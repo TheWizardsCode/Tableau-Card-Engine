@@ -245,7 +245,10 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
       'card removed from market after drag-drop buy',
     );
     expect(scene.state.streetGrid[slot]?.id).toBe(card.id);
-    expect(scene.state.resourceBank.coins).toBe(100 - card.cost);
+    // Drag-drop buy-and-place pays a +50% premium over the listed cost
+    // (CG-0MSTOF1N5005PK2R): 100 − ceil(cost × 1.5 × 2)/2.
+    const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+    expect(scene.state.resourceBank.coins).toBe(100 - premiumCost);
     // Single undoable command (direct buy-to-slot path).
     expect(scene.undoManager.canUndo()).toBe(true);
     // Back in the market phase for further play.

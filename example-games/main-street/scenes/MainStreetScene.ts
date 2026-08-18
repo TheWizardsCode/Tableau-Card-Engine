@@ -63,6 +63,11 @@ export class MainStreetScene extends CardGameScene {
   // Pending hand card for placing from hand (index into state.hand)
   public pendingHandIndex: number | null = null;
 
+  // True when the pending hand card was just moved from the market this turn
+  // (same-day move+place composite = 1 action). False when the card was
+  // already in hand (placing then costs a second action).
+  public pendingHandJustMoved: boolean = false;
+
   // Computed responsive layout metrics
   public layout!: SceneLayout;
 

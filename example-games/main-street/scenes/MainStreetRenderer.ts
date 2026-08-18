@@ -23,6 +23,7 @@ import {
   buildCoinsTooltip,
   buildReputationTooltip,
   buildScoreTooltip,
+  buildActionTooltip,
   HUD_ARIA_LABELS,
 } from './MainStreetHudTooltips';
 import {
@@ -334,6 +335,19 @@ export class MainStreetRenderer {
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
 
+    // Action counter - next to coins
+    const actionText = markHudTransient(s.add.text(
+      coinText.x + coinText.width + 16,
+      hudY,
+      `${s.state.actionsRemaining} action${s.state.actionsRemaining !== 1 ? 's' : ''} left`,
+      {
+        fontSize: '14px', fontStyle: 'bold',
+        color: s.state.actionsRemaining > 0 ? '#aaffaa' : '#ff6666',
+        fontFamily: FONT_FAMILY,
+      }
+    ).setOrigin(0, 0.5));
+    s.hudContainer.add(actionText);
+
     // Reputation - centered in strip
     const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
@@ -351,6 +365,7 @@ export class MainStreetRenderer {
       attachHudTooltipZone(s, coinText, HUD_ARIA_LABELS.coins, () => buildCoinsTooltip(s.state));
       attachHudTooltipZone(s, repText, HUD_ARIA_LABELS.rep, () => buildReputationTooltip(s.state));
       attachHudTooltipZone(s, scoreText, HUD_ARIA_LABELS.score, () => buildScoreTooltip(s.state, s.campaign));
+      attachHudTooltipZone(s, actionText, HUD_ARIA_LABELS.action, () => buildActionTooltip(s.state));
     }
 
     s.animateHudValueChanges({
@@ -1108,6 +1123,22 @@ export class MainStreetRenderer {
     // Apply income/reputation overlays for business and community-space cards
     if (card.family === 'business' || card.family === 'community-space') {
       this.applyUpgradeOverlays(container, card as BusinessCard | CommunitySpaceCard, renderW, renderH);
+
+      // Buy-and-place premium indicator (CG-0MSTOF1N5005PK2R): direct
+      // market→street placement costs +50% over the listed cost. Shown as a
+      // small badge at the bottom of business/community-space cards.
+      const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+      const premiumLabel = s.add.text(0, Math.round(renderH / 2 - 11), `B&P €${premiumCost} (listed €${card.cost})`, {
+        fontSize: '9px',
+        color: '#ffcc88',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+        align: 'center',
+        backgroundColor: '#000000aa',
+      });
+      premiumLabel.setOrigin(0.5, 0.5);
+      premiumLabel.setName('buyAndPlacePremiumLabel');
+      container.add(premiumLabel);
     }
 
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);
@@ -1116,7 +1147,14 @@ export class MainStreetRenderer {
     selectionRing.setVisible(false);
     container.add(selectionRing);
 
-    const interactiveEnabled = s.uiPhase === 'market' && !isIncidentEvent;
+    // Action economy gating (CG-0MSTOF1N5005PK2R): business/community-space
+    // card purchases consume the daily action, so those cards are
+    // non-interactive (dimmed) when the budget is spent. Events/upgrades are
+    // free operations and stay interactive.
+    const noActions = s.state.actionsRemaining <= 0;
+    const isBusinessLike = card.family === 'business' || card.family === 'community-space';
+    const interactiveEnabled =
+      s.uiPhase === 'market' && !isIncidentEvent && !(isBusinessLike && noActions);
     const selection = attachSelection(container, {
       onStateChange: ({ selected, hovered }) => {
         if (selected) {
@@ -1219,6 +1257,24 @@ export class MainStreetRenderer {
         });
         s.marketSelectionManager.registerTarget(hitArea);
         container.add(hitArea);
+      }
+
+      // Dim visual feedback + tooltip for business cards gated by the spent
+      // action budget (CG-0MSTOF1N5005PK2R): still hoverable so the player
+      // learns why the card is unavailable.
+      if (isBusinessLike && noActions && !isIncidentEvent) {
+        container.setAlpha(0.45);
+        container.setInteractive({ useHandCursor: false });
+        container.on('pointerover', () => {
+          if (s.replayMode) return;
+          s.tooltipManager?.show(
+            'No actions remaining today. End your turn to start a new day.',
+            container.x, container.y,
+          );
+        });
+        container.on('pointerout', () => {
+          s.tooltipManager?.hide();
+        });
       }
     }
 
@@ -1489,6 +1545,7 @@ export class MainStreetRenderer {
       const btnW = s.layout.actionButtonW;
       const cancelBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'Cancel', () => {
         s.pendingHandIndex = null;
+        s.pendingHandJustMoved = false;
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();

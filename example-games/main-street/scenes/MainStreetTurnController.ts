@@ -12,7 +12,7 @@ import {
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, moveToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, consumeAction } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
@@ -457,6 +457,14 @@ export class MainStreetTurnController {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
 
+    // Action economy (CG-0MSTOF1N5005PK2R): moving a market card to hand
+    // costs the daily action — gate before the transfer animation so the
+    // player gets immediate feedback instead of a mid-flight error.
+    if (s.state.actionsRemaining <= 0) {
+      s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      return;
+    }
+
     // Tutorial gating: only allow select-business if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-business' as TutorialActionType);
     if (check && !check.allowed) {
@@ -520,9 +528,12 @@ export class MainStreetTurnController {
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
         s.instructionText.setText(`"${cardName}" moved to hand (free)!`);
 
-        // Set pending hand index for placement (last card added to hand)
+        // Set pending hand index for placement (last card added to hand).
+        // Same-day move+place composite: the action was already spent on the
+        // move, so placing this card is free (it is part of the same purchase).
         const hand = s.state.hand ?? [];
         s.pendingHandIndex = hand.length - 1;
+        s.pendingHandJustMoved = true;
         s.uiPhase = 'placing-from-hand';
         s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
       } catch (e) {
@@ -612,13 +623,18 @@ export class MainStreetTurnController {
   public canPickUpBusinessCard(cardId: string): boolean {
     const s = this.scene;
     if (s.uiPhase !== 'market') return false;
+    // Action economy (CG-0MSTOF1N5005PK2R): dragging is a buy-and-place
+    // action — no pickup when the daily action budget is spent.
+    if (s.state.actionsRemaining <= 0) return false;
     const card = s.state.market.cards.find((c: any) => c.id === cardId);
     if (!card) return false;
     // Drag support covers business AND community-space cards (general change,
     // operator decision A for the T13 Library bug). Events/upgrades stay
     // click-only (they are not part of the drag-drop module's dev-row model).
     if (card.family !== 'business' && card.family !== 'community-space') return false;
-    if (s.state.resourceBank.coins < card.cost) return false;
+    // Drag-drop buy-and-place pays a +50% premium over the listed cost.
+    const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+    if (s.state.resourceBank.coins < premiumCost) return false;
     if (!s.state.streetGrid.some((slot: any) => slot === null)) return false;
 
     // Tutorial gating: only allow select-business if it is the required
@@ -652,8 +668,19 @@ export class MainStreetTurnController {
    */
   public canDropBusinessCard(cardId: string, slotIndex: number): boolean {
     const s = this.scene;
+    // Action economy (CG-0MSTOF1N5005PK2R): buy-and-place consumes the
+    // daily action — no drop when the budget is spent.
+    if (s.state.actionsRemaining <= 0) return false;
     const legality = canPurchaseBusiness(s.state, cardId, slotIndex);
     if (!legality.legal) return false;
+
+    // Drag-drop buy-and-place pays a +50% premium — verify the player can
+    // afford the premium price (not just the listed cost).
+    const card = s.state.market.cards.find((c: any) => c.id === cardId);
+    if (card && (card.family === 'business' || card.family === 'community-space')) {
+      const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+      if (s.state.resourceBank.coins < premiumCost) return false;
+    }
 
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
     if (check && !check.allowed) return false;
@@ -675,10 +702,10 @@ export class MainStreetTurnController {
    * Execute a drag-drop buy-and-place.
    *
    * Buys the dragged business card directly to the drop slot in a single
-   * undoable `buyBusinessCommand` (the same direct buy-to-slot path used by
-   * the AI strategy), with the animated market→street transfer + SFX
-   * matching the click flow's feedback. Note: unlike the click flow (which
-   * buys to hand), the drag flow bypasses the hand entirely.
+   * undoable `buyAndPlaceBusinessCommand` — the direct market→street path
+   * that pays a +50% premium over the listed cost and consumes the daily
+   * action (CG-0MSTOF1N5005PK2R). The animated market→street transfer +
+   * SFX matches the click flow's feedback.
    */
   public onDragDropBusiness(payload: DragDropPayload): void {
     const s = this.scene;
@@ -707,11 +734,11 @@ export class MainStreetTurnController {
       // NEWLY formed pairs animate (pre-existing pairs never re-trigger).
       const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
       try {
-        const cmd = buyBusinessCommand(s.state, cardId, slotIndex);
+        const cmd = buyAndPlaceBusinessCommand(s.state, cardId, slotIndex);
         s.undoManager.execute(cmd);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
-        s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
+        s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex} (50% premium)`);
       } catch (e) {
         console.error('[MS] DragBuyBusiness failed', e);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -787,6 +814,7 @@ export class MainStreetTurnController {
       const handCard = (s.state.hand ?? [])[handIndex];
       if (!handCard) {
         s.pendingHandIndex = null;
+        s.pendingHandJustMoved = false;
         s.uiPhase = 'market';
         s.instructionText.setText('Card no longer in hand.');
         return;
@@ -812,8 +840,15 @@ export class MainStreetTurnController {
         // NEWLY formed pairs animate.
         const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
         try {
+          // Action economy: placing a card that was ALREADY in hand (held
+          // from a previous day) consumes the daily action. A card just moved
+          // from the market this turn is part of the same move+place purchase
+          // (the action was already spent at move-to-hand) and places free.
+          if (!s.pendingHandJustMoved) {
+            consumeAction(s.state);
+          }
           placeFromHand(s.state, handIndex, slotIndex);
-          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'place', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
+          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-business-from-hand', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
           try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
           s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
         } catch (e) {
@@ -980,7 +1015,7 @@ export class MainStreetTurnController {
     const afterTransfer = (): void => {
       console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.cards.map((c: any)=>c.id) });
       try {
-        const cmd = moveToHandCommand(s.state, card.id);
+        const cmd = moveEventToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
@@ -1239,6 +1274,7 @@ export class MainStreetTurnController {
     // (preserving existing customClickFn behavior)
     if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
       s.pendingHandIndex = index;
+      s.pendingHandJustMoved = false; // selecting an existing hand card: placing costs an action
       const cardName = hand[index]?.name ?? 'card';
       s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
       s.refreshAll();
@@ -1256,6 +1292,7 @@ export class MainStreetTurnController {
     s.tooltipManager?.hide();
 
     s.pendingHandIndex = index;
+    s.pendingHandJustMoved = false; // card already in hand: placing consumes an action
     s.uiPhase = 'placing-from-hand';
     const cardName = hand[index]?.name ?? 'card';
     s.instructionText.setText(`Click an empty slot to place "${cardName}"`);

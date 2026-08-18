@@ -23,6 +23,20 @@ import {
   playEventFromHand,
   discardFromHand,
 } from './MainStreetMarket';
+import { buyAndPlaceBusiness, hireStaffCard } from './MainStreetEngine';
+
+// ── Action Budget Enforcement ────────────────────────────────
+
+/**
+ * Consume one action from the state budget. Throws if no actions remain.
+ * This is the central enforcement point for the command layer.
+ */
+export function consumeAction(state: MainStreetState): void {
+  if (state.actionsRemaining <= 0) {
+    throw new Error('No actions remaining today. End your turn to start a new day.');
+  }
+  state.actionsRemaining -= 1;
+}
 
 /** Snapshot of the portions of state affected by market actions. */
 interface MarketActionSnapshot {
@@ -34,6 +48,8 @@ interface MarketActionSnapshot {
   incidentDeck: any | null;
   activityLog: any | null;
   soldSlots: boolean[] | null;
+  /** Daily action budget — captured so undo restores the spent action. */
+  actionsRemaining: number | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -61,6 +77,7 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     incidentDeck: safeClone(state.incidentDeck),
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
+    actionsRemaining: state.actionsRemaining,
   };
 }
 
@@ -77,6 +94,9 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.incidentDeck = snap.incidentDeck as any;
   state.activityLog = snap.activityLog as any;
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
+  if (snap.actionsRemaining !== null && snap.actionsRemaining !== undefined) {
+    state.actionsRemaining = snap.actionsRemaining;
+  }
 }
 
 /**
@@ -103,7 +123,7 @@ function snapshotAction(
 
 // ── Commands ────────────────────────────────────────────────
 
-/** Command: Buy Business */
+/** Command: Buy Business (consumes 1 action) */
 export function buyBusinessCommand(
   state: MainStreetState,
   cardId: string,
@@ -112,7 +132,10 @@ export function buyBusinessCommand(
   return toCommand(
     state,
     snapshotAction(
-      (s) => purchaseBusiness(s, cardId, slotIndex),
+      (s) => {
+        consumeAction(s);
+        purchaseBusiness(s, cardId, slotIndex);
+      },
       `BuyBusiness ${cardId} -> slot ${slotIndex}`,
     ),
   );
@@ -133,7 +156,7 @@ export function buyUpgradeCommand(
   );
 }
 
-/** Command: Move market card to hand (free; pay on play) */
+/** Command: Move market card to hand (consumes 1 action; play-from-hand costs again) */
 export function moveToHandCommand(
   state: MainStreetState,
   cardId: string,
@@ -141,8 +164,29 @@ export function moveToHandCommand(
   return toCommand(
     state,
     snapshotAction(
-      (s) => moveToHand(s, cardId),
+      (s) => {
+        consumeAction(s);
+        moveToHand(s, cardId);
+      },
       `MoveToHand ${cardId}`,
+    ),
+  );
+}
+
+/**
+ * Command: Move an event card to hand (FREE — buy-event is a non-action
+ * operation per the action economy, CG-0MSTOF1N5005PK2R). Events use the
+ * cost-at-play deferral model: the move itself costs no coins.
+ */
+export function moveEventToHandCommand(
+  state: MainStreetState,
+  cardId: string,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => moveToHand(s, cardId),
+      `MoveEventToHand ${cardId}`,
     ),
   );
 }
@@ -175,7 +219,7 @@ export function playEventCommand(state: MainStreetState, handIndex?: number) {
   );
 }
 
-/** Command: Play Business from Hand (cost-at-play) */
+/** Command: Play Business from Hand (consumes 1 action; pays cost-at-play) */
 export function playBusinessFromHandCommand(
   state: MainStreetState,
   handIndex: number,
@@ -184,7 +228,10 @@ export function playBusinessFromHandCommand(
   return toCommand(
     state,
     snapshotAction(
-      (s) => playBusinessFromHand(s, handIndex, slotIndex),
+      (s) => {
+        consumeAction(s);
+        playBusinessFromHand(s, handIndex, slotIndex);
+      },
       `PlayBusinessFromHand ${handIndex} -> slot ${slotIndex}`,
     ),
   );
@@ -219,7 +266,42 @@ export function discardFromHandCommand(
   );
 }
 
-/** Command: Re-roll the single-row market */
+/** Command: Buy & Place business directly to slot (consumes 1 action, 50% premium) */
+export function buyAndPlaceBusinessCommand(
+  state: MainStreetState,
+  cardId: string,
+  slotIndex: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => {
+        consumeAction(s);
+        buyAndPlaceBusiness(s, cardId, slotIndex);
+      },
+      `BuyAndPlace ${cardId} -> slot ${slotIndex}`,
+    ),
+  );
+}
+
+/** Command: Hire Staff from market (consumes 1 action) */
+export function hireStaffCardCommand(
+  state: MainStreetState,
+  cardId: string,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => {
+        consumeAction(s);
+        hireStaffCard(s, cardId);
+      },
+      `HireStaff ${cardId}`,
+    ),
+  );
+}
+
+/** Command: Re-roll the single-row market (free) */
 export function refreshMarketCommand(state: MainStreetState) {
   return toCommand(
     state,
@@ -230,7 +312,7 @@ export function refreshMarketCommand(state: MainStreetState) {
   );
 }
 
-/** Command: Sell Business */
+/** Command: Sell Business (free) */
 export function sellBusinessCommand(
   state: MainStreetState,
   slotIndex: number,

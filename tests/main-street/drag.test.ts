@@ -121,8 +121,11 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
 function pickAffordableBusiness(state: any): any {
   const card = state.market.cards.find((c: any) => c.family === 'business');
   if (!card) throw new Error('No business card in development row for test');
-  // Ensure the player can afford it regardless of seed.
-  if (state.resourceBank.coins < card.cost) state.resourceBank.coins = card.cost;
+  // Ensure the player can afford it regardless of seed. Drag-drop buy-and-place
+  // now pays a +50% premium over the listed cost (CG-0MSTOF1N5005PK2R), so
+  // fund the premium price.
+  const premium = Math.ceil(card.cost * 1.5 * 2) / 2;
+  if (state.resourceBank.coins < premium) state.resourceBank.coins = premium;
   return card;
 }
 
@@ -159,7 +162,9 @@ describe('MainStreet drag-to-buy wiring', () => {
         cs = scene.state.market.cards[0];
         cs.family = 'community-space';
       }
-      if (scene.state.resourceBank.coins < cs.cost) scene.state.resourceBank.coins = cs.cost;
+      if (scene.state.resourceBank.coins < Math.ceil(cs.cost * 1.5 * 2) / 2) {
+        scene.state.resourceBank.coins = Math.ceil(cs.cost * 1.5 * 2) / 2;
+      }
       expect(firstEmptySlot(scene.state)).toBeGreaterThanOrEqual(0);
       expect(controller.canPickUpBusinessCard(cs.id)).toBe(true);
     });
@@ -225,6 +230,10 @@ describe('MainStreet drag-to-buy wiring', () => {
 
       // The required card template itself is pickable.
       card.id = 'biz-laundromat-0';
+      scene.state.resourceBank.coins = Math.max(
+        scene.state.resourceBank.coins,
+        Math.ceil(card.cost * 1.5 * 2) / 2,
+      );
       expect(controller.canPickUpBusinessCard(card.id)).toBe(true);
     });
   });
@@ -346,10 +355,11 @@ describe('MainStreet drag-to-buy wiring', () => {
       // Flush the transfer-completion microtask (mock resolves immediately).
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      // afterTransfer ran → buy executed.
+      // afterTransfer ran → buy executed at the +50% premium.
+      const premium = Math.ceil(card.cost * 1.5 * 2) / 2;
       expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeUndefined();
       expect(scene.state.streetGrid[slot]?.id).toBe(card.id);
-      expect(scene.state.resourceBank.coins).toBe(coinsBefore - card.cost);
+      expect(scene.state.resourceBank.coins).toBe(coinsBefore - premium);
       expect(scene.uiPhase).toBe('market');
       expect(scene.hiddenTransferSourceCardIds.has(card.id)).toBe(false);
       expect(scene.gameEvents.emit).toHaveBeenCalledWith('card:placed', expect.objectContaining({ cardId: card.id, slotIndex: slot }));

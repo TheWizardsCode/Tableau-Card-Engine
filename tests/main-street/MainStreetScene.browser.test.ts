@@ -465,6 +465,7 @@ describe('MainStreetScene browser tests', () => {
       expect(biz2).toBeTruthy();
 
       scene.uiPhase = 'market'; // allow the second buy (test control)
+      scene.state.actionsRemaining = 1; // action economy: refill for the second purchase
       const beforeBiz2 = transferSpy.mock.calls.length;
       scene.onBusinessCardClick(biz2);
       await waitForCondition(
