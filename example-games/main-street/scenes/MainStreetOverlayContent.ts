@@ -1,7 +1,6 @@
 import { sellBusinessCommand } from '../MainStreetCommands';
 import { addLog } from '../MainStreetState';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
-import { CARD_TEMPLATE_NAMES } from '../MainStreetCards';
 import type { TurnResult } from '../MainStreetEngine';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
 import { TIER_DEFINITIONS, ORDERED_TIER_DEFINITIONS, highestUnlockedTier } from '../MainStreetTiers';
@@ -32,11 +31,7 @@ export class MainStreetOverlayContent {
     let tierUnlockH = 0;
     if (newlyUnlockedTiers.length > 0) {
       tierUnlockH += 26; // section header
-      for (const tierId of newlyUnlockedTiers) {
-        tierUnlockH += 20; // tier name line
-        const def = TIER_DEFINITIONS[tierId];
-        if (def) tierUnlockH += def.newCardIds.length * 16; // card list
-      }
+      tierUnlockH += newlyUnlockedTiers.length * 36; // tier name line + count line + spacing per tier
       tierUnlockH += 8; // bottom padding
     }
     // Current tier + campaign stats (always shown when campaign exists)
@@ -171,18 +166,16 @@ export class MainStreetOverlayContent {
         s.overlayObjects.push(tierLine);
         cursorY += 20;
 
-        // List the new cards added by this tier
-        for (const cardId of def.newCardIds) {
-          const cardName = CARD_TEMPLATE_NAMES.get(cardId) ?? cardId;
-          const cardLine = s.add.text(
-            s.layout.gameW / 2, cursorY,
-            `  + ${cardName}`,
-            { fontSize: '12px', color: '#aaddaa', fontFamily: FONT_FAMILY },
-          ).setOrigin(0.5, 0).setDepth(101);
-          if (s.hudContainer) s.hudContainer.add(cardLine);
-          s.overlayObjects.push(cardLine);
-          cursorY += 16;
-        }
+        // Show count of new cards added by this tier
+        const cardCount = def.newCardIds.length;
+        const countLine = s.add.text(
+          s.layout.gameW / 2, cursorY,
+          `  + ${cardCount} new card${cardCount === 1 ? '' : 's'}`,
+          { fontSize: '12px', color: '#aaddaa', fontFamily: FONT_FAMILY },
+        ).setOrigin(0.5, 0).setDepth(101);
+        if (s.hudContainer) s.hudContainer.add(countLine);
+        s.overlayObjects.push(countLine);
+        cursorY += 16;
       }
     }
 
