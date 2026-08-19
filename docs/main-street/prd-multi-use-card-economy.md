@@ -65,11 +65,15 @@ Staff cards are a new card family (`family: 'staff'`) that expand the player's h
 
 #### Templates
 
-| Card | Cost | Ongoing Cost | Slots Added | Description |
-|------|------|-------------|-------------|-------------|
-| Assistant | 3 | 1 | +1 | Low-cost, low upkeep |
-| Manager | 6 | 2 | +2 | Mid-range balanced option |
-| Director | 10 | 3 | +3 | High investment, high capacity |
+| Card | Cost | Ongoing Cost | Slots Added | Ability | Description |
+|------|------|-------------|-------------|---------|-------------|
+| Apprentice | 2 | 0.5 | +1 | — | Budget entry point *(Group F).* |
+| Assistant | 3 | 1 | +1 | — | Low-cost, low upkeep |
+| Manager | 7 | 2.5 | +2 | — | Mid-range balanced option |
+| Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | **NEW** reputation ability *(Group F).* |
+| Accountant | 8 | 1.5 | +1 | refresh −1 | **NEW** economy ability *(Group F).* |
+| Director | 14 | 4 | +3 | — | High investment, high capacity |
+| Executive | 20 | 5 | +4 | — | Premium slot capacity *(Group F).* |
 
 #### Rules
 
@@ -81,10 +85,14 @@ Staff cards are a new card family (`family: 'staff'`) that expand the player's h
 - Random selection uses the game's seeded RNG for determinism
 - Laid-off staff cards return to the staff card market
 - Insufficient coins for ongoing cost: deducts what's available (down to 0)
+- **Staff abilities** (optional fields on `StaffCard`, Group F): `reputationPerTurn`
+  (e.g. Socialite +0.1 rep/turn, applied in the income phase) and
+  `refreshCostDiscount` (e.g. Accountant −1 to the market refresh cost,
+  clamped at 0). Staff without abilities behave exactly as before.
 
 #### Market
 
-Staff cards are available for purchase from a dedicated `staffCardMarket` section. Three templates are available at game start (shuffled deterministically).
+Staff cards are available for purchase from a dedicated `staffCardMarket` section. Seven templates are available at game start (shuffled deterministically).
 
 ## Economy Changes Summary
 

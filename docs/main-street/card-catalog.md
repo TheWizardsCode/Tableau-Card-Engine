@@ -11,11 +11,11 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 
 | Family        | Templates | Copies each | Total cards |
 |---------------|-----------|-------------|-------------|
-| Business      | 18        | 3           | 54          |
-| Event         | 36        | 3           | 108         |
-| Upgrade       | 27        | 2           | 54          |
-| Community Space | 2       | 3           | 6           |
-| Staff         | 3         | 3           | 9           |
+| Business      | 30        | 3           | 90          |
+| Event         | 56        | 3           | 168         |
+| Upgrade       | 39        | 2           | 78          |
+| Community Space | 8       | 3           | 24          |
+| Staff         | 7         | 3           | 21          |
 
 **Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
 
@@ -23,12 +23,39 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
-| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 7 | 6 | 5 | — | — | 18 |
-| Current catalog (`card-data.csv`) | 18 | 36 | 27 | 2 | 3 | 86 |
-| Net increase | +11 | +30 | +22 | +2 | +3 | +68 |
+| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
+| Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 7 | 140 |
+| Net increase | +24 | +49 | +31 | +8 | +7 | +119 |
 
-- 2x target from baseline: `>= 36` templates
-- Current total: `86` templates (`4.78x` baseline)
+- 2x target from baseline: `>= 40` templates
+- Current total: `140` templates (`7x` baseline)
+- Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
+  12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
+  Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
+- Community Space grew from 2 to 8 with the Group B expansion (CG-0MSQJ210I00491ZZ):
+  6 new reputation assets across five synergies (Playground, Community Garden,
+  Town Fountain, Health Kiosk, Community Shelter, Public Art), including the
+  first ongoing-cost community-space bridge card (Public Art).
+- Event family grew from 37 to 45 with the Group C expansion (CG-0MSQJ244M0055X7S):
+  8 new Investment events (investment events 13 → 21) covering every synergy,
+  plus two NEW duration effect types — positive `income-multiplier` (Tourist
+  Season 1.15×/3 turns) and `rep-multiplier` (Community Renovation 1.2×/4 turns).
+- Incident events grew from 24 to 34 with the Group D expansion (CG-0MSQJ7QLM0076FTD),
+  10 new incidents (4 good / 3 bad / 3 neutral under the streak system's net-delta
+  formula) covering under-served synergies, including the duration incident
+  Labor Shortage (income-multiplier 0.9×/3 turns).
+- Graffiti Art (evt-graffiti-art, CG-0MSRC9UR9006FBXC) adds a tier-1 good
+  incident — the exact reverse of Graffiti (+1 coin to all businesses and
+  +1 reputation), raising incidents to 35 and event templates to 56.
+- Upgrades grew from 27 to 39 with the Group E expansion (CG-0MSQJ7SYD008U3EE):
+  12 new upgrades covering every Group A business and Group B community space
+  (targets raised to maxLevel 1 so the upgrades are applicable), including
+  reputation-bonus upgrade variants (Tea Lounge, Adventure Park, Orchard,
+  Grand Fountain, Health Center).
+- Staff grew from 3 to 7 with the Group F expansion (CG-0MSQJ7VL9009JHF4):
+  Apprentice (budget) and Executive (+4 slots premium) cost points, plus two
+  NEW ability mechanics — the Socialite's +0.1 rep/turn and the Accountant's
+  market-refresh discount of 1 (StaffCard optional ability fields).
 - Non-baseline card IDs are tracked in `docs/main-street/expanded-card-manifest.json`
 
 ### Guidance: adding more cards safely
@@ -105,6 +132,37 @@ Bridge cards belong to two synergy types simultaneously, enabling cross-type adj
 | `biz-spa` | Day Spa | 5 | 3 | Service + Entertainment | Day Spa | Relaxation and pampering. | Premium bridge; high synergy potential across 2 new types. |
 | `biz-florist` | Florist | 2 | 1 | Commerce + Culture | Florist | Arrangements for every occasion. | Budget bridge linking Commerce and Culture. |
 
+### M3 Business Templates (12) — Group A expansion (CG-0MSQJ1XIB0004QVN)
+
+Adds the first **Health bridge cards**, mid-tier (T2/T3) singles across every synergy, and a T5 flagship.
+
+#### Health bridges (new)
+
+| ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
+|----|------|------|--------|---------|------|----------|-------------|-----------|
+| `biz-juice-bar` | Juice Bar | 5 | 0.5 | Food + Health | 2 | — | Fresh juices and smoothies. Bridges Food and Health synergies. | First Health bridge; connects the existing Food cluster to Health. |
+| `biz-yoga-studio` | Yoga Studio | 8 | 1 | Culture + Health | 3 | — | Calm practice space for mind and body. Bridges Culture and Health synergies. | Culture–Health bridge; mid-tier wellness option. |
+| `biz-physio` | Physiotherapy | 10 | 1 | Health + Service | 4 | 0.1 | Recovery and rehabilitation care. Bridges Health and Service synergies. Provides +0.1 reputation per turn. | Health–Service bridge with a small reputation perk. |
+
+#### Singles (mid-tier depth)
+
+| ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
+|----|------|------|--------|---------|------|----------|-------------|-----------|
+| `biz-tailor` | Tailor | 5 | 0.75 | Service | 2 | — | Custom tailoring and repairs. Gains 50% of base income per adjacent Service business. | Mid Service single; smooths T2. |
+| `biz-gym` | Gym | 8 | 1 | Health | 3 | — | Fitness training for the whole street. Gains 50% of base income per adjacent Health business. | Health single; T3 anchor. |
+| `biz-dentist` | Dentist | 12 | 1.5 | Health | 4 | — | Smiles for the whole street. Gains 50% of base income per adjacent Health business. | Premium Health single. |
+| `biz-toy-store` | Toy Store | 5 | 0.75 | Commerce | 2 | — | Toys and games for young shoppers. Gains 50% of base income per adjacent Commerce business. | Commerce depth at T2. |
+| `biz-music-store` | Music Store | 8 | 1 | Entertainment | 3 | — | Records and instruments for every taste. Gains 50% of base income per adjacent Entertainment business. | Entertainment depth at T3. |
+| `biz-delicatessen` | Delicatessen | 5 | 0.75 | Food | 2 | — | Fine meats and cheeses. Gains 50% of base income per adjacent Food business. | Food depth at T2. |
+| `biz-craft-shop` | Craft Shop | 5 | 0.75 | Culture | 2 | — | Handmade goods by local makers. Gains 50% of base income per adjacent Culture business. | Culture single (only Bookshop existed before). |
+
+#### Flagship
+
+| ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
+|----|------|------|--------|---------|------|----------|-------------|-----------|
+| `biz-hotel` | Grand Hotel | 16 | 2.5 | Service | 5 | 0.1 | Premier lodging on Main Street. Gains 50% of base income per adjacent Service business. Provides +0.1 reputation per turn. | T5 flagship; highest income in the pool. Cost exceeds the flagship band's 14 cap to reflect premium positioning (documented balance rationale). |
+| `biz-teahouse` | Teahouse | 7 | 0.75 | Food + Culture | 3 | — | Loose-leaf teas and quiet corners. Bridges Food and Culture synergies. | Second Food–Culture bridge (alongside Cafe). |
+
 ---
 
 ## Community Space Cards
@@ -118,6 +176,38 @@ alongside business cards.
 |----|------|------|--------|---------|--------------|-------------|-----------|
 | `cs-park` | Park | 4 | 0 | Culture | Park | Offers leisure space. Gains 50% of base income per adjacent Culture business or community space (scales with difficulty). | Reclassified from M1 Business; cheapest community space; synergy filler. |
 | `cs-library` | Library | 7 | 0 | Culture | Library | Quiet community space for reading and learning. Costs 0.25 coins/turn to run; +0.1 rep/turn. | Reputation asset: no income; small running cost for steady reputation. Full Culture synergy participation (Park model) — contributes to adjacent Culture businesses' synergy and receives rep synergy from rep-bonus neighbours (reversed by CG-0MSKS963N000ZSTU). |
+
+### M3 Community Space Templates (6) — Group B expansion (CG-0MSQJ210I00491ZZ)
+
+Adds reputation assets across five synergies, including the family's first bridge card.
+
+| ID | Name | Cost | Income | Ongoing | Synergy | Tier | Rep/turn | Description | Rationale |
+|----|------|------|--------|---------|---------|------|----------|-------------|-----------|
+| `cs-playground` | Playground | 4 | 0 | 0 | Entertainment | 1 | 0.05 | A safe place for kids to play. Provides +0.05 reputation per turn. | Cheap early reputation asset. |
+| `cs-community-garden` | Community Garden | 5 | 0 | 0.1 | Food | 2 | 0.1 | A shared garden plot for the neighbourhood. Costs 0.1 coins/turn to run; +0.1 rep/turn. | Food reputation asset with a small running cost. |
+| `cs-fountain` | Town Fountain | 5 | 0 | 0 | Culture | 2 | 0.1 | A gathering spot around the fountain. Provides +0.1 reputation per turn. | Culture reputation asset. |
+| `cs-health-kiosk` | Health Kiosk | 6 | 0 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. Costs 0.15 coins/turn to run; +0.15 rep/turn. | Health reputation asset; deepens the Health family. |
+| `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset. |
+| `cs-public-art` | Public Art | 8 | 0 | 0.25 | Culture + Entertainment | 4 | 0.2 | A vibrant public sculpture. Costs 0.25 coins/turn to run; +0.2 rep/turn. Bridges Culture and Entertainment community spaces. | Bridge community space; highest ongoing cost and rep yield. |
+
+### M3 Upgrade Templates (12) — Group E expansion (CG-0MSQJ7SYD008U3EE)
+
+Every Group A business and Group B community space gets an upgrade path (targets raised to maxLevel 1).
+
+| ID | Name | Target | Cost | Income+ | Range+ | Req Lvl | Rep+ | Description |
+|----|------|--------|------|---------|--------|--------|------|-------------|
+| `upg-smoothie-bar` | Upgrade to Smoothie Bar | Juice Bar | 4 | +1 | 0 | 0 | — | Turns a Juice Bar into a Smoothie Bar with higher income. |
+| `upg-wellness-retreat` | Upgrade to Wellness Retreat | Yoga Studio | 5 | +1.5 | +1 | 0 | — | Expands the Yoga Studio into a full Wellness Retreat. |
+| `upg-fitness-center` | Upgrade to Fitness Center | Gym | 5 | +1.5 | +1 | 0 | — | Expands the Gym into a full Fitness Center. |
+| `upg-dental-clinic` | Upgrade to Dental Clinic | Dentist | 7 | +2 | +1 | 0 | — | Expands the Dentist into a full Dental Clinic. |
+| `upg-bespoke-tailor` | Upgrade to Bespoke Tailor | Tailor | 4 | +1 | 0 | 0 | — | Elevates the Tailor into a Bespoke Tailor. |
+| `upg-toy-warehouse` | Upgrade to Toy Warehouse | Toy Store | 4 | +1 | +1 | 0 | — | Scales the Toy Store into a Toy Warehouse with wider reach. |
+| `upg-tea-lounge` | Upgrade to Tea Lounge | Teahouse | 4 | +1 | 0 | 0 | +0.1 | Turns the Teahouse into a Tea Lounge with a reputation boost. |
+| `upg-gourmet-deli` | Upgrade to Gourmet Deli | Delicatessen | 4 | +1.5 | 0 | 0 | — | Elevates the Delicatessen into a Gourmet Deli. |
+| `upg-adventure-park` | Upgrade to Adventure Park | Playground | 3 | 0 | 0 | 0 | +0.05 | Community-space upgrade; +0.05 rep/turn. |
+| `upg-orchard` | Upgrade to Orchard | Community Garden | 3 | 0 | 0 | 0 | +0.05 | Community-space upgrade; +0.05 rep/turn. |
+| `upg-grand-fountain` | Upgrade to Grand Fountain | Town Fountain | 3 | 0 | 0 | 0 | +0.05 | Community-space upgrade; +0.05 rep/turn. |
+| `upg-health-center` | Upgrade to Health Center | Health Kiosk | 4 | 0 | 0 | 0 | +0.05 | Community-space upgrade; +0.05 rep/turn. |
 
 ### Community Space Upgrades
 
@@ -167,6 +257,30 @@ Events fall into two categories:
 | `evt-viral-review` | Viral Review | Incident | 0 | All | -- | +2 | +1 | +2 coins, +1 rep from online fame. | Positive windfall; universal. |
 | `evt-vandalism` | Vandalism | Incident | 0 | All | -- | -1 | -1 | -1 coin, -1 rep. | Dual-penalty universal disruption. |
 | `evt-flu-outbreak` | Flu Outbreak | Incident | 0 | All | -- | 0 | 0 | 80% income for 5 turns. Duration reduced by Clinic/Medical Center. | Duration-based modifier (see ActiveEffect system). |
+
+### M3 Event Templates (8) — Group C expansion (CG-0MSQJ244M0055X7S)
+
+Gives every synergy a mid-tier Investment option and introduces two new duration effect types.
+
+#### Investment Events (6)
+
+| ID | Name | Cost | Target | Coins/biz | Rep | Tier | Effect | Rationale |
+|----|------|------|--------|-----------|-----|------|--------|-----------|
+| `evt-health-carnival` | Health Carnival | 5 | Health | +2 | +1 | 3 | +2 coins to all Health businesses and +1 reputation. | Health counterpart to Local Festival. |
+| `evt-food-tasting` | Food Tasting Tour | 5 | Food | +2 | +1 | 3 | +2 coins to all Food businesses and +1 reputation. | Food boost. |
+| `evt-art-sale` | Art Sale | 5 | Culture | +2 | +1 | 3 | +2 coins to all Culture businesses and +1 reputation. | Culture boost. |
+| `evt-shopping-spree` | Shopping Spree | 7 | Commerce | +2.5 | 0 | 4 | +2.5 coins to all Commerce businesses. | Commerce boost. |
+| `evt-summer-fest` | Summer Fest | 7 | Entertainment | +2 | +1 | 4 | +2 coins to all Entertainment businesses and +1 reputation. | Entertainment boost. |
+| `evt-service-week` | Service Week | 7 | Service | +2 | +1 | 4 | +2 coins to all Service businesses and +1 reputation. | Service boost. |
+
+#### Duration Events (2) — new effect types
+
+| ID | Name | Cost | Target | Tier | Duration | Effect Type | Multiplier | Effect | Rationale |
+|----|------|------|--------|------|----------|-------------|-----------|--------|-----------|
+| `evt-tourist-season` | Tourist Season | 10 | All | 5 | 3 | `income-multiplier` | 1.15 | All businesses generate 115% income for 3 turns. | **NEW**: positive income-multiplier (previously only negative cuts existed). |
+| `evt-community-renovation` | Community Renovation | 10 | All | 5 | 4 | `rep-multiplier` | 1.2 | All reputation income boosted to 120% for 4 turns. | **NEW**: rep-multiplier effect type (scales per-turn reputation income). |
+
+> Positive duration effects are NOT shortened by Clinic/Medical Center coverage — the reduction applies only to negative multipliers (Group C design decision, CG-0MSQJ244M0055X7S).
 
 ### Event Balance Summary
 
@@ -323,3 +437,19 @@ This writes per-run and aggregate metrics to:
 - **[Balancing Methodology](balancing-methodology.md)** — Technical description of the `run-balance-cards` balancing algorithm.
 - **[Monte Carlo Sample Results](monte-carlo-sample-results.md)** — Example output from the Monte Carlo simulation harness.
 - **[Playtest Scenarios](playtest-scenarios.md)** — Curated deterministic seeds for manual balance validation.
+
+
+## Staff Cards
+
+Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots, have no tier, and are purchased from a dedicated staff-card market.
+
+| ID | Name | Cost | Ongoing/turn | Slots+ | Ability | Description | Rationale |
+|----|------|------|--------------|--------|---------|-------------|-----------|
+| `staff-apprentice` | Apprentice | 2 | 0.5 | +1 | — | A budget hire who frees up a hand slot with a small ongoing cost. | Budget entry point *(Group F).* |
+| `staff-assistant` | Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
+| `staff-manager` | Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
+| `staff-socialite` | Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
+| `staff-accountant` | Accountant | 8 | 1.5 | +1 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
+| `staff-director` | Director | 14 | 4 | +3 | — | An experienced director oversees your operations. | Premium capacity. |
+| `staff-executive` | Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
+| `staff-general-manager` | General Manager | 20 | 5 | +4 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |

@@ -52,11 +52,11 @@ Output artifact:
 
 ## Street Adjacency Migration Note (2x5 Distance Model)
 
-Main Street synergy is now computed against the rendered 2x5 street layout using Manhattan distance (orthogonal cells only), not linear index neighbors.
+Main Street synergy is now computed against the rendered 2x5 street layout using 8-way adjacency (Chebyshev distance: orthogonal **and diagonal** cells), not linear index neighbors. (Originally Manhattan-only at milestone 4; updated to 8-way by CG-0MSP1HCAS00785MP.)
 
 - storage remains a 10-slot row-major array for compatibility
-- default range (`1`) checks up/down/left/right neighboring cells
-- upgrades expand range via `synergyRangeBonus` (Manhattan radius)
+- default range (`1`) checks all 8 surrounding cells (orthogonal + diagonal)
+- upgrades expand range via `synergyRangeBonus` (Chebyshev radius)
 
 This aligns rules with visuals and keeps existing state/transcript formats stable.
 

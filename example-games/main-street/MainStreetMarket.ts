@@ -18,93 +18,12 @@ import { addLog } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard } from './MainStreetCards';
 import {
   GRID_SIZE,
-  INCIDENT_QUEUE_SIZE,
-  MARKET_BUSINESS_SLOTS,
-  MARKET_INVESTMENT_SLOTS,
-  MARKET_INVESTMENT_UPGRADE_COUNT,
-  MARKET_INVESTMENT_EVENT_COUNT,
-  REFRESH_DEVELOPMENT_COST,
-  REFRESH_INVESTMENTS_COST,
-  findConstrainedIncidentIndex,
-  recordIncidentDraw,
+  REFRESH_MARKET_COST,
+  orderIncidentDeck,
 } from './MainStreetCards';
-import { shuffleArray } from '../../src/card-system';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
-import {
-  createMarketOfferEngine,
-  type MarketOfferEngine,
-} from '../../src/card-system/MarketOfferEngine';
-
-// Shared reshuffle helper: when a draw/refill needs cards and the deck is
-// empty but the matching discard pile is non-empty, shuffle the discard
-// into the deck using the game's seeded RNG and continue.
-function reshuffleIfNeeded<T>(state: MainStreetState, deck: T[], discard: T[], name: string): void {
-  if (deck.length === 0 && discard.length > 0) {
-    // Shuffle the discard pile deterministically using the game's RNG
-    shuffleArray(discard, state.rng);
-    // Move all shuffled cards into the deck (draw from end = top)
-    while (discard.length > 0) {
-      deck.push(discard.pop()!);
-    }
-    // Log the reshuffle for visibility in tests and UI
-    addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
-  }
-}
-
-/**
- * Force-reshuffles the discard pile into the deck regardless of whether the
- * deck is empty. Used when the deck still holds cards but none of the required
- * trigger type (e.g. only Incident cards remain when we need an Investment),
- * and reshuffleIfNeeded (which requires deck.length === 0) was insufficient.
- */
-function forceReshuffleFromDiscards<T>(state: MainStreetState, deck: T[], discard: T[], name: string): void {
-  if (discard.length > 0) {
-    shuffleArray(discard, state.rng);
-    while (discard.length > 0) {
-      deck.push(discard.pop()!);
-    }
-    addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
-  }
-}
-
-// ── Shared Market Engine Integration ──────────────────────
-
-/**
- * Builds a MarketOfferEngine snapshot from the current Main Street state.
- * The engine provides row-based access to development and investments markets.
- */
-function buildMarketEngine(state: MainStreetState): MarketOfferEngine<AnyCard> {
-  return createMarketOfferEngine<AnyCard>([
-    {
-      id: 'development',
-      slots: MARKET_BUSINESS_SLOTS,
-      cards: state.market.development,
-    },
-    {
-      id: 'investments',
-      slots: MARKET_INVESTMENT_SLOTS,
-      cards: state.market.investments,
-    },
-  ]);
-}
-
-/**
- * Syncs only the development row from the engine back to state.market.development.
- */
-function syncDevelopmentFromEngine(
-  state: MainStreetState,
-  engine: MarketOfferEngine<AnyCard>,
-): void {
-  const devRow = engine.getRow('development');
-  if (devRow) {
-    state.market.development = [];
-    for (const slot of devRow.slots) {
-      if (slot.card !== null) {
-        state.market.development.push(slot.card as BusinessCard | CommunitySpaceCard);
-      }
-    }
-  }
-}
+import { refillSingleRowMarket } from './MainStreetState';
+import { resolveEvent } from './MainStreetEngine';
 
 // ── Result Types ────────────────────────────────────────────
 
@@ -118,7 +37,7 @@ export interface PurchaseResult {
   refilled: boolean;
 }
 
-/** Result returned after refreshing the investments row. */
+/** Result returned after refreshing the single market row. */
 export interface RefreshResult {
   replaced: AnyCard[];
   cost: number;
@@ -141,9 +60,9 @@ export function canPurchaseBusiness(
   slotIndex: number,
 ): LegalityResult {
   // Find card in market
-  const card = state.market.development.find(c => c.id === cardId);
+  const card = state.market.cards.find(c => c.id === cardId);
   if (!card) {
-    return { legal: false, reason: 'Card not found in the development market.' };
+    return { legal: false, reason: 'Card not found in the market.' };
   }
 
   // Check coins
@@ -168,19 +87,19 @@ export function canPurchaseBusiness(
  * Checks whether the player can purchase an Upgrade card and apply it
  * to a matching business on the street.
  *
- * Searches the mixed investments row for upgrade-family cards.
+ * Searches the single market row for upgrade-family cards.
  * The upgrade's `requiredLevel` must be ≤ the target business's current `level`.
  *
  * @param state   Current game state.
- * @param cardId  ID of the Upgrade card in the investments row.
+ * @param cardId  ID of the Upgrade card in the market row.
  * @returns LegalityResult indicating whether the action is permitted.
  */
 export function canPurchaseUpgrade(
   state: MainStreetState,
   cardId: string,
 ): LegalityResult {
-  // Find card in investments row (must be an upgrade)
-  const card = state.market.investments.find(
+  // Find card in the market (must be an upgrade)
+  const card = state.market.cards.find(
     c => c.id === cardId && c.family === 'upgrade',
   ) as UpgradeCard | undefined;
   if (!card) {
@@ -227,8 +146,8 @@ export function canPurchaseEvent(
   state: MainStreetState,
   cardId: string,
 ): LegalityResult {
-  // Find card in investments row (must be an event)
-  const card = state.market.investments.find(
+  // Find card in the market (must be an event)
+  const card = state.market.cards.find(
     c => c.id === cardId && c.family === 'event',
   ) as EventCard | undefined;
   if (!card) {
@@ -263,182 +182,89 @@ export function canPurchaseEvent(
 
 
 /**
- * Refills the mixed investments row to MARKET_INVESTMENT_SLOTS
- * (MARKET_INVESTMENT_UPGRADE_COUNT upgrades + MARKET_INVESTMENT_EVENT_COUNT
- * investment events). Upgrades are drawn from the upgrade deck; investment
- * events are found by searching the event deck for Investment-trigger cards.
+ * Refills the single-row marketplace toward `MARKET_TOTAL_SLOTS` cards with
+ * the target composition (CG-0MSTOATDT009BRX2): at most 3 cards, always ≥1
+ * business card (community-space counts as business), the remainder random
+ * within "1–2 business, 0–1 upgrade, 0–1 event".
+ *
+ * TOP-UP semantics: currently-visible cards are preserved and only missing
+ * slots are drawn (mirrors the legacy day-start refill; the tutorial relies
+ * on this to keep scenario-placed cards alive across the day boundary).
+ * Callers wanting a full re-draw discard/clear the row first:
+ * `refreshMarket` (re-roll) and `cycleMarketCards` (end-of-day cycle) do.
  */
-export function refillInvestmentsMarket(state: MainStreetState): void {
-  const { market, decks } = state;
-
-  // Count current upgrades and investment events in the row
-  let upgradeCount = market.investments.filter(c => c.family === 'upgrade').length;
-  let eventCount = market.investments.filter(c => c.family === 'event').length;
-
-  // Ensure decks are replenished from their discards if empty
-  reshuffleIfNeeded(state, decks.upgrade, state.discards.upgrade, 'upgrade');
-  reshuffleIfNeeded(state, decks.event, state.discards.event, 'event');
-
-  // Top up upgrades
-  while (upgradeCount < MARKET_INVESTMENT_UPGRADE_COUNT && decks.upgrade.length > 0) {
-    market.investments.push(decks.upgrade.pop()!);
-    upgradeCount++;
-  }
-
-  // Top up investment events (only Investment-trigger cards)
-  while (eventCount < MARKET_INVESTMENT_EVENT_COUNT) {
-    let idx = decks.event.findIndex(e => e.trigger === 'Investment');
-    if (idx === -1) {
-      // Maybe the event deck was empty and discards can be reshuffled now
-      reshuffleIfNeeded(state, decks.event, state.discards.event, 'event');
-      // If the deck still has cards but none are Investment-trigger,
-      // force a reshuffle from discards (e.g. only Incidents remain).
-      forceReshuffleFromDiscards(state, decks.event, state.discards.event, 'event');
-      idx = decks.event.findIndex(e => e.trigger === 'Investment');
-      if (idx === -1) break;
-    }
-    market.investments.push(decks.event.splice(idx, 1)[0]);
-    eventCount++;
-  }
+export function refillMarket(state: MainStreetState): void {
+  refillSingleRowMarket(state);
 }
 
 /**
- * Refills the development row from the combined business + community-space deck.
+ * Checks whether the player can re-roll the single-row market.
  */
-export function refillDevelopmentMarket(state: MainStreetState): void {
-  const { decks } = state;
-  // If the development decks are exhausted but there are discarded cards,
-  // reshuffle them back into their decks immediately so refill can proceed.
-  reshuffleIfNeeded(state, decks.business, state.discards.business, 'business');
-  reshuffleIfNeeded(state, decks.communitySpace, state.discards.communitySpace, 'community-space');
-
-  // Build a combined deck from business and community space cards
-  const combinedDeck: (BusinessCard | CommunitySpaceCard)[] = [];
-  while (decks.business.length > 0) combinedDeck.push(decks.business.pop()!);
-  while (decks.communitySpace.length > 0) combinedDeck.push(decks.communitySpace.pop()!);
-
-  // Shuffle the combined deck
-  shuffleArray(combinedDeck, state.rng);
-
-  const engine = buildMarketEngine(state);
-  engine.refillRow('development', combinedDeck);
-  syncDevelopmentFromEngine(state, engine);
-
-  // Return remaining cards to their respective decks
-  // (combinedDeck was consumed by refillRow, any leftovers go back)
-  for (const card of combinedDeck) {
-    if (card.family === 'business') {
-      decks.business.push(card as BusinessCard);
-    } else if (card.family === 'community-space') {
-      decks.communitySpace.push(card as CommunitySpaceCard);
-    }
-  }
-}
-
-/**
- * Checks whether the player can pay to refresh the investments row.
- */
-export function canRefreshInvestments(state: MainStreetState): LegalityResult {
+export function canRefreshMarket(state: MainStreetState): LegalityResult {
   if (state.phase !== 'MarketPhase') {
-    return { legal: false, reason: 'Refresh investments is only allowed during MarketPhase.' };
+    return { legal: false, reason: 'Re-rolling the market is only allowed during MarketPhase.' };
   }
-  if (state.resourceBank.coins < REFRESH_INVESTMENTS_COST) {
-    return { legal: false, reason: `Not enough coins. Need ${REFRESH_INVESTMENTS_COST}, have ${state.resourceBank.coins}.` };
+  const cost = refreshMarketCost(state);
+  if (state.resourceBank.coins < cost) {
+    return { legal: false, reason: `Not enough coins. Need ${cost}, have ${state.resourceBank.coins}.` };
   }
   return { legal: true };
 }
 
 /**
- * Refreshes the investments row by charging the player, discarding the
- * currently-visible investment cards to their respective discard piles,
- * and drawing replacements using the same rules as refillInvestmentsMarket.
+ * Effective cost to re-roll the single-row market, after staff discounts
+ * (e.g. the Accountant's "refresh costs 1 less" ability — Group F,
+ * CG-0MSQJ7VL9009JHF4 / CG-0MSTOATDT009BRX2). Discounts are summed across
+ * hired staff and the result is clamped at 0 (never negative).
  */
-export function refreshInvestments(state: MainStreetState): RefreshResult {
-  const legality = canRefreshInvestments(state);
+export function refreshMarketCost(state: MainStreetState): number {
+  const discount = (state.staffCards ?? []).reduce(
+    (sum, card) => sum + (card.refreshCostDiscount ?? 0),
+    0,
+  );
+  return Math.max(0, REFRESH_MARKET_COST - discount);
+}
+
+/**
+ * Re-rolls the single-row market: charges the player, discards all
+ * currently-visible (unmoved/unpurchased) cards to their respective discard
+ * piles, and refills the whole line to full composition. Unlimited per turn
+ * while affordable (same cadence as the legacy per-row refreshes).
+ */
+export function refreshMarket(state: MainStreetState): RefreshResult {
+  const legality = canRefreshMarket(state);
   if (!legality.legal) throw new Error(legality.reason);
 
-  // Deduct cost
-  state.resourceBank.coins -= REFRESH_INVESTMENTS_COST;
+  // Deduct cost (after staff refresh discounts, e.g. Accountant)
+  const cost = refreshMarketCost(state);
+  state.resourceBank.coins -= cost;
 
-  // Move visible investment cards to discard piles
-  const removed: AnyCard[] = state.market.investments.slice();
+  // Move visible market cards to their respective discard piles
+  const removed: AnyCard[] = state.market.cards.slice();
   for (const c of removed) {
-    if (c.family === 'upgrade') {
+    if (c.family === 'business') {
+      state.discards.business.push(c as any);
+    } else if (c.family === 'community-space') {
+      state.discards.communitySpace.push(c as any);
+    } else if (c.family === 'upgrade') {
       state.discards.upgrade.push(c as any);
     } else if (c.family === 'event') {
       state.discards.event.push(c as any);
     }
   }
 
-  // Clear the visible investments row and draw replacements
-  state.market.investments.length = 0;
-  refillInvestmentsMarket(state);
+  // Clear the visible row and draw a fresh full line
+  state.market.cards.length = 0;
+  refillSingleRowMarket(state);
 
   // Build a detailed replacement summary for the activity log
   const replacedStrings = removed.map(c => {
     const name = (c as any).name ?? c.id;
     return `${c.id}${name ? ` (${name})` : ''}`;
   });
-  addLog(state, `Refreshed investments (-€${REFRESH_INVESTMENTS_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
+  addLog(state, `Re-rolled market (-€${cost}): replaced ${replacedStrings.join(', ')}`, 'loss');
 
-  return { replaced: removed, cost: REFRESH_INVESTMENTS_COST };
-}
-
-/**
- * Checks whether the player can pay to refresh the development row.
- */
-export function canRefreshDevelopment(state: MainStreetState): LegalityResult {
-  if (state.phase !== 'MarketPhase') {
-    return { legal: false, reason: 'Refresh development is only allowed during MarketPhase.' };
-  }
-  if (state.resourceBank.coins < REFRESH_DEVELOPMENT_COST) {
-    return { legal: false, reason: `Not enough coins. Need ${REFRESH_DEVELOPMENT_COST}, have ${state.resourceBank.coins}.` };
-  }
-  return { legal: true };
-}
-
-/**
- * Refreshes the development row by charging the player, discarding the
- * currently-visible development cards to their respective discard piles,
- * and drawing replacements using the same rules as refillDevelopmentMarket.
- */
-export function refreshDevelopment(state: MainStreetState): RefreshResult {
-  const legality = canRefreshDevelopment(state);
-  if (!legality.legal) throw new Error(legality.reason);
-
-  // Deduct cost
-  state.resourceBank.coins -= REFRESH_DEVELOPMENT_COST;
-
-  // Move visible development cards to discard piles
-  const removed: AnyCard[] = state.market.development.slice();
-  for (const c of removed) {
-    if (c.family === 'business') {
-      state.discards.business.push(c as BusinessCard);
-    } else if (c.family === 'community-space') {
-      state.discards.communitySpace.push(c as CommunitySpaceCard);
-    }
-  }
-
-  // Clear the visible development row and draw replacements
-  state.market.development.length = 0;
-  refillDevelopmentMarket(state);
-
-  // Build a detailed replacement summary for the activity log
-  const replacedStrings = removed.map(c => {
-    const name = (c as any).name ?? c.id;
-    return `${c.id}${name ? ` (${name})` : ''}`;
-  });
-  addLog(state, `Refreshed development (-€${REFRESH_DEVELOPMENT_COST}): replaced ${replacedStrings.join(', ')}`, 'loss');
-
-  return { replaced: removed, cost: REFRESH_DEVELOPMENT_COST };
-}
-
-/**
- * Refills all market rows to their maximum slot counts.
- */
-export function refillAllMarkets(state: MainStreetState): void {
-  refillDevelopmentMarket(state);
-  refillInvestmentsMarket(state);
+  return { replaced: removed, cost };
 }
 
 // ── Market Cycling (Multi-Use Card Economy) ──────────────────
@@ -456,20 +282,14 @@ export function refillAllMarkets(state: MainStreetState): void {
  * @param state  Current game state (mutated in-place).
  */
 export function cycleMarketCards(state: MainStreetState): void {
-  // ── Cycle development row cards to discards ──────────────
-  const developmentCards = state.market.development.splice(0);
-  for (const card of developmentCards) {
+  // ── Cycle the single-row market cards to discards ────────
+  const visibleCards = state.market.cards.splice(0);
+  for (const card of visibleCards) {
     if (card.family === 'business') {
       state.discards.business.push(card as BusinessCard);
     } else if (card.family === 'community-space') {
       state.discards.communitySpace.push(card as CommunitySpaceCard);
-    }
-  }
-
-  // ── Cycle investments row cards to discards ──────────────
-  const investmentCards = state.market.investments.splice(0);
-  for (const card of investmentCards) {
-    if (card.family === 'upgrade') {
+    } else if (card.family === 'upgrade') {
       state.discards.upgrade.push(card as UpgradeCard);
     } else if (card.family === 'event') {
       state.discards.event.push(card as EventCard);
@@ -477,48 +297,50 @@ export function cycleMarketCards(state: MainStreetState): void {
   }
 
   // Log the cycle
-  const totalCycled = developmentCards.length + investmentCards.length;
-  if (totalCycled > 0) {
-    addLog(state, `Market cycled: ${totalCycled} unpurchased cards moved to discard`, 'neutral');
+  if (visibleCards.length > 0) {
+    addLog(state, `Market cycled: ${visibleCards.length} unpurchased cards moved to discard`, 'neutral');
   }
 
-  // ── Refill all market rows from decks ────────────────────
-  refillAllMarkets(state);
+  // ── Refill the single row from decks ─────────────────────
+  // (refillMarket would also cycle the already-emptied row; call the raw
+  //  refill so the log line above is the canonical cycle record.)
+  refillSingleRowMarket(state);
 }
 
 /**
- * Tops up the incident queue to INCIDENT_QUEUE_SIZE by drawing
- * Incident-trigger cards from the event deck. If the deck has no
- * remaining Incident cards, the queue stays at its current size.
+ * Replenishes the face-down incident deck when it is exhausted: gathers
+ * remaining Incident-trigger cards from the event deck and event discards
+ * and rebuilds the deck constraint-aware via `orderIncidentDeck` (seeded
+ * from the resolved-draw balance history, so the rebuilt deck stays
+ * consistent with what was already resolved) — CG-0MSTOATDP000JNHH,
+ * option (a). No RNG is consumed here: the pool order is deterministic
+ * (gather order from the seeded decks/discards) and the selector scans
+ * deterministically.
  *
- * Draws are constraint-aware (CG-0MSL0OP040043KKZ): every pick routes
- * through `findConstrainedIncidentIndex`, honoring the runtime-mutable
- * repeat-spacing window and good/bad streak limits from
- * `state.incidentBalance`. The reshuffle paths (deck exhausted / no
- * Incident-trigger cards left) also route through the selector, so AC1's
- * "every point the next incident is selected" is covered.
+ * No visible refill loop: the deck is face-down and only its remaining
+ * count is shown. Called by `resolveIncident` when `incidentDeck` is empty.
+ * Does nothing when no Incident-trigger cards are available anywhere.
  */
-export function refillIncidentQueue(state: MainStreetState): void {
-  // If the event deck is empty but incident discards exist, reshuffle them.
-  reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
+export function replenishIncidentDeck(state: MainStreetState): void {
+  if (state.incidentDeck.length > 0) return;
 
-  while (state.incidentQueue.length < INCIDENT_QUEUE_SIZE) {
-    let idx = findConstrainedIncidentIndex(state.decks.event, state.incidentBalance);
-    if (idx === -1) {
-      // Attempt a reshuffle in case the deck was empty earlier
-      reshuffleIfNeeded(state, state.decks.event, state.discards.event, 'event');
-      // If the deck still has cards but none are Incident-trigger,
-      // force a reshuffle from discards (e.g. only Investments remain).
-      forceReshuffleFromDiscards(state, state.decks.event, state.discards.event, 'event');
-      idx = findConstrainedIncidentIndex(state.decks.event, state.incidentBalance);
-      if (idx === -1) break;
+  const pool: EventCard[] = [];
+  const eventDeck = state.decks.event;
+  for (let i = eventDeck.length - 1; i >= 0; i--) {
+    if (eventDeck[i].trigger === 'Incident') {
+      pool.push(eventDeck.splice(i, 1)[0]);
     }
-    const card = state.decks.event.splice(idx, 1)[0];
-    state.incidentQueue.push(card);
-    // Track the draw so subsequent selections respect the repeat/streak
-    // constraints (history mirrors the sequence the player resolves).
-    recordIncidentDraw(state.incidentBalance, card);
   }
+  const eventDiscards = state.discards.event;
+  for (let i = eventDiscards.length - 1; i >= 0; i--) {
+    if (eventDiscards[i].trigger === 'Incident') {
+      pool.push(eventDiscards.splice(i, 1)[0]);
+    }
+  }
+  if (pool.length === 0) return;
+
+  state.incidentDeck = orderIncidentDeck(pool, state.incidentBalance);
+  addLog(state, 'Reshuffled incident deck from event cards', 'neutral');
 }
 
 // ── Purchase Execution ──────────────────────────────────────
@@ -543,14 +365,14 @@ export function purchaseBusiness(
     throw new Error(legality.reason);
   }
 
-  const marketIndex = state.market.development.findIndex(c => c.id === cardId);
-  const card = state.market.development[marketIndex];
+  const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
+  const card = state.market.cards[marketIndex];
 
   // Deduct cost
   state.resourceBank.coins -= card.cost;
 
   // Remove from market
-  state.market.development.splice(marketIndex, 1);
+  state.market.cards.splice(marketIndex, 1);
 
   // Place on grid (card may be BusinessCard or CommunitySpaceCard; both have same grid mechanics)
   state.streetGrid[slotIndex] = card as BusinessCard;
@@ -578,7 +400,7 @@ export function purchaseBusiness(
  */
 export function canAddToHand(state: MainStreetState): LegalityResult {
   const hand = state.hand ?? [];
-  const maxSize = state.maxHandSize ?? 2;
+  const maxSize = state.maxHandSize ?? 3;
   if (hand.length >= maxSize) {
     return { legal: false, reason: `Hand is full (${hand.length}/${maxSize}). Place on tableau or sell a card first.` };
   }
@@ -586,50 +408,191 @@ export function canAddToHand(state: MainStreetState): LegalityResult {
 }
 
 /**
- * Purchases a Business card from the market and adds it to the player's hand
- * instead of placing it on the tableau.
- *
- * @param state   Current game state (mutated in-place).
- * @param cardId  ID of the Business card in the development market.
- * @returns PurchaseResult on success.
- * @throws Error if the action is illegal or hand is full.
+ * Moves a card from the single-row market into the player's hand for free
+ * (CG-0MSTOATDT009BRX2). Bounded only by hand capacity (`maxHandSize`); the
+ * market is NOT refilled mid-turn after moves (day-start refill unchanged).
+ * Payment is deferred — the card's listed cost is paid when it is played
+ * from hand (business on placement; upgrade/event when played/triggered).
  */
-export function purchaseBusinessToHand(
-  state: MainStreetState,
-  cardId: string,
-): PurchaseResult {
-  // Validate the card exists and player can afford it
-  const card = state.market.development.find(c => c.id === cardId);
+export function moveToHand(state: MainStreetState, cardId: string): PurchaseResult {
+  const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
+  const card = state.market.cards[marketIndex];
   if (!card) {
-    throw new Error(`Card ${cardId} not found in the development market.`);
-  }
-  if (state.resourceBank.coins < card.cost) {
-    throw new Error(`Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+    throw new Error(`Card ${cardId} not found in the market.`);
   }
 
-  // Check hand capacity
+  // Hand capacity is the only constraint; the move itself is free of coins.
   const handCheck = canAddToHand(state);
   if (!handCheck.legal) {
     throw new Error(handCheck.reason);
   }
 
-  const marketIndex = state.market.development.findIndex(c => c.id === cardId);
+  state.market.cards.splice(marketIndex, 1);
+  state.hand.push({ ...card } as any);
 
-  // Deduct cost
+  addLog(state, `Moved ${card.name} to hand (free, pay on play)`, 'neutral');
+
+  return { card, cost: 0, refilled: false };
+}
+
+// ── Play / Discard from Hand (CG-0MSTOATDT009BRX2) ───────────
+
+/**
+ * Legality gate shared by the from-hand helpers: must be the player's turn
+ * (MarketPhase) and the hand index must point at a card.
+ */
+function validateHandIndex(state: MainStreetState, handIndex: number): AnyCard {
+  if (state.phase !== 'MarketPhase') {
+    throw new Error('Playing from hand is only allowed during MarketPhase.');
+  }
+  const card = (state.hand ?? [])[handIndex];
+  if (!card) {
+    throw new Error(`No card at hand index ${handIndex}.`);
+  }
+  return card;
+}
+
+/**
+ * Plays a business/community-space card from the player's hand onto the
+ * street grid, charging its listed cost at placement time
+ * (CG-0MSTOATDT009BRX2 cost-at-play deferral model).
+ */
+export function playBusinessFromHand(
+  state: MainStreetState,
+  handIndex: number,
+  slotIndex: number,
+): PurchaseResult {
+  const card = validateHandIndex(state, handIndex);
+  if (card.family !== 'business' && card.family !== 'community-space') {
+    throw new Error(`Card at hand index ${handIndex} is not a business/community-space card.`);
+  }
+  if (state.resourceBank.coins < card.cost) {
+    throw new Error(`Not enough coins to play ${card.name} from hand. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+  }
+  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  }
+  if (state.streetGrid[slotIndex] !== null) {
+    throw new Error(`Slot ${slotIndex} is already occupied.`);
+  }
+
   state.resourceBank.coins -= card.cost;
+  state.hand.splice(handIndex, 1);
+  state.streetGrid[slotIndex] = card as BusinessCard;
+  updateNeighborsOnPlacement(state, slotIndex);
 
-  // Remove from market
-  state.market.development.splice(marketIndex, 1);
+  addLog(state, `Played ${card.name} from hand into slot ${slotIndex} (-€${card.cost})`, 'loss');
 
-  // Add to hand
-  state.hand.push({ ...card } as BusinessCard);
+  return { card, cost: card.cost, refilled: false };
+}
 
-  // Note: market is not refilled immediately.
-  const refilled = false;
+/**
+ * Plays an upgrade card from the player's hand onto a matching business,
+ * charging its listed cost at play time (CG-0MSTOATDT009BRX2).
+ */
+export function playUpgradeFromHand(
+  state: MainStreetState,
+  handIndex: number,
+  targetSlot?: number,
+): PurchaseResult {
+  const card = validateHandIndex(state, handIndex);
+  if (card.family !== 'upgrade') {
+    throw new Error(`Card at hand index ${handIndex} is not an upgrade card.`);
+  }
+  const upgrade = card as UpgradeCard;
+  if (state.resourceBank.coins < upgrade.cost) {
+    throw new Error(`Not enough coins to play ${upgrade.name} from hand. Need ${upgrade.cost}, have ${state.resourceBank.coins}.`);
+  }
 
-  addLog(state, `Added ${card.name} to hand (-€${card.cost})`, 'loss');
+  // Locate the target business (mirror purchaseUpgrade's matching rules).
+  let businessIndex: number;
+  const requiredLevel = upgrade.requiredLevel ?? 0;
+  if (targetSlot !== undefined) {
+    const biz = state.streetGrid[targetSlot];
+    if (
+      !biz ||
+      biz.name !== upgrade.targetBusiness ||
+      biz.level !== requiredLevel ||
+      biz.level >= biz.maxLevel
+    ) {
+      throw new Error(`Business at slot ${targetSlot} is not a valid target for this upgrade.`);
+    }
+    businessIndex = targetSlot;
+  } else {
+    businessIndex = findTargetBusinessSlot(state, upgrade);
+    if (businessIndex === -1) {
+      throw new Error(`No eligible ${upgrade.targetBusiness} on the street to upgrade (requires level ${requiredLevel}).`);
+    }
+  }
 
-  return { card, cost: card.cost, refilled };
+  const business = state.streetGrid[businessIndex]!;
+  state.resourceBank.coins -= upgrade.cost;
+  state.hand.splice(handIndex, 1);
+
+  business.level += 1;
+  business.incomeBonus += upgrade.incomeBonus;
+  business.synergyRangeBonus += upgrade.synergyRangeBonus;
+  business.reputationBonus += upgrade.reputationBonus ?? 0;
+  if (!business.appliedUpgrades) {
+    business.appliedUpgrades = [];
+  }
+  business.appliedUpgrades.push(upgrade.id);
+  (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + upgrade.cost;
+  updateNeighborsOnPlacement(state, businessIndex);
+
+  addLog(state, `Played upgrade ${upgrade.name} from hand onto ${business.name} (-€${upgrade.cost})`, 'loss');
+
+  return { card: upgrade, cost: upgrade.cost, refilled: false };
+}
+
+/**
+ * Plays an Investment-trigger event card from the player's hand, charging its
+ * listed cost at play time and resolving its effects (CG-0MSTOATDT009BRX2
+ * cost-at-play deferral).
+ */
+export function playEventFromHand(
+  state: MainStreetState,
+  handIndex: number,
+): PurchaseResult {
+  const card = validateHandIndex(state, handIndex);
+  if (card.family !== 'event') {
+    throw new Error(`Card at hand index ${handIndex} is not an event card.`);
+  }
+  const event = card as EventCard;
+  if (event.trigger !== 'Investment') {
+    throw new Error('Incident events cannot be played from hand.');
+  }
+  if (state.resourceBank.coins < event.cost) {
+    throw new Error(`Not enough coins to play ${event.name} from hand. Need ${event.cost}, have ${state.resourceBank.coins}.`);
+  }
+
+  state.resourceBank.coins -= event.cost;
+  resolveEvent(state, event);
+  state.hand.splice(handIndex, 1);
+
+  addLog(state, `Played event ${event.name} from hand (-€${event.cost})`, 'loss');
+
+  return { card: event, cost: event.cost, refilled: false };
+}
+
+/**
+ * Discards a card from the player's hand for free, any time during the
+ * player's turn; the card goes to its corresponding discard pile
+ * (CG-0MSTOATDT009BRX2).
+ */
+export function discardFromHand(state: MainStreetState, handIndex: number): void {
+  const card = validateHandIndex(state, handIndex);
+  state.hand.splice(handIndex, 1);
+  if (card.family === 'business') {
+    state.discards.business.push(card as BusinessCard);
+  } else if (card.family === 'community-space') {
+    state.discards.communitySpace.push(card as CommunitySpaceCard);
+  } else if (card.family === 'upgrade') {
+    state.discards.upgrade.push(card as UpgradeCard);
+  } else if (card.family === 'event') {
+    state.discards.event.push(card as EventCard);
+  }
+  addLog(state, `Discarded ${card.name} from hand (free)`, 'neutral');
 }
 
 /**
@@ -653,10 +616,10 @@ export function purchaseUpgrade(
     throw new Error(legality.reason);
   }
 
-  const marketIndex = state.market.investments.findIndex(
+  const marketIndex = state.market.cards.findIndex(
     c => c.id === cardId && c.family === 'upgrade',
   );
-  const card = state.market.investments[marketIndex] as UpgradeCard;
+  const card = state.market.cards[marketIndex] as UpgradeCard;
 
   // Find the target business
   const requiredLevel = card.requiredLevel ?? 0;
@@ -682,7 +645,7 @@ export function purchaseUpgrade(
   state.resourceBank.coins -= card.cost;
 
   // Remove from market
-  state.market.investments.splice(marketIndex, 1);
+  state.market.cards.splice(marketIndex, 1);
 
   // Apply upgrade to business
   business.level += 1;
@@ -726,16 +689,16 @@ export function purchaseEvent(
     throw new Error(legality.reason);
   }
 
-  const marketIndex = state.market.investments.findIndex(
+  const marketIndex = state.market.cards.findIndex(
     c => c.id === cardId && c.family === 'event',
   );
-  const card = state.market.investments[marketIndex] as EventCard;
+  const card = state.market.cards[marketIndex] as EventCard;
 
   // Deduct cost
   state.resourceBank.coins -= card.cost;
 
   // Remove from market
-  state.market.investments.splice(marketIndex, 1);
+  state.market.cards.splice(marketIndex, 1);
 
   // Add the event to the shared hand (appended like any other card)
   state.hand.push(card);
@@ -754,7 +717,9 @@ export function purchaseEvent(
  * currently afford (has enough coins for).
  */
 export function getAffordableBusinessCards(state: MainStreetState): (BusinessCard | CommunitySpaceCard)[] {
-  return state.market.development.filter(c => c.cost <= state.resourceBank.coins);
+  return state.market.cards.filter(
+    c => (c.family === 'business' || c.family === 'community-space') && c.cost <= state.resourceBank.coins,
+  ) as (BusinessCard | CommunitySpaceCard)[];
 }
 
 /**
@@ -762,7 +727,7 @@ export function getAffordableBusinessCards(state: MainStreetState): (BusinessCar
  * currently afford and has a valid target for.
  */
 export function getAffordableUpgradeCards(state: MainStreetState): UpgradeCard[] {
-  return (state.market.investments.filter(c => c.family === 'upgrade') as UpgradeCard[]).filter(card => {
+  return (state.market.cards.filter(c => c.family === 'upgrade') as UpgradeCard[]).filter(card => {
     if (card.cost > state.resourceBank.coins) return false;
     return state.streetGrid.some(
       b => b !== null && b.name === card.targetBusiness && b.level < b.maxLevel,
@@ -828,7 +793,7 @@ export function getUpgradeBranchesForBusiness(
   if (!business) return [];
   if (business.level >= business.maxLevel) return [];
 
-  return (state.market.investments.filter(c => c.family === 'upgrade') as UpgradeCard[]).filter(
+  return (state.market.cards.filter(c => c.family === 'upgrade') as UpgradeCard[]).filter(
     card =>
       card.targetBusiness === business.name &&
       (card.requiredLevel ?? 0) === business.level,

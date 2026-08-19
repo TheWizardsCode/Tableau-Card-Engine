@@ -9,8 +9,18 @@ describe('GUARDRAIL_THRESHOLDS', () => {
     const t = GUARDRAIL_THRESHOLDS['winRate_greedy_medium'];
     expect(t).toBeDefined();
     expect(t.metric).toBe('winRate_greedy_medium');
-    expect(t.min).toBe(30);
-    expect(t.max).toBe(60);
+    expect(t.min).toBe(45);
+    expect(t.max).toBe(75);
+    expect(t.severity).toBe('critical');
+  });
+
+  it('defines net-liquidity threshold for avgCoinsPerTurn_greedy_medium (critical)', () => {
+    const t = GUARDRAIL_THRESHOLDS['avgCoinsPerTurn_greedy_medium'];
+    expect(t).toBeDefined();
+    expect(t.metric).toBe('avgCoinsPerTurn_greedy_medium');
+    // Producer ruling (CG-0MSP26Q5N002EH8P): net liquidity 0–2.
+    expect(t.min).toBe(0);
+    expect(t.max).toBe(2);
     expect(t.severity).toBe('critical');
   });
 
@@ -20,6 +30,7 @@ describe('GUARDRAIL_THRESHOLDS', () => {
       'winRate_greedy_easy',
       'winRate_greedy_hard',
       'winRate_random_medium',
+      'avgCoinsPerTurn_greedy_medium',
       'medianScore_greedy_medium',
       'avgTurns_greedy_medium',
       'bankruptcyRate_greedy_medium',
@@ -45,10 +56,11 @@ describe('GUARDRAIL_THRESHOLDS', () => {
 describe('evaluateGuardrails', () => {
   it('returns all-pass when all metrics within ranges', () => {
     const metrics: Record<string, number> = {
-      winRate_greedy_medium: 45,
+      winRate_greedy_medium: 55,
       winRate_greedy_easy: 72,
       winRate_greedy_hard: 28,
       winRate_random_medium: 12,
+      avgCoinsPerTurn_greedy_medium: 1.5,
       medianScore_greedy_medium: 150,
       avgTurns_greedy_medium: 18,
       bankruptcyRate_greedy_medium: 55,
@@ -65,10 +77,11 @@ describe('evaluateGuardrails', () => {
 
   it('flags warning thresholds outside range', () => {
     const metrics: Record<string, number> = {
-      winRate_greedy_medium: 45,
+      winRate_greedy_medium: 55,
       winRate_greedy_easy: 72,
       winRate_greedy_hard: 10, // Below warning range (15-40)
       winRate_random_medium: 12,
+      avgCoinsPerTurn_greedy_medium: 1.5,
       medianScore_greedy_medium: 150,
       avgTurns_greedy_medium: 18,
       bankruptcyRate_greedy_medium: 55,
@@ -91,10 +104,11 @@ describe('evaluateGuardrails', () => {
 
   it('fails critical thresholds outside range', () => {
     const metrics: Record<string, number> = {
-      winRate_greedy_medium: 65, // Above critical range (30-60)
+      winRate_greedy_medium: 80, // Above critical range (45-75)
       winRate_greedy_easy: 72,
       winRate_greedy_hard: 28,
       winRate_random_medium: 12,
+      avgCoinsPerTurn_greedy_medium: 1.5,
       medianScore_greedy_medium: 150,
       avgTurns_greedy_medium: 18,
       bankruptcyRate_greedy_medium: 55,
@@ -122,10 +136,11 @@ describe('evaluateGuardrails', () => {
 
   it('handles mixed pass/flag/fail correctly', () => {
     const metrics: Record<string, number> = {
-      winRate_greedy_medium: 65, // FAIL: critical, above 60
-      winRate_greedy_easy: 90, // FLAG: warning, above 85
+      winRate_greedy_medium: 80, // FAIL: critical, above 75
+      winRate_greedy_easy: 95, // FLAG: warning, above 90
       winRate_greedy_hard: 28,
       winRate_random_medium: 12,
+      avgCoinsPerTurn_greedy_medium: 1.5,
       medianScore_greedy_medium: 150,
       avgTurns_greedy_medium: 18,
       bankruptcyRate_greedy_medium: 55,
@@ -144,10 +159,11 @@ describe('evaluateGuardrails', () => {
   it('info thresholds never cause fail', () => {
     // info thresholds, even outside range, should not cause fail
     const metrics: Record<string, number> = {
-      winRate_greedy_medium: 45,
+      winRate_greedy_medium: 55,
       winRate_greedy_easy: 72,
       winRate_greedy_hard: 28,
       winRate_random_medium: 12,
+      avgCoinsPerTurn_greedy_medium: 1.5,
       medianScore_greedy_medium: 150,
       avgTurns_greedy_medium: 30, // Outside info range (14-22), should be noted
       bankruptcyRate_greedy_medium: 55,

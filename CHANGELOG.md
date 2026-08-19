@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.1.13 (2026-08-19)
+### Features
+- Add a harder Citadel mode to Beleaguered Castle where all cards start in the tableau. (CG-0MLTDXG3H0WCXMUV)
+- Market is now a single 3-card row with one re-roll, and your hand holds 3 cards so you can plan ahead. (CG-0MSTOATDT009BRX2)
+- You now get one action per day, so choose wisely—hire a General Manager for a second one. (CG-0MSTOF1N5005PK2R)
+- Tutorial step split: Library cost/reputation and synergy bonuses are now explained separately. (CG-0MSOKNWAU002BOFP)
+- One-command draft GitHub release for the Windows installer, ready for your review. (CG-0MSQ6MV7N0085V9R)
+- Games no longer end after a fixed number of turns—play until you win or lose on your own merits. (CG-0MSLXJCHH001DLIO)
+- The game now launches as a native desktop app, ready for Steam distribution. (CG-0MSMAD19O0084CAW)
+- Added 52 new cards with fresh strategies, new staff abilities, and smoother mid-game progression. (CG-0MSQE2NLX003ADIY)
+- Synergy lines now connect card edges and corners instead of running through card centers. (CG-0MSVM3WCD007BRQP)
+- Tutorial now clarifies that the top event happens this turn, while the ones below happen next turn. (CG-0MSTASAX4005FEYL)
+- Game over screen now shows how many new cards you unlocked instead of listing each one. (CG-0MSXIGNU9007EMNY)
+- Adds a positive graffiti event that gives all businesses +1 coin and +1 reputation. (CG-0MSRC9UR9006FBXC)
+### Bug Fixes
+- Diagonal placements now count as adjacent, so businesses next to each other diagonally earn synergy bonuses. (CG-0MSP1HCAS00785MP)
+- Fixed balance tool crashing on the new card data format. (CG-0MSREC65T004J5SS)
+- Clicking tutorial buttons no longer accidentally triggers cards underneath. (CG-0MSTB03U6009J2WV)
+- Fixed dev server crash during long play sessions by stopping memory leaks. (CG-0MSXL0A25009WZVK)
+- Tutorial text now explains you can drag-and-drop to buy and place in one step. (CG-0MSOKG7HE001NMMM)
+- Dropped cards now snap into place faster when you release them close to their slot. (CG-0MST2LS3E004BTPO)
+- Clicking an unaffordable card now plays the illegal move sound and shake. (CG-0MSXIA61S00686G5)
+- Fixed an issue where an empty git email blocked all game syncs. (CG-0MSUZASM10035QSG)
+### Other
+- Main Street now has livelier animations, sounds, and effects for key moments like income, incidents, and day changes. (CG-0MSRGTAA9001F2ST)
+- Tutorial now explains why you hold the festival card for a better moment instead of playing it right away. (CG-0MSOKG89N001LDT4)
+- Balance targets updated across all difficulties so win rates, coins, and scores match design intent. (CG-0MSRKN325004ELH2)
+- Updated the tutorial's final message to better welcome you into the game. (CG-0MSTB646U000138M)
+- Removed unused market slot settings to keep the game code clean and stable. (CG-0MSXA9U95003PH0M)
+- Improved game stability and performance through code quality enhancements. (CG-0MSUUDMJZ005VYZP)
+
 ## v0.1.12 (2026-08-12)
 ### Features
 - Full test suite now runs reliably in any environment, with clear setup instructions if something's missing. (CG-0MSJ7ZXD5005N9E5)

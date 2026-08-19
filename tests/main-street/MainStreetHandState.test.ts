@@ -114,7 +114,7 @@ describe('MainStreet Hand State', () => {
 
     it('should report maxHandSize as 2', () => {
       const state = createTestState();
-      expect(getMaxHandSize(state)).toBe(2);
+      expect(getMaxHandSize(state)).toBe(3);
     });
 
     it('should report discardPile as empty array', () => {
@@ -154,7 +154,7 @@ describe('MainStreet Hand State', () => {
       expect(state.resourceBank.coins).toBeGreaterThan(0);
       expect(state.resourceBank.reputation).toBeGreaterThan(0);
       expect(state.streetGrid).toHaveLength(GRID_SIZE);
-      expect(state.market.development.length).toBeGreaterThan(0);
+      expect(state.market.cards.length).toBeGreaterThan(0);
     });
   });
 
@@ -167,7 +167,7 @@ describe('MainStreet Hand State', () => {
         const state = createTestState();
         executeDayStart(state);
 
-        const card = state.market.development.find(
+        const card = state.market.cards.find(
           c => c.cost <= state.resourceBank.coins,
         );
         if (!card) return;
@@ -201,7 +201,7 @@ describe('MainStreet Hand State', () => {
         state.resourceBank.coins = 100;
         // Fill hand to capacity
         const maxSize = getMaxHandSize(state);
-        const cards = state.market.development.filter(
+        const cards = state.market.cards.filter(
           c => c.cost <= state.resourceBank.coins,
         );
         for (let i = 0; i < Math.min(maxSize, cards.length); i++) {
@@ -219,7 +219,7 @@ describe('MainStreet Hand State', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      const card = state.market.development.find(
+      const card = state.market.cards.find(
         c => c.cost <= state.resourceBank.coins,
       );
       if (!card) return;
@@ -240,7 +240,7 @@ describe('MainStreet Hand State', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      const card = state.market.development.find(
+      const card = state.market.cards.find(
         c => c.cost <= state.resourceBank.coins,
       );
       if (!card) return;
@@ -267,7 +267,7 @@ describe('MainStreet Hand State', () => {
         expect('hand' in sAny).toBe(true);
         expect(sAny.hand).toEqual([]);
         expect('maxHandSize' in sAny).toBe(true);
-        expect(sAny.maxHandSize).toBe(2);
+        expect(sAny.maxHandSize).toBe(3);
         expect('discardPile' in sAny).toBe(true);
         expect(sAny.discardPile).toEqual([]);
         expect('staffCards' in sAny).toBe(true);
@@ -285,7 +285,7 @@ describe('MainStreet Hand State', () => {
         const fn = (market as any).purchaseBusinessToHand ?? (market as any).buyBusinessToHand;
         if (typeof fn !== 'function') return;
 
-        const cards = state.market.development.filter(
+        const cards = state.market.cards.filter(
           c => c.cost <= state.resourceBank.coins,
         );
         if (cards.length < 1) return;
@@ -379,7 +379,7 @@ describe('MainStreet Hand State', () => {
         const rAny = restored as any;
 
         expect(rAny.hand).toEqual([]);
-        expect(rAny.maxHandSize).toBe(2);
+        expect(rAny.maxHandSize).toBe(3);
         expect(rAny.discardPile).toEqual([]);
         expect(rAny.staffCards).toEqual([]);
       },
@@ -397,7 +397,7 @@ describe('MainStreet Hand State', () => {
 
       const restored = deserializeMainStreetState(serialized as MainStreetSerializedState);
       expect(restored).toBeDefined();
-      expect(restored.market.development).toBeDefined();
+      expect(restored.market.cards).toBeDefined();
       expect(restored.discards.communitySpace).toBeDefined();
     });
   });
@@ -423,7 +423,7 @@ describe('MainStreet Hand State', () => {
 
         // Boost coins to ensure enough budget for purchasing 2 cards
         state.resourceBank.coins = 100;
-        const cards = state.market.development.filter(
+        const cards = state.market.cards.filter(
           c => c.cost <= state.resourceBank.coins,
         );
         for (let i = 0; i < Math.min(2, cards.length); i++) {
@@ -449,7 +449,7 @@ describe('MainStreet Hand State', () => {
         const fn = (market as any).purchaseBusinessToHand ?? (market as any).buyBusinessToHand;
         if (typeof fn !== 'function') return;
 
-        const card = state.market.development.find(
+        const card = state.market.cards.find(
           c => c.cost <= state.resourceBank.coins,
         );
         if (!card) return;

@@ -172,7 +172,7 @@ describe('Community space card tooltip content (AC2)', () => {
     expect(tooltip).toContain('Income: +0');
     expect(tooltip).toContain('Synergy: Culture');
     expect(tooltip).toContain(resolvedDescription(park!));
-    expect(tooltip).toContain('Gains 50% of base income');
+    expect(tooltip).toContain('Gains 17.5% of base income');
   });
 
   it('builds a tooltip for Library with name and stats', () => {

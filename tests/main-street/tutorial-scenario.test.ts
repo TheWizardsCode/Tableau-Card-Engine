@@ -15,10 +15,10 @@ import { describe, it, expect } from 'vitest';
 import {
   createTutorialScenario,
   STANDARD_TUTORIAL_SCENARIO,
+  ensureTutorialMarketForUpcomingSteps,
 } from '../../example-games/main-street/TutorialScenario';
 import {
-  MARKET_BUSINESS_SLOTS,
-  MARKET_INVESTMENT_SLOTS,
+  MARKET_TOTAL_SLOTS,
   INCIDENT_QUEUE_SIZE,
 } from '../../example-games/main-street/MainStreetCards';
 import type { BusinessCard, EventCard } from '../../example-games/main-street/MainStreetCards';
@@ -50,8 +50,8 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.difficulty).toBe('Easy');
   });
 
-  it('starts with 16 coins (raised from the 12-coin Easy preset for the 4-card 16-step flow)', () => {
-    // The 16-step tutorial buys Laundromat $4 + Local Festival $3 + Bookshop $3
+  it('starts with 16 coins (raised from the 12-coin Easy preset for the 4-card 17-step flow)', () => {
+    // The 17-step tutorial buys Laundromat $4 + Local Festival $3 + Bookshop $3
     // + Library $7 = $17; 16 starting coins + ~1.9 income across the two end-turn
     // steps covers it. The scenario is intentionally richer than the base preset.
     expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(16);
@@ -64,18 +64,25 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.reputation).toBe(preset.startingReputation);
   });
 
-  it('has cs-library in the development row (replaces cs-park, keeps 4 dev slots + Culture theme)', () => {
-    expect(STANDARD_TUTORIAL_SCENARIO.market.development).toContain('cs-library');
-    expect(STANDARD_TUTORIAL_SCENARIO.market.development).not.toContain('cs-park');
-    expect(STANDARD_TUTORIAL_SCENARIO.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
+  it('day-1 single row holds Bakery + Laundromat + Local Festival (no Library yet)', () => {
+    // CG-0MSTOATDT009BRX2: the market is ONE row of exactly 3 cards. The
+    // Library is a day-3 purchase target; it is forced into the line by
+    // ensureTutorialMarketForUpcomingSteps at day start (see below).
+    expect(STANDARD_TUTORIAL_SCENARIO.market.cards).toEqual([
+      'biz-bakery',
+      'biz-laundromat',
+      'evt-festival',
+    ]);
+    expect(STANDARD_TUTORIAL_SCENARIO.market.cards).not.toContain('cs-library');
+    expect(STANDARD_TUTORIAL_SCENARIO.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
   });
 
-  it('defines exactly MARKET_BUSINESS_SLOTS development row cards', () => {
-    expect(STANDARD_TUTORIAL_SCENARIO.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
+  it('defines exactly MARKET_TOTAL_SLOTS development row cards', () => {
+    expect(STANDARD_TUTORIAL_SCENARIO.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
   });
 
-  it('defines exactly MARKET_INVESTMENT_SLOTS investments row cards', () => {
-    expect(STANDARD_TUTORIAL_SCENARIO.market.investments.length).toBe(MARKET_INVESTMENT_SLOTS);
+  it('defines exactly MARKET_TOTAL_SLOTS investments row cards', () => {
+    expect(STANDARD_TUTORIAL_SCENARIO.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
   });
 
   it('defines exactly INCIDENT_QUEUE_SIZE incident cards', () => {
@@ -84,14 +91,14 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
 
   it('all development row card template IDs are from Tier-1 pool', () => {
     const tier1Ids = getTier1TemplateIds();
-    for (const templateId of STANDARD_TUTORIAL_SCENARIO.market.development) {
+    for (const templateId of STANDARD_TUTORIAL_SCENARIO.market.cards) {
       expect(tier1Ids.has(templateId)).toBe(true);
     }
   });
 
   it('all investments row card template IDs are from Tier-1 pool', () => {
     const tier1Ids = getTier1TemplateIds();
-    for (const templateId of STANDARD_TUTORIAL_SCENARIO.market.investments) {
+    for (const templateId of STANDARD_TUTORIAL_SCENARIO.market.cards) {
       expect(tier1Ids.has(templateId)).toBe(true);
     }
   });
@@ -116,14 +123,14 @@ describe('createTutorialScenario', () => {
     const state1 = createTutorialScenario();
     const state2 = createTutorialScenario();
     // Same market cards
-    expect(state1.market.development.map(c => c.id)).toEqual(
-      state2.market.development.map(c => c.id),
+    expect(state1.market.cards.map(c => c.id)).toEqual(
+      state2.market.cards.map(c => c.id),
     );
-    expect(state1.market.investments.map(c => c.id)).toEqual(
-      state2.market.investments.map(c => c.id),
+    expect(state1.market.cards.map(c => c.id)).toEqual(
+      state2.market.cards.map(c => c.id),
     );
-    expect(state1.incidentQueue.map(c => c.id)).toEqual(
-      state2.incidentQueue.map(c => c.id),
+    expect(state1.incidentDeck.map(c => c.id)).toEqual(
+      state2.incidentDeck.map(c => c.id),
     );
     // Same resource bank
     expect(state1.resourceBank.coins).toBe(state2.resourceBank.coins);
@@ -141,27 +148,28 @@ describe('createTutorialScenario', () => {
     expect(state.resourceBank.reputation).toBe(5);
   });
 
-  it('has exactly MARKET_BUSINESS_SLOTS cards in development row', () => {
+  it('has exactly MARKET_TOTAL_SLOTS cards in development row', () => {
     const state = createTutorialScenario();
-    expect(state.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
+    expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
   });
 
-  it('has exactly 2 upgrades + 1 event in investments row', () => {
+  it('day-1 single row has exactly 1 event (Local Festival) and no upgrades', () => {
+    // The two-row market is gone; the single row never forces upgrades.
     const state = createTutorialScenario();
-    const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
-    const events = state.market.investments.filter(c => c.family === 'event');
-    expect(upgrades.length).toBe(2);
+    const upgrades = state.market.cards.filter(c => c.family === 'upgrade');
+    const events = state.market.cards.filter(c => c.family === 'event');
+    expect(upgrades.length).toBe(0);
     expect(events.length).toBe(1);
   });
 
   it('has exactly INCIDENT_QUEUE_SIZE cards in incident queue', () => {
     const state = createTutorialScenario();
-    expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
+    expect(state.incidentDeck.length).toBe(INCIDENT_QUEUE_SIZE);
   });
 
   it('has all incident cards as Incident-trigger events', () => {
     const state = createTutorialScenario();
-    for (const card of state.incidentQueue) {
+    for (const card of state.incidentDeck) {
       expect(card.family).toBe('event');
       expect((card as EventCard).trigger).toBe('Incident');
     }
@@ -200,14 +208,14 @@ describe('createTutorialScenario', () => {
 
   // ── Coin budget verification (AC5: 16-coin flow) ────────────
 
-  it('provides sufficient coin budget for the 16-step flow (16 coins, $4+$3+$3+$7 purchases)', () => {
+  it('provides sufficient coin budget for the 17-step flow (16 coins, $4+$3+$3+$7 purchases)', () => {
     const state = createTutorialScenario();
     // Scenario starts with 16 coins (not the 12-coin Easy preset)
     expect(state.resourceBank.coins).toBe(16);
 
     // The Laundromat referenced in T3 must exist and cost ≤ 4
     const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
-    const laundromat = state.market.development.find(
+    const laundromat = state.market.cards.find(
       c => matchesTemplate(c.id, t3.requiredCardId ?? ''),
     );
     expect(laundromat).toBeDefined();
@@ -228,15 +236,26 @@ describe('createTutorialScenario', () => {
     expect(afterFestivalBookshop + 1.25).toBeGreaterThanOrEqual(7);
   });
 
-  it('Library (cs-library) is present in the dev row and affordable', () => {
+  it('ensureTutorialMarketForUpcomingSteps puts the Library in the row when T13 is upcoming', () => {
+    // Day-1 state has no Library (3-slot single row). Before T13 the
+    // day-start hook forces cs-library into the visible line.
     const state = createTutorialScenario();
-    const t12 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!;
-    expect(t12).toBeDefined();
-    const library = state.market.development.find(
-      c => matchesTemplate(c.id, t12.requiredCardId ?? ''),
-    );
+    expect(state.market.cards.some(c => matchesTemplate(c.id, 'cs-library'))).toBe(false);
+
+    const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T13');
+    const controller = {
+      isActive: true,
+      currentStepIndex: t13Index - 1,
+      lastCompletedStepId: 'T12',
+      exited: false,
+    };
+    ensureTutorialMarketForUpcomingSteps(state, controller);
+
+    const library = state.market.cards.find(c => matchesTemplate(c.id, 'cs-library'));
     expect(library).toBeDefined();
     expect(library!.name).toBe('Library');
+    // The row never exceeds 3 cards — a filler was displaced back to a deck.
+    expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
     // 16 + ~1.9 income - (4+3+3) purchases = ~7.9 ≥ Library cost 7
     expect(16 + 1.875 - 4 - 3 - 3).toBeGreaterThanOrEqual(library!.cost);
   });
@@ -248,7 +267,7 @@ describe('createTutorialScenario', () => {
     const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
 
     // The requiredCardId must be present in the development row
-    const marketCard = state.market.development.find(
+    const marketCard = state.market.cards.find(
       c => matchesTemplate(c.id, t3.requiredCardId ?? ''),
     );
     expect(marketCard).toBeDefined();
@@ -262,13 +281,13 @@ describe('createTutorialScenario', () => {
 
   it('the Local Festival event card is in the investments row matching T9', () => {
     const state = createTutorialScenario();
-    const invEvents = state.market.investments.filter(
+    const invEvents = state.market.cards.filter(
       c => c.family === 'event',
     ) as EventCard[];
     expect(invEvents.length).toBe(1);
 
     const t9 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T9')!;
-    const festival = state.market.investments.find(
+    const festival = state.market.cards.find(
       c => matchesTemplate(c.id, t9.requiredCardId ?? ''),
     );
     expect(festival).toBeDefined();
@@ -282,9 +301,9 @@ describe('createTutorialScenario', () => {
 
   it('market cards are not present in their respective decks', () => {
     const state = createTutorialScenario();
-    const devIds = new Set(state.market.development.map(c => c.id));
-    const invIds = new Set(state.market.investments.map(c => c.id));
-    const incidentIds = new Set(state.incidentQueue.map(c => c.id));
+    const devIds = new Set(state.market.cards.map(c => c.id));
+    const invIds = new Set(state.market.cards.map(c => c.id));
+    const incidentIds = new Set(state.incidentDeck.map(c => c.id));
 
     // Check business deck doesn't contain development row cards
     for (const card of state.decks.business) {
@@ -317,9 +336,9 @@ describe('createTutorialScenario', () => {
       ...state.discards.communitySpace,
       ...state.discards.event,
       ...state.discards.upgrade,
-      ...state.market.development,
-      ...state.market.investments,
-      ...state.incidentQueue,
+      ...state.market.cards,
+      ...state.market.cards,
+      ...state.incidentDeck,
     ];
     // Dedup by base template ID
     const templateIdsUsed = new Set(

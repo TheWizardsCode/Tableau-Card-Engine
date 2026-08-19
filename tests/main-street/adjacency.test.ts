@@ -1,7 +1,12 @@
 /**
  * Main Street: Adjacency & Income Tests
  *
- * Validates grid-based (2x5) Manhattan-distance adjacency.
+ * Validates grid-based (2x5) 8-way (Chebyshev) adjacency: diagonally
+ * adjacent slots count at every range (max(|dx|,|dy|) <= range).
+ *
+ * CG-0MSP1HCAS00785MP: the adjacency metric was changed from Manhattan
+ * (orthogonal-only at range 1) to Chebyshev (8-way at every range). These
+ * tests define the 8-way contract consumed by F3's neighbors() change.
  */
 import { describe, it, expect } from 'vitest';
 
@@ -43,25 +48,40 @@ function emptyGrid(): (BusinessCard | null)[] {
 }
 
 describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
-  describe('neighbors', () => {
-    it('returns orthogonal neighbors for a corner (index 0)', () => {
-      expect(neighbors(0, 1)).toEqual([1, 5]);
+  describe('neighbors (8-way / Chebyshev)', () => {
+    it('returns 8-way neighbors for a corner (index 0)', () => {
+      expect(neighbors(0, 1)).toEqual([1, 5, 6]);
     });
 
-    it('returns orthogonal neighbors for top-row edge (index 2)', () => {
-      expect(neighbors(2, 1)).toEqual([1, 3, 7]);
+    it('returns 8-way neighbors for top-row interior (index 2)', () => {
+      expect(neighbors(2, 1)).toEqual([1, 3, 6, 7, 8]);
     });
 
-    it('returns orthogonal neighbors for bottom-row edge (index 7)', () => {
-      expect(neighbors(7, 1)).toEqual([2, 6, 8]);
+    it('returns 8-way neighbors for bottom-row interior (index 7)', () => {
+      expect(neighbors(7, 1)).toEqual([1, 2, 3, 6, 8]);
     });
 
-    it('returns orthogonal neighbors for corner (index 9)', () => {
-      expect(neighbors(9, 1)).toEqual([4, 8]);
+    it('returns 8-way neighbors for corner (index 9)', () => {
+      expect(neighbors(9, 1)).toEqual([3, 4, 8]);
     });
 
-    it('returns Manhattan-radius neighbors for range 2', () => {
-      expect(neighbors(0, 2)).toEqual([1, 2, 5, 6]);
+    it('returns Chebyshev-square neighbors for range 2 (corner, in-grid square)', () => {
+      // Slot 0 is a corner: the Chebyshev square of radius 2, clipped to the
+      // 2x5 grid, spans columns 0-2 x rows 0-1 (CG-0MSP1HCAS00785MP AC3).
+      expect(neighbors(0, 2)).toEqual([1, 2, 5, 6, 7]);
+    });
+
+    it('range 2 from a middle-column slot covers the whole grid', () => {
+      // Slot 2 (top-row middle): the 5x5 Chebyshev square covers the entire
+      // 2x5 grid, so every other slot is a neighbor.
+      expect(neighbors(2, 2)).toEqual([0, 1, 3, 4, 5, 6, 7, 8, 9]);
+    });
+
+    it('range 2 uses a square (Chebyshev), not a Manhattan diamond', () => {
+      // Bottom-row edge slot 7: Manhattan radius 2 gives [1, 2, 3, 5, 6, 8, 9];
+      // Chebyshev additionally includes the row-0 corners 0 and 4 (max|dx|<=2
+      // with dy=1). This is the square vs diamond distinction.
+      expect(neighbors(7, 2)).toEqual([0, 1, 2, 3, 4, 5, 6, 8, 9]);
     });
 
     it('returns all other slots for very large range', () => {
@@ -96,7 +116,7 @@ describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
       expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
     });
 
-    it('counts multiple matching neighbors on orthogonal cells', () => {
+    it('counts multiple matching neighbors', () => {
       const grid = emptyGrid();
       grid[6] = makeBiz({ id: 'center', synergyTypes: ['Food'] });
       grid[5] = makeBiz({ id: 'left', synergyTypes: ['Food'] });
@@ -106,17 +126,19 @@ describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
       expect(computeSynergyBonus(grid, 6)).toBe(3 * SYNERGY_BONUS_PER_NEIGHBOR);
     });
 
-    it('does not count diagonal-only matches', () => {
+    it('counts diagonal-only matches (8-way adjacency)', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'origin', synergyTypes: ['Food'] });
       grid[6] = makeBiz({ id: 'diag', synergyTypes: ['Food'] }); // diagonal from index 0
-      expect(computeSynergyBonus(grid, 0)).toBe(0);
+      // Each gains its 50% synergy bonus from the diagonal partner.
+      expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
+      expect(computeSynergyBonus(grid, 6)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
     });
 
     it('respects extended range from upgrades', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'origin', synergyTypes: ['Food'], synergyRangeBonus: 1 }); // range=2
-      grid[2] = makeBiz({ id: 'far', synergyTypes: ['Food'] }); // manhattan distance 2
+      grid[2] = makeBiz({ id: 'far', synergyTypes: ['Food'] }); // Chebyshev distance 2 (same row)
       expect(computeSynergyBonus(grid, 0)).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
     });
 
@@ -198,6 +220,17 @@ describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
       grid[1] = makeBiz({ id: 'biz-hardware-0', name: 'Hardware Store', baseIncome: 1, synergyTypes: ['Commerce'] });
       expect(computeBusinessIncome(grid, 0)).toBe(1); // base only, no synergy
     });
+
+    it('triggers the same-type 60% penalty via diagonal-only adjacency', () => {
+      const grid = emptyGrid();
+      // Two same-type businesses placed diagonally (slots 0 and 6).
+      grid[0] = makeBiz({ id: 'biz-diner-0', name: 'Diner', baseIncome: 2, synergyTypes: ['Food'] });
+      grid[6] = makeBiz({ id: 'biz-diner-1', name: 'Diner', baseIncome: 2, synergyTypes: ['Food'] });
+      // Same-type neighbor (diagonal) reduces base income to 60%; same-type
+      // neighbors are not counted toward synergy N, so synergy is 0.
+      expect(computeBusinessIncome(grid, 0)).toBeCloseTo(2 * 0.6, 5);
+      expect(computeBusinessIncome(grid, 6)).toBeCloseTo(2 * 0.6, 5);
+    });
   });
 
   describe('computeIncome', () => {
@@ -251,13 +284,14 @@ describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
       const coinsBefore = state.resourceBank.coins;
       const result = applyIncome(state);
 
-      // Percentage-based formula:
-      // slot 0: base=3, rate=0.5, N=1, synergy=1.5, total=4.5
-      // slot 1: base=2, rate=0.5, N=1, synergy=1, total=3
-      expect(result.total).toBe(7.5); // 4.5 + 3 pre-multiplier
+      // Percentage-based formula (Medium synergy multiplier re-tuned 1.0 → 0.35
+      // by CG-0MSP26Q5N002EH8P):
+      // slot 0: base=3, rate=0.5, N=1, synergy=0.525, total=3.525
+      // slot 1: base=2, rate=0.5, N=1, synergy=0.35, total=2.35
+      expect(result.total).toBeCloseTo(5.875); // 3.525 + 2.35 pre-multiplier
       // CG-0MRER3RE300418SG: Math.floor removed; fractional values preserved.
-      // 7.5 * 1.15 = 8.625
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 8.625);
+      // 5.875 * 1.15 = 6.75625
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 6.75625);
     });
   });
 });

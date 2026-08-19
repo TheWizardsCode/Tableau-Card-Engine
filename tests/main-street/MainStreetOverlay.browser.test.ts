@@ -129,6 +129,8 @@ function forceGameOver(scene: Phaser.Scene, isWin = false): void {
   const result: TurnResult = {
     income: { total: 0, breakdown: [], handSynergyTotal: 0 },
     incident: null,
+    incidentCoinChange: 0,
+    incidentRepChange: 0,
     finalScore: isWin ? 100 : 0,
     gameResult: isWin ? 'win' : 'loss',
     newlyCompletedChallenges: [],
@@ -310,6 +312,80 @@ describe('Main Street overlay button tests', () => {
     expect(breakdown).toBeDefined();
     expect(breakdown!.text).toContain('Coins: 123');
     expect(breakdown!.text).not.toContain('123.456');
+  });
+
+  it('should show count-only line for unlocked tiers (no per-card names)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene')!;
+    const s = scene as any;
+
+    // Ensure state/layout exist
+    if (!s.state) {
+      s.state = {
+        coins: 200,
+        reputation: 30,
+        resourceBank: { coins: 200, reputation: 30 },
+        challengesCompleted: [],
+        endReason: 'all_businesses_placed',
+        config: {
+          reputationScoreMultiplier: 2,
+          challengeBonusPoints: 10,
+        },
+      };
+    }
+    if (!s.layout) {
+      s.layout = { gameW: 1280, gameH: 720 };
+    }
+
+    // Force game-over with a newly unlocked tier that has newCardIds.
+    // Using 'tier-2' which has newCardIds in TIER_DEFINITIONS.
+    const result: TurnResult = {
+      income: { total: 0, breakdown: [], handSynergyTotal: 0 },
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      finalScore: 500,
+      gameResult: 'win',
+      newlyCompletedChallenges: [],
+    };
+    s.showGameOverOverlay(result, ['tier-2']);
+    await waitFrames(3);
+
+    const overlayObjects = s.overlayObjects as Phaser.GameObjects.GameObject[] | undefined;
+    expect(overlayObjects).toBeDefined();
+
+    const overlayTexts: Phaser.GameObjects.Text[] = (overlayObjects ?? [])
+      .filter((c) => c instanceof Phaser.GameObjects.Text) as Phaser.GameObjects.Text[];
+
+    // Use overlayTexts as the authoritative source (they hold all overlay content)
+    const allTexts = overlayTexts;
+    // Sanity guard: the unlock section must actually be rendered (non-vacuous).
+    expect(allTexts.length).toBeGreaterThan(0);
+
+    // 1. Verify the "Tier Unlocked!" header is present
+    const tierHeader = allTexts.find(
+      (t) => t.text === 'Tier Unlocked!',
+    );
+    expect(tierHeader).toBeDefined();
+
+    // 2. Verify the tier name line is present (e.g. "NEW: Tier N - <name> ...")
+    const tierLine = allTexts.find(
+      (t) => /^NEW: Tier \d+/u.test(t.text),
+    );
+    expect(tierLine).toBeDefined();
+
+    // 3. Verify the count line is present (e.g. "  + 3 new cards")
+    const countLine = allTexts.find(
+      (t) => /^\s*\+ \d+ new card/u.test(t.text),
+    );
+    expect(countLine).toBeDefined();
+
+    // 4. Verify NO individual card names appear in the overlay text nodes.
+    // Collect all text and filter for lines that look like card entries ("  + <name>").
+    const cardEntryTexts = allTexts.filter(
+      (t) => /^\s*\+ [A-Z][a-zA-Z ]+$/u.test(t.text) && !/^\s*\+ \d+ new card/u.test(t.text),
+    );
+    expect(cardEntryTexts).toHaveLength(0);
   });
 
   it('should show Menu button in the HUD container', async () => {

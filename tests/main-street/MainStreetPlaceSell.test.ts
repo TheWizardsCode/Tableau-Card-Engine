@@ -1,10 +1,11 @@
 /**
  * Main Street: Card Placement & Sell System Tests
  *
- * Tests for placing cards from hand onto the tableau at 80% of purchase cost,
- * and selling cards from hand or tableau for 75% of purchase value. Includes
- * edge cases (insufficient coins, empty slots, empty hand), discard pile
- * tracking, and transcript recording.
+ * Tests for placing cards from hand onto the tableau (cost-at-play: the card's
+ * listed cost is paid on placement, CG-0MSTOATDT009BRX2) and selling cards
+ * from hand or tableau for 75% of purchase value. Includes edge cases
+ * (insufficient coins, empty slots, empty hand), discard pile tracking, and
+ * transcript recording.
  *
  * NOTE: These tests validate place/sell features added by the Multi-Use Card
  * Economy implementation (CG-0MQRXN2CT0076OW7). The hand state fields (hand,
@@ -149,11 +150,14 @@ function findEmptySlot(state: MainStreetState): number {
 }
 
 /**
- * Returns an affordable business card from the development row.
+ * Returns an affordable business/community-space card from the market row.
+ * (CG-0MSTOATDT009BRX2: the row may also hold event/upgrade cards, but place
+ * and sell only operate on business/community-space cards.)
  */
 function getAffordableCard(state: MainStreetState): BusinessCard | undefined {
-  return state.market.development.find(
-    c => c.cost <= state.resourceBank.coins,
+  return state.market.cards.find(
+    c => (c.family === 'business' || c.family === 'community-space')
+      && c.cost <= state.resourceBank.coins,
   ) as BusinessCard | undefined;
 }
 
@@ -164,7 +168,7 @@ describe('MainStreet Place/Sell System', () => {
 
   describe('Place from hand to tableau', () => {
     it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_API_AVAILABLE)(
-      'should place card from hand to tableau without coin deduction',
+      'should place card from hand to tableau with cost-at-play deduction',
       async () => {
         const state = createTestState();
         executeDayStart(state);
@@ -183,8 +187,8 @@ describe('MainStreet Place/Sell System', () => {
         const engine = await import('../../example-games/main-street/MainStreetEngine');
         (engine as any).placeFromHand(state, handIndex, slot);
 
-        // Coins unchanged (placement is free)
-        expect(state.resourceBank.coins).toBe(coinsBefore);
+        // Coins deduct the card's listed cost at placement (cost-at-play)
+        expect(state.resourceBank.coins).toBe(coinsBefore - card.cost);
 
         // Card removed from hand
         expect(getHand(state)).not.toContainEqual(expect.objectContaining({ id: card.id }));
@@ -196,7 +200,7 @@ describe('MainStreet Place/Sell System', () => {
     );
 
     it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_API_AVAILABLE)(
-      'placement from hand does not deduct coins',
+      'placement from hand deducts the card cost',
       async () => {
         const state = createTestState();
         executeDayStart(state);
@@ -215,8 +219,12 @@ describe('MainStreet Place/Sell System', () => {
 
         (engine as any).placeFromHand(state, handIndex, slot);
 
-        // No coin deduction for placement
-        expect(state.resourceBank.coins).toBe(coinsBefore);
+        // Cost-at-play: placement pays the card's listed cost
+        expect(state.resourceBank.coins).toBe(coinsBefore - card.cost);
+
+        const expectedValue = Math.floor(card.cost * EXPECTED_SELL_VALUE_RATIO);
+        (engine as any).sellFromTableau(state, slot);
+        expect(state.resourceBank.coins).toBe(coinsBefore - card.cost + expectedValue);
       },
     );
 
@@ -252,7 +260,7 @@ describe('MainStreet Place/Sell System', () => {
 
         // Place a card directly on slot 0 to occupy it
         // Use a card from the market's development row
-        const existingCard = state.market.development[0];
+        const existingCard = state.market.cards[0];
         if (existingCard) {
           state.streetGrid[0] = existingCard as any;
         }
@@ -501,7 +509,7 @@ describe('MainStreet Place/Sell System', () => {
     );
 
     it.runIf(HAND_FEATURE_AVAILABLE && PLACE_SELL_API_AVAILABLE)(
-      'should allow placement even with 0 coins (placement is free)',
+      'should block placement with 0 coins (cost-at-play)',
       async () => {
         const state = createTestState();
         executeDayStart(state);
@@ -516,14 +524,14 @@ describe('MainStreet Place/Sell System', () => {
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 
-        // Placement with 0 coins should succeed (no cost)
+        // Placement with 0 coins must fail (the card costs 10 at play)
         expect(() => {
           (engine as any).placeFromHand(state, handIndex, slot);
-        }).not.toThrow();
+        }).toThrow(/coins/i);
 
-        // Card should be placed
-        expect(state.streetGrid[slot]).not.toBeNull();
-        expect(state.hand.length).toBe(0);
+        // Card stays in hand; slot remains empty
+        expect(state.streetGrid[slot]).toBeNull();
+        expect(state.hand.length).toBe(1);
       },
     );
   });
@@ -697,8 +705,11 @@ describe('MainStreet Place/Sell System', () => {
         const state = createTestState();
         executeDayStart(state);
 
-        const firstCard = state.market.development[0] as BusinessCard;
-        const secondCard = state.market.development[1] as BusinessCard;
+        const bizCards = state.market.cards.filter(
+          c => c.family === 'business' || c.family === 'community-space',
+        );
+        const firstCard = bizCards[0] as BusinessCard | undefined;
+        const secondCard = bizCards[1] as BusinessCard | undefined;
         if (!firstCard || !secondCard) return;
 
         addCardToHand(state, { ...firstCard });
@@ -879,7 +890,7 @@ describe('MainStreet Place/Sell System', () => {
         const state = createTestState();
         executeDayStart(state);
 
-        const cards = state.market.development.filter(
+        const cards = state.market.cards.filter(
           c => c.cost <= state.resourceBank.coins,
         ).slice(0, 2);
         if (cards.length < 2) return;
@@ -956,7 +967,7 @@ describe('MainStreet Place/Sell System', () => {
       expect(state.resourceBank.coins).toBeGreaterThan(0);
       expect(state.resourceBank.reputation).toBeGreaterThan(0);
       expect(state.streetGrid).toHaveLength(GRID_SIZE);
-      expect(state.market.development.length).toBeGreaterThan(0);
+      expect(state.market.cards.length).toBeGreaterThan(0);
     });
 
     it('rejects placing an event card from hand onto the street (CG-0MSKU0BE5003I2ZD)', async () => {
@@ -979,7 +990,7 @@ describe('MainStreet Place/Sell System', () => {
       if (slot < 0) return;
 
       const engine = await import('../../example-games/main-street/MainStreetEngine');
-      expect(() => (engine as any).placeFromHand(state, 0, slot)).toThrow(/Event cards cannot be placed/);
+      expect(() => (engine as any).placeFromHand(state, 0, slot)).toThrow(/cannot be placed/);
       // The event must remain in hand and the slot must stay empty
       expect(state.hand).toHaveLength(1);
       expect(state.streetGrid[slot]).toBeNull();

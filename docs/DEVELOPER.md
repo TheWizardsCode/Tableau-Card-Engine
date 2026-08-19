@@ -139,6 +139,29 @@ npm run package:mac    # dmg
 
 Output goes to the gitignored `release/` directory. Config: `electron-builder.yml` (app id `com.thewizardscode.tableaucardengine`, asar containing only `dist/` + `dist-electron/` + `package.json` — the renderer and Phaser are Vite-bundled, so no `node_modules` are needed). Packaging runs with `--publish never` (private repo; binaries are uploaded to Steam manually). The Windows binary is also built reproducibly by CI on every push to `main` (`.github/workflows/package.yml`) and uploaded as a workflow artifact.
 
+### Skill: release-windows
+
+`.pi/skills/release-windows/` provides a repo-local skill (`/skill:release-windows`) that promotes the latest CI-built Windows installer to a **draft** GitHub Release — the operator's approval gate is the draft itself (review + publish in the GitHub UI; no pre-approval is requested to create the draft).
+
+**Prerequisites:** `gh` CLI authenticated with `repo` scope. Invoke from the repo root.
+
+**Invocation:**
+
+```bash
+node .pi/skills/release-windows/scripts/promote-windows-release.mjs --dry-run   # print exact commands, touch nothing
+node .pi/skills/release-windows/scripts/promote-windows-release.mjs             # create the draft release
+```
+
+**What it does:**
+
+1. Resolves the latest successful `Package Windows Binary` run (`.github/workflows/package.yml`) via `gh run list` — stops with a clear message if none exists.
+2. Downloads the `tce-windows-installer` artifact (`gh run download`) and locates `TCE-Setup-<version>.exe`.
+3. Derives `v<version>` from the artifact filename and extracts the matching `CHANGELOG.md` section as release notes; falls back to `gh release create --generate-notes` (with an explicit notice) when the section is missing.
+4. Creates a **draft only** release (`gh release create v<version> <exe> --draft`) — never publishes, never marks pre-release. An existing `v<version>` tag is reused by `gh`; if a release already exists the skill skips and reports its URL (idempotent, exit 0).
+5. Prints the draft URL and reminds the operator to review and publish it in the GitHub UI.
+
+**Exit codes:** `0` success/skip; non-zero fatal (no successful run, download failure, missing installer, release creation failure). Windows Setup only — Linux/macOS assets are out of scope. See `SKILL.md` in that directory for the full workflow, error paths, and conventions.
+
 ### DLC content directory (Steam model)
 
 Game content defaults to the bundled `dist/` inside the app. For Steam DLC (option a), the launcher reads game content from an external content root — a Steam-managed DLC install directory containing `index.html` + assets — supplied via:
@@ -174,6 +197,8 @@ npm run tf:generate # generate tf audio artifacts (out-of-repo build/tf-synths)
 ```
 
 `npm test` is intentionally non-destructive and must not mutate tracked source assets such as `public/assets/games/main-street/svg/cards`. If asset regeneration is needed, run the dedicated generation scripts explicitly.
+
+> **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only. The full test suite is run locally before every push (quality gates in `AGENTS.md`) and is intentionally not re-run in PR CI: the Phaser 4 browser suite outgrew the single-Chromium-instance context budget in the constrained CI environment (reliably hard-killed mid-run). The Monte Carlo env-var table below therefore applies to **local** runs (and any future CI that re-enables tests), not to PR CI.
 
 ### Monte Carlo environment variables
 
@@ -261,6 +286,16 @@ The helper module at `tests/helpers/main-street-tutorial-e2e.ts` contains shared
 
 During Vitest runs, the dev-only transcript persistence middleware (`POST /api/transcripts`) is intentionally disabled even though Vitest browser mode uses an internal Vite server. This prevents file-system side effects and reduces harness noise/flakiness during test execution.
 
+### Dev-server transcript persistence: memory-safety bounds
+
+When running `npm run dev`, the dev server exposes `POST /api/transcripts` (via `scripts/vite-transcript-plugin.ts`) so the browser can persist game transcripts to `data/transcripts/<game>/`. Three bounds keep this endpoint from growing the dev-server process without limit (fix for CG-0MSXL0A25009WZVK):
+
+1. **Body size cap** — request bodies larger than 5 MiB are rejected with `413`. Transcripts are at most ~2.4 MB (largest fixture), so real saves are never rejected; the cap prevents a client from buffering an unbounded body in server memory (the previous `body += chunk.toString()` concat had no limit and ran in O(n²)).
+2. **Write rate limit** — at most one accepted write per second (subsequent requests receive `429`). This prevents a misbehaving save loop from flooding the watched tree with new files.
+3. **Watcher ignore list** — `server.watch.ignored` in `vite.config.ts` excludes the dev-output trees (`**/data/**`, `**/tmp/**`, `**/results/**`, `**/dist/**`, `**/dist-electron/**` via `DEV_WATCH_IGNORE_PATTERNS`). Vite does **not** consult `.gitignore` for watching, and every new file written into a watched directory previously created a permanently-retained inotify watcher + path strings in the dev server (measured ~10-43 KB/file of unbounded growth), which contributed to dev-server heap OOMs during long sessions/play-throughs.
+
+The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json`, so `scripts/replay.ts` and `scripts/export-transcripts.ts` keep working without modification. The middleware's bounded-input behaviour is unit-tested in `tests/scripts/vite-transcript-plugin.test.ts`, and the watcher-ignore wiring in `tests/scripts/vite-transcript-plugin.test.ts` (config contract).
+
 ### Writing unit tests
 
 - Place test files in `tests/` following the `*.test.ts` pattern
@@ -344,7 +379,7 @@ npx playwright install --list
 
 This lists the installed browsers and their expected locations (e.g. `chromium-1208`).
 
-**Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. CI (`.github/workflows/pr-checks.yml`) installs Chromium before `npm test`, so the pre-check passes there.
+**Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. PR CI is build-only (CG-0MT022826006EM0D) and no longer runs browser tests; local devs run `npx playwright install chromium` once (see [Browser test setup](#browser-test-setup)).
 
 ## ToneForge Audio Generation
 
@@ -432,7 +467,8 @@ example-games/
 │   ├── main.ts                         Game entry point
 │   ├── createBeleagueredCastleGame.ts   Factory function (used by main.ts)
 │   ├── BeleagueredCastleState.ts        State types, move types, constants
-│   ├── BeleagueredCastleRules.ts        Pure game logic (deal, moves, win/loss)
+│   ├── BeleagueredCastleRules.ts        Pure game logic (deal, moves, win/loss; classic + Citadel deal variants)
+│   ├── BeleagueredCastleVariant.ts      Citadel/Classic variant selection persistence (localStorage)
 │   ├── BeleagueredCastleAi.ts           AI solver (search + heuristics) powering the hint system
 │   ├── GameTranscript.ts               Transcript recording (BCTranscriptRecorder)
 │   ├── help-content.json               Help panel content (rules, controls, tips)
@@ -706,7 +742,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Game | Location | Key engine features demonstrated | Tests |
 |------|----------|--------------------------------|-------|
 | 9-Card Golf | `example-games/golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
-| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights) | `tests/beleaguered-castle/` (10 files) |
+| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights), Classic/Citadel deal variants via a persisted pre-game popup (Citadel deals all 52 cards, no pre-placed aces) | `tests/beleaguered-castle/` (13 files) |
 | Sushi Go! | `example-games/sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
@@ -738,6 +774,8 @@ data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json
 This happens via a fire-and-forget POST from `TranscriptStore.save()`. If the POST fails (e.g. the production build is being served instead of the dev server), a `console.warn` is emitted but gameplay is not disrupted.
 
 The `data/` directory is gitignored, so persisted transcripts remain local to your machine.
+
+The dev-server middleware enforces memory-safety bounds (body-size cap → 413, write rate limit → 429, and a Vite watcher ignore list for dev-output trees) — see [Dev-server transcript persistence: memory-safety bounds](#dev-server-transcript-persistence-memory-safety-bounds) under Testing. These bounds prevent the transcript write path from growing the dev-server process without limit (CG-0MSXL0A25009WZVK).
 
 ### CLI Batch Export
 
@@ -1847,11 +1885,11 @@ The tutorial layout defines these zones (all use normalized coordinates with opt
 | Zone ID | Description | Uses dimensions |
 |---------|-------------|-----------------|
 | `hud` | HUD strip (top bar with coins, reputation, score) | Yes (full-width bounding box) |
-| `marketBusinessRow` | Business card row in the market area | Yes |
+| `marketBusinessRow` | Legacy full-market-area zone (single row now drawn in the same band) | No (informational) |
 | `streetGrid` | The 2×5 street grid for placing businesses | Yes (stops before right column) |
 | `endTurnButton` | End Turn action button area | Yes |
 | `incidentQueue` | Scrollable incident cards queue | Yes |
-| `investmentsRow` | Investment/upgrade card row | Yes |
+| `investmentsRow` | ALIAS of `developmentRow` — the market rows were merged into one (CG-0MSTOATDT009BRX2); upgrade/event steps highlight the same single row | Yes |
 | `helpButton` | Help/settings button area | Yes |
 
 Zones that return `null` for highlighting (no bounding box needed):
@@ -1893,6 +1931,34 @@ When creating a new tutorial layout file:
 6. **Validate** with `validateScreenLayoutDocument()` and `composeResolvedLayouts()` before committing
 
 See `example-games/main-street/layouts/main-street-tutorial.layout.json` for a complete example.
+
+#### Tutorial tooltip input routing (DOM pass-through prevention)
+
+The tutorial tooltip is rendered as a Phaser **DOMElement** (`s.add.dom`) so it can draw above
+DOM-based card elements. Phaser 4 (RC.7) enables `input.windowEvents` by default: the
+MouseManager and TouchManager register `mousedown`/`mouseup` and `touchstart`/`touchend`
+listeners on `window.top` that process ANY event whose `event.target` is not the canvas —
+guarded only by `!event.defaultPrevented` (see `node_modules/phaser/src/input/mouse/MouseManager.js`
+and `touch/TouchManager.js`). Without interception, a pointer down/up on the tooltip (a button or
+the box itself) would ALSO dispatch `pointerdown`/`pointerup` to whatever interactive game object
+lies beneath the tooltip (hand card, market card, street slot, End Turn), corrupting game state
+mid-tutorial.
+
+`MainStreetTutorialHints.showStep()` therefore attaches `stopPropagation` listeners for
+`pointerdown`, `pointerup`, `mousedown`, `mouseup`, `touchstart`, `touchend` and `touchcancel` on
+the tooltip container, so those events never reach Phaser's window-level listeners. This is the
+only place in the repo that creates interactive Phaser DOM elements. `stopPropagation` (rather
+than `preventDefault`) is used deliberately:
+
+- it does NOT cancel the browser's default actions, so touch scrolling of the `overflow: auto`
+  tooltip body keeps working, and
+- it does NOT suppress the DOM `click` event, so the buttons' `onclick` handlers (Next / Exit
+  Tutorial / Let's play!) still fire.
+
+Regression coverage: `tests/main-street/TutorialOverlayClickThrough.browser.test.ts` dispatches
+real pointer events at a tutorial button (and the tooltip box) positioned over an interactive
+market card and asserts the game state beneath is untouched while the button's own action fires.
+See CG-0MSTB03U6009J2WV for the original bug report.
 
 ### Related follow-up scope
 
@@ -2390,6 +2456,32 @@ To verify production safety:
 | `src/ui/SettingsPanel.ts` | Debug section rendering in Settings panel |
 
 ## Troubleshooting
+
+**Vite dev server memory growth / heap OOM (CG-0MSXL0A25009WZVK):**
+
+- **Symptoms:** the `npm run dev` process aborts after minutes of use with
+  `FATAL ERROR: Ineffective mark-compacts near heap limit - JavaScript heap
+  out of memory` (V8 old-space near the 4 GB default cap; native stack in
+  `libnode.so`, `Aborted (core dumped)`). Seen on the Main Street game-over
+  screen and in the vitest browser stage.
+- **Root cause:** the dev server's transcript pipeline wrote each
+  game-over transcript as a new file inside the Vite-watched root
+  (`data/transcripts/`), and Vite (which does **not** consult `.gitignore`
+  for watching) retained a permanent inotify watcher + path strings per
+  file (~10-43 KB/file, unbounded over a dev session). The middleware also
+  buffered request bodies with an unbounded O(n²) concat. On an
+  `--host`-exposed server either path can balloon the heap.
+- **Fix applied:** bounded request bodies (413 over 5 MiB), a 1/s write
+  rate limit (429), chunk-array body accumulation, and a watcher ignore
+  list for the dev-output trees — see
+  [Dev-server transcript persistence: memory-safety bounds](#dev-server-transcript-persistence-memory-safety-bounds).
+- **Monitoring tips (profiling a dev server):** run with
+  `node --max-old-space-size=4096 --trace-gc --heapsnapshot-near-heap-limit=2
+  node_modules/vite/bin/vite.js`, sample `grep VmRSS /proc/<pid>/status`
+  and watcher growth (`cat /proc/<pid>/fdinfo/* | grep -c ino:` — a growing
+  watch count while writing files means the ignore list is missing a
+  write target); capture a heap snapshot over CDP
+  (`HeapProfiler.takeHeapSnapshot` on the `--inspect` port).
 
 **Vite dev server won't start:**
 - Check port 3000 is not already in use: `lsof -i :3000`

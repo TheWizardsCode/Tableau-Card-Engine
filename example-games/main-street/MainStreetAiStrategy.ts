@@ -27,11 +27,16 @@ import {
   type BuyBusinessAction,
   type BuyUpgradeAction,
   type BuyEventAction,
+  type MoveToHandAction,
+  type PlayBusinessFromHandAction,
+  type PlayUpgradeFromHandAction,
+  type PlayEventFromHandAction,
 } from './MainStreetEngine';
 import {
   canPurchaseBusiness,
   canPurchaseUpgrade,
   canPurchaseEvent,
+  canAddToHand,
   getEmptySlots,
 } from './MainStreetMarket';
 import type { BusinessCard, UpgradeCard, EventCard } from './MainStreetCards';
@@ -40,9 +45,6 @@ import { computeSynergyBonus } from './MainStreetAdjacency';
 import { computeScore } from './MainStreetEngine';
 
 // ── Scoring constants ───────────────────────────────────────
-
-/** Fixed score for playing a held event (ensures it is preferred over end-turn). */
-const PLAY_EVENT_SCORE = 5;
 
 // ── AI planning horizon (CG-0MSLXJCHH001DLIO, user Q2b) ───────
 
@@ -118,25 +120,37 @@ export interface MainStreetAiStrategy extends AiStrategyBase {
 /**
  * Produces all valid PlayerAction options for the given state.
  *
- * Covers all action types:
- *   - `buy-business`:  one entry per (affordable card × empty slot) pair
- *   - `buy-upgrade`:   one entry per (upgrade card × valid target slot) pair
- *   - `buy-event`:     one entry per purchasable Investment event
- *   - `play-event`:    one entry if the player holds an Investment event
- *   - `end-turn`:      always included
+ * Covers all action types for the single-row market
+ * (CG-0MSTOATDT009BRX2):
+ *   - `buy-business` / `buy-upgrade` / `buy-event`: direct buy-and-place
+ *     (pays immediately), one entry per (affordable card × valid target)
+ *   - `move-to-hand`: free acquisition, bounded only by hand capacity
+ *   - `play-*-from-hand`: cost-at-play placement/activation from the hand
+ *   - `discard-from-hand`: free discard (only enumerated when the hand is
+ *     full, so the AI never gratuitously discards)
+ *   - `end-turn`: always included
  *
- * Every action returned here is guaranteed to be accepted by `executeAction`
- * (i.e. `canPurchase*` checks all pass).
+ * Every action returned here is guaranteed to be accepted by `executeAction`.
  *
  * @param state Current game state.
  * @returns Array of legal PlayerActions.
  */
 export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   const actions: PlayerAction[] = [];
-
-  // ── buy-business ─────────────────────────────────────────
+  const hand = state.hand ?? [];
   const emptySlots = getEmptySlots(state);
-  for (const card of state.market.development as (BusinessCard | import('./MainStreetCards').CommunitySpaceCard)[]) {
+
+  // Action economy (CG-0MSTOF1N5005PK2R): when the daily action budget is
+  // spent, only end-turn is legal. Free operations (refresh/sell/hint/
+  // discard/end-turn) stay available to the player, but the AI simply ends
+  // the day rather than cycling through non-actions.
+  if ((state.actionsRemaining ?? 1) <= 0) {
+    return [{ type: 'end-turn' }];
+  }
+
+  // ── buy-business (direct buy-and-place, pays immediately) ──
+  for (const card of state.market.cards) {
+    if (card.family !== 'business' && card.family !== 'community-space') continue;
     for (const slotIndex of emptySlots) {
       const result = canPurchaseBusiness(state, card.id, slotIndex);
       if (result.legal) {
@@ -145,8 +159,8 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
-  // ── buy-upgrade ───────────────────────────────────────────
-  const upgradeCards = state.market.investments.filter(
+  // ── buy-upgrade (direct, pays immediately) ────────────────
+  const upgradeCards = state.market.cards.filter(
     c => c.family === 'upgrade',
   ) as UpgradeCard[];
   for (const card of upgradeCards) {
@@ -169,8 +183,8 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
-  // ── buy-event ─────────────────────────────────────────────
-  const eventCards = state.market.investments.filter(
+  // ── buy-event (direct, pays immediately) ──────────────────
+  const eventCards = state.market.cards.filter(
     c => c.family === 'event',
   ) as EventCard[];
   for (const card of eventCards) {
@@ -180,9 +194,46 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
-  // ── play-event ────────────────────────────────────────────
-  if ((state.hand ?? []).some(c => c.family === 'event')) {
-    actions.push({ type: 'play-event' });
+  // ── move-to-hand (free; bounded only by hand capacity) ────
+  if (canAddToHand(state).legal) {
+    for (const card of state.market.cards) {
+      actions.push({ type: 'move-to-hand', cardId: card.id });
+    }
+  }
+
+  // ── play-*-from-hand (cost-at-play) ───────────────────────
+  hand.forEach((card, handIndex) => {
+    if (card.family === 'business' || card.family === 'community-space') {
+      if (state.resourceBank.coins < card.cost) return;
+      for (const slotIndex of emptySlots) {
+        actions.push({ type: 'play-business-from-hand', handIndex, slotIndex });
+      }
+    } else if (card.family === 'upgrade') {
+      if (state.resourceBank.coins < card.cost) return;
+      const requiredLevel = card.requiredLevel ?? 0;
+      for (let i = 0; i < GRID_SIZE; i++) {
+        const biz = state.streetGrid[i];
+        if (
+          biz !== null &&
+          biz.name === card.targetBusiness &&
+          biz.level === requiredLevel &&
+          biz.level < biz.maxLevel
+        ) {
+          actions.push({ type: 'play-upgrade-from-hand', handIndex, targetSlot: i });
+        }
+      }
+    } else if (card.family === 'event' && card.trigger === 'Investment') {
+      if (state.resourceBank.coins >= card.cost) {
+        actions.push({ type: 'play-event-from-hand', handIndex });
+      }
+    }
+  });
+
+  // ── discard-from-hand (free; only enumerated when the hand is full) ──
+  if (hand.length >= (state.maxHandSize ?? 3)) {
+    hand.forEach((_, handIndex) => {
+      actions.push({ type: 'discard-from-hand', handIndex });
+    });
   }
 
   // ── end-turn ──────────────────────────────────────────────
@@ -227,19 +278,47 @@ export const GreedyStrategy: MainStreetAiStrategy = {
   chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
     const legalActions = enumerateLegalActions(state);
 
-    // Priority 1: upgrades (highest income gain per coin)
+    // Priority 1: play an affordable business from hand (cost-at-play) with
+    // the best synergy placement score.
+    const handBusinessActions = legalActions.filter(
+      a => a.type === 'play-business-from-hand',
+    ) as PlayBusinessFromHandAction[];
+    if (handBusinessActions.length > 0) {
+      return pickBest(handBusinessActions, a => scorePlayBusinessFromHandAction(state, a), rng);
+    }
+
+    // Priority 2: play an affordable upgrade from hand (cost-at-play).
+    const handUpgradeActions = legalActions.filter(
+      a => a.type === 'play-upgrade-from-hand',
+    ) as PlayUpgradeFromHandAction[];
+    if (handUpgradeActions.length > 0) {
+      return pickBest(handUpgradeActions, a => scorePlayUpgradeFromHandAction(state, a), rng);
+    }
+
+    // Priority 3: buy upgrades (highest income gain per coin)
     const upgradeActions = legalActions.filter(a => a.type === 'buy-upgrade') as BuyUpgradeAction[];
     if (upgradeActions.length > 0) {
       return pickBest(upgradeActions, a => scoreUpgradeAction(state, a), rng);
     }
 
-    // Priority 2: buy business for best synergy placement
+    // Priority 4: buy business for best synergy placement (direct, immediate pay)
     const businessActions = legalActions.filter(a => a.type === 'buy-business') as BuyBusinessAction[];
     if (businessActions.length > 0) {
       return pickBest(businessActions, a => scoreBusinessAction(state, a), rng);
     }
 
-    // Priority 3: buy Investment event with positive coinDelta ROI
+    // Priority 5: move market cards to hand for free (lock in valuable cards
+    // ahead of payment). Score by listed cost — the more expensive the card,
+    // the more valuable it is to reserve.
+    const moveActions = legalActions.filter(a => a.type === 'move-to-hand') as MoveToHandAction[];
+    if (moveActions.length > 0) {
+      return pickBest(moveActions, a => {
+        const card = state.market.cards.find(c => c.id === a.cardId);
+        return card ? card.cost : 0;
+      }, rng);
+    }
+
+    // Priority 6: buy Investment event with positive coinDelta ROI
     const eventActions = legalActions.filter(a => a.type === 'buy-event') as BuyEventAction[];
     if (eventActions.length > 0) {
       const bestEvent = pickBest(eventActions, a => scoreEventAction(state, a), rng);
@@ -248,13 +327,24 @@ export const GreedyStrategy: MainStreetAiStrategy = {
       }
     }
 
-    // Priority 4: play held event
-    const playEventAction = legalActions.find(a => a.type === 'play-event');
-    if (playEventAction) {
-      return playEventAction;
+    // Priority 7: play a held Investment event with positive ROI
+    const playEventActions = legalActions.filter(
+      a => a.type === 'play-event-from-hand',
+    ) as PlayEventFromHandAction[];
+    if (playEventActions.length > 0) {
+      const bestEvent = pickBest(playEventActions, a => scorePlayEventFromHandAction(state, a), rng);
+      if (scorePlayEventFromHandAction(state, bestEvent) > 0) {
+        return bestEvent;
+      }
     }
 
-    // Priority 5: end turn
+    // Priority 8: discard from a full hand (frees capacity for moves)
+    const discardActions = legalActions.filter(a => a.type === 'discard-from-hand');
+    if (discardActions.length > 0) {
+      return pickRandom(discardActions, rng);
+    }
+
+    // Priority 9: end turn
     return { type: 'end-turn' };
   },
 };
@@ -330,7 +420,7 @@ function scoreUpgradeAction(
   state: MainStreetState,
   action: BuyUpgradeAction,
 ): number {
-  const card = state.market.investments.find(
+  const card = state.market.cards.find(
     c => c.id === action.cardId && c.family === 'upgrade',
   ) as UpgradeCard | undefined;
   if (!card) return 0;
@@ -353,7 +443,7 @@ function scoreBusinessAction(
   state: MainStreetState,
   action: BuyBusinessAction,
 ): number {
-  const card = state.market.development.find(c => c.id === action.cardId) as BusinessCard | undefined;
+  const card = state.market.cards.find(c => c.id === action.cardId) as BusinessCard | undefined;
   if (!card) return 0;
 
   // Simulate placement: shallow-clone the grid and insert the new card
@@ -381,11 +471,61 @@ function scoreEventAction(
   state: MainStreetState,
   action: BuyEventAction,
 ): number {
-  const card = state.market.investments.find(
+  const card = state.market.cards.find(
     c => c.id === action.cardId && c.family === 'event',
   ) as EventCard | undefined;
   if (!card) return 0;
 
+  return card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost;
+}
+
+/**
+ * Scores playing a business from hand: same placement heuristic as
+ * `scoreBusinessAction` (income + synergy over the horizon), with the card
+ * located in the hand instead of the market.
+ */
+function scorePlayBusinessFromHandAction(
+  state: MainStreetState,
+  action: PlayBusinessFromHandAction,
+): number {
+  const card = (state.hand ?? [])[action.handIndex] as BusinessCard | undefined;
+  if (!card) return 0;
+
+  const simulatedGrid = [...state.streetGrid];
+  simulatedGrid[action.slotIndex] = card;
+  const projectedSynergyBonus = computeSynergyBonus(
+    simulatedGrid,
+    action.slotIndex,
+    state.config.synergyBonusPerNeighbor,
+  );
+  const horizon = aiPlanningHorizon(state);
+  return (card.baseIncome + projectedSynergyBonus) * horizon - card.cost;
+}
+
+/**
+ * Scores playing an upgrade from hand: income bonus over the horizon minus
+ * the cost paid at play time.
+ */
+function scorePlayUpgradeFromHandAction(
+  state: MainStreetState,
+  action: PlayUpgradeFromHandAction,
+): number {
+  const card = (state.hand ?? [])[action.handIndex] as UpgradeCard | undefined;
+  if (!card) return 0;
+  const horizon = aiPlanningHorizon(state);
+  return card.incomeBonus * horizon - card.cost;
+}
+
+/**
+ * Scores playing an Investment event from hand: coin/reputation value minus
+ * the cost paid at play time.
+ */
+function scorePlayEventFromHandAction(
+  state: MainStreetState,
+  action: PlayEventFromHandAction,
+): number {
+  const card = (state.hand ?? [])[action.handIndex] as EventCard | undefined;
+  if (!card) return 0;
   return card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost;
 }
 
@@ -418,12 +558,31 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       return scoreBusinessAction(state, action);
     case 'buy-event':
       return scoreEventAction(state, action);
-    case 'play-event':
-      return PLAY_EVENT_SCORE;
-    case 'buy-business-to-hand':
+    case 'play-business-from-hand':
+      return scorePlayBusinessFromHandAction(state, action);
+    case 'play-upgrade-from-hand':
+      return scorePlayUpgradeFromHandAction(state, action);
+    case 'play-event-from-hand':
+      return scorePlayEventFromHandAction(state, action);
+    case 'play-event': {
+      const card = (state.hand ?? []).find(c => c.family === 'event') as EventCard | undefined;
+      return card
+        ? card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost
+        : 0;
+    }
+    case 'move-to-hand':
+      return 0;
+    case 'discard-from-hand':
       return 0;
     case 'end-turn':
       return 0;
+    // Action economy actions (CG-0MSTOF1N5005PK2R). Minimal scoring for now;
+    // the AI strategy child (CG-0MSX41S7I009MMZN) refines budget-aware scoring.
+    case 'buy-and-place':
+      return scoreBusinessAction(state, { type: 'buy-business', cardId: action.cardId, slotIndex: action.slotIndex });
+    case 'hire-staff':
+      // Net value of expanded hand slots vs. cost + ongoing cost (rough estimate).
+      return 2;
   }
 }
 

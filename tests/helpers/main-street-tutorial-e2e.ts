@@ -351,8 +351,11 @@ async function pollUntil(
 export async function clickRequiredBusinessCard(scene: Phaser.Scene): Promise<void> {
   const s = scene as any;
   const controller = s.tutorialController;
-  const devCards = s.state?.market?.development;
-  if (!devCards || devCards.length === 0) return;
+  // Single market row (CG-0MSTOATDT009BRX2): businesses and events share one
+  // row; the tutorial select-business step targets a business/community card.
+  const marketCards = s.state?.market?.cards ?? [];
+  const devCards = marketCards.filter((c: any) => c.family === 'business' || c.family === 'community-space');
+  if (devCards.length === 0) return;
 
   let cardToClick = devCards[0];
   let requiredId: string | undefined;
@@ -418,8 +421,11 @@ function maybeAdvanceFromRequiredAction(
 export async function clickRequiredEventCard(scene: Phaser.Scene): Promise<void> {
   const s = scene as any;
   const controller = s.tutorialController;
-  const investments = s.state?.market?.investments;
-  if (!investments || investments.length === 0) return;
+  // Single market row (CG-0MSTOATDT009BRX2): events share the row with
+  // businesses; filter the event-family cards for the buy-event step.
+  const marketCards = s.state?.market?.cards ?? [];
+  const investments = marketCards.filter((c: any) => c.family === 'event');
+  if (investments.length === 0) return;
 
   let cardToClick: any = null;
   if (controller?.isActive) {
@@ -466,9 +472,14 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
   if (s.pendingHandIndex === null && hand.length === 0 && s.tutorialController?.isActive) {
     const step = getCurrentStep(s.tutorialController);
     if (step?.requiredAction === 'select-business' || step?.requiredAction === 'place-business') {
-      // Execute purchase synchronously so the card is in hand for placement
-      const devCards = s.state?.market?.development;
-      if (devCards && devCards.length > 0) {
+      // Execute the pick-up synchronously so the card is in hand for placement.
+      // Cost-at-play (CG-0MSTOATDT009BRX2): taking a card to hand is FREE; the
+      // listed cost is paid by placeFromHand when the card is placed.
+      const marketCards = s.state?.market?.cards;
+      const devCards = (marketCards ?? []).filter(
+        (c: any) => c.family === 'business' || c.family === 'community-space',
+      );
+      if (devCards.length > 0) {
         let cardToBuy = devCards[0];
         if (step?.requiredCardId) {
           // Current step has a specific requiredCardId
@@ -486,12 +497,11 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
             }
           }
         }
-        const cardIdx = devCards.findIndex((c: any) => c.id === cardToBuy.id);
+        const cardIdx = marketCards.findIndex((c: any) => c.id === cardToBuy.id);
         if (cardIdx >= 0) {
-          // Deduct coins and add to hand
-          s.state.resourceBank.coins -= cardToBuy.cost;
-          s.state.hand.push({ ...devCards[cardIdx] });
-          devCards.splice(cardIdx, 1);
+          // Move to hand (free, mirrors moveToHand()); placement pays the cost.
+          s.state.hand.push({ ...marketCards[cardIdx] });
+          marketCards.splice(cardIdx, 1);
           s.pendingHandIndex = s.state.hand.length - 1;
         }
       }
@@ -501,8 +511,10 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
   // Legacy flow: set pendingBusinessCard if hand is empty
   if (s.pendingHandIndex === null && s.pendingBusinessCard === null) {
     const controller = s.tutorialController;
-    const devCards = s.state?.market?.development;
-    if (devCards && controller?.isActive) {
+    const devCards = (s.state?.market?.cards ?? []).filter(
+      (c: any) => c.family === 'business' || c.family === 'community-space',
+    );
+    if (devCards.length > 0 && controller?.isActive) {
       const step = getCurrentStep(controller);
       if (step?.requiredCardId) {
         const found = devCards.find((c: any) => c.id === step.requiredCardId);
@@ -580,6 +592,42 @@ function dispatchCanvasMouse(type: string, worldX: number, worldY: number): void
 }
 
 /**
+ * Dispatch a real pointer click at a street slot while a card is pending
+ * WITHOUT asserting that it was placed — used to verify illegal-placement
+ * rejection during the tutorial (e.g. T13: the Library must be built next
+ * to the Bookshop).
+ *
+ * Mirrors `clickStreetSlot`'s setup (placing phase + street-grid refresh +
+ * native mousedown/mouseup through Phaser's actual input pipeline) so the
+ * rejection path is exercised end-to-end. The caller asserts the resulting
+ * user-facing feedback (instruction message naming the synergy partner,
+ * slot still empty, card still in hand, tutorial step not advanced).
+ */
+export async function clickStreetSlotExpectRejected(
+  scene: Phaser.Scene,
+  slotIdx: number,
+): Promise<void> {
+  const s = scene as any;
+  if (s.pendingHandIndex === null && (s.state?.hand ?? []).length > 0) {
+    s.pendingHandIndex = 0;
+  }
+  s.uiPhase =
+    s.pendingHandIndex !== null ? 'placing-from-hand' : 'placing-business';
+  // Rebuild the street grid so the empty-slot rectangles are interactive
+  // with the correct phase (same rationale as clickStreetSlot).
+  try { s.refreshStreetGrid(); } catch { /* ignore */ }
+  await new Promise((r) => setTimeout(r, 100));
+
+  const center = s.getStreetSlotCenter(slotIdx);
+  dispatchCanvasMouse('mousedown', center.x, center.y);
+  await new Promise((r) => setTimeout(r, 120)); // separate frames, even under CI contention
+  dispatchCanvasMouse('mouseup', center.x, center.y);
+
+  // Let the rejection handler run and set the blocked-move feedback text.
+  await new Promise((r) => setTimeout(r, 300));
+}
+
+/**
  * End the current turn and advance the tutorial.
  */
 
@@ -590,16 +638,24 @@ export async function clickEndTurn(scene: Phaser.Scene): Promise<void> {
   const s = scene as any;
   if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
   const stepBefore = getStepIndex(scene);
+  const turnBefore = s.state?.turn ?? 0;
   try { s.endTurn(); } catch (_) { /* ignore */ }
-  // Wait for the end-turn processing to complete (turn advances or tutorial
-  // advances past the end-turn step).
-  await pollUntil(() => getStepIndex(scene) !== stepBefore || (s.state?.turn ?? 0) > 1, 10_000);
+  // Wait for the end-turn processing to complete AND the day-start transition
+  // to land: the tutorial step overlay advances immediately, but the 800ms
+  // delayed startDayPhase (market refill + tutorial market guarantee hook)
+  // runs afterwards — reading state before then sees the previous day's row.
+  await pollUntil(
+    () =>
+      (getStepIndex(scene) !== stepBefore || (s.state?.turn ?? 0) > turnBefore) &&
+      s.state?.phase === 'MarketPhase',
+    10_000,
+  );
   maybeAdvanceFromRequiredAction(scene, 'end-turn');
   await new Promise((r) => setTimeout(r, 200));
 }
 
 /**
- * Play the held investment event from the hand (T13 "Triggering Events").
+ * Play the held investment event from the hand (T14 "Triggering Events").
  * Finds the first event-family card in the player's hand and calls
  * onPlayHeldEvent with its index, then waits for the event to leave the hand.
  */

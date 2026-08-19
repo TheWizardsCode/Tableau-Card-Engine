@@ -135,9 +135,12 @@ describe('Main Street CheckpointManager integration', () => {
   it('save/load round-trip preserves turn-start state deterministically', async () => {
     const store = new SaveLoadStore();
     const state = setupMainStreetGame({ seed: 'existing-api-det-roundtrip' });
+    // Coin cushion so the first market card is always affordable regardless of
+    // which card the expanded pool's seeded market draws.
+    state.resourceBank.coins = 100;
 
     executeDayStart(state);
-    const card = state.market.development[0];
+    const card = state.market.cards[0];
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(state);
 
@@ -146,6 +149,7 @@ describe('Main Street CheckpointManager integration', () => {
     expect(restored).not.toBeNull();
 
     const expected = setupMainStreetGame({ seed: 'existing-api-det-roundtrip' });
+    expected.resourceBank.coins = 100; // match the cushion applied above
     executeDayStart(expected);
     executeAction(expected, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(expected);

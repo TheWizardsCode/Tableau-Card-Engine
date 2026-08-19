@@ -221,7 +221,32 @@ describe('MainStreetScene browser tests', () => {
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
     const state = scene.state;
 
-    const eventCard = state.market.investments.find((card: any) => card && card.family === 'event');
+    // The market populates asynchronously during boot. Asserting on it
+    // immediately raced the boot (state.market.cards empty on slow machines)
+    // and flaked ~1/3 of runs — wait deterministically for it instead.
+    await waitForCondition(
+      () => (state.market.cards ?? []).length > 0,
+      { timeoutMs: 15_000, intervalMs: 50, label: 'market populated at boot' },
+    );
+
+    let eventCard = state.market.cards.find((card: any) => card && card.family === 'event');
+    if (!eventCard) {
+      // The boot draw does not guarantee an event card; this test exercises
+      // the held-event RENDERING path (not the draw), so inject a valid
+      // synthetic event card into the state when the draw lacked one.
+      eventCard = {
+        family: 'event',
+        id: 'ms-ev-held-test',
+        name: 'Held Test Event',
+        trigger: 'investment',
+        cost: 1,
+        effect: 'test',
+        target: 'player',
+        coinDelta: 0,
+        reputationDelta: 0,
+      };
+      state.market.cards.push(eventCard);
+    }
     expect(eventCard).toBeTruthy();
 
     // Ensure the held card has an SVG source available so rasterized textures can be generated.
@@ -298,11 +323,15 @@ describe('MainStreetScene browser tests', () => {
       const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
       const state = scene.state;
 
+      // Generous coins so an affordable business always exists in the row
+      // regardless of the random seed's market draw.
+      state.resourceBank.coins = 100;
+
       const emptySlots = getEmptySlots(state);
       expect(emptySlots.length).toBeGreaterThan(0);
       const targetSlot = emptySlots[0];
 
-      const business = state.market.development.find((card: any) =>
+      const business = state.market.cards.find((card: any) =>
         card && canPurchaseBusiness(state, card.id, targetSlot).legal,
       );
       expect(business).toBeTruthy();
@@ -359,7 +388,7 @@ describe('MainStreetScene browser tests', () => {
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
       expect(hideSpy).toHaveBeenCalled();
 
-      const eventCard = state.market.investments.find((card: any) =>
+      const eventCard = state.market.cards.find((card: any) =>
         card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
       );
 
@@ -418,7 +447,7 @@ describe('MainStreetScene browser tests', () => {
 
       // ── Business: buy into a NON-empty hand (hand 1 → 2) ──
       // First purchase (hand 0 → 1) so the second buy starts with a non-empty hand.
-      const biz1 = state.market.development.find((c: any) =>
+      const biz1 = state.market.cards.find((c: any) =>
         c && canPurchaseBusiness(state, c.id, 0).legal);
       expect(biz1).toBeTruthy();
 
@@ -431,11 +460,12 @@ describe('MainStreetScene browser tests', () => {
 
       // Second purchase (hand 1 → 2) — the transfer target must equal the
       // rendered resting position of the appended card.
-      const biz2 = state.market.development.find((c: any) =>
+      const biz2 = state.market.cards.find((c: any) =>
         c && c.id !== biz1.id && canPurchaseBusiness(state, c.id, 0).legal);
       expect(biz2).toBeTruthy();
 
       scene.uiPhase = 'market'; // allow the second buy (test control)
+      scene.state.actionsRemaining = 1; // action economy: refill for the second purchase
       const beforeBiz2 = transferSpy.mock.calls.length;
       scene.onBusinessCardClick(biz2);
       await waitForCondition(
@@ -454,7 +484,7 @@ describe('MainStreetScene browser tests', () => {
       expect(Math.abs(bizDest.y - bizRendered.y)).toBeLessThanOrEqual(2);
 
       // ── Event: held-event buy destination equals rendered position ──
-      const eventCard = state.market.investments.find((c: any) =>
+      const eventCard = state.market.cards.find((c: any) =>
         c && c.family === 'event' && canPurchaseEvent(state, c.id).legal);
       if (eventCard) {
         const beforeEvent = transferSpy.mock.calls.length;

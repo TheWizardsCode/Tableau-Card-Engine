@@ -71,7 +71,7 @@ function makeUpg(overrides: Partial<UpgradeCard> = {}): UpgradeCard {
 
 /** Injects an upgrade card into the investments row of state. */
 function injectUpgrade(state: MainStreetState, card: UpgradeCard): void {
-  state.market.investments.push(card);
+  state.market.cards.push(card);
 }
 
 // Helper to clear any pre-existing upgrades from the investments row to
@@ -79,7 +79,7 @@ function injectUpgrade(state: MainStreetState, card: UpgradeCard): void {
 // surprised by setup-populated market contents (deterministic but irrelevant
 // to the unit test intent).
 function clearInvestmentsUpgrades(state: MainStreetState): void {
-  state.market.investments = state.market.investments.filter(c => c.family !== 'upgrade');
+  state.market.cards = state.market.cards.filter(c => c.family !== 'upgrade');
 }
 
 // ── requiredLevel enforcement ─────────────────────────────────
@@ -519,7 +519,7 @@ describe('direct-apply upgrade with duplicate market cards', () => {
     expect(state.streetGrid[0]!.level).toBe(1);
 
     // The other copy remains in the market (not consumed)
-    expect(state.market.investments.some(c => c.id === upg2.id)).toBe(true);
+    expect(state.market.cards.some(c => c.id === upg2.id)).toBe(true);
   });
 
   it('purchases via findTargetBusinessSlot when no explicit slot is given', () => {

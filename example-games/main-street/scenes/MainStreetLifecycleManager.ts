@@ -86,6 +86,11 @@ export class MainStreetLifecycleManager {
         // shakeIllegalMove) — same pattern as Beleaguered Castle.
         s.load.audio(`${ns}:${SFX_KEYS.ILLEGAL_MOVE}`, 'assets/audio/default/illegal-move.wav');
         s.load.audio(SFX_KEYS.ILLEGAL_MOVE, 'assets/audio/default/illegal-move.wav');
+        // Game-over fanfare/sting: the default game-win / game-lost WAVs
+        // live in the shared default audio dir (same pattern as
+        // ILLEGAL_MOVE above — convention keys per docs/SFX_CONVENTION.md).
+        s.load.audio(`${ns}:${SFX_KEYS.GAME_WIN}`, 'assets/audio/default/game-win.wav');
+        s.load.audio(`${ns}:${SFX_KEYS.GAME_LOST}`, 'assets/audio/default/game-lost.wav');
       } catch (e) {
         // Some test environments may lack an audio loader; ignore preload failures
       }
@@ -333,7 +338,8 @@ export class MainStreetLifecycleManager {
         render: (scene, container, x, y, maxWidth) => {
           const paragraph =
             'Adjacent matching synergy types yield bonus income. ' +
-            'Synergy checks are performed for left/right neighbors and stack additively. ' +
+            'Adjacency is 8-way: orthogonal AND diagonally adjacent slots count (including diagonal). ' +
+            'Synergy bonuses stack additively per matching neighbor. ' +
             'Some cards bridge multiple synergy types and count for both. ' +
             'Upgrades can increase range and value. ' +
             'Plan placements to cluster synergies for higher returns.';
@@ -408,7 +414,7 @@ export class MainStreetLifecycleManager {
         body:
           'Hint: get a suggested move (once per turn).\n' +
           'Undo / Redo: step back or forward through market actions.\n' +
-          'Refresh Investments: swap the investment row (costs coins).\n' +
+          'Refresh Market: re-roll the market row for coins (5, less with the Accountant).\n' +
           'Keyboard shortcuts: End Turn key configurable in Settings.',
       },
     ];
@@ -474,8 +480,9 @@ export class MainStreetLifecycleManager {
               // shuffling. This guarantees exactly which cards appear in
               // the market and incident queue, independent of deck
               // composition. The tutorial always uses Easy difficulty
-              // (12 starting coins, 5 starting reputation) for sufficient
-              // coin budget throughout all 13 steps.
+              // (10 starting coins after CG-0MSP26Q5N002EH8P re-tune, 5
+              // starting reputation); the scenario overrides the coin
+              // budget to 16 for the tutorial's fixed buy plan.
               //
               // The scenario system uses the STANDARD_TUTORIAL_SCENARIO
               // definition which references only Tier-1 cards, ensuring
@@ -491,7 +498,7 @@ export class MainStreetLifecycleManager {
               } catch (_) { /* ignore */ }
               // Start the day phase so the market populates
               s.startDayPhase();
-              // Start the action-gated tutorial flow (T1-T12)
+              // Start the action-gated tutorial flow (T1-T17)
               const controller = (s as any).tutorialController as TutorialControllerState | undefined;
               if (controller) {
                 Object.assign(s, { tutorialController: startTutorial(controller) });
@@ -713,10 +720,10 @@ export class MainStreetLifecycleManager {
     const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
 
-    // T12 is a composite buy-and-place step (like T10): the terminal
+    // T13 is a composite buy-and-place step (like T10): the terminal
     // place-business completes it and already returns the scene to the
     // market phase with pendingHandIndex cleared. This reset for play-event
-    // steps (T13) is therefore a defensive no-op today, but it is kept so
+    // steps (T14) is therefore a defensive no-op today, but it is kept so
     // the held event card is always clickable in the hand (event clicks are
     // only wired while uiPhase === 'market').
     const nextStep = getCurrentStep(newState);
@@ -1009,7 +1016,7 @@ export class MainStreetLifecycleManager {
         // Rebuild renderer and start day phase from checkpoint state.
         // Pass skipMarketRefill=true to preserve the saved market state
         // (the saved state already has the correct market from save time;
-        // calling refillAllMarkets would replace it with fresh deck draws).
+        // calling refillMarket would replace it with fresh deck draws).
         try { s.refreshAll(); } catch (_) { /* ignore */ }
         try { s.startDayPhase(true); } catch (_) { /* ignore */ }
 

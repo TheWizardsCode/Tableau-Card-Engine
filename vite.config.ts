@@ -2,7 +2,7 @@
 import { defineConfig } from 'vite';
 import path from 'path';
 import fs from 'fs';
-import { transcriptPersistPlugin } from './scripts/vite-transcript-plugin';
+import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from './scripts/vite-transcript-plugin';
 
 // Read version from package.json (single source of truth)
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
@@ -39,6 +39,17 @@ export default defineConfig(({ mode, command }) => ({
   server: {
     port: 3000,
     open: false,
+    watch: {
+      // Exclude dev-output trees from the file watcher (fix for
+      // CG-0MSXL0A25009WZVK — dev-server heap OOM). Every file written into a
+      // watched dir (each game-over transcript POST → data/transcripts/,
+      // replay capture → tmp/, monte-carlo → results/, builds → dist/)
+      // previously created a permanently-retained per-file watcher with path
+      // strings and closure contexts — measured unbounded memory growth
+      // (~10-43 KB/file). Vite does NOT consult .gitignore for watching, so
+      // this explicit ignore list is required.
+      ignored: [...DEV_WATCH_IGNORE_PATTERNS],
+    },
   },
   test: {
     projects: [

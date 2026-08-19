@@ -7,20 +7,77 @@ import {
   canPurchaseUpgrade,
   canPurchaseEvent,
   canPurchaseBusiness,
-  canRefreshDevelopment,
-  canRefreshInvestments,
+  canRefreshMarket,
   canSellBusiness,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
-import { buyBusinessCommand, buyBusinessToHandCommand, buyUpgradeCommand, buyEventCommand, playEventCommand, refreshDevelopmentCommand, refreshInvestmentsCommand } from '../MainStreetCommands';
+import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, consumeAction } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
+import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
+import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import {
   createDragDropManager,
   DEFAULT_DRAG_DISTANCE_THRESHOLD,
   type DragDropPayload,
 } from '../../../src/ui/dragDrop';
 import { getCurrentStep, isSynergyAdjacentPlacement, resolveTutorialCardParams, type TutorialActionType } from '../TutorialFlow';
+import { ensureTutorialMarketForUpcomingSteps } from '../TutorialScenario';
+import { computeDragTransferDuration } from './MainStreetConstants';
+
+/**
+ * Play illegal-move sound and shake animation on a card target.
+ *
+ * Wraps {@link shakeIllegalMove} with a container-safe fallback:
+ * sprites are shaken directly (with red tint + x-oscillation), while
+ * container objects (market cards) receive a simple x-oscillation
+ * tween without tint (Containers don't have setTint).
+ *
+ * Sound plays via `safePlaySound` so mute/volume settings apply
+ * and missing audio assets are silently ignored.
+ * Reduced-motion is respected: when `scene.settingsPanel.reducedMotion`
+ * is true the shake distance is halved and duration shortened.
+ *
+ * Safe in headless / replay / transcript modes — if the target is
+ * null/undefined no tween is created and no sound is attempted.
+ *
+ * @param target  - Sprite (hand cards) or Container (market cards).
+ * @param scene   - Phaser scene for tween + sound plumbing.
+ */
+function playIllegalFeedback(target: Phaser.GameObjects.Container | Phaser.GameObjects.Image | Phaser.GameObjects.Sprite | null | undefined, scene: any): void {
+  // Always attempt to play the sound (safe even with no audio asset).
+  safePlaySound(scene as any, COMMON_SFX_KEYS.ILLEGAL_MOVE);
+
+  if (!target) return;
+
+  const reducedMotion = scene.settingsPanel?.reducedMotion ?? false;
+  const shakeDistance = reducedMotion ? 3 : 5;
+  const shakeDuration = reducedMotion ? 30 : 50;
+  const shakeRepeats = reducedMotion ? 1 : 2;
+
+  // Duck-typed Container detection: Containers lack setTint (they're
+  // plain groups), while Sprites/Images have setTint/clearTint.
+  const isContainer = (target as any).setTint === undefined;
+
+  if (isContainer) {
+    // Container-safe shake: position oscillation only (no tint).
+    // Sound is already played above (Containers don't support tint).
+    const originalX = (target as any).x;
+    scene.tweens.add({
+      targets: target,
+      x: originalX - shakeDistance,
+      duration: shakeDuration,
+      yoyo: true,
+      repeat: shakeRepeats,
+      ease: 'Sine.inOut',
+      onComplete: () => { (target as any).x = originalX; },
+    });
+  } else {
+    // Sprite/Image shake with red tint + sound via shakeIllegalMove.
+    shakeIllegalMove({ scene, target: target as Phaser.GameObjects.Image | Phaser.GameObjects.Sprite, shakeDistance, duration: shakeDuration, repeat: shakeRepeats });
+  }
+}
 
 /**
  * Match a card ID against a requiredCardId using prefix matching.
@@ -63,6 +120,17 @@ export class MainStreetTurnController {
     executeDayStart(s.state, skipMarketRefill);
     s.uiPhase = 'market';
 
+    // Tutorial: the single-row market only holds 3 cards, so force the
+    // upcoming steps' required purchase targets into the line (days 2+).
+    const dayStartTut = (s as any).tutorialController as any;
+    if (dayStartTut?.isActive) {
+      try {
+        ensureTutorialMarketForUpcomingSteps(s.state, dayStartTut);
+      } catch (_) {
+        // robustness — never block day start on scenario bookkeeping
+      }
+    }
+
     // Reset hint state for the new turn
     s.hintUsedThisTurn = false;
     s.hintedCardId = null;
@@ -70,12 +138,26 @@ export class MainStreetTurnController {
 
     s.refreshAll();
 
-    // Prewarm currently-visible cards after market/queue are populated.
+    // Day transition banner: non-interactive "Day N" reveal at the board
+    // centre (skipped under reduced motion / replay — handled inside the
+    // animator). Skipped while the tutorial is active (its step overlays
+    // carry the guidance) and on checkpoint resume (skipMarketRefill — the
+    // same day continues, so it is not a new-day transition).
+    const tutController = (s as any).tutorialController as { isActive?: boolean } | undefined;
+    if (!skipMarketRefill && !tutController?.isActive) {
+      try { s.msAnimator.animateDayBanner({ day: s.state.turn }); } catch (_) { /* presentation-only — ignore */ }
+    }
     void s.cardSvgLoadPromise
       .then(() => s.prewarmVisibleCardTextures())
       .then(() => {
         try {
           s.refreshAll();
+          // Market deal-in animation: the final refresh is the one the player
+          // sees, so animate after it. Skipped on checkpoint resume
+          // (skipMarketRefill) where the market is preserved, not refilled.
+          if (!skipMarketRefill) {
+            this.animateMarketDealIn('market');
+          }
         } catch {
           // scene may be shutting down
         }
@@ -131,6 +213,30 @@ export class MainStreetTurnController {
     } finally {
       // Reset the flag after processing so subsequent end-turns cycle normally
       s.state.skipMarketCycleOnEndTurn = false;
+    }
+
+    // ── Income Collection Animation ────────────────────────────
+    // Presentation-only VFX (AGENTS.md rule 8): each producing slot emits a
+    // coin that arcs to the HUD coins counter with staggered coin-pop SFX,
+    // reputation-earning cards emit a pip to the rep counter, and a final
+    // "+total" pop lands when collection completes. Skipped under reduced
+    // motion and in replay/headless modes (handled inside the animator).
+    // Runs inside the existing 400ms→800ms turn-advance window so turn
+    // timing is unchanged; never mutates state or transcript — failures are
+    // swallowed so the turn always advances.
+    try {
+      if (result.income && result.income.total > 0) {
+        const grid: Array<{ currentReputationPerTurn?: number } | null> = s.state.streetGrid ?? [];
+        const repSources = grid
+          .map((card, slotIndex) => ({ slotIndex, rep: card?.currentReputationPerTurn ?? 0 }))
+          .filter((src) => src.rep > 0);
+        s.msAnimator.animateIncomeCollection({
+          income: result.income,
+          repSources,
+        });
+      }
+    } catch (_) {
+      // Presentation-only: never block the turn on animation failures.
     }
 
     // Save checkpoint after each completed turn (fire-and-forget)
@@ -210,6 +316,26 @@ export class MainStreetTurnController {
           s.instructionText.setText(`Incident: ${result.incident.name}`);
         }
         s.refreshAll();
+        // Incident reveal presentation (AGENTS.md rule 8): non-blocking VFX —
+        // the resolved incident card flies from the Upcoming queue to the
+        // board centre with a red flash pulse, warning sting SFX, explicit
+        // HUD loss pops and a warning-indicator pulse. Runs after the final
+        // render; reduced-motion keeps the pops + sound, replay/headless
+        // skips everything (handled inside the animator). Never blocks the
+        // turn advance.
+        if (result.incident) {
+          try {
+            s.msAnimator.animateIncidentReveal({
+              cardId: result.incident.id,
+              incidentName: result.incident.name,
+              coinChange: result.incidentCoinChange,
+              repChange: result.incidentRepChange,
+              from: s.msRenderer.getFrontIncidentCardCenter(),
+            });
+          } catch (_) {
+            // presentation-only — ignore
+          }
+        }
         // Tutorial: mark end-turn step complete if active
         (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
         s.time.delayedCall(800, () => this.startDayPhase());
@@ -222,7 +348,7 @@ export class MainStreetTurnController {
     if (s.uiPhase !== 'market') return;
 
     // Tutorial gating: only allow play-event if it's the required action or
-    // the tutorial is inactive (T13 "Triggering Events" uses this gate).
+    // the tutorial is inactive (T14 "Triggering Events" uses this gate).
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('play-event' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
@@ -241,9 +367,18 @@ export class MainStreetTurnController {
     if (card.family !== 'event') return;
 
     console.debug('[MS] onPlayHeldEvent: attempting PlayEvent', { eventId: card.id, coinsBefore: s.state.resourceBank.coins });
+
+    // Capture the played card's position BEFORE the hand re-renders — the
+    // card leaves the hand on `refreshAll`, so its sprite must be read now.
+    const handSpriteSprite = s.msRenderer?.handView?.getSpriteAt?.(index) as Phaser.GameObjects.Sprite | undefined;
+    const handSprite = handSpriteSprite ? { x: handSpriteSprite.x, y: handSpriteSprite.y } : undefined;
+    const playedPos = handSprite;
+
+    let played = false;
     try {
       const cmd = playEventCommand(s.state, index);
       s.undoManager.execute(cmd);
+      played = true;
       // Record action event
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-event' }, description: cmd.description }); } catch (_) {}
       try { s.gameEvents?.emit('card:placed', { action: 'play-event', heldEventId: card.id }); } catch (_) {}
@@ -255,11 +390,25 @@ export class MainStreetTurnController {
         (s.msLifecycleManager as any).onTutorialActionComplete?.('play-event' as TutorialActionType);
       } catch (_) { /* ignore */ }
     } catch (e) {
+      const msg = (e as Error).message;
       console.error('[MS] PlayEvent failed', e);
-      s.instructionText.setText(`Error: ${(e as Error).message}`);
+      // Insufficient-coins rejection → play illegal-move feedback.
+      if (msg.toLowerCase().includes('not enough coins')) {
+        playIllegalFeedback(handSpriteSprite, s);
+      }
+      s.instructionText.setText(`Error: ${msg}`);
     }
 
     s.refreshAll();
+
+    // Burst + cheer SFX + event-name pop at the played card's position
+    // (only when the play succeeded). Reduced motion / replay handled
+    // inside the animator.
+    if (played && playedPos) {
+      try {
+        s.msAnimator.animateEventPlayed({ x: playedPos.x, y: playedPos.y, eventName: card.name });
+      } catch (_) { /* presentation-only — ignore */ }
+    }
   }
 
   public performUndo(): void {
@@ -272,6 +421,12 @@ export class MainStreetTurnController {
       addLog(s.state, 'Undo', 'neutral');
       try { if (cmd) recordMainStreetEvent({ type: 'undo', turn: s.state.turn, reversedAction: { description: cmd.description } }); } catch (_) {}
       s.refreshAll();
+      // Undo feedback (AGENTS.md rule 8): "Undid: <action>" pop above the
+      // hint bar + UI click SFX. Reduced motion / replay handled inside the
+      // animator; non-blocking, presentation-only.
+      if (cmd) {
+        try { s.msAnimator?.animateUndoRedo({ action: 'undo', description: cmd.description }); } catch (_) { /* presentation-only — ignore */ }
+      }
     } catch (e) {
       console.error('Undo failed:', e);
     }
@@ -287,6 +442,12 @@ export class MainStreetTurnController {
       addLog(s.state, 'Redo', 'neutral');
       try { if (cmd) recordMainStreetEvent({ type: 'redo', turn: s.state.turn, reappliedAction: { description: cmd.description } }); } catch (_) {}
       s.refreshAll();
+      // Redo feedback (AGENTS.md rule 8): "Redid: <action>" pop above the
+      // hint bar + UI click SFX. Reduced motion / replay handled inside the
+      // animator; non-blocking, presentation-only.
+      if (cmd) {
+        try { s.msAnimator?.animateUndoRedo({ action: 'redo', description: cmd.description }); } catch (_) { /* presentation-only — ignore */ }
+      }
     } catch (e) {
       console.error('Redo failed:', e);
     }
@@ -295,6 +456,14 @@ export class MainStreetTurnController {
   public onBusinessCardClick(card: BusinessCard): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
+
+    // Action economy (CG-0MSTOF1N5005PK2R): moving a market card to hand
+    // costs the daily action — gate before the transfer animation so the
+    // player gets immediate feedback instead of a mid-flight error.
+    if (s.state.actionsRemaining <= 0) {
+      s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      return;
+    }
 
     // Tutorial gating: only allow select-business if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-business' as TutorialActionType);
@@ -313,7 +482,7 @@ export class MainStreetTurnController {
         : null;
       if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
         // Find the card name from the market for the error message
-        const requiredCard = s.state.market.development.find(
+        const requiredCard = s.state.market.cards.find(
           (c: any) => matchesRequiredCard(c.id, step.requiredCardId!)
         );
         const requiredName = requiredCard?.name ?? 'the specified card';
@@ -338,8 +507,8 @@ export class MainStreetTurnController {
       return;
     }
 
-    // ── Buy to hand (all purchases now go through hand) ─────
-    const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === card.id);
+    // ── Move to hand (free; cost paid at play) ────────────────
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
     const cardName = card.name;
 
     // Ensure stale hover tooltip is cleared
@@ -347,21 +516,24 @@ export class MainStreetTurnController {
 
     s.clearMarketSelection();
     s.uiPhase = 'animating';
-    s.instructionText.setText(`Buying "${cardName}"...`);
+    s.instructionText.setText(`Moving "${cardName}" to hand...`);
     s.hiddenTransferSourceCardIds.add(card.id);
     s.refreshAll();
 
     const afterTransfer = () => {
       try {
-        const cmd = buyBusinessToHandCommand(s.state, card.id);
+        const cmd = moveToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'move-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
-        s.instructionText.setText(`"${cardName}" bought to hand!`);
+        s.instructionText.setText(`"${cardName}" moved to hand (free)!`);
 
-        // Set pending hand index for placement (last card added to hand)
+        // Set pending hand index for placement (last card added to hand).
+        // Same-day move+place composite: the action was already spent on the
+        // move, so placing this card is free (it is part of the same purchase).
         const hand = s.state.hand ?? [];
         s.pendingHandIndex = hand.length - 1;
+        s.pendingHandJustMoved = true;
         s.uiPhase = 'placing-from-hand';
         s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
       } catch (e) {
@@ -386,7 +558,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'business',
-        row: 'development',
+        row: 'market',
         slotIndex: sourceIndex,
         // Animate to the exact resting position in the merged hand — the
         // HandView-predicted insertion position (single source of truth),
@@ -451,13 +623,18 @@ export class MainStreetTurnController {
   public canPickUpBusinessCard(cardId: string): boolean {
     const s = this.scene;
     if (s.uiPhase !== 'market') return false;
-    const card = s.state.market.development.find((c: any) => c.id === cardId);
+    // Action economy (CG-0MSTOF1N5005PK2R): dragging is a buy-and-place
+    // action — no pickup when the daily action budget is spent.
+    if (s.state.actionsRemaining <= 0) return false;
+    const card = s.state.market.cards.find((c: any) => c.id === cardId);
     if (!card) return false;
     // Drag support covers business AND community-space cards (general change,
-    // operator decision A for the T12 Library bug). Events/upgrades stay
+    // operator decision A for the T13 Library bug). Events/upgrades stay
     // click-only (they are not part of the drag-drop module's dev-row model).
     if (card.family !== 'business' && card.family !== 'community-space') return false;
-    if (s.state.resourceBank.coins < card.cost) return false;
+    // Drag-drop buy-and-place pays a +50% premium over the listed cost.
+    const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+    if (s.state.resourceBank.coins < premiumCost) return false;
     if (!s.state.streetGrid.some((slot: any) => slot === null)) return false;
 
     // Tutorial gating: only allow select-business if it is the required
@@ -485,19 +662,30 @@ export class MainStreetTurnController {
    * The target slot must pass `canPurchaseBusiness` (card still in the
    * Development row, enough coins, empty slot, in bounds) and the tutorial
    * must allow the `place-business` action. During a composite buy-and-place
-   * step with a synergy partner (T12: Library next to the Bookshop), the
+   * step with a synergy partner (T13: Library next to the Bookshop), the
    * target must also pass `isSynergyAdjacentPlacement`. A rejected drop
    * snap-backs the card to the Development row with illegal-move feedback.
    */
   public canDropBusinessCard(cardId: string, slotIndex: number): boolean {
     const s = this.scene;
+    // Action economy (CG-0MSTOF1N5005PK2R): buy-and-place consumes the
+    // daily action — no drop when the budget is spent.
+    if (s.state.actionsRemaining <= 0) return false;
     const legality = canPurchaseBusiness(s.state, cardId, slotIndex);
     if (!legality.legal) return false;
+
+    // Drag-drop buy-and-place pays a +50% premium — verify the player can
+    // afford the premium price (not just the listed cost).
+    const card = s.state.market.cards.find((c: any) => c.id === cardId);
+    if (card && (card.family === 'business' || card.family === 'community-space')) {
+      const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+      if (s.state.resourceBank.coins < premiumCost) return false;
+    }
 
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
     if (check && !check.allowed) return false;
 
-    // Tutorial: synergy adjacency for composite buy-and-place steps (T12).
+    // Tutorial: synergy adjacency for composite buy-and-place steps (T13).
     const controller = (s as any).tutorialController as any;
     if (controller?.isActive) {
       const step = controller.currentStepIndex >= 0
@@ -514,17 +702,17 @@ export class MainStreetTurnController {
    * Execute a drag-drop buy-and-place.
    *
    * Buys the dragged business card directly to the drop slot in a single
-   * undoable `buyBusinessCommand` (the same direct buy-to-slot path used by
-   * the AI strategy), with the animated market→street transfer + SFX
-   * matching the click flow's feedback. Note: unlike the click flow (which
-   * buys to hand), the drag flow bypasses the hand entirely.
+   * undoable `buyAndPlaceBusinessCommand` — the direct market→street path
+   * that pays a +50% premium over the listed cost and consumes the daily
+   * action (CG-0MSTOF1N5005PK2R). The animated market→street transfer +
+   * SFX matches the click flow's feedback.
    */
   public onDragDropBusiness(payload: DragDropPayload): void {
     const s = this.scene;
     const cardId = payload.data as string;
     const slotIndex = payload.zoneData as number;
-    const sourceIndex = s.state.market.development.findIndex((c: any) => c.id === cardId);
-    const card = s.state.market.development.find((c: any) => c.id === cardId);
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === cardId);
+    const card = s.state.market.cards.find((c: any) => c.id === cardId);
     if (!card || sourceIndex < 0 || slotIndex == null) return;
 
     // The dragged container follows the pointer, so its position at drop
@@ -538,16 +726,19 @@ export class MainStreetTurnController {
     s.clearMarketSelection();
     s.hiddenTransferSourceCardIds.add(cardId);
     s.uiPhase = 'animating';
-    s.instructionText.setText(`Buying "${cardName}"...`);
+    s.instructionText.setText(`Moving "${cardName}" to hand...`);
     s.refreshAll();
 
     const afterTransfer = (): void => {
+      // Capture synergy pairs before the placement mutates the grid so only
+      // NEWLY formed pairs animate (pre-existing pairs never re-trigger).
+      const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
       try {
-        const cmd = buyBusinessCommand(s.state, cardId, slotIndex);
+        const cmd = buyAndPlaceBusinessCommand(s.state, cardId, slotIndex);
         s.undoManager.execute(cmd);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
-        s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
+        s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex} (50% premium)`);
       } catch (e) {
         console.error('[MS] DragBuyBusiness failed', e);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -558,6 +749,8 @@ export class MainStreetTurnController {
       s.refreshAll();
       s.refreshStreetGrid();
       s.refreshActionButtons();
+      // Synergy-formation animation for any new pairs (non-blocking).
+      this.animateNewSynergyPairs(beforePairs);
       // Tutorial: mark place-business step complete if active
       try {
         (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
@@ -565,13 +758,20 @@ export class MainStreetTurnController {
     };
 
     if (sourceIndex >= 0) {
+      // Transfer duration proportional to the drop-to-slot distance: a card
+      // released next to its slot settles quickly instead of taking the
+      // fixed 1500ms market→slot flight (click/AI flows keep 1500ms via the
+      // shared default). See computeDragTransferDuration (CG-0MST2LS3E004BTPO).
+      const destination = s.getStreetSlotCenter(slotIndex);
+      const distancePx = Math.hypot(destination.x - dropSource.x, destination.y - dropSource.y);
       void s.animateTransferFromMarket({
         cardId,
         family: 'business',
-        row: 'development',
+        row: 'market',
         slotIndex: sourceIndex,
         source: dropSource,
-        destination: s.getStreetSlotCenter(slotIndex),
+        destination,
+        duration: computeDragTransferDuration(distancePx),
       }).then(afterTransfer);
     } else {
       afterTransfer();
@@ -592,7 +792,7 @@ export class MainStreetTurnController {
     // Ensure stale hover tooltip is cleared when a card is placed.
     s.tooltipManager?.hide();
 
-    // Tutorial: synergy adjacency for composite buy-and-place steps (T12 —
+    // Tutorial: synergy adjacency for composite buy-and-place steps (T13 —
     // the Library must be built next to the Bookshop). A non-adjacent click
     // placement is rejected with a data-driven instruction message and the
     // phase stays 'placing-from-hand' so the player can retry.
@@ -614,6 +814,7 @@ export class MainStreetTurnController {
       const handCard = (s.state.hand ?? [])[handIndex];
       if (!handCard) {
         s.pendingHandIndex = null;
+        s.pendingHandJustMoved = false;
         s.uiPhase = 'market';
         s.instructionText.setText('Card no longer in hand.');
         return;
@@ -635,14 +836,30 @@ export class MainStreetTurnController {
       s.refreshAll();
 
       const afterTransfer = (): void => {
+        // Capture synergy pairs before the placement mutates the grid so only
+        // NEWLY formed pairs animate.
+        const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
         try {
+          // Action economy: placing a card that was ALREADY in hand (held
+          // from a previous day) consumes the daily action. A card just moved
+          // from the market this turn is part of the same move+place purchase
+          // (the action was already spent at move-to-hand) and places free.
+          if (!s.pendingHandJustMoved) {
+            consumeAction(s.state);
+          }
           placeFromHand(s.state, handIndex, slotIndex);
-          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'place', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
+          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-business-from-hand', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
           try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
           s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
         } catch (e) {
+          const msg = (e as Error).message;
           console.error('[MS] placeFromHand failed', e);
-          s.instructionText.setText(`Error: ${(e as Error).message}`);
+          // Insufficient-coins rejection → play illegal-move feedback.
+          if (msg.toLowerCase().includes('not enough coins')) {
+            const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
+            playIllegalFeedback(handSprite, s);
+          }
+          s.instructionText.setText(`Error: ${msg}`);
         }
 
         s.hiddenTransferSourceCardIds.delete(cardId);
@@ -650,6 +867,8 @@ export class MainStreetTurnController {
         s.refreshAll();
         s.refreshStreetGrid();
         s.refreshActionButtons();
+        // Synergy-formation animation for any new pairs (non-blocking).
+        this.animateNewSynergyPairs(beforePairs);
         // Tutorial: mark place-business step complete if active
         try {
           (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
@@ -659,7 +878,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId,
         family: 'business',
-        row: 'development',
+        row: 'market',
         slotIndex: handIndex,
         source,
         destination: s.getStreetSlotCenter(slotIndex),
@@ -697,6 +916,9 @@ export class MainStreetTurnController {
     s.refreshAll();
 
     const afterTransfer = (): void => {
+      // Capture synergy pairs before the placement mutates the grid so only
+      // NEWLY formed pairs animate.
+      const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
       try {
         const cmd = buyBusinessCommand(s.state, pendingCardId, slotIndex);
         s.undoManager.execute(cmd);
@@ -711,6 +933,8 @@ export class MainStreetTurnController {
       s.hiddenTransferSourceCardIds.delete(pendingCardId);
       s.uiPhase = 'market';
       s.refreshAll();
+      // Synergy-formation animation for any new pairs (non-blocking).
+      this.animateNewSynergyPairs(beforePairs);
       (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
     };
 
@@ -718,7 +942,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: pendingCardId,
         family: 'business',
-        row: 'development',
+        row: 'market',
         slotIndex: sourceIndex,
         destination: s.getStreetSlotCenter(slotIndex),
       }).then(afterTransfer);
@@ -746,7 +970,7 @@ export class MainStreetTurnController {
         ? getCurrentStep(evtController)
         : null;
       if (step?.requiredCardId && !matchesRequiredCard(card.id, step.requiredCardId)) {
-        const requiredCard = s.state.market.investments.find(
+        const requiredCard = s.state.market.cards.find(
           (c: any) => matchesRequiredCard(c.id, step.requiredCardId!)
         );
         const requiredName = requiredCard?.name ?? 'the specified event card';
@@ -769,27 +993,35 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseEvent(s.state, card.id);
     if (!legality.legal) {
+      const reason = (legality.reason ?? '').toLowerCase();
+      // Insufficient-coins rejection → play illegal-move feedback.
+      if (reason.includes('not enough coins')) {
+        const containers = s.msRenderer?.getMarketRowCards?.();
+        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+        const target = containers?.[cardIndex] ?? null;
+        playIllegalFeedback(target, s);
+      }
       s.instructionText.setText(`Cannot buy event: ${legality.reason ?? 'unknown'}`);
       return;
     }
 
-    const sourceIndex = s.state.market.investments.findIndex((c: any) => c.id === card.id);
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
 
     s.uiPhase = 'animating';
-    s.instructionText.setText(`Buying event "${card.name}"...`);
+    s.instructionText.setText(`Moving event "${card.name}" to hand...`);
     s.hiddenTransferSourceCardIds.add(card.id);
     s.refreshAll();
 
     const afterTransfer = (): void => {
-      console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.investments.map((c: any)=>c.id) });
+      console.debug('[MS] onEventCardClick: attempting BuyEvent', { cardId: card.id, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.cards.map((c: any)=>c.id) });
       try {
-        const cmd = buyEventCommand(s.state, card.id);
+        const cmd = moveEventToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
-        s.instructionText.setText(`Bought event: "${card.name}"`);
+        s.instructionText.setText(`Moved event to hand (free): "${card.name}"`);
       } catch (e) {
-        console.error('[MS] BuyEvent failed', e);
+        console.error('[MS] MoveEventToHand failed', e);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
       }
 
@@ -807,7 +1039,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'event',
-        row: 'investments',
+        row: 'market',
         slotIndex: sourceIndex,
         // Animate to the exact resting position of the appended hand card — the
         // merged HandView-predicted position (single source of truth), centred
@@ -819,62 +1051,103 @@ export class MainStreetTurnController {
     }
   }
 
-  public onRefreshDevelopmentClick(): void {
+  public onRefreshMarketClick(): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
 
-    const legality = canRefreshDevelopment(s.state);
+    const legality = canRefreshMarket(s.state);
     if (!legality.legal) {
-      s.instructionText.setText(`Cannot refresh: ${legality.reason ?? 'unknown'}`);
+      s.instructionText.setText(`Cannot re-roll: ${legality.reason ?? 'unknown'}`);
       return;
     }
 
     s.uiPhase = 'animating';
-    s.instructionText.setText('Discovering new development opportunities...');
+    s.instructionText.setText('Re-rolling the market...');
     s.refreshAll();
 
+    // Capture the outgoing row before the command replaces it — the swap
+    // animation fades these cards out from their current slot positions.
+    const outgoingRow = s.state.market.cards.slice();
+    let refreshed = false;
     try {
-      const cmd = refreshDevelopmentCommand(s.state);
+      const cmd = refreshMarketCommand(s.state);
       s.undoManager.execute(cmd);
-      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-development' }, description: cmd.description }); } catch (_) {}
-      s.instructionText.setText('Refreshed development');
-      addLog(s.state, 'Refreshed development (via UI)', 'neutral');
+      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-market' }, description: cmd.description }); } catch (_) {}
+      s.instructionText.setText('Market re-rolled');
+      addLog(s.state, 'Re-rolled market (via UI)', 'neutral');
+      refreshed = true;
     } catch (e) {
-      console.error('[MS] RefreshDevelopment failed', e);
+      console.error('[MS] RefreshMarket failed', e);
       s.instructionText.setText(`Error: ${(e as Error).message}`);
     }
 
     s.uiPhase = 'market';
     s.refreshAll();
+    // Market swap animation (only when the refresh actually succeeded).
+    if (refreshed) this.animateMarketSwap('market', outgoingRow);
   }
 
-  public onRefreshInvestmentsClick(): void {
+  /**
+   * Deal-in animation for a market row refill (day start).
+   * Presentation-only; never throws (tween targets may be re-rendered away
+   * by a later refresh).
+   */
+  private animateMarketDealIn(row: 'market'): void {
     const s = this.scene;
-    if (s.uiPhase !== 'market') return;
-
-    const legality = canRefreshInvestments(s.state);
-    if (!legality.legal) {
-      s.instructionText.setText(`Cannot refresh: ${legality.reason ?? 'unknown'}`);
-      return;
-    }
-
-    s.uiPhase = 'animating';
-    s.instructionText.setText('Refreshing investments...');
-    s.refreshAll();
-
     try {
-      const cmd = refreshInvestmentsCommand(s.state);
-      s.undoManager.execute(cmd);
-      try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-investments' }, description: cmd.description }); } catch (_) {}
-      s.instructionText.setText('Refreshed investments');
-      addLog(s.state, 'Refreshed investments (via UI)', 'neutral');
-    } catch (e) {
-      console.error('[MS] RefreshInvestments failed', e);
-      s.instructionText.setText(`Error: ${(e as Error).message}`);
+      s.msAnimator.animateMarketDealIn({
+        row,
+        cards: s.msRenderer.getMarketRowCards(row),
+      });
+    } catch (_) {
+      // presentation-only — ignore
     }
+  }
 
-    s.uiPhase = 'market';
-    s.refreshAll();
+  /**
+   * Swap animation for a Discover/Research row replacement: outgoing cards
+   * (captured before the refresh) fade/shrink out from their old slots while
+   * the incoming row deals in. Presentation-only; never throws.
+   */
+  private animateMarketSwap(
+    row: 'market',
+    outgoingRow: Array<{ id: string; family: 'business' | 'community-space' | 'event' | 'upgrade' }>,
+  ): void {
+    const s = this.scene;
+    try {
+      s.msAnimator.animateMarketDealIn({
+        row,
+        cards: s.msRenderer.getMarketRowCards(row),
+        outgoing: outgoingRow.map((card, i) => ({
+          cardId: card.id,
+          family: card.family,
+          ...s.msRenderer.getMarketSlotCenter(row, i),
+        })),
+      });
+    } catch (_) {
+      // presentation-only — ignore
+    }
+  }
+
+  /**
+   * Synergy-formation trigger (presentation-only): after a placement that
+   * changed the street grid, animates any NEWLY formed synergy pairs
+   * (`MainStreetAnimator.animateSynergyFormation`) — line draw-in, card
+   * pulse, "Synergy!" pop, chime. Pre-existing pairs never re-trigger on a
+   * plain refresh (the diff is against the pairs captured before the
+   * placement command). Never throws; reduced-motion and replay/headless
+   * handling live inside the animator.
+   */
+  private animateNewSynergyPairs(beforePairs: SynergyPair[]): void {
+    const s = this.scene;
+    try {
+      const afterPairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+      for (const pair of diffNewSynergyPairs(beforePairs, afterPairs)) {
+        s.msAnimator.animateSynergyFormation(pair);
+      }
+    } catch (_) {
+      // presentation-only — ignore
+    }
   }
 
   public onUpgradeCardClick(card: UpgradeCard): void {
@@ -894,11 +1167,19 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseUpgrade(s.state, card.id);
     if (!legality.legal) {
+      const reason = (legality.reason ?? '').toLowerCase();
+      // Insufficient-coins rejection → play illegal-move feedback.
+      if (reason.includes('not enough coins')) {
+        const containers = s.msRenderer?.getMarketRowCards?.();
+        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+        const target = containers?.[cardIndex] ?? null;
+        playIllegalFeedback(target, s);
+      }
       s.instructionText.setText(`Cannot buy upgrade: ${legality.reason ?? 'unknown'}`);
       return;
     }
 
-    const sourceIndex = s.state.market.investments.findIndex((c: any) => c.id === card.id);
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
 
     // Determine which business slot this upgrade targets (first eligible match)
     const targetSlot = findTargetBusinessSlot(s.state, card);
@@ -911,13 +1192,15 @@ export class MainStreetTurnController {
     s.refreshAll();
 
     const afterTransfer = (): void => {
-      console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.investments.map((c: any)=>c.id), streetBefore: s.state.streetGrid.map((slot: any)=>slot?.id ?? null) });
+      console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.cards.map((c: any)=>c.id), streetBefore: s.state.streetGrid.map((slot: any)=>slot?.id ?? null) });
+      let upgraded = false;
       try {
         const cmd = buyUpgradeCommand(s.state, card.id, targetSlot);
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-upgrade', cardId: card.id, targetSlot }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id, targetSlot }); } catch (_) {}
         s.instructionText.setText(`Applied upgrade: "${card.name}"`);
+        upgraded = true;
       } catch (e) {
         console.error('[MS] BuyUpgrade failed', e);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -926,6 +1209,19 @@ export class MainStreetTurnController {
       s.hiddenTransferSourceCardIds.delete(card.id);
       s.uiPhase = 'market';
       s.refreshAll();
+      // Level-up burst on the upgraded business when the upgrade actually
+      // landed (non-blocking presentation; reduced-motion / replay handling
+      // lives inside the animator).
+      if (upgraded && targetSlot >= 0) {
+        try {
+          const target = s.state.streetGrid[targetSlot] as { level?: number } | null;
+          if (target) {
+            s.msAnimator.animateLevelUp({ slotIndex: targetSlot, level: target.level ?? 1 });
+          }
+        } catch (_) {
+          // presentation-only — ignore
+        }
+      }
       // Tutorial: mark apply-upgrade step complete if active
       (s.msLifecycleManager as any).onTutorialActionComplete?.('apply-upgrade' as TutorialActionType);
     };
@@ -934,7 +1230,7 @@ export class MainStreetTurnController {
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'upgrade',
-        row: 'investments',
+        row: 'market',
         slotIndex: sourceIndex,
         destination: s.getStreetSlotCenter(targetSlot),
       }).then(afterTransfer);
@@ -978,6 +1274,7 @@ export class MainStreetTurnController {
     // (preserving existing customClickFn behavior)
     if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
       s.pendingHandIndex = index;
+      s.pendingHandJustMoved = false; // selecting an existing hand card: placing costs an action
       const cardName = hand[index]?.name ?? 'card';
       s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
       s.refreshAll();
@@ -995,6 +1292,7 @@ export class MainStreetTurnController {
     s.tooltipManager?.hide();
 
     s.pendingHandIndex = index;
+    s.pendingHandJustMoved = false; // card already in hand: placing consumes an action
     s.uiPhase = 'placing-from-hand';
     const cardName = hand[index]?.name ?? 'card';
     s.instructionText.setText(`Click an empty slot to place "${cardName}"`);

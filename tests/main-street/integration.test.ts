@@ -22,13 +22,14 @@ import {
   type PlayerAction,
   type TurnResult,
 } from '../../example-games/main-street/MainStreetEngine';
+import { updateNeighborsOnPlacement } from '../../example-games/main-street/MainStreetAdjacency';
 import {
   getAffordableBusinessCards,
   getEmptySlots,
 } from '../../example-games/main-street/MainStreetMarket';
 import {
-  INCIDENT_QUEUE_SIZE,
   CHALLENGE_BONUS_POINTS,
+  createBusinessDeck,
   type EventCard,
 } from '../../example-games/main-street/MainStreetCards';
 import {
@@ -97,7 +98,7 @@ describe('Integration: Full Turn Cycle', () => {
     // Execute DayStart
     executeDayStart(state);
     expect(state.phase).toBe('MarketPhase');
-    expect(state.market.development.length).toBeGreaterThan(0);
+    expect(state.market.cards.length).toBeGreaterThan(0);
 
     // Buy the first affordable business
     const affordable = getAffordableBusinessCards(state);
@@ -202,11 +203,13 @@ describe('Integration: Full Game', () => {
 
     const { totalTurns: _totalTurns } = playFullGame(state);
 
-    // With high starting resources and reputation, the game ends via the
-    // score threshold (default presets impose no turn limit, so
-    // turn_limit_victory is not reachable — CG-0MSLXJCHH001DLIO).
+    // With high starting resources and reputation, the game reaches a win
+    // (default presets impose no turn limit, so turn_limit_victory is not
+    // reachable — CG-0MSLXJCHH001DLIO). The specific win path is
+    // seed-dependent: score_threshold or all_challenges (the expanded
+    // incident pool shifts challenge-completion timing).
     expect(state.gameResult).toBe('win');
-    expect(state.endReason).toBe('score_threshold');
+    expect(['score_threshold', 'all_challenges']).toContain(state.endReason);
   });
 
   it('ends in bankruptcy when coins go below 0', () => {
@@ -307,8 +310,8 @@ describe('Integration: Seeded Determinism', () => {
     const state2 = setupMainStreetGame({ seed: 'seed-B' });
 
     // Markets should differ (different shuffle order)
-    const market1Ids = state1.market.development.map(c => c.id).sort().join(',');
-    const market2Ids = state2.market.development.map(c => c.id).sort().join(',');
+    const market1Ids = state1.market.cards.map(c => c.id).sort().join(',');
+    const market2Ids = state2.market.cards.map(c => c.id).sort().join(',');
 
     // While it's theoretically possible for two different seeds to produce
     // the same shuffle, it's extremely unlikely. We check that at least
@@ -362,91 +365,97 @@ describe('Integration: Income & Synergy', () => {
     s.resourceBank.coins = 50;
     s.resourceBank.reputation = 5;
 
-    // Turn 1: Place first Food business
+    // Deterministically place two different-template Food cards in adjacent
+    // slots (0 and 1 on the 2x5 grid). The same-type rule excludes
+    // same-template neighbors, so Bakery (Food) + Cafe (Food|Culture) both
+    // gain a real synergy bonus — no dependence on the seeded market.
+    const bakery = createBusinessDeck(1).find(c => c.name === 'Bakery')!;
+    const cafe = createBusinessDeck(1).find(c => c.name === 'Cafe')!;
+    s.streetGrid[0] = { ...bakery, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
+    updateNeighborsOnPlacement(s, 0);
+
     executeDayStart(s);
-    const food1 = s.market.development.find(c => c.synergyTypes.includes('Food'));
-    if (!food1) return; // Skip if no food card available
-    executeAction(s, { type: 'buy-business', cardId: food1.id, slotIndex: 4 });
     const result1 = processEndOfTurn(s);
-    const income1 = result1.income?.total ?? 0;
+    const income1 = result1.income?.total ?? 0; // Bakery alone: 0.5
 
-    if (s.gameResult !== 'playing') return; // Game ended
-
-    // Turn 2: Place second Food business adjacent
+    s.streetGrid[1] = { ...cafe, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
+    updateNeighborsOnPlacement(s, 1);
     executeDayStart(s);
-    const food2 = s.market.development.find(c => c.synergyTypes.includes('Food'));
-    if (!food2) return;
-    executeAction(s, { type: 'buy-business', cardId: food2.id, slotIndex: 5 });
     const result2 = processEndOfTurn(s);
-    const income2 = result2.income?.total ?? 0;
+    const income2 = result2.income?.total ?? 0; // + Cafe and both synergy bonuses
 
     // Income should increase due to synergy bonus between adjacent Food businesses
     expect(income2).toBeGreaterThan(income1);
   });
 });
 
-// ── Incident Queue Integration ──────────────────────────────
+// ── Incident Deck Integration ───────────────────────────────
 
-describe('Integration: Incident Queue', () => {
-  it('drains and refills the incident queue across multiple turns', () => {
+describe('Integration: Incident Deck', () => {
+  it('resolves the front incident card from the deck across multiple turns', () => {
     const state = setupMainStreetGame({ seed: 'queue-drain' });
     state.resourceBank.coins = 100;
     state.resourceBank.reputation = 10;
 
-    // Record initial queue IDs
-    const initialQueueIds = state.incidentQueue.map(c => c.id);
-    expect(initialQueueIds).toHaveLength(INCIDENT_QUEUE_SIZE);
+    // Record initial deck IDs
+    const initialDeckIds = state.incidentDeck.map(c => c.id);
+    expect(initialDeckIds.length).toBeGreaterThan(0);
 
-    // Turn 1: resolve front incident, queue should refill
+    // Turn 1: resolve front incident; the deck shrinks by one (no refill)
     executeDayStart(state);
     const result1 = processEndOfTurn(state);
     expect(result1.incident).not.toBeNull();
-    expect(result1.incident!.id).toBe(initialQueueIds[0]);
+    expect(result1.incident!.id).toBe(initialDeckIds[0]);
+    expect(state.incidentDeck.length).toBe(initialDeckIds.length - 1);
 
     if (state.gameResult !== 'playing') return;
-
-    // After turn 1, queue should still have INCIDENT_QUEUE_SIZE if deck has incidents
-    const incidentsInDeck1 = state.decks.event.filter(e => e.trigger === 'Incident').length;
-    if (incidentsInDeck1 > 0) {
-      expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
-    }
 
     // Turn 2: next front resolved
     executeDayStart(state);
     const result2 = processEndOfTurn(state);
     expect(result2.incident).not.toBeNull();
     // The second resolved should be the card that was at position [1] initially
-    // (or a deck-drawn card that replaced it — either way it's a valid Incident)
+    expect(result2.incident!.id).toBe(initialDeckIds[1]);
     expect(result2.incident!.trigger).toBe('Incident');
   });
 
-  it('queue shrinks naturally when deck runs out of incident cards', () => {
+  it('deck drains naturally when no incident cards remain', () => {
     const state = setupMainStreetGame({ seed: 'queue-exhaust' });
     state.resourceBank.coins = 100;
     state.resourceBank.reputation = 10;
 
-    // Remove all Incident cards from the deck
-    state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+    // Replace the incident deck with a single known card.
+    state.incidentDeck = [{
+      family: 'event',
+      id: 'only-incident',
+      name: 'Only Incident',
+      trigger: 'Incident',
+      effect: '-1 coin',
+      target: 'All',
+      coinDelta: -1,
+      reputationDelta: 0,
+      cost: 0,
+    }];
 
-    // Queue should still have its initial cards
-    const queueSizeBefore = state.incidentQueue.length;
-    expect(queueSizeBefore).toBe(INCIDENT_QUEUE_SIZE);
+    const queueSizeBefore = state.incidentDeck.length;
+    expect(queueSizeBefore).toBe(1);
 
     // Resolve all queued incidents
     for (let i = 0; i < queueSizeBefore; i++) {
-      if (state.incidentQueue.length === 0) break;
+      if (state.incidentDeck.length === 0) break;
       resolveIncident(state);
     }
 
-    // Queue should be empty — no deck cards to refill
-    expect(state.incidentQueue.length).toBe(0);
+    // Deck is empty — no cards to replenish (no refill loop)
+    expect(state.incidentDeck.length).toBe(0);
+    expect(resolveIncident(state)).toBeNull();
   });
 
   it('resolveIncident draws only Incident-trigger cards, not Investment-trigger', () => {
     const state = setupMainStreetGame({ seed: 'queue-filter' });
     state.resourceBank.coins = 100;
 
-    // Set up: queue with 1 incident, deck has only Investment events
+    // Set up: deck with 1 incident; event deck has only Investment events
     const incident: EventCard = {
       family: 'event',
       id: 'test-incident-only',
@@ -458,7 +467,7 @@ describe('Integration: Incident Queue', () => {
       reputationDelta: 0,
       cost: 0,
     };
-    state.incidentQueue = [incident];
+    state.incidentDeck = [incident];
     state.decks.event = [
       {
         family: 'event',
@@ -475,9 +484,9 @@ describe('Integration: Incident Queue', () => {
 
     resolveIncident(state);
 
-    // Queue should NOT have the Investment card
-    expect(state.incidentQueue.length).toBe(0);
-    // Investment card should still be in the deck
+    // Deck should NOT have the Investment card
+    expect(state.incidentDeck.length).toBe(0);
+    // Investment card should still be in the event deck
     expect(state.decks.event.length).toBe(1);
     expect(state.decks.event[0].trigger).toBe('Investment');
   });
@@ -542,7 +551,8 @@ describe('Integration: Held Investment Event', () => {
     const coinsAfterPlay = state.resourceBank.coins;
     // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
     // CG-0MRER3RE300418SG: Math.floor removed; 5 * 1.25 = 6.25 (was 6 before fix)
-    expect(coinsAfterPlay).toBeCloseTo(50 + 6.25); // Event delta scaled by reputation multiplier
+    // CG-0MSTOATDT009BRX2: cost-at-play — playing the event charges its cost (3).
+    expect(coinsAfterPlay).toBeCloseTo(50 - 3 + 6.25); // -cost + delta scaled by reputation multiplier
 
     // End turn — InvestmentResolution should have nothing to auto-resolve
     const result = processEndOfTurn(state);
@@ -571,7 +581,7 @@ describe('Integration: Held Investment Event', () => {
       reputationDelta: 0,
       cost: 3,
     };
-    state.market.investments.push(investmentEvt);
+    state.market.cards.push(investmentEvt);
 
     // Turn 1: buy the event
     executeDayStart(state);
@@ -588,11 +598,15 @@ describe('Integration: Held Investment Event', () => {
     // Turn 2: play the held event manually
     executeDayStart(state);
     const coinsBeforePlay = state.resourceBank.coins;
+    // Reputation multiplier: 1 + rep/20. Turn 1's incident phase can change
+    // reputation (seed-dependent incident queue), so compute from the live
+    // value rather than assuming rep stayed at 5.
+    const repMultiplier = 1 + state.resourceBank.reputation / 20;
     executeAction(state, { type: 'play-event' });
     expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false); // Now resolved
-    // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
-    // floor(4 * 1.25) = floor(5.0) = 5
-    expect(state.resourceBank.coins).toBe(coinsBeforePlay + 5); // +4 base scaled to +5 by rep
+    // CG-0MSTOATDT009BRX2: cost-at-play — the $3 cost is charged when the
+    // held event is played.
+    expect(state.resourceBank.coins).toBeCloseTo(coinsBeforePlay - 3 + 4 * repMultiplier); // -cost + +4 base scaled by rep
 
     const result2 = processEndOfTurn(state);
     expect(result2).toBeDefined();

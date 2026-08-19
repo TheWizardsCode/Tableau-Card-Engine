@@ -22,37 +22,45 @@
  *   and incident queue. Cards are identified by their **base template ID**
  *   (without copy/serial suffix) so the scenario is robust across deck
  *   construction ordering.
+ * - `ensureTutorialMarketForUpcomingSteps()` — The single-row market holds
+ *   only `MARKET_TOTAL_SLOTS` (3) cards, but the tutorial needs four
+ *   purchase targets across three days (Laundromat T3, Local Festival T9,
+ *   Bookshop T10, Library T13). At each day start the turn controller calls
+ *   this hook, which forces the upcoming action steps' required cards into
+ *   the visible line (from decks/discards), mirroring the legacy two-row
+ *   scenario-placing behaviour.
  *
- * ## Coin Budget (Easy / 16 coins)
+ * ## Coin Budget (Easy / 16 coins) — cost-at-play (CG-0MSTOATDT009BRX2)
  *
- * | Step | Action                     | Coins In | Coins Out | Balance |
- * |------|----------------------------|----------|-----------|---------|
- * | T1   | Start (Easy, 16 coins)     | 16       | 0         | 16      |
- * | T2   | Confirm (no cost)          | 0        | 0         | 16      |
- * | T3   | Buy Laundromat ($4)        | 0        | 4         | 12      |
- * | T4   | Confirm (no cost)          | 0        | 0         | 12      |
- * | T5   | Place business (free)      | 0        | 0         | 12      |
- * | T6   | Confirm (no cost)          | 0        | 0         | 12      |
- * | T7   | End Turn + income (~0.6)   | 0.625    | 0         | 12.625  |
- * | T8   | Confirm (no cost)          | 0        | 0         | 12.625  |
- * | T9   | Buy Local Festival ($3)    | 0        | 3         | 9.625   |
- * | T10  | Buy-and-place Bookshop ($3)| 0        | 3         | 6.625   |
- * | T11  | End Turn + income (~1.25)  | 1.25     | 0         | 7.875   |
- * | T12  | Buy Library ($7)           | 0        | 7         | 0.875   |
- * | T13+ | Confirm steps (no cost)    | 0        | 0         | ≥0.875  |
+ * | Step | Action                          | Coins In | Coins Out | Balance |
+ * |------|---------------------------------|----------|-----------|---------|
+ * | T1   | Start (Easy, 16 coins)          | 16       | 0         | 16      |
+ * | T2   | Confirm (no cost)               | 0        | 0         | 16      |
+ * | T3   | Move Laundromat to hand (free)  | 0        | 0         | 16      |
+ * | T4   | Confirm (no cost)               | 0        | 0         | 16      |
+ * | T5   | Place Laundromat (pays $4)      | 0        | 4         | 12      |
+ * | T6   | Confirm (no cost)               | 0        | 0         | 12      |
+ * | T7   | End Turn + income (~0.6)        | 0.625    | 0         | 12.625  |
+ * | T8   | Confirm (no cost)               | 0        | 0         | 12.625  |
+ * | T9   | Move Local Festival to hand     | 0        | 0         | 12.625  |
+ * | T10  | Buy-and-place Bookshop ($3)     | 0        | 3         | 9.625   |
+ * | T11  | End Turn + income (~1.25)       | 1.25     | 0         | 10.875  |
+ * | T12  | Confirm (no cost)               | 0        | 0         | 10.875  |
+ * | T13  | Buy Library ($7)                | 0        | 7         | 3.875   |
+ * | T14  | Play Local Festival (pays $3)   | 0        | 3         | 0.875   |
+ * | T15+ | Confirm steps (no cost)         | 0        | 0         | ≥0.875  |
  *
  * @module
  */
 
 import type { MainStreetState, ResourceBank } from './MainStreetState';
+import { addLog } from './MainStreetState';
 import {
   type BusinessCard,
   type EventCard,
   type UpgradeCard,
   type CommunitySpaceCard,
-  MARKET_BUSINESS_SLOTS,
-  MARKET_INVESTMENT_UPGRADE_COUNT,
-  MARKET_INVESTMENT_EVENT_COUNT,
+  MARKET_TOTAL_SLOTS,
   INCIDENT_QUEUE_SIZE,
   GRID_SIZE,
   createBusinessDeck,
@@ -66,6 +74,8 @@ import { deriveUnlockedCardIds } from './MainStreetTiers';
 import { createSeededRng } from '../../src/core-engine';
 import { createEconomyLedger } from '../../src/rule-engine/EconomyLedger';
 import { CHALLENGE_TEMPLATES, selectChallenges } from './MainStreetChallenges';
+import { getBaseTypeId } from './MainStreetCards';
+import { UNIFIED_TUTORIAL_STEPS, type TutorialControllerState } from './TutorialFlow';
 
 // ── Scenario Interface ───────────────────────────────────────
 
@@ -90,10 +100,13 @@ export interface TutorialScenario {
   difficulty: DifficultyName;
   /** Starting resources. */
   resourceBank: ResourceBank;
-  /** Base template IDs for the development row (exactly MARKET_BUSINESS_SLOTS). */
+  /**
+   * Day-1 single-row market (exactly `MARKET_TOTAL_SLOTS` cards). Later days
+   * are assembled by `ensureTutorialMarketForUpcomingSteps`, which forces
+   * the upcoming step's required cards into the line from the decks.
+   */
   market: {
-    development: string[];
-    investments: string[];
+    cards: string[];
   };
   /** Base template IDs for the incident queue (exactly INCIDENT_QUEUE_SIZE). */
   incidentQueue: string[];
@@ -110,45 +123,42 @@ export interface TutorialScenario {
 /**
  * The concrete tutorial scenario used by the Main Street tutorial.
  *
- * All card IDs reference Tier-1 pool cards. The market is set up so that:
- *
- * **Development Row (4 slots):**
- *   - `biz-bakery` (Bakery, $3, Food)
+ * All card IDs reference Tier-1 pool cards. The market is one single row
+ * (CG-0MSTOATDT009BRX2) of exactly 3 cards on day 1:
+ *   - `biz-bakery` (Bakery, $3, Food) — filler slot
  *   - `biz-laundromat` (Laundromat, $4, Service) — T3 purchase target
- *   - `cs-library` (Library, $7, Culture) — T12 purchase target
- *   - `biz-bookshop` (Bookshop, $3, Culture) — T10 buy-and-place target
- *
- * **Investments Row (3 slots: 2 upgrades + 1 investment event):**
- *   - `upg-patisserie` (Upgrade to Patisserie, $4, targets Bakery)
- *   - `upg-garden` (Upgrade to Garden, $3, targets Park)
  *   - `evt-festival` (Local Festival, $3) — T9 purchase target
+ *
+ * Later tutorial days force the remaining targets (Bookshop for T10,
+ * Library for T13) into the line via `ensureTutorialMarketForUpcomingSteps`
+ * (called by the turn controller at day start).
+ *
+ * **Investments row is gone:** the two upgrade cards (upg-patisserie,
+ * upg-garden) are no longer scenario-placed; upgrades may appear in the
+ * line randomly but no tutorial step requires them.
  *
  * **Incident Queue (2 cards):**
  *   - `evt-award` (Community Award, +2 reputation)
  *   - `evt-rainy` (Rainy Day, -1 coin per Food business)
  *
- * **Coin Budget:** 16 starting coins (Easy preset raised for the tutorial),
- * $4 Laundromat (T3) + $3 Local Festival (T9) + $3 Bookshop (T10) + $7 Library
- * (T12) = $17, covered by 16 + ~1.9 income across the two end-turn steps
- * (T7: Laundromat ~0.625; T11: Laundromat + Bookshop ~1.25). RNG-independent.
+ * **Coin Budget:** 16 starting coins (Easy preset raised for the tutorial);
+ * payments happen at play time (cost-at-play): Laundromat placement $4 (T5)
+ * + Local Festival play $3 (T14) + Bookshop buy-and-place $3 (T10) + Library
+ * buy-and-place $7 (T13) = $17, covered by 16 + ~1.9 income across the two
+ * end-turn steps (T7: Laundromat ~0.625; T11: Laundromat + Bookshop ~1.25).
+ * RNG-independent.
  */
 export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
   difficulty: 'Easy',
-  // 16 starting coins (vs. Easy preset's 12): the 16-step flow buys four
+  // 16 starting coins (vs. Easy preset's 10 after the CG-0MSP26Q5N002EH8P re-tune): the 17-step flow places four
   // cards (Laundromat $4 + Local Festival $3 + Bookshop $3 + Library $7 = $17)
   // and earns ~1.9 income across T7 and T11, so 16 + ~2 ≥ 17. The tutorial
   // scenario's coin budget is intentionally higher than the base preset.
   resourceBank: { coins: 16, reputation: 5 },
   market: {
-    development: [
+    cards: [
       'biz-bakery',
       'biz-laundromat',
-      'cs-library',
-      'biz-bookshop',
-    ],
-    investments: [
-      'upg-patisserie',
-      'upg-garden',
       'evt-festival',
     ],
   },
@@ -195,8 +205,7 @@ function findCardByTemplate<T extends { id: string }>(
  *    Tier-1 cards.
  * 2. Find cards matching each scenario template ID in the appropriate
  *    decks and extract them.
- * 3. Place extracted cards into the market (development / investments)
- *    and incident queue.
+ * 3. Place extracted cards into the single-row market and incident queue.
  * 4. Build and return the complete `MainStreetState` with remaining deck
  *    contents and a deterministic RNG for challenge selection.
  *
@@ -211,16 +220,10 @@ export function createTutorialScenario(
   const tier1Ids = deriveUnlockedCardIds(['tier-1']);
 
   // Validate scenario card counts
-  if (scenario.market.development.length !== MARKET_BUSINESS_SLOTS) {
+  if (scenario.market.cards.length !== MARKET_TOTAL_SLOTS) {
     throw new Error(
-      `TutorialScenario: expected ${MARKET_BUSINESS_SLOTS} development row cards, ` +
-      `got ${scenario.market.development.length}`,
-    );
-  }
-  if (scenario.market.investments.length !== MARKET_INVESTMENT_UPGRADE_COUNT + MARKET_INVESTMENT_EVENT_COUNT) {
-    throw new Error(
-      `TutorialScenario: expected ${MARKET_INVESTMENT_UPGRADE_COUNT + MARKET_INVESTMENT_EVENT_COUNT} investments row cards, ` +
-      `got ${scenario.market.investments.length}`,
+      `TutorialScenario: expected ${MARKET_TOTAL_SLOTS} single-row market cards, ` +
+      `got ${scenario.market.cards.length}`,
     );
   }
   if (scenario.incidentQueue.length !== INCIDENT_QUEUE_SIZE) {
@@ -237,32 +240,30 @@ export function createTutorialScenario(
   const upgradeDeck: UpgradeCard[] = createUpgradeDeck(2, tier1Ids);
 
   // ── Extract market cards from decks by base template ID ────
-
-  // Development row: try business deck, then community space deck
-  const developmentRow: (BusinessCard | CommunitySpaceCard)[] = [];
-  for (const templateId of scenario.market.development) {
+  const marketCards: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard)[] = [];
+  for (const templateId of scenario.market.cards) {
+    // Business / community-space: try business deck, then community space deck
     try {
-      developmentRow.push(findCardByTemplate(businessDeck, templateId));
+      marketCards.push(findCardByTemplate(businessDeck, templateId));
     } catch {
-      // Not in business deck — try community space deck
-      developmentRow.push(findCardByTemplate(communitySpaceDeck, templateId));
+      try {
+        marketCards.push(findCardByTemplate(communitySpaceDeck, templateId));
+      } catch {
+        try {
+          marketCards.push(findCardByTemplate(upgradeDeck, templateId));
+        } catch {
+          marketCards.push(findCardByTemplate(eventDeck, templateId));
+        }
+      }
     }
   }
 
-  // Investments row: try upgrade deck first, then event deck
-  const investmentsRow: (UpgradeCard | EventCard)[] = [];
-  for (const templateId of scenario.market.investments) {
-    try {
-      investmentsRow.push(findCardByTemplate(upgradeDeck, templateId));
-    } catch {
-      investmentsRow.push(findCardByTemplate(eventDeck, templateId));
-    }
-  }
-
-  // Incident queue: from event deck
-  const incidentQueue: EventCard[] = [];
+  // Incident deck (face-down): scenario-placed incidents at the front
+  // (next to resolve). Exactly the scenario's INCIDENT_QUEUE_SIZE cards for
+  // the tutorial flow (full-deck tutorial rework: CG-0MSXOXY11005CO1N).
+  const incidentDeck: EventCard[] = [];
   for (const templateId of scenario.incidentQueue) {
-    incidentQueue.push(findCardByTemplate(eventDeck, templateId));
+    incidentDeck.push(findCardByTemplate(eventDeck, templateId));
   }
 
   // ── Setup deterministic RNG ───────────────────────────────
@@ -289,8 +290,7 @@ export function createTutorialScenario(
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     market: {
-      development: developmentRow,
-      investments: investmentsRow,
+      cards: marketCards,
     },
     resourceBank: {
       coins: initCoins,
@@ -315,11 +315,11 @@ export function createTutorialScenario(
     },
     challengesCompleted: [],
     activeChallenges: [],
-    incidentQueue,
-    // Backfill the balance history from the scenario-defined queue so
-    // subsequent constrained refills see the actual resolved sequence
+    incidentDeck,
+    // Backfill the balance history from the scenario-defined deck so
+    // subsequent constrained rebuilds see the actual sequence
     // (CG-0MSL0OP040043KKZ).
-    incidentBalance: createIncidentBalanceFromQueue(incidentQueue),
+    incidentBalance: createIncidentBalanceFromQueue(incidentDeck),
     gameResult: 'playing',
     endReason: null,
     finalScore: 0,
@@ -330,12 +330,13 @@ export function createTutorialScenario(
     activityLog: [],
     activeEffects: [],
     hand: [],
-    maxHandSize: 2,
+    maxHandSize: 3,
     discardPile: [],
     staffCards: [],
     staffCardMarket: [],
     skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
+    actionsRemaining: 1,
   };
 
   // Select challenges for this run using seeded RNG
@@ -350,6 +351,103 @@ export function createTutorialScenario(
   }));
 
   return state;
+}
+
+// ── Day-Start Market Guarantee ───────────────────────────────
+
+/**
+ * Returns all upcoming action steps (before the next `end-turn` step) that
+ * reference a market card the tutorial will ask the player to buy.
+ */
+function upcomingStepCardIds(controllerState: TutorialControllerState): string[] {
+  const result: string[] = [];
+  if (!controllerState.isActive) return result;
+  const startIndex = Math.max(0, controllerState.currentStepIndex + 1);
+  for (let i = startIndex; i < UNIFIED_TUTORIAL_STEPS.length; i++) {
+    const step = UNIFIED_TUTORIAL_STEPS[i];
+    if (step.gate !== 'action') continue;
+    if (step.requiredAction === 'end-turn') break;
+    if (step.requiredCardId) {
+      result.push(step.requiredCardId);
+    }
+  }
+  return result;
+}
+
+/**
+ * Locates a scenario template card anywhere in the game (decks first, then
+ * matching discards) and returns it, removing it from its source. Returns
+ * `null` when the card is nowhere to be found.
+ */
+function extractTemplateCard(
+  state: MainStreetState,
+  templateId: string,
+): BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard | null {
+  const matches = (id: string) => id.startsWith(templateId);
+  const pools: { deck: { id: string }[]; discard: { id: string }[]; label: string }[] = [
+    { deck: state.decks.business, discard: state.discards.business, label: 'business' },
+    { deck: state.decks.communitySpace, discard: state.discards.communitySpace, label: 'community-space' },
+    { deck: state.decks.upgrade, discard: state.discards.upgrade, label: 'upgrade' },
+    { deck: state.decks.event, discard: state.discards.event, label: 'event' },
+  ];
+  for (const pool of pools) {
+    const deckIdx = pool.deck.findIndex(c => matches(c.id));
+    if (deckIdx !== -1) {
+      return pool.deck.splice(deckIdx, 1)[0] as any;
+    }
+    const discardIdx = pool.discard.findIndex(c => matches(c.id));
+    if (discardIdx !== -1) {
+      return pool.discard.splice(discardIdx, 1)[0] as any;
+    }
+  }
+  return null;
+}
+
+/**
+ * Guarantees the tutorial's upcoming purchase targets are visible in the
+ * single-row market at day start (CG-0MSTOATDT009BRX2).
+ *
+ * With only 3 visible slots and four buys spread across three days
+ * (Laundromat T3, Local Festival T9, Bookshop T10, Library T13), the visible
+ * line alone cannot hold every target. Scanning the upcoming action steps
+ * (up to the next end-turn), this hook forces any missing required card into
+ * the line: cards are drawn from the decks (or their discards), displacing
+ * the last visible card when the row is full (the displaced card returns to
+ * its family deck). Day-1 cards are scenario-placed by
+ * `createTutorialScenario`; this hook covers days 2+.
+ *
+ * Caller: `MainStreetTurnController.startDayPhase` when the tutorial is
+ * active. Deterministic — no RNG is consumed.
+ *
+ * @param state           Current game state (mutated in-place).
+ * @param controllerState The active tutorial controller state.
+ */
+export function ensureTutorialMarketForUpcomingSteps(
+  state: MainStreetState,
+  controllerState: TutorialControllerState,
+): void {
+  if (!controllerState?.isActive) return;
+
+  for (const requiredCardId of upcomingStepCardIds(controllerState)) {
+    const baseId = getBaseTypeId(requiredCardId);
+    // Already visible (any copy of the template)?
+    const visible = state.market.cards.some(c => getBaseTypeId(c.id) === baseId);
+    if (visible) continue;
+
+    const card = extractTemplateCard(state, baseId);
+    if (!card) continue;
+
+    if (state.market.cards.length >= MARKET_TOTAL_SLOTS) {
+      // Row full — displace the last visible card back to its family deck.
+      const displaced = state.market.cards.pop()!;
+      if (displaced.family === 'business') state.decks.business.push(displaced as BusinessCard);
+      else if (displaced.family === 'community-space') state.decks.communitySpace.push(displaced as CommunitySpaceCard);
+      else if (displaced.family === 'upgrade') state.decks.upgrade.push(displaced as UpgradeCard);
+      else state.decks.event.push(displaced as EventCard);
+    }
+    state.market.cards.push(card);
+    addLog(state, `Scenario: showed ${card.name} in the market for the next step`, 'neutral');
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────

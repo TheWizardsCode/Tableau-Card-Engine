@@ -47,7 +47,7 @@ import {
   UNIFIED_TUTORIAL_STEPS,
   UNIFIED_TUTORIAL_STEP_COUNT,
 } from '../../example-games/main-street/TutorialFlow';
-import { MARKET_BUSINESS_SLOTS, MARKET_INVESTMENT_SLOTS, INCIDENT_QUEUE_SIZE } from '../../example-games/main-street/MainStreetCards';
+import { MARKET_TOTAL_SLOTS, INCIDENT_QUEUE_SIZE } from '../../example-games/main-street/MainStreetCards';
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -94,16 +94,16 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
     const state2 = createTutorialScenario();
 
     // Development row cards are identical between runs
-    expect(state1.market.development.map(c => c.id)).toEqual(
-      state2.market.development.map(c => c.id),
+    expect(state1.market.cards.map(c => c.id)).toEqual(
+      state2.market.cards.map(c => c.id),
     );
     // Investments row cards are identical
-    expect(state1.market.investments.map(c => c.id)).toEqual(
-      state2.market.investments.map(c => c.id),
+    expect(state1.market.cards.map(c => c.id)).toEqual(
+      state2.market.cards.map(c => c.id),
     );
     // Incident queue cards are identical
-    expect(state1.incidentQueue.map(c => c.id)).toEqual(
-      state2.incidentQueue.map(c => c.id),
+    expect(state1.incidentDeck.map(c => c.id)).toEqual(
+      state2.incidentDeck.map(c => c.id),
     );
     // Resource bank is identical
     expect(state1.resourceBank.coins).toBe(state2.resourceBank.coins);
@@ -122,22 +122,22 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
     const state = createTutorialScenario();
 
     // Development row base template IDs match the scenario definition
-    const devTemplateIds = state.market.development.map(c => stripSerialSuffix(c.id));
-    expect(devTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.market.development);
+    const devTemplateIds = state.market.cards.map(c => stripSerialSuffix(c.id));
+    expect(devTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.market.cards);
 
     // Investments row base template IDs match
-    const invTemplateIds = state.market.investments.map(c => stripSerialSuffix(c.id));
-    expect(invTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.market.investments);
+    const invTemplateIds = state.market.cards.map(c => stripSerialSuffix(c.id));
+    expect(invTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.market.cards);
 
     // Incident queue base template IDs match
-    const incidentTemplateIds = state.incidentQueue.map(c => stripSerialSuffix(c.id));
+    const incidentTemplateIds = state.incidentDeck.map(c => stripSerialSuffix(c.id));
     expect(incidentTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.incidentQueue);
   });
 
   it('scenario state has correct starting resources for tutorial', () => {
     const state = createTutorialScenario();
     // Tutorial starts with the scenario's 16 coins (raised from the 12-coin
-    // Easy preset to afford the 4-card 16-step flow) and 5 reputation.
+    // Easy preset to afford the 4-card 17-step flow) and 5 reputation.
     expect(state.resourceBank.coins).toBe(16);
     expect(state.resourceBank.reputation).toBe(5);
   });
@@ -198,22 +198,22 @@ describe('AC2: TUTORIAL_SEED is deprecated and not used in tutorial setup path',
 
 // ── AC3: All 13 tutorial steps complete with scenario setup ──
 
-describe('AC3: All 16 tutorial steps complete with scenario-based setup', () => {
-  it('UNIFIED_TUTORIAL_STEPS contains exactly 16 steps (T1-T16)', () => {
-    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(16);
-    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(16);
+describe('AC3: All 17 tutorial steps complete with scenario-based setup', () => {
+  it('UNIFIED_TUTORIAL_STEPS contains exactly 17 steps (T1-T17)', () => {
+    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(17);
+    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(17);
 
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 17; i++) {
       expect(UNIFIED_TUTORIAL_STEPS[i].id).toBe(`T${i + 1}`);
     }
   });
 
-  it('tutorial controller walks through all 16 steps via completeCurrentStep', () => {
+  it('tutorial controller walks through all 17 steps via completeCurrentStep', () => {
     let controller = startTutorial(createTutorialControllerState());
 
-    // Walk through all 16 steps
+    // Walk through all 17 steps
     const completedIds: string[] = [];
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 17; i++) {
       expect(controller.isActive).toBe(true);
       const currentStep = getCurrentStep(controller);
       expect(currentStep).toBeDefined();
@@ -224,36 +224,36 @@ describe('AC3: All 16 tutorial steps complete with scenario-based setup', () => 
       controller = result.newState;
     }
 
-    // Verify all 16 steps were completed in order
+    // Verify all 17 steps were completed in order
     expect(completedIds).toEqual([
       'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8',
-      'T9', 'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16',
+      'T9', 'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17',
     ]);
 
-    // After the 16th step completes, the controller has advanced past the end
-    expect(controller.lastCompletedStepId).toBe('T16');
-    expect(controller.currentStepIndex).toBe(16); // Past the end
+    // After the 17th step completes, the controller has advanced past the end
+    expect(controller.lastCompletedStepId).toBe('T17');
+    expect(controller.currentStepIndex).toBe(17); // Past the end
     // isActive stays true (only exitTutorial sets it to false)
     // Verify the controller is at end by checking getCurrentStep returns null
     const afterComplete = getCurrentStep(controller);
     expect(afterComplete).toBeNull();
   });
 
-  it('scenario-based state has all requiredCardId cards in market for action steps', () => {
+  it('scenario-based state has all requiredCardId cards available: day-1 row or day-start hook', () => {
     const state = createTutorialScenario();
 
     // Build lookup sets for quick checking
-    const devTemplateIds = new Set(state.market.development.map(c => stripSerialSuffix(c.id)));
-    const invTemplateIds = new Set(state.market.investments.map(c => stripSerialSuffix(c.id)));
+    const rowTemplateIds = new Set(state.market.cards.map(c => stripSerialSuffix(c.id)));
+
+    // Day-2/3 targets (Bookshop T10, Library T13) are guaranteed by the
+    // day-start hook rather than the day-1 row (CG-0MSTOATDT009BRX2).
+    const hookCovered = new Set(['biz-bookshop', 'cs-library']);
 
     // Find all action steps with requiredCardId
     for (const step of UNIFIED_TUTORIAL_STEPS) {
       if (step.requiredCardId) {
         const templateId = stripSerialSuffix(step.requiredCardId);
-        // requiredCardId should be in development or investments row
-        const inDev = devTemplateIds.has(templateId);
-        const inInv = invTemplateIds.has(templateId);
-        expect(inDev || inInv).toBe(true);
+        expect(rowTemplateIds.has(templateId) || hookCovered.has(templateId)).toBe(true);
       }
     }
   });
@@ -264,7 +264,7 @@ describe('AC3: All 16 tutorial steps complete with scenario-based setup', () => 
     expect(t3).toBeDefined();
 
     const templateId = stripSerialSuffix(t3.requiredCardId!);
-    const devTemplateIds = state.market.development.map(c => stripSerialSuffix(c.id));
+    const devTemplateIds = state.market.cards.map(c => stripSerialSuffix(c.id));
     expect(devTemplateIds).toContain(templateId);
   });
 
@@ -273,16 +273,16 @@ describe('AC3: All 16 tutorial steps complete with scenario-based setup', () => 
     const t9 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T9')!;
     expect(t9).toBeDefined();
 
-    const invTemplateIds = state.market.investments.map(c => stripSerialSuffix(c.id));
+    const invTemplateIds = state.market.cards.map(c => stripSerialSuffix(c.id));
 
     // T9 requires buying an event from the investments row
     // The scenario has 'evt-festival' as its investment event
-    const invEvent = state.market.investments.find(c => c.family === 'event');
+    const invEvent = state.market.cards.find(c => c.family === 'event');
     expect(invEvent).toBeDefined();
     expect(invTemplateIds).toContain(stripSerialSuffix(invEvent!.id));
   });
 
-  it('scenario state provides sufficient coins for the 16-step purchases (Laundromat $4, Local Festival $3, Bookshop $3, Library $7)', () => {
+  it('scenario state provides sufficient coins for the 17-step purchases (Laundromat $4, Local Festival $3, Bookshop $3, Library $7)', () => {
     const state = createTutorialScenario();
 
     // Starting coins: 16 (scenario, raised above the 12-coin Easy preset)
@@ -312,16 +312,16 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     // Run createTutorialScenario 5 times and verify identical output
     const runs = Array.from({ length: 5 }, () => createTutorialScenario());
 
-    const firstDev = runs[0].market.development.map(c => c.id);
-    const firstInv = runs[0].market.investments.map(c => c.id);
-    const firstInc = runs[0].incidentQueue.map(c => c.id);
+    const firstDev = runs[0].market.cards.map(c => c.id);
+    const firstInv = runs[0].market.cards.map(c => c.id);
+    const firstInc = runs[0].incidentDeck.map(c => c.id);
     const firstCoins = runs[0].resourceBank.coins;
     const firstRep = runs[0].resourceBank.reputation;
 
     for (let i = 1; i < runs.length; i++) {
-      expect(runs[i].market.development.map(c => c.id)).toEqual(firstDev);
-      expect(runs[i].market.investments.map(c => c.id)).toEqual(firstInv);
-      expect(runs[i].incidentQueue.map(c => c.id)).toEqual(firstInc);
+      expect(runs[i].market.cards.map(c => c.id)).toEqual(firstDev);
+      expect(runs[i].market.cards.map(c => c.id)).toEqual(firstInv);
+      expect(runs[i].incidentDeck.map(c => c.id)).toEqual(firstInc);
       expect(runs[i].resourceBank.coins).toBe(firstCoins);
       expect(runs[i].resourceBank.reputation).toBe(firstRep);
     }
@@ -343,7 +343,7 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     expect(state).toHaveProperty('challengesCompleted');
     expect(state).toHaveProperty('activeChallenges');
     expect(state).toHaveProperty('hand');
-    expect(state).toHaveProperty('incidentQueue');
+    expect(state).toHaveProperty('incidentDeck');
     expect(state).toHaveProperty('gameResult');
     expect(state).toHaveProperty('endReason');
     expect(state).toHaveProperty('finalScore');
@@ -358,23 +358,23 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
   it('scenario state market has expected slot count and card types', () => {
     const state = createTutorialScenario();
 
-    // Development row: exactly MARKET_BUSINESS_SLOTS cards, all business or community space family
-    expect(state.market.development.length).toBe(MARKET_BUSINESS_SLOTS);
-    for (const card of state.market.development) {
-      expect(['business', 'community-space']).toContain(card.family);
-    }
+    // Single row: exactly MARKET_TOTAL_SLOTS cards. Day-1 composition is
+    // 2 business (Bakery + Laundromat) + 1 event (Local Festival).
+    expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
+    const business = state.market.cards.filter(
+      c => c.family === 'business' || c.family === 'community-space',
+    );
+    expect(business.length).toBe(2);
 
-    // Investments row: exactly MARKET_INVESTMENT_SLOTS cards
-    expect(state.market.investments.length).toBe(MARKET_INVESTMENT_SLOTS);
-    const upgrades = state.market.investments.filter(c => c.family === 'upgrade');
-    const events = state.market.investments.filter(c => c.family === 'event');
-    // Expected: 2 upgrades + 1 investment event
-    expect(upgrades.length).toBe(2);
+    // The single event is the Local Festival (T9 target)
+    const events = state.market.cards.filter(c => c.family === 'event');
     expect(events.length).toBe(1);
+    const upgrades = state.market.cards.filter(c => c.family === 'upgrade');
+    expect(upgrades.length).toBe(0);
 
     // Incident queue: exactly INCIDENT_QUEUE_SIZE Incident-trigger events
-    expect(state.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
-    for (const card of state.incidentQueue) {
+    expect(state.incidentDeck.length).toBe(INCIDENT_QUEUE_SIZE);
+    for (const card of state.incidentDeck) {
       expect(card.family).toBe('event');
       expect(card.trigger).toBe('Incident');
     }
@@ -389,7 +389,7 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     // turn limit (maxTurns is optional and unset — CG-0MSLXJCHH001DLIO).
     expect(state.config.difficultyName).toBe('Easy');
     expect(state.config.maxTurns).toBeUndefined();
-    expect(state.config.startingCoins).toBe(12);
+    expect(state.config.startingCoins).toBe(10);
     expect(state.config.startingReputation).toBe(5);
 
     // State has all four decks

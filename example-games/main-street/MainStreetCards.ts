@@ -201,6 +201,9 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       ongoingCost: Number(r.ongoingCost) || 0,
       handSlotsAdded: Number(r.handSlotsAdded) || 0,
       description: r.description,
+      reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
+      refreshCostDiscount: r.refreshCostDiscount ? Number(r.refreshCostDiscount) : undefined,
+      actionsPerTurn: r.actionsPerTurn ? Number(r.actionsPerTurn) : undefined,
     });
   }
 }
@@ -393,6 +396,23 @@ export interface StaffCard {
   readonly ongoingCost: number;
   readonly handSlotsAdded: number;
   readonly description: string;
+  /**
+   * Optional reputation granted per turn during the income phase
+   * (e.g. the Socialite's +0.1 rep/turn ability — Group F,
+   * CG-0MSQJ7VL9009JHF4).
+   */
+  readonly reputationPerTurn?: number;
+  /**
+   * Optional flat coin discount applied to each investment-row refresh
+   * (e.g. the Accountant's "refresh costs 1 less" ability — Group F,
+   * CG-0MSQJ7VL9009JHF4).
+   */
+  readonly refreshCostDiscount?: number;
+  /**
+   * Optional additional actions granted per turn.
+   * (e.g. the General Manager's +1 action per day — CG-0MSTOF1N5005PK2R).
+   */
+  readonly actionsPerTurn?: number;
 }
 
 /** Union of all card types in Main Street. */
@@ -622,6 +642,165 @@ export function findConstrainedIncidentIndex(
   return incidentIndices[0];
 }
 
+/**
+ * Orders an incident card pool into a face-down, balance-aware deck
+ * (CG-0MSTOATDP000JNHH, option (a)).
+ *
+ * The full pre-arranged draw sequence strongly favours the difficulty
+ * preset's `incidentRepeatSpacing` (N) and `incidentMaxStreak` (M) at every
+ * position, producing a deck far more balanced than a plain shuffle.
+ * Selection is constraint-tiered like `findConstrainedIncidentIndex`
+ * (strict -> relax-repeat -> invariant); within the strictest non-empty tier
+ * a **polarity-abundance** tie-break prefers the polarity with the most
+ * remaining copies (so the scarce opposite is preserved to break future
+ * runs) and a **streak-feasibility guard** prunes picks by abundance so a
+ * polarity is never stranded before the deck tail. The constraints are soft
+ * guidelines near degenerate tails (imbalanced pools may admit a rare minor
+ * deviation) — never backtracked, deterministic, and far better than a
+ * shuffle.
+ *
+ * The build is seeded from the caller's `balance` (recent resolved draws) so
+ * a rebuilt deck stays consistent with what was already resolved; the
+ * caller's balance itself is NOT mutated — `recordIncidentDraw` history still
+ * tracks the resolved sequence via `resolveIncident`, not the deck build.
+ *
+ * Deterministic: consumes no RNG (selection scans deck order with count
+ * tie-breaks), so the deck order is fully determined by the pool order
+ * (seeded shuffle) and the balance limits. Front of the returned array =
+ * next to resolve.
+ *
+ * @param pool    Incident-trigger cards to arrange (not mutated).
+ * @param balance Balance state whose limits and recent history seed the build.
+ * @returns The ordered deck (always all Incident-trigger pool cards).
+ */
+export function orderIncidentDeck(
+  pool: EventCard[],
+  balance: Pick<
+    IncidentBalanceState,
+    'repeatSpacing' | 'maxStreak' | 'recentNames' | 'polarityRun'
+  >,
+): EventCard[] {
+  const remaining = pool.filter(c => c.trigger === 'Incident');
+  if (remaining.length === 0) return [];
+
+  const windowSize = Math.max(0, balance.repeatSpacing - 1);
+  const m = balance.maxStreak;
+
+  const placedNames: string[] = [];
+  let runPolarity: IncidentPolarity | null = balance.polarityRun?.polarity ?? null;
+  let runLength = balance.polarityRun?.length ?? 0;
+
+  const atRunLimit = (): boolean => runPolarity !== null && runLength >= m;
+  const inWindow = (i: number): boolean => {
+    const win = new Set(placedNames.slice(0, windowSize));
+    return win.has(incidentTemplateName(remaining[i]));
+  };
+  const pol = (i: number): IncidentPolarity => incidentPolarity(remaining[i]);
+  const streakStrict = (i: number): boolean => {
+    if (!atRunLimit()) return true;
+    const p = pol(i);
+    return p !== 'neutral' && p !== runPolarity;
+  };
+  const streakInvariant = (i: number): boolean => {
+    if (!atRunLimit()) return true;
+    return pol(i) !== runPolarity;
+  };
+
+  /**
+   * Picks the index among `candidates` (already the strictest non-empty
+   * constraint tier). Tie-break: strongly prefer a pick that does NOT extend
+   * the current run when the run is at M-1 or higher (protects the streak
+   * guideline), then prefer the candidate whose name has the most remaining
+   * copies (even consumption keeps the spacing window diverse). Both balance
+   * guidelines are optimised deterministically without backtracking.
+   */
+  const pickBalanced = (candidates: number[]): number => {
+    const nameCounts = new Map<string, number>();
+    for (const c of remaining) {
+      const n = incidentTemplateName(c);
+      nameCounts.set(n, (nameCounts.get(n) ?? 0) + 1);
+    }
+    let bestIdx = candidates[0];
+    let bestScore = -1;
+    for (const i of candidates) {
+      const p = pol(i);
+      const extendsRun = runPolarity !== null && p === runPolarity && runLength > 0;
+      let runPenalty = 0;
+      if (extendsRun) {
+        // Extending at/over M is illegal (excluded by the tier); extending
+        // at M-1 is strongly discouraged so a breaker is saved.
+        runPenalty = runLength >= m - 1 ? 1000 : 10;
+      }
+      const nameScore = nameCounts.get(incidentTemplateName(remaining[i])) ?? 0;
+      const score = (nameScore * 2) - runPenalty;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+    return bestIdx === undefined ? 0 : bestIdx;
+  };
+
+  const deck: EventCard[] = [];
+  while (remaining.length > 0) {
+    const strict: number[] = [];
+    const relaxRepeat: number[] = [];
+    const invariantWindow: number[] = [];
+    const invariantAny: number[] = [];
+    for (let i = 0; i < remaining.length; i++) {
+      if (!inWindow(i) && streakStrict(i)) strict.push(i);
+      if (streakStrict(i)) relaxRepeat.push(i);
+      if (!inWindow(i) && streakInvariant(i)) invariantWindow.push(i);
+      if (streakInvariant(i)) invariantAny.push(i);
+    }
+
+    let idx: number;
+    if (strict.length > 0) idx = pickBalanced(strict);
+    else if (relaxRepeat.length > 0) idx = pickBalanced(relaxRepeat);
+    else if (invariantWindow.length > 0) idx = pickBalanced(invariantWindow);
+    else if (invariantAny.length > 0) idx = pickBalanced(invariantAny);
+    else idx = 0; // degenerate tail: never deadlock
+
+    const card = remaining.splice(idx, 1)[0];
+    deck.push(card);
+
+    // Update run state.
+    const p = incidentPolarity(card);
+    if (p === 'neutral') { runPolarity = null; runLength = 0; }
+    else if (p === runPolarity) { runLength += 1; }
+    else { runPolarity = p; runLength = 1; }
+    placedNames.push(incidentTemplateName(card));
+  }
+
+  // Bounded repair pass (deterministic): a greedy build can leave a streak
+  // violation when the pool ran low on breakers mid-deck. Scan forward and,
+  // for each position whose card would extend a run past M, swap it with the
+  // nearest later card that breaks the run without introducing a new
+  // violation (or that is at least a different polarity). This keeps the
+  // deck satisfying maxStreak through the body; only a genuinely degenerate
+  // tail (all same-polarity cards left) may keep a final deviation.
+  for (let i = 0; i < deck.length; i++) {
+    const p = incidentPolarity(deck[i]);
+    // Length of the current run ending at i.
+    let runLen = 1;
+    for (let k = i - 1; k >= 0 && incidentPolarity(deck[k]) === p; k--) runLen += 1;
+    if (p === 'neutral' || runLen <= m) continue;
+
+    // Violation at i: find a later card to swap in that breaks the run.
+    for (let j = i + 1; j < deck.length; j++) {
+      const q = incidentPolarity(deck[j]);
+      if (q === 'neutral' || q !== p) {
+        // Swap deck[i] and deck[j], then re-validate the neighbourhood.
+        const tmp = deck[i];
+        deck[i] = deck[j];
+        deck[j] = tmp;
+        break;
+      }
+    }
+  }
+  return deck;
+}
+
 // ── Constants ───────────────────────────────────────────────
 
 /** Number of slots in the street grid. */
@@ -637,44 +816,40 @@ export const MAX_TURNS = 20;
 /** Score required for a win via score threshold. */
 export const WIN_THRESHOLD = 150;
 
-/** Starting coin balance. */
-export const STARTING_COINS = 8;
+/** Starting coin balance (Medium preset default). */
+export const STARTING_COINS = 6;
 
 /** Starting reputation. */
 export const STARTING_REPUTATION = 3;
 
-/** Number of Business card slots visible in the market. */
-export const MARKET_BUSINESS_SLOTS = 4;
-
-/** Total number of Investment row slots (upgrades + investment events). */
-export const MARKET_INVESTMENT_SLOTS = 3;
-
-/** Number of upgrade cards in the investment row. */
-export const MARKET_INVESTMENT_UPGRADE_COUNT = 2;
-
-/** Number of investment event cards in the investment row. */
-export const MARKET_INVESTMENT_EVENT_COUNT = 1;
-
 /**
- * @deprecated Use MARKET_INVESTMENT_SLOTS-related constants instead.
- * Kept temporarily for backward-compat during UI migration.
+ * Total number of cards visible in the single-row marketplace.
+ * The market is one line of exactly 3 cards (CG-0MSTOATDT009BRX2 replaced
+ * the legacy two-row model: 4 business slots + 3 investment slots).
  */
-export const MARKET_EVENT_SLOTS = MARKET_INVESTMENT_EVENT_COUNT;
+export const MARKET_TOTAL_SLOTS = 3;
 
-/**
- * @deprecated Use MARKET_INVESTMENT_SLOTS-related constants instead.
- * Kept temporarily for backward-compat during UI migration.
- */
-export const MARKET_UPGRADE_SLOTS = MARKET_INVESTMENT_UPGRADE_COUNT;
+/** Minimum number of business cards in the single-row market (community-space counts as business). */
+export const MARKET_BUSINESS_MIN = 1;
+
+/** Maximum number of business cards in the single-row market (community-space counts as business). */
+export const MARKET_BUSINESS_MAX = 2;
+
+/** Maximum number of upgrade cards in the single-row market. */
+export const MARKET_UPGRADE_MAX = 1;
+
+/** Maximum number of event cards in the single-row market. */
+export const MARKET_EVENT_MAX = 1;
 
 /** Number of Incident cards visible in the incident queue at game start. */
 export const INCIDENT_QUEUE_SIZE = 2;
 
-/** Fixed coin cost to refresh the investments row (buy new opportunities). */
-export const REFRESH_INVESTMENTS_COST = 2;
-
-/** Fixed coin cost to refresh the development row (discover new opportunities). */
-export const REFRESH_DEVELOPMENT_COST = 2;
+/**
+ * Fixed coin cost to re-roll the single-row market (CG-0MSTOATDT009BRX2),
+ * replacing the legacy per-row refresh costs (€2 each).
+ * The Accountant's `refreshCostDiscount` (Group F) applies to this cost.
+ */
+export const REFRESH_MARKET_COST = 5;
 
 /**
  * @deprecated Synergy is now percentage-based. Each BusinessCard and

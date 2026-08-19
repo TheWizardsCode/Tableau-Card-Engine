@@ -94,7 +94,7 @@ function runGreedyGame(seed: string, maxTurns = 30): RunSummary {
     }
 
     // Buy affordable investment event if none held
-    for (const card of state.market.investments) {
+    for (const card of state.market.cards) {
       if (card.family !== 'event') continue;
       const result = canPurchaseEvent(state, card.id);
       if (result.legal) {

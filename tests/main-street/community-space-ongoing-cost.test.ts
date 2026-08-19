@@ -202,7 +202,7 @@ describe('Community space ongoing-cost deduction', () => {
     });
 
     // No incidents to keep the turn deterministic
-    state.incidentQueue = [];
+    state.incidentDeck = [];
     state.phase = 'MarketPhase';
 
     state.resourceBank.coins = 10;
@@ -217,7 +217,7 @@ describe('Community space ongoing-cost deduction', () => {
   it('should not drive coins below zero through the full turn loop', () => {
     const state = createTestState('clamped-full-turn');
     placeLibrary(state);
-    state.incidentQueue = [];
+    state.incidentDeck = [];
     state.phase = 'MarketPhase';
 
     state.resourceBank.coins = 0.1;
@@ -237,7 +237,7 @@ describe('Community Hub upgrade (upg-community-hub)', () => {
 
     // Put the Community Hub upgrade into the investments row
     const communityHub = createUpgradeDeck(1).find(u => u.targetBusiness === 'Library')!;
-    state.market.investments.push(communityHub);
+    state.market.cards.push(communityHub);
 
     const slot = state.streetGrid.indexOf(library);
     purchaseUpgrade(state, communityHub.id, slot);

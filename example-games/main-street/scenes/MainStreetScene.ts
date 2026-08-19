@@ -63,6 +63,11 @@ export class MainStreetScene extends CardGameScene {
   // Pending hand card for placing from hand (index into state.hand)
   public pendingHandIndex: number | null = null;
 
+  // True when the pending hand card was just moved from the market this turn
+  // (same-day move+place composite = 1 action). False when the card was
+  // already in hand (placing then costs a second action).
+  public pendingHandJustMoved: boolean = false;
+
   // Computed responsive layout metrics
   public layout!: SceneLayout;
 
@@ -102,6 +107,15 @@ export class MainStreetScene extends CardGameScene {
   // HUD animation state
   public previousCoins: number | null = null;
   public previousReputation: number | null = null;
+
+  /**
+   * True while the end-of-turn income collection animation is running
+   * (coins/pips flying to the HUD). Suppresses the immediate HUD delta pop
+   * in `animateHudValueChanges` so the collection's final "+total" pop is
+   * the single landing feedback. Set/reset by `MainStreetAnimator`; always
+   * false under reduced motion and in replay/headless modes.
+   */
+  public incomeCollectionActive = false;
   public transferAnimationCount = 0;
   public activeTransferTweens = new Set<Phaser.Tweens.Tween>();
   public activeTransferVisuals = new Set<Phaser.GameObjects.GameObject>();
@@ -354,13 +368,9 @@ export class MainStreetScene extends CardGameScene {
     return (this.msRenderer as any).refreshActionButtons.apply(this.msRenderer, args);
   }
 
-  // Refresh investments proxy (forward to turn controller)
-  public onRefreshDevelopmentClick(...args: any[]): any {
-    return (this.msTurnController as any).onRefreshDevelopmentClick.apply(this.msTurnController, args);
-  }
-
-  public onRefreshInvestmentsClick(...args: any[]): any {
-    return (this.msTurnController as any).onRefreshInvestmentsClick.apply(this.msTurnController, args);
+  // Refresh market proxy (forward to turn controller)
+  public onRefreshMarketClick(...args: any[]): any {
+    return (this.msTurnController as any).onRefreshMarketClick.apply(this.msTurnController, args);
   }
 
   /**

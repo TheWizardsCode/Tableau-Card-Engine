@@ -57,16 +57,16 @@ const upgradeDeck = createUpgradeDeck(1);
 // ── Template Completeness ───────────────────────────────────
 
 describe('Expanded Card Pool: Template Completeness', () => {
-  it('should have exactly 18 business templates', () => {
-    expect(businessDeck).toHaveLength(18);
+  it('should have exactly 30 business templates', () => {
+    expect(businessDeck).toHaveLength(30);
   });
 
-  it('should have exactly 37 event templates', () => {
-    expect(eventDeck).toHaveLength(37);
+  it('should have exactly 56 event templates', () => {
+    expect(eventDeck).toHaveLength(56); // +1 Graffiti Art (CG-0MSRC9UR9006FBXC)
   });
 
-  it('should have exactly 27 upgrade templates', () => {
-    expect(upgradeDeck).toHaveLength(27);
+  it('should have exactly 39 upgrade templates', () => {
+    expect(upgradeDeck).toHaveLength(39);
   });
 
   it('should have unique business IDs', () => {
@@ -399,7 +399,11 @@ describe('Expanded Card Pool: Event Card Fields', () => {
   it('Investment events should have net-positive effects', () => {
     const investments = eventDeck.filter(e => e.trigger === 'Investment');
     for (const evt of investments) {
+      // Duration events (e.g. Tourist Season, Community Renovation) carry
+      // zero one-shot deltas — their value comes from the ActiveEffect
+      // multiplier, so they are excluded from the delta assertion.
       const netValue = evt.coinDelta + evt.reputationDelta;
+      if (netValue === 0 && 'duration' in evt) continue;
       expect(netValue).toBeGreaterThanOrEqual(1);
     }
   });
@@ -448,16 +452,16 @@ describe('Expanded Card Pool: Event Card Fields', () => {
 // ── Deck Building ───────────────────────────────────────────
 
 describe('Expanded Card Pool: Deck Building', () => {
-  it('business deck with 3 copies should have 54 cards', () => {
-    expect(createBusinessDeck(3)).toHaveLength(54);
+  it('business deck with 3 copies should have 90 cards', () => {
+    expect(createBusinessDeck(3)).toHaveLength(90);
   });
 
-    it('event deck with 3 copies should have 111 cards', () => {
-    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(111);
+    it('event deck with 3 copies should have 168 cards', () => {
+    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(168); // 56 x 3 (+1 Graffiti Art)
   });
 
-  it('upgrade deck with 2 copies should have 54 cards', () => {
-    expect(createUpgradeDeck(2)).toHaveLength(54);
+  it('upgrade deck with 2 copies should have 78 cards', () => {
+    expect(createUpgradeDeck(2)).toHaveLength(78);
   });
 
   it('deck copies should have distinct IDs', () => {
@@ -516,9 +520,9 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
     const state2 = setupMainStreetGame({ seed: 'expanded-pool-test' });
 
     // Market should be identical
-    expect(state1.market.development.map(c => c.id)).toEqual(state2.market.development.map(c => c.id));
-    expect(state1.market.investments.map(c => c.id)).toEqual(state2.market.investments.map(c => c.id));
-    expect(state1.incidentQueue.map(c => c.id)).toEqual(state2.incidentQueue.map(c => c.id));
+    expect(state1.market.cards.map(c => c.id)).toEqual(state2.market.cards.map(c => c.id));
+    expect(state1.market.cards.map(c => c.id)).toEqual(state2.market.cards.map(c => c.id));
+    expect(state1.incidentDeck.map(c => c.id)).toEqual(state2.incidentDeck.map(c => c.id));
   });
 
   it('should produce different deck ordering for different seeds', () => {
@@ -526,10 +530,10 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
     const state2 = setupMainStreetGame({ seed: 'seed-beta' });
 
     // At least one market row should differ
-    const biz1 = state1.market.development.map(c => c.id).join(',');
-    const biz2 = state2.market.development.map(c => c.id).join(',');
-    const inv1 = state1.market.investments.map(c => c.id).join(',');
-    const inv2 = state2.market.investments.map(c => c.id).join(',');
+    const biz1 = state1.market.cards.map(c => c.id).join(',');
+    const biz2 = state2.market.cards.map(c => c.id).join(',');
+    const inv1 = state1.market.cards.map(c => c.id).join(',');
+    const inv2 = state2.market.cards.map(c => c.id).join(',');
 
     expect(biz1 !== biz2 || inv1 !== inv2).toBe(true);
   });
@@ -537,17 +541,17 @@ describe('Expanded Card Pool: Seeded Deck Resolution', () => {
   it('setup should account for all cards (market + deck + queue = total)', () => {
     const state = setupMainStreetGame({ seed: 'accounting-test' });
 
-    const bizTotal = state.market.development.length + state.decks.business.length;
+    const bizTotal = state.market.cards.filter(c => c.family === 'business').length + state.decks.business.length;
     expect(bizTotal).toBe(createBusinessDeck().length);
 
-    const eventTotal = state.market.investments.filter(c => c.family === 'event').length
+    const eventTotal = state.market.cards.filter(c => c.family === 'event').length
       + state.decks.event.length
-      + state.incidentQueue.length
+      + state.incidentDeck.length
       + (state.hand ?? []).filter(c => c.family === 'event').length;
     const multiplier = getPreset(undefined).positiveIncidentMultiplier;
     expect(eventTotal).toBe(createEventDeck(3, undefined, _rng, multiplier).length);
 
-    const upgTotal = state.market.investments.filter(c => c.family === 'upgrade').length
+    const upgTotal = state.market.cards.filter(c => c.family === 'upgrade').length
       + state.decks.upgrade.length;
     expect(upgTotal).toBe(createUpgradeDeck().length);
   });
@@ -564,11 +568,16 @@ describe('Expanded Card Pool: Synergy Coverage', () => {
     }
   });
 
-  it('no synergy type should have more than 6 business cards', () => {
-    const types: SynergyType[] = ['Food', 'Culture', 'Commerce', 'Service', 'Entertainment'];
+  it('no synergy type should exceed 10 business cards (expansion cap)', () => {
+    // Bound relaxed from 6 to 10 by Group A (CG-0MSQJ1XIB0004QVN): the Health
+    // bridge expansion adds 5 Health cards (8 total), Food and Culture reach 7
+    // each, while Commerce/Service/Entertainment stay at 5-6. The cap keeps
+    // any single type from dominating the pool while allowing the contracted
+    // bridge cards (which count toward two types each).
+    const types: SynergyType[] = ['Food', 'Culture', 'Commerce', 'Service', 'Entertainment', 'Health'];
     for (const st of types) {
       const count = businessDeck.filter(c => c.synergyTypes.includes(st)).length;
-      expect(count).toBeLessThanOrEqual(6);
+      expect(count).toBeLessThanOrEqual(10);
     }
   });
 

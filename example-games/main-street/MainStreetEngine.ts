@@ -18,19 +18,24 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
-import { SELL_VALUE_RATIO, isDurationEventCard, type DurationEventCard } from './MainStreetCards';
+import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard, type BusinessCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import {
   purchaseBusiness,
-  purchaseBusinessToHand,
+  moveToHand,
   purchaseUpgrade,
   purchaseEvent,
-  refillAllMarkets,
-  refillIncidentQueue,
+  refillMarket,
+  replenishIncidentDeck,
   cycleMarketCards,
+  playBusinessFromHand,
+  playUpgradeFromHand,
+  playEventFromHand,
+  discardFromHand,
   sellBusiness,
+  purchaseStaffCard,
   canSellBusiness as canSellBusinessFromMarket,
   type PurchaseResult,
 } from './MainStreetMarket';
@@ -65,11 +70,51 @@ export interface BuyEventAction {
 /** Play the currently held Investment event. */
 export interface PlayEventAction {
   type: 'play-event';
+  handIndex?: number;
 }
 
-/** Buy a business card and add it to the player's hand (Multi-Use Card Economy). */
-export interface BuyBusinessToHandAction {
-  type: 'buy-business-to-hand';
+/** Move a market card into the hand for free (CG-0MSTOATDT009BRX2). */
+export interface MoveToHandAction {
+  type: 'move-to-hand';
+  cardId: string;
+}
+
+/** Play a business/community-space card from the hand onto the street (cost-at-play). */
+export interface PlayBusinessFromHandAction {
+  type: 'play-business-from-hand';
+  handIndex: number;
+  slotIndex: number;
+}
+
+/** Play an upgrade card from the hand onto a business (cost-at-play). */
+export interface PlayUpgradeFromHandAction {
+  type: 'play-upgrade-from-hand';
+  handIndex: number;
+  targetSlot?: number;
+}
+
+/** Play an Investment event from the hand (cost-at-play). */
+export interface PlayEventFromHandAction {
+  type: 'play-event-from-hand';
+  handIndex: number;
+}
+
+/** Discard a hand card for free during the player's turn. */
+export interface DiscardFromHandAction {
+  type: 'discard-from-hand';
+  handIndex: number;
+}
+
+/** Directly buy a business from the market and place it on the street (costs 50% more). */
+export interface BuyAndPlaceAction {
+  type: 'buy-and-place';
+  cardId: string;
+  slotIndex: number;
+}
+
+/** Hire a staff card from the staff market. */
+export interface HireStaffAction {
+  type: 'hire-staff';
   cardId: string;
 }
 
@@ -83,7 +128,13 @@ export type PlayerAction =
   | BuyBusinessAction
   | BuyUpgradeAction
   | BuyEventAction
-  | BuyBusinessToHandAction
+  | MoveToHandAction
+  | PlayBusinessFromHandAction
+  | PlayUpgradeFromHandAction
+  | PlayEventFromHandAction
+  | DiscardFromHandAction
+  | BuyAndPlaceAction
+  | HireStaffAction
   | PlayEventAction
   | EndTurnAction;
 
@@ -95,6 +146,10 @@ export interface TurnResult {
   income: IncomeResult | null;
   /** Incident event drawn and resolved (if any). */
   incident: EventCard | null;
+  /** Net coin delta from the resolved incident (negative = loss). */
+  incidentCoinChange: number;
+  /** Net reputation delta from the resolved incident (negative = loss). */
+  incidentRepChange: number;
   /** Current game result after the turn. */
   gameResult: 'playing' | 'win' | 'loss';
   /** Current final score. */
@@ -180,17 +235,44 @@ export function executeAction(
   }
 
   switch (action.type) {
+    case 'move-to-hand':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
+      return moveToHand(state, action.cardId);
     case 'buy-business':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
       return purchaseBusiness(state, action.cardId, action.slotIndex);
-    case 'buy-business-to-hand':
-      return purchaseBusinessToHand(state, action.cardId);
+    case 'play-business-from-hand':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
+      return playBusinessFromHand(state, action.handIndex, action.slotIndex);
+    case 'buy-and-place':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
+      return buyAndPlaceBusiness(state, action.cardId, action.slotIndex);
+    case 'hire-staff':
+      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
+      state.actionsRemaining -= 1;
+      return hireStaffCard(state, action.cardId);
     case 'buy-upgrade':
       return purchaseUpgrade(state, action.cardId, action.targetSlot);
     case 'buy-event':
       return purchaseEvent(state, action.cardId);
-    case 'play-event':
-      playHeldEvent(state);
+    case 'play-upgrade-from-hand':
+      return playUpgradeFromHand(state, action.handIndex, action.targetSlot);
+    case 'play-event-from-hand':
+      return playEventFromHand(state, action.handIndex);
+    case 'discard-from-hand':
+      discardFromHand(state, action.handIndex);
       return null;
+    case 'play-event': {
+      const handIndex = action.handIndex ?? (state.hand ?? []).findIndex(c => c.family === 'event');
+      if (handIndex < 0) {
+        throw new Error('No Investment event is currently held in hand.');
+      }
+      return playEventFromHand(state, handIndex);
+    }
     default:
       throw new Error(`Unknown action type: ${(action as PlayerAction).type}`);
   }
@@ -239,12 +321,23 @@ function classifyEffect(coinChange: number, repChange: number): 'gain' | 'loss' 
  * - Clinic (biz-clinic) reduces duration by 2
  * - Only the stronger reduction applies (Medical Center > Clinic)
  * - Minimum duration floor is 1
+ * - Reduction applies ONLY to negative effects (multiplier < 1): a Clinic
+ *   should shorten a harmful income cut, not a positive boost like
+ *   Tourist Season / Community Renovation (Group C, CG-0MSQJ244M0055X7S).
  *
  * @param baseDuration  Base duration before reductions
  * @param state         Current game state (street grid is scanned)
+ * @param multiplier    The effect's multiplier; < 1 = negative effect
  * @returns Effective duration after reductions (min 1).
  */
-function computeDurationWithClinicReduction(baseDuration: number, state: MainStreetState): number {
+function computeDurationWithClinicReduction(
+  baseDuration: number,
+  state: MainStreetState,
+  multiplier: number,
+): number {
+  // Positive effects (>= 1) are not shortened by medical coverage.
+  if (multiplier >= 1) return baseDuration;
+
   let hasMedicalCenter = false;
   let hasClinic = false;
 
@@ -278,8 +371,9 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
   if (isDurationEventCard(event)) {
     const dEvent = event as DurationEventCard;
 
-    // Compute effective duration (check clinic/medical center for duration mitigation)
-    let effectiveDuration = computeDurationWithClinicReduction(dEvent.duration, state);
+    // Compute effective duration (check clinic/medical center for duration
+    // mitigation — negative effects only; positive effects keep full duration).
+    let effectiveDuration = computeDurationWithClinicReduction(dEvent.duration, state, dEvent.multiplier);
 
     // Create the ActiveEffect
     const effect = createActiveEffect(
@@ -291,9 +385,13 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
     );
     state.activeEffects.push(effect);
 
-    // Log the onset
+    // Log the onset (generic wording covering both negative cuts and
+    // positive boosts — Group C adds positive income-multiplier and
+    // rep-multiplier effects).
+    const multiplierLabel = Math.round(dEvent.multiplier * 100);
+    const what = dEvent.effectType === 'rep-multiplier' ? 'Reputation' : 'Income';
     const logText = effectiveDuration > 0
-      ? `${dEvent.name}: Income reduced to ${Math.round(dEvent.multiplier * 100)}% for ${effectiveDuration} turns`
+      ? `${dEvent.name}: ${what} multiplier ${multiplierLabel}% for ${effectiveDuration} turns`
       : `${dEvent.name}: Resolved with no effect (fully neutralized)`;
     addLog(state, logText, 'loss');
 
@@ -421,14 +519,26 @@ export function resolveHeldInvestment(state: MainStreetState): EventCard | null 
 }
 
 /**
- * Resolves the front Incident event from the incident queue (FIFO).
- * After resolving, draws a replacement Incident from the event deck.
- * Returns the resolved event or null if the queue is empty.
+ * Resolves the front Incident event from the face-down incident deck
+ * (front = next to resolve). Records the draw in the incident-draw balance
+ * history so subsequent constrained draws (deck rebuilds) see the resolved
+ * sequence. When the deck is exhausted, Incident cards from the event deck
+ * / discards reshuffle back in. Returns the resolved event or null if no
+ * incident is available.
  */
 export function resolveIncident(state: MainStreetState): EventCard | null {
-  // Pop front of the incident queue
-  if (state.incidentQueue.length === 0) return null;
-  const event = state.incidentQueue.shift()!;
+  // Deck exhausted: reshuffle incident cards back in from the event deck /
+  // event discards (existing reshuffle convention).
+  if (state.incidentDeck.length === 0) {
+    replenishIncidentDeck(state);
+  }
+  if (state.incidentDeck.length === 0) return null;
+
+  // Pop the top card of the incident deck (front = next to resolve).
+  const event = state.incidentDeck.shift()!;
+  // Track the draw so the balance history mirrors the resolved sequence
+  // (AC3: recordIncidentDraw history still tracks the resolved sequence).
+  recordIncidentDraw(state.incidentBalance, event);
 
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
@@ -440,9 +550,6 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
     `Incident: ${event.name} (${describeEventEffects(coinChange, repChange)})`,
     classifyEffect(coinChange, repChange),
   );
-
-  // Draw replacement from deck (only Incident-trigger cards)
-  refillIncidentQueue(state);
 
   return event;
 }
@@ -557,7 +664,7 @@ export function checkEndConditions(state: MainStreetState): boolean {
  * - Transitions to MarketPhase.
  *
  * @param state             Current game state (mutated in-place).
- * @param skipMarketRefill  When true, skips refillAllMarkets. Used during
+ * @param skipMarketRefill  When true, skips refillMarket. Used during
  *                          checkpoint resume to preserve saved market state.
  */
 export function executeDayStart(state: MainStreetState, skipMarketRefill: boolean = false): void {
@@ -567,14 +674,21 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
 
   // Turn 1 is already set by setup; subsequent turns increment here
   if (state.turn > 1 || state.phase === 'DayStart') {
-    // Refill market at start of each day (skip on checkpoint resume)
+    // Refill market at start of each day (skip on checkpoint resume).
+    // Top-up semantics: visible cards are preserved (e.g. tutorial scenario
+    // cards kept via skipMarketCycleOnEndTurn); an already-full row stays.
     if (!skipMarketRefill) {
-      refillAllMarkets(state);
+      refillMarket(state);
     }
   }
 
   // Log turn header
   addLog(state, `Turn ${state.turn}`, 'turn-header');
+
+  // Action economy: reset daily action budget.
+  // Base 1 action + sum of actionsPerTurn from employed staff cards.
+  const gmBonus = (state.staffCards ?? []).reduce((sum, card) => sum + (card.actionsPerTurn ?? 0), 0);
+  state.actionsRemaining = 1 + gmBonus;
 
   state.phase = 'MarketPhase';
 }
@@ -611,6 +725,8 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
     return {
       income: null,
       incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
@@ -629,13 +745,21 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
 
   // Phase: IncidentPhase
   state.phase = 'IncidentPhase';
+  // Capture the incident's own resource deltas (negative = loss) for the
+  // incident-reveal presentation (dramatic sting + damage feedback).
+  const coinsBeforeIncident = state.resourceBank.coins;
+  const repBeforeIncident = state.resourceBank.reputation;
   const incident = resolveIncident(state);
+  const incidentCoinChange = state.resourceBank.coins - coinsBeforeIncident;
+  const incidentRepChange = state.resourceBank.reputation - repBeforeIncident;
 
   // Check for immediate loss after incident
   if (checkImmediateLoss(state)) {
     return {
       income,
       incident,
+      incidentCoinChange,
+      incidentRepChange,
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
@@ -671,6 +795,8 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   return {
     income,
     incident,
+    incidentCoinChange,
+    incidentRepChange,
     gameResult: state.gameResult,
     finalScore: state.finalScore,
     newlyCompletedChallenges,
@@ -731,9 +857,9 @@ export function placeFromHand(
 
   const card = hand[handIndex];
 
-  // Event cards are played from the hand, never placed on the street.
-  if (card.family === 'event') {
-    throw new Error(`Event cards cannot be placed on the street. Play ${card.name} from the hand instead.`);
+  // Event and upgrade cards are played from the hand, never placed on the street.
+  if (card.family === 'event' || card.family === 'upgrade') {
+    throw new Error(`Event and upgrade cards cannot be placed on the street. Play ${card.name} from the hand instead.`);
   }
 
   // Validate slot index
@@ -746,6 +872,13 @@ export function placeFromHand(
     throw new Error(`Slot ${slotIndex} is already occupied.`);
   }
 
+  // Cost-at-play (CG-0MSTOATDT009BRX2): moving a card to hand is free, but
+  // placing it on the street pays its listed cost.
+  if (state.resourceBank.coins < card.cost) {
+    throw new Error(`Not enough coins to place ${card.name}. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+  }
+  state.resourceBank.coins -= card.cost;
+
   // Remove from hand and place on tableau
   hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card;
@@ -753,7 +886,7 @@ export function placeFromHand(
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex}`, 'neutral');
+  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-€${card.cost})`, 'loss');
 }
 
 /**
@@ -1118,4 +1251,78 @@ export function layoffStaffCard(
 
   // Return the staff card to the market
   state.staffCardMarket.push({ ...card });
+}
+
+// ── Action Economy (CG-0MSTOF1N5005PK2R) ────────────────────
+
+/**
+ * Directly buys a business/community-space card from the market and places
+ * it on the street grid in a single action, paying a 50% premium over the
+ * listed cost (CG-0MSTOF1N5005PK2R). Consumes one daily action.
+ *
+ * Premium pricing: `Math.ceil(cost * 1.5 * 2) / 2` — the listed cost × 1.5,
+ * rounded up to the nearest 0.5 (e.g. 3 → 4.5, 7 → 10.5).
+ *
+ * @param state     Current game state (mutated in-place).
+ * @param cardId    ID of the card in the market.
+ * @param slotIndex Target street grid slot (0-based).
+ * @returns PurchaseResult on success.
+ * @throws Error if the action is illegal.
+ */
+export function buyAndPlaceBusiness(
+  state: MainStreetState,
+  cardId: string,
+  slotIndex: number,
+): PurchaseResult {
+  const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
+  if (marketIndex === -1) {
+    throw new Error(`Card ${cardId} not found in the market.`);
+  }
+
+  const card = state.market.cards[marketIndex];
+  if (card.family === 'upgrade' || card.family === 'event') {
+    throw new Error('Buy-and-place only applies to business and community-space cards.');
+  }
+  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  }
+  if (state.streetGrid[slotIndex] !== null) {
+    throw new Error(`Slot ${slotIndex} is already occupied.`);
+  }
+
+  const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+  if (state.resourceBank.coins < premiumCost) {
+    throw new Error(`Not enough coins to buy-and-place ${card.name}. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
+  }
+
+  state.resourceBank.coins -= premiumCost;
+  state.market.cards.splice(marketIndex, 1);
+  state.streetGrid[slotIndex] = card as BusinessCard;
+
+  // Incrementally update the new card's and all affected neighbors' cached values
+  updateNeighborsOnPlacement(state, slotIndex);
+
+  addLog(state, `Bought & placed ${card.name} in slot ${slotIndex} (-€${premiumCost}, 50% premium)`, 'loss');
+
+  return { card, cost: premiumCost, refilled: false };
+}
+
+/**
+ * Hires a staff card from the staff market (CG-0MSTOF1N5005PK2R).
+ * Consumes one daily action; delegates to purchaseStaffCard for the
+ * coin deduction and hand-size mechanics.
+ *
+ * @param state  Current game state (mutated in-place).
+ * @param cardId ID of the staff card in the staff market.
+ * @returns PurchaseResult describing the hire.
+ * @throws Error if the card is not found or player cannot afford it.
+ */
+export function hireStaffCard(state: MainStreetState, cardId: string): PurchaseResult {
+  const marketIndex = state.staffCardMarket.findIndex(c => c.id === cardId);
+  const card = state.staffCardMarket[marketIndex];
+  if (!card) {
+    throw new Error(`Staff card ${cardId} not found in the market.`);
+  }
+  purchaseStaffCard(state, cardId);
+  return { card, cost: card.cost, refilled: false };
 }
