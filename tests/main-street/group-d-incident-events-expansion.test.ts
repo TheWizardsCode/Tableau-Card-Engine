@@ -63,7 +63,7 @@ const NEW_INCIDENT_CONTRACTS: NewIncidentContract[] = [
   // (0 + 0 = neutral) — same convention as Flu Outbreak / Recession.
   { id: 'evt-labor-shortage', name: 'Labor Shortage', intendedPolarity: 'neutral', tier: '3', coinDelta: 0, reputationDelta: 0, duration: 3, effectType: 'income-multiplier', multiplier: 0.9 },
   { id: 'evt-movie-premiere', name: 'Movie Premiere', intendedPolarity: 'good', tier: '2', targetSynergy: 'Entertainment', coinDelta: 1, reputationDelta: 1 },
-  { id: 'evt-health-screening', name: 'Free Health Screening', intendedPolarity: 'good', tier: '2', targetSynergy: 'Health', coinDelta: 1, reputationDelta: 1 },
+  { id: 'evt-health-screening', name: 'Free Health Screening', intendedPolarity: 'good', tier: '2', targetSynergy: 'Health', coinDelta: 0, reputationDelta: 1 },
   { id: 'evt-farmers-market', name: 'Farmers Market Day', intendedPolarity: 'good', tier: '2', targetSynergy: 'Food', coinDelta: 1, reputationDelta: 1 },
   { id: 'evt-library-reading', name: 'Library Story Hour', intendedPolarity: 'good', tier: '1', targetSynergy: 'Culture', coinDelta: 0, reputationDelta: 1 },
   { id: 'evt-street-cleaning', name: 'Street Cleaning', intendedPolarity: 'neutral', tier: '1', coinDelta: 0, reputationDelta: 0 },

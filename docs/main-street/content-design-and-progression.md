@@ -51,7 +51,7 @@ Event cards are split into two trigger types:
 | Parking Enforcement | Incident | -1 coin per Commerce business. *(Group D.)* |
 | Labor Shortage | Incident (duration) | All businesses generate 90% income for 3 turns. *(Group D.)* |
 | Movie Premiere | Incident | +1 coin per Entertainment business and +1 reputation. *(Group D.)* |
-| Free Health Screening | Incident | +1 coin per Health business and +1 reputation. *(Group D.)* |
+| Free Health Screening | Incident | +1 reputation. *(Group D.)* |
 | Farmers Market Day | Incident | +1 coin per Food business and +1 reputation. *(Group D.)* |
 | Library Story Hour | Incident | +1 reputation. *(Group D.)* |
 | Street Cleaning | Incident | No effect (streak breaker). *(Group D.)* |
