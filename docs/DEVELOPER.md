@@ -198,6 +198,8 @@ npm run tf:generate # generate tf audio artifacts (out-of-repo build/tf-synths)
 
 `npm test` is intentionally non-destructive and must not mutate tracked source assets such as `public/assets/games/main-street/svg/cards`. If asset regeneration is needed, run the dedicated generation scripts explicitly.
 
+> **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only. The full test suite is run locally before every push (quality gates in `AGENTS.md`) and is intentionally not re-run in PR CI: the Phaser 4 browser suite outgrew the single-Chromium-instance context budget in the constrained CI environment (reliably hard-killed mid-run). The Monte Carlo env-var table below therefore applies to **local** runs (and any future CI that re-enables tests), not to PR CI.
+
 ### Monte Carlo environment variables
 
 The Main Street balance guardrail (`tests/main-street/monte-carlo-balance.test.ts`) and harness
@@ -377,7 +379,7 @@ npx playwright install --list
 
 This lists the installed browsers and their expected locations (e.g. `chromium-1208`).
 
-**Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. CI (`.github/workflows/pr-checks.yml`) installs Chromium before `npm test`, so the pre-check passes there.
+**Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. PR CI is build-only (CG-0MT022826006EM0D) and no longer runs browser tests; local devs run `npx playwright install chromium` once (see [Browser test setup](#browser-test-setup)).
 
 ## ToneForge Audio Generation
 
