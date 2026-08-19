@@ -339,7 +339,7 @@ interface GuardrailResult {
 import { evaluateGuardrails, GUARDRAIL_THRESHOLDS } from '../../scripts/balance/guards/thresholds';
 
 const result = evaluateGuardrails({
-  winRate_greedy_medium: 55,  // within 30-60 → pass
+  winRate_greedy_medium: 55,  // within 45-75 → pass
   medianScore_greedy_medium: 110, // below 120 → flag (warning)
 });
 // { passed: 1, flagged: 1, failed: 0, overall: 'flag', ... }

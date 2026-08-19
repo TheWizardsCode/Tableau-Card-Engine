@@ -38,7 +38,6 @@ import {
   STARTING_COINS,
   STARTING_REPUTATION,
   WIN_THRESHOLD,
-  SYNERGY_BONUS_PER_NEIGHBOR,
   REPUTATION_SCORE_MULTIPLIER,
   CHALLENGE_BONUS_POINTS,
   createIncidentBalanceState,
@@ -151,7 +150,7 @@ describe('DifficultyPresets Module', () => {
   });
 
   describe('Medium preset matches original constants', () => {
-    it('should match STARTING_COINS', () => {
+    it('should match STARTING_COINS (re-tuned to 6 by CG-0MSP26Q5N002EH8P)', () => {
       expect(MEDIUM_PRESET.startingCoins).toBe(STARTING_COINS);
     });
 
@@ -163,8 +162,12 @@ describe('DifficultyPresets Module', () => {
       expect(MEDIUM_PRESET.winThreshold).toBe(WIN_THRESHOLD);
     });
 
-    it('should match SYNERGY_BONUS_PER_NEIGHBOR', () => {
-      expect(MEDIUM_PRESET.synergyBonusPerNeighbor).toBe(SYNERGY_BONUS_PER_NEIGHBOR);
+    it('should match the re-tuned synergy bonus per neighbor (CG-0MSP26Q5N002EH8P)', () => {
+      // Balance re-tune (2026-08-13): Medium synergyBonusPerNeighbor reduced
+      // 1.0 → 0.35 to hold avgCoinsPerTurn within the 0–2 net-liquidity band.
+      // The SYNERGY_BONUS_PER_NEIGHBOR constant (1) remains the raw default
+      // multiplier of computeSynergyBonus (asserted in adjacency tests).
+      expect(MEDIUM_PRESET.synergyBonusPerNeighbor).toBe(0.35);
     });
 
     it('should match REPUTATION_SCORE_MULTIPLIER', () => {
@@ -279,7 +282,7 @@ describe('DifficultyPresets Module', () => {
         for (const difficulty of ['Easy', 'Medium', 'Hard'] as const) {
           const a = createTestState('incident-determ', difficulty);
           const b = createTestState('incident-determ', difficulty);
-          expect(a.incidentQueue.map(c => c.name)).toEqual(b.incidentQueue.map(c => c.name));
+          expect(a.incidentDeck.map(c => c.name)).toEqual(b.incidentDeck.map(c => c.name));
         }
       });
 
@@ -288,8 +291,8 @@ describe('DifficultyPresets Module', () => {
         // N=3/M=2, so the seeded queue must be identical for the same seed.
         const medium = createTestState('medium-seq-invariant', 'Medium');
         const defaulted = createTestState('medium-seq-invariant');
-        expect(medium.incidentQueue.map(c => c.name)).toEqual(
-          defaulted.incidentQueue.map(c => c.name),
+        expect(medium.incidentDeck.map(c => c.name)).toEqual(
+          defaulted.incidentDeck.map(c => c.name),
         );
       });
     });

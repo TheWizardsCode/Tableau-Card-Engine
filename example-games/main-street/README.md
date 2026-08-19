@@ -2,6 +2,8 @@
 
 Main Street now uses the shared **Screen Layout Language (SLL)** as its canonical layout source.
 
+The street is a 10-slot grid rendered as **2 rows × 5 columns**; synergy adjacency is **8-way (Chebyshev)** — orthogonally *and* diagonally adjacent slots count as neighbors (CG-0MSP1HCAS00785MP).
+
 ## Layout files and adapter
 
 - Canonical layout JSON: `example-games/main-street/layouts/main-street.layout.json`

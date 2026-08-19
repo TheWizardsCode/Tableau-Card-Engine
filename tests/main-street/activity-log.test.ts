@@ -153,7 +153,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Place a business from the market
-      const biz = state.market.development[0];
+      const biz = state.market.cards[0];
       const cost = biz.cost;
       const name = biz.name;
       state.resourceBank.coins = 20; // ensure enough coins
@@ -175,7 +175,7 @@ describe('Activity Log', () => {
 
       // Inject an Investment event into the investments row
       const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1', name: 'Test Fest' });
-      state.market.investments = [investmentEvent];
+      state.market.cards = [investmentEvent];
       purchaseEvent(state, 'inv-evt-1');
 
       const entry = lastLog(state);
@@ -205,7 +205,7 @@ describe('Activity Log', () => {
         incomeBonus: 1,
         synergyRangeBonus: 0,
       };
-      state.market.investments = [upgrade];
+      state.market.cards = [upgrade];
       state.resourceBank.coins = 20;
 
       purchaseUpgrade(state, 'upg-1');
@@ -308,7 +308,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Inject an Incident event into the queue
-      state.incidentQueue = [
+      state.incidentDeck = [
         makeIncidentEvent({ id: 'ne-1', name: 'Rainy Day', coinDelta: -1, reputationDelta: 0 }),
       ];
 
@@ -327,7 +327,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Empty the incident queue
-      state.incidentQueue = [];
+      state.incidentDeck = [];
 
       state.phase = 'IncidentPhase';
       const logBefore = state.activityLog.length;
@@ -475,7 +475,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Find an affordable business and place it
-      const biz = state.market.development[0];
+      const biz = state.market.cards[0];
       state.resourceBank.coins = 50;
 
       purchaseBusiness(state, biz.id, 0);

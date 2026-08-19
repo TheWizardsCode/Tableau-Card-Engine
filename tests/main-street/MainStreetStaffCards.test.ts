@@ -120,7 +120,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
 
     it('should have maxHandSize default to 2', () => {
       const state = createTestState();
-      expect(getMaxHandSize(state)).toBe(2);
+      expect(getMaxHandSize(state)).toBe(3);
     });
 
     it.runIf(STAFF_FEATURE_AVAILABLE)(
@@ -137,7 +137,8 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
           expect(typeof tpl.cost).toBe('number');
           expect(typeof tpl.handSlotsAdded).toBe('number');
           expect(tpl.handSlotsAdded).toBeGreaterThanOrEqual(1);
-          expect(tpl.handSlotsAdded).toBeLessThanOrEqual(3);
+          // 4 = Executive premium slot capacity (Group F, CG-0MSQJ7VL9009JHF4).
+          expect(tpl.handSlotsAdded).toBeLessThanOrEqual(4);
 
           // ongoingCost should exist (0 is acceptable for cheap staff)
           expect(typeof tpl.ongoingCost).toBe('number');
@@ -589,8 +590,8 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       const staff = getStaffCards(state);
       expect(staff).toHaveLength(0);
 
-      // Default maxHandSize should remain 2
-      expect(getMaxHandSize(state)).toBe(2);
+      // Default maxHandSize is 3 (CG-0MSTOATDT009BRX2)
+      expect(getMaxHandSize(state)).toBe(3);
     });
 
     it.runIf(STAFF_FEATURE_AVAILABLE)(
@@ -652,7 +653,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       executeDayStart(state);
 
       // Normal gameplay should still work
-      const card = state.market.development.find(
+      const card = state.market.cards.find(
         c => c.cost <= state.resourceBank.coins,
       );
       if (card) {

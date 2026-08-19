@@ -49,7 +49,7 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 
 | Rule | Cards Affected | Rationale |
 |------|---------------|-----------|
-| **Incidents remain free** | All 23 Incident-trigger events | Incidents are negative events; cost would make them purchaseable, changing game balance |
+| **Incidents remain free** | All 24 Incident-trigger events | Incidents are negative events; cost would make them purchaseable, changing game balance |
 
 ### 6. Special Cases
 
@@ -61,33 +61,48 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 
 ## Per-Family Strategy
 
-### Business (18 cards) and Community Space (2 cards)
+### Business (30 cards) and Community Space (2 cards)
+
+> Business grew from 18 to 30 in the Group A expansion (CG-0MSQJ1XIB0004QVN):
+> 12 new cards (Health bridges, T2/T3 singles, T5 Grand Hotel flagship). The
+> 1/3 cost-spread rule now applies to 30 cards (threshold 10).
 
 - **Goal**: Wider cost spread (target: range increase ≥ 30%)
 - **Inputs**: baseIncome, synergyCount, synergy bonuses, reputation, tier
 - **Algorithm**: Curve-fitted cost + tier-driven base → clamped to tier bands → spread enforcement
 
-### Investment Events (13 of 36 events)
+### Investment Events (21 of 45 events)
+
+> Investment events grew from 13 to 21 in the Group C expansion
+> (CG-0MSQJ244M0055X7S), adding per-synergy mid-tier options plus two new
+> duration effect types (positive `income-multiplier`, `rep-multiplier`).
+> Duration events carry zero one-shot deltas; their cost is curve-fitted from
+> tier only.
 
 - **Goal**: Cost range wider than current 2–4 (target: range ≥ 3)
 - **Inputs**: coinDelta, reputationDelta, target scope (All vs SpecificSynergy)
 - **Scope multiplier**: All = 1.0×, SpecificSynergy = 1.2×
 
-### Incidents (23 of 36 events)
+### Incidents (24 of 45 events)
 
 - **Not adjusted** — all remain at cost 0
 
-### Upgrades (27 cards)
+### Upgrades (39 cards)
+
+> Upgrades grew from 27 to 39 in the Group E expansion (CG-0MSQJ7SYD008U3EE),
+> covering every Group A business and Group B community space.
 
 - **Goal**: Wider cost spread (target: range ≥ 6)
 - **Inputs**: incomeBonus, synergyRangeBonus, requiredLevel, reputationBonus, tier
 - **Minimum cost**: 2
 
-### Staff (3 cards)
+### Staff (7 cards)
 
 - **Goal**: Cost spread maintained (target: range ≥ 9)
 - **Inputs**: ongoingCost, handSlotsAdded
 - **Ongoing cost adjusted proportionally**: Higher purchase cost → proportionally higher ongoing cost
+- **`refreshCostDiscount`** (staff ability, e.g. Accountant): recognized and validated as a numeric CSV column (CG-0MSREC65T004J5SS), but **excluded from the cost curve** — like `reputationPerTurn` for staff, it is an ability field tracked outside the curve model.
+- **`actionsPerTurn`** (staff ability, e.g. General Manager, CG-0MSTOF1N5005PK2R): a numeric CSV column on staff cards, **excluded from the cost curve** — the same treatment as `refreshCostDiscount` and `reputationPerTurn`. The action economy is a **game-design lever**, not part of the standard cost formula: the General Manager's +1 action/day is balanced by its high cost (20) and ongoing cost (5), and is never priced into `ongoingCost * 5 + handSlotsAdded * 5`.
 
 ## Rationale Codes
 
@@ -127,6 +142,55 @@ This document consolidates all balancing methodology content previously scattere
 - `docs/main-street/card-catalog.md` — Event Balance Summary table, Upgrade Cost Distribution table
 
 The origin documents now contain cross-references to this document.
+
+## 8-Way Adjacency Re-Tune (CG-0MSP1HCAS00785MP / CG-0MSP26Q5N002EH8P)
+
+The adjacency metric was changed from **Manhattan (orthogonal-only)** to **Chebyshev (8-way)**:
+diagonally adjacent slots now count as neighbors on the 2×5 street grid. The Monte Carlo
+harness (200 seeds, greedy strategy) was re-run before and after the change.
+
+**Metric semantics (producer ruling, 2026-08-13):** the harness's `avgCoinsPerTurn`
+(= finalCoins/turns, **net liquidity**) is the focus metric for the economy band, and its
+target band is **0–2**. The 4–8 band in
+[`prd-balance-process-and-tooling.md`](prd-balance-process-and-tooling.md) targets **gross**
+income per turn (`totalCoinsEarned/totalTurns`) and is not the `avgCoinsPerTurn` target.
+
+### Initial F3 measurement (pre-re-tune, 200 seeds / 25 turns)
+
+| Metric | Before (Manhattan) | After (8-way / Chebyshev) |
+|---|---:|---:|
+| Win rate | 64.5% | 65.0% |
+| Median final score | 154.4 | 157.0 |
+| Avg coins/turn (liquidity) | 2.557 | 2.745 |
+| Approx. income/turn (positive deltas) | 4.38 | 4.63 |
+
+### Economy re-tune (CG-0MSP26Q5N002EH8P, 2026-08-13)
+
+After the concurrent card-data rebalance (CG-0MSQJ7VL9009JHF4) landed on dev, the Medium/Greedy
+`avgCoinsPerTurn` measured **4.118** — well above the 0–2 net-liquidity band. Per the lever
+order (difficulty presets first, card data only for outliers), the `MainStreetDifficulty.ts`
+presets were re-tuned:
+
+| Preset | startingCoins before → after | synergyBonusPerNeighbor before → after |
+|---|---:|---:|
+| Easy | 12 → 10 | 1.5 → 0.5 |
+| Medium | 8 → 6 | 1.0 → 0.35 |
+| Hard | 5 → 4 | 0.75 → 0.25 |
+
+`card-data.csv` was **not** changed (band reached with presets alone). Resulting harness
+metrics (200 seeds, greedy):
+
+| Metric | Before re-tune | After re-tune |
+|---|---:|---:|
+| avgCoinsPerTurn (25 turns) | 4.118 | **1.82** ✓ (0–2 band) |
+| avgCoinsPerTurn (60-turn baseline) | 4.118 | **1.85** ✓ (0–2 band) |
+| Win rate (25 turns) | 81.5% | 60.5% |
+| Median final score (25 turns) | 168.3 | 152.5 |
+
+Guardrail tests (`monte-carlo-guardrails`, `monte-carlo-greedy-guardrail`,
+`monte-carlo-balance`) pass on the re-tuned presets; the committed baseline in
+[`monte-carlo-baseline.json`](monte-carlo-baseline.json) and
+`results/main-street-monte-carlo.json/.csv` were regenerated to the new values.
 
 ## See Also
 

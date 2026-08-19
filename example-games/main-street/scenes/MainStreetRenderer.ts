@@ -6,15 +6,13 @@ import Phaser from 'phaser';
 import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
-  MARKET_BUSINESS_SLOTS,
-  MARKET_INVESTMENT_SLOTS,
-  REFRESH_DEVELOPMENT_COST,
-  REFRESH_INVESTMENTS_COST,
+  MARKET_TOTAL_SLOTS,
   synergyColor,
 } from '../MainStreetCards';
 import {
   computeSynergyPairs,
 } from '../MainStreetAdjacency';
+import { synergyLineEndpoints } from './synergyLineEndpoints';
 import {
   formatSynergyRate,
   buildCardTooltipInfo,
@@ -25,14 +23,15 @@ import {
   buildCoinsTooltip,
   buildReputationTooltip,
   buildScoreTooltip,
+  buildActionTooltip,
   HUD_ARIA_LABELS,
 } from './MainStreetHudTooltips';
 import {
   getAffordableBusinessCards,
   getAffordableUpgradeCards,
   getEmptySlots,
-  canRefreshDevelopment,
-  canRefreshInvestments,
+  canRefreshMarket,
+  refreshMarketCost,
 } from '../MainStreetMarket';
 import {
   FONT_FAMILY,
@@ -92,6 +91,12 @@ export class MainStreetRenderer {
   private dragDropRegistered = new Set<Phaser.GameObjects.Container>();
   /** Outline rectangles shown on empty street slots while a drag is active. */
   private dragHighlightRects = new Set<Phaser.GameObjects.Rectangle>();
+  /**
+   * Rendered market card containers per row ('development' | 'investments'),
+   * in slot order. Rebuilt on every refreshMarket; consumed by the market
+   * deal-in animation (`MainStreetAnimator.animateMarketDealIn`).
+   */
+  private marketRowCards = new Map<string, Phaser.GameObjects.Container[]>();
 
   constructor(private readonly scene: any) {}
 
@@ -330,6 +335,19 @@ export class MainStreetRenderer {
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
 
+    // Action counter - next to coins
+    const actionText = markHudTransient(s.add.text(
+      coinText.x + coinText.width + 16,
+      hudY,
+      `${s.state.actionsRemaining} action${s.state.actionsRemaining !== 1 ? 's' : ''} left`,
+      {
+        fontSize: '14px', fontStyle: 'bold',
+        color: s.state.actionsRemaining > 0 ? '#aaffaa' : '#ff6666',
+        fontFamily: FONT_FAMILY,
+      }
+    ).setOrigin(0, 0.5));
+    s.hudContainer.add(actionText);
+
     // Reputation - centered in strip
     const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
@@ -347,6 +365,7 @@ export class MainStreetRenderer {
       attachHudTooltipZone(s, coinText, HUD_ARIA_LABELS.coins, () => buildCoinsTooltip(s.state));
       attachHudTooltipZone(s, repText, HUD_ARIA_LABELS.rep, () => buildReputationTooltip(s.state));
       attachHudTooltipZone(s, scoreText, HUD_ARIA_LABELS.score, () => buildScoreTooltip(s.state, s.campaign));
+      attachHudTooltipZone(s, actionText, HUD_ARIA_LABELS.action, () => buildActionTooltip(s.state));
     }
 
     s.animateHudValueChanges({
@@ -481,39 +500,37 @@ export class MainStreetRenderer {
    * Draws visual lines between adjacent businesses that share a synergy type.
    * Each line uses the colour of the shared synergy type (from synergyColor).
    * Lines are drawn over the street grid but behind tooltip zones.
+   *
+   * Geometry (CG-0MSVM3WCD007BRQP): each line is the centre-to-centre
+   * segment clipped to the two SLOT rects via the shared `synergyLineEndpoints`
+   * helper — edge-to-edge for orthogonally adjacent slots, visually
+   * corner-to-corner for diagonally adjacent slots, and clipped to the card
+   * boundaries for extended-range pairs (the straight line still crosses
+   * intermediate cells). Endpoints target the slot rect (the visual card is
+   * inset 2px, `renderW/H = slotW − 4`) so the lines sit on the slot grid.
+   * The main 3px stroke and the 6px/0.2-alpha glow share the SAME clipped
+   * endpoints (drawn back-to-back on one Graphics object).
    */
   private drawSynergyLines(): void {
     const s = this.scene;
-    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
-
-    const soldSlots: boolean[] = s.state.soldSlots ?? [];
-    const pairs = computeSynergyPairs(s.state.streetGrid, soldSlots);
+    const pairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
 
     for (const pair of pairs) {
-      const fromCol = pair.fromIndex % streetCols;
-      const fromRow = Math.floor(pair.fromIndex / streetCols);
-      const toCol = pair.toIndex % streetCols;
-      const toRow = Math.floor(pair.toIndex / streetCols);
-
-      const x1 = streetX + fromCol * (slotW + slotGap) + slotW / 2;
-      const y1 = streetTop + fromRow * (slotH + streetRowGap) + slotH / 2;
-      const x2 = streetX + toCol * (slotW + slotGap) + slotW / 2;
-      const y2 = streetTop + toRow * (slotH + streetRowGap) + slotH / 2;
-
+      const { p1, p2 } = synergyLineEndpoints(pair, s.layout);
       const color = synergyColor(pair.sharedSynergy);
 
       const line = s.add.graphics();
       line.lineStyle(3, color, 0.7);
       line.beginPath();
-      line.moveTo(x1, y1);
-      line.lineTo(x2, y2);
+      line.moveTo(p1.x, p1.y);
+      line.lineTo(p2.x, p2.y);
       line.strokePath();
 
-      // Add a subtle outer glow by drawing a thicker, more transparent line underneath
+      // Subtle outer glow: thicker, more transparent line, same endpoints.
       line.lineStyle(6, color, 0.2);
       line.beginPath();
-      line.moveTo(x1, y1);
-      line.lineTo(x2, y2);
+      line.moveTo(p1.x, p1.y);
+      line.lineTo(p2.x, p2.y);
       line.strokePath();
 
       s.streetContainer.add(line);
@@ -595,6 +612,11 @@ export class MainStreetRenderer {
     // Render card via shared adapter
     const cardContainer = s.add.container(Math.round(x + slotW / 2), Math.round(y + slotH / 2));
     mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
+
+    // Tag the container with its slot index so the synergy-formation
+    // animation (`MainStreetAnimator.animateSynergyFormation`) can find and
+    // pulse the paired cards.
+    cardContainer.setData('streetSlotIndex', _index);
 
     // Apply upgrade overlays (level badge, income, name, border)
     this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
@@ -841,6 +863,8 @@ export class MainStreetRenderer {
 
   public refreshMarket(): void {
     const s = this.scene;
+    // Rebuild the per-row card registry for the deal-in animation.
+    this.marketRowCards.clear();
     // Unregister market-card draggables before the containers are destroyed
     // so the drag-drop manager never holds stale game-object references.
     this.unregisterDragDraggables();
@@ -850,12 +874,12 @@ export class MainStreetRenderer {
     s.marketSelectionByCardId.clear();
     s.selectedMarketCardId = null;
 
-    const { marketTop, marketRowH, marketRowGap, logX } = s.layout;
+    const { marketTop, marketRowH, logX } = s.layout;
 
     // Wider section background — extends from left edge to near the activity log (logX - 20px margin)
     const bgLeft = 20;
     const bgRight = logX - 20; // 820 - 20 = 800
-    const totalH = 2 * marketRowH + marketRowGap + 20;
+    const totalH = marketRowH + 30;
     const bgBox = s.add.graphics();
     bgBox.fillStyle(BOX_FILL, 0.3);
     bgBox.fillRoundedRect(bgLeft, marketTop - 10, bgRight - bgLeft, totalH, BOX_RADIUS);
@@ -869,42 +893,29 @@ export class MainStreetRenderer {
     }).setOrigin(0.5, 1);
     s.marketContainer.add(sectionLabel);
 
-    // Compute the development row's startX so the investments row can align
-    // its card slots to the first 3 development columns instead of independently
-    // centering (which would create a ~76px horizontal offset).
+    // Single-row marketplace: exactly MARKET_TOTAL_SLOTS (3) cards, always
+    // ≥1 business, random within 1–2B/0–1U/0–1E (CG-0MSTOATDT009BRX2).
     const { marketCardW, marketCardGap } = s.layout;
     const boxCenter = (bgLeft + bgRight) / 2;
-    const devTotalCardsW = MARKET_BUSINESS_SLOTS * marketCardW + (MARKET_BUSINESS_SLOTS - 1) * marketCardGap;
-    const devStartX = Math.round(boxCenter - devTotalCardsW / 2);
+    const totalCardsW = MARKET_TOTAL_SLOTS * marketCardW + (MARKET_TOTAL_SLOTS - 1) * marketCardGap;
+    const startX = Math.round(boxCenter - totalCardsW / 2);
 
-    // Development row (business + community space cards)
     this.drawMarketRow(
       marketTop + 6,
-      'Development',
-      'development',
-      s.state.market.development,
-      MARKET_BUSINESS_SLOTS,
-      (card) => s.onBusinessCardClick(card as BusinessCard),
-      devStartX,
-    );
-
-    // Investments row (mixed upgrades + investment events)
-    // Uses devStartX for alignment so investment cards sit directly below
-    // the first 3 development cards.
-    this.drawMarketRow(
-      marketTop + 6 + marketRowH + marketRowGap,
-      'Investments',
-      'investments',
-      s.state.market.investments,
-      MARKET_INVESTMENT_SLOTS,
+      'Market',
+      'market',
+      s.state.market.cards,
+      MARKET_TOTAL_SLOTS,
       (card) => {
-        if (card.family === 'upgrade') {
+        if (card.family === 'business' || card.family === 'community-space') {
+          s.onBusinessCardClick(card as BusinessCard);
+        } else if (card.family === 'upgrade') {
           s.onUpgradeCardClick(card as UpgradeCard);
         } else {
           s.onEventCardClick(card as EventCard);
         }
       },
-      devStartX,
+      startX,
     );
   }
 
@@ -926,9 +937,8 @@ export class MainStreetRenderer {
     }).setOrigin(0, 0.5);
     s.marketContainer.add(label);
 
-    // Determine card startX: when alignmentStartX is provided (investments row),
-    // use it to align with the development row's slot grid. Otherwise,
-    // independently centre the row in the market box.
+    // Determine card startX: an explicit alignmentStartX wins; otherwise
+    // centre the row independently in the market box.
     const boxLeft = 20;
     const boxRight = logX - 20;
     const boxCenter = (boxLeft + boxRight) / 2;
@@ -942,6 +952,9 @@ export class MainStreetRenderer {
       if (card && !s.hiddenTransferSourceCardIds.has(card.id)) {
         const cardObj = this.drawMarketCard(cx, y, card, onClick, rowKey, i);
         s.marketContainer.add(cardObj);
+        const rowCards = this.marketRowCards.get(rowKey) ?? [];
+        rowCards.push(cardObj);
+        this.marketRowCards.set(rowKey, rowCards);
       } else {
         // Empty slot
         const empty = s.add.rectangle(
@@ -953,158 +966,117 @@ export class MainStreetRenderer {
       }
     }
 
-    // Deck info and refresh button - immediately below the label
+    // Deck info and re-roll button - immediately below the label.
     const deckY = y + 16;
-    if (rowKey === 'development') {
-      // Development row: show deck count + Discover button
-      const bizCount = s.state.decks.business.length;
-      const csCount = s.state.decks.communitySpace.length;
-      const deckText = s.add.text(40, deckY, `Biz: ${bizCount}  CS: ${csCount}`, {
-        fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY,
-      }).setOrigin(0, 0);
-      s.marketContainer.add(deckText);
+    // Single row: show all deck counts + one Re-roll button.
+    const bizCount = s.state.decks.business.length;
+    const csCount = s.state.decks.communitySpace.length;
+    const upgCount = s.state.decks.upgrade.length;
+    const evtCount = s.state.decks.event.length;
+    const deckText = s.add.text(40, deckY, `Biz: ${bizCount}  CS: ${csCount}  Upg: ${upgCount}  Evt: ${evtCount}`, {
+      fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY,
+    }).setOrigin(0, 0);
+    s.marketContainer.add(deckText);
 
-      // Discover button for Development row
+    // Re-roll button (single market refresh, Accountant discount applies).
+    try {
+      const refreshResult = canRefreshMarket(s.state);
+      const canRefresh = refreshResult.legal;
+      const refreshCost = refreshMarketCost(s.state);
+      const btnW = Math.max(s.layout.smallButtonW, 110);
+      const labelCenter = 40 + s.layout.marketLabelW / 2;
+      const btnX = Math.round(labelCenter - btnW / 2);
+      const btnY = deckY + 22;
+
+      const labelText = `Re-roll (${refreshCost})`;
+
+      const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshMarketClick(); } : () => {}, {
+        disabled: !canRefresh,
+        ...(canRefresh ? {} : { fillColor: 0x333333, fillAlpha: 0.6 }),
+      });
+      // Dim visual when not allowed, but keep interactive so tooltip can show
       try {
-        const refreshDevResult = canRefreshDevelopment(s.state);
-        const canRefresh = refreshDevResult.legal;
-        const btnW = Math.max(s.layout.smallButtonW, 96);
-        const labelCenter = 40 + s.layout.marketLabelW / 2;
-        const btnX = Math.round(labelCenter - btnW / 2);
-        const btnY = deckY + 22;
-
-        const labelText = `Discover (${REFRESH_DEVELOPMENT_COST})`;
-
-        const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshDevelopmentClick(); } : () => {}, {
-          disabled: !canRefresh,
-          ...(canRefresh ? {} : { fillColor: 0x333333, fillAlpha: 0.6 }),
-        });
-        // Dim visual when not allowed, but keep interactive so tooltip can show
-        try {
-          const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
-          if (bg) {
-            if (!canRefresh && typeof bg.setFillStyle === 'function') {
-              bg.setFillStyle(0x333333, 0.6);
-            }
-
-            // Tooltip for the Discover button
-            const reasonSuffix = !canRefresh && refreshDevResult.reason ? `\n\n${refreshDevResult.reason}` : '';
-            const info = `Pay €${REFRESH_DEVELOPMENT_COST} to discover new development opportunities and replace the visible development row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
-            try {
-              bg.on('pointerover', (pointer: any) => {
-                if (s.tooltipManager) {
-                  s.tooltipManager.show(info, (pointer && pointer.worldX) || btn.x, (pointer && pointer.worldY) || btn.y);
-                  return;
-                }
-                try {
-                  if ((s as any)._tempDiscoverTooltip) {
-                    (s as any)._tempDiscoverTooltip.destroy();
-                    (s as any)._tempDiscoverTooltip = null;
-                  }
-                  const tt = s.add.text(btn.x, btn.y - s.layout.actionButtonH / 2 - 6, info, {
-                    fontSize: '12px', color: '#ffffff', fontFamily: FONT_FAMILY, backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 6, y: 4 }, wordWrap: { width: 280 }, align: 'center'
-                  }).setOrigin(0.5, 1).setDepth(1000);
-                  (s as any)._tempDiscoverTooltip = tt;
-                } catch (e) { /* ignore fallback errors */ }
-              });
-              bg.on('pointerout', () => {
-                if (s.tooltipManager) {
-                  s.tooltipManager.hide();
-                  return;
-                }
-                try {
-                  if ((s as any)._tempDiscoverTooltip) {
-                    (s as any)._tempDiscoverTooltip.destroy();
-                    (s as any)._tempDiscoverTooltip = null;
-                  }
-                } catch (_) { /* ignore */ }
-              });
-            } catch (_) { /* ignore */ }
+        const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
+        if (bg) {
+          if (!canRefresh && typeof bg.setFillStyle === 'function') {
+            bg.setFillStyle(0x333333, 0.6);
           }
-        } catch (_) { /* ignore tooltip attach errors in tests */ }
 
-        s.marketContainer.add(btn);
-      } catch (_) {
-        // ignore UI errors in tests
-      }
-    } else {
-      // Investments row: show both upgrade and event deck counts - below label
-      const upgCount = s.state.decks.upgrade.length;
-      const evtCount = s.state.decks.event.length;
-      const deckText = s.add.text(
-        40, deckY,
-        `Upg: ${upgCount}  Evt: ${evtCount}`,
-        { fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY },
-      ).setOrigin(0, 0);
-      s.marketContainer.add(deckText);
-
-      // Refresh Investments button (centered under Investments label / deck count)
-      try {
-        const refreshInvResult = canRefreshInvestments(s.state);
-        const canRefresh = refreshInvResult.legal;
-        // Make button wider so label fits, and move it lower to avoid overlapping deck text
-        const btnW = Math.max(s.layout.smallButtonW, 96);
-        // center under the label area: label left (40) + half label width
-        const labelCenter = 40 + s.layout.marketLabelW / 2;
-        const btnX = Math.round(labelCenter - btnW / 2);
-        const btnY = deckY + 22; // further below deck text to avoid overlap
-
-        const labelText = `Research (${REFRESH_INVESTMENTS_COST})`;
-
-        const btn = createActionButton(s, btnX, btnY, btnW, labelText, canRefresh ? () => { s.onRefreshInvestmentsClick(); } : () => {}, {
-          disabled: !canRefresh,
-          ...(canRefresh ? {} : { fillColor: 0x333333, fillAlpha: 0.6 }),
-        });
-        // Dim visual when not allowed, but keep interactive so tooltip can show
-        try {
-          const bg = (btn.list && btn.list[0]) as Phaser.GameObjects.Rectangle | undefined;
-          if (bg) {
-            if (!canRefresh && typeof bg.setFillStyle === 'function') {
-              bg.setFillStyle(0x333333, 0.6);
-            }
-
-            // Tooltip for the Research button (attach to bg so it receives pointer events)
-            const reasonSuffix = !canRefresh && refreshInvResult.reason ? `\n\n${refreshInvResult.reason}` : '';
-            const info = `Pay €${REFRESH_INVESTMENTS_COST} to research new investment opportunities and replace the visible investments row. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
-            try {
-              bg.on('pointerover', (pointer: any) => {
-                if (s.tooltipManager) {
-                  s.tooltipManager.show(info, (pointer && pointer.worldX) || btn.x, (pointer && pointer.worldY) || btn.y);
-                  return;
+          // Tooltip for the Re-roll button
+          const reasonSuffix = !canRefresh && refreshResult.reason ? `\n\n${refreshResult.reason}` : '';
+          const info = `Pay €${refreshCost} to re-roll the market and replace all visible cards. Removed cards go to their discard piles. Available only during Market phase.${reasonSuffix}`;
+          try {
+            bg.on('pointerover', (pointer: any) => {
+              if (s.tooltipManager) {
+                s.tooltipManager.show(info, (pointer && pointer.worldX) || btn.x, (pointer && pointer.worldY) || btn.y);
+                return;
+              }
+              try {
+                if ((s as any)._tempRefreshMarketTooltip) {
+                  (s as any)._tempRefreshMarketTooltip.destroy();
+                  (s as any)._tempRefreshMarketTooltip = null;
                 }
-                // Fallback: create an in-canvas text tooltip if DOM tooltip manager isn't available
-                try {
-                  if ((s as any)._tempResearchTooltip) {
-                    (s as any)._tempResearchTooltip.destroy();
-                    (s as any)._tempResearchTooltip = null;
-                  }
-                  const tt = s.add.text(btn.x, btn.y - s.layout.actionButtonH / 2 - 6, info, {
-                    fontSize: '12px', color: '#ffffff', fontFamily: FONT_FAMILY, backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 6, y: 4 }, wordWrap: { width: 280 }, align: 'center'
-                  }).setOrigin(0.5, 1).setDepth(1000);
-                  (s as any)._tempResearchTooltip = tt;
-                } catch (e) { /* ignore fallback errors */ }
-              });
-              bg.on('pointerout', () => {
-                if (s.tooltipManager) {
-                  s.tooltipManager.hide();
-                  return;
+                const tt = s.add.text(btn.x, btn.y - s.layout.actionButtonH / 2 - 6, info, {
+                  fontSize: '12px', color: '#ffffff', fontFamily: FONT_FAMILY, backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 6, y: 4 }, wordWrap: { width: 280 }, align: 'center'
+                }).setOrigin(0.5, 1).setDepth(1000);
+                (s as any)._tempRefreshMarketTooltip = tt;
+              } catch (e) { /* ignore fallback errors */ }
+            });
+            bg.on('pointerout', () => {
+              if (s.tooltipManager) {
+                s.tooltipManager.hide();
+                return;
+              }
+              try {
+                if ((s as any)._tempRefreshMarketTooltip) {
+                  (s as any)._tempRefreshMarketTooltip.destroy();
+                  (s as any)._tempRefreshMarketTooltip = null;
                 }
-                try {
-                  if ((s as any)._tempResearchTooltip) {
-                    (s as any)._tempResearchTooltip.destroy();
-                    (s as any)._tempResearchTooltip = null;
-                  }
-                } catch (_) { /* ignore */ }
-              });
-            } catch (_) { /* ignore */ }
-          }
-        } catch (_) { /* ignore tooltip attach errors in tests */ }
+              } catch (_) { /* ignore */ }
+            });
+          } catch (_) { /* ignore */ }
+        }
+      } catch (_) { /* ignore tooltip attach errors in tests */ }
 
-        s.marketContainer.add(btn);
-      } catch (_) {
-        // ignore UI errors in tests
-      }
+      s.marketContainer.add(btn);
+    } catch (_) {
+      // ignore UI errors in tests
     }
+  }
+
+  /**
+   * Rendered market card containers for a row, in slot order.
+   *
+   * The containers are rebuilt by every `refreshMarket()`; call this AFTER
+   * the final refresh of a deal-in flow so the animation targets the
+   * currently-visible cards.
+   */
+  public getMarketRowCards(rowKey: 'market'): Phaser.GameObjects.Container[] {
+    return this.marketRowCards.get(rowKey) ?? [];
+  }
+
+  /**
+   * Centre of a single-market row slot, mirroring `drawMarketRow`'s layout
+   * math (boxCenter centring, MARKET_TOTAL_SLOTS slots).
+   *
+   * Used by the market swap animation to place outgoing-card snapshot
+   * visuals at the positions the leaving cards were rendered.
+   * Keep in sync with `drawMarketRow` if the market layout changes.
+   */
+  public getMarketSlotCenter(
+    _rowKey: 'market',
+    slotIndex: number,
+  ): { x: number; y: number } {
+    const s = this.scene;
+    const { marketTop, logX, marketCardW, marketCardGap } = s.layout;
+    const boxCenter = (20 + logX - 20) / 2;
+    const totalCardsW = MARKET_TOTAL_SLOTS * marketCardW + (MARKET_TOTAL_SLOTS - 1) * marketCardGap;
+    const startX = Math.round(boxCenter - totalCardsW / 2);
+    const rowTop = marketTop + 6;
+    return {
+      x: startX + slotIndex * (marketCardW + marketCardGap) + marketCardW / 2,
+      y: rowTop + s.layout.marketCardH / 2,
+    };
   }
 
   public drawMarketCard(
@@ -1151,6 +1123,22 @@ export class MainStreetRenderer {
     // Apply income/reputation overlays for business and community-space cards
     if (card.family === 'business' || card.family === 'community-space') {
       this.applyUpgradeOverlays(container, card as BusinessCard | CommunitySpaceCard, renderW, renderH);
+
+      // Buy-and-place premium indicator (CG-0MSTOF1N5005PK2R): direct
+      // market→street placement costs +50% over the listed cost. Shown as a
+      // small badge at the bottom of business/community-space cards.
+      const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+      const premiumLabel = s.add.text(0, Math.round(renderH / 2 - 11), `B&P €${premiumCost} (listed €${card.cost})`, {
+        fontSize: '9px',
+        color: '#ffcc88',
+        fontFamily: FONT_FAMILY,
+        fontStyle: 'bold',
+        align: 'center',
+        backgroundColor: '#000000aa',
+      });
+      premiumLabel.setOrigin(0.5, 0.5);
+      premiumLabel.setName('buyAndPlacePremiumLabel');
+      container.add(premiumLabel);
     }
 
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);
@@ -1159,7 +1147,14 @@ export class MainStreetRenderer {
     selectionRing.setVisible(false);
     container.add(selectionRing);
 
-    const interactiveEnabled = s.uiPhase === 'market' && !isIncidentEvent;
+    // Action economy gating (CG-0MSTOF1N5005PK2R): business/community-space
+    // card purchases consume the daily action, so those cards are
+    // non-interactive (dimmed) when the budget is spent. Events/upgrades are
+    // free operations and stay interactive.
+    const noActions = s.state.actionsRemaining <= 0;
+    const isBusinessLike = card.family === 'business' || card.family === 'community-space';
+    const interactiveEnabled =
+      s.uiPhase === 'market' && !isIncidentEvent && !(isBusinessLike && noActions);
     const selection = attachSelection(container, {
       onStateChange: ({ selected, hovered }) => {
         if (selected) {
@@ -1193,9 +1188,9 @@ export class MainStreetRenderer {
 
       // Business AND community-space cards in the Development row are
       // draggable (drag-to-buy/place). Events and upgrades stay click-only:
-      // they live in the investments row and are not part of the drag-drop
+      // they live in the market row but are not part of the drag-drop
       // module's dev-row model (CG-0MSKSAREE007AYSZ + operator decision A
-      // for the T12 Library drag support).
+      // for the T13 Library drag support).
       const isDraggableCard =
         (card.family === 'business' || card.family === 'community-space') &&
         !!s.dragDropManager && !s.replayMode;
@@ -1263,16 +1258,51 @@ export class MainStreetRenderer {
         s.marketSelectionManager.registerTarget(hitArea);
         container.add(hitArea);
       }
+
+      // Dim visual feedback + tooltip for business cards gated by the spent
+      // action budget (CG-0MSTOF1N5005PK2R): still hoverable so the player
+      // learns why the card is unavailable.
+      if (isBusinessLike && noActions && !isIncidentEvent) {
+        container.setAlpha(0.45);
+        container.setInteractive({ useHandCursor: false });
+        container.on('pointerover', () => {
+          if (s.replayMode) return;
+          s.tooltipManager?.show(
+            'No actions remaining today. End your turn to start a new day.',
+            container.x, container.y,
+          );
+        });
+        container.on('pointerout', () => {
+          s.tooltipManager?.hide();
+        });
+      }
     }
 
     return container;
+  }
+
+  /**
+   * Centre of the front incident-queue card, mirroring `refreshIncidentQueue`
+   * layout math (panel title 22px + 8px pad, card centred horizontally in
+   * the panel). Used as the origin of the incident-reveal flight.
+   * Keep in sync with `refreshIncidentQueue` if the queue layout changes.
+   */
+  public getFrontIncidentCardCenter(): { x: number; y: number } {
+    const s = this.scene;
+    const { logX, logW, queueTop, queueCardH } = s.layout;
+    const titleH = 22; // mirrors refreshIncidentQueue
+    const pad = 8;     // mirrors refreshIncidentQueue
+    return {
+      x: logX + logW / 2,
+      y: queueTop + titleH + pad + queueCardH / 2,
+    };
   }
 
   public refreshIncidentQueue(): void {
     const s = this.scene;
     s.incidentQueueContainer.removeAll(true);
 
-    const queue = s.state.incidentQueue;
+    const queue = s.state.incidentDeck;
     const deckRemaining = s.state.decks.event.length;
     const activeEffects = s.state.activeEffects;
 
@@ -1515,6 +1545,7 @@ export class MainStreetRenderer {
       const btnW = s.layout.actionButtonW;
       const cancelBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'Cancel', () => {
         s.pendingHandIndex = null;
+        s.pendingHandJustMoved = false;
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();

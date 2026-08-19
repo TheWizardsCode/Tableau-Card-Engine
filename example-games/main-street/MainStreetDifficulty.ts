@@ -136,12 +136,12 @@ export interface GameConfig extends DifficultyConfig {
  */
 export const EASY_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Easy',
-  startingCoins: 12,
+  startingCoins: 10,
   startingReputation: 5,
   winThreshold: 120,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 15,
-  synergyBonusPerNeighbor: 1.5,
+  synergyBonusPerNeighbor: 0.5,
   challengesPerRun: 2,
   positiveIncidentMultiplier: 1.2,
   // Incident pacing: widest repeat spacing (N=4) = fewest same-card
@@ -159,12 +159,12 @@ export const EASY_PRESET: Readonly<GameConfig> = {
  */
 export const MEDIUM_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Medium',
-  startingCoins: 8,
+  startingCoins: 6,
   startingReputation: 3,
   winThreshold: 150,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 10,
-  synergyBonusPerNeighbor: 1.0,
+  synergyBonusPerNeighbor: 0.35,
   challengesPerRun: 3,
   // Increase positive incident frequency by 50% for the Medium baseline
   // as requested by work item CG-0MMLR20XP1IPPD03.
@@ -184,12 +184,12 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
  */
 export const HARD_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Hard',
-  startingCoins: 5,
+  startingCoins: 4,
   startingReputation: 2,
   winThreshold: 180,
   reputationScoreMultiplier: 5,
   challengeBonusPoints: 8,
-  synergyBonusPerNeighbor: 0.75,
+  synergyBonusPerNeighbor: 0.25,
   challengesPerRun: 4,
   positiveIncidentMultiplier: 1,
   // Incident pacing: minimal repeat guarantee (N=2) = cards can recur

@@ -134,11 +134,11 @@ function getScene(game: Phaser.Game): Scene {
   return game.scene.getScene('MainStreetScene') as Scene;
 }
 
-/** Wait until the market development row is populated (campaign load + day start). */
+/** Wait until the market row is populated (campaign load + day start). */
 async function waitForMarketReady(scene: Scene): Promise<void> {
   await waitForCondition(
-    () => scene.state?.market?.development?.length > 0,
-    'market development row populated',
+    () => scene.state?.market?.cards?.length > 0,
+    'market row populated',
   );
 }
 
@@ -168,7 +168,11 @@ async function waitForSettled(scene: Scene): Promise<void> {
 
 /** First business card in the development row. */
 function firstBusinessCard(scene: Scene): any {
-  const card = scene.state.market.development.find((c: any) => c.family === 'business');
+  // Community-space cards are grid-placeable too; accept either family so
+  // the test does not depend on the seeded row's exact composition.
+  const card = scene.state.market.cards.find(
+    (c: any) => c.family === 'business' || c.family === 'community-space',
+  );
   expect(card).toBeTruthy();
   return card;
 }
@@ -181,7 +185,7 @@ function cardContainer(scene: Scene, cardId: string): Phaser.GameObjects.Contain
 }
 
 /** Simulate a full drag gesture from (sx,sy) to (dx,dy). */
-async function simulateDrag(sx: number, sy: number, dx: number, dy: number): Promise<void> {
+async function simulateDrag(sx: number, sy: number, dx: number, dy: number, settleMs = 300): Promise<void> {
   dispatchMouse('mousedown', sx, sy);
   await wait(30);
   // First move just past the drag distance threshold (5px) so dragstart fires.
@@ -191,7 +195,7 @@ async function simulateDrag(sx: number, sy: number, dx: number, dy: number): Pro
   dispatchMouse('mousemove', dx, dy);
   await wait(80);
   dispatchMouse('mouseup', dx, dy);
-  await wait(300); // allow dragend / snap-back / illegal feedback processing
+  await wait(settleMs); // allow dragend / snap-back / illegal feedback processing
 }
 
 describe('MainStreet drag-to-buy/place (browser)', () => {
@@ -219,13 +223,16 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     const container = cardContainer(scene, card.id);
     const target = scene.getStreetSlotCenter(slot);
     const originY = container.y; // market row Y (the card's slot origin)
-    await simulateDrag(container.x, container.y, target.x, target.y);
+    await simulateDrag(container.x, container.y, target.x, target.y, 40);
 
     // Transfer visual must start at the DROP LOCATION (the card follows the
     // pointer, so it was released at the street slot) — not at the market
-    // row origin. ~300ms into the 1500ms tween the visual is still near its
-    // source, so a y near the slot end (and far from the market row)
-    // proves the animation did not jump back to the market row.
+    // row origin. The drop lands on the slot centre, so the transfer is
+    // distance-proportional (clamped to 250ms — well under the fixed
+    // 1500ms); we sample the visual right after release while the short
+    // tween is still running, and a y near the slot end (far from the
+    // market row) proves the animation did not jump back to the market row
+    // (CG-0MST2LS3E004BTPO).
     const visuals = [...(scene.activeTransferVisuals ?? [])];
     expect(visuals.length).toBe(1);
     const spread = Math.abs(originY - target.y);
@@ -234,11 +241,14 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
 
     // Direct buy-to-slot: card leaves the market and lands on the slot.
     await waitForCondition(
-      () => scene.state.market.development.find((c: any) => c.id === card.id) === undefined,
+      () => scene.state.market.cards.find((c: any) => c.id === card.id) === undefined,
       'card removed from market after drag-drop buy',
     );
     expect(scene.state.streetGrid[slot]?.id).toBe(card.id);
-    expect(scene.state.resourceBank.coins).toBe(100 - card.cost);
+    // Drag-drop buy-and-place pays a +50% premium over the listed cost
+    // (CG-0MSTOF1N5005PK2R): 100 − ceil(cost × 1.5 × 2)/2.
+    const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+    expect(scene.state.resourceBank.coins).toBe(100 - premiumCost);
     // Single undoable command (direct buy-to-slot path).
     expect(scene.undoManager.canUndo()).toBe(true);
     // Back in the market phase for further play.
@@ -260,7 +270,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     await simulateDrag(container.x, container.y, target.x, target.y);
 
     // Card never left the row; no buy happened.
-    expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeTruthy();
+    expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeTruthy();
     expect(scene.state.streetGrid[slot]).toBeNull();
     expect(scene.state.resourceBank.coins).toBe(0);
     expect(scene.undoManager.canUndo()).toBe(false);
@@ -280,7 +290,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     await simulateDrag(container.x, container.y, GAME_W - 30, GAME_H - 30);
 
     await wait(500); // allow snap-back tween
-    expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeTruthy();
+    expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeTruthy();
     expect(scene.undoManager.canUndo()).toBe(false);
   });
 
@@ -308,7 +318,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     await simulateDrag(container.x, container.y, target.x, target.y);
 
     await wait(500); // allow snap-back tween
-    expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeTruthy();
+    expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeTruthy();
     expect(scene.state.streetGrid[slot]?.id).toBe('occupied-biz');
     expect(scene.undoManager.canUndo()).toBe(false);
   });
@@ -335,7 +345,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
       'card bought to hand via click',
       15_000,
     );
-    expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeUndefined();
+    expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeUndefined();
     expect(scene.uiPhase).toBe('placing-from-hand');
   });
 });

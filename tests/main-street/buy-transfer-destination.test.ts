@@ -18,6 +18,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
 import { canPurchaseEvent } from '../../example-games/main-street/MainStreetMarket';
+import { createBusinessDeck, createEventDeck } from '../../example-games/main-street/MainStreetCards';
 import { HandView } from '../../src/ui/HandView';
 
 // ── Minimal Phaser mock (for real HandView instances) ──────
@@ -135,6 +136,9 @@ const LAYOUT = {
 function createMockScene(): any {
   const phaser = createPhaserMock();
   const state = setupMainStreetGame({ seed: 'buy-transfer-dest' });
+  // Coin cushion so the seeded investments row always contains a purchasable
+  // event regardless of which cards the expanded pool draws.
+  state.resourceBank.coins = 100;
 
   // Merged hand — mirrors handView in MainStreetRenderer.
   const handView = new HandView(phaser, {
@@ -203,7 +207,7 @@ describe('Buy transfer destinations (market → hand)', () => {
   describe('business buy to hand', () => {
     it('hand size 0: animates to the exact merged handView resting position', () => {
       const scene = createMockScene();
-      const card = scene.state.market.development[0];
+      const card = scene.state.market.cards[0];
       expect(card).toBeTruthy();
 
       // Empty hand — keep the renderer HandView in sync with the state.
@@ -222,12 +226,15 @@ describe('Buy transfer destinations (market → hand)', () => {
       // left-edge estimate (handX + handCardW/2).
       expect(opts.destination.x).toBeCloseTo(LAYOUT.handCenterX, 5);
       expect(opts.destination.x).not.toBeCloseTo(LAYOUT.handX + LAYOUT.handCardW / 2, 5);
+      // Click-to-buy flow keeps the fixed default — no duration override
+      // (drag-and-drop is the only flow that passes a proportional duration).
+      expect(opts.duration).toBeUndefined();
     });
 
     it('hand size 1: animates to the append position of a 2-card hand', () => {
       const scene = createMockScene();
-      const card = scene.state.market.development[0];
-      const second = scene.state.market.development[1];
+      const card = scene.state.market.cards[0];
+      const second = scene.state.market.cards[1];
       expect(card).toBeTruthy();
       expect(second).toBeTruthy();
 
@@ -249,17 +256,22 @@ describe('Buy transfer destinations (market → hand)', () => {
       expect(opts.destination.x).toBeGreaterThan(LAYOUT.handCenterX);
     });
 
-    it('hand size 2 (full): buy is blocked, no transfer animation is started', () => {
+    it('hand size 3 (full): buy is blocked, no transfer animation is started', () => {
       const scene = createMockScene();
-      const card = scene.state.market.development[0];
-      const second = scene.state.market.development[1];
-      const third = scene.state.market.development[2];
+      const card = scene.state.market.cards[0];
+      const second = scene.state.market.cards[1];
+      const third = scene.state.market.cards[2];
 
-      scene.state.hand = [card, second];
+      // maxHandSize is 3 (CG-0MSTOATDT009BRX2) — fill the hand completely.
+      scene.state.hand = [card, second, third];
       scene.handView.setCards(scene.state.hand);
 
+      // Inject one more card into the row so there is something to click.
+      const extra = createBusinessDeck(1, ['biz-pawnshop']).find(c => c.id.startsWith('biz-pawnshop'))!;
+      scene.state.market.cards.push(extra);
+
       const controller = new MainStreetTurnController(scene);
-      controller.onBusinessCardClick(third);
+      controller.onBusinessCardClick(extra);
 
       expect(scene.animateTransferFromMarket).not.toHaveBeenCalled();
       // Hand-full message shown to the player.
@@ -272,9 +284,16 @@ describe('Buy transfer destinations (market → hand)', () => {
   describe('event buy (shared hand)', () => {
     it('animates to the exact merged handView resting position for the appended event', () => {
       const scene = createMockScene();
-      const eventCard = scene.state.market.investments.find(
+      let eventCard = scene.state.market.cards.find(
         (c: any) => c && c.family === 'event' && canPurchaseEvent(scene.state, c.id).legal,
-      );
+      ) as any;
+      if (!eventCard) {
+        // The seeded single row may not include an event — inject one
+        // deterministically so the transfer path is exercised.
+        eventCard = createEventDeck(1, ['evt-festival'], () => 0)
+          .find(c => c.id.startsWith('evt-festival'))!;
+        scene.state.market.cards.push(eventCard);
+      }
       expect(eventCard).toBeTruthy();
 
       const controller = new MainStreetTurnController(scene);

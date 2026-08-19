@@ -60,19 +60,21 @@ function makeCard(overrides: Partial<BusinessCard> = {}): BusinessCard {
 describe('effectiveSynergyRate', () => {
   it('defaults to 0.5 (50%) when synergyCoinBonus is undefined', () => {
     const card = makeCard();
-    expect(effectiveSynergyRate(card, MEDIUM)).toBeCloseTo(0.5);
+    // Medium multiplier re-tuned 1.0 → 0.35 (CG-0MSP26Q5N002EH8P)
+    expect(effectiveSynergyRate(card, MEDIUM)).toBeCloseTo(0.175);
   });
 
   it('multiplies the per-card rate by the difficulty synergyBonusPerNeighbor', () => {
     const card = makeCard({ synergyCoinBonus: 0.5 });
-    expect(effectiveSynergyRate(card, EASY)).toBeCloseTo(0.75); // Easy 1.5x
-    expect(effectiveSynergyRate(card, MEDIUM)).toBeCloseTo(0.5); // Medium 1.0x
-    expect(effectiveSynergyRate(card, HARD)).toBeCloseTo(0.375); // Hard 0.75x
+    // Re-tuned presets (CG-0MSP26Q5N002EH8P): Easy 0.5x / Medium 0.35x / Hard 0.25x
+    expect(effectiveSynergyRate(card, EASY)).toBeCloseTo(0.25); // Easy 0.5x
+    expect(effectiveSynergyRate(card, MEDIUM)).toBeCloseTo(0.175); // Medium 0.35x
+    expect(effectiveSynergyRate(card, HARD)).toBeCloseTo(0.125); // Hard 0.25x
   });
 
   it('respects custom per-card rates (e.g. Barbershop 1.0)', () => {
     const card = makeCard({ synergyCoinBonus: 1.0 });
-    expect(effectiveSynergyRate(card, MEDIUM)).toBe(1.0);
+    expect(effectiveSynergyRate(card, MEDIUM)).toBe(0.35);
   });
 
   it('returns 0 for zero-synergy opt-out cards', () => {
@@ -84,17 +86,18 @@ describe('effectiveSynergyRate', () => {
 // ── AC: formatSynergyRate ────────────────────────────────────
 
 describe('formatSynergyRate', () => {
-  it('formats the default 0.5 rate as "50%" at Medium', () => {
-    expect(formatSynergyRate(makeCard(), MEDIUM)).toBe('50%');
+  it('formats the default 0.5 rate as "17.5%" at Medium (0.35x multiplier)', () => {
+    expect(formatSynergyRate(makeCard(), MEDIUM)).toBe('17.5%');
   });
 
-  it('formats "75%" at Easy and "37.5%" at Hard for default-rate cards', () => {
-    expect(formatSynergyRate(makeCard(), EASY)).toBe('75%');
-    expect(formatSynergyRate(makeCard(), HARD)).toBe('37.5%');
+  it('formats "25%" at Easy and "12.5%" at Hard for default-rate cards', () => {
+    // Re-tuned presets (CG-0MSP26Q5N002EH8P): 0.5 base × 0.5x / 0.25x
+    expect(formatSynergyRate(makeCard(), EASY)).toBe('25%');
+    expect(formatSynergyRate(makeCard(), HARD)).toBe('12.5%');
   });
 
   it('formats integer percentages without a trailing decimal', () => {
-    expect(formatSynergyRate(makeCard({ synergyCoinBonus: 1.0 }), MEDIUM)).toBe('100%');
+    expect(formatSynergyRate(makeCard({ synergyCoinBonus: 1.0 }), MEDIUM)).toBe('35%');
   });
 
   it('returns null for zero-synergy cards so callers can show opt-out text', () => {
@@ -107,14 +110,15 @@ describe('formatSynergyRate', () => {
 describe('resolveDescription', () => {
   it('substitutes {SYNERGY_RATE} with the effective percentage', () => {
     const desc = `Gains ${SYNERGY_RATE_TOKEN} of base income per adjacent Food business.`;
+    // Re-tuned presets (CG-0MSP26Q5N002EH8P): Easy 0.5x / Medium 0.35x / Hard 0.25x
     expect(resolveDescription(desc, makeCard(), MEDIUM)).toBe(
-      'Gains 50% of base income per adjacent Food business.',
+      'Gains 17.5% of base income per adjacent Food business.',
     );
     expect(resolveDescription(desc, makeCard(), EASY)).toBe(
-      'Gains 75% of base income per adjacent Food business.',
+      'Gains 25% of base income per adjacent Food business.',
     );
     expect(resolveDescription(desc, makeCard(), HARD)).toBe(
-      'Gains 37.5% of base income per adjacent Food business.',
+      'Gains 12.5% of base income per adjacent Food business.',
     );
   });
 

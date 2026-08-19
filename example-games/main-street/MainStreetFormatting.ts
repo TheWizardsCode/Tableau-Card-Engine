@@ -7,7 +7,8 @@
  * Main Street synergy is percentage-based (CG-0MRVCWNEQ009H52Z): each
  * business/community-space card has a `synergyCoinBonus` rate (default
  * 0.5 = 50% of base income) which the difficulty preset scales via
- * `synergyBonusPerNeighbor` (Easy 1.5 / Medium 1.0 / Hard 0.75). This
+ * `synergyBonusPerNeighbor` (Easy 0.5 / Medium 0.35 / Hard 0.25, re-tuned by
+ * CG-0MSP26Q5N002EH8P). This
  * module computes the effective rate for display and resolves the
  * `{SYNERGY_RATE}` token used in card descriptions.
  *

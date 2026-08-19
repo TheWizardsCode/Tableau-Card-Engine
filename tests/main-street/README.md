@@ -12,11 +12,11 @@ These tests serve as the regression oracle during migration.
 |---|---|---|
 | Market row retrieval | `findTargetBusinessSlot`, `getAffordableUpgradeCards` | 10 |
 | Positive-path buy eligibility | `canPurchaseBusiness`, `canPurchaseUpgrade`, `canPurchaseEvent` | 3 |
-| Negative-path buy eligibility | `canPurchaseBusiness`, `canPurchaseUpgrade`, `canPurchaseEvent`, `canRefreshInvestments` | 12 |
-| Positive-path purchase results | `purchaseBusiness`, `purchaseUpgrade`, `purchaseEvent`, `refreshInvestments` | 5 |
-| Invalid row/slot selection | `purchaseBusiness`, `purchaseUpgrade`, `purchaseEvent`, `refreshInvestments` | 7 |
+| Negative-path buy eligibility | `canPurchaseBusiness`, `canPurchaseUpgrade`, `canPurchaseEvent`, `canRefreshMarket` | 12 |
+| Positive-path purchase results | `purchaseBusiness`, `purchaseUpgrade`, `purchaseEvent`, `refreshMarket` | 5 |
+| Invalid row/slot selection | `purchaseBusiness`, `purchaseUpgrade`, `purchaseEvent`, `refreshMarket` | 7 |
 | Refill policy — incident queue | `refillIncidentQueue` | 5 |
-| Refill policy — exhaustion | `refillInvestmentsMarket`, `refillDevelopmentMarket`, `refillAllMarkets` | 3 |
+| Refill policy — exhaustion | `refillMarket` (single-row refill) | 3 |
 | Refill policy — reshuffle from discard | `reshuffleIfNeeded` (business/upgrade/event decks) | 5 |
 | Multi-turn integration | `executeDayStart`, `processEndOfTurn`, `executeAction` | 7 |
 

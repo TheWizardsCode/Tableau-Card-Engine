@@ -19,6 +19,7 @@ import {
   foundationTopRank,
   isTriviallyWinnable,
   getAutoCompleteMoves,
+  citadelColumnSize,
 } from '../../example-games/beleaguered-castle/BeleagueredCastleRules';
 import {
   FOUNDATION_COUNT,
@@ -1495,6 +1496,271 @@ describe('hasValuableMoves', () => {
     for (const seed of [1, 17, 42, 100, 999]) {
       const state = deal(seed);
       expect(hasValuableMoves(state)).toBe(true);
+    }
+  });
+});
+
+// ── Citadel variant (AC 3, AC 5) ─────────────────────────────
+
+describe('deal (citadel variant)', () => {
+  it('should deal all 52 cards to the tableau with empty foundations', () => {
+    const state = deal(42, { variant: 'citadel' });
+    for (let fi = 0; fi < FOUNDATION_COUNT; fi++) {
+      expect(state.foundations[fi].size()).toBe(0);
+    }
+    const totalTableau = state.tableau.reduce((sum, col) => sum + col.size(), 0);
+    expect(totalTableau).toBe(52);
+  });
+
+  it('should deal 4 columns of 7 and 4 columns of 6', () => {
+    const state = deal(42, { variant: 'citadel' });
+    expect(state.tableau.length).toBe(TABLEAU_COUNT);
+    const sizes = state.tableau.map((col) => col.size());
+    expect(sizes).toEqual([7, 7, 7, 7, 6, 6, 6, 6]);
+  });
+
+  it('should contain exactly 52 unique cards total (all in tableau)', () => {
+    const state = deal(42, { variant: 'citadel' });
+    const allCards: Card[] = state.tableau.flatMap((col) => col.toArray());
+    expect(allCards.length).toBe(52);
+    const cardIds = allCards.map((c) => `${c.rank}-${c.suit}`);
+    expect(new Set(cardIds).size).toBe(52);
+  });
+
+  it('should include aces in the tableau (one per suit somewhere)', () => {
+    const state = deal(42, { variant: 'citadel' });
+    const allCards = state.tableau.flatMap((col) => col.toArray());
+    const aces = allCards.filter((c) => c.rank === 'A');
+    expect(aces.length).toBe(4);
+    expect(new Set(aces.map((c) => c.suit)).size).toBe(4);
+  });
+
+  it('should have all cards face-up', () => {
+    const state = deal(42, { variant: 'citadel' });
+    for (const col of state.tableau) {
+      for (const c of col.toArray()) {
+        expect(c.faceUp).toBe(true);
+      }
+    }
+  });
+
+  it('should produce identical citadel deals with the same seed', () => {
+    const state1 = deal(42, { variant: 'citadel' });
+    const state2 = deal(42, { variant: 'citadel' });
+    for (let col = 0; col < TABLEAU_COUNT; col++) {
+      const cards1 = state1.tableau[col].toArray();
+      const cards2 = state2.tableau[col].toArray();
+      expect(cards1.length).toBe(cards2.length);
+      for (let i = 0; i < cards1.length; i++) {
+        expect(cards1[i].rank).toBe(cards2[i].rank);
+        expect(cards1[i].suit).toBe(cards2[i].suit);
+      }
+    }
+  });
+
+  it('should store the seed in game state', () => {
+    const state = deal(42, { variant: 'citadel' });
+    expect(state.seed).toBe(42);
+    expect(state.moveCount).toBe(0);
+  });
+
+  it('should keep classic deal unchanged when variant is omitted', () => {
+    const classic = deal(42);
+    const explicit = deal(42, { variant: 'classic' });
+    for (let fi = 0; fi < FOUNDATION_COUNT; fi++) {
+      expect(classic.foundations[fi].size()).toBe(1);
+      expect(explicit.foundations[fi].size()).toBe(1);
+    }
+    for (let col = 0; col < TABLEAU_COUNT; col++) {
+      expect(classic.tableau[col].size()).toBe(CARDS_PER_COLUMN);
+      expect(explicit.tableau[col].size()).toBe(CARDS_PER_COLUMN);
+    }
+  });
+
+  it('should support citadel via BaseSetupOptions with injected RNG', () => {
+    const state = deal({ rng: createSeededRng(42), variant: 'citadel' });
+    const totalTableau = state.tableau.reduce((sum, col) => sum + col.size(), 0);
+    expect(totalTableau).toBe(52);
+    for (let fi = 0; fi < FOUNDATION_COUNT; fi++) {
+      expect(state.foundations[fi].size()).toBe(0);
+    }
+  });
+
+  it('should produce a different layout than classic for the same seed', () => {
+    const classic = deal(42);
+    const citadel = deal(42, { variant: 'citadel' });
+    // Classic pre-places aces; Citadel does not.
+    expect(citadel.foundations[0].size()).not.toBe(classic.foundations[0].size());
+    // The tableau column sizes differ (6 vs 7 for the first columns).
+    expect(citadel.tableau[0].size()).toBe(7);
+    expect(classic.tableau[0].size()).toBe(6);
+  });
+});
+
+describe('citadelColumnSize', () => {
+  it('should return 7 for the first four columns and 6 for the rest', () => {
+    for (let col = 0; col < 4; col++) {
+      expect(citadelColumnSize(col)).toBe(7);
+    }
+    for (let col = 4; col < 8; col++) {
+      expect(citadelColumnSize(col)).toBe(6);
+    }
+  });
+});
+
+describe('Citadel auto-move with aces (AC 5)', () => {
+  it('should auto-move an exposed ace to an empty foundation', () => {
+    // Citadel-like state: foundations empty, an ace on top of column 0.
+    const state = testState(
+      [[], [], [], []],
+      [
+        [card('5', 'clubs'), card('A', 'clubs')], // ace exposed on top
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves).toEqual([
+      { kind: 'tableau-to-foundation', fromCol: 0, toFoundation: 0 },
+    ]);
+  });
+
+  it('should auto-move aces from multiple columns when all foundations are empty', () => {
+    const state = testState(
+      [[], [], [], []],
+      [
+        [card('A', 'clubs')],
+        [card('A', 'diamonds')],
+        [card('3', 'hearts'), card('A', 'hearts')],
+        [card('A', 'spades')],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves).toHaveLength(4);
+    for (const m of moves) {
+      expect(m.kind).toBe('tableau-to-foundation');
+    }
+    expect(moves.some((m) => m.kind === 'tableau-to-foundation' && m.toFoundation === 2)).toBe(true); // hearts ace
+  });
+
+  it('should auto-move aces even when some foundations already have aces', () => {
+    // Clubs + diamonds foundations have aces; hearts + spades are empty.
+    const state = testState(
+      [[card('A', 'clubs')], [card('A', 'diamonds')], [], []],
+      [
+        [card('A', 'hearts')], // exposed ace, empty hearts foundation
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    const moves = findSafeAutoMoves(state);
+    expect(moves).toEqual([
+      { kind: 'tableau-to-foundation', fromCol: 0, toFoundation: 2 },
+    ]);
+  });
+
+  it('should promote subsequent cards only after aces reach foundations', () => {
+    // Simulate a real citadel auto-move cascade: ace on top of column 0,
+    // 2 of clubs buried beneath it. Aces auto-move first; the 2 only
+    // becomes safe once every foundation holds at least an ace.
+    const state = testState(
+      [[], [], [], []],
+      [
+        [card('2', 'clubs'), card('A', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+
+    // Pass 1: only the ace is safe (2 is not next on the empty foundation).
+    const moves1 = findSafeAutoMoves(state);
+    expect(moves1).toEqual([
+      { kind: 'tableau-to-foundation', fromCol: 0, toFoundation: 0 },
+    ]);
+
+    // Apply the ace auto-move.
+    applyMove(state, moves1[0]);
+    // Clubs foundation now has A; other foundations still empty.
+    // 2 of clubs is next on clubs, but minFoundationRank = -1 < 0, so the
+    // conservative heuristic waits for the other aces (classic parity).
+    const moves2 = findSafeAutoMoves(state);
+    expect(moves2).toHaveLength(0);
+  });
+
+  it('should not auto-move a non-ace onto an empty foundation', () => {
+    const state = testState(
+      [[], [], [], []],
+      [
+        [card('2', 'clubs')], // 2 cannot start a foundation
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(findSafeAutoMoves(state)).toHaveLength(0);
+  });
+
+  it('should treat an ace on top as a legal foundation move in citadel', () => {
+    const state = testState(
+      [[], [], [], []],
+      [
+        [card('A', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(isLegalFoundationMove(state, 0, 0)).toEqual({ legal: true });
+  });
+
+  it('should auto-complete a trivially winnable citadel endgame from empty foundations', () => {
+    // Columns descending by rank (bottom = highest), all above foundation
+    // tops (which are -1 for empty foundations). Ace ranks 0 > -1.
+    const state = testState(
+      [[], [], [], []],
+      [
+        [card('3', 'clubs'), card('2', 'clubs'), card('A', 'clubs')],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ],
+    );
+    expect(isTriviallyWinnable(state)).toBe(true);
+    const moves = getAutoCompleteMoves(state);
+    expect(moves).toHaveLength(3);
+    for (const m of moves) {
+      expect(m.kind).toBe('tableau-to-foundation');
     }
   });
 });

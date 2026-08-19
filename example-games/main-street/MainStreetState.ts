@@ -25,17 +25,17 @@ import {
   CSV_CHECKSUM,
   CARD_DATA_RAW,
   GRID_SIZE,
-  MARKET_BUSINESS_SLOTS,
-  MARKET_INVESTMENT_UPGRADE_COUNT,
-  MARKET_INVESTMENT_EVENT_COUNT,
-  INCIDENT_QUEUE_SIZE,
+  MARKET_TOTAL_SLOTS,
+  MARKET_BUSINESS_MIN,
+  MARKET_BUSINESS_MAX,
+  MARKET_UPGRADE_MAX,
+  MARKET_EVENT_MAX,
   loadTemplatesFromCsv,
   resetTemplatesToDefault,
   type IncidentBalanceState,
   createIncidentBalanceState,
   createIncidentBalanceFromQueue,
-  findConstrainedIncidentIndex,
-  recordIncidentDraw,
+  orderIncidentDeck,
 } from './MainStreetCards';
 import {
   type ActiveChallenge,
@@ -128,15 +128,15 @@ export const PHASE_ORDER: readonly DayPhase[] = [
 
 // ── Market State ────────────────────────────────────────────
 
-/** The face-up cards available for purchase. */
+/** The face-up cards available for purchase (single-row market). */
 export interface MarketState {
-  /** Cards in the development row (business and community space cards). */
-  development: (BusinessCard | CommunitySpaceCard)[];
   /**
-   * Mixed investment row: upgrade cards and Investment-trigger event cards.
-   * Typically 2 upgrades + 1 investment event = 3 slots.
+   * Single-row marketplace: exactly `MARKET_TOTAL_SLOTS` (3) cards,
+   * always at least `MARKET_BUSINESS_MIN` business card, drawn within
+   * "1–2 business, 0–1 upgrade, 0–1 event" bounds (CG-0MSTOATDT009BRX2).
+   * Community-space cards count as business for the composition.
    */
-  investments: (UpgradeCard | EventCard)[];
+  cards: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard)[];
 }
 
 // ── Resource Bank ───────────────────────────────────────────
@@ -207,8 +207,8 @@ export interface MainStreetState {
   challengesCompleted: string[];
   /** Active challenges for this run (selected at setup, evaluated each EndCheck). */
   activeChallenges: ActiveChallenge[];
-  /** Visible FIFO queue of upcoming Incident events (front = next to resolve). */
-  incidentQueue: EventCard[];
+  /** Face-down incident deck: cards are popped from the top (end of array) at end-of-turn. */
+  incidentDeck: EventCard[];
   /**
    * Runtime-mutable incident-draw balance: repeat-spacing window, streak
    * limit, and the recent-draw history needed to enforce them. Limits can be
@@ -234,9 +234,9 @@ export interface MainStreetState {
   activityLog: LogEntry[];
   /** Active duration-based modifiers (e.g. Flu outbreak income reduction). */
   activeEffects: ActiveEffect[];
-  /** Cards held in the player's hand (not placed on tableau). Any mix of business and event cards. */
-  hand: (BusinessCard | EventCard)[];
-  /** Maximum number of cards the player can hold in hand (default 2, expanded by staff cards). */
+  /** Cards held in the player's hand (not placed on tableau). Any mix of business, event, and upgrade cards. */
+  hand: (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[];
+  /** Maximum number of cards the player can hold in hand (default 3, expanded by staff cards). */
   maxHandSize: number;
   /** Discard pile for cycled and sold cards (unified discard pool). */
   discardPile: BusinessCard[];
@@ -256,6 +256,11 @@ export interface MainStreetState {
    * false = card is active (default).
    */
   soldSlots: boolean[];
+  /**
+   * Remaining actions the player can take this turn.
+   * Resets at DayStart to 1 + sum(actionsPerTurn for employed staff).
+   */
+  actionsRemaining: number;
 }
 
 export interface MainStreetSerializedState {
@@ -283,7 +288,8 @@ export interface MainStreetSerializedState {
     challengeId: string;
     completed: boolean;
   }[];
-  incidentQueue: EventCard[];
+  /** Face-down incident deck at the time of save (migrated from old incidentQueue by the loader). */
+  incidentDeck: EventCard[];
   /** Incident-draw balance limits + recent-draw history (see MainStreetState). */
   incidentBalance: IncidentBalanceState;
   gameResult: GameResult;
@@ -294,8 +300,8 @@ export interface MainStreetSerializedState {
   rngCalls: number;
   activityLog: LogEntry[];
   activeEffects: ActiveEffect[];
-  /** Serialized hand cards (any mix of business and event cards). */
-  hand: (BusinessCard | EventCard)[];
+  /** Serialized hand cards (any mix of business, event, and upgrade cards). */
+  hand: (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[];
   /** Maximum hand size at the time of save. */
   maxHandSize: number;
   /** Serialized discard pile. */
@@ -325,6 +331,8 @@ export interface MainStreetSerializedState {
    * true = card in this slot has been sold (non-functional).
    */
   soldSlots: boolean[];
+  /** Remaining actions the player can take this turn. */
+  actionsRemaining: number;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -419,15 +427,140 @@ export function generateSeedString(): string {
 // ── Market Helpers ──────────────────────────────────────────
 
 /**
- * Draws cards from a deck to fill market slots.
- * Mutates the deck array (pops from end = top of deck).
+ * When a draw/refill needs cards and the deck is empty but the matching
+ * discard pile is non-empty, shuffle the discard into the deck using the
+ * game's seeded RNG and continue (existing reshuffle convention).
  */
-function fillMarketSlots<T>(deck: T[], count: number): T[] {
-  const slots: T[] = [];
-  for (let i = 0; i < count && deck.length > 0; i++) {
-    slots.push(deck.pop()!);
+function reshuffleIfNeeded<T>(state: MainStreetState, deck: T[], discard: T[], name: string): void {
+  if (deck.length === 0 && discard.length > 0) {
+    shuffleArray(discard, state.rng);
+    while (discard.length > 0) {
+      deck.push(discard.pop()!);
+    }
+    addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
   }
-  return slots;
+}
+
+/**
+ * Force-reshuffles the discard pile into the deck regardless of whether the
+ * deck is empty. Used when the deck still holds cards but none of the
+ * required trigger type (e.g. only Incident cards remain when we need an
+ * Investment-trigger event).
+ */
+function forceReshuffleFromDiscards<T>(state: MainStreetState, deck: T[], discard: T[], name: string): void {
+  if (discard.length > 0) {
+    shuffleArray(discard, state.rng);
+    while (discard.length > 0) {
+      deck.push(discard.pop()!);
+    }
+    addLog(state, `Reshuffled ${name} discard into deck`, 'neutral');
+  }
+}
+
+/**
+ * Refills `state.market.cards` toward the single-row target composition
+ * (CG-0MSTOATDT009BRX2):
+ *   - at most `MARKET_TOTAL_SLOTS` (3) cards;
+ *   - always ≥ `MARKET_BUSINESS_MIN` (1) business card (community-space
+ *     counts as business) while any business remains drawable;
+ *   - each missing slot is drawn randomly within the bounds
+ *     "1–2 business, 0–1 upgrade, 0–1 event" — i.e. a full row is one of
+ *     2B+1U, 2B+1E, 1B+1U+1E;
+ *   - subject to deck availability and existing reshuffle conventions
+ *     (empty decks reshuffle matching discards; Investment-trigger events
+ *     are sought in the event deck like the legacy investments row).
+ *
+ * Visible cards are PRESERVED (top-up semantics), which mirrors the legacy
+ * day-start refill behaviour relied on by the tutorial's
+ * `skipMarketCycleOnEndTurn` flow (scenario-placed market cards survive into
+ * the next day). Callers that want a full re-draw must clear the row first
+ * (refreshMarket discards + clears; cycleMarketCards empties the row).
+ *
+ * @param state Current game state (mutated in-place).
+ */
+export function refillSingleRowMarket(state: MainStreetState): void {
+  const { market, decks } = state;
+
+  // Combined business + community-space pool (community-space counts as business).
+  reshuffleIfNeeded(state, decks.business, state.discards.business, 'business');
+  reshuffleIfNeeded(state, decks.communitySpace, state.discards.communitySpace, 'community-space');
+  const businessPool: (BusinessCard | CommunitySpaceCard)[] = [];
+  while (decks.business.length > 0) businessPool.push(decks.business.pop()!);
+  while (decks.communitySpace.length > 0) businessPool.push(decks.communitySpace.pop()!);
+  shuffleArray(businessPool, state.rng);
+
+  // Replenish decks for the non-business families, as needed by the draws below.
+  reshuffleIfNeeded(state, decks.upgrade, state.discards.upgrade, 'upgrade');
+  reshuffleIfNeeded(state, decks.event, state.discards.event, 'event');
+
+  const drawBusiness = (): boolean => {
+    const card = businessPool.pop();
+    if (!card) return false;
+    market.cards.push(card);
+    return true;
+  };
+  const drawUpgrade = (): boolean => {
+    const card = decks.upgrade.pop();
+    if (!card) return false;
+    market.cards.push(card);
+    return true;
+  };
+  const drawEvent = (): boolean => {
+    let idx = decks.event.findIndex(e => e.trigger === 'Investment');
+    if (idx === -1) {
+      forceReshuffleFromDiscards(state, decks.event, state.discards.event, 'event');
+      idx = decks.event.findIndex(e => e.trigger === 'Investment');
+    }
+    if (idx === -1) return false;
+    market.cards.push(decks.event.splice(idx, 1)[0]);
+    return true;
+  };
+
+  while (market.cards.length < MARKET_TOTAL_SLOTS) {
+    const businessCount = market.cards.filter(
+      c => c.family === 'business' || c.family === 'community-space',
+    ).length;
+    const upgradeCount = market.cards.filter(c => c.family === 'upgrade').length;
+    const eventCount = market.cards.filter(c => c.family === 'event').length;
+
+    // The ≥1-business rule is absolute: with no business visible, only a
+    // business may be drawn next.
+    if (businessCount < MARKET_BUSINESS_MIN) {
+      if (!drawBusiness()) break;
+      continue;
+    }
+
+    // Otherwise pick a random family among the legal options within bounds.
+    // A pick that fails (e.g. no Investment events left) is retried against
+    // the remaining legal options instead of aborting the whole refill.
+    let picked = false;
+    const legal: (() => boolean)[] = [];
+    if (businessCount < MARKET_BUSINESS_MAX) legal.push(drawBusiness);
+    if (upgradeCount < MARKET_UPGRADE_MAX && decks.upgrade.length > 0) legal.push(drawUpgrade);
+    if (eventCount < MARKET_EVENT_MAX) legal.push(drawEvent);
+    while (legal.length > 0) {
+      const idx = Math.floor(state.rng() * legal.length);
+      const fn = legal.splice(idx, 1)[0];
+      if (fn()) {
+        picked = true;
+        break;
+      }
+    }
+    if (!picked) {
+      // Every legal option failed (deck exhaustion elsewhere): fall back to
+      // any business remaining, then give up.
+      if (!drawBusiness()) break;
+    }
+  }
+
+  // Return any un-drawn business cards to their respective decks.
+  for (const card of businessPool) {
+    if (card.family === 'business') {
+      decks.business.push(card as BusinessCard);
+    } else {
+      decks.communitySpace.push(card as CommunitySpaceCard);
+    }
+  }
 }
 
 // ── Setup Function ──────────────────────────────────────────
@@ -477,50 +610,45 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   shuffleArray(upgradeDeck, rng);
   shuffleArray(staffDeck, rng);
 
-  // Populate initial market
-  // Development row: fill from business deck (community space cards are
-  // integrated into the development row via the community-space deck during refill)
-  // Investments row: 2 upgrades + 1 investment event
-  const investments: (import('./MainStreetCards').UpgradeCard | import('./MainStreetCards').EventCard)[] = [];
-  // Draw upgrades
-  for (let i = 0; i < MARKET_INVESTMENT_UPGRADE_COUNT && upgradeDeck.length > 0; i++) {
-    investments.push(upgradeDeck.pop()!);
-  }
-  // Draw investment event(s)
-  for (let i = 0; i < MARKET_INVESTMENT_EVENT_COUNT; i++) {
-    const idx = eventDeck.findIndex(e => e.trigger === 'Investment');
-    if (idx === -1) break;
-    investments.push(eventDeck.splice(idx, 1)[0]);
-  }
+  // Populate initial market — single-row marketplace (CG-0MSTOATDT009BRX2):
+  // exactly 3 cards, always ≥1 business, random within 1–2B/0–1U/0–1E.
+  // The row is refilled via refillSingleRowMarket after the state object is
+  // assembled (it needs state.rng / decks / discards wired up).
+  const market: MarketState = { cards: [] };
 
-  const market: MarketState = {
-    development: fillMarketSlots(businessDeck, MARKET_BUSINESS_SLOTS),
-    investments,
-  };
-
-  // Pre-draw incident cards into the visible FIFO queue (constraint-aware,
-  // CG-0MSL0OP040043KKZ). The balance state carries the repeat-spacing window,
-  // streak limit, and recent-draw history; every draw goes through
-  // findConstrainedIncidentIndex so the initial queue satisfies the same
-  // constraints as later refills. No RNG is consumed here — deck order
-  // (seeded shuffle) is the source of determinism.
+  // Build the face-down incident deck: move every Incident-trigger card from
+  // the seeded event deck into `incidentDeck` (front = next to resolve). The
+  // remaining Investment-trigger cards stay in the event deck for the market.
+  // Deck order is deterministic (same seed ⇒ same shuffle ⇒ same deck); the
+  // constraint-aware ordering (repeat spacing / streak) is applied at deck
+  // build/reshuffle time by orderIncidentDeck (CG-0MSXOVQFL007G3VH).
   // Incident-draw balance limits come from the difficulty preset's config
   // (per-difficulty tuning, CG-0MSL0OU1E005WFJB). Configs that omit the
   // fields (legacy saves) fall back to the engine defaults N=3, M=2 via ??
-  // in createIncidentBalanceState. Applied before the pre-draw below so the
-  // initial queue already honors the tuned limits.
+  // in createIncidentBalanceState.
   const incidentBalance = createIncidentBalanceState({
     repeatSpacing: config.incidentRepeatSpacing,
     maxStreak: config.incidentMaxStreak,
   });
-  const incidentQueue: EventCard[] = [];
-  for (let i = 0; i < INCIDENT_QUEUE_SIZE; i++) {
-    const idx = findConstrainedIncidentIndex(eventDeck, incidentBalance);
-    if (idx === -1) break;
-    const card = eventDeck.splice(idx, 1)[0];
-    incidentQueue.push(card);
-    recordIncidentDraw(incidentBalance, card);
+  // Gather all Incident-trigger cards from the seeded event deck into a pool
+  // (remaining Investment-trigger cards stay in the event deck for the market).
+  const incidentPool: EventCard[] = [];
+  const remainingEventCards: EventCard[] = [];
+  for (const card of eventDeck) {
+    if (card.trigger === 'Incident') {
+      incidentPool.push(card);
+    } else {
+      remainingEventCards.push(card);
+    }
   }
+  eventDeck.length = 0;
+  eventDeck.push(...remainingEventCards);
+
+  // Constraint-aware deck ordering (option (a), CG-0MSXOVQFL007G3VH): the full
+  // pre-arranged draw sequence satisfies repeatSpacing (N) / maxStreak (M).
+  // Deterministic — orderIncidentDeck consumes no RNG (pool order comes from
+  // the seeded shuffle), so same seed ⇒ same deck order.
+  const incidentDeck = orderIncidentDeck(incidentPool, incidentBalance);
 
   // Build initial state -- use config values instead of hard-coded constants
   const initCoins = config.startingCoins;
@@ -555,7 +683,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     },
     challengesCompleted: [],
     activeChallenges: [],
-    incidentQueue,
+    incidentDeck,
     incidentBalance,
     gameResult: 'playing',
     endReason: null,
@@ -567,13 +695,17 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     activityLog: [],
     activeEffects: [],
     hand: [],
-    maxHandSize: 2,
+    maxHandSize: 3,
     discardPile: [],
     staffCards: [],
     staffCardMarket: staffDeck,
     skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
+    actionsRemaining: 1,
   };
+
+  // Refill the single-row market with its initial composition.
+  refillSingleRowMarket(state);
 
   // Select challenges for this run using seeded RNG and config count
   const selectedChallenges = selectChallenges(CHALLENGE_TEMPLATES, config.challengesPerRun, rng);
@@ -637,7 +769,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
       challengeId: ac.challenge.id,
       completed: ac.completed,
     })),
-    incidentQueue: structuredClone(state.incidentQueue),
+    incidentDeck: structuredClone(state.incidentDeck),
     incidentBalance: structuredClone(state.incidentBalance),
     gameResult: state.gameResult,
     endReason: state.endReason,
@@ -656,6 +788,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     soldSlots: [...state.soldSlots],
     csvChecksum: CSV_CHECKSUM,
     csvData: CARD_DATA_RAW,
+    actionsRemaining: state.actionsRemaining,
   };
 }
 
@@ -676,6 +809,21 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     delete market.business;
   }
 
+  // ── Market: merge two-row development + investments into single row ──
+  // (CG-0MSTOATDT009BRX2). Old saves carry `market.development` (up to 4
+  // business/community-space cards) and `market.investments` (up to 3
+  // upgrades/events). The new market is one `cards` row of up to
+  // `MARKET_TOTAL_SLOTS` (3). Merge with business cards first (priority for
+  // the ≥1-business rule) and trim to the new row size.
+  if (market && !('cards' in market)) {
+    const devCards = (market.development as unknown[] | undefined) ?? [];
+    const invCards = (market.investments as unknown[] | undefined) ?? [];
+    const merged = [...devCards, ...invCards].slice(0, MARKET_TOTAL_SLOTS);
+    market.cards = merged;
+    delete market.development;
+    delete market.investments;
+  }
+
   // ── Street grid: convert Park cards from business → community-space ──
   const grid = saved.streetGrid as Record<string, unknown>[] | undefined;
   if (grid) {
@@ -687,13 +835,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   }
 
   // ── Development row cards: convert Park cards from business → community-space ──
-  if (market) {
-    const devCards = market.development as Record<string, unknown>[] | undefined;
-    if (devCards) {
-      for (const card of devCards) {
-        if (card && card.family === 'business' && card.name === 'Park') {
-          card.family = 'community-space';
-        }
+  const marketCards = (market?.cards as Record<string, unknown>[] | undefined) ?? [];
+  if (marketCards) {
+    for (const card of marketCards) {
+      if (card && card.family === 'business' && card.name === 'Park') {
+        card.family = 'community-space';
       }
     }
   }
@@ -754,7 +900,14 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     }
   }
   if (!('maxHandSize' in saved)) {
-    (saved as Record<string, unknown>).maxHandSize = 2;
+    (saved as Record<string, unknown>).maxHandSize = 3;
+  } else {
+    // Base hand grew 2 → 3 (CG-0MSTOATDT009BRX2). Bump legacy base-2 saves;
+    // grown values (> 2, from staff `handSlotsAdded`) are preserved as-is.
+    const existing = (saved as { maxHandSize: number }).maxHandSize;
+    if (typeof existing === 'number' && existing <= 2) {
+      (saved as Record<string, unknown>).maxHandSize = 3;
+    }
   }
   if (!('discardPile' in saved)) {
     (saved as Record<string, unknown>).discardPile = [];
@@ -786,12 +939,42 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).soldSlots = new Array<boolean>(GRID_SIZE).fill(false);
   }
 
+  // ── actionsRemaining: backfill default for legacy saves ──
+  if (!('actionsRemaining' in saved)) {
+    (saved as Record<string, unknown>).actionsRemaining = 1;
+  }
+
   // ── incidentBalance (CG-0MSL0OP040043KKZ): backfill from the queue for ──
   // legacy saves that predate the balance state. The queue cards are recorded
   // in draw order so subsequent constrained draws see the actual sequence.
   if (!('incidentBalance' in saved)) {
     const queue = (saved.incidentQueue as EventCard[] | undefined) ?? [];
     (saved as Record<string, unknown>).incidentBalance = createIncidentBalanceFromQueue(queue);
+  }
+
+  // ── incidentQueue → incidentDeck (CG-0MSTOATDP000JNHH) ──────────
+  // Old saves stored up to 2 pre-drawn Incident cards in `incidentQueue`
+  // (front = next to resolve) with the remaining incidents still in the
+  // event deck. The new model is a single face-down `incidentDeck`: the
+  // queue cards first (they are the next to resolve), then the remaining
+  // Incident-trigger cards from the event deck in their existing order.
+  // Incident cards are removed from the event deck — they now live solely
+  // in the incident deck.
+  if ('incidentQueue' in saved && !('incidentDeck' in saved)) {
+    const queue = (saved.incidentQueue as EventCard[] | undefined) ?? [];
+    delete (saved as Record<string, unknown>).incidentQueue;
+    const eventDeck = (saved.decks as Record<string, unknown> | undefined)?.event as EventCard[] | undefined;
+    const remainingIncidents: EventCard[] = [];
+    const remainingEvents: EventCard[] = [];
+    for (const card of eventDeck ?? []) {
+      if (card.trigger === 'Incident') remainingIncidents.push(card);
+      else remainingEvents.push(card);
+    }
+    if (eventDeck) {
+      eventDeck.length = 0;
+      eventDeck.push(...remainingEvents);
+    }
+    (saved as Record<string, unknown>).incidentDeck = [...queue, ...remainingIncidents];
   }
 
   // ── currentIncome / currentReputationPerTurn: add missing fields for legacy saves ─
@@ -807,10 +990,7 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   // phase never deducts a cost from cards that never had one.
   const csCardLocations: unknown[][] = [];
   if (grid) csCardLocations.push(grid);
-  if (market) {
-    const devCards = market.development as unknown[] | undefined;
-    if (devCards) csCardLocations.push(devCards);
-  }
+  if (marketCards) csCardLocations.push(marketCards);
   if (decks) {
     const csDeck = decks.communitySpace as unknown[] | undefined;
     if (csDeck) csCardLocations.push(csDeck);
@@ -899,10 +1079,13 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
         completed: ac.completed,
       };
     }),
-    incidentQueue: structuredClone(saved.incidentQueue),
+    incidentDeck: structuredClone(saved.incidentDeck),
     incidentBalance: saved.incidentBalance
       ? structuredClone(saved.incidentBalance)
-      : createIncidentBalanceFromQueue(saved.incidentQueue ?? []),
+      // New-format saves always carry incidentBalance; this fallback only
+      // fires for malformed saves. History tracks the RESOLVED sequence, so
+      // a fresh (empty) balance is correct — never backfill from the deck.
+      : createIncidentBalanceState({}),
     gameResult: saved.gameResult,
     endReason: saved.endReason,
     finalScore: saved.finalScore,
@@ -919,6 +1102,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     staffCardMarket: structuredClone(saved.staffCardMarket),
     skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
+    actionsRemaining: saved.actionsRemaining ?? 1,
   };
 
   return state;

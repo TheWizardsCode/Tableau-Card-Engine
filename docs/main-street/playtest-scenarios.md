@@ -53,14 +53,14 @@ npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 
 ### Adding or updating tutorial text
 
-Tutorial steps are defined in `example-games/main-street/TutorialFlow.ts` in the `UNIFIED_TUTORIAL_STEPS` array. There are currently 16 steps (T1–T16), each with:
+Tutorial steps are defined in `example-games/main-street/TutorialFlow.ts` in the `UNIFIED_TUTORIAL_STEPS` array. There are currently 17 steps (T1–T17), each with:
 - `titleKey` — i18n key for the short heading shown in bold
 - `bodyKey` — i18n key for the body text
 - `highlightZone` — zone identifier for the area to highlight (resolved via the tutorial layout system), or `'centerModal'`/`'completionModal'` for centered overlays
 - `gate` — `'confirm'` for informational steps, `'action'` for action-gated steps
 - `requiredAction` — (only for action-gated steps) the in-game action required to advance
 
-All step text lives in the English locale bundle (`example-games/main-street/i18n/tutorial-en.ts`) with card facts resolved from `card-data.csv` via `{cardName}`/`{cost}`/`{bonus}` placeholders. See `docs/main-street/tutorial-localization.md` for the editorial rules (≤3 sentences per box, one point per box) and the T1–T16 step-flow table.
+All step text lives in the English locale bundle (`example-games/main-street/i18n/tutorial-en.ts`) with card facts resolved from `card-data.csv` via `{cardName}`/`{cost}`/`{bonus}` placeholders. See `docs/main-street/tutorial-localization.md` for the editorial rules (≤3 sentences per box, one point per box) and the T1–T17 step-flow table.
 
 ---
 
@@ -72,7 +72,7 @@ All step text lives in the English locale bundle (`example-games/main-street/i18
 
 ### What happens
 
-The player buys an Art Gallery (cost 4) and Block Party investment (cost 4), spending all 8 starting coins. The Tax Audit incident then hits for -3 coins, pushing the balance to -1. Bankruptcy is declared immediately.
+The player buys an Art Gallery (cost 4) and Block Party investment (cost 4), spending all 6 starting coins (Medium preset, re-tuned by CG-0MSP26Q5N002EH8P) plus income reserve. The Tax Audit incident then hits for -3 coins, pushing the balance to -1. Bankruptcy is declared immediately.
 
 ### Balance observations
 
@@ -177,23 +177,30 @@ The player opens with two Parks and two Cafes (Food+Culture bridges), creating a
 
 ## Balance Heuristics Checklist
 
+> **Updated 2026-08-13 (CG-0MSRKN325004ELH2).** This checklist predates the
+> difficulty presets; the win-rate/median-score heuristics below are superseded
+> by the per-difficulty design-intent bands enforced in the guardrail suite
+> (see [balance-guardrail-recommendations.md](balance-guardrail-recommendations.md)
+> and PRD §3.3).
+
 Use these heuristics when evaluating card changes or rule adjustments:
 
 ### Win Rate
 
-- **Target:** Greedy strategy should win 90-97% of games (currently ~96.5% over 200 seeds).
-- **If win rate drops below 85%:** Negative incidents may be too harsh; reduce coin penalties or incident frequency.
-- **If win rate exceeds 99%:** Consider increasing difficulty (lower starting coins, higher win threshold, more incidents).
+- **Target (design intent, greedy AI):** Easy 60-90%, Medium 45-75%, Hard 15-40%. Measured (200 seeds, 60 turns): Easy ~83.5%, Medium ~62%, Hard ~22%.
+- **If Medium drops below 45%** (or Hard below 15%): negative incidents may be too harsh; reduce coin penalties or incident frequency.
+- **If Easy exceeds 90%** (or Medium exceeds 75%): consider increasing difficulty (lower starting coins, higher win threshold, more incidents).
 
 ### Loss Vectors
 
-- **Bankruptcy** should account for ~50-60% of losses (currently ~57%).
-- **Reputation collapse** should account for ~30-40% of losses (currently ~29%).
-- **Timeout** (turn 20 without reaching 150) should be rare (~10% of losses).
+- **Bankruptcy** should dominate losses (~50-60%+ of losses; currently ~100% of greedy/Medium losses).
+- **Reputation collapse** should account for a meaningful share on harder presets (~30-40% target on Hard; currently ~8%).
+- **Timeout** (harness 60-turn cap) should be rare (< 15% of losses); currently 0% at 60 turns.
+  Note: turn limits are opt-in (CG-0MSLXJCHH001DLIO); presets impose no turn limit.
 
 ### Score Distribution
 
-- **Median score:** 160-170 range (with greedy strategy).
+- **Median score (greedy/Medium):** 120-180 band (PRD §3.3); measured ~153.
 - **Fast wins** (turn <= 10): ~30% of wins -- indicates strong early draws.
 - **Late wins** (turn >= 15): ~15% of wins -- indicates tough early game.
 

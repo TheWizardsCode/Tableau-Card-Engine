@@ -4,12 +4,12 @@
  * Implements the adjacency resolver for the 2x5 street grid
  * (stored as a 10-slot row-major array) and income computation
  * (base income + synergy bonuses). Upgrades can extend synergy
- * range beyond the default 1-cell Manhattan adjacency.
+ * range beyond the default 1-cell 8-way (Chebyshev) adjacency.
  *
  * @module
  */
 
-import type { BusinessCard, CommunitySpaceCard, EventCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, SynergyType } from './MainStreetCards';
 import { getBaseTypeId } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
@@ -27,8 +27,10 @@ import { applyActiveEffectMultiplier } from '../../src/core-engine/ActiveEffect'
  *   row 0: 0..4
  *   row 1: 5..9
  *
- * Default range is 1 (orthogonal neighbors at Manhattan distance 1).
- * Upgrades can extend this radius.
+ * Adjacency is 8-way (Chebyshev distance: max(|dx|, |dy|) <= range),
+ * so diagonally adjacent slots count at every range. Default range is 1
+ * (the 8 surrounding slots); upgrades extend this radius as larger
+ * 8-way squares.
  *
  * @param index  The slot index to find neighbors for.
  * @param range  How far to look in each direction (default 1).
@@ -52,7 +54,12 @@ export function neighbors(index: number, range: number = 1): number[] {
   for (let i = 0; i < GRID_SIZE; i++) {
     if (i === index) continue;
     const p = toGridPosition(i);
-    const distance = Math.abs(origin.x - p.x) + Math.abs(origin.y - p.y);
+    // 8-way (Chebyshev) distance: diagonally adjacent slots count at range 1,
+    // and range upgrades expand as larger 8-way squares (CG-0MSP1HCAS00785MP).
+    const distance = Math.max(
+      Math.abs(origin.x - p.x),
+      Math.abs(origin.y - p.y),
+    );
     if (distance <= range) {
       result.push(i);
     }
@@ -438,7 +445,7 @@ export function updateNeighborsOnSale(
  */
 export function computeHandCardSynergyBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
-  hand: (BusinessCard | EventCard)[],
+  hand: (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
   soldSlots: boolean[] = [],
 ): number {
   if (!hand || hand.length === 0) return 0;
@@ -446,8 +453,8 @@ export function computeHandCardSynergyBonus(
   let total = 0;
 
   for (const handCard of hand) {
-    // Event cards have no synergy types — only business cards contribute.
-    if (handCard.family === 'event') continue;
+    // Event and upgrade cards have no synergy types — only business cards contribute.
+    if (handCard.family === 'event' || handCard.family === 'upgrade') continue;
     if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
 
     // Each hand card provides floor(baseIncome/3) to each matching synergy business
@@ -658,8 +665,21 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     if (!card) continue;
     repPerTurn += card.currentReputationPerTurn ?? 0;
   }
-  if (repPerTurn !== 0) {
-    state.resourceBank.reputation += repPerTurn;
+  // Staff reputation abilities (e.g. the Socialite's +0.1 rep/turn —
+  // Group F, CG-0MSQJ7VL9009JHF4) also accrue during the income phase.
+  for (const staff of state.staffCards ?? []) {
+    repPerTurn += staff.reputationPerTurn ?? 0;
+  }
+  // Apply active effect rep modifiers (e.g. Community Renovation's
+  // rep-multiplier 1.2x — Group C, CG-0MSQJ244M0055X7S). Multipliers are
+  // composed multiplicatively, matching the income-multiplier behaviour.
+  const modifiedRepPerTurn = applyActiveEffectMultiplier(
+    state.activeEffects,
+    'rep-multiplier',
+    repPerTurn,
+  );
+  if (modifiedRepPerTurn !== 0) {
+    state.resourceBank.reputation += modifiedRepPerTurn;
   }
 
   // Hand card synergy is still computed fresh each turn (it is not adjacency-based
@@ -705,7 +725,8 @@ export interface SynergyPair {
  * Computes all synergy pairs on the street grid for visual line rendering.
  *
  * A pair exists when two occupied slots share at least one SynergyType and
- * are within Manhattan distance range (1 + card's synergyRangeBonus). Each pair
+ * are within 8-way / Chebyshev distance range (1 + card's synergyRangeBonus) —
+ * diagonally adjacent slots count (CG-0MSP1HCAS00785MP). Each pair
  * is reported only once (fromIndex < toIndex).
  *
  * Community-space cards are included in the same manner as business cards.
@@ -771,6 +792,21 @@ export function computeSynergyPairs(
   }
 
   return pairs.sort((a, b) => a.fromIndex - b.fromIndex || a.toIndex - b.toIndex);
+}
+
+/**
+ * Returns the synergy pairs in `after` that are not present in `before`
+ * (same slot pair), i.e. the newly-formed connections after a placement.
+ *
+ * Used by the synergy-formation animation trigger so only NEW pairs animate
+ * (pre-existing pairs never re-trigger on a plain refresh).
+ */
+export function diffNewSynergyPairs(before: SynergyPair[], after: SynergyPair[]): SynergyPair[] {
+  return after.filter(
+    (pair) => !before.some(
+      (b) => b.fromIndex === pair.fromIndex && b.toIndex === pair.toIndex,
+    ),
+  );
 }
 
 // ── Result Types ────────────────────────────────────────────

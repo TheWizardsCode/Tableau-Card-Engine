@@ -38,7 +38,17 @@ win:
 
 nsis:
   oneClick: false
-  perMachine: false
+  # perMachine: true makes the installer require admin elevation
+  # (RequestExecutionLevel admin), which is needed for two reasons:
+  #   1. The user installs to Program Files (requires admin anyway).
+  #   2. An elevated installer can force-kill zombie/orphaned Electron
+  #      processes left over from previous sessions (the standard
+  #      non-elevated taskkill is username-filtered and cannot kill them,
+  #      producing the "Tableau Card Engine cannot be closed" error).
+  # The aggressive pre-kill lives in nsis/installer.nsh (!macro customInit);
+  # the default running-instance check stays as a safety net.
+  perMachine: true
+  include: nsis/installer.nsh
   allowToChangeInstallationDirectory: true
   artifactName: TCE-Setup-${version}.${ext}
 

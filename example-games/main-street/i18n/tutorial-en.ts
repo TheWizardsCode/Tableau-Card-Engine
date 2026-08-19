@@ -2,7 +2,7 @@
  * Main Street Tutorial — English locale bundle.
  *
  * Contains all user-facing string values for:
- * - T1–T16 tutorial step titles and bodies
+ * - T1–T17 tutorial step titles and bodies
  * - Tutorial offer modal (title, body, skip/start buttons)
  * - Tutorial overlay buttons (dismiss, next, exit, start full game)
  *
@@ -11,7 +11,7 @@
  * - Modal: `tutorial.modal.<field>`
  * - Overlay: `tutorial.overlay.<field>`
  *
- * ## Editorial rules (16-step flow)
+ * ## Editorial rules (17-step flow)
  *
  * - **≤3 sentences per text box** (titles and bodies), exactly one point per box.
  * - Do NOT mention time-limited play (the "25 turns" sentence was removed).
@@ -32,7 +32,7 @@
  * - `{cost}` — the card's `cost` column, formatted via `formatCurrency()`.
  * - `{bonus}` — an event card's `coinDelta` as `+N coins` (used by T9).
  * - `{synergyCardName}` — a second card's name, when the step references a
- *   synergy partner (used by T12: Library next to Bookshop).
+ *   synergy partner (used by T13: Library next to Bookshop).
  *
  * To add a new language variant:
  *  1. Create `tutorial-<lang>.ts` with the translated bundle (keeping the
@@ -87,7 +87,7 @@ export function overlayKey(field: string): string {
 }
 
 /**
- * English locale bundle for all 16 tutorial step strings.
+ * English locale bundle for all 17 tutorial step strings.
  *
  * Maps i18n keys (e.g. `tutorial.T1.title`) to English string values.
  */
@@ -121,35 +121,39 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
 
   // ── T2: Development Row (informative) ──────────────────────
   [tutorialKey('T2', 'title')]:
-    'Development Row',
+    'The Market Row',
   [tutorialKey('T2', 'body')]:
-    'This row shows businesses you can buy. Hover a card for more details.',
+    'This row shows the cards on offer this week. Hover a card for more details.',
 
   // ── T3: Buy the Laundromat ─────────────────────────────────
   [tutorialKey('T3', 'title')]:
     'Buy the Laundromat',
   // {cardName}/{cost} are resolved from card-data.csv at render time via
   // resolveTutorialStepText() — do NOT hardcode the card name or price here.
+  // Cost-at-play (CG-0MSTOATDT009BRX2): picking the card up is free; the
+  // price is paid when the card is placed on the street. Action economy
+  // (CG-0MSTOF1N5005PK2R): taking this card uses your ONE daily action;
+  // placing it later the same turn is free (same move-and-place purchase).
   [tutorialKey('T3', 'body')]:
-    'Click the **{cardName}** card to buy it for {cost}.',
+    "Click the **{cardName}** card to buy it — taking it uses today's **one action** (it's free to take now), and you pay **{cost}** when you place it. Placing it later this turn is free — you get one action a day.",
 
   // ── T4: Your Hand ──────────────────────────────────────────
   [tutorialKey('T4', 'title')]:
     'Your Hand',
   [tutorialKey('T4', 'body')]:
-    'Cards you buy wait here in your hand. You can play them any time. They earn nothing until placed.',
+    'Cards you take wait here in your hand. You can play them any time. They earn nothing until placed.',
 
   // ── T5: Place a Business ───────────────────────────────────
   [tutorialKey('T5', 'title')]:
     'Place a Business',
   [tutorialKey('T5', 'body')]:
-    'Click an empty slot to open the business. It starts earning income right away.',
+    'Click an empty slot to open the business and pay its cost. It starts earning income right away.',
 
   // ── T6: Upcoming Incidents ─────────────────────────────────
   [tutorialKey('T6', 'title')]:
     'Upcoming Incidents',
   [tutorialKey('T6', 'body')]:
-    'Events here happen at the end of each turn. Some help you, some hurt you. Hover one for details.',
+    'The event at the top happens at the end of this turn; the ones below happen next turn. Some help you, some hurt you. Hover one for details.',
 
   // ── T7: End Turn ───────────────────────────────────────────
   [tutorialKey('T7', 'title')]:
@@ -159,65 +163,81 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
 
   // ── T8: Investments ────────────────────────────────────────
   [tutorialKey('T8', 'title')]:
-    'Investments',
+    'More than Businesses',
   [tutorialKey('T8', 'body')]:
-    'Upgrade cards improve businesses you own. Event cards boost your street when played.',
+    'The market row can also hold upgrade cards, which improve businesses you own, and event cards, which boost your street when played.',
 
   // ── T9: Buy the Local Festival ─────────────────────────────
   [tutorialKey('T9', 'title')]:
     'Buy the Local Festival',
   // {cardName}/{cost}/{bonus} resolved from card-data.csv (evt-festival) at render time.
   [tutorialKey('T9', 'body')]:
-    'Click the **{cardName}** card to buy it for {cost}. It waits in your hand for the right moment.',
+    'Click the **{cardName}** card to add it to your hand — free now, and you pay **{cost}** when you play it. It waits in your hand for the right moment.',
 
   // ── T10: Optimizing for Events ─────────────────────────────
   [tutorialKey('T10', 'title')]:
     'Optimizing for Events',
   // {cardName}/{cost} resolved from card-data.csv (biz-bookshop) at render time.
+  // Revised to clarify drag-and-drop as a one-step buy-and-place option (CG-0MSOKG7HE001NMMM).
+  // Buy-and-place premium (CG-0MSTOF1N5005PK2R): dragging straight to the
+  // street costs +50% but skips the hand; clicking to take it first uses the
+  // day's one action and pays the listed cost on placement.
   [tutorialKey('T10', 'body')]:
-    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Click it and drag it to an empty spot on your street.',
+    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Click to take it now (your one action), then place it later; or **drag it straight to your street to buy-and-place** — faster, but it costs **50% more** than the listed price.',
 
   // ── T11: End this turn ────────────────────────────────────
   [tutorialKey('T11', 'title')]:
     'End this turn',
   // {cardName} resolved from card-data.csv (evt-festival) at render time.
+  // Emphasizes deliberately holding the festival for a more opportune moment (CG-0MSOKG89N001LDT4).
   [tutorialKey('T11', 'body')]:
-    'You could play the **{cardName}** now. But first, end this turn.',
+    'We could play the **{cardName}** now, but we\'re going to wait for a more opportune moment. End this turn for now.',
 
-  // ── T12: Build a Library ───────────────────────────────────
+  // ── T12: Costs and Reputation ──────────────────────────────
   [tutorialKey('T12', 'title')]:
+    'Costs and Reputation',
+  // {cardName} = cs-library — resolved from card-data.csv at render time.
+  // Informative step (confirm gate): focuses exclusively on the Library's
+  // running cost vs reputation trade-off. NO synergy mention here — the
+  // Culture adjacency bonus is taught by the T13 action step.
+  [tutorialKey('T12', 'body')]:
+    'Some businesses cost coins to run but bring in customers. The **{cardName}** builds your reputation.',
+
+  // ── T13: Build a Library ───────────────────────────────────
+  [tutorialKey('T13', 'title')]:
     'Build a Library',
   // {cardName} = cs-library, {synergyCardName} = biz-bookshop — resolved from
-  // card-data.csv at render time. The Library costs coins to run each turn but
-  // builds reputation; placing it next to the Bookshop (a Culture business)
-  // earns the Culture adjacency bonus.
-  [tutorialKey('T12', 'body')]:
-    'Some businesses cost coins to run but bring in customers. The **{cardName}** builds your reputation. Place it next to **{synergyCardName}** for a Culture bonus.',
+  // card-data.csv at render time. The synergy system: placing the Library next
+  // to the Bookshop (a Culture business) earns the Culture adjacency bonus.
+  // Adjacency is 8-way (Chebyshev): placing the Library diagonally next to the
+  // Bookshop counts just as much as orthogonally.
+  [tutorialKey('T13', 'body')]:
+    'The **{cardName}** brings a Culture bonus when placed next to other Culture cards. Buy it and place it next to **{synergyCardName}** — orthogonally or diagonally — to gain the bonus.',
 
-  // ── T13: Triggering Events ─────────────────────────────────
-  [tutorialKey('T13', 'title')]:
+  // ── T14: Triggering Events ─────────────────────────────────
+  [tutorialKey('T14', 'title')]:
     'Triggering Events',
   // {cardName} resolved from card-data.csv (evt-festival) at render time.
-  [tutorialKey('T13', 'body')]:
+  [tutorialKey('T14', 'body')]:
     'Two Culture businesses on your street power the festival. Click the **{cardName}** in your hand to play it.',
 
-  // ── T14: Success and Failure ───────────────────────────────
-  [tutorialKey('T14', 'title')]:
+  // ── T15: Success and Failure ───────────────────────────────
+  [tutorialKey('T15', 'title')]:
     'Success and Failure',
-  [tutorialKey('T14', 'body')]:
+  [tutorialKey('T15', 'body')]:
     'The bar shows your coins, reputation, score, and target. Hover each to see how it is calculated.',
 
-  // ── T15: Challenges ────────────────────────────────────────
-  [tutorialKey('T15', 'title')]:
+  // ── T16: Challenges ────────────────────────────────────────
+  [tutorialKey('T16', 'title')]:
     'Challenges',
-  [tutorialKey('T15', 'body')]:
+  [tutorialKey('T16', 'body')]:
     'Each game gives you challenges for bonus points. See them in the Challenge Tracker. Completing challenges unlocks new cards for future games!',
 
-  // ── T16: Tutorial Complete ─────────────────────────────────
-  [tutorialKey('T16', 'title')]:
+  // ── T17: Tutorial Complete ─────────────────────────────────
+  [tutorialKey('T17', 'title')]:
     'Tutorial Complete',
-  [tutorialKey('T16', 'body')]:
-    'Great job! You are ready to play a full game. Find the tutorial again in the settings menu.',
+  [tutorialKey('T17', 'body')]:
+    'There are many more things to discover as you play, but you have the basics now. Let\'s play.',
 } as const;
 
 // Re-export helpers

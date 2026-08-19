@@ -7,7 +7,7 @@
  *    pickup, affordability, empty-slot availability, phase, tutorial gating
  *    and requiredCardId;
  *  - drop-zone validation (`canDropBusinessCard`): canPurchaseBusiness plus
- *    tutorial place-business gating and T12 synergy adjacency enforcement;
+ *    tutorial place-business gating and T13 synergy adjacency enforcement;
  *  - drag → buy+place (`onDragDropBusiness`): single undoable
  *    buyBusinessCommand, state mutation, events, tutorial completion;
  *  - module wiring: pickup veto keeps the card in place with illegal
@@ -23,6 +23,7 @@ import { MainStreetTurnController } from '../../example-games/main-street/scenes
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
 import { COMMON_SFX_KEYS } from '../../src/core-engine/SoundManager';
 import { UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
+import { DRAG_TRANSFER_DURATION_MIN_MS, DRAG_TRANSFER_DURATION_MAX_MS } from '../../example-games/main-street/scenes/MainStreetConstants';
 
 // ── Mocks ──────────────────────────────────────────────────
 
@@ -118,10 +119,13 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
 
 /** First business card in the development row, made affordable deterministically. */
 function pickAffordableBusiness(state: any): any {
-  const card = state.market.development.find((c: any) => c.family === 'business');
+  const card = state.market.cards.find((c: any) => c.family === 'business');
   if (!card) throw new Error('No business card in development row for test');
-  // Ensure the player can afford it regardless of seed.
-  if (state.resourceBank.coins < card.cost) state.resourceBank.coins = card.cost;
+  // Ensure the player can afford it regardless of seed. Drag-drop buy-and-place
+  // now pays a +50% premium over the listed cost (CG-0MSTOF1N5005PK2R), so
+  // fund the premium price.
+  const premium = Math.ceil(card.cost * 1.5 * 2) / 2;
+  if (state.resourceBank.coins < premium) state.resourceBank.coins = premium;
   return card;
 }
 
@@ -152,19 +156,21 @@ describe('MainStreet drag-to-buy wiring', () => {
     });
 
     it('allows an affordable community-space card (general drag support)', () => {
-      let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
+      let cs = scene.state.market.cards.find((c: any) => c.family === 'community-space');
       if (!cs) {
         // Deterministic: manufacture a community-space card in the row.
-        cs = scene.state.market.development[0];
+        cs = scene.state.market.cards[0];
         cs.family = 'community-space';
       }
-      if (scene.state.resourceBank.coins < cs.cost) scene.state.resourceBank.coins = cs.cost;
+      if (scene.state.resourceBank.coins < Math.ceil(cs.cost * 1.5 * 2) / 2) {
+        scene.state.resourceBank.coins = Math.ceil(cs.cost * 1.5 * 2) / 2;
+      }
       expect(firstEmptySlot(scene.state)).toBeGreaterThanOrEqual(0);
       expect(controller.canPickUpBusinessCard(cs.id)).toBe(true);
     });
 
     it('rejects non-business/community-space families (event/upgrade stay click-only)', () => {
-      const card = scene.state.market.development[0];
+      const card = scene.state.market.cards[0];
       if (scene.state.resourceBank.coins < card.cost) scene.state.resourceBank.coins = card.cost;
       card.family = 'event';
       expect(controller.canPickUpBusinessCard(card.id)).toBe(false);
@@ -224,6 +230,10 @@ describe('MainStreet drag-to-buy wiring', () => {
 
       // The required card template itself is pickable.
       card.id = 'biz-laundromat-0';
+      scene.state.resourceBank.coins = Math.max(
+        scene.state.resourceBank.coins,
+        Math.ceil(card.cost * 1.5 * 2) / 2,
+      );
       expect(controller.canPickUpBusinessCard(card.id)).toBe(true);
     });
   });
@@ -256,20 +266,20 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(controller.canDropBusinessCard(card.id, slot)).toBe(false);
     });
 
-    it('enforces synergy adjacency during T12 (Library must be next to the Bookshop)', () => {
-      const t12Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T12');
-      expect(t12Index).toBeGreaterThanOrEqual(0);
+    it('enforces synergy adjacency during T13 (Library must be next to the Bookshop)', () => {
+      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
+      expect(t13Index).toBeGreaterThanOrEqual(0);
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t12Index,
+        currentStepIndex: t13Index,
         lastCompletedStepId: null,
         exited: false,
       };
 
       // Deterministic cs-library card in the dev row, affordable.
-      let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
+      let cs = scene.state.market.cards.find((c: any) => c.family === 'community-space');
       if (!cs) {
-        cs = scene.state.market.development[0];
+        cs = scene.state.market.cards[0];
         cs.family = 'community-space';
       }
       cs.id = 'cs-library-0';
@@ -280,27 +290,28 @@ describe('MainStreet drag-to-buy wiring', () => {
       scene.state.streetGrid[0] = { id: 'biz-laundromat-0', family: 'business' } as any;
       scene.state.streetGrid[1] = { id: 'biz-bookshop-0', family: 'business' } as any;
 
-      // Adjacent slots (2 and 6 are Manhattan neighbors of slot 1) are accepted.
+      // Adjacent slots (2, 6 orthogonal; 5 diagonal — 8-way/Chebyshev) are accepted.
       expect(controller.canDropBusinessCard(cs.id, 2)).toBe(true);
       expect(controller.canDropBusinessCard(cs.id, 6)).toBe(true);
+      expect(controller.canDropBusinessCard(cs.id, 5)).toBe(true); // diagonal
       // Non-adjacent slots are rejected (drag snap-back + illegal feedback).
       expect(controller.canDropBusinessCard(cs.id, 3)).toBe(false);
-      expect(controller.canDropBusinessCard(cs.id, 5)).toBe(false);
+      expect(controller.canDropBusinessCard(cs.id, 8)).toBe(false);
       // The synergy slot itself (occupied) is also rejected.
       expect(controller.canDropBusinessCard(cs.id, 1)).toBe(false);
     });
 
     it('does not enforce adjacency when the synergy card is not on the street', () => {
-      const t12Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T12');
+      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t12Index,
+        currentStepIndex: t13Index,
         lastCompletedStepId: null,
         exited: false,
       };
-      let cs = scene.state.market.development.find((c: any) => c.family === 'community-space');
+      let cs = scene.state.market.cards.find((c: any) => c.family === 'community-space');
       if (!cs) {
-        cs = scene.state.market.development[0];
+        cs = scene.state.market.cards[0];
         cs.family = 'community-space';
       }
       cs.id = 'cs-library-0';
@@ -330,17 +341,25 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
       const opts = scene.animateTransferFromMarket.mock.calls[0][0];
       expect(opts.cardId).toBe(card.id);
-      expect(opts.row).toBe('development');
+      expect(opts.row).toBe('market');
       expect(opts.source).toEqual({ x: 412, y: 331 });
       expect(opts.destination).toEqual(scene.getStreetSlotCenter(slot));
+
+      // Distance-proportional duration: the drop is close to the slot
+      // centre (mock slot centre is (500+slot, 260)), so the duration is
+      // well below the fixed 1500ms default and respects the clamp bounds.
+      expect(opts.duration).toBeDefined();
+      expect(opts.duration).toBeLessThan(DRAG_TRANSFER_DURATION_MAX_MS);
+      expect(opts.duration).toBeGreaterThanOrEqual(DRAG_TRANSFER_DURATION_MIN_MS);
 
       // Flush the transfer-completion microtask (mock resolves immediately).
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      // afterTransfer ran → buy executed.
-      expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeUndefined();
+      // afterTransfer ran → buy executed at the +50% premium.
+      const premium = Math.ceil(card.cost * 1.5 * 2) / 2;
+      expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeUndefined();
       expect(scene.state.streetGrid[slot]?.id).toBe(card.id);
-      expect(scene.state.resourceBank.coins).toBe(coinsBefore - card.cost);
+      expect(scene.state.resourceBank.coins).toBe(coinsBefore - premium);
       expect(scene.uiPhase).toBe('market');
       expect(scene.hiddenTransferSourceCardIds.has(card.id)).toBe(false);
       expect(scene.gameEvents.emit).toHaveBeenCalledWith('card:placed', expect.objectContaining({ cardId: card.id, slotIndex: slot }));
@@ -349,7 +368,7 @@ describe('MainStreet drag-to-buy wiring', () => {
       // Single undo step reverses the whole buy+place.
       expect(scene.undoManager.canUndo()).toBe(true);
       scene.undoManager.undo();
-      expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeTruthy();
+      expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeTruthy();
       expect(scene.state.streetGrid[slot]).toBeNull();
       expect(scene.state.resourceBank.coins).toBe(coinsBefore);
       expect(scene.undoManager.canUndo()).toBe(false);
@@ -463,7 +482,7 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(container.y).toBe(150);
       expect(container.depth).toBe(5);
       expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
-      expect(scene.state.market.development.find((c: any) => c.id === card.id)).toBeTruthy();
+      expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeTruthy();
       expect(scene.state.streetGrid[slot]?.id).toBe('other-biz');
     });
   });

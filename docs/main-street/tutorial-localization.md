@@ -50,7 +50,7 @@ Example (T3 body in `tutorial-en.ts`):
 
 1. `resolveTutorialStepText(step)` in `TutorialFlow.ts` calls
    `resolveTutorialCardParams(step)`.
-2. The step's `requiredCardId` (purchase-gated steps like T3/T8) or
+2. The step's `requiredCardId` (purchase-gated steps like T3/T9) or
    `referencedCardId` (text-only references like T7/T9) provides the card
    lookup key (e.g. `biz-laundromat-0`).
 3. `getBaseTypeId()` strips the copy suffix (`biz-laundromat`) and
@@ -122,38 +122,44 @@ Tutorial text follows these editorial principles:
 
 - **Reading level:** ~10-year-old reading level (Flesch-Kincaid Grade Level ≤ 5-6)
 - **Sentence limit:** **≤3 sentences per text box** (titles and bodies), each box
-  communicating **exactly one point** (16-step flow editorial rule)
+  communicating **exactly one point** (17-step flow editorial rule)
 - **Word count:** Each step body under 50 words (soft boundary — conciseness preferred)
 - **Concepts:** At most 1–2 distinct gameplay concepts per step (soft boundary)
 - **Plain language:** Short sentences, common words, active voice, no jargon without explanation
 - **Consistency:** Use consistent terminology across all steps (e.g. "Coins" not "gold", "turns" not "days")
 
-### Content rules for the 16-step flow
+### Content rules for the 17-step flow
 
 - Do NOT mention time-limited play (the "25 turns" sentence was removed from T1).
 - Do NOT describe incident cards as "blue" or list their impacts in Upcoming Incidents.
 - Do NOT mention matching cards in the Place a Business step.
 
-### Step flow (16 steps, T1–T16)
+### Step flow (17 steps, T1–T17)
 
 | # | ID | Title | Gate | Highlight zone |
 |---|----|-------|------|----------------|
 | 1 | T1 | Welcome to Main Street | confirm | centerModal |
-| 2 | T2 | Development Row | confirm | developmentRow (dev row only) |
+| 2 | T2 | The Market Row | confirm | developmentRow (single market row) |
 | 3 | T3 | Buy the Laundromat | action (select-business) | laundromatCard (card-level) |
 | 4 | T4 | Your Hand | confirm | hand |
 | 5 | T5 | Place a Business | action (place-business) | streetGrid |
 | 6 | T6 | Upcoming Incidents | confirm | incidentQueue |
 | 7 | T7 | End Turn | action (end-turn) | endTurnButton |
-| 8 | T8 | Investments | confirm | investmentsRow |
+| 8 | T8 | More than Businesses | confirm | investmentsRow (aliases the single market row) |
 | 9 | T9 | Buy the Local Festival | action (buy-event) | festivalCard (card-level) |
 | 10 | T10 | Optimizing for Events | action (buy-and-place) | developmentRow |
 | 11 | T11 | End this turn | action (end-turn) | endTurnButton |
-| 12 | T12 | Build a Library | action (buy-and-place) | developmentRow |
-| 13 | T13 | Triggering Events | action (play-event) | hand |
-| 14 | T14 | Success and Failure | confirm | hud (scoring bar) |
-| 15 | T15 | Challenges | confirm | challengePanel |
-| 16 | T16 | Tutorial Complete | confirm | completionModal |
+| 12 | T12 | Costs and Reputation | confirm (informative) | developmentRow |
+| 13 | T13 | Build a Library | action (buy-and-place + synergy) | developmentRow |
+| 14 | T14 | Triggering Events | action (play-event) | hand |
+| 15 | T15 | Success and Failure | confirm | hud (scoring bar) |
+| 16 | T16 | Challenges | confirm | challengePanel |
+| 17 | T17 | Tutorial Complete | confirm | completionModal |
+
+T12 (Costs and Reputation) is an informative step that introduces the Library's
+running cost vs reputation trade-off; the buy-and-place action and the Culture
+synergy rule (place the Library next to the Bookshop) moved to T13. Gate
+count: 9 confirm + 8 action = 17.
 
 Card-level highlight zones (`laundromatCard`, `festivalCard`) are resolved through
 `resolveMarketCardAnchor()` in `MainStreetTutorialHints.ts` using the deterministic
@@ -162,7 +168,7 @@ tutorial-scenario market slots, not hardcoded pixel positions.
 ### Scenario budget (Easy / 16 coins)
 
 The tutorial runs the **Easy** preset with a **16-coin starting budget** (raised
-from the standard Easy 12 for the 16-step flow). The walkthrough spends exactly:
+from the standard Easy 12 for the 17-step flow). The walkthrough spends exactly:
 
 | Step | Action | Coins In | Coins Out | Balance |
 |------|--------|----------|-----------|---------|
@@ -172,9 +178,10 @@ from the standard Easy 12 for the 16-step flow). The walkthrough spends exactly:
 | T9   | Buy Local Festival ($3) | 0 | 3 | 9.625 |
 | T10  | Buy-and-place Bookshop ($3) | 0 | 3 | 6.625 |
 | T11  | End Turn + income | 1.25 | 0 | 7.875 |
-| T12  | Buy Library ($7) | 0 | 7 | 0.875 |
+| T12  | Confirm (no cost) | 0 | 0 | 7.875 |
+| T13  | Buy Library ($7) | 0 | 7 | 0.875 |
 
-T13+ are confirm-only steps (no cost), so the balance never drops below 0.875.
+T14+ are confirm-only steps (no cost), so the balance never drops below 0.875.
 The authoritative walkthrough lives in the `Coin Budget (Easy / 16 coins)` table
 in `example-games/main-street/TutorialScenario.ts`.
 
@@ -267,7 +274,7 @@ registerLocale('fr', {
 });
 setLocale('fr');
 t(tutorialKey('T1', 'title')); // → 'Bienvenue à Main Street'
-t(tutorialKey('T2', 'title')); // → 'Resource HUD' (English fallback)
+t(tutorialKey('T2', 'title')); // → 'The Market Row' (English fallback)
 ```
 
 > **Note:** fallback strings that contain placeholder tokens (e.g. a partial

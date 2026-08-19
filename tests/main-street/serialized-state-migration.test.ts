@@ -3,7 +3,7 @@
  *
  * Validates backward-compatible deserialization after the Park reclassification
  * from 'business' to 'community-space' family and the market.business to
- * market.development rename.
+ * market.cards rename.
  *
  * Acceptance criteria:
  * 1. Deserializing old-format save with Park as family: 'business' produces valid state with Park as family: 'community-space'
@@ -25,7 +25,7 @@ function createTestState(seed: string = 'migration-test'): MainStreetState {
 
 /**
  * Creates an old-format serialized state shape with `market.business`
- * instead of `market.development`, and Park as `family: 'business'`.
+ * instead of `market.cards`, and Park as `family: 'business'`.
  * This simulates a save from before the community-space reclassification.
  */
 function createOldFormatSavedState(seed: string = 'migration-test'): Record<string, unknown> {
@@ -34,10 +34,10 @@ function createOldFormatSavedState(seed: string = 'migration-test'): Record<stri
   // Serialize normally then mutate to old format
   const serialized = JSON.parse(JSON.stringify(serializeMainStreetState(state)));
 
-  // Replace market.development with market.business (old format)
+  // Replace market.cards with market.business (old format)
   const market = serialized.market as Record<string, unknown>;
-  market.business = market.development;
-  delete market.development;
+  market.business = market.cards;
+  delete market.cards;
 
   // Find any Park cards in the street grid and change their family to 'business' (old format)
   const grid = serialized.streetGrid as Record<string, unknown>[];
@@ -71,7 +71,7 @@ function createOldFormatSavedState(seed: string = 'migration-test'): Record<stri
 // ── AC1: Old-format save migration ─────────────────────────
 
 describe('Old-format save migration (AC1)', () => {
-  it('should deserialize old-format save with market.business to market.development', () => {
+  it('should deserialize old-format save with market.business to market.cards', () => {
     const oldSave = createOldFormatSavedState('migration-test-1');
 
     // Verify the old format has market.business (not development)
@@ -81,9 +81,9 @@ describe('Old-format save migration (AC1)', () => {
     // Deserialize (should trigger migration)
     const migratedState = deserializeMainStreetState(oldSave as unknown as MainStreetSerializedState);
 
-    // After migration, state should have market.development
-    expect(migratedState.market.development).toBeDefined();
-    expect(Array.isArray(migratedState.market.development)).toBe(true);
+    // After migration, state should have market.cards
+    expect(migratedState.market.cards).toBeDefined();
+    expect(Array.isArray(migratedState.market.cards)).toBe(true);
   });
 
   it('should convert Park cards with family: "business" to family: "community-space"', () => {
@@ -158,14 +158,14 @@ describe('New-format save deserialization (AC2)', () => {
     const state = createTestState('new-format-test');
     const serialized = serializeMainStreetState(state);
 
-    // New format should have market.development
-    expect(serialized.market.development).toBeDefined();
+    // New format should have market.cards
+    expect(serialized.market.cards).toBeDefined();
 
     // Deserialize without migration needed
     const deserialized = deserializeMainStreetState(serialized);
 
     // Should have all required fields
-    expect(deserialized.market.development).toBeDefined();
+    expect(deserialized.market.cards).toBeDefined();
     expect(deserialized.turn).toBe(state.turn);
     expect(deserialized.seed).toBe(state.seed);
   });
@@ -176,8 +176,8 @@ describe('New-format save deserialization (AC2)', () => {
     const deserialized = deserializeMainStreetState(serialized);
 
     // Verify key properties are preserved
-    expect(deserialized.market.development.map(c => c.id)).toEqual(
-      state1.market.development.map(c => c.id),
+    expect(deserialized.market.cards.map(c => c.id)).toEqual(
+      state1.market.cards.map(c => c.id),
     );
 
     expect(deserialized.resourceBank.coins).toBe(state1.resourceBank.coins);
@@ -262,8 +262,8 @@ describe('Migration integration (AC4)', () => {
     // The migrated state should have valid game structure
     expect(migratedState).toHaveProperty('config');
     expect(migratedState).toHaveProperty('market');
-    expect(migratedState.market.development).toBeDefined();
-    expect(migratedState.market.investments).toBeDefined();
+    expect(migratedState.market.cards).toBeDefined();
+    expect(migratedState.market.cards).toBeDefined();
     expect(migratedState).toHaveProperty('resourceBank');
     expect(migratedState).toHaveProperty('decks');
     expect(migratedState).toHaveProperty('discards');
@@ -278,8 +278,8 @@ describe('Migration integration (AC4)', () => {
     // Simulate old format by changing market and Park family
     const oldFormat = JSON.parse(JSON.stringify(serialized)) as Record<string, unknown>;
     const oldMarket = oldFormat.market as Record<string, unknown>;
-    oldMarket.business = oldMarket.development;
-    delete oldMarket.development;
+    oldMarket.business = oldMarket.cards;
+    delete oldMarket.cards;
 
     const grid = oldFormat.streetGrid as Record<string, unknown>[];
     for (const slot of grid) {
@@ -291,7 +291,7 @@ describe('Migration integration (AC4)', () => {
     const migratedState = deserializeMainStreetState(oldFormat as unknown as MainStreetSerializedState);
 
     // Should produce a valid state
-    expect(migratedState.market.development.length).toBeGreaterThan(0);
+    expect(migratedState.market.cards.length).toBeGreaterThan(0);
   });
 
   it('should preserve financial state after migration', () => {

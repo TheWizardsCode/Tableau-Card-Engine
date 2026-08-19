@@ -13,15 +13,17 @@
  * highlight zones must match these targets, otherwise the highlights land on
  * empty space instead of on their target element.
  *
- * Unified step mapping for the alignment checks (16 steps):
+ * Unified step mapping for the alignment checks (17 steps):
  *   T2 (developmentRow, index 1)  T3 (laundromatCard, index 2)
  *   T4 (hand, index 3)  T5 (streetGrid, index 4)
  *   T6 (incidentQueue, index 5)  T7 (endTurnButton, index 6)
- *   T8 (investmentsRow, index 7)  T9 (festivalCard, index 8)
+ *   T8 (investmentsRow, index 7)  T9 (festivalCard, index 8)  ← T8's
+ *     investmentsRow highlight now aliases the SINGLE market row
+ *     (CG-0MSTOATDT009BRX2 — the two market rows were merged)
  *   T10 (developmentRow, index 9)  T11 (endTurnButton, index 10)
- *   T12 (developmentRow, index 11)  T13 (hand, index 12)
- *   T14 (hud, index 13)  T15 (challengePanel, index 14)
- *   T16 (completionModal, index 15)
+ *   T12 (developmentRow, index 11)  T13 (developmentRow, index 12)
+ *   T14 (hand, index 13)  T15 (hud, index 14)
+ *   T16 (challengePanel, index 15)  T17 (completionModal, index 16)
  *
  * Screenshots are still captured for visual regression review (red reference
  * rects are drawn at depth 250 as diagnostics), but geometry is now asserted.
@@ -36,7 +38,7 @@ import {
   type TutorialHighlightZone,
 } from '../../example-games/main-street/TutorialFlow';
 import { STANDARD_TUTORIAL_SCENARIO } from '../../example-games/main-street/TutorialScenario';
-import { MARKET_BUSINESS_SLOTS } from '../../example-games/main-street/MainStreetCards';
+import { MARKET_TOTAL_SLOTS } from '../../example-games/main-street/MainStreetCards';
 import {
   CHALLENGE_LINE_H,
   CHALLENGE_PAD,
@@ -106,8 +108,8 @@ function computeDevStartX(layout: Record<string, number>): number {
   const boxRight = (layout.logX ?? 0) - 20;
   const boxCenter = (boxLeft + boxRight) / 2;
   const devTotalCardsW =
-    MARKET_BUSINESS_SLOTS * layout.marketCardW +
-    (MARKET_BUSINESS_SLOTS - 1) * layout.marketCardGap;
+    MARKET_TOTAL_SLOTS * layout.marketCardW +
+    (MARKET_TOTAL_SLOTS - 1) * layout.marketCardGap;
   return Math.round(boxCenter - devTotalCardsW / 2);
 }
 
@@ -136,13 +138,9 @@ function computeTargetRect(
       return { x: 20, y: layout.marketTop + 6, w: layout.logX - 40, h: layout.marketRowH };
     }
     case 'investmentsRow': {
-      // Investments row: same strip, top at marketTop + 6 + rowH + gap
-      return {
-        x: 20,
-        y: layout.marketTop + 6 + layout.marketRowH + layout.marketRowGap,
-        w: layout.logX - 40,
-        h: layout.marketRowH,
-      };
+      // Single-row market (CG-0MSTOATDT009BRX2): upgrade/event steps alias
+      // the developmentRow zone — both highlight the one market row strip.
+      return { x: 20, y: layout.marketTop + 6, w: layout.logX - 40, h: layout.marketRowH };
     }
     case 'streetGrid': {
       // Street slots: 5×140 + 4×20 wide, 2 rows of 80 + 12 gap
@@ -173,7 +171,7 @@ function computeTargetRect(
     case 'incidentQueue': {
       // Incident queue panel — mirror refreshIncidentQueue() panel math with
       // the LIVE queue/effects (boot: 2 cards, 0 effects → 194px).
-      const queue = s?.state?.incidentQueue ?? [];
+      const queue = s?.state?.incidentDeck ?? [];
       const effects = s?.state?.activeEffects ?? [];
       const titleH = 22;
       const pad = 8;
@@ -204,21 +202,16 @@ function computeTargetRect(
     }
     case 'laundromatCard':
     case 'festivalCard': {
-      // Card-level zones: deterministic scenario slots (dev slot 1 /
-      // investments slot 2), same math as resolveMarketCardAnchor().
+      // Card-level zones: deterministic single-row scenario slots, same math
+      // as resolveMarketCardAnchor() — every card sits on the one market row.
       const templateId = CARD_LEVEL_TEMPLATES[zone];
       if (!templateId) return null;
-      const devIdx = STANDARD_TUTORIAL_SCENARIO.market.development.indexOf(templateId);
-      const invIdx = STANDARD_TUTORIAL_SCENARIO.market.investments.indexOf(templateId);
-      const rowIndex = devIdx >= 0 ? devIdx : invIdx;
+      const rowIndex = STANDARD_TUTORIAL_SCENARIO.market.cards.indexOf(templateId);
       if (rowIndex < 0) return null;
       const devStartX = computeDevStartX(layout);
       return {
         x: devStartX + rowIndex * (layout.marketCardW + layout.marketCardGap),
-        y:
-          devIdx >= 0
-            ? layout.marketTop + 6
-            : layout.marketTop + 6 + layout.marketRowH + layout.marketRowGap,
+        y: layout.marketTop + 6,
         w: layout.marketCardW,
         h: layout.marketCardH,
       };
@@ -376,7 +369,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
     destroyGame();
   });
 
-  /** All 16 steps with their highlight zones (null zones have no rect). */
+  /** All 17 steps with their highlight zones (null zones have no rect). */
   const alignmentSteps = UNIFIED_TUTORIAL_STEPS
     .map((step, index) => ({ id: step.id, stepIndex: index, zone: step.highlightZone }))
     .filter((s) => !NULL_ZONES.has(s.zone));
@@ -417,7 +410,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
     60_000,
   );
 
-  it('completionModal (T16) draws no highlight', async () => {
+  it('completionModal (T17) draws no highlight', async () => {
     const mgr = scene.tutorialOverlay as {
       showStep?: (index: number) => void;
       dismiss?: () => void;
@@ -427,7 +420,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
       if (typeof mgr.dismiss === 'function') {
         mgr.dismiss();
       }
-      mgr.showStep(15); // T16 = completionModal (confirm gate)
+      mgr.showStep(16); // T17 = completionModal (confirm gate)
       await new Promise((r) => setTimeout(r, 50));
 
       const highlights = scene.children.list.filter(

@@ -47,6 +47,10 @@ export const HUD_TOOLTIP_I18N_KEYS = {
   scoreThresholdMet: 'hud.tooltip.score.thresholdMet',
   scoreNextTierLabel: 'hud.tooltip.score.nextTier',
   scoreAllTiersUnlocked: 'hud.tooltip.score.allTiersUnlocked',
+  actionTitle: 'hud.tooltip.action.title',
+  actionRemainingLabel: 'hud.tooltip.action.remaining',
+  actionConsumesLabel: 'hud.tooltip.action.consumes',
+  actionFreeOpsLabel: 'hud.tooltip.action.freeOps',
 } as const;
 
 /** ARIA label i18n keys (for screen-reader accessibility). */
@@ -54,6 +58,7 @@ export const HUD_ARIA_I18N_KEYS = {
   coins: 'hud.aria.coins',
   rep: 'hud.aria.rep',
   score: 'hud.aria.score',
+  action: 'hud.aria.action',
 } as const;
 
 // ── ARIA label lookup via i18n ──────────────────────────────
@@ -63,6 +68,7 @@ export const HUD_ARIA_LABELS = {
   get coins() { return t(HUD_ARIA_I18N_KEYS.coins); },
   get rep() { return t(HUD_ARIA_I18N_KEYS.rep); },
   get score() { return t(HUD_ARIA_I18N_KEYS.score); },
+  get action() { return t(HUD_ARIA_I18N_KEYS.action); },
 };
 
 // ── Default English strings (registered as the 'en' locale bundle) ────
@@ -87,6 +93,10 @@ export const HUD_TOOLTIP_STRINGS = {
   scoreThresholdMet: 'Win threshold met!',
   scoreNextTierLabel: 'Next tier',
   scoreAllTiersUnlocked: 'All tiers unlocked',
+  actionTitle: 'Actions This Day',
+  actionRemainingLabel: 'Actions remaining',
+  actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff',
+  actionFreeOpsLabel: 'Free: re-roll market, sell, discard, end turn',
 } as const;
 
 /** ARIA label default English strings. Registered as the `en` locale bundle. */
@@ -94,6 +104,7 @@ export const HUD_ARIA_STRINGS = {
   coins: 'Coins status — hover for expected income breakdown',
   rep: 'Reputation status — hover for multiplier details',
   score: 'Score status — hover for next tier threshold',
+  action: 'Actions remaining this day — buying/placing/hiring spends one',
 } as const;
 
 // ── Register the English locale bundle ────────────────────────────────
@@ -265,6 +276,23 @@ export function buildScoreTooltip(
     );
   }
 
+  return lines.join('\n');
+}
+
+/**
+ * Builds the tooltip content string for the Actions HUD element.
+ *
+ * Explains the daily action budget: what spends an action and what is free.
+ */
+export function buildActionTooltip(state: MainStreetState): string {
+  const remaining = state.actionsRemaining;
+  const lines = [
+    t(HUD_TOOLTIP_I18N_KEYS.actionTitle),
+    `${t(HUD_TOOLTIP_I18N_KEYS.actionRemainingLabel)}: ${remaining}`,
+    '',
+    t(HUD_TOOLTIP_I18N_KEYS.actionConsumesLabel),
+    t(HUD_TOOLTIP_I18N_KEYS.actionFreeOpsLabel),
+  ];
   return lines.join('\n');
 }
 

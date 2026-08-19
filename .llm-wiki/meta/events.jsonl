@@ -20,3 +20,4 @@
 {"slug":"container-drag-click-coexistence-phaser","title":"Phaser Container drag + click coexistence pattern","category":"frontend","timestamp":"2026-08-09T00:20:56.533Z","kind":"retro"}
 {"slug":"obs-2026-08-09-drag-drop-transfer-starts-from-drop-location-f5ac812d","title":"Drag-drop transfer starts from drop location (f5ac812d)","relevance":"high","timestamp":"2026-08-09T00:56:07.099Z","kind":"observe"}
 {"timestamp":"2026-08-09T16:17:41.025Z","kind":"decision"}
+{"timestamp":"2026-08-15T17:53:51.035Z","kind":"digest"}

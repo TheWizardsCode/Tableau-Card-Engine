@@ -296,14 +296,14 @@ describe('Market state preservation on save/load', () => {
     const serialized = serializeMainStreetState(state);
 
     // Record development row card IDs before reload
-    const devIds = serialized.market.development.map(c => c.id);
+    const devIds = serialized.market.cards.map(c => c.id);
     expect(devIds.length).toBeGreaterThan(0);
 
     // Load the saved state
     const deserialized = deserializeMainStreetState(serialized);
 
     // Verify development row cards are unchanged
-    const reloadedDevIds = deserialized.market.development.map(c => c.id);
+    const reloadedDevIds = deserialized.market.cards.map(c => c.id);
     expect(reloadedDevIds).toEqual(devIds);
   });
 
@@ -312,14 +312,14 @@ describe('Market state preservation on save/load', () => {
     const serialized = serializeMainStreetState(state);
 
     // Record investments row card IDs before reload
-    const invIds = serialized.market.investments.map(c => c.id);
+    const invIds = serialized.market.cards.map(c => c.id);
     expect(invIds.length).toBeGreaterThan(0);
 
     // Load the saved state
     const deserialized = deserializeMainStreetState(serialized);
 
     // Verify investments row cards are unchanged
-    const reloadedInvIds = deserialized.market.investments.map(c => c.id);
+    const reloadedInvIds = deserialized.market.cards.map(c => c.id);
     expect(reloadedInvIds).toEqual(invIds);
   });
 
@@ -335,15 +335,15 @@ describe('Market state preservation on save/load', () => {
     executeDayStart(deserialized);
 
     // Verify market cards exist (refilled from deck)
-    const newDevIds = deserialized.market.development.map(c => c.id);
+    const newDevIds = deserialized.market.cards.map(c => c.id);
     expect(newDevIds.length).toBeGreaterThan(0);
   });
 
   it('save → load → executeDayStart with skipMarketRefill preserves market cards', () => {
     const state = setupMainStreetGame({ seed: 'market-preserve' });
     const serialized = serializeMainStreetState(state);
-    const savedDevIds = serialized.market.development.map(c => c.id);
-    const savedInvIds = serialized.market.investments.map(c => c.id);
+    const savedDevIds = serialized.market.cards.map(c => c.id);
+    const savedInvIds = serialized.market.cards.map(c => c.id);
 
     // Load the saved state
     const deserialized = deserializeMainStreetState(serialized);
@@ -353,8 +353,8 @@ describe('Market state preservation on save/load', () => {
     executeDayStart(deserialized, true);
 
     // Verify market cards are preserved
-    const newDevIds = deserialized.market.development.map(c => c.id);
-    const newInvIds = deserialized.market.investments.map(c => c.id);
+    const newDevIds = deserialized.market.cards.map(c => c.id);
+    const newInvIds = deserialized.market.cards.map(c => c.id);
     expect(newDevIds).toEqual(savedDevIds);
     expect(newInvIds).toEqual(savedInvIds);
   });
@@ -367,10 +367,10 @@ describe('Market state preservation on save/load', () => {
     const reSerialized = serializeMainStreetState(deserialized);
 
     // Both development and investments row should match original
-    expect(reSerialized.market.development.map(c => c.id))
-      .toEqual(original.market.development.map(c => c.id));
-    expect(reSerialized.market.investments.map(c => c.id))
-      .toEqual(original.market.investments.map(c => c.id));
+    expect(reSerialized.market.cards.map(c => c.id))
+      .toEqual(original.market.cards.map(c => c.id));
+    expect(reSerialized.market.cards.map(c => c.id))
+      .toEqual(original.market.cards.map(c => c.id));
   });
 });
 

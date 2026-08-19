@@ -792,9 +792,9 @@ The following items are explicitly excluded from this spec:
 
 | Snapshot | Business | Event | Upgrade | Total templates |
 |---|---:|---:|---:|---:|
-| Tier 1 baseline | 7 | 6 | 5 | 18 |
-| Current catalog | 17 | 17 | 25 | 59 |
-| Net increase | +10 | +11 | +20 | +41 |
+| Tier 1 baseline | 6 | 6 | 8 | 20 |
+| Current catalog | 30 | 56 | 39 | 125 |
+| Net increase | +24 | +49 | +31 | +104 |
 
 Verification artifacts:
 - `docs/main-street/card-catalog-baseline.json`
@@ -1090,7 +1090,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 1. Easy mode gives more starting resources (coins and reputation) and more turns than Medium.
 2. Hard mode gives fewer starting resources, fewer turns, and a higher win threshold than Medium.
-3. Easy mode applies a higher synergy multiplier per neighbor (1.5x vs 1.0x) and higher challenge bonus points (15 vs 10).
+3. Easy mode applies a higher synergy multiplier per neighbor (0.5x vs 0.35x, re-tuned by CG-0MSP26Q5N002EH8P) and higher challenge bonus points (15 vs 10).
 4. Hard mode assigns more challenges per run (4 vs 3) to increase the difficulty of the `all_challenges` win condition.
 5. The game engine reads all configured values from `state.config` rather than hardcoded constants.
 
@@ -1154,7 +1154,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 Economy balance is verified via a two-tier Monte Carlo approach:
 
-- **CI guardrail** (`tests/main-street/monte-carlo-balance.test.ts`): A Vitest test that runs a configurable number of deterministic seeds with the `market-greedy` strategy over 25 turns. Seed count and win-rate thresholds are controlled via environment variables (`MONTE_SEEDS`, `MONTE_MIN_WIN_RATE`, `MONTE_MAX_WIN_RATE`). PR CI uses 20 seeds with wide bounds (0.20–0.80) for fast feedback; main branch CI uses 200 seeds with strict bounds (0.30–0.60). Detailed pacing metrics (median score, grid fill, loss-reason dominance) are only asserted for runs of 50+ seeds. It runs on every `npm test` invocation.
+- **CI guardrail** (`tests/main-street/monte-carlo-balance.test.ts`): A Vitest test that runs a configurable number of deterministic seeds with the `market-greedy` strategy over 60 turns. Seed count and win-rate thresholds are controlled via environment variables (`MONTE_SEEDS`, `MONTE_MIN_WIN_RATE`, `MONTE_MAX_WIN_RATE`). PR CI uses 20 seeds with wide bounds (0.20–0.80) for fast feedback (the wide band is the regression guardrail; the tuned per-difficulty bands are enforced by `tests/main-street/monte-carlo-greedy-guardrail.test.ts`). Detailed pacing metrics (grid fill, loss-reason dominance, no-action turns) are only asserted for runs of 50+ seeds. It runs on every `npm test` invocation.
 - **Balance harness** (`npm run monte-carlo`): A standalone script that runs 200 seeds by default (configurable via `--seeds`/`MONTE_SEEDS`) and writes detailed JSON and CSV output to `results/`. This is used for manual analysis and tuning, not enforced in CI.
 
 **Acceptance Criteria:**

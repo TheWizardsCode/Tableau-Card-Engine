@@ -70,7 +70,7 @@ function runGreedyGame(seed: string, maxTurns = 30): {
       actions.push({ type: 'play-event' });
     }
 
-    for (const card of state.market.investments) {
+    for (const card of state.market.cards) {
       if (card.family !== 'event') continue;
       const result = canPurchaseEvent(state, card.id);
       if (result.legal) {
