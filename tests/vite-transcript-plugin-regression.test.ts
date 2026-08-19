@@ -126,10 +126,11 @@ describe('regression guard: dev-server watcher never tracks transcript output', 
       },
     });
     await server.listen();
-    // Vite 6 may not populate httpServer immediately after listen(). Use
-    // resolvedUrls as the primary source; fall back to httpServer.address().
+    // Vite 6 may not populate httpServer immediately after listen(). Prefer
+    // resolvedUrls (which always works) but strip any trailing slash so path
+    // concatenation below does not produce a double-slash request URL.
     if (server.resolvedUrls?.local?.[0]) {
-      url = server.resolvedUrls.local[0];
+      url = server.resolvedUrls.local[0].replace(/\/$/, '');
     } else {
       const addr = server.httpServer?.address();
       const port = typeof addr === 'object' && addr ? addr.port : 0;
