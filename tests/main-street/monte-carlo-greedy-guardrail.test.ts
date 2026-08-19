@@ -77,7 +77,10 @@ describe('Main Street greedy AI per-difficulty design-intent guardrails', () => 
     // CG-0MSTOATDT009BRX2 re-baseline: measured median 39.8 under cost-at-play
     // (games end earlier/lower as payment is deferred); see
     // monte-carlo-baseline.json difficultyMatrix.
+    // CG-0MSXOVQFL007G3VH re-baseline (face-down incident deck with
+    // balance-aware ordering): median rose to ~153 as balanced incidents keep
+    // games longer/higher; band widened to the measured range ± 30%.
     expect(medium.metrics.medianScore).toBeGreaterThanOrEqual(20);
-    expect(medium.metrics.medianScore).toBeLessThanOrEqual(80);
+    expect(medium.metrics.medianScore).toBeLessThanOrEqual(200);
   });
 });

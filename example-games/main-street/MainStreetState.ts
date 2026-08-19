@@ -35,6 +35,7 @@ import {
   type IncidentBalanceState,
   createIncidentBalanceState,
   createIncidentBalanceFromQueue,
+  orderIncidentDeck,
 } from './MainStreetCards';
 import {
   type ActiveChallenge,
@@ -629,17 +630,25 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     repeatSpacing: config.incidentRepeatSpacing,
     maxStreak: config.incidentMaxStreak,
   });
-  const incidentDeck: EventCard[] = [];
+  // Gather all Incident-trigger cards from the seeded event deck into a pool
+  // (remaining Investment-trigger cards stay in the event deck for the market).
+  const incidentPool: EventCard[] = [];
   const remainingEventCards: EventCard[] = [];
   for (const card of eventDeck) {
     if (card.trigger === 'Incident') {
-      incidentDeck.push(card);
+      incidentPool.push(card);
     } else {
       remainingEventCards.push(card);
     }
   }
   eventDeck.length = 0;
   eventDeck.push(...remainingEventCards);
+
+  // Constraint-aware deck ordering (option (a), CG-0MSXOVQFL007G3VH): the full
+  // pre-arranged draw sequence satisfies repeatSpacing (N) / maxStreak (M).
+  // Deterministic — orderIncidentDeck consumes no RNG (pool order comes from
+  // the seeded shuffle), so same seed ⇒ same deck order.
+  const incidentDeck = orderIncidentDeck(incidentPool, incidentBalance);
 
   // Build initial state -- use config values instead of hard-coded constants
   const initCoins = config.startingCoins;

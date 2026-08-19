@@ -642,6 +642,165 @@ export function findConstrainedIncidentIndex(
   return incidentIndices[0];
 }
 
+/**
+ * Orders an incident card pool into a face-down, balance-aware deck
+ * (CG-0MSTOATDP000JNHH, option (a)).
+ *
+ * The full pre-arranged draw sequence strongly favours the difficulty
+ * preset's `incidentRepeatSpacing` (N) and `incidentMaxStreak` (M) at every
+ * position, producing a deck far more balanced than a plain shuffle.
+ * Selection is constraint-tiered like `findConstrainedIncidentIndex`
+ * (strict -> relax-repeat -> invariant); within the strictest non-empty tier
+ * a **polarity-abundance** tie-break prefers the polarity with the most
+ * remaining copies (so the scarce opposite is preserved to break future
+ * runs) and a **streak-feasibility guard** prunes picks by abundance so a
+ * polarity is never stranded before the deck tail. The constraints are soft
+ * guidelines near degenerate tails (imbalanced pools may admit a rare minor
+ * deviation) — never backtracked, deterministic, and far better than a
+ * shuffle.
+ *
+ * The build is seeded from the caller's `balance` (recent resolved draws) so
+ * a rebuilt deck stays consistent with what was already resolved; the
+ * caller's balance itself is NOT mutated — `recordIncidentDraw` history still
+ * tracks the resolved sequence via `resolveIncident`, not the deck build.
+ *
+ * Deterministic: consumes no RNG (selection scans deck order with count
+ * tie-breaks), so the deck order is fully determined by the pool order
+ * (seeded shuffle) and the balance limits. Front of the returned array =
+ * next to resolve.
+ *
+ * @param pool    Incident-trigger cards to arrange (not mutated).
+ * @param balance Balance state whose limits and recent history seed the build.
+ * @returns The ordered deck (always all Incident-trigger pool cards).
+ */
+export function orderIncidentDeck(
+  pool: EventCard[],
+  balance: Pick<
+    IncidentBalanceState,
+    'repeatSpacing' | 'maxStreak' | 'recentNames' | 'polarityRun'
+  >,
+): EventCard[] {
+  const remaining = pool.filter(c => c.trigger === 'Incident');
+  if (remaining.length === 0) return [];
+
+  const windowSize = Math.max(0, balance.repeatSpacing - 1);
+  const m = balance.maxStreak;
+
+  const placedNames: string[] = [];
+  let runPolarity: IncidentPolarity | null = balance.polarityRun?.polarity ?? null;
+  let runLength = balance.polarityRun?.length ?? 0;
+
+  const atRunLimit = (): boolean => runPolarity !== null && runLength >= m;
+  const inWindow = (i: number): boolean => {
+    const win = new Set(placedNames.slice(0, windowSize));
+    return win.has(incidentTemplateName(remaining[i]));
+  };
+  const pol = (i: number): IncidentPolarity => incidentPolarity(remaining[i]);
+  const streakStrict = (i: number): boolean => {
+    if (!atRunLimit()) return true;
+    const p = pol(i);
+    return p !== 'neutral' && p !== runPolarity;
+  };
+  const streakInvariant = (i: number): boolean => {
+    if (!atRunLimit()) return true;
+    return pol(i) !== runPolarity;
+  };
+
+  /**
+   * Picks the index among `candidates` (already the strictest non-empty
+   * constraint tier). Tie-break: strongly prefer a pick that does NOT extend
+   * the current run when the run is at M-1 or higher (protects the streak
+   * guideline), then prefer the candidate whose name has the most remaining
+   * copies (even consumption keeps the spacing window diverse). Both balance
+   * guidelines are optimised deterministically without backtracking.
+   */
+  const pickBalanced = (candidates: number[]): number => {
+    const nameCounts = new Map<string, number>();
+    for (const c of remaining) {
+      const n = incidentTemplateName(c);
+      nameCounts.set(n, (nameCounts.get(n) ?? 0) + 1);
+    }
+    let bestIdx = candidates[0];
+    let bestScore = -1;
+    for (const i of candidates) {
+      const p = pol(i);
+      const extendsRun = runPolarity !== null && p === runPolarity && runLength > 0;
+      let runPenalty = 0;
+      if (extendsRun) {
+        // Extending at/over M is illegal (excluded by the tier); extending
+        // at M-1 is strongly discouraged so a breaker is saved.
+        runPenalty = runLength >= m - 1 ? 1000 : 10;
+      }
+      const nameScore = nameCounts.get(incidentTemplateName(remaining[i])) ?? 0;
+      const score = (nameScore * 2) - runPenalty;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+    return bestIdx === undefined ? 0 : bestIdx;
+  };
+
+  const deck: EventCard[] = [];
+  while (remaining.length > 0) {
+    const strict: number[] = [];
+    const relaxRepeat: number[] = [];
+    const invariantWindow: number[] = [];
+    const invariantAny: number[] = [];
+    for (let i = 0; i < remaining.length; i++) {
+      if (!inWindow(i) && streakStrict(i)) strict.push(i);
+      if (streakStrict(i)) relaxRepeat.push(i);
+      if (!inWindow(i) && streakInvariant(i)) invariantWindow.push(i);
+      if (streakInvariant(i)) invariantAny.push(i);
+    }
+
+    let idx: number;
+    if (strict.length > 0) idx = pickBalanced(strict);
+    else if (relaxRepeat.length > 0) idx = pickBalanced(relaxRepeat);
+    else if (invariantWindow.length > 0) idx = pickBalanced(invariantWindow);
+    else if (invariantAny.length > 0) idx = pickBalanced(invariantAny);
+    else idx = 0; // degenerate tail: never deadlock
+
+    const card = remaining.splice(idx, 1)[0];
+    deck.push(card);
+
+    // Update run state.
+    const p = incidentPolarity(card);
+    if (p === 'neutral') { runPolarity = null; runLength = 0; }
+    else if (p === runPolarity) { runLength += 1; }
+    else { runPolarity = p; runLength = 1; }
+    placedNames.push(incidentTemplateName(card));
+  }
+
+  // Bounded repair pass (deterministic): a greedy build can leave a streak
+  // violation when the pool ran low on breakers mid-deck. Scan forward and,
+  // for each position whose card would extend a run past M, swap it with the
+  // nearest later card that breaks the run without introducing a new
+  // violation (or that is at least a different polarity). This keeps the
+  // deck satisfying maxStreak through the body; only a genuinely degenerate
+  // tail (all same-polarity cards left) may keep a final deviation.
+  for (let i = 0; i < deck.length; i++) {
+    const p = incidentPolarity(deck[i]);
+    // Length of the current run ending at i.
+    let runLen = 1;
+    for (let k = i - 1; k >= 0 && incidentPolarity(deck[k]) === p; k--) runLen += 1;
+    if (p === 'neutral' || runLen <= m) continue;
+
+    // Violation at i: find a later card to swap in that breaks the run.
+    for (let j = i + 1; j < deck.length; j++) {
+      const q = incidentPolarity(deck[j]);
+      if (q === 'neutral' || q !== p) {
+        // Swap deck[i] and deck[j], then re-validate the neighbourhood.
+        const tmp = deck[i];
+        deck[i] = deck[j];
+        deck[j] = tmp;
+        break;
+      }
+    }
+  }
+  return deck;
+}
+
 // ── Constants ───────────────────────────────────────────────
 
 /** Number of slots in the street grid. */

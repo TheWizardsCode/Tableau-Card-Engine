@@ -19,8 +19,8 @@ import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard 
 import {
   GRID_SIZE,
   REFRESH_MARKET_COST,
+  orderIncidentDeck,
 } from './MainStreetCards';
-import { shuffleArray } from '../../src/card-system';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import { refillSingleRowMarket } from './MainStreetState';
 import { resolveEvent } from './MainStreetEngine';
@@ -309,9 +309,13 @@ export function cycleMarketCards(state: MainStreetState): void {
 
 /**
  * Replenishes the face-down incident deck when it is exhausted: gathers
- * remaining Incident-trigger cards from the event deck and event discards,
- * shuffles them with the game's seeded RNG, and pushes them onto the deck
- * (existing reshuffle convention — CG-0MSTOATDP000JNHH).
+ * remaining Incident-trigger cards from the event deck and event discards
+ * and rebuilds the deck constraint-aware via `orderIncidentDeck` (seeded
+ * from the resolved-draw balance history, so the rebuilt deck stays
+ * consistent with what was already resolved) — CG-0MSTOATDP000JNHH,
+ * option (a). No RNG is consumed here: the pool order is deterministic
+ * (gather order from the seeded decks/discards) and the selector scans
+ * deterministically.
  *
  * No visible refill loop: the deck is face-down and only its remaining
  * count is shown. Called by `resolveIncident` when `incidentDeck` is empty.
@@ -335,8 +339,7 @@ export function replenishIncidentDeck(state: MainStreetState): void {
   }
   if (pool.length === 0) return;
 
-  shuffleArray(pool, state.rng);
-  state.incidentDeck.push(...pool);
+  state.incidentDeck = orderIncidentDeck(pool, state.incidentBalance);
   addLog(state, 'Reshuffled incident deck from event cards', 'neutral');
 }
 
