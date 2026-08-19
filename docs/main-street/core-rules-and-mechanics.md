@@ -205,6 +205,32 @@ Default presets impose **no turn limit** (CG-0MSLXJCHH001DLIO): a player who kee
 
 ## 6. Core Actions
 
+### 6.0 Action Economy (daily action budget)
+
+Each day (MarketPhase) the player has **exactly one action** — two while a **General Manager** is employed (CG-0MSTOF1N5005PK2R). The budget resets at **DayStart**; spending it blocks further action-type operations until the next day. The remaining budget is shown in the HUD action counter.
+
+**Action-type operations (spend the daily action):**
+
+| Operation | Cost | Notes |
+|-----------|------|-------|
+| Move a market card to hand | 1 action | Free of coins; pays the listed cost when placed. |
+| Play a card from hand to the street | 1 action | Pays the card's listed cost at placement. |
+| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`). Triggered by dragging a market card straight onto a street slot. |
+| Hire a staff card | 1 action | From the staff market. |
+
+**Free operations (never consume an action):**
+
+- Market re-roll/refresh
+- Selling a business
+- Hint (still 1/day)
+- Discarding from hand
+- Buying/playing upgrade cards and Investment events
+- Ending the turn
+
+> Same-day composite: clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase** — the placement itself is free. A card left in hand and placed on a **later** day costs that day's action.
+
+---
+
 | Action | Description | Preconditions | Result |
 |--------|-------------|---------------|--------|
 | **Buy Business** | Spend coins to acquire a Business card from the market and place it on an empty slot. | Market contains Business card; `resourceBank.coins >= cost`; at least one empty slot. | Business placed; coins deducted; slot becomes occupied. |

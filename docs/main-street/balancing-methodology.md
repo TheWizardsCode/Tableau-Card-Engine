@@ -102,6 +102,7 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 - **Inputs**: ongoingCost, handSlotsAdded
 - **Ongoing cost adjusted proportionally**: Higher purchase cost → proportionally higher ongoing cost
 - **`refreshCostDiscount`** (staff ability, e.g. Accountant): recognized and validated as a numeric CSV column (CG-0MSREC65T004J5SS), but **excluded from the cost curve** — like `reputationPerTurn` for staff, it is an ability field tracked outside the curve model.
+- **`actionsPerTurn`** (staff ability, e.g. General Manager, CG-0MSTOF1N5005PK2R): a numeric CSV column on staff cards, **excluded from the cost curve** — the same treatment as `refreshCostDiscount` and `reputationPerTurn`. The action economy is a **game-design lever**, not part of the standard cost formula: the General Manager's +1 action/day is balanced by its high cost (20) and ongoing cost (5), and is never priced into `ongoingCost * 5 + handSlotsAdded * 5`.
 
 ## Rationale Codes
 

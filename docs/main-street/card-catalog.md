@@ -452,3 +452,4 @@ Staff cards are a separate card family (`family: 'staff'`) that expand hand capa
 | `staff-accountant` | Accountant | 8 | 1.5 | +1 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
 | `staff-director` | Director | 14 | 4 | +3 | — | An experienced director oversees your operations. | Premium capacity. |
 | `staff-executive` | Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
+| `staff-general-manager` | General Manager | 20 | 5 | +4 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
