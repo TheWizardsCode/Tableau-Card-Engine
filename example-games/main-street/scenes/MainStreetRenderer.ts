@@ -1546,6 +1546,7 @@ export class MainStreetRenderer {
       const cancelBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'Cancel', () => {
         s.pendingHandIndex = null;
         s.pendingHandJustMoved = false;
+        s.justMovedHandCardId = null;
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();

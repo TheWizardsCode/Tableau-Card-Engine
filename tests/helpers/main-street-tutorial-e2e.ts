@@ -465,13 +465,18 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
 
   // ── New flow (CG-0MSXIQIPJ000NDTL): hand cards are NOT auto-selected. ──
   // If a card is in hand but not yet selected (pendingHandIndex === null),
-  // the player must first click the hand card to select it.
+  // select the just-moved card (from justMovedHandCardId) — falling back to
+  // the last card, the most recently added. We derive pendingHandJustMoved
+  // from the justMovedHandCardId tracker so placing the just-moved card stays
+  // free. We do NOT route through onHandBusinessCardClick here because that
+  // triggers a full re-render which, combined with the street-grid refresh
+  // below, can invalidate the slot objects under the pointer before the
+  // dispatch (the tutorial flow is time-sensitive).
   if (s.pendingHandIndex === null && hand.length > 0) {
-    // Ensure we are in market phase so onHandBusinessCardClick processes the
-    // click (it returns early when uiPhase !== 'market').
-    if (s.uiPhase !== 'market') s.uiPhase = 'market';
-    s.onHandBusinessCardClick(0);
-    // After selecting the hand card, the scene is in placing-from-hand.
+    const justMovedIdx = hand.findIndex((c: any) => c.id === s.justMovedHandCardId);
+    s.pendingHandIndex = justMovedIdx >= 0 ? justMovedIdx : hand.length - 1;
+    s.pendingHandJustMoved = justMovedIdx >= 0;
+    s.uiPhase = 'placing-from-hand';
   }
 
   // If async buy-to-hand hasn't completed, execute it synchronously
@@ -508,9 +513,12 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
         const cardIdx = marketCards.findIndex((c: any) => c.id === cardToBuy.id);
         if (cardIdx >= 0) {
           // Move to hand (free, mirrors moveToHand()); placement pays the cost.
+          // Post-CG-0MSXIQIPJ000NDTL: record the just-moved card so a later
+          // selection (clickStreetSlot below) places it free, without
+          // auto-selecting it here.
           s.state.hand.push({ ...marketCards[cardIdx] });
           marketCards.splice(cardIdx, 1);
-          s.pendingHandIndex = s.state.hand.length - 1;
+          s.justMovedHandCardId = cardToBuy.id;
         }
       }
     }
@@ -616,8 +624,16 @@ export async function clickStreetSlotExpectRejected(
   slotIdx: number,
 ): Promise<void> {
   const s = scene as any;
+  // Post-CG-0MSXIQIPJ000NDTL: hand cards are not auto-selected after
+  // market-to-hand. If no card is pending, select the just-moved card
+  // (from justMovedHandCardId), falling back to the most recent hand card
+  // — NOT index 0, which may be an un-placeable held event card (e.g. the
+  // Local Festival held from T9 while the T13 Library is the just-moved one).
   if (s.pendingHandIndex === null && (s.state?.hand ?? []).length > 0) {
-    s.pendingHandIndex = 0;
+    const hand = s.state.hand;
+    const justMovedIdx = hand.findIndex((c: any) => c.id === s.justMovedHandCardId);
+    s.pendingHandIndex = justMovedIdx >= 0 ? justMovedIdx : hand.length - 1;
+    s.pendingHandJustMoved = justMovedIdx >= 0;
   }
   s.uiPhase =
     s.pendingHandIndex !== null ? 'placing-from-hand' : 'placing-business';
