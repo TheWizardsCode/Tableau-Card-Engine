@@ -113,14 +113,8 @@ export class MainStreetTurnController {
    *
    * @param skipMarketRefill  When true (e.g., checkpoint resume), the market
    *                          is not refilled and the saved market state is preserved.
-   * @param suppressDayBanner When true, the "Day N" banner animation (and its
-   *                          SFX) is suppressed. Used by boot-time calls that
-   *                          run before the player has chosen how to start the
-   *                          game (run tutorial / resume / new game) — the
-   *                          banner is presented via `playDeferredDayBanner()`
-   *                          once the game actually begins.
    */
-  public startDayPhase(skipMarketRefill: boolean = false, suppressDayBanner: boolean = false): void {
+  public startDayPhase(skipMarketRefill: boolean = false): void {
     const s = this.scene;
     // Execute DayStart (optionally refills market, transitions to MarketPhase)
     executeDayStart(s.state, skipMarketRefill);
@@ -147,12 +141,10 @@ export class MainStreetTurnController {
     // Day transition banner: non-interactive "Day N" reveal at the board
     // centre (skipped under reduced motion / replay — handled inside the
     // animator). Skipped while the tutorial is active (its step overlays
-    // carry the guidance), on checkpoint resume (skipMarketRefill — the
-    // same day continues, so it is not a new-day transition), and during
-    // boot-time starts (suppressDayBanner — the banner must wait until the
-    // player has chosen how to start the game).
+    // carry the guidance) and on checkpoint resume (skipMarketRefill — the
+    // same day continues, so it is not a new-day transition).
     const tutController = (s as any).tutorialController as { isActive?: boolean } | undefined;
-    if (!skipMarketRefill && !suppressDayBanner && !tutController?.isActive) {
+    if (!skipMarketRefill && !tutController?.isActive) {
       try { s.msAnimator.animateDayBanner({ day: s.state.turn }); } catch (_) { /* presentation-only — ignore */ }
     }
     void s.cardSvgLoadPromise
