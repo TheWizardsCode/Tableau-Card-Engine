@@ -213,12 +213,18 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
 
     scene.onBusinessCardClick(business);
 
+    // Post-CG-0MSXIQIPJ000NDTL: buying to hand no longer auto-selects;
+    // the player must click the hand card first.
     await waitForCondition(
-      () => scene.uiPhase === 'placing-from-hand',
-      'business bought to hand (placing-from-hand phase)',
+      () => scene.state.hand?.some((c: any) => c.id === business.id),
+      'business moved to hand (not auto-selected)',
     );
-    const handBusiness = (scene.state.hand ?? []).find((c: any) => c.id === business.id);
-    expect(handBusiness).toBeTruthy();
+    // Click the hand card to select it and enter placing-from-hand phase.
+    scene.onHandBusinessCardClick(0);
+    await waitForCondition(
+      () => scene.uiPhase === 'placing-from-hand' && scene.pendingHandIndex === 0,
+      'hand card selected (placing-from-hand phase)',
+    );
 
     // ── The regression guard: a REAL pointer click on the empty slot. ──
     // Dispatches native mousedown/mouseup through the canvas so Phaser's
@@ -267,12 +273,18 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
 
     scene.onBusinessCardClick(business);
 
+    // Post-CG-0MSXIQIPJ000NDTL: buying to hand no longer auto-selects;
+    // the player must click the hand card first.
     await waitForCondition(
-      () => scene.uiPhase === 'placing-from-hand',
-      'business bought to hand (placing-from-hand phase)',
+      () => scene.state.hand?.some((c: any) => c.id === business.id),
+      'business moved to hand (not auto-selected)',
     );
-    const handBusiness = (scene.state.hand ?? []).find((c: any) => c.id === business.id);
-    expect(handBusiness).toBeTruthy();
+    // Click the hand card to select it and enter placing-from-hand phase.
+    scene.onHandBusinessCardClick(0);
+    await waitForCondition(
+      () => scene.uiPhase === 'placing-from-hand' && scene.pendingHandIndex === 0,
+      'hand card selected (placing-from-hand phase)',
+    );
 
     await wait(120);
     const slotCenter = scene.getStreetSlotCenter(targetSlot);

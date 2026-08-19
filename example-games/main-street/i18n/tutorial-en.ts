@@ -147,7 +147,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T5', 'title')]:
     'Place a Business',
   [tutorialKey('T5', 'body')]:
-    'Click an empty slot to open the business and pay its cost. It starts earning income right away.',
+    'The card is in your hand. Click the card in your hand to select it, then click an empty slot on the street to place it and pay its cost. It starts earning income right away.',
 
   // ── T6: Upcoming Incidents ─────────────────────────────────
   [tutorialKey('T6', 'title')]:
@@ -182,8 +182,11 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // Buy-and-place premium (CG-0MSTOF1N5005PK2R): dragging straight to the
   // street costs +50% but skips the hand; clicking to take it first uses the
   // day's one action and pays the listed cost on placement.
+  // Post-CG-0MSXIQIPJ000NDTL: clicking the market card takes it to hand (no
+  // auto-select); player must then click the hand card to select it before
+  // placing on the street.
   [tutorialKey('T10', 'body')]:
-    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Click to take it now (your one action), then place it later; or **drag it straight to your street to buy-and-place** — faster, but it costs **50% more** than the listed price.',
+    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Click to take it to your hand (your one action), then click the card in your hand to select it and click an empty slot to place it; or **drag it straight to your street to buy-and-place** — faster, but it costs **50% more** than the listed price.',
 
   // ── T11: End this turn ────────────────────────────────────
   [tutorialKey('T11', 'title')]:
@@ -211,8 +214,11 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // to the Bookshop (a Culture business) earns the Culture adjacency bonus.
   // Adjacency is 8-way (Chebyshev): placing the Library diagonally next to the
   // Bookshop counts just as much as orthogonally.
+  // Post-CG-0MSXIQIPJ000NDTL: clicking the market card takes it to hand (no
+  // auto-select); player must then click the hand card to select it before
+  // placing next to the synergy partner.
   [tutorialKey('T13', 'body')]:
-    'The **{cardName}** brings a Culture bonus when placed next to other Culture cards. Buy it and place it next to **{synergyCardName}** — orthogonally or diagonally — to gain the bonus.',
+    'The **{cardName}** brings a Culture bonus when placed next to other Culture cards. Take it to your hand, then click the card in your hand to select it and place it next to **{synergyCardName}** — orthogonally or diagonally — to gain the bonus.',
 
   // ── T14: Triggering Events ─────────────────────────────────
   [tutorialKey('T14', 'title')]:

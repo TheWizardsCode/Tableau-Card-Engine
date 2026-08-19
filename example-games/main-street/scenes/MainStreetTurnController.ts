@@ -536,14 +536,12 @@ export class MainStreetTurnController {
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
         s.instructionText.setText(`"${cardName}" moved to hand (free)!`);
 
-        // Set pending hand index for placement (last card added to hand).
-        // Same-day move+place composite: the action was already spent on the
-        // move, so placing this card is free (it is part of the same purchase).
-        const hand = s.state.hand ?? [];
-        s.pendingHandIndex = hand.length - 1;
-        s.pendingHandJustMoved = true;
-        s.uiPhase = 'placing-from-hand';
-        s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+        // No auto-selection: the card rests in hand, unselected. The player
+        // must explicitly click the hand card when ready to place it.
+        s.pendingHandIndex = null;
+        s.pendingHandJustMoved = false;
+        s.uiPhase = 'market';
+        s.instructionText.setText(`"${cardName}" is in hand — click the card to select it, then an empty slot to place.`);
       } catch (e) {
         console.error('[MS] BuyBusinessToHand failed', e);
         s.instructionText.setText(`Error: ${(e as Error).message}`);

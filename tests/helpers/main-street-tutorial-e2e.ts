@@ -463,9 +463,15 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
   const s = scene as any;
   const hand = s.state?.hand ?? [];
 
-  // New flow: if cards exist in hand, use pendingHandIndex
+  // ── New flow (CG-0MSXIQIPJ000NDTL): hand cards are NOT auto-selected. ──
+  // If a card is in hand but not yet selected (pendingHandIndex === null),
+  // the player must first click the hand card to select it.
   if (s.pendingHandIndex === null && hand.length > 0) {
-    s.pendingHandIndex = 0;
+    // Ensure we are in market phase so onHandBusinessCardClick processes the
+    // click (it returns early when uiPhase !== 'market').
+    if (s.uiPhase !== 'market') s.uiPhase = 'market';
+    s.onHandBusinessCardClick(0);
+    // After selecting the hand card, the scene is in placing-from-hand.
   }
 
   // If async buy-to-hand hasn't completed, execute it synchronously
@@ -475,6 +481,8 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
       // Execute the pick-up synchronously so the card is in hand for placement.
       // Cost-at-play (CG-0MSTOATDT009BRX2): taking a card to hand is FREE; the
       // listed cost is paid by placeFromHand when the card is placed.
+      // Post-CG-0MSXIQIPJ000NDTL: after buying, the card is in hand but NOT
+      // auto-selected; we must also call onHandBusinessCardClick.
       const marketCards = s.state?.market?.cards;
       const devCards = (marketCards ?? []).filter(
         (c: any) => c.family === 'business' || c.family === 'community-space',
