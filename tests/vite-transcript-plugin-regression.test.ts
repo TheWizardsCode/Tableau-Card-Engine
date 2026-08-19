@@ -126,9 +126,15 @@ describe('regression guard: dev-server watcher never tracks transcript output', 
       },
     });
     await server.listen();
-    const address = server.httpServer?.address();
-    const port = typeof address === 'object' && address ? address.port : 0;
-    url = `http://127.0.0.1:${port}`;
+    // Vite 6 may not populate httpServer immediately after listen(). Use
+    // resolvedUrls as the primary source; fall back to httpServer.address().
+    if (server.resolvedUrls?.local?.[0]) {
+      url = server.resolvedUrls.local[0];
+    } else {
+      const addr = server.httpServer?.address();
+      const port = typeof addr === 'object' && addr ? addr.port : 0;
+      url = `http://127.0.0.1:${port}`;
+    }
   }, 120_000);
 
   afterAll(async () => {
