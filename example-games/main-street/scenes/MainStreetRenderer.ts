@@ -330,7 +330,7 @@ export class MainStreetRenderer {
     // Coins - left-aligned in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${Math.round(coins)}`, {
+    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${coins.toFixed(2)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
@@ -349,7 +349,7 @@ export class MainStreetRenderer {
     s.hudContainer.add(actionText);
 
     // Reputation - centered in strip
-    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation}`, {
+    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation.toFixed(2)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 0.5));
     s.hudContainer.add(repText);
