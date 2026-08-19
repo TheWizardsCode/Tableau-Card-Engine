@@ -53,7 +53,7 @@ Event cards are split into two trigger types:
 | Movie Premiere | Incident | +1 coin per Entertainment business and +1 reputation. *(Group D.)* |
 | Free Health Screening | Incident | +1 reputation. *(Group D.)* |
 | Farmers Market Day | Incident | +1 coin per Food business and +1 reputation. *(Group D.)* |
-| Library Story Hour | Incident | +1 reputation. *(Group D.)* |
+| Children's Story Hour | Incident | +1 reputation. *(Group D.)* |
 | Street Cleaning | Incident | No effect (streak breaker). *(Group D.)* |
 | Neighborhood Watch | Incident | -1 coin but +1 reputation (net-0, streak breaker). *(Group D.)* |
 | Tax Audit | Incident | Lose 3 coins. |
