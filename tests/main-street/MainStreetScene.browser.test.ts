@@ -351,15 +351,21 @@ describe('MainStreetScene browser tests', () => {
         { label: 'business transfer animation start' },
       );
 
-      // New flow: the business is bought to hand first (market → hand transfer),
-      // then placed on the grid (hand → street placement).
+      // New flow: the business is bought to hand first (market → hand transfer), then placed on the grid (hand → street placement). Post-CG-0MSXIQIPJ000NDTL: the card is NOT auto-selected; click the hand card to select it before placing.
       await waitForCondition(
-        () => scene.uiPhase === 'placing-from-hand',
+        () => (state.hand ?? []).some((c: any) => c.id === business.id),
         { timeoutMs: 6000, label: 'business bought to hand' },
       );
       const handBusiness = (state.hand ?? []).find((c: any) => c.id === business.id);
       expect(handBusiness).toBeTruthy();
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
+
+      // Select the hand card to enter placing-from-hand (no auto-selection).
+      scene.onHandBusinessCardClick(state.hand.findIndex((c: any) => c.id === business.id));
+      await waitForCondition(
+        () => scene.uiPhase === 'placing-from-hand',
+        { timeoutMs: 6000, label: 'hand card selected for placement' },
+      );
 
       // Now place the business on the target slot.
       scene.onSlotClick(targetSlot);
@@ -453,10 +459,12 @@ describe('MainStreetScene browser tests', () => {
 
       scene.onBusinessCardClick(biz1);
       await waitForCondition(
-        () => scene.uiPhase === 'placing-from-hand',
+        () => (state.hand ?? []).some((c: any) => c.id === biz1.id),
         { timeoutMs: 6000, label: 'first business bought to hand' },
       );
       expect(state.hand).toHaveLength(1);
+      // Post-CG-0MSXIQIPJ000NDTL: no auto-selection — the phase stays market.
+      expect(scene.uiPhase).toBe('market');
 
       // Second purchase (hand 1 → 2) — the transfer target must equal the
       // rendered resting position of the appended card.

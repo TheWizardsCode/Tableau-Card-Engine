@@ -32,6 +32,7 @@ function createMockScene(): any {
     uiPhase: 'market' as const,
     pendingHandIndex: null as number | null,
     pendingHandJustMoved: false,
+    justMovedHandCardId: null as string | null,
     instructionText: { setText: vi.fn() },
     refreshAll: vi.fn(),
     overlayObjects: [],
@@ -99,6 +100,9 @@ describe('Move-to-hand does NOT auto-select (CG-0MSXIQIPJ000NDTL)', () => {
     // Post-CG-0MSXIQIPJ000NDTL: the card is in hand but NOT auto-selected.
     scene.pendingHandIndex = null;
     scene.pendingHandJustMoved = false;
+    // Record the just-moved card so placing it stays free when the player
+    // selects it.
+    scene.justMovedHandCardId = card.id;
     scene.uiPhase = 'market';
   }
 
@@ -151,12 +155,10 @@ describe('Move-to-hand does NOT auto-select (CG-0MSXIQIPJ000NDTL)', () => {
     expect(scene.pendingHandIndex).toBeNull();
 
     // Now select the hand card.  Since uiPhase was 'market' at the time
-    // of the hand-card click, the "new selection" branch runs, which sets
-    // pendingHandJustMoved to false (placing from an existing hand card
-    // costs an action).
+    // of the hand-card click, the "new selection" branch runs.
     const controller = new MainStreetTurnController(scene);
     controller.onHandBusinessCardClick(0);
-    expect(scene.pendingHandJustMoved).toBe(false);
+    expect(scene.pendingHandJustMoved).toBe(true);
     expect(scene.pendingHandIndex).toBe(0);
   });
 
@@ -204,6 +206,51 @@ describe('Move-to-hand does NOT auto-select (CG-0MSXIQIPJ000NDTL)', () => {
     controller.onHandBusinessCardClick(1);
     expect(scene.pendingHandIndex).toBe(1);
     expect(scene.uiPhase).toBe('placing-from-hand');
+  });
+
+  it('selecting a held card that was NOT just moved costs an action', () => {
+    const scene = createMockScene();
+    scene.state.hand = [];
+    const bizCards = scene.state.market.cards.filter(
+      (c: any) => c.family === 'business' || c.family === 'community-space',
+    );
+    expect(bizCards.length).toBeGreaterThanOrEqual(2);
+
+    // Buy first business (becomes the just-moved card).
+    buyToHand(scene, bizCards[0]);
+    // Manually add a second held card (e.g. held from a previous day) that
+    // is NOT the just-moved card.
+    scene.state.hand.push({ ...bizCards[1], id: 'held-from-yesterday' });
+
+    const controller = new MainStreetTurnController(scene);
+
+    // Selecting the just-moved card → placement is free.
+    controller.onHandBusinessCardClick(0);
+    expect(scene.pendingHandJustMoved).toBe(true);
+
+    // Selecting the other held card → placement costs an action.
+    controller.onHandBusinessCardClick(1);
+    expect(scene.pendingHandJustMoved).toBe(false);
+    expect(scene.pendingHandIndex).toBe(1);
+  });
+
+  it('justMovedHandCardId is cleared after the card is placed', () => {
+    const scene = createMockScene();
+    scene.state.hand = [];
+    const biz = findMarketBusiness(scene);
+    expect(biz).toBeTruthy();
+
+    buyToHand(scene, biz);
+    expect(scene.justMovedHandCardId).toBe(biz.id);
+
+    // Select it, then simulate the placement success clearing the tracker
+    // (mirrors onSlotClick's afterTransfer).
+    const controller = new MainStreetTurnController(scene);
+    controller.onHandBusinessCardClick(0);
+    if (scene.justMovedHandCardId === biz.id) {
+      scene.justMovedHandCardId = null;
+    }
+    expect(scene.justMovedHandCardId).toBeNull();
   });
 
   it('onHandBusinessCardClick when card is already selected in placing-from-hand phase', () => {

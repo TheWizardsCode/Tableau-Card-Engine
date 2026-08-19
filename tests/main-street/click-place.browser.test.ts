@@ -202,8 +202,9 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
     // Plenty of coins so affordability is not a factor.
     scene.state.resourceBank.coins = 100;
 
-    // Buy a business to hand → enters the placing-from-hand phase, making the
-    // empty slot rectangles interactive (the state under test).
+    // Buy a business to hand → card rests in hand unselected (CG-0MSXIQIPJ000NDTL);
+    // selecting it enters placing-from-hand, making the empty slot rectangles
+    // interactive (the state under test).
     const targetSlot = getEmptySlots(scene.state)[0];
     expect(targetSlot).toBeGreaterThanOrEqual(0);
     const business = scene.state.market.cards.find((c: any) =>

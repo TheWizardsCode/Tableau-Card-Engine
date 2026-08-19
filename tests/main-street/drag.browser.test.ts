@@ -346,6 +346,15 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
       15_000,
     );
     expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeUndefined();
+    // Post-CG-0MSXIQIPJ000NDTL: the bought card is NOT auto-selected — the
+    // scene returns to the market phase and the player selects the hand card
+    // (onHandBusinessCardClick) before placing.
+    expect(scene.uiPhase).toBe('market');
+    expect(scene.pendingHandIndex).toBeNull();
+
+    // Selecting the hand card still enters the placing-from-hand phase.
+    scene.onHandBusinessCardClick(0);
     expect(scene.uiPhase).toBe('placing-from-hand');
+    expect(scene.pendingHandIndex).toBe(0);
   });
 });

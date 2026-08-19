@@ -68,6 +68,14 @@ export class MainStreetScene extends CardGameScene {
   // already in hand (placing then costs a second action).
   public pendingHandJustMoved: boolean = false;
 
+  // ID of the hand card most recently moved from the market this turn
+  // (CG-0MSXIQIPJ000NDTL). The card rests unselected in the hand; when the
+  // player clicks it, pendingHandJustMoved is derived from this ID so placing
+  // the just-moved card stays free (same-day move+place = 1 action) while any
+  // other held card still costs an action. Cleared on placement, cancel, new
+  // day, or undo.
+  public justMovedHandCardId: string | null = null;
+
   // Computed responsive layout metrics
   public layout!: SceneLayout;
 

@@ -125,6 +125,9 @@ export class MainStreetTurnController {
     // Execute DayStart (optionally refills market, transitions to MarketPhase)
     executeDayStart(s.state, skipMarketRefill);
     s.uiPhase = 'market';
+    // A new day means no card is "just moved" anymore — any hand card
+    // selected now costs an action to place (CG-0MSXIQIPJ000NDTL).
+    s.justMovedHandCardId = null;
 
     // Tutorial: the single-row market only holds 3 cards, so force the
     // upcoming steps' required purchase targets into the line (days 2+).
@@ -428,6 +431,9 @@ export class MainStreetTurnController {
       const cmd = s.undoManager.undo();
       addLog(s.state, 'Undo', 'neutral');
       try { if (cmd) recordMainStreetEvent({ type: 'undo', turn: s.state.turn, reversedAction: { description: cmd.description } }); } catch (_) {}
+      // Undoing a move-to-hand removes the card from hand, so any tracked
+      // "just moved" card is stale (CG-0MSXIQIPJ000NDTL).
+      s.justMovedHandCardId = null;
       s.refreshAll();
       // Undo feedback (AGENTS.md rule 8): "Undid: <action>" pop above the
       // hint bar + UI click SFX. Reduced motion / replay handled inside the
@@ -536,10 +542,13 @@ export class MainStreetTurnController {
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
         s.instructionText.setText(`"${cardName}" moved to hand (free)!`);
 
-        // No auto-selection: the card rests in hand, unselected. The player
-        // must explicitly click the hand card when ready to place it.
+        // No auto-selection (CG-0MSXIQIPJ000NDTL): the card rests in hand,
+        // unselected. The player must explicitly click the hand card when
+        // ready to place it. Record the card ID so that placing it stays
+        // free (same-day move+place = 1 action) when the player selects it.
         s.pendingHandIndex = null;
         s.pendingHandJustMoved = false;
+        s.justMovedHandCardId = card.id;
         s.uiPhase = 'market';
         s.instructionText.setText(`"${cardName}" is in hand — click the card to select it, then an empty slot to place.`);
       } catch (e) {
@@ -854,6 +863,13 @@ export class MainStreetTurnController {
             consumeAction(s.state);
           }
           placeFromHand(s.state, handIndex, slotIndex);
+          // The just-moved card has now been placed; clear the tracker so a
+          // later selection of any other hand card costs an action again.
+          // (Cleared only on success — on failure the card stays in hand and
+          // a retry must still place it free, CG-0MSXIQIPJ000NDTL.)
+          if (s.justMovedHandCardId === cardId) {
+            s.justMovedHandCardId = null;
+          }
           try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-business-from-hand', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
           try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
           s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
@@ -1280,7 +1296,10 @@ export class MainStreetTurnController {
     // (preserving existing customClickFn behavior)
     if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
       s.pendingHandIndex = index;
-      s.pendingHandJustMoved = false; // selecting an existing hand card: placing costs an action
+      // Placing is free only if the selected card is the one just moved from
+      // the market this turn (CG-0MSXIQIPJ000NDTL); any other hand card costs
+      // an action (pendingHandJustMoved derived from justMovedHandCardId).
+      s.pendingHandJustMoved = s.justMovedHandCardId === hand[index]?.id;
       const cardName = hand[index]?.name ?? 'card';
       s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
       s.refreshAll();
@@ -1298,7 +1317,10 @@ export class MainStreetTurnController {
     s.tooltipManager?.hide();
 
     s.pendingHandIndex = index;
-    s.pendingHandJustMoved = false; // card already in hand: placing consumes an action
+    // Placing is free only if the selected card is the one just moved from
+    // the market this turn (CG-0MSXIQIPJ000NDTL); any other hand card costs
+    // an action.
+    s.pendingHandJustMoved = s.justMovedHandCardId === hand[index]?.id;
     s.uiPhase = 'placing-from-hand';
     const cardName = hand[index]?.name ?? 'card';
     s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
