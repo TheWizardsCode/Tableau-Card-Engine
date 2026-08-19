@@ -195,6 +195,24 @@ describe('Tutorial text updates (17-step restructure)', () => {
       expect(t('tutorial.overlay.startFullGame')).toBe("Let's play!");
     });
   });
+
+  describe('Action economy + buy-and-place premium copy (CG-0MSTOF1N5005PK2R)', () => {
+    it('T3 teaches the one-action-per-day rule', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
+      expect(body.toLowerCase()).toMatch(/one action/i);
+    });
+
+    it('T3 explains same-turn placement is free', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
+      expect(body.toLowerCase()).toMatch(/placing.*free|free.*placing/i);
+    });
+
+    it('T10 teaches the buy-and-place +50% premium', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!).body;
+      expect(body.toLowerCase()).toMatch(/50% more|50% premium|50%*more/i);
+      expect(body.toLowerCase()).toMatch(/buy-and-place|buy and place/i);
+    });
+  });
 });
 
 describe('Data-driven tutorial text (card facts from card data)', () => {

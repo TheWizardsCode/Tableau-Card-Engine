@@ -131,9 +131,11 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // {cardName}/{cost} are resolved from card-data.csv at render time via
   // resolveTutorialStepText() — do NOT hardcode the card name or price here.
   // Cost-at-play (CG-0MSTOATDT009BRX2): picking the card up is free; the
-  // price is paid when the card is placed on the street.
+  // price is paid when the card is placed on the street. Action economy
+  // (CG-0MSTOF1N5005PK2R): taking this card uses your ONE daily action;
+  // placing it later the same turn is free (same move-and-place purchase).
   [tutorialKey('T3', 'body')]:
-    "Click the **{cardName}** card to buy it — it's free to take now, and you pay **{cost}** when you place it.",
+    "Click the **{cardName}** card to buy it — taking it uses today's **one action** (it's free to take now), and you pay **{cost}** when you place it. Placing it later this turn is free — you get one action a day.",
 
   // ── T4: Your Hand ──────────────────────────────────────────
   [tutorialKey('T4', 'title')]:
@@ -177,8 +179,11 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
     'Optimizing for Events',
   // {cardName}/{cost} resolved from card-data.csv (biz-bookshop) at render time.
   // Revised to clarify drag-and-drop as a one-step buy-and-place option (CG-0MSOKG7HE001NMMM).
+  // Buy-and-place premium (CG-0MSTOF1N5005PK2R): dragging straight to the
+  // street costs +50% but skips the hand; clicking to take it first uses the
+  // day's one action and pays the listed cost on placement.
   [tutorialKey('T10', 'body')]:
-    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Drag it to an empty spot on your street to buy and place it in one action — or click to take it now, then place it later.',
+    'The **{cardName}** is a Culture business. Culture businesses make your festival stronger. Click to take it now (your one action), then place it later; or **drag it straight to your street to buy-and-place** — faster, but it costs **50% more** than the listed price.',
 
   // ── T11: End this turn ────────────────────────────────────
   [tutorialKey('T11', 'title')]:
