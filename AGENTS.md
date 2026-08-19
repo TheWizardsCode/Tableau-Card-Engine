@@ -104,6 +104,8 @@ The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, whic
   - Browser: `npx vitest run --project browser tests/<game>/<name>.browser.test.ts`
 - **Before any push to origin** — always run the full `npm test` and `npm run build` (see the quality gates above).
 
+> **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only (TypeScript compile + Vite bundle). The full test suite is run **locally** before every push (per the quality gates above) and is intentionally NOT re-run in PR CI — the Phaser 4 browser suite has outgrown the single-Chromium-instance context budget in constrained CI environments. `deploy.yml` on `main` also builds only; `package.yml` smoke-tests the packaged Windows binary separately.
+
 #### Browser tests
 
 - Cover Phaser UI/rendering and interactions: `tests/**/*.browser.test.ts` (non-tutorial).

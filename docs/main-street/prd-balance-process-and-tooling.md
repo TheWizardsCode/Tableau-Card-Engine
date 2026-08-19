@@ -861,7 +861,7 @@ mc-balance-002,greedy,medium,loss,bankruptcy,67,0,7,4,7,0
 ### 7.3 CI Pipeline (GitHub Actions — `.github/workflows/`)
 
 **Current capabilities:**
-- `pr-checks.yml`: Runs test suite on PRs; includes Monte Carlo guardrail tests (`mont​e-carlo-guardrails.test.ts`)
+- `pr-checks.yml`: Build-only gate on PRs (TypeScript compile + Vite bundle). Tests are run locally before every push (see `AGENTS.md` quality gates; build-only CI per CG-0MT022826006EM0D).
 - `deploy.yml`: Builds and deploys on push to main
 
 **Integration:**
