@@ -357,11 +357,12 @@ Use `EconomyLedger` from `@rule-engine` for resource tracking with constraint en
 
 Main Street's business card placement uses a **two-step click pattern** (CG-0MSXIQIPJ000NDTL):
 
-1. **Market → Hand (free):** Click a business card in the market row. The card moves to hand but is **NOT auto-selected** — `pendingHandIndex` stays `null`, `uiPhase` reverts to `'market'`.
-2. **Select hand card (consumes action):** Click the card in the hand. This sets `pendingHandIndex` and switches to `'placing-from-hand'`.
+1. **Market → Hand (free):** Click a business card in the market row. The card moves to hand but is **NOT auto-selected** — `pendingHandIndex` stays `null`, `uiPhase` reverts to `'market'`. The scene records the just-moved card id (
+`justMovedHandCardId`).
+2. **Select hand card:** Click the card in the hand. This sets `pendingHandIndex` and switches to `'placing-from-hand'`. If the selected card is the one just moved (same-day composite), placing it stays free; any other held card costs that day's action.
 3. **Place on street:** Click an empty slot. The card is placed, coins are deducted, `pendingHandIndex` resets to `null`, and `uiPhase` returns to `'market'`.
 
-**Key state fields:** `pendingHandIndex` (index into `state.hand`), `pendingHandJustMoved` (true for same-day move+place, false for click-then-place), `uiPhase` (`'market'` | `'placing-from-hand'` | `'animating'`).
+**Key state fields:** `pendingHandIndex` (index into `state.hand`), `pendingHandJustMoved` (true for same-day move+place, false for click-then-place), `justMovedHandCardId` (id of the card just moved to hand this turn, used to derive `pendingHandJustMoved` when the player later selects it), `uiPhase` (`'market'` | `'placing-from-hand'` | `'animating'`).
 
 **Tutorial gating:** During tutorial steps (T5 `place-business`, T10/T13 `buy-and-place`), both `select-hand-card` and `place-business` actions are allowed via `isRequiredAction`. The step completes only on the terminal `place-business` action.
 
