@@ -92,6 +92,7 @@ export type TutorialActionType =
   | 'confirm'            // Click continue/confirm
   | 'acknowledge'        // Click a highlighted area
   | 'select-business'    // Select a business card from market
+  | 'select-hand-card'   // Click a card in the hand to select it for placement
   | 'place-business'     // Place a business on the street grid
   | 'end-turn'           // Click End Turn
   | 'acknowledge-queue'  // Click incident queue
@@ -442,8 +443,17 @@ export function isRequiredAction(
   // drop (place-business) are required/allowable while the step is active;
   // the step completes only on the terminal drop action (see
   // MainStreetLifecycleManager.onTutorialActionComplete).
+  // Selecting a hand card (select-hand-card) is also allowed during placement
+  // steps so the player can pick which card to place (CG-0MSXIQIPJ000NDTL).
   if (step.requiredAction === 'buy-and-place') {
-    return actionType === 'select-business' || actionType === 'place-business';
+    return actionType === 'select-business'
+      || actionType === 'place-business'
+      || actionType === 'select-hand-card';
+  }
+  // During a place-business step the player must click the hand card first
+  // (select-hand-card), then click an empty slot (place-business).
+  if (step.requiredAction === 'place-business') {
+    return actionType === 'place-business' || actionType === 'select-hand-card';
   }
   return step.requiredAction === actionType;
 }

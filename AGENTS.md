@@ -355,6 +355,21 @@ Use `EconomyLedger` from `@rule-engine` for resource tracking with constraint en
 - **Key APIs:** `createEconomyLedger()`, `EconomyLedger`, `ResourceDelta`, leglity result helpers
 - **When to use:** Any game with resources (currency, health, points) that need constraint validation. The scene demonstrates illegality for multiple reasons: not your turn, insufficient funds, out of bounds, wrong phase. Use `EconomyLedger` to add/subtract resources with automatic constraint enforcement.
 
+### 10b. Main Street Business Card Click-to-Place Flow
+
+Main Street's business card placement uses a **two-step click pattern** (CG-0MSXIQIPJ000NDTL):
+
+1. **Market → Hand (free):** Click a business card in the market row. The card moves to hand but is **NOT auto-selected** — `pendingHandIndex` stays `null`, `uiPhase` reverts to `'market'`.
+2. **Select hand card (consumes action):** Click the card in the hand. This sets `pendingHandIndex` and switches to `'placing-from-hand'`.
+3. **Place on street:** Click an empty slot. The card is placed, coins are deducted, `pendingHandIndex` resets to `null`, and `uiPhase` returns to `'market'`.
+
+**Key state fields:** `pendingHandIndex` (index into `state.hand`), `pendingHandJustMoved` (true for same-day move+place, false for click-then-place), `uiPhase` (`'market'` | `'placing-from-hand'` | `'animating'`).
+
+**Tutorial gating:** During tutorial steps (T5 `place-business`, T10/T13 `buy-and-place`), both `select-hand-card` and `place-business` actions are allowed via `isRequiredAction`. The step completes only on the terminal `place-business` action.
+
+- **Key APIs:** `onBusinessCardClick(card)`, `onHandBusinessCardClick(index)`, `scene.pendingHandIndex`, `scene.uiPhase`
+- **When to use:** This is the canonical Main Street pattern for business card placement. Drag-and-drop (market → slot in one gesture) is supported as an alternative via `buy-and-place` but costs +50%.
+
 ### 11. Tooltip System (DOM and Phaser Modes)
 
 Use `TooltipManager` from `@ui` for contextual information on hover. Supports two rendering modes: **DOM mode** (HTML overlay over the canvas) and **Phaser mode** (game-object containers rendered within the scene).

@@ -165,9 +165,12 @@ describe('Tutorial text updates (17-step restructure)', () => {
       expect(body.toLowerCase()).toMatch(/culture/);
       expect(body.toLowerCase()).toMatch(/bonus/);
     });
-    it('tells the player to buy and place the Library next to the Bookshop', () => {
+    it('tells the player to take, select, and place the Library next to the Bookshop', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
-      expect(body.toLowerCase()).toMatch(/buy/);
+      // Post-CG-0MSXIQIPJ000NDTL: the text uses "take it to your hand" and
+      // "click the card in your hand to select it" instead of a single "buy".
+      expect(body.toLowerCase()).toMatch(/take|buy/);
+      expect(body.toLowerCase()).toMatch(/select|place/);
       expect(body.toLowerCase()).toMatch(/place/);
       expect(body.toLowerCase()).toMatch(/next to/);
     });
