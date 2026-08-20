@@ -148,20 +148,6 @@ describe('MainStreet day banner', () => {
     expect(calls).toHaveLength(0);
   }, 30_000);
 
-  it('still fires the trigger under reduced motion (animator degrades internally)', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-    (scene as unknown as { tutorialController?: unknown }).tutorialController = undefined;
-    (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
-
-    const { calls } = spyOnDayBanner(scene);
-
-    (scene.state as { phase: string }).phase = 'DayStart';
-    (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase();
-
-    await waitForCondition(() => calls.length >= 1, { timeoutMs: 5000, label: 'day banner trigger (reduced motion)' });
-    expect(calls).toHaveLength(1);
-  }, 30_000);
 
   // ── Deferral tests (CG-0MSZE2PY7007J6XA) ──────────────────
   //

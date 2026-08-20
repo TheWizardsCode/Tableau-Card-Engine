@@ -6,6 +6,11 @@
 # 2. Non-tutorial browser tests
 # 3. Tutorial E2E tests (each in own browser context via workspace projects)
 #
+# For faster local feedback during implementation, use the test profiles
+# instead of this full suite (see docs/DEVELOPER.md#smoke-tests):
+#   npm run test:smoke  # ~2 min, one representative test per game
+#   npm run test:dev    # ~3.5 min, smoke + key E2E per game
+#
 # The unit and browser steps run through scripts/vitest-run-with-retry.ts, which
 # retries once on Vitest's transient contention-induced failures
 # ([vitest-worker]: Timeout calling "onTaskUpdate" for the worker RPC layer,

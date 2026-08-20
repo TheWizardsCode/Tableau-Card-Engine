@@ -237,7 +237,9 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` (excludes `replay-*.test.ts`) | Logic, data, and integration tests — runs in parallel (worker pool capped at `maxWorkers: 4`; see contention mitigation below) |
 | `replay-e2e` | Node.js (fork pool) | `tests/e2e/replay-*.test.ts` | Playwright-driven replay e2e tests. Runs in its own fork (`singleFork: true`) after unit tests to avoid Vite cold-start CPU contention |
-| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
+| `smoke` | Chromium (Playwright) | 10 explicit files (see [smoke profile](#smoke-tests)) | One representative test per game + core engine/UI smoke. ~30s for rapid feedback during implementation |
+| `dev` | Chromium (Playwright) | 30 explicit files (see [dev profile](#dev-tests)) | Smoke + key E2E per game. ~3 min for the implement/audit workflow |
+| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | All non-tutorial Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
 | `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance; requires [browser test setup](#browser-test-setup)) |
 
 All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
@@ -301,6 +303,41 @@ The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameTy
 - Place test files in `tests/` following the `*.test.ts` pattern
 - Import from `vitest` directly: `import { describe, it, expect } from 'vitest'`
 - Vitest globals are enabled -- `describe`, `it`, `expect` are available without imports in test files
+
+### Smoke Tests
+
+Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedback during implementation. The smoke profile runs one representative test per game plus core engine/UI smoke tests — target runtime is ~30 seconds for 10 files.
+
+**Smoke profile files:**
+- `tests/main-street/MainStreetScene.browser.test.ts` (Main Street core game flow)
+- `tests/golf/GolfScene.browser.test.ts` (Golf core flow)
+- `tests/feudalism/FeudalismSmokeTest.browser.test.ts` (FC smoke)
+- `tests/beleaguered-castle/BeleagueredCastleOverlay.browser.test.ts` (BC overlay)
+- `tests/coloretto/ColorettoScene.browser.test.ts` (Coloretto core)
+- `tests/sushi-go/SushiGoIcons.browser.test.ts` (Sushi Go rendering)
+- `tests/lost-cities/LostCitiesRoundEnd.browser.test.ts` (Lost Cities flow)
+- `tests/core-engine/SvgHelpers.browser.test.ts` (Core SVG pipeline)
+- `tests/ui/HelpPanel.browser.test.ts` (UI chrome)
+- `tests/gym/GymSceneSmoke.browser.test.ts` (All 19 gym scenes boot)
+
+### Dev Tests
+
+Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehensive but still fast suite. The dev profile adds key E2E tests per game on top of all smoke tests — target runtime is ~3 minutes for ~30 files.
+
+**Dev profile coverage:**
+- All smoke files (above)
+- Core + UI: `SvgHelpers`, `PhaserEventBridge`, `HelpPanel`, `TooltipManager`, `SettingsPanelTooltips`
+- Main Street key E2E: `MainStreetScene`, `drag`, `undo-redo`, `MainStreetOverlay`, `game-over`
+- Golf key E2E: `GolfScene`, `GolfInteraction`, `GolfEvents`
+- FC key E2E: `FeudalismSmokeTest`, `FeudalismSelection`, `FeudalismLayout`
+- BC key E2E: `BeleagueredCastleOverlay`, `BeleagueredCastleTurnController`, `BeleagueredCastleLayout`
+- Sushi Go key E2E: `SushiGoIcons`, `SushiGoOverlay`, `SushiGoTableauRendering`
+- Lost Cities key E2E: `LostCitiesRoundEnd`, `LostCitiesOverlayAlignment`
+- Coloretto: `ColorettoScene`
+- HandView: `gym-handpile-drag`, `gym-handpile-cancel`
+- Gym: `GymDeckRngScene`, `GymOverlayUiScene`
+
+Tutorial E2E tests are excluded from smoke and dev profiles (run in CI only).
 
 ### Writing browser tests
 

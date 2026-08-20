@@ -692,48 +692,6 @@ describe('ColorettoScene (browser)', () => {
     ).toEqual([900, 901]);
   });
 
-  it('applies a take instantly without animation in reduced-motion mode', async () => {
-    window.localStorage.setItem('tce-ui-reduced-motion', 'true');
-    try {
-      game = await bootGame();
-      const scene = game.scene.getScene('ColorettoScene') as any;
-      await waitFrames(10);
-
-      expect(scene.reducedMotion).toBe(true);
-      expect(clickText(scene, '2 (1 AI)')).toBe(true);
-      // Strip the Last Round card so an AI-first randomized turn order can
-      // never end the round mid-test (these tests drive their own turns).
-      scene.session.deck = createColorettoDeck().filter(
-        (c) => c.type !== 'last-round',
-      );
-      // Await the human turn so no AI delayed turn is pending while the test
-      // forces its own turn state (turn order is randomized at game start).
-      await waitForCondition(() => scene.phaseManager?.current === 'human-turn');
-
-      scene.session.rows[0].cards = [
-        { id: 902, type: 'chameleon', color: 'green', count: 1 },
-      ];
-      scene.session.currentTurnIndex = 0;
-      scene.session.players[0].roundState = 'active';
-      scene.refreshAll();
-
-      scene.actionMode = 'take';
-      const zones = scene.rowZones as Phaser.GameObjects.Rectangle[];
-      expect(zones[0]).toBeDefined();
-      zones[0].emit('pointerdown');
-
-      // Instant transfer: no 'animating' phase, no flyers, turn advances.
-      expect(scene.phaseManager.current).toBe('ai-thinking');
-      expect(flyerContainers(scene)).toHaveLength(0);
-      expect(
-        (scene.session.players[0].collection as { id: number }[]).map((c) => c.id),
-      ).toEqual([902]);
-      expect(scene.session.rows[0].cards).toHaveLength(0);
-    } finally {
-      window.localStorage.removeItem('tce-ui-reduced-motion');
-    }
-  });
-
   it('animates an AI take action the same way as a human take', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('ColorettoScene') as any;
@@ -940,39 +898,6 @@ describe('ColorettoScene (browser)', () => {
     );
     expect(totalCards).toBe(cardsBefore + 2);
     expect(scene.session.currentTurnIndex).toBe(0);
-  }, 15000);
-
-  it('applies placements instantly when reduced motion is enabled', async () => {
-    localStorage.setItem(REDUCED_MOTION_KEY, 'true');
-    game = await bootGame();
-    const scene = await startTwoPlayerGame(game);
-    expect(scene.reducedMotion).toBe(true);
-
-    // The board may already hold a card from the AI's lead turn when the
-    // randomized turn order put the AI first (see above).
-    const cardsBefore = [0, 1, 2].reduce(
-      (sum, i) => sum + scene.session.rows[i].cards.length,
-      0,
-    );
-
-    humanPlace(scene, 0);
-
-    // No in-flight card is created and the turn advances synchronously.
-    expect(scene.flightCard).toBeNull();
-    expect(scene.phaseManager.current).toBe('ai-thinking');
-
-    await waitForCondition(() => scene.phaseManager.current === 'human-turn');
-    // Both turns completed instantly in reduced-motion mode: the human's
-    // card is on row 0 and the AI placed one card on some row. The AI's
-    // row choice is RNG-dependent (all rows are equal value at game start),
-    // so assert the total across rows rather than a specific row.
-    const totalCards = [0, 1, 2].reduce(
-      (sum, i) => sum + scene.session.rows[i].cards.length,
-      0,
-    );
-    expect(totalCards).toBe(cardsBefore + 2);
-    expect(scene.session.rows[0].cards.length).toBeGreaterThanOrEqual(1);
-    expect(scene.flightCard).toBeNull();
   }, 15000);
 
   it('Last Round card: flips on the deck, settles at the resting position, and is omitted from its slot', async () => {

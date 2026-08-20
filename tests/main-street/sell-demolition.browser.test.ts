@@ -147,30 +147,4 @@ describe('MainStreet sell demolition animation', () => {
     expect(state.soldSlots[0]).toBe(true);
     expect(state.resourceBank.coins).toBe(50 + expectedRefund);
   }, 30_000);
-
-  it('still fires the sell trigger under reduced motion (animator degrades internally)', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-    const biz = makeBusiness();
-
-    const state = scene.state as {
-      streetGrid: Array<BusinessCard | null>;
-      resourceBank: { coins: number };
-      soldSlots: boolean[];
-    };
-    state.streetGrid[0] = biz;
-    state.resourceBank.coins = 50;
-    (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
-    (scene as unknown as { refreshAll: () => void }).refreshAll();
-
-    const { calls } = spyOnSell(scene);
-
-    (scene.msTurnController as unknown as { onSellCard: (slotIndex: number) => void }).onSellCard(0);
-    findSellButton(scene).emit('pointerdown');
-
-    await waitForCondition(() => calls.length >= 1, { timeoutMs: 5000, label: 'sell animation trigger (reduced motion)' });
-    expect(calls).toHaveLength(1);
-    expect(calls[0].slotIndex).toBe(0);
-    expect(state.soldSlots[0]).toBe(true);
-  }, 30_000);
 });

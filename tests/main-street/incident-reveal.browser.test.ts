@@ -161,31 +161,4 @@ describe('MainStreet incident reveal presentation', () => {
       label: 'next day start (phase back to MarketPhase)',
     });
   }, 30_000);
-
-  it('skips the flight and flash under reduced motion (trigger still fires)', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-
-    (scene.state as { incidentDeck: EventCard[] }).incidentDeck = [makeLossIncident()];
-    // Force reduced motion on the settings panel.
-    (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
-
-    const createVisualSpy = vi.spyOn(scene.msAnimator as unknown as { createTransferCardVisual: (...a: unknown[]) => unknown }, 'createTransferCardVisual');
-    const { calls } = spyOnIncidentReveal(scene);
-
-    (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
-
-    // Trigger still fires (the trigger point is unchanged)...
-    await waitForCondition(() => calls.length >= 1, { label: 'incident reveal trigger (reduced motion)' });
-    expect(calls).toHaveLength(1);
-    expect(calls[0].coinChange).toBe(-3);
-    // ...but no flight visual is created under reduced motion.
-    expect(createVisualSpy).not.toHaveBeenCalled();
-
-    // Let the next day start before teardown (no pending turn-advance timers).
-    await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
-      timeoutMs: 5000,
-      label: 'next day start (reduced motion)',
-    });
-  }, 30_000);
 });

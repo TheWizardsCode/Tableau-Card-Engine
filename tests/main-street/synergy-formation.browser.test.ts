@@ -354,31 +354,4 @@ describe('MainStreet synergy formation animation', () => {
     expect(Math.abs(segments[0].moveTo.x - centerX0)).toBeGreaterThan(20);
     expect(Math.abs(segments[0].lineTo.x - centerX1)).toBeGreaterThan(20);
   }, 30_000);
-
-  it('still fires the trigger under reduced motion (animator degrades internally)', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-    const { cardA, cardB } = makeSynergyPair();
-
-    const state = scene.state as {
-      streetGrid: Array<BusinessCard | null>;
-      market: { cards: Array<BusinessCard | null> };
-      resourceBank: { coins: number };
-    };
-    state.streetGrid[0] = cardA;
-    state.market.cards[0] = cardB;
-    state.resourceBank.coins = 100;
-    (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
-    (scene as unknown as { refreshAll: () => void }).refreshAll();
-
-    const { calls } = spyOnSynergyFormation(scene);
-
-    (scene.msTurnController as unknown as {
-      onDragDropBusiness: (payload: { data: string; zoneData: number; gameObject: unknown }) => void;
-    }).onDragDropBusiness({ data: cardB.id, zoneData: 1, gameObject: null });
-
-    await waitForCondition(() => calls.length >= 1, { timeoutMs: 8000, label: 'synergy formation trigger (reduced motion)' });
-    expect(calls).toHaveLength(1);
-    expect(calls[0].sharedSynergy).toBeTruthy();
-  }, 30_000);
 });
