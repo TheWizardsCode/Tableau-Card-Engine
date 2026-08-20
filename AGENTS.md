@@ -72,7 +72,7 @@ npm install          # Install dependencies
 npm run dev          # Start Vite dev server with hot-reload (port 3000)
 npm test             # Run Vitest test suite (non-destructive: does not modify tracked assets)
 npm run build        # TypeScript check + production build to dist/
-npm run preview      # Serve production build locally
+npm run preview      # Serve production build locally (binds to all interfaces, reachable via Tailscale/LAN)
 npm run monte-carlo  # Run Main Street Monte Carlo harness (JSON + CSV)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher

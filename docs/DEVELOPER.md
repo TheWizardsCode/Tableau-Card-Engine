@@ -92,6 +92,8 @@ To preview the production build locally:
 npm run preview
 ```
 
+The preview server binds to all interfaces (`--host`, like `npm run dev`), so it is reachable from the LAN / Tailscale network at `http://<tailscale-ip>:4173/Tableau-Card-Engine/` (the `/Tableau-Card-Engine/` base path comes from the production `base` config used for GitHub Pages).
+
 **Note:** The Phaser library produces a ~2.0 MB chunk with the current Phaser 4 RC bundle. This is expected and can be addressed with code-splitting when needed.
 
 ## Deployment / Release
