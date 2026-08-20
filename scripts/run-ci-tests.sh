@@ -18,6 +18,15 @@
 # WebSocket drop) — a non-zero exit that happens even when every test passed.
 # The retry is masked against genuine failures (see that script's
 # shouldRetryOnce). See CG-0MS9M5UJP005PWD3 and CG-0MSCI73RH004VPCE.
+#
+# The same runner bounds every attempt with a wall-clock timeout
+# (CG-0MT08R2QR0070F3N): a true hang — e.g. a browser test whose
+# requestAnimationFrame loop is starved of frames under CPU contention, or a
+# Phaser game destroy that never completes — is aborted with exit 124 and a
+# [hang-timeout] diagnostic instead of stalling the gate indefinitely. Hangs
+# are never retried. Bounds: 5 min for unit (nominal <2 min), 15 min for
+# browser (~40 files; ~6-8 min nominal, up to 12+ min under heavy
+# concurrent-suite contention). Tune with --timeout-ms if needed.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -34,11 +43,11 @@ npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 echo "=== Unit Tests ==="
-npx tsx scripts/vitest-run-with-retry.ts --project unit 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project unit --timeout-ms 300000 2>&1 | tail -20
 echo ""
 
 echo "=== Browser Tests (non-tutorial) ==="
-npx tsx scripts/vitest-run-with-retry.ts --project browser 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project browser --timeout-ms 900000 2>&1 | tail -20
 echo ""
 
 echo "=== Tutorial E2E Tests ==="

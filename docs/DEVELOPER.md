@@ -281,6 +281,44 @@ Two mitigations are in place in this repository:
    summary before a retry is allowed, so a genuine test failure can never be
    hidden by a retry.
 
+#### Hang timeout (bounded wall-clock abort)
+
+The transient signatures above cover runs that **exit** non-zero. A different
+failure mode (CG-0MT08R2QR0070F3N) never exits at all: under heavy CPU
+contention (load avg 14-35 on 16 cores), a browser test can stall indefinitely
+— e.g. a `requestAnimationFrame` loop starved of frames, or a Phaser game
+destroy in `afterEach` that never completes — leaving the whole browser stage
+hanging with no exit code. The retry path cannot help: a hang produces no
+output to mask against.
+
+Mitigation: every attempt in `scripts/vitest-run-with-retry.ts` is bounded by
+a wall-clock timeout. The runner spawns vitest asynchronously into its own
+process group; when the bound elapses the whole group (vitest + tinypool
+workers + Playwright Chromium) is SIGTERMed (graceful shutdown), then
+SIGKILLed after a short grace period if it survives. An async `spawn` is
+required: a `spawnSync` with a `timeout` hangs forever if the child ignores
+SIGTERM, which would defeat the whole point against a genuinely hung
+process. When the bound elapses the runner exits with code **124**
+(`HANG_TIMEOUT_EXIT_CODE`, the conventional GNU-timeout exit code; vitest
+itself only ever exits 0 or 1) after printing a `[hang-timeout]` diagnostic
+with re-run guidance. Hangs are **never retried** — a genuine hang must
+surface, not be masked. `scripts/run-ci-tests.sh` sets the bounds
+explicitly: 5 minutes for the unit stage, 15 minutes for the browser stage
+(`--timeout-ms <n>`, default 10 minutes in the runner itself). The browser
+bound is deliberately generous — ~40 files at 8-10s each runs 6-8 minutes
+nominal, and concurrent full-suite runs from parallel worktrees can stretch
+it past 12 — while a true hang never completes and is still bounded. Under
+`set -euo pipefail` the 124 exit aborts the gate instead of stalling it
+indefinitely.
+
+Diagnosing a hang: `[hang-timeout]` in the output identifies the stage;
+re-run the suspected file(s) in isolation via
+`npx vitest run --project browser tests/<file>` to see whether the hang
+reproduces without suite-wide contention. If it does, look for an unresolved
+`Phaser.Game` (the `afterEach` must destroy it) or a frame-wait helper without
+a timeout fallback. Exit codes from the runner: 0/1 from vitest, 124 on hang
+abort, 2 on an invalid `--timeout-ms` value.
+
 If you see the worker-timeout error repeatedly under sustained load, run the
 suites sequentially (e.g. `npx vitest run --project unit` alone) rather than
 launching concurrent full-suite runs, and check for other vitest processes
@@ -2541,7 +2579,7 @@ To verify production safety:
 - `npm test` runs a fast-fail pre-check (`scripts/check-browser-test-env.ts`) that prints the exact remediation command if Chromium is missing; verify the install with `npx playwright install --list`
 - Check that `@vitest/browser` version matches `vitest` version
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
-- If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game)
+- If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game). A full `npm test` run that stalls indefinitely is aborted by the runner's wall-clock timeout (see [Hang timeout](#hang-timeout-bounded-wall-clock-abort)) with exit 124 and a `[hang-timeout]` diagnostic — run the suspected file in isolation to reproduce.
 - **Process/resource leak cleanup:** All browser tests should clean up Phaser.Game instances in `afterEach` using `game.destroy(true, false)` and remove the game container div. The dev server utilities (`scripts/dev-server-utils.ts`) use a simplified start-stop-per-call pattern with no reference counting. `ensureDevServer()` kills any existing process on port 3000 before starting a fresh server. `killDevServer()` unconditionally kills the child process and any remaining process on port 3000. SIGTERM/SIGINT handlers provide additional cleanup for forced exits.
 
 **Large bundle warning:**
