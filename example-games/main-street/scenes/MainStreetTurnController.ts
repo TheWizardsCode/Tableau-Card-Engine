@@ -113,8 +113,12 @@ export class MainStreetTurnController {
    *
    * @param skipMarketRefill  When true (e.g., checkpoint resume), the market
    *                          is not refilled and the saved market state is preserved.
+   * @param suppressDayBanner When true, the day-transition banner is NOT
+   *                          played (used at boot while the tutorial offer
+   *                          modal is visible; the deferred banner fires later
+   *                          via MainStreetScene.playDeferredDayBanner()).
    */
-  public startDayPhase(skipMarketRefill: boolean = false): void {
+  public startDayPhase(skipMarketRefill: boolean = false, suppressDayBanner: boolean = false): void {
     const s = this.scene;
     // Execute DayStart (optionally refills market, transitions to MarketPhase)
     executeDayStart(s.state, skipMarketRefill);
@@ -144,10 +148,12 @@ export class MainStreetTurnController {
     // Day transition banner: non-interactive "Day N" reveal at the board
     // centre (skipped under reduced motion / replay — handled inside the
     // animator). Skipped while the tutorial is active (its step overlays
-    // carry the guidance) and on checkpoint resume (skipMarketRefill — the
-    // same day continues, so it is not a new-day transition).
+    // carry the guidance), on checkpoint resume (skipMarketRefill — the
+    // same day continues, so it is not a new-day transition), or when
+    // suppressed at boot (suppressDayBanner — deferred until the player
+    // commits to playing).
     const tutController = (s as any).tutorialController as { isActive?: boolean } | undefined;
-    if (!skipMarketRefill && !tutController?.isActive) {
+    if (!skipMarketRefill && !suppressDayBanner && !tutController?.isActive) {
       try { s.msAnimator.animateDayBanner({ day: s.state.turn }); } catch (_) { /* presentation-only — ignore */ }
     }
     void s.cardSvgLoadPromise

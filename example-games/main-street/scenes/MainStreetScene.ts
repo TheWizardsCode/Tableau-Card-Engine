@@ -56,6 +56,24 @@ export class MainStreetScene extends CardGameScene {
   // Selected difficulty (persisted across replays)
   public selectedDifficulty: DifficultyName = 'Medium';
 
+  /**
+   * When true, the day-banner at boot is deferred until the player commits
+   * to playing (skips the tutorial offer, starts the tutorial, or resumes
+   * from checkpoint). Cleared after it fires exactly once.
+   */
+  public deferredDayBanner = false;
+
+  /**
+   * Plays the deferred day-banner animation if one is pending.
+   * Clears the `deferredDayBanner` flag so it fires at most once.
+   * Safe to call when no banner is pending (no-op).
+   */
+  public playDeferredDayBanner(): void {
+    if (!this.deferredDayBanner) return;
+    this.deferredDayBanner = false;
+    try { this.msAnimator?.animateDayBanner({ day: this.state?.turn ?? 1 }); } catch (_) { /* presentation-only */ }
+  }
+
   // Pending selection for placing a business
   public pendingBusinessCard: BusinessCard | null = null;
   public pendingBusinessSourceIndex: number | null = null;
