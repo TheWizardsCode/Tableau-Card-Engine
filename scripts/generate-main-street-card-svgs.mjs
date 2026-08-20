@@ -246,9 +246,13 @@ export function regenerateCardSvgs(options = {}) {
     fs.writeFileSync(outPath, svg, 'utf8');
   }
 
-  // Write checksum file alongside SVGs for runtime change detection
+  // Write checksum file alongside SVGs for runtime change detection.
+  // Trailing newline matches the committed file convention so the tree
+  // stays clean after regeneration (card-svg-coverage.test.ts regenerates
+  // during the suite; a newline-less rewrite would dirty the working tree
+  // and invalidate the read-only test cache fingerprint).
   const checksumPath = path.join(outDir, 'csv-checksum.json');
-  fs.writeFileSync(checksumPath, JSON.stringify({ checksum }), 'utf8');
+  fs.writeFileSync(checksumPath, JSON.stringify({ checksum }) + '\n', 'utf8');
 
   return { checksum, count: templates.length };
 }
