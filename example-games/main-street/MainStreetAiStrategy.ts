@@ -236,6 +236,15 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     });
   }
 
+  // ── peek-incident-deck (staff peek skill, CG-0MSXOW6GN008ZSMN) ──
+  // Legal only when a peek-capable staff member is employed and the deck
+  // has a card to look at. The once-per-turn gate and action cost are
+  // enforced inside executeAction/peekIncidentDeck.
+  const hasPeekStaff = (state.staffCards ?? []).some(card => card.peekOncePerTurn);
+  if (hasPeekStaff && state.incidentDeck.length > 0) {
+    actions.push({ type: 'peek-incident-deck' });
+  }
+
   // ── end-turn ──────────────────────────────────────────────
   actions.push({ type: 'end-turn' });
 
@@ -583,6 +592,11 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
     case 'hire-staff':
       // Net value of expanded hand slots vs. cost + ongoing cost (rough estimate).
       return 2;
+    case 'peek-incident-deck':
+      // Staff peek skill (CG-0MSXOW6GN008ZSMN): foresight is mildly useful,
+      // but a greedy heuristic cannot exploit the revealed card, so it scores
+      // below most productive actions.
+      return 1;
   }
 }
 

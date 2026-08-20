@@ -123,9 +123,11 @@ describe('MainStreet Market Cycling', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Buy a card and place on tableau
+      // Buy a business-family card and place on tableau (buy-business only
+      // accepts business/community-space cards — the market row may lead
+      // with an upgrade/event card for some seeds).
       const card = state.market.cards.find(
-        c => c.cost <= state.resourceBank.coins,
+        c => (c.family === 'business' || c.family === 'community-space') && c.cost <= state.resourceBank.coins,
       );
       if (!card) return;
 
@@ -283,9 +285,10 @@ describe('MainStreet Market Cycling', () => {
         for (let i = 0; i < 3 && state.gameResult === 'playing'; i++) {
           executeDayStart(state);
 
-          // Buy a card if possible
+          // Buy a business-family card if possible (buy-business only
+          // accepts business/community-space cards).
           const card = state.market.cards.find(
-            c => c.cost <= state.resourceBank.coins,
+            c => (c.family === 'business' || c.family === 'community-space') && c.cost <= state.resourceBank.coins,
           );
           if (card) {
             const slot = state.streetGrid.findIndex(s => s === null);

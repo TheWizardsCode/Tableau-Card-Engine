@@ -399,6 +399,11 @@ export class MainStreetScene extends CardGameScene {
     return (this.msTurnController as any).onRefreshMarketClick.apply(this.msTurnController, args);
   }
 
+  /** Staff peek action proxy (forward to turn controller, CG-0MSXOW6GN008ZSMN). */
+  public onPeekClick(...args: any[]): any {
+    return (this.msTurnController as any).onPeekClick.apply(this.msTurnController, args);
+  }
+
   /**
    * Creates a "Hint" button that is disabled after first use per turn.
    * When clicked, queries the Greedy strategy and highlights the recommended

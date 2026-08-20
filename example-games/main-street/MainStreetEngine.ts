@@ -123,6 +123,15 @@ export interface EndTurnAction {
   type: 'end-turn';
 }
 
+/**
+ * Staff peek skill (CG-0MSXOW6GN008ZSMN): reveal the top card of the
+ * face-down incident deck once per turn, as an action. The peeked card is
+ * returned face-down without being resolved.
+ */
+export interface PeekIncidentAction {
+  type: 'peek-incident-deck';
+}
+
 /** Union of all player actions. */
 export type PlayerAction =
   | BuyBusinessAction
@@ -136,6 +145,7 @@ export type PlayerAction =
   | BuyAndPlaceAction
   | HireStaffAction
   | PlayEventAction
+  | PeekIncidentAction
   | EndTurnAction;
 
 // ── Turn Result ─────────────────────────────────────────────
@@ -273,6 +283,13 @@ export function executeAction(
       }
       return playEventFromHand(state, handIndex);
     }
+    case 'peek-incident-deck':
+      // Consumes one action and enforces the once-per-turn gate inside
+      // peekIncidentDeck. The peeked card is intentionally not surfaced
+      // through executeAction (PurchaseResult | null) — presentation is the
+      // scene layer's job via peekIncidentDeck directly.
+      peekIncidentDeck(state);
+      return null;
     default:
       throw new Error(`Unknown action type: ${(action as PlayerAction).type}`);
   }
@@ -554,6 +571,63 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
   return event;
 }
 
+// ── Staff Peek Skill (CG-0MSXOW6GN008ZSMN) ─────────────────
+
+/**
+ * Staff peek skill: reveals the top card of the face-down incident deck
+ * once per turn, as an action, and returns it face-down without resolving
+ * it.
+ *
+ * Requirements (all enforced):
+ * - Game still in progress and phase is MarketPhase.
+ * - An employed staff member carries the `peekOncePerTurn` ability.
+ * - The once-per-turn gate (`state.peekUsedThisTurn`) is not yet used.
+ * - At least one daily action remains (the peek consumes one action).
+ *
+ * The deck is NOT mutated — the peeked card stays on top (face-down return)
+ * and nothing is resolved (no resource changes, no draw history, no
+ * Incident log). The revealed card is exposed via `state.revealedPeekedCard`
+ * for the scene to render face-up (AC2); the scene clears the field after
+ * the reveal. Returns null (consuming nothing) when the deck is empty.
+ *
+ * @param state Current game state (mutated in-place: action + gate).
+ * @returns The top EventCard of the incident deck, or null if the deck is
+ *          empty.
+ * @throws Error if the peek is illegal (no peek staff, gate used, no
+ *         actions, wrong phase, game over).
+ */
+export function peekIncidentDeck(state: MainStreetState): EventCard | null {
+  if (state.gameResult !== 'playing') {
+    throw new Error('Game is over. No more actions allowed.');
+  }
+  if (state.phase !== 'MarketPhase') {
+    throw new Error(`Cannot peek during ${state.phase}. Must be in MarketPhase.`);
+  }
+  const hasPeekStaff = (state.staffCards ?? []).some(card => card.peekOncePerTurn);
+  if (!hasPeekStaff) {
+    throw new Error('No staff member with the peek ability is employed.');
+  }
+  if (state.peekUsedThisTurn) {
+    throw new Error('You have already peeked at the incident deck this turn.');
+  }
+  if (state.actionsRemaining <= 0) {
+    throw new Error('No actions remaining today. End your turn to start a new day.');
+  }
+  // Nothing to peek: no-op (no action consumed, gate stays closed).
+  if (state.incidentDeck.length === 0) return null;
+
+  state.actionsRemaining -= 1;
+  state.peekUsedThisTurn = true;
+  addLog(state, 'Peeked at the top card of the incident deck.', 'neutral');
+
+  // Reveal-only: expose the top card to the scene via `revealedPeekedCard`
+  // (AC2) and return it without removing it from the deck. The scene
+  // renders the face-up reveal, then clears the field.
+  const peeked = state.incidentDeck[0];
+  state.revealedPeekedCard = peeked;
+  return peeked;
+}
+
 // ── Win/Loss Detection ──────────────────────────────────────
 
 /**
@@ -689,6 +763,11 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   // Base 1 action + sum of actionsPerTurn from employed staff cards.
   const gmBonus = (state.staffCards ?? []).reduce((sum, card) => sum + (card.actionsPerTurn ?? 0), 0);
   state.actionsRemaining = 1 + gmBonus;
+
+  // Staff peek gate (CG-0MSXOW6GN008ZSMN): exactly one peek per turn.
+  state.peekUsedThisTurn = false;
+  // Clear any pending peek reveal — a new day starts with a clean slate.
+  state.revealedPeekedCard = null;
 
   state.phase = 'MarketPhase';
 }

@@ -64,6 +64,7 @@ import {
   LOG_LINE_H,
   LOG_PAD,
   LOG_TITLE_H,
+  CARD_BACK_TEMPLATE,
   type SceneLayout,
 } from './MainStreetConstants';
 
@@ -1282,9 +1283,11 @@ export class MainStreetRenderer {
   }
 
   /**
-   * Centre of the front incident-queue card, mirroring `refreshIncidentQueue`
-   * layout math (panel title 22px + 8px pad, card centred horizontally in
-   * the panel). Used as the origin of the incident-reveal flight.
+   * Centre of the face-down incident-deck stack, mirroring
+   * `refreshIncidentQueue` layout math (panel title 22px + 8px pad, the
+   * single card back centred horizontally in the panel). Used as the origin
+   * of the incident-reveal flight and the staff-peek reveal
+   * (CG-0MSXOWLHU0099QF6 / CG-0MSXOW6GN008ZSMN).
    * Keep in sync with `refreshIncidentQueue` if the queue layout changes.
    */
   public getFrontIncidentCardCenter(): { x: number; y: number } {
@@ -1302,8 +1305,7 @@ export class MainStreetRenderer {
     const s = this.scene;
     s.incidentQueueContainer.removeAll(true);
 
-    const queue = s.state.incidentDeck;
-    const deckRemaining = s.state.decks.event.length;
+    const deckRemaining = s.state.incidentDeck.length;
     const activeEffects = s.state.activeEffects;
 
     const { logX, logW, queueTop } = s.layout;
@@ -1315,13 +1317,14 @@ export class MainStreetRenderer {
     const titleH = 22;
     const contentX = panelX + pad;
 
-    // Calculate dynamic height
+    // Calculate dynamic height. The panel now shows a single face-down
+    // incident-deck card back (CG-0MSXOWLHU0099QF6) plus the remaining-deck
+    // count — incident content is never visible before its turn.
     const activeEffectLines = activeEffects.length;
     const extraH = activeEffectLines > 0 ? 16 + activeEffectLines * 16 : 0;
     const cardRenderW = s.layout.queueCardW;
     const cardRenderH = s.layout.queueCardH;
-    const maxCards = Math.min(2, queue.length);
-    const cardAreaH = maxCards * (cardRenderH + 6) - 6 + 12; // cards + deck count
+    const cardAreaH = cardRenderH + 6 + 12; // one face-down card + deck count
     const panelH = titleH + pad + cardAreaH + extraH + pad;
 
     // Panel background — same warm-dark style as activity log
@@ -1343,51 +1346,19 @@ export class MainStreetRenderer {
     }).setOrigin(0.5);
     s.incidentQueueContainer.add(titleText);
 
-    // Queue cards — stacked vertically, centred in the panel
-    // Dimensions come from layout.queueCardW/queueCardH (currently 120×69)
-    // to preserve the standard 7:4 SVG aspect ratio.
+    // Face-down deck stack — a single card back centred in the panel. The
+    // top of the incident deck is intentionally NOT revealed: incident
+    // content only appears when it resolves at end of turn (or via the
+    // staff peek skill, CG-0MSXOW6GN008ZSMN).
+    const cx = panelX + (panelW - cardRenderW) / 2;
     let cardY = queueTop + titleH + pad;
 
-    for (let i = 0; i < maxCards; i++) {
-      const card = queue[i];
-      const cx = panelX + (panelW - cardRenderW) / 2;
+    const container = s.add.container(Math.round(cx + cardRenderW / 2), Math.round(cardY + cardRenderH / 2));
+    mainStreetRenderCardSvg(s, container, CARD_BACK_TEMPLATE, cardRenderW, cardRenderH);
+    s.incidentQueueContainer.add(container);
+    cardY += cardRenderH + 6;
 
-      if (card) {
-        const container = s.add.container(Math.round(cx + cardRenderW / 2), Math.round(cardY + cardRenderH / 2));
-        mainStreetRenderCardSvg(s, container, card.id, cardRenderW, cardRenderH);
-        s.incidentQueueContainer.add(container);
-
-        if (!s.replayMode) {
-          const hover = s.add.rectangle(0, 0, cardRenderW, cardRenderH, 0x000000, 0.001);
-          hover.setInteractive({ useHandCursor: true });
-          hover.on('pointerover', () => {
-            let info: string;
-            const dCard = card as any;
-            if (dCard.duration !== undefined) {
-              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nDuration: ' + dCard.duration + ' turns\n' + Math.round(dCard.multiplier * 100) + '% income modifier';
-            } else {
-              const coinDelta = card.coinDelta >= 0 ? '+' : '';
-              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nCoins: ' + coinDelta + card.coinDelta.toFixed(3) + ', Rep: ' + (card.reputationDelta >= 0 ? '+' : '') + card.reputationDelta;
-            }
-            s.tooltipManager?.show(info, container.x, container.y);
-          });
-          hover.on('pointerout', () => s.tooltipManager?.hide());
-          container.add(hover);
-        }
-      } else {
-        // Empty queue slot
-        const empty = s.add.rectangle(
-          cx + cardRenderW / 2, cardY + cardRenderH / 2,
-          cardRenderW, cardRenderH, 0x111122, 0.3,
-        );
-        empty.setStrokeStyle(1, 0x223344);
-        s.incidentQueueContainer.add(empty);
-      }
-
-      cardY += cardRenderH + 6;
-    }
-
-    // Deck count below cards
+    // Deck count below the stack
     const deckText = s.add.text(contentX, cardY, 'Deck: ' + deckRemaining, {
       fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0);
@@ -1529,6 +1500,30 @@ export class MainStreetRenderer {
         s.hintUsedThisTurn, () => s.onHintClick(),
       );
       s.actionContainer.add(hintBtn);
+
+      // Peek button (staff peek skill, CG-0MSXOW6GN008ZSMN) — to the left of
+      // the Hint button. Only offered while a peek-capable staff member is
+      // employed; disabled once the once-per-turn gate is spent, when no
+      // daily actions remain, or when the incident deck is empty.
+      const hasPeekStaff = (s.state.staffCards ?? []).some((card: { peekOncePerTurn?: boolean }) => card.peekOncePerTurn);
+      if (hasPeekStaff) {
+        const peekDisabled = s.state.peekUsedThisTurn || s.state.actionsRemaining <= 0 || s.state.incidentDeck.length === 0;
+        const peekBtn = createActionButton(
+          s, rightX - btnW - 12 - hintBtnW - 12 - btnW, by + 4, btnW,
+          peekDisabled ? 'Peek \u2713' : 'Peek',
+          () => s.onPeekClick(),
+          {
+            height: s.layout.actionButtonH,
+            fillColor: peekDisabled ? 0x2a2a2a : 0x224422,
+            fillAlpha: 0.8,
+            strokeColor: peekDisabled ? 0x444444 : 0x44aa44,
+            textColor: peekDisabled ? '#666666' : '#88ff88',
+            fontSize: '14px',
+            disabled: peekDisabled,
+          },
+        );
+        s.actionContainer.add(peekBtn);
+      }
 
     } else if (s.uiPhase === 'placing-from-hand') {
       const rightX = s.layout.gameW - 24;

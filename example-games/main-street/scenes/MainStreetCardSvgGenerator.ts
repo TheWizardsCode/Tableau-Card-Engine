@@ -331,6 +331,9 @@ export function generateCardSvgFromCsvRow(
     if (row.handSlotsAdded && Number(row.handSlotsAdded) > 0) {
       inner.push('  <text x="' + (width / 2) + '" y="48" font-family="' + FONT + '" font-size="9" fill="#88bbff" font-weight="400" text-anchor="middle">+' + row.handSlotsAdded + ' slots</text>');
     }
+    if (row.peekOncePerTurn && Number(row.peekOncePerTurn) > 0) {
+      inner.push('  <text x="' + (width / 2) + '" y="58" font-family="' + FONT + '" font-size="9" fill="#ffcc66" font-weight="400" text-anchor="middle">peek 1/turn</text>');
+    }
   }
 
   // Community space ongoing cost (reputation-asset cards, e.g. Library -0.25/turn)

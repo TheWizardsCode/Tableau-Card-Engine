@@ -337,6 +337,8 @@ export function createTutorialScenario(
     skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
+    peekUsedThisTurn: false,
+    revealedPeekedCard: null,
   };
 
   // Select challenges for this run using seeded RNG

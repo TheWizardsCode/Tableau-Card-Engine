@@ -261,6 +261,19 @@ export interface MainStreetState {
    * Resets at DayStart to 1 + sum(actionsPerTurn for employed staff).
    */
   actionsRemaining: number;
+  /**
+   * Staff peek gate (CG-0MSXOW6GN008ZSMN): whether the once-per-turn peek
+   * at the top of the incident deck has already been used this turn.
+   * Reset to false at DayStart.
+   */
+  peekUsedThisTurn: boolean;
+  /**
+   * Staff peek skill (CG-0MSXOW6GN008ZSMN): the top incident-deck card
+   * revealed by the most recent peek action. The scene reads it to render
+   * the face-up reveal, then clears it. Null when no peek is pending.
+   * Never resolved — the card stays on top of the face-down deck.
+   */
+  revealedPeekedCard: EventCard | null;
 }
 
 export interface MainStreetSerializedState {
@@ -333,6 +346,10 @@ export interface MainStreetSerializedState {
   soldSlots: boolean[];
   /** Remaining actions the player can take this turn. */
   actionsRemaining: number;
+  /** Whether the once-per-turn staff peek has been used this turn. */
+  peekUsedThisTurn: boolean;
+  /** Top incident-deck card revealed by the most recent peek (null = none). */
+  revealedPeekedCard: EventCard | null;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -608,6 +625,11 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   shuffleArray(communitySpaceDeck, rng);
   shuffleArray(eventDeck, rng);
   shuffleArray(upgradeDeck, rng);
+  // Staff deck shuffle: draw count scales with deck size, so adding a staff
+  // template shifts the seeded game draws (market refill, challenge
+  // selection) by one — the established precedent when staff templates grow
+  // (e.g. General Manager, CG-0MSTOF1N5005PK2R). Seeded determinism (same
+  // seed ⇒ same game) is preserved.
   shuffleArray(staffDeck, rng);
 
   // Populate initial market — single-row marketplace (CG-0MSTOATDT009BRX2):
@@ -702,6 +724,8 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
+    peekUsedThisTurn: false,
+    revealedPeekedCard: null,
   };
 
   // Refill the single-row market with its initial composition.
@@ -789,6 +813,8 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     csvChecksum: CSV_CHECKSUM,
     csvData: CARD_DATA_RAW,
     actionsRemaining: state.actionsRemaining,
+    peekUsedThisTurn: state.peekUsedThisTurn,
+    revealedPeekedCard: state.revealedPeekedCard ?? null,
   };
 }
 
@@ -942,6 +968,18 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   // ── actionsRemaining: backfill default for legacy saves ──
   if (!('actionsRemaining' in saved)) {
     (saved as Record<string, unknown>).actionsRemaining = 1;
+  }
+
+  // ── peekUsedThisTurn (CG-0MSXOW6GN008ZSMN): backfill default ──
+  // Legacy saves predate the staff peek gate; default to false (unused).
+  if (!('peekUsedThisTurn' in saved)) {
+    (saved as Record<string, unknown>).peekUsedThisTurn = false;
+  }
+
+  // ── revealedPeekedCard (CG-0MSXOW6GN008ZSMN): backfill default ──
+  // Legacy saves predate the peek reveal state; default to null (none).
+  if (!('revealedPeekedCard' in saved)) {
+    (saved as Record<string, unknown>).revealedPeekedCard = null;
   }
 
   // ── incidentBalance (CG-0MSL0OP040043KKZ): backfill from the queue for ──
@@ -1103,6 +1141,8 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: saved.actionsRemaining ?? 1,
+    peekUsedThisTurn: saved.peekUsedThisTurn ?? false,
+    revealedPeekedCard: (saved.revealedPeekedCard as EventCard | null) ?? null,
   };
 
   return state;

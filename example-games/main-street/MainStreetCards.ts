@@ -204,6 +204,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
       refreshCostDiscount: r.refreshCostDiscount ? Number(r.refreshCostDiscount) : undefined,
       actionsPerTurn: r.actionsPerTurn ? Number(r.actionsPerTurn) : undefined,
+      peekOncePerTurn: r.peekOncePerTurn ? Number(r.peekOncePerTurn) > 0 : undefined,
     });
   }
 }
@@ -413,6 +414,12 @@ export interface StaffCard {
    * (e.g. the General Manager's +1 action per day — CG-0MSTOF1N5005PK2R).
    */
   readonly actionsPerTurn?: number;
+  /**
+   * Optional staff peek ability: once per turn, as an action, the player
+   * may reveal the top card of the face-down incident deck and return it
+   * face-down without resolving it (CG-0MSXOW6GN008ZSMN).
+   */
+  readonly peekOncePerTurn?: boolean;
 }
 
 /** Union of all card types in Main Street. */

@@ -30,7 +30,7 @@ import {
 import { refreshMarketCost } from '../../example-games/main-street/MainStreetMarket';
 
 /** Fresh MarketPhase state with a full action budget. */
-function setupMarketState(seed = 'command-action-economy'): ReturnType<typeof setupMainStreetGame> {
+function setupMarketState(seed = 'command-action-economy-test'): ReturnType<typeof setupMainStreetGame> {
   const state = setupMainStreetGame({ seed });
   executeDayStart(state);
   expect(state.actionsRemaining).toBe(1);

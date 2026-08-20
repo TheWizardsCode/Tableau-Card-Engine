@@ -170,13 +170,12 @@ function computeTargetRect(
     }
     case 'incidentQueue': {
       // Incident queue panel — mirror refreshIncidentQueue() panel math with
-      // the LIVE queue/effects (boot: 2 cards, 0 effects → 194px).
-      const queue = s?.state?.incidentDeck ?? [];
+      // the LIVE state (boot: single face-down deck stack + count, 0 effects
+      // → 125px, CG-0MSXOWLHU0099QF6).
       const effects = s?.state?.activeEffects ?? [];
       const titleH = 22;
       const pad = 8;
-      const maxCards = Math.min(2, queue.length);
-      const cardAreaH = maxCards * (layout.queueCardH + 6) - 6 + 12;
+      const cardAreaH = layout.queueCardH + 6 + 12;
       const extraH = effects.length > 0 ? 16 + effects.length * 16 : 0;
       const panelH = titleH + pad + cardAreaH + extraH + pad;
       return { x: layout.logX, y: layout.queueTop, w: layout.logW, h: panelH };

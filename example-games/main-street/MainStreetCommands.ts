@@ -23,7 +23,7 @@ import {
   playEventFromHand,
   discardFromHand,
 } from './MainStreetMarket';
-import { buyAndPlaceBusiness, hireStaffCard } from './MainStreetEngine';
+import { buyAndPlaceBusiness, hireStaffCard, peekIncidentDeck } from './MainStreetEngine';
 
 // ── Action Budget Enforcement ────────────────────────────────
 
@@ -50,6 +50,10 @@ interface MarketActionSnapshot {
   soldSlots: boolean[] | null;
   /** Daily action budget — captured so undo restores the spent action. */
   actionsRemaining: number | null;
+  /** Staff peek gate — captured so undo restores the once-per-turn flag. */
+  peekUsedThisTurn: boolean | null;
+  /** Staff peek reveal — captured so undo clears a pending reveal. */
+  revealedPeekedCard: any | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -78,6 +82,8 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
     actionsRemaining: state.actionsRemaining,
+    peekUsedThisTurn: state.peekUsedThisTurn ?? false,
+    revealedPeekedCard: state.revealedPeekedCard ?? null,
   };
 }
 
@@ -96,6 +102,12 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
   if (snap.actionsRemaining !== null && snap.actionsRemaining !== undefined) {
     state.actionsRemaining = snap.actionsRemaining;
+  }
+  if (snap.peekUsedThisTurn !== null && snap.peekUsedThisTurn !== undefined) {
+    state.peekUsedThisTurn = snap.peekUsedThisTurn;
+  }
+  if ('revealedPeekedCard' in snap) {
+    state.revealedPeekedCard = snap.revealedPeekedCard;
   }
 }
 
@@ -322,6 +334,23 @@ export function sellBusinessCommand(
     snapshotAction(
       (s) => sellBusiness(s, slotIndex),
       `SellBusiness slot ${slotIndex}`,
+    ),
+  );
+}
+
+/**
+ * Command: Staff peek at the incident deck (CG-0MSXOW6GN008ZSMN).
+ * Consumes 1 action, sets the once-per-turn gate, and exposes the revealed
+ * card via `state.revealedPeekedCard`. The deck is NOT mutated — the card
+ * stays on top face-down and is never resolved. Undo restores the action,
+ * the gate, and clears the reveal.
+ */
+export function peekIncidentDeckCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { peekIncidentDeck(s); },
+      'PeekIncidentDeck',
     ),
   );
 }

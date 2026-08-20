@@ -12,7 +12,7 @@ import {
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, consumeAction } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, peekIncidentDeckCommand, consumeAction } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
@@ -1105,6 +1105,84 @@ export class MainStreetTurnController {
     s.refreshAll();
     // Market swap animation (only when the refresh actually succeeded).
     if (refreshed) this.animateMarketSwap('market', outgoingRow);
+  }
+
+  /**
+   * Staff peek at the incident deck (CG-0MSXOW6GN008ZSMN).
+   *
+   * Consumes one daily action via the undoable peek command, exposes the
+   * revealed card through `state.revealedPeekedCard`, and plays the face-up
+   * reveal animation from the face-down deck stack position (with SFX per
+   * AGENTS.md rule 8 — reduced-motion respected, mute honoured via
+   * SoundManager). The card is returned face-down without being resolved.
+   */
+  public onPeekClick(): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    if (s.state.actionsRemaining <= 0) {
+      s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+    if (s.state.peekUsedThisTurn) {
+      s.instructionText.setText('You have already peeked at the incident deck this turn.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+    if (!(s.state.staffCards ?? []).some((card: { peekOncePerTurn?: boolean }) => card.peekOncePerTurn)) {
+      s.instructionText.setText('No staff member with the peek ability is employed.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+    if (s.state.incidentDeck.length === 0) {
+      s.instructionText.setText('The incident deck is empty \u2014 nothing to peek at.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText('Peeking at the incident deck...');
+    try {
+      const cmd = peekIncidentDeckCommand(s.state);
+      s.undoManager.execute(cmd);
+      try {
+        recordMainStreetEvent({
+          type: 'action',
+          turn: s.state.turn,
+          action: { type: 'peek-incident-deck' },
+          description: cmd.description,
+        });
+      } catch (_) { /* transcript disabled */ }
+    } catch (e) {
+      console.error('[MS] Peek failed', e);
+      s.instructionText.setText(`Error: ${(e as Error).message}`);
+      s.uiPhase = 'market';
+      s.refreshAll();
+      return;
+    }
+
+    const peeked = s.state.revealedPeekedCard;
+    if (!peeked) {
+      // Empty-deck no-op: nothing to reveal.
+      s.uiPhase = 'market';
+      s.refreshAll();
+      return;
+    }
+
+    s.msAnimator.animatePeekReveal({
+      cardId: peeked.id,
+      cardName: peeked.name,
+      from: s.msRenderer.getFrontIncidentCardCenter(),
+      onComplete: () => {
+        s.state.revealedPeekedCard = null;
+        s.uiPhase = 'market';
+        s.instructionText.setText(
+          `${turnLabel(s.state.config, s.state.turn)} -- Peeked: ${peeked.name} (returned face-down)`,
+        );
+        s.refreshAll();
+      },
+    });
   }
 
   /**

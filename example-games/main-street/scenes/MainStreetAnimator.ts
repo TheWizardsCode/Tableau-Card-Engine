@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { CARD_TEMPLATE_NAMES, synergyColor } from '../MainStreetCards';
 import { FONT_FAMILY, popTextOrIcon, moveGameObject } from '../../../src/ui';
 import type { SlotIncome, SynergyPair } from '../MainStreetAdjacency';
-import { SFX_KEYS } from './MainStreetConstants';
+import { SFX_KEYS, CARD_BACK_TEMPLATE } from './MainStreetConstants';
 import { synergyLineEndpoints } from './synergyLineEndpoints';
+import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
 
 /** MainStreetAnimator -- animation and HUD-delta helper for Main Street scene. */
 export class MainStreetAnimator {
@@ -504,6 +505,97 @@ export class MainStreetAnimator {
     };
     popLoss(coinX, params.coinChange);
     popLoss(repX, params.repChange);
+  }
+
+  /**
+   * Staff peek reveal (CG-0MSXOW6GN008ZSMN): briefly shows the top card of
+   * the face-down incident deck face-up, then returns it face-down.
+   *
+   * Full effect (reduced-motion OFF):
+   * 1. At the deck-stack position, a card-back sprite sits on top of the
+   *    actual SVG card face (`mainStreetRenderCardSvg`).
+   * 2. The back hinges open (scaleX → 0) with the deal SFX
+   *    (`SFX_KEYS.DEAL`), holding the face up for ~1.6s.
+   * 3. The back hinges closed (scaleX → 1) with a click SFX
+   *    (`SFX_KEYS.CLICK`), returning the card face-down; the temporary
+   *    visual is destroyed.
+   *
+   * Accessibility (reduced motion): the hinge tweens are skipped — the back
+   * is dropped instantly and restored after a short hold — but the SFX is
+   * retained (AGENTS.md rule 8 keeps sound under reduced motion). Mute and
+   * volume are honoured because playback goes through `soundManager`.
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only; returns
+   * immediately in replay/headless mode (`scene.replayMode`) — no rendering,
+   * no audio. Never mutates game state or the transcript.
+   *
+   * @param params  Peeked card id/name and the face-down deck-stack origin.
+   */
+  public animatePeekReveal(params: {
+    cardId: string;
+    cardName: string;
+    /** Origin of the reveal: the face-down incident-deck stack centre. */
+    from: { x: number; y: number };
+    /** Fired after the card is returned face-down (both modes). */
+    onComplete?: () => void;
+  }): void {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return;
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+    const w = s.layout.queueCardW;
+    const h = s.layout.queueCardH;
+
+    const container = s.add.container(params.from.x, params.from.y);
+    container.setDepth(10000);
+
+    // The actual SVG face sits beneath the card back; the back flips open
+    // to reveal it and flips closed to return the card face-down.
+    mainStreetRenderCardSvg(s, container, params.cardId, w, h);
+    const back = mainStreetRenderCardSvg(s, container, CARD_BACK_TEMPLATE, w, h);
+
+    const cleanup = (): void => {
+      container.destroy();
+      params.onComplete?.();
+    };
+
+    // Deal SFX on reveal — retained under reduced motion (rule 8).
+    try { s.soundManager?.play(SFX_KEYS.DEAL); } catch (_) { /* ignore */ }
+
+    if (reducedMotion) {
+      // Instant reveal: drop the back, hold the face briefly, restore.
+      back.setVisible(false);
+      s.time.delayedCall(900, () => {
+        try { s.soundManager?.play(SFX_KEYS.CLICK); } catch (_) { /* ignore */ }
+        cleanup();
+      });
+      return;
+    }
+
+    // Hinge open: scaleX 1 → 0 reveals the face beneath.
+    s.tweens.add({
+      targets: back,
+      scaleX: 0,
+      duration: 260,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        back.setVisible(false);
+        try { s.soundManager?.play(SFX_KEYS.CLICK); } catch (_) { /* ignore */ }
+        // Hold the face up, then flip back down.
+        s.time.delayedCall(1600, () => {
+          back.setVisible(true);
+          back.scaleX = 0;
+          s.tweens.add({
+            targets: back,
+            scaleX: 1,
+            duration: 260,
+            ease: 'Cubic.easeOut',
+            onComplete: cleanup,
+          });
+        });
+      },
+    });
   }
 
   /**
