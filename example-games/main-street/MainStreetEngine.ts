@@ -132,6 +132,13 @@ export interface PeekIncidentAction {
   type: 'peek-incident-deck';
 }
 
+/** Community Favour action: exchange coins ↔ reputation. */
+export interface CommunityFavourAction {
+  type: 'community-favour';
+  /** Direction of the exchange. */
+  direction: 'coins-to-rep' | 'rep-to-coins';
+}
+
 /** Union of all player actions. */
 export type PlayerAction =
   | BuyBusinessAction
@@ -146,6 +153,7 @@ export type PlayerAction =
   | HireStaffAction
   | PlayEventAction
   | PeekIncidentAction
+  | CommunityFavourAction
   | EndTurnAction;
 
 // ── Turn Result ─────────────────────────────────────────────
@@ -290,6 +298,10 @@ export function executeAction(
       // scene layer's job via peekIncidentDeck directly.
       peekIncidentDeck(state);
       return null;
+    case 'community-favour': {
+      const result = executeCommunityFavour(state, action.direction);
+      return result;
+    }
     default:
       throw new Error(`Unknown action type: ${(action as PlayerAction).type}`);
   }
@@ -571,6 +583,80 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
   return event;
 }
 
+// ── Community Favour (CG-0MSTOATDQ005XDET) ─────────────────
+
+/**
+ * Executes the Community Favour exchange.
+ *
+ * This is a **free** once-per-turn action available during MarketPhase.
+ * It does NOT consume `actionsRemaining` — it functions as a true fallback
+ * when the player cannot afford a market purchase.
+ *
+ * Exchange rates (per-difficulty via `state.config`):
+ *   - `coins-to-rep`: spends `favourCoinsToRepCost` coins for 1 reputation.
+ *   - `rep-to-coins`: spends `favourRepToCoinsRepCost` reputation for
+ *     `favourRepToCoinsCoinGain` coins.
+ *
+ * The round-trip is lossy (e.g. 2 coins → 1 rep → 1.5 coins on the default
+ * 2→3 rate), preventing infinite arbitrage.
+ *
+ * @param state   Current game state (mutated in-place).
+ * @param direction Exchange direction.
+ * @returns Always null — Community Favour is a pure resource exchange.
+ * @throws Error if the exchange is illegal (wrong phase, gate used,
+ *         insufficient funds, game over).
+ */
+export function executeCommunityFavour(
+  state: MainStreetState,
+  direction: 'coins-to-rep' | 'rep-to-coins',
+): null {
+  if (state.gameResult !== 'playing') {
+    throw new Error('Game is over. No more actions allowed.');
+  }
+  if (state.phase !== 'MarketPhase') {
+    throw new Error(`Cannot perform Community Favour during ${state.phase}. Must be in MarketPhase.`);
+  }
+  if (state.favourUsedThisTurn) {
+    throw new Error('You have already used Community Favour this turn.');
+  }
+
+  // Sync the ledger from resourceBank before validating so the exchange
+  // sees any direct resourceBank mutations (mirrors computeScore).
+  syncResourceBankToLedger(state);
+
+  const config = state.config;
+
+  if (direction === 'coins-to-rep') {
+    const cost = config.favourCoinsToRepCost;
+    if (state.ledger.get('coins') < cost) {
+      throw new Error(
+        `Not enough coins for Community Favour (coins-to-rep). Need ${cost}, have ${state.ledger.get('coins')}.`,
+      );
+    }
+    state.resourceBank.coins -= cost;
+    state.resourceBank.reputation += 1;
+    addLog(state, `Community Favour: spent ${cost} coins for 1 reputation.`, 'neutral');
+  } else {
+    // rep-to-coins
+    const repCost = config.favourRepToCoinsRepCost;
+    const coinGain = config.favourRepToCoinsCoinGain;
+    if (state.ledger.get('reputation') < repCost) {
+      throw new Error(
+        `Not enough reputation for Community Favour (rep-to-coins). Need ${repCost}, have ${state.ledger.get('reputation')}.`,
+      );
+    }
+    state.resourceBank.reputation -= repCost;
+    state.resourceBank.coins += coinGain;
+    addLog(state, `Community Favour: spent ${repCost} reputation for ${coinGain} coins.`, 'neutral');
+  }
+
+  // Sync the ledger so the exchange is visible to other engine systems.
+  syncResourceBankToLedger(state);
+
+  state.favourUsedThisTurn = true;
+  return null;
+}
+
 // ── Staff Peek Skill (CG-0MSXOW6GN008ZSMN) ─────────────────
 
 /**
@@ -768,6 +854,9 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   state.peekUsedThisTurn = false;
   // Clear any pending peek reveal — a new day starts with a clean slate.
   state.revealedPeekedCard = null;
+
+  // Community Favour gate (CG-0MSTOATDQ005XDET): one resource exchange per turn.
+  state.favourUsedThisTurn = false;
 
   state.phase = 'MarketPhase';
 }

@@ -597,6 +597,17 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       // but a greedy heuristic cannot exploit the revealed card, so it scores
       // below most productive actions.
       return 1;
+    case 'community-favour':
+      // Community Favour (CG-0MSTOATDQ005XDET): a free fallback when the
+      // player cannot afford purchases. Score based on resource state —
+      // rep-to-coins is useful when coins are low; coins-to-rep is less
+      // valuable early but may be useful late-game for win conditions.
+      if (action.direction === 'rep-to-coins' && state.resourceBank.coins < state.config.startingCoins) {
+        return 3; // useful fallback when cash-strapped
+      }
+      // Default low score — it is always available but generally subordinate
+      // to productive actions that generate income.
+      return 1;
   }
 }
 
