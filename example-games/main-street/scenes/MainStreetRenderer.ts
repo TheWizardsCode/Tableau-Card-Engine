@@ -1588,7 +1588,10 @@ export class MainStreetRenderer {
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();
-        s.instructionText.setText(
+        // Reset the HintBar to the standard market instruction (AC3).
+        // s.instructionText is the same text object as s.hintBar.textObject,
+        // so route the reset through HintBar explicitly for consistency.
+        s.hintBar.setText(
           `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
         );
       });
@@ -1609,7 +1612,10 @@ export class MainStreetRenderer {
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();
-        s.instructionText.setText(
+        // Reset the HintBar to the standard market instruction (AC3).
+        // s.instructionText is the same text object as s.hintBar.textObject,
+        // so route the reset through HintBar explicitly for consistency.
+        s.hintBar.setText(
           `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
         );
       });
