@@ -3,7 +3,7 @@
  *
  * Validates that the highlight rectangles drawn by showStep
  * cover the correct UI areas for each TutorialHighlightZone in the
- * unified T1–T17 tutorial system.
+ * unified T1–T18 tutorial system.
  *
  * Unified step mapping (18 steps):
  *   0=T1 centerModal(confirm)  1=T2 developmentRow(confirm)

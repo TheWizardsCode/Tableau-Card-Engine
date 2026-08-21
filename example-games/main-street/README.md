@@ -4,6 +4,23 @@ Main Street now uses the shared **Screen Layout Language (SLL)** as its canonica
 
 The street is a 10-slot grid rendered as **2 rows × 5 columns**; synergy adjacency is **8-way (Chebyshev)** — orthogonally *and* diagonally adjacent slots count as neighbors (CG-0MSP1HCAS00785MP).
 
+## Community Favour (CG-0MSTOATDQ005XDET)
+
+Main Street has a **Community Favour** resource exchange available once per turn during the market phase (a **FREE** action — it does **not** consume `actionsRemaining`):
+
+- **coins → reputation:** spend `favourCoinsToRepCost` (default **2**) coins for **+1** reputation.
+- **reputation → coins:** spend `favourRepToCoinsRepCost` (default **2**) reputation for `favourRepToCoinsCoinGain` (default **3**) coins.
+
+Rules:
+- **Once per turn:** `state.favourUsedThisTurn` gates the exchange; reset at each `DayStart`.
+- **MarketPhase only:** rejected outside the market phase.
+- **Lossy round-trip:** 2 coins → 1 rep → 1.5 coins (2→3 rate), so the exchange cannot be arbitraged.
+- **Configurable:** the three rates live on `GameConfig` and are tuned per-difficulty in `MainStreetDifficulty.ts` (defaults on all three presets).
+- **UI:** two SLL-positioned buttons in the market-phase action bar (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones; rendered in `MainStreetRenderer.refreshActionButtons`), disabled when the input resource is insufficient or the gate is spent.
+- **AI:** `enumerateLegalActions` includes the action when affordable and unused; `GreedyStrategy` uses it only when genuinely stalled (cannot afford the cheapest market card) with a reputation buffer, so it never dominates normal purchases.
+- **Tutorial:** T13 teaches the rep→coins exchange (required to afford the $7 Library with the 12-coin scenario budget); the tutorial starts with 12 coins so the conversion is mandatory.
+- **Persistence:** `favourUsedThisTurn` is serialized with legacy-save backfill to `false`.
+
 ## Layout files and adapter
 
 - Canonical layout JSON: `example-games/main-street/layouts/main-street.layout.json`

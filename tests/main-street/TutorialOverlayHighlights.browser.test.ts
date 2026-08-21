@@ -13,7 +13,7 @@
  * highlight zones must match these targets, otherwise the highlights land on
  * empty space instead of on their target element.
  *
- * Unified step mapping for the alignment checks (17 steps):
+ * * Unified step mapping for the alignment checks (18 steps):
  *   T2 (developmentRow, index 1)  T3 (laundromatCard, index 2)
  *   T4 (hand, index 3)  T5 (streetGrid, index 4)
  *   T6 (incidentQueue, index 5)  T7 (endTurnButton, index 6)
@@ -382,7 +382,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
     destroyGame();
   });
 
-  /** All 17 steps with their highlight zones (null zones have no rect). */
+  /** All 18 steps with their highlight zones (null zones have no rect). */
   const alignmentSteps = UNIFIED_TUTORIAL_STEPS
     .map((step, index) => ({ id: step.id, stepIndex: index, zone: step.highlightZone }))
     .filter((s) => !NULL_ZONES.has(s.zone));

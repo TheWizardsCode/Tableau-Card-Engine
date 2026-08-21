@@ -2,7 +2,7 @@
  * Main Street Tutorial — English locale bundle.
  *
  * Contains all user-facing string values for:
- * - T1–T17 tutorial step titles and bodies
+ * - T1–T18 tutorial step titles and bodies
  * - Tutorial offer modal (title, body, skip/start buttons)
  * - Tutorial overlay buttons (dismiss, next, exit, start full game)
  *
@@ -11,7 +11,7 @@
  * - Modal: `tutorial.modal.<field>`
  * - Overlay: `tutorial.overlay.<field>`
  *
- * ## Editorial rules (17-step flow)
+ * ## Editorial rules (18-step flow)
  *
  * - **≤3 sentences per text box** (titles and bodies), exactly one point per box.
  * - Do NOT mention time-limited play (the "25 turns" sentence was removed).

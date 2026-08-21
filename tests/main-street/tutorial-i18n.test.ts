@@ -179,7 +179,7 @@ describe('Tutorial i18n: resolveTutorialStepText', () => {
     expect(body).toContain(row.name);
   });
 
-  it('works for all 17 steps', () => {
+  it('works for all tutorial steps', () => {
     for (const step of UNIFIED_TUTORIAL_STEPS) {
       const { title, body } = resolveTutorialStepText(step);
       expect(title.length).toBeGreaterThan(0);

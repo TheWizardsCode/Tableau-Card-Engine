@@ -1,7 +1,7 @@
 /**
  * Main Street: Unified Tutorial Flow
  *
- * Defines the unified T1-T17 tutorial steps (17 steps) that teach the core
+ * Defines the unified T1-T18 tutorial steps (18 steps) that teach the core
  * Main Street loop (buy → hand → place; invest → optimize → trigger). Each
  * step has a gate type:
  *
@@ -112,7 +112,7 @@ export type TutorialActionType =
 export type TutorialGateType = 'confirm' | 'action';
 
 /**
- * A single unified tutorial step definition (17 steps total T1-T17).
+ * A single unified tutorial step definition (18 steps total T1-T18).
  *
  * Confirm steps only need `gate: 'confirm'`; they do not have a
  * `requiredAction` field because the only way to advance is by
@@ -173,7 +173,7 @@ export interface UnifiedTutorialStepDef {
   synergyCardId?: string;
 }
 
-// ── Unified Tutorial Script (T1-T17) ────────────────────────
+// ── Unified Tutorial Script (T1-T18) ────────────────────────
 
 /**
  * The unified set of 18 tutorial steps, in sequential order.
