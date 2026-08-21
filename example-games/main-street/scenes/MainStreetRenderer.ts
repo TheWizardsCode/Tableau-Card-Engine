@@ -1532,10 +1532,7 @@ export class MainStreetRenderer {
 
       const hand = s.state.hand ?? [];
       const handCount = hand.length;
-      const hint = s.add.text(rightX, by - 4, `Card in hand (${handCount}) — click an empty slot to place`, {
-        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 1);
-      s.actionContainer.add(hint);
+      s.hintBar.setText(`Card in hand (${handCount}) — click an empty slot to place`);
 
       // Cancel button (right-aligned) — returns to market, card stays in hand
       const btnW = s.layout.actionButtonW;
@@ -1557,10 +1554,7 @@ export class MainStreetRenderer {
       const by = s.layout.actionY;
 
       const cardName = s.pendingBusinessCard?.name ?? '???';
-      const hint = s.add.text(rightX, by - 4, `Place "${cardName}" -- click an empty slot`, {
-        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 1);
-      s.actionContainer.add(hint);
+      s.hintBar.setText(`Place "${cardName}" -- click an empty slot`);
 
       // Cancel button (right-aligned)
       const btnW = s.layout.actionButtonW;
