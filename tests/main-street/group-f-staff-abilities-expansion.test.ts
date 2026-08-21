@@ -10,7 +10,9 @@
  *   Accountant reduces the investments-refresh cost by 1.
  * - Staff without abilities (Apprentice, Executive, and the existing
  *   Assistant/Manager/Director) behave exactly as before (AC3).
- * - All IDs unique (AC4); staff cards carry no tier (existing convention).
+ * - All IDs unique (AC4); staff cards carry tiers following the rebalance
+ *   (CG-0MT2WU0CX005Z143): every staff card is assigned a tier so staff are
+ *   unlocked through the same progression as other families.
  *
  * @module
  */
@@ -24,7 +26,6 @@ import {
   createEventDeck,
   createUpgradeDeck,
   CARD_TIER_MAP,
-  CARD_TEMPLATE_NAMES,
   type StaffCard,
 } from '../../example-games/main-street/MainStreetCards';
 import { validateCsvRows } from '../../src/balance-cards';
@@ -80,18 +81,20 @@ describe('Group F staff expansion: uniqueness & tier convention (AC4)', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('staff cards carry no tier (existing convention)', () => {
+  it('staff cards carry a tier (rebalance, CG-0MT2WU0CX005Z143)', () => {
     for (const c of NEW_STAFF_CONTRACTS) {
-      expect(CARD_TIER_MAP.has(c.id), `${c.id} should not be tier-assigned`).toBe(false);
+      expect(CARD_TIER_MAP.has(c.id), `${c.id} should be tier-assigned`).toBe(true);
     }
   });
 
-  it('staff cards are not tier-registered (existing convention)', () => {
-    // CARD_TEMPLATE_NAMES/CARD_TIER_MAP cover tiered families only; staff
-    // cards carry no tier and are intentionally absent from both maps.
-    for (const c of NEW_STAFF_CONTRACTS) {
-      expect(CARD_TEMPLATE_NAMES.has(c.id), `${c.id} should not be in CARD_TEMPLATE_NAMES`).toBe(false);
-      expect(CARD_TIER_MAP.has(c.id), `${c.id} should not be tier-assigned`).toBe(false);
+  it('staff cards are tier-registered like other families (rebalance, CG-0MT2WU0CX005Z143)', () => {
+    // All staff cards are tier-assigned and cover every tier so no tier lacks
+    // staff (the rebalance requires all five families present in each tier).
+    const staffIds = getCsvRows().filter(r => r.family === 'staff').map(r => r.id);
+    const staffTiers = new Set(staffIds.map(id => CARD_TIER_MAP.get(id)));
+    expect(staffTiers).toEqual(new Set(['1', '2', '3', '4', '5']));
+    for (const id of staffIds) {
+      expect(CARD_TIER_MAP.has(id), `${id} should be tier-assigned`).toBe(true);
     }
   });
 });

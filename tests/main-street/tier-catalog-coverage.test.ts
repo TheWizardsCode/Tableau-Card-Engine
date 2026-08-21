@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createBusinessDeck, createCommunitySpaceDeck, createEventDeck, createUpgradeDeck } from '../../example-games/main-street/MainStreetCards';
+import { createBusinessDeck, createCommunitySpaceDeck, createEventDeck, createUpgradeDeck, createStaffDeck } from '../../example-games/main-street/MainStreetCards';
 import { TIER_DEFINITIONS } from '../../example-games/main-street/MainStreetTiers';
 import { createSeededRng } from '../../src/core-engine';
 
@@ -10,7 +10,8 @@ function allTemplateIds(): Set<string> {
   const communitySpaces = createCommunitySpaceDeck(1).map(c => c.id.replace(/-\d+$/, ''));
   const events = createEventDeck(1, undefined, rng, 1).map(c => c.id.replace(/-\d+$/, ''));
   const upgrades = createUpgradeDeck(1).map(c => c.id.replace(/-\d+$/, ''));
-  return new Set([...business, ...communitySpaces, ...events, ...upgrades]);
+  const staff = createStaffDeck(1).map(c => c.id.replace(/-\d+$/, ''));
+  return new Set([...business, ...communitySpaces, ...events, ...upgrades, ...staff]);
 }
 
 describe('Main Street tier catalog coverage', () => {
@@ -38,8 +39,8 @@ describe('Main Street tier catalog coverage', () => {
     const expandedCountInTier1 = TIER_DEFINITIONS['tier-1'].newCardIds.filter(id => !baselineM1.has(id)).length;
 
     expect(expanded.length).toBeGreaterThan(0);
-    // 26 tier-1 cards - 13 fixed M1 baseline = 13 (+cs-playground, 3 Group D,
-    // upg-adventure-park, evt-graffiti-art)
-    expect(expandedCountInTier1).toBe(13);
+    // 27 tier-1 cards - 13 fixed M1 baseline = 14 (cs-playground rebalanced to
+    // T2, +2 staff tiered in at T1; rebalance CG-0MT2WU0CX005Z143).
+    expect(expandedCountInTier1).toBe(14);
   });
 });

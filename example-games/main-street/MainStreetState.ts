@@ -627,17 +627,20 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   // are selected deterministically per-game-seed rather than by template order.
   const eventDeck = createEventDeck(3, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
-  const staffDeck = createStaffDeck(1);
+  // Staff deck is tier-gated like the other families (CG-0MT2WU0CX005Z143):
+  // only staff whose tier is unlocked appear in the staff market.
+  const staffDeck = createStaffDeck(1, options.unlockedCardIds);
 
   shuffleArray(businessDeck, rng);
   shuffleArray(communitySpaceDeck, rng);
   shuffleArray(eventDeck, rng);
   shuffleArray(upgradeDeck, rng);
-  // Staff deck shuffle: draw count scales with deck size, so adding a staff
-  // template shifts the seeded game draws (market refill, challenge
-  // selection) by one — the established precedent when staff templates grow
-  // (e.g. General Manager, CG-0MSTOF1N5005PK2R). Seeded determinism (same
-  // seed ⇒ same game) is preserved.
+  // Staff deck shuffle: draw count scales with deck size (now tier-filtered,
+  // CG-0MT2WU0CX005Z143), so changing the unlocked pool shifts the seeded
+  // game draws (market refill, challenge selection) — the established
+  // precedent when staff template counts change (e.g. General Manager,
+  // CG-0MSTOF1N5005PK2R). Seeded determinism (same seed ⇒ same game) is
+  // preserved.
   shuffleArray(staffDeck, rng);
 
   // Populate initial market — single-row marketplace (CG-0MSTOATDT009BRX2):

@@ -24,11 +24,11 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
-| Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 7 | 140 |
-| Net increase | +24 | +49 | +31 | +8 | +7 | +119 |
+| Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 9 | 142 |
+| Net increase | +24 | +49 | +31 | +8 | +9 | +121 |
 
 - 2x target from baseline: `>= 40` templates
-- Current total: `140` templates (`7x` baseline)
+- Current total: `142` templates (`7.1x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
@@ -140,8 +140,8 @@ Adds the first **Health bridge cards**, mid-tier (T2/T3) singles across every sy
 
 | ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
 |----|------|------|--------|---------|------|----------|-------------|-----------|
-| `biz-juice-bar` | Juice Bar | 5 | 0.5 | Food + Health | 2 | — | Fresh juices and smoothies. Bridges Food and Health synergies. | First Health bridge; connects the existing Food cluster to Health. |
-| `biz-yoga-studio` | Yoga Studio | 8 | 1 | Culture + Health | 3 | — | Calm practice space for mind and body. Bridges Culture and Health synergies. | Culture–Health bridge; mid-tier wellness option. |
+| `biz-juice-bar` | Juice Bar | 5 | 0.5 | Food + Health | 3 | — | Fresh juices and smoothies. Bridges Food and Health synergies. | First Health bridge; connects the existing Food cluster to Health. |
+| `biz-yoga-studio` | Yoga Studio | 8 | 1 | Culture + Health | 4 | — | Calm practice space for mind and body. Bridges Culture and Health synergies. | Culture–Health bridge; mid-tier wellness option. |
 | `biz-physio` | Physiotherapy | 10 | 1 | Health + Service | 4 | 0.1 | Recovery and rehabilitation care. Bridges Health and Service synergies. Provides +0.1 reputation per turn. | Health–Service bridge with a small reputation perk. |
 
 #### Singles (mid-tier depth)
@@ -149,10 +149,10 @@ Adds the first **Health bridge cards**, mid-tier (T2/T3) singles across every sy
 | ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
 |----|------|------|--------|---------|------|----------|-------------|-----------|
 | `biz-tailor` | Tailor | 5 | 0.75 | Service | 2 | — | Custom tailoring and repairs. Gains 50% of base income per adjacent Service business. | Mid Service single; smooths T2. |
-| `biz-gym` | Gym | 8 | 1 | Health | 3 | — | Fitness training for the whole street. Gains 50% of base income per adjacent Health business. | Health single; T3 anchor. |
-| `biz-dentist` | Dentist | 12 | 1.5 | Health | 4 | — | Smiles for the whole street. Gains 50% of base income per adjacent Health business. | Premium Health single. |
-| `biz-toy-store` | Toy Store | 5 | 0.75 | Commerce | 2 | — | Toys and games for young shoppers. Gains 50% of base income per adjacent Commerce business. | Commerce depth at T2. |
-| `biz-music-store` | Music Store | 8 | 1 | Entertainment | 3 | — | Records and instruments for every taste. Gains 50% of base income per adjacent Entertainment business. | Entertainment depth at T3. |
+| `biz-gym` | Gym | 8 | 1 | Health | 5 | — | Fitness training for the whole street. Gains 50% of base income per adjacent Health business. | Health single; T5 anchor (rebalanced from T3, CG-0MT2WU0CX005Z143). |
+| `biz-dentist` | Dentist | 12 | 1.5 | Health | 5 | — | Smiles for the whole street. Gains 50% of base income per adjacent Health business. | Premium Health single (rebalanced from T4). |
+| `biz-toy-store` | Toy Store | 5 | 0.75 | Commerce | 3 | — | Toys and games for young shoppers. Gains 50% of base income per adjacent Commerce business. | Commerce depth at T3 (rebalanced from T2). |
+| `biz-music-store` | Music Store | 8 | 1 | Entertainment | 5 | — | Records and instruments for every taste. Gains 50% of base income per adjacent Entertainment business. | Entertainment depth at T5 (rebalanced from T3). |
 | `biz-delicatessen` | Delicatessen | 5 | 0.75 | Food | 2 | — | Fine meats and cheeses. Gains 50% of base income per adjacent Food business. | Food depth at T2. |
 | `biz-craft-shop` | Craft Shop | 5 | 0.75 | Culture | 2 | — | Handmade goods by local makers. Gains 50% of base income per adjacent Culture business. | Culture single (only Bookshop existed before). |
 
@@ -183,12 +183,12 @@ Adds reputation assets across five synergies, including the family's first bridg
 
 | ID | Name | Cost | Income | Ongoing | Synergy | Tier | Rep/turn | Description | Rationale |
 |----|------|------|--------|---------|---------|------|----------|-------------|-----------|
-| `cs-playground` | Playground | 4 | 0 | 0 | Entertainment | 1 | 0.05 | A safe place for kids to play. Provides +0.05 reputation per turn. | Cheap early reputation asset. |
+| `cs-playground` | Playground | 4 | 0 | 0 | Entertainment | 2 | 0.05 | A safe place for kids to play. Provides +0.05 reputation per turn. | Cheap early reputation asset (rebalanced from T1). |
 | `cs-community-garden` | Community Garden | 5 | 0 | 0.1 | Food | 2 | 0.1 | A shared garden plot for the neighbourhood. Costs 0.1 coins/turn to run; +0.1 rep/turn. | Food reputation asset with a small running cost. |
-| `cs-fountain` | Town Fountain | 5 | 0 | 0 | Culture | 2 | 0.1 | A gathering spot around the fountain. Provides +0.1 reputation per turn. | Culture reputation asset. |
+| `cs-fountain` | Town Fountain | 5 | 0 | 0 | Culture | 3 | 0.1 | A gathering spot around the fountain. Provides +0.1 reputation per turn. | Culture reputation asset (rebalanced from T2). |
 | `cs-health-kiosk` | Health Kiosk | 6 | 0 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. Costs 0.15 coins/turn to run; +0.15 rep/turn. | Health reputation asset; deepens the Health family. |
-| `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset. |
-| `cs-public-art` | Public Art | 8 | 0 | 0.25 | Culture + Entertainment | 4 | 0.2 | A vibrant public sculpture. Costs 0.25 coins/turn to run; +0.2 rep/turn. Bridges Culture and Entertainment community spaces. | Bridge community space; highest ongoing cost and rep yield. |
+| `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 4 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset (rebalanced from T3). |
+| `cs-public-art` | Public Art | 8 | 0 | 0.25 | Culture + Entertainment | 5 | 0.2 | A vibrant public sculpture. Costs 0.25 coins/turn to run; +0.2 rep/turn. Bridges Culture and Entertainment community spaces. | Bridge community space; highest ongoing cost and rep yield (rebalanced from T4). |
 
 ### M3 Upgrade Templates (12) — Group E expansion (CG-0MSQJ7SYD008U3EE)
 
@@ -441,15 +441,16 @@ This writes per-run and aggregate metrics to:
 
 ## Staff Cards
 
-Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots, have no tier, and are purchased from a dedicated staff-card market.
+Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice, Assistant). They are purchased from the dedicated staff-card market.
 
-| ID | Name | Cost | Ongoing/turn | Slots+ | Ability | Description | Rationale |
-|----|------|------|--------------|--------|---------|-------------|-----------|
-| `staff-apprentice` | Apprentice | 2 | 0.5 | +1 | — | A budget hire who frees up a hand slot with a small ongoing cost. | Budget entry point *(Group F).* |
-| `staff-assistant` | Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
-| `staff-manager` | Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
-| `staff-socialite` | Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
-| `staff-accountant` | Accountant | 8 | 1.5 | +1 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
-| `staff-director` | Director | 14 | 4 | +3 | — | An experienced director oversees your operations. | Premium capacity. |
-| `staff-executive` | Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
-| `staff-general-manager` | General Manager | 20 | 5 | +4 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
+| ID | Name | Cost | Ongoing/turn | Slots+ | Tier | Ability | Description | Rationale |
+|----|------|------|--------------|--------|------|---------|-------------|-----------|
+| `staff-apprentice` | Apprentice | 2 | 0.5 | +1 | 1 | — | A budget hire who frees up a hand slot with a small ongoing cost. | Budget entry point *(Group F).* |
+| `staff-assistant` | Assistant | 3 | 1 | +1 | 1 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
+| `staff-manager` | Manager | 7 | 2.5 | +2 | 2 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
+| `staff-socialite` | Socialite | 8 | 1.5 | +1 | 2 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
+| `staff-accountant` | Accountant | 8 | 1.5 | +1 | 3 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
+| `staff-lookout` | Lookout | 10 | 2 | +1 | 3 | Peek once/turn | A sharp-eyed lookout can peek at the top card of the incident deck once per turn. | **NEW** peek ability *(CG-0MSXOW6GN008ZSMN).* |
+| `staff-director` | Director | 14 | 4 | +3 | 4 | — | An experienced director oversees your operations. | Premium capacity. |
+| `staff-executive` | Executive | 20 | 5 | +4 | 4 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
+| `staff-general-manager` | General Manager | 20 | 5 | +4 | 5 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |

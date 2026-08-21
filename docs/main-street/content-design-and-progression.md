@@ -70,13 +70,13 @@ Community-space cards are placed on the street grid like businesses but generate
 | Name | Cost (coins) | Ongoing/turn | Synergy | Tier | Rep/turn | Description |
 |------|--------------|--------------|---------|------|----------|-------------|
 | Park | 3 | 0 | Culture | 1 | 0 | Offers leisure space. Full Culture synergy participation. |
-| Playground | 4 | 0 | Entertainment | 1 | 0.05 | A safe place for kids to play. *(Group B.)* |
+| Playground | 4 | 0 | Entertainment | 2 | 0.05 | A safe place for kids to play. *(Group B.)* |
 | Community Garden | 5 | 0.1 | Food | 2 | 0.1 | A shared garden plot for the neighbourhood. *(Group B.)* |
-| Town Fountain | 5 | 0 | Culture | 2 | 0.1 | A gathering spot around the fountain. *(Group B.)* |
+| Town Fountain | 5 | 0 | Culture | 3 | 0.1 | A gathering spot around the fountain. *(Group B.)* |
 | Health Kiosk | 6 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. *(Group B.)* |
-| Community Shelter | 6 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. *(Group B.)* |
+| Community Shelter | 6 | 0 | Service | 4 | 0.15 | A warm shelter for those in need. *(Group B.)* |
 | Library | 7 | 0.25 | Culture | 1 | 0.1 | Quiet community space for reading and learning. |
-| Public Art | 8 | 0.25 | Culture, Entertainment | 4 | 0.2 | A vibrant public sculpture. Bridges Culture and Entertainment community spaces. *(Group B.)* |
+| Public Art | 8 | 0.25 | Culture, Entertainment | 5 | 0.2 | A vibrant public sculpture. Bridges Culture and Entertainment community spaces. *(Group B.)* |
 
 ### 1.3 Upgrade Cards
 | Name | Target Business | Cost (coins) | Income Bonus | Synergy Range Bonus | Description |
@@ -103,15 +103,17 @@ Community-space cards are placed on the street grid like businesses but generate
 
 Staff cards expand hand capacity at an ongoing per-turn coin cost. *(Group F, CG-0MSQJ7VL9009JHF4, grew this family from 3 to 7 cards.)*
 
-| Name | Cost | Ongoing/turn | Slots+ | Ability | Description |
-|------|------|--------------|--------|---------|-------------|
-| Apprentice | 2 | 0.5 | +1 | — | A budget hire who frees up a hand slot. *(Group F.)* |
-| Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. |
-| Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. |
-| Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds hand capacity and reputation. *(Group F.)* |
-| Accountant | 8 | 1.5 | +1 | refresh −1 | Makes market refreshes cost 1 less. *(Group F.)* |
-| Director | 14 | 4 | +3 | — | An experienced director oversees your operations. |
-| Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity. *(Group F.)* |
+| Name | Cost | Ongoing/turn | Slots+ | Tier | Ability | Description |
+|------|------|--------------|--------|------|---------|-------------|
+| Apprentice | 2 | 0.5 | +1 | 1 | — | A budget hire who frees up a hand slot. *(Group F.)* |
+| Assistant | 3 | 1 | +1 | 1 | — | Hire an assistant to help manage your hand. |
+| Manager | 7 | 2.5 | +2 | 2 | — | A skilled manager keeps things organised. |
+| Socialite | 8 | 1.5 | +1 | 2 | +0.1 rep/turn | A charming socialite adds hand capacity and reputation. *(Group F.)* |
+| Accountant | 8 | 1.5 | +1 | 3 | refresh −1 | Makes market refreshes cost 1 less. *(Group F.)* |
+| Lookout | 10 | 2 | +1 | 3 | peek once/turn | Peek at the top incident-deck card once per turn. *(CG-0MSXOW6GN008ZSMN.)* |
+| Director | 14 | 4 | +3 | 4 | — | An experienced director oversees your operations. |
+| Executive | 20 | 5 | +4 | 4 | — | An experienced executive adds major hand capacity. *(Group F.)* |
+| General Manager | 20 | 5 | +4 | 5 | +1 action/turn | Grants an extra action per day while employed. *(CG-0MSTOF1N5005PK2R.)* |
 
 ## 2. Recipes / Blueprints
 
