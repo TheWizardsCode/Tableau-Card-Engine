@@ -119,7 +119,9 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
 
 /** First business card in the development row, made affordable deterministically. */
 function pickAffordableBusiness(state: any): any {
-  const card = state.market.cards.find((c: any) => c.family === 'business');
+  const card = state.market.cards.find(
+    (c: any) => c.family === 'business' || c.family === 'community-space',
+  );
   if (!card) throw new Error('No business card in development row for test');
   // Ensure the player can afford it regardless of seed. Drag-drop buy-and-place
   // now pays a +50% premium over the listed cost (CG-0MSTOF1N5005PK2R), so

@@ -244,7 +244,9 @@ describe('Main Street click-path illegal-afford feedback', () => {
 
   describe('onSlotClick (insufficient coins to place business from hand)', () => {
     it('plays sfx-illegal-move and shakes the hand card when placement is unaffordable', async () => {
-      const biz = scene.state.market.cards.find((c: any) => c.family === 'business');
+      const biz = scene.state.market.cards.find(
+        (c: any) => c.family === 'business' || c.family === 'community-space',
+      );
       biz.cost = 5;
       scene.state.hand = [biz];
       scene.state.streetGrid[0] = null;
@@ -269,7 +271,9 @@ describe('Main Street click-path illegal-afford feedback', () => {
     });
 
     it('does NOT play feedback when the slot is occupied (non-affordability)', async () => {
-      const biz = scene.state.market.cards.find((c: any) => c.family === 'business');
+      const biz = scene.state.market.cards.find(
+        (c: any) => c.family === 'business' || c.family === 'community-space',
+      );
       biz.cost = 1;
       scene.state.hand = [biz];
       scene.state.streetGrid[0] = { id: 'other-biz', family: 'business' };
