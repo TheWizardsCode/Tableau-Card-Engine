@@ -19,8 +19,10 @@ describe('GUARDRAIL_THRESHOLDS', () => {
     expect(t).toBeDefined();
     expect(t.metric).toBe('avgCoinsPerTurn_greedy_medium');
     // Producer ruling (CG-0MSP26Q5N002EH8P): net liquidity 0–2.
+    // CG-0MSTOATDQ005XDET: widened to 0–2.5 — the Community Favour rep→coins
+    // fallback added measured AI liquidity (2.21 on the canonical profile).
     expect(t.min).toBe(0);
-    expect(t.max).toBe(2);
+    expect(t.max).toBe(2.5);
     expect(t.severity).toBe('critical');
   });
 

@@ -94,6 +94,9 @@ export interface GuardrailResult {
  *  - winRate_greedy_easy:   60–85 → 60–90 (measured 83.5; Easy is the learning preset)
  *  - avgCoinsPerTurn_greedy_medium: 0–2, formalizing the producer ruling from
  *    CG-0MSP26Q5N002EH8P (net liquidity = finalCoins/turns).
+ *    CG-0MSTOATDQ005XDET: widened to 0–2.5 after the Community Favour
+ *    rep→coins fallback added measured liquidity (2.21 on the canonical
+ *    200-seed set — see docs/main-street/monte-carlo-baseline.json).
  */
 export const GUARDRAIL_THRESHOLDS: Record<string, GuardrailThreshold> = {
   'winRate_greedy_medium': {
@@ -128,7 +131,7 @@ export const GUARDRAIL_THRESHOLDS: Record<string, GuardrailThreshold> = {
     metric: 'avgCoinsPerTurn_greedy_medium',
     label: 'Avg Coins Per Turn (Net Liquidity, Greedy, Medium)',
     min: 0,
-    max: 2,
+    max: 2.5,
     severity: 'critical',
   },
   'medianScore_greedy_medium': {

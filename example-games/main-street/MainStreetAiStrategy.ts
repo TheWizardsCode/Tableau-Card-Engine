@@ -31,6 +31,7 @@ import {
   type PlayBusinessFromHandAction,
   type PlayUpgradeFromHandAction,
   type PlayEventFromHandAction,
+  type CommunityFavourAction,
 } from './MainStreetEngine';
 import {
   canPurchaseBusiness,
@@ -140,12 +141,33 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   const hand = state.hand ?? [];
   const emptySlots = getEmptySlots(state);
 
+  // ── Community Favour (CG-0MSTOATDQ005XDET) ────────────────
+  // A FREE once-per-turn resource exchange (does not consume actionsRemaining),
+  // so it stays available even when the daily action budget is spent — as a
+  // fallback when the player cannot afford any market purchase. Legal only
+  // during MarketPhase, once per turn, and when the input resource suffices.
+  if (
+    state.phase === 'MarketPhase' &&
+    !state.favourUsedThisTurn &&
+    state.actionsRemaining >= 0
+  ) {
+    if (state.resourceBank.coins >= state.config.favourCoinsToRepCost) {
+      actions.push({ type: 'community-favour', direction: 'coins-to-rep' });
+    }
+    if (state.resourceBank.reputation >= state.config.favourRepToCoinsRepCost) {
+      actions.push({ type: 'community-favour', direction: 'rep-to-coins' });
+    }
+  }
+
   // Action economy (CG-0MSTOF1N5005PK2R): when the daily action budget is
   // spent, only end-turn is legal. Free operations (refresh/sell/hint/
   // discard/end-turn) stay available to the player, but the AI simply ends
-  // the day rather than cycling through non-actions.
+  // the day rather than cycling through non-actions. The free Community
+  // Favour fallback (added above) stays legal too — with end-turn always
+  // present so the AI loop still terminates.
   if ((state.actionsRemaining ?? 1) <= 0) {
-    return [{ type: 'end-turn' }];
+    if (actions.length === 0) return [{ type: 'end-turn' }];
+    return [...actions, { type: 'end-turn' }];
   }
 
   // ── buy-business (direct buy-and-place, pays immediately) ──
@@ -254,6 +276,29 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
 // ── RandomStrategy ──────────────────────────────────────────
 
 /**
+ * Returns the cheapest purchasable MARKET card cost (business/community-
+ * space/upgrade/event), or Infinity when the market is empty.
+ *
+ * Used by the Community Favour heuristic to detect a STALLED turn — a
+ * player who cannot afford the cheapest market card cannot advance the
+ * economy with normal purchases, so the free rep→coins exchange is the
+ * right fallback. Staff cards are excluded: they are a late-game luxury
+ * purchase in a separate market and are rarely the gatekeeper card.
+ */
+function getCheapestMarketCost(state: MainStreetState): number {
+  const marketCards = state.market?.cards ?? [];
+  let cheapest = Infinity;
+  for (const card of marketCards) {
+    if (typeof card !== 'object' || card === null) continue;
+    const cost = (card as { cost?: number }).cost;
+    if (typeof cost === 'number' && cost >= 0 && cost < cheapest) cheapest = cost;
+  }
+  return cheapest;
+}
+
+// ── RandomStrategy ──────────────────────────────────────────
+
+/**
  * Selects a uniformly random legal action each turn.
  *
  * Baseline strategy used for Monte Carlo balance testing and as a
@@ -353,7 +398,26 @@ export const GreedyStrategy: MainStreetAiStrategy = {
       return pickRandom(discardActions, rng);
     }
 
-    // Priority 9: end turn
+    // Priority 9: Community Favour fallback (CG-0MSTOATDQ005XDET).
+    // A FREE once-per-turn exchange, reached only when nothing more
+    // productive is available (no purchases/plays/moves). Only fires when
+    // the best favour action is genuinely value-creating (score > 1:
+    // e.g. rep-to-coins when cash-strapped). Neutral conversions (score 1)
+    // are skipped — blindly burning coins for rep every turn destroys
+    // liquidity and collapses the economy (a lossy exchange). This keeps
+    // AI turns meaningful on an unaffordable market without dominating
+    // normal purchases when affordable.
+    const favourActions = legalActions.filter(
+      a => a.type === 'community-favour',
+    ) as CommunityFavourAction[];
+    if (favourActions.length > 0) {
+      const best = pickBest(favourActions, a => scoreAction(state, a), rng);
+      if (scoreAction(state, best) > 1) {
+        return best;
+      }
+    }
+
+    // Priority 10: end turn
     return { type: 'end-turn' };
   },
 };
@@ -599,14 +663,29 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       return 1;
     case 'community-favour':
       // Community Favour (CG-0MSTOATDQ005XDET): a free fallback when the
-      // player cannot afford purchases. Score based on resource state —
-      // rep-to-coins is useful when coins are low; coins-to-rep is less
-      // valuable early but may be useful late-game for win conditions.
-      if (action.direction === 'rep-to-coins' && state.resourceBank.coins < state.config.startingCoins) {
-        return 3; // useful fallback when cash-strapped
+      // player cannot afford purchases. rep-to-coins is genuinely valuable
+      // only when the player is STALLED (cannot afford the cheapest market
+      // card) AND the conversion leaves a reputation buffer (reputation
+      // after the exchange stays >= 1) — burning the last reputation would
+      // trigger reputation-collapse loss. Otherwise the exchange is a
+      // low-value (score 1) legal fallback that never outranks purchases.
+      if (action.direction === 'rep-to-coins') {
+        const cheapestCardCost = getCheapestMarketCost(state);
+        // Convert only when genuinely stalled (cannot afford the cheapest
+        // market card) AND the conversion leaves a reputation buffer
+        // (reputation after the exchange stays >= 1) — burning the last
+        // reputation would trigger reputation-collapse loss.
+        if (
+          Number.isFinite(cheapestCardCost) &&
+          state.resourceBank.coins < cheapestCardCost &&
+          state.resourceBank.reputation >= state.config.favourRepToCoinsRepCost + 1
+        ) {
+          return 3; // useful fallback when stalled with rep to spare
+        }
+        return 1;
       }
-      // Default low score — it is always available but generally subordinate
-      // to productive actions that generate income.
+      // coins-to-rep: spending scarce coins on reputation is rarely better
+      // than buying cards; stays as a legal fallback at the low default.
       return 1;
   }
 }
