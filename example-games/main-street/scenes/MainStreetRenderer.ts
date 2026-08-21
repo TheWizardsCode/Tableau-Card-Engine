@@ -331,7 +331,8 @@ export class MainStreetRenderer {
     // Coins - left-aligned in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${Math.round(coins)}`, {
+    // HUD displays coins and reputation to 2 decimal places (presentation only; internal precision is 3dp). Score remains rounded to whole numbers.
+    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${coins.toFixed(2)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
@@ -350,7 +351,7 @@ export class MainStreetRenderer {
     s.hudContainer.add(actionText);
 
     // Reputation - centered in strip
-    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation}`, {
+    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation.toFixed(2)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 0.5));
     s.hudContainer.add(repText);
@@ -1525,16 +1526,58 @@ export class MainStreetRenderer {
         s.actionContainer.add(peekBtn);
       }
 
+      // ── Community Favour buttons (CG-0MSTOATDQ005XDET) ────────────────
+      // Two buttons (one per direction), positioned via SLL zones, to the
+      // left of the action cluster. Disabled when the input resource is
+      // insufficient, when the once-per-turn gate is spent, or outside
+      // MarketPhase (the refresh only renders in the market UI phase).
+      const favourW = s.layout.favourButtonW;
+      const favourGone = s.state.favourUsedThisTurn;
+      const coinsToRepCost = s.state.config.favourCoinsToRepCost;
+      const repToCoinsRepCost = s.state.config.favourRepToCoinsRepCost;
+      const repToCoinsCoinGain = s.state.config.favourRepToCoinsCoinGain;
+      const coinsToRepDisabled = favourGone || s.state.resourceBank.coins < coinsToRepCost;
+      const repToCoinsDisabled = favourGone || s.state.resourceBank.reputation < repToCoinsRepCost;
+
+      const favourCoinsToRepBtn = createActionButton(
+        s, s.layout.favourCoinsToRepX, by + 4, favourW,
+        `${coinsToRepCost}c → 1r`,
+        () => s.onCommunityFavourClick('coins-to-rep'),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: coinsToRepDisabled ? 0x2a2a2a : 0x442244,
+          fillAlpha: 0.8,
+          strokeColor: coinsToRepDisabled ? 0x444444 : 0xaa44aa,
+          textColor: coinsToRepDisabled ? '#666666' : '#ff88ff',
+          fontSize: '13px',
+          disabled: coinsToRepDisabled,
+        },
+      );
+      s.actionContainer.add(favourCoinsToRepBtn);
+
+      const favourRepToCoinsBtn = createActionButton(
+        s, s.layout.favourRepToCoinsX, by + 4, favourW,
+        `${repToCoinsRepCost}r → ${repToCoinsCoinGain}c`,
+        () => s.onCommunityFavourClick('rep-to-coins'),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: repToCoinsDisabled ? 0x2a2a2a : 0x224422,
+          fillAlpha: 0.8,
+          strokeColor: repToCoinsDisabled ? 0x444444 : 0x44aa44,
+          textColor: repToCoinsDisabled ? '#666666' : '#88ff88',
+          fontSize: '13px',
+          disabled: repToCoinsDisabled,
+        },
+      );
+      s.actionContainer.add(favourRepToCoinsBtn);
+
     } else if (s.uiPhase === 'placing-from-hand') {
       const rightX = s.layout.gameW - 24;
       const by = s.layout.actionY;
 
       const hand = s.state.hand ?? [];
       const handCount = hand.length;
-      const hint = s.add.text(rightX, by - 4, `Card in hand (${handCount}) — click an empty slot to place`, {
-        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 1);
-      s.actionContainer.add(hint);
+      s.hintBar.setText(`Card in hand (${handCount}) — click an empty slot to place`);
 
       // Cancel button (right-aligned) — returns to market, card stays in hand
       const btnW = s.layout.actionButtonW;
@@ -1545,7 +1588,10 @@ export class MainStreetRenderer {
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();
-        s.instructionText.setText(
+        // Reset the HintBar to the standard market instruction (AC3).
+        // s.instructionText is the same text object as s.hintBar.textObject,
+        // so route the reset through HintBar explicitly for consistency.
+        s.hintBar.setText(
           `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
         );
       });
@@ -1556,10 +1602,7 @@ export class MainStreetRenderer {
       const by = s.layout.actionY;
 
       const cardName = s.pendingBusinessCard?.name ?? '???';
-      const hint = s.add.text(rightX, by - 4, `Place "${cardName}" -- click an empty slot`, {
-        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 1);
-      s.actionContainer.add(hint);
+      s.hintBar.setText(`Place "${cardName}" -- click an empty slot`);
 
       // Cancel button (right-aligned)
       const btnW = s.layout.actionButtonW;
@@ -1569,7 +1612,10 @@ export class MainStreetRenderer {
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();
-        s.instructionText.setText(
+        // Reset the HintBar to the standard market instruction (AC3).
+        // s.instructionText is the same text object as s.hintBar.textObject,
+        // so route the reset through HintBar explicitly for consistency.
+        s.hintBar.setText(
           `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
         );
       });

@@ -52,12 +52,12 @@ interface NewCommunitySpaceContract {
 }
 
 const NEW_COMMUNITY_SPACE_CONTRACTS: NewCommunitySpaceContract[] = [
-  { id: 'cs-playground', name: 'Playground', cost: 4, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Entertainment'], tier: '1', reputationPerTurn: 0.05 },
+  { id: 'cs-playground', name: 'Playground', cost: 4, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Entertainment'], tier: '2', reputationPerTurn: 0.05 },
   { id: 'cs-community-garden', name: 'Community Garden', cost: 5, baseIncome: 0, ongoingCost: 0.1, synergyTypes: ['Food'], tier: '2', reputationPerTurn: 0.1 },
-  { id: 'cs-fountain', name: 'Town Fountain', cost: 5, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Culture'], tier: '2', reputationPerTurn: 0.1 },
+  { id: 'cs-fountain', name: 'Town Fountain', cost: 5, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Culture'], tier: '3', reputationPerTurn: 0.1 },
   { id: 'cs-health-kiosk', name: 'Health Kiosk', cost: 6, baseIncome: 0, ongoingCost: 0.15, synergyTypes: ['Health'], tier: '3', reputationPerTurn: 0.15 },
-  { id: 'cs-shelter', name: 'Community Shelter', cost: 6, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Service'], tier: '3', reputationPerTurn: 0.15 },
-  { id: 'cs-public-art', name: 'Public Art', cost: 8, baseIncome: 0, ongoingCost: 0.25, synergyTypes: ['Culture', 'Entertainment'], tier: '4', reputationPerTurn: 0.2 },
+  { id: 'cs-shelter', name: 'Community Shelter', cost: 6, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Service'], tier: '4', reputationPerTurn: 0.15 },
+  { id: 'cs-public-art', name: 'Public Art', cost: 8, baseIncome: 0, ongoingCost: 0.25, synergyTypes: ['Culture', 'Entertainment'], tier: '5', reputationPerTurn: 0.2 },
 ];
 
 function byId(templates: readonly { id: string }[], id: string): CommunitySpaceCard | undefined {

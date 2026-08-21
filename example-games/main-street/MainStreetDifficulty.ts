@@ -125,6 +125,24 @@ export interface GameConfig extends DifficultyConfig {
    * Default 3.0 means coin rewards can at most triple.
    */
   readonly maxReputationCoinMultiplier: number;
+
+  // ── Community Favour ────────────────────────────────────
+  /**
+   * Coins consumed to gain 1 reputation via Community Favour.
+   * Default 2 (2 coins → 1 rep).
+   */
+  readonly favourCoinsToRepCost: number;
+  /**
+   * Reputation consumed to gain coins via Community Favour.
+   * Default 2 (2 rep → N coins, where N = favourRepToCoinsCoinGain).
+   */
+  readonly favourRepToCoinsRepCost: number;
+  /**
+   * Coins gained when spending reputation via Community Favour.
+   * Default 3 (2 rep → 3 coins). Round-trip is lossy,
+   * preventing infinite arbitrage.
+   */
+  readonly favourRepToCoinsCoinGain: number;
 }
 
 // ── Preset Definitions ──────────────────────────────────────
@@ -150,6 +168,10 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   incidentMaxStreak: 2,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
+  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  favourCoinsToRepCost: 2,
+  favourRepToCoinsRepCost: 2,
+  favourRepToCoinsCoinGain: 3,
 };
 
 /**
@@ -175,6 +197,10 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   incidentMaxStreak: 2,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
+  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  favourCoinsToRepCost: 2,
+  favourRepToCoinsRepCost: 2,
+  favourRepToCoinsCoinGain: 3,
 };
 
 /**
@@ -200,6 +226,10 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   incidentMaxStreak: 3,
   reputationCoinDivisor: 20,
   maxReputationCoinMultiplier: 3.0,
+  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  favourCoinsToRepCost: 2,
+  favourRepToCoinsRepCost: 2,
+  favourRepToCoinsCoinGain: 3,
 };
 
 // ── Preset Registry ─────────────────────────────────────────

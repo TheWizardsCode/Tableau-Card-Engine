@@ -1,7 +1,7 @@
 /**
  * Main Street Tutorial E2E browser test — Part 2 (Tests 7-8).
  *
- * Walks the new 17-step tutorial flow: T6 Upcoming Incidents → T7 End Turn.
+ * Walks the new 18-step tutorial flow: T6 Upcoming Incidents → T7 End Turn.
  *
  * Stays well within the browser's per-process canvas/WebGL context budget.
  */

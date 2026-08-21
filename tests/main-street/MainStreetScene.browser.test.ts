@@ -634,9 +634,8 @@ describe('MainStreetScene browser tests', () => {
     ) as Phaser.GameObjects.Text | undefined;
 
     expect(coinText).toBeTruthy();
-    // Rounded whole number, no decimal places (e.g. "Coins: 123", not "Coins: 123.456")
-    expect(coinText!.text).toBe('Coins: 123');
-    expect(coinText!.text).not.toContain('.');
+    // 2 decimal places (e.g. "Coins: 123.46")
+    expect(coinText!.text).toBe('Coins: 123.46');
 
     destroyGame(game);
     game = null;

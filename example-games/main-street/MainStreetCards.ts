@@ -1094,13 +1094,28 @@ export const STAFF_CARD_TEMPLATES: StaffCard[] = _STAFF_CARD_TEMPLATES;
 /**
  * Creates the full Staff deck for a game.
  *
- * @param copies  Number of copies per template (default 1).
+ * Staff cards are tier-gated like every other family (rebalance work item
+ * CG-0MT2WU0CX005Z143): only templates whose ID is in `unlockedCardIds` are
+ * included when the list is provided, so progression tiers control which
+ * staff are available for hire.
+ *
+ * @param copies          Number of copies per template (default 1).
+ * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
+ *                        When provided, only templates whose ID is in this list
+ *                        are included. When omitted, the full pool is used.
  * @returns Array of StaffCard instances.
  */
-export function createStaffDeck(copies: number = 1): StaffCard[] {
+export function createStaffDeck(
+  copies: number = 1,
+  unlockedCardIds?: string[],
+): StaffCard[] {
+  const templates = unlockedCardIds
+    ? _STAFF_CARD_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : _STAFF_CARD_TEMPLATES;
+
   const deck: StaffCard[] = [];
   for (let c = 0; c < copies; c++) {
-    for (const template of _STAFF_CARD_TEMPLATES) {
+    for (const template of templates) {
       deck.push({ ...template, id: `${template.id}-${c}` });
     }
   }
@@ -1331,7 +1346,8 @@ export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = _CARD_TEMPLATE_N
  * (as a numeric string, e.g. `'1'` through `'5'`).
  *
  * Built once at module load from the CSV `tier` column.
- * Cards without a tier assignment (e.g. staff cards) are omitted from this map.
+ * Cards without a tier assignment are omitted from this map (all families,
+ * including staff, are tier-assigned as of CG-0MT2WU0CX005Z143).
  * Updated at runtime when loadTemplatesFromCsv() is called.
  */
 export const CARD_TIER_MAP: ReadonlyMap<string, string> = _CARD_TIER_MAP;

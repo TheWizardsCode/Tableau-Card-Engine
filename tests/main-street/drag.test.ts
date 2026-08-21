@@ -119,7 +119,9 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
 
 /** First business card in the development row, made affordable deterministically. */
 function pickAffordableBusiness(state: any): any {
-  const card = state.market.cards.find((c: any) => c.family === 'business');
+  const card = state.market.cards.find(
+    (c: any) => c.family === 'business' || c.family === 'community-space',
+  );
   if (!card) throw new Error('No business card in development row for test');
   // Ensure the player can afford it regardless of seed. Drag-drop buy-and-place
   // now pays a +50% premium over the listed cost (CG-0MSTOF1N5005PK2R), so
@@ -266,12 +268,12 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(controller.canDropBusinessCard(card.id, slot)).toBe(false);
     });
 
-    it('enforces synergy adjacency during T13 (Library must be next to the Bookshop)', () => {
-      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
-      expect(t13Index).toBeGreaterThanOrEqual(0);
+    it('enforces synergy adjacency during T14 (Library must be next to the Bookshop)', () => {
+      const t14Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T14');
+      expect(t14Index).toBeGreaterThanOrEqual(0);
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t13Index,
+        currentStepIndex: t14Index,
         lastCompletedStepId: null,
         exited: false,
       };
@@ -302,10 +304,10 @@ describe('MainStreet drag-to-buy wiring', () => {
     });
 
     it('does not enforce adjacency when the synergy card is not on the street', () => {
-      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
+      const t14Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T14');
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t13Index,
+        currentStepIndex: t14Index,
         lastCompletedStepId: null,
         exited: false,
       };

@@ -73,6 +73,7 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const actionButtonH = 34;
   const hintButtonW = 104;
   const smallButtonW = 68;
+  const favourButtonW = 110;
   const actionButtonW = 140; // from per-game constants (matches legacy endTurnButton.width)
 
   const logVisible = true;
@@ -80,6 +81,11 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const logH = Math.round(logBottomRight.y - logTopLeft.y);
   const challengeW = Math.round(challengeBottomRight.x - challengeTopLeft.x);
   const eventsHeight = Math.round(queueBottomLeft.y - queueTopLeft.y);
+
+  // ── Community Favour buttons (CG-0MSTOATDQ005XDET) ──────────
+  // Positioned via SLL zone center anchors; left edge = centerX - width/2.
+  const favourCoinsToRepCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'favourCoinsToRepButton', 'center', viewport, 1);
+  const favourRepToCoinsCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'favourRepToCoinsButton', 'center', viewport, 1);
 
   return {
     gameW,
@@ -117,6 +123,9 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
     actionButtonW,
     hintButtonW,
     smallButtonW,
+    favourButtonW,
+    favourCoinsToRepX: Math.round(favourCoinsToRepCenter.x - favourButtonW / 2),
+    favourRepToCoinsX: Math.round(favourRepToCoinsCenter.x - favourButtonW / 2),
     challengeX: Math.round(challengeTopLeft.x),
     challengeY: Math.round(challengeTopLeft.y),
     challengeW,

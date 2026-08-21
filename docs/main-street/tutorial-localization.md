@@ -122,19 +122,19 @@ Tutorial text follows these editorial principles:
 
 - **Reading level:** ~10-year-old reading level (Flesch-Kincaid Grade Level ≤ 5-6)
 - **Sentence limit:** **≤3 sentences per text box** (titles and bodies), each box
-  communicating **exactly one point** (17-step flow editorial rule)
+  communicating **exactly one point** (18-step flow editorial rule)
 - **Word count:** Each step body under 50 words (soft boundary — conciseness preferred)
 - **Concepts:** At most 1–2 distinct gameplay concepts per step (soft boundary)
 - **Plain language:** Short sentences, common words, active voice, no jargon without explanation
 - **Consistency:** Use consistent terminology across all steps (e.g. "Coins" not "gold", "turns" not "days")
 
-### Content rules for the 17-step flow
+### Content rules for the 18-step flow
 
 - Do NOT mention time-limited play (the "25 turns" sentence was removed from T1).
 - Do NOT describe incident cards as "blue" or list their impacts in Upcoming Incidents.
 - Do NOT mention matching cards in the Place a Business step.
 
-### Step flow (17 steps, T1–T17)
+### Step flow (18 steps, T1–T18)
 
 | # | ID | Title | Gate | Highlight zone |
 |---|----|-------|------|----------------|
@@ -150,40 +150,47 @@ Tutorial text follows these editorial principles:
 | 10 | T10 | Optimizing for Events | action (buy-and-place) | developmentRow |
 | 11 | T11 | End this turn | action (end-turn) | endTurnButton |
 | 12 | T12 | Costs and Reputation | confirm (informative) | developmentRow |
-| 13 | T13 | Build a Library | action (buy-and-place + synergy) | developmentRow |
-| 14 | T14 | Triggering Events | action (play-event) | hand |
-| 15 | T15 | Success and Failure | confirm | hud (scoring bar) |
-| 16 | T16 | Challenges | confirm | challengePanel |
-| 17 | T17 | Tutorial Complete | confirm | completionModal |
+| 13 | T13 | Community Favour | action (community-favour, rep→coins) | actionButtons (action bar) |
+| 14 | T14 | Build a Library | action (buy-and-place + synergy) | developmentRow |
+| 15 | T15 | Triggering Events | action (play-event) | hand |
+| 16 | T16 | Success and Failure | confirm | hud (scoring bar) |
+| 17 | T17 | Challenges | confirm | challengePanel |
+| 18 | T18 | Tutorial Complete | confirm | completionModal |
 
 T12 (Costs and Reputation) is an informative step that introduces the Library's
 running cost vs reputation trade-off; the buy-and-place action and the Culture
-synergy rule (place the Library next to the Bookshop) moved to T13. Gate
-count: 9 confirm + 8 action = 17.
+synergy rule (place the Library next to the Bookshop) moved to T14. T13 teaches
+the Community Favour rep→coins exchange (CG-0MSTOATDQ005XDET) that is REQUIRED to
+afford the $7 Library. Gate count: 9 confirm + 9 action = 18.
 
 Card-level highlight zones (`laundromatCard`, `festivalCard`) are resolved through
 `resolveMarketCardAnchor()` in `MainStreetTutorialHints.ts` using the deterministic
 tutorial-scenario market slots, not hardcoded pixel positions.
 
-### Scenario budget (Easy / 16 coins)
+### Scenario budget (Easy / 12 coins)
 
-The tutorial runs the **Easy** preset with a **16-coin starting budget** (raised
-from the standard Easy 12 for the 17-step flow). The walkthrough spends exactly:
+The tutorial runs the **Easy** preset with a **12-coin starting budget**
+(CG-0MSTOATDQ005XDET reduced from 16 so the T13 Community Favour rep→coins
+conversion is REQUIRED before the Library). The walkthrough spends exactly:
 
 | Step | Action | Coins In | Coins Out | Balance |
 |------|--------|----------|-----------|---------|
-| T1   | Start (Easy, 16 coins) | 16 | 0 | 16 |
-| T3   | Buy Laundromat ($4) | 0 | 4 | 12 |
-| T7   | End Turn + income | 0.625 | 0 | 12.625 |
-| T9   | Buy Local Festival ($3) | 0 | 3 | 9.625 |
-| T10  | Buy-and-place Bookshop ($3) | 0 | 3 | 6.625 |
-| T11  | End Turn + income | 1.25 | 0 | 7.875 |
-| T12  | Confirm (no cost) | 0 | 0 | 7.875 |
-| T13  | Buy Library ($7) | 0 | 7 | 0.875 |
+| T1   | Start (Easy, 12 coins) | 12 | 0 | 12 |
+| T3   | Move Laundromat to hand (free) | 0 | 0 | 12 |
+| T5   | Place Laundromat ($4) | 0 | 4 | 8 |
+| T7   | End Turn + income | 0.625 | 0 | 8.625 |
+| T9   | Move Local Festival to hand (free) | 0 | 0 | 8.625 |
+| T10  | Buy-and-place Bookshop ($3) | 0 | 3 | 5.625 |
+| T11  | End Turn + income | 1.25 | 0 | 6.875 |
+| T12  | Confirm (no cost) | 0 | 0 | 6.875 |
+| T13  | Community Favour (2 rep → 3 coins) | 3 | 0 | 9.875 |
+| T14  | Buy Library ($7) | 0 | 7 | 2.875 |
+| T15  | Play Local Festival ($3, +4 culture) | 0 | 3 | 3.875 |
 
-T14+ are confirm-only steps (no cost), so the balance never drops below 0.875.
-The authoritative walkthrough lives in the `Coin Budget (Easy / 16 coins)` table
-in `example-games/main-street/TutorialScenario.ts`.
+6.875 < 7, so the T13 conversion is the ONLY path to the Library; after the
+Library, the Local Festival's +4 Culture bonus (Bookshop + Library) offsets its
+$3 play cost. The authoritative walkthrough lives in the
+`Coin Budget (Easy / 12 coins)` table in `example-games/main-street/TutorialScenario.ts`.
 
 ### Changing existing text
 

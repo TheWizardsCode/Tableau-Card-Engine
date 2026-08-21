@@ -136,9 +136,11 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
 
   it('scenario state has correct starting resources for tutorial', () => {
     const state = createTutorialScenario();
-    // Tutorial starts with the scenario's 16 coins (raised from the 12-coin
-    // Easy preset to afford the 4-card 17-step flow) and 5 reputation.
-    expect(state.resourceBank.coins).toBe(16);
+    // Tutorial starts with the scenario's 12 coins (CG-0MSTOATDQ005XDET
+    // reduced from 16 so the T13 Community Favour rep→coins conversion is
+    // REQUIRED for the $7 Library) and 5 reputation (2 spent by the
+    // conversion, leaving a safe 3).
+    expect(state.resourceBank.coins).toBe(12);
     expect(state.resourceBank.reputation).toBe(5);
   });
 
@@ -198,22 +200,22 @@ describe('AC2: TUTORIAL_SEED is deprecated and not used in tutorial setup path',
 
 // ── AC3: All 13 tutorial steps complete with scenario setup ──
 
-describe('AC3: All 17 tutorial steps complete with scenario-based setup', () => {
-  it('UNIFIED_TUTORIAL_STEPS contains exactly 17 steps (T1-T17)', () => {
-    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(17);
-    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(17);
+describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => {
+  it('UNIFIED_TUTORIAL_STEPS contains exactly 18 steps (T1-T18)', () => {
+    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(18);
+    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(18);
 
-    for (let i = 0; i < 17; i++) {
+    for (let i = 0; i < 18; i++) {
       expect(UNIFIED_TUTORIAL_STEPS[i].id).toBe(`T${i + 1}`);
     }
   });
 
-  it('tutorial controller walks through all 17 steps via completeCurrentStep', () => {
+  it('tutorial controller walks through all 18 steps via completeCurrentStep', () => {
     let controller = startTutorial(createTutorialControllerState());
 
-    // Walk through all 17 steps
+    // Walk through all 18 steps
     const completedIds: string[] = [];
-    for (let i = 0; i < 17; i++) {
+    for (let i = 0; i < 18; i++) {
       expect(controller.isActive).toBe(true);
       const currentStep = getCurrentStep(controller);
       expect(currentStep).toBeDefined();
@@ -224,15 +226,15 @@ describe('AC3: All 17 tutorial steps complete with scenario-based setup', () => 
       controller = result.newState;
     }
 
-    // Verify all 17 steps were completed in order
+    // Verify all 18 steps were completed in order
     expect(completedIds).toEqual([
       'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8',
-      'T9', 'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17',
+      'T9', 'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18',
     ]);
 
-    // After the 17th step completes, the controller has advanced past the end
-    expect(controller.lastCompletedStepId).toBe('T17');
-    expect(controller.currentStepIndex).toBe(17); // Past the end
+    // After the 18th step completes, the controller has advanced past the end
+    expect(controller.lastCompletedStepId).toBe('T18');
+    expect(controller.currentStepIndex).toBe(18); // Past the end
     // isActive stays true (only exitTutorial sets it to false)
     // Verify the controller is at end by checking getCurrentStep returns null
     const afterComplete = getCurrentStep(controller);
@@ -282,26 +284,30 @@ describe('AC3: All 17 tutorial steps complete with scenario-based setup', () => 
     expect(invTemplateIds).toContain(stripSerialSuffix(invEvent!.id));
   });
 
-  it('scenario state provides sufficient coins for the 17-step purchases (Laundromat $4, Local Festival $3, Bookshop $3, Library $7)', () => {
+  it('scenario state provides sufficient coins for the 18-step purchases (Laundromat $4, Local Festival $3, Bookshop $3, Library $7 + required conversion)', () => {
     const state = createTutorialScenario();
 
-    // Starting coins: 16 (scenario, raised above the 12-coin Easy preset)
-    expect(state.resourceBank.coins).toBe(16);
+    // Starting coins: 12 (scenario, with the REQUIRED T13 Community Favour
+    // +3 conversion bridging the Library gap)
+    expect(state.resourceBank.coins).toBe(12);
 
-    // After buying Laundromat ($4): 12 coins remaining
-    const afterLaundromat = 16 - 4;
-    expect(afterLaundromat).toBe(12);
+    // After buying Laundromat ($4): 8 coins remaining
+    const afterLaundromat = 12 - 4;
+    expect(afterLaundromat).toBe(8);
 
-    // After one income turn (Laundromat ~0.625): ~12.6, enough for the $3 Local Festival
+    // After one income turn (Laundromat ~0.625): ~8.6, enough for the $3 Bookshop
     const afterIncome = afterLaundromat + 0.625;
     expect(afterIncome).toBeGreaterThanOrEqual(3);
 
-    // After Local Festival ($3) and Bookshop ($3): ~6.6
-    const afterFestivalBookshop = afterIncome - 3 - 3;
-    expect(afterFestivalBookshop).toBeGreaterThanOrEqual(0);
+    // After Bookshop ($3): ~5.6
+    const afterBookshop = afterIncome - 3;
+    expect(afterBookshop).toBeGreaterThanOrEqual(0);
 
-    // Second income turn (Laundromat + Bookshop ~1.25): ~7.9, enough for the $7 Library
-    expect(afterFestivalBookshop + 1.25).toBeGreaterThanOrEqual(7);
+    // Second income turn (Laundromat + Bookshop ~1.25): ~6.875 — BELOW the
+    // $7 Library, so the T13 Community Favour conversion (+3) is required.
+    const beforeLibrary = afterBookshop + 1.25;
+    expect(beforeLibrary).toBeLessThan(7);
+    expect(beforeLibrary + 3).toBeGreaterThanOrEqual(7);
   });
 });
 

@@ -53,7 +53,7 @@ npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 
 ### Adding or updating tutorial text
 
-Tutorial steps are defined in `example-games/main-street/TutorialFlow.ts` in the `UNIFIED_TUTORIAL_STEPS` array. There are currently 17 steps (T1–T17), each with:
+Tutorial steps are defined in `example-games/main-street/TutorialFlow.ts` in the `UNIFIED_TUTORIAL_STEPS` array. There are currently 18 steps (T1–T18), each with:
 - `titleKey` — i18n key for the short heading shown in bold
 - `bodyKey` — i18n key for the body text
 - `highlightZone` — zone identifier for the area to highlight (resolved via the tutorial layout system), or `'centerModal'`/`'completionModal'` for centered overlays

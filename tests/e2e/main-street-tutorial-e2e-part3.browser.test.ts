@@ -49,7 +49,7 @@ async function walkToT8(scene: Phaser.Scene): Promise<void> {
   await waitForOverlayVisible(10_000);
 }
 
-describe('Main Street Tutorial E2E — Coin Budget (16 coins)', () => {
+describe('Main Street Tutorial E2E — Coin Budget (12 coins)', () => {
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -66,11 +66,12 @@ describe('Main Street Tutorial E2E — Coin Budget (16 coins)', () => {
     game = null;
   });
 
-  it('starts with 16 coins and the Laundromat is affordable', async () => {
+  it('starts with 12 coins and the Laundromat is affordable', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     const s = scene as any;
-    // 16 coins (raised from the 12-coin Easy preset for the 4-card flow)
-    expect(s.state?.resourceBank?.coins).toBe(16);
+    // 12 coins (lowered from 16 by CG-0MSTOATDQ005XDET so the T13 Community
+    // Favour conversion is REQUIRED for the $7 Library)
+    expect(s.state?.resourceBank?.coins).toBe(12);
     const laundromat = s.state.market.cards.find((c: any) => c.id.startsWith('biz-laundromat'));
     expect(laundromat).toBeTruthy();
     expect(laundromat.cost).toBeLessThanOrEqual(4);

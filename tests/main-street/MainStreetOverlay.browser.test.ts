@@ -310,8 +310,8 @@ describe('Main Street overlay button tests', () => {
     // The breakdown block contains Coins and Final Score lines
     const breakdown = allTexts.find((t) => t.text.includes('Coins:') && t.text.includes('Final Score:'));
     expect(breakdown).toBeDefined();
-    expect(breakdown!.text).toContain('Coins: 123');
-    expect(breakdown!.text).not.toContain('123.456');
+    // Coins displayed to 2 decimal places for consistency with HUD bar.
+    expect(breakdown!.text).toContain('Coins: 123.46');
   });
 
   it('should show count-only line for unlocked tiers (no per-card names)', async () => {

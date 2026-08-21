@@ -176,6 +176,8 @@ Run N+1 starts with expanded card pool
 
 > Update note: tier distribution was expanded in follow-up work item CG-0MP1VO5FM008LB5Z so campaign progression now covers the full 59-template catalog, with a 5-card expanded sample available in Tier 1.
 
+> Update note 2 (rebalance CG-0MT2WU0CX005Z143): tier assignments now live in the `tier` column of `example-games/main-street/card-data.csv` (via `CARD_TIER_MAP` → `TIER_DEFINITIONS`). The composition was rebalanced so every tier contains a roughly equal mix of all five card families (business, community-space, event, upgrade, staff) — including newly tiered staff (2/2/2/2/1 by cost ladder) and a Tier 5 that is no longer event-dominated. The table above is historical.
+
 ### 2.7 Historical note (superseded)
 
 This section originally tracked cards that were not tier-gated. It is now superseded by follow-up work item CG-0MP1VO5FM008LB5Z, which updated progression so the full expanded catalog is tier-gated and reachable through campaign unlocks.

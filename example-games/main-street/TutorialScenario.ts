@@ -30,25 +30,31 @@
  *   the visible line (from decks/discards), mirroring the legacy two-row
  *   scenario-placing behaviour.
  *
- * ## Coin Budget (Easy / 16 coins) — cost-at-play (CG-0MSTOATDT009BRX2)
+ * ## Coin Budget (Easy / 12 coins) — cost-at-play (CG-0MSTOATDT009BRX2, CG-0MSTOATDQ005XDET)
  *
  * | Step | Action                          | Coins In | Coins Out | Balance |
  * |------|---------------------------------|----------|-----------|---------|
- * | T1   | Start (Easy, 16 coins)          | 16       | 0         | 16      |
- * | T2   | Confirm (no cost)               | 0        | 0         | 16      |
- * | T3   | Move Laundromat to hand (free)  | 0        | 0         | 16      |
- * | T4   | Confirm (no cost)               | 0        | 0         | 16      |
- * | T5   | Place Laundromat (pays $4)      | 0        | 4         | 12      |
- * | T6   | Confirm (no cost)               | 0        | 0         | 12      |
- * | T7   | End Turn + income (~0.6)        | 0.625    | 0         | 12.625  |
- * | T8   | Confirm (no cost)               | 0        | 0         | 12.625  |
- * | T9   | Move Local Festival to hand     | 0        | 0         | 12.625  |
- * | T10  | Buy-and-place Bookshop ($3)     | 0        | 3         | 9.625   |
- * | T11  | End Turn + income (~1.25)       | 1.25     | 0         | 10.875  |
- * | T12  | Confirm (no cost)               | 0        | 0         | 10.875  |
- * | T13  | Buy Library ($7)                | 0        | 7         | 3.875   |
- * | T14  | Play Local Festival (pays $3)   | 0        | 3         | 0.875   |
- * | T15+ | Confirm steps (no cost)         | 0        | 0         | ≥0.875  |
+ * | T1   | Start (Easy, 12 coins)          | 12       | 0         | 12      |
+ * | T2   | Confirm (no cost)               | 0        | 0         | 12      |
+ * | T3   | Move Laundromat to hand (free)  | 0        | 0         | 12      |
+ * | T4   | Confirm (no cost)               | 0        | 0         | 12      |
+ * | T5   | Place Laundromat (pays $4)      | 0        | 4         | 8       |
+ * | T6   | Confirm (no cost)               | 0        | 0         | 8       |
+ * | T7   | End Turn + income (~0.6)        | 0.625    | 0         | 8.625   |
+ * | T8   | Confirm (no cost)               | 0        | 0         | 8.625   |
+ * | T9   | Move Local Festival to hand     | 0        | 0         | 8.625   |
+ * | T10  | Buy-and-place Bookshop ($3)     | 0        | 3         | 5.625   |
+ * | T11  | End Turn + income (~1.25)       | 1.25     | 0         | 6.875   |
+ * | T12  | Confirm (no cost)               | 0        | 0         | 6.875   |
+ * | T13  | Community Favour (2 rep → 3c)   | 3        | 0         | 9.875   |
+ * | T14  | Buy Library ($7)                | 0        | 7         | 2.875   |
+ * | T15  | Play Local Festival (pays $3)   | 0        | 3         | −0.125  |
+ * | T16+ | Confirm steps (no cost)         | 0        | 0         | ≥−0.125 |
+ *
+ * The rep→coins conversion is REQUIRED: without it the balance before the
+ * Library is 6.875 < 7, so T14 is unaffordable. After the Library the Local
+ * Festival (T15, +4 coins to the 2 Culture businesses: Bookshop + Library −
+ * $3 play cost = +1 net) brings the balance back above zero.
  *
  * @module
  */
@@ -141,20 +147,23 @@ export interface TutorialScenario {
  *   - `evt-award` (Community Award, +2 reputation)
  *   - `evt-rainy` (Rainy Day, -1 coin per Food business)
  *
- * **Coin Budget:** 16 starting coins (Easy preset raised for the tutorial);
+ * **Coin Budget:** 12 starting coins (CG-0MSTOATDQ005XDET reduced from 16 so
+ * the Community Favour rep→coins conversion is REQUIRED before the Library);
  * payments happen at play time (cost-at-play): Laundromat placement $4 (T5)
- * + Local Festival play $3 (T14) + Bookshop buy-and-place $3 (T10) + Library
- * buy-and-place $7 (T13) = $17, covered by 16 + ~1.9 income across the two
- * end-turn steps (T7: Laundromat ~0.625; T11: Laundromat + Bookshop ~1.25).
- * RNG-independent.
+ * + Bookshop buy-and-place $3 (T10) + Library buy-and-place $7 (T14) +
+ * Local Festival play $3 (T15) — all covered by 12 + the T13 rep→coins
+ * conversion (+3) + ~1.9 income across the two end-turn steps (T7 ~0.625
+ * and T11 ~1.25). RNG-independent.
  */
 export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
   difficulty: 'Easy',
-  // 16 starting coins (vs. Easy preset's 10 after the CG-0MSP26Q5N002EH8P re-tune): the 17-step flow places four
-  // cards (Laundromat $4 + Local Festival $3 + Bookshop $3 + Library $7 = $17)
-  // and earns ~1.9 income across T7 and T11, so 16 + ~2 ≥ 17. The tutorial
-  // scenario's coin budget is intentionally higher than the base preset.
-  resourceBank: { coins: 16, reputation: 5 },
+  // 12 starting coins: the 18-step flow places four cards (Laundromat $4 +
+  // Bookshop $3 + Library $7 + Local Festival $3) and earns ~1.9 income +
+  // one Community Favour conversion (2 rep → 3 coins) at T13, which is
+  // REQUIRED to afford the $7 Library (6.875 + 3 = 9.875 ≥ 7). Reputation
+  // starts at 5 (the conversion spends 2, leaving 3 — safely above the
+  // reputation-collapse threshold).
+  resourceBank: { coins: 12, reputation: 5 },
   market: {
     cards: [
       'biz-bakery',
@@ -339,6 +348,7 @@ export function createTutorialScenario(
     actionsRemaining: 1,
     peekUsedThisTurn: false,
     revealedPeekedCard: null,
+    favourUsedThisTurn: false,
   };
 
   // Select challenges for this run using seeded RNG

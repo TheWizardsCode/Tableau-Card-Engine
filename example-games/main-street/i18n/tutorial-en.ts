@@ -2,7 +2,7 @@
  * Main Street Tutorial — English locale bundle.
  *
  * Contains all user-facing string values for:
- * - T1–T17 tutorial step titles and bodies
+ * - T1–T18 tutorial step titles and bodies
  * - Tutorial offer modal (title, body, skip/start buttons)
  * - Tutorial overlay buttons (dismiss, next, exit, start full game)
  *
@@ -11,7 +11,7 @@
  * - Modal: `tutorial.modal.<field>`
  * - Overlay: `tutorial.overlay.<field>`
  *
- * ## Editorial rules (17-step flow)
+ * ## Editorial rules (18-step flow)
  *
  * - **≤3 sentences per text box** (titles and bodies), exactly one point per box.
  * - Do NOT mention time-limited play (the "25 turns" sentence was removed).
@@ -206,8 +206,16 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T12', 'body')]:
     'Some businesses cost coins to run but bring in customers. The **{cardName}** builds your reputation.',
 
-  // ── T13: Build a Library ───────────────────────────────────
+  // ── T13: Community Favour (CG-0MSTOATDQ005XDET) ─────────────
+  // Teaches the once-per-turn rep→coins exchange REQUIRED to afford the
+  // $7 Library in T14 (pre-conversion balance 6.875 < 7 → 9.875 after).
   [tutorialKey('T13', 'title')]:
+    'Community Favour',
+  [tutorialKey('T13', 'body')]:
+    'You\'re a little short on coins for the **{cardName}**. Use **Community Favour** to turn reputation into coins: click the **2r → 3c** button in the action bar below (a FREE once-per-turn exchange).',
+
+  // ── T14: Build a Library ───────────────────────────────────
+  [tutorialKey('T14', 'title')]:
     'Build a Library',
   // {cardName} = cs-library, {synergyCardName} = biz-bookshop — resolved from
   // card-data.csv at render time. The synergy system: placing the Library next
@@ -217,32 +225,32 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // Post-CG-0MSXIQIPJ000NDTL: clicking the market card takes it to hand (no
   // auto-select); player must then click the hand card to select it before
   // placing next to the synergy partner.
-  [tutorialKey('T13', 'body')]:
+  [tutorialKey('T14', 'body')]:
     'The **{cardName}** brings a Culture bonus when placed next to other Culture cards. Take it to your hand, then click the card in your hand to select it and place it next to **{synergyCardName}** — orthogonally or diagonally — to gain the bonus.',
 
-  // ── T14: Triggering Events ─────────────────────────────────
-  [tutorialKey('T14', 'title')]:
+  // ── T15: Triggering Events ─────────────────────────────────
+  [tutorialKey('T15', 'title')]:
     'Triggering Events',
   // {cardName} resolved from card-data.csv (evt-festival) at render time.
-  [tutorialKey('T14', 'body')]:
+  [tutorialKey('T15', 'body')]:
     'Two Culture businesses on your street power the festival. Click the **{cardName}** in your hand to play it.',
 
-  // ── T15: Success and Failure ───────────────────────────────
-  [tutorialKey('T15', 'title')]:
+  // ── T16: Success and Failure ───────────────────────────────
+  [tutorialKey('T16', 'title')]:
     'Success and Failure',
-  [tutorialKey('T15', 'body')]:
+  [tutorialKey('T16', 'body')]:
     'The bar shows your coins, reputation, score, and target. Hover each to see how it is calculated.',
 
-  // ── T16: Challenges ────────────────────────────────────────
-  [tutorialKey('T16', 'title')]:
+  // ── T17: Challenges ────────────────────────────────────────
+  [tutorialKey('T17', 'title')]:
     'Challenges',
-  [tutorialKey('T16', 'body')]:
+  [tutorialKey('T17', 'body')]:
     'Each game gives you challenges for bonus points. See them in the Challenge Tracker. Completing challenges unlocks new cards for future games!',
 
-  // ── T17: Tutorial Complete ─────────────────────────────────
-  [tutorialKey('T17', 'title')]:
+  // ── T18: Tutorial Complete ─────────────────────────────────
+  [tutorialKey('T18', 'title')]:
     'Tutorial Complete',
-  [tutorialKey('T17', 'body')]:
+  [tutorialKey('T18', 'body')]:
     'There are many more things to discover as you play, but you have the basics now. Let\'s play.',
 } as const;
 

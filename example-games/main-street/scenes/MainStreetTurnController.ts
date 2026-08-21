@@ -1,5 +1,5 @@
 import { addLog } from '../MainStreetState';
-import { executeDayStart, processEndOfTurn, placeFromHand, type TurnResult } from '../MainStreetEngine';
+import { executeDayStart, processEndOfTurn, placeFromHand, executeAction, type TurnResult } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
 import {
   findTargetBusinessSlot,
@@ -17,6 +17,8 @@ import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStre
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
+import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
+import { FONT_FAMILY } from '../../../src/ui/constants';
 import {
   createDragDropManager,
   DEFAULT_DRAG_DISTANCE_THRESHOLD,
@@ -1189,6 +1191,105 @@ export class MainStreetTurnController {
         s.refreshAll();
       },
     });
+  }
+
+  /**
+   * Community Favour exchange (CG-0MSTOATDQ005XDET): coins ↔ reputation.
+   *
+   * Dispatches through the engine's `executeAction` — the same animated and
+   * sounded path as other market actions. The resource deltas animate via
+   * the existing HUD delta pop (`refreshAll` → `refreshHud` →
+   * `animateHudValueChanges`) plus a `popTextOrIcon` exchange summary and
+   * `UI_CLICK` SFX. Illegal attempts (once-per-turn spent, insufficient
+   * resource) surface the standard illegal-move feedback.
+   */
+  public onCommunityFavourClick(direction: 'coins-to-rep' | 'rep-to-coins'): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    // Tutorial gating: the community-favour action is only allowed while the
+    // active step requires it; any other attempt surfaces the standard
+    // illegal-move feedback.
+    const tutorialCheck = (s.msLifecycleManager as any)?.isTutorialActionAllowed?.('community-favour' as TutorialActionType);
+    if (tutorialCheck && !tutorialCheck.allowed) {
+      s.instructionText.setText(tutorialCheck.reason ?? 'Complete the highlighted step first.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+
+    const config = s.state.config;
+    const cost = direction === 'coins-to-rep' ? config.favourCoinsToRepCost : config.favourRepToCoinsRepCost;
+    const resource = direction === 'coins-to-rep' ? s.state.resourceBank.coins : s.state.resourceBank.reputation;
+    const resourceName = direction === 'coins-to-rep' ? 'coins' : 'reputation';
+
+    // ── Guards (mirror the button disabled states) — surface, don't fail silently ──
+    if (s.state.favourUsedThisTurn) {
+      s.instructionText.setText('You have already used Community Favour this turn.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+    if (resource < cost) {
+      s.instructionText.setText(
+        `Not enough ${resourceName} for Community Favour (need ${cost}, have ${resource}).`,
+      );
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText('Community Favour exchange...');
+    try {
+      executeAction(s.state, { type: 'community-favour', direction });
+
+      // Animated + sounded feedback: UI click SFX and a pop-up summary.
+      safePlaySound(s, COMMON_SFX_KEYS.UI_CLICK);
+      const reducedMotion = s.settingsPanel?.reducedMotion ?? false;
+      const summary = s.add.text(
+        s.layout.gameW / 2,
+        s.layout.actionY - 40,
+        direction === 'coins-to-rep' ? 'Community Favour: 2c → 1r' : 'Community Favour: 2r → 3c',
+        {
+          fontSize: '14px',
+          fontStyle: 'bold',
+          color: '#ffdd88',
+          fontFamily: FONT_FAMILY,
+        },
+      ).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: s,
+        target: summary,
+        duration: 1400,
+        riseY: 26,
+        scale: 1.15,
+        reducedMotion,
+      });
+
+      try {
+        recordMainStreetEvent({
+          type: 'action',
+          turn: s.state.turn,
+          action: { type: 'community-favour', direction },
+          description: `Community Favour (${direction}) executed`,
+        });
+      } catch (_) { /* transcript disabled */ }
+    } catch (e) {
+      // Engine rejected the exchange — surface standard illegal feedback.
+      console.error('[MS] Community Favour failed', e);
+      s.instructionText.setText(`Error: ${(e as Error).message}`);
+      playIllegalFeedback(s.actionContainer, s);
+      s.uiPhase = 'market';
+      s.refreshAll();
+      return;
+    }
+
+    s.uiPhase = 'market';
+    s.refreshAll();
+
+    // Tutorial: mark the community-favour step complete after a successful
+    // exchange (mirrors how other action-gated steps advance).
+    try {
+      (s.msLifecycleManager as any)?.onTutorialActionComplete?.('community-favour' as TutorialActionType);
+    } catch (_) { /* ignore */ }
   }
 
   /**

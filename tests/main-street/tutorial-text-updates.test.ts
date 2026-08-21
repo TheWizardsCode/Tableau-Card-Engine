@@ -158,15 +158,27 @@ describe('Tutorial text updates (17-step restructure)', () => {
     });
   });
 
-  describe('T13 Build a Library (AC: synergy system, Culture adjacency)', () => {
-    it('mentions the Culture bonus via synergyCardName placeholder', () => {
+  describe('T13 Community Favour (AC: rep→coins exchange for the Library)', () => {
+    it('mentions Community Favour and the rep→coins exchange', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
+      expect(body.toLowerCase()).toMatch(/community favour/);
+      expect(body.toLowerCase()).toMatch(/2r → 3c|reputation/);
+    });
+    it('mentions the Library affordability goal', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
+      expect(body).toContain('Library');
+    });
+  });
+
+  describe('T14 Build a Library (AC: synergy system, Culture adjacency)', () => {
+    it('mentions the Culture bonus via synergyCardName placeholder', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!).body;
       expect(body).toContain('Bookshop');
       expect(body.toLowerCase()).toMatch(/culture/);
       expect(body.toLowerCase()).toMatch(/bonus/);
     });
     it('tells the player to take, select, and place the Library next to the Bookshop', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!).body;
       // Post-CG-0MSXIQIPJ000NDTL: the text uses "take it to your hand" and
       // "click the card in your hand to select it" instead of a single "buy".
       expect(body.toLowerCase()).toMatch(/take|buy/);
@@ -176,17 +188,17 @@ describe('Tutorial text updates (17-step restructure)', () => {
     });
   });
 
-  describe('T14 Triggering Events (AC: play festival from hand)', () => {
+  describe('T15 Triggering Events (AC: play festival from hand)', () => {
     it('mentions clicking the held festival in hand', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T15')!).body;
       expect(body.toLowerCase()).toMatch(/hand/);
       expect(body.toLowerCase()).toMatch(/click/);
     });
   });
 
-  describe('T15 Success and Failure (AC: scoring bar)', () => {
+  describe('T16 Success and Failure (AC: scoring bar)', () => {
     it('mentions the scoring bar components', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T15')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T16')!).body;
       expect(body.toLowerCase()).toMatch(/coins/);
       expect(body.toLowerCase()).toMatch(/score/);
       expect(body.toLowerCase()).toMatch(/target/);
@@ -287,16 +299,22 @@ describe('Data-driven tutorial text (card facts from card data)', () => {
     // T10's copy references the Bookshop by name but does not quote its cost.
   });
 
-  it('T13 resolves {cardName} (Library) and {synergyCardName} (Bookshop) from card data', () => {
-    const t13 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!;
-    const libraryRow = getCsvRows().find(r => r.id === getBaseTypeId(t13.requiredCardId!))!;
-    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t13.synergyCardId!))!;
+  it('T14 resolves {cardName} (Library) and {synergyCardName} (Bookshop) from card data', () => {
+    const t14 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!;
+    const libraryRow = getCsvRows().find(r => r.id === getBaseTypeId(t14.requiredCardId!))!;
+    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t14.synergyCardId!))!;
     expect(libraryRow).toBeDefined();
     expect(bookshopRow).toBeDefined();
 
-    const body = resolveTutorialStepText(t13).body;
+    const body = resolveTutorialStepText(t14).body;
     expect(body).toContain(libraryRow.name);      // Library
     expect(body).toContain(bookshopRow.name);     // Bookshop
+    expect(body).not.toMatch(/\{[A-Za-z_]+\}/);
+  });
+
+  it('T13 Community Favour resolves with no unresolved placeholder tokens', () => {
+    const t13 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!;
+    const body = resolveTutorialStepText(t13).body;
     expect(body).not.toMatch(/\{[A-Za-z_]+\}/);
   });
 });

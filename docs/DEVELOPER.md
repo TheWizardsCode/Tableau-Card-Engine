@@ -985,6 +985,32 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
 
+#### Community Favour (CG-0MSTOATDQ005XDET)
+
+The Community Favour resource exchange is a **free** once-per-turn action
+available during the market phase (it does not consume `actionsRemaining`):
+
+- **coins → reputation:** spend `favourCoinsToRepCost` (default 2) coins for +1 rep.
+- **reputation → coins:** spend `favourRepToCoinsRepCost` (default 2) rep for
+  `favourRepToCoinsCoinGain` (default 3) coins. The round-trip is lossy, so no
+  arbitrage.
+- Rates are per-difficulty `GameConfig` constants in `MainStreetDifficulty.ts`
+  (defaults on Easy/Medium/Hard).
+- Gating: `state.favourUsedThisTurn` (market-phase only, reset at `DayStart`),
+  serialized with legacy-save backfill to `false`.
+- UI: two SLL-positioned buttons in the market-phase action bar
+  (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones), disabled when the
+  input resource is insufficient or the gate is spent.
+- AI: `MainStreetAiStrategy` enumerates the action when affordable/unused and
+  scores rep→coins > 1 only when genuinely stalled (cannot afford the cheapest
+  market card) with a reputation buffer; `GreedyStrategy` Priority 9 selects it
+  only in that case, so normal purchases are never dominated.
+- Tutorial: T13 (action-gated) teaches the rep→coins exchange; the scenario
+  starts with 12 coins so the conversion is REQUIRED for the $7 Library (T14).
+- Tests: `tests/main-street/community-favour-*.test.ts` (engine, AI,
+  persistence) + `community-favour-ui.browser.test.ts` (buttons, disabled
+  states, full exchange round).
+
 ## Replay Tool
 
 The replay tool (`scripts/replay.ts`) replays a fixture transcript through the game's Phaser scene in a headless browser, capturing per-turn screenshots. It is the foundation for thumbnail generation and visual regression testing.
@@ -1924,7 +1950,7 @@ reusing base layout zones through composition.
 | `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
 | `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
 | `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T13 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types |
+| `example-games/main-street/TutorialFlow.ts` | T1-T18 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types |
 
 #### How composition works
 

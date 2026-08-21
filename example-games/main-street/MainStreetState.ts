@@ -274,6 +274,12 @@ export interface MainStreetState {
    * Never resolved — the card stays on top of the face-down deck.
    */
   revealedPeekedCard: EventCard | null;
+  /**
+   * Community Favour gate (CG-0MSTOATDQ005XDET): whether the once-per-turn
+   * resource exchange has already been used this turn.
+   * Reset to false at DayStart.
+   */
+  favourUsedThisTurn: boolean;
 }
 
 export interface MainStreetSerializedState {
@@ -350,6 +356,8 @@ export interface MainStreetSerializedState {
   peekUsedThisTurn: boolean;
   /** Top incident-deck card revealed by the most recent peek (null = none). */
   revealedPeekedCard: EventCard | null;
+  /** Whether the once-per-turn Community Favour exchange has been used this turn. */
+  favourUsedThisTurn: boolean;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -619,17 +627,20 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   // are selected deterministically per-game-seed rather than by template order.
   const eventDeck = createEventDeck(3, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
-  const staffDeck = createStaffDeck(1);
+  // Staff deck is tier-gated like the other families (CG-0MT2WU0CX005Z143):
+  // only staff whose tier is unlocked appear in the staff market.
+  const staffDeck = createStaffDeck(1, options.unlockedCardIds);
 
   shuffleArray(businessDeck, rng);
   shuffleArray(communitySpaceDeck, rng);
   shuffleArray(eventDeck, rng);
   shuffleArray(upgradeDeck, rng);
-  // Staff deck shuffle: draw count scales with deck size, so adding a staff
-  // template shifts the seeded game draws (market refill, challenge
-  // selection) by one — the established precedent when staff templates grow
-  // (e.g. General Manager, CG-0MSTOF1N5005PK2R). Seeded determinism (same
-  // seed ⇒ same game) is preserved.
+  // Staff deck shuffle: draw count scales with deck size (now tier-filtered,
+  // CG-0MT2WU0CX005Z143), so changing the unlocked pool shifts the seeded
+  // game draws (market refill, challenge selection) — the established
+  // precedent when staff template counts change (e.g. General Manager,
+  // CG-0MSTOF1N5005PK2R). Seeded determinism (same seed ⇒ same game) is
+  // preserved.
   shuffleArray(staffDeck, rng);
 
   // Populate initial market — single-row marketplace (CG-0MSTOATDT009BRX2):
@@ -726,6 +737,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     actionsRemaining: 1,
     peekUsedThisTurn: false,
     revealedPeekedCard: null,
+    favourUsedThisTurn: false,
   };
 
   // Refill the single-row market with its initial composition.
@@ -815,6 +827,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     actionsRemaining: state.actionsRemaining,
     peekUsedThisTurn: state.peekUsedThisTurn,
     revealedPeekedCard: state.revealedPeekedCard ?? null,
+    favourUsedThisTurn: state.favourUsedThisTurn,
   };
 }
 
@@ -982,6 +995,13 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).revealedPeekedCard = null;
   }
 
+  // ── favourUsedThisTurn (CG-0MSTOATDQ005XDET): backfill default ──
+  // Legacy saves predate the Community Favour mechanic; default to false
+  // (unused). Mirrors the pattern used for actionsRemaining and peekUsedThisTurn.
+  if (!('favourUsedThisTurn' in saved)) {
+    (saved as Record<string, unknown>).favourUsedThisTurn = false;
+  }
+
   // ── incidentBalance (CG-0MSL0OP040043KKZ): backfill from the queue for ──
   // legacy saves that predate the balance state. The queue cards are recorded
   // in draw order so subsequent constrained draws see the actual sequence.
@@ -1142,6 +1162,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: saved.actionsRemaining ?? 1,
     peekUsedThisTurn: saved.peekUsedThisTurn ?? false,
+    favourUsedThisTurn: saved.favourUsedThisTurn ?? false,
     revealedPeekedCard: (saved.revealedPeekedCard as EventCard | null) ?? null,
   };
 
