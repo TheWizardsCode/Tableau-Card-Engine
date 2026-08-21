@@ -1526,6 +1526,51 @@ export class MainStreetRenderer {
         s.actionContainer.add(peekBtn);
       }
 
+      // ── Community Favour buttons (CG-0MSTOATDQ005XDET) ────────────────
+      // Two buttons (one per direction), positioned via SLL zones, to the
+      // left of the action cluster. Disabled when the input resource is
+      // insufficient, when the once-per-turn gate is spent, or outside
+      // MarketPhase (the refresh only renders in the market UI phase).
+      const favourW = s.layout.favourButtonW;
+      const favourGone = s.state.favourUsedThisTurn;
+      const coinsToRepCost = s.state.config.favourCoinsToRepCost;
+      const repToCoinsRepCost = s.state.config.favourRepToCoinsRepCost;
+      const repToCoinsCoinGain = s.state.config.favourRepToCoinsCoinGain;
+      const coinsToRepDisabled = favourGone || s.state.resourceBank.coins < coinsToRepCost;
+      const repToCoinsDisabled = favourGone || s.state.resourceBank.reputation < repToCoinsRepCost;
+
+      const favourCoinsToRepBtn = createActionButton(
+        s, s.layout.favourCoinsToRepX, by + 4, favourW,
+        `${coinsToRepCost}c → 1r`,
+        () => s.onCommunityFavourClick('coins-to-rep'),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: coinsToRepDisabled ? 0x2a2a2a : 0x442244,
+          fillAlpha: 0.8,
+          strokeColor: coinsToRepDisabled ? 0x444444 : 0xaa44aa,
+          textColor: coinsToRepDisabled ? '#666666' : '#ff88ff',
+          fontSize: '13px',
+          disabled: coinsToRepDisabled,
+        },
+      );
+      s.actionContainer.add(favourCoinsToRepBtn);
+
+      const favourRepToCoinsBtn = createActionButton(
+        s, s.layout.favourRepToCoinsX, by + 4, favourW,
+        `${repToCoinsRepCost}r → ${repToCoinsCoinGain}c`,
+        () => s.onCommunityFavourClick('rep-to-coins'),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: repToCoinsDisabled ? 0x2a2a2a : 0x224422,
+          fillAlpha: 0.8,
+          strokeColor: repToCoinsDisabled ? 0x444444 : 0x44aa44,
+          textColor: repToCoinsDisabled ? '#666666' : '#88ff88',
+          fontSize: '13px',
+          disabled: repToCoinsDisabled,
+        },
+      );
+      s.actionContainer.add(favourRepToCoinsBtn);
+
     } else if (s.uiPhase === 'placing-from-hand') {
       const rightX = s.layout.gameW - 24;
       const by = s.layout.actionY;
