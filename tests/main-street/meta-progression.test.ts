@@ -135,12 +135,12 @@ describe('Meta-Progression System', () => {
   // ────────────────────────────────────────────────────────────
 
   describe('Tier registry structure', () => {
-    it('defines exactly 5 tiers', () => {
-      expect(Object.keys(TIER_DEFINITIONS)).toHaveLength(5);
+    it('defines exactly 12 tiers', () => {
+      expect(Object.keys(TIER_DEFINITIONS)).toHaveLength(12);
     });
 
-    it('has tiers named tier-1 through tier-5', () => {
-      for (let i = 1; i <= 5; i++) {
+    it('has tiers named tier-1 through tier-12', () => {
+      for (let i = 1; i <= 12; i++) {
         expect(TIER_DEFINITIONS[`tier-${i}`]).toBeDefined();
         expect(TIER_DEFINITIONS[`tier-${i}`].id).toBe(`tier-${i}`);
         expect(TIER_DEFINITIONS[`tier-${i}`].order).toBe(i);
@@ -155,38 +155,37 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 1 has baseline plus early expanded sample plus community space and staff cards (27 cards total)', () => {
-      // 27 = 24 (post-Group-D) + upg-adventure-park (Group E) + evt-graffiti-art
-      // + staff tiering (CG-0MT2WU0CX005Z143 added 2 staff to T1; the community
-      // space rebalance moved cs-playground out of T1 to T2).
-      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(27);
-      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(27);
+    it('Tier 1 has the starter set (15 cards incl. tutorial-pinned cards)', () => {
+      // 15 = 4 business + 2 community-space + 4 events + 1 staff + 4 upgrades.
+      // Includes the tutorial-pinned tier-1 cards (bakery, laundromat,
+      // bookshop, library, festival, award, rainy) - CG-0MT3C744B009DS84.
+      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(15);
+      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(15);
+      const tier1 = new Set(TIER_DEFINITIONS['tier-1'].newCardIds);
+      for (const pinned of ['biz-bakery', 'biz-laundromat', 'biz-bookshop',
+        'cs-library', 'evt-festival', 'evt-award', 'evt-rainy']) {
+        expect(tier1.has(pinned), `tier-1 missing tutorial pin ${pinned}`).toBe(true);
+      }
     });
 
     it('each subsequent tier adds additional cards', () => {
-      for (let i = 2; i <= 5; i++) {
+      for (let i = 2; i <= 12; i++) {
         expect(TIER_DEFINITIONS[`tier-${i}`].newCardIds.length).toBeGreaterThan(0);
       }
     });
 
-    it('Tier 5 cumulative pool covers full catalog (142 tiered templates)', () => {
-      // 142 = 133 (pre-rebalance tiered catalog) + 9 staff cards now assigned a
-      // tier (rebalance CG-0MT2WU0CX005Z143 staff them like every other family).
-      expect(TIER_DEFINITIONS['tier-5'].cumulativeCardIds).toHaveLength(142);
+    it('Tier 12 cumulative pool covers full catalog (142 tiered templates)', () => {
+      // 142 = 133 (post-Group-D tiered catalog) + 9 staff cards now assigned a
+      // tier. 12-tier expansion re-distributes across tiers 1-12.
+      expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(142);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
-      const tier1 = new Set(TIER_DEFINITIONS['tier-1'].cumulativeCardIds);
-      const tier2 = new Set(TIER_DEFINITIONS['tier-2'].cumulativeCardIds);
-      const tier3 = new Set(TIER_DEFINITIONS['tier-3'].cumulativeCardIds);
-      const tier4 = new Set(TIER_DEFINITIONS['tier-4'].cumulativeCardIds);
-      const tier5 = new Set(TIER_DEFINITIONS['tier-5'].cumulativeCardIds);
-
-      // Each tier's cumulative set is a superset of the previous
-      for (const id of tier1) expect(tier2.has(id)).toBe(true);
-      for (const id of tier2) expect(tier3.has(id)).toBe(true);
-      for (const id of tier3) expect(tier4.has(id)).toBe(true);
-      for (const id of tier4) expect(tier5.has(id)).toBe(true);
+      for (let i = 2; i <= 12; i++) {
+        const prev = new Set(TIER_DEFINITIONS[`tier-${i - 1}`].cumulativeCardIds);
+        const cur = new Set(TIER_DEFINITIONS[`tier-${i}`].cumulativeCardIds);
+        for (const id of prev) expect(cur.has(id)).toBe(true);
+      }
     });
 
     it('Tier 1 reputation threshold is 0', () => {
@@ -200,12 +199,13 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('specific reputation thresholds match PRD (0, 8, 16, 32, 64)', () => {
-      expect(TIER_DEFINITIONS['tier-1'].reputationThreshold).toBe(0);
-      expect(TIER_DEFINITIONS['tier-2'].reputationThreshold).toBe(8);
-      expect(TIER_DEFINITIONS['tier-3'].reputationThreshold).toBe(16);
-      expect(TIER_DEFINITIONS['tier-4'].reputationThreshold).toBe(32);
-      expect(TIER_DEFINITIONS['tier-5'].reputationThreshold).toBe(64);
+    it('specific reputation thresholds follow the 12-tier ladder (0, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80)', () => {
+      // Anchors 8/16/32/64 preserved from the 5-tier ladder (8, 16, 32, 64)
+      // at T3/T5/T7/T11; extended to aspirational T12=80 - CG-0MT3C744B009DS84.
+      const expected = [0, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80];
+      for (let i = 0; i < 12; i++) {
+        expect(TIER_DEFINITIONS[`tier-${i + 1}`].reputationThreshold).toBe(expected[i]);
+      }
     });
 
     it('all card IDs in tier definitions reference valid template IDs', () => {
@@ -231,63 +231,83 @@ describe('Meta-Progression System', () => {
   // ────────────────────────────────────────────────────────────
 
   describe('US-1: Tier evaluation via reputation thresholds', () => {
-    it('unlocks Tier 2 when reputation >= 8', async () => {
+    it('unlocks Tier 2 when reputation >= 4', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 8 });
+      const state = createCompletedRunState({ reputation: 4 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).toContain('tier-2');
     });
 
-    it('does NOT unlock Tier 2 when reputation < 8 and no challenges', async () => {
+    it('does NOT unlock Tier 2 when reputation < 4 and no challenges', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 7 });
+      const state = createCompletedRunState({ reputation: 3 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).not.toContain('tier-2');
     });
 
-    it('unlocks Tier 3 when reputation >= 16', async () => {
+    it('unlocks Tier 3 when reputation >= 8', async () => {
       const campaign = freshCampaign();
       campaign.unlockedTiers.push('tier-2'); // Must already have tier 2 or not - tiers are independent
-      const state = createCompletedRunState({ reputation: 16 });
+      const state = createCompletedRunState({ reputation: 8 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).toContain('tier-3');
     });
 
-    it('unlocks Tier 4 when reputation >= 32', async () => {
+    it('unlocks Tier 4 when reputation >= 12', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 32 });
+      const state = createCompletedRunState({ reputation: 12 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).toContain('tier-4');
     });
 
-    it('unlocks Tier 5 when reputation >= 64', async () => {
+    it('unlocks Tier 5 when reputation >= 16', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 64 });
+      const state = createCompletedRunState({ reputation: 16 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).toContain('tier-5');
     });
 
+    it('unlocks Tier 12 only at the aspirational end-reputation (80)', async () => {
+      const campaign = freshCampaign();
+      const state = createCompletedRunState({ reputation: 80 });
+
+      await updateCampaignAfterRun(campaign, state);
+
+      expect(campaign.unlockedTiers).toContain('tier-12');
+    });
+
+    it('does NOT unlock Tier 12 below 80 reputation', async () => {
+      const campaign = freshCampaign();
+      const state = createCompletedRunState({ reputation: 79 });
+
+      await updateCampaignAfterRun(campaign, state);
+
+      expect(campaign.unlockedTiers).not.toContain('tier-12');
+    });
+
     it('unlocks multiple tiers in a single high-reputation run', async () => {
       const campaign = freshCampaign();
-      // A run with reputation 64 should unlock tiers 2, 3, 4, and 5 in one go
+      // A run with reputation 64 should unlock tiers 2 through 11 in one go
+      // (T12 needs 80; thresholds go 4, 8, 12, 16, 24, 32, 40, 48, 56, 64).
       const state = createCompletedRunState({ reputation: 64 });
 
       await updateCampaignAfterRun(campaign, state);
 
       expect(campaign.unlockedTiers).toContain('tier-2');
-      expect(campaign.unlockedTiers).toContain('tier-3');
-      expect(campaign.unlockedTiers).toContain('tier-4');
       expect(campaign.unlockedTiers).toContain('tier-5');
+      expect(campaign.unlockedTiers).toContain('tier-7');
+      expect(campaign.unlockedTiers).toContain('tier-11');
+      expect(campaign.unlockedTiers).not.toContain('tier-12');
     });
 
     it('updates persistentReputation to highest seen value', async () => {
@@ -357,11 +377,11 @@ describe('Meta-Progression System', () => {
   // ────────────────────────────────────────────────────────────
 
   describe('US-2: Challenge-based tier unlock', () => {
-    it('unlocks Tier 2 with 2 completed challenges (any category)', async () => {
+    it('unlocks Tier 2 with 1 completed challenge (any category)', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0, // Low rep, challenge path only
-        challengesCompleted: ['ch-foodie-row', 'ch-deep-pockets'],
+        challengesCompleted: ['ch-foodie-row'],
       });
 
       await updateCampaignAfterRun(campaign, state);
@@ -369,11 +389,11 @@ describe('Meta-Progression System', () => {
       expect(campaign.unlockedTiers).toContain('tier-2');
     });
 
-    it('does NOT unlock Tier 2 with only 1 challenge', async () => {
+    it('does NOT unlock Tier 2 with 0 challenges', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
-        challengesCompleted: ['ch-foodie-row'],
+        challengesCompleted: [],
       });
 
       await updateCampaignAfterRun(campaign, state);
@@ -381,7 +401,7 @@ describe('Meta-Progression System', () => {
       expect(campaign.unlockedTiers).not.toContain('tier-2');
     });
 
-    it('unlocks Tier 3 with 1 synergy + 1 resource challenge', async () => {
+    it('unlocks Tier 3 with 2 completed challenges (any category)', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
@@ -404,11 +424,46 @@ describe('Meta-Progression System', () => {
       expect(campaign.unlockedTiers).toContain('tier-3');
     });
 
-    it('does NOT unlock Tier 3 with only synergy challenges (no resource)', async () => {
+    it('does NOT unlock Tier 3 with only 1 challenge', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
-        challengesCompleted: ['ch-foodie-row', 'ch-culture-district'],
+        challengesCompleted: ['ch-foodie-row'],
+      });
+
+      await updateCampaignAfterRun(campaign, state);
+
+      expect(campaign.unlockedTiers).toContain('tier-2');
+      expect(campaign.unlockedTiers).not.toContain('tier-3');
+    });
+
+    it('unlocks Tier 4 with 1 synergy + 1 resource challenge', async () => {
+      const campaign = freshCampaign();
+      const state = createCompletedRunState({
+        reputation: 0,
+        challengesCompleted: ['ch-foodie-row', 'ch-deep-pockets'],
+      });
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find((t) => t.id === 'ch-foodie-row')!,
+          completed: true,
+        },
+        {
+          challenge: CHALLENGE_TEMPLATES.find((t) => t.id === 'ch-deep-pockets')!,
+          completed: true,
+        },
+      ];
+
+      await updateCampaignAfterRun(campaign, state);
+
+      expect(campaign.unlockedTiers).toContain('tier-4');
+    });
+
+    it('does NOT unlock Tier 4 with only synergy challenges (no resource)', async () => {
+      const campaign = freshCampaign();
+      const state = createCompletedRunState({
+        reputation: 0,
+        challengesCompleted: ['ch-foodie-row', 'ch-culture-district', 'ch-commerce-hub'],
       });
       state.activeChallenges = [
         {
@@ -419,16 +474,20 @@ describe('Meta-Progression System', () => {
           challenge: CHALLENGE_TEMPLATES.find((t) => t.id === 'ch-culture-district')!,
           completed: true,
         },
+        {
+          challenge: CHALLENGE_TEMPLATES.find((t) => t.id === 'ch-commerce-hub')!,
+          completed: true,
+        },
       ];
 
       await updateCampaignAfterRun(campaign, state);
 
-      // May unlock tier-2 (2 challenges) but NOT tier-3 (needs resource)
-      expect(campaign.unlockedTiers).toContain('tier-2');
-      expect(campaign.unlockedTiers).not.toContain('tier-3');
+      // May unlock tier-2/tier-3 (3 challenges) but NOT tier-4 (needs resource)
+      expect(campaign.unlockedTiers).toContain('tier-3');
+      expect(campaign.unlockedTiers).not.toContain('tier-4');
     });
 
-    it('unlocks Tier 4 with 3 challenges including cross-cutting', async () => {
+    it('unlocks Tier 5 with 3 challenges including cross-cutting', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
@@ -451,10 +510,10 @@ describe('Meta-Progression System', () => {
 
       await updateCampaignAfterRun(campaign, state);
 
-      expect(campaign.unlockedTiers).toContain('tier-4');
+      expect(campaign.unlockedTiers).toContain('tier-5');
     });
 
-    it('unlocks Tier 4 with 3 challenges including placement', async () => {
+    it('unlocks Tier 5 with 3 challenges including placement', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
@@ -477,10 +536,10 @@ describe('Meta-Progression System', () => {
 
       await updateCampaignAfterRun(campaign, state);
 
-      expect(campaign.unlockedTiers).toContain('tier-4');
+      expect(campaign.unlockedTiers).toContain('tier-5');
     });
 
-    it('does NOT unlock Tier 4 with 3 challenges but none cross-cutting/placement', async () => {
+    it('does NOT unlock Tier 5 with 3 challenges but none cross-cutting/placement', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
@@ -503,10 +562,11 @@ describe('Meta-Progression System', () => {
 
       await updateCampaignAfterRun(campaign, state);
 
-      expect(campaign.unlockedTiers).not.toContain('tier-4');
+      expect(campaign.unlockedTiers).toContain('tier-4'); // synergy+resource
+      expect(campaign.unlockedTiers).not.toContain('tier-5');
     });
 
-    it('unlocks Tier 5 via the Diversified challenge', async () => {
+    it('unlocks Tier 10 via the Diversified challenge (5 synergy types)', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
@@ -521,10 +581,10 @@ describe('Meta-Progression System', () => {
 
       await updateCampaignAfterRun(campaign, state);
 
-      expect(campaign.unlockedTiers).toContain('tier-5');
+      expect(campaign.unlockedTiers).toContain('tier-10');
     });
 
-    it('does NOT unlock Tier 5 via a non-Diversified challenge', async () => {
+    it('unlocks Tier 11 via the Synergy Master challenge (5+ synergy pairs)', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
@@ -539,13 +599,72 @@ describe('Meta-Progression System', () => {
 
       await updateCampaignAfterRun(campaign, state);
 
-      expect(campaign.unlockedTiers).not.toContain('tier-5');
+      expect(campaign.unlockedTiers).toContain('tier-11');
+    });
+
+    it('does NOT unlock Tier 10 via a non-Diversified challenge', async () => {
+      const campaign = freshCampaign();
+      const state = createCompletedRunState({
+        reputation: 0,
+        challengesCompleted: ['ch-synergy-master'],
+      });
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find((t) => t.id === 'ch-synergy-master')!,
+          completed: true,
+        },
+      ];
+
+      await updateCampaignAfterRun(campaign, state);
+
+      expect(campaign.unlockedTiers).not.toContain('tier-10');
+    });
+
+    it('unlocks Tier 12 only via BOTH flagship cross-cutting challenges', async () => {
+      const campaign = freshCampaign();
+      const state = createCompletedRunState({
+        reputation: 0,
+        challengesCompleted: ['ch-diversified', 'ch-synergy-master'],
+      });
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find((t) => t.id === 'ch-diversified')!,
+          completed: true,
+        },
+        {
+          challenge: CHALLENGE_TEMPLATES.find((t) => t.id === 'ch-synergy-master')!,
+          completed: true,
+        },
+      ];
+
+      await updateCampaignAfterRun(campaign, state);
+
+      expect(campaign.unlockedTiers).toContain('tier-12');
+    });
+
+    it('does NOT unlock Tier 12 with only one flagship challenge', async () => {
+      const campaign = freshCampaign();
+      const state = createCompletedRunState({
+        reputation: 0,
+        challengesCompleted: ['ch-diversified'],
+      });
+      state.activeChallenges = [
+        {
+          challenge: CHALLENGE_TEMPLATES.find((t) => t.id === 'ch-diversified')!,
+          completed: true,
+        },
+      ];
+
+      await updateCampaignAfterRun(campaign, state);
+
+      expect(campaign.unlockedTiers).toContain('tier-10');
+      expect(campaign.unlockedTiers).not.toContain('tier-12');
     });
 
     it('reputation and challenge paths are OR: either unlocks the tier', async () => {
       // Reputation path for tier 2
       const campaignA = freshCampaign();
-      const stateA = createCompletedRunState({ reputation: 8 });
+      const stateA = createCompletedRunState({ reputation: 4 });
       await updateCampaignAfterRun(campaignA, stateA);
       expect(campaignA.unlockedTiers).toContain('tier-2');
 
@@ -553,7 +672,7 @@ describe('Meta-Progression System', () => {
       const campaignB = freshCampaign();
       const stateB = createCompletedRunState({
         reputation: 0,
-        challengesCompleted: ['ch-foodie-row', 'ch-deep-pockets'],
+        challengesCompleted: ['ch-foodie-row'],
       });
       await updateCampaignAfterRun(campaignB, stateB);
       expect(campaignB.unlockedTiers).toContain('tier-2');
@@ -568,8 +687,8 @@ describe('Meta-Progression System', () => {
     it('unlocks are never removed by subsequent runs', async () => {
       const campaign = freshCampaign();
 
-      // First run: unlock tier-2 and tier-3
-      const run1 = createCompletedRunState({ reputation: 16 });
+      // First run: unlock tier-2 and tier-3 (thresholds 4 and 8)
+      const run1 = createCompletedRunState({ reputation: 8 });
       await updateCampaignAfterRun(campaign, run1);
       expect(campaign.unlockedTiers).toContain('tier-2');
       expect(campaign.unlockedTiers).toContain('tier-3');
@@ -585,7 +704,7 @@ describe('Meta-Progression System', () => {
       const campaign = freshCampaign();
 
       // Unlock tier-2 twice with high rep
-      const run1 = createCompletedRunState({ reputation: 8 });
+      const run1 = createCompletedRunState({ reputation: 4 });
       await updateCampaignAfterRun(campaign, run1);
       const run2 = createCompletedRunState({ reputation: 9 });
       await updateCampaignAfterRun(campaign, run2);
@@ -598,17 +717,17 @@ describe('Meta-Progression System', () => {
       const campaign = freshCampaign();
 
       // Run 1: unlock tier-2 only
-      const run1 = createCompletedRunState({ reputation: 8 });
+      const run1 = createCompletedRunState({ reputation: 4 });
       await updateCampaignAfterRun(campaign, run1);
       expect(campaign.unlockedTiers).toEqual(['tier-1', 'tier-2']);
 
       // Run 2: unlock tier-3 (tier-2 was already unlocked)
-      const run2 = createCompletedRunState({ reputation: 16 });
+      const run2 = createCompletedRunState({ reputation: 8 });
       await updateCampaignAfterRun(campaign, run2);
       expect(campaign.unlockedTiers).toEqual(['tier-1', 'tier-2', 'tier-3']);
 
-      // Run 3: unlock tier-5 (skipping tier-4? No—rep 64 meets tier-4 threshold too)
-      const run3 = createCompletedRunState({ reputation: 64 });
+      // Run 3: unlock tier-5 (rep 16 meets tier-4 (12) and tier-5 (16) too)
+      const run3 = createCompletedRunState({ reputation: 16 });
       await updateCampaignAfterRun(campaign, run3);
       expect(campaign.unlockedTiers).toContain('tier-4');
       expect(campaign.unlockedTiers).toContain('tier-5');
@@ -700,16 +819,16 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 5 pool yields all unique template IDs across all deck builders (incl. staff)', () => {
+    it('Tier 12 pool yields all unique template IDs across all deck builders (incl. staff)', () => {
       // 134 = business (30) + event (56) + upgrade (39) + staff (9);
       // community-space (8) is not part of these builders.
-      const tier5CardIds = TIER_DEFINITIONS['tier-5'].cumulativeCardIds;
+      const tier12CardIds = TIER_DEFINITIONS['tier-12'].cumulativeCardIds;
 
-      const bizDeck = createBusinessDeck(1, tier5CardIds);
-      const evtDeck = createEventDeck(1, tier5CardIds, createSeededRng(42));
-      const upgDeck = createUpgradeDeck(1, tier5CardIds);
+      const bizDeck = createBusinessDeck(1, tier12CardIds);
+      const evtDeck = createEventDeck(1, tier12CardIds, createSeededRng(42));
+      const upgDeck = createUpgradeDeck(1, tier12CardIds);
       // Staff are tier-gated like every other family (CG-0MT2WU0CX005Z143).
-      const staffDeck = createStaffDeck(1, tier5CardIds);
+      const staffDeck = createStaffDeck(1, tier12CardIds);
 
       const allBaseIds = new Set([
         ...bizDeck.map((c) => c.id.replace(/-\d+$/, '')),
@@ -733,10 +852,13 @@ describe('Meta-Progression System', () => {
       expect(campaign.schemaVersion).toBe(2);
     });
 
-    it('default campaign has tier-1 unlocked with 27 card IDs', () => {
+    it('default campaign has tier-1 unlocked with all 15 tier-1 card IDs', () => {
       const campaign = createDefaultCampaignProgress();
       expect(campaign.unlockedTiers).toEqual(['tier-1']);
-      expect(campaign.unlockedCardIds).toHaveLength(27); // +2 staff (CG-0MT2WU0CX005Z143)
+      // 15 tier-1 cards in the 12-tier design (CG-0MT3C744B009DS84).
+      const expected = deriveUnlockedCardIds(['tier-1']);
+      expect(campaign.unlockedCardIds).toHaveLength(expected.length);
+      expect(campaign.unlockedCardIds).toHaveLength(15);
       expect(campaign.milestoneHistory).toEqual([]);
     });
 
@@ -915,7 +1037,7 @@ describe('Meta-Progression System', () => {
     it('appends MilestoneRecord when a tier is unlocked via reputation', async () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
-        reputation: 8,
+        reputation: 4,
         finalScore: 120,
         seed: 'ms-rep-test',
       });
@@ -926,7 +1048,7 @@ describe('Meta-Progression System', () => {
       const record = campaign.milestoneHistory[0];
       expect(record.tierId).toBe('tier-2');
       expect(record.triggerType).toBe('reputation');
-      expect(record.reputationAtUnlock).toBe(8);
+      expect(record.reputationAtUnlock).toBe(4);
       expect(record.challengeIdsAtUnlock).toBeNull();
       expect(record.runFinalScore).toBe(120);
       expect(record.runSeed).toBe('ms-rep-test');
@@ -940,7 +1062,7 @@ describe('Meta-Progression System', () => {
       const campaign = freshCampaign();
       const state = createCompletedRunState({
         reputation: 0,
-        challengesCompleted: ['ch-foodie-row', 'ch-deep-pockets'],
+        challengesCompleted: ['ch-foodie-row'],
         finalScore: 80,
         seed: 'ms-ch-test',
       });
@@ -951,10 +1073,7 @@ describe('Meta-Progression System', () => {
       expect(tier2Records).toHaveLength(1);
       expect(tier2Records[0].triggerType).toBe('challenge');
       expect(tier2Records[0].reputationAtUnlock).toBeNull();
-      expect(tier2Records[0].challengeIdsAtUnlock).toEqual([
-        'ch-foodie-row',
-        'ch-deep-pockets',
-      ]);
+      expect(tier2Records[0].challengeIdsAtUnlock).toEqual(['ch-foodie-row']);
     });
 
     it('multiple tier unlocks in one run each produce a MilestoneRecord', async () => {
@@ -963,13 +1082,15 @@ describe('Meta-Progression System', () => {
 
       await updateCampaignAfterRun(campaign, state);
 
-      // Should have 4 records (tier-2, tier-3, tier-4, tier-5)
-      expect(campaign.milestoneHistory).toHaveLength(4);
+      // Rep 64 clears thresholds 4,8,12,16,24,32,40,48,56,64 => tiers 2-11
+      // (10 records); tier-12 needs 80.
+      expect(campaign.milestoneHistory).toHaveLength(10);
       const tierIds = campaign.milestoneHistory.map((r) => r.tierId);
       expect(tierIds).toContain('tier-2');
-      expect(tierIds).toContain('tier-3');
-      expect(tierIds).toContain('tier-4');
       expect(tierIds).toContain('tier-5');
+      expect(tierIds).toContain('tier-7');
+      expect(tierIds).toContain('tier-11');
+      expect(tierIds).not.toContain('tier-12');
     });
 
     it('no MilestoneRecord is added when no new tier is unlocked', async () => {
@@ -985,13 +1106,13 @@ describe('Meta-Progression System', () => {
     it('MilestoneRecords accumulate across runs', async () => {
       const campaign = freshCampaign();
 
-      // Run 1: unlock tier-2
-      const run1 = createCompletedRunState({ reputation: 8, seed: 'run1' });
+      // Run 1: unlock tier-2 (rep 4)
+      const run1 = createCompletedRunState({ reputation: 4, seed: 'run1' });
       await updateCampaignAfterRun(campaign, run1);
       expect(campaign.milestoneHistory).toHaveLength(1);
 
-      // Run 2: unlock tier-3
-      const run2 = createCompletedRunState({ reputation: 16, seed: 'run2' });
+      // Run 2: unlock tier-3 (rep 8)
+      const run2 = createCompletedRunState({ reputation: 8, seed: 'run2' });
       await updateCampaignAfterRun(campaign, run2);
       expect(campaign.milestoneHistory).toHaveLength(2);
 
@@ -1007,13 +1128,13 @@ describe('Meta-Progression System', () => {
 
     it('reputation trigger records reputation value; challenge trigger records null', async () => {
       const campaign = freshCampaign();
-      const state = createCompletedRunState({ reputation: 8 });
+      const state = createCompletedRunState({ reputation: 4 });
 
       await updateCampaignAfterRun(campaign, state);
 
       const record = campaign.milestoneHistory[0];
       expect(record.triggerType).toBe('reputation');
-      expect(record.reputationAtUnlock).toBe(8);
+      expect(record.reputationAtUnlock).toBe(4);
       expect(record.challengeIdsAtUnlock).toBeNull();
     });
 
@@ -1032,12 +1153,12 @@ describe('Meta-Progression System', () => {
 
       await updateCampaignAfterRun(campaign, state);
 
-      // Find the tier-5 record (Diversified unlocks tier-5)
-      const tier5Record = campaign.milestoneHistory.find((r) => r.tierId === 'tier-5');
-      expect(tier5Record).toBeDefined();
-      expect(tier5Record!.triggerType).toBe('challenge');
-      expect(tier5Record!.reputationAtUnlock).toBeNull();
-      expect(tier5Record!.challengeIdsAtUnlock).toEqual(['ch-diversified']);
+      // Find the tier-10 record (Diversified unlocks tier-10)
+      const tier10Record = campaign.milestoneHistory.find((r) => r.tierId === 'tier-10');
+      expect(tier10Record).toBeDefined();
+      expect(tier10Record!.triggerType).toBe('challenge');
+      expect(tier10Record!.reputationAtUnlock).toBeNull();
+      expect(tier10Record!.challengeIdsAtUnlock).toEqual(['ch-diversified']);
     });
 
     it('milestone history survives save/load round-trip', async () => {
@@ -1073,17 +1194,18 @@ describe('Meta-Progression System', () => {
   describe('deriveUnlockedCardIds', () => {
     it('returns tier-1 cards for ["tier-1"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1']);
-      expect(ids).toHaveLength(27); // +2 staff (CG-0MT2WU0CX005Z143)
-      expect(new Set(ids).size).toBe(27); // no duplicates
+      expect(ids).toHaveLength(15); // 12-tier starter set (CG-0MT3C744B009DS84)
+      expect(new Set(ids).size).toBe(15); // no duplicates
     });
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(56); // 27 (T1) + 29 (T2 new)
+      expect(ids).toHaveLength(27); // 15 (T1) + 12 (T2 new)
     });
 
-    it('returns all 142 cards for all 5 tiers', () => {
-      const ids = deriveUnlockedCardIds(['tier-1', 'tier-2', 'tier-3', 'tier-4', 'tier-5']);
+    it('returns all 142 cards for all 12 tiers', () => {
+      const allTierIds = Array.from({ length: 12 }, (_, i) => `tier-${i + 1}`);
+      const ids = deriveUnlockedCardIds(allTierIds);
       expect(ids).toHaveLength(142); // full catalog incl. 9 staff
     });
 
@@ -1094,7 +1216,7 @@ describe('Meta-Progression System', () => {
 
     it('ignores unknown tier IDs gracefully', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-99']);
-      expect(ids).toHaveLength(27); // only tier-1 cards (+2 staff)
+      expect(ids).toHaveLength(15); // only tier-1 cards
     });
 
     it('does not produce duplicates even if tiers are listed twice', () => {
@@ -1104,7 +1226,7 @@ describe('Meta-Progression System', () => {
     });
 
     it('matches cumulativeCardIds from TIER_DEFINITIONS', () => {
-      for (let i = 1; i <= 5; i++) {
+      for (let i = 1; i <= 12; i++) {
         const tierIds = Array.from({ length: i }, (_, j) => `tier-${j + 1}`);
         const derived = deriveUnlockedCardIds(tierIds);
         const expected = TIER_DEFINITIONS[`tier-${i}`].cumulativeCardIds;

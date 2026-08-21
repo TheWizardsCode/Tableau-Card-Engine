@@ -87,12 +87,18 @@ describe('Group F staff expansion: uniqueness & tier convention (AC4)', () => {
     }
   });
 
-  it('staff cards are tier-registered like other families (rebalance, CG-0MT2WU0CX005Z143)', () => {
-    // All staff cards are tier-assigned and cover every tier so no tier lacks
-    // staff (the rebalance requires all five families present in each tier).
+  it('staff cards are tier-registered like other families (12-tier, CG-0MT3C744B009DS84)', () => {
+    // All 9 staff cards are tier-assigned and spread across tiers 1-12
+    // (apprentice T1, assistant T2, manager T3, socialite T4, accountant T6,
+    // lookout T7, director T9, executive T10, general-manager T12).
     const staffIds = getCsvRows().filter(r => r.family === 'staff').map(r => r.id);
-    const staffTiers = new Set(staffIds.map(id => CARD_TIER_MAP.get(id)));
-    expect(staffTiers).toEqual(new Set(['1', '2', '3', '4', '5']));
+    expect(staffIds).toHaveLength(9);
+    const staffTiers = staffIds.map(id => CARD_TIER_MAP.get(id));
+    const validTiers = Array.from({ length: 12 }, (_, i) => String(i + 1));
+    for (const t of staffTiers) {
+      expect(validTiers).toContain(t);
+    }
+    expect(new Set(staffTiers).size).toBeGreaterThanOrEqual(8); // spread across >= 8 tiers
     for (const id of staffIds) {
       expect(CARD_TIER_MAP.has(id), `${id} should be tier-assigned`).toBe(true);
     }

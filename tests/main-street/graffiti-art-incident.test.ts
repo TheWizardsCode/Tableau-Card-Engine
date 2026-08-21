@@ -40,7 +40,7 @@ const GRAFFITI_ART_CONTRACT = {
   family: 'event',
   trigger: 'Incident',
   cost: '0',
-  tier: '1',
+  tier: '3',
   coinDelta: '1',
   reputationDelta: '1',
   target: 'All',
@@ -73,7 +73,9 @@ describe('Graffiti Art: CSV template contract (AC1)', () => {
     expect(Number(art.coinDelta)).toBe(-Number(graffiti.coinDelta));
     expect(Number(art.reputationDelta)).toBe(-Number(graffiti.reputationDelta));
     expect(art.target).toBe(graffiti.target);
-    expect(art.tier).toBe(graffiti.tier);
+    // Graffiti Art unlocks at/after Graffiti (Graffiti T2, Art T3 in the
+    // 12-tier progression - CG-0MT3C744B009DS84).
+    expect(Number(art.tier)).toBeGreaterThanOrEqual(Number(graffiti.tier));
   });
 });
 

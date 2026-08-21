@@ -50,18 +50,18 @@ interface NewBusinessContract {
 }
 
 const NEW_BUSINESS_CONTRACTS: NewBusinessContract[] = [
-  { id: 'biz-juice-bar', name: 'Juice Bar', cost: 5, baseIncome: 0.5, synergyTypes: ['Food', 'Health'], tier: '3' },
-  { id: 'biz-yoga-studio', name: 'Yoga Studio', cost: 8, baseIncome: 1, synergyTypes: ['Culture', 'Health'], tier: '4' },
-  { id: 'biz-physio', name: 'Physiotherapy', cost: 10, baseIncome: 1, synergyTypes: ['Health', 'Service'], tier: '4', reputationPerTurn: 0.1 },
-  { id: 'biz-tailor', name: 'Tailor', cost: 5, baseIncome: 0.75, synergyTypes: ['Service'], tier: '2' },
-  { id: 'biz-gym', name: 'Gym', cost: 8, baseIncome: 1, synergyTypes: ['Health'], tier: '5' },
-  { id: 'biz-dentist', name: 'Dentist', cost: 12, baseIncome: 1.5, synergyTypes: ['Health'], tier: '5' },
-  { id: 'biz-toy-store', name: 'Toy Store', cost: 5, baseIncome: 0.75, synergyTypes: ['Commerce'], tier: '3' },
-  { id: 'biz-music-store', name: 'Music Store', cost: 8, baseIncome: 1, synergyTypes: ['Entertainment'], tier: '5' },
-  { id: 'biz-delicatessen', name: 'Delicatessen', cost: 5, baseIncome: 0.75, synergyTypes: ['Food'], tier: '2' },
-  { id: 'biz-craft-shop', name: 'Craft Shop', cost: 5, baseIncome: 0.75, synergyTypes: ['Culture'], tier: '2' },
-  { id: 'biz-hotel', name: 'Grand Hotel', cost: 16, baseIncome: 2.5, synergyTypes: ['Service'], tier: '5', reputationPerTurn: 0.1 },
-  { id: 'biz-teahouse', name: 'Teahouse', cost: 7, baseIncome: 0.75, synergyTypes: ['Food', 'Culture'], tier: '3' },
+  { id: 'biz-juice-bar', name: 'Juice Bar', cost: 5, baseIncome: 0.5, synergyTypes: ['Food', 'Health'], tier: '5' },
+  { id: 'biz-yoga-studio', name: 'Yoga Studio', cost: 8, baseIncome: 1, synergyTypes: ['Culture', 'Health'], tier: '9' },
+  { id: 'biz-physio', name: 'Physiotherapy', cost: 10, baseIncome: 1, synergyTypes: ['Health', 'Service'], tier: '11', reputationPerTurn: 0.1 },
+  { id: 'biz-tailor', name: 'Tailor', cost: 5, baseIncome: 0.75, synergyTypes: ['Service'], tier: '6' },
+  { id: 'biz-gym', name: 'Gym', cost: 8, baseIncome: 1, synergyTypes: ['Health'], tier: '9' },
+  { id: 'biz-dentist', name: 'Dentist', cost: 12, baseIncome: 1.5, synergyTypes: ['Health'], tier: '11' },
+  { id: 'biz-toy-store', name: 'Toy Store', cost: 5, baseIncome: 0.75, synergyTypes: ['Commerce'], tier: '6' },
+  { id: 'biz-music-store', name: 'Music Store', cost: 8, baseIncome: 1, synergyTypes: ['Entertainment'], tier: '10' },
+  { id: 'biz-delicatessen', name: 'Delicatessen', cost: 5, baseIncome: 0.75, synergyTypes: ['Food'], tier: '7' },
+  { id: 'biz-craft-shop', name: 'Craft Shop', cost: 5, baseIncome: 0.75, synergyTypes: ['Culture'], tier: '7' },
+  { id: 'biz-hotel', name: 'Grand Hotel', cost: 16, baseIncome: 2.5, synergyTypes: ['Service'], tier: '12', reputationPerTurn: 0.1 },
+  { id: 'biz-teahouse', name: 'Teahouse', cost: 7, baseIncome: 0.75, synergyTypes: ['Food', 'Culture'], tier: '7' },
 ];
 
 function byId(templates: readonly { id: string }[], id: string): BusinessCard | undefined {
@@ -157,16 +157,8 @@ describe('Group A business expansion: tier map membership (AC2)', () => {
     for (const t of getBusinessTemplates()) {
       expect(CARD_TIER_MAP.has(t.id), `${t.id} has no tier assignment`).toBe(true);
       const tier = CARD_TIER_MAP.get(t.id)!;
-      expect(['1', '2', '3', '4', '5']).toContain(tier);
+      expect(Array.from({ length: 12 }, (_, i) => String(i + 1))).toContain(tier);
     }
-  });
-
-  it('smooths the T2/T3 thinness (business T2+T3 count >= 12)', () => {
-    const t2t3 = getBusinessTemplates().filter(t => {
-      const tier = CARD_TIER_MAP.get(t.id);
-      return tier === '2' || tier === '3';
-    });
-    expect(t2t3.length).toBeGreaterThanOrEqual(12);
   });
 });
 

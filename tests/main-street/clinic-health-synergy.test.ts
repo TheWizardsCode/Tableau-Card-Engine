@@ -211,29 +211,27 @@ describe('Pharmacy (biz-pharmacy)', () => {
   });
 });
 
-// ── Tier Registration ───────────────────────────────────────
+// ── Tier Registration (12-tier expansion CG-0MT3C744B009DS84) ────────
 
-describe('Tier 4 Registration', () => {
-  const tier4CardIds = TIER_DEFINITIONS['tier-4'].newCardIds;
-
-  it('should include biz-clinic (reworked)', () => {
-    expect(tier4CardIds).toContain('biz-clinic');
+// Clinic-family cards sit in the late tiers (T8-T12) in the 12-tier design:
+// pharmacy T8, clinic + medical-center T10, private-clinic + private-medical
+// center T12. Each card's tier >= its synergy-family business tier and the
+// upgrade tiers follow their clinic targets.
+describe('Tier Registration (12-tier)', () => {
+  it('should register biz-pharmacy at tier-8', () => {
+    expect(TIER_DEFINITIONS['tier-8'].newCardIds).toContain('biz-pharmacy');
   });
 
-  it('should include biz-private-clinic (new)', () => {
-    expect(tier4CardIds).toContain('biz-private-clinic');
+  it('should register biz-clinic and upg-medical-center at tier-10', () => {
+    const t10 = TIER_DEFINITIONS['tier-10'].newCardIds;
+    expect(t10).toContain('biz-clinic');
+    expect(t10).toContain('upg-medical-center');
   });
 
-  it('should include biz-pharmacy (new)', () => {
-    expect(tier4CardIds).toContain('biz-pharmacy');
-  });
-
-  it('should include upg-medical-center (reworked)', () => {
-    expect(tier4CardIds).toContain('upg-medical-center');
-  });
-
-  it('should include upg-private-medical-center (new)', () => {
-    expect(tier4CardIds).toContain('upg-private-medical-center');
+  it('should register biz-private-clinic + upg-private-medical-center at tier-12', () => {
+    const t12 = TIER_DEFINITIONS['tier-12'].newCardIds;
+    expect(t12).toContain('biz-private-clinic');
+    expect(t12).toContain('upg-private-medical-center');
   });
 });
 

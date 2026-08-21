@@ -1343,7 +1343,7 @@ export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = _CARD_TEMPLATE_N
 
 /**
  * Read-only map from card template ID (e.g. `'biz-cafe'`) to its tier number
- * (as a numeric string, e.g. `'1'` through `'5'`).
+ * (as a numeric string, e.g. `'1'` through `'12'`).
  *
  * Built once at module load from the CSV `tier` column.
  * Cards without a tier assignment are omitted from this map (all families,

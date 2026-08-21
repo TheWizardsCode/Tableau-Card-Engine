@@ -15,32 +15,45 @@ function allTemplateIds(): Set<string> {
 }
 
 describe('Main Street tier catalog coverage', () => {
-  it('tier-5 cumulative card IDs cover the full catalog', () => {
+  it('tier-12 cumulative card IDs cover the full catalog', () => {
     const all = allTemplateIds();
-    const tier5 = new Set(TIER_DEFINITIONS['tier-5'].cumulativeCardIds);
+    const tier12 = new Set(TIER_DEFINITIONS['tier-12'].cumulativeCardIds);
 
-    expect(tier5.size).toBe(all.size);
+    expect(tier12.size).toBe(all.size);
     for (const id of all) {
-      expect(tier5.has(id), `missing template in tier progression: ${id}`).toBe(true);
+      expect(tier12.has(id), `missing template in tier progression: ${id}`).toBe(true);
     }
   });
 
-  it('tier-1 includes a small expanded sample (~10% of expanded set = 5 cards)', () => {
-    const all = allTemplateIds();
-    const tier1 = new Set(TIER_DEFINITIONS['tier-1'].newCardIds);
+  it('tier-1 is the starter set (15 cards) and includes every tutorial-pinned card', () => {
+    const tier1 = TIER_DEFINITIONS['tier-1'].newCardIds;
+    // 12-tier starter set (CG-0MT3C744B009DS84): 4 biz + 2 cs + 4 events
+    // + 1 staff + 4 upgrades. The tutorial builds decks from the tier-1 pool,
+    // so the 7 scenario cards are all present.
+    expect(tier1).toHaveLength(15);
+    const set = new Set(tier1);
+    for (const pinned of ['biz-bakery', 'biz-laundromat', 'biz-bookshop',
+      'cs-library', 'evt-festival', 'evt-award', 'evt-rainy']) {
+      expect(set.has(pinned), `tier-1 missing ${pinned}`).toBe(true);
+    }
+  });
 
-    const expanded = [...all].filter(id => !tier1.has(id));
-    // expanded cards in tier1 = cards in tier1 that are outside original M1 baseline (13 fixed IDs)
-    const baselineM1 = new Set([
-      'biz-bakery', 'biz-diner', 'biz-bookshop', 'cs-park', 'biz-hardware',
-      'evt-festival', 'evt-rainy', 'evt-tax', 'evt-award', 'evt-inspection',
-      'upg-patisserie', 'upg-bistro', 'upg-readers-cafe',
-    ]);
-    const expandedCountInTier1 = TIER_DEFINITIONS['tier-1'].newCardIds.filter(id => !baselineM1.has(id)).length;
+  it('every tier has at least 10 new cards (no thin tiers)', () => {
+    for (let i = 1; i <= 12; i++) {
+      expect(
+        TIER_DEFINITIONS[`tier-${i}`].newCardIds.length,
+        `tier-${i} too thin`,
+      ).toBeGreaterThanOrEqual(10);
+    }
+  });
 
-    expect(expanded.length).toBeGreaterThan(0);
-    // 27 tier-1 cards - 13 fixed M1 baseline = 14 (cs-playground rebalanced to
-    // T2, +2 staff tiered in at T1; rebalance CG-0MT2WU0CX005Z143).
-    expect(expandedCountInTier1).toBe(14);
+  it('cumulative pools grow monotonically to 142', () => {
+    let prevSize = 0;
+    for (let i = 1; i <= 12; i++) {
+      const size = TIER_DEFINITIONS[`tier-${i}`].cumulativeCardIds.length;
+      expect(size).toBeGreaterThan(prevSize);
+      prevSize = size;
+    }
+    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(142);
   });
 });

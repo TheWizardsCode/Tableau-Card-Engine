@@ -23,12 +23,12 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
-| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
+| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 4 | 4 | 4 | 2 | 1 | 15 |
 | Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 9 | 142 |
-| Net increase | +24 | +49 | +31 | +8 | +9 | +121 |
+| Net increase | +26 | +52 | +35 | +6 | +8 | +127 |
 
-- 2x target from baseline: `>= 40` templates
-- Current total: `142` templates (`7.1x` baseline)
+- 2x target from baseline: `>= 30` templates
+- Current total: `142` templates (`9.5x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
@@ -44,8 +44,8 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
   10 new incidents (4 good / 3 bad / 3 neutral under the streak system's net-delta
   formula) covering under-served synergies, including the duration incident
   Labor Shortage (income-multiplier 0.9×/3 turns).
-- Graffiti Art (evt-graffiti-art, CG-0MSRC9UR9006FBXC) adds a tier-1 good
-  incident — the exact reverse of Graffiti (+1 coin to all businesses and
+- Graffiti Art (evt-graffiti-art, CG-0MSRC9UR9006FBXC) adds a good incident —
+  the exact reverse of Graffiti (+1 coin to all businesses and
   +1 reputation), raising incidents to 35 and event templates to 56.
 - Upgrades grew from 27 to 39 with the Group E expansion (CG-0MSQJ7SYD008U3EE):
   12 new upgrades covering every Group A business and Group B community space
@@ -441,16 +441,16 @@ This writes per-run and aggregate metrics to:
 
 ## Staff Cards
 
-Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice, Assistant). They are purchased from the dedicated staff-card market.
+Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143; 12-tier spread CG-0MT3C744B009DS84): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice). They are purchased from the dedicated staff-card market.
 
 | ID | Name | Cost | Ongoing/turn | Slots+ | Tier | Ability | Description | Rationale |
 |----|------|------|--------------|--------|------|---------|-------------|-----------|
 | `staff-apprentice` | Apprentice | 2 | 0.5 | +1 | 1 | — | A budget hire who frees up a hand slot with a small ongoing cost. | Budget entry point *(Group F).* |
-| `staff-assistant` | Assistant | 3 | 1 | +1 | 1 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
-| `staff-manager` | Manager | 7 | 2.5 | +2 | 2 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
-| `staff-socialite` | Socialite | 8 | 1.5 | +1 | 2 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
-| `staff-accountant` | Accountant | 8 | 1.5 | +1 | 3 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
-| `staff-lookout` | Lookout | 10 | 2 | +1 | 3 | Peek once/turn | A sharp-eyed lookout can peek at the top card of the incident deck once per turn. | **NEW** peek ability *(CG-0MSXOW6GN008ZSMN).* |
-| `staff-director` | Director | 14 | 4 | +3 | 4 | — | An experienced director oversees your operations. | Premium capacity. |
-| `staff-executive` | Executive | 20 | 5 | +4 | 4 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
-| `staff-general-manager` | General Manager | 20 | 5 | +4 | 5 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
+| `staff-assistant` | Assistant | 3 | 1 | +1 | 2 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
+| `staff-manager` | Manager | 7 | 2.5 | +2 | 3 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
+| `staff-socialite` | Socialite | 8 | 1.5 | +1 | 4 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
+| `staff-accountant` | Accountant | 8 | 1.5 | +1 | 6 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
+| `staff-lookout` | Lookout | 10 | 2 | +1 | 7 | Peek once/turn | A sharp-eyed lookout can peek at the top card of the incident deck once per turn. | **NEW** peek ability *(CG-0MSXOW6GN008ZSMN).* |
+| `staff-director` | Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. | Premium capacity. |
+| `staff-executive` | Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
+| `staff-general-manager` | General Manager | 20 | 5 | +4 | 12 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
