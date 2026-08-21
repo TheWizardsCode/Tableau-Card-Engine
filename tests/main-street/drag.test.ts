@@ -268,12 +268,12 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(controller.canDropBusinessCard(card.id, slot)).toBe(false);
     });
 
-    it('enforces synergy adjacency during T13 (Library must be next to the Bookshop)', () => {
-      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
-      expect(t13Index).toBeGreaterThanOrEqual(0);
+    it('enforces synergy adjacency during T14 (Library must be next to the Bookshop)', () => {
+      const t14Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T14');
+      expect(t14Index).toBeGreaterThanOrEqual(0);
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t13Index,
+        currentStepIndex: t14Index,
         lastCompletedStepId: null,
         exited: false,
       };
@@ -304,10 +304,10 @@ describe('MainStreet drag-to-buy wiring', () => {
     });
 
     it('does not enforce adjacency when the synergy card is not on the street', () => {
-      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
+      const t14Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T14');
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t13Index,
+        currentStepIndex: t14Index,
         lastCompletedStepId: null,
         exited: false,
       };

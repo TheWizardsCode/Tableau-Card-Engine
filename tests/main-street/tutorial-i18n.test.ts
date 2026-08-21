@@ -85,13 +85,13 @@ describe('Tutorial i18n: English bundle registration', () => {
     expect(body).toContain(formatCurrency(Number(row.cost)));
   });
 
-  it('T15 title resolves to "Success and Failure"', () => {
-    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T15')!;
+  it('T16 title resolves to "Success and Failure"', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T16')!;
     expect(t(step.titleKey)).toBe('Success and Failure');
   });
 
-  it('T17 title resolves to "Tutorial Complete"', () => {
-    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T17')!;
+  it('T18 title resolves to "Tutorial Complete"', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T18')!;
     expect(t(step.titleKey)).toBe('Tutorial Complete');
   });
 

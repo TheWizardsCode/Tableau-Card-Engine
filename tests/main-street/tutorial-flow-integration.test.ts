@@ -71,10 +71,10 @@ describe('Tutorial Flow Integration - Business Selection', () => {
     expect(getCurrentStep(ctrl)?.id).toBe('T11');
   });
 
-  it('T14 play-event is required after T13', () => {
+  it('T15 play-event is required after T14', () => {
     let ctrl = startTutorial(createTutorialControllerState());
-    for (let i = 0; i < 13; i++) ctrl = completeCurrentStep(ctrl).newState;
-    expect(getCurrentStep(ctrl)?.id).toBe('T14');
+    for (let i = 0; i < 14; i++) ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T15');
     expect(getCurrentStep(ctrl)?.requiredAction).toBe('play-event');
     expect(isRequiredAction(ctrl, 'play-event')).toBe(true);
   });

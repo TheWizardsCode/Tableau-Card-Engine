@@ -62,7 +62,7 @@ describe('Scenario Validation: requiredCardId references', () => {
     // The single-row market (CG-0MSTOATDT009BRX2) holds only 3 cards, but the
     // tutorial needs four purchase targets across three days. Day-1 targets
     // (T3 Laundromat, T9 Local Festival) are scenario-placed; day-2/3 targets
-    // (T10 Bookshop, T13 Library) are forced into the visible line at day
+    // (T10 Bookshop, T14 Library) are forced into the visible line at day
     // start by ensureTutorialMarketForUpcomingSteps. Both paths are valid.
     const hookCovered = new Set(['biz-bookshop', 'cs-library']);
 
@@ -98,13 +98,13 @@ describe('Scenario Validation: requiredCardId references', () => {
   });
 
   it('the day-start hook actually guarantees the hook-covered targets appear in the row', () => {
-    // Day-3 start: T13 (Library) is upcoming; the hook must put cs-library
+    // Day-3 start: T14 (Library) is upcoming; the hook must put cs-library
     // into the visible row.
-    const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T13');
+    const t14Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T14');
     const controller: TutorialControllerState = {
       isActive: true,
-      currentStepIndex: t13Index - 1,
-      lastCompletedStepId: 'T12',
+      currentStepIndex: t14Index - 1,
+      lastCompletedStepId: 'T13',
       exited: false,
     };
     const state = setupMainStreetGame({ seed: 'scenario-hook-validation' });
@@ -121,13 +121,14 @@ describe('Scenario Validation: requiredCardId references', () => {
     }
   });
 
-  it('T3/T9/T10/T13 are the action steps with a requiredCardId (current invariant)', () => {
+  it('T3/T9/T10/T14 are the action steps with a requiredCardId (current invariant)', () => {
     const actionStepsWithRequiredCardId = UNIFIED_TUTORIAL_STEPS.filter(
       (step) => step.gate === 'action' && step.requiredCardId !== undefined,
     );
-    // T3 (Laundromat), T9 (Local Festival), T10 (Bookshop), T13 (Library)
+    // T3 (Laundromat), T9 (Local Festival), T10 (Bookshop), T14 (Library —
+    // renumbered from T13 by the Community Favour insertion)
     expect(actionStepsWithRequiredCardId.length).toBe(4);
-    expect(actionStepsWithRequiredCardId.map(s => s.id)).toEqual(['T3', 'T9', 'T10', 'T13']);
+    expect(actionStepsWithRequiredCardId.map(s => s.id)).toEqual(['T3', 'T9', 'T10', 'T14']);
     expect(actionStepsWithRequiredCardId[0].requiredCardId).toBe('biz-laundromat-0');
     expect(actionStepsWithRequiredCardId[1].requiredCardId).toBe('evt-festival-0');
     expect(actionStepsWithRequiredCardId[2].requiredCardId).toBe('biz-bookshop-0');

@@ -679,6 +679,29 @@ export async function clickEndTurn(scene: Phaser.Scene): Promise<void> {
 }
 
 /**
+ * Perform the Community Favour rep→coins exchange (T13, CG-0MSTOATDQ005XDET).
+ * Calls the turn controller's onCommunityFavourClick('rep-to-coins') — the
+ * same dispatch the favour buttons use — then waits for the exchange to land
+ * (gate spent) and lets the tutorial advance from the action-gated step.
+ */
+export async function clickCommunityFavour(scene: Phaser.Scene): Promise<void> {
+  const s = scene as any;
+  if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
+  const coinsBefore = s.state?.resourceBank?.coins ?? 0;
+  try { s.onCommunityFavourClick('rep-to-coins'); } catch (_) { /* ignore */ }
+  // Wait for the exchange to land: coins increased by the config coin gain
+  // and the once-per-turn gate spent.
+  await pollUntil(
+    () =>
+      (s.state?.favourUsedThisTurn === true) &&
+      (s.state?.resourceBank?.coins ?? 0) > coinsBefore,
+    6_000,
+  );
+  maybeAdvanceFromRequiredAction(scene, 'community-favour');
+  await new Promise((r) => setTimeout(r, 200));
+}
+
+/**
  * Play the held investment event from the hand (T14 "Triggering Events").
  * Finds the first event-family card in the player's hand and calls
  * onPlayHeldEvent with its index, then waits for the event to leave the hand.

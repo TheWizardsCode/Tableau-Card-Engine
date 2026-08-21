@@ -50,13 +50,15 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.difficulty).toBe('Easy');
   });
 
-  it('starts with 16 coins (raised from the 12-coin Easy preset for the 4-card 17-step flow)', () => {
-    // The 17-step tutorial buys Laundromat $4 + Local Festival $3 + Bookshop $3
-    // + Library $7 = $17; 16 starting coins + ~1.9 income across the two end-turn
-    // steps covers it. The scenario is intentionally richer than the base preset.
-    expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(16);
+  it('starts with 12 coins (12 + Community Favour conversion bankrolls the 4-card 18-step flow)', () => {
+    // The 18-step tutorial buys Laundromat $4 + Bookshop $3 + Library $7 +
+    // Local Festival $3 = $17; 12 starting coins + ~1.9 income + the REQUIRED
+    // T13 Community Favour rep→coins conversion (+3) cover it. 12 is tighter
+    // than the 16-coin pre-favour budget, which is the point — the conversion
+    // must be used to afford the Library (CG-0MSTOATDQ005XDET).
+    expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(12);
     const preset = getPreset('Easy');
-    expect(16).toBeGreaterThan(preset.startingCoins);
+    expect(12).toBeGreaterThan(preset.startingCoins);
   });
 
   it('defines starting reputation matching Easy preset', () => {
@@ -142,9 +144,12 @@ describe('createTutorialScenario', () => {
     expect(state.config.difficultyName).toBe('Easy');
   });
 
-  it('has correct starting resources (16 coins, 5 reputation per scenario)', () => {
+  it('has correct starting resources (12 coins, 5 reputation per scenario)', () => {
     const state = createTutorialScenario();
-    expect(state.resourceBank.coins).toBe(16);
+    // 12 coins (CG-0MSTOATDQ005XDET reduced from 16 so the T13 Community
+    // Favour rep→coins conversion is REQUIRED for the $7 Library); reputation
+    // stays 5 so the conversion spends 2 and leaves a safe 3.
+    expect(state.resourceBank.coins).toBe(12);
     expect(state.resourceBank.reputation).toBe(5);
   });
 
@@ -206,12 +211,12 @@ describe('createTutorialScenario', () => {
     expect(state.activeChallenges.length).toBeGreaterThan(0);
   });
 
-  // ── Coin budget verification (AC5: 16-coin flow) ────────────
+  // ── Coin budget verification (AC5: 12-coin flow + required conversion) ──
 
-  it('provides sufficient coin budget for the 17-step flow (16 coins, $4+$3+$3+$7 purchases)', () => {
+  it('provides sufficient coin budget for the 18-step flow (12 coins, $4+$3+$3+$7 purchases + required conversion)', () => {
     const state = createTutorialScenario();
-    // Scenario starts with 16 coins (not the 12-coin Easy preset)
-    expect(state.resourceBank.coins).toBe(16);
+    // Scenario starts with 12 coins (not the 16-coin pre-favour budget).
+    expect(state.resourceBank.coins).toBe(12);
 
     // The Laundromat referenced in T3 must exist and cost ≤ 4
     const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
@@ -221,32 +226,32 @@ describe('createTutorialScenario', () => {
     expect(laundromat).toBeDefined();
     expect(laundromat!.cost).toBeLessThanOrEqual(4);
 
-    // After buying $4 card: 12 coins remaining
+    // After buying $4 card: 8 coins remaining
     const afterLaundromat = state.resourceBank.coins - 4;
-    expect(afterLaundromat).toBe(12);
+    expect(afterLaundromat).toBe(8);
 
-    // After one income turn (Laundromat 0.5 base × 1.25 rep multiplier ≈ 0.625):
-    // 12.625 should be enough for the $3 Local Festival
-    expect(afterLaundromat + 0.625).toBeGreaterThanOrEqual(3);
-
-    // After festival ($3) + Bookshop ($3): ~6.6, then second income turn
-    // (Laundromat + Bookshop = 1.0 × 1.25 = 1.25) → ~7.9, enough for Library ($7)
-    const afterFestivalBookshop = afterLaundromat + 0.625 - 3 - 3;
-    expect(afterFestivalBookshop).toBeGreaterThanOrEqual(0);
-    expect(afterFestivalBookshop + 1.25).toBeGreaterThanOrEqual(7);
+    // T9 moves the Local Festival to hand for FREE; T10 buy-and-place
+    // Bookshop costs $3. After one income turn (Laundromat 0.5 base × 1.25
+    // rep multiplier ≈ 0.625): 8.625, then −3 (Bookshop), then the second
+    // income turn (Laundromat + Bookshop = 1.0 × 1.25 = 1.25) → 6.875 —
+    // BELOW the $7 Library, so the T13 Community Favour conversion
+    // (2 rep → 3 coins) is REQUIRED.
+    const beforeLibrary = afterLaundromat + 0.625 - 3 + 1.25;
+    expect(beforeLibrary).toBeLessThan(7);
+    expect(beforeLibrary + 3).toBeGreaterThanOrEqual(7);
   });
 
-  it('ensureTutorialMarketForUpcomingSteps puts the Library in the row when T13 is upcoming', () => {
-    // Day-1 state has no Library (3-slot single row). Before T13 the
-    // day-start hook forces cs-library into the visible line.
+  it('ensureTutorialMarketForUpcomingSteps puts the Library in the row when T14 is upcoming', () => {
+    // Day-1 state has no Library (3-slot single row). Before T14 (the Library
+    // buy-and-place step) the day-start hook forces cs-library into the line.
     const state = createTutorialScenario();
     expect(state.market.cards.some(c => matchesTemplate(c.id, 'cs-library'))).toBe(false);
 
-    const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T13');
+    const t14Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T14');
     const controller = {
       isActive: true,
-      currentStepIndex: t13Index - 1,
-      lastCompletedStepId: 'T12',
+      currentStepIndex: t14Index - 1,
+      lastCompletedStepId: 'T13',
       exited: false,
     };
     ensureTutorialMarketForUpcomingSteps(state, controller);
@@ -256,8 +261,10 @@ describe('createTutorialScenario', () => {
     expect(library!.name).toBe('Library');
     // The row never exceeds 3 cards — a filler was displaced back to a deck.
     expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
-    // 16 + ~1.9 income - (4+3+3) purchases = ~7.9 ≥ Library cost 7
-    expect(16 + 1.875 - 4 - 3 - 3).toBeGreaterThanOrEqual(library!.cost);
+    // 12 + ~1.9 income − 4 (Laundromat) − 3 (Bookshop) + 3 (the REQUIRED
+    // T13 Community Favour conversion) = ~9.875 ≥ Library cost 7. The
+    // festival move to hand is FREE (only its later play costs).
+    expect(12 + 1.875 - 4 - 3 + 3).toBeGreaterThanOrEqual(library!.cost);
   });
 
   // ── Market card integration with tutorial steps ──────────────

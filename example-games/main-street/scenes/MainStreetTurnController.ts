@@ -1201,6 +1201,16 @@ export class MainStreetTurnController {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
 
+    // Tutorial gating: the community-favour action is only allowed while the
+    // active step requires it; any other attempt surfaces the standard
+    // illegal-move feedback.
+    const tutorialCheck = (s.msLifecycleManager as any)?.isTutorialActionAllowed?.('community-favour' as TutorialActionType);
+    if (tutorialCheck && !tutorialCheck.allowed) {
+      s.instructionText.setText(tutorialCheck.reason ?? 'Complete the highlighted step first.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+
     const config = s.state.config;
     const cost = direction === 'coins-to-rep' ? config.favourCoinsToRepCost : config.favourRepToCoinsRepCost;
     const resource = direction === 'coins-to-rep' ? s.state.resourceBank.coins : s.state.resourceBank.reputation;
@@ -1268,6 +1278,12 @@ export class MainStreetTurnController {
 
     s.uiPhase = 'market';
     s.refreshAll();
+
+    // Tutorial: mark the community-favour step complete after a successful
+    // exchange (mirrors how other action-gated steps advance).
+    try {
+      (s.msLifecycleManager as any)?.onTutorialActionComplete?.('community-favour' as TutorialActionType);
+    } catch (_) { /* ignore */ }
   }
 
   /**

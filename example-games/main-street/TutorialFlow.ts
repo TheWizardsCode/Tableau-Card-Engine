@@ -82,6 +82,7 @@ export type TutorialHighlightZone =
   | 'helpButton'
   | 'completionModal'
   | 'hand'             // hand area (Your Hand / Triggering Events)
+  | 'actionButtons'    // market-phase action bar (End Turn / Hint / Community Favour buttons)
   | 'laundromatCard'   // card-level: Laundromat on the market row (T3)
   | 'festivalCard';    // card-level: Local Festival on the market row (T9)
 
@@ -100,6 +101,7 @@ export type TutorialActionType =
   | 'apply-upgrade'      // Buy/apply an upgrade
   | 'play-event'         // Play a held investment event from the hand
   | 'buy-and-place'      // Composite: drag a business card and drop it on the street
+  | 'community-favour'   // Perform a Community Favour exchange (rep-to-coins / coins-to-rep)
   | 'confirm-complete';  // Click "Let's play!" on completion modal
 
 /**
@@ -174,16 +176,18 @@ export interface UnifiedTutorialStepDef {
 // ── Unified Tutorial Script (T1-T17) ────────────────────────
 
 /**
- * The unified set of 17 tutorial steps, in sequential order.
+ * The unified set of 18 tutorial steps, in sequential order.
  *
  * The flow teaches one concept per step: buy → hand → place; invest →
  * optimize → trigger. T12 was split into an informative cost/reputation
- * step (new T12) and the synergy-focused buy-and-place step (T13). See the
- * parent work item's T1–T17 mapping for the full rationale (steps dropped,
- * split, renamed, and inserted).
+ * step (new T12) and the synergy-focused buy-and-place step (T13). The
+ * Community Favour step (T13, CG-0MSTOATDQ005XDET) teaches the rep→coins
+ * exchange needed to afford the Library (T14); T13–T17 below it are
+ * renumbered T14–T18. See the parent work item's T1–T18 mapping for the
+ * full rationale (steps dropped, split, renamed, and inserted).
  *
- * Gate type distribution: 9 confirm + 8 action
- * (action steps: T3, T5, T7, T9, T10, T11, T13, T14).
+ * Gate type distribution: 10 confirm + 8 action
+ * (action steps: T3, T5, T7, T9, T10, T11, T13, T15).
  */
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
@@ -293,7 +297,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     // Informative cost-vs-reputation step: highlights the market row (like T2)
     // and references cs-library so {cardName}/{cost} resolve from live card
     // data. No action required and NO synergy mention — the buy-and-place
-    // action and the synergy rule live on T13.
+    // action and the synergy rule live on T14.
     highlightZone: 'developmentRow',
     gate: 'confirm',
     referencedCardId: 'cs-library',
@@ -302,6 +306,21 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T13',
     titleKey: tutorialKey('T13', 'title'),
     bodyKey: tutorialKey('T13', 'body'),
+    // Community Favour (CG-0MSTOATDQ005XDET): the player converts 2
+    // reputation into 3 coins via the free once-per-turn exchange so they
+    // can afford the Library in T14. Action-gated on the rep-to-coins
+    // direction; highlight the market-phase action bar where the two favour
+    // buttons render. The {cardName} placeholder resolves from cs-library
+    // (the card the conversion is meant to afford).
+    highlightZone: 'actionButtons',
+    gate: 'action',
+    requiredAction: 'community-favour',
+    referencedCardId: 'cs-library',
+  },
+  {
+    id: 'T14',
+    titleKey: tutorialKey('T14', 'title'),
+    bodyKey: tutorialKey('T14', 'body'),
     // Composite buy-and-place step (like T10): the player buys cs-library
     // from the market row (drag or click-to-take) and places it on the street.
     // The step completes only on the terminal place-business drop; the
@@ -314,9 +333,9 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     synergyCardId: 'biz-bookshop-0',
   },
   {
-    id: 'T14',
-    titleKey: tutorialKey('T14', 'title'),
-    bodyKey: tutorialKey('T14', 'body'),
+    id: 'T15',
+    titleKey: tutorialKey('T15', 'title'),
+    bodyKey: tutorialKey('T15', 'body'),
     // Triggering Events: play the held Local Festival from the hand.
     highlightZone: 'hand',
     gate: 'action',
@@ -324,31 +343,31 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     referencedCardId: 'evt-festival-0',
   },
   {
-    id: 'T15',
-    titleKey: tutorialKey('T15', 'title'),
-    bodyKey: tutorialKey('T15', 'body'),
-    // Success and Failure: the scoring bar (HUD).
-    highlightZone: 'hud',
-    gate: 'confirm',
-  },
-  {
     id: 'T16',
     titleKey: tutorialKey('T16', 'title'),
     bodyKey: tutorialKey('T16', 'body'),
-    highlightZone: 'challengePanel',
+    // Success and Failure: the scoring bar (HUD).
+    highlightZone: 'hud',
     gate: 'confirm',
   },
   {
     id: 'T17',
     titleKey: tutorialKey('T17', 'title'),
     bodyKey: tutorialKey('T17', 'body'),
+    highlightZone: 'challengePanel',
+    gate: 'confirm',
+  },
+  {
+    id: 'T18',
+    titleKey: tutorialKey('T18', 'title'),
+    bodyKey: tutorialKey('T18', 'body'),
     highlightZone: 'completionModal',
     gate: 'confirm',
   },
 ] as const;
 
 /** Total number of unified tutorial steps. */
-export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 17
+export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 18
 
 export const INVALID_ACTION_MESSAGE = 'Complete the highlighted step first.';
 

@@ -1,7 +1,7 @@
 /**
  * Main Street Tutorial E2E browser test — Part 1 (Tests 1-6).
  *
- * Walks the new 17-step tutorial flow (CG-0MSKSJ9SS0069ZWT):
+ * Walks the new 18-step tutorial flow (CG-0MSKSJ9SS0069ZWT, + CG-0MSTOATDQ005XDET T13 Community Favour):
  * T1 Welcome → T2 Development Row → T3 Buy the Laundromat → T4 Your Hand.
  *
  * Stays under Phaser 4 RC's ~8-cycle game create/destroy limit per browser
@@ -51,7 +51,7 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     game = null;
   });
 
-  it('Tutorial uses scenario: market cards match STANDARD_TUTORIAL_SCENARIO (16 coins)', async () => {
+  it('Tutorial uses scenario: market cards match STANDARD_TUTORIAL_SCENARIO (12 coins)', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     expect(getStepIndex(scene)).toBe(0);
     const s = scene as any;
@@ -60,7 +60,9 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     expect(marketCards).toBeTruthy();
     expect(marketCards.length).toBe(3);
     expect(marketCards[0].id).toBe('biz-bakery-0');
-    expect(s.state.resourceBank.coins).toBe(16);
+    // 12 coins (CG-0MSTOATDQ005XDET lowered from 16 so the T13 Community
+    // Favour rep→coins conversion is required for the $7 Library).
+    expect(s.state.resourceBank.coins).toBe(12);
     const localFestival = marketCards.find((c: any) => c.name === 'Local Festival');
     expect(localFestival).toBeTruthy();
     expect(localFestival.cost).toBe(3);
