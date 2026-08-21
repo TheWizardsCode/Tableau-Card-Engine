@@ -515,6 +515,12 @@ export class MainStreetTurnController {
     // Check hand capacity
     const handCheck = canAddToHand(s.state);
     if (!handCheck.legal) {
+      // Illegal feedback (CG-0MSXKQVZC009AM9L): play sfx + shake on the market
+      // card so the player immediately understands the action is blocked.
+      const containers = s.msRenderer?.getMarketRowCards?.();
+      const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const target = containers?.[cardIndex] ?? null;
+      playIllegalFeedback(target, s);
       s.instructionText.setText(`Hand full: ${handCheck.reason ?? 'Place or sell a card first.'}`);
       return;
     }

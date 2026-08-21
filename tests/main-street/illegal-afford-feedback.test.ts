@@ -339,6 +339,34 @@ describe('Main Street click-path illegal-afford feedback', () => {
     });
   });
 
+  describe('onBusinessCardClick (hand full)', () => {
+    it('plays sfx-illegal-move and shakes the market card container when hand is full', () => {
+      // Fill the hand to capacity (default is 5)
+      const biz = scene.state.market.cards.find((c: any) => c.family === 'business');
+      const existing = scene.state.hand.filter((c: any) => c.family === 'business');
+      while (existing.length < 4) {
+        const extra = { ...biz, id: `test-biz-${existing.length}` };
+        scene.state.hand.push(extra);
+        existing.push(extra);
+      }
+      scene.state.market.cards = [biz];
+
+      controller.onBusinessCardClick(biz);
+
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
+      expect(scene.tweens.add).toHaveBeenCalled();
+      // Shake targeted the market card container (first index).
+      const containers = scene.msRenderer.getMarketRowCards();
+      const shakeConfig = scene.tweens.add.mock.calls.find(
+        (c: any) => c[0]?.targets === containers?.[0],
+      );
+      expect(shakeConfig).toBeTruthy();
+      // No state mutation: card still in market, hand unchanged.
+      expect(scene.state.market.cards.find((c: any) => c.id === biz.id)).toBeTruthy();
+      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Hand full'));
+    });
+  });
+
   describe('feedback safety', () => {
     it('does not throw when the shake target is unavailable (headless/replay)', async () => {
       // Strip the renderer so getMarketRowCards/getSpriteAt return undefined.
