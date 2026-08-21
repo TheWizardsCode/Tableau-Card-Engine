@@ -238,6 +238,10 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T6',
     titleKey: tutorialKey('T6', 'title'),
     bodyKey: tutorialKey('T6', 'body'),
+    // Deck-based flow (CG-0MSTOATDP000JNHH): the Upcoming panel now shows a
+    // face-down incident deck stack + remaining count (zone name
+    // 'incidentQueue' retained for the container/highlight); the body teaches
+    // the hidden deck + one peek per turn. No action required — confirm only.
     highlightZone: 'incidentQueue',
     gate: 'confirm',
   },

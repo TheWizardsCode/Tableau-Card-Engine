@@ -111,11 +111,18 @@ describe('Tutorial text updates (17-step restructure)', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
       expect(body.toLowerCase()).not.toMatch(/cost coins|cost reputation|-1 coin|-1 rep|per food/i);
     });
-    it('frames events as good/bad with a hover hint', () => {
+    it('teaches the face-down incident deck and the peek skill', () => {
+      // Face-down deck mechanic (CG-0MSTOATDP000JNHH): incidents live in a
+      // hidden deck; the player sees only the remaining count. The old
+      // visible-queue wording (top this turn / below next turn / hover for
+      // details) must be gone.
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
-      expect(body.toLowerCase()).toMatch(/help/);
-      expect(body.toLowerCase()).toMatch(/hurt/);
-      expect(body.toLowerCase()).toMatch(/hover/i);
+      expect(body.toLowerCase()).toMatch(/deck/);
+      expect(body.toLowerCase()).toMatch(/face-down|face down|hidden/);
+      expect(body.toLowerCase()).toMatch(/peek/);
+      expect(body.toLowerCase()).not.toMatch(/top happens/);
+      expect(body.toLowerCase()).not.toMatch(/below next turn/);
+      expect(body.toLowerCase()).not.toMatch(/hover/i);
     });
   });
 

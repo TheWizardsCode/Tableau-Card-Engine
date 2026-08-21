@@ -129,9 +129,9 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
     const invTemplateIds = state.market.cards.map(c => stripSerialSuffix(c.id));
     expect(invTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.market.cards);
 
-    // Incident queue base template IDs match
+    // Incident deck base template IDs match
     const incidentTemplateIds = state.incidentDeck.map(c => stripSerialSuffix(c.id));
-    expect(incidentTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.incidentQueue);
+    expect(incidentTemplateIds).toEqual(STANDARD_TUTORIAL_SCENARIO.incidentDeck);
   });
 
   it('scenario state has correct starting resources for tutorial', () => {
@@ -378,7 +378,7 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     const upgrades = state.market.cards.filter(c => c.family === 'upgrade');
     expect(upgrades.length).toBe(0);
 
-    // Incident queue: exactly INCIDENT_QUEUE_SIZE Incident-trigger events
+    // Incident deck: exactly INCIDENT_QUEUE_SIZE Incident-trigger events
     expect(state.incidentDeck.length).toBe(INCIDENT_QUEUE_SIZE);
     for (const card of state.incidentDeck) {
       expect(card.family).toBe('event');

@@ -13,15 +13,15 @@
  * ## Architecture
  *
  * - `TutorialScenario` — A data-only interface describing the desired initial
- *   game state (market cards, resources, incident queue, difficulty).
+ *   game state (market cards, resources, incident deck, difficulty).
  * - `STANDARD_TUTORIAL_SCENARIO` — The concrete scenario used by the
  *   Main Street tutorial. All card IDs reference Tier-1 cards only.
  * - `createTutorialScenario()` — Builds a fully initialised `MainStreetState`
  *   from the scenario definition, using the standard deck builders and then
  *   explicitly extracting and placing the scenario's cards into the market
- *   and incident queue. Cards are identified by their **base template ID**
- *   (without copy/serial suffix) so the scenario is robust across deck
- *   construction ordering.
+ *   and the face-down incident deck (CG-0MSTOATDP000JNHH). Cards are
+ *   identified by their **base template ID** (without copy/serial suffix)
+ *   so the scenario is robust across deck construction ordering.
  * - `ensureTutorialMarketForUpcomingSteps()` — The single-row market holds
  *   only `MARKET_TOTAL_SLOTS` (3) cards, but the tutorial needs four
  *   purchase targets across three days (Laundromat T3, Local Festival T9,
@@ -89,7 +89,7 @@ import { UNIFIED_TUTORIAL_STEPS, type TutorialControllerState } from './Tutorial
  * Describes a pre-built game state for a Main Street scenario.
  *
  * The scenario explicitly defines which cards appear in the market,
- * incident queue, and the player's starting resources — bypassing all
+ * incident deck, and the player's starting resources — bypassing all
  * seed-based shuffling.
  *
  * Card IDs are **base template IDs** (without copy/serial suffix).
@@ -114,8 +114,8 @@ export interface TutorialScenario {
   market: {
     cards: string[];
   };
-  /** Base template IDs for the incident queue (exactly INCIDENT_QUEUE_SIZE). */
-  incidentQueue: string[];
+  /** Base template IDs for the face-down incident deck (exactly INCIDENT_QUEUE_SIZE). */
+  incidentDeck: string[];
   /**
    * Seed string for deterministic RNG (used for challenge selection and
    * any remaining RNG-dependent game mechanics). Does NOT affect market
@@ -143,7 +143,7 @@ export interface TutorialScenario {
  * upg-garden) are no longer scenario-placed; upgrades may appear in the
  * line randomly but no tutorial step requires them.
  *
- * **Incident Queue (2 cards):**
+ * **Incident Deck (face-down, 2 cards):**
  *   - `evt-award` (Community Award, +2 reputation)
  *   - `evt-rainy` (Rainy Day, -1 coin per Food business)
  *
@@ -171,7 +171,7 @@ export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
       'evt-festival',
     ],
   },
-  incidentQueue: [
+  incidentDeck: [
     'evt-award',
     'evt-rainy',
   ],
@@ -235,10 +235,10 @@ export function createTutorialScenario(
       `got ${scenario.market.cards.length}`,
     );
   }
-  if (scenario.incidentQueue.length !== INCIDENT_QUEUE_SIZE) {
+  if (scenario.incidentDeck.length !== INCIDENT_QUEUE_SIZE) {
     throw new Error(
-      `TutorialScenario: expected ${INCIDENT_QUEUE_SIZE} incident queue cards, ` +
-      `got ${scenario.incidentQueue.length}`,
+      `TutorialScenario: expected ${INCIDENT_QUEUE_SIZE} incident deck cards, ` +
+      `got ${scenario.incidentDeck.length}`,
     );
   }
 
@@ -267,11 +267,13 @@ export function createTutorialScenario(
     }
   }
 
-  // Incident deck (face-down): scenario-placed incidents at the front
-  // (next to resolve). Exactly the scenario's INCIDENT_QUEUE_SIZE cards for
-  // the tutorial flow (full-deck tutorial rework: CG-0MSXOXY11005CO1N).
+  // Incident deck (face-down, CG-0MSTOATDP000JNHH): scenario-placed
+  // incidents at the deck front (next to resolve). Kept at exactly
+  // INCIDENT_QUEUE_SIZE (2) cards for the deterministic tutorial flow — a
+  // larger random deck could resolve an unbudgeted, coin-costing incident
+  // and break the tutorial's tight coin budget.
   const incidentDeck: EventCard[] = [];
-  for (const templateId of scenario.incidentQueue) {
+  for (const templateId of scenario.incidentDeck) {
     incidentDeck.push(findCardByTemplate(eventDeck, templateId));
   }
 

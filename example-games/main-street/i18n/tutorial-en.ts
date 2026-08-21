@@ -150,10 +150,14 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
     'The card is in your hand. Click the card in your hand to select it, then click an empty slot on the street to place it and pay its cost. It starts earning income right away.',
 
   // ── T6: Upcoming Incidents ─────────────────────────────────
+  // Face-down incident deck (CG-0MSTOATDP000JNHH): incidents are hidden in
+  // a deck — the player sees only the remaining count; the top card is
+  // revealed and resolved at the end of each turn. A peek staff member
+  // (staff-lookout) can look at the top card once per turn as an action.
   [tutorialKey('T6', 'title')]:
     'Upcoming Incidents',
   [tutorialKey('T6', 'body')]:
-    'The event at the top happens at the end of this turn; the ones below happen next turn. Some help you, some hurt you. Hover one for details.',
+    'Incidents hide in a face-down deck \u2014 you see only how many are left, not what is next. The top card is revealed and resolved at the end of each turn. Some help you, some hurt you; a peek staff member can look at the top card once per turn.',
 
   // ── T7: End Turn ───────────────────────────────────────────
   [tutorialKey('T7', 'title')]:

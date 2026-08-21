@@ -3,7 +3,7 @@
  *
  * Verifies that the TutorialScenario system:
  * - Creates a valid MainStreetState without seed-based shuffling
- * - Places exactly the expected cards in the market and incident queue
+ * - Places exactly the expected cards in the market and incident deck
  * - Uses only Tier-1 card IDs (validation test catches drift)
  * - Provides sufficient coin budget for all tutorial steps
  * - Is deterministic (same result every invocation)
@@ -87,8 +87,8 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
   });
 
-  it('defines exactly INCIDENT_QUEUE_SIZE incident cards', () => {
-    expect(STANDARD_TUTORIAL_SCENARIO.incidentQueue.length).toBe(INCIDENT_QUEUE_SIZE);
+  it('defines exactly INCIDENT_QUEUE_SIZE incident deck cards', () => {
+    expect(STANDARD_TUTORIAL_SCENARIO.incidentDeck.length).toBe(INCIDENT_QUEUE_SIZE);
   });
 
   it('all development row card template IDs are from Tier-1 pool', () => {
@@ -105,9 +105,9 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     }
   });
 
-  it('all incident queue card template IDs are from Tier-1 pool', () => {
+  it('all incident deck card template IDs are from Tier-1 pool', () => {
     const tier1Ids = getTier1TemplateIds();
-    for (const templateId of STANDARD_TUTORIAL_SCENARIO.incidentQueue) {
+    for (const templateId of STANDARD_TUTORIAL_SCENARIO.incidentDeck) {
       expect(tier1Ids.has(templateId)).toBe(true);
     }
   });
@@ -167,7 +167,7 @@ describe('createTutorialScenario', () => {
     expect(events.length).toBe(1);
   });
 
-  it('has exactly INCIDENT_QUEUE_SIZE cards in incident queue', () => {
+  it('has exactly INCIDENT_QUEUE_SIZE cards in incident deck', () => {
     const state = createTutorialScenario();
     expect(state.incidentDeck.length).toBe(INCIDENT_QUEUE_SIZE);
   });
