@@ -38,7 +38,6 @@ import {
   STARTING_COINS,
   STARTING_REPUTATION,
   WIN_THRESHOLD,
-  REPUTATION_SCORE_MULTIPLIER,
   CHALLENGE_BONUS_POINTS,
   createIncidentBalanceState,
   DEFAULT_INCIDENT_REPEAT_SPACING,
@@ -113,7 +112,6 @@ describe('DifficultyPresets Module', () => {
         'startingCoins',
         'startingReputation',
         'winThreshold',
-        'reputationScoreMultiplier',
         'challengeBonusPoints',
         'synergyBonusPerNeighbor',
         'challengesPerRun',
@@ -132,7 +130,6 @@ describe('DifficultyPresets Module', () => {
         'startingCoins',
         'startingReputation',
         'winThreshold',
-        'reputationScoreMultiplier',
         'challengeBonusPoints',
         'synergyBonusPerNeighbor',
         'challengesPerRun',
@@ -158,8 +155,9 @@ describe('DifficultyPresets Module', () => {
       expect(MEDIUM_PRESET.startingReputation).toBe(STARTING_REPUTATION);
     });
 
-    it('should match WIN_THRESHOLD', () => {
+    it('should match WIN_THRESHOLD (retuned to 120 by CG-0MT3J8FXG006RCOA)', () => {
       expect(MEDIUM_PRESET.winThreshold).toBe(WIN_THRESHOLD);
+      expect(WIN_THRESHOLD).toBe(120);
     });
 
     it('should match the re-tuned synergy bonus per neighbor (CG-0MSP26Q5N002EH8P)', () => {
@@ -168,10 +166,6 @@ describe('DifficultyPresets Module', () => {
       // The SYNERGY_BONUS_PER_NEIGHBOR constant (1) remains the raw default
       // multiplier of computeSynergyBonus (asserted in adjacency tests).
       expect(MEDIUM_PRESET.synergyBonusPerNeighbor).toBe(0.35);
-    });
-
-    it('should match REPUTATION_SCORE_MULTIPLIER', () => {
-      expect(MEDIUM_PRESET.reputationScoreMultiplier).toBe(REPUTATION_SCORE_MULTIPLIER);
     });
 
     it('should match CHALLENGE_BONUS_POINTS', () => {
@@ -192,8 +186,9 @@ describe('DifficultyPresets Module', () => {
       expect(EASY_PRESET.startingReputation).toBeGreaterThan(MEDIUM_PRESET.startingReputation);
     });
 
-    it('should have lower win threshold', () => {
+    it('should have a lower win threshold (retuned to 100 by CG-0MT3J8FXG006RCOA)', () => {
       expect(EASY_PRESET.winThreshold).toBeLessThan(MEDIUM_PRESET.winThreshold);
+      expect(EASY_PRESET.winThreshold).toBe(100);
     });
 
     it('should have higher synergy bonus per neighbor', () => {
@@ -216,8 +211,9 @@ describe('DifficultyPresets Module', () => {
       expect(HARD_PRESET.startingReputation).toBeLessThan(MEDIUM_PRESET.startingReputation);
     });
 
-    it('should have higher win threshold', () => {
+    it('should have a higher win threshold (retuned to 150 by CG-0MT3J8FXG006RCOA)', () => {
       expect(HARD_PRESET.winThreshold).toBeGreaterThan(MEDIUM_PRESET.winThreshold);
+      expect(HARD_PRESET.winThreshold).toBe(150);
     });
 
     it('should have more challenges per run', () => {
@@ -424,14 +420,14 @@ describe('setupMainStreetGame with difficulty', () => {
 
 describe('Engine uses config values', () => {
   describe('computeScore', () => {
-    it('should use config.reputationScoreMultiplier for Easy', () => {
+    it('should count reputation as plain value (no multiplier) for Easy', () => {
       const state = createTestState('score-easy', 'Easy');
       state.resourceBank.coins = 10;
       state.resourceBank.reputation = 4;
       state.challengesCompleted = ['ch-1'];
       const expected =
         10 +
-        4 * EASY_PRESET.reputationScoreMultiplier +
+        4 +
         1 * EASY_PRESET.challengeBonusPoints;
       expect(computeScore(state)).toBe(expected);
     });
@@ -443,7 +439,7 @@ describe('Engine uses config values', () => {
       state.challengesCompleted = ['ch-1', 'ch-2'];
       const expected =
         5 +
-        2 * HARD_PRESET.reputationScoreMultiplier +
+        2 +
         2 * HARD_PRESET.challengeBonusPoints;
       expect(computeScore(state)).toBe(expected);
     });
@@ -485,8 +481,8 @@ describe('Engine uses config values', () => {
       state.challengesCompleted = [];
       state.activeChallenges = [];
       checkEndConditions(state);
-      // The score is EASY_PRESET.winThreshold + 1*5 = 125
-      // That's below Hard's 180 threshold; no turn limit applies.
+      // The score is EASY_PRESET.winThreshold + 1 = 101
+      // That's below Hard's 150 threshold; no turn limit applies.
       expect(state.endReason).not.toBe('score_threshold');
     });
   });

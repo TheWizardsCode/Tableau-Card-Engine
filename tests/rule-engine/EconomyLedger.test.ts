@@ -720,10 +720,10 @@ describe('EconomyLedger — Main Street integration parity', () => {
         reputation: state.resourceBank.reputation,
       });
 
-      // Main Street score: coins + (reputation * reputationScoreMultiplier) + (challengesCompleted * challengeBonusPoints)
+      // Main Street score: coins + reputation + (challengesCompleted * challengeBonusPoints)
       const expectedScore =
         state.resourceBank.coins +
-        state.resourceBank.reputation * state.config.reputationScoreMultiplier +
+        state.resourceBank.reputation +
         state.challengesCompleted.length * state.config.challengeBonusPoints;
 
       ledger.setScore(expectedScore);
@@ -741,8 +741,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
 
       // Compute score the Main Street way
       const expectedScore =
-        state.resourceBank.coins +
-        state.resourceBank.reputation * state.config.reputationScoreMultiplier;
+        state.resourceBank.coins + state.resourceBank.reputation;
 
       const ledger = createLedger({
         coins: state.resourceBank.coins,
@@ -777,7 +776,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
       ledger.setScore(actualScore);
 
       expect(ledger.get('score')).toBe(actualScore);
-      expect(ledger.get('score')).toBe(state.resourceBank.coins + state.resourceBank.reputation * state.config.reputationScoreMultiplier + state.challengesCompleted.length * state.config.challengeBonusPoints);
+      expect(ledger.get('score')).toBe(state.resourceBank.coins + state.resourceBank.reputation + state.challengesCompleted.length * state.config.challengeBonusPoints);
     });
   });
 

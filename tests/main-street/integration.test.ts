@@ -665,7 +665,7 @@ describe('Integration: Challenge System', () => {
     state.challengesCompleted.push(ac.challenge.id);
 
     const score = computeScore(state);
-    const expectedBase = state.resourceBank.coins + (state.resourceBank.reputation * 5);
+    const expectedBase = state.resourceBank.coins + state.resourceBank.reputation;
     const expectedChallengeBonus = state.challengesCompleted.length * CHALLENGE_BONUS_POINTS;
     expect(score).toBe(expectedBase + expectedChallengeBonus);
   });

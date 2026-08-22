@@ -121,8 +121,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 50;
       state.resourceBank.reputation = 10;
       state.challengesCompleted = ['ch1', 'ch2'];
-      // 50 + (10 * 5) + (2 * 10) = 50 + 50 + 20 = 120
-      expect(computeScore(state)).toBe(120);
+      // 50 + 10 + (2 * 10) = 50 + 10 + 20 = 80
+      expect(computeScore(state)).toBe(80);
     });
 
     it('should compute score with zero reputation and no challenges', () => {
@@ -138,8 +138,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = -5;
       state.resourceBank.reputation = 2;
       state.challengesCompleted = [];
-      // -5 + (2 * 5) = -5 + 10 = 5
-      expect(computeScore(state)).toBe(5);
+      // -5 + 2 = -3
+      expect(computeScore(state)).toBe(-3);
     });
   });
 
@@ -150,8 +150,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.reputation = 5;
       state.challengesCompleted = ['ch1'];
       updateScore(state);
-      // 100 + 25 + 10 = 135
-      expect(state.finalScore).toBe(135);
+      // 100 + 5 + 10 = 115
+      expect(state.finalScore).toBe(115);
     });
   });
 
@@ -901,7 +901,7 @@ describe('MainStreetEngine', () => {
       // Score should now include the challenge bonus
       // Note: income/incidents may change coins/rep, but challengesCompleted.length changed by 1
       expect(state.challengesCompleted).toHaveLength(1);
-      // Score formula: coins + (rep * 5) + (challengesCompleted.length * CHALLENGE_BONUS_POINTS)
+      // Score formula: coins + rep + (challengesCompleted.length * CHALLENGE_BONUS_POINTS)
       // The bonus should be reflected
       expect(state.finalScore).toBe(computeScore(state));
       expect(state.finalScore).toBeGreaterThanOrEqual(scoreBefore + CHALLENGE_BONUS_POINTS - 20);

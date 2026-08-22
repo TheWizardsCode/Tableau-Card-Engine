@@ -459,14 +459,14 @@ describe('scoreAction', () => {
     expect(actual).toBe(expected);
   });
 
-  it('scores buy-event using coinDelta + reputationDelta * reputationScoreMultiplier - cost', () => {
+  it('scores buy-event using coinDelta + reputationDelta - cost (reputation counts plainly)', () => {
     const state = createTestState();
     state.hand = [];
     const eventCard = state.market.cards.find(c => c.family === 'event');
     if (!eventCard) return; // skip if no event in market for this seed
 
     const { coinDelta, reputationDelta, cost } = eventCard as import('../../example-games/main-street/MainStreetCards').EventCard;
-    const expected = coinDelta + reputationDelta * state.config.reputationScoreMultiplier - cost;
+    const expected = coinDelta + reputationDelta - cost;
     const actual = scoreAction(state, { type: 'buy-event', cardId: eventCard.id });
     expect(actual).toBe(expected);
   });
@@ -528,8 +528,8 @@ describe('aiPlanningHorizon', () => {
     state.resourceBank.coins = 70;
     state.resourceBank.reputation = 0;
     state.challengesCompleted = [];
-    // Medium winThreshold=150, scorePace=8: ceil((150-70)/8) = ceil(10) = 10
-    expect(aiPlanningHorizon(state)).toBe(10);
+    // Medium winThreshold=120, scorePace=8: ceil((120-70)/8) = ceil(6.25) = 7
+    expect(aiPlanningHorizon(state)).toBe(7);
   });
 
   it('prefers early-game upgrades over near-threshold ones (behavioural sanity)', () => {

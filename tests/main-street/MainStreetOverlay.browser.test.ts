@@ -113,7 +113,6 @@ function forceGameOver(scene: Phaser.Scene, isWin = false): void {
       challengesCompleted: [],
       endReason: isWin ? 'all_businesses_placed' : 'no_coins',
       config: {
-        reputationScoreMultiplier: 2,
         challengeBonusPoints: 10,
       },
     };
@@ -328,7 +327,6 @@ describe('Main Street overlay button tests', () => {
         challengesCompleted: [],
         endReason: 'all_businesses_placed',
         config: {
-          reputationScoreMultiplier: 2,
           challengeBonusPoints: 10,
         },
       };

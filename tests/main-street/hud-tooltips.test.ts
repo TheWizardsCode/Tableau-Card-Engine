@@ -352,7 +352,7 @@ describe('buildScoreTooltip', () => {
     state.resourceBank.reputation = 8;
     state.challengesCompleted = ['ch-1'];
 
-    const repContribution = state.resourceBank.reputation * state.config.reputationScoreMultiplier;
+    const repContribution = state.resourceBank.reputation;
     const challengeContribution = state.challengesCompleted.length * state.config.challengeBonusPoints;
 
     const tooltip = buildScoreTooltip(state, null);
