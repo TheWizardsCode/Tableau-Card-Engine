@@ -96,7 +96,7 @@ export class MainStreetOverlayContent {
     const lines = [
       // HUD bar displays coins and reputation to 2 decimal places; game-over overlay is consistent.
       `Coins: ${coins.toFixed(2)}`,
-      `Reputation: ${reputation.toFixed(2)} (x${cfg.reputationScoreMultiplier} = ${(reputation * cfg.reputationScoreMultiplier).toFixed(2)})`,
+      `Reputation: ${reputation.toFixed(2)}`,
       `Challenges: ${challenges} (x${cfg.challengeBonusPoints} = ${challenges * cfg.challengeBonusPoints})`,
       `Final Score: ${Math.round(result.finalScore)}`,
     ];

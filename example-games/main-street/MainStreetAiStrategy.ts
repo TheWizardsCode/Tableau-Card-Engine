@@ -535,10 +535,12 @@ function scoreBusinessAction(
 }
 
 /**
- * Score an event purchase using the PRD Appendix A formula:
- *   score = coinDelta + (reputationDelta * config.reputationScoreMultiplier) - cost
+ * Score an event purchase using the final-score value heuristic:
+ *   score = coinDelta + reputationDelta - cost
  *
  * A score > 0 means the event has positive expected value and is worth buying.
+ * Reputation is valued at 1 point per unit (plain count), matching the
+ * final score function (CG-0MT3J8FXG006RCOA).
  */
 function scoreEventAction(
   state: MainStreetState,
@@ -549,7 +551,7 @@ function scoreEventAction(
   ) as EventCard | undefined;
   if (!card) return 0;
 
-  return card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost;
+  return card.coinDelta + card.reputationDelta - card.cost;
 }
 
 /**
@@ -599,7 +601,7 @@ function scorePlayEventFromHandAction(
 ): number {
   const card = (state.hand ?? [])[action.handIndex] as EventCard | undefined;
   if (!card) return 0;
-  return card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost;
+  return card.coinDelta + card.reputationDelta - card.cost;
 }
 
 // ── Public Scoring API ──────────────────────────────────────
@@ -610,7 +612,7 @@ function scorePlayEventFromHandAction(
  * Scores are in "net coin-equivalent value" units:
  *   - `buy-upgrade`:  `incomeBonus * horizon - cost`
  *   - `buy-business`: `(baseIncome + projectedSynergyBonus) * horizon - cost`
- *   - `buy-event`:    `coinDelta + reputationDelta * reputationScoreMultiplier - cost`
+ *   - `buy-event`:    `coinDelta + reputationDelta - cost` (reputation counts plainly)
  *   - `play-event`:   fixed bonus of 5 (prefer playing over end-turn)
  *   - `end-turn`:     0 (baseline / fallback)
  *
@@ -640,7 +642,7 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
     case 'play-event': {
       const card = (state.hand ?? []).find(c => c.family === 'event') as EventCard | undefined;
       return card
-        ? card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost
+        ? card.coinDelta + card.reputationDelta - card.cost
         : 0;
     }
     case 'move-to-hand':

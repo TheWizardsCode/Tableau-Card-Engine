@@ -97,6 +97,11 @@ export interface GuardrailResult {
  *    CG-0MSTOATDQ005XDET: widened to 0–2.5 after the Community Favour
  *    rep→coins fallback added measured liquidity (2.21 on the canonical
  *    200-seed set — see docs/main-street/monte-carlo-baseline.json).
+ *    CG-0MT3J8FXG006RCOA: widened to 0–3 after the plain-count reputation
+ *    score + retuned thresholds (100/120/150) deflated scores, leaving more
+ *    end-of-game coins relative to turns (measured 2.69 on the canonical
+ *    200-seed set). Operator pre-accepted balance drift — plan "do NOT gate
+ *    on exact parity".
  */
 export const GUARDRAIL_THRESHOLDS: Record<string, GuardrailThreshold> = {
   'winRate_greedy_medium': {
@@ -131,7 +136,7 @@ export const GUARDRAIL_THRESHOLDS: Record<string, GuardrailThreshold> = {
     metric: 'avgCoinsPerTurn_greedy_medium',
     label: 'Avg Coins Per Turn (Net Liquidity, Greedy, Medium)',
     min: 0,
-    max: 2.5,
+    max: 3,
     severity: 'critical',
   },
   'medianScore_greedy_medium': {

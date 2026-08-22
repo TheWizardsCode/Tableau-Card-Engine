@@ -820,8 +820,8 @@ export const GRID_SIZE = 10;
  */
 export const MAX_TURNS = 20;
 
-/** Score required for a win via score threshold. */
-export const WIN_THRESHOLD = 150;
+/** Score required for a win via score threshold (Medium preset default, retuned to 120 by CG-0MT3J8FXG006RCOA). */
+export const WIN_THRESHOLD = 120;
 
 /** Starting coin balance (Medium preset default). */
 export const STARTING_COINS = 6;
@@ -873,9 +873,6 @@ export const REFRESH_MARKET_COST = 5;
  * Kept for backward compatibility with existing test code.
  */
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
-
-/** Multiplier applied to reputation in final score. */
-export const REPUTATION_SCORE_MULTIPLIER = 5;
 
 /** Points awarded per completed challenge. */
 export const CHALLENGE_BONUS_POINTS = 10;

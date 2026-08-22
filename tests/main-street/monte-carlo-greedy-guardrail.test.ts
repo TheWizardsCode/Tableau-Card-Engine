@@ -60,7 +60,7 @@ describe('Main Street greedy AI per-difficulty design-intent guardrails', () => 
     }
   }, 120_000);
 
-  it('greedy Medium economy: net liquidity 0–2 and median score 120–180', () => {
+  it('greedy Medium economy: net liquidity 0–3 and median score 20–200', () => {
     const [medium] = runAllCombinations({
       seeds: SEEDS,
       maxTurns: MAX_TURNS,
@@ -75,8 +75,13 @@ describe('Main Street greedy AI per-difficulty design-intent guardrails', () => 
     // fallback adds measured liquidity to 2.21 (200-seed canonical profile),
     // so the band is widened to 0–2.5 with the mechanic documented as the
     // driver.
+    // CG-0MT3J8FXG006RCOA re-baseline (plain-count reputation score + retuned
+    // thresholds 100/120/150): measured 2.69 on the canonical 200-seed set.
+    // The score deflation leaves more end-of-game coins relative to turns,
+    // so the band is widened to 0–3.0; the operator pre-accepted balance
+    // drift for this change (plan: "do NOT gate on exact parity").
     expect(medium.metrics.averageCoinsPerTurn).toBeGreaterThanOrEqual(0);
-    expect(medium.metrics.averageCoinsPerTurn).toBeLessThanOrEqual(2.5);
+    expect(medium.metrics.averageCoinsPerTurn).toBeLessThanOrEqual(3);
 
     // PRD warning band for Greedy/Medium median score (PRD §3.3).
     // CG-0MSTOATDT009BRX2 re-baseline: measured median 39.8 under cost-at-play

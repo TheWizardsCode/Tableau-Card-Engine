@@ -235,7 +235,7 @@ export function buildScoreTooltip(
   // Score breakdown components
   const coins = state.resourceBank.coins;
   const rep = state.resourceBank.reputation;
-  const repContribution = rep * state.config.reputationScoreMultiplier;
+  const repContribution = rep;
   const challengeContribution = state.challengesCompleted.length * state.config.challengeBonusPoints;
   const remaining = threshold - score;
 
@@ -248,7 +248,7 @@ export function buildScoreTooltip(
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${Math.round(score)}/${threshold}`,
     '',
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${Math.round(coins)}`,
-    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)} ${state.config.reputationScoreMultiplier}: ${repContribution}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)}: ${repContribution}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownChallenges)}: ${challengeContribution}`,
   ];
 
