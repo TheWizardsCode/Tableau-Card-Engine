@@ -216,6 +216,51 @@ describe('purchaseUpgrade state persistence', () => {
     expect(state.resourceBank.coins).toBe(46);
   });
 
+  it('sets displayName from the upgrade newDisplayName (CG-0MT24MHGZ0025O20)', () => {
+    const state = createTestState();
+    const biz = makeBiz({ level: 0, name: 'Bakery' });
+    state.streetGrid[0] = biz;
+    state.resourceBank.coins = 100;
+
+    const upg = makeUpg({ id: 'upg-patisserie-display', newDisplayName: 'Patisserie' });
+    injectUpgrade(state, upg);
+
+    purchaseUpgrade(state, upg.id);
+
+    expect(state.streetGrid[0]!.displayName).toBe('Patisserie');
+  });
+
+  it('updates displayName to the most recently applied upgrade (CG-0MT24MHGZ0025O20)', () => {
+    const state = createTestState();
+    const biz = makeBiz({ level: 0, maxLevel: 3, name: 'Hardware Store' });
+    state.streetGrid[0] = biz;
+    state.resourceBank.coins = 200;
+
+    const upg0 = makeUpg({ id: 'upg-home-improvement-display', targetBusiness: 'Hardware Store', requiredLevel: 0, newDisplayName: 'Home Improvement' });
+    injectUpgrade(state, upg0);
+    purchaseUpgrade(state, upg0.id);
+    expect(state.streetGrid[0]!.displayName).toBe('Home Improvement');
+
+    const upg1 = makeUpg({ id: 'upg-lumber-yard-display', targetBusiness: 'Hardware Store', requiredLevel: 1, newDisplayName: 'Lumber Yard' });
+    injectUpgrade(state, upg1);
+    purchaseUpgrade(state, upg1.id);
+    expect(state.streetGrid[0]!.displayName).toBe('Lumber Yard');
+  });
+
+  it('keeps previous displayName when upgrade has no newDisplayName (CG-0MT24MHGZ0025O20)', () => {
+    const state = createTestState();
+    const biz = makeBiz({ level: 1, displayName: 'Patisserie' });
+    state.streetGrid[0] = biz;
+    state.resourceBank.coins = 100;
+
+    const upg = makeUpg({ requiredLevel: 1 }); // no newDisplayName
+    injectUpgrade(state, upg);
+
+    purchaseUpgrade(state, upg.id);
+
+    expect(state.streetGrid[0]!.displayName).toBe('Patisserie');
+  });
+
   it('targets a specific slot when targetSlot is provided', () => {
     const state = createTestState();
     const biz2 = makeBiz({ id: 'biz-bakery-slot2', level: 0 });

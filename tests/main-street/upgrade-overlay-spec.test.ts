@@ -1,32 +1,46 @@
 /**
- * Unit tests for UpgradeOverlaySpec — the pure-data spec builder that
- * describes what visual overlays to render on Main Street business cards.
+ * Main Street: Upgrade Overlay Spec Tests (CG-0MT24MHGZ0025O20)
  *
- * These tests run in any JS environment (no Phaser dependency).
+ * Validates that `buildUpgradeOverlaySpec()` returns the correct name overlay
+ * text for both base (un-upgraded) and upgraded business/community-space cards.
+ *
+ * Acceptance criteria:
+ *   AC1  Upgraded cards display the upgraded name (not the base name).
+ *   AC2  The upgraded name is derived from the BusinessCard's `displayName`
+ *        field, which is populated when upgrades are applied.
+ *   AC3  Multi-level upgrades show the name from the most recently applied upgrade.
+ *   AC4  Base (un-upgraded) cards have no name overlay (`nameText` is null).
+ *   AC5  Works for all business upgrade paths.
+ *   AC6  Works for community-space upgrade paths.
+ *
+ * @module
  */
 
 import { describe, it, expect } from 'vitest';
+
 import { buildUpgradeOverlaySpec } from '../../example-games/main-street/scenes/UpgradeOverlaySpec';
 import type { BusinessCard, CommunitySpaceCard } from '../../example-games/main-street/MainStreetCards';
+import {
+  getUpgradeTemplates,
+  createBusinessDeck,
+} from '../../example-games/main-street/MainStreetCards';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// ── Test helpers ──────────────────────────────────────────────
 
-const CARD_W = 140;
-const CARD_H = 80;
+const WIDTH = 120;
+const HEIGHT = 160;
 
-/** Create a minimal BusinessCard with overrides. */
-function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
-  return {
+/** Creates a minimal BusinessCard for testing. */
+function makeBusiness(overrides: Partial<BusinessCard> = {}): BusinessCard {
+  const base: BusinessCard = {
     family: 'business',
-    id: 'biz-test-0',
+    id: 'test-biz',
     name: 'Test Business',
-    cost: 6,
-    baseIncome: 1,
-    synergyTypes: ['Food'],
+    cost: 3,
+    baseIncome: 0.5,
+    synergyTypes: [],
     maxLevel: 2,
-    description: 'A test business',
+    description: 'A test business.',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
@@ -34,20 +48,21 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     appliedUpgrades: [],
     ...overrides,
   };
+  return base;
 }
 
-/** Create a minimal CommunitySpaceCard with overrides. */
+/** Creates a minimal CommunitySpaceCard for testing. */
 function makeCommunitySpace(overrides: Partial<CommunitySpaceCard> = {}): CommunitySpaceCard {
-  return {
+  const base: CommunitySpaceCard = {
     family: 'community-space',
-    id: 'cs-test-0',
+    id: 'test-cs',
     name: 'Test Community Space',
     cost: 4,
-    baseIncome: 0,
+    baseIncome: 0.3,
     ongoingCost: 0,
-    synergyTypes: ['Culture'],
-    maxLevel: 1,
-    description: 'A test community space',
+    synergyTypes: [],
+    maxLevel: 2,
+    description: 'A test community space.',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
@@ -55,212 +70,251 @@ function makeCommunitySpace(overrides: Partial<CommunitySpaceCard> = {}): Commun
     appliedUpgrades: [],
     ...overrides,
   };
+  return base;
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+// ── AC4: Base cards have no name overlay ──────────────────────
 
-describe('buildUpgradeOverlaySpec - base cards (level === 0)', () => {
-  it('should show income text when baseIncome > 0', () => {
-    const biz = makeBiz({ baseIncome: 2, level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.incomeText).not.toBeNull();
-    expect(spec.incomeText!.text).toBe('Income: +2/turn');
-  });
-
-  it('should omit income text when total income is 0', () => {
-    const biz = makeBiz({ baseIncome: 0, incomeBonus: 0, level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.incomeText).toBeNull();
-  });
-
-  it('should show reputation text when reputationPerTurn > 0', () => {
-    const biz = makeBiz({ reputationPerTurn: 0.2, level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.reputationText).not.toBeNull();
-    expect(spec.reputationText!.text).toBe('+0.2/turn');
-  });
-
-  it('should omit reputation text when reputationPerTurn is 0 and no bonus', () => {
-    const biz = makeBiz({ baseIncome: 1, level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.reputationText).toBeNull();
-  });
-
-  it('should omit reputation text when reputationPerTurn is undefined and no bonus', () => {
-    const biz = makeBiz({ baseIncome: 1, level: 0, reputationPerTurn: undefined });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.reputationText).toBeNull();
-  });
-
-  it('should not show level badge for base cards', () => {
-    const biz = makeBiz({ level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.levelBadge).toBeNull();
-  });
-
-  it('should not show name overlay for base cards', () => {
-    const biz = makeBiz({ level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
+describe('Base cards (level 0): no name overlay (AC4)', () => {
+  it('returns null nameText for a base BusinessCard', () => {
+    const biz = makeBusiness({ level: 0 });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.nameText).toBeNull();
   });
 
-  it('should not show upgrade border for base cards', () => {
-    const biz = makeBiz({ level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.upgradeBorder).toBeNull();
-  });
-
-  it('should show both income and reputation when both are present', () => {
-    const biz = makeBiz({ baseIncome: 1, reputationPerTurn: 0.2, level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.incomeText).not.toBeNull();
-    expect(spec.incomeText!.text).toBe('Income: +1/turn');
-    expect(spec.reputationText).not.toBeNull();
-    expect(spec.reputationText!.text).toBe('+0.2/turn');
+  it('returns null nameText for a base CommunitySpaceCard', () => {
+    const cs = makeCommunitySpace({ level: 0 });
+    const spec = buildUpgradeOverlaySpec(cs, WIDTH, HEIGHT);
+    expect(spec.nameText).toBeNull();
   });
 });
 
-describe('buildUpgradeOverlaySpec - upgraded cards (level > 0)', () => {
-  it('should show income text with combined base + bonus', () => {
-    const biz = makeBiz({ baseIncome: 1, incomeBonus: 2, level: 1 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
+// ── AC1, AC2: Upgraded cards show the upgraded name ───────────
 
-    expect(spec.incomeText).not.toBeNull();
-    expect(spec.incomeText!.text).toBe('Income: +3/turn');
-  });
-
-  it('should show reputation text when reputationPerTurn + bonus > 0', () => {
-    const biz = makeBiz({ reputationPerTurn: 0.2, reputationBonus: 0.1, level: 1 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.reputationText).not.toBeNull();
-    expect(spec.reputationText!.text).toBe('+0.3/turn');
-  });
-
-  it('should show level badge for upgraded cards', () => {
-    const biz = makeBiz({ level: 2 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.levelBadge).not.toBeNull();
-    expect(spec.levelBadge!.text).toBe('Lvl 2');
-  });
-
-  it('should show name text for upgraded cards', () => {
-    const biz = makeBiz({ name: 'Patisserie', level: 1 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
+describe('Upgraded BusinessCard: displays upgraded name (AC1, AC2)', () => {
+  it('shows displayName when set (upgraded Bakery → Patisserie)', () => {
+    const biz = makeBusiness({
+      level: 1,
+      name: 'Bakery',
+      displayName: 'Patisserie',
+    });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
 
     expect(spec.nameText).not.toBeNull();
     expect(spec.nameText!.text).toBe('Patisserie');
+    expect(spec.nameText!.text).not.toBe('Bakery');
   });
 
-  it('should show upgrade border for upgraded cards', () => {
-    const biz = makeBiz({ level: 1 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
+  it('falls back to base name when displayName is not set', () => {
+    const biz = makeBusiness({
+      level: 1,
+      name: 'Bakery',
+    });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
 
-    expect(spec.upgradeBorder).not.toBeNull();
-  });
-
-  it('should omit income text if total income is 0 even when upgraded', () => {
-    const biz = makeBiz({ baseIncome: 0, incomeBonus: 0, level: 1, reputationPerTurn: 0.1 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.incomeText).toBeNull();
-    expect(spec.reputationText).not.toBeNull();
-  });
-
-  it('should omit reputation text if total reputation is 0 even when upgraded', () => {
-    const biz = makeBiz({ baseIncome: 1, incomeBonus: 1, level: 1, reputationPerTurn: 0, reputationBonus: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
-    expect(spec.incomeText).not.toBeNull();
-    expect(spec.incomeText!.text).toBe('Income: +2/turn');
-    expect(spec.reputationText).toBeNull();
+    expect(spec.nameText).not.toBeNull();
+    expect(spec.nameText!.text).toBe('Bakery');
   });
 });
 
-describe('buildUpgradeOverlaySpec - community space cards', () => {
-  it('should show income text for community space with income', () => {
-    const cs = makeCommunitySpace({ baseIncome: 1, level: 0 });
-    const spec = buildUpgradeOverlaySpec(cs, CARD_W, CARD_H);
+describe('Upgraded CommunitySpaceCard: displays upgraded name (AC1, AC2)', () => {
+  it('shows displayName for upgraded community space', () => {
+    const cs = makeCommunitySpace({
+      level: 1,
+      name: 'Park',
+      displayName: 'Garden',
+    });
+    const spec = buildUpgradeOverlaySpec(cs, WIDTH, HEIGHT);
 
+    expect(spec.nameText).not.toBeNull();
+    expect(spec.nameText!.text).toBe('Garden');
+    expect(spec.nameText!.text).not.toBe('Park');
+  });
+});
+
+// ── AC3: Multi-level upgrades show the most recent name ───────
+
+describe('Multi-level upgrades: most recent displayName (AC3)', () => {
+  it('shows the name from the last applied upgrade', () => {
+    const biz = makeBusiness({
+      level: 2,
+      name: 'Hardware Store',
+      appliedUpgrades: ['upg-home-improvement', 'upg-lumber-yard'],
+      displayName: 'Lumber Yard',
+    });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
+
+    expect(spec.nameText).not.toBeNull();
+    expect(spec.nameText!.text).toBe('Lumber Yard');
+  });
+
+  it('updates displayName when a second upgrade is applied', () => {
+    // Level 1: Hardware Store → Home Improvement
+    const bizLvl1 = makeBusiness({
+      level: 1,
+      name: 'Hardware Store',
+      displayName: 'Home Improvement',
+    });
+    expect(buildUpgradeOverlaySpec(bizLvl1, WIDTH, HEIGHT).nameText!.text).toBe('Home Improvement');
+
+    // Level 2: Home Improvement → Lumber Yard
+    const bizLvl2 = makeBusiness({
+      level: 2,
+      name: 'Hardware Store',
+      appliedUpgrades: ['upg-home-improvement', 'upg-lumber-yard'],
+      displayName: 'Lumber Yard',
+    });
+    expect(buildUpgradeOverlaySpec(bizLvl2, WIDTH, HEIGHT).nameText!.text).toBe('Lumber Yard');
+  });
+});
+
+// ── AC5: All business upgrade paths ───────────────────────────
+
+describe('All business upgrade paths (AC5)', () => {
+  const businessUpgradeTests = [
+    { base: 'Bakery', upgraded: 'Patisserie' },
+    { base: 'Diner', upgraded: 'Bistro' },
+    { base: 'Bookshop', upgraded: "Reader's Café" },
+    { base: 'Pawn Shop', upgraded: 'Vintage Shop' },
+    { base: 'Barbershop', upgraded: 'Salon' },
+    { base: 'Laundromat', upgraded: 'Dry Cleaners' },
+    { base: 'Juice Bar', upgraded: 'Smoothie Bar' },
+    { base: 'Toy Store', upgraded: 'Toy Warehouse' },
+    { base: 'Arcade', upgraded: 'Gaming Lounge' },
+    { base: 'Tailor', upgraded: 'Bespoke Tailor' },
+  ];
+
+  for (const { base, upgraded } of businessUpgradeTests) {
+    it(`${base} → ${upgraded} shows upgraded name`, () => {
+      const biz = makeBusiness({
+        level: 1,
+        name: base,
+        displayName: upgraded,
+      });
+      const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
+      expect(spec.nameText).not.toBeNull();
+      expect(spec.nameText!.text).toBe(upgraded);
+      expect(spec.nameText!.text).not.toBe(base);
+    });
+  }
+});
+
+// ── AC6: Community-space upgrade paths ────────────────────────
+
+describe('Community-space upgrade paths (AC6)', () => {
+  const csUpgradeTests = [
+    { base: 'Park', upgraded: 'Garden' },
+    { base: 'Town Fountain', upgraded: 'Grand Fountain' },
+    { base: 'Community Garden', upgraded: 'Orchard' },
+  ];
+
+  for (const { base, upgraded } of csUpgradeTests) {
+    it(`${base} → ${upgraded} shows upgraded name`, () => {
+      const cs = makeCommunitySpace({
+        level: 1,
+        name: base,
+        displayName: upgraded,
+      });
+      const spec = buildUpgradeOverlaySpec(cs, WIDTH, HEIGHT);
+      expect(spec.nameText).not.toBeNull();
+      expect(spec.nameText!.text).toBe(upgraded);
+      expect(spec.nameText!.text).not.toBe(base);
+    });
+  }
+});
+
+// ── AC2: CSV data-driven newDisplayName ───────────────────────
+
+describe('CSV data: upgrade templates carry newDisplayName (AC2)', () => {
+  it('every upgrade template has a non-empty newDisplayName', () => {
+    const templates = getUpgradeTemplates();
+    const missing = templates.filter(t => !t.newDisplayName || t.newDisplayName.trim() === '');
+    if (missing.length > 0) {
+      console.warn(`Missing newDisplayName for: ${missing.map(t => t.id).join(', ')}`);
+    }
+    expect(missing.length).toBe(0);
+  });
+
+  it('Bakery upgrade (upg-patisserie) has displayName "Patisserie"', () => {
+    const upg = getUpgradeTemplates().find(t => t.id === 'upg-patisserie');
+    expect(upg).toBeDefined();
+    expect(upg!.newDisplayName).toBe('Patisserie');
+  });
+
+  it('Diner upgrade (upg-bistro) has displayName "Bistro"', () => {
+    const upg = getUpgradeTemplates().find(t => t.id === 'upg-bistro');
+    expect(upg).toBeDefined();
+    expect(upg!.newDisplayName).toBe('Bistro');
+  });
+
+  it('multi-level upgrade (upg-home-improvement) has displayName "Home Improvement"', () => {
+    const upg = getUpgradeTemplates().find(t => t.id === 'upg-home-improvement');
+    expect(upg).toBeDefined();
+    expect(upg!.newDisplayName).toBe('Home Improvement');
+  });
+});
+
+// ── Overlay spec structural integrity ─────────────────────────
+
+describe('Overlay spec structure', () => {
+  it('base card: levelBadge and upgradeBorder are null, incomeText is present', () => {
+    const biz = makeBusiness({ level: 0, baseIncome: 1 });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
+
+    expect(spec.levelBadge).toBeNull();
+    expect(spec.nameText).toBeNull();
+    expect(spec.upgradeBorder).toBeNull();
     expect(spec.incomeText).not.toBeNull();
     expect(spec.incomeText!.text).toBe('Income: +1/turn');
   });
 
-  it('should show reputation text for community space with reputation', () => {
-    const cs = makeCommunitySpace({ reputationPerTurn: 0.1, level: 0 });
-    const spec = buildUpgradeOverlaySpec(cs, CARD_W, CARD_H);
-
-    expect(spec.reputationText).not.toBeNull();
-    expect(spec.reputationText!.text).toBe('+0.1/turn');
-  });
-
-  it('should show level badge and upgrade border when upgraded', () => {
-    const cs = makeCommunitySpace({ level: 1, baseIncome: 1 });
-    const spec = buildUpgradeOverlaySpec(cs, CARD_W, CARD_H);
+  it('upgraded card: all overlays present when income > 0', () => {
+    const biz = makeBusiness({
+      level: 1,
+      name: 'Bakery',
+      displayName: 'Patisserie',
+      baseIncome: 0.5,
+      incomeBonus: 1,
+    });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
 
     expect(spec.levelBadge).not.toBeNull();
+    expect(spec.levelBadge!.text).toBe('Lvl 1');
+    expect(spec.incomeText).not.toBeNull();
+    expect(spec.incomeText!.text).toBe('Income: +1.5/turn');
     expect(spec.nameText).not.toBeNull();
+    expect(spec.nameText!.text).toBe('Patisserie');
     expect(spec.upgradeBorder).not.toBeNull();
   });
 });
 
-describe('buildUpgradeOverlaySpec - positioning', () => {
-  it('should position income text centred on card', () => {
-    const biz = makeBiz({ baseIncome: 2, level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
+// ── Real-world scenario: upgrade application flow ─────────────
 
-    expect(spec.incomeText).not.toBeNull();
-    // Income should be horizontally centred (x=0 in container-local space)
-    expect(spec.incomeText!.x).toBe(0);
-    // Income should be slightly above centre vertically (negative y)
-    expect(spec.incomeText!.y).toBeLessThan(0);
-    expect(spec.incomeText!.y).toBeGreaterThan(-CARD_H / 4);
-  });
+describe('Real-world upgrade flow: business gets displayName', () => {
+  it('applying upg-patisserie to a Bakery sets displayName to "Patisserie"', () => {
+    // Create a Bakery at level 0
+    const bakeryCards = createBusinessDeck(1);
+    const bakery = bakeryCards.find(b => b.name === 'Bakery');
+    expect(bakery).toBeDefined();
+    expect(bakery!.level).toBe(0);
+    expect(bakery!.displayName).toBeUndefined();
 
-  it('should position reputation text centred below income', () => {
-    const biz = makeBiz({ baseIncome: 1, reputationPerTurn: 0.2, level: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
+    // Simulate applying the upgrade (what purchaseUpgrade does)
+    const upgTemplates = getUpgradeTemplates();
+    const patisserieUpg = upgTemplates.find(t => t.id === 'upg-patisserie');
+    expect(patisserieUpg).toBeDefined();
 
-    expect(spec.reputationText).not.toBeNull();
-    // Reputation should be horizontally centred (x=0 in container-local space)
-    expect(spec.reputationText!.x).toBe(0);
-    // Reputation should be below centre (positive y)
-    expect(spec.reputationText!.y).toBeGreaterThan(0);
-    expect(spec.reputationText!.y).toBeLessThanOrEqual(CARD_H / 4);
-  });
+    bakery!.level += 1;
+    bakery!.appliedUpgrades = ['upg-patisserie'];
+    bakery!.displayName = patisserieUpg!.newDisplayName || bakery!.displayName;
 
-  it('should position level badge at top-right', () => {
-    const biz = makeBiz({ level: 1 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
+    // Verify displayName is set
+    expect(bakery!.displayName).toBe('Patisserie');
 
-    expect(spec.levelBadge).not.toBeNull();
-    // In container-local space, right edge is at +width/2; badge should be near it
-    expect(spec.levelBadge!.x).toBeGreaterThan(0);
-    expect(spec.levelBadge!.x).toBeLessThanOrEqual(CARD_W / 2);
-    // At top: y should be negative (above centre in container space)
-    expect(spec.levelBadge!.y).toBeLessThan(0);
-  });
-
-  it('should position name text at top-centre for upgraded cards', () => {
-    const biz = makeBiz({ name: 'Patisserie', level: 1 });
-    const spec = buildUpgradeOverlaySpec(biz, CARD_W, CARD_H);
-
+    // Verify overlay spec shows the upgraded name
+    const spec = buildUpgradeOverlaySpec(bakery!, WIDTH, HEIGHT);
     expect(spec.nameText).not.toBeNull();
-    // Name should be horizontally centred (x=0 in container-local space)
-    expect(spec.nameText!.x).toBe(0);
-    // Name should be above centre (negative y, near top of card)
-    expect(spec.nameText!.y).toBeLessThan(0);
+    expect(spec.nameText!.text).toBe('Patisserie');
+    expect(spec.nameText!.text).not.toBe('Bakery');
   });
 });

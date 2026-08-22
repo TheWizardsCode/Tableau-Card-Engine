@@ -40,7 +40,7 @@ export const CSV_COLUMNS: readonly string[] = [
   'description', 'tier', 'trigger', 'effect', 'target',
   'targetSynergy', 'coinDelta', 'reputationDelta', 'duration', 'effectType',
   'multiplier', 'targetBusiness', 'incomeBonus', 'synergyRangeBonus',
-  'requiredLevel', 'reputationBonus', 'ongoingCost', 'handSlotsAdded',
+  'requiredLevel', 'reputationBonus', 'newDisplayName', 'ongoingCost', 'handSlotsAdded',
   'refreshCostDiscount', 'actionsPerTurn', 'peekOncePerTurn',
 ];
 

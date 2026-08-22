@@ -377,7 +377,7 @@ describe('CSV Validation', () => {
   });
 
   it('parseCsv correctly parses a real CSV row', () => {
-    const csv = 'family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,synergyCoinBonus,synergyRepBonus,description,tier,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,ongoingCost,handSlotsAdded,refreshCostDiscount,actionsPerTurn,peekOncePerTurn\nbusiness,biz-test,Test,6,1,Food,,1,,,,,,,,,,,,,,,,,,,';
+    const csv = 'family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,synergyCoinBonus,synergyRepBonus,description,tier,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,newDisplayName,ongoingCost,handSlotsAdded,refreshCostDiscount,actionsPerTurn,peekOncePerTurn\nbusiness,biz-test,Test,6,1,Food,,1,,,,,,,,,,,,,,,,,,,';
     const rows = parseCsv(csv);
     expect(rows.length).toBe(1);
     expect(rows[0].id).toBe('biz-test');
@@ -385,7 +385,7 @@ describe('CSV Validation', () => {
   });
 
   it('toCsvString round-trips correctly', () => {
-    const csv = 'family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,synergyCoinBonus,synergyRepBonus,description,tier,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,ongoingCost,handSlotsAdded,refreshCostDiscount,actionsPerTurn,peekOncePerTurn\nbusiness,biz-test,Test,6,1,Food,,1,,,,,,,,,,,,,,,,,,,';
+    const csv = 'family,id,name,cost,baseIncome,synergyTypes,upgradePath,maxLevel,reputationPerTurn,synergyCoinBonus,synergyRepBonus,description,tier,trigger,effect,target,targetSynergy,coinDelta,reputationDelta,duration,effectType,multiplier,targetBusiness,incomeBonus,synergyRangeBonus,requiredLevel,reputationBonus,newDisplayName,ongoingCost,handSlotsAdded,refreshCostDiscount,actionsPerTurn,peekOncePerTurn\nbusiness,biz-test,Test,6,1,Food,,1,,,,,,,,,,,,,,,,,,,';
     const rows = parseCsv(csv);
     const output = toCsvString(rows);
     const reparsed = parseCsv(output);

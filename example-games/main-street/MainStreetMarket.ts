@@ -538,6 +538,7 @@ export function playUpgradeFromHand(
   }
   business.appliedUpgrades.push(upgrade.id);
   (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + upgrade.cost;
+  business.displayName = upgrade.newDisplayName || business.displayName;
   updateNeighborsOnPlacement(state, businessIndex);
 
   addLog(state, `Played upgrade ${upgrade.name} from hand onto ${business.name} (-€${upgrade.cost})`, 'loss');
@@ -657,6 +658,7 @@ export function purchaseUpgrade(
   }
   business.appliedUpgrades.push(card.id);
   (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + card.cost;
+  business.displayName = card.newDisplayName || business.displayName;
 
   // Recalculate the upgraded card's cached values (incomeBonus and reputationBonus changed)
   // Import is at top of file via updateNeighborsOnPlacement/updateNeighborsOnSale
