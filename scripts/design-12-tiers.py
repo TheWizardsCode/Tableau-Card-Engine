@@ -162,7 +162,8 @@ FAMILY_CAP = 0.42
 
 def main() -> None:
     csv_path = 'example-games/main-street/card-data.csv'
-    rows = list(csv.DictReader(open(csv_path)))
+    with open(csv_path) as f:
+        rows = list(csv.DictReader(f))
     by_id = {r['id']: r for r in rows}
     errors = []
 
