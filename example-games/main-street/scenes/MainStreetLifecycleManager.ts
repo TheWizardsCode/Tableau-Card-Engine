@@ -330,7 +330,9 @@ export class MainStreetLifecycleManager {
           'Business (green): persistent board value, placed on your street.\n' +
           'Upgrade (orange): enhances an existing business on the street.\n' +
           'Event / Investment (brown): one-time effects, held in your hand.\n' +
-          'Incident (blue): automatic pressure events at end of each turn.\n' +
+          'Incident: hidden in a face-down deck; the top card is revealed and\n' +
+          'resolves at the end of each turn. A peek staff member can look at the\n' +
+          'top card once per turn (CG-0MSTOATDP000JNHH).\n' +
           'Each card has a cost, value, and one or more synergy types.',
       },
       {
@@ -478,7 +480,7 @@ export class MainStreetLifecycleManager {
               // When the tutorial starts, create the game state using the
               // explicit TutorialScenario system instead of seed-based
               // shuffling. This guarantees exactly which cards appear in
-              // the market and incident queue, independent of deck
+              // the market and incident deck, independent of deck
               // composition. The tutorial always uses Easy difficulty
               // (10 starting coins after CG-0MSP26Q5N002EH8P re-tune, 5
               // starting reputation); the scenario overrides the coin

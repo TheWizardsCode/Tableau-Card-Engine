@@ -221,7 +221,7 @@ Every Group A business and Group B community space gets an upgrade path (targets
 
 Events fall into two categories:
 - **Investment** events are purchased from the market, held in the player's hand, and played voluntarily. They have a coin cost and generally positive effects.
-- **Incident** events are drawn automatically into the incident queue and resolve at the end of each turn. Most are negative disruptions; a few are positive surprises.
+- **Incident** events live in a hidden face-down incident deck (card back + count only, CG-0MSTOATDP000JNHH). The top card is revealed and resolved at the end of each turn. Most are negative disruptions; a few are positive surprises.
 
 ### M1 Event Templates (5)
 

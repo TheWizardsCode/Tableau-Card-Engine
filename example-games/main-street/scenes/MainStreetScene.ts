@@ -370,7 +370,8 @@ export class MainStreetScene extends CardGameScene {
     return (this.msRenderer as any).drawMarketCard.apply(this.msRenderer, args);
   }
 
-  // ── Incident Queue ───────────────────────────────────────
+  // ── Incident Deck Panel (private accessors; names retain the legacy
+  // ── 'IncidentQueue' for API/test compatibility) ──
   public refreshIncidentQueue(...args: any[]): any {
     return (this.msRenderer as any).refreshIncidentQueue.apply(this.msRenderer, args);
   }

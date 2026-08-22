@@ -32,7 +32,7 @@ The **Main Street** game uses three distinct card families. Below is the current
 Event cards are split into two trigger types:
 
 - **Investment** events are purchased from the Investments market row, held by the player, and played (or auto-resolved) during the turn. They are generally positive.
-- **Incident** events populate a visible FIFO queue and resolve automatically at the start of each turn's Incident Phase. They are generally negative or disruptive.
+- **Incident** events populate a hidden face-down incident deck and resolve automatically (top card revealed) during the end-of-turn Incident Phase. They are generally negative or disruptive.
 
 | Name | Trigger | Effect |
 |------|---------|--------|
@@ -61,7 +61,7 @@ Event cards are split into two trigger types:
 | Community Award | Incident | +2 reputation from community recognition. |
 | Health Inspection | Incident | -2 coins per Food business and -1 reputation. |
 
-**Deck composition:** 5 event templates × 3 copies = 15 cards total (3 Investment, 12 Incident). At game start, the Investments market row draws 1 Investment event and the incident queue draws 2 Incidents from the shuffled event deck.
+**Deck composition:** 5 event templates × 3 copies = 15 cards total (3 Investment, 12 Incident). At game start, the Investments market row draws 1 Investment event and the incident deck is built from the Incident-trigger events, constraint-ordered so repeat-spacing/streak limits hold across the draw sequence (CG-0MSTOATDP000JNHH).
 
 ### 1.2b Community Space Cards
 

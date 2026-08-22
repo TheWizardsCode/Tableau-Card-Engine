@@ -119,7 +119,7 @@ export interface TutorialScenario {
   /**
    * Seed string for deterministic RNG (used for challenge selection and
    * any remaining RNG-dependent game mechanics). Does NOT affect market
-   * or incident queue composition — those are driven by card IDs above.
+   * or incident deck composition — those are driven by card IDs above.
    */
   seed: string;
 }
@@ -214,7 +214,7 @@ function findCardByTemplate<T extends { id: string }>(
  *    Tier-1 cards.
  * 2. Find cards matching each scenario template ID in the appropriate
  *    decks and extract them.
- * 3. Place extracted cards into the single-row market and incident queue.
+ * 3. Place extracted cards into the single-row market and incident deck.
  * 4. Build and return the complete `MainStreetState` with remaining deck
  *    contents and a deterministic RNG for challenge selection.
  *

@@ -442,9 +442,9 @@ export interface IncidentPolarityRun {
 /**
  * Runtime-mutable state governing constrained Incident draws.
  *
- * The incident queue is a visible FIFO of upcoming events. To keep the
- * sequence of incidents the player actually resolves fair, draws are
- * constrained by two limits:
+ * Incidents live in a hidden face-down deck (CG-0MSTOATDP000JNHH); deck
+ * order is arranged at build/reshuffle time so the sequence of incidents
+ * the player actually resolves is constrained by two limits:
  *
  * - `repeatSpacing` (N): a card name cannot reappear within the last
  *   `N - 1` drawn cards (e.g. N=3 blocks a card drawn at position 1 from
@@ -453,7 +453,7 @@ export interface IncidentPolarityRun {
  *   (good = net > 0, bad = net < 0). Neutral cards (net == 0) break runs.
  *
  * Both limits are mutable at runtime via `setIncidentBalanceLimits` in
- * `MainStreetState.ts`; changes affect subsequent draws only.
+ * `MainStreetState.ts`; changes affect subsequent rebuilds only.
  */
 export interface IncidentBalanceState {
   /** Repeat-spacing window N (>= 1, default 3). */
@@ -848,7 +848,12 @@ export const MARKET_UPGRADE_MAX = 1;
 /** Maximum number of event cards in the single-row market. */
 export const MARKET_EVENT_MAX = 1;
 
-/** Number of Incident cards visible in the incident queue at game start. */
+/**
+ * Legacy: number of Incident cards in the pre-deck incident queue. The
+ * face-down incident deck replaced the visible queue (CG-0MSTOATDP000JNHH);
+ * retained for backward compatibility and the deterministic tutorial
+ * scenario (TutorialScenario.ts builds exactly this many deck cards).
+ */
 export const INCIDENT_QUEUE_SIZE = 2;
 
 /**

@@ -756,10 +756,11 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
 /**
  * Live mid-session hook to adjust the incident-draw balance limits.
  *
- * Changes take effect on all subsequent constrained incident draws (refills,
- * reshuffle paths); the currently-visible queue is left untouched. This is
- * the runtime-manipulation interface for designers/balancers — difficulty
- * presets wire values here in a follow-up work item (CG-0MSL0OU1E005WFJB).
+ * Changes take effect on all subsequent constrained incident deck rebuilds
+ * (refill/reshuffle paths); the already-ordered remainder of the current
+ * deck is left untouched. This is the runtime-manipulation interface for
+ * designers/balancers — difficulty presets wire values here in a follow-up
+ * work item (CG-0MSL0OU1E005WFJB).
  *
  * @param state   Current game state (mutated in place).
  * @param limits  Partial limits to update: `repeatSpacing` (N) and/or `maxStreak` (M).

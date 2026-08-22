@@ -96,7 +96,7 @@ export type TutorialActionType =
   | 'select-hand-card'   // Click a card in the hand to select it for placement
   | 'place-business'     // Place a business on the street grid
   | 'end-turn'           // Click End Turn
-  | 'acknowledge-queue'  // Click incident queue
+  | 'acknowledge-queue'  // Click incident deck panel
   | 'buy-event'          // Buy an event card from the market row
   | 'apply-upgrade'      // Buy/apply an upgrade
   | 'play-event'         // Play a held investment event from the hand

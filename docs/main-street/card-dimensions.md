@@ -46,7 +46,7 @@ UI slot mappings (recommendations)
 
 ## Layout notes (Main Street)
 
-- Main Street presents the street as a responsive 2×5 grid to preserve readability and avoid overlap with market, incident queue, hand, action controls, and instruction text across desktop and narrow/tall viewports.
+- Main Street presents the street as a responsive 2×5 grid to preserve readability and avoid overlap with market, incident-deck panel, hand, action controls, and instruction text across desktop and narrow/tall viewports.
 - Bottom-right action controls are compact by design to preserve vertical space for the lower hand/challenge area.
 
 ## Migration notes

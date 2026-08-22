@@ -328,7 +328,8 @@ export class MainStreetTurnController {
         }
         s.refreshAll();
         // Incident reveal presentation (AGENTS.md rule 8): non-blocking VFX —
-        // the resolved incident card flies from the Upcoming queue to the
+        // the resolved incident card flies from the face-down incident-deck
+        // panel (CG-0MSTOATDP000JNHH) to the
         // board centre with a red flash pulse, warning sting SFX, explicit
         // HUD loss pops and a warning-indicator pulse. Runs after the final
         // render; reduced-motion keeps the pops + sound, replay/headless
