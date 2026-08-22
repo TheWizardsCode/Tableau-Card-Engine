@@ -184,15 +184,35 @@ describe('Move-to-hand does NOT auto-select (CG-0MSXIQIPJ000NDTL)', () => {
     const bizCards = scene.state.market.cards.filter(
       (c: any) => c.family === 'business' || c.family === 'community-space',
     );
-    expect(bizCards.length).toBeGreaterThanOrEqual(2);
+    expect(bizCards.length).toBeGreaterThanOrEqual(1);
 
     // Buy first business.
     buyToHand(scene, bizCards[0]);
     expect(scene.pendingHandIndex).toBeNull();
     expect(scene.state.hand.length).toBe(1);
 
+    // Ensure a second business card is available in the market for the
+    // switching test (the market may only have 1 due to the ≥1 business
+    // constraint — CG-0MSXIQIPJ000NDTL). Push a synthetic card if needed.
+    const remainingBiz = scene.state.market.cards.filter(
+      (c: any) => c.family === 'business' || c.family === 'community-space',
+    );
+    if (remainingBiz.length === 0) {
+      // Create a second synthetic business card in the market.
+      scene.state.market.cards.push({
+        ...bizCards[0],
+        id: 'synthetic-second-biz',
+        name: 'Second Business (synthetic)',
+      } as any);
+    }
     // Buy second business.
-    buyToHand(scene, bizCards[1]);
+    const secondBiz = scene.state.market.cards.find(
+      (c: any) => c.id !== bizCards[0].id && (c.family === 'business' || c.family === 'community-space'),
+    );
+    if (!secondBiz) {
+      throw new Error('No second business card available in market or hand');
+    }
+    buyToHand(scene, secondBiz);
     expect(scene.pendingHandIndex).toBeNull();
     expect(scene.state.hand.length).toBe(2);
 
@@ -214,13 +234,14 @@ describe('Move-to-hand does NOT auto-select (CG-0MSXIQIPJ000NDTL)', () => {
     const bizCards = scene.state.market.cards.filter(
       (c: any) => c.family === 'business' || c.family === 'community-space',
     );
-    expect(bizCards.length).toBeGreaterThanOrEqual(2);
+    expect(bizCards.length).toBeGreaterThanOrEqual(1);
 
     // Buy first business (becomes the just-moved card).
     buyToHand(scene, bizCards[0]);
     // Manually add a second held card (e.g. held from a previous day) that
-    // is NOT the just-moved card.
-    scene.state.hand.push({ ...bizCards[1], id: 'held-from-yesterday' });
+    // is NOT the just-moved card. Use a synthetic card to avoid depending
+    // on market composition — CG-0MSXIQIPJ000NDTL.
+    scene.state.hand.push({ ...bizCards[0], id: 'held-from-yesterday' });
 
     const controller = new MainStreetTurnController(scene);
 
