@@ -315,7 +315,7 @@ eventImpactScore = average(coinDelta + reputationDelta × reputationWeight)
 Where:
 - `coinDelta`: Net coin change from the event (from the per-run action log)
 - `reputationDelta`: Net reputation change from the event
-- `reputationWeight`: A conversion factor representing the economic value of 1 reputation. Default = 5 (based on typical score contribution of reputation).
+- `reputationWeight`: A conversion factor representing the economic value of 1 reputation. Default = 1 (reputation counts 1:1 toward the final score; the old x5 score multiplier was removed by CG-0MT3J8FXG006RCOA).
 
 For incidents (cost 0), this measures pure negative impact. For investments, it measures ROI.
 
@@ -369,7 +369,7 @@ survivalRate = runsWhereCardOwnedAndPlayerWon / runsWhereCardOwned
 | M3 | Cost-to-Income Ratio | cost / baseIncome | `card-data.csv` | Static |
 | M4 | Synergy Utilization | actualBonuses / maxBonuses | Income breakdown + placement log | Dynamic |
 | M5 | Upgrade Adoption | upgrades / purchases of parent | Action log + ownership log | Dynamic |
-| M6 | Event Impact Score | avg(coinDelta + repDelta × 5) | Event log + `card-data.csv` | Hybrid |
+| M6 | Event Impact Score | avg(coinDelta + repDelta) | Event log + `card-data.csv` | Hybrid |
 | M7 | Survival Rate | wins(owned) / runs(owned) | Ownership log + run results | Dynamic |
 
 ---

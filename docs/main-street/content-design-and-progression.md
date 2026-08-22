@@ -132,7 +132,7 @@ Main Street does **not** feature crafting or combination mechanics. The game rev
 The core economic loop consists of two primary resources:
 
 1. **Coins** – the spendable currency used to purchase Business, Event, and Upgrade cards from the market.
-2. **Reputation** – a score multiplier that is increased by completing challenges or by positive events. Reputation is applied at final‑score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+2. **Reputation** – a plain score count increased by completing challenges or by positive events. Reputation counts 1:1 at final‑score calculation (`finalScore = coins + reputation + challengeBonuses`).
 
 **Flow of Resources**:
 - At the start of each **Day Phase**, the player may spend coins to acquire cards.
@@ -156,14 +156,14 @@ The balancing methodology and targets for Main Street have been consolidated int
 The final score is calculated at the end of the **Night Phase** using the formula:
 
 ```
-finalScore = resourceBank.coins + (resourceBank.reputation * 5) + challengeBonus
+finalScore = resourceBank.coins + resourceBank.reputation + challengeBonus
 ```
 
 - **Coins** contribute directly.
-- **Reputation** is multiplied by 5 to give it meaningful weight.
+- **Reputation** counts 1:1 toward the final score.
 - **Challenge Bonus** adds `10` points per completed challenge (e.g., *Foodie Row*, *Cultural District*).
 
-Victory conditions (see Core Rules) require `finalScore >= 150` **or** all primary challenges completed.
+Victory conditions (see Core Rules) require `finalScore >= winThreshold` (100 Easy / 120 Medium / 150 Hard) **or** all primary challenges completed.
 
 ---
 

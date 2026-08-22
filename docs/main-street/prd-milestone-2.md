@@ -1083,7 +1083,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 - `getPresetNames(MAIN_STREET_PRESETS)` returns an array containing `'easy'`, `'medium'`, and `'hard'`.
 - `EASY_CONFIG.startingCoins > MEDIUM_CONFIG.startingCoins > HARD_CONFIG.startingCoins` (12 > 8 > 5).
 - ~~`EASY_CONFIG.maxTurns > MEDIUM_CONFIG.maxTurns > HARD_CONFIG.maxTurns` (25 > 20 > 15).~~ Removed per CG-0MSLXJCHH001DLIO.
-- `EASY_CONFIG.winThreshold < MEDIUM_CONFIG.winThreshold < HARD_CONFIG.winThreshold` (120 < 150 < 180).
+- `EASY_CONFIG.winThreshold < MEDIUM_CONFIG.winThreshold < HARD_CONFIG.winThreshold` (100 < 120 < 150).
 - ~~Given a game initialized with `difficulty: 'easy'`, `state.config.startingCoins === 12` and `state.config.maxTurns === 25`.~~ `state.config.maxTurns` is `undefined` for all default presets per CG-0MSLXJCHH001DLIO.
 
 ### US-17: Difficulty Affects Gameplay
@@ -1103,7 +1103,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 - `EASY_CONFIG.synergyBonusPerNeighbor === 1.5`, `MEDIUM_CONFIG.synergyBonusPerNeighbor === 1`, and `HARD_CONFIG.synergyBonusPerNeighbor === 0.75`.
 - `EASY_CONFIG.challengeBonusPoints === 15` and `HARD_CONFIG.challengeBonusPoints === 8`.
 - `HARD_CONFIG.challengesPerRun === 4` and `EASY_CONFIG.challengesPerRun === 2`.
-- Given an Easy game, `computeScore()` uses `config.reputationScoreMultiplier` (5) and `config.challengeBonusPoints` (15) -- not hardcoded values.
+- Given an Easy game, `computeScore()` uses `config.challengeBonusPoints` (15) and a plain reputation count (1 point per reputation, no score multiplier) -- not hardcoded values.
 - Given two adjacent matching-synergy businesses on Easy, a default-rate (0.5) card's synergy rate is 75% of effective base income (not an absolute coin value).
 
 ---

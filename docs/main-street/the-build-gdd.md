@@ -4,7 +4,7 @@
 
 ## Executive Summary
 
-**Main Street** (working title: *The Build*) is a single-player, turn-based tableau card game where the player revitalises a 10-slot street grid by purchasing and placing business cards from a market. Adjacent (including diagonally adjacent) businesses sharing synergy types generate bonus income. The player manages two resources (Coins and Reputation) across 20 day/night turns, aiming to reach a score threshold of 150 or complete all challenges. The game is built on the Tableau Card Engine using Phaser 3, TypeScript, and seeded deterministic RNG for reproducible sessions.
+**Main Street** (working title: *The Build*) is a single-player, turn-based tableau card game where the player revitalises a 10-slot street grid by purchasing and placing business cards from a market. Adjacent (including diagonally adjacent) businesses sharing synergy types generate bonus income. The player manages two resources (Coins and Reputation) across 20 day/night turns, aiming to reach a difficulty-scaled score threshold (100 Easy / 120 Medium / 150 Hard) or complete all challenges. The game is built on the Tableau Card Engine using Phaser 3, TypeScript, and seeded deterministic RNG for reproducible sessions.
 
 ## Table of Contents
 1. [Core Rules and Mechanics](#core-rules-and-mechanics)
@@ -38,7 +38,7 @@
 | **Business Card** | A card representing a shop or service. It has a cost, a base income, one or more **Synergy Types**, and optional **Upgrade Paths**.
 | **Synergy Type** | A tag (e.g., *Food*, *Culture*, *Commerce*) that determines adjacency bonuses. When two adjacent businesses — orthogonally or **diagonally adjacent** (8‑way / Chebyshev adjacency, default range 1) — share a synergy type, each gains a **Synergy Bonus** equal to a percentage of its own effective base income per matching neighbor. The per-card rate defaults to 50% (`synergyCoinBonus` 0.5) and is scaled by the difficulty preset multiplier `synergyBonusPerNeighbor` (Easy 0.5 / Medium 0.35 / Hard 0.25, re-tuned by CG-0MSP26Q5N002EH8P). Same-type adjacent businesses do not receive synergy from each other.
 | **Market** | The face‑up cards the player may purchase each turn. It has two rows: a **Business** row (4 slots) and a mixed **Investments** row (2 Upgrade cards + 1 Investment event card = 3 slots). Incidents are not purchasable; they populate a visible FIFO **Incident Queue** instead.
-| **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (score multiplier). Coins start at 8 and Reputation starts at 3.
+| **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (plain score count). Coins start at 8 and Reputation starts at 3.
 | **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
 | **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are player‑bought from the Investments row and held until played; **Incident** events resolve automatically from the incident queue.
 | **Incident Queue** | A visible FIFO queue of 2 face‑up Incident cards. Each turn the front card is resolved and a replacement is drawn from the event deck. The player can see upcoming incidents and plan accordingly.
@@ -151,7 +151,7 @@ interface GameState {
 - **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (default range 1, can be extended by upgrades).
 - **Market** – two rows: Business row (4 face‑up cards from the Business deck) and Investments row (2 Upgrades + 1 Investment event = 3 slots). Cards are replenished after purchase.
 - **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
-- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation is a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation counts 1:1 toward the final score (`finalScore = coins + reputation + challengeBonuses`).
 
 ---
 
@@ -213,9 +213,9 @@ The turn ends when either:
 ## 7. Win Conditions
 
 The game is considered **won** when **any** of the following conditions are satisfied **at the end of a Night Phase**:
-1. **Score Threshold** – `finalScore >= 150` where:
+1. **Score Threshold** – `finalScore >= winThreshold` where winThreshold is difficulty-scaled (100 Easy / 120 Medium / 150 Hard):
 ```ts
-finalScore = resourceBank.coins + resourceBank.reputation * 5 + challengeBonus;
+finalScore = resourceBank.coins + resourceBank.reputation + challengeBonus;
 // challengeBonus = sum of 10 points per completed Challenge.
 ```
 2. **Challenge Completion** – All **Primary Challenges** (defined in `docs/games/the-build/challenges.md`) are completed, granting an automatic win regardless of numeric score.
@@ -306,7 +306,7 @@ Main Street does **not** feature crafting or combination mechanics. The game rev
 
 The core economic loop consists of two primary resources:
 1. **Coins** – the spendable currency used to purchase Business, Event, and Upgrade cards from the market.
-2. **Reputation** – a score multiplier that is increased by completing challenges or by positive events. Reputation is applied at final‑score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+2. **Reputation** – a plain score count increased by completing challenges or by positive events. Reputation counts 1:1 at final‑score calculation (`finalScore = coins + reputation + challengeBonuses`).
 
 **Flow of Resources**:
 - At the start of each **Day Phase**, the player may spend coins to acquire cards.
@@ -329,13 +329,13 @@ The balancing methodology and targets for Main Street have been consolidated int
 
 The final score is calculated at the end of the **Night Phase** using the formula:
 ```
-finalScore = resourceBank.coins + (resourceBank.reputation * 5) + challengeBonus
+finalScore = resourceBank.coins + resourceBank.reputation + challengeBonus
 ```
 - **Coins** contribute directly.
-- **Reputation** is multiplied by 5 to give it meaningful weight.
+- **Reputation** counts 1:1 toward the final score.
 - **Challenge Bonus** adds `10` points per completed challenge (e.g., *Foodie Row*, *Cultural District*).
 
-Victory conditions (see Core Rules) require `finalScore >= 150` **or** all primary challenges completed.
+Victory conditions (see Core Rules) require `finalScore >= winThreshold` (100 Easy / 120 Medium / 150 Hard) **or** all primary challenges completed.
 
 ---
 
