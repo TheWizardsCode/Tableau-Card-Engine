@@ -7,6 +7,10 @@
  *
  * Work item: CG-0MMLR38NJ1N11DOS
  *
+ * CG-0MT3J80HV0084IF1: reputation coin multiplier quartered — divisor 20→80,
+ * cap 3.0→1.5 in all presets. Reference points below use the quartered values
+ * (rep=10 → 1.125x, rep=20 → 1.25x, rep=40 → 1.5x cap).
+ *
  * CG-0MRER3RE300418SG: Removed Math.floor from applyReputationMultiplier
  * so fractional income values (e.g. 0.5 baseIncome) are preserved instead
  * of being silently truncated. Added fractional-income accumulation tests.
@@ -44,8 +48,8 @@ import type { BusinessCard, EventCard } from '../../example-games/main-street/Ma
 type MultiplierConfig = Pick<GameConfig, 'reputationCoinDivisor' | 'maxReputationCoinMultiplier'>;
 
 const DEFAULT_CFG: MultiplierConfig = {
-  reputationCoinDivisor: 20,
-  maxReputationCoinMultiplier: 3.0,
+  reputationCoinDivisor: 80,
+  maxReputationCoinMultiplier: 1.5,
 };
 
 // ── Unit tests: reputationCoinMultiplier() ──────────────────────────
@@ -61,21 +65,21 @@ describe('reputationCoinMultiplier', () => {
   });
 
   it('scales linearly with positive reputation', () => {
-    // rep=5  → 1 + 5/20 = 1.25
-    expect(reputationCoinMultiplier(5, DEFAULT_CFG)).toBeCloseTo(1.25);
-    // rep=10 → 1 + 10/20 = 1.5
-    expect(reputationCoinMultiplier(10, DEFAULT_CFG)).toBeCloseTo(1.5);
-    // rep=20 → 1 + 20/20 = 2.0
-    expect(reputationCoinMultiplier(20, DEFAULT_CFG)).toBeCloseTo(2.0);
-    // rep=40 → 1 + 40/20 = 3.0 (at cap)
-    expect(reputationCoinMultiplier(40, DEFAULT_CFG)).toBeCloseTo(3.0);
+    // rep=5  → 1 + 5/80 = 1.0625
+    expect(reputationCoinMultiplier(5, DEFAULT_CFG)).toBeCloseTo(1.0625);
+    // rep=10 → 1 + 10/80 = 1.125
+    expect(reputationCoinMultiplier(10, DEFAULT_CFG)).toBeCloseTo(1.125);
+    // rep=20 → 1 + 20/80 = 1.25 (regression pin: quartered value)
+    expect(reputationCoinMultiplier(20, DEFAULT_CFG)).toBeCloseTo(1.25);
+    // rep=40 → 1 + 40/80 = 1.5 (at cap)
+    expect(reputationCoinMultiplier(40, DEFAULT_CFG)).toBeCloseTo(1.5);
   });
 
   it('caps at maxReputationCoinMultiplier', () => {
-    // rep=60 → raw = 1 + 60/20 = 4.0, capped to 3.0
-    expect(reputationCoinMultiplier(60, DEFAULT_CFG)).toBe(3.0);
-    // rep=100 → raw = 6.0, capped to 3.0
-    expect(reputationCoinMultiplier(100, DEFAULT_CFG)).toBe(3.0);
+    // rep=60 → raw = 1 + 60/80 = 1.75, capped to 1.5
+    expect(reputationCoinMultiplier(60, DEFAULT_CFG)).toBe(1.5);
+    // rep=100 → raw = 1 + 100/80 = 2.25, capped to 1.5 (regression pin)
+    expect(reputationCoinMultiplier(100, DEFAULT_CFG)).toBe(1.5);
   });
 
   it('respects custom divisor and cap', () => {
@@ -102,18 +106,18 @@ describe('reputationCoinMultiplier', () => {
 
 describe('applyReputationMultiplier', () => {
   it('scales positive coin deltas', () => {
-    // delta=10, rep=10 → multiplier=1.5 → 15
-    expect(applyReputationMultiplier(10, 10, DEFAULT_CFG)).toBe(15);
+    // delta=10, rep=10 → multiplier=1.125 → 11.25
+    expect(applyReputationMultiplier(10, 10, DEFAULT_CFG)).toBeCloseTo(11.25);
   });
 
   it('preserves fractional products (no longer floors)', () => {
     // CG-0MRER3RE300418SG: Math.floor removed; fractional values preserved.
-    // delta=7, rep=3 → multiplier=1.15 → 7*1.15=8.05
-    expect(applyReputationMultiplier(7, 3, DEFAULT_CFG)).toBeCloseTo(8.05);
-    // delta=5, rep=5 → multiplier=1.25 → 5*1.25=6.25
-    expect(applyReputationMultiplier(5, 5, DEFAULT_CFG)).toBeCloseTo(6.25);
-    // delta=3, rep=7 → multiplier=1.35 → 3*1.35=4.05
-    expect(applyReputationMultiplier(3, 7, DEFAULT_CFG)).toBeCloseTo(4.05);
+    // delta=7, rep=3 → multiplier=1.0375 → 7*1.0375=7.2625
+    expect(applyReputationMultiplier(7, 3, DEFAULT_CFG)).toBeCloseTo(7.2625);
+    // delta=5, rep=5 → multiplier=1.0625 → 5*1.0625=5.3125
+    expect(applyReputationMultiplier(5, 5, DEFAULT_CFG)).toBeCloseTo(5.3125);
+    // delta=3, rep=7 → multiplier=1.0875 → 3*1.0875=3.2625
+    expect(applyReputationMultiplier(3, 7, DEFAULT_CFG)).toBeCloseTo(3.2625);
   });
 
   it('does not scale negative coin deltas', () => {
@@ -137,8 +141,8 @@ describe('applyReputationMultiplier', () => {
   });
 
   it('caps multiplied value at max multiplier', () => {
-    // delta=10, rep=100 → multiplier capped at 3.0 → 10*3=30
-    expect(applyReputationMultiplier(10, 100, DEFAULT_CFG)).toBe(30);
+    // delta=10, rep=100 → multiplier capped at 1.5 → 10*1.5=15 (regression pin)
+    expect(applyReputationMultiplier(10, 100, DEFAULT_CFG)).toBe(15);
   });
 
   // ── Fractional income tests (CG-0MRER3RE300418SG) ──────────────
@@ -156,13 +160,14 @@ describe('applyReputationMultiplier', () => {
   });
 
   it('accumulates fractional income with reputation multiplier', () => {
-    // rep=3 → multiplier=1.15
-    // Each turn: 0.5 * 1.15 = 0.575
+    // rep=3 → multiplier=1.0375
+    // Each turn: 0.5 * 1.0375 = 0.51875
     const turn1 = applyReputationMultiplier(0.5, 3, DEFAULT_CFG);
     const turn2 = applyReputationMultiplier(0.5, 3, DEFAULT_CFG);
-    expect(turn1).toBeCloseTo(0.575);
-    expect(turn2).toBeCloseTo(0.575);
-    // After 2 turns: 0.575 + 0.575 = 1.15 (≥ 1 coin, was 0 before fix)
+    expect(turn1).toBeCloseTo(0.51875);
+    expect(turn2).toBeCloseTo(0.51875);
+    // After 2 turns: 0.51875 + 0.51875 = 1.0375 (≥ 1 coin, was 0 before fix)
+    expect(turn1 + turn2).toBeCloseTo(1.0375);
     expect(turn1 + turn2).toBeGreaterThanOrEqual(1.0);
   });
 
@@ -175,10 +180,10 @@ describe('applyReputationMultiplier', () => {
   });
 
   it('integer baseIncome with reputation still produces expected values', () => {
-    // delta=1, rep=3 → multiplier=1.15 → 1.15 (was floor(1.15)=1 before fix)
-    expect(applyReputationMultiplier(1, 3, DEFAULT_CFG)).toBeCloseTo(1.15);
-    // delta=2, rep=10 → multiplier=1.5 → 3.0
-    expect(applyReputationMultiplier(2, 10, DEFAULT_CFG)).toBe(3);
+    // delta=1, rep=3 → multiplier=1.0375 → 1.0375 (was floor(1.15)=1 before fix)
+    expect(applyReputationMultiplier(1, 3, DEFAULT_CFG)).toBeCloseTo(1.0375);
+    // delta=2, rep=10 → multiplier=1.125 → 2.25
+    expect(applyReputationMultiplier(2, 10, DEFAULT_CFG)).toBeCloseTo(2.25);
   });
 });
 
@@ -208,14 +213,14 @@ describe('Reputation multiplier: income integration', () => {
     state.streetGrid.fill(null);
     state.streetGrid[0] = makeBiz({ id: 'shop-1', baseIncome: 10, synergyTypes: [] });
     recalculateCard(state, 0);
-    state.resourceBank.reputation = 10; // multiplier = 1.5
+    state.resourceBank.reputation = 10; // multiplier = 1.125
 
     const coinsBefore = state.resourceBank.coins;
     const result = applyIncome(state);
 
-    // Base income = 10 (no synergy). Multiplied: 10 * 1.5 = 15
+    // Base income = 10 (no synergy). Multiplied: 10 * 1.125 = 11.25
     expect(result.total).toBe(10); // computeIncome total is raw
-    expect(state.resourceBank.coins).toBe(coinsBefore + 15);
+    expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 11.25);
   });
 
   it('income is unchanged at reputation 0', () => {
@@ -270,17 +275,17 @@ describe('Reputation multiplier: income integration', () => {
     state.streetGrid.fill(null);
     state.streetGrid[0] = makeBiz({ id: 'biz-1', baseIncome: 0.5, synergyTypes: [] });
     recalculateCard(state, 0);
-    state.resourceBank.reputation = 3; // Medium preset, multiplier ≈ 1.15
+    state.resourceBank.reputation = 3; // Medium preset, multiplier ≈ 1.0375
 
     state.resourceBank.coins = 0;
 
-    // Turn 1: 0.5 * 1.15 = 0.575
+    // Turn 1: 0.5 * 1.0375 = 0.51875
     applyIncome(state);
-    expect(state.resourceBank.coins).toBeCloseTo(0.575);
+    expect(state.resourceBank.coins).toBeCloseTo(0.51875);
 
-    // Turn 2: 0.5 * 1.15 = 0.575 → total = 1.15 (was 0 before fix due to floor)
+    // Turn 2: 0.5 * 1.0375 = 0.51875 → total = 1.0375 (was 0 before fix due to floor)
     applyIncome(state);
-    expect(state.resourceBank.coins).toBeCloseTo(1.15);
+    expect(state.resourceBank.coins).toBeCloseTo(1.0375);
     expect(state.resourceBank.coins).toBeGreaterThanOrEqual(1.0);
   });
 });
@@ -290,7 +295,7 @@ describe('Reputation multiplier: income integration', () => {
 describe('Reputation multiplier: event resolution integration', () => {
   it('positive event coinDelta is scaled by reputation (target: All)', () => {
     const state = setupMainStreetGame({ seed: 'rep-event-all' });
-    state.resourceBank.reputation = 20; // multiplier = 2.0
+    state.resourceBank.reputation = 20; // multiplier = 1.25 (regression pin)
     const coinsBefore = state.resourceBank.coins;
 
     const event: EventCard = {
@@ -306,13 +311,13 @@ describe('Reputation multiplier: event resolution integration', () => {
     };
 
     resolveEvent(state, event);
-    // 5 * 2.0 = 10 (integer, no change from floor behavior)
-    expect(state.resourceBank.coins).toBe(coinsBefore + 10);
+    // 5 * 1.25 = 6.25
+    expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 6.25);
   });
 
   it('negative event coinDelta is NOT scaled', () => {
     const state = setupMainStreetGame({ seed: 'rep-event-neg' });
-    state.resourceBank.reputation = 20; // multiplier = 2.0 (should not apply)
+    state.resourceBank.reputation = 20; // multiplier = 1.25 (should not apply)
     const coinsBefore = state.resourceBank.coins;
 
     const event: EventCard = {
@@ -367,20 +372,20 @@ describe('Reputation multiplier: preset configuration', () => {
   }
 
   it('Medium preset starting rep produces a modest multiplier', () => {
-    // Medium: startingReputation=3, divisor=20 → 1.15
+    // Medium: startingReputation=3, divisor=80 → 1.0375
     const m = reputationCoinMultiplier(MEDIUM_PRESET.startingReputation, MEDIUM_PRESET);
-    expect(m).toBeCloseTo(1.15);
+    expect(m).toBeCloseTo(1.0375);
   });
 
   it('Easy preset starting rep produces a slightly higher multiplier', () => {
-    // Easy: startingReputation=5, divisor=20 → 1.25
+    // Easy: startingReputation=5, divisor=80 → 1.0625
     const m = reputationCoinMultiplier(EASY_PRESET.startingReputation, EASY_PRESET);
-    expect(m).toBeCloseTo(1.25);
+    expect(m).toBeCloseTo(1.0625);
   });
 
   it('Hard preset starting rep produces the smallest multiplier', () => {
-    // Hard: startingReputation=2, divisor=20 → 1.10
+    // Hard: startingReputation=2, divisor=80 → 1.025
     const m = reputationCoinMultiplier(HARD_PRESET.startingReputation, HARD_PRESET);
-    expect(m).toBeCloseTo(1.10);
+    expect(m).toBeCloseTo(1.025);
   });
 });

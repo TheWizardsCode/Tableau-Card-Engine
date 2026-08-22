@@ -287,9 +287,9 @@ describe('MainStreetEngine', () => {
       expect(result).not.toBeNull();
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta is now multiplied by reputation and not floored
-      // Medium preset rep=3 → multiplier=1.15, 4 * 1.15 = 4.6 (was 4 before fix)
+      // Medium preset rep=3 → multiplier=1.0375, 4 * 1.0375 = 4.15 (quartered, CG-0MT3J80HV0084IF1)
       // makeInvestmentEvent defaults cost to 0, so only the delta applies.
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.15);
     });
 
     it('should throw play-event action when no Investment is held', () => {
@@ -329,8 +329,8 @@ describe('MainStreetEngine', () => {
 
       // 2 Food businesses * 2 coinDelta = +4 raw
       // CG-0MRER3RE300418SG: raw delta multiplied by reputation, not floored
-      // 4 * 1.15 = 4.6 (was 4 before fix)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
+      // 4 * 1.0375 = 4.15 (quartered, CG-0MT3J80HV0084IF1)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.15);
     });
 
     it('should apply reputationDelta', () => {
@@ -367,8 +367,8 @@ describe('MainStreetEngine', () => {
       expect(resolved!.id).toBe('e1');
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
-      // 5 * 1.15 = 5.75 (was 5 before fix)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 5.75);
+      // 5 * 1.0375 = 5.1875 (quartered, CG-0MT3J80HV0084IF1)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 5.1875);
     });
 
     it('should return null when no event is held', () => {
@@ -388,8 +388,8 @@ describe('MainStreetEngine', () => {
 
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
-      // 3 * 1.15 = 3.45 (was 3 before fix)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 3.45);
+      // 3 * 1.0375 = 3.1125 (quartered, CG-0MT3J80HV0084IF1)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 3.1125);
     });
 
     it('should throw when no event is held', () => {

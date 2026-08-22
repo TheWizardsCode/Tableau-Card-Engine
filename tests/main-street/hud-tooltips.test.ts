@@ -180,13 +180,14 @@ describe('buildCoinsTooltip', () => {
 
   it('reflects multiplier changes with different reputation values', () => {
     const state = setupMainStreetGame({ seed: 'test-rep' });
-    state.resourceBank.reputation = 20; // should give 2.0x multiplier
+    state.resourceBank.reputation = 20; // → 1.25x multiplier (quartered, CG-0MT3J80HV0084IF1)
 
     const mult = reputationCoinMultiplier(20, state.config);
-    expect(mult).toBeCloseTo(2.0);
+    expect(mult).toBeCloseTo(1.25);
 
     const tooltip = buildCoinsTooltip(state);
-    expect(tooltip).toContain('×2.0');
+    // Tooltip renders the multiplier with toFixed(1): 1.25 → '×1.3'
+    expect(tooltip).toContain('×1.3');
   });
 
   it('excludes sold cards from income display', () => {
@@ -260,8 +261,8 @@ describe('buildReputationTooltip', () => {
     state.resourceBank.reputation = 100; // capped at maxReputationCoinMultiplier
 
     const tooltip = buildReputationTooltip(state);
-    // With default config, max multiplier is 3.0
-    expect(tooltip).toContain('×3.0');
+    // With default config, max multiplier is 1.5 (quartered cap, CG-0MT3J80HV0084IF1)
+    expect(tooltip).toContain('×1.5');
   });
 });
 

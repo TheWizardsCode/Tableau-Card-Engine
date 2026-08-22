@@ -549,10 +549,11 @@ describe('Integration: Held Investment Event', () => {
     expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false);
 
     const coinsAfterPlay = state.resourceBank.coins;
-    // Reputation multiplier: rep=5, divisor=20 → 1 + 5/20 = 1.25
-    // CG-0MRER3RE300418SG: Math.floor removed; 5 * 1.25 = 6.25 (was 6 before fix)
+    // Reputation multiplier: rep=5, divisor=80 → 1 + 5/80 = 1.0625
+    // CG-0MRER3RE300418SG: Math.floor removed; 5 * 1.0625 = 5.3125 (was 6 before fix)
     // CG-0MSTOATDT009BRX2: cost-at-play — playing the event charges its cost (3).
-    expect(coinsAfterPlay).toBeCloseTo(50 - 3 + 6.25); // -cost + delta scaled by reputation multiplier
+    // (CG-0MT3J80HV0084IF1: divisor quartered 20→80.)
+    expect(coinsAfterPlay).toBeCloseTo(50 - 3 + 5.3125); // -cost + delta scaled by reputation multiplier
 
     // End turn — InvestmentResolution should have nothing to auto-resolve
     const result = processEndOfTurn(state);
@@ -598,10 +599,11 @@ describe('Integration: Held Investment Event', () => {
     // Turn 2: play the held event manually
     executeDayStart(state);
     const coinsBeforePlay = state.resourceBank.coins;
-    // Reputation multiplier: 1 + rep/20. Turn 1's incident phase can change
+    // Reputation multiplier: 1 + rep/80 (divisor quartered 20→80 by
+    // CG-0MT3J80HV0084IF1). Turn 1's incident phase can change
     // reputation (seed-dependent incident queue), so compute from the live
     // value rather than assuming rep stayed at 5.
-    const repMultiplier = 1 + state.resourceBank.reputation / 20;
+    const repMultiplier = 1 + state.resourceBank.reputation / 80;
     executeAction(state, { type: 'play-event' });
     expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false); // Now resolved
     // CG-0MSTOATDT009BRX2: cost-at-play — the $3 cost is charged when the
