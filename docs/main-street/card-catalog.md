@@ -85,7 +85,7 @@ Business cards are placed on the 10-slot street grid. Each generates base income
 | `biz-bakery` | Bakery | 3 | 2 | Food | Bakery | Warm pastries. Gains 50% of base income per adjacent Food business (scales with difficulty). | Affordable Food starter. |
 | `biz-diner` | Diner | 4 | 3 | Food | Diner | Quick meals. Gains 50% of base income per adjacent Food business (scales with difficulty). | Higher-cost, higher-income Food option. |
 | `biz-bookshop` | Bookshop | 4 | 2 | Culture | Bookshop | Sells books. Gains 50% of base income per adjacent Culture business (scales with difficulty). | Mid-cost Culture business. |
-| `biz-hardware` | Hardware Store | 5 | 3 | Commerce | Hardware Store | Supplies tools. Gains 50% of base income per adjacent Commerce business (scales with difficulty). | M1's only Commerce card; expensive but strong income. |
+| `biz-hardware` | Hardware Store | 5 | 3 | Service | Hardware Store | Supplies tools. Gains 50% of base income per adjacent Service business (scales with difficulty). | Retagged Commerce → Service (CG-0MT3IPFSF005KEFB): tool supply is a Service; gives T2 a second synergy type (Commerce 2 / Service 1). |
 
 Park has been reclassified as a **Community Space** card (see below).
 
@@ -117,7 +117,7 @@ Park has been reclassified as a **Community Space** card (see below).
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-arcade` | Arcade | 4 | 2 | Entertainment | Arcade | Retro fun. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | Mid-cost Entertainment starter. |
+| `biz-arcade` | Arcade | 4 | 2 | Entertainment + Service | Arcade | Retro fun. Bridges Entertainment and Service synergies. | Entertainment→Service bridge (CG-0MT3IPFSF005KEFB) so T3 spans two types; an arcade is an entertainment service. |
 | `biz-cinema` | Cinema | 5 | 3 | Entertainment | Cinema | Latest films. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | Premium Entertainment; anchors the type. |
 
 #### Multi-Synergy Bridge Cards
@@ -174,7 +174,7 @@ alongside business cards.
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `cs-park` | Park | 4 | 0 | Culture | Park | Offers leisure space. Gains 50% of base income per adjacent Culture business or community space (scales with difficulty). | Reclassified from M1 Business; cheapest community space; synergy filler. |
+| `cs-park` | Park | 4 | 0 | Entertainment | Park | Offers leisure space. Gains 50% of base income per adjacent Entertainment business or community space (scales with difficulty). | Reclassified from M1 Business; retagged Culture → Entertainment (CG-0MT3IPFSF005KEFB) so T1's spread is Culture 2 / Food 2 / Service 1 / Entertainment 1; cheapest community space. |
 | `cs-library` | Library | 7 | 0 | Culture | Library | Quiet community space for reading and learning. Costs 0.25 coins/turn to run; +0.1 rep/turn. | Reputation asset: no income; small running cost for steady reputation. Full Culture synergy participation (Park model) — contributes to adjacent Culture businesses' synergy and receives rep synergy from rep-bonus neighbours (reversed by CG-0MSKS963N000ZSTU). |
 
 ### M3 Community Space Templates (6) — Group B expansion (CG-0MSQJ210I00491ZZ)
@@ -371,20 +371,22 @@ Multi-level upgrades require the business to already be at Level 1 (`requiredLev
 
 ### Multi-Synergy Bridge Cards
 
-M2 introduces 5 bridge cards that belong to two synergy types simultaneously. The adjacency resolver (`MainStreetAdjacency.ts`) uses `some()` to check if any synergy type matches, so bridge cards earn bonuses from neighbours of either type. This creates interesting placement decisions: a Cafe (Food+Culture) placed between a Bakery and a Bookshop earns bonuses from both sides.
+The adjacency resolver (`MainStreetAdjacency.ts`) uses `some()` to check if any synergy type matches, so bridge cards earn bonuses from neighbours of either type — a Cafe (Food+Culture) placed between a Bakery and a Bookshop earns bonuses from both sides. Bridges are also the primary lever for spreading synergy types across sparse tiers: since a bridge counts one card toward two types, a 2-card tier can span 3–4 types (e.g. the Arcade, Entertainment|Service, stretches T3 to Entertainment 2 / Service 1, CG-0MT3IPFSF005KEFB).
 
 ### Synergy Type Coverage
 
 | Synergy | Single-type | Bridge (shared) | Total |
 |---------|-------------|-----------------|-------|
-| Food | 2 (Bakery, Diner) | 2 (Cafe, Food Truck) | 4 |
-| Culture | 1 (Bookshop) | 3 (Cafe, Art Gallery, Florist) | 4 (plus Park as Community Space) |
-| Commerce | 3 (Hardware, Pawn Shop, Boutique) | 1 (Florist) | 4 |
-| Service | 2 (Laundromat, Barbershop) | 1 (Day Spa) | 3 |
-| Entertainment | 2 (Arcade, Cinema) | 3 (Food Truck, Art Gallery, Day Spa) | 5 |
-| Health | 3 (Clinic, Private Clinic, Pharmacy) | 0 | 3 |
+| Food | 4 (Bakery, Community Garden, Delicatessen, Diner) | 4 (Cafe, Food Truck, Juice Bar, Teahouse) | 8 |
+| Culture | 4 (Bookshop, Craft Shop, Library, Town Fountain) | 6 (Art Gallery, Cafe, Florist, Public Art, Teahouse, Yoga Studio) | 10 |
+| Commerce | 3 (Boutique, Pawn Shop, Toy Store) | 1 (Florist) | 4 |
+| Service | 6 (Barbershop, Community Shelter, Grand Hotel, Hardware Store, Laundromat, Tailor) | 3 (Arcade, Day Spa, Physiotherapy) | 9 |
+| Entertainment | 4 (Cinema, Music Store, Park, Playground) | 5 (Arcade, Art Gallery, Day Spa, Food Truck, Public Art) | 9 |
+| Health | 6 (Clinic, Dentist, Gym, Health Kiosk, Pharmacy, Private Clinic) | 3 (Juice Bar, Physiotherapy, Yoga Studio) | 9 |
 
-Culture and Entertainment have the most bridge-card representation, making them easiest to chain synergies with. Commerce and Service rely more on dedicated single-type cards.
+Service and Health now have bridge representation on a par with the other types, while Commerce remains the most single-type reliant (its only bridge is the Florist). Global totals are intentionally not balanced per type (Culture 10 vs Commerce 4) — the balance rule is defined **per tier**, mirroring the family rebalance (CG-0MT2WU0CX005Z143) along the synergy-type axis.
+
+> **Per-tier synergy balance (CG-0MT3IPFSF005KEFB):** every tier's synergy-bearing cards (business + community-space) span ≥ 2 distinct types, and no type's assignment count within a tier exceeds 2× any other type's count in that tier (bridge cards count once per type they carry). Sparse tiers are stretched with retags/bridges rather than new cards: T1 Park Culture→Entertainment, T2 Hardware Store Commerce→Service, T3 Arcade → Entertainment|Service bridge. Enforced by `tests/main-street/tier-synergy-balance.test.ts`.
 
 ### Branching & Multi-Level Upgrades
 

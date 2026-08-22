@@ -12,8 +12,8 @@ The **Main Street** game uses three distinct card families. Below is the current
 | Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains 50% of base income per adjacent Food business. |
 | Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains 50% of base income per adjacent Food business. |
 | Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains 50% of base income per adjacent Culture business. |
-| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains 50% of base income per adjacent Culture business or community space. |
-| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains 50% of base income per adjacent Commerce business. |
+| Park | 2 | 1 | Entertainment | Park → Garden | Offers leisure. Gains 50% of base income per adjacent Entertainment business or community space. *(Culture→Entertainment retag, CG-0MT3IPFSF005KEFB; Park itself now lives in §1.2b as a community space.)* |
+| Hardware Store | 5 | 3 | Service | Hardware Store → Home Improvement | Supplies tools. Gains 50% of base income per adjacent Service business. *(Commerce→Service retag, CG-0MT3IPFSF005KEFB — tool supply is a Service, gives T2 a second type.)* |
 | Juice Bar | 5 | 0.5 | Food, Health | — | Fresh juices and smoothies. Bridges Food and Health synergies. *(Group A: first Health bridge.)* |
 | Yoga Studio | 8 | 1 | Culture, Health | — | Calm practice space for mind and body. Bridges Culture and Health synergies. *(Group A.)* |
 | Physiotherapy | 10 | 1 | Health, Service | — | Recovery and rehabilitation care. Bridges Health and Service synergies; +0.1 rep/turn. *(Group A.)* |
@@ -69,7 +69,7 @@ Community-space cards are placed on the street grid like businesses but generate
 
 | Name | Cost (coins) | Ongoing/turn | Synergy | Tier | Rep/turn | Description |
 |------|--------------|--------------|---------|------|----------|-------------|
-| Park | 3 | 0 | Culture | 1 | 0 | Offers leisure space. Full Culture synergy participation. |
+| Park | 3 | 0 | Entertainment | 1 | 0 | Offers leisure space. Full Entertainment synergy participation. *(Culture→Entertainment retag, CG-0MT3IPFSF005KEFB.)* |
 | Playground | 4 | 0 | Entertainment | 3 | 0.05 | A safe place for kids to play. *(Group B.)* |
 | Community Garden | 5 | 0.1 | Food | 4 | 0.1 | A shared garden plot for the neighbourhood. *(Group B.)* |
 | Town Fountain | 5 | 0 | Culture | 5 | 0.1 | A gathering spot around the fountain. *(Group B.)* |
@@ -79,6 +79,8 @@ Community-space cards are placed on the street grid like businesses but generate
 | Public Art | 8 | 0.25 | Culture, Entertainment | 12 | 0.2 | A vibrant public sculpture. Bridges Culture and Entertainment community spaces. *(Group B.)* |
 
 > 12-tier expansion (CG-0MT3C744B009DS84): community-space cards are spread across 7 of the 12 tiers (8 cards cannot cover every tier); Park and Library are Tier-1 because the tutorial requires them in the tier-1 card pool.
+
+> **Per-tier synergy balance (CG-0MT3IPFSF005KEFB):** across business + community-space cards, every tier spans ≥ 2 distinct synergy types, and no type's assignment count within a tier exceeds 2× any other type's count (bridge cards count once per type they carry, e.g. the T3 Arcade Entertainment|Service bridge). The three sparse tiers were stretched without new cards: T1 Park Culture→Entertainment, T2 Hardware Store Commerce→Service, T3 Arcade → Entertainment|Service. See `card-catalog.md` "Synergy Type Coverage" and `tests/main-street/tier-synergy-balance.test.ts`.
 
 ### 1.3 Upgrade Cards
 | Name | Target Business | Cost (coins) | Income Bonus | Synergy Range Bonus | Description |
