@@ -406,7 +406,7 @@ export class MainStreetLifecycleManager {
       {
         heading: 'Win / Loss Conditions',
         body:
-          `Reach ${cfg.winThreshold} points to win (coins + reputation multiplier + challenges).\n` +
+          `Reach ${cfg.winThreshold} points to win (coins + reputation + challenges).\n` +
           `Complete all ${cfg.challengesPerRun} challenges for an instant win.\n` +
           'No turn limit: keep playing until you win or lose.\n' +
           'Bankruptcy (coins < 0) or reputation collapse (rep <= 0) loses the game.',

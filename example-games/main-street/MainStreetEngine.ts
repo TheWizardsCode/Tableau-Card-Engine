@@ -180,7 +180,7 @@ export interface TurnResult {
 
 /**
  * Computes the final score.
- * Formula: coins + (reputation * reputationScoreMultiplier) + (challengesCompleted * challengeBonusPoints)
+ * Formula: coins + reputation + (challengesCompleted * challengeBonusPoints)
  */
 export function computeScore(state: MainStreetState): number {
   // Sync the ledger from resourceBank before reading, to ensure it reflects
@@ -189,7 +189,7 @@ export function computeScore(state: MainStreetState): number {
   // Use shared EconomyLedger for resource values
   return (
     state.ledger.get('coins') +
-    state.ledger.get('reputation') * state.config.reputationScoreMultiplier +
+    state.ledger.get('reputation') +
     state.challengesCompleted.length * state.config.challengeBonusPoints
   );
 }

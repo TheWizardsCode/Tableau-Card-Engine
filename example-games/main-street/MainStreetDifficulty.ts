@@ -74,8 +74,6 @@ export interface GameConfig extends DifficultyConfig {
   // ── Scoring ─────────────────────────────────────────────
   /** Score required for a win via score threshold. */
   readonly winThreshold: number;
-  /** Multiplier applied to reputation in final score. */
-  readonly reputationScoreMultiplier: number;
   /** Points awarded per completed challenge. */
   readonly challengeBonusPoints: number;
 
@@ -156,8 +154,7 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Easy',
   startingCoins: 10,
   startingReputation: 5,
-  winThreshold: 120,
-  reputationScoreMultiplier: 5,
+  winThreshold: 100,
   challengeBonusPoints: 15,
   synergyBonusPerNeighbor: 0.5,
   challengesPerRun: 2,
@@ -183,8 +180,7 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Medium',
   startingCoins: 6,
   startingReputation: 3,
-  winThreshold: 150,
-  reputationScoreMultiplier: 5,
+  winThreshold: 120,
   challengeBonusPoints: 10,
   synergyBonusPerNeighbor: 0.35,
   challengesPerRun: 3,
@@ -212,8 +208,7 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Hard',
   startingCoins: 4,
   startingReputation: 2,
-  winThreshold: 180,
-  reputationScoreMultiplier: 5,
+  winThreshold: 150,
   challengeBonusPoints: 8,
   synergyBonusPerNeighbor: 0.25,
   challengesPerRun: 4,
