@@ -78,7 +78,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 
 Business cards are placed on the 10-slot street grid. Each generates base income plus synergy bonuses from adjacent businesses sharing a synergy type.
 
-> **Ongoing cost field (CG-0MSVYPEZ90085SHE):** Business cards gain an `ongoingCost` CSV column value (column 28) that is deducted from coins every IncomePhase — whether the card is placed on the street grid **or held in hand** — alongside staff and community-space costs. Deductions are clamped at 0 coins and logged. Cards with an empty `ongoingCost` CSV value default to 0. The per-card values (balance guideline: **¼ purchase price, min 0.25**) are populated by the producer balance task; the engine deducts whatever value is on the card.
+> **Ongoing cost field (CG-0MSVYPEZ90085SHE):** Business cards gain an `ongoingCost` CSV column value (column 29; col 28 is `newDisplayName` — the intake brief's "column 28" was a miscount) that is deducted from coins every IncomePhase — whether the card is placed on the street grid **or held in hand** — alongside staff and community-space costs. Deductions are clamped at 0 coins and logged. Cards with an empty `ongoingCost` CSV value default to 0. The per-card values (balance guideline: **¼ purchase price, min 0.25**) are populated by the producer balance task; the engine deducts whatever value is on the card.
 
 ### M1 Business Templates (4)
 
