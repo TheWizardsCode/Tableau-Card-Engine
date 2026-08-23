@@ -114,7 +114,12 @@ export class MainStreetScene extends CardGameScene {
   public logScrollOffset = 0;
   public logMaxScroll = 0;
   public logTotalContentH = 0;
-  public logAutoScroll = false;
+  /** Whether the log should auto-scroll to show the latest entry on each refresh.
+   * Starts `true` so the log defaults to showing the bottom (newest entries).
+   * Set to `false` when the player scrolls up to read history; re-engages
+   * automatically when they wheel-scroll back to the bottom (see
+   * `MainStreetRenderer.refreshLog` and `MainStreetInputManager.handleLogWheel`). */
+  public logAutoScroll = true;
   public logPrevEntryCount = 0;
   /** The index of the first entry displayed in the current log window (for windowed rendering). */
   public logRenderedStartIdx = 0;

@@ -1624,6 +1624,23 @@ export class MainStreetRenderer {
   }
 
 
+  /**
+   * Rebuild the activity log DOM and recompute scroll bounds.
+   *
+   * Auto-scroll behaviour:
+   * - When `s.logAutoScroll` is `true` (the default), the log jumps to the
+   *   bottom on every refresh so the newest entries are visible.
+   * - When `s.logAutoScroll` is `false` (player scrolled up), the current
+   *   scroll offset is preserved (clamped to valid range) so the player can
+   *   read older entries without the view "yanking" back down.
+   * - After clamping, `logAutoScroll` is re-evaluated: if the offset is
+   *   within 4px of the bottom it is re-enabled (`true`), so subsequent
+   *   entries will again scroll into view. This lets the player scroll down
+   *   manually to resume live updates.
+   * - The initial `true` value (set in `MainStreetScene` and
+   *   `MainStreetLifecycleManager.create`) ensures the log starts at the
+   *   bottom on game start / restart.
+   */
   public refreshLog(): void {
     const s = this.scene;
     const entries = s.state.activityLog;
