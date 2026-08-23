@@ -207,7 +207,21 @@ Default presets impose **no turn limit** (CG-0MSLXJCHH001DLIO): a player who kee
 
 ### 6.0 Action Economy (daily action budget)
 
-Each day (MarketPhase) the player has **exactly one action** — two while a **General Manager** is employed (CG-0MSTOF1N5005PK2R). The budget resets at **DayStart**; spending it blocks further action-type operations until the next day. The remaining budget is shown in the HUD action counter.
+Each day (MarketPhase) the player has **exactly one action** — two while a **General Manager** is employed (CG-0MSTOF1N5005PK2R) — plus any **banked** actions carried over from previous days (CG-0MT3IOPZB005LNAR). The budget resets at **DayStart**; spending it blocks further action-type operations until the next day. The remaining budget is shown in the HUD action counter (banked count shown as `(N banked)` when non-zero).
+
+**Day-start composition.** At DayStart the daily budget is:
+
+```
+1 base + staff actionsPerTurn bonus + banked actions (capped at 2)
+```
+
+- The **base action banks**: any unused base action at end of day is banked, up to a **bank cap of 2**.
+- **Staff actions never bank.** Staff-derived actions (e.g. the General Manager's +1 `actionsPerTurn`) are **consumed first** and are not bankable — an idle GM day banks exactly 1 (the base), not 2.
+- Spending during the day draws down the combined budget (base + staff + banked share one counter).
+- **No expiry:** banked actions persist indefinitely across days until spent. They reset to 0 only on a new game.
+- At day end, at most **1** action can bank (only the base portion), so reaching the cap takes two idle days; overflow beyond the cap is discarded.
+
+> **Follow-ups:** Tutorial coverage of banking is tracked in CG-0MT3JK16W006A66P; a banking-aware AI strategy (deliberate hoarding) in CG-0MT3JMGA60091J8W.
 
 **Action-type operations (spend the daily action):**
 
