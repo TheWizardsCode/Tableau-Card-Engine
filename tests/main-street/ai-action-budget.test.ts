@@ -154,9 +154,9 @@ describe('Monte Carlo-style loop respects the action cap', () => {
   it('hiring a General Manager allows up to 2 action-type actions per day', () => {
     const state = setupState('mc-budget-gm');
     executeDayStart(state); // Day 1
-    const gm = state.staffCardMarket?.find(
-      (c: any) => c.id === 'staff-general-manager' || c.id?.startsWith('staff-general-manager'),
-    );
+    // Staff are in the market row or deck (CG-0MT3KZNQB0053K55)
+    const gm = (state.market.cards.find((c: any) => c.id.startsWith('staff-general-manager'))
+      ?? state.decks.staff.find((c: any) => c.id.startsWith('staff-general-manager')));
     expect(gm).toBeTruthy();
     state.resourceBank.coins = 30; // enough for the GM (cost 20), far below the win threshold
     hireStaffCard(state, gm!.id);

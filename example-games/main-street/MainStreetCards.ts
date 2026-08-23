@@ -182,6 +182,13 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
   for (const t of csTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
   for (const t of evtTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
   for (const t of upgTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
+  // Staff templates are also first-class cards in the general market
+  // (CG-0MT3KZNQB0053K55); register them in the display-name lookup.
+  for (const row of rows) {
+    if (row.family === 'staff' && row.id) {
+      _CARD_TEMPLATE_NAMES.set(row.id, row.name);
+    }
+  }
 
   _CARD_TIER_MAP.clear();
   for (const row of rows) {
@@ -862,6 +869,9 @@ export const MARKET_UPGRADE_MAX = 1;
 
 /** Maximum number of event cards in the single-row market. */
 export const MARKET_EVENT_MAX = 1;
+
+/** Maximum number of staff cards per market row (CG-0MT3KZNQB0053K55). */
+export const MARKET_STAFF_MAX = 1;
 
 /**
  * Legacy: number of Incident cards in the pre-deck incident queue. The

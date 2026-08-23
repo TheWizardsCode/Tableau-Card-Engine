@@ -452,6 +452,12 @@ describe('MainStreetScene browser tests', () => {
       const transferSpy = vi.spyOn(scene, 'animateTransferFromMarket');
 
       // ── Business: buy into a NON-empty hand (hand 1 → 2) ──
+      // Staff cards now occupy a market slot (CG-0MT3KZNQB0053K55), so the
+      // seeded row may contain only one business. Seed a two-business row
+      // (from the business deck) so the transfer-destination assertions have
+      // two distinct purchases to exercise.
+      state.market.cards = state.decks.business.slice(0, 2).map((c: any) => ({ ...c }));
+
       // First purchase (hand 0 → 1) so the second buy starts with a non-empty hand.
       const biz1 = state.market.cards.find((c: any) =>
         c && canPurchaseBusiness(state, c.id, 0).legal);

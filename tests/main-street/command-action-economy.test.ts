@@ -112,7 +112,10 @@ describe('action-type commands spend the daily action', () => {
 
   it('hireStaffCardCommand spends 1 action', () => {
     const state = setupMarketState();
-    const staff = state.staffCardMarket?.[0];
+    // Staff are in the market row or deck (CG-0MT3KZNQB0053K55)
+    const firstStaff = state.market.cards.find(c => c.family === 'staff')
+      ?? state.decks.staff.find(c => c.family === 'staff');
+    const staff = firstStaff as any;
     expect(staff).toBeTruthy();
     state.resourceBank.coins = Math.max(state.resourceBank.coins, staff.cost);
     const coinsBefore = state.resourceBank.coins;

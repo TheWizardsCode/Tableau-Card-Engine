@@ -727,9 +727,11 @@ describe('MarketOfferEngine — refill policy: exhaustion edge cases', () => {
       state.decks.event = [];
       state.discards.upgrade = [];
       state.discards.event = [];
+      state.decks.staff = []; // No staff either (CG-0MT3KZNQB0053K55)
+      state.discards.staff = [];
 
       refillMarket(state);
-      // No upgrades/events exist anywhere — the row must still satisfy the
+      // No upgrades/events/staff exist anywhere — the row must still satisfy the
       // ≥1-business contract, up to the available business supply.
       expect(state.market.cards.length).toBeGreaterThan(0);
       for (const card of state.market.cards) {
@@ -741,6 +743,8 @@ describe('MarketOfferEngine — refill policy: exhaustion edge cases', () => {
       const state = createTestState();
       state.market.cards = [];
       state.decks.event = state.decks.event.filter(e => e.trigger !== 'Investment');
+      state.decks.staff = []; // No staff (CG-0MT3KZNQB0053K55)
+      state.discards.staff = [];
       // Ensure upgrade deck has cards
       expect(state.decks.upgrade.length).toBeGreaterThanOrEqual(MARKET_UPGRADE_MAX);
 
@@ -748,8 +752,10 @@ describe('MarketOfferEngine — refill policy: exhaustion edge cases', () => {
 
       const upgrades = state.market.cards.filter(c => c.family === 'upgrade');
       const events = state.market.cards.filter(c => c.family === 'event');
+      const staff = state.market.cards.filter(c => c.family === 'staff');
       expect(upgrades.length).toBe(MARKET_UPGRADE_MAX);
       expect(events.length).toBe(0);
+      expect(staff.length).toBe(0);
     });
   });
 
@@ -854,10 +860,12 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
       const investInDiscard = state.discards.event.filter(e => e.trigger === 'Investment').length;
       if (investInDiscard === 0) return; // Skip if no Investment events available
       state.market.cards = [];
-      // Empty the upgrade deck so the non-business slot must come from the
-      // reshuffled Investment-event discards.
+      // Empty the upgrade deck AND staff deck so the non-business slot must
+      // come from the reshuffled Investment-event discards (CG-0MT3KZNQB0053K55).
       state.decks.upgrade = [];
       state.discards.upgrade = [];
+      state.decks.staff = [];
+      state.discards.staff = [];
       refillMarket(state);
       // Events should have been drawn from reshuffled discards
       const events = state.market.cards.filter(c => c.family === 'event');

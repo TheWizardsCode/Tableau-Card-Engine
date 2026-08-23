@@ -18,6 +18,7 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
+import type { CommunitySpaceCard, UpgradeCard, StaffCard } from './MainStreetCards';
 import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard, type BusinessCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
@@ -1429,8 +1430,8 @@ export function layoffStaffCard(
     addLog(state, `Laid off ${card.name}: no hand cards to remove`, 'neutral');
   }
 
-  // Return the staff card to the market
-  state.staffCardMarket.push({ ...card });
+  // Return the staff card to discards.staff for the general market pipeline (CG-0MT3KZNQB0053K55).
+  state.discards.staff.push({ ...card });
 }
 
 // ── Action Economy (CG-0MSTOF1N5005PK2R) ────────────────────
@@ -1498,10 +1499,18 @@ export function buyAndPlaceBusiness(
  * @throws Error if the card is not found or player cannot afford it.
  */
 export function hireStaffCard(state: MainStreetState, cardId: string): PurchaseResult {
-  const marketIndex = state.staffCardMarket.findIndex(c => c.id === cardId);
-  const card = state.staffCardMarket[marketIndex];
+  // Staff cards are now part of the general market row (CG-0MT3KZNQB0053K55);
+  // look for the card in the market row first, then in the staff deck as a fallback.
+  const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
+  const deckIndex = marketIndex === -1 ? state.decks.staff.findIndex(c => c.id === cardId) : -1;
+  let card: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard | StaffCard) | undefined;
+  if (marketIndex !== -1) {
+    card = state.market.cards[marketIndex];
+  } else if (deckIndex !== -1) {
+    card = state.decks.staff[deckIndex];
+  }
   if (!card) {
-    throw new Error(`Staff card ${cardId} not found in the market.`);
+    throw new Error(`Staff card ${cardId} not found in the market or deck.`);
   }
   purchaseStaffCard(state, cardId);
   return { card, cost: card.cost, refilled: false };

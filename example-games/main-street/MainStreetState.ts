@@ -30,6 +30,7 @@ import {
   MARKET_BUSINESS_MAX,
   MARKET_UPGRADE_MAX,
   MARKET_EVENT_MAX,
+  MARKET_STAFF_MAX,
   loadTemplatesFromCsv,
   resetTemplatesToDefault,
   type IncidentBalanceState,
@@ -133,10 +134,10 @@ export interface MarketState {
   /**
    * Single-row marketplace: exactly `MARKET_TOTAL_SLOTS` (3) cards,
    * always at least `MARKET_BUSINESS_MIN` business card, drawn within
-   * "1–2 business, 0–1 upgrade, 0–1 event" bounds (CG-0MSTOATDT009BRX2).
+   * "1–2 business, 0–1 upgrade, 0–1 event, 0–1 staff" bounds (CG-0MT3KZNQB0053K55).
    * Community-space cards count as business for the composition.
    */
-  cards: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard)[];
+  cards: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard | StaffCard)[];
 }
 
 // ── Resource Bank ───────────────────────────────────────────
@@ -195,6 +196,8 @@ export interface MainStreetState {
     communitySpace: CommunitySpaceCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
+    /** Staff cards pool, drawn into the market row like other families (CG-0MT3KZNQB0053K55). */
+    staff: StaffCard[];
   };
   /** Discard piles for each deck (cards removed from markets are placed here). */
   discards: {
@@ -202,6 +205,8 @@ export interface MainStreetState {
     communitySpace: CommunitySpaceCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
+    /** Laid-off/cycled staff cards, available again on next refill (CG-0MT3KZNQB0053K55). */
+    staff: StaffCard[];
   };
   /** IDs of completed challenges. */
   challengesCompleted: string[];
@@ -242,8 +247,6 @@ export interface MainStreetState {
   discardPile: BusinessCard[];
   /** Active staff cards providing hand capacity bonuses. */
   staffCards: StaffCard[];
-  /** Staff cards available for purchase in the market. */
-  staffCardMarket: StaffCard[];
   /**
    * If true, `processEndOfTurn()` will skip `cycleMarketCards()`.
    * Used during the tutorial to preserve scenario-placed market cards
@@ -301,6 +304,7 @@ export interface MainStreetSerializedState {
     communitySpace: CommunitySpaceCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
+    staff: StaffCard[];
   };
   /** Discard piles snapshot (for save/restore) */
   discards: {
@@ -308,6 +312,7 @@ export interface MainStreetSerializedState {
     communitySpace: CommunitySpaceCard[];
     event: EventCard[];
     upgrade: UpgradeCard[];
+    staff: StaffCard[];
   };
   challengesCompleted: string[];
   activeChallenges: {
@@ -334,8 +339,6 @@ export interface MainStreetSerializedState {
   discardPile: BusinessCard[];
   /** Serialized active staff cards. */
   staffCards: StaffCard[];
-  /** Serialized staff card market. */
-  staffCardMarket: StaffCard[];
   /** Whether market cycling should be skipped on next end-of-turn. */
   skipMarketCycleOnEndTurn: boolean;
   /**
@@ -498,10 +501,11 @@ function forceReshuffleFromDiscards<T>(state: MainStreetState, deck: T[], discar
  *   - always ≥ `MARKET_BUSINESS_MIN` (1) business card (community-space
  *     counts as business) while any business remains drawable;
  *   - each missing slot is drawn randomly within the bounds
- *     "1–2 business, 0–1 upgrade, 0–1 event" — i.e. a full row is one of
- *     2B+1U, 2B+1E, 1B+1U+1E;
+ *     "1–2 business, 0–1 upgrade, 0–1 event, 0–1 staff" (CG-0MT3KZNQB0053K55)
+ *     — i.e. a full row is one of 2B+1U, 2B+1E, 1B+1U+1E, or a row with one
+ *     staff card replacing the non-business slot;
  *   - subject to deck availability and existing reshuffle conventions
- *     (empty decks reshuffle matching discards; Investment-trigger events
+ *     (empty decks reshuffle matching discards — staff included; Investment-trigger events
  *     are sought in the event deck like the legacy investments row).
  *
  * Visible cards are PRESERVED (top-up semantics), which mirrors the legacy
@@ -526,6 +530,7 @@ export function refillSingleRowMarket(state: MainStreetState): void {
   // Replenish decks for the non-business families, as needed by the draws below.
   reshuffleIfNeeded(state, decks.upgrade, state.discards.upgrade, 'upgrade');
   reshuffleIfNeeded(state, decks.event, state.discards.event, 'event');
+  reshuffleIfNeeded(state, decks.staff, state.discards.staff, 'staff');
 
   const drawBusiness = (): boolean => {
     const card = businessPool.pop();
@@ -550,12 +555,22 @@ export function refillSingleRowMarket(state: MainStreetState): void {
     return true;
   };
 
+  // Staff cards are drawn from the staff deck into the market row (CG-0MT3KZNQB0053K55),
+  // exactly like the other non-business families.
+  const drawStaff = (): boolean => {
+    const card = decks.staff.pop();
+    if (!card) return false;
+    market.cards.push(card);
+    return true;
+  };
+
   while (market.cards.length < MARKET_TOTAL_SLOTS) {
     const businessCount = market.cards.filter(
       c => c.family === 'business' || c.family === 'community-space',
     ).length;
     const upgradeCount = market.cards.filter(c => c.family === 'upgrade').length;
     const eventCount = market.cards.filter(c => c.family === 'event').length;
+    const staffCount = market.cards.filter(c => c.family === 'staff').length;
 
     // The ≥1-business rule is absolute: with no business visible, only a
     // business may be drawn next.
@@ -572,6 +587,7 @@ export function refillSingleRowMarket(state: MainStreetState): void {
     if (businessCount < MARKET_BUSINESS_MAX) legal.push(drawBusiness);
     if (upgradeCount < MARKET_UPGRADE_MAX && decks.upgrade.length > 0) legal.push(drawUpgrade);
     if (eventCount < MARKET_EVENT_MAX) legal.push(drawEvent);
+    if (staffCount < MARKET_STAFF_MAX && decks.staff.length > 0) legal.push(drawStaff);
     while (legal.length > 0) {
       const idx = Math.floor(state.rng() * legal.length);
       const fn = legal.splice(idx, 1)[0];
@@ -715,6 +731,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
       communitySpace: communitySpaceDeck,
       event: eventDeck,
       upgrade: upgradeDeck,
+      staff: staffDeck,
     },
     // Discard piles for removed market cards
     discards: {
@@ -722,6 +739,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
       communitySpace: [],
       event: [],
       upgrade: [],
+      staff: [],
     },
     challengesCompleted: [],
     activeChallenges: [],
@@ -740,7 +758,6 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     maxHandSize: 3,
     discardPile: [],
     staffCards: [],
-    staffCardMarket: staffDeck,
     skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
@@ -830,7 +847,6 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     maxHandSize: state.maxHandSize,
     discardPile: structuredClone(state.discardPile),
     staffCards: structuredClone(state.staffCards),
-    staffCardMarket: structuredClone(state.staffCardMarket),
     skipMarketCycleOnEndTurn: state.skipMarketCycleOnEndTurn,
     soldSlots: [...state.soldSlots],
     csvChecksum: CSV_CHECKSUM,
@@ -966,8 +982,32 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   if (!('staffCards' in saved)) {
     (saved as Record<string, unknown>).staffCards = [];
   }
-  if (!('staffCardMarket' in saved)) {
-    (saved as Record<string, unknown>).staffCardMarket = [];
+
+  // ── Legacy staffCardMarket → decks.staff migration (CG-0MT3KZNQB0053K55) ──
+  // Old saves carry `staffCardMarket` (dedicated staff-market deck). Fold those
+  // cards into the new `decks.staff` pool so they remain available for future
+  // market refills. Remove the legacy field.
+  const legacyStaffMarket = saved.staffCardMarket as unknown[] | undefined;
+  if (Array.isArray(legacyStaffMarket)) {
+    const decks = saved.decks as Record<string, unknown> | undefined;
+    if (decks) {
+      const staffDeck = (decks.staff as unknown[] | undefined) ?? [];
+      for (const card of legacyStaffMarket) {
+        if (card && typeof card === 'object') {
+          staffDeck.push(card);
+        }
+      }
+      decks.staff = staffDeck;
+    }
+  }
+  delete (saved as Record<string, unknown>).staffCardMarket;
+
+  // ── Add decks.staff / discards.staff for old saves ─────────
+  if (decks && !('staff' in decks)) {
+    (decks as Record<string, unknown>).staff = [];
+  }
+  if (discards && !('staff' in discards)) {
+    (discards as Record<string, unknown>).staff = [];
   }
 
   // ── skipMarketCycleOnEndTurn: add missing flag (defaults to false) ─
@@ -1175,7 +1215,6 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     maxHandSize: saved.maxHandSize,
     discardPile: structuredClone(saved.discardPile),
     staffCards: structuredClone(saved.staffCards),
-    staffCardMarket: structuredClone(saved.staffCardMarket),
     skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: saved.actionsRemaining ?? 1,

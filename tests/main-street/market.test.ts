@@ -413,11 +413,14 @@ describe('MainStreetMarket', () => {
       state.decks.business = state.decks.business.slice(0, 2); // Only 2 left
       state.decks.communitySpace.length = 0; // No community space cards either
       state.discards.communitySpace.length = 0;
-      state.decks.upgrade.length = 0; // No upgrades to fill the 3rd slot
+      state.decks.upgrade.length = 0; // No upgrades to fill remaining slots
       state.discards.upgrade.length = 0;
       state.decks.event = state.decks.event.filter(e => e.trigger !== 'Investment');
       state.discards.event.length = 0;
+      state.decks.staff.length = 0; // No staff either (CG-0MT3KZNQB0053K55)
+      state.discards.staff.length = 0;
       refillMarket(state);
+      // With business=2, staff=0, upgrade=0, event=0: only 2 business can be drawn
       expect(state.market.cards).toHaveLength(2);
     });
 

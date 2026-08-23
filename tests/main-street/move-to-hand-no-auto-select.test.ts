@@ -16,7 +16,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
-import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
+import { setupMainStreetGame, refillSingleRowMarket } from '../../example-games/main-street/MainStreetState';
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -181,6 +181,14 @@ describe('Move-to-hand does NOT auto-select (CG-0MSXIQIPJ000NDTL)', () => {
   it('clicking a different hand card switches selection after market-to-hand', () => {
     const scene = createMockScene();
     scene.state.hand = [];
+    // Ensure a business-rich row (staff take a market slot, CG-0MT3KZNQB0053K55)
+    scene.state.market.cards = [];
+    scene.state.decks.staff = [];
+    scene.state.discards.staff = [];
+    scene.state.decks.upgrade = [];
+    scene.state.decks.event = [];
+    scene.state.decks.communitySpace = [];
+    refillSingleRowMarket(scene.state);
     const bizCards = scene.state.market.cards.filter(
       (c: any) => c.family === 'business' || c.family === 'community-space',
     );
@@ -231,6 +239,14 @@ describe('Move-to-hand does NOT auto-select (CG-0MSXIQIPJ000NDTL)', () => {
   it('selecting a held card that was NOT just moved costs an action', () => {
     const scene = createMockScene();
     scene.state.hand = [];
+    // Ensure a business-rich row (staff take a market slot, CG-0MT3KZNQB0053K55)
+    scene.state.market.cards = [];
+    scene.state.decks.staff = [];
+    scene.state.discards.staff = [];
+    scene.state.decks.upgrade = [];
+    scene.state.decks.event = [];
+    scene.state.decks.communitySpace = [];
+    refillSingleRowMarket(scene.state);
     const bizCards = scene.state.market.cards.filter(
       (c: any) => c.family === 'business' || c.family === 'community-space',
     );

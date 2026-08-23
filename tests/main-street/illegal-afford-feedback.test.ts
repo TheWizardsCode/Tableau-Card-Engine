@@ -311,8 +311,26 @@ describe('Main Street click-path illegal-afford feedback', () => {
   });
 
   describe('onUpgradeCardClick (insufficient coins to buy upgrade)', () => {
+    // A market row may not contain an upgrade (staff takes a slot, CG-0MT3KZNQB0053K55),
+    // so push one in from the deck when needed. Rebuild the market card
+    // container mocks so the shake targets the pushed card's row index.
+    function ensureUpgradeInMarket(scene: any): any {
+      let card = scene.state.market.cards.find((c: any) => c.family === 'upgrade');
+      if (!card && scene.state.decks.upgrade.length > 0) {
+        card = scene.state.decks.upgrade.pop();
+        scene.state.market.cards.push(card);
+        (scene.msRenderer.getMarketRowCards as any).mockReturnValue(
+          scene.state.market.cards.map(
+            (_c: any, i: number) => createMockContainer(300 + i * 110, 150, 10 + i),
+          ),
+        );
+      }
+      return card;
+    }
+
     it('plays sfx-illegal-move and shakes the market card container', () => {
-      const upgrade = scene.state.market.cards.find((c: any) => c.family === 'upgrade');
+      const upgrade = ensureUpgradeInMarket(scene);
+      expect(upgrade).toBeTruthy();
       upgrade.cost = 5;
       // No eligible target business on the street for the upgrade.
       scene.state.streetGrid = scene.state.streetGrid.map(() => null);
@@ -329,7 +347,8 @@ describe('Main Street click-path illegal-afford feedback', () => {
     });
 
     it('does NOT play feedback when the upgrade has no eligible target (non-affordability)', () => {
-      const upgrade = scene.state.market.cards.find((c: any) => c.family === 'upgrade');
+      const upgrade = ensureUpgradeInMarket(scene);
+      expect(upgrade).toBeTruthy();
       upgrade.cost = 1;
       scene.state.streetGrid = scene.state.streetGrid.map(() => null);
       scene.state.resourceBank.coins = 100;

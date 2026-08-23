@@ -217,8 +217,11 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   }
 
   // ── move-to-hand (free; bounded only by hand capacity) ────
+  // Staff cards are hired directly from the market row, never moved to the
+  // hand (CG-0MT3KZNQB0053K55); skip them here.
   if (canAddToHand(state).legal) {
     for (const card of state.market.cards) {
+      if (card.family === 'staff') continue;
       actions.push({ type: 'move-to-hand', cardId: card.id });
     }
   }
@@ -277,13 +280,13 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
 
 /**
  * Returns the cheapest purchasable MARKET card cost (business/community-
- * space/upgrade/event), or Infinity when the market is empty.
+ * space/upgrade/event/staff), or Infinity when the market is empty.
  *
  * Used by the Community Favour heuristic to detect a STALLED turn — a
  * player who cannot afford the cheapest market card cannot advance the
  * economy with normal purchases, so the free rep→coins exchange is the
- * right fallback. Staff cards are excluded: they are a late-game luxury
- * purchase in a separate market and are rarely the gatekeeper card.
+ * right fallback. Staff cards are part of the general market row
+ * (CG-0MT3KZNQB0053K55), so they are included like any other family.
  */
 function getCheapestMarketCost(state: MainStreetState): number {
   const marketCards = state.market?.cards ?? [];

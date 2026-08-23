@@ -160,9 +160,11 @@ describe('Multi-Use Card Economy Integration', () => {
       const state = createTestState();
       setUpTableauAndHand(state);
 
-      // Hire a staff card
-      if (state.staffCardMarket.length > 0) {
-        const staffCard = state.staffCardMarket[0];
+      // Hire a staff card (staff are in the market row or deck, CG-0MT3KZNQB0053K55)
+      const staffInMarket = state.market.cards.find(c => c.family === 'staff');
+      const staffInDeck = state.decks.staff.find(c => c.family === 'staff');
+      const staffCard = staffInMarket ?? staffInDeck ?? null;
+      if (staffCard) {
         state.resourceBank.coins = staffCard.cost + 10;
 
         purchaseStaffCard(state, staffCard.id);
@@ -246,10 +248,13 @@ describe('Multi-Use Card Economy Integration', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Purchase a staff card
-      if (state.staffCardMarket.length === 0) return;
+      // Purchase a staff card (staff are in the market row or deck, CG-0MT3KZNQB0053K55)
+      const staffInMarket2 = state.market.cards.find(c => c.family === 'staff');
+      const staffInDeck2 = state.decks.staff.find(c => c.family === 'staff');
+      const staffCard2 = staffInMarket2 ?? staffInDeck2;
+      if (!staffCard2) return;
 
-      const staffCard = state.staffCardMarket[0];
+      const staffCard = staffCard2;
       state.resourceBank.coins = staffCard.cost + 20;
       const maxBefore = state.maxHandSize;
 
@@ -341,7 +346,7 @@ describe('Multi-Use Card Economy Integration', () => {
       delete serialized.maxHandSize;
       delete serialized.discardPile;
       delete serialized.staffCards;
-      delete serialized.staffCardMarket;
+      // staffCardMarket removed by CG-0MT3KZNQB0053K55 — staff live in decks.staff
 
       // Should not throw
       const restored = deserializeMainStreetState(serialized as MainStreetSerializedState);
@@ -351,7 +356,8 @@ describe('Multi-Use Card Economy Integration', () => {
       expect(restored.maxHandSize).toBe(3);
       expect(restored.discardPile).toEqual([]);
       expect(restored.staffCards).toEqual([]);
-      expect(restored.staffCardMarket).toEqual([]);
+      // decks.staff is a required field in the new model (CG-0MT3KZNQB0053K55)
+      expect(restored.decks.staff).toEqual(state.decks.staff);
     });
 
     it('should preserve deterministic RNG after migration round-trip', () => {
@@ -399,8 +405,12 @@ describe('Multi-Use Card Economy Integration', () => {
       // Turn 3: staff purchase
       if (state.gameResult === 'playing') {
         executeDayStart(state);
-        if (state.staffCardMarket.length > 0) {
-          const staffCard = state.staffCardMarket[0];
+        // Staff cards are in the market row or deck (CG-0MT3KZNQB0053K55)
+        const staffInMarket3 = state.market.cards.find(c => c.family === 'staff');
+        const staffInDeck3 = state.decks.staff.find(c => c.family === 'staff');
+        const staffCard3 = staffInMarket3 ?? staffInDeck3;
+        if (staffCard3) {
+          const staffCard = staffCard3;
           if (state.resourceBank.coins >= staffCard.cost) {
             purchaseStaffCard(state, staffCard.id);
           }

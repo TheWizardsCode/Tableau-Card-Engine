@@ -15,7 +15,7 @@
 import type { LegalityResult } from '../../src/rule-engine';
 import type { MainStreetState } from './MainStreetState';
 import { addLog } from './MainStreetState';
-import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard, StaffCard } from './MainStreetCards';
 import {
   GRID_SIZE,
   REFRESH_MARKET_COST,
@@ -250,6 +250,9 @@ export function refreshMarket(state: MainStreetState): RefreshResult {
       state.discards.upgrade.push(c as any);
     } else if (c.family === 'event') {
       state.discards.event.push(c as any);
+    } else if (c.family === 'staff') {
+      // Staff are a first-class market family (CG-0MT3KZNQB0053K55).
+      state.discards.staff.push(c as StaffCard);
     }
   }
 
@@ -293,6 +296,9 @@ export function cycleMarketCards(state: MainStreetState): void {
       state.discards.upgrade.push(card as UpgradeCard);
     } else if (card.family === 'event') {
       state.discards.event.push(card as EventCard);
+    } else if (card.family === 'staff') {
+      // Staff are a first-class market family (CG-0MT3KZNQB0053K55).
+      state.discards.staff.push(card as StaffCard);
     }
   }
 
@@ -419,6 +425,12 @@ export function moveToHand(state: MainStreetState, cardId: string): PurchaseResu
   const card = state.market.cards[marketIndex];
   if (!card) {
     throw new Error(`Card ${cardId} not found in the market.`);
+  }
+  // Staff cards cannot be held in hand — they are hired directly from the
+  // market row (CG-0MT3KZNQB0053K55). Guard so a staff card in the row is
+  // never moved into the hand (the hand type excludes the staff family).
+  if (card.family === 'staff') {
+    throw new Error(`Staff card ${card.name} cannot be moved to hand — hire it directly.`);
   }
 
   // Hand capacity is the only constraint; the move itself is free of coins.
@@ -817,12 +829,19 @@ export function purchaseStaffCard(
   state: MainStreetState,
   cardId: string,
 ): void {
-  const marketIndex = state.staffCardMarket.findIndex(c => c.id === cardId);
-  if (marketIndex === -1) {
-    throw new Error(`Staff card ${cardId} not found in the market.`);
+  // Staff cards are now part of the general market row (CG-0MT3KZNQB0053K55);
+  // look for the card in the market row first, then in the staff deck as a fallback.
+  const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
+  const deckIndex = marketIndex === -1 ? state.decks.staff.findIndex(c => c.id === cardId) : -1;
+  let card: StaffCard | undefined;
+  if (marketIndex !== -1) {
+    card = state.market.cards[marketIndex] as StaffCard | undefined;
+  } else if (deckIndex !== -1) {
+    card = state.decks.staff[deckIndex];
   }
-
-  const card = state.staffCardMarket[marketIndex];
+  if (!card || card.family !== 'staff') {
+    throw new Error(`Staff card ${cardId} not found in the market or deck.`);
+  }
 
   if (state.resourceBank.coins < card.cost) {
     throw new Error(`Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.`);
@@ -831,8 +850,12 @@ export function purchaseStaffCard(
   // Deduct cost
   state.resourceBank.coins -= card.cost;
 
-  // Remove from market
-  state.staffCardMarket.splice(marketIndex, 1);
+  // Remove from market (or deck as fallback)
+  if (marketIndex !== -1) {
+    state.market.cards.splice(marketIndex, 1);
+  } else if (deckIndex !== -1) {
+    state.decks.staff.splice(deckIndex, 1);
+  }
 
   // Add to active staff cards
   state.staffCards.push({ ...card });
