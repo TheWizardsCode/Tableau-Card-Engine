@@ -1,17 +1,20 @@
 /**
  * Main Street: Graffiti Art good-incident card (CG-0MSRC9UR9006FBXC)
  *
- * Validates the new good-polarity incident card — a positive counterpart to
- * the existing Graffiti incident, with its bad effects reversed to good:
+ * Validates the good-polarity incident card — a reputation-focused positive
+ * counterpart to the existing Graffiti incident. Graffiti Art is a *loose*
+ * mirror of Graffiti: reputation is reversed (+1 vs -1) but coins are not
+ * mirrored (0 vs -1), per the design decision to make Graffiti Art
+ * reputation-only.
  *
  * - Template contract in card-data.csv (AC1): family `event`, trigger
- *   `Incident`, cost 0, tier 1, `coinDelta +1`, `reputationDelta +1`,
- *   target `All` (exact mirror of Graffiti's -1/-1).
+ *   `Incident`, cost 0, tier 3, `coinDelta 0`, `reputationDelta +1`,
+ *   target `All` (partial mirror of Graffiti's -1/-1).
  * - Deck integration (AC2): event templates grow 55 -> 56, incidents
  *   34 -> 35; the card is drawn with `target: 'All'` and no duration.
  * - System polarity (AC1): the net-delta formula classifies Graffiti Art as
- *   `good` (reverse of Graffiti's `bad`), and resolution grants +1 coins and
- *   +1 reputation while Graffiti costs -1/-1 (mirror relation).
+ *   `good` (reverse of Graffiti's `bad`), and resolution grants +0 coins and
+ *   +1 reputation while Graffiti costs -1/-1 (partial mirror relation).
  * - Balance guardrails (AC3): card IDs stay unique and the balance validator
  *   accepts the extended CSV.
  *
@@ -41,7 +44,7 @@ const GRAFFITI_ART_CONTRACT = {
   trigger: 'Incident',
   cost: '0',
   tier: '3',
-  coinDelta: '1',
+  coinDelta: '0',
   reputationDelta: '1',
   target: 'All',
 };
@@ -65,12 +68,13 @@ describe('Graffiti Art: CSV template contract (AC1)', () => {
     expect(row!.description.length).toBeGreaterThan(0);
   });
 
-  it('is the exact reverse of Graffiti (bad effects -> good)', () => {
+  it('is a loose mirror of Graffiti (reputation reversed, coin not mirrored)', () => {
     const graffiti = getCsvRows().find(r => r.id === GRAFFITI_ID)!;
     const art = getCsvRows().find(r => r.id === GRAFFITI_ART_CONTRACT.id)!;
     expect(graffiti.family).toBe('event');
     expect(graffiti.trigger).toBe('Incident');
-    expect(Number(art.coinDelta)).toBe(-Number(graffiti.coinDelta));
+    // Graffiti Art is reputation-only: coinDelta 0 is NOT the negation of
+    // Graffiti's -1.  Reputation is reversed as expected.
     expect(Number(art.reputationDelta)).toBe(-Number(graffiti.reputationDelta));
     expect(art.target).toBe(graffiti.target);
     // Graffiti Art unlocks at/after Graffiti (Graffiti T2, Art T3 in the
@@ -98,7 +102,7 @@ describe('Graffiti Art: deck integration (AC2)', () => {
     expect(card!.name).toBe(GRAFFITI_ART_CONTRACT.name);
     expect(card!.trigger).toBe('Incident');
     expect(card!.target).toBe('All');
-    expect(card!.coinDelta).toBe(1);
+    expect(card!.coinDelta).toBe(0);
     expect(card!.reputationDelta).toBe(1);
     expect(isDurationEventCard(card!)).toBe(false);
   });
@@ -121,7 +125,7 @@ describe('Graffiti Art: polarity & resolution (AC1)', () => {
     expect(incidentPolarity(graffiti)).toBe('bad');
   });
 
-  it('grants +1 coin and +1 reputation when resolved', () => {
+  it('grants +0 coins and +1 reputation when resolved', () => {
     const state = setupMainStreetGame({ seed: 'graffiti-art-resolve' });
     // Pin reputation to 0 so the reputation coin multiplier is exactly 1.0
     // (the seed's default preset would scale positive deltas otherwise).
@@ -131,7 +135,8 @@ describe('Graffiti Art: polarity & resolution (AC1)', () => {
 
     resolveEvent(state, art);
 
-    expect(state.resourceBank.coins).toBe(coinsBefore + 1);
+    // Graffiti Art grants reputation only: no coin change, +1 reputation
+    expect(state.resourceBank.coins).toBe(coinsBefore);
     expect(state.resourceBank.reputation).toBe(repBefore + 1);
   });
 

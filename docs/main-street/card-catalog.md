@@ -45,8 +45,8 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
   formula) covering under-served synergies, including the duration incident
   Labor Shortage (income-multiplier 0.9×/3 turns).
 - Graffiti Art (evt-graffiti-art, CG-0MSRC9UR9006FBXC) adds a good incident —
-  the exact reverse of Graffiti (+1 coin to all businesses and
-  +1 reputation), raising incidents to 35 and event templates to 56.
+  a reputation-only positive counterpart to Graffiti (+1 reputation to all
+  businesses, no coins), raising incidents to 35 and event templates to 56.
 - Upgrades grew from 27 to 39 with the Group E expansion (CG-0MSQJ7SYD008U3EE):
   12 new upgrades covering every Group A business and Group B community space
   (targets raised to maxLevel 1 so the upgrades are applicable), including
