@@ -15,7 +15,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Event         | 56        | 3           | 168         |
 | Upgrade       | 39        | 2           | 78          |
 | Community Space | 8       | 3           | 24          |
-| Staff         | 7         | 3           | 21          |
+| Staff         | 9         | 3           | 27          |
 
 **Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
 
