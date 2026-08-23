@@ -623,6 +623,189 @@ describe('MainStreetScene browser tests', () => {
     game = null;
   });
 
+  it('shows the full tooltip for a dimmed market business card when no actions remain (AC1)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+    const state = scene.state;
+
+    // The market populates asynchronously during boot. Wait deterministically.
+    await waitForCondition(
+      () => (state.market.cards ?? []).length > 0,
+      { timeoutMs: 15_000, intervalMs: 50, label: 'market populated at boot' },
+    );
+
+    // The ≥1-business refill rule counts community-space cards as business
+    // (CG-0MSTOATDT009BRX2), so the row may contain only community-space +
+    // upgrade/event. Both business and community-space cards share the
+    // isBusinessLike dimmed+tooltip path under test here.
+    const businessIdx = state.market.cards.findIndex(
+      (card: any) => card && (card.family === 'business' || card.family === 'community-space'),
+    );
+    expect(businessIdx).toBeGreaterThanOrEqual(0);
+    const business = state.market.cards[businessIdx];
+    const familyLabel = business.family === 'community-space' ? 'Community Space' : 'Business';
+
+    // The boot deal-in animation (deferred via cardSvgLoadPromise) tweens
+    // market card alpha to 1 and can land after our first refreshAll. Wait
+    // for it to settle (containers exist, alpha === 1) so the dim below is
+    // not clobbered by a late deal-in tween.
+    await waitForCondition(
+      () => {
+        const row = scene.msRenderer.getMarketRowCards('market');
+        const c = row[businessIdx] as Phaser.GameObjects.Container | undefined;
+        return !!c && c.alpha === 1;
+      },
+      { timeoutMs: 8000, intervalMs: 50, label: 'boot market deal-in settled' },
+    );
+
+    // Exhaust the action budget then re-render the market: business cards
+    // become dimmed (alpha 0.45) but must remain hoverable with the FULL
+    // card tooltip (CG-0MT24RFIV007NQMP).
+    state.actionsRemaining = 0;
+    scene.refreshAll();
+
+    const rowCards = scene.msRenderer.getMarketRowCards('market');
+    const container = rowCards[businessIdx] as Phaser.GameObjects.Container;
+    expect(container).toBeTruthy();
+
+    // Dimmed visual.
+    expect(container.alpha).toBeCloseTo(0.45, 2);
+
+    // The tooltip-only hover rectangle (interactive child of the card) was
+    // wired in the noActions branch.
+    const hoverRect = (container.list ?? []).find(
+      (obj: any) =>
+        obj instanceof Phaser.GameObjects.Rectangle &&
+        obj.input &&
+        obj.input.enabled,
+    ) as Phaser.GameObjects.Rectangle | undefined;
+    expect(hoverRect).toBeTruthy();
+
+    const tooltipShowSpy = vi.spyOn(scene.tooltipManager, 'show');
+    const tooltipHideSpy = vi.spyOn(scene.tooltipManager, 'hide');
+
+    hoverRect!.emit('pointerover');
+    expect(tooltipShowSpy).toHaveBeenCalled();
+    const content = tooltipShowSpy.mock.calls[0][0] as string;
+    // Full card details — NOT a generic "no actions" message.
+    expect(content).toContain(`${familyLabel}: ${business.name}`);
+    expect(content).toContain('Cost:');
+    expect(content).toContain('Income:');
+    expect(content).toContain('Synergy:');
+    expect(content).not.toContain('No actions remaining');
+
+    hoverRect!.emit('pointerout');
+    expect(tooltipHideSpy).toHaveBeenCalled();
+
+    destroyGame(game);
+    game = null;
+  });
+
+  it('shows the full tooltip when hovering a business card in the hand (AC2)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+    const state = scene.state;
+
+    await waitForCondition(
+      () => (state.market.cards ?? []).length > 0,
+      { timeoutMs: 15_000, intervalMs: 50, label: 'market populated at boot' },
+    );
+
+    // Generous coins so an affordable market card always exists. Both
+    // business and community-space cards take the hand card path under test.
+    state.resourceBank.coins = 200;
+    const business = state.market.cards.find(
+      (card: any) => card && (card.family === 'business' || card.family === 'community-space'),
+    );
+    expect(business).toBeTruthy();
+    const familyLabel = business.family === 'community-space' ? 'Community Space' : 'Business';
+
+    // Buy the business into the hand (market → hand transfer flow).
+    scene.onBusinessCardClick(business);
+    await waitForCondition(
+      () => (state.hand ?? []).some((c: any) => c.id === business.id),
+      { timeoutMs: 6000, label: 'business bought to hand' },
+    );
+    // Force a deterministic hand re-render so the hover rectangle exists
+    // regardless of transfer-animation timing.
+    scene.refreshAll();
+
+    const handIdx = (state.hand ?? []).findIndex((c: any) => c.id === business.id);
+    const handSprite = scene.msRenderer.handView.getSpriteAt(handIdx) as Phaser.GameObjects.Container;
+    expect(handSprite).toBeTruthy();
+
+    // Business cards in the hand now get an interactive hover rectangle
+    // wired to the full card tooltip (CG-0MT24RFIV007NQMP).
+    const hoverRect = (handSprite.list ?? []).find(
+      (obj: any) =>
+        obj instanceof Phaser.GameObjects.Rectangle &&
+        obj.input &&
+        obj.input.enabled,
+    ) as Phaser.GameObjects.Rectangle | undefined;
+    expect(hoverRect).toBeTruthy();
+
+    const tooltipShowSpy = vi.spyOn(scene.tooltipManager, 'show');
+    const tooltipHideSpy = vi.spyOn(scene.tooltipManager, 'hide');
+
+    hoverRect!.emit('pointerover');
+    expect(tooltipShowSpy).toHaveBeenCalled();
+    const content = tooltipShowSpy.mock.calls[0][0] as string;
+    expect(content).toContain(`${familyLabel}: ${business.name}`);
+    expect(content).toContain('Cost:');
+    expect(content).toContain('Income:');
+    expect(content).toContain('Synergy:');
+
+    hoverRect!.emit('pointerout');
+    expect(tooltipHideSpy).toHaveBeenCalled();
+
+    destroyGame(game);
+    game = null;
+  });
+
+  it('suppresses card tooltips in replay mode (AC4)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+    const state = scene.state;
+
+    await waitForCondition(
+      () => (state.market.cards ?? []).length > 0,
+      { timeoutMs: 15_000, intervalMs: 50, label: 'market populated at boot' },
+    );
+
+    const businessIdx = state.market.cards.findIndex(
+      (card: any) => card && (card.family === 'business' || card.family === 'community-space'),
+    );
+    expect(businessIdx).toBeGreaterThanOrEqual(0);
+
+    // Enter replay mode and re-render the market. Keep a positive action
+    // budget so the market business card takes the click-only path (its
+    // pointerover handler is guarded by !s.replayMode).
+    state.actionsRemaining = 3;
+    scene.replayMode = true;
+    scene.refreshAll();
+
+    const rowCards = scene.msRenderer.getMarketRowCards('market');
+    const container = rowCards[businessIdx] as Phaser.GameObjects.Container;
+    expect(container).toBeTruthy();
+
+    const tooltipShowSpy = vi.spyOn(scene.tooltipManager, 'show');
+
+    // Emit pointerover on every interactive child of the card container and
+    // on the container itself — in replay mode no tooltip may appear.
+    const interactiveObjects = [
+      ...(container.list ?? []).filter((obj: any) => obj.input && obj.input.enabled),
+      container,
+    ];
+    expect(interactiveObjects.length).toBeGreaterThan(0);
+    for (const obj of interactiveObjects) {
+      obj.emit('pointerover');
+    }
+    expect(tooltipShowSpy).not.toHaveBeenCalled();
+
+    destroyGame(game);
+    game = null;
+  });
+
   it('shows the banked action count in the HUD action counter', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;

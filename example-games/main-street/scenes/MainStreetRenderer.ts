@@ -183,18 +183,25 @@ export class MainStreetRenderer {
             container.add(hover);
           }
         } else {
-          // ── Business card path: upgrade overlays + placement click ──
+          // ── Business card path: upgrade overlays, tooltip, + placement click ──
           this.applyUpgradeOverlays(container, card, renderW, renderH);
 
-          // Add interactive hit area so cards can be clicked during market phase
-          // to start the placing-from-hand flow.
           if (!s.replayMode) {
-            const hitArea = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
-            hitArea.setInteractive({ useHandCursor: true });
-            hitArea.on('pointerdown', () => {
+            // Single interactive rectangle (mirrors the event card path):
+            // hover shows the full card tooltip, click-to-place starts the
+            // placing-from-hand flow. Hand tooltips use the default
+            // includeEventDetail: false (no coin/rep detail lines).
+            const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+            hover.setInteractive({ useHandCursor: true });
+            hover.on('pointerover', () => {
+              const info = buildCardTooltipInfo(card, s.state.config);
+              s.tooltipManager?.show(info, container.x, container.y);
+            });
+            hover.on('pointerout', () => s.tooltipManager?.hide());
+            hover.on('pointerdown', () => {
               s.onHandBusinessCardClick(cardIndex);
             });
-            container.add(hitArea);
+            container.add(hover);
           }
         }
 
@@ -1263,23 +1270,31 @@ export class MainStreetRenderer {
         s.marketSelectionManager.registerTarget(hitArea);
         container.add(hitArea);
       }
+    }
 
-      // Dim visual feedback + tooltip for business cards gated by the spent
-      // action budget (CG-0MSTOF1N5005PK2R): still hoverable so the player
-      // learns why the card is unavailable.
-      if (isBusinessLike && noActions && !isIncidentEvent) {
-        container.setAlpha(0.45);
-        container.setInteractive({ useHandCursor: false });
-        container.on('pointerover', () => {
-          if (s.replayMode) return;
-          s.tooltipManager?.show(
-            'No actions remaining today. End your turn to start a new day.',
-            container.x, container.y,
-          );
+    // Dim visual feedback + tooltip for business cards gated by the spent
+    // action budget (CG-0MSTOF1N5005PK2R). The card is dimmed so the
+    // player understands it is unavailable, but hovering it still shows
+    // the FULL card tooltip (regardless of remaining actions,
+    // CG-0MT24RFIV007NQMP) instead of a generic "no actions" message.
+    // NB: this MUST live OUTSIDE the `interactiveEnabled` gate above —
+    // interactiveEnabled is false precisely when noActions is true, so an
+    // in-gate block would be dead code (the original bug: tooltips were
+    // suppressed entirely when actions were exhausted). We add a dedicated
+    // tooltip-only hover rectangle (explicit hit area, unlike the
+    // container-level setInteractive that previously suppressed pointer
+    // events).
+    if (isBusinessLike && noActions && !isIncidentEvent) {
+      container.setAlpha(0.45);
+      if (!s.replayMode) {
+        const hover = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
+        hover.setInteractive({ useHandCursor: false });
+        hover.on('pointerover', () => {
+          const info = buildCardTooltipInfo(card, s.state.config, { includeEventDetail: true });
+          s.tooltipManager?.show(info, container.x, container.y);
         });
-        container.on('pointerout', () => {
-          s.tooltipManager?.hide();
-        });
+        hover.on('pointerout', () => s.tooltipManager?.hide());
+        container.add(hover);
       }
     }
 
