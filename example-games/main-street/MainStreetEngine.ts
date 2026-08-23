@@ -846,9 +846,9 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   addLog(state, `Turn ${state.turn}`, 'turn-header');
 
   // Action economy: reset daily action budget.
-  // Base 1 action + sum of actionsPerTurn from employed staff cards.
+  // Base 1 action + sum of actionsPerTurn from employed staff + banked actions (capped at 2).
   const gmBonus = (state.staffCards ?? []).reduce((sum, card) => sum + (card.actionsPerTurn ?? 0), 0);
-  state.actionsRemaining = 1 + gmBonus;
+  state.actionsRemaining = 1 + gmBonus + (state.bankedActions ?? 0);
 
   // Staff peek gate (CG-0MSXOW6GN008ZSMN): exactly one peek per turn.
   state.peekUsedThisTurn = false;
@@ -957,6 +957,14 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // If game continues, advance to next turn
   if (state.gameResult === 'playing') {
     state.turn += 1;
+
+    // ── Action Banking (CG-0MT3IOPZB005LNAR) ─────────────
+    // Bank unused base actions (at most 1 per day) up to the cap of 2.
+    // Staff-derived actions (e.g. General Manager +1) never bank;
+    // only the base-action portion remains bankable.
+    const bankable = Math.min(state.actionsRemaining, 1);
+    state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
+
     state.phase = 'DayStart';
   }
 

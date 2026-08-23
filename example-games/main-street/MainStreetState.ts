@@ -258,9 +258,16 @@ export interface MainStreetState {
   soldSlots: boolean[];
   /**
    * Remaining actions the player can take this turn.
-   * Resets at DayStart to 1 + sum(actionsPerTurn for employed staff).
+   * Resets at DayStart to 1 + sum(actionsPerTurn for employed staff) + bankedActions.
    */
   actionsRemaining: number;
+  /**
+   * Unused base actions banked from previous days (capped at 2).
+   * Composed into the daily budget at DayStart. Staff-derived actions
+   * (e.g. General Manager +1) are never banked — only the base action
+   * banks each day. (CG-0MT3IOPZB005LNAR)
+   */
+  bankedActions: number;
   /**
    * Staff peek gate (CG-0MSXOW6GN008ZSMN): whether the once-per-turn peek
    * at the top of the incident deck has already been used this turn.
@@ -352,6 +359,8 @@ export interface MainStreetSerializedState {
   soldSlots: boolean[];
   /** Remaining actions the player can take this turn. */
   actionsRemaining: number;
+  /** Unused base actions banked from previous days (capped at 2). */
+  bankedActions: number;
   /** Whether the once-per-turn staff peek has been used this turn. */
   peekUsedThisTurn: boolean;
   /** Top incident-deck card revealed by the most recent peek (null = none). */
@@ -735,6 +744,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
+    bankedActions: 0,
     peekUsedThisTurn: false,
     revealedPeekedCard: null,
     favourUsedThisTurn: false,
@@ -826,6 +836,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     csvChecksum: CSV_CHECKSUM,
     csvData: CARD_DATA_RAW,
     actionsRemaining: state.actionsRemaining,
+    bankedActions: state.bankedActions,
     peekUsedThisTurn: state.peekUsedThisTurn,
     revealedPeekedCard: state.revealedPeekedCard ?? null,
     favourUsedThisTurn: state.favourUsedThisTurn,
@@ -982,6 +993,12 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   // ── actionsRemaining: backfill default for legacy saves ──
   if (!('actionsRemaining' in saved)) {
     (saved as Record<string, unknown>).actionsRemaining = 1;
+  }
+
+  // ── bankedActions (CG-0MT3IOPZB005LNAR): backfill default for legacy saves ──
+  // Legacy saves predate the action-banking mechanic; default to 0.
+  if (!('bankedActions' in saved)) {
+    (saved as Record<string, unknown>).bankedActions = 0;
   }
 
   // ── peekUsedThisTurn (CG-0MSXOW6GN008ZSMN): backfill default ──
@@ -1162,6 +1179,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: saved.actionsRemaining ?? 1,
+    bankedActions: saved.bankedActions ?? 0,
     peekUsedThisTurn: saved.peekUsedThisTurn ?? false,
     favourUsedThisTurn: saved.favourUsedThisTurn ?? false,
     revealedPeekedCard: (saved.revealedPeekedCard as EventCard | null) ?? null,

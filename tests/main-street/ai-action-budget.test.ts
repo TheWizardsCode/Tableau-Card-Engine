@@ -163,12 +163,13 @@ describe('Monte Carlo-style loop respects the action cap', () => {
     processEndOfTurn(state); // Day 1 ends
     expect(state.phase).toBe('DayStart'); // game not ended by the hire
 
-    // Day 2 → GM bonus applies: 1 base + 1 GM = 2 actions.
+    // Day 2 → GM bonus applies: 1 base + 1 GM + 1 banked (from Day 1 idle remainder)
+    // Day 1: 2 actions total, 1 spent hiring GM → 1 banks → Day 2 budget = 3.
     executeDayStart(state);
-    expect(state.actionsRemaining).toBe(2);
+    expect(state.actionsRemaining).toBe(3); // 1 base + 1 GM + 1 banked (CG-0MT3IOPZB005LNAR)
 
-    // With the 2-action budget the AI can execute up to 2 action-type
-    // actions before end-turn is forced.
+    // With the 3-action budget the AI can execute up to 3 action-type
+    // actions before end-turn is forced (banking-aware: CG-0MT3IOPZB005LNAR).
     let count = 0;
     let guard = 0;
     let action = enumerateLegalActions(state)[0];
@@ -178,7 +179,7 @@ describe('Monte Carlo-style loop respects the action cap', () => {
       executeAction(state, action);
       action = enumerateLegalActions(state)[0];
     }
-    expect(count).toBeLessThanOrEqual(2);
+    expect(count).toBeLessThanOrEqual(3); // banking-aware upper bound (was 2 pre-banking)
     expect(count).toBeGreaterThan(0);
     processEndOfTurn(state);
   });

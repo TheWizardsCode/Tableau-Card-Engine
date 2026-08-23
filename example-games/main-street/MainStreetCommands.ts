@@ -50,6 +50,8 @@ interface MarketActionSnapshot {
   soldSlots: boolean[] | null;
   /** Daily action budget — captured so undo restores the spent action. */
   actionsRemaining: number | null;
+  /** Banked actions — captured so undo restores the banking state. */
+  bankedActions: number | null;
   /** Staff peek gate — captured so undo restores the once-per-turn flag. */
   peekUsedThisTurn: boolean | null;
   /** Staff peek reveal — captured so undo clears a pending reveal. */
@@ -82,6 +84,7 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
     actionsRemaining: state.actionsRemaining,
+    bankedActions: state.bankedActions ?? 0,
     peekUsedThisTurn: state.peekUsedThisTurn ?? false,
     revealedPeekedCard: state.revealedPeekedCard ?? null,
   };
@@ -102,6 +105,9 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
   if (snap.actionsRemaining !== null && snap.actionsRemaining !== undefined) {
     state.actionsRemaining = snap.actionsRemaining;
+  }
+  if (snap.bankedActions !== null && snap.bankedActions !== undefined) {
+    state.bankedActions = snap.bankedActions;
   }
   if (snap.peekUsedThisTurn !== null && snap.peekUsedThisTurn !== undefined) {
     state.peekUsedThisTurn = snap.peekUsedThisTurn;

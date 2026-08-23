@@ -348,6 +348,7 @@ export function createTutorialScenario(
     skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
+    bankedActions: 0,
     peekUsedThisTurn: false,
     revealedPeekedCard: null,
     favourUsedThisTurn: false,
