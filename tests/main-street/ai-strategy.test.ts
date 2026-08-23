@@ -233,6 +233,7 @@ describe('enumerateLegalActions', () => {
       incomeBonus: 0,
       synergyRangeBonus: 0,
       reputationBonus: 0,
+      ongoingCost: 0,
     };
     for (let i = 0; i < GRID_SIZE; i++) {
       state.streetGrid[i] = { ...dummyCard, id: `dummy-${i}` };
@@ -322,6 +323,7 @@ describe('GreedyStrategy', () => {
       incomeBonus: 0,
       synergyRangeBonus: 0,
       reputationBonus: 0,
+      ongoingCost: 0,
       appliedUpgrades: [],
     };
     state.streetGrid[0] = bakery;

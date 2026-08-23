@@ -104,6 +104,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
       synergyCoinBonus: r.synergyCoinBonus !== undefined && r.synergyCoinBonus !== '' ? Number(r.synergyCoinBonus) : undefined,
       synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
+      ongoingCost: Number(r.ongoingCost) || 0,
       description: r.description,
     }));
 
@@ -310,6 +311,14 @@ export interface BusinessCard {
    * Undefined until the card is placed on the grid and recalculateCard is called.
    */
   currentReputationPerTurn?: number;
+
+  /**
+   * Ongoing per-turn cost for this business card.
+   * Deducted from coins each income phase, whether the card is placed on the
+   * street grid or held in hand. Mirrors StaffCard and CommunitySpaceCard.
+   * Defaults to 0 for legacy cards with no CSV value.
+   */
+  readonly ongoingCost: number;
 }
 
 /**
@@ -916,13 +925,14 @@ export const SELL_VALUE_RATIO = 0.75;
  * Creates a fresh copy of a BusinessCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus' | 'currentIncome' | 'currentReputationPerTurn'>): BusinessCard {
+function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus' | 'currentIncome' | 'currentReputationPerTurn' | 'ongoingCost'>): BusinessCard {
   const card: BusinessCard = {
     family: 'business',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     ...template,
   };

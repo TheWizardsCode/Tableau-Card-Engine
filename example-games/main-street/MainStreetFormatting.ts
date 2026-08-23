@@ -123,7 +123,8 @@ export function buildCardTooltipInfo(
       const b = card;
       const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
       const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
-      return `Business: ${b.name}\nCost: ${formatCurrency(b.cost)}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${resolveDescription(b.description ?? '', b, config)}`;
+      const bOngoingInfo = (b.ongoingCost ?? 0) > 0 ? `\nOngoing cost: -${b.ongoingCost}/turn` : '';
+      return `Business: ${b.name}\nCost: ${formatCurrency(b.cost)}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bOngoingInfo}${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${resolveDescription(b.description ?? '', b, config)}`;
     }
     case 'community-space': {
       const cs = card;

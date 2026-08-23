@@ -59,6 +59,7 @@ function placeCardOnGrid(state: MainStreetState, templateId: string, slotIndex: 
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
   };
   state.streetGrid[slotIndex] = card;

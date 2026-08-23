@@ -81,6 +81,7 @@ function makeProducingBiz(id: string): BusinessCard {
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     // applyIncome() reads the cached per-turn income; template cards carry
     // this field only after syncCardCurrentIncome() runs, so set it here.

@@ -80,6 +80,7 @@ function makeTestBusiness(overrides: Partial<BusinessCard> = {}): BusinessCard {
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     ...overrides,
   };
 }

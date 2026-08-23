@@ -17,8 +17,8 @@
 
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
-import type { EventCard, SynergyType } from './MainStreetCards';
-import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard, type BusinessCard } from './MainStreetCards';
+import type { BusinessCard, EventCard, SynergyType } from './MainStreetCards';
+import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
@@ -915,6 +915,9 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // Apply community space ongoing costs (reputation-asset cards, e.g. Library)
   applyCommunitySpaceOngoingCosts(state);
 
+  // Apply business card ongoing costs (held in hand or placed on grid)
+  applyBusinessOngoingCosts(state);
+
   // Phase: IncidentPhase
   state.phase = 'IncidentPhase';
   // Capture the incident's own resource deltas (negative = loss) for the
@@ -1369,6 +1372,57 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
     }
     if (actualDeduction < totalCost) {
       addLog(state, `Insufficient coins for community space costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
+    }
+  }
+}
+
+/**
+ * Applies ongoing costs for business cards each turn.
+ * Deducts each business card's `ongoingCost` (e.g. 0.5 coins/turn) from coins,
+ * for every business card held in hand OR placed on the street grid.
+ * If coins are insufficient, deducts what's available (down to 0).
+ *
+ * Mirrors {@link applyStaffOngoingCosts} and {@link applyCommunitySpaceOngoingCosts}
+ * clamping/log conventions.
+ *
+ * @param state  Current game state (mutated in-place).
+ */
+export function applyBusinessOngoingCosts(state: MainStreetState): void {
+  let totalCost = 0;
+  let bizCount = 0;
+
+  // Sum ongoing costs from business cards in hand
+  const hand = state.hand ?? [];
+  for (const card of hand) {
+    if (card.family !== 'business') continue;
+    const cost = (card as BusinessCard).ongoingCost ?? 0;
+    if (cost > 0) {
+      totalCost += cost;
+      bizCount += 1;
+    }
+  }
+
+  // Sum ongoing costs from business cards on the street grid
+  const grid = state.streetGrid;
+  for (const slot of grid) {
+    if (!slot || slot.family !== 'business') continue;
+    const cost = (slot as BusinessCard).ongoingCost ?? 0;
+    if (cost > 0) {
+      totalCost += cost;
+      bizCount += 1;
+    }
+  }
+
+  if (bizCount === 0) return;
+
+  if (totalCost > 0) {
+    const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
+    state.resourceBank.coins -= actualDeduction;
+    if (actualDeduction > 0) {
+      addLog(state, `Business costs: -${actualDeduction} coins (${bizCount} businesses)`, 'loss');
+    }
+    if (actualDeduction < totalCost) {
+      addLog(state, `Insufficient coins for business costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
     }
   }
 }

@@ -204,6 +204,7 @@ describe('Reputation multiplier: income integration', () => {
       incomeBonus: overrides.incomeBonus ?? 0,
       synergyRangeBonus: overrides.synergyRangeBonus ?? 0,
       reputationBonus: overrides.reputationBonus ?? 0,
+    ongoingCost: overrides.ongoingCost ?? 0,
     };
   }
 

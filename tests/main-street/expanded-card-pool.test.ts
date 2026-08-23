@@ -44,6 +44,7 @@ function makeBiz(overrides: Partial<BusinessCard> & { name: string; synergyTypes
     incomeBonus: overrides.incomeBonus ?? 0,
     synergyRangeBonus: overrides.synergyRangeBonus ?? 0,
     reputationBonus: overrides.reputationBonus ?? 0,
+    ongoingCost: overrides.ongoingCost ?? 0,
   };
 }
 
