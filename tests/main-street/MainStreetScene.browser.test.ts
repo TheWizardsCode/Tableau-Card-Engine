@@ -623,6 +623,51 @@ describe('MainStreetScene browser tests', () => {
     game = null;
   });
 
+  it('shows the banked action count in the HUD action counter', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    // Bank 2 actions (cap) and leave 1 remaining
+    scene.state.bankedActions = 2;
+    scene.state.actionsRemaining = 1;
+    scene.refreshHud();
+
+    const hudList = scene.hudContainer.list as Phaser.GameObjects.GameObject[];
+    const actionText = hudList.find(
+      (obj) => obj instanceof Phaser.GameObjects.Text
+        && (obj as any)._hudTransient
+        && (obj as Phaser.GameObjects.Text).text.includes('action'),
+    ) as Phaser.GameObjects.Text | undefined;
+
+    expect(actionText).toBeTruthy();
+    expect(actionText!.text).toBe('1 action left (2 banked)');
+
+    destroyGame(game);
+    game = null;
+  });
+
+  it('omits the banked suffix when no actions are banked', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    scene.state.bankedActions = 0;
+    scene.state.actionsRemaining = 1;
+    scene.refreshHud();
+
+    const hudList = scene.hudContainer.list as Phaser.GameObjects.GameObject[];
+    const actionText = hudList.find(
+      (obj) => obj instanceof Phaser.GameObjects.Text
+        && (obj as any)._hudTransient
+        && (obj as Phaser.GameObjects.Text).text.includes('action'),
+    ) as Phaser.GameObjects.Text | undefined;
+
+    expect(actionText).toBeTruthy();
+    expect(actionText!.text).toBe('1 action left');
+
+    destroyGame(game);
+    game = null;
+  });
+
   it('rounds the HUD Coins display to a whole number (no fractional digits)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;

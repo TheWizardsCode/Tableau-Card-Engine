@@ -338,10 +338,13 @@ export class MainStreetRenderer {
     s.hudContainer.add(coinText);
 
     // Action counter - next to coins
+    const banked = s.state.bankedActions ?? 0;
+    const actionLabel = `${s.state.actionsRemaining} action${s.state.actionsRemaining !== 1 ? 's' : ''} left`
+      + (banked > 0 ? ` (${banked} banked)` : '');
     const actionText = markHudTransient(s.add.text(
       coinText.x + coinText.width + 16,
       hudY,
-      `${s.state.actionsRemaining} action${s.state.actionsRemaining !== 1 ? 's' : ''} left`,
+      actionLabel,
       {
         fontSize: '14px', fontStyle: 'bold',
         color: s.state.actionsRemaining > 0 ? '#aaffaa' : '#ff6666',

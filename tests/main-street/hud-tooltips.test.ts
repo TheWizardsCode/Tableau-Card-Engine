@@ -13,6 +13,7 @@ import {
   buildCoinsTooltip,
   buildReputationTooltip,
   buildScoreTooltip,
+  buildActionTooltip,
   findNextLockedTier,
   HUD_TOOLTIP_I18N_KEYS,
   HUD_ARIA_I18N_KEYS,
@@ -26,6 +27,7 @@ import {
   setupMainStreetGame,
   type MainStreetCampaignProgress,
 } from '../../example-games/main-street/MainStreetState';
+import { getStaffCardTemplates } from '../../example-games/main-street/MainStreetCards';
 
 import {
   reputationCoinMultiplier,
@@ -138,6 +140,75 @@ describe('findNextLockedTier', () => {
     const result = findNextLockedTier([]);
     expect(result).toBeDefined();
     expect(result!.id).toBe('tier-1');
+  });
+});
+
+// ── Unit tests: buildActionTooltip ──────────────────────────
+
+describe('buildActionTooltip', () => {
+  it('shows remaining actions, banked count, and the banking explanation', () => {
+    const state = setupMainStreetGame({ seed: 'tooltip-action-basic' });
+    state.actionsRemaining = 2;
+    state.bankedActions = 1;
+
+    const tooltip = buildActionTooltip(state);
+
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.actionTitle);
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.actionRemainingLabel}: 2`);
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.actionBankedLabel}: 1`);
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.actionConsumesLabel);
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.actionFreeOpsLabel);
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.actionBankingExplain);
+  });
+
+  it('shows zero banked when the player has none', () => {
+    const state = setupMainStreetGame({ seed: 'tooltip-action-zero' });
+    state.bankedActions = 0;
+
+    const tooltip = buildActionTooltip(state);
+    expect(tooltip).toContain(`${HUD_TOOLTIP_STRINGS.actionBankedLabel}: 0`);
+  });
+
+  it('appends the General Manager note when a GM is employed', () => {
+    const state = setupMainStreetGame({ seed: 'tooltip-action-gm' });
+    const gm = getStaffCardTemplates().find(t => t.id === 'staff-general-manager');
+    if (!gm) throw new Error('staff-general-manager template missing');
+    state.staffCards.push({ ...gm });
+    state.actionsRemaining = 3;
+    state.bankedActions = 2;
+
+    const tooltip = buildActionTooltip(state);
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.actionBankingGmNote);
+  });
+
+  it('omits the General Manager note when no staff boosts actions', () => {
+    const state = setupMainStreetGame({ seed: 'tooltip-action-no-gm' });
+    state.staffCards = [];
+
+    const tooltip = buildActionTooltip(state);
+    expect(tooltip).not.toContain(HUD_TOOLTIP_STRINGS.actionBankingGmNote);
+  });
+
+  it('i18n override changes banking explanation text', () => {
+    const state = setupMainStreetGame({ seed: 'tooltip-action-i18n' });
+    registerLocale('fr', {
+      [HUD_TOOLTIP_I18N_KEYS.actionBankingExplain]: 'Un tour avec deux tours de banque',
+    });
+    setLocale('fr');
+
+    const tooltip = buildActionTooltip(state);
+    expect(tooltip).toContain('Un tour avec deux tours de banque');
+
+    resetI18n();
+    const enBundle: Record<string, string> = {};
+    for (const [k, v] of Object.entries(HUD_TOOLTIP_STRINGS)) {
+      enBundle[HUD_TOOLTIP_I18N_KEYS[k as keyof typeof HUD_TOOLTIP_STRINGS]] = v;
+    }
+    for (const [k, v] of Object.entries(HUD_ARIA_STRINGS)) {
+      enBundle[HUD_ARIA_I18N_KEYS[k as keyof typeof HUD_ARIA_STRINGS]] = v;
+    }
+    registerLocale('en', enBundle);
+    setLocale('en');
   });
 });
 
