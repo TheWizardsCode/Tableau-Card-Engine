@@ -1251,13 +1251,13 @@ export class MainStreetAnimator {
 
   public createTransferCardVisual(
     cardId: string,
-    family: 'business' | 'community-space' | 'event' | 'upgrade',
+    family: 'business' | 'community-space' | 'event' | 'upgrade' | 'staff',
     atX: number,
     atY: number,
   ): Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform {
     const s = this.scene;
     const templateId = s.templateIdFromCardId(cardId);
-    const bgColor = family === 'business' ? 0x5a7f36 : family === 'community-space' ? 0x2E86C1 : family === 'upgrade' ? 0x6B4C9A : 0x8B4513;
+    const bgColor = family === 'business' ? 0x5a7f36 : family === 'community-space' ? 0x2E86C1 : family === 'upgrade' ? 0x6B4C9A : family === 'staff' ? 0x555555 : 0x8B4513;
     const w = s.layout.marketCardW;
     const h = s.layout.marketCardH;
     const container = s.add.container(atX, atY);
@@ -1305,7 +1305,7 @@ export class MainStreetAnimator {
 
   public animateTransferFromMarket(options: {
     cardId: string;
-    family: 'business' | 'community-space' | 'event' | 'upgrade';
+    family: 'business' | 'community-space' | 'event' | 'upgrade' | 'staff';
     row: 'market';
     slotIndex: number;
     /**
@@ -1345,6 +1345,11 @@ export class MainStreetAnimator {
         }
         if (family === 'upgrade') {
           return { start: SFX_KEYS.UPGRADE_START, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.UPGRADE_END, moveIntervalMs: 1500 };
+        }
+        if (family === 'staff') {
+          // Staff hires (CG-0MT3KZOUX007GQ44) reuse the deal/place sound
+          // family — no new game-scoped SFX keys (docs/SFX_CONVENTION.md).
+          return { start: SFX_KEYS.BUSINESS_START, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.PLACE, moveIntervalMs: 1500 };
         }
         return { start: SFX_KEYS.BUSINESS_START, move: SFX_KEYS.MOVE_LOOP, end: SFX_KEYS.BUSINESS_END, moveIntervalMs: 1500 };
       };

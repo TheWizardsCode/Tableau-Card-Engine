@@ -455,6 +455,9 @@ export class MainStreetScene extends CardGameScene {
   public onUpgradeCardClick(...args: any[]): any {
     return (this.msTurnController as any).onUpgradeCardClick.apply(this.msTurnController, args);
   }
+  public onStaffCardClick(...args: any[]): any {
+    return (this.msTurnController as any).onStaffCardClick.apply(this.msTurnController, args);
+  }
 
   public onSellCard(...args: any[]): any {
     return (this.msTurnController as any).onSellCard.apply(this.msTurnController, args);

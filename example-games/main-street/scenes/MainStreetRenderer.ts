@@ -3,7 +3,7 @@
  */
 
 import Phaser from 'phaser';
-import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard } from '../MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import {
   GRID_SIZE,
   MARKET_TOTAL_SLOTS,
@@ -923,6 +923,10 @@ export class MainStreetRenderer {
           s.onBusinessCardClick(card as BusinessCard);
         } else if (card.family === 'upgrade') {
           s.onUpgradeCardClick(card as UpgradeCard);
+        } else if (card.family === 'staff') {
+          // Staff cards are hired directly from the market row
+          // (CG-0MT3KZOUX007GQ44) — never moved to the hand.
+          s.onStaffCardClick(card as StaffCard);
         } else {
           s.onEventCardClick(card as EventCard);
         }
@@ -935,9 +939,9 @@ export class MainStreetRenderer {
     y: number,
     rowLabel: string,
     rowKey: string,
-    cards: readonly (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
+    cards: readonly (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard | StaffCard)[],
     maxSlots: number,
-    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
+    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard | StaffCard) => void,
     alignmentStartX?: number,
   ): void {
     const s = this.scene;
@@ -1094,8 +1098,8 @@ export class MainStreetRenderer {
   public drawMarketCard(
     x: number,
     y: number,
-    card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard,
-    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
+    card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard | StaffCard,
+    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard | StaffCard) => void,
     _rowKey: string,
     _slotIndex: number,
   ): Phaser.GameObjects.Container {
@@ -1162,11 +1166,13 @@ export class MainStreetRenderer {
     // Action economy gating (CG-0MSTOF1N5005PK2R): business/community-space
     // card purchases consume the daily action, so those cards are
     // non-interactive (dimmed) when the budget is spent. Events/upgrades are
-    // free operations and stay interactive.
+    // free operations and stay interactive. Staff hires also consume an
+    // action (CG-0MT3KZOUX007GQ44), so they gate on the budget like business.
     const noActions = s.state.actionsRemaining <= 0;
     const isBusinessLike = card.family === 'business' || card.family === 'community-space';
+    const consumesAction = isBusinessLike || card.family === 'staff';
     const interactiveEnabled =
-      s.uiPhase === 'market' && !isIncidentEvent && !(isBusinessLike && noActions);
+      s.uiPhase === 'market' && !isIncidentEvent && !(consumesAction && noActions);
     const selection = attachSelection(container, {
       onStateChange: ({ selected, hovered }) => {
         if (selected) {
@@ -1272,11 +1278,12 @@ export class MainStreetRenderer {
       }
     }
 
-    // Dim visual feedback + tooltip for business cards gated by the spent
-    // action budget (CG-0MSTOF1N5005PK2R). The card is dimmed so the
-    // player understands it is unavailable, but hovering it still shows
-    // the FULL card tooltip (regardless of remaining actions,
-    // CG-0MT24RFIV007NQMP) instead of a generic "no actions" message.
+    // Dim visual feedback + tooltip for action-gaited cards (business /
+    // community-space / staff hire — CG-0MSTOF1N5005PK2R + CG-0MT3KZOUX007GQ44).
+    // The card is dimmed so the player understands it is unavailable, but
+    // hovering it still shows the FULL card tooltip (regardless of
+    // remaining actions, CG-0MT24RFIV007NQMP) instead of a generic
+    // "no actions" message.
     // NB: this MUST live OUTSIDE the `interactiveEnabled` gate above —
     // interactiveEnabled is false precisely when noActions is true, so an
     // in-gate block would be dead code (the original bug: tooltips were
@@ -1284,7 +1291,7 @@ export class MainStreetRenderer {
     // tooltip-only hover rectangle (explicit hit area, unlike the
     // container-level setInteractive that previously suppressed pointer
     // events).
-    if (isBusinessLike && noActions && !isIncidentEvent) {
+    if (consumesAction && noActions && !isIncidentEvent) {
       container.setAlpha(0.45);
       if (!s.replayMode) {
         const hover = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);

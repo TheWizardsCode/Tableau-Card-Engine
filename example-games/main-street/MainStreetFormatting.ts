@@ -21,7 +21,7 @@
  */
 
 import type { GameConfig } from './MainStreetDifficulty';
-import type { AnyCard } from './MainStreetCards';
+import type { AnyCard, StaffCard } from './MainStreetCards';
 import { formatCurrency } from '@core-engine/I18n';
 
 /** Default per-card coin synergy rate when the CSV does not specify one. */
@@ -106,8 +106,7 @@ export interface CardTooltipInfoOptions {
  * currency symbol follows the active locale (e.g. `€` for `en`, `$` for
  * `en-US`) instead of a hardcoded symbol or raw number.
  *
- * Staff and unknown card families return an empty string (matching the
- * previous behaviour where those cards showed no tooltip text).
+ * Unknown card families return an empty string.
  *
  * @param card    The card to describe.
  * @param config  The active difficulty config (for synergy-rate resolution).
@@ -143,6 +142,24 @@ export function buildCardTooltipInfo(
     case 'upgrade': {
       const u = card;
       return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+    }
+    case 'staff': {
+      // Staff cards are hired directly from the general market row
+      // (CG-0MT3KZOUX007GQ44): show hire-relevant info — cost, hand slots,
+      // ongoing cost and the staff member's abilities.
+      const st = card as StaffCard;
+      const lines = [
+        `Staff: ${st.name}`,
+        `Cost: ${formatCurrency(st.cost)}`,
+        `Hand slots: +${st.handSlotsAdded}`,
+      ];
+      if ((st.ongoingCost ?? 0) > 0) lines.push(`Ongoing cost: -${st.ongoingCost}/turn`);
+      if ((st.reputationPerTurn ?? 0) > 0) lines.push(`Reputation: +${st.reputationPerTurn}/turn`);
+      if ((st.refreshCostDiscount ?? 0) > 0) lines.push(`Refresh discount: -${st.refreshCostDiscount} per refresh`);
+      if ((st.actionsPerTurn ?? 0) > 0) lines.push(`Actions: +${st.actionsPerTurn}/day`);
+      if (st.peekOncePerTurn) lines.push('Ability: peek the incident deck once per turn');
+      if (st.description) lines.push(st.description);
+      return lines.join('\n');
     }
     default:
       // Staff cards (and any future unknown families) show no tooltip text.

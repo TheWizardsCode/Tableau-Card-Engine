@@ -653,7 +653,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   const eventDeck = createEventDeck(3, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
   // Staff deck is tier-gated like the other families (CG-0MT2WU0CX005Z143):
-  // only staff whose tier is unlocked appear in the staff market.
+  // only staff whose tier is unlocked are drawn into the general market.
   const staffDeck = createStaffDeck(1, options.unlockedCardIds);
 
   shuffleArray(businessDeck, rng);

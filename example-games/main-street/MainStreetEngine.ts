@@ -112,7 +112,7 @@ export interface BuyAndPlaceAction {
   slotIndex: number;
 }
 
-/** Hire a staff card from the staff market. */
+/** Hire a staff card from the general market row. */
 export interface HireStaffAction {
   type: 'hire-staff';
   cardId: string;
@@ -1488,12 +1488,12 @@ export function buyAndPlaceBusiness(
 }
 
 /**
- * Hires a staff card from the staff market (CG-0MSTOF1N5005PK2R).
+ * Hires a staff card from the general market row (CG-0MSTOF1N5005PK2R).
  * Consumes one daily action; delegates to purchaseStaffCard for the
  * coin deduction and hand-size mechanics.
  *
  * @param state  Current game state (mutated in-place).
- * @param cardId ID of the staff card in the staff market.
+ * @param cardId ID of the staff card in the general market row.
  * @returns PurchaseResult describing the hire.
  * @throws Error if the card is not found or player cannot afford it.
  */

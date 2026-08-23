@@ -230,7 +230,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 | Move a market card to hand | 1 action | Free of coins; pays the listed cost when placed. |
 | Play a card from hand to the street | 1 action | Pays the card's listed cost at placement. |
 | Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`). Triggered by dragging a market card straight onto a street slot. |
-| Hire a staff card | 1 action | From the staff market. |
+| Hire a staff card | 1 action | From the general market row. |
 
 **Free operations (never consume an action):**
 

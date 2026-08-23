@@ -7,12 +7,13 @@ import {
   canPurchaseUpgrade,
   canPurchaseEvent,
   canPurchaseBusiness,
+  canPurchaseStaff,
   canRefreshMarket,
   canSellBusiness,
 } from '../MainStreetMarket';
-import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
+import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, peekIncidentDeckCommand, consumeAction } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, peekIncidentDeckCommand, consumeAction, hireStaffCardCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
@@ -1439,6 +1440,98 @@ export class MainStreetTurnController {
         row: 'market',
         slotIndex: sourceIndex,
         destination: s.getStreetSlotCenter(targetSlot),
+      }).then(afterTransfer);
+    } else {
+      afterTransfer();
+    }
+  }
+
+  /**
+   * Handles clicking on a staff card in the general market row
+   * (CG-0MT3KZOUX007GQ44): hires the staff member — consuming one daily
+   * action — through the same animated + SFX feedback path as the other
+   * market purchases. Staff cards are never moved to the hand.
+   *
+   * @param card  The staff card in the market row.
+   */
+  public onStaffCardClick(card: StaffCard): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    // Tutorial gating: only allow hire-staff if it's the required action or
+    // the tutorial is inactive.
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('hire-staff' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
+
+    // Ensure stale hover tooltip is cleared when a card is hired.
+    s.tooltipManager?.hide();
+
+    s.selectMarketCardById(card.id);
+
+    const legality = canPurchaseStaff(s.state, card.id);
+    if (!legality.legal) {
+      const reason = (legality.reason ?? '').toLowerCase();
+      // Insufficient-coins rejection → play illegal-move feedback.
+      if (reason.includes('not enough coins')) {
+        const containers = s.msRenderer?.getMarketRowCards?.();
+        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+        const target = containers?.[cardIndex] ?? null;
+        playIllegalFeedback(target, s);
+      }
+      s.instructionText.setText(`Cannot hire: ${legality.reason ?? 'unknown'}`);
+      return;
+    }
+
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText(`Hiring "${card.name}"...`);
+    s.hiddenTransferSourceCardIds.add(card.id);
+    s.refreshAll();
+
+    const afterTransfer = (): void => {
+      console.debug('[MS] onStaffCardClick: attempting HireStaff', { cardId: card.id, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.cards.map((c: any) => c.id) });
+      let hired = false;
+      try {
+        const cmd = hireStaffCardCommand(s.state, card.id);
+        s.undoManager.execute(cmd);
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'hire-staff', cardId: card.id }, description: cmd.description }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
+        s.instructionText.setText(`Hired "${card.name}" (+${card.handSlotsAdded} hand slots)`);
+        // Lightweight notification for the hire (popup above the hand).
+        try {
+          void popTextOrIcon({ scene: s, x: s.layout.handCenterX, y: s.layout.handY, label: `Hired ${card.name}` });
+        } catch (_) {}
+        hired = true;
+      } catch (e) {
+        console.error('[MS] HireStaff failed', e);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      s.hiddenTransferSourceCardIds.delete(card.id);
+      s.uiPhase = 'market';
+      s.refreshAll();
+
+      // Tutorial: mark hire-staff step complete if active.
+      if (hired) {
+        try {
+          (s.msLifecycleManager as any).onTutorialActionComplete?.('hire-staff' as TutorialActionType);
+        } catch (_) {}
+      }
+    };
+
+    if (sourceIndex >= 0) {
+      void s.animateTransferFromMarket({
+        cardId: card.id,
+        family: 'staff',
+        row: 'market',
+        slotIndex: sourceIndex,
+        // The hired staff member joins the player's side: fly to the hand
+        // region (the card is then removed from the row on refresh).
+        destination: { x: s.layout.handCenterX, y: s.layout.handY + (s.layout.handCardH ?? 0) / 2 },
       }).then(afterTransfer);
     } else {
       afterTransfer();
