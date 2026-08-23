@@ -112,10 +112,14 @@ describe('action-type commands spend the daily action', () => {
 
   it('hireStaffCardCommand spends 1 action', () => {
     const state = setupMarketState();
-    // Staff are in the market row or deck (CG-0MT3KZNQB0053K55)
-    const firstStaff = state.market.cards.find(c => c.family === 'staff')
-      ?? state.decks.staff.find(c => c.family === 'staff');
-    const staff = firstStaff as any;
+    // Staff are hired from the general market row (CG-0MT3KZOBZ005IRYE);
+    // if the seeded row lacks one, move a deck staff card into the row.
+    let staff = state.market.cards.find(c => c.family === 'staff') as any;
+    if (!staff) {
+      const deckStaff = state.decks.staff.find(c => c.family === 'staff');
+      if (deckStaff) state.market.cards.push({ ...deckStaff });
+      staff = state.market.cards.find(c => c.family === 'staff') as any;
+    }
     expect(staff).toBeTruthy();
     state.resourceBank.coins = Math.max(state.resourceBank.coins, staff.cost);
     const coinsBefore = state.resourceBank.coins;

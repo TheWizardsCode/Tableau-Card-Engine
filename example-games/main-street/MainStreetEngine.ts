@@ -18,7 +18,6 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { EventCard, SynergyType } from './MainStreetCards';
-import type { CommunitySpaceCard, UpgradeCard, StaffCard } from './MainStreetCards';
 import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard, type BusinessCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
@@ -1499,18 +1498,12 @@ export function buyAndPlaceBusiness(
  * @throws Error if the card is not found or player cannot afford it.
  */
 export function hireStaffCard(state: MainStreetState, cardId: string): PurchaseResult {
-  // Staff cards are now part of the general market row (CG-0MT3KZNQB0053K55);
-  // look for the card in the market row first, then in the staff deck as a fallback.
+  // Staff cards are part of the general market row (CG-0MT3KZNQB0053K55):
+  // resolve strictly against the row and delegate to the unified purchase.
   const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
-  const deckIndex = marketIndex === -1 ? state.decks.staff.findIndex(c => c.id === cardId) : -1;
-  let card: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard | StaffCard) | undefined;
-  if (marketIndex !== -1) {
-    card = state.market.cards[marketIndex];
-  } else if (deckIndex !== -1) {
-    card = state.decks.staff[deckIndex];
-  }
-  if (!card) {
-    throw new Error(`Staff card ${cardId} not found in the market or deck.`);
+  const card = marketIndex !== -1 ? state.market.cards[marketIndex] : undefined;
+  if (!card || card.family !== 'staff') {
+    throw new Error(`Staff card ${cardId} not found in the market row.`);
   }
   purchaseStaffCard(state, cardId);
   return { card, cost: card.cost, refilled: false };

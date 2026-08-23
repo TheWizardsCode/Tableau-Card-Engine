@@ -817,30 +817,45 @@ export function getUpgradeBranchesForBusiness(
 // ── Staff Card Operations (Multi-Use Card Economy) ───────────
 
 /**
- * Purchases a staff card from the staff card market.
+ * Legality check for hiring a staff card from the general market row
+ * (CG-0MT3KZOBZ005IRYE). Staff cards are hired directly from the row;
+ * they are never moved to the hand.
+ *
+ * @param state  Current game state (read-only).
+ * @param cardId ID of the staff card in the market row.
+ * @returns LegalityResult indicating whether the hire is permitted.
+ */
+export function canPurchaseStaff(state: MainStreetState, cardId: string): LegalityResult {
+  const card = state.market.cards.find(c => c.id === cardId);
+  if (!card || card.family !== 'staff') {
+    return { legal: false, reason: `Staff card ${cardId} not found in the market row.` };
+  }
+  if (state.resourceBank.coins < card.cost) {
+    return { legal: false, reason: `Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.` };
+  }
+  return { legal: true };
+}
+
+/**
+ * Purchases a staff card from the general market row.
  * Deducts coins, adds the staff card to active staffCards[],
  * and increases maxHandSize by the card's handSlotsAdded.
  *
  * @param state  Current game state (mutated in-place).
- * @param cardId ID of the staff card in the staff card market.
- * @throws Error if the card is not found or player cannot afford it.
+ * @param cardId ID of the staff card in the market row.
+ * @throws Error if the card is not found (or not a staff card) or the player cannot afford it.
  */
 export function purchaseStaffCard(
   state: MainStreetState,
   cardId: string,
 ): void {
-  // Staff cards are now part of the general market row (CG-0MT3KZNQB0053K55);
-  // look for the card in the market row first, then in the staff deck as a fallback.
+  // Staff cards are part of the general market row (CG-0MT3KZNQB0053K55);
+  // resolve strictly against the row — an un-drawn staff card in the deck
+  // is not purchasable.
   const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
-  const deckIndex = marketIndex === -1 ? state.decks.staff.findIndex(c => c.id === cardId) : -1;
-  let card: StaffCard | undefined;
-  if (marketIndex !== -1) {
-    card = state.market.cards[marketIndex] as StaffCard | undefined;
-  } else if (deckIndex !== -1) {
-    card = state.decks.staff[deckIndex];
-  }
+  const card = marketIndex !== -1 ? state.market.cards[marketIndex] : undefined;
   if (!card || card.family !== 'staff') {
-    throw new Error(`Staff card ${cardId} not found in the market or deck.`);
+    throw new Error(`Staff card ${cardId} not found in the market row.`);
   }
 
   if (state.resourceBank.coins < card.cost) {
@@ -850,12 +865,8 @@ export function purchaseStaffCard(
   // Deduct cost
   state.resourceBank.coins -= card.cost;
 
-  // Remove from market (or deck as fallback)
-  if (marketIndex !== -1) {
-    state.market.cards.splice(marketIndex, 1);
-  } else if (deckIndex !== -1) {
-    state.decks.staff.splice(deckIndex, 1);
-  }
+  // Remove from market
+  state.market.cards.splice(marketIndex, 1);
 
   // Add to active staff cards
   state.staffCards.push({ ...card });

@@ -164,8 +164,8 @@ describe('AC2: refreshMarket re-roll', () => {
 
     const accountant = createStaffDeck(1).find(c => c.id.startsWith('staff-accountant'));
     expect(accountant).toBeTruthy();
-    // Staff cards go to decks.staff (CG-0MT3KZNQB0053K55)
-    state.decks.staff.push({ ...accountant! });
+    // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
+    state.market.cards.push({ ...accountant! });
     state.resourceBank.coins = 20;
     purchaseStaffCard(state, accountant!.id);
 
@@ -444,13 +444,13 @@ describe('AC6: maxHandSize base 3, growable', () => {
     state.resourceBank.coins = 50;
 
     const assistant = createStaffDeck(1).find(c => c.id.startsWith('staff-assistant'))!;
-    // Staff cards go to decks.staff (CG-0MT3KZNQB0053K55)
-    state.decks.staff.push({ ...assistant });
+    // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
+    state.market.cards.push({ ...assistant });
     purchaseStaffCard(state, assistant.id);
     expect(state.maxHandSize).toBe(3 + assistant.handSlotsAdded);
 
     const manager = createStaffDeck(1).find(c => c.id.startsWith('staff-manager'))!;
-    state.decks.staff.push({ ...manager });
+    state.market.cards.push({ ...manager });
     purchaseStaffCard(state, manager.id);
     expect(state.maxHandSize).toBe(3 + assistant.handSlotsAdded + manager.handSlotsAdded);
   });
@@ -462,8 +462,8 @@ describe('AC6: maxHandSize base 3, growable', () => {
     state.resourceBank.coins = 0;
 
     const assistant = createStaffDeck(1).find(c => c.id.startsWith('staff-assistant'))!;
-    // Staff cards go to decks.staff (CG-0MT3KZNQB0053K55)
-    state.decks.staff.push({ ...assistant });
+    // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
+    state.market.cards.push({ ...assistant });
     state.resourceBank.coins = 20;
     purchaseStaffCard(state, assistant.id);
     const capacity = state.maxHandSize;

@@ -27,6 +27,7 @@ import {
   type BuyBusinessAction,
   type BuyUpgradeAction,
   type BuyEventAction,
+  type HireStaffAction,
   type MoveToHandAction,
   type PlayBusinessFromHandAction,
   type PlayUpgradeFromHandAction,
@@ -37,10 +38,11 @@ import {
   canPurchaseBusiness,
   canPurchaseUpgrade,
   canPurchaseEvent,
+  canPurchaseStaff,
   canAddToHand,
   getEmptySlots,
 } from './MainStreetMarket';
-import type { BusinessCard, UpgradeCard, EventCard } from './MainStreetCards';
+import type { BusinessCard, UpgradeCard, EventCard, StaffCard } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import { computeSynergyBonus } from './MainStreetAdjacency';
 import { computeScore } from './MainStreetEngine';
@@ -216,6 +218,24 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
+  // ── hire-staff (direct hire from the market row, pays immediately) ──
+  // Staff cards are hired straight from the general market row
+  // (CG-0MT3KZOBZ005IRYE); never moved to the hand. Skip staff already
+  // employed (same template) — one employee per role.
+  const employedStaffTemplates = new Set(
+    state.staffCards.map(s => s.id.replace(/-\d+$/, '')),
+  );
+  const staffCards = state.market.cards.filter(
+    c => c.family === 'staff',
+  ) as StaffCard[];
+  for (const card of staffCards) {
+    if (employedStaffTemplates.has(card.id.replace(/-\d+$/, ''))) continue;
+    const result = canPurchaseStaff(state, card.id);
+    if (result.legal) {
+      actions.push({ type: 'hire-staff', cardId: card.id });
+    }
+  }
+
   // ── move-to-hand (free; bounded only by hand capacity) ────
   // Staff cards are hired directly from the market row, never moved to the
   // hand (CG-0MT3KZNQB0053K55); skip them here.
@@ -262,11 +282,13 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   }
 
   // ── peek-incident-deck (staff peek skill, CG-0MSXOW6GN008ZSMN) ──
-  // Legal only when a peek-capable staff member is employed and the deck
-  // has a card to look at. The once-per-turn gate and action cost are
-  // enforced inside executeAction/peekIncidentDeck.
+  // Legal only when a peek-capable staff member is employed, the deck
+  // has a card to look at, and the once-per-turn peek has not been used
+  // this turn (CG-0MT3KZOBZ005IRYE: the AI can now hire staff, so the
+  // enumeration must reflect the peek legality gate or RandomStrategy
+  // can draw an illegal second peek).
   const hasPeekStaff = (state.staffCards ?? []).some(card => card.peekOncePerTurn);
-  if (hasPeekStaff && state.incidentDeck.length > 0) {
+  if (hasPeekStaff && state.incidentDeck.length > 0 && !state.peekUsedThisTurn) {
     actions.push({ type: 'peek-incident-deck' });
   }
 
@@ -420,7 +442,18 @@ export const GreedyStrategy: MainStreetAiStrategy = {
       }
     }
 
-    // Priority 10: end turn
+    // Priority 10: hire staff from the market row (CG-0MT3KZOBZ005IRYE).
+    // Reached when no more productive purchase/play/move is available.
+    // Hiring adds hand capacity and staff perks (GM actions, Accountant
+    // refresh discount, ...), which beats ending the day early.
+    const hireActions = legalActions.filter(
+      a => a.type === 'hire-staff',
+    ) as HireStaffAction[];
+    if (hireActions.length > 0) {
+      return pickBest(hireActions, a => scoreAction(state, a), rng);
+    }
+
+    // Priority 11: end turn
     return { type: 'end-turn' };
   },
 };

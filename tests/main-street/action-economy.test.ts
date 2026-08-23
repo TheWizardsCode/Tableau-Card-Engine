@@ -176,10 +176,15 @@ describe('action spend', () => {
     const state = setupMainStreetGame({ seed: 'spend-hire' });
     executeDayStart(state, true);
     state.resourceBank.coins = 100;
-    // Staff are in the market row or deck (CG-0MT3KZNQB0053K55)
-    const gm = state.market.cards.find(c => c.id.startsWith('staff-general-manager'))
-      ?? state.decks.staff.find(c => c.id.startsWith('staff-general-manager'));
-    if (!gm) throw new Error('GM not in market row or deck');
+    // Staff are hired from the general market row (CG-0MT3KZOBZ005IRYE);
+    // if the seeded row lacks the GM, move one from the staff deck into it.
+    let gm = state.market.cards.find(c => c.id.startsWith('staff-general-manager'));
+    if (!gm) {
+      const deckGm = state.decks.staff.find(c => c.id.startsWith('staff-general-manager'));
+      if (deckGm) state.market.cards.push({ ...deckGm });
+      gm = state.market.cards.find(c => c.id.startsWith('staff-general-manager'));
+    }
+    if (!gm) throw new Error('GM not in market row');
     executeAction(state, { type: 'hire-staff', cardId: gm.id });
     expect(state.actionsRemaining).toBe(0);
     expect(state.staffCards.length).toBe(1);

@@ -160,10 +160,14 @@ describe('Multi-Use Card Economy Integration', () => {
       const state = createTestState();
       setUpTableauAndHand(state);
 
-      // Hire a staff card (staff are in the market row or deck, CG-0MT3KZNQB0053K55)
-      const staffInMarket = state.market.cards.find(c => c.family === 'staff');
-      const staffInDeck = state.decks.staff.find(c => c.family === 'staff');
-      const staffCard = staffInMarket ?? staffInDeck ?? null;
+      // Hire a staff card from the general market row (CG-0MT3KZOBZ005IRYE);
+      // if the row lacks one, move a deck staff card into it.
+      let staffCard = state.market.cards.find(c => c.family === 'staff') ?? null;
+      if (!staffCard) {
+        const deckStaff = state.decks.staff.find(c => c.family === 'staff');
+        if (deckStaff) state.market.cards.push({ ...deckStaff });
+        staffCard = state.market.cards.find(c => c.family === 'staff') ?? null;
+      }
       if (staffCard) {
         state.resourceBank.coins = staffCard.cost + 10;
 
@@ -248,10 +252,14 @@ describe('Multi-Use Card Economy Integration', () => {
       const state = createTestState();
       executeDayStart(state);
 
-      // Purchase a staff card (staff are in the market row or deck, CG-0MT3KZNQB0053K55)
-      const staffInMarket2 = state.market.cards.find(c => c.family === 'staff');
-      const staffInDeck2 = state.decks.staff.find(c => c.family === 'staff');
-      const staffCard2 = staffInMarket2 ?? staffInDeck2;
+      // Hire a staff card from the general market row (CG-0MT3KZOBZ005IRYE);
+      // if the row lacks one, move a deck staff card into it.
+      let staffCard2 = state.market.cards.find(c => c.family === 'staff');
+      if (!staffCard2) {
+        const deckStaff = state.decks.staff.find(c => c.family === 'staff');
+        if (deckStaff) state.market.cards.push({ ...deckStaff });
+        staffCard2 = state.market.cards.find(c => c.family === 'staff');
+      }
       if (!staffCard2) return;
 
       const staffCard = staffCard2;
@@ -405,10 +413,13 @@ describe('Multi-Use Card Economy Integration', () => {
       // Turn 3: staff purchase
       if (state.gameResult === 'playing') {
         executeDayStart(state);
-        // Staff cards are in the market row or deck (CG-0MT3KZNQB0053K55)
-        const staffInMarket3 = state.market.cards.find(c => c.family === 'staff');
-        const staffInDeck3 = state.decks.staff.find(c => c.family === 'staff');
-        const staffCard3 = staffInMarket3 ?? staffInDeck3;
+        // Hire a staff card from the general market row (CG-0MT3KZOBZ005IRYE)
+        let staffCard3 = state.market.cards.find(c => c.family === 'staff');
+        if (!staffCard3) {
+          const deckStaff = state.decks.staff.find(c => c.family === 'staff');
+          if (deckStaff) state.market.cards.push({ ...deckStaff });
+          staffCard3 = state.market.cards.find(c => c.family === 'staff');
+        }
         if (staffCard3) {
           const staffCard = staffCard3;
           if (state.resourceBank.coins >= staffCard.cost) {
