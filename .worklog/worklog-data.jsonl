@@ -1,7 +1,4 @@
 {"__worklog_sync__":{"kind":"delta","version":1}}
-{"data":{"auditedAt":"2026-08-23T21:42:19.433Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MSTOATDP000JNHH"},"type":"audit_result"}
-{"data":{"auditedAt":"2026-08-23T21:42:24.438Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MSVM3WCD007BRQP"},"type":"audit_result"}
-{"data":{"auditedAt":"2026-08-23T21:42:48.751Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MT00JNOP003KVH8"},"type":"audit_result"}
-{"data":{"auditedAt":"2026-08-23T21:42:02.387Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MT24RFIV007NQMP"},"type":"audit_result"}
-{"data":{"auditedAt":"2026-08-23T21:42:06.351Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MT2WU0CX005Z143"},"type":"audit_result"}
-{"data":{"auditedAt":"2026-08-23T21:42:41.891Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MT3P3J05009F4Z4"},"type":"audit_result"}
+{"data":{"auditedAt":"2026-08-23T21:43:24.540Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MSXILJHN008CHQY"},"type":"audit_result"}
+{"data":{"auditedAt":"2026-08-23T21:43:45.151Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MSXIQDI4007K6N0"},"type":"audit_result"}
+{"data":{"auditedAt":"2026-08-23T21:43:52.149Z","author":"rgardler","rawOutput":null,"readyToClose":true,"summary":"Approved by manual review","workItemId":"CG-0MT2WTN0L004JA53"},"type":"audit_result"}
