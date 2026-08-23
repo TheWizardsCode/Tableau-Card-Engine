@@ -354,7 +354,7 @@ describe('Multi-Use Card Economy Integration', () => {
       delete serialized.maxHandSize;
       delete serialized.discardPile;
       delete serialized.staffCards;
-      // staffCardMarket removed by CG-0MT3KZNQB0053K55 — staff live in decks.staff
+      // The dedicated staff market field was removed (CG-0MT3KZNQB0053K55) — staff live in decks.staff
 
       // Should not throw
       const restored = deserializeMainStreetState(serialized as MainStreetSerializedState);

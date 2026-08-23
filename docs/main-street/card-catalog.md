@@ -443,7 +443,7 @@ This writes per-run and aggregate metrics to:
 
 ## Staff Cards
 
-Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143; 12-tier spread CG-0MT3C744B009DS84): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice). They are purchased from the dedicated staff-card market.
+Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143; 12-tier spread CG-0MT3C744B009DS84): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice). They are hired directly from the general market row (0–1 staff per row, `MARKET_STAFF_MAX`) — there is no dedicated staff market (CG-0MT2WTN0L004JA53).
 
 | ID | Name | Cost | Ongoing/turn | Slots+ | Tier | Ability | Description | Rationale |
 |----|------|------|--------------|--------|------|---------|-------------|-----------|
