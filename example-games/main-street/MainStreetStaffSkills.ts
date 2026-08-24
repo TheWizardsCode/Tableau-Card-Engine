@@ -47,6 +47,18 @@ export type SkillCategory = SpecializationSkillCategory;
 /** Baseline skill always assigned to every staff applicant. */
 export const BASELINE_SKILL_ID = 'skill-town-gossip' as const;
 
+/**
+ * Category badge colors used by the market-card skill chips (I5,
+ * CG-0MT4WXX1Q00860VP). Hex strings consumed directly by Phaser text
+ * `backgroundColor`. Distinct per effect category for at-a-glance reads.
+ */
+export const STAFF_SKILL_CHIP_COLORS: Readonly<Record<SpecializationSkillCategory, string>> = {
+  'income-boost': '#226633',
+  'reputation-boost': '#334488',
+  'cost-reduction': '#886622',
+  'incident-mitigation': '#883333',
+};
+
 // ── Catalog (16 skills, 4 categories) ────────────────────────
 
 /** The global specialization-skill pool (locked at game start). */

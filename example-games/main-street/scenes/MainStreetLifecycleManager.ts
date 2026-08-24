@@ -394,6 +394,18 @@ export class MainStreetLifecycleManager {
         },
       },
       {
+        heading: 'Staff & Specialization Skills',
+        body:
+          'Staff cards in the market row are applicants. Each one carries 1-3\n' +
+          'specialization skills (shown as colored chips on the card) that are\n' +
+          'randomized once per game and locked. Color key: green = income,\n' +
+          'blue = reputation, amber = cost reduction, red = incident mitigation.\n' +
+          'Every applicant keeps the Town Gossip baseline (peek the incident\n' +
+          'deck once per turn). No applicant may hold more than 1 income boost\n' +
+          'AND 1 reputation boost, so stacks stay balanced. Hover a staff card\n' +
+          'for its full skill list (I5, CG-0MT4WXX1Q00860VP).',
+      },
+      {
         heading: 'Turn Flow',
         body:
           'Day Start: market refreshes and income is calculated.\n' +

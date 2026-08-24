@@ -4,6 +4,8 @@
 
 import Phaser from 'phaser';
 import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
+import type { SpecializationSkill } from '../MainStreetStaffSkills';
+import { getSkill, STAFF_SKILL_CHIP_COLORS } from '../MainStreetStaffSkills';
 import {
   GRID_SIZE,
   MARKET_TOTAL_SLOTS,
@@ -1155,6 +1157,42 @@ export class MainStreetRenderer {
       premiumLabel.setOrigin(0.5, 0.5);
       premiumLabel.setName('buyAndPlacePremiumLabel');
       container.add(premiumLabel);
+    }
+
+    // Staff specialization skill badges (I5, CG-0MT4WXX1Q00860VP): each
+    // applicant card shows its locked skill set (1-3 skills, I3) as
+    // category-colored chips at the card bottom. Card-relative positioning
+    // (same pattern as the premium label) — no absolute pixel coordinates.
+    // Static text only, so reduced-motion preferences are inherently respected.
+    if (card.family === 'staff') {
+      const st = card as StaffCard;
+      const skillIds = Array.isArray(st.specializationSkillIds) ? st.specializationSkillIds : [];
+      const skills: SpecializationSkill[] = [];
+      for (const id of skillIds) {
+        try {
+          skills.push(getSkill(id));
+        } catch {
+          // Unknown/stale id on a saved card — skip the chip (forward-compat).
+        }
+      }
+      let chipY = Math.round(renderH / 2 - 8);
+      for (const skill of skills) {
+        const chipBg = STAFF_SKILL_CHIP_COLORS[skill.category] ?? '#444455';
+        const chip = s.add.text(0, chipY, skill.name, {
+          fontSize: '8px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          fontFamily: FONT_FAMILY,
+          align: 'center',
+          backgroundColor: chipBg,
+          padding: { x: 3, y: 1 },
+        });
+        chip.setOrigin(0.5, 1);
+        chip.setName(`staffSkillBadge-${skill.id}`);
+        chip.setDepth(1);
+        container.add(chip);
+        chipY -= 12;
+      }
     }
 
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);

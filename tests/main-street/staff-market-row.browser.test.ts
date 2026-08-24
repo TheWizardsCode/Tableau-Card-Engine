@@ -139,4 +139,34 @@ describe('Main Street staff render & hire in the market row', () => {
     expect(state.staffCards).toHaveLength(0);
     expect(state.market.cards.some((c: any) => c.id === staff.id)).toBe(true);
   });
+
+  it('renders specialization skill badges on a staff market card (I5)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+    const state = scene.state;
+    scene.settingsPanel = { ...scene.settingsPanel, reducedMotion: true };
+
+    // Place an applicant with a known skill set in the row (skills are
+    // assigned at game start by I3; a template copy needs explicit ids).
+    const staff = { ...createStaffDeck(1)[0], specializationSkillIds: ['skill-chef', 'skill-cost-cutter'] };
+    state.market.cards[0] = staff;
+    state.resourceBank.coins = staff.cost + 20;
+    state.actionsRemaining = 1;
+    scene.refreshAll();
+
+    const rowCards = scene.msRenderer.getMarketRowCards('market') as Phaser.GameObjects.Container[];
+    const staffContainer = rowCards[0];
+    expect(staffContainer).toBeTruthy();
+
+    const names = staffContainer.list.map((o: Phaser.GameObjects.GameObject) => (o as any).name ?? '');
+    expect(names).toContain('staffSkillBadge-skill-chef');
+    expect(names).toContain('staffSkillBadge-skill-cost-cutter');
+
+    // Badge chips carry the skill display name (player-readable).
+    const chefChip = staffContainer.list.find(
+      (o: Phaser.GameObjects.GameObject) => (o as any).name === 'staffSkillBadge-skill-chef',
+    ) as Phaser.GameObjects.Text | undefined;
+    expect(chefChip).toBeTruthy();
+    expect(chefChip!.text).toContain('Chef de Cuisine');
+  });
 });

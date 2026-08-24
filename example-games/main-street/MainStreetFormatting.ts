@@ -22,6 +22,7 @@
 
 import type { GameConfig } from './MainStreetDifficulty';
 import type { AnyCard, StaffCard } from './MainStreetCards';
+import { getSkill } from './MainStreetStaffSkills';
 import { formatCurrency } from '@core-engine/I18n';
 
 /** Default per-card coin synergy rate when the CSV does not specify one. */
@@ -159,6 +160,19 @@ export function buildCardTooltipInfo(
       if ((st.refreshCostDiscount ?? 0) > 0) lines.push(`Refresh discount: -${st.refreshCostDiscount} per refresh`);
       if ((st.actionsPerTurn ?? 0) > 0) lines.push(`Actions: +${st.actionsPerTurn}/day`);
       if (st.peekOncePerTurn) lines.push('Ability: peek the incident deck once per turn');
+      // Specialization skills (CG-0MT1CIWSD003VBPK): the applicant card's
+      // locked skill set (1-3 skills incl. the Town Gossip baseline). Legacy
+      // cards without specializationSkillIds show no skills line.
+      const skillIds = Array.isArray(st.specializationSkillIds) ? st.specializationSkillIds : [];
+      const skillNames: string[] = [];
+      for (const id of skillIds) {
+        try {
+          skillNames.push(getSkill(id).name);
+        } catch {
+          // Unknown/stale id on a saved card — show nothing for it (forward-compat).
+        }
+      }
+      if (skillNames.length > 0) lines.push(`Skills: ${skillNames.join(', ')}`);
       if (st.description) lines.push(st.description);
       return lines.join('\n');
     }
