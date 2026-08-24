@@ -80,8 +80,14 @@ describe('Main Street greedy AI per-difficulty design-intent guardrails', () => 
     // The score deflation leaves more end-of-game coins relative to turns,
     // so the band is widened to 0–3.0; the operator pre-accepted balance
     // drift for this change (plan: "do NOT gate on exact parity").
+    // CG-0MSVYPEZ90085SHE re-baseline (business ongoing costs + income raise,
+    // operator-chosen option A): hand-held cards now drain coins every turn,
+    // so winning runs are short (~10-turn) rich sprints that bank 50–80 coins
+    // — measured 5.76 on the canonical 200-seed set. The band is widened to
+    // 0–6.0; the win-rate design ladder (Easy ≥ Medium ≥ Hard) is preserved
+    // and remains the primary balance gate (see balance-guardrail-recommendations.md).
     expect(medium.metrics.averageCoinsPerTurn).toBeGreaterThanOrEqual(0);
-    expect(medium.metrics.averageCoinsPerTurn).toBeLessThanOrEqual(3);
+    expect(medium.metrics.averageCoinsPerTurn).toBeLessThanOrEqual(6);
 
     // PRD warning band for Greedy/Medium median score (PRD §3.3).
     // CG-0MSTOATDT009BRX2 re-baseline: measured median 39.8 under cost-at-play

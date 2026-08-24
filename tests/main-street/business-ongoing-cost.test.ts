@@ -69,23 +69,48 @@ describe('CSV parsing — ongoingCost on business cards', () => {
     }
   });
 
-  it('should default to 0 for business cards with empty ongoingCost in CSV', () => {
-    // Pick a known business card that has no ongoingCost in CSV (e.g. Bakery)
+  it('should parse ongoingCost from CSV as 1/4 of purchase price (min 0.25)', () => {
+    // Every business row in card-data.csv carries ongoingCost = max(0.25, cost / 4).
     const templates = getBusinessTemplates();
-    const bakery = templates.find(t => t.id === 'biz-bakery');
-    expect(bakery).toBeDefined();
-    expect(bakery!.ongoingCost).toBe(0);
+    const byId = new Map(templates.map(t => [t.id, t]));
+    expect(byId.get('biz-bakery')!.ongoingCost).toBe(0.75);   // cost 3 -> 0.75
+    expect(byId.get('biz-laundromat')!.ongoingCost).toBe(1);   // cost 4 -> 1
+    expect(byId.get('biz-barbershop')!.ongoingCost).toBe(1.25); // cost 5 -> 1.25
+    expect(byId.get('biz-teahouse')!.ongoingCost).toBe(1.75);   // cost 7 -> 1.75
+    expect(byId.get('biz-gallery')!.ongoingCost).toBe(3.5);     // cost 14 -> 3.5
+    expect(byId.get('biz-hotel')!.ongoingCost).toBe(4);         // cost 16 -> 4
   });
 
-  it('should read ongoingCost from CSV for business cards that have a value', () => {
-    // Create a deck and check a card that we know has ongoingCost in CSV
-    // For now, verify the mechanism works with cards that have 0 (default)
-    // Actual non-zero values require CSV population (balance task, out of scope)
+  it('should carry ongoingCost through to deck cards created from templates', () => {
     const deck = createBusinessDeck(1);
-    expect(deck.length).toBeGreaterThan(0);
+    const teahouse = deck.find(c => c.id.startsWith('biz-teahouse'));
+    expect(teahouse).toBeDefined();
+    expect(teahouse!.ongoingCost).toBe(1.75);
+    // All deck cards must have a numeric ongoingCost (legacy fallback 0)
     for (const card of deck) {
       expect(typeof card.ongoingCost).toBe('number');
     }
+  });
+
+  it('should treat a missing ongoingCost on a legacy card as 0 (no deduction)', () => {
+    // Legacy deserialised cards lack the property entirely; `?? 0` must apply.
+    const state = createTestState('legacy-no-field');
+    state.resourceBank.coins = 100;
+    const legacy: BusinessCard = {
+      family: 'business',
+      ...getBusinessTemplates()[0],
+      id: 'legacy-biz',
+      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
+      reputationBonus: 0, appliedUpgrades: [],
+    };
+    // Simulate a legacy card that lacks the property entirely (`?? 0` applies).
+    const legacyNoField = { ...legacy } as BusinessCard & { ongoingCost?: number };
+    delete (legacyNoField as { ongoingCost?: number }).ongoingCost;
+    addBusinessToHand(state, legacyNoField);
+
+    const coinsBefore = state.resourceBank.coins;
+    applyBusinessOngoingCosts(state);
+    expect(state.resourceBank.coins).toBe(coinsBefore);
   });
 });
 
@@ -292,6 +317,49 @@ describe('Tooltip — ongoing cost in card tooltip info', () => {
 
     const tooltip = buildCardTooltipInfo(biz, { synergyBonusPerNeighbor: 1 });
     expect(tooltip).not.toContain('Ongoing cost');
+  });
+});
+
+// ── Producer regression: Tea house held in hand (real CSV data) ──────
+
+describe('producer regression — business card in hand costs 1/4 purchase price per turn', () => {
+  it('should deduct 1.75/turn for the Tea house (cost 7) held in hand', () => {
+    // Producer scenario: a business card in hand, no income from built
+    // businesses, 6 coins in the bank. Expected loss: 7 * 0.25 = 1.75.
+    const state = createTestState('teahouse-in-hand');
+    state.resourceBank.coins = 6;
+    // No built businesses → base income of 0 for everything on the street grid
+    state.streetGrid = [];
+    state.incidentDeck = [];
+
+    const deck = createBusinessDeck(1);
+    const teahouse = deck.find(c => c.id.startsWith('biz-teahouse'));
+    expect(teahouse).toBeDefined();
+    addBusinessToHand(state, teahouse!);
+    state.phase = 'MarketPhase';
+
+    const result = processEndOfTurn(state);
+
+    expect(result.income).toBeDefined();
+    expect(state.resourceBank.coins).toBeCloseTo(6 - 1.75, 5);
+    expect(state.activityLog.some(l => l.text.includes('Business costs: -1.75'))).toBe(true);
+  });
+
+  it('should clamp coins at 0 when a hand card costs more than available coins', () => {
+    const state = createTestState('teahouse-clamp');
+    state.resourceBank.coins = 0.5;
+    state.streetGrid = [];
+    state.incidentDeck = [];
+
+    const deck = createBusinessDeck(1);
+    const teahouse = deck.find(c => c.id.startsWith('biz-teahouse'));
+    addBusinessToHand(state, teahouse!);
+    state.phase = 'MarketPhase';
+
+    processEndOfTurn(state);
+
+    expect(state.resourceBank.coins).toBe(0);
+    expect(state.activityLog.some(l => l.text.includes('Insufficient coins'))).toBe(true);
   });
 });
 

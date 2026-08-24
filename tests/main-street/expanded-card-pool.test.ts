@@ -477,7 +477,7 @@ describe('Expanded Card Pool: Deck Building', () => {
     expect(bakeries).toHaveLength(2);
     for (const b of bakeries) {
       expect(b.cost).toBe(3);
-      expect(b.baseIncome).toBe(0.5);
+      expect(b.baseIncome).toBe(2.3); // raised 0.5 → 2.3 by CG-0MSVYPEZ90085SHE
       expect(b.synergyTypes).toEqual(['Food']);
     }
   });

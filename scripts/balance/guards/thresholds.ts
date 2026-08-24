@@ -102,6 +102,12 @@ export interface GuardrailResult {
  *    end-of-game coins relative to turns (measured 2.69 on the canonical
  *    200-seed set). Operator pre-accepted balance drift — plan "do NOT gate
  *    on exact parity".
+ *    CG-0MSVYPEZ90085SHE: widened to 0–6 after the business-ongoing-costs +
+ *    income-raise re-baseline (operator-chosen option A). Hand-held cards
+ *    drain coins every turn, so winning greedy runs are short (~10-turn)
+ *    rich sprints that bank 50–80 coins — measured 5.76 on the canonical
+ *    200-seed set. The win-rate design ladder is preserved and remains the
+ *    primary balance gate.
  */
 export const GUARDRAIL_THRESHOLDS: Record<string, GuardrailThreshold> = {
   'winRate_greedy_medium': {
@@ -136,7 +142,7 @@ export const GUARDRAIL_THRESHOLDS: Record<string, GuardrailThreshold> = {
     metric: 'avgCoinsPerTurn_greedy_medium',
     label: 'Avg Coins Per Turn (Net Liquidity, Greedy, Medium)',
     min: 0,
-    max: 3,
+    max: 6,
     severity: 'critical',
   },
   'medianScore_greedy_medium': {

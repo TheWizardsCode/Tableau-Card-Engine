@@ -50,18 +50,20 @@ interface NewBusinessContract {
 }
 
 const NEW_BUSINESS_CONTRACTS: NewBusinessContract[] = [
-  { id: 'biz-juice-bar', name: 'Juice Bar', cost: 5, baseIncome: 0.5, synergyTypes: ['Food', 'Health'], tier: '5' },
-  { id: 'biz-yoga-studio', name: 'Yoga Studio', cost: 8, baseIncome: 1, synergyTypes: ['Culture', 'Health'], tier: '9' },
-  { id: 'biz-physio', name: 'Physiotherapy', cost: 10, baseIncome: 1, synergyTypes: ['Health', 'Service'], tier: '11', reputationPerTurn: 0.1 },
-  { id: 'biz-tailor', name: 'Tailor', cost: 5, baseIncome: 0.75, synergyTypes: ['Service'], tier: '6' },
-  { id: 'biz-gym', name: 'Gym', cost: 8, baseIncome: 1, synergyTypes: ['Health'], tier: '9' },
-  { id: 'biz-dentist', name: 'Dentist', cost: 12, baseIncome: 1.5, synergyTypes: ['Health'], tier: '11' },
-  { id: 'biz-toy-store', name: 'Toy Store', cost: 5, baseIncome: 0.75, synergyTypes: ['Commerce'], tier: '6' },
-  { id: 'biz-music-store', name: 'Music Store', cost: 8, baseIncome: 1, synergyTypes: ['Entertainment'], tier: '10' },
-  { id: 'biz-delicatessen', name: 'Delicatessen', cost: 5, baseIncome: 0.75, synergyTypes: ['Food'], tier: '7' },
-  { id: 'biz-craft-shop', name: 'Craft Shop', cost: 5, baseIncome: 0.75, synergyTypes: ['Culture'], tier: '7' },
-  { id: 'biz-hotel', name: 'Grand Hotel', cost: 16, baseIncome: 2.5, synergyTypes: ['Service'], tier: '12', reputationPerTurn: 0.1 },
-  { id: 'biz-teahouse', name: 'Teahouse', cost: 7, baseIncome: 0.75, synergyTypes: ['Food', 'Culture'], tier: '7' },
+  // Income/rep values raised by the CG-0MSVYPEZ90085SHE ongoing-cost rebalance
+  // (income = old income + 2.4 × ongoing cost; tiered reputation per turn).
+  { id: 'biz-juice-bar', name: 'Juice Bar', cost: 5, baseIncome: 3.5, synergyTypes: ['Food', 'Health'], tier: '5', reputationPerTurn: 0.08 },
+  { id: 'biz-yoga-studio', name: 'Yoga Studio', cost: 8, baseIncome: 5.8, synergyTypes: ['Culture', 'Health'], tier: '9', reputationPerTurn: 0.12 },
+  { id: 'biz-physio', name: 'Physiotherapy', cost: 10, baseIncome: 7, synergyTypes: ['Health', 'Service'], tier: '11', reputationPerTurn: 0.15 },
+  { id: 'biz-tailor', name: 'Tailor', cost: 5, baseIncome: 3.75, synergyTypes: ['Service'], tier: '6', reputationPerTurn: 0.08 },
+  { id: 'biz-gym', name: 'Gym', cost: 8, baseIncome: 5.8, synergyTypes: ['Health'], tier: '9', reputationPerTurn: 0.12 },
+  { id: 'biz-dentist', name: 'Dentist', cost: 12, baseIncome: 8.7, synergyTypes: ['Health'], tier: '11', reputationPerTurn: 0.2 },
+  { id: 'biz-toy-store', name: 'Toy Store', cost: 5, baseIncome: 3.75, synergyTypes: ['Commerce'], tier: '6', reputationPerTurn: 0.08 },
+  { id: 'biz-music-store', name: 'Music Store', cost: 8, baseIncome: 5.8, synergyTypes: ['Entertainment'], tier: '10', reputationPerTurn: 0.12 },
+  { id: 'biz-delicatessen', name: 'Delicatessen', cost: 5, baseIncome: 3.75, synergyTypes: ['Food'], tier: '7', reputationPerTurn: 0.08 },
+  { id: 'biz-craft-shop', name: 'Craft Shop', cost: 5, baseIncome: 3.75, synergyTypes: ['Culture'], tier: '7', reputationPerTurn: 0.08 },
+  { id: 'biz-hotel', name: 'Grand Hotel', cost: 16, baseIncome: 12.1, synergyTypes: ['Service'], tier: '12', reputationPerTurn: 0.3 },
+  { id: 'biz-teahouse', name: 'Teahouse', cost: 7, baseIncome: 4.95, synergyTypes: ['Food', 'Culture'], tier: '7', reputationPerTurn: 0.1 },
 ];
 
 function byId(templates: readonly { id: string }[], id: string): BusinessCard | undefined {

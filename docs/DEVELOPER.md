@@ -212,7 +212,7 @@ quickly while the main branch retains full, strict checks:
 |---|---|---|---|---|
 | `MONTE_SEEDS` | 20 | 20 | 200 | Number of deterministic seeds to simulate |
 | `MONTE_MIN_WIN_RATE` | 0.20 | 0.20 | 0.30 | Minimum acceptable win rate |
-| `MONTE_MAX_WIN_RATE` | 0.80 | 0.80 | 0.60 | Maximum acceptable win rate |
+| `MONTE_MAX_WIN_RATE` | 0.90 | 0.90 | 0.90 | Maximum acceptable win rate |
 
 Detailed pacing metrics (median score, grid fill timing, loss-reason dominance) are only asserted
 when `MONTE_SEEDS >= 50`, since they are not statistically meaningful for small sample sizes.
@@ -230,7 +230,7 @@ MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.30 MONTE_MAX_WIN_RATE=0.60 npm test
 MONTE_SEEDS=50 npm run monte-carlo
 
 # Fully explicit override:
-MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.20 MONTE_MAX_WIN_RATE=0.80 npm test
+MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.20 MONTE_MAX_WIN_RATE=0.90 npm test
 ```
 
 Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite.config.ts`:

@@ -89,9 +89,12 @@ describe('Reworked Clinic (biz-clinic)', () => {
     expect(clinic!.baseIncome).toBe(0);
   });
 
-  it('should have reputationPerTurn of 0.2', () => {
+  it('should have reputationPerTurn of 0.4', () => {
     // reputationPerTurn is optional; if undefined, treat as 0
-    expect((clinic as any).reputationPerTurn).toBe(0.2);
+    // Raised 0.2 → 0.4 by CG-0MSVYPEZ90085SHE: clinic is the 0-income
+    // reputation anchor — reduced ongoing cost (2.25 → 0.5) + boosted rep so
+    // it pays off via late-game income multipliers.
+    expect((clinic as any).reputationPerTurn).toBe(0.4);
   });
 
   it('should still have cost 9, maxLevel 1, upgradePath Clinic', () => {
@@ -137,9 +140,9 @@ describe('Private Clinic (biz-private-clinic)', () => {
     expect(card).toBeDefined();
   });
 
-  it('should have cost 14, baseIncome 2.5, Health synergy', () => {
+  it('should have cost 14, baseIncome 10.9, Health synergy', () => {
     expect(card!.cost).toBe(14);
-    expect(card!.baseIncome).toBe(2.5);
+    expect(card!.baseIncome).toBe(10.9);
     expect(card!.synergyTypes).toEqual(['Health']);
   });
 
@@ -148,9 +151,9 @@ describe('Private Clinic (biz-private-clinic)', () => {
     expect(card!.upgradePath).toBe('Private Clinic');
   });
 
-  it('should have no reputationPerTurn (undefined or 0)', () => {
+  it('should have reputationPerTurn of 0.25 (CG-0MSVYPEZ90085SHE tiered rep)', () => {
     const rep = (card as any).reputationPerTurn;
-    expect(rep === undefined || rep === 0).toBe(true);
+    expect(rep).toBe(0.25);
   });
 });
 
@@ -191,9 +194,9 @@ describe('Pharmacy (biz-pharmacy)', () => {
     expect(card).toBeDefined();
   });
 
-  it('should have cost 7, baseIncome 1, Health synergy', () => {
+  it('should have cost 7, baseIncome 5.2, Health synergy', () => {
     expect(card!.cost).toBe(7);
-    expect(card!.baseIncome).toBe(1);
+    expect(card!.baseIncome).toBe(5.2);
     expect(card!.synergyTypes).toEqual(['Health']);
   });
 
@@ -205,9 +208,9 @@ describe('Pharmacy (biz-pharmacy)', () => {
     expect(card!.upgradePath).toBeUndefined();
   });
 
-  it('should have no reputationPerTurn', () => {
+  it('should have reputationPerTurn of 0.1 (CG-0MSVYPEZ90085SHE tiered rep)', () => {
     const rep = (card as any).reputationPerTurn;
-    expect(rep === undefined || rep === 0).toBe(true);
+    expect(rep).toBe(0.1);
   });
 });
 
@@ -248,13 +251,13 @@ describe('Reputation Per Turn (Income Phase)', () => {
   it('Private Clinic should generate income from baseIncome', () => {
     const grid = emptyGrid();
     grid[0] = { ...findBizTemplate('biz-private-clinic')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
-    expect(computeBusinessIncome(grid, 0)).toBe(2.5);
+    expect(computeBusinessIncome(grid, 0)).toBe(10.9);
   });
 
   it('Pharmacy should generate income from baseIncome', () => {
     const grid = emptyGrid();
     grid[0] = { ...findBizTemplate('biz-pharmacy')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
-    expect(computeBusinessIncome(grid, 0)).toBe(1);
+    expect(computeBusinessIncome(grid, 0)).toBe(5.2);
   });
 
   it('Clinic with Medical Center upgrade should still generate 0 coin income', () => {
@@ -268,10 +271,10 @@ describe('Reputation Per Turn (Income Phase)', () => {
     grid[0] = { ...findBizTemplate('biz-private-clinic')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
     grid[1] = { ...findBizTemplate('biz-pharmacy')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
     // Percentage-based formula:
-    // Private Clinic: base=2.5, synergyCoinBonus=0.5, N=1, synergy=2.5*0.5=1.25, total=3.75
-    expect(computeBusinessIncome(grid, 0)).toBe(3.75);
-    // Pharmacy: base=1, synergyCoinBonus=0.5, N=1, synergy=1*0.5=0.5, total=1.5
-    expect(computeBusinessIncome(grid, 1)).toBe(1.5);
+    // Private Clinic: base=10.9, synergyCoinBonus=0.5, N=1, synergy=10.9*0.5=5.45, total=16.35
+    expect(computeBusinessIncome(grid, 0)).toBeCloseTo(16.35, 5);
+    // Pharmacy: base=5.2, synergyCoinBonus=0.5, N=1, synergy=5.2*0.5=2.6, total=7.8
+    expect(computeBusinessIncome(grid, 1)).toBeCloseTo(7.8, 5);
   });
 
   it('Health synergy counts diagonal neighbors (8-way adjacency)', () => {
@@ -280,8 +283,8 @@ describe('Reputation Per Turn (Income Phase)', () => {
     grid[0] = { ...findBizTemplate('biz-private-clinic')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
     grid[6] = { ...findBizTemplate('biz-pharmacy')!, level: 0, incomeBonus: 0, synergyRangeBonus: 0 };
     // Same values as the orthogonal case: diagonal Health neighbors synergize.
-    expect(computeBusinessIncome(grid, 0)).toBe(3.75);
-    expect(computeBusinessIncome(grid, 6)).toBe(1.5);
+    expect(computeBusinessIncome(grid, 0)).toBeCloseTo(16.35, 5);
+    expect(computeBusinessIncome(grid, 6)).toBeCloseTo(7.8, 5);
   });
 
   it('applyIncome should add reputation from Clinic reputationPerTurn', () => {
@@ -297,8 +300,8 @@ describe('Reputation Per Turn (Income Phase)', () => {
 
     // Income (coin) should be 0 since Clinic has baseIncome=0 and no neighbors
     expect(result.total).toBe(0);
-    // Reputation should have increased by 0.2
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.2);
+    // Reputation should have increased by 0.4 (CG-0MSVYPEZ90085SHE clinic rep raise)
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.4);
   });
 
   it('applying Medical Center upgrade should add additional 0.1 reputation per turn', () => {
@@ -317,8 +320,8 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
 
-    // Clinic reputationPerTurn=0.2 + Medical Center reputationBonus=0.1 = 0.3
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.3);
+    // Clinic reputationPerTurn=0.4 + Medical Center reputationBonus=0.1 = 0.5
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.5);
   });
 
   it('multiple clinics should each contribute reputation per turn', () => {
@@ -332,11 +335,11 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
 
-    // 2 clinics * 0.2 each (synergyRepBonus nullified by same-type rule) = 0.4
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.4);
+    // 2 clinics * 0.4 each (synergyRepBonus nullified by same-type rule) = 0.8
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.8);
   });
 
-  it('Private Clinic and Pharmacy should not add reputation per turn', () => {
+  it('Private Clinic and Pharmacy should add reputation per turn (CG-0MSVYPEZ90085SHE tiered rep)', () => {
     const state = setupMainStreetGame({ seed: 'no-rep-test' });
     const pcTemplate = findBizTemplate('biz-private-clinic')!;
     const pharmTemplate = findBizTemplate('biz-pharmacy')!;
@@ -348,7 +351,8 @@ describe('Reputation Per Turn (Income Phase)', () => {
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
 
-    // Private Clinic has reputationBonus=0.1, so rep increases by 0.1
-    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.1);
+    // Tiered rep (CG-0MSVYPEZ90085SHE): Private Clinic 0.25 + Pharmacy 0.2
+    // (0.1 base + 0.1 Health synergy rep from the adjacent Private Clinic) = 0.45
+    expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.45);
   });
 });

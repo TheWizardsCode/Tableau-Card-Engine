@@ -24,8 +24,11 @@ describe('GUARDRAIL_THRESHOLDS', () => {
     // CG-0MT3J8FXG006RCOA: widened to 0–3 — plain-count reputation score +
     // retuned thresholds (100/120/150) deflated scores, leaving more coins
     // per turn (measured 2.69; operator pre-accepted balance drift).
+    // CG-0MSVYPEZ90085SHE: widened to 0–6 — business ongoing costs + income
+    // raise make winning runs short ~10-turn sprints that bank 50–80 coins
+    // (measured 5.76; win-rate design ladder preserved as primary gate).
     expect(t.min).toBe(0);
-    expect(t.max).toBe(3);
+    expect(t.max).toBe(6);
     expect(t.severity).toBe('critical');
   });
 
