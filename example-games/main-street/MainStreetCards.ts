@@ -471,6 +471,13 @@ export interface StaffCard {
   readonly handSlotsAdded: number;
   readonly description: string;
   /**
+   * Specialization skills randomized at game start (CG-0MT4WXSWG0023VR0,
+   * parent CG-0MT1CIWSD003VBPK). Stored as stable catalog ids; resolved via
+   * `getSkill`. Assigned once per card instance at setup and locked for the
+   * full game. Absent (undefined) on legacy saves — treat as no skills.
+   */
+  specializationSkillIds?: string[];
+  /**
    * Optional reputation granted per turn during the income phase
    * (e.g. the Socialite's +0.1 rep/turn ability — Group F,
    * CG-0MSQJ7VL9009JHF4).

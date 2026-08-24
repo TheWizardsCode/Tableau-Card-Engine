@@ -30,6 +30,8 @@
  */
 
 import type { SpecializationSkill, SpecializationSkillCategory } from './MainStreetCards';
+import type { MainStreetState } from './MainStreetState';
+import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 export type { SpecializationSkill, SpecializationSkillCategory } from './MainStreetCards';
 export { STACKED_SKILL_CATEGORIES } from './MainStreetCards';
@@ -109,6 +111,48 @@ export function deserializeSkillIds(raw: unknown): SpecializationSkill[] {
     throw new Error(`Invalid specialization skill state: expected an array, got ${typeof raw}`);
   }
   return raw.map(id => getSkill(String(id)));
+}
+
+// ── Game-start randomization (I3, CG-0MT4WXSWG0023VR0) ─────
+
+/**
+ * Derivation salt separating the skill-assignment RNG stream from the main
+ * game RNG stream (deck shuffles, market draws, challenge selection). Using a
+ * dedicated stream keeps `state.rngCalls` and every seed-dependent deck
+ * ordering unchanged, so the wider suite's seeded fixtures stay stable.
+ */
+const SKILL_RNG_SALT = 0x5eed;
+
+/**
+ * Assigns specialization skills to every staff card instance in a new game:
+ * the staff deck pool and the staff cards currently face-up in the market
+ * row. Called once at set-up (CG-0MT4WXSWG0023VR0); assignments are locked
+ * for the whole game — hires, discards, and market refills never re-roll
+ * them (CG-0MSTOATDU006UGAX).
+ *
+ * Determinism: a dedicated `createSeededRng` stream derived from the game's
+ * numeric seed produces the same assignments for the same seed (same seed ⇒
+ * same game), without perturbing the main RNG stream.
+ *
+ * Skills are deliberately assigned from the global pool regardless of the
+ * staff member's nominal job — a "Chef" can hold the "Security" skill.
+ *
+ * @param state Initialized game state (decks + market already assembled).
+ */
+export function assignStaffApplicantSkills(state: MainStreetState): void {
+  const skillRng = createSeededRng(state.numericSeed ^ SKILL_RNG_SALT);
+  const assign = (card: { specializationSkillIds?: string[] }): void => {
+    card.specializationSkillIds = serializeSkillIds(assignSkillsToApplicant(skillRng));
+  };
+
+  for (const card of state.decks.staff) {
+    assign(card);
+  }
+  for (const card of state.market.cards) {
+    if (card.family === 'staff') {
+      assign(card as { specializationSkillIds?: string[] });
+    }
+  }
 }
 
 // ── Deterministic Assignment (AC3/AC4) ───────────────────────

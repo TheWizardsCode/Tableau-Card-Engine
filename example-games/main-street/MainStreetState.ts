@@ -43,6 +43,7 @@ import {
   CHALLENGE_TEMPLATES,
   selectChallenges,
 } from './MainStreetChallenges';
+import { assignStaffApplicantSkills } from './MainStreetStaffSkills';
 import {
   type GameConfig,
   type DifficultyName,
@@ -769,6 +770,10 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
 
   // Refill the single-row market with its initial composition.
   refillSingleRowMarket(state);
+
+  // Randomize specialization skills for every staff applicant once per game
+  // (I3, CG-0MT4WXSWG0023VR0). Dedicated seeded stream — main RNG untouched.
+  assignStaffApplicantSkills(state);
 
   // Select challenges for this run using seeded RNG and config count
   const selectedChallenges = selectChallenges(CHALLENGE_TEMPLATES, config.challengesPerRun, rng);
