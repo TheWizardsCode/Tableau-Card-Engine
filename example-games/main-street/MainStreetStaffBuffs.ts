@@ -32,6 +32,8 @@
 
 import type { SynergyType } from './MainStreetCards';
 import type { SpecializationSkill } from './MainStreetStaffSkills';
+import { deserializeSkillIds } from './MainStreetStaffSkills';
+import type { MainStreetState } from './MainStreetState';
 
 // ── Buff Profiles ───────────────────────────────────────────
 
@@ -177,6 +179,58 @@ export function computePerBusinessSkillBuffs(
 }
 
 // ── Street / engine-level buff helpers ──────────────────────
+
+/**
+ * Flattens the specialization skills of every currently employed staff
+ * member (hired cards in `state.staffCards`) into one skill list. Skills are
+ * read from the card's locked `specializationSkillIds` (I3); members without
+ * the field (legacy saves / hand-built fixtures) contribute nothing.
+ */
+export function getEmployedSpecializationSkills(state: MainStreetState): SpecializationSkill[] {
+  return (state.staffCards ?? []).flatMap(card => {
+    const ids = Array.isArray(card.specializationSkillIds) ? card.specializationSkillIds : [];
+    try {
+      return deserializeSkillIds(ids);
+    } catch {
+      // A stale/unknown skill id on a saved member must not break the income
+      // phase; skip the member's skills (documented forward-compat path).
+      return [];
+    }
+  });
+}
+
+/**
+ * Incident-mitigation buffs aggregated street-wide, independent of any
+ * single business profile (all incident skills are profile-agnostic). Used by
+ * the incident resolution path (I4).
+ */
+export function computeIncidentSkillBuffs(skills: readonly SpecializationSkill[]): IncidentSkillBuffs {
+  const incidents = {
+    coinDamageReductionPct: 0,
+    reputationDamageReductionFlat: 0,
+    probabilityReductionPct: 0,
+    immuneToTheftLoss: false,
+  };
+  for (const skill of skills) {
+    switch (skill.id) {
+      case 'skill-quality-inspector':
+        incidents.coinDamageReductionPct += QUALITY_INSPECTOR_COIN_PCT;
+        break;
+      case 'skill-compliance':
+        incidents.reputationDamageReductionFlat += COMPLIANCE_REP_FLAT;
+        break;
+      case 'skill-risk-manager':
+        incidents.probabilityReductionPct += RISK_MANAGER_PROBABILITY_PCT;
+        break;
+      case 'skill-security-consultant':
+        incidents.immuneToTheftLoss = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return incidents;
+}
 
 /**
  * Street-wide ongoing-cost reduction (Cost Cutter, -15%). Flagged AC5 for

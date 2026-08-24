@@ -23,6 +23,14 @@ import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/Ac
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import {
+  computeIncidentSkillBuffs,
+  computeReputationGainMultiplier,
+  computeStaffSalaryCost,
+  computeStreetOngoingCostReductionPct,
+  getEmployedSpecializationSkills,
+} from './MainStreetStaffBuffs';
+import { deserializeSkillIds } from './MainStreetStaffSkills';
+import {
   purchaseBusiness,
   moveToHand,
   purchaseUpgrade,
@@ -390,6 +398,19 @@ function computeDurationWithClinicReduction(
 }
 
 /**
+ * True for Incident events representing theft or loss of coins (targeted in
+ * the Security Consultant's immunity, I4). Matches on the incident's
+ * description, which is the stable design source (all incident descriptions
+ * in card-data.csv state their consequence explicitly).
+ */
+function isTheftLossIncident(event: EventCard): boolean {
+  return (
+    event.trigger === 'Incident' &&
+    (/\btheft\b/i.test(event.effect) || /\bloss(?:es)?\b/i.test(event.effect))
+  );
+}
+
+/**
  * Resolves a single event card's effects on the game state.
  *
  * DurationEventCards branch to ActiveEffect creation instead of applying
@@ -439,6 +460,27 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
   }
 
   // ── Regular EventCard resolution ────────────────────────────
+  // Staff specialization incident/rep buffs (I4, CG-0MT4WXV2J000M35M):
+  // damage reductions apply to Incident events only; the Brand Ambassador
+  // +50% gains multiplier applies to positive reputation deltas from both
+  // incidents and investments.
+  const employedSkills = getEmployedSpecializationSkills(state);
+  const repGainMultiplier = computeReputationGainMultiplier(employedSkills);
+  const incidentBuffs = event.trigger === 'Incident' ? computeIncidentSkillBuffs(employedSkills) : null;
+  const theftNeutralized =
+    incidentBuffs !== null && incidentBuffs.immuneToTheftLoss && isTheftLossIncident(event);
+  /** Effective coin delta after quality-inspector / security-consultant mitigation. */
+  const cDelta = (effect: number): number => {
+    if (theftNeutralized && effect < 0) return 0; // theft immunity: no coin loss
+    if (incidentBuffs === null || effect >= 0) return effect;
+    return effect + Math.abs(effect) * incidentBuffs.coinDamageReductionPct;
+  };
+  /** Effective reputation delta after brand-ambassador / compliance mitigation. */
+  const rDelta = (effect: number): number => {
+    if (effect > 0) return effect * repGainMultiplier;
+    if (incidentBuffs === null) return effect;
+    return Math.min(0, effect + incidentBuffs.reputationDamageReductionFlat);
+  };
   const rep = state.resourceBank.reputation;
   const cfg = state.config;
 
@@ -449,14 +491,14 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
         b => b !== null && b.synergyTypes.includes(event.targetSynergy as SynergyType),
       ).length;
       const rawDelta = event.coinDelta * matchCount;
-      state.resourceBank.coins += applyReputationMultiplier(rawDelta, rep, cfg);
-      state.resourceBank.reputation += event.reputationDelta;
+      state.resourceBank.coins += applyReputationMultiplier(cDelta(rawDelta), rep, cfg);
+      state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
     }
     case 'All': {
       // Apply to all -- direct delta on resource bank
-      state.resourceBank.coins += applyReputationMultiplier(event.coinDelta, rep, cfg);
-      state.resourceBank.reputation += event.reputationDelta;
+      state.resourceBank.coins += applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg);
+      state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
     }
     case 'RandomBusiness': {
@@ -467,9 +509,9 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
         // Consume RNG for deterministic selection (used in future milestones)
         const _targetIdx = Math.floor(state.rng() * placed.length);
         void _targetIdx;
-        state.resourceBank.coins += applyReputationMultiplier(event.coinDelta, rep, cfg);
+        state.resourceBank.coins += applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg);
       }
-      state.resourceBank.reputation += event.reputationDelta;
+      state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
     }
   }
@@ -556,6 +598,18 @@ export function resolveHeldInvestment(state: MainStreetState): EventCard | null 
  * incident is available.
  */
 export function resolveIncident(state: MainStreetState): EventCard | null {
+  // Risk Manager: -15% incident probability (I4, CG-0MT4WXV2J000M35M). When
+  // employed, each turn's incident draw is averted with probability
+  // probabilityReductionPct; the deck is untouched so the averted card
+  // resolves next turn. Consumes one main-RNG draw while employed
+  // (deterministic per seed).
+  const employed = getEmployedSpecializationSkills(state);
+  const incidentBuffs = computeIncidentSkillBuffs(employed);
+  if (incidentBuffs.probabilityReductionPct > 0 && state.rng() < incidentBuffs.probabilityReductionPct) {
+    addLog(state, 'Risk Manager averted today\'s incident.', 'neutral');
+    return null;
+  }
+
   // Deck exhausted: reshuffle incident cards back in from the event deck /
   // event discards (existing reshuffle convention).
   if (state.incidentDeck.length === 0) {
@@ -1322,10 +1376,18 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
   const staffCards = state.staffCards ?? [];
   if (staffCards.length === 0) return;
 
+  const employed = getEmployedSpecializationSkills(state);
+  // Cost Cutter: -15% street-wide ongoing costs (AC7 flagged for extra
+  // balance testing). Applied to every ongoing deduction family uniformly.
+  const streetReduction = computeStreetOngoingCostReductionPct(employed);
+
   let totalCost = 0;
   for (const card of staffCards) {
-    totalCost += card.ongoingCost;
+    // Operations Manager: -0.5 of THIS member's own salary (computeStaffSalaryCost).
+    const memberSkills = Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [];
+    totalCost += computeStaffSalaryCost(memberSkills, card.ongoingCost);
   }
+  totalCost *= 1 - streetReduction;
 
   if (totalCost > 0) {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
@@ -1352,6 +1414,8 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
 export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
   const grid = state.streetGrid;
 
+  const streetReduction = computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state));
+
   let totalCost = 0;
   let spaceCount = 0;
   for (const slot of grid) {
@@ -1362,6 +1426,7 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
       spaceCount += 1;
     }
   }
+  totalCost *= 1 - streetReduction;
   if (spaceCount === 0) return;
 
   if (totalCost > 0) {
@@ -1414,6 +1479,9 @@ export function applyBusinessOngoingCosts(state: MainStreetState): void {
   }
 
   if (bizCount === 0) return;
+
+  // Cost Cutter: -15% street-wide ongoing costs (I4).
+  totalCost *= 1 - computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state));
 
   if (totalCost > 0) {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);

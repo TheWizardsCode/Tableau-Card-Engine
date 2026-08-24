@@ -22,6 +22,10 @@ import {
   orderIncidentDeck,
 } from './MainStreetCards';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
+import {
+  computeRefreshCostDiscount,
+  getEmployedSpecializationSkills,
+} from './MainStreetStaffBuffs';
 import { refillSingleRowMarket } from './MainStreetState';
 import { resolveEvent } from './MainStreetEngine';
 
@@ -232,7 +236,9 @@ export function refreshMarketCost(state: MainStreetState): number {
     (sum, card) => sum + (card.refreshCostDiscount ?? 0),
     0,
   );
-  return Math.max(0, REFRESH_MARKET_COST - discount);
+  // Negotiator specialization skill: -1 on refreshes (I4, CG-0MT4WXV2J000M35M).
+  const negotiatorDiscount = computeRefreshCostDiscount(getEmployedSpecializationSkills(state));
+  return Math.max(0, REFRESH_MARKET_COST - discount - negotiatorDiscount);
 }
 
 /**

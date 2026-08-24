@@ -16,6 +16,10 @@ import type { MainStreetState } from './MainStreetState';
 import { addLog, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier } from './MainStreetDifficulty';
 import { applyActiveEffectMultiplier } from '../../src/core-engine/ActiveEffect';
+import {
+  computePerBusinessSkillBuffs,
+  getEmployedSpecializationSkills,
+} from './MainStreetStaffBuffs';
 
 // ── Adjacency Resolver ──────────────────────────────────────
 
@@ -615,6 +619,12 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   const soldSlots = state.soldSlots ?? [];
   const grid = state.streetGrid;
 
+  // Specialization skills of all employed staff (I4, CG-0MT4WXV2J000M35M).
+  // Buffs are folded in READ-ONLY at income time — the per-card currentIncome
+  // cache is never mutated, so hiring/editing staff never leaves stale caches
+  // (AC2: no conflicts with the adjacency caching contract).
+  const employedSkills = getEmployedSpecializationSkills(state);
+
   // Read cached currentIncome for each active slot instead of calling
   // computeBusinessIncome from scratch every turn.
   // If a card doesn't have currentIncome set (undefined, e.g. legacy saves
@@ -628,14 +638,22 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     if (!card) continue;
 
     const slotIncome = card.currentIncome ?? 0;
+    // Per-business income skill buffs: +pct of the business's cached income,
+    // plus a flat coin bonus (chef/dj/sales-champion — I4).
+    const buffs = computePerBusinessSkillBuffs(employedSkills, {
+      synergyTypes: (card as BusinessCard).synergyTypes ?? [],
+      baseIncome: (card as BusinessCard).baseIncome ?? 0,
+      ongoingCost: (card as BusinessCard).ongoingCost ?? 0,
+    });
+    const buffedIncome = slotIncome * (1 + buffs.income.percent) + buffs.income.flat;
     breakdown.push({
       slotIndex: i,
       businessName: card.name,
       baseIncome: slotIncome,
       synergyBonus: 0,
-      total: slotIncome,
+      total: buffedIncome,
     });
-    total += slotIncome;
+    total += buffedIncome;
   }
 
   // Apply active effect income modifiers per-slot, before reputation multiplier.
@@ -663,7 +681,15 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     if (soldSlots[i]) continue;
     const card = grid[i];
     if (!card) continue;
-    repPerTurn += card.currentReputationPerTurn ?? 0;
+    const baseRep = card.currentReputationPerTurn ?? 0;
+    // Per-business reputation skill buffs (community-builder +0.1 all,
+    // pr-strategist +0.15 Service; I4).
+    const buffs = computePerBusinessSkillBuffs(employedSkills, {
+      synergyTypes: (card as BusinessCard).synergyTypes ?? [],
+      baseIncome: (card as BusinessCard).baseIncome ?? 0,
+      ongoingCost: (card as BusinessCard).ongoingCost ?? 0,
+    });
+    repPerTurn += baseRep + buffs.reputation.flat;
   }
   // Staff reputation abilities (e.g. the Socialite's +0.1 rep/turn —
   // Group F, CG-0MSQJ7VL9009JHF4) also accrue during the income phase.
