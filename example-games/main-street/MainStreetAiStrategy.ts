@@ -18,6 +18,7 @@
 import type { AiStrategyBase } from '../../src/ai';
 import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
 import { recordMainStreetEvent } from './MainStreetTranscript';
+import { hasPeekCapableStaff } from './MainStreetStaffSkills';
 import type { MainStreetState } from './MainStreetState';
 import {
   executeDayStart,
@@ -287,7 +288,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   // this turn (CG-0MT3KZOBZ005IRYE: the AI can now hire staff, so the
   // enumeration must reflect the peek legality gate or RandomStrategy
   // can draw an illegal second peek).
-  const hasPeekStaff = (state.staffCards ?? []).some(card => card.peekOncePerTurn);
+  const hasPeekStaff = hasPeekCapableStaff(state);
   if (hasPeekStaff && state.incidentDeck.length > 0 && !state.peekUsedThisTurn) {
     actions.push({ type: 'peek-incident-deck' });
   }

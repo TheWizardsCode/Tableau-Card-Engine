@@ -29,7 +29,7 @@ import {
   computeStreetOngoingCostReductionPct,
   getEmployedSpecializationSkills,
 } from './MainStreetStaffBuffs';
-import { deserializeSkillIds } from './MainStreetStaffSkills';
+import { deserializeSkillIds, hasPeekCapableStaff } from './MainStreetStaffSkills';
 import {
   purchaseBusiness,
   moveToHand,
@@ -743,7 +743,7 @@ export function peekIncidentDeck(state: MainStreetState): EventCard | null {
   if (state.phase !== 'MarketPhase') {
     throw new Error(`Cannot peek during ${state.phase}. Must be in MarketPhase.`);
   }
-  const hasPeekStaff = (state.staffCards ?? []).some(card => card.peekOncePerTurn);
+  const hasPeekStaff = hasPeekCapableStaff(state);
   if (!hasPeekStaff) {
     throw new Error('No staff member with the peek ability is employed.');
   }

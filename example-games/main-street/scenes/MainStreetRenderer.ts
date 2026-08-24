@@ -5,7 +5,7 @@
 import Phaser from 'phaser';
 import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import type { SpecializationSkill } from '../MainStreetStaffSkills';
-import { getSkill, STAFF_SKILL_CHIP_COLORS } from '../MainStreetStaffSkills';
+import { getSkill, hasPeekCapableStaff, STAFF_SKILL_CHIP_COLORS } from '../MainStreetStaffSkills';
 import {
   GRID_SIZE,
   MARKET_TOTAL_SLOTS,
@@ -1569,7 +1569,7 @@ export class MainStreetRenderer {
       // the Hint button. Only offered while a peek-capable staff member is
       // employed; disabled once the once-per-turn gate is spent, when no
       // daily actions remain, or when the incident deck is empty.
-      const hasPeekStaff = (s.state.staffCards ?? []).some((card: { peekOncePerTurn?: boolean }) => card.peekOncePerTurn);
+      const hasPeekStaff = hasPeekCapableStaff(s.state);
       if (hasPeekStaff) {
         const peekDisabled = s.state.peekUsedThisTurn || s.state.actionsRemaining <= 0 || s.state.incidentDeck.length === 0;
         const peekBtn = createActionButton(

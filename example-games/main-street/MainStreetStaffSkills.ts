@@ -97,6 +97,23 @@ export function getSkill(skillId: string): SpecializationSkill {
 // ── Serialization (I2, CG-0MT4WXQCN001G1LF) ─────────────────
 
 /**
+ * True when an employed staff member can peek at the incident deck: either
+ * the Lookout's `peekOncePerTurn` ability (CG-0MSXOW6GN008ZSMN) or the Town
+ * Gossip baseline specialization skill (`skill-town-gossip`, parent epic
+ * CG-0MT1CIWSD003VBPK). Consolidates the peek gates used by the engine,
+ * AI, renderer, and turn controller.
+ */
+export function hasPeekCapableStaff(state: {
+  staffCards?: readonly { peekOncePerTurn?: boolean; specializationSkillIds?: readonly string[] }[];
+}): boolean {
+  return (state.staffCards ?? []).some(
+    card =>
+      card.peekOncePerTurn === true ||
+      (Array.isArray(card.specializationSkillIds) && card.specializationSkillIds.includes(BASELINE_SKILL_ID)),
+  );
+}
+
+/**
  * Collapses a skill set to its stable id list for persistence. Skills travel
  * in saved state as plain ids (version-safe: catalogs evolve, stored ids do
  * not) and are resolved back through `getSkill` on load. Compatible with the

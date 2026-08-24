@@ -1,6 +1,7 @@
 import { addLog } from '../MainStreetState';
 import { executeDayStart, processEndOfTurn, placeFromHand, executeAction, type TurnResult } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
+import { hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import {
   findTargetBusinessSlot,
   canAddToHand,
@@ -1140,7 +1141,7 @@ export class MainStreetTurnController {
       playIllegalFeedback(s.actionContainer, s);
       return;
     }
-    if (!(s.state.staffCards ?? []).some((card: { peekOncePerTurn?: boolean }) => card.peekOncePerTurn)) {
+    if (!hasPeekCapableStaff(s.state)) {
       s.instructionText.setText('No staff member with the peek ability is employed.');
       playIllegalFeedback(s.actionContainer, s);
       return;
