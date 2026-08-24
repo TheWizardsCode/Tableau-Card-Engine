@@ -9,11 +9,13 @@ import { runMonteCarlo } from '../../example-games/main-street/MainStreetMonteCa
 //
 // This is the *regression guardrail* for the whole game (market-greedy smoke
 // strategy): a deliberately wide band that catches gross breakage without
-// being flaky at the 20-seed PR-CI seed count. The 0.90 cap was raised from
-// 0.80 by the CG-0MSVYPEZ90085SHE re-baseline (business ongoing costs +
-// income raise): hand costs make winning market-greedy runs reach the score
-// threshold more reliably (measured 0.79–0.85 post-rebalance on the
-// mc-balance seed set).
+// being flaky at the 20-seed PR-CI seed count. The 0.96 cap replaces 0.80/
+// 0.90 from the CG-0MSVYPEZ90085SHE ongoing-cost re-baseline: staff
+// specialization skills (CG-0MT4WXNR80090FXZ) landed alongside the raised
+// business incomes, and together market-greedy now wins ~0.95 on Medium
+// (measured 0.95 on the mc-balance seed set) — the game is deliberately
+// income-rich; the tuned design-intent bands are in
+// monte-carlo-greedy-guardrail.test.ts.
 //
 // The *tuned target* bands (design intent, per difficulty) are enforced
 // separately in monte-carlo-greedy-guardrail.test.ts; see
@@ -25,7 +27,7 @@ const DETAILED_METRICS_MIN_SEEDS = 50;
 
 const monteSeeds = Number.parseInt(process.env['MONTE_SEEDS'] ?? '20', 10);
 const monteMinWinRate = Number.parseFloat(process.env['MONTE_MIN_WIN_RATE'] ?? '0.20');
-const monteMaxWinRate = Number.parseFloat(process.env['MONTE_MAX_WIN_RATE'] ?? '0.90');
+const monteMaxWinRate = Number.parseFloat(process.env['MONTE_MAX_WIN_RATE'] ?? '0.96');
 
 describe('Main Street Monte Carlo balance heuristics', () => {
   it(`stays within CI guardrails over ${monteSeeds} deterministic seeds`, () => {

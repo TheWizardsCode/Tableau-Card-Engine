@@ -114,7 +114,14 @@ describe('MainStreet undo/redo feedback', () => {
 
     const emptySlot = state.streetGrid.findIndex((cell) => cell === null);
     expect(emptySlot).toBeGreaterThanOrEqual(0);
-    const affordable = state.market.cards.find((b) => b.cost <= state.resourceBank.coins);
+    // The cheapest *purchasable-on-street* card (business/community-space) —
+    // events/staff/upgrades are bought through their own commands and would
+    // be rejected by buyBusinessCommand.
+    const affordable = state.market.cards.find(
+      (b) =>
+        (b.family === 'business' || b.family === 'community-space') &&
+        b.cost <= state.resourceBank.coins,
+    );
     expect(affordable).toBeDefined();
 
     // Execute a real purchase through the scene's own undo manager (the same

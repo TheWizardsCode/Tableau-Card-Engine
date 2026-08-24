@@ -39,7 +39,7 @@ The recommended values above are the **tuned target bands** (design intent): the
 | Test | What it guards | Band / tolerance |
 |------|----------------|------------------|
 | `monte-carlo-guardrails.test.ts` | Drift vs the committed baseline (`docs/main-street/monte-carlo-baseline.json`) for Medium **and** the per-difficulty matrix | winRate ±0.25; coins ±30% |
-| `monte-carlo-balance.test.ts` | Whole-game smoke (market-greedy) at 20-seed PR CI | 0.20–0.90 win rate (raised from 0.80 by CG-0MSVYPEZ90085SHE: hand costs make winning market-greedy runs reach the threshold more reliably, measured 0.79–0.85) |
+| `monte-carlo-balance.test.ts` | Whole-game smoke (market-greedy) at 20-seed PR CI | 0.20–0.96 win rate (raised from 0.80 by CG-0MSVYPEZ90085SHE: hand costs + raised incomes, then the staff-specialisation economy (CG-0MT4WXNR80090FXZ) — measured 0.95 on the mc-balance seed set) |
 
 The old 20–80% greedy test band (`monte-carlo-greedy-guardrail.test.ts`) was redundant with these two tiers and conflated "tuned target" with "regression guardrail"; it has been replaced by the per-difficulty design-intent test.
 
@@ -73,7 +73,7 @@ Generated with `runAllCombinations()` — greedy, 200 seeds, 60 max turns, `mc-b
 > sprints that bank 50–80 coins: measured Medium liquidity 5.76 (band widened
 > 0–3 → 0–6), win rates Easy 0.835 / Medium 0.595 / Hard 0.160 (all in the
 > design-intent bands), Medium median 125. The baseline was regenerated from
-> the current code and the market-greedy smoke cap raised 0.80 → 0.90.
+> the current code and the market-greedy smoke cap raised 0.80 → 0.96 (staff-specialisation skills landed on top of the raised incomes; greedy design bands still measured Easy 0.820 / Medium 0.555 / Hard 0.120).
 > Losses are still bankruptcy-dominated; no run hits the 60-turn harness cap.
 
 For reference, an earlier sweep with a different seed prefix (`mc-baseline-`) gave Easy 0.77 / Medium 0.595 / Hard 0.25 — the difficulty ladder is stable across seed sets and cleanly monotone-decreasing (≈80 / ≈60 / ≈25), which is exactly the shape design intent calls for.
