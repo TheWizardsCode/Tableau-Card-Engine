@@ -445,7 +445,7 @@ This writes per-run and aggregate metrics to:
 
 ## Staff Cards
 
-Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143; 12-tier spread CG-0MT3C744B009DS84): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice). They are hired directly from the general market row (0–1 staff per row, `MARKET_STAFF_MAX`) — there is no dedicated staff market (CG-0MT2WTN0L004JA53).
+Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143; 12-tier spread CG-0MT3C744B009DS84): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice). They are hired directly from the general market row (0–1 staff per row, `MARKET_STAFF_MAX`) — there is no dedicated staff market (CG-0MT2WTN0L004JA53). A second wave of 12 specialization applicant cards (CG-0MT4WXNR80090FXZ) adds role-themed staff across tiers 2–5; none grant hand slots — they are employed-applicant cards whose effects (synergy/incident/cost bonuses) are wired by the staff-specialization epic.
 
 | ID | Name | Cost | Ongoing/turn | Slots+ | Tier | Ability | Description | Rationale |
 |----|------|------|--------------|--------|------|---------|-------------|-----------|
@@ -458,3 +458,15 @@ Staff cards are a separate card family (`family: 'staff'`) that expand hand capa
 | `staff-director` | Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. | Premium capacity. |
 | `staff-executive` | Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
 | `staff-general-manager` | General Manager | 20 | 5 | +4 | 12 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
+| `staff-barista` | Barista | 3 | 0.5 | — | 2 | Food synergy | A skilled barista brings warmth to any business. Adjacent Food businesses gain +0.2 synergy coins. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-bookkeeper` | Bookkeeper | 3 | 0.5 | — | 2 | −20% ongoing | Keeps the books tight. Reduces this business ongoing cost by 20%. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-customer-rep` | Customer Service Rep | 3 | 0.5 | — | 2 | Service synergy | Ensures every visitor leaves satisfied. Adjacent businesses gain +0.1 synergy reputation. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-delivery` | Delivery Driver | 3 | 0.5 | — | 2 | −0.5 purchase cost | Handles the logistics. Reduces business card purchase cost by 0.5 for this business. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-security` | Security Guard | 7 | 0.75 | — | 3 | −10% incident coins | Experienced guard watches over the street. Reduces all incident coin damage by 10%. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-marketing` | Marketing Consultant | 7 | 1 | — | 3 | +10% rep sources | Expert at drawing crowds. Businesses gain +10% reputation from all sources. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-event-planner` | Event Planner | 7 | 0.75 | — | 3 | Entertainment synergy | Creates buzz and draws visitors. +1 synergy coin per turn from Entertainment businesses. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-maintenance` | Maintenance Worker | 7 | 0.75 | — | 3 | −0.5 incident rep | Keeps everything running smoothly. Reduces incident reputation damage by 0.5. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-it` | IT Specialist | 8 | 1 | — | 4 | Refresh −1 | Modernizes operations. Reduces this business refresh cost by 1. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-health-safety` | Health & Safety Inspector | 8 | 1 | — | 4 | −10% Health incidents | Keeps everything up to code. Reduces incident frequency by 10% for Health businesses. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-pr` | PR Officer | 8 | 1 | — | 4 | +0.15 rep/turn | Manages the street image. +0.15 reputation per turn from all businesses. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-financial` | Financial Advisor | 10 | 1.25 | — | 5 | Upgrade −1 | Smart investments pay off. Reduces this business upgrade cost by 1. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |

@@ -1514,7 +1514,7 @@ export function buyAndPlaceBusiness(
   }
 
   const card = state.market.cards[marketIndex];
-  if (card.family === 'upgrade' || card.family === 'event') {
+  if (card.family !== 'business' && card.family !== 'community-space') {
     throw new Error('Buy-and-place only applies to business and community-space cards.');
   }
   if (slotIndex < 0 || slotIndex >= GRID_SIZE) {

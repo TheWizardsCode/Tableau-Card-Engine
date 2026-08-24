@@ -174,10 +174,11 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 12 cumulative pool covers full catalog (142 tiered templates)', () => {
-      // 142 = 133 (post-Group-D tiered catalog) + 9 staff cards now assigned a
-      // tier. 12-tier expansion re-distributes across tiers 1-12.
-      expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(142);
+    it('Tier 12 cumulative pool covers full catalog (154 tiered templates)', () => {
+      // 154 = 133 (post-Group-D tiered catalog) + 21 staff cards now assigned a
+      // tier (9 original + 12 specialization applicants, CG-0MT4WXNR80090FXZ).
+      // 12-tier expansion re-distributes across tiers 1-12.
+      expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(154);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -837,7 +838,7 @@ describe('Meta-Progression System', () => {
         ...staffDeck.map((c) => c.id.replace(/-\d+$/, '')),
       ]);
 
-      expect(allBaseIds.size).toBe(134); // +1 Graffiti Art over 133 (incl. 9 staff)
+      expect(allBaseIds.size).toBe(146); // +1 Graffiti Art over 133 (pre Graffiti) + 12 specialization staff (CG-0MT4WXNR80090FXZ)incl. 9 staff)
     });
   });
 
@@ -1200,13 +1201,13 @@ describe('Meta-Progression System', () => {
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(27); // 15 (T1) + 12 (T2 new)
+      expect(ids).toHaveLength(31); // 15 (T1) + 16 (T2 new: 12 + 4 specialization staff, CG-0MT4WXNR80090FXZ)
     });
 
-    it('returns all 142 cards for all 12 tiers', () => {
+    it('returns all 154 cards for all 12 tiers', () => {
       const allTierIds = Array.from({ length: 12 }, (_, i) => `tier-${i + 1}`);
       const ids = deriveUnlockedCardIds(allTierIds);
-      expect(ids).toHaveLength(142); // full catalog incl. 9 staff
+      expect(ids).toHaveLength(154); // full catalog incl. 21 staff
     });
 
     it('handles empty array', () => {

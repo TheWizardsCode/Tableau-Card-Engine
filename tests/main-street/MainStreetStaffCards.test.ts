@@ -161,7 +161,9 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
           expect(typeof tpl.name).toBe('string');
           expect(typeof tpl.cost).toBe('number');
           expect(typeof tpl.handSlotsAdded).toBe('number');
-          expect(tpl.handSlotsAdded).toBeGreaterThanOrEqual(1);
+          // Employed-applicant cards (12 specialization staff, CG-0MT4WXNR80090FXZ)
+          // deliberately grant 0 hand slots; only hand-capacity staff add slots.
+          expect(tpl.handSlotsAdded).toBeGreaterThanOrEqual(0);
           // 4 = Executive premium slot capacity (Group F, CG-0MSQJ7VL9009JHF4).
           expect(tpl.handSlotsAdded).toBeLessThanOrEqual(4);
 

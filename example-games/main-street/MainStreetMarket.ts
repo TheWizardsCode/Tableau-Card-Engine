@@ -65,6 +65,16 @@ export function canPurchaseBusiness(
     return { legal: false, reason: 'Card not found in the market.' };
   }
 
+  // Only business/community-space cards occupy street-grid slots. Staff are
+  // hired via the 'hire-staff' action (CG-0MT4WXNR80090FXZ grew the staff
+  // pool, so a bare cost check no longer keeps staff out of this action).
+  if (card.family !== 'business' && card.family !== 'community-space') {
+    return {
+      legal: false,
+      reason: `${card.name} cannot be placed on the street. Only business and community-space cards can be bought here.`,
+    };
+  }
+
   // Check coins
   if (state.resourceBank.coins < card.cost) {
     return { legal: false, reason: `Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.` };

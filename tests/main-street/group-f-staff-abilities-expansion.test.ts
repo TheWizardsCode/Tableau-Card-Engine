@@ -61,8 +61,8 @@ function findStaff(deck: readonly StaffCard[], id: string): StaffCard | undefine
 // ── AC1: Template count ───────────────────────────────────────────────
 
 describe('Group F staff expansion: template count (AC1)', () => {
-  it('grows staff templates from 3 to exactly 9 (incl. General Manager + Lookout)', () => {
-    expect(createStaffDeck(1)).toHaveLength(9);
+  it('grows staff templates to exactly 21 (incl. General Manager + Lookout + 12 specialization applicants)', () => {
+    expect(createStaffDeck(1)).toHaveLength(21);
   });
 
   it('adds exactly the 4 contracted card IDs', () => {
@@ -88,11 +88,12 @@ describe('Group F staff expansion: uniqueness & tier convention (AC4)', () => {
   });
 
   it('staff cards are tier-registered like other families (12-tier, CG-0MT3C744B009DS84)', () => {
-    // All 9 staff cards are tier-assigned and spread across tiers 1-12
+    // All 21 staff cards are tier-assigned and spread across tiers 1-12
     // (apprentice T1, assistant T2, manager T3, socialite T4, accountant T6,
-    // lookout T7, director T9, executive T10, general-manager T12).
+    // lookout T7, director T9, executive T10, general-manager T12, plus the 12
+    // specialization applicants across T2-T5, CG-0MT4WXNR80090FXZ).
     const staffIds = getCsvRows().filter(r => r.family === 'staff').map(r => r.id);
-    expect(staffIds).toHaveLength(9);
+    expect(staffIds).toHaveLength(21);
     const staffTiers = staffIds.map(id => CARD_TIER_MAP.get(id));
     const validTiers = Array.from({ length: 12 }, (_, i) => String(i + 1));
     for (const t of staffTiers) {

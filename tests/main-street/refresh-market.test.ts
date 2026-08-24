@@ -146,6 +146,7 @@ describe('AC2: refreshMarket re-roll', () => {
       ...state.discards.communitySpace.map(c => c.id),
       ...state.discards.upgrade.map(c => c.id),
       ...state.discards.event.map(c => c.id),
+      ...state.discards.staff.map(c => c.id),
     ];
     for (const id of result.replaced.map(c => c.id)) {
       expect(discarded).toContain(id);

@@ -47,13 +47,14 @@ describe('Main Street tier catalog coverage', () => {
     }
   });
 
-  it('cumulative pools grow monotonically to 142', () => {
+  it('cumulative pools grow monotonically to 154', () => {
     let prevSize = 0;
     for (let i = 1; i <= 12; i++) {
       const size = TIER_DEFINITIONS[`tier-${i}`].cumulativeCardIds.length;
       expect(size).toBeGreaterThan(prevSize);
       prevSize = size;
     }
-    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(142);
+    // 142 + 12 specialization staff applicants (CG-0MT4WXNR80090FXZ).
+    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(154);
   });
 });
