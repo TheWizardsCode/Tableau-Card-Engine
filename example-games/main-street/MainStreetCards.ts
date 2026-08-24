@@ -223,6 +223,48 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
 /** Synergy types used by Business cards for adjacency bonuses. */
 export type SynergyType = 'Food' | 'Culture' | 'Commerce' | 'Service' | 'Entertainment' | 'Health';
 
+// ── Staff specialization skills (CG-0MT1CIWSD003VBPK) ────────
+
+/** Effect category a specialization skill belongs to (AC4 of CG-0MT1CIWSD003VBPK). */
+export type SpecializationSkillCategory =
+  | 'income-boost'
+  | 'reputation-boost'
+  | 'cost-reduction'
+  | 'incident-mitigation';
+
+/**
+ * Categories tracked by the per-staff stacking cap: a staff member may hold
+ * at most 1 income-boost AND at most 1 reputation-boost skill beyond the Town
+ * Gossip baseline. Other categories (cost-reduction, incident-mitigation)
+ * stack freely (AC4 / acceptance criteria of CG-0MT4WXQCN001G1LF).
+ */
+export const STACKED_SKILL_CATEGORIES: readonly SpecializationSkillCategory[] = [
+  'income-boost',
+  'reputation-boost',
+] as const;
+
+/**
+ * A single specialization skill from the global pool.
+ *
+ * Skills are randomized once per game at start and locked for the full game;
+ * they are stored in game state by id (strings) and resolved through the
+ * catalog (`getSkill` in MainStreetStaffSkills). `category` doubles as the
+ * stacking-tracked category for income/reputation boosts.
+ */
+export interface SpecializationSkill {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  /** Effect category; also the stacking-tracked category for income/reputation boosts. */
+  readonly category: SpecializationSkillCategory;
+  /**
+   * Machine-readable effect hint consumed by buff wiring (MainStreetStaffBuffs,
+   * I4 CG-0MT4WXV2J000M35M) and rendering/help text (I5 CG-0MT4WXX1Q00860VP).
+   * Mirrors `description` in semantics; kept stable for serialized state.
+   */
+  readonly effect: string;
+}
+
 /** When an Event card resolves. */
 export type EventTrigger = 'Investment' | 'Incident';
 

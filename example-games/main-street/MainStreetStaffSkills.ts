@@ -22,25 +22,25 @@
  * `MainStreetStaffBuffs` / adjacency wiring; this module stays free of engine
  * or state imports so it can be unit-tested headlessly.
  *
+ * The canonical `SpecializationSkill` / `SpecializationSkillCategory` types
+ * live in `MainStreetCards` (I2, CG-0MT4WXQCN001G1LF) and are re-exported
+ * here for backward compatibility with earlier imports.
+ *
  * @module
  */
 
+import type { SpecializationSkill, SpecializationSkillCategory } from './MainStreetCards';
+
+export type { SpecializationSkill, SpecializationSkillCategory } from './MainStreetCards';
+export { STACKED_SKILL_CATEGORIES } from './MainStreetCards';
+
 // ── Effect Categories (AC4) ─────────────────────────────────
 
-/** Effect category a specialization skill belongs to. */
-export type SkillCategory =
-  | 'income-boost'
-  | 'reputation-boost'
-  | 'cost-reduction'
-  | 'incident-mitigation';
-
-/** A single specialization skill from the global pool. */
-export interface SpecializationSkill {
-  readonly id: string;
-  readonly name: string;
-  readonly category: SkillCategory;
-  readonly description: string;
-}
+/**
+ * Effect category a specialization skill belongs to. Re-exported alias of the
+ * canonical `SpecializationSkillCategory` from MainStreetCards (I2).
+ */
+export type SkillCategory = SpecializationSkillCategory;
 
 /** Baseline skill always assigned to every staff applicant. */
 export const BASELINE_SKILL_ID = 'skill-town-gossip' as const;
@@ -50,25 +50,25 @@ export const BASELINE_SKILL_ID = 'skill-town-gossip' as const;
 /** The global specialization-skill pool (locked at game start). */
 export const STAFF_SKILL_CATALOG: readonly SpecializationSkill[] = [
   // Category A: Income Boosts
-  { id: 'skill-networker', name: 'Networker', category: 'income-boost', description: '+0.2 coins per adjacent business synergy (passive).' },
-  { id: 'skill-chef', name: 'Chef de Cuisine', category: 'income-boost', description: '+20% income from Food businesses.' },
-  { id: 'skill-dj', name: 'DJ', category: 'income-boost', description: '+20% income from Entertainment businesses.' },
-  { id: 'skill-sales-champion', name: 'Sales Champion', category: 'income-boost', description: '+0.5 coins per turn from Commerce businesses.' },
-  { id: 'skill-tech-guru', name: 'Tech Guru', category: 'income-boost', description: 'Unlocks +1 synergy range for Entertainment businesses.' },
+  { id: 'skill-networker', name: 'Networker', category: 'income-boost', description: '+0.2 coins per adjacent business synergy (passive).', effect: 'adjacency-coin-bonus' },
+  { id: 'skill-chef', name: 'Chef de Cuisine', category: 'income-boost', description: '+20% income from Food businesses.', effect: 'income-percent-food' },
+  { id: 'skill-dj', name: 'DJ', category: 'income-boost', description: '+20% income from Entertainment businesses.', effect: 'income-percent-entertainment' },
+  { id: 'skill-sales-champion', name: 'Sales Champion', category: 'income-boost', description: '+0.5 coins per turn from Commerce businesses.', effect: 'income-flat-commerce' },
+  { id: 'skill-tech-guru', name: 'Tech Guru', category: 'income-boost', description: 'Unlocks +1 synergy range for Entertainment businesses.', effect: 'synergy-range-entertainment' },
   // Category B: Reputation Boosts
-  { id: 'skill-town-gossip', name: 'Town Gossip', category: 'reputation-boost', description: 'Peek at the top incident-deck card once per turn (baseline).' },
-  { id: 'skill-community-builder', name: 'Community Builder', category: 'reputation-boost', description: '+0.1 reputation per turn from all businesses.' },
-  { id: 'skill-brand-ambassador', name: 'Brand Ambassador', category: 'reputation-boost', description: '+50% reputation gain from incidents and investments.' },
-  { id: 'skill-pr-strategist', name: 'PR Strategist', category: 'reputation-boost', description: '+0.15 reputation per turn from Service businesses.' },
+  { id: 'skill-town-gossip', name: 'Town Gossip', category: 'reputation-boost', description: 'Peek at the top incident-deck card once per turn (baseline).', effect: 'peek-incident-deck' },
+  { id: 'skill-community-builder', name: 'Community Builder', category: 'reputation-boost', description: '+0.1 reputation per turn from all businesses.', effect: 'reputation-flat-all' },
+  { id: 'skill-brand-ambassador', name: 'Brand Ambassador', category: 'reputation-boost', description: '+50% reputation gain from incidents and investments.', effect: 'reputation-multiplier-sources' },
+  { id: 'skill-pr-strategist', name: 'PR Strategist', category: 'reputation-boost', description: '+0.15 reputation per turn from Service businesses.', effect: 'reputation-flat-service' },
   // Category C: Cost Reductions
-  { id: 'skill-cost-cutter', name: 'Cost Cutter', category: 'cost-reduction', description: '-15% ongoing costs for the entire street (flagged for extra balance testing).' },
-  { id: 'skill-negotiator', name: 'Negotiator', category: 'cost-reduction', description: '-1 cost on business card refreshes.' },
-  { id: 'skill-operations-manager', name: 'Operations Manager', category: 'cost-reduction', description: '-0.5 salary cost for this employed staff member.' },
+  { id: 'skill-cost-cutter', name: 'Cost Cutter', category: 'cost-reduction', description: '-15% ongoing costs for the entire street (flagged for extra balance testing).', effect: 'ongoing-cost-street-pct' },
+  { id: 'skill-negotiator', name: 'Negotiator', category: 'cost-reduction', description: '-1 cost on business card refreshes.', effect: 'refresh-cost-flat' },
+  { id: 'skill-operations-manager', name: 'Operations Manager', category: 'cost-reduction', description: '-0.5 salary cost for this employed staff member.', effect: 'salary-flat' },
   // Category D: Incident Mitigation
-  { id: 'skill-quality-inspector', name: 'Quality Inspector', category: 'incident-mitigation', description: '-30% coin damage from all incidents.' },
-  { id: 'skill-risk-manager', name: 'Risk Manager', category: 'incident-mitigation', description: 'Reduces incident probability by 15%.' },
-  { id: 'skill-security-consultant', name: 'Security Consultant', category: 'incident-mitigation', description: 'Immunity to theft/loss incidents on the home business.' },
-  { id: 'skill-compliance', name: 'Compliance Officer', category: 'incident-mitigation', description: 'Reduces incident reputation damage by 0.5.' },
+  { id: 'skill-quality-inspector', name: 'Quality Inspector', category: 'incident-mitigation', description: '-30% coin damage from all incidents.', effect: 'incident-coin-damage-pct' },
+  { id: 'skill-risk-manager', name: 'Risk Manager', category: 'incident-mitigation', description: 'Reduces incident probability by 15%.', effect: 'incident-probability-pct' },
+  { id: 'skill-security-consultant', name: 'Security Consultant', category: 'incident-mitigation', description: 'Immunity to theft/loss incidents on the home business.', effect: 'incident-theft-immunity' },
+  { id: 'skill-compliance', name: 'Compliance Officer', category: 'incident-mitigation', description: 'Reduces incident reputation damage by 0.5.', effect: 'incident-rep-damage-flat' },
 ];
 
 /** O(1) lookup of a specialization skill by id. */
@@ -78,6 +78,37 @@ export function getSkill(skillId: string): SpecializationSkill {
     throw new Error(`Unknown specialization skill id: ${skillId}`);
   }
   return skill;
+}
+
+// ── Serialization (I2, CG-0MT4WXQCN001G1LF) ─────────────────
+
+/**
+ * Collapses a skill set to its stable id list for persistence. Skills travel
+ * in saved state as plain ids (version-safe: catalogs evolve, stored ids do
+ * not) and are resolved back through `getSkill` on load. Compatible with the
+ * SaveLoadStore versioned-serialization convention — unknown ids fail loudly
+ * rather than silently corrupting the roster.
+ *
+ * @param skills Skills to persist (e.g. an applicant's assigned skills).
+ * @returns Stable id array suitable for JSON serialization.
+ */
+export function serializeSkillIds(skills: readonly SpecializationSkill[]): string[] {
+  return skills.map(s => s.id);
+}
+
+/**
+ * Restores a skill set from persisted ids, validating each id against the
+ * current catalog.
+ *
+ * @param raw Persisted value (expected: array of skill ids).
+ * @returns Resolved skill objects in stored order.
+ * @throws Error when the payload is not an array or contains unknown ids.
+ */
+export function deserializeSkillIds(raw: unknown): SpecializationSkill[] {
+  if (!Array.isArray(raw)) {
+    throw new Error(`Invalid specialization skill state: expected an array, got ${typeof raw}`);
+  }
+  return raw.map(id => getSkill(String(id)));
 }
 
 // ── Deterministic Assignment (AC3/AC4) ───────────────────────
