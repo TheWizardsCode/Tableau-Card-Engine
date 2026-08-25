@@ -27,6 +27,7 @@ import {
   type SynergyType,
 } from '../../example-games/main-street/MainStreetCards';
 import { synergyLineEndpoints } from '../../example-games/main-street/scenes/synergyLineEndpoints';
+import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
 
 // ── Boot helpers (mirrors MainStreetScene.browser.test.ts) ──
 
@@ -199,6 +200,7 @@ describe('MainStreet synergy formation animation', () => {
     delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE__;
     delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE_URL__;
     delete (globalThis as unknown as Record<string, unknown>).__TF_PLAY_COUNT__;
+    try { localStorage.removeItem(PREMIUM_DIALOG_DISMISSED_KEY); } catch { /* ignore */ }
     destroyGame(game);
     game = null;
   });
@@ -217,6 +219,10 @@ describe('MainStreet synergy formation animation', () => {
     state.streetGrid[0] = cardA;
     state.market.cards[0] = cardB;
     state.resourceBank.coins = 100;
+    // Drag buy-and-place on a 1-action day incurs the +50% premium explainer
+    // dialog (CG-0MT24X0SX007RLHN) — dismiss it so this test focuses on the
+    // synergy-formation animation.
+    try { localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true'); } catch { /* ignore */ }
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
     const { calls } = spyOnSynergyFormation(scene);
@@ -318,6 +324,10 @@ describe('MainStreet synergy formation animation', () => {
     state.streetGrid[0] = cardA;
     state.market.cards[0] = cardB;
     state.resourceBank.coins = 100;
+    // Drag buy-and-place on a 1-action day incurs the +50% premium explainer
+    // dialog (CG-0MT24X0SX007RLHN) — dismiss it so this test focuses on the
+    // synergy-formation animation.
+    try { localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true'); } catch { /* ignore */ }
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
     // Form the NEW pair by placing cardB on slot 1 → animateSynergyFormation

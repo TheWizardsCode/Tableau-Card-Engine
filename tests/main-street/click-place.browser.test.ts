@@ -24,6 +24,7 @@ import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { TUTORIAL_STATE_STORAGE_KEY } from '../../example-games/main-street/TutorialState';
 import { canPurchaseBusiness, getEmptySlots } from '../../example-games/main-street/MainStreetMarket';
+import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
 
 const GAME_W = 1280;
 const GAME_H = 720;
@@ -191,6 +192,7 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
     destroyGame(game);
     game = null;
     localStorage.removeItem(TUTORIAL_STATE_STORAGE_KEY);
+    localStorage.removeItem(PREMIUM_DIALOG_DISMISSED_KEY);
   });
 
   it('clicking an empty street slot places the held business via real pointer events', async () => {
@@ -201,6 +203,12 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
 
     // Plenty of coins so affordability is not a factor.
     scene.state.resourceBank.coins = 100;
+
+    // Same-day composite buy-and-play now incurs the +50% premium with a
+    // one-time explainer dialog (CG-0MT24X0SX007RLHN). Dismiss it here so
+    // the regression test focuses on the pointer-pipeline fix; the dialog
+    // flow itself is covered by dedicated dialog tests.
+    try { localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true'); } catch { /* ignore */ }
 
     // Buy a business to hand → card rests in hand unselected (CG-0MSXIQIPJ000NDTL);
     // selecting it enters placing-from-hand, making the empty slot rectangles

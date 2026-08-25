@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { executeDayStart, processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
 import { canPurchaseBusiness, canPurchaseEvent, getEmptySlots } from '../../example-games/main-street/MainStreetMarket';
+import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
 
 async function bootGame(options: { width?: number; height?: number } = {}): Promise<Phaser.Game> {
   let container = document.getElementById('game-container');
@@ -67,6 +68,7 @@ describe('MainStreetScene browser tests', () => {
     delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE__;
     delete (globalThis as unknown as Record<string, unknown>).__MAIN_STREET_TF_MODULE_URL__;
     delete (globalThis as unknown as Record<string, unknown>).__TF_PLAY_COUNT__;
+    try { localStorage.removeItem(PREMIUM_DIALOG_DISMISSED_KEY); } catch { /* ignore */ }
     destroyGame(game);
     game = null;
   });
@@ -326,6 +328,10 @@ describe('MainStreetScene browser tests', () => {
       // Generous coins so an affordable business always exists in the row
       // regardless of the random seed's market draw.
       state.resourceBank.coins = 100;
+      // Same-day composite placement now incurs the +50% premium with a
+      // one-time explainer dialog (CG-0MT24X0SX007RLHN) — dismiss it so
+      // this test focuses on the transfer-visual mechanics.
+      try { localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true'); } catch { /* ignore */ }
 
       const emptySlots = getEmptySlots(state);
       expect(emptySlots.length).toBeGreaterThan(0);
