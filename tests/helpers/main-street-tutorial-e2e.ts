@@ -14,6 +14,7 @@ import Phaser from 'phaser';
 import { page } from '@vitest/browser/context';
 import { waitForScene } from './waitForScene';
 import { advanceTutorialStep, getCurrentStep, UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
+import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
 
 // ── Constants ────────────────────────────────────────────
 
@@ -123,6 +124,20 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
     '../../example-games/main-street/createMainStreetGame'
   );
   const game = createMainStreetGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
+
+  // Same-turn buy-and-play now charges the +50% premium and fires a one-time
+  // explainer dialog (CG-0MT24X0SX007RLHN). The tutorial's scripted
+  // move→place steps run at 0 actions, so the dialog would otherwise
+  // intercept the automation's placement clicks. Pre-dismissing the
+  // preference here keeps the tutorial focus on the step flow. The tutorial
+  // rework (CG-0MT53NXGZ004H5AE) splits buy-and-place across two turns,
+  // after which this is redundant (placements with an action available do
+  // not fire the dialog).
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true');
+    }
+  } catch { /* ignore */ }
 
   // Check canvas and rendering context validity
   const gameCanvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
