@@ -656,9 +656,12 @@ export class MainStreetTurnController {
     // operator decision A for the T13 Library bug). Events/upgrades stay
     // click-only (they are not part of the drag-drop module's dev-row model).
     if (card.family !== 'business' && card.family !== 'community-space') return false;
-    // Drag-drop buy-and-place pays a +50% premium over the listed cost.
-    const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-    if (s.state.resourceBank.coins < premiumCost) return false;
+    // Composite-parity buy-and-place price (CG-0MT24X0SX007RLHN): on GM
+    // 2-action days the drag charges the LISTED cost (consuming 2 actions);
+    // on a 1-action day it charges the +50% premium (consuming 1 action).
+    // Check affordability against the applicable price.
+    const price = s.state.actionsRemaining >= 2 ? card.cost : Math.ceil(card.cost * 1.5 * 2) / 2;
+    if (s.state.resourceBank.coins < price) return false;
     if (!s.state.streetGrid.some((slot: any) => slot === null)) return false;
 
     // Tutorial gating: only allow select-business if it is the required
@@ -693,17 +696,20 @@ export class MainStreetTurnController {
   public canDropBusinessCard(cardId: string, slotIndex: number): boolean {
     const s = this.scene;
     // Action economy (CG-0MSTOF1N5005PK2R): buy-and-place consumes the
-    // daily action — no drop when the budget is spent.
+    // daily action — no drop when the budget is spent. On GM 2-action days
+    // the drag consumes BOTH actions (composite parity), so 2 must remain.
     if (s.state.actionsRemaining <= 0) return false;
     const legality = canPurchaseBusiness(s.state, cardId, slotIndex);
     if (!legality.legal) return false;
 
-    // Drag-drop buy-and-place pays a +50% premium — verify the player can
-    // afford the premium price (not just the listed cost).
+    // Composite-parity buy-and-place price (CG-0MT24X0SX007RLHN): on GM
+    // 2-action days the drag charges the LISTED cost (2 actions consumed);
+    // on a 1-action day it charges the +50% premium. Verify affordability
+    // against the applicable price (not just the listed cost).
     const card = s.state.market.cards.find((c: any) => c.id === cardId);
     if (card && (card.family === 'business' || card.family === 'community-space')) {
-      const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-      if (s.state.resourceBank.coins < premiumCost) return false;
+      const price = s.state.actionsRemaining >= 2 ? card.cost : Math.ceil(card.cost * 1.5 * 2) / 2;
+      if (s.state.resourceBank.coins < price) return false;
     }
 
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
@@ -726,10 +732,14 @@ export class MainStreetTurnController {
    * Execute a drag-drop buy-and-place.
    *
    * Buys the dragged business card directly to the drop slot in a single
-   * undoable `buyAndPlaceBusinessCommand` — the direct market→street path
-   * that pays a +50% premium over the listed cost and consumes the daily
-   * action (CG-0MSTOF1N5005PK2R). The animated market→street transfer +
-   * SFX matches the click flow's feedback.
+   * undoable `buyAndPlaceBusinessCommand` — the direct market→street path.
+   * Composite-parity pricing (CG-0MT24X0SX007RLHN): the drag is the same
+   * turn's move+place in one gesture. When only the last action remains
+   * (1-action day) the placement step has no action → +50% premium (1
+   * action total, dialog confirms). On 2-action (GM) days the placement
+   * step consumes the remaining action at listed cost — identical to the
+   * click composite, so drag is never cheaper than click. The animated
+   * market→street transfer + SFX matches the click flow's feedback.
    */
   public onDragDropBusiness(payload: DragDropPayload): void {
     const s = this.scene;
@@ -746,60 +756,95 @@ export class MainStreetTurnController {
     const dropSource = { x: payload.gameObject?.x ?? 0, y: payload.gameObject?.y ?? 0 };
 
     const cardName = card.name;
-    s.tooltipManager?.hide();
-    s.clearMarketSelection();
-    s.hiddenTransferSourceCardIds.add(cardId);
-    s.uiPhase = 'animating';
-    s.instructionText.setText(`Moving "${cardName}" to hand...`);
-    s.refreshAll();
 
-    const afterTransfer = (): void => {
-      // Capture synergy pairs before the placement mutates the grid so only
-      // NEWLY formed pairs animate (pre-existing pairs never re-trigger).
-      const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
-      try {
-        const cmd = buyAndPlaceBusinessCommand(s.state, cardId, slotIndex);
-        s.undoManager.execute(cmd);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
-        try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
-        s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex} (50% premium)`);
-      } catch (e) {
-        console.error('[MS] DragBuyBusiness failed', e);
-        s.instructionText.setText(`Error: ${(e as Error).message}`);
-      }
+    // Composite-parity pricing for the drag's move+place accounting:
+    // premium applies only when the drag's own action leaves no action for
+    // the placement step (last action on a 1-action day); on GM 2-action
+    // days the placement consumes the remaining action at listed cost.
+    const premiumApplies = s.state.actionsRemaining <= 1;
+    const priceOverride = premiumApplies ? undefined : card.cost;
+    const extraActions = premiumApplies ? 0 : 1;
 
-      s.hiddenTransferSourceCardIds.delete(cardId);
-      s.uiPhase = 'market';
+    const startTransfer = (): void => {
+      s.tooltipManager?.hide();
+      s.clearMarketSelection();
+      s.hiddenTransferSourceCardIds.add(cardId);
+      s.uiPhase = 'animating';
+      s.instructionText.setText(`Moving "${cardName}" to hand...`);
       s.refreshAll();
-      s.refreshStreetGrid();
-      s.refreshActionButtons();
-      // Synergy-formation animation for any new pairs (non-blocking).
-      this.animateNewSynergyPairs(beforePairs);
-      // Tutorial: mark place-business step complete if active
-      try {
-        (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
-      } catch (_) { /* ignore */ }
+
+      const afterTransfer = (): void => {
+        // Capture synergy pairs before the placement mutates the grid so only
+        // NEWLY formed pairs animate (pre-existing pairs never re-trigger).
+        const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+        try {
+          const cmd = buyAndPlaceBusinessCommand(s.state, cardId, slotIndex, priceOverride, extraActions);
+          s.undoManager.execute(cmd);
+          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
+          try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
+          s.instructionText.setText(premiumApplies
+            ? `Placed "${cardName}" on slot ${slotIndex} (50% premium)`
+            : `Placed "${cardName}" on slot ${slotIndex}`);
+        } catch (e) {
+          console.error('[MS] DragBuyBusiness failed', e);
+          // Insufficient-coins rejection → play illegal-move feedback.
+          const msg = (e as Error).message;
+          if (msg.toLowerCase().includes('not enough coins')) {
+            const container = s.msRenderer?.getMarketRowCards?.()?.[sourceIndex] ?? null;
+            playIllegalFeedback(container, s);
+          }
+          s.instructionText.setText(`Error: ${msg}`);
+        }
+
+        s.hiddenTransferSourceCardIds.delete(cardId);
+        s.uiPhase = 'market';
+        s.refreshAll();
+        s.refreshStreetGrid();
+        s.refreshActionButtons();
+        // Synergy-formation animation for any new pairs (non-blocking).
+        this.animateNewSynergyPairs(beforePairs);
+        // Tutorial: mark place-business step complete if active
+        try {
+          (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+        } catch (_) { /* ignore */ }
+      };
+
+      if (sourceIndex >= 0) {
+        // Transfer duration proportional to the drop-to-slot distance: a card
+        // released next to its slot settles quickly instead of taking the
+        // fixed 1500ms market→slot flight (click/AI flows keep 1500ms via the
+        // shared default). See computeDragTransferDuration (CG-0MST2LS3E004BTPO).
+        const destination = s.getStreetSlotCenter(slotIndex);
+        const distancePx = Math.hypot(destination.x - dropSource.x, destination.y - dropSource.y);
+        void s.animateTransferFromMarket({
+          cardId,
+          family: 'business',
+          row: 'market',
+          slotIndex: sourceIndex,
+          source: dropSource,
+          destination,
+          duration: computeDragTransferDuration(distancePx),
+        }).then(afterTransfer);
+      } else {
+        afterTransfer();
+      }
     };
 
-    if (sourceIndex >= 0) {
-      // Transfer duration proportional to the drop-to-slot distance: a card
-      // released next to its slot settles quickly instead of taking the
-      // fixed 1500ms market→slot flight (click/AI flows keep 1500ms via the
-      // shared default). See computeDragTransferDuration (CG-0MST2LS3E004BTPO).
-      const destination = s.getStreetSlotCenter(slotIndex);
-      const distancePx = Math.hypot(destination.x - dropSource.x, destination.y - dropSource.y);
-      void s.animateTransferFromMarket({
-        cardId,
-        family: 'business',
-        row: 'market',
-        slotIndex: sourceIndex,
-        source: dropSource,
-        destination,
-        duration: computeDragTransferDuration(distancePx),
-      }).then(afterTransfer);
-    } else {
-      afterTransfer();
+    if (premiumApplies) {
+      // Explain dialog before confirming the premium drag (CG-0MT24X0SX007RLHN):
+      // proceed → place at premium; cancel → the card returns to the market
+      // row (no coins deducted, no action consumed).
+      s.showBuyAndPlacePremiumDialog(cardName, startTransfer, () => {
+        s.uiPhase = 'market';
+        s.instructionText.setText(`"${cardName}" stays in the market — buy cancelled.`);
+        try { s.msRenderer?.clearDragHighlights?.(); } catch (_) { /* ignore */ }
+        s.refreshAll();
+        s.refreshStreetGrid();
+        s.refreshActionButtons();
+      });
+      return;
     }
+    startTransfer();
   }
 
   public onSlotClick(slotIndex: number): void {
@@ -863,47 +908,81 @@ export class MainStreetTurnController {
         // Capture synergy pairs before the placement mutates the grid so only
         // NEWLY formed pairs animate.
         const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
-        try {
-          // Action economy: placing a card that was ALREADY in hand (held
-          // from a previous day) consumes the daily action. A card just moved
-          // from the market this turn is part of the same move+place purchase
-          // (the action was already spent at move-to-hand) and places free.
-          if (!s.pendingHandJustMoved) {
-            consumeAction(s.state);
-          }
-          placeFromHand(s.state, handIndex, slotIndex);
-          // The just-moved card has now been placed; clear the tracker so a
-          // later selection of any other hand card costs an action again.
-          // (Cleared only on success — on failure the card stays in hand and
-          // a retry must still place it free, CG-0MSXIQIPJ000NDTL.)
-          if (s.justMovedHandCardId === cardId) {
-            s.justMovedHandCardId = null;
-          }
-          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-business-from-hand', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
-          try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
-          s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
-        } catch (e) {
-          const msg = (e as Error).message;
-          console.error('[MS] placeFromHand failed', e);
-          // Insufficient-coins rejection → play illegal-move feedback.
-          if (msg.toLowerCase().includes('not enough coins')) {
-            const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
-            playIllegalFeedback(handSprite, s);
-          }
-          s.instructionText.setText(`Error: ${msg}`);
-        }
 
-        s.hiddenTransferSourceCardIds.delete(cardId);
-        s.uiPhase = 'market';
-        s.refreshAll();
-        s.refreshStreetGrid();
-        s.refreshActionButtons();
-        // Synergy-formation animation for any new pairs (non-blocking).
-        this.animateNewSynergyPairs(beforePairs);
-        // Tutorial: mark place-business step complete if active
-        try {
-          (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
-        } catch (_) { /* ignore */ }
+        // Composite pricing (CG-0MT24X0SX007RLHN): a same-day card (just
+        // moved from the market this turn) is part of the move+place purchase
+        // — the move already spent the daily action. When no action remains
+        // for the placement step, the +50% premium replaces the missing
+        // action; when an action DOES remain (Golden Mile 2-action days), the
+        // placement consumes it at listed cost. Held cards (plan-ahead) always
+        // consume an action at listed cost.
+        const premiumApplies = s.pendingHandJustMoved && s.state.actionsRemaining <= 0;
+        const premiumCost = premiumApplies
+          ? Math.ceil(handCard.cost * 1.5 * 2) / 2
+          : undefined;
+
+        // Shared post-place cleanup (success, failure, or dialog cancel).
+        const finish = (): void => {
+          s.hiddenTransferSourceCardIds.delete(cardId);
+          s.uiPhase = 'market';
+          s.refreshAll();
+          s.refreshStreetGrid();
+          s.refreshActionButtons();
+          // Synergy-formation animation for any new pairs (non-blocking).
+          this.animateNewSynergyPairs(beforePairs);
+          // Tutorial: mark place-business step complete if active
+          try {
+            (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+          } catch (_) { /* ignore */ }
+        };
+
+        const doPlace = (): void => {
+          try {
+            // Action economy: a held card (plan-ahead) or a GM composite
+            // with a remaining action consumes the action at listed cost.
+            // The premium path (no action available) is action-free — the
+            // premium is a coin substitute for the unavailable action.
+            if (!premiumApplies) {
+              consumeAction(s.state);
+            }
+            placeFromHand(s.state, handIndex, slotIndex, premiumCost);
+            // The just-moved card has now been placed; clear the tracker so a
+            // later selection of any other hand card costs an action again.
+            // (Cleared only on success — on failure the card stays in hand and
+            // a retry must still place it free, CG-0MSXIQIPJ000NDTL.)
+            if (s.justMovedHandCardId === cardId) {
+              s.justMovedHandCardId = null;
+            }
+            try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-business-from-hand', handIndex, slotIndex }, description: premiumApplies ? `Placed from hand to slot ${slotIndex} (50% premium, no action left)` : `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
+            try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
+            s.instructionText.setText(premiumApplies
+              ? `Placed "${cardName}" on slot ${slotIndex} (50% premium)`
+              : `Placed "${cardName}" on slot ${slotIndex}`);
+          } catch (e) {
+            const msg = (e as Error).message;
+            console.error('[MS] placeFromHand failed', e);
+            // Insufficient-coins rejection → play illegal-move feedback.
+            if (msg.toLowerCase().includes('not enough coins')) {
+              const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
+              playIllegalFeedback(handSprite, s);
+            }
+            s.instructionText.setText(`Error: ${msg}`);
+          }
+          finish();
+        };
+
+        if (premiumApplies) {
+          // Explain dialog before confirming the premium placement
+          // (CG-0MT24X0SX007RLHN): proceed → place at premium; cancel →
+          // placement aborts and the card returns to hand (no cost, no
+          // action consumed).
+          s.showBuyAndPlacePremiumDialog(cardName, doPlace, () => {
+            s.instructionText.setText(`"${cardName}" stays in hand — placement cancelled.`);
+            finish();
+          });
+          return;
+        }
+        doPlace();
       };
 
       void s.animateTransferFromMarket({

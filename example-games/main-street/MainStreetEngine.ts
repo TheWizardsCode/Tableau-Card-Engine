@@ -1583,11 +1583,16 @@ export function layoffStaffCard(
  * listed cost (CG-0MSTOF1N5005PK2R). Consumes one daily action.
  *
  * Premium pricing: `Math.ceil(cost * 1.5 * 2) / 2` — the listed cost × 1.5,
- * rounded up to the nearest 0.5 (e.g. 3 → 4.5, 7 → 10.5).
+ * rounded up to the nearest 0.5 (e.g. 3 → 4.5, 7 → 10.5). When
+ * `premiumCost` is supplied (Golden Mile 2-action days, where the
+ * equivalent composite placement consumes an action at listed cost —
+ * CG-0MT24X0SX007RLHN), that price replaces the premium.
  *
- * @param state     Current game state (mutated in-place).
- * @param cardId    ID of the card in the market.
- * @param slotIndex Target street grid slot (0-based).
+ * @param state       Current game state (mutated in-place).
+ * @param cardId      ID of the card in the market.
+ * @param slotIndex   Target street grid slot (0-based).
+ * @param priceOverride Optional price to charge instead of the +50% premium
+ *                      (listed cost for GM parity; unset → premium default).
  * @returns PurchaseResult on success.
  * @throws Error if the action is illegal.
  */
@@ -1595,6 +1600,7 @@ export function buyAndPlaceBusiness(
   state: MainStreetState,
   cardId: string,
   slotIndex: number,
+  priceOverride?: number,
 ): PurchaseResult {
   const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
   if (marketIndex === -1) {
@@ -1613,20 +1619,21 @@ export function buyAndPlaceBusiness(
   }
 
   const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-  if (state.resourceBank.coins < premiumCost) {
-    throw new Error(`Not enough coins to buy-and-place ${card.name}. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
+  const price = priceOverride ?? premiumCost;
+  if (state.resourceBank.coins < price) {
+    throw new Error(`Not enough coins to buy-and-place ${card.name}. Need ${price}, have ${state.resourceBank.coins}.`);
   }
 
-  state.resourceBank.coins -= premiumCost;
+  state.resourceBank.coins -= price;
   state.market.cards.splice(marketIndex, 1);
   state.streetGrid[slotIndex] = card as BusinessCard;
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Bought & placed ${card.name} in slot ${slotIndex} (-€${premiumCost}, 50% premium)`, 'loss');
+  addLog(state, `Bought & placed ${card.name} in slot ${slotIndex} (-€${price}, ${price === premiumCost ? '50% premium' : 'listed'})`, 'loss');
 
-  return { card, cost: premiumCost, refilled: false };
+  return { card, cost: price, refilled: false };
 }
 
 /**

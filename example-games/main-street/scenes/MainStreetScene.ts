@@ -622,6 +622,24 @@ export class MainStreetScene extends CardGameScene {
     this.msTurnController?.onSlotClick?.(slotIndex);
   }
 
+  /**
+   * Shows the buy-and-play premium explainer dialog.
+   *
+   * Fires before a same-turn buy-and-play (click composite placement or
+   * drag) commits a +50% premium charge (CG-0MT24X0SX007RLHN). Proceed
+   * continues the placement at the premium price; cancel aborts it (the
+   * card returns to where it came from with no coins deducted).
+   *
+   * @param cardName  Card being placed.
+   * @param onProceed Callback when the player proceeds at the premium price.
+   * @param onCancel  Callback when the player cancels.
+   */
+  public showBuyAndPlacePremiumDialog(cardName: string, onProceed: () => void, onCancel: () => void): void {
+    if (this.msOverlayManager && typeof (this.msOverlayManager as any).showBuyAndPlacePremiumDialog === 'function') {
+      (this.msOverlayManager as any).showBuyAndPlacePremiumDialog(cardName, onProceed, onCancel);
+    }
+  }
+
   // ── Tutorial Flow (Milestone 5 action-gated) ────────────
   public confirmTutorialStep(...args: any[]): any {
     return (this.msLifecycleManager as any).confirmTutorialStep.apply(this.msLifecycleManager, args);

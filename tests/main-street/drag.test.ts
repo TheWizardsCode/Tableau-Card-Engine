@@ -97,6 +97,13 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
     },
     instructionText: { setText: vi.fn() },
     tooltipManager: { hide: vi.fn(), show: vi.fn() },
+    // Buy-and-play premium explainer dialog (CG-0MT24X0SX007RLHN): captures
+    // the callbacks so tests can proceed/cancel the premium placement.
+    showBuyAndPlacePremiumDialog: vi.fn((_cardName: string, onProceed: () => void) => {
+      // Record the proceed callback for explicit invocation in tests.
+      scene.premiumDialogOnProceed = onProceed;
+    }),
+    premiumDialogOnProceed: null,
     selectMarketCardById: vi.fn(),
     clearMarketSelection: vi.fn(),
     hiddenTransferSourceCardIds: new Set(),
@@ -338,6 +345,14 @@ describe('MainStreet drag-to-buy wiring', () => {
         zoneData: slot,
       });
 
+      // Premium explainer dialog gated the buy (1-action day → drag leaves
+      // no action for the placement step → +50% premium, CG-0MT24X0SX007RLHN).
+      expect(scene.showBuyAndPlacePremiumDialog).toHaveBeenCalled();
+      expect(scene.premiumDialogOnProceed).toBeTypeOf('function');
+      expect(scene.animateTransferFromMarket).not.toHaveBeenCalled();
+      // Player proceeds at the premium price.
+      scene.premiumDialogOnProceed();
+
       // Transfer animation started from the DROP LOCATION (not the market
       // slot origin) and targeted the street slot centre.
       expect(scene.animateTransferFromMarket).toHaveBeenCalledTimes(1);
@@ -437,6 +452,13 @@ describe('MainStreet drag-to-buy wiring', () => {
       );
       events['dragstart'](POINTER, container);
       events['drop'](POINTER, container, zone);
+
+      // Premium explainer dialog gated the buy (1-action day → drag leaves
+      // no action for the placement step → +50% premium, CG-0MT24X0SX007RLHN).
+      expect(scene.showBuyAndPlacePremiumDialog).toHaveBeenCalled();
+      expect(scene.premiumDialogOnProceed).toBeTypeOf('function');
+      // Player proceeds at the premium price.
+      scene.premiumDialogOnProceed();
 
       // Flush the transfer-completion microtask before asserting state.
       await new Promise((resolve) => setTimeout(resolve, 0));

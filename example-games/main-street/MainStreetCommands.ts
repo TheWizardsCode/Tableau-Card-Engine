@@ -284,18 +284,32 @@ export function discardFromHandCommand(
   );
 }
 
-/** Command: Buy & Place business directly to slot (consumes 1 action, 50% premium) */
+/**
+ * Command: Buy & Place business directly to slot (consumes 1 action; +50%
+ * premium, or listed price when `priceOverride` is supplied for GM parity
+ * — CG-0MT24X0SX007RLHN).
+ *
+ * @param priceOverride Optional price to charge instead of the +50% premium
+ *                      (listed cost for GM parity; unset → premium default).
+ * @param extraActions  Additional daily actions to consume alongside the
+ *                      drag's own action. 1 on Golden Mile days (the
+ *                      equivalent composite move+place consumes 2 actions at
+ *                      listed cost; drag must charge identically).
+ */
 export function buyAndPlaceBusinessCommand(
   state: MainStreetState,
   cardId: string,
   slotIndex: number,
+  priceOverride?: number,
+  extraActions: number = 0,
 ) {
   return toCommand(
     state,
     snapshotAction(
       (s) => {
+        for (let i = 0; i < extraActions; i += 1) consumeAction(s);
         consumeAction(s);
-        buyAndPlaceBusiness(s, cardId, slotIndex);
+        buyAndPlaceBusiness(s, cardId, slotIndex, priceOverride);
       },
       `BuyAndPlace ${cardId} -> slot ${slotIndex}`,
     ),
