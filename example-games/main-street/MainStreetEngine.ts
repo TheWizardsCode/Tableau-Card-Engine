@@ -1075,15 +1075,20 @@ export function executeFullTurn(
  * Places a card from the player's hand onto an empty tableau slot.
  * Costs 80% of the card's purchase price.
  *
- * @param state      Current game state (mutated in-place).
- * @param handIndex  Index of the card in state.hand to place.
- * @param slotIndex  Target street grid slot (0-based, must be empty).
+ * @param state       Current game state (mutated in-place).
+ * @param handIndex   Index of the card in state.hand to place.
+ * @param slotIndex   Target street grid slot (0-based, must be empty).
+ * @param premiumCost Optional premium price to charge instead of the listed
+ *                    `card.cost` (same-day composite buy-and-play when no
+ *                    action is available — CG-0MT24X0SX007RLHN). When absent,
+ *                    the listed cost is charged (held-card / plan-ahead path).
  * @throws Error if the hand index is invalid, slot is occupied, or coins insufficient.
  */
 export function placeFromHand(
   state: MainStreetState,
   handIndex: number,
   slotIndex: number,
+  premiumCost?: number,
 ): void {
   const hand = state.hand ?? [];
 
@@ -1110,11 +1115,14 @@ export function placeFromHand(
   }
 
   // Cost-at-play (CG-0MSTOATDT009BRX2): moving a card to hand is free, but
-  // placing it on the street pays its listed cost.
-  if (state.resourceBank.coins < card.cost) {
-    throw new Error(`Not enough coins to place ${card.name}. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+  // placing it on the street pays its listed cost (or the optional premium
+  // price for same-day composite buy-and-play when no action is available,
+  // CG-0MSTOF1N5005PK2R / CG-0MT24X0SX007RLHN).
+  const price = premiumCost ?? card.cost;
+  if (state.resourceBank.coins < price) {
+    throw new Error(`Not enough coins to place ${card.name}. Need ${price}, have ${state.resourceBank.coins}.`);
   }
-  state.resourceBank.coins -= card.cost;
+  state.resourceBank.coins -= price;
 
   // Remove from hand and place on tableau
   hand.splice(handIndex, 1);
@@ -1123,7 +1131,13 @@ export function placeFromHand(
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-€${card.cost})`, 'loss');
+  addLog(
+    state,
+    premiumCost !== undefined
+      ? `Placed ${card.name} from hand in slot ${slotIndex} (-€${price}, 50% premium)`
+      : `Placed ${card.name} from hand in slot ${slotIndex} (-€${price})`,
+    'loss',
+  );
 }
 
 /**
@@ -1219,11 +1233,15 @@ export function sellFromTableau(
  * given tableau slot without mutating state.
  *
  * Validates hand bounds, slot bounds, slot occupancy, and coin sufficiency
- * (a card can only be placed if the player can afford its purchase price).
+ * (a card can only be placed if the player can afford its purchase price —
+ * or the optional premium price for same-day composite buy-and-play).
  *
  * @param state      Current game state (read-only).
  * @param handIndex  Index of the card in state.hand to place.
  * @param slotIndex  Target street grid slot (0-based, must be empty).
+ * @param premiumCost Optional premium price to check affordability against
+ *                    instead of the listed `card.cost` (same-day composite
+ *                    premium path — CG-0MT24X0SX007RLHN).
  * @returns LegalityResult — `{ legal: true }` if valid, otherwise
  *          `{ legal: false, reason }` describing the violation.
  */
@@ -1231,6 +1249,7 @@ export function canPlaceFromHand(
   state: MainStreetState,
   handIndex: number,
   slotIndex: number,
+  premiumCost?: number,
 ): import('../../src/rule-engine').LegalityResult {
   const hand = state.hand ?? [];
 
@@ -1256,9 +1275,10 @@ export function canPlaceFromHand(
     return { legal: false, reason: `Slot ${slotIndex} is already occupied.` };
   }
 
-  // Check coin sufficiency
-  if (state.resourceBank.coins < card.cost) {
-    return { legal: false, reason: `Insufficient coins to place ${card.name}: need ${card.cost}, have ${state.resourceBank.coins}.` };
+  // Check coin sufficiency against the applicable price (listed or premium)
+  const price = premiumCost ?? card.cost;
+  if (state.resourceBank.coins < price) {
+    return { legal: false, reason: `Insufficient coins to place ${card.name}: need ${price}, have ${state.resourceBank.coins}.` };
   }
 
   return { legal: true };

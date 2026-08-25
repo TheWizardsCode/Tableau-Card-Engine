@@ -484,18 +484,25 @@ function validateHandIndex(state: MainStreetState, handIndex: number): AnyCard {
  * Plays a business/community-space card from the player's hand onto the
  * street grid, charging its listed cost at placement time
  * (CG-0MSTOATDT009BRX2 cost-at-play deferral model).
+ *
+ * @param premiumCost Optional premium price to charge instead of the listed
+ *                    `card.cost` (same-day composite buy-and-play when no
+ *                    action is available — CG-0MT24X0SX007RLHN). When absent,
+ *                    the listed cost is charged (held-card / plan-ahead path).
  */
 export function playBusinessFromHand(
   state: MainStreetState,
   handIndex: number,
   slotIndex: number,
+  premiumCost?: number,
 ): PurchaseResult {
   const card = validateHandIndex(state, handIndex);
   if (card.family !== 'business' && card.family !== 'community-space') {
     throw new Error(`Card at hand index ${handIndex} is not a business/community-space card.`);
   }
-  if (state.resourceBank.coins < card.cost) {
-    throw new Error(`Not enough coins to play ${card.name} from hand. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+  const price = premiumCost ?? card.cost;
+  if (state.resourceBank.coins < price) {
+    throw new Error(`Not enough coins to play ${card.name} from hand. Need ${price}, have ${state.resourceBank.coins}.`);
   }
   if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
     throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
@@ -504,14 +511,20 @@ export function playBusinessFromHand(
     throw new Error(`Slot ${slotIndex} is already occupied.`);
   }
 
-  state.resourceBank.coins -= card.cost;
+  state.resourceBank.coins -= price;
   state.hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card as BusinessCard;
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Played ${card.name} from hand into slot ${slotIndex} (-€${card.cost})`, 'loss');
+  addLog(
+    state,
+    premiumCost !== undefined
+      ? `Played ${card.name} from hand into slot ${slotIndex} (-€${price}, 50% premium)`
+      : `Played ${card.name} from hand into slot ${slotIndex} (-€${price})`,
+    'loss',
+  );
 
-  return { card, cost: card.cost, refilled: false };
+  return { card, cost: price, refilled: false };
 }
 
 /**
