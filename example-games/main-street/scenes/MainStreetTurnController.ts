@@ -971,6 +971,16 @@ export class MainStreetTurnController {
         };
 
         if (premiumApplies) {
+          // Affordability pre-gate (CG-0MT24X0SX007RLHN): reject the premium
+          // placement with illegal feedback BEFORE the explainer dialog when
+          // the player cannot afford the premium price (dialog does not fire).
+          const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
+          if (s.state.resourceBank.coins < premiumCost!) {
+            playIllegalFeedback(handSprite, s);
+            s.instructionText.setText(`Error: Not enough coins to place ${cardName} at the premium price. Need ${premiumCost}, have ${s.state.resourceBank.coins}.`);
+            finish();
+            return;
+          }
           // Explain dialog before confirming the premium placement
           // (CG-0MT24X0SX007RLHN): proceed → place at premium; cancel →
           // placement aborts and the card returns to hand (no cost, no

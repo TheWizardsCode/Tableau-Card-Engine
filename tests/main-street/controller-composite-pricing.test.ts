@@ -19,6 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
+import { COMMON_SFX_KEYS } from '../../src/core-engine/SoundManager';
 import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
@@ -88,13 +89,32 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
         return { stop: vi.fn(), destroy: vi.fn() };
       }),
     },
+    // Canvas-compatible tint overlay used by shakeIllegalMove.
+    add: {
+      rectangle: vi.fn(() => {
+        const rect: any = {
+          setAlpha: vi.fn(() => rect),
+          setOrigin: vi.fn(() => rect),
+          setRotation: vi.fn(() => rect),
+          setDepth: vi.fn(() => rect),
+          destroy: vi.fn(),
+        };
+        return rect;
+      }),
+    },
     animateTransferFromMarket: vi.fn().mockResolvedValue(undefined),
     getStreetSlotCenter: vi.fn((slotIndex: number) => ({ x: 500 + slotIndex, y: 260 })),
     getBusinessHandInsertionPosition: vi.fn().mockReturnValue({ x: 400, y: 620 }),
     msRenderer: {
       handView: {
         getBasePosition: vi.fn().mockReturnValue({ x: 300, y: 610 }),
-        getSpriteAt: vi.fn().mockReturnValue(null),
+        getSpriteAt: vi.fn().mockReturnValue({
+          x: 300,
+          y: 610,
+          setTint: vi.fn(),
+          clearTint: vi.fn(),
+          setX: vi.fn(),
+        }),
       },
       getMarketRowCards: vi.fn().mockReturnValue([]),
       clearDragHighlights: vi.fn(),
@@ -258,6 +278,90 @@ describe('Composite buy-and-play pricing (CG-0MT24X0SX007RLHN)', () => {
     scene.premiumDialogOnProceed();
     expect(scene.state.resourceBank.coins).toBe(coinsBefore - premium);
     expect(scene.state.streetGrid.some((slot: any) => slot?.name === 'Library')).toBe(true);
+  });
+
+  it('rejects the premium placement with illegal feedback and NO dialog when unaffordable', async () => {
+    const biz = setupSameDayComposite(scene, 6);
+    scene.state.actionsRemaining = 0; // premium applies
+    scene.state.resourceBank.coins = 5; // below the 9 premium
+    const coinsBefore = scene.state.resourceBank.coins;
+
+    await placeFromHandComposite(scene, controller);
+
+    // Pre-gate: dialog does NOT fire when the player cannot afford it.
+    expect(scene.showBuyAndPlacePremiumDialog).not.toHaveBeenCalled();
+    // Illegal feedback played (aspiration: sound + shake on the hand card).
+    expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
+    expect(scene.tweens.add).toHaveBeenCalled();
+    // No state mutation: card stays in hand, slot empty, coins unchanged.
+    expect(scene.state.hand).toHaveLength(1);
+    expect(scene.state.streetGrid.filter((slot: any) => slot !== null)).toHaveLength(0);
+    expect(scene.state.resourceBank.coins).toBe(coinsBefore);
+    expect(scene.state.actionsRemaining).toBe(0);
+    // Tracker preserved: a funded retry still places the same card free.
+    expect(scene.justMovedHandCardId).toBe(biz.id);
+    expect(scene.uiPhase).toBe('market');
+  });
+
+  it('parity: composite premium equals buyAndPlaceBusiness drag-drop premium (drag never cheaper)', async () => {
+    // Same card, same day, no actions available:
+    //  - click composite (same-day, 0 actions) charges premium
+    //  - drag buy-and-place (1-action day) charges the same premium
+    const cost = 6;
+    const premium = Math.ceil(cost * 1.5 * 2) / 2; // 9
+
+    // Composite side.
+    setupSameDayComposite(scene, cost);
+    scene.state.actionsRemaining = 0;
+    scene.state.resourceBank.coins = 100;
+    const compositeCoinsBefore = scene.state.resourceBank.coins;
+    await placeFromHandComposite(scene, controller);
+    scene.premiumDialogOnProceed();
+    const compositeDeducted = compositeCoinsBefore - scene.state.resourceBank.coins;
+    expect(compositeDeducted).toBe(premium);
+
+    // Drag side (fresh scene + controller, 1 action day).
+    const dragScene = createMockScene();
+    dragScene.uiPhase = 'market';
+    const dragController = new MainStreetTurnController(dragScene);
+    const card = makeBiz('biz-drag-parity', 'DragParity', cost);
+    dragScene.state.market.cards = [card];
+    dragScene.state.resourceBank.coins = 100;
+    dragScene.state.actionsRemaining = 1;
+    const slot = firstEmptySlot(dragScene.state);
+    const dragCoinsBefore = dragScene.state.resourceBank.coins;
+    dragController.onDragDropBusiness({ gameObject: { x: 400, y: 300, depth: 5, setDepth: vi.fn() }, data: card.id, zoneData: slot } as any);
+    dragScene.premiumDialogOnProceed();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const dragDeducted = dragCoinsBefore - dragScene.state.resourceBank.coins;
+    expect(dragDeducted).toBe(premium);
+    // Parity invariant: drag is never cheaper than click.
+    expect(dragDeducted).toBeGreaterThanOrEqual(compositeDeducted);
+    expect(dragDeducted).toBe(compositeDeducted);
+  });
+
+  it('dialog preference dismissal auto-proceeds on subsequent premium placements', async () => {
+    // Simulate the persisted "Don't show this again" preference: the scene
+    // mock fires onProceed synchronously (as the real overlay does when the
+    // preference is set), so the placement completes without a dialog pause.
+    scene.showBuyAndPlacePremiumDialog = vi.fn((cardName: string, onProceed: () => void) => {
+      scene.premiumDialogCardName = cardName;
+      onProceed();
+    });
+    setupSameDayComposite(scene, 6);
+    scene.state.actionsRemaining = 0;
+    scene.state.resourceBank.coins = 100;
+    const coinsBefore = scene.state.resourceBank.coins;
+
+    await placeFromHandComposite(scene, controller);
+
+    // Dialog invoked (would auto-proceed when the pref is persisted) and the
+    // premium was charged in the same flow.
+    expect(scene.showBuyAndPlacePremiumDialog).toHaveBeenCalledTimes(1);
+    const premium = Math.ceil(6 * 1.5 * 2) / 2; // 9
+    expect(scene.state.resourceBank.coins).toBe(coinsBefore - premium);
+    expect(scene.state.streetGrid.some((slot: any) => slot?.name === 'Same Day')).toBe(true);
+    expect(scene.uiPhase).toBe('market');
   });
 });
 
