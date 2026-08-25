@@ -19,6 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
+import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
 
@@ -34,6 +35,9 @@ function makeBiz(id: string, name: string, cost: number): any {
  */
 function createMockScene(overrides: Record<string, unknown> = {}): any {
   const state = setupMainStreetGame({ seed: 'controller-pricing-test' });
+  // Enter the MarketPhase so Market-layer commands (playBusinessFromHand →
+  // validateHandIndex) accept the placement (CG-0MT76QNJX005UR93).
+  executeDayStart(state);
   const scene: any = {
     state,
     uiPhase: 'placing-from-hand',

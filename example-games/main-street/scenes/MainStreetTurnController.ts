@@ -1,5 +1,5 @@
 import { addLog } from '../MainStreetState';
-import { executeDayStart, processEndOfTurn, placeFromHand, executeAction, type TurnResult } from '../MainStreetEngine';
+import { executeDayStart, processEndOfTurn, executeAction, type TurnResult } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
 import { hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import {
@@ -14,7 +14,7 @@ import {
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, peekIncidentDeckCommand, consumeAction, hireStaffCardCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, playBusinessFromHandCommand, peekIncidentDeckCommand, hireStaffCardCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
@@ -938,14 +938,13 @@ export class MainStreetTurnController {
 
         const doPlace = (): void => {
           try {
-            // Action economy: a held card (plan-ahead) or a GM composite
-            // with a remaining action consumes the action at listed cost.
-            // The premium path (no action available) is action-free — the
-            // premium is a coin substitute for the unavailable action.
-            if (!premiumApplies) {
-              consumeAction(s.state);
-            }
-            placeFromHand(s.state, handIndex, slotIndex, premiumCost);
+            // Composite-premium command (CG-0MT24X0SX007RLHN): when
+            // `premiumCost` is supplied the +50% premium replaces the action
+            // (no action consumed); the held-card / GM-listed path (undefined)
+            // consumes the action at listed cost. Executed through the undo
+            // manager so the coin deduction is fully undoable/redoable.
+            const cmd = playBusinessFromHandCommand(s.state, handIndex, slotIndex, premiumCost);
+            s.undoManager.execute(cmd);
             // The just-moved card has now been placed; clear the tracker so a
             // later selection of any other hand card costs an action again.
             // (Cleared only on success — on failure the card stays in hand and
@@ -960,7 +959,7 @@ export class MainStreetTurnController {
               : `Placed "${cardName}" on slot ${slotIndex}`);
           } catch (e) {
             const msg = (e as Error).message;
-            console.error('[MS] placeFromHand failed', e);
+            console.error('[MS] playBusinessFromHandCommand failed', e);
             // Insufficient-coins rejection → play illegal-move feedback.
             if (msg.toLowerCase().includes('not enough coins')) {
               const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);

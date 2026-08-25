@@ -237,20 +237,35 @@ export function playEventCommand(state: MainStreetState, handIndex?: number) {
   );
 }
 
-/** Command: Play Business from Hand (consumes 1 action; pays cost-at-play) */
+/**
+ * Command: Play Business from Hand (consumes 1 action; pays cost-at-play).
+ *
+ * Premium-aware (CG-0MT24X0SX007RLHN): when `premiumCost` is supplied the
+ * +50% premium REPLACES the missing action (same-day composite placement
+ * with 0 actions remaining) — no action is consumed and the premium price
+ * is deducted, recorded in the undo/redo snapshot. When absent, the held-
+ * card (plan-ahead) path is unchanged: 1 action consumed + listed cost.
+ */
 export function playBusinessFromHandCommand(
   state: MainStreetState,
   handIndex: number,
   slotIndex: number,
+  premiumCost?: number,
 ) {
   return toCommand(
     state,
     snapshotAction(
       (s) => {
-        consumeAction(s);
-        playBusinessFromHand(s, handIndex, slotIndex);
+        // Premium replaces the missing action — consume only on the
+        // held-card / listed-cost path (CG-0MT24X0SX007RLHN).
+        if (premiumCost === undefined) {
+          consumeAction(s);
+        }
+        playBusinessFromHand(s, handIndex, slotIndex, premiumCost);
       },
-      `PlayBusinessFromHand ${handIndex} -> slot ${slotIndex}`,
+      premiumCost !== undefined
+        ? `PlayBusinessFromHand ${handIndex} -> slot ${slotIndex} (premium ${premiumCost})`
+        : `PlayBusinessFromHand ${handIndex} -> slot ${slotIndex}`,
     ),
   );
 }
