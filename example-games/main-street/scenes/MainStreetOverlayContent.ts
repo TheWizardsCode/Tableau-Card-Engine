@@ -4,6 +4,10 @@ import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { TurnResult } from '../MainStreetEngine';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
 import { TIER_DEFINITIONS, ORDERED_TIER_DEFINITIONS, highestUnlockedTier } from '../MainStreetTiers';
+import {
+  isBuyAndPlacePremiumDialogDismissed,
+  setBuyAndPlacePremiumDialogDismissed,
+} from '../MainStreetPrefs';
 
 export class MainStreetOverlayContent {
   constructor(private readonly scene: any) {}
@@ -380,6 +384,117 @@ export class MainStreetOverlayContent {
       dismissOverlay(s.overlayObjects);
       s.overlayObjects = [];
       s.instructionText?.setText('Sale cancelled.');
+    });
+    s.overlayObjects.push(cancelBtn);
+  }
+
+  /**
+   * Shows the buy-and-play premium explainer dialog.
+   *
+   * Fires when a same-turn buy-and-play (click composite or drag) will incur
+   * the +50% premium because no action is available (CG-0MT24X0SX007RLHN).
+   * Explains the rule, offers Proceed / Cancel, and a persisted "Don't show
+   * this again" checkbox (localStorage, mirroring SettingsStore patterns).
+   *
+   * @param cardName Display name of the card being placed.
+   * @param onProceed Callback invoked when the player proceeds (placement
+   *                  continues at the premium price).
+   * @param onCancel  Callback invoked when the player cancels (placement
+   *                  aborts, no coins deducted).
+   */
+  public showBuyAndPlacePremiumDialog(
+    cardName: string,
+    onProceed: () => void,
+    onCancel: () => void,
+  ): void {
+    const s = this.scene;
+    if (isBuyAndPlacePremiumDialogDismissed()) {
+      // Preference persisted: dialog does not fire, placement proceeds.
+      onProceed();
+      return;
+    }
+
+    const panelW = 440;
+    const panelH = 250;
+    const panelY = s.layout.gameH / 2 - panelH / 2;
+
+    // Overlay background with semi-transparent backdrop (depth 199 backdrop,
+    // 200 box, 201 elements — UI Best Practices, AGENTS.md).
+    const boxConfig = {
+      width: panelW,
+      height: panelH,
+      color: 0x000000,
+      alpha: 1.0,
+      depth: 200,
+    };
+    const overlay = createOverlayBackground(
+      s,
+      { depth: 199, alpha: 0.6 },
+      boxConfig,
+    );
+    s.overlayObjects.push(...overlay.objects);
+
+    // Title
+    const titleText = s.add.text(s.layout.gameW / 2, panelY + 25, 'Buy & Place Premium', {
+      fontSize: '20px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(titleText);
+    s.overlayObjects.push(titleText);
+
+    // Explanation body
+    const bodyText = s.add.text(s.layout.gameW / 2, panelY + 75,
+      `Placing "${cardName}" in the same turn costs 50% more because you have no actions left.`,
+      {
+        fontSize: '14px',
+        color: '#ddccbb',
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        lineSpacing: 4,
+        wordWrap: { width: panelW - 60 },
+      },
+    ).setOrigin(0.5, 0).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(bodyText);
+    s.overlayObjects.push(bodyText);
+
+    // "Don't show this again" checkbox (toggleable text button)
+    let dontShowAgain = false;
+    const checkLabel = s.add.text(
+      s.layout.gameW / 2, panelY + 145,
+      '[ ] Don\'t show this again',
+      { fontSize: '14px', color: '#ccbbaa', fontFamily: FONT_FAMILY },
+    ).setOrigin(0.5).setDepth(201).setInteractive({ useHandCursor: true });
+    if (s.hudContainer) s.hudContainer.add(checkLabel);
+    checkLabel.on('pointerdown', () => {
+      dontShowAgain = !dontShowAgain;
+      checkLabel.setText(dontShowAgain ? '[x] Don\'t show this again' : '[ ] Don\'t show this again');
+    });
+    s.overlayObjects.push(checkLabel);
+
+    // Proceed button
+    const proceedBtn = createOverlayButton(
+      s, s.layout.gameW / 2 - 110, panelY + 195,
+      '[ Proceed ]', 201,
+    );
+    if (s.hudContainer) s.hudContainer.add(proceedBtn);
+    proceedBtn.on('pointerdown', () => {
+      if (dontShowAgain) setBuyAndPlacePremiumDialogDismissed(true);
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      onProceed();
+    });
+    s.overlayObjects.push(proceedBtn);
+
+    // Cancel button
+    const cancelBtn = createOverlayButton(
+      s, s.layout.gameW / 2 + 40, panelY + 195,
+      '[ Cancel ]', 201,
+    );
+    if (s.hudContainer) s.hudContainer.add(cancelBtn);
+    cancelBtn.on('pointerdown', () => {
+      if (dontShowAgain) setBuyAndPlacePremiumDialogDismissed(true);
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      onCancel();
     });
     s.overlayObjects.push(cancelBtn);
   }
