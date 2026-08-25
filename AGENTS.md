@@ -367,10 +367,18 @@ Main Street's business card placement uses a **two-step click pattern** (CG-0MSX
 
 **Key state fields:** `pendingHandIndex` (index into `state.hand`), `pendingHandJustMoved` (true for same-day move+place, false for click-then-place), `justMovedHandCardId` (id of the card just moved to hand this turn, used to derive `pendingHandJustMoved` when the player later selects it), `uiPhase` (`'market'` | `'placing-from-hand'` | `'animating'`).
 
+**Consistent same-turn pricing (CG-0MT24X0SX007RLHN):** The click composite (move + place in one turn) and drag-and-drop buy-and-play are priced identically — **drag is never cheaper than click**. The rule applies to business AND community-space cards alike:
+
+- **Composite with no action available** (the move already consumed the daily action): the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**.
+- **Composite with an action remaining** (Golden Mile 2-action days): the placement consumes the remaining action at **listed cost** — the composite and the GM-equivalent drag path are priced identically.
+- **Held-card play (plan-ahead)** is unchanged: listed cost + 1 action, no dialog.
+
+**Explainer dialog:** A premium-incurring placement (composite with 0 actions remaining, or a drag buy-and-place) fires a one-time explainer dialog — `showBuyAndPlacePremiumDialog(cardName, onProceed, onCancel)` on `MainStreetOverlayContent` — before the placement is finalised. Proceed commits the premium placement; Cancel aborts with **no state mutation** (the card stays in hand / market, and a composite retry still places free because `justMovedHandCardId` is preserved). The dialog offers a **"Don't show this again"** preference persisted under `PREMIUM_DIALOG_DISMISSED_KEY` (`MainStreetPrefs`). When the player cannot afford the premium, the placement is rejected with illegal-move feedback **before** the dialog fires (affordability pre-gate).
+
 **Tutorial gating:** During tutorial steps (T5 `place-business`, T10/T13 `buy-and-place`), both `select-hand-card` and `place-business` actions are allowed via `isRequiredAction`. The step completes only on the terminal `place-business` action.
 
-- **Key APIs:** `onBusinessCardClick(card)`, `onHandBusinessCardClick(index)`, `scene.pendingHandIndex`, `scene.uiPhase`
-- **When to use:** This is the canonical Main Street pattern for business card placement. Drag-and-drop (market → slot in one gesture) is supported as an alternative via `buy-and-place` but costs +50%.
+- **Key APIs:** `onBusinessCardClick(card)`, `onHandBusinessCardClick(index)`, `scene.pendingHandIndex`, `scene.uiPhase`, `placeFromHand(state, handIndex, slotIndex, premiumCost?)` / `canPlaceFromHand(..., premiumCost?)` (engine premium override), `playBusinessFromHandCommand(state, handIndex, slotIndex, premiumCost?)` (undoable composite command), `buyAndPlaceBusinessCommand(..., priceOverride?, extraActions?)` (drag path)
+- **When to use:** This is the canonical Main Street pattern for business card placement. Drag-and-drop (market → slot in one gesture) is supported as an alternative via `buy-and-place` and charges the identical premium when no actions are available after the move.
 
 ### 11. Tooltip System (DOM and Phaser Modes)
 

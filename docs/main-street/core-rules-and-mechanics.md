@@ -232,7 +232,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 |-----------|------|-------|
 | Move a market card to hand | 1 action | Free of coins; pays the listed cost when placed. |
 | Play a card from hand to the street | 1 action | Pays the card's listed cost at placement. |
-| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`). Triggered by dragging a market card straight onto a street slot. |
+| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`) when the move leaves **no action** for the placement (same pricing as the click composite). Triggered by dragging a market card straight onto a street slot. On a Golden Mile 2-action day the placement instead consumes the remaining action at **listed cost** — drag is never cheaper than click. |
 | Hire a staff card | 1 action | From the general market row. |
 
 **Free operations (never consume an action):**
@@ -244,7 +244,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 - Buying/playing upgrade cards and Investment events
 - Ending the turn
 
-> Same-day composite: clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase** — the placement itself is free. A card left in hand and placed on a **later** day costs that day's action.
+> Same-day composite pricing (CG-0MT24X0SX007RLHN): clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase**. If the move consumed the daily action (0 actions left), the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**; an explainer dialog fires first (Proceed commits, Cancel aborts with no cost, "Don't show this again" persists the preference). If an action **remains** (Golden Mile 2-action days), the placement consumes it at **listed cost**. A card left in hand and placed on a **later** day costs that day's action at listed cost, with no dialog. Business and community-space cards are priced identically.
 
 ---
 
