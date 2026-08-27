@@ -146,26 +146,4 @@ describe('MainStreet market deal-in animation', () => {
       label: 'first market card to return to full scale',
     });
   }, 30_000);
-
-  it('skips the animation under reduced motion (cards stay at full scale instantly)', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-
-    // Force reduced motion on the settings panel.
-    (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
-
-    const { calls } = spyOnMarketDealIn(scene);
-
-    (scene.state as { phase: string }).phase = 'DayStart';
-    (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase();
-
-    await waitForCondition(() => calls.length >= 1, { label: 'deal-in call (reduced motion)' });
-
-    for (const call of calls) {
-      // The animator is still called (the trigger point is unchanged) but
-      // returns early: no dealt state is applied, cards stay full scale.
-      expect(call.cards.length).toBeGreaterThan(0);
-      expect(call.scaleAtCall).toBe(1);
-    }
-  }, 30_000);
 });

@@ -83,7 +83,7 @@ Staff cards are a new card family (`family: 'staff'`) that expand the player's h
 - Layoff removes a random selection of hand cards equal to `handSlotsAdded`
 - If the hand has fewer cards than slots to remove, all hand cards are removed
 - Random selection uses the game's seeded RNG for determinism
-- Laid-off staff cards return to the staff card market
+- Laid-off staff cards return to `discards.staff` (available again via the standard market refill/cycle pipeline — CG-0MT2WTN0L004JA53)
 - Insufficient coins for ongoing cost: deducts what's available (down to 0)
 - **Staff abilities** (optional fields on `StaffCard`, Group F): `reputationPerTurn`
   (e.g. Socialite +0.1 rep/turn, applied in the income phase) and
@@ -92,7 +92,10 @@ Staff cards are a new card family (`family: 'staff'`) that expand the player's h
 
 #### Market
 
-Staff cards are available for purchase from a dedicated `staffCardMarket` section. Seven templates are available at game start (shuffled deterministically).
+Staff cards are drawn into the general market row like every other family
+(0–1 staff per row, `MARKET_STAFF_MAX`, CG-0MT3KZNQB0053K55): there is no
+dedicated `staffCardMarket` section. Nine templates are available at game
+start (shuffled deterministically).
 
 ## Economy Changes Summary
 
@@ -119,7 +122,7 @@ The physical card game uses a card-discard economy where cards are single-use an
 All multi-use economy features are implemented in the following files:
 
 - `MainStreetCards.ts` — StaffCard interface, templates, `createStaffDeck()`
-- `MainStreetState.ts` — `hand`, `maxHandSize`, `discardPile`, `staffCards`, `staffCardMarket`
+- `MainStreetState.ts` — `hand`, `maxHandSize`, `discardPile`, `staffCards`, `decks.staff`/`discards.staff` (staff live in the general deck pool, CG-0MT3KZNQB0053K55)
 - `MainStreetMarket.ts` — `purchaseBusinessToHand()`, `canAddToHand()`, `purchaseStaffCard()`, `cycleMarketCards()`
 - `MainStreetAdjacency.ts` — `computeHandCardSynergyBonus()`, updated `computeIncome()` with hand param
 - `MainStreetEngine.ts` — `applyStaffOngoingCosts()`, `layoffStaffCard()`, `BuyBusinessToHandAction`
@@ -134,7 +137,8 @@ Old saved games (without hand/staff/discard fields) load correctly with defaults
 - `maxHandSize` → `2`
 - `discardPile` → `[]`
 - `staffCards` → `[]`
-- `staffCardMarket` → `[]`
+- `decks.staff` / `discards.staff` → `[]` — legacy `staffCardMarket` saves are
+  migrated into `decks.staff` (CG-0MT3KZNQB0053K55)
 
 ## Test Coverage
 

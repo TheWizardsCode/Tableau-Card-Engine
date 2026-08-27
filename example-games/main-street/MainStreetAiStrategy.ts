@@ -18,6 +18,7 @@
 import type { AiStrategyBase } from '../../src/ai';
 import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
 import { recordMainStreetEvent } from './MainStreetTranscript';
+import { hasPeekCapableStaff } from './MainStreetStaffSkills';
 import type { MainStreetState } from './MainStreetState';
 import {
   executeDayStart,
@@ -27,19 +28,22 @@ import {
   type BuyBusinessAction,
   type BuyUpgradeAction,
   type BuyEventAction,
+  type HireStaffAction,
   type MoveToHandAction,
   type PlayBusinessFromHandAction,
   type PlayUpgradeFromHandAction,
   type PlayEventFromHandAction,
+  type CommunityFavourAction,
 } from './MainStreetEngine';
 import {
   canPurchaseBusiness,
   canPurchaseUpgrade,
   canPurchaseEvent,
+  canPurchaseStaff,
   canAddToHand,
   getEmptySlots,
 } from './MainStreetMarket';
-import type { BusinessCard, UpgradeCard, EventCard } from './MainStreetCards';
+import type { BusinessCard, UpgradeCard, EventCard, StaffCard } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import { computeSynergyBonus } from './MainStreetAdjacency';
 import { computeScore } from './MainStreetEngine';
@@ -140,12 +144,33 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   const hand = state.hand ?? [];
   const emptySlots = getEmptySlots(state);
 
+  // ── Community Favour (CG-0MSTOATDQ005XDET) ────────────────
+  // A FREE once-per-turn resource exchange (does not consume actionsRemaining),
+  // so it stays available even when the daily action budget is spent — as a
+  // fallback when the player cannot afford any market purchase. Legal only
+  // during MarketPhase, once per turn, and when the input resource suffices.
+  if (
+    state.phase === 'MarketPhase' &&
+    !state.favourUsedThisTurn &&
+    state.actionsRemaining >= 0
+  ) {
+    if (state.resourceBank.coins >= state.config.favourCoinsToRepCost) {
+      actions.push({ type: 'community-favour', direction: 'coins-to-rep' });
+    }
+    if (state.resourceBank.reputation >= state.config.favourRepToCoinsRepCost) {
+      actions.push({ type: 'community-favour', direction: 'rep-to-coins' });
+    }
+  }
+
   // Action economy (CG-0MSTOF1N5005PK2R): when the daily action budget is
   // spent, only end-turn is legal. Free operations (refresh/sell/hint/
   // discard/end-turn) stay available to the player, but the AI simply ends
-  // the day rather than cycling through non-actions.
+  // the day rather than cycling through non-actions. The free Community
+  // Favour fallback (added above) stays legal too — with end-turn always
+  // present so the AI loop still terminates.
   if ((state.actionsRemaining ?? 1) <= 0) {
-    return [{ type: 'end-turn' }];
+    if (actions.length === 0) return [{ type: 'end-turn' }];
+    return [...actions, { type: 'end-turn' }];
   }
 
   // ── buy-business (direct buy-and-place, pays immediately) ──
@@ -194,9 +219,30 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
+  // ── hire-staff (direct hire from the market row, pays immediately) ──
+  // Staff cards are hired straight from the general market row
+  // (CG-0MT3KZOBZ005IRYE); never moved to the hand. Skip staff already
+  // employed (same template) — one employee per role.
+  const employedStaffTemplates = new Set(
+    state.staffCards.map(s => s.id.replace(/-\d+$/, '')),
+  );
+  const staffCards = state.market.cards.filter(
+    c => c.family === 'staff',
+  ) as StaffCard[];
+  for (const card of staffCards) {
+    if (employedStaffTemplates.has(card.id.replace(/-\d+$/, ''))) continue;
+    const result = canPurchaseStaff(state, card.id);
+    if (result.legal) {
+      actions.push({ type: 'hire-staff', cardId: card.id });
+    }
+  }
+
   // ── move-to-hand (free; bounded only by hand capacity) ────
+  // Staff cards are hired directly from the market row, never moved to the
+  // hand (CG-0MT3KZNQB0053K55); skip them here.
   if (canAddToHand(state).legal) {
     for (const card of state.market.cards) {
+      if (card.family === 'staff') continue;
       actions.push({ type: 'move-to-hand', cardId: card.id });
     }
   }
@@ -236,10 +282,44 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     });
   }
 
+  // ── peek-incident-deck (staff peek skill, CG-0MSXOW6GN008ZSMN) ──
+  // Legal only when a peek-capable staff member is employed, the deck
+  // has a card to look at, and the once-per-turn peek has not been used
+  // this turn (CG-0MT3KZOBZ005IRYE: the AI can now hire staff, so the
+  // enumeration must reflect the peek legality gate or RandomStrategy
+  // can draw an illegal second peek).
+  const hasPeekStaff = hasPeekCapableStaff(state);
+  if (hasPeekStaff && state.incidentDeck.length > 0 && !state.peekUsedThisTurn) {
+    actions.push({ type: 'peek-incident-deck' });
+  }
+
   // ── end-turn ──────────────────────────────────────────────
   actions.push({ type: 'end-turn' });
 
   return actions;
+}
+
+// ── RandomStrategy ──────────────────────────────────────────
+
+/**
+ * Returns the cheapest purchasable MARKET card cost (business/community-
+ * space/upgrade/event/staff), or Infinity when the market is empty.
+ *
+ * Used by the Community Favour heuristic to detect a STALLED turn — a
+ * player who cannot afford the cheapest market card cannot advance the
+ * economy with normal purchases, so the free rep→coins exchange is the
+ * right fallback. Staff cards are part of the general market row
+ * (CG-0MT3KZNQB0053K55), so they are included like any other family.
+ */
+function getCheapestMarketCost(state: MainStreetState): number {
+  const marketCards = state.market?.cards ?? [];
+  let cheapest = Infinity;
+  for (const card of marketCards) {
+    if (typeof card !== 'object' || card === null) continue;
+    const cost = (card as { cost?: number }).cost;
+    if (typeof cost === 'number' && cost >= 0 && cost < cheapest) cheapest = cost;
+  }
+  return cheapest;
 }
 
 // ── RandomStrategy ──────────────────────────────────────────
@@ -344,7 +424,37 @@ export const GreedyStrategy: MainStreetAiStrategy = {
       return pickRandom(discardActions, rng);
     }
 
-    // Priority 9: end turn
+    // Priority 9: Community Favour fallback (CG-0MSTOATDQ005XDET).
+    // A FREE once-per-turn exchange, reached only when nothing more
+    // productive is available (no purchases/plays/moves). Only fires when
+    // the best favour action is genuinely value-creating (score > 1:
+    // e.g. rep-to-coins when cash-strapped). Neutral conversions (score 1)
+    // are skipped — blindly burning coins for rep every turn destroys
+    // liquidity and collapses the economy (a lossy exchange). This keeps
+    // AI turns meaningful on an unaffordable market without dominating
+    // normal purchases when affordable.
+    const favourActions = legalActions.filter(
+      a => a.type === 'community-favour',
+    ) as CommunityFavourAction[];
+    if (favourActions.length > 0) {
+      const best = pickBest(favourActions, a => scoreAction(state, a), rng);
+      if (scoreAction(state, best) > 1) {
+        return best;
+      }
+    }
+
+    // Priority 10: hire staff from the market row (CG-0MT3KZOBZ005IRYE).
+    // Reached when no more productive purchase/play/move is available.
+    // Hiring adds hand capacity and staff perks (GM actions, Accountant
+    // refresh discount, ...), which beats ending the day early.
+    const hireActions = legalActions.filter(
+      a => a.type === 'hire-staff',
+    ) as HireStaffAction[];
+    if (hireActions.length > 0) {
+      return pickBest(hireActions, a => scoreAction(state, a), rng);
+    }
+
+    // Priority 11: end turn
     return { type: 'end-turn' };
   },
 };
@@ -462,10 +572,12 @@ function scoreBusinessAction(
 }
 
 /**
- * Score an event purchase using the PRD Appendix A formula:
- *   score = coinDelta + (reputationDelta * config.reputationScoreMultiplier) - cost
+ * Score an event purchase using the final-score value heuristic:
+ *   score = coinDelta + reputationDelta - cost
  *
  * A score > 0 means the event has positive expected value and is worth buying.
+ * Reputation is valued at 1 point per unit (plain count), matching the
+ * final score function (CG-0MT3J8FXG006RCOA).
  */
 function scoreEventAction(
   state: MainStreetState,
@@ -476,7 +588,7 @@ function scoreEventAction(
   ) as EventCard | undefined;
   if (!card) return 0;
 
-  return card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost;
+  return card.coinDelta + card.reputationDelta - card.cost;
 }
 
 /**
@@ -526,7 +638,7 @@ function scorePlayEventFromHandAction(
 ): number {
   const card = (state.hand ?? [])[action.handIndex] as EventCard | undefined;
   if (!card) return 0;
-  return card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost;
+  return card.coinDelta + card.reputationDelta - card.cost;
 }
 
 // ── Public Scoring API ──────────────────────────────────────
@@ -537,7 +649,7 @@ function scorePlayEventFromHandAction(
  * Scores are in "net coin-equivalent value" units:
  *   - `buy-upgrade`:  `incomeBonus * horizon - cost`
  *   - `buy-business`: `(baseIncome + projectedSynergyBonus) * horizon - cost`
- *   - `buy-event`:    `coinDelta + reputationDelta * reputationScoreMultiplier - cost`
+ *   - `buy-event`:    `coinDelta + reputationDelta - cost` (reputation counts plainly)
  *   - `play-event`:   fixed bonus of 5 (prefer playing over end-turn)
  *   - `end-turn`:     0 (baseline / fallback)
  *
@@ -567,7 +679,7 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
     case 'play-event': {
       const card = (state.hand ?? []).find(c => c.family === 'event') as EventCard | undefined;
       return card
-        ? card.coinDelta + card.reputationDelta * state.config.reputationScoreMultiplier - card.cost
+        ? card.coinDelta + card.reputationDelta - card.cost
         : 0;
     }
     case 'move-to-hand':
@@ -583,6 +695,37 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
     case 'hire-staff':
       // Net value of expanded hand slots vs. cost + ongoing cost (rough estimate).
       return 2;
+    case 'peek-incident-deck':
+      // Staff peek skill (CG-0MSXOW6GN008ZSMN): foresight is mildly useful,
+      // but a greedy heuristic cannot exploit the revealed card, so it scores
+      // below most productive actions.
+      return 1;
+    case 'community-favour':
+      // Community Favour (CG-0MSTOATDQ005XDET): a free fallback when the
+      // player cannot afford purchases. rep-to-coins is genuinely valuable
+      // only when the player is STALLED (cannot afford the cheapest market
+      // card) AND the conversion leaves a reputation buffer (reputation
+      // after the exchange stays >= 1) — burning the last reputation would
+      // trigger reputation-collapse loss. Otherwise the exchange is a
+      // low-value (score 1) legal fallback that never outranks purchases.
+      if (action.direction === 'rep-to-coins') {
+        const cheapestCardCost = getCheapestMarketCost(state);
+        // Convert only when genuinely stalled (cannot afford the cheapest
+        // market card) AND the conversion leaves a reputation buffer
+        // (reputation after the exchange stays >= 1) — burning the last
+        // reputation would trigger reputation-collapse loss.
+        if (
+          Number.isFinite(cheapestCardCost) &&
+          state.resourceBank.coins < cheapestCardCost &&
+          state.resourceBank.reputation >= state.config.favourRepToCoinsRepCost + 1
+        ) {
+          return 3; // useful fallback when stalled with rep to spare
+        }
+        return 1;
+      }
+      // coins-to-rep: spending scarce coins on reputation is rarely better
+      // than buying cards; stays as a legal fallback at the low default.
+      return 1;
   }
 }
 

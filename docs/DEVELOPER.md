@@ -92,6 +92,8 @@ To preview the production build locally:
 npm run preview
 ```
 
+The preview server binds to all interfaces (`--host`, like `npm run dev`), so it is reachable from the LAN / Tailscale network at `http://<tailscale-ip>:4173/Tableau-Card-Engine/` (the `/Tableau-Card-Engine/` base path comes from the production `base` config used for GitHub Pages).
+
 **Note:** The Phaser library produces a ~2.0 MB chunk with the current Phaser 4 RC bundle. This is expected and can be addressed with code-splitting when needed.
 
 ## Deployment / Release
@@ -210,7 +212,7 @@ quickly while the main branch retains full, strict checks:
 |---|---|---|---|---|
 | `MONTE_SEEDS` | 20 | 20 | 200 | Number of deterministic seeds to simulate |
 | `MONTE_MIN_WIN_RATE` | 0.20 | 0.20 | 0.30 | Minimum acceptable win rate |
-| `MONTE_MAX_WIN_RATE` | 0.80 | 0.80 | 0.60 | Maximum acceptable win rate |
+| `MONTE_MAX_WIN_RATE` | 0.96 | 0.96 | 0.96 | Maximum acceptable win rate |
 
 Detailed pacing metrics (median score, grid fill timing, loss-reason dominance) are only asserted
 when `MONTE_SEEDS >= 50`, since they are not statistically meaningful for small sample sizes.
@@ -228,7 +230,7 @@ MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.30 MONTE_MAX_WIN_RATE=0.60 npm test
 MONTE_SEEDS=50 npm run monte-carlo
 
 # Fully explicit override:
-MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.20 MONTE_MAX_WIN_RATE=0.80 npm test
+MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.20 MONTE_MAX_WIN_RATE=0.96 npm test
 ```
 
 Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite.config.ts`:
@@ -237,7 +239,9 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` (excludes `replay-*.test.ts`) | Logic, data, and integration tests — runs in parallel (worker pool capped at `maxWorkers: 4`; see contention mitigation below) |
 | `replay-e2e` | Node.js (fork pool) | `tests/e2e/replay-*.test.ts` | Playwright-driven replay e2e tests. Runs in its own fork (`singleFork: true`) after unit tests to avoid Vite cold-start CPU contention |
-| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
+| `smoke` | Chromium (Playwright) | 10 explicit files (see [smoke profile](#smoke-tests)) | One representative test per game + core engine/UI smoke. ~30s for rapid feedback during implementation |
+| `dev` | Chromium (Playwright) | 30 explicit files (see [dev profile](#dev-tests)) | Smoke + key E2E per game. ~3 min for the implement/audit workflow |
+| `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | All non-tutorial Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
 | `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance; requires [browser test setup](#browser-test-setup)) |
 
 All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
@@ -277,6 +281,44 @@ Two mitigations are in place in this repository:
    summary before a retry is allowed, so a genuine test failure can never be
    hidden by a retry.
 
+#### Hang timeout (bounded wall-clock abort)
+
+The transient signatures above cover runs that **exit** non-zero. A different
+failure mode (CG-0MT08R2QR0070F3N) never exits at all: under heavy CPU
+contention (load avg 14-35 on 16 cores), a browser test can stall indefinitely
+— e.g. a `requestAnimationFrame` loop starved of frames, or a Phaser game
+destroy in `afterEach` that never completes — leaving the whole browser stage
+hanging with no exit code. The retry path cannot help: a hang produces no
+output to mask against.
+
+Mitigation: every attempt in `scripts/vitest-run-with-retry.ts` is bounded by
+a wall-clock timeout. The runner spawns vitest asynchronously into its own
+process group; when the bound elapses the whole group (vitest + tinypool
+workers + Playwright Chromium) is SIGTERMed (graceful shutdown), then
+SIGKILLed after a short grace period if it survives. An async `spawn` is
+required: a `spawnSync` with a `timeout` hangs forever if the child ignores
+SIGTERM, which would defeat the whole point against a genuinely hung
+process. When the bound elapses the runner exits with code **124**
+(`HANG_TIMEOUT_EXIT_CODE`, the conventional GNU-timeout exit code; vitest
+itself only ever exits 0 or 1) after printing a `[hang-timeout]` diagnostic
+with re-run guidance. Hangs are **never retried** — a genuine hang must
+surface, not be masked. `scripts/run-ci-tests.sh` sets the bounds
+explicitly: 5 minutes for the unit stage, 15 minutes for the browser stage
+(`--timeout-ms <n>`, default 10 minutes in the runner itself). The browser
+bound is deliberately generous — ~40 files at 8-10s each runs 6-8 minutes
+nominal, and concurrent full-suite runs from parallel worktrees can stretch
+it past 12 — while a true hang never completes and is still bounded. Under
+`set -euo pipefail` the 124 exit aborts the gate instead of stalling it
+indefinitely.
+
+Diagnosing a hang: `[hang-timeout]` in the output identifies the stage;
+re-run the suspected file(s) in isolation via
+`npx vitest run --project browser tests/<file>` to see whether the hang
+reproduces without suite-wide contention. If it does, look for an unresolved
+`Phaser.Game` (the `afterEach` must destroy it) or a frame-wait helper without
+a timeout fallback. Exit codes from the runner: 0/1 from vitest, 124 on hang
+abort, 2 on an invalid `--timeout-ms` value.
+
 If you see the worker-timeout error repeatedly under sustained load, run the
 suites sequentially (e.g. `npx vitest run --project unit` alone) rather than
 launching concurrent full-suite runs, and check for other vitest processes
@@ -301,6 +343,41 @@ The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameTy
 - Place test files in `tests/` following the `*.test.ts` pattern
 - Import from `vitest` directly: `import { describe, it, expect } from 'vitest'`
 - Vitest globals are enabled -- `describe`, `it`, `expect` are available without imports in test files
+
+### Smoke Tests
+
+Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedback during implementation. The smoke profile runs one representative test per game plus core engine/UI smoke tests — target runtime is ~30 seconds for 10 files.
+
+**Smoke profile files:**
+- `tests/main-street/MainStreetScene.browser.test.ts` (Main Street core game flow)
+- `tests/golf/GolfScene.browser.test.ts` (Golf core flow)
+- `tests/feudalism/FeudalismSmokeTest.browser.test.ts` (FC smoke)
+- `tests/beleaguered-castle/BeleagueredCastleOverlay.browser.test.ts` (BC overlay)
+- `tests/coloretto/ColorettoScene.browser.test.ts` (Coloretto core)
+- `tests/sushi-go/SushiGoIcons.browser.test.ts` (Sushi Go rendering)
+- `tests/lost-cities/LostCitiesRoundEnd.browser.test.ts` (Lost Cities flow)
+- `tests/core-engine/SvgHelpers.browser.test.ts` (Core SVG pipeline)
+- `tests/ui/HelpPanel.browser.test.ts` (UI chrome)
+- `tests/gym/GymSceneSmoke.browser.test.ts` (All 19 gym scenes boot)
+
+### Dev Tests
+
+Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehensive but still fast suite. The dev profile adds key E2E tests per game on top of all smoke tests — target runtime is ~3 minutes for ~30 files.
+
+**Dev profile coverage:**
+- All smoke files (above)
+- Core + UI: `SvgHelpers`, `PhaserEventBridge`, `HelpPanel`, `TooltipManager`, `SettingsPanelTooltips`
+- Main Street key E2E: `MainStreetScene`, `drag`, `undo-redo`, `MainStreetOverlay`, `game-over`
+- Golf key E2E: `GolfScene`, `GolfInteraction`, `GolfEvents`
+- FC key E2E: `FeudalismSmokeTest`, `FeudalismSelection`, `FeudalismLayout`
+- BC key E2E: `BeleagueredCastleOverlay`, `BeleagueredCastleTurnController`, `BeleagueredCastleLayout`
+- Sushi Go key E2E: `SushiGoIcons`, `SushiGoOverlay`, `SushiGoTableauRendering`
+- Lost Cities key E2E: `LostCitiesRoundEnd`, `LostCitiesOverlayAlignment`
+- Coloretto: `ColorettoScene`
+- HandView: `gym-handpile-drag`, `gym-handpile-cancel`
+- Gym: `GymDeckRngScene`, `GymOverlayUiScene`
+
+Tutorial E2E tests are excluded from smoke and dev profiles (run in CI only).
 
 ### Writing browser tests
 
@@ -907,6 +984,34 @@ the reputation coin multiplier. Effects decay at the end of each turn during
   old saves (missing field defaults to `[]`)
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
+
+#### Community Favour (CG-0MSTOATDQ005XDET)
+
+The Community Favour resource exchange is a **free** once-per-turn action
+available during the market phase (it does not consume `actionsRemaining`):
+
+- **coins → reputation:** spend `favourCoinsToRepCost` (default 2) coins for +1 rep.
+- **reputation → coins:** spend `favourRepToCoinsRepCost` (default 2) rep for
+  `favourRepToCoinsCoinGain` (default 3) coins. The round-trip is lossy, so no
+  arbitrage.
+- Rates are per-difficulty `GameConfig` constants in `MainStreetDifficulty.ts`
+  (defaults on Easy/Medium/Hard).
+- Gating: `state.favourUsedThisTurn` (market-phase only, reset at `DayStart`),
+  serialized with legacy-save backfill to `false`.
+- UI: two SLL-positioned buttons in the market-phase action bar
+  (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones), disabled when the
+  input resource is insufficient or the gate is spent.
+- AI: `MainStreetAiStrategy` enumerates the action when affordable/unused and
+  scores rep→coins > 1 only when genuinely stalled (cannot afford the cheapest
+  market card) with a reputation buffer; `GreedyStrategy` Priority 9 selects it
+  only in that case, so normal purchases are never dominated.
+- Tutorial: T13 (action-gated) teaches the rep→coins exchange. In the
+  two-turn flow (CG-0MT53NXGZ004H5AE) the conversion is optional — end-turn
+  income already keeps the balance above the $7 Library (T19), so the lesson
+  is low-pressure.
+- Tests: `tests/main-street/community-favour-*.test.ts` (engine, AI,
+  persistence) + `community-favour-ui.browser.test.ts` (buttons, disabled
+  states, full exchange round).
 
 ## Replay Tool
 
@@ -1847,7 +1952,7 @@ reusing base layout zones through composition.
 | `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
 | `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
 | `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T13 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types |
+| `example-games/main-street/TutorialFlow.ts` | T1-T23 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types |
 
 #### How composition works
 
@@ -1888,7 +1993,7 @@ The tutorial layout defines these zones (all use normalized coordinates with opt
 | `marketBusinessRow` | Legacy full-market-area zone (single row now drawn in the same band) | No (informational) |
 | `streetGrid` | The 2×5 street grid for placing businesses | Yes (stops before right column) |
 | `endTurnButton` | End Turn action button area | Yes |
-| `incidentQueue` | Scrollable incident cards queue | Yes |
+| `incidentQueue` | Face-down incident deck panel (card back + remaining count, CG-0MSTOATDP000JNHH) | Yes |
 | `investmentsRow` | ALIAS of `developmentRow` — the market rows were merged into one (CG-0MSTOATDT009BRX2); upgrade/event steps highlight the same single row | Yes |
 | `helpButton` | Help/settings button area | Yes |
 
@@ -2502,7 +2607,7 @@ To verify production safety:
 - `npm test` runs a fast-fail pre-check (`scripts/check-browser-test-env.ts`) that prints the exact remediation command if Chromium is missing; verify the install with `npx playwright install --list`
 - Check that `@vitest/browser` version matches `vitest` version
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
-- If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game)
+- If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game). A full `npm test` run that stalls indefinitely is aborted by the runner's wall-clock timeout (see [Hang timeout](#hang-timeout-bounded-wall-clock-abort)) with exit 124 and a `[hang-timeout]` diagnostic — run the suspected file in isolation to reproduce.
 - **Process/resource leak cleanup:** All browser tests should clean up Phaser.Game instances in `afterEach` using `game.destroy(true, false)` and remove the game container div. The dev server utilities (`scripts/dev-server-utils.ts`) use a simplified start-stop-per-call pattern with no reference counting. `ensureDevServer()` kills any existing process on port 3000 before starting a fresh server. `killDevServer()` unconditionally kills the child process and any remaining process on port 3000. SIGTERM/SIGINT handlers provide additional cleanup for forced exits.
 
 **Large bundle warning:**

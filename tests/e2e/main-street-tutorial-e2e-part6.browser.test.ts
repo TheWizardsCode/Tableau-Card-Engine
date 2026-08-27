@@ -1,10 +1,10 @@
 /**
- * Main Street Tutorial E2E test — T14 Triggering Events → T17 Tutorial Complete.
+ * Main Street Tutorial E2E test — T20 Triggering Events → T23 Tutorial Complete.
  *
- * Walks the new flow: after building the Library (T13), the player plays the
- * held Local Festival from the hand (T14, play-event gate), then confirms
- * Success and Failure (T15), Challenges (T16), and completes (T17) with the
- * "Let's play!" button.
+ * Walks the finale of the 23-step two-turn tutorial (CG-0MT53NXGZ004H5AE):
+ * after building the Library (T19), the player plays the held Local Festival
+ * from the hand (T20, play-event gate), then confirms Success and Failure
+ * (T21), Challenges (T22), and completes (T23) with the "Let's play!" button.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
@@ -20,6 +20,7 @@ import {
   clickRequiredEventCard,
   clickStreetSlot,
   clickEndTurn,
+  clickCommunityFavour,
   clickPlayHeldEvent,
   saveScreenshot,
   getOverlay,
@@ -37,42 +38,48 @@ async function waitForStartButton(scene: Phaser.Scene, timeoutMs = 8_000): Promi
   return null;
 }
 
-/** Walk from T1 to the end of T13 (arrives on T14). */
-async function walkToT14(scene: Phaser.Scene): Promise<void> {
+/** Walk from T1 to the end of T19 (arrives on T20 Triggering Events). */
+async function walkToT20(scene: Phaser.Scene): Promise<void> {
   await clickOverlayButtonByText('Next >'); // T1 -> T2
   await clickOverlayButtonByText('Next >'); // T2 -> T3
-  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
+  await clickRequiredBusinessCard(scene);  // T3 move Laundromat -> T4
   await waitForOverlayVisible(5_000);
   await clickOverlayButtonByText('Next >'); // T4 -> T5
   await waitForOverlayVisible(5_000);
-  await clickStreetSlot(scene, 0);  // T5 place -> T6
+  await clickOverlayButtonByText('Next >'); // T5 -> T6
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T6 end -> T7
+  await waitForOverlayVisible(10_000);
+  await clickStreetSlot(scene, 0);        // T7 place Laundromat -> T8
   await new Promise((r) => setTimeout(r, 500));
   await waitForOverlayVisible(5_000);
-  await clickOverlayButtonByText('Next >'); // T6 -> T7
-  await waitForOverlayVisible(5_000);
-  await clickEndTurn(scene);               // T7 -> T8
-  await waitForOverlayVisible(10_000);
   await clickOverlayButtonByText('Next >'); // T8 -> T9
   await waitForOverlayVisible(5_000);
-  await clickRequiredEventCard(scene);  // T9 buy Local Festival -> T10
+  await clickRequiredEventCard(scene);   // T9 buy Local Festival -> T10
   await waitForOverlayVisible(5_000);
-  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
-  await new Promise((r) => setTimeout(r, 500));
-  await waitForOverlayVisible(5_000);
-  await clickStreetSlot(scene, 1);  // T5 place -> T6
-  await new Promise((r) => setTimeout(r, 500));
-  await waitForOverlayVisible(5_000);
-  await clickEndTurn(scene);               // T11 -> T12 (informative)
+  await clickEndTurn(scene);              // T10 end -> T11
   await waitForOverlayVisible(10_000);
-  await clickOverlayButtonByText('Next >'); // T12 -> T13 (Build a Library)
+  await clickRequiredBusinessCard(scene); // T11 move Bookshop -> T12
   await waitForOverlayVisible(5_000);
-  await clickRequiredBusinessCard(scene);  // T13 buy Library to hand (composite step stays active)
+  await clickOverlayButtonByText('Next >'); // T12 -> T13
   await waitForOverlayVisible(5_000);
-  await clickStreetSlot(scene, 2);         // T13 place Library next to the Bookshop (slot 1) -> T14
+  await clickCommunityFavour(scene);       // T13 -> T14
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T14 -> T15
+  await waitForOverlayVisible(10_000);
+  await clickStreetSlot(scene, 1);         // T15 place Bookshop -> T16
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T16 -> T17
+  await waitForOverlayVisible(10_000);
+  await clickRequiredBusinessCard(scene);  // T17 move Library -> T18
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T18 -> T19
+  await waitForOverlayVisible(10_000);
+  await clickStreetSlot(scene, 2);         // T19 place Library -> T20
   await waitForOverlayVisible(5_000);
 }
 
-describe('Main Street Tutorial E2E — T14-T17', () => {
+describe('Main Street Tutorial E2E — T20-T23', () => {
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -89,10 +96,10 @@ describe('Main Street Tutorial E2E — T14-T17', () => {
     game = null;
   });
 
-  it('T14: Triggering Events — play the held Local Festival from the hand', async () => {
+  it('T20: Triggering Events — play the held Local Festival from the hand', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
-    await walkToT14(scene);
-    expect(getStepIndex(scene)).toBe(13); // T14
+    await walkToT20(scene);
+    expect(getStepIndex(scene)).toBe(19); // T20
 
     // The held event (Local Festival) is in the hand
     const s = scene as any;
@@ -101,23 +108,23 @@ describe('Main Street Tutorial E2E — T14-T17', () => {
 
     await clickPlayHeldEvent(scene);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(14); // T15 Success and Failure
-    await saveScreenshot('t14-t15');
+    expect(getStepIndex(scene)).toBe(20); // T21 Success and Failure
+    await saveScreenshot('t20-t21');
   }, 60_000);
 
-  it('T15-T17: Success and Failure, Challenges, and Tutorial Complete ("Let\'s play!")', async () => {
+  it('T21-T23: Success and Failure, Challenges, and Tutorial Complete ("Let\'s play!")', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
-    await walkToT14(scene);
-    await clickPlayHeldEvent(scene);             // T14 -> T15
+    await walkToT20(scene);
+    await clickPlayHeldEvent(scene);             // T20 -> T21
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(14);
-    await clickOverlayButtonByText('Next >'); // T15 -> T16
+    expect(getStepIndex(scene)).toBe(20);
+    await clickOverlayButtonByText('Next >'); // T21 -> T22
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(15);
-    await clickOverlayButtonByText('Next >'); // T16 -> T17
+    expect(getStepIndex(scene)).toBe(21);
+    await clickOverlayButtonByText('Next >'); // T22 -> T23
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(16);
-    await saveScreenshot('t16-t17');
+    expect(getStepIndex(scene)).toBe(22);
+    await saveScreenshot('t22-t23');
     // The completion button is now "Let's play!"
     await clickOverlayButtonByText('Let\'s play!');
     await new Promise((r) => setTimeout(r, 500));

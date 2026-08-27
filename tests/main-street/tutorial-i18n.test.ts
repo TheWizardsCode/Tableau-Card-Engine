@@ -85,13 +85,13 @@ describe('Tutorial i18n: English bundle registration', () => {
     expect(body).toContain(formatCurrency(Number(row.cost)));
   });
 
-  it('T15 title resolves to "Success and Failure"', () => {
-    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T15')!;
+  it('T21 title resolves to "Success and Failure"', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T21')!;
     expect(t(step.titleKey)).toBe('Success and Failure');
   });
 
-  it('T17 title resolves to "Tutorial Complete"', () => {
-    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T17')!;
+  it('T23 title resolves to "Tutorial Complete"', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T23')!;
     expect(t(step.titleKey)).toBe('Tutorial Complete');
   });
 
@@ -179,7 +179,7 @@ describe('Tutorial i18n: resolveTutorialStepText', () => {
     expect(body).toContain(row.name);
   });
 
-  it('works for all 17 steps', () => {
+  it('works for all tutorial steps', () => {
     for (const step of UNIFIED_TUTORIAL_STEPS) {
       const { title, body } = resolveTutorialStepText(step);
       expect(title.length).toBeGreaterThan(0);

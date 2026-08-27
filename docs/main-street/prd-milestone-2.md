@@ -176,6 +176,10 @@ Run N+1 starts with expanded card pool
 
 > Update note: tier distribution was expanded in follow-up work item CG-0MP1VO5FM008LB5Z so campaign progression now covers the full 59-template catalog, with a 5-card expanded sample available in Tier 1.
 
+> Update note 2 (rebalance CG-0MT2WU0CX005Z143): tier assignments now live in the `tier` column of `example-games/main-street/card-data.csv` (via `CARD_TIER_MAP` → `TIER_DEFINITIONS`). The composition was rebalanced so every tier contains a roughly equal mix of all five card families (business, community-space, event, upgrade, staff) — including newly tiered staff (2/2/2/2/1 by cost ladder) and a Tier 5 that is no longer event-dominated. The table above is historical.
+
+> Update note 3 (12-tier expansion CG-0MT3C744B009DS84): the progression was expanded from **5 tiers to 12 tiers** so each tier holds ~10-15 cards instead of ~27-30. Reputation thresholds form an anchored ladder (0, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 80) that preserves the historical anchors 8/16/32/64 at T3/T5/T7/T11 and adds an aspirational T12=80. Challenge paths are progressive: T2 any 1 challenge, T3 any 2, T4 synergy+resource, T5 3 incl. cross-cutting/placement, T6 synergy+placement+upgrade, T7 any 4, T8 synergy+resource+upgrade, T9 4 incl. cross-cutting, T10 ch-diversified, T11 ch-synergy-master, T12 both flagships. Community-space (8 cards) and staff (9 cards) are spread across as many tiers as their card counts allow (cs in 7 tiers; staff in 9 tiers) rather than forced into every tier. Tier names: T1 Foundation, T2 Rising Street, T3 Neighborhood, T4 District, T5 Midtown, T6 Metropolitan, T7 City Center, T8 Capital, T9 Iconic Quarter, T10 Historic Mile, T11 National Street, T12 Legendary Main Street. All tables above are historical; see the `tier` column in `card-data.csv` for current per-card assignments.
+
 ### 2.7 Historical note (superseded)
 
 This section originally tracked cards that were not tier-gated. It is now superseded by follow-up work item CG-0MP1VO5FM008LB5Z, which updated progression so the full expanded catalog is tier-gated and reachable through campaign unlocks.
@@ -1079,7 +1083,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 - `getPresetNames(MAIN_STREET_PRESETS)` returns an array containing `'easy'`, `'medium'`, and `'hard'`.
 - `EASY_CONFIG.startingCoins > MEDIUM_CONFIG.startingCoins > HARD_CONFIG.startingCoins` (12 > 8 > 5).
 - ~~`EASY_CONFIG.maxTurns > MEDIUM_CONFIG.maxTurns > HARD_CONFIG.maxTurns` (25 > 20 > 15).~~ Removed per CG-0MSLXJCHH001DLIO.
-- `EASY_CONFIG.winThreshold < MEDIUM_CONFIG.winThreshold < HARD_CONFIG.winThreshold` (120 < 150 < 180).
+- `EASY_CONFIG.winThreshold < MEDIUM_CONFIG.winThreshold < HARD_CONFIG.winThreshold` (100 < 120 < 150).
 - ~~Given a game initialized with `difficulty: 'easy'`, `state.config.startingCoins === 12` and `state.config.maxTurns === 25`.~~ `state.config.maxTurns` is `undefined` for all default presets per CG-0MSLXJCHH001DLIO.
 
 ### US-17: Difficulty Affects Gameplay
@@ -1099,7 +1103,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 - `EASY_CONFIG.synergyBonusPerNeighbor === 1.5`, `MEDIUM_CONFIG.synergyBonusPerNeighbor === 1`, and `HARD_CONFIG.synergyBonusPerNeighbor === 0.75`.
 - `EASY_CONFIG.challengeBonusPoints === 15` and `HARD_CONFIG.challengeBonusPoints === 8`.
 - `HARD_CONFIG.challengesPerRun === 4` and `EASY_CONFIG.challengesPerRun === 2`.
-- Given an Easy game, `computeScore()` uses `config.reputationScoreMultiplier` (5) and `config.challengeBonusPoints` (15) -- not hardcoded values.
+- Given an Easy game, `computeScore()` uses `config.challengeBonusPoints` (15) and a plain reputation count (1 point per reputation, no score multiplier) -- not hardcoded values.
 - Given two adjacent matching-synergy businesses on Easy, a default-rate (0.5) card's synergy rate is 75% of effective base income (not an absolute coin value).
 
 ---
@@ -1154,7 +1158,7 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 
 Economy balance is verified via a two-tier Monte Carlo approach:
 
-- **CI guardrail** (`tests/main-street/monte-carlo-balance.test.ts`): A Vitest test that runs a configurable number of deterministic seeds with the `market-greedy` strategy over 60 turns. Seed count and win-rate thresholds are controlled via environment variables (`MONTE_SEEDS`, `MONTE_MIN_WIN_RATE`, `MONTE_MAX_WIN_RATE`). PR CI uses 20 seeds with wide bounds (0.20–0.80) for fast feedback (the wide band is the regression guardrail; the tuned per-difficulty bands are enforced by `tests/main-street/monte-carlo-greedy-guardrail.test.ts`). Detailed pacing metrics (grid fill, loss-reason dominance, no-action turns) are only asserted for runs of 50+ seeds. It runs on every `npm test` invocation.
+- **CI guardrail** (`tests/main-street/monte-carlo-balance.test.ts`): A Vitest test that runs a configurable number of deterministic seeds with the `market-greedy` strategy over 60 turns. Seed count and win-rate thresholds are controlled via environment variables (`MONTE_SEEDS`, `MONTE_MIN_WIN_RATE`, `MONTE_MAX_WIN_RATE`). PR CI uses 20 seeds with wide bounds (0.20–0.96 after the CG-0MSVYPEZ90085SHE ongoing-cost re-baseline and the staff-specialisation economy) for fast feedback (the wide band is the regression guardrail; the tuned per-difficulty bands are enforced by `tests/main-street/monte-carlo-greedy-guardrail.test.ts`). Detailed pacing metrics (grid fill, loss-reason dominance, no-action turns) are only asserted for runs of 50+ seeds. It runs on every `npm test` invocation.
 - **Balance harness** (`npm run monte-carlo`): A standalone script that runs 200 seeds by default (configurable via `--seeds`/`MONTE_SEEDS`) and writes detailed JSON and CSV output to `results/`. This is used for manual analysis and tuning, not enforced in CI.
 
 **Acceptance Criteria:**

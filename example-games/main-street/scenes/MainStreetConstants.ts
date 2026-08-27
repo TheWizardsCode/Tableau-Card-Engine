@@ -22,6 +22,13 @@ export const BASE_MARKET_LABEL_W = 90;
 export const BASE_QUEUE_CARD_W = 120;
 export const BASE_QUEUE_CARD_H = 69;
 export const BASE_QUEUE_CARD_GAP = 10;
+
+/**
+ * Template id of the face-down incident-deck card back (CG-0MSXOWLHU0099QF6).
+ * A static SVG asset (`svg/cards/card-back.svg`) fetched by the texture
+ * manager; not a CSV card template.
+ */
+export const CARD_BACK_TEMPLATE = 'card-back';
 // Make street slots match market placeholder size (market slots: 140x80)
 export const BASE_SLOT_W = 140;
 export const BASE_SLOT_H = 80;
@@ -143,6 +150,12 @@ export interface SceneLayout {
   actionButtonW: number;
   hintButtonW: number;
   smallButtonW: number;
+  /** Left-edge X of the coins-to-rep Community Favour button (SLL-driven). */
+  favourCoinsToRepX: number;
+  /** Left-edge X of the rep-to-coins Community Favour button (SLL-driven). */
+  favourRepToCoinsX: number;
+  /** Width of each Community Favour button. */
+  favourButtonW: number;
   challengeX: number;
   challengeY: number;
   challengeW: number;

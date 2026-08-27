@@ -51,6 +51,9 @@ export const HUD_TOOLTIP_I18N_KEYS = {
   actionRemainingLabel: 'hud.tooltip.action.remaining',
   actionConsumesLabel: 'hud.tooltip.action.consumes',
   actionFreeOpsLabel: 'hud.tooltip.action.freeOps',
+  actionBankedLabel: 'hud.tooltip.action.banked',
+  actionBankingExplain: 'hud.tooltip.action.bankingExplain',
+  actionBankingGmNote: 'hud.tooltip.action.bankingGmNote',
 } as const;
 
 /** ARIA label i18n keys (for screen-reader accessibility). */
@@ -97,6 +100,9 @@ export const HUD_TOOLTIP_STRINGS = {
   actionRemainingLabel: 'Actions remaining',
   actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff',
   actionFreeOpsLabel: 'Free: re-roll market, sell, discard, end turn',
+  actionBankedLabel: 'Banked actions',
+  actionBankingExplain: "1 action per turn, with up to two turns' unused actions banked",
+  actionBankingGmNote: '+1 action per turn from General Manager (staff actions are used first, never banked)',
 } as const;
 
 /** ARIA label default English strings. Registered as the `en` locale bundle. */
@@ -235,7 +241,7 @@ export function buildScoreTooltip(
   // Score breakdown components
   const coins = state.resourceBank.coins;
   const rep = state.resourceBank.reputation;
-  const repContribution = rep * state.config.reputationScoreMultiplier;
+  const repContribution = rep;
   const challengeContribution = state.challengesCompleted.length * state.config.challengeBonusPoints;
   const remaining = threshold - score;
 
@@ -248,7 +254,7 @@ export function buildScoreTooltip(
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreEstimateLabel)}: ${Math.round(score)}/${threshold}`,
     '',
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${Math.round(coins)}`,
-    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)} ${state.config.reputationScoreMultiplier}: ${repContribution}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)}: ${repContribution}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownChallenges)}: ${challengeContribution}`,
   ];
 
@@ -282,17 +288,28 @@ export function buildScoreTooltip(
 /**
  * Builds the tooltip content string for the Actions HUD element.
  *
- * Explains the daily action budget: what spends an action and what is free.
+ * Explains the daily action budget: what spends an action, what is free,
+ * and the banking mechanic (unused base actions carry over, capped at 2).
+ * When a General Manager is employed (+actionsPerTurn), appends the GM note
+ * (staff actions are consumed first and never bank). (CG-0MT3IOPZB005LNAR)
  */
 export function buildActionTooltip(state: MainStreetState): string {
   const remaining = state.actionsRemaining;
+  const banked = state.bankedActions ?? 0;
+  const gmBonus = (state.staffCards ?? []).reduce((sum, card) => sum + (card.actionsPerTurn ?? 0), 0);
   const lines = [
     t(HUD_TOOLTIP_I18N_KEYS.actionTitle),
     `${t(HUD_TOOLTIP_I18N_KEYS.actionRemainingLabel)}: ${remaining}`,
+    `${t(HUD_TOOLTIP_I18N_KEYS.actionBankedLabel)}: ${banked}`,
     '',
     t(HUD_TOOLTIP_I18N_KEYS.actionConsumesLabel),
     t(HUD_TOOLTIP_I18N_KEYS.actionFreeOpsLabel),
+    '',
+    t(HUD_TOOLTIP_I18N_KEYS.actionBankingExplain),
   ];
+  if (gmBonus > 0) {
+    lines.push(t(HUD_TOOLTIP_I18N_KEYS.actionBankingGmNote));
+  }
   return lines.join('\n');
 }
 

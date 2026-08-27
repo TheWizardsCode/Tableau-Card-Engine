@@ -3,7 +3,9 @@
  */
 
 import Phaser from 'phaser';
-import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard } from '../MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
+import type { SpecializationSkill } from '../MainStreetStaffSkills';
+import { getSkill, hasPeekCapableStaff, STAFF_SKILL_CHIP_COLORS } from '../MainStreetStaffSkills';
 import {
   GRID_SIZE,
   MARKET_TOTAL_SLOTS,
@@ -64,6 +66,7 @@ import {
   LOG_LINE_H,
   LOG_PAD,
   LOG_TITLE_H,
+  CARD_BACK_TEMPLATE,
   type SceneLayout,
 } from './MainStreetConstants';
 
@@ -182,18 +185,25 @@ export class MainStreetRenderer {
             container.add(hover);
           }
         } else {
-          // ── Business card path: upgrade overlays + placement click ──
+          // ── Business card path: upgrade overlays, tooltip, + placement click ──
           this.applyUpgradeOverlays(container, card, renderW, renderH);
 
-          // Add interactive hit area so cards can be clicked during market phase
-          // to start the placing-from-hand flow.
           if (!s.replayMode) {
-            const hitArea = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
-            hitArea.setInteractive({ useHandCursor: true });
-            hitArea.on('pointerdown', () => {
+            // Single interactive rectangle (mirrors the event card path):
+            // hover shows the full card tooltip, click-to-place starts the
+            // placing-from-hand flow. Hand tooltips use the default
+            // includeEventDetail: false (no coin/rep detail lines).
+            const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+            hover.setInteractive({ useHandCursor: true });
+            hover.on('pointerover', () => {
+              const info = buildCardTooltipInfo(card, s.state.config);
+              s.tooltipManager?.show(info, container.x, container.y);
+            });
+            hover.on('pointerout', () => s.tooltipManager?.hide());
+            hover.on('pointerdown', () => {
               s.onHandBusinessCardClick(cardIndex);
             });
-            container.add(hitArea);
+            container.add(hover);
           }
         }
 
@@ -330,16 +340,20 @@ export class MainStreetRenderer {
     // Coins - left-aligned in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${Math.round(coins)}`, {
+    // HUD displays coins and reputation to 2 decimal places (presentation only; internal precision is 3dp). Score remains rounded to whole numbers.
+    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${coins.toFixed(2)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
 
     // Action counter - next to coins
+    const banked = s.state.bankedActions ?? 0;
+    const actionLabel = `${s.state.actionsRemaining} action${s.state.actionsRemaining !== 1 ? 's' : ''} left`
+      + (banked > 0 ? ` (${banked} banked)` : '');
     const actionText = markHudTransient(s.add.text(
       coinText.x + coinText.width + 16,
       hudY,
-      `${s.state.actionsRemaining} action${s.state.actionsRemaining !== 1 ? 's' : ''} left`,
+      actionLabel,
       {
         fontSize: '14px', fontStyle: 'bold',
         color: s.state.actionsRemaining > 0 ? '#aaffaa' : '#ff6666',
@@ -349,7 +363,7 @@ export class MainStreetRenderer {
     s.hudContainer.add(actionText);
 
     // Reputation - centered in strip
-    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation}`, {
+    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation.toFixed(2)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 0.5));
     s.hudContainer.add(repText);
@@ -911,6 +925,10 @@ export class MainStreetRenderer {
           s.onBusinessCardClick(card as BusinessCard);
         } else if (card.family === 'upgrade') {
           s.onUpgradeCardClick(card as UpgradeCard);
+        } else if (card.family === 'staff') {
+          // Staff cards are hired directly from the market row
+          // (CG-0MT3KZOUX007GQ44) — never moved to the hand.
+          s.onStaffCardClick(card as StaffCard);
         } else {
           s.onEventCardClick(card as EventCard);
         }
@@ -923,9 +941,9 @@ export class MainStreetRenderer {
     y: number,
     rowLabel: string,
     rowKey: string,
-    cards: readonly (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
+    cards: readonly (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard | StaffCard)[],
     maxSlots: number,
-    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
+    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard | StaffCard) => void,
     alignmentStartX?: number,
   ): void {
     const s = this.scene;
@@ -1082,8 +1100,8 @@ export class MainStreetRenderer {
   public drawMarketCard(
     x: number,
     y: number,
-    card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard,
-    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard) => void,
+    card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard | StaffCard,
+    onClick: (card: BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard | StaffCard) => void,
     _rowKey: string,
     _slotIndex: number,
   ): Phaser.GameObjects.Container {
@@ -1141,6 +1159,42 @@ export class MainStreetRenderer {
       container.add(premiumLabel);
     }
 
+    // Staff specialization skill badges (I5, CG-0MT4WXX1Q00860VP): each
+    // applicant card shows its locked skill set (1-3 skills, I3) as
+    // category-colored chips at the card bottom. Card-relative positioning
+    // (same pattern as the premium label) — no absolute pixel coordinates.
+    // Static text only, so reduced-motion preferences are inherently respected.
+    if (card.family === 'staff') {
+      const st = card as StaffCard;
+      const skillIds = Array.isArray(st.specializationSkillIds) ? st.specializationSkillIds : [];
+      const skills: SpecializationSkill[] = [];
+      for (const id of skillIds) {
+        try {
+          skills.push(getSkill(id));
+        } catch {
+          // Unknown/stale id on a saved card — skip the chip (forward-compat).
+        }
+      }
+      let chipY = Math.round(renderH / 2 - 8);
+      for (const skill of skills) {
+        const chipBg = STAFF_SKILL_CHIP_COLORS[skill.category] ?? '#444455';
+        const chip = s.add.text(0, chipY, skill.name, {
+          fontSize: '8px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          fontFamily: FONT_FAMILY,
+          align: 'center',
+          backgroundColor: chipBg,
+          padding: { x: 3, y: 1 },
+        });
+        chip.setOrigin(0.5, 1);
+        chip.setName(`staffSkillBadge-${skill.id}`);
+        chip.setDepth(1);
+        container.add(chip);
+        chipY -= 12;
+      }
+    }
+
     const selectionRing = s.add.rectangle(0, 0, marketCardW, marketCardH);
     selectionRing.setFillStyle(0x000000, 0);
     selectionRing.setStrokeStyle(2, 0x44ff66);
@@ -1150,11 +1204,13 @@ export class MainStreetRenderer {
     // Action economy gating (CG-0MSTOF1N5005PK2R): business/community-space
     // card purchases consume the daily action, so those cards are
     // non-interactive (dimmed) when the budget is spent. Events/upgrades are
-    // free operations and stay interactive.
+    // free operations and stay interactive. Staff hires also consume an
+    // action (CG-0MT3KZOUX007GQ44), so they gate on the budget like business.
     const noActions = s.state.actionsRemaining <= 0;
     const isBusinessLike = card.family === 'business' || card.family === 'community-space';
+    const consumesAction = isBusinessLike || card.family === 'staff';
     const interactiveEnabled =
-      s.uiPhase === 'market' && !isIncidentEvent && !(isBusinessLike && noActions);
+      s.uiPhase === 'market' && !isIncidentEvent && !(consumesAction && noActions);
     const selection = attachSelection(container, {
       onStateChange: ({ selected, hovered }) => {
         if (selected) {
@@ -1258,23 +1314,32 @@ export class MainStreetRenderer {
         s.marketSelectionManager.registerTarget(hitArea);
         container.add(hitArea);
       }
+    }
 
-      // Dim visual feedback + tooltip for business cards gated by the spent
-      // action budget (CG-0MSTOF1N5005PK2R): still hoverable so the player
-      // learns why the card is unavailable.
-      if (isBusinessLike && noActions && !isIncidentEvent) {
-        container.setAlpha(0.45);
-        container.setInteractive({ useHandCursor: false });
-        container.on('pointerover', () => {
-          if (s.replayMode) return;
-          s.tooltipManager?.show(
-            'No actions remaining today. End your turn to start a new day.',
-            container.x, container.y,
-          );
+    // Dim visual feedback + tooltip for action-gaited cards (business /
+    // community-space / staff hire — CG-0MSTOF1N5005PK2R + CG-0MT3KZOUX007GQ44).
+    // The card is dimmed so the player understands it is unavailable, but
+    // hovering it still shows the FULL card tooltip (regardless of
+    // remaining actions, CG-0MT24RFIV007NQMP) instead of a generic
+    // "no actions" message.
+    // NB: this MUST live OUTSIDE the `interactiveEnabled` gate above —
+    // interactiveEnabled is false precisely when noActions is true, so an
+    // in-gate block would be dead code (the original bug: tooltips were
+    // suppressed entirely when actions were exhausted). We add a dedicated
+    // tooltip-only hover rectangle (explicit hit area, unlike the
+    // container-level setInteractive that previously suppressed pointer
+    // events).
+    if (consumesAction && noActions && !isIncidentEvent) {
+      container.setAlpha(0.45);
+      if (!s.replayMode) {
+        const hover = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
+        hover.setInteractive({ useHandCursor: false });
+        hover.on('pointerover', () => {
+          const info = buildCardTooltipInfo(card, s.state.config, { includeEventDetail: true });
+          s.tooltipManager?.show(info, container.x, container.y);
         });
-        container.on('pointerout', () => {
-          s.tooltipManager?.hide();
-        });
+        hover.on('pointerout', () => s.tooltipManager?.hide());
+        container.add(hover);
       }
     }
 
@@ -1282,9 +1347,11 @@ export class MainStreetRenderer {
   }
 
   /**
-   * Centre of the front incident-queue card, mirroring `refreshIncidentQueue`
-   * layout math (panel title 22px + 8px pad, card centred horizontally in
-   * the panel). Used as the origin of the incident-reveal flight.
+   * Centre of the face-down incident-deck stack, mirroring
+   * `refreshIncidentQueue` layout math (panel title 22px + 8px pad, the
+   * single card back centred horizontally in the panel). Used as the origin
+   * of the incident-reveal flight and the staff-peek reveal
+   * (CG-0MSXOWLHU0099QF6 / CG-0MSXOW6GN008ZSMN).
    * Keep in sync with `refreshIncidentQueue` if the queue layout changes.
    */
   public getFrontIncidentCardCenter(): { x: number; y: number } {
@@ -1302,8 +1369,7 @@ export class MainStreetRenderer {
     const s = this.scene;
     s.incidentQueueContainer.removeAll(true);
 
-    const queue = s.state.incidentDeck;
-    const deckRemaining = s.state.decks.event.length;
+    const deckRemaining = s.state.incidentDeck.length;
     const activeEffects = s.state.activeEffects;
 
     const { logX, logW, queueTop } = s.layout;
@@ -1315,13 +1381,14 @@ export class MainStreetRenderer {
     const titleH = 22;
     const contentX = panelX + pad;
 
-    // Calculate dynamic height
+    // Calculate dynamic height. The panel now shows a single face-down
+    // incident-deck card back (CG-0MSXOWLHU0099QF6) plus the remaining-deck
+    // count — incident content is never visible before its turn.
     const activeEffectLines = activeEffects.length;
     const extraH = activeEffectLines > 0 ? 16 + activeEffectLines * 16 : 0;
     const cardRenderW = s.layout.queueCardW;
     const cardRenderH = s.layout.queueCardH;
-    const maxCards = Math.min(2, queue.length);
-    const cardAreaH = maxCards * (cardRenderH + 6) - 6 + 12; // cards + deck count
+    const cardAreaH = cardRenderH + 6 + 12; // one face-down card + deck count
     const panelH = titleH + pad + cardAreaH + extraH + pad;
 
     // Panel background — same warm-dark style as activity log
@@ -1343,51 +1410,19 @@ export class MainStreetRenderer {
     }).setOrigin(0.5);
     s.incidentQueueContainer.add(titleText);
 
-    // Queue cards — stacked vertically, centred in the panel
-    // Dimensions come from layout.queueCardW/queueCardH (currently 120×69)
-    // to preserve the standard 7:4 SVG aspect ratio.
+    // Face-down deck stack — a single card back centred in the panel. The
+    // top of the incident deck is intentionally NOT revealed: incident
+    // content only appears when it resolves at end of turn (or via the
+    // staff peek skill, CG-0MSXOW6GN008ZSMN).
+    const cx = panelX + (panelW - cardRenderW) / 2;
     let cardY = queueTop + titleH + pad;
 
-    for (let i = 0; i < maxCards; i++) {
-      const card = queue[i];
-      const cx = panelX + (panelW - cardRenderW) / 2;
+    const container = s.add.container(Math.round(cx + cardRenderW / 2), Math.round(cardY + cardRenderH / 2));
+    mainStreetRenderCardSvg(s, container, CARD_BACK_TEMPLATE, cardRenderW, cardRenderH);
+    s.incidentQueueContainer.add(container);
+    cardY += cardRenderH + 6;
 
-      if (card) {
-        const container = s.add.container(Math.round(cx + cardRenderW / 2), Math.round(cardY + cardRenderH / 2));
-        mainStreetRenderCardSvg(s, container, card.id, cardRenderW, cardRenderH);
-        s.incidentQueueContainer.add(container);
-
-        if (!s.replayMode) {
-          const hover = s.add.rectangle(0, 0, cardRenderW, cardRenderH, 0x000000, 0.001);
-          hover.setInteractive({ useHandCursor: true });
-          hover.on('pointerover', () => {
-            let info: string;
-            const dCard = card as any;
-            if (dCard.duration !== undefined) {
-              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nDuration: ' + dCard.duration + ' turns\n' + Math.round(dCard.multiplier * 100) + '% income modifier';
-            } else {
-              const coinDelta = card.coinDelta >= 0 ? '+' : '';
-              info = 'Event: ' + card.name + '\nEffect: ' + card.effect + '\nCoins: ' + coinDelta + card.coinDelta.toFixed(3) + ', Rep: ' + (card.reputationDelta >= 0 ? '+' : '') + card.reputationDelta;
-            }
-            s.tooltipManager?.show(info, container.x, container.y);
-          });
-          hover.on('pointerout', () => s.tooltipManager?.hide());
-          container.add(hover);
-        }
-      } else {
-        // Empty queue slot
-        const empty = s.add.rectangle(
-          cx + cardRenderW / 2, cardY + cardRenderH / 2,
-          cardRenderW, cardRenderH, 0x111122, 0.3,
-        );
-        empty.setStrokeStyle(1, 0x223344);
-        s.incidentQueueContainer.add(empty);
-      }
-
-      cardY += cardRenderH + 6;
-    }
-
-    // Deck count below cards
+    // Deck count below the stack
     const deckText = s.add.text(contentX, cardY, 'Deck: ' + deckRemaining, {
       fontSize: '11px', color: '#776655', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0);
@@ -1530,26 +1565,96 @@ export class MainStreetRenderer {
       );
       s.actionContainer.add(hintBtn);
 
+      // Peek button (staff peek skill, CG-0MSXOW6GN008ZSMN) — to the left of
+      // the Hint button. Only offered while a peek-capable staff member is
+      // employed; disabled once the once-per-turn gate is spent, when no
+      // daily actions remain, or when the incident deck is empty.
+      const hasPeekStaff = hasPeekCapableStaff(s.state);
+      if (hasPeekStaff) {
+        const peekDisabled = s.state.peekUsedThisTurn || s.state.actionsRemaining <= 0 || s.state.incidentDeck.length === 0;
+        const peekBtn = createActionButton(
+          s, rightX - btnW - 12 - hintBtnW - 12 - btnW, by + 4, btnW,
+          peekDisabled ? 'Peek \u2713' : 'Peek',
+          () => s.onPeekClick(),
+          {
+            height: s.layout.actionButtonH,
+            fillColor: peekDisabled ? 0x2a2a2a : 0x224422,
+            fillAlpha: 0.8,
+            strokeColor: peekDisabled ? 0x444444 : 0x44aa44,
+            textColor: peekDisabled ? '#666666' : '#88ff88',
+            fontSize: '14px',
+            disabled: peekDisabled,
+          },
+        );
+        s.actionContainer.add(peekBtn);
+      }
+
+      // ── Community Favour buttons (CG-0MSTOATDQ005XDET) ────────────────
+      // Two buttons (one per direction), positioned via SLL zones, to the
+      // left of the action cluster. Disabled when the input resource is
+      // insufficient, when the once-per-turn gate is spent, or outside
+      // MarketPhase (the refresh only renders in the market UI phase).
+      const favourW = s.layout.favourButtonW;
+      const favourGone = s.state.favourUsedThisTurn;
+      const coinsToRepCost = s.state.config.favourCoinsToRepCost;
+      const repToCoinsRepCost = s.state.config.favourRepToCoinsRepCost;
+      const repToCoinsCoinGain = s.state.config.favourRepToCoinsCoinGain;
+      const coinsToRepDisabled = favourGone || s.state.resourceBank.coins < coinsToRepCost;
+      const repToCoinsDisabled = favourGone || s.state.resourceBank.reputation < repToCoinsRepCost;
+
+      const favourCoinsToRepBtn = createActionButton(
+        s, s.layout.favourCoinsToRepX, by + 4, favourW,
+        `${coinsToRepCost}c → 1r`,
+        () => s.onCommunityFavourClick('coins-to-rep'),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: coinsToRepDisabled ? 0x2a2a2a : 0x442244,
+          fillAlpha: 0.8,
+          strokeColor: coinsToRepDisabled ? 0x444444 : 0xaa44aa,
+          textColor: coinsToRepDisabled ? '#666666' : '#ff88ff',
+          fontSize: '13px',
+          disabled: coinsToRepDisabled,
+        },
+      );
+      s.actionContainer.add(favourCoinsToRepBtn);
+
+      const favourRepToCoinsBtn = createActionButton(
+        s, s.layout.favourRepToCoinsX, by + 4, favourW,
+        `${repToCoinsRepCost}r → ${repToCoinsCoinGain}c`,
+        () => s.onCommunityFavourClick('rep-to-coins'),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: repToCoinsDisabled ? 0x2a2a2a : 0x224422,
+          fillAlpha: 0.8,
+          strokeColor: repToCoinsDisabled ? 0x444444 : 0x44aa44,
+          textColor: repToCoinsDisabled ? '#666666' : '#88ff88',
+          fontSize: '13px',
+          disabled: repToCoinsDisabled,
+        },
+      );
+      s.actionContainer.add(favourRepToCoinsBtn);
+
     } else if (s.uiPhase === 'placing-from-hand') {
       const rightX = s.layout.gameW - 24;
       const by = s.layout.actionY;
 
       const hand = s.state.hand ?? [];
       const handCount = hand.length;
-      const hint = s.add.text(rightX, by - 4, `Card in hand (${handCount}) — click an empty slot to place`, {
-        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 1);
-      s.actionContainer.add(hint);
+      s.hintBar.setText(`Card in hand (${handCount}) — click an empty slot to place`);
 
       // Cancel button (right-aligned) — returns to market, card stays in hand
       const btnW = s.layout.actionButtonW;
       const cancelBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'Cancel', () => {
         s.pendingHandIndex = null;
         s.pendingHandJustMoved = false;
+        s.justMovedHandCardId = null;
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();
-        s.instructionText.setText(
+        // Reset the HintBar to the standard market instruction (AC3).
+        // s.instructionText is the same text object as s.hintBar.textObject,
+        // so route the reset through HintBar explicitly for consistency.
+        s.hintBar.setText(
           `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
         );
       });
@@ -1560,10 +1665,7 @@ export class MainStreetRenderer {
       const by = s.layout.actionY;
 
       const cardName = s.pendingBusinessCard?.name ?? '???';
-      const hint = s.add.text(rightX, by - 4, `Place "${cardName}" -- click an empty slot`, {
-        fontSize: '14px', fontStyle: 'bold', color: '#ffdd44', fontFamily: FONT_FAMILY,
-      }).setOrigin(1, 1);
-      s.actionContainer.add(hint);
+      s.hintBar.setText(`Place "${cardName}" -- click an empty slot`);
 
       // Cancel button (right-aligned)
       const btnW = s.layout.actionButtonW;
@@ -1573,7 +1675,10 @@ export class MainStreetRenderer {
         s.clearMarketSelection();
         s.uiPhase = 'market';
         this.refreshAll();
-        s.instructionText.setText(
+        // Reset the HintBar to the standard market instruction (AC3).
+        // s.instructionText is the same text object as s.hintBar.textObject,
+        // so route the reset through HintBar explicitly for consistency.
+        s.hintBar.setText(
           `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
         );
       });
@@ -1582,6 +1687,23 @@ export class MainStreetRenderer {
   }
 
 
+  /**
+   * Rebuild the activity log DOM and recompute scroll bounds.
+   *
+   * Auto-scroll behaviour:
+   * - When `s.logAutoScroll` is `true` (the default), the log jumps to the
+   *   bottom on every refresh so the newest entries are visible.
+   * - When `s.logAutoScroll` is `false` (player scrolled up), the current
+   *   scroll offset is preserved (clamped to valid range) so the player can
+   *   read older entries without the view "yanking" back down.
+   * - After clamping, `logAutoScroll` is re-evaluated: if the offset is
+   *   within 4px of the bottom it is re-enabled (`true`), so subsequent
+   *   entries will again scroll into view. This lets the player scroll down
+   *   manually to resume live updates.
+   * - The initial `true` value (set in `MainStreetScene` and
+   *   `MainStreetLifecycleManager.create`) ensures the log starts at the
+   *   bottom on game start / restart.
+   */
   public refreshLog(): void {
     const s = this.scene;
     const entries = s.state.activityLog;

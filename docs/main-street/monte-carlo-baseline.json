@@ -1,31 +1,31 @@
 {
-  "source": "Generated from MainStreetMonteCarlo.runAllCombinations (greedy, all difficulties)",
-  "generatedAt": "2026-08-19T00:42:34.418Z",
+  "source": "Generated from MainStreetMonteCarlo.runAllCombinations",
+  "generatedAt": "2026-08-24T10:41:39.277Z",
   "seeds": 200,
   "maxTurns": 60,
   "strategy": "greedy",
   "metrics": {
-    "winRate": 0.595,
-    "averageCoinsPerTurn": 1.4570404444098162
+    "winRate": 0.555,
+    "averageCoinsPerTurn": 5.4593513146991555
   },
   "difficultyMatrix": [
     {
       "difficulty": "Easy",
-      "winRate": 0.81,
-      "averageCoinsPerTurn": 2.037320429060256,
-      "medianScore": 129.149625
+      "winRate": 0.82,
+      "averageCoinsPerTurn": 9.066578183230147,
+      "medianScore": 111.76578931249998
     },
     {
       "difficulty": "Medium",
-      "winRate": 0.595,
-      "averageCoinsPerTurn": 1.4570404444098162,
-      "medianScore": 153.247734375
+      "winRate": 0.555,
+      "averageCoinsPerTurn": 5.4593513146991555,
+      "medianScore": 122.00888156250001
     },
     {
       "difficulty": "Hard",
-      "winRate": 0.205,
-      "averageCoinsPerTurn": 0.2576269293458006,
-      "medianScore": 19.314375
+      "winRate": 0.12,
+      "averageCoinsPerTurn": 0.770170905002825,
+      "medianScore": 0.5000000000000002
     }
   ]
 }

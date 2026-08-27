@@ -441,7 +441,7 @@ describe('MainStreet Activity Log scroll bounds', () => {
     expect(containerWorldY).toBeLessThan(maskTopY);
   });
 
-  it('does not position content above the log display area when entries first overflow', async () => {
+  it('auto-scrolls to bottom when entries first overflow', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as any;
 
@@ -469,8 +469,7 @@ describe('MainStreet Activity Log scroll bounds', () => {
 
     // ── Phase 2: Add enough entries to overflow ──
     // This simulates gameplay adding enough entries that they exceed visibleH.
-    // After the fix, logAutoScroll should STILL be false (it was never
-    // re-enabled in the "all fit" branch), so scrollOffset stays at 0.
+    // logAutoScroll starts true, so the log should auto-scroll to the bottom.
     for (let i = 0; i < 50; i++) {
       scene.state.activityLog.push({
         text: `Overflow entry ${i}`,
@@ -481,13 +480,16 @@ describe('MainStreet Activity Log scroll bounds', () => {
     scene.msRenderer.refreshLog();
     await waitFrames(3);
 
-    // Scroll offset should remain 0 — no auto-scroll on initial overflow
-    expect(scene.logScrollOffset).toBe(0);
-    expect(scene.logAutoScroll).toBe(false);
-
-    // The container should NOT be shifted up — content should start
-    // right below the title bar.
-    expect(scene.logContentContainer.y).toBe(LOG_TITLE_H + 2);
+    // logAutoScroll is true, so scroll offset should be at the bottom
+    const visibleH = Math.max(1, scene.layout.logH - LOG_TITLE_H - 4);
+    if (scene.logTotalContentH > visibleH) {
+      expect(scene.logScrollOffset).toBeCloseTo(scene.logMaxScroll, 0);
+      expect(scene.logAutoScroll).toBe(true);
+      // Container shifted up to show the bottom
+      expect(scene.logContentContainer.y).toBeLessThan(LOG_TITLE_H + 2);
+    } else {
+      expect(scene.logScrollOffset).toBe(0);
+    }
 
     // Verify all text objects have non-negative Y within the container
     const textEntries = scene.logContentContainer.list.filter(
@@ -497,9 +499,7 @@ describe('MainStreet Activity Log scroll bounds', () => {
 
     for (const txt of textEntries) {
       // Every text's local Y should be >= 0 (no entry positioned above
-      // the container origin). Combined with the container being at
-      // LOG_TITLE_H + 2 (not shifted up), this means no content renders
-      // above the title bar.
+      // the container origin). No content renders above the container.
       expect(txt.y).toBeGreaterThanOrEqual(0);
     }
   });
@@ -534,5 +534,154 @@ describe('MainStreet Activity Log scroll bounds', () => {
     // logTotalContentH should reflect the true total height.
     expect(textEntries.length).toBeGreaterThanOrEqual(entryCount);
     expect(scene.logTotalContentH).toBeGreaterThan(scene.layout.logH);
+  });
+
+  it('auto-scrolls to bottom as entries accumulate from a fresh scene', async () => {
+    // Regression test for CG-0MT24HFNM002MPF5: the log should auto-scroll
+    // to show the latest entries without the player needing to manually
+    // wheel-scroll to the bottom first.
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(10);
+
+    const { LOG_TITLE_H } = await import(
+      '../../example-games/main-street/scenes/MainStreetConstants'
+    );
+    const visibleH = Math.max(1, scene.layout.logH - LOG_TITLE_H - 4);
+
+    // Start with a few entries that fit
+    for (let i = 0; i < 5; i++) {
+      scene.state.activityLog.push({
+        text: `Entry ${i}`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // At start, logAutoScroll should be true and no offset needed (all fit)
+    expect(scene.logAutoScroll).toBe(true);
+    expect(scene.logScrollOffset).toBe(0);
+
+    // Add entries that cause overflow — auto-scroll should engage immediately
+    for (let i = 0; i < 50; i++) {
+      scene.state.activityLog.push({
+        text: `Entry ${i}`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // With overflow and logAutoScroll=true, offset should be at the bottom
+    expect(scene.logAutoScroll).toBe(true);
+    if (scene.logTotalContentH > visibleH) {
+      expect(scene.logScrollOffset).toBeCloseTo(scene.logMaxScroll, 0);
+    }
+  });
+
+  it('does not yank scroll position when player has scrolled up', async () => {
+    // Regression test for CG-0MT24HFNM002MPF5: if the player scrolls up
+    // to read history, new entries must NOT steal their scroll position.
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(10);
+
+    // Add enough entries to overflow
+    for (let i = 0; i < 80; i++) {
+      scene.state.activityLog.push({
+        text: `Entry ${i}`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // Player scrolls up manually by setting logAutoScroll = false and
+    // picking an offset in the middle of the content
+    scene.logAutoScroll = false;
+    const scrollUpOffset = Math.floor(scene.logMaxScroll / 2);
+    scene.logScrollOffset = scrollUpOffset;
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    const positionBefore = scene.logScrollOffset;
+
+    // Add new entries — player is NOT at bottom, so auto-scroll should NOT engage
+    for (let i = 0; i < 5; i++) {
+      scene.state.activityLog.push({
+        text: `New entry ${i}`,
+        type: 'neutral',
+        turn: 2,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // Scroll offset should be unchanged — the player's reading position
+    // is preserved. logAutoScroll remains false.
+    expect(scene.logScrollOffset).toBe(positionBefore);
+    expect(scene.logAutoScroll).toBe(false);
+  });
+
+  it('re-engages auto-scroll when player scrolls back to bottom', async () => {
+    // Regression test for CG-0MT24HFNM002MPF5: if the player scrolls back
+    // to the bottom, subsequent new entries should again auto-scroll.
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as any;
+
+    await waitFrames(10);
+
+    const { LOG_TITLE_H } = await import(
+      '../../example-games/main-street/scenes/MainStreetConstants'
+    );
+    const visibleH = Math.max(1, scene.layout.logH - LOG_TITLE_H - 4);
+
+    // Add enough entries to overflow
+    for (let i = 0; i < 80; i++) {
+      scene.state.activityLog.push({
+        text: `Entry ${i}`,
+        type: 'neutral',
+        turn: 1,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // Player scrolls up
+    scene.logAutoScroll = false;
+    scene.logScrollOffset = Math.floor(scene.logMaxScroll / 2);
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // Now player scrolls back to bottom
+    scene.logScrollOffset = scene.logMaxScroll;
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // atBottom check should re-enable auto-scroll
+    expect(scene.logAutoScroll).toBe(true);
+
+    // Add new entries — should auto-scroll
+    for (let i = 0; i < 5; i++) {
+      scene.state.activityLog.push({
+        text: `New entry ${i}`,
+        type: 'neutral',
+        turn: 2,
+      });
+    }
+    scene.msRenderer.refreshLog();
+    await waitFrames(3);
+
+    // Offset should have moved to the bottom again
+    expect(scene.logAutoScroll).toBe(true);
+    if (scene.logTotalContentH > visibleH) {
+      expect(scene.logScrollOffset).toBeCloseTo(scene.logMaxScroll, 0);
+    }
   });
 });

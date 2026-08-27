@@ -151,7 +151,9 @@ harness (200 seeds, greedy strategy) was re-run before and after the change.
 
 **Metric semantics (producer ruling, 2026-08-13):** the harness's `avgCoinsPerTurn`
 (= finalCoins/turns, **net liquidity**) is the focus metric for the economy band, and its
-target band is **0–2**. The 4–8 band in
+target band is **0–2** (later widened — current bands in
+[`balance-guardrail-recommendations.md`](balance-guardrail-recommendations.md): 0–6 after
+the CG-0MSVYPEZ90085SHE ongoing-cost re-baseline). The 4–8 band in
 [`prd-balance-process-and-tooling.md`](prd-balance-process-and-tooling.md) targets **gross**
 income per turn (`totalCoinsEarned/totalTurns`) and is not the `avgCoinsPerTurn` target.
 

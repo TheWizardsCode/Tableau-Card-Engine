@@ -71,8 +71,8 @@ import { resolveMarketCardAnchor } from '../../example-games/main-street/scenes/
 
 /** UNIFIED_TUTORIAL_STEPS[2] === T3 "Buy the Laundromat" (action: select-business). */
 const T3_INDEX = 2;
-/** Starting coin balance in STANDARD_TUTORIAL_SCENARIO. */
-const START_COINS = 16;
+/** Starting coin balance in STANDARD_TUTORIAL_SCENARIO (12 after CG-0MSTOATDQ005XDET). */
+const START_COINS = 12;
 /** Exit Tutorial button label (i18n `tutorial.overlay.exit`). */
 const EXIT_LABEL = 'Exit Tutorial';
 /** Next button label (i18n `tutorial.overlay.next`). */

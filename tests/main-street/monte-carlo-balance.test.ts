@@ -5,13 +5,17 @@ import { runMonteCarlo } from '../../example-games/main-street/MainStreetMonteCa
 // Configurable via env vars:
 //   MONTE_SEEDS         — number of deterministic seeds to run (default: 20)
 //   MONTE_MIN_WIN_RATE  — minimum acceptable win rate (default: 0.20)
-//   MONTE_MAX_WIN_RATE  — maximum acceptable win rate (default: 0.80)
+//   MONTE_MAX_WIN_RATE  — maximum acceptable win rate (default: 0.90)
 //
 // This is the *regression guardrail* for the whole game (market-greedy smoke
 // strategy): a deliberately wide band that catches gross breakage without
-// being flaky at the 20-seed PR-CI seed count. PR Checks CI sets
-// MONTE_SEEDS=20 / MONTE_MIN_WIN_RATE=0.20 / MONTE_MAX_WIN_RATE=0.80
-// (.github/workflows/pr-checks.yml); there is no main-branch test job.
+// being flaky at the 20-seed PR-CI seed count. The 0.96 cap replaces 0.80/
+// 0.90 from the CG-0MSVYPEZ90085SHE ongoing-cost re-baseline: staff
+// specialization skills (CG-0MT4WXNR80090FXZ) landed alongside the raised
+// business incomes, and together market-greedy now wins ~0.95 on Medium
+// (measured 0.95 on the mc-balance seed set) — the game is deliberately
+// income-rich; the tuned design-intent bands are in
+// monte-carlo-greedy-guardrail.test.ts.
 //
 // The *tuned target* bands (design intent, per difficulty) are enforced
 // separately in monte-carlo-greedy-guardrail.test.ts; see
@@ -23,7 +27,7 @@ const DETAILED_METRICS_MIN_SEEDS = 50;
 
 const monteSeeds = Number.parseInt(process.env['MONTE_SEEDS'] ?? '20', 10);
 const monteMinWinRate = Number.parseFloat(process.env['MONTE_MIN_WIN_RATE'] ?? '0.20');
-const monteMaxWinRate = Number.parseFloat(process.env['MONTE_MAX_WIN_RATE'] ?? '0.80');
+const monteMaxWinRate = Number.parseFloat(process.env['MONTE_MAX_WIN_RATE'] ?? '0.96');
 
 describe('Main Street Monte Carlo balance heuristics', () => {
   it(`stays within CI guardrails over ${monteSeeds} deterministic seeds`, () => {
@@ -38,6 +42,11 @@ describe('Main Street Monte Carlo balance heuristics', () => {
     // statistically reliable. These are only asserted for runs of 50+ seeds (local dev
     // runs with MONTE_SEEDS>=50; PR CI at 20 seeds skips them).
     //
+    // Bounds recalibrated by CG-0MSVYPEZ90085SHE (business ongoing costs +
+    // income raise): hand costs speed up games (winning runs end ~10 turns),
+    // so grids fill earlier than the long-game baseline. Measured on the
+    // canonical 200-seed set: noAction 4.83, gridHalf 7.92, gridFull 13.02.
+    //
     // Note: medianScore is intentionally NOT asserted here — the market-greedy score
     // distribution is bimodal (loss cluster ~10-60 vs win cluster ~140+), so the median
     // jumps discontinuously once the win rate crosses 50%, making any fixed band flaky.
@@ -47,15 +56,15 @@ describe('Main Street Monte Carlo balance heuristics', () => {
       const dominantLossRate = Math.max(0, ...Object.values(metrics.lossReasonRates));
       expect(dominantLossRate).toBeGreaterThanOrEqual(0.75);
 
-      expect(metrics.averageNoActionTurns).toBeGreaterThanOrEqual(6);
+      expect(metrics.averageNoActionTurns).toBeGreaterThanOrEqual(3);
 
       expect(metrics.averageTurnWhenGridHalf).not.toBeNull();
-      expect(metrics.averageTurnWhenGridHalf!).toBeGreaterThanOrEqual(11);
-      expect(metrics.averageTurnWhenGridHalf!).toBeLessThanOrEqual(15);
+      expect(metrics.averageTurnWhenGridHalf!).toBeGreaterThanOrEqual(6);
+      expect(metrics.averageTurnWhenGridHalf!).toBeLessThanOrEqual(10);
 
       expect(metrics.averageTurnWhenGridFull).not.toBeNull();
-      expect(metrics.averageTurnWhenGridFull!).toBeGreaterThanOrEqual(15);
-      expect(metrics.averageTurnWhenGridFull!).toBeLessThanOrEqual(19);
+      expect(metrics.averageTurnWhenGridFull!).toBeGreaterThanOrEqual(11);
+      expect(metrics.averageTurnWhenGridFull!).toBeLessThanOrEqual(16);
     }
   });
 });

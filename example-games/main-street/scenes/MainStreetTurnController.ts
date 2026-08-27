@@ -1,22 +1,26 @@
 import { addLog } from '../MainStreetState';
-import { executeDayStart, processEndOfTurn, placeFromHand, type TurnResult } from '../MainStreetEngine';
+import { executeDayStart, processEndOfTurn, executeAction, type TurnResult } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
+import { hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import {
   findTargetBusinessSlot,
   canAddToHand,
   canPurchaseUpgrade,
   canPurchaseEvent,
   canPurchaseBusiness,
+  canPurchaseStaff,
   canRefreshMarket,
   canSellBusiness,
 } from '../MainStreetMarket';
-import type { BusinessCard, EventCard, UpgradeCard } from '../MainStreetCards';
+import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, consumeAction } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, playBusinessFromHandCommand, peekIncidentDeckCommand, hireStaffCardCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
+import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
+import { FONT_FAMILY } from '../../../src/ui/constants';
 import {
   createDragDropManager,
   DEFAULT_DRAG_DISTANCE_THRESHOLD,
@@ -113,12 +117,19 @@ export class MainStreetTurnController {
    *
    * @param skipMarketRefill  When true (e.g., checkpoint resume), the market
    *                          is not refilled and the saved market state is preserved.
+   * @param suppressDayBanner When true, the day-transition banner is NOT
+   *                          played (used at boot while the tutorial offer
+   *                          modal is visible; the deferred banner fires later
+   *                          via MainStreetScene.playDeferredDayBanner()).
    */
-  public startDayPhase(skipMarketRefill: boolean = false): void {
+  public startDayPhase(skipMarketRefill: boolean = false, suppressDayBanner: boolean = false): void {
     const s = this.scene;
     // Execute DayStart (optionally refills market, transitions to MarketPhase)
     executeDayStart(s.state, skipMarketRefill);
     s.uiPhase = 'market';
+    // A new day means no card is "just moved" anymore — any hand card
+    // selected now costs an action to place (CG-0MSXIQIPJ000NDTL).
+    s.justMovedHandCardId = null;
 
     // Tutorial: the single-row market only holds 3 cards, so force the
     // upcoming steps' required purchase targets into the line (days 2+).
@@ -141,10 +152,12 @@ export class MainStreetTurnController {
     // Day transition banner: non-interactive "Day N" reveal at the board
     // centre (skipped under reduced motion / replay — handled inside the
     // animator). Skipped while the tutorial is active (its step overlays
-    // carry the guidance) and on checkpoint resume (skipMarketRefill — the
-    // same day continues, so it is not a new-day transition).
+    // carry the guidance), on checkpoint resume (skipMarketRefill — the
+    // same day continues, so it is not a new-day transition), or when
+    // suppressed at boot (suppressDayBanner — deferred until the player
+    // commits to playing).
     const tutController = (s as any).tutorialController as { isActive?: boolean } | undefined;
-    if (!skipMarketRefill && !tutController?.isActive) {
+    if (!skipMarketRefill && !suppressDayBanner && !tutController?.isActive) {
       try { s.msAnimator.animateDayBanner({ day: s.state.turn }); } catch (_) { /* presentation-only — ignore */ }
     }
     void s.cardSvgLoadPromise
@@ -317,7 +330,8 @@ export class MainStreetTurnController {
         }
         s.refreshAll();
         // Incident reveal presentation (AGENTS.md rule 8): non-blocking VFX —
-        // the resolved incident card flies from the Upcoming queue to the
+        // the resolved incident card flies from the face-down incident-deck
+        // panel (CG-0MSTOATDP000JNHH) to the
         // board centre with a red flash pulse, warning sting SFX, explicit
         // HUD loss pops and a warning-indicator pulse. Runs after the final
         // render; reduced-motion keeps the pops + sound, replay/headless
@@ -420,6 +434,9 @@ export class MainStreetTurnController {
       const cmd = s.undoManager.undo();
       addLog(s.state, 'Undo', 'neutral');
       try { if (cmd) recordMainStreetEvent({ type: 'undo', turn: s.state.turn, reversedAction: { description: cmd.description } }); } catch (_) {}
+      // Undoing a move-to-hand removes the card from hand, so any tracked
+      // "just moved" card is stale (CG-0MSXIQIPJ000NDTL).
+      s.justMovedHandCardId = null;
       s.refreshAll();
       // Undo feedback (AGENTS.md rule 8): "Undid: <action>" pop above the
       // hint bar + UI click SFX. Reduced motion / replay handled inside the
@@ -503,6 +520,12 @@ export class MainStreetTurnController {
     // Check hand capacity
     const handCheck = canAddToHand(s.state);
     if (!handCheck.legal) {
+      // Illegal feedback (CG-0MSXKQVZC009AM9L): play sfx + shake on the market
+      // card so the player immediately understands the action is blocked.
+      const containers = s.msRenderer?.getMarketRowCards?.();
+      const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const target = containers?.[cardIndex] ?? null;
+      playIllegalFeedback(target, s);
       s.instructionText.setText(`Hand full: ${handCheck.reason ?? 'Place or sell a card first.'}`);
       return;
     }
@@ -528,14 +551,15 @@ export class MainStreetTurnController {
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
         s.instructionText.setText(`"${cardName}" moved to hand (free)!`);
 
-        // Set pending hand index for placement (last card added to hand).
-        // Same-day move+place composite: the action was already spent on the
-        // move, so placing this card is free (it is part of the same purchase).
-        const hand = s.state.hand ?? [];
-        s.pendingHandIndex = hand.length - 1;
-        s.pendingHandJustMoved = true;
-        s.uiPhase = 'placing-from-hand';
-        s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
+        // No auto-selection (CG-0MSXIQIPJ000NDTL): the card rests in hand,
+        // unselected. The player must explicitly click the hand card when
+        // ready to place it. Record the card ID so that placing it stays
+        // free (same-day move+place = 1 action) when the player selects it.
+        s.pendingHandIndex = null;
+        s.pendingHandJustMoved = false;
+        s.justMovedHandCardId = card.id;
+        s.uiPhase = 'market';
+        s.instructionText.setText(`"${cardName}" is in hand — click the card to select it, then an empty slot to place.`);
       } catch (e) {
         console.error('[MS] BuyBusinessToHand failed', e);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
@@ -632,9 +656,12 @@ export class MainStreetTurnController {
     // operator decision A for the T13 Library bug). Events/upgrades stay
     // click-only (they are not part of the drag-drop module's dev-row model).
     if (card.family !== 'business' && card.family !== 'community-space') return false;
-    // Drag-drop buy-and-place pays a +50% premium over the listed cost.
-    const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-    if (s.state.resourceBank.coins < premiumCost) return false;
+    // Composite-parity buy-and-place price (CG-0MT24X0SX007RLHN): on GM
+    // 2-action days the drag charges the LISTED cost (consuming 2 actions);
+    // on a 1-action day it charges the +50% premium (consuming 1 action).
+    // Check affordability against the applicable price.
+    const price = s.state.actionsRemaining >= 2 ? card.cost : Math.ceil(card.cost * 1.5 * 2) / 2;
+    if (s.state.resourceBank.coins < price) return false;
     if (!s.state.streetGrid.some((slot: any) => slot === null)) return false;
 
     // Tutorial gating: only allow select-business if it is the required
@@ -661,25 +688,28 @@ export class MainStreetTurnController {
    *
    * The target slot must pass `canPurchaseBusiness` (card still in the
    * Development row, enough coins, empty slot, in bounds) and the tutorial
-   * must allow the `place-business` action. During a composite buy-and-place
-   * step with a synergy partner (T13: Library next to the Bookshop), the
+   * must allow the `place-business` action. During a plan-ahead placement
+   * step with a synergy partner (T19: Library next to the Bookshop), the
    * target must also pass `isSynergyAdjacentPlacement`. A rejected drop
    * snap-backs the card to the Development row with illegal-move feedback.
    */
   public canDropBusinessCard(cardId: string, slotIndex: number): boolean {
     const s = this.scene;
     // Action economy (CG-0MSTOF1N5005PK2R): buy-and-place consumes the
-    // daily action — no drop when the budget is spent.
+    // daily action — no drop when the budget is spent. On GM 2-action days
+    // the drag consumes BOTH actions (composite parity), so 2 must remain.
     if (s.state.actionsRemaining <= 0) return false;
     const legality = canPurchaseBusiness(s.state, cardId, slotIndex);
     if (!legality.legal) return false;
 
-    // Drag-drop buy-and-place pays a +50% premium — verify the player can
-    // afford the premium price (not just the listed cost).
+    // Composite-parity buy-and-place price (CG-0MT24X0SX007RLHN): on GM
+    // 2-action days the drag charges the LISTED cost (2 actions consumed);
+    // on a 1-action day it charges the +50% premium. Verify affordability
+    // against the applicable price (not just the listed cost).
     const card = s.state.market.cards.find((c: any) => c.id === cardId);
     if (card && (card.family === 'business' || card.family === 'community-space')) {
-      const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-      if (s.state.resourceBank.coins < premiumCost) return false;
+      const price = s.state.actionsRemaining >= 2 ? card.cost : Math.ceil(card.cost * 1.5 * 2) / 2;
+      if (s.state.resourceBank.coins < price) return false;
     }
 
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
@@ -702,10 +732,14 @@ export class MainStreetTurnController {
    * Execute a drag-drop buy-and-place.
    *
    * Buys the dragged business card directly to the drop slot in a single
-   * undoable `buyAndPlaceBusinessCommand` — the direct market→street path
-   * that pays a +50% premium over the listed cost and consumes the daily
-   * action (CG-0MSTOF1N5005PK2R). The animated market→street transfer +
-   * SFX matches the click flow's feedback.
+   * undoable `buyAndPlaceBusinessCommand` — the direct market→street path.
+   * Composite-parity pricing (CG-0MT24X0SX007RLHN): the drag is the same
+   * turn's move+place in one gesture. When only the last action remains
+   * (1-action day) the placement step has no action → +50% premium (1
+   * action total, dialog confirms). On 2-action (GM) days the placement
+   * step consumes the remaining action at listed cost — identical to the
+   * click composite, so drag is never cheaper than click. The animated
+   * market→street transfer + SFX matches the click flow's feedback.
    */
   public onDragDropBusiness(payload: DragDropPayload): void {
     const s = this.scene;
@@ -722,60 +756,95 @@ export class MainStreetTurnController {
     const dropSource = { x: payload.gameObject?.x ?? 0, y: payload.gameObject?.y ?? 0 };
 
     const cardName = card.name;
-    s.tooltipManager?.hide();
-    s.clearMarketSelection();
-    s.hiddenTransferSourceCardIds.add(cardId);
-    s.uiPhase = 'animating';
-    s.instructionText.setText(`Moving "${cardName}" to hand...`);
-    s.refreshAll();
 
-    const afterTransfer = (): void => {
-      // Capture synergy pairs before the placement mutates the grid so only
-      // NEWLY formed pairs animate (pre-existing pairs never re-trigger).
-      const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
-      try {
-        const cmd = buyAndPlaceBusinessCommand(s.state, cardId, slotIndex);
-        s.undoManager.execute(cmd);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
-        try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
-        s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex} (50% premium)`);
-      } catch (e) {
-        console.error('[MS] DragBuyBusiness failed', e);
-        s.instructionText.setText(`Error: ${(e as Error).message}`);
-      }
+    // Composite-parity pricing for the drag's move+place accounting:
+    // premium applies only when the drag's own action leaves no action for
+    // the placement step (last action on a 1-action day); on GM 2-action
+    // days the placement consumes the remaining action at listed cost.
+    const premiumApplies = s.state.actionsRemaining <= 1;
+    const priceOverride = premiumApplies ? undefined : card.cost;
+    const extraActions = premiumApplies ? 0 : 1;
 
-      s.hiddenTransferSourceCardIds.delete(cardId);
-      s.uiPhase = 'market';
+    const startTransfer = (): void => {
+      s.tooltipManager?.hide();
+      s.clearMarketSelection();
+      s.hiddenTransferSourceCardIds.add(cardId);
+      s.uiPhase = 'animating';
+      s.instructionText.setText(`Moving "${cardName}" to hand...`);
       s.refreshAll();
-      s.refreshStreetGrid();
-      s.refreshActionButtons();
-      // Synergy-formation animation for any new pairs (non-blocking).
-      this.animateNewSynergyPairs(beforePairs);
-      // Tutorial: mark place-business step complete if active
-      try {
-        (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
-      } catch (_) { /* ignore */ }
+
+      const afterTransfer = (): void => {
+        // Capture synergy pairs before the placement mutates the grid so only
+        // NEWLY formed pairs animate (pre-existing pairs never re-trigger).
+        const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+        try {
+          const cmd = buyAndPlaceBusinessCommand(s.state, cardId, slotIndex, priceOverride, extraActions);
+          s.undoManager.execute(cmd);
+          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
+          try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
+          s.instructionText.setText(premiumApplies
+            ? `Placed "${cardName}" on slot ${slotIndex} (50% premium)`
+            : `Placed "${cardName}" on slot ${slotIndex}`);
+        } catch (e) {
+          console.error('[MS] DragBuyBusiness failed', e);
+          // Insufficient-coins rejection → play illegal-move feedback.
+          const msg = (e as Error).message;
+          if (msg.toLowerCase().includes('not enough coins')) {
+            const container = s.msRenderer?.getMarketRowCards?.()?.[sourceIndex] ?? null;
+            playIllegalFeedback(container, s);
+          }
+          s.instructionText.setText(`Error: ${msg}`);
+        }
+
+        s.hiddenTransferSourceCardIds.delete(cardId);
+        s.uiPhase = 'market';
+        s.refreshAll();
+        s.refreshStreetGrid();
+        s.refreshActionButtons();
+        // Synergy-formation animation for any new pairs (non-blocking).
+        this.animateNewSynergyPairs(beforePairs);
+        // Tutorial: mark place-business step complete if active
+        try {
+          (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+        } catch (_) { /* ignore */ }
+      };
+
+      if (sourceIndex >= 0) {
+        // Transfer duration proportional to the drop-to-slot distance: a card
+        // released next to its slot settles quickly instead of taking the
+        // fixed 1500ms market→slot flight (click/AI flows keep 1500ms via the
+        // shared default). See computeDragTransferDuration (CG-0MST2LS3E004BTPO).
+        const destination = s.getStreetSlotCenter(slotIndex);
+        const distancePx = Math.hypot(destination.x - dropSource.x, destination.y - dropSource.y);
+        void s.animateTransferFromMarket({
+          cardId,
+          family: 'business',
+          row: 'market',
+          slotIndex: sourceIndex,
+          source: dropSource,
+          destination,
+          duration: computeDragTransferDuration(distancePx),
+        }).then(afterTransfer);
+      } else {
+        afterTransfer();
+      }
     };
 
-    if (sourceIndex >= 0) {
-      // Transfer duration proportional to the drop-to-slot distance: a card
-      // released next to its slot settles quickly instead of taking the
-      // fixed 1500ms market→slot flight (click/AI flows keep 1500ms via the
-      // shared default). See computeDragTransferDuration (CG-0MST2LS3E004BTPO).
-      const destination = s.getStreetSlotCenter(slotIndex);
-      const distancePx = Math.hypot(destination.x - dropSource.x, destination.y - dropSource.y);
-      void s.animateTransferFromMarket({
-        cardId,
-        family: 'business',
-        row: 'market',
-        slotIndex: sourceIndex,
-        source: dropSource,
-        destination,
-        duration: computeDragTransferDuration(distancePx),
-      }).then(afterTransfer);
-    } else {
-      afterTransfer();
+    if (premiumApplies) {
+      // Explain dialog before confirming the premium drag (CG-0MT24X0SX007RLHN):
+      // proceed → place at premium; cancel → the card returns to the market
+      // row (no coins deducted, no action consumed).
+      s.showBuyAndPlacePremiumDialog(cardName, startTransfer, () => {
+        s.uiPhase = 'market';
+        s.instructionText.setText(`"${cardName}" stays in the market — buy cancelled.`);
+        try { s.msRenderer?.clearDragHighlights?.(); } catch (_) { /* ignore */ }
+        s.refreshAll();
+        s.refreshStreetGrid();
+        s.refreshActionButtons();
+      });
+      return;
     }
+    startTransfer();
   }
 
   public onSlotClick(slotIndex: number): void {
@@ -839,40 +908,90 @@ export class MainStreetTurnController {
         // Capture synergy pairs before the placement mutates the grid so only
         // NEWLY formed pairs animate.
         const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
-        try {
-          // Action economy: placing a card that was ALREADY in hand (held
-          // from a previous day) consumes the daily action. A card just moved
-          // from the market this turn is part of the same move+place purchase
-          // (the action was already spent at move-to-hand) and places free.
-          if (!s.pendingHandJustMoved) {
-            consumeAction(s.state);
-          }
-          placeFromHand(s.state, handIndex, slotIndex);
-          try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-business-from-hand', handIndex, slotIndex }, description: `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
-          try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
-          s.instructionText.setText(`Placed "${cardName}" on slot ${slotIndex}`);
-        } catch (e) {
-          const msg = (e as Error).message;
-          console.error('[MS] placeFromHand failed', e);
-          // Insufficient-coins rejection → play illegal-move feedback.
-          if (msg.toLowerCase().includes('not enough coins')) {
-            const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
-            playIllegalFeedback(handSprite, s);
-          }
-          s.instructionText.setText(`Error: ${msg}`);
-        }
 
-        s.hiddenTransferSourceCardIds.delete(cardId);
-        s.uiPhase = 'market';
-        s.refreshAll();
-        s.refreshStreetGrid();
-        s.refreshActionButtons();
-        // Synergy-formation animation for any new pairs (non-blocking).
-        this.animateNewSynergyPairs(beforePairs);
-        // Tutorial: mark place-business step complete if active
-        try {
-          (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
-        } catch (_) { /* ignore */ }
+        // Composite pricing (CG-0MT24X0SX007RLHN): a same-day card (just
+        // moved from the market this turn) is part of the move+place purchase
+        // — the move already spent the daily action. When no action remains
+        // for the placement step, the +50% premium replaces the missing
+        // action; when an action DOES remain (Golden Mile 2-action days), the
+        // placement consumes it at listed cost. Held cards (plan-ahead) always
+        // consume an action at listed cost.
+        const premiumApplies = s.pendingHandJustMoved && s.state.actionsRemaining <= 0;
+        const premiumCost = premiumApplies
+          ? Math.ceil(handCard.cost * 1.5 * 2) / 2
+          : undefined;
+
+        // Shared post-place cleanup (success, failure, or dialog cancel).
+        const finish = (): void => {
+          s.hiddenTransferSourceCardIds.delete(cardId);
+          s.uiPhase = 'market';
+          s.refreshAll();
+          s.refreshStreetGrid();
+          s.refreshActionButtons();
+          // Synergy-formation animation for any new pairs (non-blocking).
+          this.animateNewSynergyPairs(beforePairs);
+          // Tutorial: mark place-business step complete if active
+          try {
+            (s.msLifecycleManager as any).onTutorialActionComplete?.('place-business' as TutorialActionType);
+          } catch (_) { /* ignore */ }
+        };
+
+        const doPlace = (): void => {
+          try {
+            // Composite-premium command (CG-0MT24X0SX007RLHN): when
+            // `premiumCost` is supplied the +50% premium replaces the action
+            // (no action consumed); the held-card / GM-listed path (undefined)
+            // consumes the action at listed cost. Executed through the undo
+            // manager so the coin deduction is fully undoable/redoable.
+            const cmd = playBusinessFromHandCommand(s.state, handIndex, slotIndex, premiumCost);
+            s.undoManager.execute(cmd);
+            // The just-moved card has now been placed; clear the tracker so a
+            // later selection of any other hand card costs an action again.
+            // (Cleared only on success — on failure the card stays in hand and
+            // a retry must still place it free, CG-0MSXIQIPJ000NDTL.)
+            if (s.justMovedHandCardId === cardId) {
+              s.justMovedHandCardId = null;
+            }
+            try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-business-from-hand', handIndex, slotIndex }, description: premiumApplies ? `Placed from hand to slot ${slotIndex} (50% premium, no action left)` : `Placed from hand to slot ${slotIndex}` }); } catch (_) {}
+            try { s.gameEvents?.emit('card:placed', { handIndex, slotIndex }); } catch (_) {}
+            s.instructionText.setText(premiumApplies
+              ? `Placed "${cardName}" on slot ${slotIndex} (50% premium)`
+              : `Placed "${cardName}" on slot ${slotIndex}`);
+          } catch (e) {
+            const msg = (e as Error).message;
+            console.error('[MS] playBusinessFromHandCommand failed', e);
+            // Insufficient-coins rejection → play illegal-move feedback.
+            if (msg.toLowerCase().includes('not enough coins')) {
+              const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
+              playIllegalFeedback(handSprite, s);
+            }
+            s.instructionText.setText(`Error: ${msg}`);
+          }
+          finish();
+        };
+
+        if (premiumApplies) {
+          // Affordability pre-gate (CG-0MT24X0SX007RLHN): reject the premium
+          // placement with illegal feedback BEFORE the explainer dialog when
+          // the player cannot afford the premium price (dialog does not fire).
+          const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
+          if (s.state.resourceBank.coins < premiumCost!) {
+            playIllegalFeedback(handSprite, s);
+            s.instructionText.setText(`Error: Not enough coins to place ${cardName} at the premium price. Need ${premiumCost}, have ${s.state.resourceBank.coins}.`);
+            finish();
+            return;
+          }
+          // Explain dialog before confirming the premium placement
+          // (CG-0MT24X0SX007RLHN): proceed → place at premium; cancel →
+          // placement aborts and the card returns to hand (no cost, no
+          // action consumed).
+          s.showBuyAndPlacePremiumDialog(cardName, doPlace, () => {
+            s.instructionText.setText(`"${cardName}" stays in hand — placement cancelled.`);
+            finish();
+          });
+          return;
+        }
+        doPlace();
       };
 
       void s.animateTransferFromMarket({
@@ -1088,6 +1207,183 @@ export class MainStreetTurnController {
   }
 
   /**
+   * Staff peek at the incident deck (CG-0MSXOW6GN008ZSMN).
+   *
+   * Consumes one daily action via the undoable peek command, exposes the
+   * revealed card through `state.revealedPeekedCard`, and plays the face-up
+   * reveal animation from the face-down deck stack position (with SFX per
+   * AGENTS.md rule 8 — reduced-motion respected, mute honoured via
+   * SoundManager). The card is returned face-down without being resolved.
+   */
+  public onPeekClick(): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    if (s.state.actionsRemaining <= 0) {
+      s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+    if (s.state.peekUsedThisTurn) {
+      s.instructionText.setText('You have already peeked at the incident deck this turn.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+    if (!hasPeekCapableStaff(s.state)) {
+      s.instructionText.setText('No staff member with the peek ability is employed.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+    if (s.state.incidentDeck.length === 0) {
+      s.instructionText.setText('The incident deck is empty \u2014 nothing to peek at.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText('Peeking at the incident deck...');
+    try {
+      const cmd = peekIncidentDeckCommand(s.state);
+      s.undoManager.execute(cmd);
+      try {
+        recordMainStreetEvent({
+          type: 'action',
+          turn: s.state.turn,
+          action: { type: 'peek-incident-deck' },
+          description: cmd.description,
+        });
+      } catch (_) { /* transcript disabled */ }
+    } catch (e) {
+      console.error('[MS] Peek failed', e);
+      s.instructionText.setText(`Error: ${(e as Error).message}`);
+      s.uiPhase = 'market';
+      s.refreshAll();
+      return;
+    }
+
+    const peeked = s.state.revealedPeekedCard;
+    if (!peeked) {
+      // Empty-deck no-op: nothing to reveal.
+      s.uiPhase = 'market';
+      s.refreshAll();
+      return;
+    }
+
+    s.msAnimator.animatePeekReveal({
+      cardId: peeked.id,
+      cardName: peeked.name,
+      from: s.msRenderer.getFrontIncidentCardCenter(),
+      onComplete: () => {
+        s.state.revealedPeekedCard = null;
+        s.uiPhase = 'market';
+        s.instructionText.setText(
+          `${turnLabel(s.state.config, s.state.turn)} -- Peeked: ${peeked.name} (returned face-down)`,
+        );
+        s.refreshAll();
+      },
+    });
+  }
+
+  /**
+   * Community Favour exchange (CG-0MSTOATDQ005XDET): coins ↔ reputation.
+   *
+   * Dispatches through the engine's `executeAction` — the same animated and
+   * sounded path as other market actions. The resource deltas animate via
+   * the existing HUD delta pop (`refreshAll` → `refreshHud` →
+   * `animateHudValueChanges`) plus a `popTextOrIcon` exchange summary and
+   * `UI_CLICK` SFX. Illegal attempts (once-per-turn spent, insufficient
+   * resource) surface the standard illegal-move feedback.
+   */
+  public onCommunityFavourClick(direction: 'coins-to-rep' | 'rep-to-coins'): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    // Tutorial gating: the community-favour action is only allowed while the
+    // active step requires it; any other attempt surfaces the standard
+    // illegal-move feedback.
+    const tutorialCheck = (s.msLifecycleManager as any)?.isTutorialActionAllowed?.('community-favour' as TutorialActionType);
+    if (tutorialCheck && !tutorialCheck.allowed) {
+      s.instructionText.setText(tutorialCheck.reason ?? 'Complete the highlighted step first.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+
+    const config = s.state.config;
+    const cost = direction === 'coins-to-rep' ? config.favourCoinsToRepCost : config.favourRepToCoinsRepCost;
+    const resource = direction === 'coins-to-rep' ? s.state.resourceBank.coins : s.state.resourceBank.reputation;
+    const resourceName = direction === 'coins-to-rep' ? 'coins' : 'reputation';
+
+    // ── Guards (mirror the button disabled states) — surface, don't fail silently ──
+    if (s.state.favourUsedThisTurn) {
+      s.instructionText.setText('You have already used Community Favour this turn.');
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+    if (resource < cost) {
+      s.instructionText.setText(
+        `Not enough ${resourceName} for Community Favour (need ${cost}, have ${resource}).`,
+      );
+      playIllegalFeedback(s.actionContainer, s);
+      return;
+    }
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText('Community Favour exchange...');
+    try {
+      executeAction(s.state, { type: 'community-favour', direction });
+
+      // Animated + sounded feedback: UI click SFX and a pop-up summary.
+      safePlaySound(s, COMMON_SFX_KEYS.UI_CLICK);
+      const reducedMotion = s.settingsPanel?.reducedMotion ?? false;
+      const summary = s.add.text(
+        s.layout.gameW / 2,
+        s.layout.actionY - 40,
+        direction === 'coins-to-rep' ? 'Community Favour: 2c → 1r' : 'Community Favour: 2r → 3c',
+        {
+          fontSize: '14px',
+          fontStyle: 'bold',
+          color: '#ffdd88',
+          fontFamily: FONT_FAMILY,
+        },
+      ).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: s,
+        target: summary,
+        duration: 1400,
+        riseY: 26,
+        scale: 1.15,
+        reducedMotion,
+      });
+
+      try {
+        recordMainStreetEvent({
+          type: 'action',
+          turn: s.state.turn,
+          action: { type: 'community-favour', direction },
+          description: `Community Favour (${direction}) executed`,
+        });
+      } catch (_) { /* transcript disabled */ }
+    } catch (e) {
+      // Engine rejected the exchange — surface standard illegal feedback.
+      console.error('[MS] Community Favour failed', e);
+      s.instructionText.setText(`Error: ${(e as Error).message}`);
+      playIllegalFeedback(s.actionContainer, s);
+      s.uiPhase = 'market';
+      s.refreshAll();
+      return;
+    }
+
+    s.uiPhase = 'market';
+    s.refreshAll();
+
+    // Tutorial: mark the community-favour step complete after a successful
+    // exchange (mirrors how other action-gated steps advance).
+    try {
+      (s.msLifecycleManager as any)?.onTutorialActionComplete?.('community-favour' as TutorialActionType);
+    } catch (_) { /* ignore */ }
+  }
+
+  /**
    * Deal-in animation for a market row refill (day start).
    * Presentation-only; never throws (tween targets may be re-rendered away
    * by a later refresh).
@@ -1240,6 +1536,98 @@ export class MainStreetTurnController {
   }
 
   /**
+   * Handles clicking on a staff card in the general market row
+   * (CG-0MT3KZOUX007GQ44): hires the staff member — consuming one daily
+   * action — through the same animated + SFX feedback path as the other
+   * market purchases. Staff cards are never moved to the hand.
+   *
+   * @param card  The staff card in the market row.
+   */
+  public onStaffCardClick(card: StaffCard): void {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return;
+
+    // Tutorial gating: only allow hire-staff if it's the required action or
+    // the tutorial is inactive.
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('hire-staff' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      return;
+    }
+
+    // Ensure stale hover tooltip is cleared when a card is hired.
+    s.tooltipManager?.hide();
+
+    s.selectMarketCardById(card.id);
+
+    const legality = canPurchaseStaff(s.state, card.id);
+    if (!legality.legal) {
+      const reason = (legality.reason ?? '').toLowerCase();
+      // Insufficient-coins rejection → play illegal-move feedback.
+      if (reason.includes('not enough coins')) {
+        const containers = s.msRenderer?.getMarketRowCards?.();
+        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+        const target = containers?.[cardIndex] ?? null;
+        playIllegalFeedback(target, s);
+      }
+      s.instructionText.setText(`Cannot hire: ${legality.reason ?? 'unknown'}`);
+      return;
+    }
+
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+
+    s.uiPhase = 'animating';
+    s.instructionText.setText(`Hiring "${card.name}"...`);
+    s.hiddenTransferSourceCardIds.add(card.id);
+    s.refreshAll();
+
+    const afterTransfer = (): void => {
+      console.debug('[MS] onStaffCardClick: attempting HireStaff', { cardId: card.id, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.cards.map((c: any) => c.id) });
+      let hired = false;
+      try {
+        const cmd = hireStaffCardCommand(s.state, card.id);
+        s.undoManager.execute(cmd);
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'hire-staff', cardId: card.id }, description: cmd.description }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
+        s.instructionText.setText(`Hired "${card.name}" (+${card.handSlotsAdded} hand slots)`);
+        // Lightweight notification for the hire (popup above the hand).
+        try {
+          void popTextOrIcon({ scene: s, x: s.layout.handCenterX, y: s.layout.handY, label: `Hired ${card.name}` });
+        } catch (_) {}
+        hired = true;
+      } catch (e) {
+        console.error('[MS] HireStaff failed', e);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      s.hiddenTransferSourceCardIds.delete(card.id);
+      s.uiPhase = 'market';
+      s.refreshAll();
+
+      // Tutorial: mark hire-staff step complete if active.
+      if (hired) {
+        try {
+          (s.msLifecycleManager as any).onTutorialActionComplete?.('hire-staff' as TutorialActionType);
+        } catch (_) {}
+      }
+    };
+
+    if (sourceIndex >= 0) {
+      void s.animateTransferFromMarket({
+        cardId: card.id,
+        family: 'staff',
+        row: 'market',
+        slotIndex: sourceIndex,
+        // The hired staff member joins the player's side: fly to the hand
+        // region (the card is then removed from the row on refresh).
+        destination: { x: s.layout.handCenterX, y: s.layout.handY + (s.layout.handCardH ?? 0) / 2 },
+      }).then(afterTransfer);
+    } else {
+      afterTransfer();
+    }
+  }
+
+  /**
    * Handles clicking on a placed business/community-space card during the
    * MarketPhase to open a sell confirmation dialog.
    *
@@ -1274,7 +1662,10 @@ export class MainStreetTurnController {
     // (preserving existing customClickFn behavior)
     if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
       s.pendingHandIndex = index;
-      s.pendingHandJustMoved = false; // selecting an existing hand card: placing costs an action
+      // Placing is free only if the selected card is the one just moved from
+      // the market this turn (CG-0MSXIQIPJ000NDTL); any other hand card costs
+      // an action (pendingHandJustMoved derived from justMovedHandCardId).
+      s.pendingHandJustMoved = s.justMovedHandCardId === hand[index]?.id;
       const cardName = hand[index]?.name ?? 'card';
       s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
       s.refreshAll();
@@ -1292,7 +1683,10 @@ export class MainStreetTurnController {
     s.tooltipManager?.hide();
 
     s.pendingHandIndex = index;
-    s.pendingHandJustMoved = false; // card already in hand: placing consumes an action
+    // Placing is free only if the selected card is the one just moved from
+    // the market this turn (CG-0MSXIQIPJ000NDTL); any other hand card costs
+    // an action.
+    s.pendingHandJustMoved = s.justMovedHandCardId === hand[index]?.id;
     s.uiPhase = 'placing-from-hand';
     const cardName = hand[index]?.name ?? 'card';
     s.instructionText.setText(`Click an empty slot to place "${cardName}"`);

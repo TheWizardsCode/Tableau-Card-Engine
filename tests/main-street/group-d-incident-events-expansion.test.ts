@@ -56,18 +56,18 @@ interface NewIncidentContract {
 }
 
 const NEW_INCIDENT_CONTRACTS: NewIncidentContract[] = [
-  { id: 'evt-graffiti', name: 'Graffiti', intendedPolarity: 'bad', tier: '1', coinDelta: -1, reputationDelta: -1 },
-  { id: 'evt-water-main', name: 'Water Main Break', intendedPolarity: 'bad', tier: '2', targetSynergy: 'Service', coinDelta: -2, reputationDelta: 0 },
-  { id: 'evt-parking-tickets', name: 'Parking Enforcement', intendedPolarity: 'bad', tier: '2', targetSynergy: 'Commerce', coinDelta: -1, reputationDelta: 0 },
+  { id: 'evt-graffiti', name: 'Graffiti', intendedPolarity: 'bad', tier: '2', coinDelta: -1, reputationDelta: -1 },
+  { id: 'evt-water-main', name: 'Water Main Break', intendedPolarity: 'bad', tier: '4', targetSynergy: 'Service', coinDelta: -2, reputationDelta: 0 },
+  { id: 'evt-parking-tickets', name: 'Parking Enforcement', intendedPolarity: 'bad', tier: '4', targetSynergy: 'Commerce', coinDelta: -1, reputationDelta: 0 },
   // Thematic polarity is 'bad', but the streak system classifies by net delta
   // (0 + 0 = neutral) — same convention as Flu Outbreak / Recession.
-  { id: 'evt-labor-shortage', name: 'Labor Shortage', intendedPolarity: 'neutral', tier: '3', coinDelta: 0, reputationDelta: 0, duration: 3, effectType: 'income-multiplier', multiplier: 0.9 },
-  { id: 'evt-movie-premiere', name: 'Movie Premiere', intendedPolarity: 'good', tier: '2', targetSynergy: 'Entertainment', coinDelta: 1, reputationDelta: 1 },
-  { id: 'evt-health-screening', name: 'Free Health Screening', intendedPolarity: 'good', tier: '2', targetSynergy: 'Health', coinDelta: 0, reputationDelta: 1 },
-  { id: 'evt-farmers-market', name: 'Farmers Market Day', intendedPolarity: 'good', tier: '2', targetSynergy: 'Food', coinDelta: 1, reputationDelta: 1 },
-  { id: 'evt-library-reading', name: 'Library Story Hour', intendedPolarity: 'good', tier: '1', targetSynergy: 'Culture', coinDelta: 0, reputationDelta: 1 },
-  { id: 'evt-street-cleaning', name: 'Street Cleaning', intendedPolarity: 'neutral', tier: '1', coinDelta: 0, reputationDelta: 0 },
-  { id: 'evt-neighborhood-watch', name: 'Neighborhood Watch', intendedPolarity: 'neutral', tier: '2', coinDelta: -1, reputationDelta: 1 },
+  { id: 'evt-labor-shortage', name: 'Labor Shortage', intendedPolarity: 'neutral', tier: '7', coinDelta: 0, reputationDelta: 0, duration: 3, effectType: 'income-multiplier', multiplier: 0.9 },
+  { id: 'evt-movie-premiere', name: 'Movie Premiere', intendedPolarity: 'good', tier: '5', targetSynergy: 'Entertainment', coinDelta: 1, reputationDelta: 1 },
+  { id: 'evt-health-screening', name: 'Free Health Screening', intendedPolarity: 'good', tier: '5', targetSynergy: 'Health', coinDelta: 0, reputationDelta: 1 },
+  { id: 'evt-farmers-market', name: 'Farmers Market Day', intendedPolarity: 'good', tier: '5', targetSynergy: 'Food', coinDelta: 1, reputationDelta: 1 },
+  { id: 'evt-library-reading', name: "Children's Story Hour", intendedPolarity: 'good', tier: '3', targetSynergy: 'Culture', coinDelta: 0, reputationDelta: 1 },
+  { id: 'evt-street-cleaning', name: 'Street Cleaning', intendedPolarity: 'neutral', tier: '3', coinDelta: 0, reputationDelta: 0 },
+  { id: 'evt-neighborhood-watch', name: 'Neighborhood Watch', intendedPolarity: 'neutral', tier: '5', coinDelta: -1, reputationDelta: 1 },
 ];
 
 // ── AC1: Template count ───────────────────────────────────────────────
@@ -190,6 +190,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     ...overrides,
   };

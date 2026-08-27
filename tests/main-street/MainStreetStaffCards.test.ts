@@ -27,6 +27,7 @@ import {
   processEndOfTurn,
   executeAction,
 } from '../../example-games/main-street/MainStreetEngine';
+import { createStaffDeck, type StaffCard } from '../../example-games/main-street/MainStreetCards';
 
 // ── Feature Detection ───────────────────────────────────────
 
@@ -105,6 +106,30 @@ function getHand(state: MainStreetState): any[] {
   return (state as any).hand ?? [];
 }
 
+/**
+ * Ensures a staff card is present in the general market row (the unified
+ * market model, CG-0MT2WTN0L004JA53): staff are hired directly from the
+ * row — there is no dedicated staff market. Returns the first staff card
+ * in the row, moving a staff-deck card into the row when empty.
+ */
+function ensureStaffInMarket(state: MainStreetState): StaffCard {
+  const existing = (state.market.cards as any[]).find((c: any) => c.family === 'staff');
+  if (existing) return existing as StaffCard;
+  const deckCard = createStaffDeck(1)[0];
+  state.market.cards.push({ ...deckCard });
+  return state.market.cards[state.market.cards.length - 1] as StaffCard;
+}
+
+/**
+ * Employs a staff member directly (layoff/stacking setups avoid hiring
+ * through the market row so the tests focus on the layoff mechanic itself).
+ */
+function employStaff(state: MainStreetState, overrides: Partial<StaffCard> = {}): StaffCard {
+  const tpl = { ...createStaffDeck(1)[0], ...overrides };
+  (state as any).staffCards.push({ ...tpl });
+  return tpl;
+}
+
 // ── Tests ───────────────────────────────────────────────────
 
 describe('MainStreet Staff Cards & Hand Capacity', () => {
@@ -136,7 +161,9 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
           expect(typeof tpl.name).toBe('string');
           expect(typeof tpl.cost).toBe('number');
           expect(typeof tpl.handSlotsAdded).toBe('number');
-          expect(tpl.handSlotsAdded).toBeGreaterThanOrEqual(1);
+          // Employed-applicant cards (12 specialization staff, CG-0MT4WXNR80090FXZ)
+          // deliberately grant 0 hand slots; only hand-capacity staff add slots.
+          expect(tpl.handSlotsAdded).toBeGreaterThanOrEqual(0);
           // 4 = Executive premium slot capacity (Group F, CG-0MSQJ7VL9009JHF4).
           expect(tpl.handSlotsAdded).toBeLessThanOrEqual(4);
 
@@ -192,11 +219,8 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
 
         const initialMax = getMaxHandSize(state);
 
-        // Find a staff card in the market
-        const staffCards = (state as any).staffCardMarket ?? [];
-        if (staffCards.length === 0) return;
-
-        const card = staffCards[0];
+        // Hire a staff card from the general market row (CG-0MT2WTN0L004JA53).
+        const card = ensureStaffInMarket(state);
         state.resourceBank.coins = card.cost;
 
         fn(state, card.id);
@@ -217,10 +241,8 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engineModule as any).purchaseStaffCard;
         if (typeof fn !== 'function') return;
 
-        const staffCards = (state as any).staffCardMarket ?? [];
-        if (staffCards.length === 0) return;
-
-        const card = staffCards[0];
+        // Hire a staff card from the general market row (CG-0MT2WTN0L004JA53)
+        const card = ensureStaffInMarket(state);
         state.resourceBank.coins = card.cost + 10;
         const coinsBefore = state.resourceBank.coins;
 
@@ -242,10 +264,8 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engineModule as any).purchaseStaffCard;
         if (typeof fn !== 'function') return;
 
-        const staffCards = (state as any).staffCardMarket ?? [];
-        if (staffCards.length === 0) return;
-
-        const card = staffCards[0];
+        // Hire a staff card from the general market row (CG-0MT2WTN0L004JA53)
+        const card = ensureStaffInMarket(state);
         state.resourceBank.coins = card.cost + 10;
         const staffBefore = getStaffCards(state).length;
 
@@ -291,8 +311,14 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engineModule as any).purchaseStaffCard;
         if (typeof fn !== 'function') return;
 
-        const staffCards = (state as any).staffCardMarket ?? [];
-        if (staffCards.length < 2) return;
+        // Seed two distinct staff cards into the general market row
+        // (CG-0MT2WTN0L004JA53) so both hires stack hand capacity.
+        const deck = createStaffDeck(1);
+        const first = deck[0];
+        const second = deck[1] ?? deck[0];
+        state.market.cards.push({ ...first });
+        if (second.id !== first.id) state.market.cards.push({ ...second });
+        const staffCards = [first, ...(second.id !== first.id ? [second] : [])];
 
         const initialMax = getMaxHandSize(state);
 
@@ -379,10 +405,10 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engine as any).layoffStaffCard;
         if (typeof fn !== 'function') return;
 
-        // Add hand cards and a staff card
+        // Add hand cards and employ a staff card to lay off
+        // (CG-0MT2WTN0L004JA53: layoff returns staff to discards.staff).
         const hand = getHand(state);
-        const staffCards = getStaffCards(state);
-        if (staffCards.length === 0) return;
+        const staffCard = employStaff(state);
 
         // Add some hand cards
         for (let i = 0; i < 3; i++) {
@@ -396,7 +422,6 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         }
 
         const handSizeBefore = hand.length;
-        const staffCard = staffCards[0];
         const slotsToRemove = staffCard.handSlotsAdded;
 
         fn(state, staffCard.id);
@@ -419,11 +444,9 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engine as any).layoffStaffCard;
         if (typeof fn !== 'function') return;
 
-        const staffCards = getStaffCards(state);
-        if (staffCards.length === 0) return;
-
-        // Add just 1 hand card
+        // Employ a staff card to lay off (CG-0MT2WTN0L004JA53)
         const hand = getHand(state);
+        const staffCard = employStaff(state);
         hand.push({
           family: 'business',
           id: 'hand-card-only',
@@ -432,7 +455,6 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
           synergyTypes: ['Food'],
         });
 
-        const staffCard = staffCards[0];
         fn(state, staffCard.id);
 
         // All hand cards should be removed (fewer than slots)
@@ -453,11 +475,9 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engine as any).layoffStaffCard;
         if (typeof fn !== 'function') return;
 
-        const staffCards = getStaffCards(state);
-        if (staffCards.length === 0) return;
-
-        const staffCountBefore = staffCards.length;
-        const staffCard = staffCards[0];
+        // Employ a staff card to lay off (CG-0MT2WTN0L004JA53)
+        const staffCard = employStaff(state);
+        const staffCountBefore = getStaffCards(state).length;
 
         fn(state, staffCard.id);
 
@@ -478,10 +498,8 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engine as any).layoffStaffCard;
         if (typeof fn !== 'function') return;
 
-        const staffCards = getStaffCards(state);
-        if (staffCards.length === 0) return;
-
-        const staffCard = staffCards[0];
+        // Employ a staff card to lay off (CG-0MT2WTN0L004JA53)
+        const staffCard = employStaff(state);
         const maxBefore = getMaxHandSize(state);
 
         fn(state, staffCard.id);
@@ -524,13 +542,13 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
           });
         }
 
-        // Add same staff to both
-        const staffCards1 = getStaffCards(state1);
-        const staffCards2 = getStaffCards(state2);
-        if (staffCards1.length === 0) return;
+        // Employ the same staff template in both (CG-0MT2WTN0L004JA53)
+        const tpl = createStaffDeck(1)[0];
+        (state1 as any).staffCards.push({ ...tpl });
+        (state2 as any).staffCards.push({ ...tpl });
 
-        fn(state1, staffCards1[0].id);
-        fn(state2, staffCards2[0].id);
+        fn(state1, tpl.id);
+        fn(state2, tpl.id);
 
         // Same seed should produce same random card removal
         const hand1Ids = getHand(state1).map((c: any) => c.id).sort();
@@ -607,14 +625,12 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engine as any).layoffStaffCard;
         if (typeof fn !== 'function') return;
 
-        const staffCards = getStaffCards(state);
-        if (staffCards.length === 0) return;
-
-        // Hand is empty
+        // Employ a staff card to lay off (CG-0MT2WTN0L004JA53); hand is empty
+        const staffCard = employStaff(state);
         expect(getHand(state)).toHaveLength(0);
 
         // Layoff with empty hand should not throw
-        expect(() => fn(state, staffCards[0].id)).not.toThrow();
+        expect(() => fn(state, staffCard.id)).not.toThrow();
       },
     );
 
@@ -631,11 +647,14 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const fn = (engineModule as any).purchaseStaffCard;
         if (typeof fn !== 'function') return;
 
-        const staffCards = (state as any).staffCardMarket ?? [];
-        // Need at least a +1 and a +3 card
-        const plus1 = staffCards.find((c: any) => c.handSlotsAdded === 1);
-        const plus3 = staffCards.find((c: any) => c.handSlotsAdded === 3);
+        // Seed a +1 and a +3 staff card into the general market row
+        // (CG-0MT2WTN0L004JA53) so both slots stack.
+        const deck = createStaffDeck(1);
+        const plus1 = deck.find((c: any) => c.handSlotsAdded === 1);
+        const plus3 = deck.find((c: any) => c.handSlotsAdded === 3);
         if (!plus1 || !plus3) return;
+        state.market.cards.push({ ...plus1 });
+        state.market.cards.push({ ...plus3 });
 
         state.resourceBank.coins = 100;
         const baseMax = getMaxHandSize(state);

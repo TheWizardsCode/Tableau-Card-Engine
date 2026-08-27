@@ -113,6 +113,98 @@ export default defineConfig(({ mode, command }) => ({
           hookTimeout: 240_000,
         },
       },
+      // ── Smoke Tests (~30s, ~8-10 files) ───────────────
+      // One representative test file per game + core engine/UI smoke.
+      // Used for rapid feedback during implementation.
+      {
+        extends: true,
+        test: {
+          name: 'smoke',
+          include: [
+            'tests/main-street/MainStreetScene.browser.test.ts',
+            'tests/golf/GolfScene.browser.test.ts',
+            'tests/feudalism/FeudalismSmokeTest.browser.test.ts',
+            'tests/beleaguered-castle/BeleagueredCastleOverlay.browser.test.ts',
+            'tests/coloretto/ColorettoScene.browser.test.ts',
+            'tests/sushi-go/SushiGoIcons.browser.test.ts',
+            'tests/lost-cities/LostCitiesRoundEnd.browser.test.ts',
+            'tests/core-engine/SvgHelpers.browser.test.ts',
+            'tests/ui/HelpPanel.browser.test.ts',
+            'tests/gym/GymSceneSmoke.browser.test.ts',
+          ],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 30_000,
+          browser: {
+            enabled: true,
+            provider: 'playwright',
+            headless: true,
+            instances: [{ browser: 'chromium' }],
+            viewport: { width: 900, height: 700 },
+            isolate: true,
+          },
+        },
+      },
+      // ── Dev Tests (~3 min, ~25-30 files) ──────────────
+      // Smoke + key E2E per game. Used by implement/audit workflow.
+      {
+        extends: true,
+        test: {
+          name: 'dev',
+          include: [
+            // Core + UI
+            'tests/core-engine/SvgHelpers.browser.test.ts',
+            'tests/core-engine/PhaserEventBridge.browser.test.ts',
+            'tests/ui/HelpPanel.browser.test.ts',
+            'tests/ui/TooltipManager.browser.test.ts',
+            'tests/ui/SettingsPanelTooltips.browser.test.ts',
+            // Main Street key E2E
+            'tests/main-street/MainStreetScene.browser.test.ts',
+            'tests/main-street/drag.browser.test.ts',
+            'tests/main-street/undo-redo.browser.test.ts',
+            'tests/main-street/MainStreetOverlay.browser.test.ts',
+            'tests/main-street/game-over.browser.test.ts',
+            // Golf key E2E
+            'tests/golf/GolfScene.browser.test.ts',
+            'tests/golf/GolfInteraction.browser.test.ts',
+            'tests/golf/GolfEvents.browser.test.ts',
+            // FC key E2E
+            'tests/feudalism/FeudalismSmokeTest.browser.test.ts',
+            'tests/feudalism/FeudalismSelection.browser.test.ts',
+            'tests/feudalism/FeudalismLayout.browser.test.ts',
+            // BC key E2E
+            'tests/beleaguered-castle/BeleagueredCastleOverlay.browser.test.ts',
+            'tests/beleaguered-castle/BeleagueredCastleTurnController.browser.test.ts',
+            'tests/beleaguered-castle/BeleagueredCastleLayout.browser.test.ts',
+            // Sushi Go key E2E
+            'tests/sushi-go/SushiGoIcons.browser.test.ts',
+            'tests/sushi-go/SushiGoOverlay.browser.test.ts',
+            'tests/sushi-go/SushiGoTableauRendering.browser.test.ts',
+            // Lost Cities key E2E
+            'tests/lost-cities/LostCitiesRoundEnd.browser.test.ts',
+            'tests/lost-cities/LostCitiesOverlayAlignment.browser.test.ts',
+            // Coloretto
+            'tests/coloretto/ColorettoScene.browser.test.ts',
+            // HandView
+            'tests/handView/gym-handpile-drag.browser.test.ts',
+            'tests/handView/gym-handpile-cancel.browser.test.ts',
+            // Gym feature tests
+            'tests/gym/GymDeckRngScene.browser.test.ts',
+            'tests/gym/GymOverlayUiScene.browser.test.ts',
+          ],
+          fileParallelism: false,
+          sequence: { concurrent: false },
+          testTimeout: 30_000,
+          browser: {
+            enabled: true,
+            provider: 'playwright',
+            headless: true,
+            instances: [{ browser: 'chromium' }],
+            viewport: { width: 900, height: 700 },
+            isolate: true,
+          },
+        },
+      },
       // ── Non-Tutorial Browser Tests ────────────────────
       {
         extends: true,

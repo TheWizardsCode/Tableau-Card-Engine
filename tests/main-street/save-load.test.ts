@@ -59,7 +59,12 @@ describe('Main Street save/load integration', () => {
     const state = setupMainStreetGame({ seed: 'save-load-turn-start' });
 
     executeDayStart(state);
-    const card = state.market.cards.find(c => c.cost <= state.resourceBank.coins)!;
+    state.resourceBank.coins = 100;
+    const card = state.market.cards.find(
+      c =>
+        (c.family === 'business' || c.family === 'community-space') &&
+        c.cost <= state.resourceBank.coins,
+    )!;
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(state);
 
@@ -69,7 +74,12 @@ describe('Main Street save/load integration', () => {
 
     const expected = setupMainStreetGame({ seed: 'save-load-turn-start' });
     executeDayStart(expected);
-    const expectedCard = expected.market.cards.find(c => c.cost <= expected.resourceBank.coins)!;
+    expected.resourceBank.coins = 100;
+    const expectedCard = expected.market.cards.find(
+      c =>
+        (c.family === 'business' || c.family === 'community-space') &&
+        c.cost <= expected.resourceBank.coins,
+    )!;
     executeAction(expected, { type: 'buy-business', cardId: expectedCard.id, slotIndex: 0 });
     processEndOfTurn(expected);
 

@@ -21,7 +21,8 @@
  */
 
 import type { GameConfig } from './MainStreetDifficulty';
-import type { AnyCard } from './MainStreetCards';
+import type { AnyCard, StaffCard } from './MainStreetCards';
+import { getSkill } from './MainStreetStaffSkills';
 import { formatCurrency } from '@core-engine/I18n';
 
 /** Default per-card coin synergy rate when the CSV does not specify one. */
@@ -106,8 +107,7 @@ export interface CardTooltipInfoOptions {
  * currency symbol follows the active locale (e.g. `€` for `en`, `$` for
  * `en-US`) instead of a hardcoded symbol or raw number.
  *
- * Staff and unknown card families return an empty string (matching the
- * previous behaviour where those cards showed no tooltip text).
+ * Unknown card families return an empty string.
  *
  * @param card    The card to describe.
  * @param config  The active difficulty config (for synergy-rate resolution).
@@ -124,7 +124,8 @@ export function buildCardTooltipInfo(
       const b = card;
       const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
       const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
-      return `Business: ${b.name}\nCost: ${formatCurrency(b.cost)}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${resolveDescription(b.description ?? '', b, config)}`;
+      const bOngoingInfo = (b.ongoingCost ?? 0) > 0 ? `\nOngoing cost: -${b.ongoingCost}/turn` : '';
+      return `Business: ${b.name}\nCost: ${formatCurrency(b.cost)}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bOngoingInfo}${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${resolveDescription(b.description ?? '', b, config)}`;
     }
     case 'community-space': {
       const cs = card;
@@ -143,6 +144,37 @@ export function buildCardTooltipInfo(
     case 'upgrade': {
       const u = card;
       return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+    }
+    case 'staff': {
+      // Staff cards are hired directly from the general market row
+      // (CG-0MT3KZOUX007GQ44): show hire-relevant info — cost, hand slots,
+      // ongoing cost and the staff member's abilities.
+      const st = card as StaffCard;
+      const lines = [
+        `Staff: ${st.name}`,
+        `Cost: ${formatCurrency(st.cost)}`,
+        `Hand slots: +${st.handSlotsAdded}`,
+      ];
+      if ((st.ongoingCost ?? 0) > 0) lines.push(`Ongoing cost: -${st.ongoingCost}/turn`);
+      if ((st.reputationPerTurn ?? 0) > 0) lines.push(`Reputation: +${st.reputationPerTurn}/turn`);
+      if ((st.refreshCostDiscount ?? 0) > 0) lines.push(`Refresh discount: -${st.refreshCostDiscount} per refresh`);
+      if ((st.actionsPerTurn ?? 0) > 0) lines.push(`Actions: +${st.actionsPerTurn}/day`);
+      if (st.peekOncePerTurn) lines.push('Ability: peek the incident deck once per turn');
+      // Specialization skills (CG-0MT1CIWSD003VBPK): the applicant card's
+      // locked skill set (1-3 skills incl. the Town Gossip baseline). Legacy
+      // cards without specializationSkillIds show no skills line.
+      const skillIds = Array.isArray(st.specializationSkillIds) ? st.specializationSkillIds : [];
+      const skillNames: string[] = [];
+      for (const id of skillIds) {
+        try {
+          skillNames.push(getSkill(id).name);
+        } catch {
+          // Unknown/stale id on a saved card — show nothing for it (forward-compat).
+        }
+      }
+      if (skillNames.length > 0) lines.push(`Skills: ${skillNames.join(', ')}`);
+      if (st.description) lines.push(st.description);
+      return lines.join('\n');
     }
     default:
       // Staff cards (and any future unknown families) show no tooltip text.

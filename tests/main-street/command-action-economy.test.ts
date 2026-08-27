@@ -30,7 +30,7 @@ import {
 import { refreshMarketCost } from '../../example-games/main-street/MainStreetMarket';
 
 /** Fresh MarketPhase state with a full action budget. */
-function setupMarketState(seed = 'command-action-economy'): ReturnType<typeof setupMainStreetGame> {
+function setupMarketState(seed = 'command-action-economy-test'): ReturnType<typeof setupMainStreetGame> {
   const state = setupMainStreetGame({ seed });
   executeDayStart(state);
   expect(state.actionsRemaining).toBe(1);
@@ -112,7 +112,14 @@ describe('action-type commands spend the daily action', () => {
 
   it('hireStaffCardCommand spends 1 action', () => {
     const state = setupMarketState();
-    const staff = state.staffCardMarket?.[0];
+    // Staff are hired from the general market row (CG-0MT3KZOBZ005IRYE);
+    // if the seeded row lacks one, move a deck staff card into the row.
+    let staff = state.market.cards.find(c => c.family === 'staff') as any;
+    if (!staff) {
+      const deckStaff = state.decks.staff.find(c => c.family === 'staff');
+      if (deckStaff) state.market.cards.push({ ...deckStaff });
+      staff = state.market.cards.find(c => c.family === 'staff') as any;
+    }
     expect(staff).toBeTruthy();
     state.resourceBank.coins = Math.max(state.resourceBank.coins, staff.cost);
     const coinsBefore = state.resourceBank.coins;

@@ -40,8 +40,8 @@ export const CSV_COLUMNS: readonly string[] = [
   'description', 'tier', 'trigger', 'effect', 'target',
   'targetSynergy', 'coinDelta', 'reputationDelta', 'duration', 'effectType',
   'multiplier', 'targetBusiness', 'incomeBonus', 'synergyRangeBonus',
-  'requiredLevel', 'reputationBonus', 'ongoingCost', 'handSlotsAdded',
-  'refreshCostDiscount', 'actionsPerTurn',
+  'requiredLevel', 'reputationBonus', 'newDisplayName', 'ongoingCost', 'handSlotsAdded',
+  'refreshCostDiscount', 'actionsPerTurn', 'peekOncePerTurn',
 ];
 
 export const NUMERIC_COLUMNS: readonly string[] = [
@@ -49,6 +49,7 @@ export const NUMERIC_COLUMNS: readonly string[] = [
   'ongoingCost', 'reputationPerTurn', 'reputationBonus', 'synergyCoinBonus',
   'synergyRepBonus', 'synergyRangeBonus', 'requiredLevel', 'handSlotsAdded',
   'refreshCostDiscount', 'actionsPerTurn', 'maxLevel', 'duration', 'multiplier',
+  'peekOncePerTurn',
 ];
 
 function parseCsvLine(line: string): string[] {

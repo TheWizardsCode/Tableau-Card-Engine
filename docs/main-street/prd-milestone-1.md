@@ -49,7 +49,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 | **Card Types** | 5 Business cards (Bakery, Diner, Bookshop, Park, Hardware Store), 5 Event cards (Local Festival, Rainy Day, Tax Audit, Community Award, Health Inspection), 3 Upgrade cards (Patisserie, Bistro, Reader's Café). Defined as typed JSON fixtures. |
 | **Turn Structure** | 6-phase day cycle: DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck. Implemented via `PhaseManager`. |
 | **Core Actions** | Buy Business, Buy Upgrade, Buy Event, Place Business, End Turn. All with legality validation returning `LegalityResult`. |
-| **Win/Loss Detection** | Score threshold (>=150), all-challenges-complete, turn-limit victory (turn 20 with reputation > 0 and coins >= 0). Loss: bankruptcy (coins < 0), reputation collapse (reputation <= 0), turn exhaustion without victory. |
+| **Win/Loss Detection** | Score threshold (>= winThreshold: 100 Easy / 120 Medium / 150 Hard), all-challenges-complete, turn-limit victory (turn 20 with reputation > 0 and coins >= 0). Loss: bankruptcy (coins < 0), reputation collapse (reputation <= 0), turn exhaustion without victory. |
 | **Adjacency & Income** | `AdjacencyResolver` computing synergy bonuses for the linear 1x10 grid. `computeIncome()` summing base income + synergy bonuses. Upgrades extending adjacency range. |
 | **Minimal UI** | Phaser scene with: 10-slot street grid, market display (business row + investments row), incident queue area (2 face-up incidents), resource bank display (coins, reputation, turn, score), player hand area (any mix of business + event cards), buy/place/upgrade click flow, end-turn button, game-over overlay. Placeholder art (colored rectangles with text labels). Responsive layout for desktop and mobile. |
 | **Seeded RNG** | Deterministic randomness using `createSeededRng()` from `@core-engine`. Seed displayed on title screen and usable for reproducible games. |
@@ -149,13 +149,13 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 **so that** I know when my session is complete and can see my final score.
 
 **Acceptance Criteria:**
-- [ ] AC-6.1: Win triggers when `finalScore >= 150` at end of Night Phase.
+- [ ] AC-6.1: Win triggers when `finalScore >= winThreshold` (100 Easy / 120 Medium / 150 Hard) at end of Night Phase.
 - [ ] AC-6.2: Win triggers when all primary challenges are completed.
 - [ ] AC-6.3: Loss triggers immediately when coins < 0 (bankruptcy).
 - [ ] AC-6.4: Loss triggers immediately when reputation <= 0 (reputation collapse).
 - [ ] AC-6.5: Loss triggers at turn 20 if win conditions are not met (turn exhaustion).
 - [ ] AC-6.6: Game-over overlay displays win/loss status, final score breakdown, and a "Play Again" button.
-- [ ] AC-6.7: Final score formula: `coins + (reputation * 5) + (challengesCompleted * 10)`.
+- [ ] AC-6.7: Final score formula: `coins + reputation + (challengesCompleted * challengeBonusPoints)`.
 
 ### US-7: Deterministic Replay
 
@@ -312,7 +312,6 @@ const MARKET_INVESTMENT_UPGRADE_COUNT = 2; // Upgrades in investment row
 const MARKET_INVESTMENT_EVENT_COUNT = 1;   // Investment events in investment row
 const INCIDENT_QUEUE_SIZE = 2;           // Visible FIFO incident queue size
 const SYNERGY_BONUS_PER_NEIGHBOR = 1;
-const REPUTATION_SCORE_MULTIPLIER = 5;
 const CHALLENGE_BONUS_POINTS = 10;
 ```
 

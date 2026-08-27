@@ -1,16 +1,23 @@
 /**
  * Main Street: Tier Definition Registry
  *
- * Defines the 5-tier meta-progression system. Each tier maps to a set of
+ * Defines the 12-tier meta-progression system. Each tier maps to a set of
  * unlock thresholds (reputation or challenge-based) and card assignments.
  *
  * **Card-to-tier assignments** are read from the `tier` column in
  * `card-data.csv` via `CARD_TIER_MAP` (exported from `MainStreetCards.ts`).
  * This keeps per-card tier data colocated with card templates and editable
- * without TypeScript.
+ * without TypeScript. Tier new-card arrays are built generically from the
+ * map (tiers '1'..'12'), so adding a card in the CSV is enough to register
+ * it in the progression.
  *
  * **Tier structure** (thresholds, challenge conditions, ordering) remains
- * in TypeScript and is defined below in `TIER_DEFINITIONS`.
+ * in TypeScript and is defined below in `TIER_CONFIG`, from which
+ * `TIER_DEFINITIONS` is generated.
+ *
+ * Expansion CG-0MT3C744B009DS84: 5 -> 12 tiers. Reputation thresholds form
+ * an anchored ladder (old 5-tier anchors 8/16/32/64 preserved at T3/T5/
+ * T7/T11) extended to an aspirational T12=80.
  *
  * See docs/main-street/prd-milestone-2.md Section 2 and 4.3.5.
  *
@@ -29,7 +36,7 @@ export interface TierDefinition {
   id: string;
   /** Human-readable tier name, e.g. 'Foundation'. */
   name: string;
-  /** Evaluation order (1-5). Lower tiers are evaluated first. */
+  /** Evaluation order (1-12). Lower tiers are evaluated first. */
   order: number;
   /** Minimum reputation at end-of-run to unlock this tier. 0 for Tier 1 (always unlocked). */
   reputationThreshold: number;
@@ -47,25 +54,23 @@ export interface TierDefinition {
 
 // ── Tier Card IDs (from CSV) ───────────────────────────────
 
-// Build tier card ID arrays from the CSV-derived CARD_TIER_MAP.
-// This externalises the per-card tier assignment into card-data.csv
-// while keeping TIER_DEFINITIONS structure (thresholds, challenges) in TS.
-
-const TIER_1_CARD_IDS: string[] = [];
-const TIER_2_NEW_CARD_IDS: string[] = [];
-const TIER_3_NEW_CARD_IDS: string[] = [];
-const TIER_4_NEW_CARD_IDS: string[] = [];
-const TIER_5_NEW_CARD_IDS: string[] = [];
-
-for (const [cardId, tier] of CARD_TIER_MAP) {
-  switch (tier) {
-    case '1': TIER_1_CARD_IDS.push(cardId); break;
-    case '2': TIER_2_NEW_CARD_IDS.push(cardId); break;
-    case '3': TIER_3_NEW_CARD_IDS.push(cardId); break;
-    case '4': TIER_4_NEW_CARD_IDS.push(cardId); break;
-    case '5': TIER_5_NEW_CARD_IDS.push(cardId); break;
+/**
+ * Builds the per-tier new-card arrays generically from `CARD_TIER_MAP`.
+ * Tiers are keyed '1'..'12' (the CSV `tier` column). Any card without a
+ * tier in 1..12 is skipped (defensive; the CSV is validated at design time).
+ */
+function buildTierNewCardIds(): string[][] {
+  const byTier: string[][] = Array.from({ length: 12 }, () => []);
+  for (const [cardId, tier] of CARD_TIER_MAP) {
+    const idx = Number(tier);
+    if (Number.isInteger(idx) && idx >= 1 && idx <= 12) {
+      byTier[idx - 1].push(cardId);
+    }
   }
+  return byTier;
 }
+
+const TIER_NEW_CARD_IDS: string[][] = buildTierNewCardIds();
 
 // ── Challenge Condition Helpers ─────────────────────────────
 
@@ -100,88 +105,142 @@ function hasCompletedChallengeInCategory(
   return categories.some((cat) => completed.has(cat));
 }
 
-// ── Tier Definitions ────────────────────────────────────────
+// ── Tier Configuration ──────────────────────────────────────
 
 /**
- * The authoritative tier definition registry.
+ * Per-tier static configuration: order, name, reputation threshold and
+ * challenge-based unlock condition. IDs are derived ('tier-1'..'tier-12')
+ * and card arrays are injected from `TIER_NEW_CARD_IDS`.
  *
- * Maps tier IDs to their full definitions including thresholds, challenge
- * conditions, and card assignments.
+ * Challenge path is progressive (CG-0MT3C744B009DS84):
+ *   T2-T3  easy counts, T4-T6/8 category combinations, T7/9 counts with
+ *   category gates, T10-T12 specific flagship cross-cutting challenges.
  */
-export const TIER_DEFINITIONS: Record<string, TierDefinition> = {
-  'tier-1': {
-    id: 'tier-1',
+interface TierConfig {
+  name: string;
+  reputationThreshold: number;
+  challengeCondition: (state: MainStreetState) => boolean;
+}
+
+const TIER_CONFIG: readonly TierConfig[] = [
+  // tier-1 — always unlocked
+  {
     name: 'Foundation',
-    order: 1,
     reputationThreshold: 0,
-    challengeCondition: () => false, // Tier 1 is always unlocked by default
-    newCardIds: TIER_1_CARD_IDS,
-    cumulativeCardIds: [...TIER_1_CARD_IDS],
+    challengeCondition: () => false,
   },
-
-  'tier-2': {
-    id: 'tier-2',
+  // tier-2 — Rising Street: any 1 completed challenge
+  {
     name: 'Rising Street',
-    order: 2,
-    reputationThreshold: 8,
-    // Challenge path: Complete any 2 challenges in a single run
-    challengeCondition: (state) => completedChallengeCount(state) >= 2,
-    newCardIds: TIER_2_NEW_CARD_IDS,
-    cumulativeCardIds: [...TIER_1_CARD_IDS, ...TIER_2_NEW_CARD_IDS],
+    reputationThreshold: 4,
+    challengeCondition: (state) => completedChallengeCount(state) >= 1,
   },
-
-  'tier-3': {
-    id: 'tier-3',
+  // tier-3 — Neighborhood: any 2 completed challenges
+  {
     name: 'Neighborhood',
-    order: 3,
-    reputationThreshold: 16,
-    // Challenge path: Complete 1 synergy challenge AND 1 resource challenge
+    reputationThreshold: 8,
+    challengeCondition: (state) => completedChallengeCount(state) >= 2,
+  },
+  // tier-4 — District: 1 synergy AND 1 resource challenge
+  {
+    name: 'District',
+    reputationThreshold: 12,
     challengeCondition: (state) =>
       hasCompletedChallengeInCategory(state, 'synergy') &&
       hasCompletedChallengeInCategory(state, 'resource'),
-    newCardIds: TIER_3_NEW_CARD_IDS,
-    cumulativeCardIds: [...TIER_1_CARD_IDS, ...TIER_2_NEW_CARD_IDS, ...TIER_3_NEW_CARD_IDS],
   },
-
-  'tier-4': {
-    id: 'tier-4',
-    name: 'District',
-    order: 4,
-    reputationThreshold: 32,
-    // Challenge path: Complete any 3 challenges (at least 1 must be cross-cutting or placement)
+  // tier-5 — Midtown: 3 challenges (at least 1 cross-cutting or placement)
+  {
+    name: 'Midtown',
+    reputationThreshold: 16,
     challengeCondition: (state) =>
       completedChallengeCount(state) >= 3 &&
       hasCompletedChallengeInCategory(state, 'cross-cutting', 'placement'),
-    newCardIds: TIER_4_NEW_CARD_IDS,
-    cumulativeCardIds: [
-      ...TIER_1_CARD_IDS,
-      ...TIER_2_NEW_CARD_IDS,
-      ...TIER_3_NEW_CARD_IDS,
-      ...TIER_4_NEW_CARD_IDS,
-    ],
   },
-
-  'tier-5': {
-    id: 'tier-5',
-    name: 'Landmark',
-    order: 5,
-    reputationThreshold: 64,
-    // Challenge path: Complete the "Diversified" challenge
+  // tier-6 — Metropolitan: synergy + placement + upgrade
+  {
+    name: 'Metropolitan',
+    reputationThreshold: 24,
+    challengeCondition: (state) =>
+      hasCompletedChallengeInCategory(state, 'synergy') &&
+      hasCompletedChallengeInCategory(state, 'placement') &&
+      hasCompletedChallengeInCategory(state, 'upgrade'),
+  },
+  // tier-7 — City Center: any 4 completed challenges
+  {
+    name: 'City Center',
+    reputationThreshold: 32,
+    challengeCondition: (state) => completedChallengeCount(state) >= 4,
+  },
+  // tier-8 — Capital: synergy + resource + upgrade
+  {
+    name: 'Capital',
+    reputationThreshold: 40,
+    challengeCondition: (state) =>
+      hasCompletedChallengeInCategory(state, 'synergy') &&
+      hasCompletedChallengeInCategory(state, 'resource') &&
+      hasCompletedChallengeInCategory(state, 'upgrade'),
+  },
+  // tier-9 — Iconic Quarter: 4 challenges incl. a cross-cutting one
+  {
+    name: 'Iconic Quarter',
+    reputationThreshold: 48,
+    challengeCondition: (state) =>
+      completedChallengeCount(state) >= 4 &&
+      hasCompletedChallengeInCategory(state, 'cross-cutting'),
+  },
+  // tier-10 — Historic Mile: complete ch-diversified (all 5 synergy types)
+  {
+    name: 'Historic Mile',
+    reputationThreshold: 56,
     challengeCondition: (state) => state.challengesCompleted.includes('ch-diversified'),
-    newCardIds: TIER_5_NEW_CARD_IDS,
-    cumulativeCardIds: [
-      ...TIER_1_CARD_IDS,
-      ...TIER_2_NEW_CARD_IDS,
-      ...TIER_3_NEW_CARD_IDS,
-      ...TIER_4_NEW_CARD_IDS,
-      ...TIER_5_NEW_CARD_IDS,
-    ],
   },
-};
+  // tier-11 — National Street: complete ch-synergy-master (5+ synergy pairs)
+  {
+    name: 'National Street',
+    reputationThreshold: 64,
+    challengeCondition: (state) => state.challengesCompleted.includes('ch-synergy-master'),
+  },
+  // tier-12 — Legendary Main Street: both flagship cross-cutting challenges
+  {
+    name: 'Legendary Main Street',
+    reputationThreshold: 80,
+    challengeCondition: (state) =>
+      state.challengesCompleted.includes('ch-diversified') &&
+      state.challengesCompleted.includes('ch-synergy-master'),
+  },
+];
+
+// ── Tier Definitions ────────────────────────────────────────
+
+/**
+ * The authoritative tier definition registry (built from TIER_CONFIG +
+ * generic per-tier card arrays). Maps tier IDs to their full definitions
+ * including thresholds, challenge conditions, and card assignments.
+ */
+export const TIER_DEFINITIONS: Record<string, TierDefinition> = (() => {
+  const defs: Record<string, TierDefinition> = {};
+  let cumulative: string[] = [];
+  for (let i = 0; i < TIER_CONFIG.length; i++) {
+    const tierId = `tier-${i + 1}`;
+    const newCardIds = TIER_NEW_CARD_IDS[i];
+    cumulative = [...cumulative, ...newCardIds];
+    defs[tierId] = {
+      id: tierId,
+      name: TIER_CONFIG[i].name,
+      order: i + 1,
+      reputationThreshold: TIER_CONFIG[i].reputationThreshold,
+      challengeCondition: TIER_CONFIG[i].challengeCondition,
+      newCardIds,
+      cumulativeCardIds: [...cumulative],
+    };
+  }
+  return defs;
+})();
 
 /**
  * Tier definitions sorted by evaluation order (ascending).
- * Tier 1 is first, Tier 5 is last.
+ * Tier 1 is first, Tier 12 is last.
  */
 export const ORDERED_TIER_DEFINITIONS: readonly TierDefinition[] = Object.values(
   TIER_DEFINITIONS,

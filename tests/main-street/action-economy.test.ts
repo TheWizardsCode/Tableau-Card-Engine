@@ -46,6 +46,7 @@ function makeBiz(id: string, name: string, cost: number): BusinessCard {
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
   };
 }
@@ -83,10 +84,10 @@ describe('General Manager staff card', () => {
     expect(gm.actionsPerTurn).toBe(1);
   });
 
-  it('is present in the staff card market of a new game', () => {
+  it('is present in the staff deck (general market) of a new game', () => {
     const state = setupMainStreetGame({ seed: 'gm-market' });
-    const inMarket = state.staffCardMarket.some(c => c.id.startsWith('staff-general-manager'));
-    expect(inMarket).toBe(true);
+    const inDeck = state.decks.staff.some((c: any) => c.id.startsWith('staff-general-manager'));
+    expect(inDeck).toBe(true);
   });
 });
 
@@ -176,8 +177,15 @@ describe('action spend', () => {
     const state = setupMainStreetGame({ seed: 'spend-hire' });
     executeDayStart(state, true);
     state.resourceBank.coins = 100;
-    const gm = state.staffCardMarket.find(c => c.id.startsWith('staff-general-manager'));
-    if (!gm) throw new Error('GM not in staff market');
+    // Staff are hired from the general market row (CG-0MT3KZOBZ005IRYE);
+    // if the seeded row lacks the GM, move one from the staff deck into it.
+    let gm = state.market.cards.find(c => c.id.startsWith('staff-general-manager'));
+    if (!gm) {
+      const deckGm = state.decks.staff.find(c => c.id.startsWith('staff-general-manager'));
+      if (deckGm) state.market.cards.push({ ...deckGm });
+      gm = state.market.cards.find(c => c.id.startsWith('staff-general-manager'));
+    }
+    if (!gm) throw new Error('GM not in market row');
     executeAction(state, { type: 'hire-staff', cardId: gm.id });
     expect(state.actionsRemaining).toBe(0);
     expect(state.staffCards.length).toBe(1);
@@ -243,7 +251,10 @@ describe('budget enforcement', () => {
       .toThrow(/No actions remaining/);
     expect(() => executeAction(state, { type: 'buy-business', cardId: state.market.cards[0].id, slotIndex: 0 }))
       .toThrow(/No actions remaining/);
-    expect(() => executeAction(state, { type: 'hire-staff', cardId: state.staffCardMarket[0].id }))
+    // Staff are in the market row or deck (CG-0MT3KZNQB0053K55)
+    const firstStaff = state.market.cards.find(c => c.family === 'staff')
+      ?? state.decks.staff.find(c => c.family === 'staff');
+    expect(() => executeAction(state, { type: 'hire-staff', cardId: firstStaff!.id }))
       .toThrow(/No actions remaining/);
   });
 });

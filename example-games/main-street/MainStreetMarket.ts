@@ -15,13 +15,17 @@
 import type { LegalityResult } from '../../src/rule-engine';
 import type { MainStreetState } from './MainStreetState';
 import { addLog } from './MainStreetState';
-import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard, StaffCard } from './MainStreetCards';
 import {
   GRID_SIZE,
   REFRESH_MARKET_COST,
   orderIncidentDeck,
 } from './MainStreetCards';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
+import {
+  computeRefreshCostDiscount,
+  getEmployedSpecializationSkills,
+} from './MainStreetStaffBuffs';
 import { refillSingleRowMarket } from './MainStreetState';
 import { resolveEvent } from './MainStreetEngine';
 
@@ -63,6 +67,16 @@ export function canPurchaseBusiness(
   const card = state.market.cards.find(c => c.id === cardId);
   if (!card) {
     return { legal: false, reason: 'Card not found in the market.' };
+  }
+
+  // Only business/community-space cards occupy street-grid slots. Staff are
+  // hired via the 'hire-staff' action (CG-0MT4WXNR80090FXZ grew the staff
+  // pool, so a bare cost check no longer keeps staff out of this action).
+  if (card.family !== 'business' && card.family !== 'community-space') {
+    return {
+      legal: false,
+      reason: `${card.name} cannot be placed on the street. Only business and community-space cards can be bought here.`,
+    };
   }
 
   // Check coins
@@ -222,7 +236,9 @@ export function refreshMarketCost(state: MainStreetState): number {
     (sum, card) => sum + (card.refreshCostDiscount ?? 0),
     0,
   );
-  return Math.max(0, REFRESH_MARKET_COST - discount);
+  // Negotiator specialization skill: -1 on refreshes (I4, CG-0MT4WXV2J000M35M).
+  const negotiatorDiscount = computeRefreshCostDiscount(getEmployedSpecializationSkills(state));
+  return Math.max(0, REFRESH_MARKET_COST - discount - negotiatorDiscount);
 }
 
 /**
@@ -250,6 +266,9 @@ export function refreshMarket(state: MainStreetState): RefreshResult {
       state.discards.upgrade.push(c as any);
     } else if (c.family === 'event') {
       state.discards.event.push(c as any);
+    } else if (c.family === 'staff') {
+      // Staff are a first-class market family (CG-0MT3KZNQB0053K55).
+      state.discards.staff.push(c as StaffCard);
     }
   }
 
@@ -293,6 +312,9 @@ export function cycleMarketCards(state: MainStreetState): void {
       state.discards.upgrade.push(card as UpgradeCard);
     } else if (card.family === 'event') {
       state.discards.event.push(card as EventCard);
+    } else if (card.family === 'staff') {
+      // Staff are a first-class market family (CG-0MT3KZNQB0053K55).
+      state.discards.staff.push(card as StaffCard);
     }
   }
 
@@ -420,6 +442,12 @@ export function moveToHand(state: MainStreetState, cardId: string): PurchaseResu
   if (!card) {
     throw new Error(`Card ${cardId} not found in the market.`);
   }
+  // Staff cards cannot be held in hand — they are hired directly from the
+  // market row (CG-0MT3KZNQB0053K55). Guard so a staff card in the row is
+  // never moved into the hand (the hand type excludes the staff family).
+  if (card.family === 'staff') {
+    throw new Error(`Staff card ${card.name} cannot be moved to hand — hire it directly.`);
+  }
 
   // Hand capacity is the only constraint; the move itself is free of coins.
   const handCheck = canAddToHand(state);
@@ -456,18 +484,25 @@ function validateHandIndex(state: MainStreetState, handIndex: number): AnyCard {
  * Plays a business/community-space card from the player's hand onto the
  * street grid, charging its listed cost at placement time
  * (CG-0MSTOATDT009BRX2 cost-at-play deferral model).
+ *
+ * @param premiumCost Optional premium price to charge instead of the listed
+ *                    `card.cost` (same-day composite buy-and-play when no
+ *                    action is available — CG-0MT24X0SX007RLHN). When absent,
+ *                    the listed cost is charged (held-card / plan-ahead path).
  */
 export function playBusinessFromHand(
   state: MainStreetState,
   handIndex: number,
   slotIndex: number,
+  premiumCost?: number,
 ): PurchaseResult {
   const card = validateHandIndex(state, handIndex);
   if (card.family !== 'business' && card.family !== 'community-space') {
     throw new Error(`Card at hand index ${handIndex} is not a business/community-space card.`);
   }
-  if (state.resourceBank.coins < card.cost) {
-    throw new Error(`Not enough coins to play ${card.name} from hand. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+  const price = premiumCost ?? card.cost;
+  if (state.resourceBank.coins < price) {
+    throw new Error(`Not enough coins to play ${card.name} from hand. Need ${price}, have ${state.resourceBank.coins}.`);
   }
   if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
     throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
@@ -476,14 +511,20 @@ export function playBusinessFromHand(
     throw new Error(`Slot ${slotIndex} is already occupied.`);
   }
 
-  state.resourceBank.coins -= card.cost;
+  state.resourceBank.coins -= price;
   state.hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card as BusinessCard;
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Played ${card.name} from hand into slot ${slotIndex} (-€${card.cost})`, 'loss');
+  addLog(
+    state,
+    premiumCost !== undefined
+      ? `Played ${card.name} from hand into slot ${slotIndex} (-€${price}, 50% premium)`
+      : `Played ${card.name} from hand into slot ${slotIndex} (-€${price})`,
+    'loss',
+  );
 
-  return { card, cost: card.cost, refilled: false };
+  return { card, cost: price, refilled: false };
 }
 
 /**
@@ -538,6 +579,7 @@ export function playUpgradeFromHand(
   }
   business.appliedUpgrades.push(upgrade.id);
   (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + upgrade.cost;
+  business.displayName = upgrade.newDisplayName || business.displayName;
   updateNeighborsOnPlacement(state, businessIndex);
 
   addLog(state, `Played upgrade ${upgrade.name} from hand onto ${business.name} (-€${upgrade.cost})`, 'loss');
@@ -657,6 +699,7 @@ export function purchaseUpgrade(
   }
   business.appliedUpgrades.push(card.id);
   (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + card.cost;
+  business.displayName = card.newDisplayName || business.displayName;
 
   // Recalculate the upgraded card's cached values (incomeBonus and reputationBonus changed)
   // Import is at top of file via updateNeighborsOnPlacement/updateNeighborsOnSale
@@ -803,24 +846,46 @@ export function getUpgradeBranchesForBusiness(
 // ── Staff Card Operations (Multi-Use Card Economy) ───────────
 
 /**
- * Purchases a staff card from the staff card market.
+ * Legality check for hiring a staff card from the general market row
+ * (CG-0MT3KZOBZ005IRYE). Staff cards are hired directly from the row;
+ * they are never moved to the hand.
+ *
+ * @param state  Current game state (read-only).
+ * @param cardId ID of the staff card in the market row.
+ * @returns LegalityResult indicating whether the hire is permitted.
+ */
+export function canPurchaseStaff(state: MainStreetState, cardId: string): LegalityResult {
+  const card = state.market.cards.find(c => c.id === cardId);
+  if (!card || card.family !== 'staff') {
+    return { legal: false, reason: `Staff card ${cardId} not found in the market row.` };
+  }
+  if (state.resourceBank.coins < card.cost) {
+    return { legal: false, reason: `Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.` };
+  }
+  return { legal: true };
+}
+
+/**
+ * Purchases a staff card from the general market row.
  * Deducts coins, adds the staff card to active staffCards[],
  * and increases maxHandSize by the card's handSlotsAdded.
  *
  * @param state  Current game state (mutated in-place).
- * @param cardId ID of the staff card in the staff card market.
- * @throws Error if the card is not found or player cannot afford it.
+ * @param cardId ID of the staff card in the market row.
+ * @throws Error if the card is not found (or not a staff card) or the player cannot afford it.
  */
 export function purchaseStaffCard(
   state: MainStreetState,
   cardId: string,
 ): void {
-  const marketIndex = state.staffCardMarket.findIndex(c => c.id === cardId);
-  if (marketIndex === -1) {
-    throw new Error(`Staff card ${cardId} not found in the market.`);
+  // Staff cards are part of the general market row (CG-0MT3KZNQB0053K55);
+  // resolve strictly against the row — an un-drawn staff card in the deck
+  // is not purchasable.
+  const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
+  const card = marketIndex !== -1 ? state.market.cards[marketIndex] : undefined;
+  if (!card || card.family !== 'staff') {
+    throw new Error(`Staff card ${cardId} not found in the market row.`);
   }
-
-  const card = state.staffCardMarket[marketIndex];
 
   if (state.resourceBank.coins < card.cost) {
     throw new Error(`Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.`);
@@ -830,7 +895,7 @@ export function purchaseStaffCard(
   state.resourceBank.coins -= card.cost;
 
   // Remove from market
-  state.staffCardMarket.splice(marketIndex, 1);
+  state.market.cards.splice(marketIndex, 1);
 
   // Add to active staff cards
   state.staffCards.push({ ...card });

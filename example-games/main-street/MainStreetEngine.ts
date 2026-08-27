@@ -17,11 +17,19 @@
 
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
-import type { EventCard, SynergyType } from './MainStreetCards';
-import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard, type BusinessCard } from './MainStreetCards';
+import type { BusinessCard, EventCard, SynergyType } from './MainStreetCards';
+import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard } from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
+import {
+  computeIncidentSkillBuffs,
+  computeReputationGainMultiplier,
+  computeStaffSalaryCost,
+  computeStreetOngoingCostReductionPct,
+  getEmployedSpecializationSkills,
+} from './MainStreetStaffBuffs';
+import { deserializeSkillIds, hasPeekCapableStaff } from './MainStreetStaffSkills';
 import {
   purchaseBusiness,
   moveToHand,
@@ -112,7 +120,7 @@ export interface BuyAndPlaceAction {
   slotIndex: number;
 }
 
-/** Hire a staff card from the staff market. */
+/** Hire a staff card from the general market row. */
 export interface HireStaffAction {
   type: 'hire-staff';
   cardId: string;
@@ -121,6 +129,22 @@ export interface HireStaffAction {
 /** End the current market/action phase. */
 export interface EndTurnAction {
   type: 'end-turn';
+}
+
+/**
+ * Staff peek skill (CG-0MSXOW6GN008ZSMN): reveal the top card of the
+ * face-down incident deck once per turn, as an action. The peeked card is
+ * returned face-down without being resolved.
+ */
+export interface PeekIncidentAction {
+  type: 'peek-incident-deck';
+}
+
+/** Community Favour action: exchange coins ↔ reputation. */
+export interface CommunityFavourAction {
+  type: 'community-favour';
+  /** Direction of the exchange. */
+  direction: 'coins-to-rep' | 'rep-to-coins';
 }
 
 /** Union of all player actions. */
@@ -136,6 +160,8 @@ export type PlayerAction =
   | BuyAndPlaceAction
   | HireStaffAction
   | PlayEventAction
+  | PeekIncidentAction
+  | CommunityFavourAction
   | EndTurnAction;
 
 // ── Turn Result ─────────────────────────────────────────────
@@ -162,7 +188,7 @@ export interface TurnResult {
 
 /**
  * Computes the final score.
- * Formula: coins + (reputation * reputationScoreMultiplier) + (challengesCompleted * challengeBonusPoints)
+ * Formula: coins + reputation + (challengesCompleted * challengeBonusPoints)
  */
 export function computeScore(state: MainStreetState): number {
   // Sync the ledger from resourceBank before reading, to ensure it reflects
@@ -171,7 +197,7 @@ export function computeScore(state: MainStreetState): number {
   // Use shared EconomyLedger for resource values
   return (
     state.ledger.get('coins') +
-    state.ledger.get('reputation') * state.config.reputationScoreMultiplier +
+    state.ledger.get('reputation') +
     state.challengesCompleted.length * state.config.challengeBonusPoints
   );
 }
@@ -273,6 +299,17 @@ export function executeAction(
       }
       return playEventFromHand(state, handIndex);
     }
+    case 'peek-incident-deck':
+      // Consumes one action and enforces the once-per-turn gate inside
+      // peekIncidentDeck. The peeked card is intentionally not surfaced
+      // through executeAction (PurchaseResult | null) — presentation is the
+      // scene layer's job via peekIncidentDeck directly.
+      peekIncidentDeck(state);
+      return null;
+    case 'community-favour': {
+      const result = executeCommunityFavour(state, action.direction);
+      return result;
+    }
     default:
       throw new Error(`Unknown action type: ${(action as PlayerAction).type}`);
   }
@@ -361,6 +398,19 @@ function computeDurationWithClinicReduction(
 }
 
 /**
+ * True for Incident events representing theft or loss of coins (targeted in
+ * the Security Consultant's immunity, I4). Matches on the incident's
+ * description, which is the stable design source (all incident descriptions
+ * in card-data.csv state their consequence explicitly).
+ */
+function isTheftLossIncident(event: EventCard): boolean {
+  return (
+    event.trigger === 'Incident' &&
+    (/\btheft\b/i.test(event.effect) || /\bloss(?:es)?\b/i.test(event.effect))
+  );
+}
+
+/**
  * Resolves a single event card's effects on the game state.
  *
  * DurationEventCards branch to ActiveEffect creation instead of applying
@@ -410,6 +460,27 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
   }
 
   // ── Regular EventCard resolution ────────────────────────────
+  // Staff specialization incident/rep buffs (I4, CG-0MT4WXV2J000M35M):
+  // damage reductions apply to Incident events only; the Brand Ambassador
+  // +50% gains multiplier applies to positive reputation deltas from both
+  // incidents and investments.
+  const employedSkills = getEmployedSpecializationSkills(state);
+  const repGainMultiplier = computeReputationGainMultiplier(employedSkills);
+  const incidentBuffs = event.trigger === 'Incident' ? computeIncidentSkillBuffs(employedSkills) : null;
+  const theftNeutralized =
+    incidentBuffs !== null && incidentBuffs.immuneToTheftLoss && isTheftLossIncident(event);
+  /** Effective coin delta after quality-inspector / security-consultant mitigation. */
+  const cDelta = (effect: number): number => {
+    if (theftNeutralized && effect < 0) return 0; // theft immunity: no coin loss
+    if (incidentBuffs === null || effect >= 0) return effect;
+    return effect + Math.abs(effect) * incidentBuffs.coinDamageReductionPct;
+  };
+  /** Effective reputation delta after brand-ambassador / compliance mitigation. */
+  const rDelta = (effect: number): number => {
+    if (effect > 0) return effect * repGainMultiplier;
+    if (incidentBuffs === null) return effect;
+    return Math.min(0, effect + incidentBuffs.reputationDamageReductionFlat);
+  };
   const rep = state.resourceBank.reputation;
   const cfg = state.config;
 
@@ -420,14 +491,14 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
         b => b !== null && b.synergyTypes.includes(event.targetSynergy as SynergyType),
       ).length;
       const rawDelta = event.coinDelta * matchCount;
-      state.resourceBank.coins += applyReputationMultiplier(rawDelta, rep, cfg);
-      state.resourceBank.reputation += event.reputationDelta;
+      state.resourceBank.coins += applyReputationMultiplier(cDelta(rawDelta), rep, cfg);
+      state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
     }
     case 'All': {
       // Apply to all -- direct delta on resource bank
-      state.resourceBank.coins += applyReputationMultiplier(event.coinDelta, rep, cfg);
-      state.resourceBank.reputation += event.reputationDelta;
+      state.resourceBank.coins += applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg);
+      state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
     }
     case 'RandomBusiness': {
@@ -438,9 +509,9 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
         // Consume RNG for deterministic selection (used in future milestones)
         const _targetIdx = Math.floor(state.rng() * placed.length);
         void _targetIdx;
-        state.resourceBank.coins += applyReputationMultiplier(event.coinDelta, rep, cfg);
+        state.resourceBank.coins += applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg);
       }
-      state.resourceBank.reputation += event.reputationDelta;
+      state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
     }
   }
@@ -527,6 +598,18 @@ export function resolveHeldInvestment(state: MainStreetState): EventCard | null 
  * incident is available.
  */
 export function resolveIncident(state: MainStreetState): EventCard | null {
+  // Risk Manager: -15% incident probability (I4, CG-0MT4WXV2J000M35M). When
+  // employed, each turn's incident draw is averted with probability
+  // probabilityReductionPct; the deck is untouched so the averted card
+  // resolves next turn. Consumes one main-RNG draw while employed
+  // (deterministic per seed).
+  const employed = getEmployedSpecializationSkills(state);
+  const incidentBuffs = computeIncidentSkillBuffs(employed);
+  if (incidentBuffs.probabilityReductionPct > 0 && state.rng() < incidentBuffs.probabilityReductionPct) {
+    addLog(state, 'Risk Manager averted today\'s incident.', 'neutral');
+    return null;
+  }
+
   // Deck exhausted: reshuffle incident cards back in from the event deck /
   // event discards (existing reshuffle convention).
   if (state.incidentDeck.length === 0) {
@@ -552,6 +635,137 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
   );
 
   return event;
+}
+
+// ── Community Favour (CG-0MSTOATDQ005XDET) ─────────────────
+
+/**
+ * Executes the Community Favour exchange.
+ *
+ * This is a **free** once-per-turn action available during MarketPhase.
+ * It does NOT consume `actionsRemaining` — it functions as a true fallback
+ * when the player cannot afford a market purchase.
+ *
+ * Exchange rates (per-difficulty via `state.config`):
+ *   - `coins-to-rep`: spends `favourCoinsToRepCost` coins for 1 reputation.
+ *   - `rep-to-coins`: spends `favourRepToCoinsRepCost` reputation for
+ *     `favourRepToCoinsCoinGain` coins.
+ *
+ * The round-trip is lossy (e.g. 2 coins → 1 rep → 1.5 coins on the default
+ * 2→3 rate), preventing infinite arbitrage.
+ *
+ * @param state   Current game state (mutated in-place).
+ * @param direction Exchange direction.
+ * @returns Always null — Community Favour is a pure resource exchange.
+ * @throws Error if the exchange is illegal (wrong phase, gate used,
+ *         insufficient funds, game over).
+ */
+export function executeCommunityFavour(
+  state: MainStreetState,
+  direction: 'coins-to-rep' | 'rep-to-coins',
+): null {
+  if (state.gameResult !== 'playing') {
+    throw new Error('Game is over. No more actions allowed.');
+  }
+  if (state.phase !== 'MarketPhase') {
+    throw new Error(`Cannot perform Community Favour during ${state.phase}. Must be in MarketPhase.`);
+  }
+  if (state.favourUsedThisTurn) {
+    throw new Error('You have already used Community Favour this turn.');
+  }
+
+  // Sync the ledger from resourceBank before validating so the exchange
+  // sees any direct resourceBank mutations (mirrors computeScore).
+  syncResourceBankToLedger(state);
+
+  const config = state.config;
+
+  if (direction === 'coins-to-rep') {
+    const cost = config.favourCoinsToRepCost;
+    if (state.ledger.get('coins') < cost) {
+      throw new Error(
+        `Not enough coins for Community Favour (coins-to-rep). Need ${cost}, have ${state.ledger.get('coins')}.`,
+      );
+    }
+    state.resourceBank.coins -= cost;
+    state.resourceBank.reputation += 1;
+    addLog(state, `Community Favour: spent ${cost} coins for 1 reputation.`, 'neutral');
+  } else {
+    // rep-to-coins
+    const repCost = config.favourRepToCoinsRepCost;
+    const coinGain = config.favourRepToCoinsCoinGain;
+    if (state.ledger.get('reputation') < repCost) {
+      throw new Error(
+        `Not enough reputation for Community Favour (rep-to-coins). Need ${repCost}, have ${state.ledger.get('reputation')}.`,
+      );
+    }
+    state.resourceBank.reputation -= repCost;
+    state.resourceBank.coins += coinGain;
+    addLog(state, `Community Favour: spent ${repCost} reputation for ${coinGain} coins.`, 'neutral');
+  }
+
+  // Sync the ledger so the exchange is visible to other engine systems.
+  syncResourceBankToLedger(state);
+
+  state.favourUsedThisTurn = true;
+  return null;
+}
+
+// ── Staff Peek Skill (CG-0MSXOW6GN008ZSMN) ─────────────────
+
+/**
+ * Staff peek skill: reveals the top card of the face-down incident deck
+ * once per turn, as an action, and returns it face-down without resolving
+ * it.
+ *
+ * Requirements (all enforced):
+ * - Game still in progress and phase is MarketPhase.
+ * - An employed staff member carries the `peekOncePerTurn` ability.
+ * - The once-per-turn gate (`state.peekUsedThisTurn`) is not yet used.
+ * - At least one daily action remains (the peek consumes one action).
+ *
+ * The deck is NOT mutated — the peeked card stays on top (face-down return)
+ * and nothing is resolved (no resource changes, no draw history, no
+ * Incident log). The revealed card is exposed via `state.revealedPeekedCard`
+ * for the scene to render face-up (AC2); the scene clears the field after
+ * the reveal. Returns null (consuming nothing) when the deck is empty.
+ *
+ * @param state Current game state (mutated in-place: action + gate).
+ * @returns The top EventCard of the incident deck, or null if the deck is
+ *          empty.
+ * @throws Error if the peek is illegal (no peek staff, gate used, no
+ *         actions, wrong phase, game over).
+ */
+export function peekIncidentDeck(state: MainStreetState): EventCard | null {
+  if (state.gameResult !== 'playing') {
+    throw new Error('Game is over. No more actions allowed.');
+  }
+  if (state.phase !== 'MarketPhase') {
+    throw new Error(`Cannot peek during ${state.phase}. Must be in MarketPhase.`);
+  }
+  const hasPeekStaff = hasPeekCapableStaff(state);
+  if (!hasPeekStaff) {
+    throw new Error('No staff member with the peek ability is employed.');
+  }
+  if (state.peekUsedThisTurn) {
+    throw new Error('You have already peeked at the incident deck this turn.');
+  }
+  if (state.actionsRemaining <= 0) {
+    throw new Error('No actions remaining today. End your turn to start a new day.');
+  }
+  // Nothing to peek: no-op (no action consumed, gate stays closed).
+  if (state.incidentDeck.length === 0) return null;
+
+  state.actionsRemaining -= 1;
+  state.peekUsedThisTurn = true;
+  addLog(state, 'Peeked at the top card of the incident deck.', 'neutral');
+
+  // Reveal-only: expose the top card to the scene via `revealedPeekedCard`
+  // (AC2) and return it without removing it from the deck. The scene
+  // renders the face-up reveal, then clears the field.
+  const peeked = state.incidentDeck[0];
+  state.revealedPeekedCard = peeked;
+  return peeked;
 }
 
 // ── Win/Loss Detection ──────────────────────────────────────
@@ -686,9 +900,21 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   addLog(state, `Turn ${state.turn}`, 'turn-header');
 
   // Action economy: reset daily action budget.
-  // Base 1 action + sum of actionsPerTurn from employed staff cards.
+  // Base 1 action + sum of actionsPerTurn from employed staff + banked actions (capped at 2).
   const gmBonus = (state.staffCards ?? []).reduce((sum, card) => sum + (card.actionsPerTurn ?? 0), 0);
-  state.actionsRemaining = 1 + gmBonus;
+  // Defensive clamp: banking never exceeds the cap (2) at day end, but a
+  // malformed/legacy save could carry a higher value — cap the day budget
+  // contribution explicitly (AC3, CG-0MT3IOPZB005LNAR).
+  const banked = Math.min(2, state.bankedActions ?? 0);
+  state.actionsRemaining = 1 + gmBonus + banked;
+
+  // Staff peek gate (CG-0MSXOW6GN008ZSMN): exactly one peek per turn.
+  state.peekUsedThisTurn = false;
+  // Clear any pending peek reveal — a new day starts with a clean slate.
+  state.revealedPeekedCard = null;
+
+  // Community Favour gate (CG-0MSTOATDQ005XDET): one resource exchange per turn.
+  state.favourUsedThisTurn = false;
 
   state.phase = 'MarketPhase';
 }
@@ -743,6 +969,9 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // Apply community space ongoing costs (reputation-asset cards, e.g. Library)
   applyCommunitySpaceOngoingCosts(state);
 
+  // Apply business card ongoing costs (held in hand or placed on grid)
+  applyBusinessOngoingCosts(state);
+
   // Phase: IncidentPhase
   state.phase = 'IncidentPhase';
   // Capture the incident's own resource deltas (negative = loss) for the
@@ -789,6 +1018,14 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // If game continues, advance to next turn
   if (state.gameResult === 'playing') {
     state.turn += 1;
+
+    // ── Action Banking (CG-0MT3IOPZB005LNAR) ─────────────
+    // Bank unused base actions (at most 1 per day) up to the cap of 2.
+    // Staff-derived actions (e.g. General Manager +1) never bank;
+    // only the base-action portion remains bankable.
+    const bankable = Math.min(state.actionsRemaining, 1);
+    state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
+
     state.phase = 'DayStart';
   }
 
@@ -838,15 +1075,20 @@ export function executeFullTurn(
  * Places a card from the player's hand onto an empty tableau slot.
  * Costs 80% of the card's purchase price.
  *
- * @param state      Current game state (mutated in-place).
- * @param handIndex  Index of the card in state.hand to place.
- * @param slotIndex  Target street grid slot (0-based, must be empty).
+ * @param state       Current game state (mutated in-place).
+ * @param handIndex   Index of the card in state.hand to place.
+ * @param slotIndex   Target street grid slot (0-based, must be empty).
+ * @param premiumCost Optional premium price to charge instead of the listed
+ *                    `card.cost` (same-day composite buy-and-play when no
+ *                    action is available — CG-0MT24X0SX007RLHN). When absent,
+ *                    the listed cost is charged (held-card / plan-ahead path).
  * @throws Error if the hand index is invalid, slot is occupied, or coins insufficient.
  */
 export function placeFromHand(
   state: MainStreetState,
   handIndex: number,
   slotIndex: number,
+  premiumCost?: number,
 ): void {
   const hand = state.hand ?? [];
 
@@ -873,11 +1115,14 @@ export function placeFromHand(
   }
 
   // Cost-at-play (CG-0MSTOATDT009BRX2): moving a card to hand is free, but
-  // placing it on the street pays its listed cost.
-  if (state.resourceBank.coins < card.cost) {
-    throw new Error(`Not enough coins to place ${card.name}. Need ${card.cost}, have ${state.resourceBank.coins}.`);
+  // placing it on the street pays its listed cost (or the optional premium
+  // price for same-day composite buy-and-play when no action is available,
+  // CG-0MSTOF1N5005PK2R / CG-0MT24X0SX007RLHN).
+  const price = premiumCost ?? card.cost;
+  if (state.resourceBank.coins < price) {
+    throw new Error(`Not enough coins to place ${card.name}. Need ${price}, have ${state.resourceBank.coins}.`);
   }
-  state.resourceBank.coins -= card.cost;
+  state.resourceBank.coins -= price;
 
   // Remove from hand and place on tableau
   hand.splice(handIndex, 1);
@@ -886,7 +1131,13 @@ export function placeFromHand(
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Placed ${card.name} from hand in slot ${slotIndex} (-€${card.cost})`, 'loss');
+  addLog(
+    state,
+    premiumCost !== undefined
+      ? `Placed ${card.name} from hand in slot ${slotIndex} (-€${price}, 50% premium)`
+      : `Placed ${card.name} from hand in slot ${slotIndex} (-€${price})`,
+    'loss',
+  );
 }
 
 /**
@@ -982,11 +1233,15 @@ export function sellFromTableau(
  * given tableau slot without mutating state.
  *
  * Validates hand bounds, slot bounds, slot occupancy, and coin sufficiency
- * (a card can only be placed if the player can afford its purchase price).
+ * (a card can only be placed if the player can afford its purchase price —
+ * or the optional premium price for same-day composite buy-and-play).
  *
  * @param state      Current game state (read-only).
  * @param handIndex  Index of the card in state.hand to place.
  * @param slotIndex  Target street grid slot (0-based, must be empty).
+ * @param premiumCost Optional premium price to check affordability against
+ *                    instead of the listed `card.cost` (same-day composite
+ *                    premium path — CG-0MT24X0SX007RLHN).
  * @returns LegalityResult — `{ legal: true }` if valid, otherwise
  *          `{ legal: false, reason }` describing the violation.
  */
@@ -994,6 +1249,7 @@ export function canPlaceFromHand(
   state: MainStreetState,
   handIndex: number,
   slotIndex: number,
+  premiumCost?: number,
 ): import('../../src/rule-engine').LegalityResult {
   const hand = state.hand ?? [];
 
@@ -1019,9 +1275,10 @@ export function canPlaceFromHand(
     return { legal: false, reason: `Slot ${slotIndex} is already occupied.` };
   }
 
-  // Check coin sufficiency
-  if (state.resourceBank.coins < card.cost) {
-    return { legal: false, reason: `Insufficient coins to place ${card.name}: need ${card.cost}, have ${state.resourceBank.coins}.` };
+  // Check coin sufficiency against the applicable price (listed or premium)
+  const price = premiumCost ?? card.cost;
+  if (state.resourceBank.coins < price) {
+    return { legal: false, reason: `Insufficient coins to place ${card.name}: need ${price}, have ${state.resourceBank.coins}.` };
   }
 
   return { legal: true };
@@ -1139,10 +1396,18 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
   const staffCards = state.staffCards ?? [];
   if (staffCards.length === 0) return;
 
+  const employed = getEmployedSpecializationSkills(state);
+  // Cost Cutter: -15% street-wide ongoing costs (AC7 flagged for extra
+  // balance testing). Applied to every ongoing deduction family uniformly.
+  const streetReduction = computeStreetOngoingCostReductionPct(employed);
+
   let totalCost = 0;
   for (const card of staffCards) {
-    totalCost += card.ongoingCost;
+    // Operations Manager: -0.5 of THIS member's own salary (computeStaffSalaryCost).
+    const memberSkills = Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [];
+    totalCost += computeStaffSalaryCost(memberSkills, card.ongoingCost);
   }
+  totalCost *= 1 - streetReduction;
 
   if (totalCost > 0) {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
@@ -1169,6 +1434,8 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
 export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
   const grid = state.streetGrid;
 
+  const streetReduction = computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state));
+
   let totalCost = 0;
   let spaceCount = 0;
   for (const slot of grid) {
@@ -1179,6 +1446,7 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
       spaceCount += 1;
     }
   }
+  totalCost *= 1 - streetReduction;
   if (spaceCount === 0) return;
 
   if (totalCost > 0) {
@@ -1189,6 +1457,60 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
     }
     if (actualDeduction < totalCost) {
       addLog(state, `Insufficient coins for community space costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
+    }
+  }
+}
+
+/**
+ * Applies ongoing costs for business cards each turn.
+ * Deducts each business card's `ongoingCost` (e.g. 0.5 coins/turn) from coins,
+ * for every business card held in hand OR placed on the street grid.
+ * If coins are insufficient, deducts what's available (down to 0).
+ *
+ * Mirrors {@link applyStaffOngoingCosts} and {@link applyCommunitySpaceOngoingCosts}
+ * clamping/log conventions.
+ *
+ * @param state  Current game state (mutated in-place).
+ */
+export function applyBusinessOngoingCosts(state: MainStreetState): void {
+  let totalCost = 0;
+  let bizCount = 0;
+
+  // Sum ongoing costs from business cards in hand
+  const hand = state.hand ?? [];
+  for (const card of hand) {
+    if (card.family !== 'business') continue;
+    const cost = (card as BusinessCard).ongoingCost ?? 0;
+    if (cost > 0) {
+      totalCost += cost;
+      bizCount += 1;
+    }
+  }
+
+  // Sum ongoing costs from business cards on the street grid
+  const grid = state.streetGrid;
+  for (const slot of grid) {
+    if (!slot || slot.family !== 'business') continue;
+    const cost = (slot as BusinessCard).ongoingCost ?? 0;
+    if (cost > 0) {
+      totalCost += cost;
+      bizCount += 1;
+    }
+  }
+
+  if (bizCount === 0) return;
+
+  // Cost Cutter: -15% street-wide ongoing costs (I4).
+  totalCost *= 1 - computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state));
+
+  if (totalCost > 0) {
+    const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
+    state.resourceBank.coins -= actualDeduction;
+    if (actualDeduction > 0) {
+      addLog(state, `Business costs: -${actualDeduction} coins (${bizCount} businesses)`, 'loss');
+    }
+    if (actualDeduction < totalCost) {
+      addLog(state, `Insufficient coins for business costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
     }
   }
 }
@@ -1249,8 +1571,8 @@ export function layoffStaffCard(
     addLog(state, `Laid off ${card.name}: no hand cards to remove`, 'neutral');
   }
 
-  // Return the staff card to the market
-  state.staffCardMarket.push({ ...card });
+  // Return the staff card to discards.staff for the general market pipeline (CG-0MT3KZNQB0053K55).
+  state.discards.staff.push({ ...card });
 }
 
 // ── Action Economy (CG-0MSTOF1N5005PK2R) ────────────────────
@@ -1261,11 +1583,16 @@ export function layoffStaffCard(
  * listed cost (CG-0MSTOF1N5005PK2R). Consumes one daily action.
  *
  * Premium pricing: `Math.ceil(cost * 1.5 * 2) / 2` — the listed cost × 1.5,
- * rounded up to the nearest 0.5 (e.g. 3 → 4.5, 7 → 10.5).
+ * rounded up to the nearest 0.5 (e.g. 3 → 4.5, 7 → 10.5). When
+ * `premiumCost` is supplied (Golden Mile 2-action days, where the
+ * equivalent composite placement consumes an action at listed cost —
+ * CG-0MT24X0SX007RLHN), that price replaces the premium.
  *
- * @param state     Current game state (mutated in-place).
- * @param cardId    ID of the card in the market.
- * @param slotIndex Target street grid slot (0-based).
+ * @param state       Current game state (mutated in-place).
+ * @param cardId      ID of the card in the market.
+ * @param slotIndex   Target street grid slot (0-based).
+ * @param priceOverride Optional price to charge instead of the +50% premium
+ *                      (listed cost for GM parity; unset → premium default).
  * @returns PurchaseResult on success.
  * @throws Error if the action is illegal.
  */
@@ -1273,6 +1600,7 @@ export function buyAndPlaceBusiness(
   state: MainStreetState,
   cardId: string,
   slotIndex: number,
+  priceOverride?: number,
 ): PurchaseResult {
   const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
   if (marketIndex === -1) {
@@ -1280,7 +1608,7 @@ export function buyAndPlaceBusiness(
   }
 
   const card = state.market.cards[marketIndex];
-  if (card.family === 'upgrade' || card.family === 'event') {
+  if (card.family !== 'business' && card.family !== 'community-space') {
     throw new Error('Buy-and-place only applies to business and community-space cards.');
   }
   if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
@@ -1291,37 +1619,40 @@ export function buyAndPlaceBusiness(
   }
 
   const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-  if (state.resourceBank.coins < premiumCost) {
-    throw new Error(`Not enough coins to buy-and-place ${card.name}. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
+  const price = priceOverride ?? premiumCost;
+  if (state.resourceBank.coins < price) {
+    throw new Error(`Not enough coins to buy-and-place ${card.name}. Need ${price}, have ${state.resourceBank.coins}.`);
   }
 
-  state.resourceBank.coins -= premiumCost;
+  state.resourceBank.coins -= price;
   state.market.cards.splice(marketIndex, 1);
   state.streetGrid[slotIndex] = card as BusinessCard;
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Bought & placed ${card.name} in slot ${slotIndex} (-€${premiumCost}, 50% premium)`, 'loss');
+  addLog(state, `Bought & placed ${card.name} in slot ${slotIndex} (-€${price}, ${price === premiumCost ? '50% premium' : 'listed'})`, 'loss');
 
-  return { card, cost: premiumCost, refilled: false };
+  return { card, cost: price, refilled: false };
 }
 
 /**
- * Hires a staff card from the staff market (CG-0MSTOF1N5005PK2R).
+ * Hires a staff card from the general market row (CG-0MSTOF1N5005PK2R).
  * Consumes one daily action; delegates to purchaseStaffCard for the
  * coin deduction and hand-size mechanics.
  *
  * @param state  Current game state (mutated in-place).
- * @param cardId ID of the staff card in the staff market.
+ * @param cardId ID of the staff card in the general market row.
  * @returns PurchaseResult describing the hire.
  * @throws Error if the card is not found or player cannot afford it.
  */
 export function hireStaffCard(state: MainStreetState, cardId: string): PurchaseResult {
-  const marketIndex = state.staffCardMarket.findIndex(c => c.id === cardId);
-  const card = state.staffCardMarket[marketIndex];
-  if (!card) {
-    throw new Error(`Staff card ${cardId} not found in the market.`);
+  // Staff cards are part of the general market row (CG-0MT3KZNQB0053K55):
+  // resolve strictly against the row and delegate to the unified purchase.
+  const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
+  const card = marketIndex !== -1 ? state.market.cards[marketIndex] : undefined;
+  if (!card || card.family !== 'staff') {
+    throw new Error(`Staff card ${cardId} not found in the market row.`);
   }
   purchaseStaffCard(state, cardId);
   return { card, cost: card.cost, refilled: false };

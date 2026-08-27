@@ -66,8 +66,9 @@ import { STANDARD_TUTORIAL_SCENARIO } from '../TutorialScenario';
  *   - hand           (266, 620, 288, 80) — centred on handCenterX (410), max
  *                                          3 cards (3×140 + 16 gap)
  *   - endTurnButton  (1116, 652, 140, 34) — gameW-24-140, actionY + 4
- *   - incidentQueue  (960, 408, 300, 194) — queueTop, boot-time panel (2 cards,
- *                                         0 active effects: 22+8+156+8)
+ *   - incidentQueue  (960, 408, 300, 125) — queueTop, boot-time panel (one
+ *     face-down deck stack + count, CG-0MSXOWLHU0099QF6; 0 active effects:
+ *     22+8+87+8)
  *   - helpButton     (1000, 652, 104, 34) — to the left of End Turn
  * The challengePanel highlight is computed DYNAMICALLY from the live state in
  * `zoneToAnchor` (challengeY + panel height from activeChallenges) because the

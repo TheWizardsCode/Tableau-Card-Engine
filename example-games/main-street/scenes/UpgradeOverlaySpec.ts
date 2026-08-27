@@ -147,9 +147,11 @@ export function buildUpgradeOverlaySpec(
   // Name overlay: top centre, only for upgraded cards to highlight the new name
   // Container origin is at card centre, so x=0 is horizontal centre
   // and y = -height/2 + 16 places the top edge near the card's top.
+  // Uses displayName (set by purchaseUpgrade/playUpgradeFromHand) when present,
+  // falling back to the base name for legacy/uncleaned state.
   const nameText: OverlayTextSpec | null = isUpgraded
     ? {
-        text: biz.name,
+        text: biz.displayName ?? biz.name,
         x: 0,
         y: Math.round(-height / 2 + 16),
         fontSize: '10px',

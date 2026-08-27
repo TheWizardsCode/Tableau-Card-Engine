@@ -74,8 +74,6 @@ export interface GameConfig extends DifficultyConfig {
   // ── Scoring ─────────────────────────────────────────────
   /** Score required for a win via score threshold. */
   readonly winThreshold: number;
-  /** Multiplier applied to reputation in final score. */
-  readonly reputationScoreMultiplier: number;
   /** Points awarded per completed challenge. */
   readonly challengeBonusPoints: number;
 
@@ -116,15 +114,35 @@ export interface GameConfig extends DifficultyConfig {
    *   multiplier = 1 + (reputation / reputationCoinDivisor)
    *
    * Higher values make reputation less impactful on coin rewards.
-   * Default 20 means rep=20 yields a 2x multiplier.
+   * Default 80 (CG-0MT3J80HV0084IF1: quartered from 20) means rep=20
+   * yields a 1.25x multiplier.
    */
   readonly reputationCoinDivisor: number;
   /**
    * Maximum value the reputation coin multiplier can reach.
    * Prevents runaway scaling in long or lucky games.
-   * Default 3.0 means coin rewards can at most triple.
+   * Default 1.5 (CG-0MT3J80HV0084IF1: scaled from 3.0) means coin
+   * rewards can at most grow 1.5x — the cap still bites at rep=40.
    */
   readonly maxReputationCoinMultiplier: number;
+
+  // ── Community Favour ────────────────────────────────────
+  /**
+   * Coins consumed to gain 1 reputation via Community Favour.
+   * Default 2 (2 coins → 1 rep).
+   */
+  readonly favourCoinsToRepCost: number;
+  /**
+   * Reputation consumed to gain coins via Community Favour.
+   * Default 2 (2 rep → N coins, where N = favourRepToCoinsCoinGain).
+   */
+  readonly favourRepToCoinsRepCost: number;
+  /**
+   * Coins gained when spending reputation via Community Favour.
+   * Default 3 (2 rep → 3 coins). Round-trip is lossy,
+   * preventing infinite arbitrage.
+   */
+  readonly favourRepToCoinsCoinGain: number;
 }
 
 // ── Preset Definitions ──────────────────────────────────────
@@ -138,8 +156,7 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Easy',
   startingCoins: 10,
   startingReputation: 5,
-  winThreshold: 120,
-  reputationScoreMultiplier: 5,
+  winThreshold: 100,
   challengeBonusPoints: 15,
   synergyBonusPerNeighbor: 0.5,
   challengesPerRun: 2,
@@ -148,8 +165,12 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   // repeats, calmer variety; standard bad-run protection (M=2).
   incidentRepeatSpacing: 4,
   incidentMaxStreak: 2,
-  reputationCoinDivisor: 20,
-  maxReputationCoinMultiplier: 3.0,
+  reputationCoinDivisor: 80,
+  maxReputationCoinMultiplier: 1.5,
+  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  favourCoinsToRepCost: 2,
+  favourRepToCoinsRepCost: 2,
+  favourRepToCoinsCoinGain: 3,
 };
 
 /**
@@ -161,8 +182,7 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Medium',
   startingCoins: 6,
   startingReputation: 3,
-  winThreshold: 150,
-  reputationScoreMultiplier: 5,
+  winThreshold: 120,
   challengeBonusPoints: 10,
   synergyBonusPerNeighbor: 0.35,
   challengesPerRun: 3,
@@ -173,8 +193,12 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   // "Medium = original hard-coded constants" backward-compat invariant.
   incidentRepeatSpacing: 3,
   incidentMaxStreak: 2,
-  reputationCoinDivisor: 20,
-  maxReputationCoinMultiplier: 3.0,
+  reputationCoinDivisor: 80,
+  maxReputationCoinMultiplier: 1.5,
+  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  favourCoinsToRepCost: 2,
+  favourRepToCoinsRepCost: 2,
+  favourRepToCoinsCoinGain: 3,
 };
 
 /**
@@ -186,8 +210,7 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Hard',
   startingCoins: 4,
   startingReputation: 2,
-  winThreshold: 180,
-  reputationScoreMultiplier: 5,
+  winThreshold: 150,
   challengeBonusPoints: 8,
   synergyBonusPerNeighbor: 0.25,
   challengesPerRun: 4,
@@ -198,8 +221,12 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   // "longer good streaks on Hard" profile.
   incidentRepeatSpacing: 2,
   incidentMaxStreak: 3,
-  reputationCoinDivisor: 20,
-  maxReputationCoinMultiplier: 3.0,
+  reputationCoinDivisor: 80,
+  maxReputationCoinMultiplier: 1.5,
+  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  favourCoinsToRepCost: 2,
+  favourRepToCoinsRepCost: 2,
+  favourRepToCoinsCoinGain: 3,
 };
 
 // ── Preset Registry ─────────────────────────────────────────
@@ -254,11 +281,14 @@ export const DIFFICULTY_NAMES: readonly DifficultyName[] = ['Easy', 'Medium', 'H
  * baseline (no reward lost). The multiplier is capped to prevent
  * runaway scaling in long or lucky games.
  *
+ * (CG-0MT3J80HV0084IF1: divisor 20→80 and cap 3.0→1.5 quarter the
+ * additive bonus above the 1.0x baseline.)
+ *
  * - reputation=0  -> 1.0x (baseline preserved)
- * - reputation=10 -> 1.5x (with divisor=20)
- * - reputation=20 -> 2.0x
- * - reputation=40 -> 3.0x (capped at maxMultiplier=3.0)
- * - reputation=60 -> 3.0x (capped)
+ * - reputation=10 -> 1.125x (with divisor=80)
+ * - reputation=20 -> 1.25x
+ * - reputation=40 -> 1.5x (capped at maxMultiplier=1.5)
+ * - reputation=60 -> 1.5x (capped)
  *
  * Negative reputation clamps the multiplier at 1.0 (no penalty via
  * this channel -- reputation collapse is handled elsewhere).

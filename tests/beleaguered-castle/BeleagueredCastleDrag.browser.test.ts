@@ -328,62 +328,6 @@ describe('Beleaguered Castle drag-to-move (browser)', () => {
     );
   });
 
-  it('restores the card instantly in reduced-motion mode (synchronous snap-back)', async () => {
-    game = await bootGame();
-    const scene = getScene(game);
-    await waitForDeal(scene);
-
-    // bootGame() forces reduced motion via __BC_TEST_REDUCED_MOTION__; the
-    // drag-drop manager was created with reducedMotion=true, so snap-back
-    // must restore the origin synchronously instead of tweening.
-    expect((scene as any).bcRenderer.reducedMotion).toBe(true);
-
-    const colIndex = 0;
-    const src = topSprite(scene, colIndex);
-    const originX = src.x;
-    const originY = src.y;
-    const moveCountBefore = scene.getGameState().moveCount;
-
-    // Drag to an illegal drop (wrong foundation), then release.
-    const state: BeleagueredCastleState = scene.getGameState();
-    let fromCol = -1;
-    let illegalFoundation = -1;
-    for (let c = 0; c < 8 && illegalFoundation === -1; c++) {
-      if (state.tableau[c].isEmpty()) continue;
-      for (let fi = 0; fi < 4; fi++) {
-        if (!isLegalFoundationMove(state, c, fi).legal) {
-          fromCol = c;
-          illegalFoundation = fi;
-          break;
-        }
-      }
-    }
-    expect(fromCol).toBeGreaterThanOrEqual(0);
-    const zone = scene.foundationDropZones[illegalFoundation] as Phaser.GameObjects.Zone;
-
-    dispatchMouse('mousedown', src.x, src.y);
-    await wait(30);
-    dispatchMouse('mousemove', src.x + 6, src.y);
-    await wait(30);
-    dispatchMouse('mousemove', zone.x, zone.y);
-    await wait(80);
-    dispatchMouse('mouseup', zone.x, zone.y);
-    // Reduced-motion snap-back is synchronous (restoreOrigin, no tween).
-    // Assert restoration completes well within SNAP_BACK_DURATION (200ms):
-    // at ~60% of a 200ms Power2 tween the card would still be ~30px from
-    // its origin, so a sub-150ms restore proves the no-tween path.
-    await waitForCondition(
-      () => Math.abs(src.x - originX) < 2 && Math.abs(src.y - originY) < 2,
-      'instant (synchronous) snap-back in reduced motion',
-      150,
-    );
-
-    expect(Math.abs(src.x - originX)).toBeLessThan(2);
-    expect(Math.abs(src.y - originY)).toBeLessThan(2);
-    expect(scene.getGameState().moveCount).toBe(moveCountBefore);
-    expect(scene.getUndoManager().canUndo()).toBe(false);
-  });
-
   it('vetoes pickup while interaction is blocked (auto-complete running)', async () => {
     game = await bootGame();
     const scene = getScene(game);

@@ -55,14 +55,14 @@ interface NewEventContract {
 }
 
 const NEW_EVENT_CONTRACTS: NewEventContract[] = [
-  { id: 'evt-health-carnival', name: 'Health Carnival', cost: 5, tier: '3', targetSynergy: 'Health', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-food-tasting', name: 'Food Tasting Tour', cost: 5, tier: '3', targetSynergy: 'Food', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-art-sale', name: 'Art Sale', cost: 5, tier: '3', targetSynergy: 'Culture', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-shopping-spree', name: 'Shopping Spree', cost: 7, tier: '4', targetSynergy: 'Commerce', coinDelta: 2.5, reputationDelta: 0 },
-  { id: 'evt-summer-fest', name: 'Summer Fest', cost: 7, tier: '4', targetSynergy: 'Entertainment', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-service-week', name: 'Service Week', cost: 7, tier: '4', targetSynergy: 'Service', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-tourist-season', name: 'Tourist Season', cost: 10, tier: '5', coinDelta: 0, reputationDelta: 0, duration: 3, effectType: 'income-multiplier', multiplier: 1.15 },
-  { id: 'evt-community-renovation', name: 'Community Renovation', cost: 10, tier: '5', coinDelta: 0, reputationDelta: 0, duration: 4, effectType: 'rep-multiplier', multiplier: 1.2 },
+  { id: 'evt-health-carnival', name: 'Health Carnival', cost: 5, tier: '7', targetSynergy: 'Health', coinDelta: 2, reputationDelta: 1 },
+  { id: 'evt-food-tasting', name: 'Food Tasting Tour', cost: 5, tier: '7', targetSynergy: 'Food', coinDelta: 2, reputationDelta: 1 },
+  { id: 'evt-art-sale', name: 'Art Sale', cost: 5, tier: '7', targetSynergy: 'Culture', coinDelta: 2, reputationDelta: 1 },
+  { id: 'evt-shopping-spree', name: 'Shopping Spree', cost: 7, tier: '8', targetSynergy: 'Commerce', coinDelta: 2.5, reputationDelta: 0 },
+  { id: 'evt-summer-fest', name: 'Summer Fest', cost: 7, tier: '8', targetSynergy: 'Entertainment', coinDelta: 2, reputationDelta: 1 },
+  { id: 'evt-service-week', name: 'Service Week', cost: 7, tier: '8', targetSynergy: 'Service', coinDelta: 2, reputationDelta: 1 },
+  { id: 'evt-tourist-season', name: 'Tourist Season', cost: 10, tier: '12', coinDelta: 0, reputationDelta: 0, duration: 3, effectType: 'income-multiplier', multiplier: 1.15 },
+  { id: 'evt-community-renovation', name: 'Community Renovation', cost: 10, tier: '12', coinDelta: 0, reputationDelta: 0, duration: 4, effectType: 'rep-multiplier', multiplier: 1.2 },
 ];
 
 function findTemplate<T extends EventCard>(cards: readonly T[], id: string): T | undefined {
@@ -165,6 +165,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     ...overrides,
   };

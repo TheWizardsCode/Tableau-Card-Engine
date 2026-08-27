@@ -257,7 +257,9 @@ describe('Park reclassification to community-space (AC4)', () => {
     // These stats should remain unchanged from original business card
     expect(park!.cost).toBe(3);
     expect(park!.baseIncome).toBe(0);
-    expect(park!.synergyTypes).toEqual(['Culture']);
+    // Synergy rebalanced Culture -> Entertainment (CG-0MT3IPFSF005KEFB):
+    // Park's "leisure space" flavour now feeds the Entertainment type.
+    expect(park!.synergyTypes).toEqual(['Entertainment']);
     expect(park!.maxLevel).toBe(1);
   });
 

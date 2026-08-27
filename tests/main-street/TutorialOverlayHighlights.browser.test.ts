@@ -13,17 +13,20 @@
  * highlight zones must match these targets, otherwise the highlights land on
  * empty space instead of on their target element.
  *
- * Unified step mapping for the alignment checks (17 steps):
+ * * Unified step mapping for the alignment checks (23 steps, two-turn flow):
  *   T2 (developmentRow, index 1)  T3 (laundromatCard, index 2)
- *   T4 (hand, index 3)  T5 (streetGrid, index 4)
- *   T6 (incidentQueue, index 5)  T7 (endTurnButton, index 6)
+ *   T4 (hand, index 3)  T5 (incidentQueue, index 4)
+ *   T6 (endTurnButton, index 5)  T7 (streetGrid, index 6)
  *   T8 (investmentsRow, index 7)  T9 (festivalCard, index 8)  ← T8's
  *     investmentsRow highlight now aliases the SINGLE market row
  *     (CG-0MSTOATDT009BRX2 — the two market rows were merged)
- *   T10 (developmentRow, index 9)  T11 (endTurnButton, index 10)
- *   T12 (developmentRow, index 11)  T13 (developmentRow, index 12)
- *   T14 (hand, index 13)  T15 (hud, index 14)
- *   T16 (challengePanel, index 15)  T17 (completionModal, index 16)
+ *   T10 (endTurnButton, index 9)  T11 (developmentRow, index 10 — Bookshop move)
+ *   T12 (developmentRow, index 11)  T13 (actionButtons, index 12)
+ *   T14 (endTurnButton, index 13)  T15 (streetGrid, index 14 — Bookshop place)
+ *   T16 (endTurnButton, index 15)  T17 (developmentRow, index 16 — Library move)
+ *   T18 (endTurnButton, index 17)  T19 (streetGrid, index 18 — Library place)
+ *   T20 (hand, index 19)  T21 (hud, index 20)
+ *   T22 (challengePanel, index 21)  T23 (completionModal, index 22)
  *
  * Screenshots are still captured for visual regression review (red reference
  * rects are drawn at depth 250 as diagnostics), but geometry is now asserted.
@@ -170,13 +173,12 @@ function computeTargetRect(
     }
     case 'incidentQueue': {
       // Incident queue panel — mirror refreshIncidentQueue() panel math with
-      // the LIVE queue/effects (boot: 2 cards, 0 effects → 194px).
-      const queue = s?.state?.incidentDeck ?? [];
+      // the LIVE state (boot: single face-down deck stack + count, 0 effects
+      // → 125px, CG-0MSXOWLHU0099QF6).
       const effects = s?.state?.activeEffects ?? [];
       const titleH = 22;
       const pad = 8;
-      const maxCards = Math.min(2, queue.length);
-      const cardAreaH = maxCards * (layout.queueCardH + 6) - 6 + 12;
+      const cardAreaH = layout.queueCardH + 6 + 12;
       const extraH = effects.length > 0 ? 16 + effects.length * 16 : 0;
       const panelH = titleH + pad + cardAreaH + extraH + pad;
       return { x: layout.logX, y: layout.queueTop, w: layout.logW, h: panelH };
@@ -214,6 +216,20 @@ function computeTargetRect(
         y: layout.marketTop + 6,
         w: layout.marketCardW,
         h: layout.marketCardH,
+      };
+    }
+    case 'actionButtons': {
+      // Community Favour action-bar band (CG-0MSTOATDQ005XDET): the two
+      // favour buttons span the SLL zone in the main-street-tutorial layout
+      // (x 0.365625..0.639063 at y 0.905556..0.952778 → px at 1280×720).
+      // Mirror the tutorial layout JSON used by resolveZoneToAnchor.
+      const x = Math.round(0.365625 * gameW);
+      const w = Math.round(0.273438 * gameW);
+      return {
+        x,
+        y: layout.actionY + 4,
+        w,
+        h: layout.actionButtonH,
       };
     }
     default:
@@ -369,7 +385,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
     destroyGame();
   });
 
-  /** All 17 steps with their highlight zones (null zones have no rect). */
+  /** All 18 steps with their highlight zones (null zones have no rect). */
   const alignmentSteps = UNIFIED_TUTORIAL_STEPS
     .map((step, index) => ({ id: step.id, stepIndex: index, zone: step.highlightZone }))
     .filter((s) => !NULL_ZONES.has(s.zone));
@@ -410,7 +426,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
     60_000,
   );
 
-  it('completionModal (T17) draws no highlight', async () => {
+  it('completionModal (T23) draws no highlight', async () => {
     const mgr = scene.tutorialOverlay as {
       showStep?: (index: number) => void;
       dismiss?: () => void;
@@ -420,7 +436,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
       if (typeof mgr.dismiss === 'function') {
         mgr.dismiss();
       }
-      mgr.showStep(16); // T17 = completionModal (confirm gate)
+      mgr.showStep(22); // T23 = completionModal (confirm gate)
       await new Promise((r) => setTimeout(r, 50));
 
       const highlights = scene.children.list.filter(
@@ -448,6 +464,7 @@ describe('Tutorial overlay highlight alignment (renderer geometry)', () => {
         'helpButton',
         'completionModal',
         'hand',
+        'actionButtons',
         'laundromatCard',
         'festivalCard',
       ];

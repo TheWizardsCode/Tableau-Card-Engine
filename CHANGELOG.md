@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.1.14 (2026-08-27)
+### Features
+- Main Street: business cards incur ongoing per-turn cost (1/4 purchase price, min 0.25), even in hand (CG-0MSVYPEZ90085SHE)
+- Play illegal move audio/visual when hand is full during buy (CG-0MSXKQVZC009AM9L)
+- Remove dedicated staff market; route staff cards into general market selection (CG-0MT2WTN0L004JA53)
+- Local skill: promote Windows Setup artifact to GitHub release (operator-approved) (CG-0MSQ6MV7N0085V9R)
+- Change upcoming two-card stack to a face-down deck (CG-0MSTOATDP000JNHH)
+- Tooltips for business cards do not work reliably (CG-0MT24RFIV007NQMP)
+- Main Street: don't auto-select a card moved to hand from the market for another action (CG-0MSXIQIPJ000NDTL)
+- Defer day-banner until player commits to starting the game (CG-0MSZE2PY7007J6XA)
+- Main Street: Graffiti Art grants reputation only (no coins) (CG-0MSXILJHN008CHQY)
+- Synergy lines drawn edge-to-edge / corner-to-corner instead of center-to-center (CG-0MSVM3WCD007BRQP)
+- Main Street: quarter the reputation-based income coin multiplier (CG-0MT3J80HV0084IF1)
+- Implement Community Favour mechanic (CG-0MSTOATDQ005XDET)
+- Rebalance card families across progression tiers (incl. tiering staff cards) (CG-0MT2WU0CX005Z143)
+- Expand Main Street progression from 5 tiers to 12 tiers (CG-0MT3C744B009DS84)
+- Main Street: action banking (bank unused actions for future turns) (CG-0MT3IOPZB005LNAR)
+### Bug Fixes
+- Split non-tutorial browser test suite into per-instance chunks to fix CI context-exhaustion regression (CG-0MT00JNOP003KVH8)
+### Other
+- Fix latent drag.browser.test.ts firstBusinessCard flake (dev row may deal community-space, not business) (CG-0MSYTE8J50076PFF)
+- Evaluate synergy-type distribution across Main Street tiers and even out the spread (CG-0MT3IPFSF005KEFB)
+- Rename 'Library Story Hour' event card to 'Children's Story Hour' (CG-0MSXITDJ5009I2FT)
+- Staff specialization: new applicant card suggestions (CG-0MT1CIWSD003VBPK)
+- wl pre-push author-identity gate blocks all pushes (empty user.email) (CG-0MSUZASM10035QSG)
+- Show HUD bar money and reputation to 2 decimal places (CG-0MSXIQDI4007K6N0)
+- Preview script should bind to all interfaces (--host) for Tailscale/network access (CG-0MT1LV76L008HJ8W)
+- Quality Improvement - Refactoring (CG-0MSXL2L0T009CA3I)
+- Add peek once-per-turn unit tests (CG-0MSXOXN81004MW8I)
+- Quality Improvement - Refactoring (CG-0MT3P3J05009F4Z4)
+- Implement staff peek skill (CG-0MSXOW6GN008ZSMN)
+
 ## v0.1.13 (2026-08-19)
 ### Features
 - Add a harder Citadel mode to Beleaguered Castle where all cards start in the tableau. (CG-0MLTDXG3H0WCXMUV)

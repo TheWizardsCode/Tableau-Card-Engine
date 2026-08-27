@@ -113,7 +113,6 @@ function forceGameOver(scene: Phaser.Scene, isWin = false): void {
       challengesCompleted: [],
       endReason: isWin ? 'all_businesses_placed' : 'no_coins',
       config: {
-        reputationScoreMultiplier: 2,
         challengeBonusPoints: 10,
       },
     };
@@ -310,8 +309,8 @@ describe('Main Street overlay button tests', () => {
     // The breakdown block contains Coins and Final Score lines
     const breakdown = allTexts.find((t) => t.text.includes('Coins:') && t.text.includes('Final Score:'));
     expect(breakdown).toBeDefined();
-    expect(breakdown!.text).toContain('Coins: 123');
-    expect(breakdown!.text).not.toContain('123.456');
+    // Coins displayed to 2 decimal places for consistency with HUD bar.
+    expect(breakdown!.text).toContain('Coins: 123.46');
   });
 
   it('should show count-only line for unlocked tiers (no per-card names)', async () => {
@@ -328,7 +327,6 @@ describe('Main Street overlay button tests', () => {
         challengesCompleted: [],
         endReason: 'all_businesses_placed',
         config: {
-          reputationScoreMultiplier: 2,
           challengeBonusPoints: 10,
         },
       };

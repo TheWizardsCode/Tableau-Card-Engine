@@ -247,7 +247,7 @@ The Greedy strategy follows a priority chain, evaluating all legal actions and s
 
 **Priority 2: Buy Business** -- For each affordable business card, evaluate every empty slot. Score = `(baseIncome + projectedSynergyBonus) * remainingTurns - cost`. The projected synergy bonus is computed by `computeSynergyBonus()` assuming the card is placed at that slot.
 
-**Priority 3: Buy Event** -- If an affordable Investment event has positive expected value (`coinDelta + reputationDelta * reputationScoreMultiplier > cost`), buy it. Score = `expectedValue - cost`.
+**Priority 3: Buy Event** -- If an affordable Investment event has positive expected value (`coinDelta + reputationDelta > cost`), buy it. Score = `expectedValue - cost`.
 
 **Priority 4: Play Event from Hand** -- If the player holds an Investment event card in hand, play it. Score = a fixed bonus (ensures events are played before end-of-turn).
 
@@ -739,7 +739,7 @@ For branching upgrades, evaluate each branch independently and pick the higher-s
 #### Buy Event (Investment)
 
 ```
-score = coinDelta + (reputationDelta * config.reputationScoreMultiplier) - cost
+score = coinDelta + reputationDelta - cost
 ```
 
 Only consider events with positive score (i.e., expected value exceeds cost).

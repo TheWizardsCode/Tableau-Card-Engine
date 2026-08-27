@@ -15,11 +15,11 @@
 | **Slot** | A single cell in the 10‑slot **Street Grid** (rendered as a 2‑row × 5‑column layout) where a Business card may be placed. Slots are indexed 0‑9.
 | **Business Card** | A card representing a shop or service. It has a cost, a base income, one or more **Synergy Types**, and optional **Upgrade Paths**.
 | **Synergy Type** | A tag (e.g., *Food*, *Culture*, *Commerce*) that determines adjacency bonuses. When two adjacent businesses — orthogonally or **diagonally adjacent** (8‑way / Chebyshev adjacency, default range 1) — share a synergy type and are of **different base types** (different template IDs), each gains a **Synergy Bonus** equal to a percentage of its own effective base income per matching neighbor. The per-card synergy rate defaults to 50% (0.5) and is configurable via `synergyCoinBonus`. Same-type adjacent businesses do not receive synergy from each other.
-| **Market** | The face‑up cards the player may purchase each turn. A single row of exactly **3 cards** (CG-0MSTOATDT009BRX2): 1–2 Business/Community‑Space cards, 0–1 Upgrade, 0–1 Investment event (combinations 2B+1U, 2B+1E, or 1B+1U+1E). Incidents are not purchasable; they populate a visible FIFO **Incident Queue** instead.
-| **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (score multiplier). Coins start at 8 and Reputation starts at 3.
+| **Market** | The face‑up cards the player may purchase each turn. A single row of exactly **3 cards** (CG-0MSTOATDT009BRX2): 1–2 Business/Community‑Space cards, 0–1 Upgrade, 0–1 Investment event (combinations 2B+1U, 2B+1E, or 1B+1U+1E). Incidents are not purchasable; they populate a hidden face‑down **Incident Deck** instead (CG-0MSTOATDP000JNHH).
+| **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (plain score count). Coins start at 8 and Reputation starts at 3.
 | **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
-| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are taken from the single market row (free) and held until played (cost at play); **Incident** events resolve automatically from the incident queue.
-| **Incident Queue** | A visible FIFO queue of 2 face‑up Incident cards. Each turn the front card is resolved and a replacement is drawn from the event deck. The player can see upcoming incidents and plan accordingly.
+| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are taken from the single market row (free) and held until played (cost at play); **Incident** events resolve automatically from the face-down incident deck (CG-0MSTOATDP000JNHH).
+| **Incident Deck** | A hidden face‑down deck of Incident cards (card back + remaining count only). Each turn the top card is revealed and resolved at the end of the turn; when the deck is exhausted, resolved events are reshuffled back in with the order rebuilt constraint‑aware (repeat‑spacing / streak limits, CG-0MSTOATDP000JNHH). A peek staff member (staff‑lookout) can look at the top card once per turn as an action.
 | **Upgrade Card** | A card that modifies a specific Business card (e.g., upgrade a Bakery to a Patisserie, increasing income and synergy range).
 | **Challenge** | A optional meta‑goal (e.g., *Build a Foodie Row*) that grants a bonus score at the end of the game if satisfied.
 
@@ -38,7 +38,10 @@
 | **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this business. |
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
 | **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g., Clinic provides +0.2 rep/turn). Default 0. |
+| **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase**, whether the card is placed on the street grid **or held in hand**. Defaults to 0 for cards without a CSV value. Mirrors the StaffCard/CommunitySpaceCard `ongoingCost` mechanic. |
 | **Description** | string | Flavor text and any special rules. |
+
+> **Business ongoing costs are deducted in the IncomePhase.** Business cards with `ongoingCost > 0` — held in hand or placed on the street grid — have their total running cost deducted from coins each turn, alongside staff and community-space costs (CG-0MSVYPEZ90085SHE). The deduction is **clamped at 0 coins** — the player is never driven below zero — and both the deduction and any shortfall are logged to the activity log.
 
 **Example Business Card (JSON‑like)**
 ```json
@@ -129,7 +132,7 @@ interface GameState {
   market: {
     cards: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard)[]; // single row, exactly 3 slots
   };
-  incidentQueue: EventCard[];  // Visible FIFO queue of upcoming Incidents (size 2)
+  incidentDeck: EventCard[];  // Face-down incident deck; top card reveals and resolves at end of turn
   resourceBank: {
     coins: number; // start = 8
     reputation: number; // start = 3
@@ -150,9 +153,9 @@ interface GameState {
 - **Grid<T>** – generic NxM grid (used here as 1x10), now using the reusable `@core-engine` `Grid` type.
 - **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (8‑way / Chebyshev adjacency: orthogonal **and diagonal** neighbors at default range 1, extendable by upgrades) via `@core-engine/SpatialRules`.
 - **Market** – a single row of 3 face‑up cards drawn from the Business, Community Space, Upgrade, and Event (Investment‑trigger) decks, always with ≥1 Business/Community‑Space card. The row is refilled at day start; taking a card to hand is **free** (CG-0MSTOATDT009BRX2), and the listed cost is paid when the card is played or placed.
-- **Incident Queue** – visible FIFO queue of 2 Incident cards drawn from the event deck. The front card resolves each turn during IncidentPhase; a replacement is drawn from the deck afterward. If the deck runs out, the queue shrinks naturally.
+- **Incident Deck** – hidden face-down deck of Incident cards, order rebuilt constraint-aware at build/reshuffle (CG-0MSTOATDP000JNHH). The top card reveals and resolves each turn during IncidentPhase; when the deck runs out, resolved events are shuffled back in.
 - **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
-- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation is also a multiplier applied at final score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation also counts 1:1 toward the final score (`finalScore = coins + reputation + challengeBonuses`).
 
 ### Spatial API migration note
 
@@ -171,7 +174,7 @@ stateDiagram-v2
     MarketPhase --> ActionPhase: Player purchases/places/upgrades (+ play held Investment)
     ActionPhase --> InvestmentResolution: Auto‑resolve held Investment if not played
     InvestmentResolution --> IncomePhase: Collect Base Income + Synergy Bonuses
-    IncomePhase --> IncidentPhase: Resolve front of incident queue (FIFO)
+    IncomePhase --> IncidentPhase: Reveal and resolve top of incident deck
     IncidentPhase --> EndCheck: Evaluate win/loss conditions
     EndCheck --> DayStart: Loop to next turn
 ```
@@ -190,8 +193,8 @@ stateDiagram-v2
    - `resourceBank.coins += totalIncome`.
    - `totalReputationPerTurn` is calculated from all placed cards (some Health-synergy cards like the Clinic provide `reputationPerTurn`). Upgrades may also contribute `reputationBonus`. Synergy reputation from adjacent neighbors is only earned from **different-type** businesses; same-type neighbors contribute 0 reputation synergy.
    - `resourceBank.reputation += totalReputationPerTurn`.
-   - **Ongoing costs** (staff cards and community-space cards with `ongoingCost > 0`, e.g. the Library's 0.25 coins/turn) are deducted from coins after income. Deductions are clamped at 0 coins (the player is never driven below zero) and logged.
-6. **IncidentPhase** – Resolve the front Incident card from the visible FIFO incident queue. After resolution, draw a replacement Incident from the event deck to the back of the queue (maintaining queue size of 2). If the deck has no more Incidents, the queue shrinks naturally.
+   - **Ongoing costs** (staff cards, community-space cards, and business cards with `ongoingCost > 0` — e.g. the Library's 0.25 coins/turn; business cards are charged whether placed or held in hand) are deducted from coins after income. Deductions are clamped at 0 coins (the player is never driven below zero) and logged.
+6. **IncidentPhase** – Reveal and resolve the top card of the face‑down incident deck. The player knows only how many incidents remain (card back + count); the revealed card's effect posts to the activity log. When the deck is exhausted, resolved events are reshuffled back in with the order rebuilt constraint‑aware (CG-0MSTOATDP000JNHH).
 7. **EndCheck** – Evaluate win/loss conditions.
 8. Loop back to **DayStart** for the next turn.
 
@@ -207,7 +210,21 @@ Default presets impose **no turn limit** (CG-0MSLXJCHH001DLIO): a player who kee
 
 ### 6.0 Action Economy (daily action budget)
 
-Each day (MarketPhase) the player has **exactly one action** — two while a **General Manager** is employed (CG-0MSTOF1N5005PK2R). The budget resets at **DayStart**; spending it blocks further action-type operations until the next day. The remaining budget is shown in the HUD action counter.
+Each day (MarketPhase) the player has **exactly one action** — two while a **General Manager** is employed (CG-0MSTOF1N5005PK2R) — plus any **banked** actions carried over from previous days (CG-0MT3IOPZB005LNAR). The budget resets at **DayStart**; spending it blocks further action-type operations until the next day. The remaining budget is shown in the HUD action counter (banked count shown as `(N banked)` when non-zero).
+
+**Day-start composition.** At DayStart the daily budget is:
+
+```
+1 base + staff actionsPerTurn bonus + banked actions (capped at 2)
+```
+
+- The **base action banks**: any unused base action at end of day is banked, up to a **bank cap of 2**.
+- **Staff actions never bank.** Staff-derived actions (e.g. the General Manager's +1 `actionsPerTurn`) are **consumed first** and are not bankable — an idle GM day banks exactly 1 (the base), not 2.
+- Spending during the day draws down the combined budget (base + staff + banked share one counter).
+- **No expiry:** banked actions persist indefinitely across days until spent. They reset to 0 only on a new game.
+- At day end, at most **1** action can bank (only the base portion), so reaching the cap takes two idle days; overflow beyond the cap is discarded.
+
+> **Follow-ups:** Tutorial coverage of banking is tracked in CG-0MT3JK16W006A66P; a banking-aware AI strategy (deliberate hoarding) in CG-0MT3JMGA60091J8W.
 
 **Action-type operations (spend the daily action):**
 
@@ -215,8 +232,8 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 |-----------|------|-------|
 | Move a market card to hand | 1 action | Free of coins; pays the listed cost when placed. |
 | Play a card from hand to the street | 1 action | Pays the card's listed cost at placement. |
-| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`). Triggered by dragging a market card straight onto a street slot. |
-| Hire a staff card | 1 action | From the staff market. |
+| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`) when the move leaves **no action** for the placement (same pricing as the click composite). Triggered by dragging a market card straight onto a street slot. On a Golden Mile 2-action day the placement instead consumes the remaining action at **listed cost** — drag is never cheaper than click. |
+| Hire a staff card | 1 action | From the general market row. |
 
 **Free operations (never consume an action):**
 
@@ -227,7 +244,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 - Buying/playing upgrade cards and Investment events
 - Ending the turn
 
-> Same-day composite: clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase** — the placement itself is free. A card left in hand and placed on a **later** day costs that day's action.
+> Same-day composite pricing (CG-0MT24X0SX007RLHN): clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase**. If the move consumed the daily action (0 actions left), the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**; an explainer dialog fires first (Proceed commits, Cancel aborts with no cost, "Don't show this again" persists the preference). If an action **remains** (Golden Mile 2-action days), the placement consumes it at **listed cost**. A card left in hand and placed on a **later** day costs that day's action at listed cost, with no dialog. Business and community-space cards are priced identically.
 
 ---
 
@@ -247,9 +264,9 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 
 The game is considered **won** when **any** of the following conditions are satisfied **at the end of a Night Phase**:
 
-1. **Score Threshold** – `finalScore >= 150` where:
+1. **Score Threshold** – `finalScore >= winThreshold` where winThreshold is difficulty-scaled (100 Easy / 120 Medium / 150 Hard):
    ```ts
-   finalScore = resourceBank.coins + resourceBank.reputation * 5 + challengeBonus;
+   finalScore = resourceBank.coins + resourceBank.reputation + challengeBonus;
    // challengeBonus = sum of 10 points per completed Challenge.
    ```
 2. **Challenge Completion** – All **Primary Challenges** (defined in `docs/games/the-build/challenges.md`) are completed, granting an automatic win regardless of numeric score.
@@ -276,7 +293,7 @@ Loss conditions are evaluated at the end of the **Night Income** phase before ch
 | Aspect | Random Source | Visibility |
 |--------|----------------|------------|
 | **Market Draw** | Seeded RNG draws from the Business, Community Space, Upgrade, and Event decks to fill a single 3‑card market row (always ≥1 Business/Community‑Space card; 0–1 Upgrade; 0–1 Investment event). | Face‑up – player sees all options before taking.
-| **Event Cards** | Incident events populate a visible FIFO queue (2 cards, face‑up) so the player can plan ahead. Investment events appear in the single market row and are taken to hand (free) and held until played (cost paid at play). | Incidents: face‑up in queue. Investments: face‑up in market, then held.
+| **Event Cards** | Incident events populate a hidden face-down incident deck (card back + remaining count only, CG-0MSTOATDP000JNHH); the top card is revealed and resolved at the end of each turn. Investment events appear in the single market row and are taken to hand (free) and held until played (cost paid at play). | Incidents: face-down deck (count only). Investments: face-up in market, then held.
 | **Challenge Generation** | Fixed set defined in `challenges.md`; no randomness.
 | **RNG Seed** | Determined by the **Game Engine** on startup (`Math.seedrandom(seedString)`). | The seed is displayed on the title screen for reproducibility.
 
@@ -296,7 +313,7 @@ flowchart TD
     Actions --> ResolveInvestment[Resolve Held Investment]
     ResolveInvestment --> Income[Collect Income & Synergy]
     Income[Collect Income & Synergy
-⚠ Same-type: base×0.6, no synergy] --> Incident[Resolve Front of Incident Queue]
+⚠ Same-type: base×0.6, no synergy] --> Incident[Reveal & Resolve Top of Incident Deck]
     Incident --> EndCheck{Win/Loss Check}
     EndCheck -->|Win| EndWin((Victory))
     EndCheck -->|Loss| EndLoss((Defeat))
@@ -329,7 +346,7 @@ ActiveEffects are stored in `state.activeEffects: ActiveEffect[]` (part of `Main
 
 ### Example: Flu Outbreak (`evt-flu-outbreak`)
 
-- **Trigger**: Incident (automatic draw from incident queue)
+- **Trigger**: Incident (automatic reveal from the face-down incident deck)
 - **Base duration**: 5 turns
 - **Effect**: All businesses generate 80% income (0.8× multiplier)
 - **Duration reduction**: If a Clinic (`biz-clinic`) is on the street grid, duration → 3 turns. If a Medical Center (`upg-medical-center`) is present, duration → 2 turns. Only the stronger reduction applies.

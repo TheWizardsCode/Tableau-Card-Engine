@@ -97,6 +97,13 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
     },
     instructionText: { setText: vi.fn() },
     tooltipManager: { hide: vi.fn(), show: vi.fn() },
+    // Buy-and-play premium explainer dialog (CG-0MT24X0SX007RLHN): captures
+    // the callbacks so tests can proceed/cancel the premium placement.
+    showBuyAndPlacePremiumDialog: vi.fn((_cardName: string, onProceed: () => void) => {
+      // Record the proceed callback for explicit invocation in tests.
+      scene.premiumDialogOnProceed = onProceed;
+    }),
+    premiumDialogOnProceed: null,
     selectMarketCardById: vi.fn(),
     clearMarketSelection: vi.fn(),
     hiddenTransferSourceCardIds: new Set(),
@@ -119,7 +126,9 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
 
 /** First business card in the development row, made affordable deterministically. */
 function pickAffordableBusiness(state: any): any {
-  const card = state.market.cards.find((c: any) => c.family === 'business');
+  const card = state.market.cards.find(
+    (c: any) => c.family === 'business' || c.family === 'community-space',
+  );
   if (!card) throw new Error('No business card in development row for test');
   // Ensure the player can afford it regardless of seed. Drag-drop buy-and-place
   // now pays a +50% premium over the listed cost (CG-0MSTOF1N5005PK2R), so
@@ -266,12 +275,15 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(controller.canDropBusinessCard(card.id, slot)).toBe(false);
     });
 
-    it('enforces synergy adjacency during T13 (Library must be next to the Bookshop)', () => {
-      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
-      expect(t13Index).toBeGreaterThanOrEqual(0);
+    it('enforces synergy adjacency during T19 (Library must be next to the Bookshop)', () => {
+      // T19 is the two-turn Library placement step with the Bookshop synergy
+      // partner (CG-0MT53NXGZ004H5AE). The adjacency rule keys off the step's
+      // synergyCardId, so the split place-business step enforces it too.
+      const t19Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T19');
+      expect(t19Index).toBeGreaterThanOrEqual(0);
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t13Index,
+        currentStepIndex: t19Index,
         lastCompletedStepId: null,
         exited: false,
       };
@@ -302,10 +314,10 @@ describe('MainStreet drag-to-buy wiring', () => {
     });
 
     it('does not enforce adjacency when the synergy card is not on the street', () => {
-      const t13Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T13');
+      const t14Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T14');
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t13Index,
+        currentStepIndex: t14Index,
         lastCompletedStepId: null,
         exited: false,
       };
@@ -335,6 +347,14 @@ describe('MainStreet drag-to-buy wiring', () => {
         data: card.id,
         zoneData: slot,
       });
+
+      // Premium explainer dialog gated the buy (1-action day → drag leaves
+      // no action for the placement step → +50% premium, CG-0MT24X0SX007RLHN).
+      expect(scene.showBuyAndPlacePremiumDialog).toHaveBeenCalled();
+      expect(scene.premiumDialogOnProceed).toBeTypeOf('function');
+      expect(scene.animateTransferFromMarket).not.toHaveBeenCalled();
+      // Player proceeds at the premium price.
+      scene.premiumDialogOnProceed();
 
       // Transfer animation started from the DROP LOCATION (not the market
       // slot origin) and targeted the street slot centre.
@@ -435,6 +455,13 @@ describe('MainStreet drag-to-buy wiring', () => {
       );
       events['dragstart'](POINTER, container);
       events['drop'](POINTER, container, zone);
+
+      // Premium explainer dialog gated the buy (1-action day → drag leaves
+      // no action for the placement step → +50% premium, CG-0MT24X0SX007RLHN).
+      expect(scene.showBuyAndPlacePremiumDialog).toHaveBeenCalled();
+      expect(scene.premiumDialogOnProceed).toBeTypeOf('function');
+      // Player proceeds at the premium price.
+      scene.premiumDialogOnProceed();
 
       // Flush the transfer-completion microtask before asserting state.
       await new Promise((resolve) => setTimeout(resolve, 0));

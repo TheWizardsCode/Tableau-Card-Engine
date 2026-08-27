@@ -17,7 +17,7 @@ All values below are **enforced in the guardrail test suite** (`tests/main-stree
 | Metric | Easy | Medium | Hard | Severity |
 |--------|------|--------|------|----------|
 | **Win rate** | **60–90%** | **45–75%** | **15–40%** | Medium: critical; Easy/Hard: warning |
-| **Avg coins per turn** (net liquidity, `finalCoins/turns`) | — | **0–2** | — | Critical (producer ruling) |
+| **Avg coins per turn** (net liquidity, `finalCoins/turns`) | — | **0–6** | — | Critical (producer ruling; widened by CG-0MSTOATDQ005XDET, CG-0MT3J8FXG006RCOA, then CG-0MSVYPEZ90085SHE) |
 | **Median score** | — | **120–180** | — | Warning |
 
 ### Changes vs the previous documented state
@@ -27,7 +27,7 @@ All values below are **enforced in the guardrail test suite** (`tests/main-stree
 | Win rate Medium | 30–60% (PRD critical) | **45–75%** | Measured 62% sits at/above the old cap with no design intent violated; 45–75 matches casual-solo industry targets and preserves ladder separation. |
 | Win rate Easy | 60–85% (PRD warning) | **60–90%** | Easy is the learning/comfort preset; greedy (a competent AI) measured 83.5%, only 1.5 pts below the old cap — too fragile to enforce and not a design problem. Floor unchanged at 60%. |
 | Win rate Hard | 15–40% (PRD warning) | **15–40%** | Unchanged — measured 22% sits comfortably mid-band. |
-| Avg coins per turn | Producer ruling 0–2 (G3 text only, never codified) | **0–2** | Formalized into the guardrail table + thresholds + tests; measured 1.85. |
+| Avg coins per turn | Producer ruling 0–2 (G3 text only, never codified) | **0–2.5** | Formalized into the guardrail table + thresholds + tests; measured 2.21 after the Community Favour rep→coins fallback added AI liquidity (CG-0MSTOATDQ005XDET). **0–3 since CG-0MT3J8FXG006RCOA**: plain-count reputation + retuned thresholds (100/120/150) deflated scores, measured 2.69 (operator pre-accepted balance drift). **0–6 since CG-0MSVYPEZ90085SHE**: business ongoing costs + income raise make winning greedy runs short ~10-turn sprints that bank 50–80 coins (measured 5.76; win-rate ladder preserved as the primary gate). |
 | Median score Medium | 120–180 (PRD warning); conflicting 20–65 in `monte-carlo-balance.test.ts` (market-greedy) | **120–180** (greedy); the 20–65 market-greedy assertion was **removed** | Score bands are strategy-scoped; the market-greedy median is bimodal and unstable (41.6 at 100 seeds → 91.6 at 200 seeds). |
 
 ### Tuned targets vs regression guardrails (two tiers)
@@ -39,7 +39,7 @@ The recommended values above are the **tuned target bands** (design intent): the
 | Test | What it guards | Band / tolerance |
 |------|----------------|------------------|
 | `monte-carlo-guardrails.test.ts` | Drift vs the committed baseline (`docs/main-street/monte-carlo-baseline.json`) for Medium **and** the per-difficulty matrix | winRate ±0.25; coins ±30% |
-| `monte-carlo-balance.test.ts` | Whole-game smoke (market-greedy) at 20-seed PR CI | 0.20–0.80 win rate |
+| `monte-carlo-balance.test.ts` | Whole-game smoke (market-greedy) at 20-seed PR CI | 0.20–0.96 win rate (raised from 0.80 by CG-0MSVYPEZ90085SHE: hand costs + raised incomes, then the staff-specialisation economy (CG-0MT4WXNR80090FXZ) — measured 0.95 on the mc-balance seed set) |
 
 The old 20–80% greedy test band (`monte-carlo-greedy-guardrail.test.ts`) was redundant with these two tiers and conflated "tuned target" with "regression guardrail"; it has been replaced by the per-difficulty design-intent test.
 
@@ -52,8 +52,29 @@ Generated with `runAllCombinations()` — greedy, 200 seeds, 60 max turns, `mc-b
 | Difficulty | winRate | avgCoinsPerTurn | medianScore | In recommended bands? |
 |------------|---------|-----------------|-------------|------------------------|
 | Easy | 0.835 | 2.678 | 130.4 | ✓ (margin to cap: 6.5 pts) |
-| Medium | 0.620 | 1.846 | 153.3 | ✓ (margins: 17 / 13 pts) |
-| Hard | 0.220 | 0.498 | 14.2 | ✓ (margins: 7 / 18 pts) |
+| Medium | 0.620 | 2.210 | 153.7 | ✓ (margins: 13 / 13 pts) |
+| Hard | 0.155 | 0.679 | 6.8 | ✓ (margins: 5 / 25 pts) |
+
+> **CG-0MSTOATDQ005XDET re-baseline (2026-08-21):** the Community Favour
+> rep→coins fallback (`GreedyStrategy` Priority 9, used only when the AI is
+> genuinely stalled — cannot afford the cheapest market card — and holds a
+> reputation buffer) adds turn liquidity and shifted Medium to 0.62 win rate /
+> 2.21 coins-per-turn. Baselines and bands were regenerated from the current
+> code (`scripts/generate-main-street-monte-baseline.ts` + the difficulty
+> matrix in `monte-carlo-baseline.json`). Loss decomposition is still
+> bankruptcy-dominated; no run hits the 60-turn harness cap.
+>
+> **CG-0MSVYPEZ90085SHE re-baseline (2026-08-24, operator-chosen option A):**
+> business cards now incur an ongoing cost (`max(0.25, cost/4)` coins/turn)
+> **even while held in hand**, so business income was raised
+> (`income = old income + 2.4 × ongoing cost`) and every business gained
+> tiered reputation-per-turn to feed the late-game income multiplier.
+> Hand-held cards drain coins every turn, so winning runs are short (~10-turn)
+> sprints that bank 50–80 coins: measured Medium liquidity 5.76 (band widened
+> 0–3 → 0–6), win rates Easy 0.835 / Medium 0.595 / Hard 0.160 (all in the
+> design-intent bands), Medium median 125. The baseline was regenerated from
+> the current code and the market-greedy smoke cap raised 0.80 → 0.96 (staff-specialisation skills landed on top of the raised incomes; greedy design bands still measured Easy 0.820 / Medium 0.555 / Hard 0.120).
+> Losses are still bankruptcy-dominated; no run hits the 60-turn harness cap.
 
 For reference, an earlier sweep with a different seed prefix (`mc-baseline-`) gave Easy 0.77 / Medium 0.595 / Hard 0.25 — the difficulty ladder is stable across seed sets and cleanly monotone-decreasing (≈80 / ≈60 / ≈25), which is exactly the shape design intent calls for.
 
@@ -80,15 +101,15 @@ Loss decomposition (greedy, 60 turns): bankruptcy dominates on all difficulties 
 - **Easy (learning preset):** 60–90%. A competent AI winning up to ~90% on Easy is *by design* comfortable — the mode teaches mechanics. The floor (60%) still catches Easy becoming too hard.
 - **Hard (mastery preset):** 15–40% unchanged. 22% measured — demanding without being unwinnable.
 
-### 3.2 avgCoinsPerTurn (net liquidity) — 0–2
+### 3.2 avgCoinsPerTurn (net liquidity) — 0–6
 
-The producer ruling (CG-0MSP26Q5N002EH8P) defines net liquidity as `finalCoins/turns` and requires 0–2. This review validates and formalizes it:
+The producer ruling (CG-0MSP26Q5N002EH8P) defines net liquidity as `finalCoins/turns` and requires 0–2. This review validates and formalizes it; CG-0MSTOATDQ005XDET widened the band to 0–2.5 after the Community Favour fallback measurably increased AI liquidity (2.21); CG-0MT3J8FXG006RCOA widened it again to 0–3 after the plain-count reputation score + retuned thresholds (100/120/150) deflated scores, measured 2.69 (operator pre-accepted balance drift); CG-0MSVYPEZ90085SHE widened it to 0–6 after hand-held business cards gained ongoing costs and incomes were raised (measured 5.76, again operator pre-accepted balance drift — see §1):
 
-- **Too low (< 0):** players end games in net debt — starvation. (Measured on Hard: 0.50; earlier 25-turn profiles dipped near 0 on Hard, which is acceptable for the hardest preset but a red line for Medium.)
-- **0–2:** the economy is tight — income roughly matches spending through the game, so players make meaningful purchase decisions every turn (the PRD's "decision tension" requirement, G3). Measured Medium: 1.85.
-- **Too high (> 2):** liquidity accumulates, purchases become trivial, and "can't afford anything" tension disappears.
+- **Too low (< 0):** players end games in net debt — starvation. (Measured on Hard: 1.13; earlier 25-turn profiles dipped near 0 on Hard, which is acceptable for the hardest preset but a red line for Medium.)
+- **0–6:** winning runs under hand-cost economics are short rich sprints — incomes comfortably cover the per-card drain (including held cards), so the AI banks a large reserve before crossing the score threshold at ~turn 10. The economy is *income-rich* rather than *tight*: the binding tension is placement timing and hand management, not per-turn affordability.
+- **Too high (> 6):** liquidity accumulates beyond any spending sink, purchases become trivial, and "can't afford anything" tension disappears.
 
-This is consistent with, and complementary to, the **gross** income band of 4–8 coins/turn (G3): gross income covers costs and events, while net liquidity measures the reserve at the end. The 0–2 net band is now a **critical** guardrail (producer ruling) — codified in §3.3, `thresholds.ts`, and the guardrail tests.
+This is consistent with, and complementary to, the **gross** income band of 4–8 coins/turn (G3): gross income covers costs and events, while net liquidity measures the reserve at the end. The net band remains a **critical** guardrail (producer ruling) — codified in §3.3, `thresholds.ts`, and the guardrail tests — but since CG-0MSVYPEZ90085SHE the win-rate ladder is the primary balance gate and liquidity is a pacing signal.
 
 ### 3.3 medianScore — 120–180 (greedy/Medium)
 

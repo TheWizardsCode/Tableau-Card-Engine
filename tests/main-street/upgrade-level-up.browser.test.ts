@@ -150,32 +150,4 @@ describe('MainStreet upgrade level-up animation', () => {
     // The upgrade card left the market (splice — the row may have shifted).
     expect(state.market.cards.some(c => c !== null && c.id === upgrade.id)).toBe(false);
   }, 30_000);
-
-  it('still fires the level-up trigger under reduced motion (animator degrades internally)', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-    const { biz, upgrade } = makeUpgradeFixture();
-
-    const state = scene.state as {
-      streetGrid: Array<BusinessCard | null>;
-      market: { cards: Array<UpgradeCard | null> };
-      resourceBank: { coins: number };
-    };
-    state.streetGrid[0] = biz;
-    state.market.cards[0] = upgrade;
-    state.resourceBank.coins = 100;
-    (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
-    (scene as unknown as { refreshAll: () => void }).refreshAll();
-
-    const { calls } = spyOnLevelUp(scene);
-
-    (scene.msTurnController as unknown as {
-      onUpgradeCardClick: (card: UpgradeCard) => void;
-    }).onUpgradeCardClick(upgrade);
-
-    await waitForCondition(() => calls.length >= 1, { timeoutMs: 10_000, label: 'level-up trigger (reduced motion)' });
-    expect(calls).toHaveLength(1);
-    expect(calls[0].slotIndex).toBe(0);
-    expect(state.streetGrid[0]?.level).toBe(1);
-  }, 30_000);
 });

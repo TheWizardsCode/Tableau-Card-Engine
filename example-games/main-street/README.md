@@ -4,6 +4,23 @@ Main Street now uses the shared **Screen Layout Language (SLL)** as its canonica
 
 The street is a 10-slot grid rendered as **2 rows × 5 columns**; synergy adjacency is **8-way (Chebyshev)** — orthogonally *and* diagonally adjacent slots count as neighbors (CG-0MSP1HCAS00785MP).
 
+## Community Favour (CG-0MSTOATDQ005XDET)
+
+Main Street has a **Community Favour** resource exchange available once per turn during the market phase (a **FREE** action — it does **not** consume `actionsRemaining`):
+
+- **coins → reputation:** spend `favourCoinsToRepCost` (default **2**) coins for **+1** reputation.
+- **reputation → coins:** spend `favourRepToCoinsRepCost` (default **2**) reputation for `favourRepToCoinsCoinGain` (default **3**) coins.
+
+Rules:
+- **Once per turn:** `state.favourUsedThisTurn` gates the exchange; reset at each `DayStart`.
+- **MarketPhase only:** rejected outside the market phase.
+- **Lossy round-trip:** 2 coins → 1 rep → 1.5 coins (2→3 rate), so the exchange cannot be arbitraged.
+- **Configurable:** the three rates live on `GameConfig` and are tuned per-difficulty in `MainStreetDifficulty.ts` (defaults on all three presets).
+- **UI:** two SLL-positioned buttons in the market-phase action bar (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones; rendered in `MainStreetRenderer.refreshActionButtons`), disabled when the input resource is insufficient or the gate is spent.
+- **AI:** `enumerateLegalActions` includes the action when affordable and unused; `GreedyStrategy` uses it only when genuinely stalled (cannot afford the cheapest market card) with a reputation buffer, so it never dominates normal purchases.
+- **Tutorial:** T13 teaches the rep→coins exchange, which speeds up the $7 Library purchase under the 12-coin scenario budget; the tutorial starts with 12 coins so the exchange is available from the first day (the tutorial's two-turn plan-ahead flow budgets it, but it is not strictly required — the budget table comments in `TutorialScenario.ts` show the Library remains affordable without it).
+- **Persistence:** `favourUsedThisTurn` is serialized with legacy-save backfill to `false`.
+
 ## Layout files and adapter
 
 - Canonical layout JSON: `example-games/main-street/layouts/main-street.layout.json`
@@ -104,7 +121,7 @@ The first row is the header. Columns common to all card families:
 | `id` | string | Unique card template ID (e.g. `biz-bakery`, `evt-festival`) |
 | `name` | string | Display name shown in-game |
 | `description` | string | Flavour / effect description |
-| `tier` | string | Progression tier: `1`–`5`. Empty (or absent) for always-available cards (e.g. staff). Tier assignments are consumed by `MainStreetTiers.ts` to build `TIER_DEFINITIONS` arrays. |
+| `tier` | string | Progression tier: `1`–`12` (all families, including staff, are tier-assigned). Tier assignments are consumed by `MainStreetTiers.ts` to build `TIER_DEFINITIONS` arrays. |
 
 #### Family-specific columns
 
@@ -212,7 +229,7 @@ Main Street Milestone 5 (CG-0MOY5TOJK008JFJM) adds a first-time player onboardin
 
 ### Action-Gated Tutorial Flow
 
-- **Module:** `TutorialFlow.ts` — T1-T10 step definitions with pure progression controller.
+- **Module:** `TutorialFlow.ts` — T1-T23 step definitions with pure progression controller.
 - Each step gates on a specific player action (confirm, select-business, place-business, end-turn, etc.)
 - Invalid actions show: "Complete the highlighted step first."
 

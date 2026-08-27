@@ -127,6 +127,14 @@ export function generateBusinessCardSvg(
       ? `<text x="${width / 2}" y="47" font-family="${FONT}" font-size="10" fill="#88bbff" font-weight="bold" text-anchor="middle">+${fmtRep(totalRep)}/turn</text>`
       : '';
 
+  // Ongoing cost label: centred, below rep, omitted when 0
+  // Uses orange/red text (same color as staff/community-space cards)
+  const ongoingCost = (card as BusinessCard).ongoingCost ?? 0;
+  const ongoingCostLabel =
+    ongoingCost > 0
+      ? `<text x="${width / 2}" y="59" font-family="${FONT}" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-${ongoingCost}/turn</text>`
+      : '';
+
   // Level badge: top-right, only for upgraded cards
   const levelBadge =
     isUpgraded
@@ -160,6 +168,7 @@ export function generateBusinessCardSvg(
   ${titleText}
   ${incomeLabel}
   ${repLabel}
+  ${ongoingCostLabel}
   ${levelBadge}
   ${costCircle}
   ${costText}
@@ -331,10 +340,18 @@ export function generateCardSvgFromCsvRow(
     if (row.handSlotsAdded && Number(row.handSlotsAdded) > 0) {
       inner.push('  <text x="' + (width / 2) + '" y="48" font-family="' + FONT + '" font-size="9" fill="#88bbff" font-weight="400" text-anchor="middle">+' + row.handSlotsAdded + ' slots</text>');
     }
+    if (row.peekOncePerTurn && Number(row.peekOncePerTurn) > 0) {
+      inner.push('  <text x="' + (width / 2) + '" y="58" font-family="' + FONT + '" font-size="9" fill="#ffcc66" font-weight="400" text-anchor="middle">peek 1/turn</text>');
+    }
   }
 
   // Community space ongoing cost (reputation-asset cards, e.g. Library -0.25/turn)
   if (family === 'community-space' && row.ongoingCost && Number(row.ongoingCost) > 0) {
+    inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
+  }
+
+  // Business ongoing cost (cards charged whether placed or held in hand, CG-0MSVYPEZ90085SHE)
+  if (family === 'business' && row.ongoingCost && Number(row.ongoingCost) > 0) {
     inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
   }
 

@@ -1,8 +1,10 @@
 /**
- * Main Street Tutorial E2E test — Coin Budget + T8 Investments → T9 Buy Local Festival.
+ * Main Street Tutorial E2E test — Coin Budget + T8 Investments → T9 Buy Local
+ * Festival → T10 End this turn (day 2 end).
  *
- * Verifies the 16-coin starting budget and walks T8 (Investments, confirm) and
- * T9 (Buy the Local Festival, buy-event gate with requiredCardId evt-festival-0).
+ * Verifies the 12-coin starting budget and walks T8 (Investments, confirm),
+ * T9 (Buy the Local Festival, buy-event gate with requiredCardId
+ * evt-festival-0), and T10 (day-2 End Turn).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
@@ -36,20 +38,20 @@ async function waitForStartButton(scene: Phaser.Scene, timeoutMs = 8_000): Promi
 async function walkToT8(scene: Phaser.Scene): Promise<void> {
   await clickOverlayButtonByText('Next >'); // T1 -> T2
   await clickOverlayButtonByText('Next >'); // T2 -> T3
-  await clickRequiredBusinessCard(scene);  // T3 buy Laundromat -> T4
+  await clickRequiredBusinessCard(scene);  // T3 move Laundromat -> T4
   await waitForOverlayVisible(5_000);
   await clickOverlayButtonByText('Next >'); // T4 -> T5
   await waitForOverlayVisible(5_000);
-  await clickStreetSlot(scene, 0);  // T5 place -> T6
+  await clickOverlayButtonByText('Next >'); // T5 -> T6
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T6 end turn -> T7
+  await waitForOverlayVisible(10_000);
+  await clickStreetSlot(scene, 0);         // T7 place Laundromat -> T8
   await new Promise((r) => setTimeout(r, 500));
   await waitForOverlayVisible(5_000);
-  await clickOverlayButtonByText('Next >'); // T6 -> T7
-  await waitForOverlayVisible(5_000);
-  await clickEndTurn(scene);               // T7 end turn -> T8
-  await waitForOverlayVisible(10_000);
 }
 
-describe('Main Street Tutorial E2E — Coin Budget (16 coins)', () => {
+describe('Main Street Tutorial E2E — Coin Budget (12 coins)', () => {
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -66,11 +68,11 @@ describe('Main Street Tutorial E2E — Coin Budget (16 coins)', () => {
     game = null;
   });
 
-  it('starts with 16 coins and the Laundromat is affordable', async () => {
+  it('starts with 12 coins and the Laundromat is affordable', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     const s = scene as any;
-    // 16 coins (raised from the 12-coin Easy preset for the 4-card flow)
-    expect(s.state?.resourceBank?.coins).toBe(16);
+    // 12 coins (two-turn listed-cost flow stays positive throughout)
+    expect(s.state?.resourceBank?.coins).toBe(12);
     const laundromat = s.state.market.cards.find((c: any) => c.id.startsWith('biz-laundromat'));
     expect(laundromat).toBeTruthy();
     expect(laundromat.cost).toBeLessThanOrEqual(4);

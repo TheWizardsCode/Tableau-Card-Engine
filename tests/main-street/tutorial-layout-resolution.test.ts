@@ -89,8 +89,9 @@ function computeExpectedZoneBounds(
     }
     case 'incidentQueue': {
       // Incident queue panel at boot: queueTop, width logW, height = the
-      // renderer's panelH with 2 cards and 0 active effects (22+8+156+8=194).
-      const cardAreaH = 2 * (layout.queueCardH + 6) - 6 + 12;
+      // renderer's panelH with the single face-down deck stack and 0 active
+      // effects (22+8+87+8=125, CG-0MSXOWLHU0099QF6).
+      const cardAreaH = layout.queueCardH + 6 + 12;
       const panelH = 22 + 8 + cardAreaH + 8;
       return {
         x: logX,
