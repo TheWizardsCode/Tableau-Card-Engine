@@ -1,6 +1,6 @@
 {
   "name": "tableau-card-engine",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Tableau Card Engine (TCE) -- a modular game engine for building single-player tableau card games using Phaser 4 RC and TypeScript",
   "author": "TheWizardsCode",
   "private": true,
