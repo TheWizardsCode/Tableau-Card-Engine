@@ -444,8 +444,8 @@ function extractTemplateCard(
  * Guarantees the tutorial's upcoming purchase targets are visible in the
  * single-row market at day start (CG-0MSTOATDT009BRX2).
  *
- * With only 3 visible slots and four buys spread across three days
- * (Laundromat T3, Local Festival T9, Bookshop T10, Library T13), the visible
+ * With only 3 visible slots and four buys spread across the tutorial
+ * (Laundromat T3, Local Festival T9, Bookshop T11, Library T17), the visible
  * line alone cannot hold every target. Scanning the upcoming action steps
  * (up to the next end-turn), this hook forces any missing required card into
  * the line: cards are drawn from the decks (or their discards), displacing

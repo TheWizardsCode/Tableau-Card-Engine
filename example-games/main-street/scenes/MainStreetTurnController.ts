@@ -688,8 +688,8 @@ export class MainStreetTurnController {
    *
    * The target slot must pass `canPurchaseBusiness` (card still in the
    * Development row, enough coins, empty slot, in bounds) and the tutorial
-   * must allow the `place-business` action. During a composite buy-and-place
-   * step with a synergy partner (T13: Library next to the Bookshop), the
+   * must allow the `place-business` action. During a plan-ahead placement
+   * step with a synergy partner (T19: Library next to the Bookshop), the
    * target must also pass `isSynergyAdjacentPlacement`. A rejected drop
    * snap-backs the card to the Development row with illegal-move feedback.
    */

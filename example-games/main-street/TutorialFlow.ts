@@ -187,7 +187,7 @@ export interface UnifiedTutorialStepDef {
    *
    * Used for steps whose body references TWO cards — the purchased card (via
    * `requiredCardId`, feeding `{cardName}`) and the synergy partner card (via
-   * `synergyCardId`, feeding `{synergyCardName}`). E.g. T13 builds the Library
+   * `synergyCardId`, feeding `{synergyCardName}`). E.g. T19 builds the Library
    * next to the Bookshop for a Culture adjacency bonus.
    */
   synergyCardId?: string;
@@ -674,7 +674,7 @@ export function resolveTutorialCardParams(
   };
 
   // Resolve the synergy-partner card ({synergyCardName}) when the step
-  // references a second card (e.g. T13 builds the Library next to the Bookshop).
+  // references a second card (e.g. T19 builds the Library next to the Bookshop).
   if (step.synergyCardId) {
     const synergyBaseId = getBaseTypeId(step.synergyCardId);
     const synergyRow = getCsvRows().find(r => r.id === synergyBaseId);

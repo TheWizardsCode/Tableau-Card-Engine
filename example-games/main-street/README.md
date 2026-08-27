@@ -18,7 +18,7 @@ Rules:
 - **Configurable:** the three rates live on `GameConfig` and are tuned per-difficulty in `MainStreetDifficulty.ts` (defaults on all three presets).
 - **UI:** two SLL-positioned buttons in the market-phase action bar (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones; rendered in `MainStreetRenderer.refreshActionButtons`), disabled when the input resource is insufficient or the gate is spent.
 - **AI:** `enumerateLegalActions` includes the action when affordable and unused; `GreedyStrategy` uses it only when genuinely stalled (cannot afford the cheapest market card) with a reputation buffer, so it never dominates normal purchases.
-- **Tutorial:** T13 teaches the rep→coins exchange (required to afford the $7 Library with the 12-coin scenario budget); the tutorial starts with 12 coins so the conversion is mandatory.
+- **Tutorial:** T13 teaches the rep→coins exchange, which speeds up the $7 Library purchase under the 12-coin scenario budget; the tutorial starts with 12 coins so the exchange is available from the first day (the tutorial's two-turn plan-ahead flow budgets it, but it is not strictly required — the budget table comments in `TutorialScenario.ts` show the Library remains affordable without it).
 - **Persistence:** `favourUsedThisTurn` is serialized with legacy-save backfill to `false`.
 
 ## Layout files and adapter

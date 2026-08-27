@@ -36,7 +36,7 @@
  * - `{cost}` — the card's `cost` column, formatted via `formatCurrency()`.
  * - `{bonus}` — an event card's `coinDelta` as `+N coins` (used by T9).
  * - `{synergyCardName}` — a second card's name, when the step references a
- *   synergy partner (used by T13: Library next to Bookshop).
+ *   synergy partner (used by T19: Library next to Bookshop).
  *
  * To add a new language variant:
  *  1. Create `tutorial-<lang>.ts` with the translated bundle (keeping the
