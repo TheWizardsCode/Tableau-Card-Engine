@@ -95,6 +95,10 @@ Worklog Specific Ignores
 .opencode/tmp/
 
 ### End of Worklog Specific Ignores
+
+# herdr server runtime flag (created/removed by the herdr server process;
+# keep it out of git status so release/hygiene gates see a clean tree)
+.herdr-downtime-disabled
 # Ignore local pi settings but track project-level agent skills
 .pi/*
 !.pi/skills/
