@@ -194,7 +194,7 @@ TCE_SMOKE_BINARY=/path/to/binary npx vitest run --project electron
 
 ```bash
 npm test            # run all tests once (unit + browser, no tracked-asset restore step)
-npm run monte-carlo # run Main Street Monte Carlo harness (JSON + CSV outputs)
+npm run monte-carlo # run Main Street Monte Carlo harness via vite-node (JSON + CSV outputs)
 npm run tf:generate # generate tf audio artifacts (out-of-repo build/tf-synths)
 ```
 
