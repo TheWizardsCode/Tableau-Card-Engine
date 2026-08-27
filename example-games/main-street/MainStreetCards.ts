@@ -730,6 +730,12 @@ export function findConstrainedIncidentIndex(
 }
 
 /**
+ * @deprecated Replaced by runtime selection via `findConstrainedIncidentIndex`
+ * (CG-0MSZDD2TP003TZS5). The incident deck is now shuffled once at setup/
+ * reshuffle time and each draw is selected at runtime by evaluating constraints
+ * against the resolved-draw balance history. This pre-ordering function is
+ * retained only for reference — it is no longer called in production code.
+ *
  * Orders an incident card pool into a face-down, balance-aware deck
  * (CG-0MSTOATDP000JNHH, option (a)).
  *

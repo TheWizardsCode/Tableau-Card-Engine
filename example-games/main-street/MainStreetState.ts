@@ -36,7 +36,6 @@ import {
   type IncidentBalanceState,
   createIncidentBalanceState,
   createIncidentBalanceFromQueue,
-  orderIncidentDeck,
 } from './MainStreetCards';
 import {
   type ActiveChallenge,
@@ -676,11 +675,9 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   const market: MarketState = { cards: [] };
 
   // Build the face-down incident deck: move every Incident-trigger card from
-  // the seeded event deck into `incidentDeck` (front = next to resolve). The
-  // remaining Investment-trigger cards stay in the event deck for the market.
-  // Deck order is deterministic (same seed ⇒ same shuffle ⇒ same deck); the
-  // constraint-aware ordering (repeat spacing / streak) is applied at deck
-  // build/reshuffle time by orderIncidentDeck (CG-0MSXOVQFL007G3VH).
+  // the seeded event deck into `incidentDeck` (candidate pool for runtime
+  // selection). The remaining Investment-trigger cards stay in the event
+  // deck for the market.
   // Incident-draw balance limits come from the difficulty preset's config
   // (per-difficulty tuning, CG-0MSL0OU1E005WFJB). Configs that omit the
   // fields (legacy saves) fall back to the engine defaults N=3, M=2 via ??
@@ -703,11 +700,14 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   eventDeck.length = 0;
   eventDeck.push(...remainingEventCards);
 
-  // Constraint-aware deck ordering (option (a), CG-0MSXOVQFL007G3VH): the full
-  // pre-arranged draw sequence satisfies repeatSpacing (N) / maxStreak (M).
-  // Deterministic — orderIncidentDeck consumes no RNG (pool order comes from
-  // the seeded shuffle), so same seed ⇒ same deck order.
-  const incidentDeck = orderIncidentDeck(incidentPool, incidentBalance);
+  // Constraint-aware deck ordering replaced by runtime selection
+  // (CG-0MSZDD2TP003TZS5): the incident pool is shuffled once (seeded —
+  // same seed ⇒ same deck order) and each draw is selected at runtime by
+  // `findConstrainedIncidentIndex` against the resolved-draw balance
+  // history. No pre-ordering; constraints (repeatSpacing / maxStreak) are
+  // enforced at draw time.
+  shuffleArray(incidentPool, rng);
+  const incidentDeck = incidentPool;
 
   // Build initial state -- use config values instead of hard-coded constants
   const initCoins = config.startingCoins;

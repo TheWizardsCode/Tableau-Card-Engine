@@ -13,13 +13,13 @@
  */
 
 import type { LegalityResult } from '../../src/rule-engine';
+import { shuffleArray } from '../../src/card-system';
 import type { MainStreetState } from './MainStreetState';
 import { addLog } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard, StaffCard } from './MainStreetCards';
 import {
   GRID_SIZE,
   REFRESH_MARKET_COST,
-  orderIncidentDeck,
 } from './MainStreetCards';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
 import {
@@ -332,12 +332,10 @@ export function cycleMarketCards(state: MainStreetState): void {
 /**
  * Replenishes the face-down incident deck when it is exhausted: gathers
  * remaining Incident-trigger cards from the event deck and event discards
- * and rebuilds the deck constraint-aware via `orderIncidentDeck` (seeded
- * from the resolved-draw balance history, so the rebuilt deck stays
- * consistent with what was already resolved) — CG-0MSTOATDP000JNHH,
- * option (a). No RNG is consumed here: the pool order is deterministic
- * (gather order from the seeded decks/discards) and the selector scans
- * deterministically.
+ * and shuffles them into a new face-down deck (seeded, so the order is
+ * deterministic per game seed). Constraint satisfaction (repeat spacing /
+ * streak) happens at draw time via `findConstrainedIncidentIndex`, not by
+ * pre-ordering the deck (CG-0MSZDD2TP003TZS5).
  *
  * No visible refill loop: the deck is face-down and only its remaining
  * count is shown. Called by `resolveIncident` when `incidentDeck` is empty.
@@ -361,7 +359,11 @@ export function replenishIncidentDeck(state: MainStreetState): void {
   }
   if (pool.length === 0) return;
 
-  state.incidentDeck = orderIncidentDeck(pool, state.incidentBalance);
+  // Seeded shuffle only — no pre-ordering. `resolveIncident` selects each
+  // card at draw time via `findConstrainedIncidentIndex` (deterministic,
+  // consumes no RNG), so the deck order here only sets the candidate order.
+  shuffleArray(pool, state.rng);
+  state.incidentDeck = pool;
   addLog(state, 'Reshuffled incident deck from event cards', 'neutral');
 }
 

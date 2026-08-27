@@ -18,7 +18,10 @@
 import type { MainStreetState, DayPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
 import type { BusinessCard, EventCard, SynergyType } from './MainStreetCards';
-import { SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, type DurationEventCard } from './MainStreetCards';
+import {
+  SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
+  type DurationEventCard,
+} from './MainStreetCards';
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
@@ -617,10 +620,19 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
   }
   if (state.incidentDeck.length === 0) return null;
 
-  // Pop the top card of the incident deck (front = next to resolve).
-  const event = state.incidentDeck.shift()!;
-  // Track the draw so the balance history mirrors the resolved sequence
-  // (AC3: recordIncidentDraw history still tracks the resolved sequence).
+  // Runtime constraint-aware selection: pick the next incident card from the
+  // face-down pool using `findConstrainedIncidentIndex`. This replaces the
+  // legacy pre-ordering (`orderIncidentDeck`) — the deck is shuffled once at
+  // setup/reshuffle, then each draw picks the best constrained card by index
+  // without consuming any RNG (deterministic from deck order).
+  const idx = findConstrainedIncidentIndex(state.incidentDeck, state.incidentBalance);
+  if (idx < 0) return null; // No Incident-trigger cards in deck.
+
+  // Remove the chosen card by index (deck remains face-down, player sees only
+  // the resolved sequence).
+  const event = state.incidentDeck.splice(idx, 1)[0]!;
+
+  // Track the draw so the balance history mirrors the resolved sequence.
   recordIncidentDraw(state.incidentBalance, event);
 
   const coinsBefore = state.resourceBank.coins;
