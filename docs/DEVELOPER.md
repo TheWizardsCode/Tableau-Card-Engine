@@ -1005,8 +1005,10 @@ available during the market phase (it does not consume `actionsRemaining`):
   scores rep→coins > 1 only when genuinely stalled (cannot afford the cheapest
   market card) with a reputation buffer; `GreedyStrategy` Priority 9 selects it
   only in that case, so normal purchases are never dominated.
-- Tutorial: T13 (action-gated) teaches the rep→coins exchange; the scenario
-  starts with 12 coins so the conversion is REQUIRED for the $7 Library (T14).
+- Tutorial: T13 (action-gated) teaches the rep→coins exchange. In the
+  two-turn flow (CG-0MT53NXGZ004H5AE) the conversion is optional — end-turn
+  income already keeps the balance above the $7 Library (T19), so the lesson
+  is low-pressure.
 - Tests: `tests/main-street/community-favour-*.test.ts` (engine, AI,
   persistence) + `community-favour-ui.browser.test.ts` (buttons, disabled
   states, full exchange round).
@@ -1950,7 +1952,7 @@ reusing base layout zones through composition.
 | `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
 | `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
 | `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T18 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types |
+| `example-games/main-street/TutorialFlow.ts` | T1-T23 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types |
 
 #### How composition works
 

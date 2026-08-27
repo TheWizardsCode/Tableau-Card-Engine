@@ -47,7 +47,7 @@ import {
   UNIFIED_TUTORIAL_STEPS,
   UNIFIED_TUTORIAL_STEP_COUNT,
 } from '../../example-games/main-street/TutorialFlow';
-import { MARKET_TOTAL_SLOTS, INCIDENT_QUEUE_SIZE } from '../../example-games/main-street/MainStreetCards';
+import { MARKET_TOTAL_SLOTS } from '../../example-games/main-street/MainStreetCards';
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -201,21 +201,21 @@ describe('AC2: TUTORIAL_SEED is deprecated and not used in tutorial setup path',
 // ── AC3: All 13 tutorial steps complete with scenario setup ──
 
 describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => {
-  it('UNIFIED_TUTORIAL_STEPS contains exactly 18 steps (T1-T18)', () => {
-    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(18);
-    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(18);
+  it('UNIFIED_TUTORIAL_STEPS contains exactly 23 steps (T1-T23)', () => {
+    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(23);
+    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(23);
 
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 23; i++) {
       expect(UNIFIED_TUTORIAL_STEPS[i].id).toBe(`T${i + 1}`);
     }
   });
 
-  it('tutorial controller walks through all 18 steps via completeCurrentStep', () => {
+  it('tutorial controller walks through all 23 steps via completeCurrentStep', () => {
     let controller = startTutorial(createTutorialControllerState());
 
-    // Walk through all 18 steps
+    // Walk through all 23 steps
     const completedIds: string[] = [];
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 23; i++) {
       expect(controller.isActive).toBe(true);
       const currentStep = getCurrentStep(controller);
       expect(currentStep).toBeDefined();
@@ -226,15 +226,15 @@ describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => 
       controller = result.newState;
     }
 
-    // Verify all 18 steps were completed in order
+    // Verify all 23 steps were completed in order
     expect(completedIds).toEqual([
       'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8',
-      'T9', 'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18',
+      'T9', 'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18', 'T19', 'T20', 'T21', 'T22', 'T23',
     ]);
 
-    // After the 18th step completes, the controller has advanced past the end
-    expect(controller.lastCompletedStepId).toBe('T18');
-    expect(controller.currentStepIndex).toBe(18); // Past the end
+    // After the 23rd step completes, the controller has advanced past the end
+    expect(controller.lastCompletedStepId).toBe('T23');
+    expect(controller.currentStepIndex).toBe(23); // Past the end
     // isActive stays true (only exitTutorial sets it to false)
     // Verify the controller is at end by checking getCurrentStep returns null
     const afterComplete = getCurrentStep(controller);
@@ -284,30 +284,27 @@ describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => 
     expect(invTemplateIds).toContain(stripSerialSuffix(invEvent!.id));
   });
 
-  it('scenario state provides sufficient coins for the 18-step purchases (Laundromat $4, Local Festival $3, Bookshop $3, Library $7 + required conversion)', () => {
+  it('scenario state provides sufficient coins for the 23-step two-turn purchases (Laundromat $4 + Bookshop $3 + Library $7 at listed cost)', () => {
     const state = createTutorialScenario();
 
-    // Starting coins: 12 (scenario, with the REQUIRED T13 Community Favour
-    // +3 conversion bridging the Library gap)
+    // Starting coins: 12 (scenario; the two-turn flow places every card the
+    // day after its move at LISTED cost — no same-turn +50% premium)
     expect(state.resourceBank.coins).toBe(12);
 
-    // After buying Laundromat ($4): 8 coins remaining
-    const afterLaundromat = 12 - 4;
-    expect(afterLaundromat).toBe(8);
+    // After moving the Laundromat to hand (day 1) and placing it at listed
+    // cost (day 2): 8 coins remaining — positive even after holding it
+    // overnight (ongoing-cost overhead).
+    expect(12 - 4).toBe(8);
 
-    // After one income turn (Laundromat ~0.625): ~8.6, enough for the $3 Bookshop
-    const afterIncome = afterLaundromat + 0.625;
+    // End-turn income (~2.154 from the placed Laundromat on day 2) funds the
+    // $3 Bookshop placement (T15); see TutorialScenario's budget table.
+    const afterIncome = 12 - 4 + 2.154;
     expect(afterIncome).toBeGreaterThanOrEqual(3);
 
-    // After Bookshop ($3): ~5.6
-    const afterBookshop = afterIncome - 3;
-    expect(afterBookshop).toBeGreaterThanOrEqual(0);
-
-    // Second income turn (Laundromat + Bookshop ~1.25): ~6.875 — BELOW the
-    // $7 Library, so the T13 Community Favour conversion (+3) is required.
-    const beforeLibrary = afterBookshop + 1.25;
-    expect(beforeLibrary).toBeLessThan(7);
-    expect(beforeLibrary + 3).toBeGreaterThanOrEqual(7);
+    // End-turn income on days 4-5 (~3.9 each) plus the optional T13
+    // Community Favour (+3) keep the balance well above the $7 Library.
+    const beforeLibrary = afterIncome - 3 + 1.333 + 3.911 + 3.918 + 3;
+    expect(beforeLibrary).toBeGreaterThanOrEqual(7);
   });
 });
 
@@ -378,8 +375,9 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     const upgrades = state.market.cards.filter(c => c.family === 'upgrade');
     expect(upgrades.length).toBe(0);
 
-    // Incident deck: exactly INCIDENT_QUEUE_SIZE Incident-trigger events
-    expect(state.incidentDeck.length).toBe(INCIDENT_QUEUE_SIZE);
+    // Incident deck: exactly 5 Incident-trigger events (one per End Turn
+    // in the two-turn flow, CG-0MT53NXGZ004H5AE)
+    expect(state.incidentDeck.length).toBe(5);
     for (const card of state.incidentDeck) {
       expect(card.family).toBe('event');
       expect(card.trigger).toBe('Incident');

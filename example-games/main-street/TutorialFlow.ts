@@ -1,9 +1,9 @@
 /**
  * Main Street: Unified Tutorial Flow
  *
- * Defines the unified T1-T18 tutorial steps (18 steps) that teach the core
- * Main Street loop (buy → hand → place; invest → optimize → trigger). Each
- * step has a gate type:
+ * Defines the unified T1-T23 tutorial steps (23 steps) that teach the core
+ * Main Street loop (buy → hand → end turn → place; invest → optimize →
+ * trigger). Each step has a gate type:
  *
  * - **confirm**: The player clicks "Next"/"Continue" to advance (no gameplay
  *   action required). Used for informational/reference steps.
@@ -13,39 +13,50 @@
  * A pure controller manages tutorial progression. This module has NO Phaser
  * dependency so it can be unit tested in Node.
  *
+ * ## Two-turn buy-and-play (CG-0MT53NXGZ004H5AE)
+ *
+ * Every purchase is taught as **plan-ahead**: move a market card to hand on
+ * day N (consumes the daily action), End Turn, then place it from hand on
+ * day N+1 at its **listed cost** (consuming that day's action). Same-turn
+ * place-after-move (which CG-0MT24X0SX007RLHN prices at +50% premium) is
+ * never required within a tutorial step.
+ *
+ * Day map: T1-T6 (day 1: move Laundromat), T7-T10 (day 2: place Laundromat,
+ * buy Local Festival), T11-T14 (day 3: move Bookshop, Community Favour),
+ * T15-T16 (day 4: place Bookshop), T17-T18 (day 5: move Library),
+ * T19-T23 (day 6: place Library, play Local Festival, confirmations).
+ *
  * ## Coin Budget Analysis (TutorialScenario, Easy difficulty)
  *
- * With the TutorialScenario system and Easy difficulty (16 coins, 5 reputation):
+ * With the TutorialScenario system and Easy difficulty (12 coins, 5 reputation):
  *
- * - Market development row: Bakery ($3), **Laundromat ($4)**, **Library ($7)**, **Bookshop ($3)**
- * - Investments: Upgrade to Patisserie ($4), Upgrade to Garden ($3), Local Festival ($3)
- * - Incidents in queue: Community Award (+2 rep), Rainy Day (-1 coin per Food)
+ * - Market development row: Bakery ($3), **Laundromat ($4)**, **Bookshop ($3)**
+ * - Local Festival ($3) bought free (event moves cost no action)
+ * - Incidents in queue (5 deterministic, all budget-safe for the tutorial
+ *   street): Community Award (+2 rep) ×3, Rainy Day (0 coins — no Food
+ *   businesses are placed) ×2. See TutorialScenario.ts.
  *
- * ### Budget Walkthrough
+ * ### Budget Walkthrough (two-turn plan-ahead, listed-cost placements)
  *
  * | Step | Action                           | Coins In | Coins Out | Balance |
  * |------|----------------------------------|----------|-----------|---------|
- * | T1   | Start (Easy, 16 coins)           | 16       | 0         | 16      |
- * | T2   | Confirm (no cost)                | 0        | 0         | 16      |
- * | T3   | Buy Laundromat ($4)              | 0        | 4         | 12      |
- * | T4   | Confirm (no cost)                | 0        | 0         | 12      |
- * | T5   | Place business (free)            | 0        | 0         | 12      |
- * | T6   | Confirm (no cost)                | 0        | 0         | 12      |
- * | T7   | End Turn + income (~0.6 coin)    | 0.625    | 0         | 12.625  |
- * | T8   | Confirm (no cost)                | 0        | 0         | 12.625  |
- * | T9   | Buy Local Festival ($3)          | 0        | 3         | 9.625   |
- * | T10  | Buy-and-place Bookshop ($3)      | 0        | 3         | 6.625   |
- * | T11  | End Turn + income (~1.25 coins)  | 1.25     | 0         | 7.875   |
- * | T12  | Confirm (no cost)                | 0        | 0         | 7.875   |
- * | T13  | Buy Library ($7)                 | 0        | 7         | 0.875   |
- * | T14  | Play held event (free)           | 0        | 0         | ~1      |
- * | T15+ | Confirm steps (no cost)          | 0        | 0         | ~1      |
+ * | T1   | Start (Easy, 12 coins)           | 12       | 0         | 12      |
+ * | T3   | Move Laundromat to hand (free)   | 0        | 0         | 12      |
+ * | T6   | End Turn (held card cost -1)     | 0        | 1         | 11      |
+ * | T7   | Place Laundromat (listed $4)     | 0        | 4         | 7       |
+ * | T10  | End Turn + income (~2.15)        | 2.154    | 0         | 9.154   |
+ * | T13  | Community Favour (+3)            | 3        | 0         | 12.154  |
+ * | T14  | End Turn + income (~1.33)        | 1.333    | 0         | 13.487  |
+ * | T15  | Place Bookshop (listed $3)       | 0        | 3         | 10.487  |
+ * | T16  | End Turn + income (~3.91)        | 3.911    | 0         | 14.398  |
+ * | T18  | End Turn + income (~3.92)        | 3.918    | 0         | 18.316  |
+ * | T19  | Place Library (listed $7)        | 0        | 7         | 11.316  |
+ * | T20  | Play Local Festival (net +1)     | 1        | 0         | 12.316  |
  *
- * **Conclusion:** Even with worst-case incidents, the budget is sufficient
- * for all tutorial actions. Laundromat ($4) + Local Festival ($3) + Bookshop
- * ($3) + Library ($7) = $17 is covered by 16 starting coins plus ~1.9 income
- * across the two end-turn steps. The Bookshop (Culture business) and Library
- * (Culture community space) enable the Local Festival bonus when played in T14.
+ * **Conclusion:** Every step keeps a positive balance; no premium is ever
+ * paid because each placement follows an End Turn (plan-ahead). The
+ * Community Favour rep→coins exchange teaches the mechanic; the Library is
+ * affordable even without it, keeping the lesson low-pressure.
  *
  * @module
  */
@@ -92,7 +103,7 @@ export type TutorialHighlightZone =
 export type TutorialActionType =
   | 'confirm'            // Click continue/confirm
   | 'acknowledge'        // Click a highlighted area
-  | 'select-business'    // Select a business card from market
+  | 'select-business'    // Select a business card from market (moves it to hand)
   | 'select-hand-card'   // Click a card in the hand to select it for placement
   | 'place-business'     // Place a business on the street grid
   | 'end-turn'           // Click End Turn
@@ -100,9 +111,18 @@ export type TutorialActionType =
   | 'buy-event'          // Buy an event card from the market row
   | 'apply-upgrade'      // Buy/apply an upgrade
   | 'play-event'         // Play a held investment event from the hand
-  | 'buy-and-place'      // Composite: drag a business card and drop it on the street
   | 'community-favour'   // Perform a Community Favour exchange (rep-to-coins / coins-to-rep)
   | 'confirm-complete';  // Click "Let's play!" on completion modal
+
+/**
+ * @deprecated Since CG-0MT53NXGZ004H5AE removed same-turn composite steps.
+ * The tutorial now teaches two-turn plan-ahead (move day N → place day N+1),
+ * so no step uses the composite `buy-and-place` gating. Retained only so
+ * `isRequiredAction` can defend against legacy callers; the runtime path
+ * (MainStreetLifecycleManager / E2E helper) uses `select-business` +
+ * `place-business` split steps.
+ */
+export const COMPOSITE_BUY_AND_PLACE = 'buy-and-place' as TutorialActionType;
 
 /**
  * The gate type for a tutorial step.
@@ -173,21 +193,20 @@ export interface UnifiedTutorialStepDef {
   synergyCardId?: string;
 }
 
-// ── Unified Tutorial Script (T1-T18) ────────────────────────
+// ── Unified Tutorial Script (T1-T23) ────────────────────────
 
 /**
- * The unified set of 18 tutorial steps, in sequential order.
+ * The unified set of 23 tutorial steps, in sequential order.
  *
- * The flow teaches one concept per step: buy → hand → place; invest →
- * optimize → trigger. T12 was split into an informative cost/reputation
- * step (new T12) and the synergy-focused buy-and-place step (T13). The
- * Community Favour step (T13, CG-0MSTOATDQ005XDET) teaches the rep→coins
- * exchange needed to afford the Library (T14); T13–T17 below it are
- * renumbered T14–T18. See the parent work item's T1–T18 mapping for the
- * full rationale (steps dropped, split, renamed, and inserted).
+ * The flow teaches one concept per step: move → hand → end turn → place
+ * (plan-ahead); invest → optimize → trigger. Every purchase is a two-turn
+ * flow (CG-0MT53NXGZ004H5AE): a `select-business` step moves the card to
+ * hand on day N, an `end-turn` advances the day, and a `place-business`
+ * step places it on day N+1 at listed cost. There are no same-turn
+ * composite `buy-and-place` steps.
  *
- * Gate type distribution: 10 confirm + 8 action
- * (action steps: T3, T5, T7, T9, T10, T11, T13, T15).
+ * Gate type distribution: 9 confirm + 14 action
+ * (action steps: T3, T6, T7, T9, T10, T11, T13, T14, T15, T16, T17, T18, T19, T20).
  */
 export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
@@ -228,30 +247,34 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   },
   {
     id: 'T5',
+    // Upcoming Incidents moved BEFORE the first End Turn so the player
+    // understands the face-down deck before its first resolution.
     titleKey: tutorialKey('T5', 'title'),
     bodyKey: tutorialKey('T5', 'body'),
-    highlightZone: 'streetGrid',
-    gate: 'action',
-    requiredAction: 'place-business',
-  },
-  {
-    id: 'T6',
-    titleKey: tutorialKey('T6', 'title'),
-    bodyKey: tutorialKey('T6', 'body'),
-    // Deck-based flow (CG-0MSTOATDP000JNHH): the Upcoming panel now shows a
-    // face-down incident deck stack + remaining count (zone name
-    // 'incidentQueue' retained for the container/highlight); the body teaches
-    // the hidden deck + one peek per turn. No action required — confirm only.
     highlightZone: 'incidentQueue',
     gate: 'confirm',
   },
   {
-    id: 'T7',
-    titleKey: tutorialKey('T7', 'title'),
-    bodyKey: tutorialKey('T7', 'body'),
+    id: 'T6',
+    // Day-1 End Turn: ends the day in which the Laundromat was moved to
+    // hand. The first incident (Community Award, +2 rep) resolves here.
+    titleKey: tutorialKey('T6', 'title'),
+    bodyKey: tutorialKey('T6', 'body'),
     highlightZone: 'endTurnButton',
     gate: 'action',
     requiredAction: 'end-turn',
+  },
+  {
+    id: 'T7',
+    // Day 2: place the Laundromat from hand at LISTED cost (plan-ahead).
+    // justMovedHandCardId was cleared at day start, so no same-turn premium.
+    // Body references the Laundromat ({cardName}/{cost}) via referencedCardId.
+    titleKey: tutorialKey('T7', 'title'),
+    bodyKey: tutorialKey('T7', 'body'),
+    highlightZone: 'streetGrid',
+    gate: 'action',
+    requiredAction: 'place-business',
+    referencedCardId: 'biz-laundromat-0',
   },
   {
     id: 'T8',
@@ -269,30 +292,34 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     gate: 'action',
     requiredAction: 'buy-event',
     // The TutorialScenario system puts Local Festival (evt-festival, $3)
-    // on the market row, affordable after the T3 placement + T7 income.
+    // on the market row. Events move to hand FREE (no action), so this can
+    // share day 2 with the Laundromat placement (T7).
     requiredCardId: 'evt-festival-0',
   },
   {
     id: 'T10',
     titleKey: tutorialKey('T10', 'title'),
     bodyKey: tutorialKey('T10', 'body'),
-    // Composite buy-and-place step: drag the Bookshop from the market row onto
-    // an empty street slot (drag-drop buy-and-place, landed via CG-0MSKSAREE007AYSZ).
-    highlightZone: 'developmentRow',
+    // Day-2 End Turn: ends the day in which the Laundromat was placed and
+    // the Local Festival was bought; resolves the second incident. Body text
+    // references the Local Festival bought in T9 — referencedCardId feeds
+    // the {cardName} placeholder from live card data (no gate here).
+    highlightZone: 'endTurnButton',
     gate: 'action',
-    requiredAction: 'buy-and-place',
-    requiredCardId: 'biz-bookshop-0',
+    requiredAction: 'end-turn',
+    referencedCardId: 'evt-festival-0',
   },
   {
     id: 'T11',
     titleKey: tutorialKey('T11', 'title'),
     bodyKey: tutorialKey('T11', 'body'),
-    highlightZone: 'endTurnButton',
+    // Day 3, split 1 of the Bookshop purchase: move it to hand (the day's
+    // one action). Same-turn placement would cost +50%; we end the turn and
+    // place at listed cost tomorrow (T15).
+    highlightZone: 'developmentRow',
     gate: 'action',
-    requiredAction: 'end-turn',
-    // Body text references the Local Festival bought in T9 — referencedCardId
-    // feeds the {cardName} placeholder from live card data (no gate here).
-    referencedCardId: 'evt-festival-0',
+    requiredAction: 'select-business',
+    requiredCardId: 'biz-bookshop-0',
   },
   {
     id: 'T12',
@@ -300,8 +327,8 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     bodyKey: tutorialKey('T12', 'body'),
     // Informative cost-vs-reputation step: highlights the market row (like T2)
     // and references cs-library so {cardName}/{cost} resolve from live card
-    // data. No action required and NO synergy mention — the buy-and-place
-    // action and the synergy rule live on T14.
+    // data. No action required and NO synergy mention — the placement
+    // action and the synergy rule live on T19.
     highlightZone: 'developmentRow',
     gate: 'confirm',
     referencedCardId: 'cs-library',
@@ -310,12 +337,11 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T13',
     titleKey: tutorialKey('T13', 'title'),
     bodyKey: tutorialKey('T13', 'body'),
-    // Community Favour (CG-0MSTOATDQ005XDET): the player converts 2
-    // reputation into 3 coins via the free once-per-turn exchange so they
-    // can afford the Library in T14. Action-gated on the rep-to-coins
-    // direction; highlight the market-phase action bar where the two favour
-    // buttons render. The {cardName} placeholder resolves from cs-library
-    // (the card the conversion is meant to afford).
+    // Community Favour (CG-0MSTOATDQ005XDET): the free once-per-turn
+    // rep→coins exchange teaches the mechanic; it is NOT strictly required
+    // for the Library in the two-turn budget (see TutorialFlow budget
+    // analysis). Action-gated on the rep-to-coins direction; highlight the
+    // market-phase action bar where the two favour buttons render.
     highlightZone: 'actionButtons',
     gate: 'action',
     requiredAction: 'community-favour',
@@ -325,21 +351,74 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T14',
     titleKey: tutorialKey('T14', 'title'),
     bodyKey: tutorialKey('T14', 'body'),
-    // Composite buy-and-place step (like T10): the player buys cs-library
-    // from the market row (drag or click-to-take) and places it on the street.
-    // The step completes only on the terminal place-business drop; the
-    // Library must be placed NEXT TO the Bookshop (synergyCardId) for the
-    // Culture adjacency bonus — see isSynergyAdjacentPlacement().
-    highlightZone: 'developmentRow',
+    // Day-3 End Turn: ends the day in which the Bookshop was moved to hand;
+    // resolves the third (safe) incident. Body references the Bookshop
+    // ({cardName}) via referencedCardId — no gate here.
+    highlightZone: 'endTurnButton',
     gate: 'action',
-    requiredAction: 'buy-and-place',
-    requiredCardId: 'cs-library',
-    synergyCardId: 'biz-bookshop-0',
+    requiredAction: 'end-turn',
+    referencedCardId: 'biz-bookshop-0',
   },
   {
     id: 'T15',
     titleKey: tutorialKey('T15', 'title'),
     bodyKey: tutorialKey('T15', 'body'),
+    // Day 4, split 2 of the Bookshop purchase: place from hand at LISTED $3
+    // (plan-ahead — no premium). Body references the Bookshop
+    // ({cardName}/{cost}) via referencedCardId — no gate here.
+    highlightZone: 'streetGrid',
+    gate: 'action',
+    requiredAction: 'place-business',
+    referencedCardId: 'biz-bookshop-0',
+  },
+  {
+    id: 'T16',
+    titleKey: tutorialKey('T16', 'title'),
+    bodyKey: tutorialKey('T16', 'body'),
+    // Day-4 End Turn: resolves the fourth (safe) incident.
+    highlightZone: 'endTurnButton',
+    gate: 'action',
+    requiredAction: 'end-turn',
+  },
+  {
+    id: 'T17',
+    titleKey: tutorialKey('T17', 'title'),
+    bodyKey: tutorialKey('T17', 'body'),
+    // Day 5, split 1 of the Library purchase: move cs-library to hand.
+    highlightZone: 'developmentRow',
+    gate: 'action',
+    requiredAction: 'select-business',
+    requiredCardId: 'cs-library',
+  },
+  {
+    id: 'T18',
+    titleKey: tutorialKey('T18', 'title'),
+    bodyKey: tutorialKey('T18', 'body'),
+    // Day-5 End Turn: resolves the fifth (safe) incident. Body references
+    // the Library ({cardName}) via referencedCardId — no gate here.
+    highlightZone: 'endTurnButton',
+    gate: 'action',
+    requiredAction: 'end-turn',
+    referencedCardId: 'cs-library',
+  },
+  {
+    id: 'T19',
+    titleKey: tutorialKey('T19', 'title'),
+    bodyKey: tutorialKey('T19', 'body'),
+    // Day 6, split 2 of the Library purchase: place from hand at LISTED $7
+    // NEXT TO the Bookshop (synergyCardId) for the Culture adjacency bonus —
+    // see isSynergyAdjacentPlacement(). referencedCardId feeds the
+    // {cardName}/{cost} placeholders from live card data (no market gate).
+    highlightZone: 'streetGrid',
+    gate: 'action',
+    requiredAction: 'place-business',
+    referencedCardId: 'cs-library',
+    synergyCardId: 'biz-bookshop-0',
+  },
+  {
+    id: 'T20',
+    titleKey: tutorialKey('T20', 'title'),
+    bodyKey: tutorialKey('T20', 'body'),
     // Triggering Events: play the held Local Festival from the hand.
     highlightZone: 'hand',
     gate: 'action',
@@ -347,31 +426,31 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     referencedCardId: 'evt-festival-0',
   },
   {
-    id: 'T16',
-    titleKey: tutorialKey('T16', 'title'),
-    bodyKey: tutorialKey('T16', 'body'),
+    id: 'T21',
+    titleKey: tutorialKey('T21', 'title'),
+    bodyKey: tutorialKey('T21', 'body'),
     // Success and Failure: the scoring bar (HUD).
     highlightZone: 'hud',
     gate: 'confirm',
   },
   {
-    id: 'T17',
-    titleKey: tutorialKey('T17', 'title'),
-    bodyKey: tutorialKey('T17', 'body'),
+    id: 'T22',
+    titleKey: tutorialKey('T22', 'title'),
+    bodyKey: tutorialKey('T22', 'body'),
     highlightZone: 'challengePanel',
     gate: 'confirm',
   },
   {
-    id: 'T18',
-    titleKey: tutorialKey('T18', 'title'),
-    bodyKey: tutorialKey('T18', 'body'),
+    id: 'T23',
+    titleKey: tutorialKey('T23', 'title'),
+    bodyKey: tutorialKey('T23', 'body'),
     highlightZone: 'completionModal',
     gate: 'confirm',
   },
 ] as const;
 
 /** Total number of unified tutorial steps. */
-export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 18
+export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 23
 
 export const INVALID_ACTION_MESSAGE = 'Complete the highlighted step first.';
 
@@ -462,19 +541,12 @@ export function isRequiredAction(
 ): boolean {
   const step = getCurrentStep(state);
   if (!step || step.gate !== 'action') return false;
-  // Composite buy-and-place step: both the pickup (select-business) and the
-  // drop (place-business) are required/allowable while the step is active;
-  // the step completes only on the terminal drop action (see
-  // MainStreetLifecycleManager.onTutorialActionComplete).
+  // Two-turn plan-ahead flow (CG-0MT53NXGZ004H5AE): there are no same-turn
+  // composite `buy-and-place` steps — a `select-business` step moves the
+  // card to hand today, an `end-turn` advances the day, and a
+  // `place-business` step places it tomorrow at listed cost.
   // Selecting a hand card (select-hand-card) is also allowed during placement
   // steps so the player can pick which card to place (CG-0MSXIQIPJ000NDTL).
-  if (step.requiredAction === 'buy-and-place') {
-    return actionType === 'select-business'
-      || actionType === 'place-business'
-      || actionType === 'select-hand-card';
-  }
-  // During a place-business step the player must click the hand card first
-  // (select-hand-card), then click an empty slot (place-business).
   if (step.requiredAction === 'place-business') {
     return actionType === 'place-business' || actionType === 'select-hand-card';
   }
@@ -490,9 +562,10 @@ export function shouldAllowAction(
 }
 
 /**
- * Pure placement rule for composite buy-and-place steps with a synergy
- * partner (currently T13: the Library must be built next to the Bookshop
- * for the Culture adjacency bonus).
+ * Pure placement rule for the Library's synergy-adjacent placement (T19:
+ * the Library must be built next to the Bookshop for the Culture adjacency
+ * bonus). Applies to the tutorial step that declares a `synergyCardId` —
+ * both the old composite gate and the current place-business split step.
  *
  * Enforced by both the drag path (`MainStreetTurnController.canDropBusinessCard`
  * → snap-back + illegal-move feedback) and the click path (`onSlotClick` →
@@ -504,11 +577,11 @@ export function shouldAllowAction(
  * @returns `true` when the placement is allowed, `false` when it must be
  *          rejected because the target is not adjacent to the synergy card.
  *
- * The rule ONLY applies to composite `buy-and-place` steps that declare a
- * `synergyCardId`. For every other step the helper returns `true` (no-op).
- * "Next to" means 8-way adjacency (Chebyshev distance ≤ 1, diagonals
- * included) via the shared `neighbors()` resolver from `MainStreetAdjacency`
- * — the same semantics the synergy bonus system uses.
+ * The rule ONLY applies to tutorial steps that declare a `synergyCardId`.
+ * For every other step the helper returns `true` (no-op). "Next to" means
+ * 8-way adjacency (Chebyshev distance ≤ 1, diagonals included) via the
+ * shared `neighbors()` resolver from `MainStreetAdjacency` — the same
+ * semantics the synergy bonus system uses.
  *
  * The synergy card's slot is resolved dynamically from the live grid (the
  * operator explicitly rejected a hardcoded slot — "don't assume the player
@@ -516,16 +589,16 @@ export function shouldAllowAction(
  * template (copy-suffix stripped) so any copy of the synergy template
  * satisfies the rule. If the synergy card is NOT on the street, the rule
  * cannot be enforced and returns `true` (allowed) — the partner is
- * guaranteed to be present when T13 is reached (T10's buy-and-place
- * completes only on placement), but the helper stays robust regardless.
+ * guaranteed to be present when T19 is reached (T15's placement completes
+ * the Bookshop on day 4), but the helper stays robust regardless.
  */
 export function isSynergyAdjacentPlacement(
   step: UnifiedTutorialStepDef,
   streetGrid: readonly (BusinessCard | CommunitySpaceCard | null)[],
   targetSlot: number,
 ): boolean {
-  // Rule only applies to composite buy-and-place steps with a synergy partner.
-  if (step.requiredAction !== 'buy-and-place' || !step.synergyCardId) return true;
+  // Rule only applies to steps that declare a synergy partner.
+  if (!step.synergyCardId) return true;
 
   // Resolve the synergy card's ACTUAL street slot from the live grid.
   const synergySlot = streetGrid.findIndex(

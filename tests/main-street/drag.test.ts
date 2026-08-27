@@ -275,12 +275,15 @@ describe('MainStreet drag-to-buy wiring', () => {
       expect(controller.canDropBusinessCard(card.id, slot)).toBe(false);
     });
 
-    it('enforces synergy adjacency during T14 (Library must be next to the Bookshop)', () => {
-      const t14Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T14');
-      expect(t14Index).toBeGreaterThanOrEqual(0);
+    it('enforces synergy adjacency during T19 (Library must be next to the Bookshop)', () => {
+      // T19 is the two-turn Library placement step with the Bookshop synergy
+      // partner (CG-0MT53NXGZ004H5AE). The adjacency rule keys off the step's
+      // synergyCardId, so the split place-business step enforces it too.
+      const t19Index = UNIFIED_TUTORIAL_STEPS.findIndex((s) => s.id === 'T19');
+      expect(t19Index).toBeGreaterThanOrEqual(0);
       scene.tutorialController = {
         isActive: true,
-        currentStepIndex: t14Index,
+        currentStepIndex: t19Index,
         lastCompletedStepId: null,
         exited: false,
       };

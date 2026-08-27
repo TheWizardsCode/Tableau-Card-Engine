@@ -1,13 +1,16 @@
 /**
  * Tutorial Text Updates Tests
  *
- * Validates the 17-step tutorial text restructure (CG-0MSKSJ9SS0069ZWT):
+ * Validates the 23-step two-turn tutorial text (CG-0MT53NXGZ004H5AE):
  * 1. Every resolved title and body is ≤3 sentences and communicates exactly one point.
  * 2. T1 no longer mentions "25 turns" (time-limited play sentence removed).
  * 3. Upcoming Incidents has no "blue" wording and no incident-impact details.
  * 4. Place a Business has no matching-card mention.
  * 5. Card facts (name, cost, income) are resolved from live card data via
  *    {cardName}/{cost}/{bonus}/{synergyCardName} placeholders — never hardcoded.
+ * 6. Every purchase is a two-turn plan-ahead flow: move to hand today (one
+ *    action), End Turn, place tomorrow at LISTED cost. No copy promises
+ *    same-turn placement at listed cost (that path now costs a +50% premium).
  *
  * Text is resolved through the i18n system from `TUTORIAL_EN_BUNDLE`, with
  * card-data placeholders interpolated via `resolveTutorialStepText()`.
@@ -40,7 +43,7 @@ function countSentences(text: string): number {
   return parts.length;
 }
 
-describe('Tutorial text updates (17-step restructure)', () => {
+describe('Tutorial text updates (23-step two-turn restructure)', () => {
   beforeEach(() => {
     resetI18n();
     registerLocale('en', TUTORIAL_EN_BUNDLE);
@@ -78,45 +81,37 @@ describe('Tutorial text updates (17-step restructure)', () => {
     });
   });
 
-  describe('T3 Buy the Laundromat (AC: explicit click-to-buy, no "place cards" instruction)', () => {
+  describe('T3 Buy the Laundromat (AC: explicit click-to-buy, teaching move-today / place-tomorrow)', () => {
     it('mentions clicking to buy', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
       expect(body.toLowerCase()).toMatch(/click/);
       expect(body.toLowerCase()).toMatch(/buy/);
     });
-    it('does not instruct placing cards in this step', () => {
+    it('teaches move-today / place-tomorrow (one action today, listed cost tomorrow)', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
-      expect(body.toLowerCase()).not.toMatch(/place cards/i);
+      expect(body.toLowerCase()).toMatch(/one action/);
+      expect(body.toLowerCase()).toMatch(/tomorrow/);
+    });
+    it('does not promise same-turn placement at listed cost', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
+      // The stale "placing later this turn is free" claim is forbidden: a
+      // same-turn place-after-move now costs the +50% premium.
+      expect(body.toLowerCase()).not.toMatch(/placing later this turn is free/i);
+      expect(body.toLowerCase()).not.toMatch(/free.*this turn/i);
     });
   });
 
-  describe('T5 Place a Business (AC: no matching-card mention)', () => {
-    it('does not mention matching cards', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
-      expect(body.toLowerCase()).not.toMatch(/match/i);
-    });
-    it('explicitly says click an empty slot to earn income', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
-      expect(body.toLowerCase()).toMatch(/click/);
-      expect(body.toLowerCase()).toMatch(/income/i);
-    });
-  });
-
-  describe('T6 Upcoming Incidents (AC: no "blue", no impact details)', () => {
+  describe('T5 Upcoming Incidents (AC: no "blue", no impact details)', () => {
     it('does not describe incident cards as blue', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
       expect(body.toLowerCase()).not.toMatch(/\bblue\b/i);
     });
     it('does not list specific incident impacts', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
       expect(body.toLowerCase()).not.toMatch(/cost coins|cost reputation|-1 coin|-1 rep|per food/i);
     });
     it('teaches the face-down incident deck and the peek skill', () => {
-      // Face-down deck mechanic (CG-0MSTOATDP000JNHH): incidents live in a
-      // hidden deck; the player sees only the remaining count. The old
-      // visible-queue wording (top this turn / below next turn / hover for
-      // details) must be gone.
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
       expect(body.toLowerCase()).toMatch(/deck/);
       expect(body.toLowerCase()).toMatch(/face-down|face down|hidden/);
       expect(body.toLowerCase()).toMatch(/peek/);
@@ -126,22 +121,46 @@ describe('Tutorial text updates (17-step restructure)', () => {
     });
   });
 
-  describe('T10 Optimizing for Events (AC: drag to place, depends on drag-drop)', () => {
-    it('mentions culture businesses and drag-to-place', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!).body;
-      expect(body.toLowerCase()).toMatch(/culture/);
-      expect(body.toLowerCase()).toMatch(/drag/);
-      expect(body.toLowerCase()).toMatch(/street/);
+  describe('T6 End Turn (day 1 → day 2) — first two-turn boundary', () => {
+    it('says to end the day and that the taken card waits overnight', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
+      expect(body.toLowerCase()).toMatch(/end/i);
+      expect(body.toLowerCase()).toMatch(/overnight|tomorrow|next one/i);
     });
   });
 
-  describe('T11 End this turn (AC: wait for a more opportune moment)', () => {
-    it('says we could play the card now but wait for a more opportune moment', () => {
+  describe('T7 Place a Business (AC: no matching-card mention, listed cost)', () => {
+    it('does not mention matching cards', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T7')!).body;
+      expect(body.toLowerCase()).not.toMatch(/match/i);
+    });
+    it('explicitly says click an empty slot and pay listed cost', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T7')!).body;
+      expect(body.toLowerCase()).toMatch(/click/);
+      expect(body.toLowerCase()).toMatch(/listed/);
+    });
+  });
+
+  describe('T11 Move the Bookshop to hand (split 1/2 — teaches plan-ahead)', () => {
+    it('mentions culture businesses and move-to-hand', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;
+      expect(body.toLowerCase()).toMatch(/culture/);
+      expect(body.toLowerCase()).toMatch(/hand/);
+    });
+    it('teaches place-tomorrow at listed cost instead of same-day premium', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;
+      expect(body.toLowerCase()).toMatch(/tomorrow/);
+      expect(body.toLowerCase()).toMatch(/listed/);
+    });
+  });
+
+  describe('T10 End this turn (AC: wait for a more opportune moment)', () => {
+    it('says we could play the card now but wait for a more opportune moment', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!).body;
       expect(body).toMatch(/(wait|hold).*(opportune|moment)/i);
     });
     it('resolves {cardName} from card data (no raw placeholder tokens)', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!).body;
       expect(body).not.toMatch(/\{[A-Za-z_]+\}/);
     });
   });
@@ -165,74 +184,75 @@ describe('Tutorial text updates (17-step restructure)', () => {
     });
   });
 
-  describe('T13 Community Favour (AC: rep→coins exchange for the Library)', () => {
+  describe('T13 Community Favour (AC: teaches the rep→coins exchange)', () => {
     it('mentions Community Favour and the rep→coins exchange', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
       expect(body.toLowerCase()).toMatch(/community favour/);
       expect(body.toLowerCase()).toMatch(/2r → 3c|reputation/);
     });
-    it('mentions the Library affordability goal', () => {
+    it('does not claim the Library is unaffordable without it (two-turn budget)', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T13')!).body;
-      expect(body).toContain('Library');
+      expect(body.toLowerCase()).not.toMatch(/little short on coins/i);
+      expect(body.toLowerCase()).not.toMatch(/required/i);
     });
   });
 
-  describe('T14 Build a Library (AC: synergy system, Culture adjacency)', () => {
+  describe('T19 Build a Library next to the Bookshop (AC: synergy system, Culture adjacency)', () => {
     it('mentions the Culture bonus via synergyCardName placeholder', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T19')!).body;
       expect(body).toContain('Bookshop');
       expect(body.toLowerCase()).toMatch(/culture/);
       expect(body.toLowerCase()).toMatch(/bonus/);
     });
-    it('tells the player to take, select, and place the Library next to the Bookshop', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!).body;
-      // Post-CG-0MSXIQIPJ000NDTL: the text uses "take it to your hand" and
-      // "click the card in your hand to select it" instead of a single "buy".
-      expect(body.toLowerCase()).toMatch(/take|buy/);
-      expect(body.toLowerCase()).toMatch(/select|place/);
+    it('tells the player to select and place the Library next to the Bookshop', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T19')!).body;
+      expect(body.toLowerCase()).toMatch(/hand/);
       expect(body.toLowerCase()).toMatch(/place/);
       expect(body.toLowerCase()).toMatch(/next to/);
     });
   });
 
-  describe('T15 Triggering Events (AC: play festival from hand)', () => {
+  describe('T20 Triggering Events (AC: play festival from hand)', () => {
     it('mentions clicking the held festival in hand', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T15')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T20')!).body;
       expect(body.toLowerCase()).toMatch(/hand/);
       expect(body.toLowerCase()).toMatch(/click/);
     });
   });
 
-  describe('T16 Success and Failure (AC: scoring bar)', () => {
+  describe('T21 Success and Failure (AC: scoring bar)', () => {
     it('mentions the scoring bar components', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T16')!).body;
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T21')!).body;
       expect(body.toLowerCase()).toMatch(/coins/);
       expect(body.toLowerCase()).toMatch(/score/);
       expect(body.toLowerCase()).toMatch(/target/);
     });
   });
 
-  describe('T16 button label (AC: "Let\'s play!")', () => {
+  describe('T23 button label (AC: "Let\'s play!")', () => {
     it('overlay startFullGame is "Let\'s play!"', () => {
       expect(t('tutorial.overlay.startFullGame')).toBe("Let's play!");
     });
   });
 
-  describe('Action economy + buy-and-place premium copy (CG-0MSTOF1N5005PK2R)', () => {
+  describe('Action economy + two-turn plan-ahead copy (CG-0MT53NXGZ004H5AE)', () => {
     it('T3 teaches the one-action-per-day rule', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
       expect(body.toLowerCase()).toMatch(/one action/i);
     });
 
-    it('T3 explains same-turn placement is free', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
-      expect(body.toLowerCase()).toMatch(/placing.*free|free.*placing/i);
+    it('T11 teaches move-today / place-tomorrow at listed cost', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;
+      expect(body.toLowerCase()).toMatch(/one action/i);
+      expect(body.toLowerCase()).toMatch(/tomorrow.*listed|listed.*tomorrow/i);
     });
 
-    it('T10 teaches the buy-and-place +50% premium', () => {
-      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!).body;
-      expect(body.toLowerCase()).toMatch(/50% more|50% premium|50%*more/i);
-      expect(body.toLowerCase()).toMatch(/buy-and-place|buy and place/i);
+    it('no step copy promises same-turn placement at listed cost', () => {
+      for (const step of UNIFIED_TUTORIAL_STEPS) {
+        const body = resolveTutorialStepText(step).body.toLowerCase();
+        expect(body, `${step.id} must not promise free same-turn placement`).not.toMatch(/placing later this turn is free/i);
+        expect(body, `${step.id} must not teach same-day buy-and-place at listed cost`).not.toMatch(/buy-and-place|buy and place.*free/i);
+      }
     });
   });
 });
@@ -283,14 +303,14 @@ describe('Data-driven tutorial text (card facts from card data)', () => {
     }
   });
 
-  it('T3/T9/T10 embed card names/costs via data-driven placeholders', () => {
+  it('T3/T9/T11 embed card names/costs via data-driven placeholders', () => {
     const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
     const t9 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T9')!;
-    const t10 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!;
+    const t11 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!;
 
     const laundromatRow = getCsvRows().find(r => r.id === getBaseTypeId(t3.requiredCardId!))!;
     const festivalRow = getCsvRows().find(r => r.id === getBaseTypeId(t9.requiredCardId!))!;
-    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t10.requiredCardId!))!;
+    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t11.requiredCardId!))!;
 
     expect(laundromatRow).toBeDefined();
     expect(festivalRow).toBeDefined();
@@ -298,22 +318,21 @@ describe('Data-driven tutorial text (card facts from card data)', () => {
 
     const t3Body = resolveTutorialStepText(t3).body;
     const t9Body = resolveTutorialStepText(t9).body;
-    const t10Body = resolveTutorialStepText(t10).body;
+    const t11Body = resolveTutorialStepText(t11).body;
 
     expect(t3Body).toContain(laundromatRow.name);
     expect(t9Body).toContain(festivalRow.name);
-    expect(t10Body).toContain(bookshopRow.name);
-    // T10's copy references the Bookshop by name but does not quote its cost.
+    expect(t11Body).toContain(bookshopRow.name);
   });
 
-  it('T14 resolves {cardName} (Library) and {synergyCardName} (Bookshop) from card data', () => {
-    const t14 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T14')!;
-    const libraryRow = getCsvRows().find(r => r.id === getBaseTypeId(t14.requiredCardId!))!;
-    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t14.synergyCardId!))!;
+  it('T19 resolves {cardName} (Library) and {synergyCardName} (Bookshop) from card data', () => {
+    const t19 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T19')!;
+    const libraryRow = getCsvRows().find(r => r.id === getBaseTypeId(t19.referencedCardId!))!;
+    const bookshopRow = getCsvRows().find(r => r.id === getBaseTypeId(t19.synergyCardId!))!;
     expect(libraryRow).toBeDefined();
     expect(bookshopRow).toBeDefined();
 
-    const body = resolveTutorialStepText(t14).body;
+    const body = resolveTutorialStepText(t19).body;
     expect(body).toContain(libraryRow.name);      // Library
     expect(body).toContain(bookshopRow.name);     // Bookshop
     expect(body).not.toMatch(/\{[A-Za-z_]+\}/);

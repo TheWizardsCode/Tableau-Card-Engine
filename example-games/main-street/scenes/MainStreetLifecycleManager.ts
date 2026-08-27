@@ -745,9 +745,10 @@ export class MainStreetLifecycleManager {
    * Called when a tutorial action-gated game action succeeds.
    * Advances the tutorial to the next step and shows the next overlay.
    *
-   * For the composite `buy-and-place` action (T10), only the terminal drop
-   * (`place-business`) completes the step — the pickup (`select-business`)
-   * keeps the step active so the player can still drag the card onto the street.
+   * Two-turn plan-ahead flow (CG-0MT53NXGZ004H5AE): there are no composite
+   * `buy-and-place` steps — `select-business` steps (T3/T11/T17) complete on
+   * the pickup, `end-turn` steps (T6/T10/T14/T16/T18) on the day transition,
+   * and `place-business` steps (T7/T15/T19) on the placement at listed cost.
    */
   public onTutorialActionComplete(actionType: TutorialActionType): void {
     const s = this.scene;
@@ -756,22 +757,17 @@ export class MainStreetLifecycleManager {
     const step = getCurrentStep(controller);
     if (!step || step.gate !== 'action') return;
 
-    // Composite buy-and-place: only the terminal drop completes the step.
-    if (step.requiredAction === 'buy-and-place') {
-      if (actionType !== 'place-business') return;
-    } else if (!isRequiredAction(controller, actionType)) {
+    if (!isRequiredAction(controller, actionType)) {
       return;
     }
 
     const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
 
-    // T13 is a composite buy-and-place step (like T10): the terminal
-    // place-business completes it and already returns the scene to the
+    // A completed place-business step already returns the scene to the
     // market phase with pendingHandIndex cleared. This reset for play-event
-    // steps (T14) is therefore a defensive no-op today, but it is kept so
-    // the held event card is always clickable in the hand (event clicks are
-    // only wired while uiPhase === 'market').
+    // steps (T20) keeps the held event card clickable in the hand (event
+    // clicks are only wired while uiPhase === 'market').
     const nextStep = getCurrentStep(newState);
     if (nextStep?.requiredAction === 'play-event') {
       s.uiPhase = 'market';

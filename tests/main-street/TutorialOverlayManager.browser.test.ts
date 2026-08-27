@@ -152,7 +152,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(layout).toBeTruthy();
     expect(layout!.hudY).toBeGreaterThan(0);
 
-    const highlight = showStepAndGetHighlight('T16'); // T16 = confirm, hud zone
+    const highlight = showStepAndGetHighlight('T21'); // T21 = confirm, hud zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -246,7 +246,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T5'); // T5 = action, streetGrid zone
+    const highlight = showStepAndGetHighlight('T7'); // T7 = action (Laundromat placement), streetGrid zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -270,7 +270,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T6'); // T6 = confirm, incidentQueue zone
+    const highlight = showStepAndGetHighlight('T5'); // T5 = confirm, incidentQueue zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -294,7 +294,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T7'); // T7 = action, endTurnButton zone
+    const highlight = showStepAndGetHighlight('T6'); // T6 = action (day-1 End Turn), endTurnButton zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -313,7 +313,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T11'); // T11 = action, endTurnButton zone
+    const highlight = showStepAndGetHighlight('T18'); // T18 = action (day-5 End Turn), endTurnButton zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -371,13 +371,13 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.y).toBeLessThanOrEqual(layout!.marketTop + layout!.marketRowH + 6);
   });
 
-  // ── AC 10: Development Row highlight (T10, buy-and-place) ──
+  // ── AC 10: Development Row highlight (T11, Bookshop move-to-hand) ──
 
-  it('Development Row highlight (T10) covers the dev row (buy-and-place step)', async () => {
+  it('Development Row highlight (T11) covers the dev row (Move the Bookshop to hand)', async () => {
     const layout = scene.layout as { marketTop: number; marketRowH: number } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T10'); // T10 = action, developmentRow zone
+    const highlight = showStepAndGetHighlight('T11'); // T11 = action (Bookshop move-to-hand), developmentRow zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -418,13 +418,13 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.h).toBeGreaterThanOrEqual(layout!.actionButtonH);
   });
 
-  // ── AC 11c: Build a Library dev row highlight (T14) ────────
+  // ── AC 11c: Move the Library dev row highlight (T17) ───────
 
-  it('Development Row highlight (T14) covers the dev row (Build a Library)', async () => {
+  it('Development Row highlight (T17) covers the dev row (Move the Library to hand)', async () => {
     const layout = scene.layout as { marketTop: number; marketRowH: number } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T14'); // T14 = action, developmentRow zone
+    const highlight = showStepAndGetHighlight('T17'); // T17 = action (Library move-to-hand), developmentRow zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -439,7 +439,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     const layout = scene.layout as { handY: number; gameH: number } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T15'); // T15 = action, hand zone
+    const highlight = showStepAndGetHighlight('T20'); // T20 = action, hand zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);
@@ -469,7 +469,7 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 14: completionModal zone (T18, null anchor) ─────────
 
-  it('completionModal zone (T18) returns null anchor (no highlight graphics drawn)', async () => {
+  it('completionModal zone (T23) returns null anchor (no highlight graphics drawn)', async () => {
     const mgr = scene.tutorialOverlay as { showStep?: (index: number) => void; dismiss?: () => void };
 
     if (mgr && typeof mgr.showStep === 'function') {
@@ -477,7 +477,7 @@ describe('TutorialOverlayManager highlight zones', () => {
         mgr.dismiss();
       }
 
-      mgr.showStep(stepIdToIndex('T18'));
+      mgr.showStep(stepIdToIndex('T23'));
 
       // completionModal should not draw any highlight graphics at depth 199
       const highlights = findHighlightGraphics(scene);
@@ -485,9 +485,9 @@ describe('TutorialOverlayManager highlight zones', () => {
     }
   });
 
-  // ── AC 15: Challenge panel highlight (T17) ─────────────────
+  // ── AC 15: Challenge panel highlight (T22) ─────────────────
 
-  it('challengePanel highlight (T17) covers the challenge panel area', async () => {
+  it('challengePanel highlight (T22) covers the challenge panel area', async () => {
     const layout = scene.layout as {
       challengeX: number;
       challengeY: number;
@@ -495,7 +495,7 @@ describe('TutorialOverlayManager highlight zones', () => {
     } | undefined;
     expect(layout).toBeTruthy();
 
-    const highlight = showStepAndGetHighlight('T17'); // T17 = confirm, challengePanel zone
+    const highlight = showStepAndGetHighlight('T22'); // T22 = confirm, challengePanel zone
     expect(highlight).toBeTruthy();
 
     const bounds = getHighlightBounds(highlight!);

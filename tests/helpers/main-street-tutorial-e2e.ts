@@ -125,14 +125,12 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
   );
   const game = createMainStreetGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
 
-  // Same-turn buy-and-play now charges the +50% premium and fires a one-time
-  // explainer dialog (CG-0MT24X0SX007RLHN). The tutorial's scripted
-  // move→place steps run at 0 actions, so the dialog would otherwise
-  // intercept the automation's placement clicks. Pre-dismissing the
-  // preference here keeps the tutorial focus on the step flow. The tutorial
-  // rework (CG-0MT53NXGZ004H5AE) splits buy-and-place across two turns,
-  // after which this is redundant (placements with an action available do
-  // not fire the dialog).
+  // Same-turn buy-and-play charged a +50% premium and fired a one-time
+  // explainer dialog (CG-0MT24X0SX007RLHN). The two-turn tutorial rework
+  // (CG-0MT53NXGZ004H5AE) removed same-turn placements entirely: every
+  // placement follows an End Turn, so no step ever requests the premium and
+  // the dialog never fires. Pre-setting the dismissal key is therefore
+  // redundant but harmless (kept so a stale manual save never interrupts).
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true');
@@ -417,12 +415,9 @@ function maybeAdvanceFromRequiredAction(
   if (!controller?.isActive) return;
   const step = getCurrentStep(controller);
   if (!step || step.gate !== 'action') return;
-  if (step.requiredAction === 'buy-and-place') {
-    // Composite: the drop (place-business) is the terminal action. Only
-    // force-advance when the current step is still the buy-and-place step
-    // and the player has already placed the card (hand empty / slot filled).
-    if (requiredAction !== 'place-business') return;
-  } else if (step.requiredAction !== requiredAction) {
+  // Two-turn plan-ahead flow (CG-0MT53NXGZ004H5AE): no composite
+  // buy-and-place steps — each action type completes its own step.
+  if (step.requiredAction !== requiredAction) {
     return;
   }
   s.tutorialController = advanceTutorialStep(controller);
@@ -515,7 +510,7 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
           if (found) cardToBuy = found;
         } else if (step?.requiredAction === 'place-business') {
           // place-business steps don't have requiredCardId. Find the card that
-          // was specified by the preceding select-business step (e.g., T10→T11).
+          // was specified by the preceding select-business step (e.g., T15 follows T11).
           const myIdx = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === step.id);
           for (let i = myIdx - 1; i >= 0; i--) {
             const prev = UNIFIED_TUTORIAL_STEPS[i];
@@ -625,7 +620,7 @@ function dispatchCanvasMouse(type: string, worldX: number, worldY: number): void
 /**
  * Dispatch a real pointer click at a street slot while a card is pending
  * WITHOUT asserting that it was placed — used to verify illegal-placement
- * rejection during the tutorial (e.g. T13: the Library must be built next
+ * rejection during the tutorial (e.g. T19: the Library must be built next
  * to the Bookshop).
  *
  * Mirrors `clickStreetSlot`'s setup (placing phase + street-grid refresh +
@@ -717,7 +712,7 @@ export async function clickCommunityFavour(scene: Phaser.Scene): Promise<void> {
 }
 
 /**
- * Play the held investment event from the hand (T14 "Triggering Events").
+ * Play the held investment event from the hand (T20 "Triggering Events").
  * Finds the first event-family card in the player's hand and calls
  * onPlayHeldEvent with its index, then waits for the event to leave the hand.
  */
