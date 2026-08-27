@@ -20,6 +20,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { TUTORIAL_STATE_STORAGE_KEY } from '../../example-games/main-street/TutorialState';
+import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
 
 const GAME_W = 1280;
 const GAME_H = 720;
@@ -206,6 +207,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     game = null;
     // Reset tutorial state between tests so each run starts fresh.
     localStorage.removeItem(TUTORIAL_STATE_STORAGE_KEY);
+    try { localStorage.removeItem(PREMIUM_DIALOG_DISMISSED_KEY); } catch { /* ignore */ }
   });
 
   it('drag onto an empty slot buys and places in one undoable step', async () => {
@@ -213,6 +215,12 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     const scene = getScene(game);
     await waitForMarketReady(scene);
     await waitForSettled(scene);
+
+    // Drag-drop buy-and-place on a 1-action day now incurs the +50%
+    // premium with a one-time explainer dialog (CG-0MT24X0SX007RLHN).
+    // Dismiss it so these tests focus on the drag mechanics; the dialog
+    // flow itself is covered by dedicated dialog tests.
+    try { localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true'); } catch { /* ignore */ }
 
     // Plenty of coins so affordability is not a factor.
     scene.state.resourceBank.coins = 100;
@@ -346,6 +354,15 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
       15_000,
     );
     expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeUndefined();
+    // Post-CG-0MSXIQIPJ000NDTL: the bought card is NOT auto-selected — the
+    // scene returns to the market phase and the player selects the hand card
+    // (onHandBusinessCardClick) before placing.
+    expect(scene.uiPhase).toBe('market');
+    expect(scene.pendingHandIndex).toBeNull();
+
+    // Selecting the hand card still enters the placing-from-hand phase.
+    scene.onHandBusinessCardClick(0);
     expect(scene.uiPhase).toBe('placing-from-hand');
+    expect(scene.pendingHandIndex).toBe(0);
   });
 });

@@ -146,6 +146,7 @@ describe('AC2: refreshMarket re-roll', () => {
       ...state.discards.communitySpace.map(c => c.id),
       ...state.discards.upgrade.map(c => c.id),
       ...state.discards.event.map(c => c.id),
+      ...state.discards.staff.map(c => c.id),
     ];
     for (const id of result.replaced.map(c => c.id)) {
       expect(discarded).toContain(id);
@@ -164,7 +165,8 @@ describe('AC2: refreshMarket re-roll', () => {
 
     const accountant = createStaffDeck(1).find(c => c.id.startsWith('staff-accountant'));
     expect(accountant).toBeTruthy();
-    state.staffCardMarket.push({ ...accountant! });
+    // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
+    state.market.cards.push({ ...accountant! });
     state.resourceBank.coins = 20;
     purchaseStaffCard(state, accountant!.id);
 
@@ -221,9 +223,18 @@ describe('AC3: moveToHand is free; direct buy-and-place pays immediately', () =>
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0;
 
-    // Move all visible cards into the hand (hand holds up to 3).
-    while (state.market.cards.length > 0 && canAddToHand(state).legal) {
-      moveToHand(state, state.market.cards[0].id);
+    // Move all movable (non-staff) cards into the hand (hand holds up to 3).
+    // Staff cards are hired directly and never enter the hand (CG-0MT3KZNQB0053K55),
+    // so when a staff card occupies a row slot, top up the row with a business
+    // card to prove the hand-capacity bound still holds.
+    while (canAddToHand(state).legal) {
+      const idx = state.market.cards.findIndex(c => c.family !== 'staff');
+      if (idx === -1) {
+        const topup = createBusinessDeck(1, ['biz-bakery']).find(c => c.id.startsWith('biz-bakery'))!;
+        state.market.cards.push(topup);
+        continue;
+      }
+      moveToHand(state, state.market.cards[idx].id);
     }
     expect(state.hand.length).toBeLessThanOrEqual(state.maxHandSize);
     expect(canAddToHand(state).legal).toBe(false);
@@ -235,11 +246,17 @@ describe('AC3: moveToHand is free; direct buy-and-place pays immediately', () =>
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0;
 
-    while (state.market.cards.length > 0 && canAddToHand(state).legal) {
-      moveToHand(state, state.market.cards[0].id);
+    while (canAddToHand(state).legal) {
+      const idx = state.market.cards.findIndex(c => c.family !== 'staff');
+      if (idx === -1) {
+        const topup = createBusinessDeck(1, ['biz-bakery']).find(c => c.id.startsWith('biz-bakery'))!;
+        state.market.cards.push(topup);
+        continue;
+      }
+      moveToHand(state, state.market.cards[idx].id);
     }
     expect(state.hand.length).toBe(state.maxHandSize);
-    // Re-seed the (now empty) row with one card to exercise the rejection path.
+    // Re-seed the (now full) row with one card to exercise the rejection path.
     const extra = createBusinessDeck(1, ['biz-bakery']).find(c => c.id.startsWith('biz-bakery'))!;
     state.market.cards.push(extra);
     expect(() => moveToHand(state, extra.id)).toThrow(/full/i);
@@ -428,12 +445,13 @@ describe('AC6: maxHandSize base 3, growable', () => {
     state.resourceBank.coins = 50;
 
     const assistant = createStaffDeck(1).find(c => c.id.startsWith('staff-assistant'))!;
-    state.staffCardMarket.push({ ...assistant });
+    // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
+    state.market.cards.push({ ...assistant });
     purchaseStaffCard(state, assistant.id);
     expect(state.maxHandSize).toBe(3 + assistant.handSlotsAdded);
 
     const manager = createStaffDeck(1).find(c => c.id.startsWith('staff-manager'))!;
-    state.staffCardMarket.push({ ...manager });
+    state.market.cards.push({ ...manager });
     purchaseStaffCard(state, manager.id);
     expect(state.maxHandSize).toBe(3 + assistant.handSlotsAdded + manager.handSlotsAdded);
   });
@@ -445,20 +463,24 @@ describe('AC6: maxHandSize base 3, growable', () => {
     state.resourceBank.coins = 0;
 
     const assistant = createStaffDeck(1).find(c => c.id.startsWith('staff-assistant'))!;
-    state.staffCardMarket.push({ ...assistant });
+    // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
+    state.market.cards.push({ ...assistant });
     state.resourceBank.coins = 20;
     purchaseStaffCard(state, assistant.id);
     const capacity = state.maxHandSize;
     expect(capacity).toBe(4);
 
-    while (state.market.cards.length > 0 && state.hand.length < capacity) {
-      moveToHand(state, state.market.cards[0].id);
+    // Move movable (non-staff) cards; top up the row with business cards
+    // when a staff card occupies the last row slot (CG-0MT3KZNQB0053K55).
+    while (state.hand.length < capacity) {
+      const idx = state.market.cards.findIndex(c => c.family !== 'staff');
+      if (idx === -1) {
+        const topup = createBusinessDeck(1, ['biz-pawnshop']).find(c => c.id.startsWith('biz-pawnshop'))!;
+        state.market.cards.push(topup);
+        continue;
+      }
+      moveToHand(state, state.market.cards[idx].id);
     }
-    // The single row only holds 3 cards — extend it manually to prove the
-    // hand itself can hold more than 3 once grown.
-    const extra = createBusinessDeck(1, ['biz-pawnshop']).find(c => c.id.startsWith('biz-pawnshop'))!;
-    state.market.cards.push(extra);
-    moveToHand(state, extra.id);
     expect(state.hand.length).toBe(capacity);
 });
 

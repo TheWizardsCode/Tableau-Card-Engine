@@ -31,7 +31,7 @@ counter, and a final `+total` pop lands when collection completes. See
 
 `MainStreetAnimator.animateIncidentReveal({ cardId, incidentName, coinChange,
 repChange, from })` animates an end-of-turn incident resolution: a snapshot
-card visual flies from the Upcoming queue to the board centre, a brief red
+card visual flies from the face-down incident-deck panel (CG-0MSTOATDP000JNHH) to the board centre, a brief red
 flash pulses, the warning sting plays (`sfx-income-negative`), the incident's
 coin/rep losses pop on the HUD, and the ⚠ active-effects indicator pulses
 once. The resource deltas come from `TurnResult.incidentCoinChange` /

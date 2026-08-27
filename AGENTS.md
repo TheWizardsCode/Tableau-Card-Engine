@@ -72,7 +72,7 @@ npm install          # Install dependencies
 npm run dev          # Start Vite dev server with hot-reload (port 3000)
 npm test             # Run Vitest test suite (non-destructive: does not modify tracked assets)
 npm run build        # TypeScript check + production build to dist/
-npm run preview      # Serve production build locally
+npm run preview      # Serve production build locally (binds to all interfaces, reachable via Tailscale/LAN)
 npm run monte-carlo  # Run Main Street Monte Carlo harness (JSON + CSV)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
@@ -97,11 +97,12 @@ Each example game should have its own set of tests to ensure that the game mecha
 2. **Non-tutorial browser tests** (`--project browser`, headless Chromium) — Phaser UI/rendering tests in `tests/**/*.browser.test.ts`. Phaser needs a real browser (WebGL/Canvas) and cannot run under Node/JSDOM.
 3. **Tutorial E2E tests** (`scripts/run-tutorial-tests.sh`) — Main Street tutorial flows in `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`, each part in its own browser instance to avoid Phaser 4 canvas/GPU context exhaustion.
 
-The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, which retries once on Vitest's transient contention-induced failures (worker RPC timeout, browser WebSocket drop) only when every file actually passed. A `replay-e2e` project (`tests/e2e/replay-*.test.ts`) is also defined for Playwright-driven replay checks. See `docs/DEVELOPER.md#testing` for the full project table, CPU-contention mitigations, and guidance on writing unit and browser tests.
+The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, which retries once on Vitest's transient contention-induced failures (worker RPC timeout, browser WebSocket drop) only when every file actually passed, and bounds every attempt with a wall-clock timeout (exit 124 `[hang-timeout]` diagnostic on a genuine hang — never retried; see CG-0MT08R2QR0070F3N). A `replay-e2e` project (`tests/e2e/replay-*.test.ts`) is also defined for Playwright-driven replay checks. See `docs/DEVELOPER.md#testing` for the full project table, CPU-contention mitigations, and guidance on writing unit and browser tests.
 
 - **During implementation** — prefer targeted runs for fast feedback (seconds, not minutes):
   - Unit: `npx vitest run --project unit tests/<game>/` or `npx vitest run --project unit tests/<game>/<name>.test.ts`
   - Browser: `npx vitest run --project browser tests/<game>/<name>.browser.test.ts`
+  - **Profiles**: `npm run test:smoke` (~2 min, one representative file per game + core/UI smoke, `--project smoke`) or `npm run test:dev` (~3.5 min, smoke + key E2E per game, `--project dev`). Tutorial E2E parts are excluded from both profiles. Full project table in `docs/DEVELOPER.md#smoke-tests` / `#dev-tests`.
 - **Before any push to origin** — always run the full `npm test` and `npm run build` (see the quality gates above).
 
 > **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only (TypeScript compile + Vite bundle). The full test suite is run **locally** before every push (per the quality gates above) and is intentionally NOT re-run in PR CI — the Phaser 4 browser suite has outgrown the single-Chromium-instance context budget in constrained CI environments. `deploy.yml` on `main` also builds only; `package.yml` smoke-tests the packaged Windows binary separately.
@@ -354,6 +355,30 @@ Use `EconomyLedger` from `@rule-engine` for resource tracking with constraint en
 - **Gym scene:** `GymRuleEngineScene` — `example-games/gym/scenes/GymRuleEngineScene.ts`
 - **Key APIs:** `createEconomyLedger()`, `EconomyLedger`, `ResourceDelta`, leglity result helpers
 - **When to use:** Any game with resources (currency, health, points) that need constraint validation. The scene demonstrates illegality for multiple reasons: not your turn, insufficient funds, out of bounds, wrong phase. Use `EconomyLedger` to add/subtract resources with automatic constraint enforcement.
+
+### 10b. Main Street Business Card Click-to-Place Flow
+
+Main Street's business card placement uses a **two-step click pattern** (CG-0MSXIQIPJ000NDTL):
+
+1. **Market → Hand (free):** Click a business card in the market row. The card moves to hand but is **NOT auto-selected** — `pendingHandIndex` stays `null`, `uiPhase` reverts to `'market'`. The scene records the just-moved card id (
+`justMovedHandCardId`).
+2. **Select hand card:** Click the card in the hand. This sets `pendingHandIndex` and switches to `'placing-from-hand'`. If the selected card is the one just moved (same-day composite), placing it stays free; any other held card costs that day's action.
+3. **Place on street:** Click an empty slot. The card is placed, coins are deducted, `pendingHandIndex` resets to `null`, and `uiPhase` returns to `'market'`.
+
+**Key state fields:** `pendingHandIndex` (index into `state.hand`), `pendingHandJustMoved` (true for same-day move+place, false for click-then-place), `justMovedHandCardId` (id of the card just moved to hand this turn, used to derive `pendingHandJustMoved` when the player later selects it), `uiPhase` (`'market'` | `'placing-from-hand'` | `'animating'`).
+
+**Consistent same-turn pricing (CG-0MT24X0SX007RLHN):** The click composite (move + place in one turn) and drag-and-drop buy-and-play are priced identically — **drag is never cheaper than click**. The rule applies to business AND community-space cards alike:
+
+- **Composite with no action available** (the move already consumed the daily action): the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**.
+- **Composite with an action remaining** (Golden Mile 2-action days): the placement consumes the remaining action at **listed cost** — the composite and the GM-equivalent drag path are priced identically.
+- **Held-card play (plan-ahead)** is unchanged: listed cost + 1 action, no dialog.
+
+**Explainer dialog:** A premium-incurring placement (composite with 0 actions remaining, or a drag buy-and-place) fires a one-time explainer dialog — `showBuyAndPlacePremiumDialog(cardName, onProceed, onCancel)` on `MainStreetOverlayContent` — before the placement is finalised. Proceed commits the premium placement; Cancel aborts with **no state mutation** (the card stays in hand / market, and a composite retry still places free because `justMovedHandCardId` is preserved). The dialog offers a **"Don't show this again"** preference persisted under `PREMIUM_DIALOG_DISMISSED_KEY` (`MainStreetPrefs`). When the player cannot afford the premium, the placement is rejected with illegal-move feedback **before** the dialog fires (affordability pre-gate).
+
+**Tutorial gating:** The tutorial teaches two-turn plan-ahead (CG-0MT53NXGZ004H5AE): a `select-business` step (T3/T11/T17) moves a card to hand on day N, an `end-turn` step (T6/T10/T14/T16/T18) advances the day, and a `place-business` step (T7/T15/T19) places it on day N+1 at **listed cost** (no same-day premium). During `place-business` steps both `select-hand-card` and `place-business` actions are allowed via `isRequiredAction`; the step completes on the terminal `place-business` action.
+
+- **Key APIs:** `onBusinessCardClick(card)`, `onHandBusinessCardClick(index)`, `scene.pendingHandIndex`, `scene.uiPhase`, `placeFromHand(state, handIndex, slotIndex, premiumCost?)` / `canPlaceFromHand(..., premiumCost?)` (engine premium override), `playBusinessFromHandCommand(state, handIndex, slotIndex, premiumCost?)` (undoable composite command), `buyAndPlaceBusinessCommand(..., priceOverride?, extraActions?)` (drag path)
+- **When to use:** This is the canonical Main Street pattern for business card placement. Drag-and-drop (market → slot in one gesture) is supported as an alternative via `buy-and-place` and charges the identical premium when no actions are available after the move.
 
 ### 11. Tooltip System (DOM and Phaser Modes)
 

@@ -44,7 +44,7 @@ describe('Tutorial Flow Integration - Business Selection', () => {
     expect(getCurrentStep(ctrl)?.gate).toBe('confirm');
   });
 
-  it('should advance from T4 (Your Hand) to T5 (Place a Business)', () => {
+  it('should advance from T4 (Your Hand) to T5 (Upcoming Incidents) to T6 (End Turn)', () => {
     let ctrl = startTutorial(createTutorialControllerState());
     ctrl = completeCurrentStep(ctrl).newState; // T1 -> T2
     ctrl = completeCurrentStep(ctrl).newState; // T2 -> T3
@@ -53,28 +53,33 @@ describe('Tutorial Flow Integration - Business Selection', () => {
 
     ctrl = completeCurrentStep(ctrl).newState; // T4 -> T5
     expect(getCurrentStep(ctrl)?.id).toBe('T5');
-    expect(isRequiredAction(ctrl, 'place-business')).toBe(true);
+    expect(getCurrentStep(ctrl)?.gate).toBe('confirm');
+
+    ctrl = completeCurrentStep(ctrl).newState; // T5 -> T6
+    expect(getCurrentStep(ctrl)?.id).toBe('T6');
+    expect(getCurrentStep(ctrl)?.gate).toBe('action');
+    expect(isRequiredAction(ctrl, 'end-turn')).toBe(true);
   });
 
-  it('T10 buy-and-place composite allows select-business then completes on place-business', () => {
+  it('T11 (Bookshop move-to-hand) is select-business — no same-turn placement allowed', () => {
     let ctrl = startTutorial(createTutorialControllerState());
-    // Advance to T10 (index 9): complete T1..T9
-    for (let i = 0; i < 9; i++) ctrl = completeCurrentStep(ctrl).newState;
-    expect(getCurrentStep(ctrl)?.id).toBe('T10');
-
-    // Composite: pickup (select-business) and drop (place-business) both allowed
-    expect(isRequiredAction(ctrl, 'select-business')).toBe(true);
-    expect(isRequiredAction(ctrl, 'place-business')).toBe(true);
-
-    // Complete the step (drop)
-    ctrl = completeCurrentStep(ctrl).newState;
+    // Advance to T11 (index 10): complete T1..T10
+    for (let i = 0; i < 10; i++) ctrl = completeCurrentStep(ctrl).newState;
     expect(getCurrentStep(ctrl)?.id).toBe('T11');
+
+    // Two-turn split: only pickup is required while T11 is active.
+    expect(isRequiredAction(ctrl, 'select-business')).toBe(true);
+    expect(isRequiredAction(ctrl, 'place-business')).toBe(false);
+
+    // Complete the pickup step
+    ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T12');
   });
 
-  it('T14 play-event is required after T13', () => {
+  it('T20 play-event is required after T19', () => {
     let ctrl = startTutorial(createTutorialControllerState());
-    for (let i = 0; i < 13; i++) ctrl = completeCurrentStep(ctrl).newState;
-    expect(getCurrentStep(ctrl)?.id).toBe('T14');
+    for (let i = 0; i < 19; i++) ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T20');
     expect(getCurrentStep(ctrl)?.requiredAction).toBe('play-event');
     expect(isRequiredAction(ctrl, 'play-event')).toBe(true);
   });

@@ -52,12 +52,12 @@ interface NewCommunitySpaceContract {
 }
 
 const NEW_COMMUNITY_SPACE_CONTRACTS: NewCommunitySpaceContract[] = [
-  { id: 'cs-playground', name: 'Playground', cost: 4, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Entertainment'], tier: '1', reputationPerTurn: 0.05 },
-  { id: 'cs-community-garden', name: 'Community Garden', cost: 5, baseIncome: 0, ongoingCost: 0.1, synergyTypes: ['Food'], tier: '2', reputationPerTurn: 0.1 },
-  { id: 'cs-fountain', name: 'Town Fountain', cost: 5, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Culture'], tier: '2', reputationPerTurn: 0.1 },
-  { id: 'cs-health-kiosk', name: 'Health Kiosk', cost: 6, baseIncome: 0, ongoingCost: 0.15, synergyTypes: ['Health'], tier: '3', reputationPerTurn: 0.15 },
-  { id: 'cs-shelter', name: 'Community Shelter', cost: 6, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Service'], tier: '3', reputationPerTurn: 0.15 },
-  { id: 'cs-public-art', name: 'Public Art', cost: 8, baseIncome: 0, ongoingCost: 0.25, synergyTypes: ['Culture', 'Entertainment'], tier: '4', reputationPerTurn: 0.2 },
+  { id: 'cs-playground', name: 'Playground', cost: 4, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Entertainment'], tier: '3', reputationPerTurn: 0.05 },
+  { id: 'cs-community-garden', name: 'Community Garden', cost: 5, baseIncome: 0, ongoingCost: 0.1, synergyTypes: ['Food'], tier: '4', reputationPerTurn: 0.1 },
+  { id: 'cs-fountain', name: 'Town Fountain', cost: 5, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Culture'], tier: '5', reputationPerTurn: 0.1 },
+  { id: 'cs-health-kiosk', name: 'Health Kiosk', cost: 6, baseIncome: 0, ongoingCost: 0.15, synergyTypes: ['Health'], tier: '8', reputationPerTurn: 0.15 },
+  { id: 'cs-shelter', name: 'Community Shelter', cost: 6, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Service'], tier: '6', reputationPerTurn: 0.15 },
+  { id: 'cs-public-art', name: 'Public Art', cost: 8, baseIncome: 0, ongoingCost: 0.25, synergyTypes: ['Culture', 'Entertainment'], tier: '12', reputationPerTurn: 0.2 },
 ];
 
 function byId(templates: readonly { id: string }[], id: string): CommunitySpaceCard | undefined {
@@ -150,7 +150,7 @@ describe('Group B community-space expansion: tier map membership (AC2)', () => {
   it('keeps every community-space card tier-registered (no tier regressions)', () => {
     for (const t of getCommunitySpaceTemplates()) {
       expect(CARD_TIER_MAP.has(t.id), `${t.id} has no tier assignment`).toBe(true);
-      expect(['1', '2', '3', '4', '5']).toContain(CARD_TIER_MAP.get(t.id));
+      expect(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']).toContain(CARD_TIER_MAP.get(t.id));
     }
   });
 });

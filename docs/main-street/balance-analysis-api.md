@@ -85,7 +85,7 @@ Per-card micro metrics (M1–M7). Each function accepts a card ID and an array o
 | `computeCostToIncomeRatio(input)` | `number` | M3: cost / baseIncome. Infinity for zero income. |
 | `computeSynergyUtilization(cardId, runs)` | `SynergyUtilizationResult \| null` | M4: actual synergy / max possible synergy. |
 | `computeUpgradeAdoption(upgradeId, parentId, runs)` | `UpgradeAdoptionResult \| null` | M5: upgrades / parent purchases. |
-| `computeEventImpactScore(cardId, runs, fallback?)` | `EventImpactResult` | M6: avg(coinDelta + repDelta × 5). |
+| `computeEventImpactScore(cardId, runs, fallback?)` | `EventImpactResult` | M6: avg(coinDelta + repDelta). |
 | `computeSurvivalRate(cardId, runs)` | `SurvivalRateResult \| null` | M7: wins(owned) / runs(owned). |
 
 ### Types

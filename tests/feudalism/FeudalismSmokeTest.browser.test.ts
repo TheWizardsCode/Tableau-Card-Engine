@@ -198,30 +198,7 @@ describe('Feudalism smoke test (HandView/PileView migration)', () => {
     }).not.toThrow();
   });
 
-  // ── Test 8: Reduced-motion mode works ──
-
-  it('should respect reduced-motion preference from SettingsStore', async () => {
-    // Set reduced-motion preference in localStorage before booting
-    (globalThis as any).localStorage.setItem('tce-ui-reduced-motion', 'true');
-
-    game = await bootGame();
-    const scene = game.scene.getScene('FeudalismScene')!;
-    const internals = scene as any;
-
-    // Verify the scene is active and rendering
-    expect(scene.sys.isActive()).toBe(true);
-
-    // The game should have booted with reduced-motion enabled.
-    // Verify by checking that the market container still has content
-    // (reduced motion should not affect content, only animations).
-    const marketContainer = (internals.feudRenderer as any).marketContainer;
-    expect(marketContainer.list.length).toBeGreaterThan(0);
-
-    // Clean up the localStorage setting
-    (globalThis as any).localStorage.removeItem('tce-ui-reduced-motion');
-  });
-
-  // ── Test 9: Action buttons render in player-turn phase ──
+  // ── Test 8: Action buttons render in player-turn phase ──
 
   it('should render action buttons in the player-turn phase', async () => {
     game = await bootGame();

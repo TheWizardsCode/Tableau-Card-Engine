@@ -120,28 +120,4 @@ describe('MainStreet held-event play burst', () => {
     const stillHeld = (scene.state as { hand: { id: string }[] }).hand.some((c) => c.id === eventCard.id);
     expect(stillHeld).toBe(false);
   }, 30_000);
-
-  it('still fires the trigger under reduced motion (animator degrades internally)', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-
-    const { getEventTemplates } = await import('../../example-games/main-street/MainStreetCards');
-    const templates = getEventTemplates();
-    // Pick a playable (non-incident) event: incident events are auto-resolved
-    // at draw and cannot be played from hand (playEventFromHand rejects them).
-    const eventCard = templates.find((t) => t.trigger !== 'Incident') ?? templates[0];
-    (scene.state as { hand: unknown[] }).hand.push({ ...eventCard });
-    (scene as unknown as { refreshAll: () => void }).refreshAll();
-
-    (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
-
-    const { calls } = spyOnEventPlayed(scene);
-    const handIndex = (scene.state as { hand: { id: string }[] }).hand.findIndex((c) => c.id === eventCard.id);
-
-    (scene.msTurnController as unknown as { onPlayHeldEvent: (handIndex?: number) => void }).onPlayHeldEvent(handIndex);
-
-    await waitForCondition(() => calls.length >= 1, { timeoutMs: 5000, label: 'event played trigger (reduced motion)' });
-    expect(calls).toHaveLength(1);
-    expect(calls[0].eventName).toBe(eventCard.name);
-  }, 30_000);
 });

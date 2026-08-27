@@ -181,6 +181,13 @@ export function buildRationale(
 
     case 'discard-from-hand':
       return 'Discard a card from hand to free capacity';
+    case 'community-favour': {
+      const a = action as { type: 'community-favour'; direction: 'coins-to-rep' | 'rep-to-coins' };
+      if (a.direction === 'coins-to-rep') {
+        return `Community Favour: spend ${state.config.favourCoinsToRepCost} coins for 1 reputation`;
+      }
+      return `Community Favour: spend ${state.config.favourRepToCoinsRepCost} reputation for ${state.config.favourRepToCoinsCoinGain} coins`;
+    }
     case 'end-turn':
       return 'No good buys available -- end your turn';
     default:

@@ -162,8 +162,11 @@ function parseCardCsv(csvText) {
     const synergies = card.synergyTypes ? card.synergyTypes.split('|').filter(Boolean) : [];
     const cost = card.cost ? Number(card.cost) : null;
     const trigger = card.trigger || null;
+    // Business cards carry an ongoing per-turn cost (1/4 purchase price, min 0.25) —
+    // kept for the static art so the `-X/turn` label matches the runtime generator.
+    const ongoingCost = card.ongoingCost ? Number(card.ongoingCost) : 0;
 
-    templates.push({ id: card.id, name: card.name, cost, family, trigger, synergies });
+    templates.push({ id: card.id, name: card.name, cost, family, trigger, synergies, ongoingCost });
   }
 
   return templates;
@@ -189,6 +192,13 @@ function generateCardSvg(t) {
     ? `<text x="${w - 16}" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">${t.cost}</text>`
     : '';
 
+  // Ongoing-cost label for business cards: orange `-X/turn`, same format/colour
+  // as the runtime generator (MainStreetCardSvgGenerator.ts). Omitted when 0.
+  const ongoingCostText =
+    t.family === 'business' && t.ongoingCost > 0
+      ? `<text x="${w / 2}" y="33" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-${t.ongoingCost}/turn</text>`
+      : '';
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${title}">
   <defs>
@@ -203,6 +213,7 @@ function generateCardSvg(t) {
   <text x="${w / 2}" y="19" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">${title}</text>
 ${priceBadge}
 ${priceText}
+${ongoingCostText}
 ${iconMarkup}
 
 </svg>
@@ -246,9 +257,13 @@ export function regenerateCardSvgs(options = {}) {
     fs.writeFileSync(outPath, svg, 'utf8');
   }
 
-  // Write checksum file alongside SVGs for runtime change detection
+  // Write checksum file alongside SVGs for runtime change detection.
+  // Trailing newline matches the committed file convention so the tree
+  // stays clean after regeneration (card-svg-coverage.test.ts regenerates
+  // during the suite; a newline-less rewrite would dirty the working tree
+  // and invalidate the read-only test cache fingerprint).
   const checksumPath = path.join(outDir, 'csv-checksum.json');
-  fs.writeFileSync(checksumPath, JSON.stringify({ checksum }), 'utf8');
+  fs.writeFileSync(checksumPath, JSON.stringify({ checksum }) + '\n', 'utf8');
 
   return { checksum, count: templates.length };
 }

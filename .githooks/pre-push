@@ -1,8 +1,67 @@
 #!/bin/sh
-# worklog:pre-push-hook:v1
-# Auto-sync Worklog data before pushing (committed hooks).
-# Set WORKLOG_SKIP_PRE_PUSH=1 to bypass.
+# worklog:pre-push-hook:v2
+# 1. Auto-sync Worklog data before pushing (committed hooks).
+# 2. Enforce branch naming policy: block pushes to protected branches.
+# 3. Context-budget regression gate (F6, SA-0MSLK7XNZ00366YY): fail the push
+#    when the startup context surface exceeds committed thresholds.
+#
+# Set WORKLOG_SKIP_PRE_PUSH=1 to bypass worklog sync.
+# Set BRANCH_POLICY_SKIP=1 to bypass branch policy check (not recommended).
+# Set CONTEXT_BUDGET_SKIP=1 to bypass the context-budget gate (not recommended).
 set -e
+
+# ── Branch policy enforcement ────────────────────────────────────────────────
+# Check that the current branch is not a protected branch.
+if [ "$BRANCH_POLICY_SKIP" != "1" ]; then
+  current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  # Protected branches that agents must never push to.
+  blocked_branches="main master HEAD"
+  for blocked in $blocked_branches; do
+    if [ "$current_branch" = "$blocked" ]; then
+      echo "ERROR: Push to '$current_branch' is blocked by branch policy." >&2
+      echo "  Regular agents must NOT push directly to main." >&2
+      echo "  Work in feature branches (wl-<id>-<desc>) and push into dev." >&2
+      echo "  See the framework ship skill for the push-to-dev workflow." >&2
+      exit 1
+    fi
+  done
+fi
+
+# ── Context-budget regression gate ──────────────────────────────────────────
+# Fail the push when the pi session startup context surface exceeds the
+# committed thresholds (docs/dev/context-budget.thresholds.json). The gate is
+# fail-open when the tooling or thresholds file is absent (e.g. worktrees of
+# old commits, or repositories that do not ship the context-audit skill).
+# measure_context.py is resolved first from the local skill/context-audit/
+# path, then from the installed global symlink
+# (~/.pi/agent/skills/context-audit/scripts/measure_context.py) installed by
+# the framework's install_pi.sh.
+if [ "$CONTEXT_BUDGET_SKIP" != "1" ]; then
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -f "$repo_root/skill/context-audit/scripts/measure_context.py" ]; then
+    measure="$repo_root/skill/context-audit/scripts/measure_context.py"
+  elif [ -f "$HOME/.pi/agent/skills/context-audit/scripts/measure_context.py" ]; then
+    measure="$HOME/.pi/agent/skills/context-audit/scripts/measure_context.py"
+  else
+    measure=""
+  fi
+  thresholds="$repo_root/docs/dev/context-budget.thresholds.json"
+  if [ -n "$repo_root" ] && [ -n "$measure" ] && [ -f "$measure" ] && [ -f "$thresholds" ]; then
+    # Pass --repo-root explicitly: when the global symlink is used, the
+    # script's default repo-root resolves to the symlink target (SorraAgents)
+    # instead of the project being pushed.
+    if python3 "$measure" --repo-root "$repo_root" --include-hidden --thresholds "$thresholds" >/dev/null 2>&1; then
+      :
+    else
+      echo "ERROR: Context budget exceeded committed thresholds." >&2
+      echo "  Run: python3 $measure --repo-root $repo_root --include-hidden --thresholds $thresholds" >&2
+      echo "  See docs/dev/context-budget.md. Set CONTEXT_BUDGET_SKIP=1 to bypass." >&2
+      exit 1
+    fi
+  fi
+fi
+
+# ── Worklog sync ─────────────────────────────────────────────────────────────
 if [ "$WORKLOG_SKIP_PRE_PUSH" = "1" ]; then
   exit 0
 fi

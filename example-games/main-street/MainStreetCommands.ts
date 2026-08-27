@@ -23,7 +23,7 @@ import {
   playEventFromHand,
   discardFromHand,
 } from './MainStreetMarket';
-import { buyAndPlaceBusiness, hireStaffCard } from './MainStreetEngine';
+import { buyAndPlaceBusiness, hireStaffCard, peekIncidentDeck } from './MainStreetEngine';
 
 // ── Action Budget Enforcement ────────────────────────────────
 
@@ -50,6 +50,12 @@ interface MarketActionSnapshot {
   soldSlots: boolean[] | null;
   /** Daily action budget — captured so undo restores the spent action. */
   actionsRemaining: number | null;
+  /** Banked actions — captured so undo restores the banking state. */
+  bankedActions: number | null;
+  /** Staff peek gate — captured so undo restores the once-per-turn flag. */
+  peekUsedThisTurn: boolean | null;
+  /** Staff peek reveal — captured so undo clears a pending reveal. */
+  revealedPeekedCard: any | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -78,6 +84,9 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
     actionsRemaining: state.actionsRemaining,
+    bankedActions: state.bankedActions ?? 0,
+    peekUsedThisTurn: state.peekUsedThisTurn ?? false,
+    revealedPeekedCard: state.revealedPeekedCard ?? null,
   };
 }
 
@@ -96,6 +105,15 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
   if (snap.actionsRemaining !== null && snap.actionsRemaining !== undefined) {
     state.actionsRemaining = snap.actionsRemaining;
+  }
+  if (snap.bankedActions !== null && snap.bankedActions !== undefined) {
+    state.bankedActions = snap.bankedActions;
+  }
+  if (snap.peekUsedThisTurn !== null && snap.peekUsedThisTurn !== undefined) {
+    state.peekUsedThisTurn = snap.peekUsedThisTurn;
+  }
+  if ('revealedPeekedCard' in snap) {
+    state.revealedPeekedCard = snap.revealedPeekedCard;
   }
 }
 
@@ -219,20 +237,35 @@ export function playEventCommand(state: MainStreetState, handIndex?: number) {
   );
 }
 
-/** Command: Play Business from Hand (consumes 1 action; pays cost-at-play) */
+/**
+ * Command: Play Business from Hand (consumes 1 action; pays cost-at-play).
+ *
+ * Premium-aware (CG-0MT24X0SX007RLHN): when `premiumCost` is supplied the
+ * +50% premium REPLACES the missing action (same-day composite placement
+ * with 0 actions remaining) — no action is consumed and the premium price
+ * is deducted, recorded in the undo/redo snapshot. When absent, the held-
+ * card (plan-ahead) path is unchanged: 1 action consumed + listed cost.
+ */
 export function playBusinessFromHandCommand(
   state: MainStreetState,
   handIndex: number,
   slotIndex: number,
+  premiumCost?: number,
 ) {
   return toCommand(
     state,
     snapshotAction(
       (s) => {
-        consumeAction(s);
-        playBusinessFromHand(s, handIndex, slotIndex);
+        // Premium replaces the missing action — consume only on the
+        // held-card / listed-cost path (CG-0MT24X0SX007RLHN).
+        if (premiumCost === undefined) {
+          consumeAction(s);
+        }
+        playBusinessFromHand(s, handIndex, slotIndex, premiumCost);
       },
-      `PlayBusinessFromHand ${handIndex} -> slot ${slotIndex}`,
+      premiumCost !== undefined
+        ? `PlayBusinessFromHand ${handIndex} -> slot ${slotIndex} (premium ${premiumCost})`
+        : `PlayBusinessFromHand ${handIndex} -> slot ${slotIndex}`,
     ),
   );
 }
@@ -266,18 +299,32 @@ export function discardFromHandCommand(
   );
 }
 
-/** Command: Buy & Place business directly to slot (consumes 1 action, 50% premium) */
+/**
+ * Command: Buy & Place business directly to slot (consumes 1 action; +50%
+ * premium, or listed price when `priceOverride` is supplied for GM parity
+ * — CG-0MT24X0SX007RLHN).
+ *
+ * @param priceOverride Optional price to charge instead of the +50% premium
+ *                      (listed cost for GM parity; unset → premium default).
+ * @param extraActions  Additional daily actions to consume alongside the
+ *                      drag's own action. 1 on Golden Mile days (the
+ *                      equivalent composite move+place consumes 2 actions at
+ *                      listed cost; drag must charge identically).
+ */
 export function buyAndPlaceBusinessCommand(
   state: MainStreetState,
   cardId: string,
   slotIndex: number,
+  priceOverride?: number,
+  extraActions: number = 0,
 ) {
   return toCommand(
     state,
     snapshotAction(
       (s) => {
+        for (let i = 0; i < extraActions; i += 1) consumeAction(s);
         consumeAction(s);
-        buyAndPlaceBusiness(s, cardId, slotIndex);
+        buyAndPlaceBusiness(s, cardId, slotIndex, priceOverride);
       },
       `BuyAndPlace ${cardId} -> slot ${slotIndex}`,
     ),
@@ -322,6 +369,23 @@ export function sellBusinessCommand(
     snapshotAction(
       (s) => sellBusiness(s, slotIndex),
       `SellBusiness slot ${slotIndex}`,
+    ),
+  );
+}
+
+/**
+ * Command: Staff peek at the incident deck (CG-0MSXOW6GN008ZSMN).
+ * Consumes 1 action, sets the once-per-turn gate, and exposes the revealed
+ * card via `state.revealedPeekedCard`. The deck is NOT mutated — the card
+ * stays on top face-down and is never resolved. Undo restores the action,
+ * the gate, and clears the reveal.
+ */
+export function peekIncidentDeckCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { peekIncidentDeck(s); },
+      'PeekIncidentDeck',
     ),
   );
 }

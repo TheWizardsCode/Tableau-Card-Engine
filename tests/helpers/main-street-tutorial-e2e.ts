@@ -14,6 +14,7 @@ import Phaser from 'phaser';
 import { page } from '@vitest/browser/context';
 import { waitForScene } from './waitForScene';
 import { advanceTutorialStep, getCurrentStep, UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
+import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
 
 // ── Constants ────────────────────────────────────────────
 
@@ -123,6 +124,18 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
     '../../example-games/main-street/createMainStreetGame'
   );
   const game = createMainStreetGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
+
+  // Same-turn buy-and-play charged a +50% premium and fired a one-time
+  // explainer dialog (CG-0MT24X0SX007RLHN). The two-turn tutorial rework
+  // (CG-0MT53NXGZ004H5AE) removed same-turn placements entirely: every
+  // placement follows an End Turn, so no step ever requests the premium and
+  // the dialog never fires. Pre-setting the dismissal key is therefore
+  // redundant but harmless (kept so a stale manual save never interrupts).
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true');
+    }
+  } catch { /* ignore */ }
 
   // Check canvas and rendering context validity
   const gameCanvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
@@ -402,12 +415,9 @@ function maybeAdvanceFromRequiredAction(
   if (!controller?.isActive) return;
   const step = getCurrentStep(controller);
   if (!step || step.gate !== 'action') return;
-  if (step.requiredAction === 'buy-and-place') {
-    // Composite: the drop (place-business) is the terminal action. Only
-    // force-advance when the current step is still the buy-and-place step
-    // and the player has already placed the card (hand empty / slot filled).
-    if (requiredAction !== 'place-business') return;
-  } else if (step.requiredAction !== requiredAction) {
+  // Two-turn plan-ahead flow (CG-0MT53NXGZ004H5AE): no composite
+  // buy-and-place steps — each action type completes its own step.
+  if (step.requiredAction !== requiredAction) {
     return;
   }
   s.tutorialController = advanceTutorialStep(controller);
@@ -463,9 +473,20 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
   const s = scene as any;
   const hand = s.state?.hand ?? [];
 
-  // New flow: if cards exist in hand, use pendingHandIndex
+  // ── New flow (CG-0MSXIQIPJ000NDTL): hand cards are NOT auto-selected. ──
+  // If a card is in hand but not yet selected (pendingHandIndex === null),
+  // select the just-moved card (from justMovedHandCardId) — falling back to
+  // the last card, the most recently added. We derive pendingHandJustMoved
+  // from the justMovedHandCardId tracker so placing the just-moved card stays
+  // free. We do NOT route through onHandBusinessCardClick here because that
+  // triggers a full re-render which, combined with the street-grid refresh
+  // below, can invalidate the slot objects under the pointer before the
+  // dispatch (the tutorial flow is time-sensitive).
   if (s.pendingHandIndex === null && hand.length > 0) {
-    s.pendingHandIndex = 0;
+    const justMovedIdx = hand.findIndex((c: any) => c.id === s.justMovedHandCardId);
+    s.pendingHandIndex = justMovedIdx >= 0 ? justMovedIdx : hand.length - 1;
+    s.pendingHandJustMoved = justMovedIdx >= 0;
+    s.uiPhase = 'placing-from-hand';
   }
 
   // If async buy-to-hand hasn't completed, execute it synchronously
@@ -475,6 +496,8 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
       // Execute the pick-up synchronously so the card is in hand for placement.
       // Cost-at-play (CG-0MSTOATDT009BRX2): taking a card to hand is FREE; the
       // listed cost is paid by placeFromHand when the card is placed.
+      // Post-CG-0MSXIQIPJ000NDTL: after buying, the card is in hand but NOT
+      // auto-selected; we must also call onHandBusinessCardClick.
       const marketCards = s.state?.market?.cards;
       const devCards = (marketCards ?? []).filter(
         (c: any) => c.family === 'business' || c.family === 'community-space',
@@ -487,7 +510,7 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
           if (found) cardToBuy = found;
         } else if (step?.requiredAction === 'place-business') {
           // place-business steps don't have requiredCardId. Find the card that
-          // was specified by the preceding select-business step (e.g., T10→T11).
+          // was specified by the preceding select-business step (e.g., T15 follows T11).
           const myIdx = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === step.id);
           for (let i = myIdx - 1; i >= 0; i--) {
             const prev = UNIFIED_TUTORIAL_STEPS[i];
@@ -500,9 +523,12 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
         const cardIdx = marketCards.findIndex((c: any) => c.id === cardToBuy.id);
         if (cardIdx >= 0) {
           // Move to hand (free, mirrors moveToHand()); placement pays the cost.
+          // Post-CG-0MSXIQIPJ000NDTL: record the just-moved card so a later
+          // selection (clickStreetSlot below) places it free, without
+          // auto-selecting it here.
           s.state.hand.push({ ...marketCards[cardIdx] });
           marketCards.splice(cardIdx, 1);
-          s.pendingHandIndex = s.state.hand.length - 1;
+          s.justMovedHandCardId = cardToBuy.id;
         }
       }
     }
@@ -594,7 +620,7 @@ function dispatchCanvasMouse(type: string, worldX: number, worldY: number): void
 /**
  * Dispatch a real pointer click at a street slot while a card is pending
  * WITHOUT asserting that it was placed — used to verify illegal-placement
- * rejection during the tutorial (e.g. T13: the Library must be built next
+ * rejection during the tutorial (e.g. T19: the Library must be built next
  * to the Bookshop).
  *
  * Mirrors `clickStreetSlot`'s setup (placing phase + street-grid refresh +
@@ -608,8 +634,16 @@ export async function clickStreetSlotExpectRejected(
   slotIdx: number,
 ): Promise<void> {
   const s = scene as any;
+  // Post-CG-0MSXIQIPJ000NDTL: hand cards are not auto-selected after
+  // market-to-hand. If no card is pending, select the just-moved card
+  // (from justMovedHandCardId), falling back to the most recent hand card
+  // — NOT index 0, which may be an un-placeable held event card (e.g. the
+  // Local Festival held from T9 while the T13 Library is the just-moved one).
   if (s.pendingHandIndex === null && (s.state?.hand ?? []).length > 0) {
-    s.pendingHandIndex = 0;
+    const hand = s.state.hand;
+    const justMovedIdx = hand.findIndex((c: any) => c.id === s.justMovedHandCardId);
+    s.pendingHandIndex = justMovedIdx >= 0 ? justMovedIdx : hand.length - 1;
+    s.pendingHandJustMoved = justMovedIdx >= 0;
   }
   s.uiPhase =
     s.pendingHandIndex !== null ? 'placing-from-hand' : 'placing-business';
@@ -655,7 +689,30 @@ export async function clickEndTurn(scene: Phaser.Scene): Promise<void> {
 }
 
 /**
- * Play the held investment event from the hand (T14 "Triggering Events").
+ * Perform the Community Favour rep→coins exchange (T13, CG-0MSTOATDQ005XDET).
+ * Calls the turn controller's onCommunityFavourClick('rep-to-coins') — the
+ * same dispatch the favour buttons use — then waits for the exchange to land
+ * (gate spent) and lets the tutorial advance from the action-gated step.
+ */
+export async function clickCommunityFavour(scene: Phaser.Scene): Promise<void> {
+  const s = scene as any;
+  if (s.uiPhase !== 'market') { s.uiPhase = 'market'; }
+  const coinsBefore = s.state?.resourceBank?.coins ?? 0;
+  try { s.onCommunityFavourClick('rep-to-coins'); } catch (_) { /* ignore */ }
+  // Wait for the exchange to land: coins increased by the config coin gain
+  // and the once-per-turn gate spent.
+  await pollUntil(
+    () =>
+      (s.state?.favourUsedThisTurn === true) &&
+      (s.state?.resourceBank?.coins ?? 0) > coinsBefore,
+    6_000,
+  );
+  maybeAdvanceFromRequiredAction(scene, 'community-favour');
+  await new Promise((r) => setTimeout(r, 200));
+}
+
+/**
+ * Play the held investment event from the hand (T20 "Triggering Events").
  * Finds the first event-family card in the player's hand and calls
  * onPlayHeldEvent with its index, then waits for the event to leave the hand.
  */

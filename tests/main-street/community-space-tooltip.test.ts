@@ -117,8 +117,8 @@ describe('Community space card tooltip data fields (AC1)', () => {
     const park = communitySpaceDeck.find(c => c.name === 'Park');
     expect(park).toBeDefined();
 
-    // Park has Culture synergy (same as before reclassification)
-    expect(park!.synergyTypes).toContain('Culture');
+    // Park has Entertainment synergy (rebalanced from Culture, CG-0MT3IPFSF005KEFB)
+    expect(park!.synergyTypes).toContain('Entertainment');
 
     // Should have same synergy type structure as a business card
     const cultureBusiness = businessDeck.find(c => c.synergyTypes.includes('Culture'));
@@ -170,7 +170,7 @@ describe('Community space card tooltip content (AC2)', () => {
     expect(tooltip).toContain('Community Space: Park');
     expect(tooltip).toContain('Cost: 3');
     expect(tooltip).toContain('Income: +0');
-    expect(tooltip).toContain('Synergy: Culture');
+    expect(tooltip).toContain('Synergy: Entertainment');
     expect(tooltip).toContain(resolvedDescription(park!));
     expect(tooltip).toContain('Gains 17.5% of base income');
   });

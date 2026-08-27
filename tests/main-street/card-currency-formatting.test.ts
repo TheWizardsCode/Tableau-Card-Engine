@@ -57,6 +57,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     ...overrides,
   };
@@ -182,8 +183,16 @@ describe('buildCardTooltipInfo - cost formatting', () => {
     expect(info).not.toContain('Cost: 8\n');
   });
 
-  it('staff/unknown cards produce an empty tooltip (existing behaviour)', () => {
-    expect(buildCardTooltipInfo(makeStaff(), config)).toBe('');
+  it('staff cards produce a hire-relevant tooltip with locale-aware cost (CG-0MT3KZOUX007GQ44)', () => {
+    const info = buildCardTooltipInfo(makeStaff(), config);
+    expect(info).toContain('Staff: Test Staff');
+    expect(info).toContain('Cost: €3');
+    expect(info).toContain('Hand slots: +1');
+    expect(info).not.toBe('');
+  });
+
+  it('unknown card families produce an empty tooltip (existing behaviour)', () => {
+    expect(buildCardTooltipInfo({ family: 'unknown' } as any, config)).toBe('');
   });
 });
 

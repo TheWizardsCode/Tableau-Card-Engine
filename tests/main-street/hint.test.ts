@@ -154,6 +154,23 @@ describe('generateHint', () => {
     expect(result!.action.type).toBe('end-turn');
     expect(result!.rationale).toBe('No good buys available -- end your turn');
   });
+
+  it('recommends rep-to-coins Community Favour when stalled with actions spent but reputation available', () => {
+    const state = makeMarketState('cf-hint');
+    // Action budget spent and nothing affordable: the free Community Favour
+    // exchange is the only meaningful non-end-turn action left.
+    state.actionsRemaining = 0;
+    state.resourceBank.coins = 0;
+    state.resourceBank.reputation = 5;
+    state.favourUsedThisTurn = false;
+    state.market.cards.forEach(c => { (c as { cost: number }).cost = 10; });
+    state.hand = [];
+    const result = generateHint(state);
+    expect(result).not.toBeNull();
+    expect(result!.action.type).toBe('community-favour');
+    expect((result!.action as PlayerAction & { direction?: string }).direction).toBe('rep-to-coins');
+    expect(result!.rationale).toContain('Community Favour');
+  });
 });
 
 // ── Per-turn limit (caller-enforced) ─────────────────────────
@@ -259,7 +276,7 @@ describe('buildRationale', () => {
     const fakeBiz: BusinessCard = {
       id: 'fake-biz', name: card.targetBusiness, family: 'business',
       description: 'Test business', cost: 3, baseIncome: 2, incomeBonus: 0,
-      synergyRangeBonus: 0, reputationBonus: 0, synergyTypes: [], level: 0, maxLevel: 2, appliedUpgrades: [],
+      synergyRangeBonus: 0, reputationBonus: 0, ongoingCost: 0, synergyTypes: [], level: 0, maxLevel: 2, appliedUpgrades: [],
     };
     state.streetGrid[2] = fakeBiz;
 

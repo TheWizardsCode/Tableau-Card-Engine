@@ -15,7 +15,9 @@ interface BaselineCatalog {
   perTier: {
     tier1: {
       business: number;
+      'community-space': number;
       event: number;
+      staff: number;
       upgrade: number;
       total: number;
     };
@@ -44,7 +46,11 @@ describe('Main Street card catalog baseline', () => {
     const baseline = loadBaseline();
     expect(baseline.source).toContain('Tier 1');
     expect(baseline.perTier.tier1.total).toBe(
-      baseline.perTier.tier1.business + baseline.perTier.tier1.event + baseline.perTier.tier1.upgrade,
+      baseline.perTier.tier1.business +
+        baseline.perTier.tier1['community-space'] +
+        baseline.perTier.tier1.event +
+        baseline.perTier.tier1.staff +
+        baseline.perTier.tier1.upgrade,
     );
     expect(baseline.totals.targetAtLeast).toBe(baseline.totals.baselineTotal * 2);
   });

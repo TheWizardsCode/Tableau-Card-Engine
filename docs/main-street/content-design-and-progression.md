@@ -12,8 +12,8 @@ The **Main Street** game uses three distinct card families. Below is the current
 | Bakery | 3 | 2 | Food | Bakery → Patisserie | Provides warm pastries. Gains 50% of base income per adjacent Food business. |
 | Diner | 4 | 3 | Food | Diner → Bistro | Serves quick meals. Gains 50% of base income per adjacent Food business. |
 | Bookshop | 4 | 2 | Culture | Bookshop → Reader's Café | Sells books. Gains 50% of base income per adjacent Culture business. |
-| Park | 2 | 1 | Culture | Park → Garden | Offers leisure. Gains 50% of base income per adjacent Culture business or community space. |
-| Hardware Store | 5 | 3 | Commerce | Hardware Store → Home Improvement | Supplies tools. Gains 50% of base income per adjacent Commerce business. |
+| Park | 2 | 1 | Entertainment | Park → Garden | Offers leisure. Gains 50% of base income per adjacent Entertainment business or community space. *(Culture→Entertainment retag, CG-0MT3IPFSF005KEFB; Park itself now lives in §1.2b as a community space.)* |
+| Hardware Store | 5 | 3 | Service | Hardware Store → Home Improvement | Supplies tools. Gains 50% of base income per adjacent Service business. *(Commerce→Service retag, CG-0MT3IPFSF005KEFB — tool supply is a Service, gives T2 a second type.)* |
 | Juice Bar | 5 | 0.5 | Food, Health | — | Fresh juices and smoothies. Bridges Food and Health synergies. *(Group A: first Health bridge.)* |
 | Yoga Studio | 8 | 1 | Culture, Health | — | Calm practice space for mind and body. Bridges Culture and Health synergies. *(Group A.)* |
 | Physiotherapy | 10 | 1 | Health, Service | — | Recovery and rehabilitation care. Bridges Health and Service synergies; +0.1 rep/turn. *(Group A.)* |
@@ -32,7 +32,7 @@ The **Main Street** game uses three distinct card families. Below is the current
 Event cards are split into two trigger types:
 
 - **Investment** events are purchased from the Investments market row, held by the player, and played (or auto-resolved) during the turn. They are generally positive.
-- **Incident** events populate a visible FIFO queue and resolve automatically at the start of each turn's Incident Phase. They are generally negative or disruptive.
+- **Incident** events populate a hidden face-down incident deck and resolve automatically (top card revealed) during the end-of-turn Incident Phase. They are generally negative or disruptive.
 
 | Name | Trigger | Effect |
 |------|---------|--------|
@@ -46,14 +46,14 @@ Event cards are split into two trigger types:
 | Tourist Season | Investment (duration) | All businesses generate 115% income for 3 turns. *(Group C — new positive income-multiplier.)* |
 | Community Renovation | Investment (duration) | All reputation income boosted to 120% for 4 turns. *(Group C — new rep-multiplier.)* |
 | Graffiti | Incident | -1 coin to all businesses and -1 reputation. *(Group D.)* |
-| Graffiti Art | Incident | +1 coin to all businesses and +1 reputation. *(Good reverse of Graffiti, CG-0MSRC9UR9006FBXC.)* |
+| Graffiti Art | Incident | +1 reputation to all businesses. *(Reputation-only positive counterpart of Graffiti, CG-0MSRC9UR9006FBXC.)* |
 | Water Main Break | Incident | -2 coins per Service business. *(Group D.)* |
 | Parking Enforcement | Incident | -1 coin per Commerce business. *(Group D.)* |
 | Labor Shortage | Incident (duration) | All businesses generate 90% income for 3 turns. *(Group D.)* |
 | Movie Premiere | Incident | +1 coin per Entertainment business and +1 reputation. *(Group D.)* |
 | Free Health Screening | Incident | +1 reputation. *(Group D.)* |
 | Farmers Market Day | Incident | +1 coin per Food business and +1 reputation. *(Group D.)* |
-| Library Story Hour | Incident | +1 reputation. *(Group D.)* |
+| Children's Story Hour | Incident | +1 reputation. *(Group D.)* |
 | Street Cleaning | Incident | No effect (streak breaker). *(Group D.)* |
 | Neighborhood Watch | Incident | -1 coin but +1 reputation (net-0, streak breaker). *(Group D.)* |
 | Tax Audit | Incident | Lose 3 coins. |
@@ -61,7 +61,7 @@ Event cards are split into two trigger types:
 | Community Award | Incident | +2 reputation from community recognition. |
 | Health Inspection | Incident | -2 coins per Food business and -1 reputation. |
 
-**Deck composition:** 5 event templates × 3 copies = 15 cards total (3 Investment, 12 Incident). At game start, the Investments market row draws 1 Investment event and the incident queue draws 2 Incidents from the shuffled event deck.
+**Deck composition:** 5 event templates × 3 copies = 15 cards total (3 Investment, 12 Incident). At game start, the Investments market row draws 1 Investment event and the incident deck is built from the Incident-trigger events, constraint-ordered so repeat-spacing/streak limits hold across the draw sequence (CG-0MSTOATDP000JNHH).
 
 ### 1.2b Community Space Cards
 
@@ -69,14 +69,18 @@ Community-space cards are placed on the street grid like businesses but generate
 
 | Name | Cost (coins) | Ongoing/turn | Synergy | Tier | Rep/turn | Description |
 |------|--------------|--------------|---------|------|----------|-------------|
-| Park | 3 | 0 | Culture | 1 | 0 | Offers leisure space. Full Culture synergy participation. |
-| Playground | 4 | 0 | Entertainment | 1 | 0.05 | A safe place for kids to play. *(Group B.)* |
-| Community Garden | 5 | 0.1 | Food | 2 | 0.1 | A shared garden plot for the neighbourhood. *(Group B.)* |
-| Town Fountain | 5 | 0 | Culture | 2 | 0.1 | A gathering spot around the fountain. *(Group B.)* |
-| Health Kiosk | 6 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. *(Group B.)* |
-| Community Shelter | 6 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. *(Group B.)* |
+| Park | 3 | 0 | Entertainment | 1 | 0 | Offers leisure space. Full Entertainment synergy participation. *(Culture→Entertainment retag, CG-0MT3IPFSF005KEFB.)* |
+| Playground | 4 | 0 | Entertainment | 3 | 0.05 | A safe place for kids to play. *(Group B.)* |
+| Community Garden | 5 | 0.1 | Food | 4 | 0.1 | A shared garden plot for the neighbourhood. *(Group B.)* |
+| Town Fountain | 5 | 0 | Culture | 5 | 0.1 | A gathering spot around the fountain. *(Group B.)* |
+| Health Kiosk | 6 | 0.15 | Health | 8 | 0.15 | A walk-up health advice kiosk. *(Group B.)* |
+| Community Shelter | 6 | 0 | Service | 6 | 0.15 | A warm shelter for those in need. *(Group B.)* |
 | Library | 7 | 0.25 | Culture | 1 | 0.1 | Quiet community space for reading and learning. |
-| Public Art | 8 | 0.25 | Culture, Entertainment | 4 | 0.2 | A vibrant public sculpture. Bridges Culture and Entertainment community spaces. *(Group B.)* |
+| Public Art | 8 | 0.25 | Culture, Entertainment | 12 | 0.2 | A vibrant public sculpture. Bridges Culture and Entertainment community spaces. *(Group B.)* |
+
+> 12-tier expansion (CG-0MT3C744B009DS84): community-space cards are spread across 7 of the 12 tiers (8 cards cannot cover every tier); Park and Library are Tier-1 because the tutorial requires them in the tier-1 card pool.
+
+> **Per-tier synergy balance (CG-0MT3IPFSF005KEFB):** across business + community-space cards, every tier spans ≥ 2 distinct synergy types, and no type's assignment count within a tier exceeds 2× any other type's count (bridge cards count once per type they carry, e.g. the T3 Arcade Entertainment|Service bridge). The three sparse tiers were stretched without new cards: T1 Park Culture→Entertainment, T2 Hardware Store Commerce→Service, T3 Arcade → Entertainment|Service. See `card-catalog.md` "Synergy Type Coverage" and `tests/main-street/tier-synergy-balance.test.ts`.
 
 ### 1.3 Upgrade Cards
 | Name | Target Business | Cost (coins) | Income Bonus | Synergy Range Bonus | Description |
@@ -103,15 +107,19 @@ Community-space cards are placed on the street grid like businesses but generate
 
 Staff cards expand hand capacity at an ongoing per-turn coin cost. *(Group F, CG-0MSQJ7VL9009JHF4, grew this family from 3 to 7 cards.)*
 
-| Name | Cost | Ongoing/turn | Slots+ | Ability | Description |
-|------|------|--------------|--------|---------|-------------|
-| Apprentice | 2 | 0.5 | +1 | — | A budget hire who frees up a hand slot. *(Group F.)* |
-| Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. |
-| Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. |
-| Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds hand capacity and reputation. *(Group F.)* |
-| Accountant | 8 | 1.5 | +1 | refresh −1 | Makes market refreshes cost 1 less. *(Group F.)* |
-| Director | 14 | 4 | +3 | — | An experienced director oversees your operations. |
-| Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity. *(Group F.)* |
+| Name | Cost | Ongoing/turn | Slots+ | Tier | Ability | Description |
+|------|------|--------------|--------|------|---------|-------------|
+| Apprentice | 2 | 0.5 | +1 | 1 | — | A budget hire who frees up a hand slot. *(Group F.)* |
+| Assistant | 3 | 1 | +1 | 2 | — | Hire an assistant to help manage your hand. |
+| Manager | 7 | 2.5 | +2 | 3 | — | A skilled manager keeps things organised. |
+| Socialite | 8 | 1.5 | +1 | 4 | +0.1 rep/turn | A charming socialite adds hand capacity and reputation. *(Group F.)* |
+| Accountant | 8 | 1.5 | +1 | 6 | refresh −1 | Makes market refreshes cost 1 less. *(Group F.)* |
+| Lookout | 10 | 2 | +1 | 7 | peek once/turn | Peek at the top incident-deck card once per turn. *(CG-0MSXOW6GN008ZSMN.)* |
+| Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. |
+| Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity. *(Group F.)* |
+| General Manager | 20 | 5 | +4 | 12 | +1 action/turn | Grants an extra action per day while employed. *(CG-0MSTOF1N5005PK2R.)* |
+
+> 12-tier expansion (CG-0MT3C744B009DS84): staff cards are spread across 9 of the 12 tiers (9 cards cannot cover every tier); the tier tracks the cost ladder 2→20.
 
 ## 2. Recipes / Blueprints
 
@@ -124,7 +132,7 @@ Main Street does **not** feature crafting or combination mechanics. The game rev
 The core economic loop consists of two primary resources:
 
 1. **Coins** – the spendable currency used to purchase Business, Event, and Upgrade cards from the market.
-2. **Reputation** – a score multiplier that is increased by completing challenges or by positive events. Reputation is applied at final‑score calculation (`finalScore = coins + reputation * 5 + challengeBonuses`).
+2. **Reputation** – a plain score count increased by completing challenges or by positive events. Reputation counts 1:1 at final‑score calculation (`finalScore = coins + reputation + challengeBonuses`).
 
 **Flow of Resources**:
 - At the start of each **Day Phase**, the player may spend coins to acquire cards.
@@ -148,14 +156,14 @@ The balancing methodology and targets for Main Street have been consolidated int
 The final score is calculated at the end of the **Night Phase** using the formula:
 
 ```
-finalScore = resourceBank.coins + (resourceBank.reputation * 5) + challengeBonus
+finalScore = resourceBank.coins + resourceBank.reputation + challengeBonus
 ```
 
 - **Coins** contribute directly.
-- **Reputation** is multiplied by 5 to give it meaningful weight.
+- **Reputation** counts 1:1 toward the final score.
 - **Challenge Bonus** adds `10` points per completed challenge (e.g., *Foodie Row*, *Cultural District*).
 
-Victory conditions (see Core Rules) require `finalScore >= 150` **or** all primary challenges completed.
+Victory conditions (see Core Rules) require `finalScore >= winThreshold` (100 Easy / 120 Medium / 150 Hard) **or** all primary challenges completed.
 
 ---
 

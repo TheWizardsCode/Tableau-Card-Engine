@@ -60,6 +60,24 @@
         "rightCenter": { "x": 0.979688, "y": 0.954167 }
       }
     },
+    "favourCoinsToRepButton": {
+      "rect": {
+        "x": 0.34375,
+        "y": 0.905556
+      },
+      "anchors": {
+        "center": { "x": 0.408594, "y": 0.929167 }
+      }
+    },
+    "favourRepToCoinsButton": {
+      "rect": {
+        "x": 0.53125,
+        "y": 0.905556
+      },
+      "anchors": {
+        "center": { "x": 0.596094, "y": 0.929167 }
+      }
+    },
     "activityLog": {
       "rect": {
         "x": 0.75,

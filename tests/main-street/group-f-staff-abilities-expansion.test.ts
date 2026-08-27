@@ -10,7 +10,9 @@
  *   Accountant reduces the investments-refresh cost by 1.
  * - Staff without abilities (Apprentice, Executive, and the existing
  *   Assistant/Manager/Director) behave exactly as before (AC3).
- * - All IDs unique (AC4); staff cards carry no tier (existing convention).
+ * - All IDs unique (AC4); staff cards carry tiers following the rebalance
+ *   (CG-0MT2WU0CX005Z143): every staff card is assigned a tier so staff are
+ *   unlocked through the same progression as other families.
  *
  * @module
  */
@@ -24,7 +26,6 @@ import {
   createEventDeck,
   createUpgradeDeck,
   CARD_TIER_MAP,
-  CARD_TEMPLATE_NAMES,
   type StaffCard,
 } from '../../example-games/main-street/MainStreetCards';
 import { validateCsvRows } from '../../src/balance-cards';
@@ -60,8 +61,8 @@ function findStaff(deck: readonly StaffCard[], id: string): StaffCard | undefine
 // ── AC1: Template count ───────────────────────────────────────────────
 
 describe('Group F staff expansion: template count (AC1)', () => {
-  it('grows staff templates from 3 to exactly 8 (incl. General Manager)', () => {
-    expect(createStaffDeck(1)).toHaveLength(8);
+  it('grows staff templates to exactly 21 (incl. General Manager + Lookout + 12 specialization applicants)', () => {
+    expect(createStaffDeck(1)).toHaveLength(21);
   });
 
   it('adds exactly the 4 contracted card IDs', () => {
@@ -80,18 +81,27 @@ describe('Group F staff expansion: uniqueness & tier convention (AC4)', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('staff cards carry no tier (existing convention)', () => {
+  it('staff cards carry a tier (rebalance, CG-0MT2WU0CX005Z143)', () => {
     for (const c of NEW_STAFF_CONTRACTS) {
-      expect(CARD_TIER_MAP.has(c.id), `${c.id} should not be tier-assigned`).toBe(false);
+      expect(CARD_TIER_MAP.has(c.id), `${c.id} should be tier-assigned`).toBe(true);
     }
   });
 
-  it('staff cards are not tier-registered (existing convention)', () => {
-    // CARD_TEMPLATE_NAMES/CARD_TIER_MAP cover tiered families only; staff
-    // cards carry no tier and are intentionally absent from both maps.
-    for (const c of NEW_STAFF_CONTRACTS) {
-      expect(CARD_TEMPLATE_NAMES.has(c.id), `${c.id} should not be in CARD_TEMPLATE_NAMES`).toBe(false);
-      expect(CARD_TIER_MAP.has(c.id), `${c.id} should not be tier-assigned`).toBe(false);
+  it('staff cards are tier-registered like other families (12-tier, CG-0MT3C744B009DS84)', () => {
+    // All 21 staff cards are tier-assigned and spread across tiers 1-12
+    // (apprentice T1, assistant T2, manager T3, socialite T4, accountant T6,
+    // lookout T7, director T9, executive T10, general-manager T12, plus the 12
+    // specialization applicants across T2-T5, CG-0MT4WXNR80090FXZ).
+    const staffIds = getCsvRows().filter(r => r.family === 'staff').map(r => r.id);
+    expect(staffIds).toHaveLength(21);
+    const staffTiers = staffIds.map(id => CARD_TIER_MAP.get(id));
+    const validTiers = Array.from({ length: 12 }, (_, i) => String(i + 1));
+    for (const t of staffTiers) {
+      expect(validTiers).toContain(t);
+    }
+    expect(new Set(staffTiers).size).toBeGreaterThanOrEqual(8); // spread across >= 8 tiers
+    for (const id of staffIds) {
+      expect(CARD_TIER_MAP.has(id), `${id} should be tier-assigned`).toBe(true);
     }
   });
 });
@@ -135,6 +145,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     ...overrides,
   };

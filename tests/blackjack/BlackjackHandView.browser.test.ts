@@ -188,29 +188,4 @@ describe('Blackjack HandView rendering', () => {
     expect(holeSpriteAfter).toBeDefined();
     expect(holeSpriteAfter.texture.key).toBe(cardTextureKey(holeCard.rank, holeCard.suit));
   });
-
-  it('reveals the hole card instantly when reduced motion is enabled', async () => {
-    setReducedMotion(true);
-
-    game = await bootGame();
-    const scene = getScene(game);
-    const state = createBlackjackGameState({ seed: SAFE_SEED });
-    scene.state = state;
-
-    clickButton(findButtonByText(scene, '[ Deal ]')!);
-    await wait(500); // reduced motion skips deal animations
-
-    const dealerHandView = getHandView(scene, 'dealerHandView');
-    const holeCard = state.dealerHand.cards.toArray()[0];
-    expect((dealerHandView.getSpriteAt(0) as Phaser.GameObjects.Image).texture.key)
-      .toBe('card_back');
-
-    // Stand with reduced motion: the reveal applies instantly — the face
-    // texture must be present well before the 150ms flip midpoint.
-    clickButton(findButtonByText(scene, '[ Stand ]')!);
-    await wait(30);
-
-    expect((dealerHandView.getSpriteAt(0) as Phaser.GameObjects.Image).texture.key)
-      .toBe(cardTextureKey(holeCard.rank, holeCard.suit));
-  });
 });

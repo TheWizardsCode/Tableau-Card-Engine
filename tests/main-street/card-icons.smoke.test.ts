@@ -22,8 +22,13 @@ describe('Main Street card generator: synergy icons smoke', () => {
 
     expect(hasIconGroup || hasFallback).toBe(true);
 
-    // Ensure the textual synergy label is not present (we now show only the icon)
-    expect(content.includes('x="8"') && content.includes('font-size="9"')).toBe(false);
+    // Ensure the textual synergy label is not present (we now show only the icon).
+    // Legacy label was `<text x="8" ... font-size="9">Synergy</text>`; the raw
+    // `includes('x="8"')` check collides with unrelated attributes in modern SVG
+    // output (icon eye circles `x="8"`, the `-X/turn` ongoing-cost label which
+    // shares font-size="9" with the runtime generator), so look for a *text*
+    // element positioned at x="8" instead.
+    expect(/<text[^>]*x="8"/.test(content)).toBe(false);
 
     // Also check that aria-label for the card title is present
     expect(content).toMatch(/aria-label=".+"/);

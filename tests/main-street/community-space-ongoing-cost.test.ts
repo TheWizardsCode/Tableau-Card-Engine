@@ -111,20 +111,22 @@ describe('Library synergy participation (behavioral, Park model)', () => {
     state.streetGrid[1] = library;
 
     // The Library participates in synergy now, so it is counted toward N:
-    // Cafe earns 1 base income × 0.5 default rate × 1 neighbor = 0.5 coins.
-    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(0.5);
+    // Cafe earns 5.2 base income × 0.5 default rate × 1 neighbor = 2.6 coins
+    // (base income raised by CG-0MSVYPEZ90085SHE: 1 → 5.2).
+    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(2.6);
   });
 
-  it('should give a Bookshop 0.25 Culture synergy when placed adjacent', () => {
+  it('should give a Bookshop 1.15 Culture synergy when placed adjacent', () => {
     const state = createTestState('bookshop-library-synergy');
-    // Bookshop (Culture, baseIncome 0.5) adjacent to the Library
+    // Bookshop (Culture, baseIncome 2.3) adjacent to the Library
     const bookshop = createBusinessDeck(1).find(c => c.name === 'Bookshop')!;
     const library = createCommunitySpaceDeck(1).find(c => c.name === 'Library')!;
     state.streetGrid[0] = bookshop;
     state.streetGrid[1] = library;
 
-    // 0.5 base income × 0.5 default rate × 1 neighbor = 0.25 coins/turn.
-    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(0.25);
+    // 2.3 base income × 0.5 default rate × 1 neighbor = 1.15 coins/turn
+    // (base income raised by CG-0MSVYPEZ90085SHE: 0.5 → 2.3).
+    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(1.15);
   });
 
   it('should draw a Culture synergy line between a Bookshop and the Library', () => {

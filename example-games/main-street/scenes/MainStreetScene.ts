@@ -56,6 +56,24 @@ export class MainStreetScene extends CardGameScene {
   // Selected difficulty (persisted across replays)
   public selectedDifficulty: DifficultyName = 'Medium';
 
+  /**
+   * When true, the day-banner at boot is deferred until the player commits
+   * to playing (skips the tutorial offer, starts the tutorial, or resumes
+   * from checkpoint). Cleared after it fires exactly once.
+   */
+  public deferredDayBanner = false;
+
+  /**
+   * Plays the deferred day-banner animation if one is pending.
+   * Clears the `deferredDayBanner` flag so it fires at most once.
+   * Safe to call when no banner is pending (no-op).
+   */
+  public playDeferredDayBanner(): void {
+    if (!this.deferredDayBanner) return;
+    this.deferredDayBanner = false;
+    try { this.msAnimator?.animateDayBanner({ day: this.state?.turn ?? 1 }); } catch (_) { /* presentation-only */ }
+  }
+
   // Pending selection for placing a business
   public pendingBusinessCard: BusinessCard | null = null;
   public pendingBusinessSourceIndex: number | null = null;
@@ -67,6 +85,14 @@ export class MainStreetScene extends CardGameScene {
   // (same-day move+place composite = 1 action). False when the card was
   // already in hand (placing then costs a second action).
   public pendingHandJustMoved: boolean = false;
+
+  // ID of the hand card most recently moved from the market this turn
+  // (CG-0MSXIQIPJ000NDTL). The card rests unselected in the hand; when the
+  // player clicks it, pendingHandJustMoved is derived from this ID so placing
+  // the just-moved card stays free (same-day move+place = 1 action) while any
+  // other held card still costs an action. Cleared on placement, cancel, new
+  // day, or undo.
+  public justMovedHandCardId: string | null = null;
 
   // Computed responsive layout metrics
   public layout!: SceneLayout;
@@ -88,7 +114,12 @@ export class MainStreetScene extends CardGameScene {
   public logScrollOffset = 0;
   public logMaxScroll = 0;
   public logTotalContentH = 0;
-  public logAutoScroll = false;
+  /** Whether the log should auto-scroll to show the latest entry on each refresh.
+   * Starts `true` so the log defaults to showing the bottom (newest entries).
+   * Set to `false` when the player scrolls up to read history; re-engages
+   * automatically when they wheel-scroll back to the bottom (see
+   * `MainStreetRenderer.refreshLog` and `MainStreetInputManager.handleLogWheel`). */
+  public logAutoScroll = true;
   public logPrevEntryCount = 0;
   /** The index of the first entry displayed in the current log window (for windowed rendering). */
   public logRenderedStartIdx = 0;
@@ -344,7 +375,8 @@ export class MainStreetScene extends CardGameScene {
     return (this.msRenderer as any).drawMarketCard.apply(this.msRenderer, args);
   }
 
-  // ── Incident Queue ───────────────────────────────────────
+  // ── Incident Deck Panel (private accessors; names retain the legacy
+  // ── 'IncidentQueue' for API/test compatibility) ──
   public refreshIncidentQueue(...args: any[]): any {
     return (this.msRenderer as any).refreshIncidentQueue.apply(this.msRenderer, args);
   }
@@ -371,6 +403,16 @@ export class MainStreetScene extends CardGameScene {
   // Refresh market proxy (forward to turn controller)
   public onRefreshMarketClick(...args: any[]): any {
     return (this.msTurnController as any).onRefreshMarketClick.apply(this.msTurnController, args);
+  }
+
+  /** Staff peek action proxy (forward to turn controller, CG-0MSXOW6GN008ZSMN). */
+  public onPeekClick(...args: any[]): any {
+    return (this.msTurnController as any).onPeekClick.apply(this.msTurnController, args);
+  }
+
+  /** Community Favour action proxy (forward to turn controller, CG-0MSTOATDQ005XDET). */
+  public onCommunityFavourClick(...args: any[]): any {
+    return (this.msTurnController as any).onCommunityFavourClick.apply(this.msTurnController, args);
   }
 
   /**
@@ -412,6 +454,9 @@ export class MainStreetScene extends CardGameScene {
   }
   public onUpgradeCardClick(...args: any[]): any {
     return (this.msTurnController as any).onUpgradeCardClick.apply(this.msTurnController, args);
+  }
+  public onStaffCardClick(...args: any[]): any {
+    return (this.msTurnController as any).onStaffCardClick.apply(this.msTurnController, args);
   }
 
   public onSellCard(...args: any[]): any {
@@ -575,6 +620,24 @@ export class MainStreetScene extends CardGameScene {
     }
     // Fallback: if no overlay manager method exists, execute sell directly
     this.msTurnController?.onSlotClick?.(slotIndex);
+  }
+
+  /**
+   * Shows the buy-and-play premium explainer dialog.
+   *
+   * Fires before a same-turn buy-and-play (click composite placement or
+   * drag) commits a +50% premium charge (CG-0MT24X0SX007RLHN). Proceed
+   * continues the placement at the premium price; cancel aborts it (the
+   * card returns to where it came from with no coins deducted).
+   *
+   * @param cardName  Card being placed.
+   * @param onProceed Callback when the player proceeds at the premium price.
+   * @param onCancel  Callback when the player cancels.
+   */
+  public showBuyAndPlacePremiumDialog(cardName: string, onProceed: () => void, onCancel: () => void): void {
+    if (this.msOverlayManager && typeof (this.msOverlayManager as any).showBuyAndPlacePremiumDialog === 'function') {
+      (this.msOverlayManager as any).showBuyAndPlacePremiumDialog(cardName, onProceed, onCancel);
+    }
   }
 
   // ── Tutorial Flow (Milestone 5 action-gated) ────────────

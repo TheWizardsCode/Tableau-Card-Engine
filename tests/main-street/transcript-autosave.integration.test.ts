@@ -59,7 +59,9 @@ function playTurns(state: ReturnType<typeof setupMainStreetGame>, turns: number)
     executeDayStart(state);
     // Try to buy first affordable business
     const affordable = state.market.cards.filter(
-      (c) => c.cost <= state.resourceBank.coins,
+      c =>
+        (c.family === 'business' || c.family === 'community-space') &&
+        c.cost <= state.resourceBank.coins,
     );
     const emptyIdx = state.streetGrid.findIndex((b) => b === null);
     if (affordable.length > 0 && emptyIdx >= 0) {

@@ -57,11 +57,18 @@ describe('Main Street card schema and registry validation', () => {
 
     const runtimeCardIds = [
       ...state.market.cards.map(card => card.id),
-      ...state.market.cards.map(card => card.id),
       ...state.incidentDeck.map(card => card.id),
       ...state.decks.business.map(card => card.id),
       ...state.decks.event.map(card => card.id),
       ...state.decks.upgrade.map(card => card.id),
+      ...state.decks.staff.map(card => card.id),  // CG-0MT3KZNQB0053K55
+      ...state.discards.business.map(card => card.id),
+      ...state.discards.event.map(card => card.id),
+      ...state.discards.upgrade.map(card => card.id),
+      ...state.discards.staff.map(card => card.id),
+      ...state.staffCards.map(card => card.id),
+      ...state.streetGrid.filter((c): c is NonNullable<typeof c> => c !== null).map(card => card.id),
+      ...state.hand.map(card => card.id),
     ];
 
     for (const runtimeId of runtimeCardIds) {

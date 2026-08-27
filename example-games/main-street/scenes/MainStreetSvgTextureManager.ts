@@ -1,6 +1,7 @@
 import { CARD_TEMPLATE_NAMES, getCsvRows } from '../MainStreetCards';
 import { rasteriseSvgToTexture, makeTextureKey } from '../../../src/core-engine';
 import { generateCardSvgFromCsvRow } from './MainStreetCardSvgGenerator';
+import { CARD_BACK_TEMPLATE } from './MainStreetConstants';
 
 export class MainStreetSvgTextureManager {
   private lastDevicePixelRatio: number;
@@ -53,6 +54,20 @@ export class MainStreetSvgTextureManager {
         .catch(() => { /* ignore fetch failures in test environments */ });
       fetches.push(p);
     }
+
+    // Face-down incident-deck card back (CG-0MSXOWLHU0099QF6) — a static
+    // SVG asset, not a CSV card template.
+    const backPath = `assets/games/main-street/svg/cards/${CARD_BACK_TEMPLATE}.svg`;
+    const backFetch = fetch(backPath)
+      .then((resp) => (resp.ok ? resp.text() : null))
+      .then((text) => {
+        if (text) {
+          s.cardSvgSources.set(CARD_BACK_TEMPLATE, text);
+        }
+      })
+      .catch(() => { /* ignore fetch failures in test environments */ });
+    fetches.push(backFetch);
+
     s.cardSvgLoadPromise = Promise.all(fetches).then(() => {});
   }
 
@@ -125,6 +140,18 @@ export class MainStreetSvgTextureManager {
 
     const dpr = this.getCurrentDevicePixelRatio();
     const rasterizePromises: Promise<void>[] = [];
+
+    // Face-down incident-deck card back (CG-0MSXOWLHU0099QF6): prewarm at
+    // the queue size so the deck stack renders immediately.
+    const backSvg = s.cardSvgSources.get(CARD_BACK_TEMPLATE);
+    if (backSvg) {
+      const backKey = makeTextureKey(CARD_BACK_TEMPLATE, s.layout.queueCardW, s.layout.queueCardH, dpr);
+      if (!s.textures.exists(backKey)) {
+        const p = rasteriseSvgToTexture(s, backKey, backSvg, s.layout.queueCardW, s.layout.queueCardH, dpr)
+          .catch(() => {});
+        rasterizePromises.push(p);
+      }
+    }
 
     for (const templateId of visibleTemplates) {
       const svgText = s.cardSvgSources.get(templateId);

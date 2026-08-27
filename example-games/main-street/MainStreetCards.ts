@@ -104,6 +104,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
       synergyCoinBonus: r.synergyCoinBonus !== undefined && r.synergyCoinBonus !== '' ? Number(r.synergyCoinBonus) : undefined,
       synergyRepBonus: r.synergyRepBonus !== undefined && r.synergyRepBonus !== '' ? Number(r.synergyRepBonus) : undefined,
+      ongoingCost: Number(r.ongoingCost) || 0,
       description: r.description,
     }));
 
@@ -163,6 +164,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       description: r.description,
       requiredLevel: r.requiredLevel ? Number(r.requiredLevel) : undefined,
       reputationBonus: r.reputationBonus ? Number(r.reputationBonus) : undefined,
+      newDisplayName: r.newDisplayName || undefined,
     }));
 
   // Assign to the mutable module-level variables
@@ -181,6 +183,13 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
   for (const t of csTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
   for (const t of evtTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
   for (const t of upgTemplates) _CARD_TEMPLATE_NAMES.set(t.id, t.name);
+  // Staff templates are also first-class cards in the general market
+  // (CG-0MT3KZNQB0053K55); register them in the display-name lookup.
+  for (const row of rows) {
+    if (row.family === 'staff' && row.id) {
+      _CARD_TEMPLATE_NAMES.set(row.id, row.name);
+    }
+  }
 
   _CARD_TIER_MAP.clear();
   for (const row of rows) {
@@ -204,6 +213,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
       refreshCostDiscount: r.refreshCostDiscount ? Number(r.refreshCostDiscount) : undefined,
       actionsPerTurn: r.actionsPerTurn ? Number(r.actionsPerTurn) : undefined,
+      peekOncePerTurn: r.peekOncePerTurn ? Number(r.peekOncePerTurn) > 0 : undefined,
     });
   }
 }
@@ -212,6 +222,48 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
 
 /** Synergy types used by Business cards for adjacency bonuses. */
 export type SynergyType = 'Food' | 'Culture' | 'Commerce' | 'Service' | 'Entertainment' | 'Health';
+
+// ── Staff specialization skills (CG-0MT1CIWSD003VBPK) ────────
+
+/** Effect category a specialization skill belongs to (AC4 of CG-0MT1CIWSD003VBPK). */
+export type SpecializationSkillCategory =
+  | 'income-boost'
+  | 'reputation-boost'
+  | 'cost-reduction'
+  | 'incident-mitigation';
+
+/**
+ * Categories tracked by the per-staff stacking cap: a staff member may hold
+ * at most 1 income-boost AND at most 1 reputation-boost skill beyond the Town
+ * Gossip baseline. Other categories (cost-reduction, incident-mitigation)
+ * stack freely (AC4 / acceptance criteria of CG-0MT4WXQCN001G1LF).
+ */
+export const STACKED_SKILL_CATEGORIES: readonly SpecializationSkillCategory[] = [
+  'income-boost',
+  'reputation-boost',
+] as const;
+
+/**
+ * A single specialization skill from the global pool.
+ *
+ * Skills are randomized once per game at start and locked for the full game;
+ * they are stored in game state by id (strings) and resolved through the
+ * catalog (`getSkill` in MainStreetStaffSkills). `category` doubles as the
+ * stacking-tracked category for income/reputation boosts.
+ */
+export interface SpecializationSkill {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  /** Effect category; also the stacking-tracked category for income/reputation boosts. */
+  readonly category: SpecializationSkillCategory;
+  /**
+   * Machine-readable effect hint consumed by buff wiring (MainStreetStaffBuffs,
+   * I4 CG-0MT4WXV2J000M35M) and rendering/help text (I5 CG-0MT4WXX1Q00860VP).
+   * Mirrors `description` in semantics; kept stable for serialized state.
+   */
+  readonly effect: string;
+}
 
 /** When an Event card resolves. */
 export type EventTrigger = 'Investment' | 'Incident';
@@ -279,6 +331,13 @@ export interface BusinessCard {
    * Used for sell value calculation. Defaults to 0 for cards without upgrades.
    */
   totalUpgradeCost?: number;
+  /**
+   * Display name shown on the card overlay when the business has been upgraded.
+   * Set to the upgraded business name by `purchaseUpgrade()` / `playUpgradeFromHand()`
+   * when an upgrade card is applied. Falls back to `name` (the original business name)
+   * when the business is at level 0 (un-upgraded).
+   */
+  displayName?: string;
 
   /**
    * Current effective income per turn (base + upgrade bonus + synergy + same-type penalty).
@@ -294,6 +353,14 @@ export interface BusinessCard {
    * Undefined until the card is placed on the grid and recalculateCard is called.
    */
   currentReputationPerTurn?: number;
+
+  /**
+   * Ongoing per-turn cost for this business card.
+   * Deducted from coins each income phase, whether the card is placed on the
+   * street grid or held in hand. Mirrors StaffCard and CommunitySpaceCard.
+   * Defaults to 0 for legacy cards with no CSV value.
+   */
+  readonly ongoingCost: number;
 }
 
 /**
@@ -381,6 +448,13 @@ export interface UpgradeCard {
    * Fractional values are supported (e.g. 0.1 for the Medical Center upgrade).
    */
   readonly reputationBonus?: number;
+  /**
+   * The new display name for the target business when this upgrade is applied.
+   * This is the name shown on the card overlay (e.g., "Patisserie" for an
+   * upgrade that turns a Bakery into a Patisserie). Used by
+   * `buildUpgradeOverlaySpec()` to compute the name overlay text.
+   */
+  readonly newDisplayName?: string;
 }
 
 /**
@@ -396,6 +470,13 @@ export interface StaffCard {
   readonly ongoingCost: number;
   readonly handSlotsAdded: number;
   readonly description: string;
+  /**
+   * Specialization skills randomized at game start (CG-0MT4WXSWG0023VR0,
+   * parent CG-0MT1CIWSD003VBPK). Stored as stable catalog ids; resolved via
+   * `getSkill`. Assigned once per card instance at setup and locked for the
+   * full game. Absent (undefined) on legacy saves — treat as no skills.
+   */
+  specializationSkillIds?: string[];
   /**
    * Optional reputation granted per turn during the income phase
    * (e.g. the Socialite's +0.1 rep/turn ability — Group F,
@@ -413,6 +494,12 @@ export interface StaffCard {
    * (e.g. the General Manager's +1 action per day — CG-0MSTOF1N5005PK2R).
    */
   readonly actionsPerTurn?: number;
+  /**
+   * Optional staff peek ability: once per turn, as an action, the player
+   * may reveal the top card of the face-down incident deck and return it
+   * face-down without resolving it (CG-0MSXOW6GN008ZSMN).
+   */
+  readonly peekOncePerTurn?: boolean;
 }
 
 /** Union of all card types in Main Street. */
@@ -435,9 +522,9 @@ export interface IncidentPolarityRun {
 /**
  * Runtime-mutable state governing constrained Incident draws.
  *
- * The incident queue is a visible FIFO of upcoming events. To keep the
- * sequence of incidents the player actually resolves fair, draws are
- * constrained by two limits:
+ * Incidents live in a hidden face-down deck (CG-0MSTOATDP000JNHH); deck
+ * order is arranged at build/reshuffle time so the sequence of incidents
+ * the player actually resolves is constrained by two limits:
  *
  * - `repeatSpacing` (N): a card name cannot reappear within the last
  *   `N - 1` drawn cards (e.g. N=3 blocks a card drawn at position 1 from
@@ -446,7 +533,7 @@ export interface IncidentPolarityRun {
  *   (good = net > 0, bad = net < 0). Neutral cards (net == 0) break runs.
  *
  * Both limits are mutable at runtime via `setIncidentBalanceLimits` in
- * `MainStreetState.ts`; changes affect subsequent draws only.
+ * `MainStreetState.ts`; changes affect subsequent rebuilds only.
  */
 export interface IncidentBalanceState {
   /** Repeat-spacing window N (>= 1, default 3). */
@@ -813,8 +900,8 @@ export const GRID_SIZE = 10;
  */
 export const MAX_TURNS = 20;
 
-/** Score required for a win via score threshold. */
-export const WIN_THRESHOLD = 150;
+/** Score required for a win via score threshold (Medium preset default, retuned to 120 by CG-0MT3J8FXG006RCOA). */
+export const WIN_THRESHOLD = 120;
 
 /** Starting coin balance (Medium preset default). */
 export const STARTING_COINS = 6;
@@ -841,7 +928,15 @@ export const MARKET_UPGRADE_MAX = 1;
 /** Maximum number of event cards in the single-row market. */
 export const MARKET_EVENT_MAX = 1;
 
-/** Number of Incident cards visible in the incident queue at game start. */
+/** Maximum number of staff cards per market row (CG-0MT3KZNQB0053K55). */
+export const MARKET_STAFF_MAX = 1;
+
+/**
+ * Legacy: number of Incident cards in the pre-deck incident queue. The
+ * face-down incident deck replaced the visible queue (CG-0MSTOATDP000JNHH);
+ * retained for backward compatibility and the deterministic tutorial
+ * scenario (TutorialScenario.ts builds exactly this many deck cards).
+ */
 export const INCIDENT_QUEUE_SIZE = 2;
 
 /**
@@ -862,9 +957,6 @@ export const REFRESH_MARKET_COST = 5;
  */
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 
-/** Multiplier applied to reputation in final score. */
-export const REPUTATION_SCORE_MULTIPLIER = 5;
-
 /** Points awarded per completed challenge. */
 export const CHALLENGE_BONUS_POINTS = 10;
 
@@ -882,13 +974,14 @@ export const SELL_VALUE_RATIO = 0.75;
  * Creates a fresh copy of a BusinessCard from template data.
  * Mutable fields (level, incomeBonus, synergyRangeBonus, appliedUpgrades) are reset.
  */
-function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus' | 'currentIncome' | 'currentReputationPerTurn'>): BusinessCard {
+function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeBonus' | 'synergyRangeBonus' | 'appliedUpgrades' | 'reputationBonus' | 'currentIncome' | 'currentReputationPerTurn' | 'ongoingCost'>): BusinessCard {
   const card: BusinessCard = {
     family: 'business',
     level: 0,
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     ...template,
   };
@@ -1005,6 +1098,13 @@ export interface CommunitySpaceCard {
    * Undefined until the card is placed on the grid and recalculateCard is called.
    */
   currentReputationPerTurn?: number;
+  /**
+   * Display name shown on the card overlay when the community space has been upgraded.
+   * Set to the upgraded name by `purchaseUpgrade()` / `playUpgradeFromHand()`
+   * when an upgrade card is applied. Falls back to `name` (the original name)
+   * when the community space is at level 0 (un-upgraded).
+   */
+  displayName?: string;
 }
 
 // ── CSV → typed template arrays ─────────────────────────────
@@ -1087,13 +1187,28 @@ export const STAFF_CARD_TEMPLATES: StaffCard[] = _STAFF_CARD_TEMPLATES;
 /**
  * Creates the full Staff deck for a game.
  *
- * @param copies  Number of copies per template (default 1).
+ * Staff cards are tier-gated like every other family (rebalance work item
+ * CG-0MT2WU0CX005Z143): only templates whose ID is in `unlockedCardIds` are
+ * included when the list is provided, so progression tiers control which
+ * staff are available for hire.
+ *
+ * @param copies          Number of copies per template (default 1).
+ * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
+ *                        When provided, only templates whose ID is in this list
+ *                        are included. When omitted, the full pool is used.
  * @returns Array of StaffCard instances.
  */
-export function createStaffDeck(copies: number = 1): StaffCard[] {
+export function createStaffDeck(
+  copies: number = 1,
+  unlockedCardIds?: string[],
+): StaffCard[] {
+  const templates = unlockedCardIds
+    ? _STAFF_CARD_TEMPLATES.filter((t) => unlockedCardIds.includes(t.id))
+    : _STAFF_CARD_TEMPLATES;
+
   const deck: StaffCard[] = [];
   for (let c = 0; c < copies; c++) {
-    for (const template of _STAFF_CARD_TEMPLATES) {
+    for (const template of templates) {
       deck.push({ ...template, id: `${template.id}-${c}` });
     }
   }
@@ -1321,10 +1436,11 @@ export const CARD_TEMPLATE_NAMES: ReadonlyMap<string, string> = _CARD_TEMPLATE_N
 
 /**
  * Read-only map from card template ID (e.g. `'biz-cafe'`) to its tier number
- * (as a numeric string, e.g. `'1'` through `'5'`).
+ * (as a numeric string, e.g. `'1'` through `'12'`).
  *
  * Built once at module load from the CSV `tier` column.
- * Cards without a tier assignment (e.g. staff cards) are omitted from this map.
+ * Cards without a tier assignment are omitted from this map (all families,
+ * including staff, are tier-assigned as of CG-0MT2WU0CX005Z143).
  * Updated at runtime when loadTemplatesFromCsv() is called.
  */
 export const CARD_TIER_MAP: ReadonlyMap<string, string> = _CARD_TIER_MAP;

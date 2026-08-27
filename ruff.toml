@@ -1,3 +1,17 @@
+# ruff (Python linter) is explicitly scoped to Python files only.
+# TypeScript, JavaScript, and other non-Python files MUST be excluded to
+# prevent false-positive lint findings — ruff misparses them as Python
+# and reports spurious errors (e.g. CG-0MSXL2L0T009CA3I had 627 false
+# positives on MainStreetLifecycleManager.ts).
+exclude = [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.mjs",
+    "**/*.cjs",
+]
+
 # Auto-generated LLM wiki metadata (.llm-wiki/) is JSON/JSONL, not Python
 # source.  The code-quality review passes explicit file paths to ruff, which
 # parses these files as Python and reports false-positive B018 "useless

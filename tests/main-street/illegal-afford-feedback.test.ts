@@ -244,7 +244,9 @@ describe('Main Street click-path illegal-afford feedback', () => {
 
   describe('onSlotClick (insufficient coins to place business from hand)', () => {
     it('plays sfx-illegal-move and shakes the hand card when placement is unaffordable', async () => {
-      const biz = scene.state.market.cards.find((c: any) => c.family === 'business');
+      const biz = scene.state.market.cards.find(
+        (c: any) => c.family === 'business' || c.family === 'community-space',
+      );
       biz.cost = 5;
       scene.state.hand = [biz];
       scene.state.streetGrid[0] = null;
@@ -269,7 +271,9 @@ describe('Main Street click-path illegal-afford feedback', () => {
     });
 
     it('does NOT play feedback when the slot is occupied (non-affordability)', async () => {
-      const biz = scene.state.market.cards.find((c: any) => c.family === 'business');
+      const biz = scene.state.market.cards.find(
+        (c: any) => c.family === 'business' || c.family === 'community-space',
+      );
       biz.cost = 1;
       scene.state.hand = [biz];
       scene.state.streetGrid[0] = { id: 'other-biz', family: 'business' };
@@ -307,8 +311,26 @@ describe('Main Street click-path illegal-afford feedback', () => {
   });
 
   describe('onUpgradeCardClick (insufficient coins to buy upgrade)', () => {
+    // A market row may not contain an upgrade (staff takes a slot, CG-0MT3KZNQB0053K55),
+    // so push one in from the deck when needed. Rebuild the market card
+    // container mocks so the shake targets the pushed card's row index.
+    function ensureUpgradeInMarket(scene: any): any {
+      let card = scene.state.market.cards.find((c: any) => c.family === 'upgrade');
+      if (!card && scene.state.decks.upgrade.length > 0) {
+        card = scene.state.decks.upgrade.pop();
+        scene.state.market.cards.push(card);
+        (scene.msRenderer.getMarketRowCards as any).mockReturnValue(
+          scene.state.market.cards.map(
+            (_c: any, i: number) => createMockContainer(300 + i * 110, 150, 10 + i),
+          ),
+        );
+      }
+      return card;
+    }
+
     it('plays sfx-illegal-move and shakes the market card container', () => {
-      const upgrade = scene.state.market.cards.find((c: any) => c.family === 'upgrade');
+      const upgrade = ensureUpgradeInMarket(scene);
+      expect(upgrade).toBeTruthy();
       upgrade.cost = 5;
       // No eligible target business on the street for the upgrade.
       scene.state.streetGrid = scene.state.streetGrid.map(() => null);
@@ -325,7 +347,8 @@ describe('Main Street click-path illegal-afford feedback', () => {
     });
 
     it('does NOT play feedback when the upgrade has no eligible target (non-affordability)', () => {
-      const upgrade = scene.state.market.cards.find((c: any) => c.family === 'upgrade');
+      const upgrade = ensureUpgradeInMarket(scene);
+      expect(upgrade).toBeTruthy();
       upgrade.cost = 1;
       scene.state.streetGrid = scene.state.streetGrid.map(() => null);
       scene.state.resourceBank.coins = 100;
@@ -336,6 +359,34 @@ describe('Main Street click-path illegal-afford feedback', () => {
       expect(scene.sound.play).not.toHaveBeenCalled();
       expect(scene.tweens.add).not.toHaveBeenCalled();
       expect(scene.state.resourceBank.coins).toBe(100);
+    });
+  });
+
+  describe('onBusinessCardClick (hand full)', () => {
+    it('plays sfx-illegal-move and shakes the market card container when hand is full', () => {
+      // Fill the hand to capacity (default is 5)
+      const biz = scene.state.market.cards.find((c: any) => c.family === 'business');
+      const existing = scene.state.hand.filter((c: any) => c.family === 'business');
+      while (existing.length < 4) {
+        const extra = { ...biz, id: `test-biz-${existing.length}` };
+        scene.state.hand.push(extra);
+        existing.push(extra);
+      }
+      scene.state.market.cards = [biz];
+
+      controller.onBusinessCardClick(biz);
+
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
+      expect(scene.tweens.add).toHaveBeenCalled();
+      // Shake targeted the market card container (first index).
+      const containers = scene.msRenderer.getMarketRowCards();
+      const shakeConfig = scene.tweens.add.mock.calls.find(
+        (c: any) => c[0]?.targets === containers?.[0],
+      );
+      expect(shakeConfig).toBeTruthy();
+      // No state mutation: card still in market, hand unchanged.
+      expect(scene.state.market.cards.find((c: any) => c.id === biz.id)).toBeTruthy();
+      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Hand full'));
     });
   });
 

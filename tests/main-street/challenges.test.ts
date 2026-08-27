@@ -63,6 +63,7 @@ function makeBiz(opts: {
     incomeBonus: opts.incomeBonus ?? 0,
     synergyRangeBonus: opts.synergyRangeBonus ?? 0,
     reputationBonus: opts.reputationBonus ?? 0,
+    ongoingCost: 0,
   };
 }
 

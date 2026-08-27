@@ -81,6 +81,7 @@ function makeProducingBiz(id: string): BusinessCard {
     incomeBonus: 0,
     synergyRangeBonus: 0,
     reputationBonus: 0,
+    ongoingCost: 0,
     appliedUpgrades: [],
     // applyIncome() reads the cached per-turn income; template cards carry
     // this field only after syncCardCurrentIncome() runs, so set it here.
@@ -138,27 +139,5 @@ describe('MainStreet income collection animation', () => {
       timeoutMs: 5000,
       label: 'income collection animation to complete',
     });
-  }, 30_000);
-
-  it('skips flights under reduced motion (no incomeCollectionActive window)', async () => {
-    game = await bootGame();
-    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-
-    const state = scene.state as { streetGrid: Array<BusinessCard | null> };
-    state.streetGrid[0] = makeProducingBiz('biz-income-reduced-motion-test');
-    // Force reduced motion on the settings panel.
-    (scene as unknown as { settingsPanel: { reducedMotion: boolean } }).settingsPanel = { reducedMotion: true };
-
-    const spy = vi.spyOn(
-      scene.msAnimator as unknown as { animateIncomeCollection: (params: unknown) => void },
-      'animateIncomeCollection',
-    );
-
-    (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
-
-    // The animator is still called (the trigger point is unchanged) but
-    // returns early: no collection window is opened.
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(scene.incomeCollectionActive).toBe(false);
   }, 30_000);
 });

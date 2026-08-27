@@ -57,6 +57,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     incomeBonus: overrides.incomeBonus ?? 0,
     synergyRangeBonus: overrides.synergyRangeBonus ?? 0,
     reputationBonus: overrides.reputationBonus ?? 0,
+    ongoingCost: overrides.ongoingCost ?? 0,
   };
 }
 
@@ -121,8 +122,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 50;
       state.resourceBank.reputation = 10;
       state.challengesCompleted = ['ch1', 'ch2'];
-      // 50 + (10 * 5) + (2 * 10) = 50 + 50 + 20 = 120
-      expect(computeScore(state)).toBe(120);
+      // 50 + 10 + (2 * 10) = 50 + 10 + 20 = 80
+      expect(computeScore(state)).toBe(80);
     });
 
     it('should compute score with zero reputation and no challenges', () => {
@@ -138,8 +139,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = -5;
       state.resourceBank.reputation = 2;
       state.challengesCompleted = [];
-      // -5 + (2 * 5) = -5 + 10 = 5
-      expect(computeScore(state)).toBe(5);
+      // -5 + 2 = -3
+      expect(computeScore(state)).toBe(-3);
     });
   });
 
@@ -150,8 +151,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.reputation = 5;
       state.challengesCompleted = ['ch1'];
       updateScore(state);
-      // 100 + 25 + 10 = 135
-      expect(state.finalScore).toBe(135);
+      // 100 + 5 + 10 = 115
+      expect(state.finalScore).toBe(115);
     });
   });
 
@@ -287,9 +288,9 @@ describe('MainStreetEngine', () => {
       expect(result).not.toBeNull();
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta is now multiplied by reputation and not floored
-      // Medium preset rep=3 → multiplier=1.15, 4 * 1.15 = 4.6 (was 4 before fix)
+      // Medium preset rep=3 → multiplier=1.0375, 4 * 1.0375 = 4.15 (quartered, CG-0MT3J80HV0084IF1)
       // makeInvestmentEvent defaults cost to 0, so only the delta applies.
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.15);
     });
 
     it('should throw play-event action when no Investment is held', () => {
@@ -329,8 +330,8 @@ describe('MainStreetEngine', () => {
 
       // 2 Food businesses * 2 coinDelta = +4 raw
       // CG-0MRER3RE300418SG: raw delta multiplied by reputation, not floored
-      // 4 * 1.15 = 4.6 (was 4 before fix)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.6);
+      // 4 * 1.0375 = 4.15 (quartered, CG-0MT3J80HV0084IF1)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.15);
     });
 
     it('should apply reputationDelta', () => {
@@ -367,8 +368,8 @@ describe('MainStreetEngine', () => {
       expect(resolved!.id).toBe('e1');
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
-      // 5 * 1.15 = 5.75 (was 5 before fix)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 5.75);
+      // 5 * 1.0375 = 5.1875 (quartered, CG-0MT3J80HV0084IF1)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 5.1875);
     });
 
     it('should return null when no event is held', () => {
@@ -388,8 +389,8 @@ describe('MainStreetEngine', () => {
 
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
       // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
-      // 3 * 1.15 = 3.45 (was 3 before fix)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 3.45);
+      // 3 * 1.0375 = 3.1125 (quartered, CG-0MT3J80HV0084IF1)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 3.1125);
     });
 
     it('should throw when no event is held', () => {
@@ -901,7 +902,7 @@ describe('MainStreetEngine', () => {
       // Score should now include the challenge bonus
       // Note: income/incidents may change coins/rep, but challengesCompleted.length changed by 1
       expect(state.challengesCompleted).toHaveLength(1);
-      // Score formula: coins + (rep * 5) + (challengesCompleted.length * CHALLENGE_BONUS_POINTS)
+      // Score formula: coins + rep + (challengesCompleted.length * CHALLENGE_BONUS_POINTS)
       // The bonus should be reflected
       expect(state.finalScore).toBe(computeScore(state));
       expect(state.finalScore).toBeGreaterThanOrEqual(scoreBefore + CHALLENGE_BONUS_POINTS - 20);

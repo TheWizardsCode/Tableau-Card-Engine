@@ -50,18 +50,20 @@ interface NewBusinessContract {
 }
 
 const NEW_BUSINESS_CONTRACTS: NewBusinessContract[] = [
-  { id: 'biz-juice-bar', name: 'Juice Bar', cost: 5, baseIncome: 0.5, synergyTypes: ['Food', 'Health'], tier: '2' },
-  { id: 'biz-yoga-studio', name: 'Yoga Studio', cost: 8, baseIncome: 1, synergyTypes: ['Culture', 'Health'], tier: '3' },
-  { id: 'biz-physio', name: 'Physiotherapy', cost: 10, baseIncome: 1, synergyTypes: ['Health', 'Service'], tier: '4', reputationPerTurn: 0.1 },
-  { id: 'biz-tailor', name: 'Tailor', cost: 5, baseIncome: 0.75, synergyTypes: ['Service'], tier: '2' },
-  { id: 'biz-gym', name: 'Gym', cost: 8, baseIncome: 1, synergyTypes: ['Health'], tier: '3' },
-  { id: 'biz-dentist', name: 'Dentist', cost: 12, baseIncome: 1.5, synergyTypes: ['Health'], tier: '4' },
-  { id: 'biz-toy-store', name: 'Toy Store', cost: 5, baseIncome: 0.75, synergyTypes: ['Commerce'], tier: '2' },
-  { id: 'biz-music-store', name: 'Music Store', cost: 8, baseIncome: 1, synergyTypes: ['Entertainment'], tier: '3' },
-  { id: 'biz-delicatessen', name: 'Delicatessen', cost: 5, baseIncome: 0.75, synergyTypes: ['Food'], tier: '2' },
-  { id: 'biz-craft-shop', name: 'Craft Shop', cost: 5, baseIncome: 0.75, synergyTypes: ['Culture'], tier: '2' },
-  { id: 'biz-hotel', name: 'Grand Hotel', cost: 16, baseIncome: 2.5, synergyTypes: ['Service'], tier: '5', reputationPerTurn: 0.1 },
-  { id: 'biz-teahouse', name: 'Teahouse', cost: 7, baseIncome: 0.75, synergyTypes: ['Food', 'Culture'], tier: '3' },
+  // Income/rep values raised by the CG-0MSVYPEZ90085SHE ongoing-cost rebalance
+  // (income = old income + 2.4 × ongoing cost; tiered reputation per turn).
+  { id: 'biz-juice-bar', name: 'Juice Bar', cost: 5, baseIncome: 3.5, synergyTypes: ['Food', 'Health'], tier: '5', reputationPerTurn: 0.08 },
+  { id: 'biz-yoga-studio', name: 'Yoga Studio', cost: 8, baseIncome: 5.8, synergyTypes: ['Culture', 'Health'], tier: '9', reputationPerTurn: 0.12 },
+  { id: 'biz-physio', name: 'Physiotherapy', cost: 10, baseIncome: 7, synergyTypes: ['Health', 'Service'], tier: '11', reputationPerTurn: 0.15 },
+  { id: 'biz-tailor', name: 'Tailor', cost: 5, baseIncome: 3.75, synergyTypes: ['Service'], tier: '6', reputationPerTurn: 0.08 },
+  { id: 'biz-gym', name: 'Gym', cost: 8, baseIncome: 5.8, synergyTypes: ['Health'], tier: '9', reputationPerTurn: 0.12 },
+  { id: 'biz-dentist', name: 'Dentist', cost: 12, baseIncome: 8.7, synergyTypes: ['Health'], tier: '11', reputationPerTurn: 0.2 },
+  { id: 'biz-toy-store', name: 'Toy Store', cost: 5, baseIncome: 3.75, synergyTypes: ['Commerce'], tier: '6', reputationPerTurn: 0.08 },
+  { id: 'biz-music-store', name: 'Music Store', cost: 8, baseIncome: 5.8, synergyTypes: ['Entertainment'], tier: '10', reputationPerTurn: 0.12 },
+  { id: 'biz-delicatessen', name: 'Delicatessen', cost: 5, baseIncome: 3.75, synergyTypes: ['Food'], tier: '7', reputationPerTurn: 0.08 },
+  { id: 'biz-craft-shop', name: 'Craft Shop', cost: 5, baseIncome: 3.75, synergyTypes: ['Culture'], tier: '7', reputationPerTurn: 0.08 },
+  { id: 'biz-hotel', name: 'Grand Hotel', cost: 16, baseIncome: 12.1, synergyTypes: ['Service'], tier: '12', reputationPerTurn: 0.3 },
+  { id: 'biz-teahouse', name: 'Teahouse', cost: 7, baseIncome: 4.95, synergyTypes: ['Food', 'Culture'], tier: '7', reputationPerTurn: 0.1 },
 ];
 
 function byId(templates: readonly { id: string }[], id: string): BusinessCard | undefined {
@@ -157,16 +159,8 @@ describe('Group A business expansion: tier map membership (AC2)', () => {
     for (const t of getBusinessTemplates()) {
       expect(CARD_TIER_MAP.has(t.id), `${t.id} has no tier assignment`).toBe(true);
       const tier = CARD_TIER_MAP.get(t.id)!;
-      expect(['1', '2', '3', '4', '5']).toContain(tier);
+      expect(Array.from({ length: 12 }, (_, i) => String(i + 1))).toContain(tier);
     }
-  });
-
-  it('smooths the T2/T3 thinness (business T2+T3 count >= 12)', () => {
-    const t2t3 = getBusinessTemplates().filter(t => {
-      const tier = CARD_TIER_MAP.get(t.id);
-      return tier === '2' || tier === '3';
-    });
-    expect(t2t3.length).toBeGreaterThanOrEqual(12);
   });
 });
 
@@ -251,6 +245,6 @@ describe('Group A business expansion: balance guardrails (AC4)', () => {
     expect(createCommunitySpaceDeck(1).length).toBe(8); // +6 Group B community-space cards
     expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(56); // +8 Group C, +10 Group D, +1 Graffiti Art
     expect(createUpgradeDeck(1).length).toBe(39); // +12 Group E upgrades
-    expect(createStaffDeck(1).length).toBe(8); // +4 Group F staff, +1 General Manager (CG-0MSTOF1N5005PK2R)
+    expect(createStaffDeck(1).length).toBe(21); // +4 Group F staff, +1 General Manager (CG-0MSTOF1N5005PK2R), +1 Lookout (CG-0MSXOW6GN008ZSMN), +12 specialization applicants (CG-0MT4WXNR80090FXZ)
   });
 });

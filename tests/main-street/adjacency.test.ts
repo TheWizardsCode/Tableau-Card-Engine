@@ -39,6 +39,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     incomeBonus: overrides.incomeBonus ?? 0,
     synergyRangeBonus: overrides.synergyRangeBonus ?? 0,
     reputationBonus: overrides.reputationBonus ?? 0,
+    ongoingCost: overrides.ongoingCost ?? 0,
     ...overrides,
   };
 }
@@ -290,8 +291,8 @@ describe('MainStreetAdjacency (2x5 grid, percentage-based synergy)', () => {
       // slot 1: base=2, rate=0.5, N=1, synergy=0.35, total=2.35
       expect(result.total).toBeCloseTo(5.875); // 3.525 + 2.35 pre-multiplier
       // CG-0MRER3RE300418SG: Math.floor removed; fractional values preserved.
-      // 5.875 * 1.15 = 6.75625
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 6.75625);
+      // 5.875 * 1.0375 = 6.0953125 (quartered multiplier, CG-0MT3J80HV0084IF1)
+      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 6.0953125);
     });
   });
 });

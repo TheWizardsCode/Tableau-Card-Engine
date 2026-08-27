@@ -15,7 +15,7 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Event         | 56        | 3           | 168         |
 | Upgrade       | 39        | 2           | 78          |
 | Community Space | 8       | 3           | 24          |
-| Staff         | 7         | 3           | 21          |
+| Staff         | 9         | 3           | 27          |
 
 **Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
 
@@ -23,12 +23,12 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
-| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 6 | 6 | 8 | — | — | 20 |
-| Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 7 | 140 |
-| Net increase | +24 | +49 | +31 | +8 | +7 | +119 |
+| Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 4 | 4 | 4 | 2 | 1 | 15 |
+| Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 9 | 142 |
+| Net increase | +26 | +52 | +35 | +6 | +8 | +127 |
 
-- 2x target from baseline: `>= 40` templates
-- Current total: `140` templates (`7x` baseline)
+- 2x target from baseline: `>= 30` templates
+- Current total: `142` templates (`9.5x` baseline)
 - Business family grew from 18 to 30 with the Group A expansion (CG-0MSQJ1XIB0004QVN):
   12 new cards including the first Health bridge cards (Juice Bar, Yoga Studio,
   Physiotherapy), mid-tier (T2/T3) singles, and the T5 Grand Hotel flagship.
@@ -44,9 +44,9 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
   10 new incidents (4 good / 3 bad / 3 neutral under the streak system's net-delta
   formula) covering under-served synergies, including the duration incident
   Labor Shortage (income-multiplier 0.9×/3 turns).
-- Graffiti Art (evt-graffiti-art, CG-0MSRC9UR9006FBXC) adds a tier-1 good
-  incident — the exact reverse of Graffiti (+1 coin to all businesses and
-  +1 reputation), raising incidents to 35 and event templates to 56.
+- Graffiti Art (evt-graffiti-art, CG-0MSRC9UR9006FBXC) adds a good incident —
+  a reputation-only positive counterpart to Graffiti (+1 reputation to all
+  businesses, no coins), raising incidents to 35 and event templates to 56.
 - Upgrades grew from 27 to 39 with the Group E expansion (CG-0MSQJ7SYD008U3EE):
   12 new upgrades covering every Group A business and Group B community space
   (targets raised to maxLevel 1 so the upgrades are applicable), including
@@ -78,14 +78,18 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 
 Business cards are placed on the 10-slot street grid. Each generates base income plus synergy bonuses from adjacent businesses sharing a synergy type.
 
+> **Ongoing cost field (CG-0MSVYPEZ90085SHE):** Business cards gain an `ongoingCost` CSV column value (column 29; col 28 is `newDisplayName` — the intake brief's "column 28" was a miscount) that is deducted from coins every IncomePhase — whether the card is placed on the street grid **or held in hand** — alongside staff and community-space costs. Deductions are clamped at 0 coins and logged. Cards with an empty `ongoingCost` CSV value default to 0. The per-card values (balance guideline: **¼ purchase price, min 0.25**) are populated by the producer balance task; the engine deducts whatever value is on the card.
+
+> **Ongoing cost field (CG-0MSVYPEZ90085SHE):** Business cards gain an `ongoingCost` CSV column value (column 29; col 28 is `newDisplayName` — the intake brief's "column 28" was a miscount) that is deducted from coins every IncomePhase — whether the card is placed on the street grid **or held in hand** — alongside staff and community-space costs. Deductions are clamped at 0 coins and logged. Cards with an empty `ongoingCost` CSV value default to 0. Per-card values are populated in `card-data.csv` using the balance guideline **¼ purchase price, min 0.25** (e.g. Teahouse costs 7 → 1.75 coins/turn).
+
 ### M1 Business Templates (4)
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-bakery` | Bakery | 3 | 2 | Food | Bakery | Warm pastries. Gains 50% of base income per adjacent Food business (scales with difficulty). | Affordable Food starter. |
-| `biz-diner` | Diner | 4 | 3 | Food | Diner | Quick meals. Gains 50% of base income per adjacent Food business (scales with difficulty). | Higher-cost, higher-income Food option. |
-| `biz-bookshop` | Bookshop | 4 | 2 | Culture | Bookshop | Sells books. Gains 50% of base income per adjacent Culture business (scales with difficulty). | Mid-cost Culture business. |
-| `biz-hardware` | Hardware Store | 5 | 3 | Commerce | Hardware Store | Supplies tools. Gains 50% of base income per adjacent Commerce business (scales with difficulty). | M1's only Commerce card; expensive but strong income. |
+| `biz-bakery` | Bakery | 3 | 2.3 (rep +0.05/turn, ongoing −0.75/turn) | Food | Bakery | Warm pastries. Gains 50% of base income per adjacent Food business (scales with difficulty). | Affordable Food starter. |
+| `biz-diner` | Diner | 3 | 2.3 (rep +0.05/turn, ongoing −0.75/turn) | Food | Diner | Quick meals. Gains 50% of base income per adjacent Food business (scales with difficulty). | Higher-cost, higher-income Food option. |
+| `biz-bookshop` | Bookshop | 3 | 2.3 (rep +0.05/turn, ongoing −0.75/turn) | Culture | Bookshop | Sells books. Gains 50% of base income per adjacent Culture business (scales with difficulty). | Mid-cost Culture business. |
+| `biz-hardware` | Hardware Store | 3 | 2.3 (rep +0.05/turn, ongoing −0.75/turn) | Service | Hardware Store | Supplies tools. Gains 50% of base income per adjacent Service business (scales with difficulty). | Retagged Commerce → Service (CG-0MT3IPFSF005KEFB): tool supply is a Service; gives T2 a second synergy type (Commerce 2 / Service 1). |
 
 Park has been reclassified as a **Community Space** card (see below).
 
@@ -95,30 +99,30 @@ Park has been reclassified as a **Community Space** card (see below).
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-pawnshop` | Pawn Shop | 3 | 2 | Commerce | Pawn Shop | Second-hand goods. Does not provide or receive synergy bonuses. | Budget Commerce option; makes Commerce synergies viable. |
-| `biz-boutique` | Boutique | 4 | 2 | Commerce | Boutique | Curated fashion. Gains 50% of base income per adjacent Commerce business (scales with difficulty). | Mid-tier Commerce; distinct flavour from Hardware Store. |
+| `biz-pawnshop` | Pawn Shop | 3 | 2.3 (rep +0.05/turn, ongoing −0.75/turn) | Commerce | Pawn Shop | Second-hand goods. Does not provide or receive synergy bonuses. | Budget Commerce option; makes Commerce synergies viable. |
+| `biz-boutique` | Boutique | 3 | 2.3 (rep +0.05/turn, ongoing −0.75/turn) | Commerce | Boutique | Curated fashion. Gains 50% of base income per adjacent Commerce business (scales with difficulty). | Mid-tier Commerce; distinct flavour from Hardware Store. |
 
 #### Service (new synergy type)
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-laundromat` | Laundromat | 3 | 2 | Service | Laundromat | Self-serve laundry. Gains 50% of base income per adjacent Service business (scales with difficulty). | Budget Service entry point. |
-| `biz-barbershop` | Barbershop | 3 | 2 | Service | Barbershop | Classic cuts. Gains 100% of base income per adjacent Service business (scales with difficulty). | Pairs with Laundromat for early Service cluster. |
+| `biz-laundromat` | Laundromat | 4 | 2.9 (rep +0.05/turn, ongoing −1/turn) | Service | Laundromat | Self-serve laundry. Gains 50% of base income per adjacent Service business (scales with difficulty). | Budget Service entry point. |
+| `biz-barbershop` | Barbershop | 5 | 4 (rep +0.08/turn, ongoing −1.25/turn) | Service | Barbershop | Classic cuts. Gains 100% of base income per adjacent Service business (scales with difficulty). | Pairs with Laundromat for early Service cluster. |
 
 #### Health (new synergy type)
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-clinic` | Clinic | 10 | 0 (rep +0.2/turn) | Health | Clinic | Walk-in medical care. Provides +0.2 rep/turn. | Non-profit community health provider; reputation instead of income. |
-| `biz-private-clinic` | Private Clinic | 8 | 2 | Health | Private Clinic | Private medical practice. Gains 50% of base income per adjacent Health business (scales with difficulty). | For-profit counterpart to Clinic; income-focused. |
-| `biz-pharmacy` | Pharmacy | 6 | 1 | Health | — | Provides essential medications. Gains 50% of base income per adjacent Health business (scales with difficulty). | Standalone Health card (no upgrade). |
+| `biz-clinic` | Clinic | 9 | 0 (rep +0.4/turn, ongoing −0.5/turn) | Health | Clinic | Walk-in medical care. Provides +0.4 rep/turn. | Non-profit community health provider; reputation instead of income. |
+| `biz-private-clinic` | Private Clinic | 14 | 10.9 (rep +0.25/turn, ongoing −3.5/turn) | Health | Private Clinic | Private medical practice. Gains 50% of base income per adjacent Health business (scales with difficulty). | For-profit counterpart to Clinic; income-focused. |
+| `biz-pharmacy` | Pharmacy | 7 | 5.2 (rep +0.1/turn, ongoing −1.75/turn) | Health | — | Provides essential medications. Gains 50% of base income per adjacent Health business (scales with difficulty). | Standalone Health card (no upgrade). |
 
 #### Entertainment (new synergy type)
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-arcade` | Arcade | 4 | 2 | Entertainment | Arcade | Retro fun. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | Mid-cost Entertainment starter. |
-| `biz-cinema` | Cinema | 5 | 3 | Entertainment | Cinema | Latest films. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | Premium Entertainment; anchors the type. |
+| `biz-arcade` | Arcade | 4 | 2.9 (rep +0.05/turn, ongoing −1/turn) | Entertainment + Service | Arcade | Retro fun. Bridges Entertainment and Service synergies. | Entertainment→Service bridge (CG-0MT3IPFSF005KEFB) so T3 spans two types; an arcade is an entertainment service. |
+| `biz-cinema` | Cinema | 5 | 3.5 (rep +0.08/turn, ongoing −1.25/turn) | Entertainment | Cinema | Latest films. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | Premium Entertainment; anchors the type. |
 
 #### Multi-Synergy Bridge Cards
 
@@ -126,11 +130,11 @@ Bridge cards belong to two synergy types simultaneously, enabling cross-type adj
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-cafe` | Cafe | 3 | 2 | Food + Culture | Cafe | Coffee and conversation. | Bridges the two most common M1 types. |
-| `biz-food-truck` | Food Truck | 2 | 1 | Food + Entertainment | Food Truck | Street eats with flair. | Cheapest bridge card; low risk, low reward. |
-| `biz-gallery` | Art Gallery | 4 | 2 | Culture + Entertainment | Art Gallery | Showcases local artists. | Connects M1 Culture with new Entertainment. |
-| `biz-spa` | Day Spa | 5 | 3 | Service + Entertainment | Day Spa | Relaxation and pampering. | Premium bridge; high synergy potential across 2 new types. |
-| `biz-florist` | Florist | 2 | 1 | Commerce + Culture | Florist | Arrangements for every occasion. | Budget bridge linking Commerce and Culture. |
+| `biz-cafe` | Cafe | 7 | 5.2 (rep +0.1/turn, ongoing −1.75/turn) | Food + Culture | Cafe | Coffee and conversation. | Bridges the two most common M1 types. |
+| `biz-food-truck` | Food Truck | 4 | 2.9 (rep +0.05/turn, ongoing −1/turn) | Food + Entertainment | Food Truck | Street eats with flair. | Cheapest bridge card; low risk, low reward. |
+| `biz-gallery` | Art Gallery | 14 | 9.4 (rep +0.25/turn, ongoing −3.5/turn) | Culture + Entertainment | Art Gallery | Showcases local artists. | Connects M1 Culture with new Entertainment. |
+| `biz-spa` | Day Spa | 14 | 9.4 (rep +0.25/turn, ongoing −3.5/turn) | Service + Entertainment | Day Spa | Relaxation and pampering. | Premium bridge; high synergy potential across 2 new types. |
+| `biz-florist` | Florist | 5 | 3 (rep +0.1/turn, ongoing −1.25/turn) | Commerce + Culture | Florist | Arrangements for every occasion. | Budget bridge linking Commerce and Culture. |
 
 ### M3 Business Templates (12) — Group A expansion (CG-0MSQJ1XIB0004QVN)
 
@@ -140,28 +144,28 @@ Adds the first **Health bridge cards**, mid-tier (T2/T3) singles across every sy
 
 | ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
 |----|------|------|--------|---------|------|----------|-------------|-----------|
-| `biz-juice-bar` | Juice Bar | 5 | 0.5 | Food + Health | 2 | — | Fresh juices and smoothies. Bridges Food and Health synergies. | First Health bridge; connects the existing Food cluster to Health. |
-| `biz-yoga-studio` | Yoga Studio | 8 | 1 | Culture + Health | 3 | — | Calm practice space for mind and body. Bridges Culture and Health synergies. | Culture–Health bridge; mid-tier wellness option. |
-| `biz-physio` | Physiotherapy | 10 | 1 | Health + Service | 4 | 0.1 | Recovery and rehabilitation care. Bridges Health and Service synergies. Provides +0.1 reputation per turn. | Health–Service bridge with a small reputation perk. |
+| `biz-juice-bar` | Juice Bar | 5 | 3.5 (rep +0.08/turn, ongoing −1.25/turn) | Food + Health | 3 | 0.08 | Fresh juices and smoothies. Bridges Food and Health synergies. | First Health bridge; connects the existing Food cluster to Health. |
+| `biz-yoga-studio` | Yoga Studio | 8 | 5.8 (rep +0.12/turn, ongoing −2/turn) | Culture + Health | 4 | 0.12 | Calm practice space for mind and body. Bridges Culture and Health synergies. | Culture–Health bridge; mid-tier wellness option. |
+| `biz-physio` | Physiotherapy | 10 | 7 (rep +0.15/turn, ongoing −2.5/turn) | Health + Service | 4 | 0.15 | Recovery and rehabilitation care. Bridges Health and Service synergies. Provides +0.15 reputation per turn. | Health–Service bridge with a small reputation perk. |
 
 #### Singles (mid-tier depth)
 
 | ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
 |----|------|------|--------|---------|------|----------|-------------|-----------|
-| `biz-tailor` | Tailor | 5 | 0.75 | Service | 2 | — | Custom tailoring and repairs. Gains 50% of base income per adjacent Service business. | Mid Service single; smooths T2. |
-| `biz-gym` | Gym | 8 | 1 | Health | 3 | — | Fitness training for the whole street. Gains 50% of base income per adjacent Health business. | Health single; T3 anchor. |
-| `biz-dentist` | Dentist | 12 | 1.5 | Health | 4 | — | Smiles for the whole street. Gains 50% of base income per adjacent Health business. | Premium Health single. |
-| `biz-toy-store` | Toy Store | 5 | 0.75 | Commerce | 2 | — | Toys and games for young shoppers. Gains 50% of base income per adjacent Commerce business. | Commerce depth at T2. |
-| `biz-music-store` | Music Store | 8 | 1 | Entertainment | 3 | — | Records and instruments for every taste. Gains 50% of base income per adjacent Entertainment business. | Entertainment depth at T3. |
-| `biz-delicatessen` | Delicatessen | 5 | 0.75 | Food | 2 | — | Fine meats and cheeses. Gains 50% of base income per adjacent Food business. | Food depth at T2. |
-| `biz-craft-shop` | Craft Shop | 5 | 0.75 | Culture | 2 | — | Handmade goods by local makers. Gains 50% of base income per adjacent Culture business. | Culture single (only Bookshop existed before). |
+| `biz-tailor` | Tailor | 5 | 3.75 (rep +0.08/turn, ongoing −1.25/turn) | Service | 2 | 0.08 | Custom tailoring and repairs. Gains 50% of base income per adjacent Service business. | Mid Service single; smooths T2. |
+| `biz-gym` | Gym | 8 | 5.8 (rep +0.12/turn, ongoing −2/turn) | Health | 5 | 0.12 | Fitness training for the whole street. Gains 50% of base income per adjacent Health business. | Health single; T5 anchor (rebalanced from T3, CG-0MT2WU0CX005Z143). |
+| `biz-dentist` | Dentist | 12 | 8.7 (rep +0.2/turn, ongoing −3/turn) | Health | 5 | 0.2 | Smiles for the whole street. Gains 50% of base income per adjacent Health business. | Premium Health single (rebalanced from T4). |
+| `biz-toy-store` | Toy Store | 5 | 3.75 (rep +0.08/turn, ongoing −1.25/turn) | Commerce | 3 | 0.08 | Toys and games for young shoppers. Gains 50% of base income per adjacent Commerce business. | Commerce depth at T3 (rebalanced from T2). |
+| `biz-music-store` | Music Store | 8 | 5.8 (rep +0.12/turn, ongoing −2/turn) | Entertainment | 5 | 0.12 | Records and instruments for every taste. Gains 50% of base income per adjacent Entertainment business. | Entertainment depth at T5 (rebalanced from T3). |
+| `biz-delicatessen` | Delicatessen | 5 | 3.75 (rep +0.08/turn, ongoing −1.25/turn) | Food | 2 | 0.08 | Fine meats and cheeses. Gains 50% of base income per adjacent Food business. | Food depth at T2. |
+| `biz-craft-shop` | Craft Shop | 5 | 3.75 (rep +0.08/turn, ongoing −1.25/turn) | Culture | 2 | 0.08 | Handmade goods by local makers. Gains 50% of base income per adjacent Culture business. | Culture single (only Bookshop existed before). |
 
 #### Flagship
 
 | ID | Name | Cost | Income | Synergy | Tier | Rep/turn | Description | Rationale |
 |----|------|------|--------|---------|------|----------|-------------|-----------|
-| `biz-hotel` | Grand Hotel | 16 | 2.5 | Service | 5 | 0.1 | Premier lodging on Main Street. Gains 50% of base income per adjacent Service business. Provides +0.1 reputation per turn. | T5 flagship; highest income in the pool. Cost exceeds the flagship band's 14 cap to reflect premium positioning (documented balance rationale). |
-| `biz-teahouse` | Teahouse | 7 | 0.75 | Food + Culture | 3 | — | Loose-leaf teas and quiet corners. Bridges Food and Culture synergies. | Second Food–Culture bridge (alongside Cafe). |
+| `biz-hotel` | Grand Hotel | 16 | 12.1 (rep +0.3/turn, ongoing −4/turn) | Service | 5 | 0.3 | Premier lodging on Main Street. Gains 50% of base income per adjacent Service business. Provides +0.3 reputation per turn. | T5 flagship; highest income in the pool. Cost exceeds the flagship band's 14 cap to reflect premium positioning (documented balance rationale). |
+| `biz-teahouse` | Teahouse | 7 | 4.95 (rep +0.1/turn, ongoing −1.75/turn) | Food + Culture | 3 | 0.1 | Loose-leaf teas and quiet corners. Bridges Food and Culture synergies. | Second Food–Culture bridge (alongside Cafe). |
 
 ---
 
@@ -174,7 +178,7 @@ alongside business cards.
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `cs-park` | Park | 4 | 0 | Culture | Park | Offers leisure space. Gains 50% of base income per adjacent Culture business or community space (scales with difficulty). | Reclassified from M1 Business; cheapest community space; synergy filler. |
+| `cs-park` | Park | 4 | 0 | Entertainment | Park | Offers leisure space. Gains 50% of base income per adjacent Entertainment business or community space (scales with difficulty). | Reclassified from M1 Business; retagged Culture → Entertainment (CG-0MT3IPFSF005KEFB) so T1's spread is Culture 2 / Food 2 / Service 1 / Entertainment 1; cheapest community space. |
 | `cs-library` | Library | 7 | 0 | Culture | Library | Quiet community space for reading and learning. Costs 0.25 coins/turn to run; +0.1 rep/turn. | Reputation asset: no income; small running cost for steady reputation. Full Culture synergy participation (Park model) — contributes to adjacent Culture businesses' synergy and receives rep synergy from rep-bonus neighbours (reversed by CG-0MSKS963N000ZSTU). |
 
 ### M3 Community Space Templates (6) — Group B expansion (CG-0MSQJ210I00491ZZ)
@@ -183,12 +187,12 @@ Adds reputation assets across five synergies, including the family's first bridg
 
 | ID | Name | Cost | Income | Ongoing | Synergy | Tier | Rep/turn | Description | Rationale |
 |----|------|------|--------|---------|---------|------|----------|-------------|-----------|
-| `cs-playground` | Playground | 4 | 0 | 0 | Entertainment | 1 | 0.05 | A safe place for kids to play. Provides +0.05 reputation per turn. | Cheap early reputation asset. |
+| `cs-playground` | Playground | 4 | 0 | 0 | Entertainment | 2 | 0.05 | A safe place for kids to play. Provides +0.05 reputation per turn. | Cheap early reputation asset (rebalanced from T1). |
 | `cs-community-garden` | Community Garden | 5 | 0 | 0.1 | Food | 2 | 0.1 | A shared garden plot for the neighbourhood. Costs 0.1 coins/turn to run; +0.1 rep/turn. | Food reputation asset with a small running cost. |
-| `cs-fountain` | Town Fountain | 5 | 0 | 0 | Culture | 2 | 0.1 | A gathering spot around the fountain. Provides +0.1 reputation per turn. | Culture reputation asset. |
+| `cs-fountain` | Town Fountain | 5 | 0 | 0 | Culture | 3 | 0.1 | A gathering spot around the fountain. Provides +0.1 reputation per turn. | Culture reputation asset (rebalanced from T2). |
 | `cs-health-kiosk` | Health Kiosk | 6 | 0 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. Costs 0.15 coins/turn to run; +0.15 rep/turn. | Health reputation asset; deepens the Health family. |
-| `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset. |
-| `cs-public-art` | Public Art | 8 | 0 | 0.25 | Culture + Entertainment | 4 | 0.2 | A vibrant public sculpture. Costs 0.25 coins/turn to run; +0.2 rep/turn. Bridges Culture and Entertainment community spaces. | Bridge community space; highest ongoing cost and rep yield. |
+| `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 4 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset (rebalanced from T3). |
+| `cs-public-art` | Public Art | 8 | 0 | 0.25 | Culture + Entertainment | 5 | 0.2 | A vibrant public sculpture. Costs 0.25 coins/turn to run; +0.2 rep/turn. Bridges Culture and Entertainment community spaces. | Bridge community space; highest ongoing cost and rep yield (rebalanced from T4). |
 
 ### M3 Upgrade Templates (12) — Group E expansion (CG-0MSQJ7SYD008U3EE)
 
@@ -221,7 +225,7 @@ Every Group A business and Group B community space gets an upgrade path (targets
 
 Events fall into two categories:
 - **Investment** events are purchased from the market, held in the player's hand, and played voluntarily. They have a coin cost and generally positive effects.
-- **Incident** events are drawn automatically into the incident queue and resolve at the end of each turn. Most are negative disruptions; a few are positive surprises.
+- **Incident** events live in a hidden face-down incident deck (card back + count only, CG-0MSTOATDP000JNHH). The top card is revealed and resolved at the end of each turn. Most are negative disruptions; a few are positive surprises.
 
 ### M1 Event Templates (5)
 
@@ -371,20 +375,22 @@ Multi-level upgrades require the business to already be at Level 1 (`requiredLev
 
 ### Multi-Synergy Bridge Cards
 
-M2 introduces 5 bridge cards that belong to two synergy types simultaneously. The adjacency resolver (`MainStreetAdjacency.ts`) uses `some()` to check if any synergy type matches, so bridge cards earn bonuses from neighbours of either type. This creates interesting placement decisions: a Cafe (Food+Culture) placed between a Bakery and a Bookshop earns bonuses from both sides.
+The adjacency resolver (`MainStreetAdjacency.ts`) uses `some()` to check if any synergy type matches, so bridge cards earn bonuses from neighbours of either type — a Cafe (Food+Culture) placed between a Bakery and a Bookshop earns bonuses from both sides. Bridges are also the primary lever for spreading synergy types across sparse tiers: since a bridge counts one card toward two types, a 2-card tier can span 3–4 types (e.g. the Arcade, Entertainment|Service, stretches T3 to Entertainment 2 / Service 1, CG-0MT3IPFSF005KEFB).
 
 ### Synergy Type Coverage
 
 | Synergy | Single-type | Bridge (shared) | Total |
 |---------|-------------|-----------------|-------|
-| Food | 2 (Bakery, Diner) | 2 (Cafe, Food Truck) | 4 |
-| Culture | 1 (Bookshop) | 3 (Cafe, Art Gallery, Florist) | 4 (plus Park as Community Space) |
-| Commerce | 3 (Hardware, Pawn Shop, Boutique) | 1 (Florist) | 4 |
-| Service | 2 (Laundromat, Barbershop) | 1 (Day Spa) | 3 |
-| Entertainment | 2 (Arcade, Cinema) | 3 (Food Truck, Art Gallery, Day Spa) | 5 |
-| Health | 3 (Clinic, Private Clinic, Pharmacy) | 0 | 3 |
+| Food | 4 (Bakery, Community Garden, Delicatessen, Diner) | 4 (Cafe, Food Truck, Juice Bar, Teahouse) | 8 |
+| Culture | 4 (Bookshop, Craft Shop, Library, Town Fountain) | 6 (Art Gallery, Cafe, Florist, Public Art, Teahouse, Yoga Studio) | 10 |
+| Commerce | 3 (Boutique, Pawn Shop, Toy Store) | 1 (Florist) | 4 |
+| Service | 6 (Barbershop, Community Shelter, Grand Hotel, Hardware Store, Laundromat, Tailor) | 3 (Arcade, Day Spa, Physiotherapy) | 9 |
+| Entertainment | 4 (Cinema, Music Store, Park, Playground) | 5 (Arcade, Art Gallery, Day Spa, Food Truck, Public Art) | 9 |
+| Health | 6 (Clinic, Dentist, Gym, Health Kiosk, Pharmacy, Private Clinic) | 3 (Juice Bar, Physiotherapy, Yoga Studio) | 9 |
 
-Culture and Entertainment have the most bridge-card representation, making them easiest to chain synergies with. Commerce and Service rely more on dedicated single-type cards.
+Service and Health now have bridge representation on a par with the other types, while Commerce remains the most single-type reliant (its only bridge is the Florist). Global totals are intentionally not balanced per type (Culture 10 vs Commerce 4) — the balance rule is defined **per tier**, mirroring the family rebalance (CG-0MT2WU0CX005Z143) along the synergy-type axis.
+
+> **Per-tier synergy balance (CG-0MT3IPFSF005KEFB):** every tier's synergy-bearing cards (business + community-space) span ≥ 2 distinct types, and no type's assignment count within a tier exceeds 2× any other type's count in that tier (bridge cards count once per type they carry). Sparse tiers are stretched with retags/bridges rather than new cards: T1 Park Culture→Entertainment, T2 Hardware Store Commerce→Service, T3 Arcade → Entertainment|Service bridge. Enforced by `tests/main-street/tier-synergy-balance.test.ts`.
 
 ### Branching & Multi-Level Upgrades
 
@@ -441,15 +447,28 @@ This writes per-run and aggregate metrics to:
 
 ## Staff Cards
 
-Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots, have no tier, and are purchased from a dedicated staff-card market.
+Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143; 12-tier spread CG-0MT3C744B009DS84): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice). They are hired directly from the general market row (0–1 staff per row, `MARKET_STAFF_MAX`) — there is no dedicated staff market (CG-0MT2WTN0L004JA53). A second wave of 12 specialization applicant cards (CG-0MT4WXNR80090FXZ) adds role-themed staff across tiers 2–5; none grant hand slots — they are employed-applicant cards whose effects (synergy/incident/cost bonuses) are wired by the staff-specialization epic. **Staff specialization skills** (1–3 locked skills per applicant, Town Gossip baseline, stacking caps) are documented in [specialization-skills.md](specialization-skills.md).
 
-| ID | Name | Cost | Ongoing/turn | Slots+ | Ability | Description | Rationale |
-|----|------|------|--------------|--------|---------|-------------|-----------|
-| `staff-apprentice` | Apprentice | 2 | 0.5 | +1 | — | A budget hire who frees up a hand slot with a small ongoing cost. | Budget entry point *(Group F).* |
-| `staff-assistant` | Assistant | 3 | 1 | +1 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
-| `staff-manager` | Manager | 7 | 2.5 | +2 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
-| `staff-socialite` | Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
-| `staff-accountant` | Accountant | 8 | 1.5 | +1 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
-| `staff-director` | Director | 14 | 4 | +3 | — | An experienced director oversees your operations. | Premium capacity. |
-| `staff-executive` | Executive | 20 | 5 | +4 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
-| `staff-general-manager` | General Manager | 20 | 5 | +4 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
+| ID | Name | Cost | Ongoing/turn | Slots+ | Tier | Ability | Description | Rationale |
+|----|------|------|--------------|--------|------|---------|-------------|-----------|
+| `staff-apprentice` | Apprentice | 2 | 0.5 | +1 | 1 | — | A budget hire who frees up a hand slot with a small ongoing cost. | Budget entry point *(Group F).* |
+| `staff-assistant` | Assistant | 3 | 1 | +1 | 2 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
+| `staff-manager` | Manager | 7 | 2.5 | +2 | 3 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
+| `staff-socialite` | Socialite | 8 | 1.5 | +1 | 4 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
+| `staff-accountant` | Accountant | 8 | 1.5 | +1 | 6 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
+| `staff-lookout` | Lookout | 10 | 2 | +1 | 7 | Peek once/turn | A sharp-eyed lookout can peek at the top card of the incident deck once per turn. | **NEW** peek ability *(CG-0MSXOW6GN008ZSMN).* |
+| `staff-director` | Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. | Premium capacity. |
+| `staff-executive` | Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
+| `staff-general-manager` | General Manager | 20 | 5 | +4 | 12 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
+| `staff-barista` | Barista | 3 | 0.5 | — | 2 | Food synergy | A skilled barista brings warmth to any business. Adjacent Food businesses gain +0.2 synergy coins. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-bookkeeper` | Bookkeeper | 3 | 0.5 | — | 2 | −20% ongoing | Keeps the books tight. Reduces this business ongoing cost by 20%. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-customer-rep` | Customer Service Rep | 3 | 0.5 | — | 2 | Service synergy | Ensures every visitor leaves satisfied. Adjacent businesses gain +0.1 synergy reputation. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-delivery` | Delivery Driver | 3 | 0.5 | — | 2 | −0.5 purchase cost | Handles the logistics. Reduces business card purchase cost by 0.5 for this business. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-security` | Security Guard | 7 | 0.75 | — | 3 | −10% incident coins | Experienced guard watches over the street. Reduces all incident coin damage by 10%. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-marketing` | Marketing Consultant | 7 | 1 | — | 3 | +10% rep sources | Expert at drawing crowds. Businesses gain +10% reputation from all sources. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-event-planner` | Event Planner | 7 | 0.75 | — | 3 | Entertainment synergy | Creates buzz and draws visitors. +1 synergy coin per turn from Entertainment businesses. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-maintenance` | Maintenance Worker | 7 | 0.75 | — | 3 | −0.5 incident rep | Keeps everything running smoothly. Reduces incident reputation damage by 0.5. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-it` | IT Specialist | 8 | 1 | — | 4 | Refresh −1 | Modernizes operations. Reduces this business refresh cost by 1. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-health-safety` | Health & Safety Inspector | 8 | 1 | — | 4 | −10% Health incidents | Keeps everything up to code. Reduces incident frequency by 10% for Health businesses. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-pr` | PR Officer | 8 | 1 | — | 4 | +0.15 rep/turn | Manages the street image. +0.15 reputation per turn from all businesses. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-financial` | Financial Advisor | 10 | 1.25 | — | 5 | Upgrade −1 | Smart investments pay off. Reduces this business upgrade cost by 1. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |

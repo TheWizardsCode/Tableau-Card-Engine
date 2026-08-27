@@ -154,21 +154,27 @@ describe('Monte Carlo-style loop respects the action cap', () => {
   it('hiring a General Manager allows up to 2 action-type actions per day', () => {
     const state = setupState('mc-budget-gm');
     executeDayStart(state); // Day 1
-    const gm = state.staffCardMarket?.find(
-      (c: any) => c.id === 'staff-general-manager' || c.id?.startsWith('staff-general-manager'),
-    );
+    // Staff are hired from the general market row (CG-0MT3KZOBZ005IRYE);
+    // if the seeded row lacks the GM, move one from the staff deck into it.
+    let gm = state.market.cards.find((c: any) => c.id.startsWith('staff-general-manager'));
+    if (!gm) {
+      const deckGm = state.decks.staff.find((c: any) => c.id.startsWith('staff-general-manager'));
+      if (deckGm) state.market.cards.push({ ...deckGm });
+      gm = state.market.cards.find((c: any) => c.id.startsWith('staff-general-manager'));
+    }
     expect(gm).toBeTruthy();
     state.resourceBank.coins = 30; // enough for the GM (cost 20), far below the win threshold
     hireStaffCard(state, gm!.id);
     processEndOfTurn(state); // Day 1 ends
     expect(state.phase).toBe('DayStart'); // game not ended by the hire
 
-    // Day 2 → GM bonus applies: 1 base + 1 GM = 2 actions.
+    // Day 2 → GM bonus applies: 1 base + 1 GM + 1 banked (from Day 1 idle remainder)
+    // Day 1: 2 actions total, 1 spent hiring GM → 1 banks → Day 2 budget = 3.
     executeDayStart(state);
-    expect(state.actionsRemaining).toBe(2);
+    expect(state.actionsRemaining).toBe(3); // 1 base + 1 GM + 1 banked (CG-0MT3IOPZB005LNAR)
 
-    // With the 2-action budget the AI can execute up to 2 action-type
-    // actions before end-turn is forced.
+    // With the 3-action budget the AI can execute up to 3 action-type
+    // actions before end-turn is forced (banking-aware: CG-0MT3IOPZB005LNAR).
     let count = 0;
     let guard = 0;
     let action = enumerateLegalActions(state)[0];
@@ -178,7 +184,7 @@ describe('Monte Carlo-style loop respects the action cap', () => {
       executeAction(state, action);
       action = enumerateLegalActions(state)[0];
     }
-    expect(count).toBeLessThanOrEqual(2);
+    expect(count).toBeLessThanOrEqual(3); // banking-aware upper bound (was 2 pre-banking)
     expect(count).toBeGreaterThan(0);
     processEndOfTurn(state);
   });
