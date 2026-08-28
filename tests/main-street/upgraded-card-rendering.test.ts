@@ -84,31 +84,31 @@ describe('buildUpgradeOverlaySpec', () => {
     });
   });
 
-  describe('income display', () => {
-    it('shows combined income for a card with incomeBonus', () => {
+  describe('cash line display (CG-0MTCP76MP0088TQW)', () => {
+    it('shows combined cash line for a card with incomeBonus', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
-      expect(spec.incomeText).not.toBeNull();
-      expect(spec.incomeText!.text).toBe('Income: +8/turn'); // 3 + 5 = 8
+      expect(spec.cashLine).not.toBeNull();
+      expect(spec.cashLine!.text).toBe('Cash: +8'); // 3 + 5 = 8
     });
 
-    it('shows income overlay for an un-upgraded card when income > 0', () => {
+    it('shows cash line overlay for an un-upgraded card when income > 0', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 0, level: 0 });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
-      expect(spec.incomeText).not.toBeNull();
-      expect(spec.incomeText!.text).toBe('Income: +3/turn');
+      expect(spec.cashLine).not.toBeNull();
+      expect(spec.cashLine!.text).toBe('Cash: +3');
     });
 
-    it('positions the income text centred on the card', () => {
+    it('positions the cash line centred on the card', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
       const height = 280;
       const spec = buildUpgradeOverlaySpec(biz, 200, height);
-      expect(spec.incomeText).not.toBeNull();
-      // Income is now centred: x=0 horizontally, y slightly above centre
-      expect(spec.incomeText!.x).toBe(0);
+      expect(spec.cashLine).not.toBeNull();
+      // Cash line is centred: x=0 horizontally, y slightly above centre
+      expect(spec.cashLine!.x).toBe(0);
       // y should be negative (above centre) and near zero (centre of card)
-      expect(spec.incomeText!.y).toBeLessThan(0);
-      expect(spec.incomeText!.y).toBeGreaterThan(-height * 0.2);
+      expect(spec.cashLine!.y).toBeLessThan(0);
+      expect(spec.cashLine!.y).toBeGreaterThan(-height * 0.2);
     });
   });
 

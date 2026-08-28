@@ -756,21 +756,22 @@ export class MainStreetRenderer {
     // card's SVG texture via a display-name variant, so it renders as part of
     // the card image exactly like the base name. No Phaser text overlay.
 
-    // Income text (centred on card)
-    if (spec.incomeText) {
-      const incomeText = this.scene.add.text(
-        spec.incomeText.x,
-        spec.incomeText.y,
-        spec.incomeText.text,
+    // Combined cash line (centred on card, above reputation) — CG-0MTCP76MP0088TQW
+    // Replaces the former separate income/cost overlays that visually overlapped.
+    if (spec.cashLine) {
+      const cashText = this.scene.add.text(
+        spec.cashLine.x,
+        spec.cashLine.y,
+        spec.cashLine.text,
         {
-          fontSize: spec.incomeText.fontSize ?? '11px',
-          fontStyle: spec.incomeText.fontStyle,
-          color: spec.incomeText.color,
+          fontSize: spec.cashLine.fontSize ?? '11px',
+          fontStyle: spec.cashLine.fontStyle,
+          color: spec.cashLine.color,
           fontFamily: FONT_FAMILY,
         },
       );
-      incomeText.setOrigin(spec.incomeText.originX ?? 0, spec.incomeText.originY ?? 0);
-      container.add(incomeText);
+      cashText.setOrigin(spec.cashLine.originX ?? 0, spec.cashLine.originY ?? 0);
+      container.add(cashText);
     }
 
     // Reputation text (centred below income)

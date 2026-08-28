@@ -149,17 +149,17 @@ describe('CSV data: upgrade templates carry newDisplayName (AC2)', () => {
 // ── Overlay spec structural integrity ─────────────────────────
 
 describe('Overlay spec structure', () => {
-  it('base card: levelBadge and upgradeBorder are null, incomeText is present', () => {
+  it('base card: levelBadge and upgradeBorder are null, cashLine is present', () => {
     const biz = makeBusiness({ level: 0, baseIncome: 1 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
 
     expect(spec.levelBadge).toBeNull();
     expect(spec.upgradeBorder).toBeNull();
-    expect(spec.incomeText).not.toBeNull();
-    expect(spec.incomeText!.text).toBe('Income: +1/turn');
+    expect(spec.cashLine).not.toBeNull();
+    expect(spec.cashLine!.text).toBe('Cash: +1');
   });
 
-  it('upgraded card: income/reputation/level/border overlays present when income > 0', () => {
+  it('upgraded card: cash/reputation/level/border overlays present when income > 0', () => {
     const biz = makeBusiness({
       level: 1,
       name: 'Bakery',
@@ -171,8 +171,8 @@ describe('Overlay spec structure', () => {
 
     expect(spec.levelBadge).not.toBeNull();
     expect(spec.levelBadge!.text).toBe('Lvl 1');
-    expect(spec.incomeText).not.toBeNull();
-    expect(spec.incomeText!.text).toBe('Income: +1.5/turn');
+    expect(spec.cashLine).not.toBeNull();
+    expect(spec.cashLine!.text).toBe('Cash: +1.5');
     expect(spec.upgradeBorder).not.toBeNull();
   });
 

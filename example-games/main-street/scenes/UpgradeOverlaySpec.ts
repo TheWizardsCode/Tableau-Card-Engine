@@ -59,8 +59,9 @@ export interface OverlayBorderSpec {
 export interface UpgradeOverlaySpec {
   /** Level badge text (e.g. "Lvl 2"), null for base cards. */
   levelBadge: OverlayTextSpec | null;
-  /** Per-turn income text (e.g. "Income: +3/turn"), null when total income is 0. */
-  incomeText: OverlayTextSpec | null;
+  /** Combined cash line (e.g. "Cash: +2 / -0.75"), null when income and cost are both 0.
+   *  Replaces the former separate income/cost overlays (CG-0MTCP76MP0088TQW). */
+  cashLine: OverlayTextSpec | null;
   /** Per-turn reputation text (e.g. "+0.2/turn"), null when total reputation is 0. */
   reputationText: OverlayTextSpec | null;
   /** Border/glow for upgraded cards, null for base cards. */
@@ -113,21 +114,32 @@ export function buildUpgradeOverlaySpec(
       }
     : null;
 
-  // Income text: centred on the card, shown for any card with income > 0
-  // Uses "Income: +X/turn" format for clarity
-  // Container origin is at card centre, so x=0 is horizontal centre
-  // and a small negative y offset centres the label slightly above middle.
-  const incomeText: OverlayTextSpec | null = totalIncome > 0
-    ? {
-        text: `Income: +${totalIncome}/turn`,
-        x: 0,
-        y: Math.round(-height * 0.06),
-        fontSize: '11px',
-        color: '#44ff44',
-        fontStyle: 'bold',
-        originX: 0.5,
-        originY: 0.5,
-      }
+  // Combined cash line: "Cash: +{income} / -{cost}" (CG-0MTCP76MP0088TQW)
+  // Replaces separate income and ongoing-cost overlays that visually overlapped.
+  // Shown only when totalIncome > 0 OR ongoingCost > 0.
+  // Format: integers without decimals, fractions up to 2 decimal places with
+  // trailing zeros stripped (e.g. 0.75, 0.5, not 0.8 or 0.750).
+  const cashLine: OverlayTextSpec | null = (totalIncome > 0 || biz.ongoingCost > 0)
+    ? (() => {
+        const fmt = (n: number): string =>
+          Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+        const hasIncome = totalIncome > 0;
+        const hasCost = biz.ongoingCost > 0;
+        const parts: string[] = [];
+        if (hasIncome) parts.push(`+${fmt(totalIncome)}`);
+        if (hasCost) parts.push(`-${fmt(biz.ongoingCost)}`);
+        const text = `Cash: ${parts.join(' / ')}`;
+        return {
+          text,
+          x: 0,
+          y: Math.round(-height * 0.04),
+          fontSize: '11px',
+          color: totalIncome > 0 && biz.ongoingCost > 0 ? '#dddd44' : '#44ff44',
+          fontStyle: 'bold',
+          originX: 0.5,
+          originY: 0.5,
+        };
+      })()
     : null;
 
   // Reputation text: centred below income, shown for any card with reputation > 0
@@ -164,5 +176,5 @@ export function buildUpgradeOverlaySpec(
       }
     : null;
 
-  return { levelBadge, incomeText, reputationText, upgradeBorder };
+  return { levelBadge, cashLine, reputationText, upgradeBorder };
 }
