@@ -32,12 +32,13 @@ function setupMarketState(): ReturnType<typeof setupMainStreetGame> {
   return state;
 }
 
-/** Moves the first affordable business card to hand (consuming the action). */
+/** Moves the first business card to hand (consuming the action). */
 function moveCardToHand(state: any): { cardId: string; handIndex: number; card: any } {
   const mgr = new UndoRedoManager();
-  const card = state.market.cards.find(
-    (c: any) => c.family === 'business' && state.resourceBank.coins >= Math.ceil(c.cost * 1.5 * 2) / 2,
-  );
+  // moveToHandCommand only consumes an action — no coin check at this stage.
+  // Ensure coins are sufficient for subsequent premium play (CG-0MTC2804X004TA74).
+  state.resourceBank.coins = 100;
+  const card = state.market.cards.find((c: any) => c.family === 'business');
   expect(card).toBeTruthy();
   mgr.execute(moveToHandCommand(state, card.id));
   expect(state.actionsRemaining).toBe(0);
