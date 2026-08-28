@@ -822,6 +822,15 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
   describe('reshuffleIfNeeded — upgrade deck', () => {
     it('should reshuffle upgrade discards into deck when upgrade deck is empty', () => {
       const state = createTestState();
+      // Leave exactly 1 business card for the market minimum requirement;
+      // empty community-space and staff to avoid competing sources.
+      state.decks.business.length = 1;
+      state.discards.business.length = 0;
+      state.decks.communitySpace.length = 0;
+      state.discards.communitySpace.length = 0;
+      state.decks.staff.length = 0;
+      state.discards.staff.length = 0;
+      // Move upgrade cards to discard, empty deck so reshuffle is needed.
       const moved = state.decks.upgrade.splice(0, 2);
       state.discards.upgrade.push(...moved);
       state.decks.upgrade.length = 0;
@@ -830,6 +839,7 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
       // The reshuffled discard must have been consumed (nothing left there),
       // and the non-business slot is filled from it (upgrade or event).
       expect(state.discards.upgrade.length).toBe(0);
+      expect(state.decks.upgrade.length).toBeGreaterThanOrEqual(1);
       const nonBusiness = state.market.cards.filter(
         c => c.family === 'upgrade' || c.family === 'event',
       );

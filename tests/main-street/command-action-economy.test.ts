@@ -38,10 +38,19 @@ function setupMarketState(seed = 'command-action-economy-test'): ReturnType<type
 }
 
 function firstAffordableBusinessId(state: any): string {
-  const card = state.market.cards.find(
+  let card = state.market.cards.find(
     (c: any) => c.family === 'business' && state.resourceBank.coins >= c.cost,
   );
-  expect(card).toBeTruthy();
+  // If no business card landed in the market row with this seed, push one from
+  // the deck — same fallback pattern the hireStaffCardCommand test uses.
+  if (!card) {
+    const deckCard = state.decks.business?.find((c: any) => c.family === 'business');
+    if (!deckCard) {
+      throw new Error('No business cards available in market or deck');
+    }
+    card = { ...deckCard };
+    state.market.cards.push(card);
+  }
   state.resourceBank.coins = Math.max(state.resourceBank.coins, Math.ceil(card.cost * 1.5 * 2) / 2);
   return card.id;
 }
