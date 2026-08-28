@@ -8,10 +8,14 @@
  *
  * ## How it fits into the rendering pipeline
  *
- * 1. `MainStreetRenderer.drawBusinessSlot()` renders the base SVG card texture
- *    via `mainStreetRenderCardSvg()`.
+ * 1. `MainStreetRenderer.drawBusinessSlot()` renders the card SVG texture via
+ *    `mainStreetRenderCardSvg()`. Upgraded businesses get a **display-name
+ *    variant texture** so the upgraded name renders as part of the card image
+ *    (CG-0MT24MHGZ0025O20).
  * 2. It then calls `applyUpgradeOverlays()`, which invokes
- *    `buildUpgradeOverlaySpec()` to get overlay specifications.
+ *    `buildUpgradeOverlaySpec()` to get overlay specifications (level badge,
+ *    income, reputation, border — the NAME is intentionally not part of this
+ *    spec; it lives in the card face).
  * 3. The renderer creates Phaser Text/Graphics objects from the spec and adds
  *    them as children of the card's container.
  *
@@ -59,8 +63,6 @@ export interface UpgradeOverlaySpec {
   incomeText: OverlayTextSpec | null;
   /** Per-turn reputation text (e.g. "+0.2/turn"), null when total reputation is 0. */
   reputationText: OverlayTextSpec | null;
-  /** Upgraded name text, null for base cards. */
-  nameText: OverlayTextSpec | null;
   /** Border/glow for upgraded cards, null for base cards. */
   upgradeBorder: OverlayBorderSpec | null;
 }
@@ -71,12 +73,17 @@ export interface UpgradeOverlaySpec {
 
 /**
  * Build an overlay specification for a BusinessCard based on its current
- * upgrade state. Returns specs for level badge, income display, name overlay,
- * and border styling.
+ * upgrade state. Returns specs for level badge, income display, and border
+ * styling.
  *
  * Base cards (level === 0) get `null` for all overlay fields — the renderer
  * skips overlay creation entirely. Upgraded cards (level > 0) get all four
  * overlays populated for visual distinction.
+ *
+ * Note: the upgraded business NAME is intentionally NOT part of the overlay
+ * spec (since CG-0MT24MHGZ0025O20 review): it is baked into the card's SVG
+ * face as a display-name variant texture by the renderer/texture manager, so
+ * it renders as part of the card image like the base name.
  *
  * @param biz - The BusinessCard to generate overlays for.
  * @param width - Card display width in pixels.
@@ -144,21 +151,10 @@ export function buildUpgradeOverlaySpec(
       }
     : null;
 
-  // Name overlay: top centre, only for upgraded cards to highlight the new name
-  // Container origin is at card centre, so x=0 is horizontal centre
-  // and y = -height/2 + 16 places the top edge near the card's top.
-  // Uses displayName (set by purchaseUpgrade/playUpgradeFromHand) when present,
-  // falling back to the base name for legacy/uncleaned state.
-  const nameText: OverlayTextSpec | null = isUpgraded
-    ? {
-        text: biz.displayName ?? biz.name,
-        x: 0,
-        y: Math.round(-height / 2 + 16),
-        fontSize: '10px',
-        color: '#ffffff',
-        fontStyle: 'bold',
-      }
-    : null;
+  // Name overlay — REMOVED (CG-0MT24MHGZ0025O20 manual review): the upgraded
+  // name is baked into the card's SVG texture as a display-name variant, not
+  // rendered as a Phaser overlay. The card face therefore shows the upgraded
+  // name as a part of the card image, exactly like the base name.
 
   // Upgrade border: golden glow for upgraded cards
   const upgradeBorder: OverlayBorderSpec | null = isUpgraded
@@ -168,5 +164,5 @@ export function buildUpgradeOverlaySpec(
       }
     : null;
 
-  return { levelBadge, incomeText, reputationText, nameText, upgradeBorder };
+  return { levelBadge, incomeText, reputationText, upgradeBorder };
 }

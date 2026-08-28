@@ -131,14 +131,15 @@ describe('buildUpgradeOverlaySpec', () => {
     it('returns no name overlay for a base (level 0) card', () => {
       const biz = makeBiz({ level: 0, name: 'Bakery' });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
-      expect(spec.nameText).toBeNull();
+      expect(spec).not.toHaveProperty('nameText');
     });
 
-    it('returns the card name overlay for an upgraded card', () => {
-      const biz = makeBiz({ level: 1, name: 'Patisserie' });
+    it('returns no name overlay for an upgraded card (name is part of the card face — CG-0MT24MHGZ0025O20)', () => {
+      const biz = makeBiz({ level: 1, name: 'Bakery', displayName: 'Patisserie' });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
-      expect(spec.nameText).not.toBeNull();
-      expect(spec.nameText!.text).toBe('Patisserie');
+      // The upgraded name is baked into the card SVG, so the overlay spec
+      // must NOT carry a name overlay (manual review directive).
+      expect(spec).not.toHaveProperty('nameText');
     });
   });
 });

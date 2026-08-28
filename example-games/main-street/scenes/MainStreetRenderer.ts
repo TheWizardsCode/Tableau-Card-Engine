@@ -166,8 +166,11 @@ export class MainStreetRenderer {
           return container;
         }
 
-        // Render SVG card via shared adapter
-        mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
+        // Render SVG card via shared adapter. Hand business cards are never
+        // upgraded (upgrades target street businesses), so displayName is
+        // always undefined here; passing it keeps the street renderer the
+        // single display-name-aware site (CG-0MT24MHGZ0025O20).
+        mainStreetRenderCardSvg(s, container, card.id, renderW, renderH, card.displayName);
 
         if (card.family === 'event') {
           // ── Event card path: tooltip + play-event click (market phase only) ──
@@ -623,9 +626,11 @@ export class MainStreetRenderer {
     const renderW = Math.max(1, Math.round(slotW - 4));
     const renderH = Math.max(1, Math.round(slotH - 4));
 
-    // Render card via shared adapter
+    // Render card via shared adapter. Upgraded businesses (level > 0) get a
+    // display-name variant texture so the upgraded name is baked into the card
+    // image like the base name (CG-0MT24MHGZ0025O20).
     const cardContainer = s.add.container(Math.round(x + slotW / 2), Math.round(y + slotH / 2));
-    mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
+    mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH, biz.displayName);
 
     // Tag the container with its slot index so the synergy-formation
     // animation (`MainStreetAnimator.animateSynergyFormation`) can find and
@@ -746,35 +751,10 @@ export class MainStreetRenderer {
       container.add(lvlText);
     }
 
-    // Name overlay (top center) for upgraded cards
-    if (spec.nameText) {
-      const nameText = this.scene.add.text(
-        spec.nameText.x,
-        spec.nameText.y,
-        spec.nameText.text,
-        {
-          fontSize: spec.nameText.fontSize ?? '10px',
-          fontStyle: spec.nameText.fontStyle,
-          color: spec.nameText.color,
-          fontFamily: FONT_FAMILY,
-        },
-      );
-      nameText.setOrigin(0.5, 0);
-      // Add a subtle dark background for readability
-      const bg = this.scene.add.graphics();
-      const textWidth = nameText.width + 8;
-      const textHeight = nameText.height + 2;
-      bg.fillStyle(0x000000, 0.6);
-      bg.fillRoundedRect(
-        spec.nameText.x - textWidth / 2,
-        spec.nameText.y - 1,
-        textWidth,
-        textHeight,
-        2,
-      );
-      container.add(bg);
-      container.add(nameText);
-    }
+    // Name overlay (top center) for upgraded cards — REMOVED per manual
+    // review (CG-0MT24MHGZ0025O20): the upgraded name is now baked into the
+    // card's SVG texture via a display-name variant, so it renders as part of
+    // the card image exactly like the base name. No Phaser text overlay.
 
     // Income text (centred on card)
     if (spec.incomeText) {
@@ -1119,8 +1099,11 @@ export class MainStreetRenderer {
     const renderH = Math.max(1, Math.round(marketCardH - 4));
     const baseStrokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
 
-    // Render card via shared adapter
-    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
+    // Render card via shared adapter. Market business cards are always base
+    // copies (never upgraded), so displayName is undefined for them; passing
+    // it keeps the street renderer the primary display-name-aware site
+    // (CG-0MT24MHGZ0025O20).
+    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH, (card as Partial<BusinessCard>).displayName);
 
     // For upgrade cards, add a dynamic text overlay showing the target business
     if (card.family === 'upgrade') {

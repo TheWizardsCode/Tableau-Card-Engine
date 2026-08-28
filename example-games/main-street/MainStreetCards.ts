@@ -332,10 +332,12 @@ export interface BusinessCard {
    */
   totalUpgradeCost?: number;
   /**
-   * Display name shown on the card overlay when the business has been upgraded.
-   * Set to the upgraded business name by `purchaseUpgrade()` / `playUpgradeFromHand()`
-   * when an upgrade card is applied. Falls back to `name` (the original business name)
-   * when the business is at level 0 (un-upgraded).
+   * Display name baked into the card's SVG face when the business has been
+   * upgraded (CG-0MT24MHGZ0025O20). Set to the upgraded business name by
+   * `purchaseUpgrade()` / `playUpgradeFromHand()` when an upgrade card is
+   * applied. Falls back to `name` (the original business name) when the
+   * business is at level 0 (un-upgraded). The overlay spec intentionally
+   * carries NO name overlay — the name renders as part of the card image.
    */
   displayName?: string;
 
@@ -450,9 +452,11 @@ export interface UpgradeCard {
   readonly reputationBonus?: number;
   /**
    * The new display name for the target business when this upgrade is applied.
-   * This is the name shown on the card overlay (e.g., "Patisserie" for an
-   * upgrade that turns a Bakery into a Patisserie). Used by
-   * `buildUpgradeOverlaySpec()` to compute the name overlay text.
+   * This is the name baked into the card's SVG face when the business is
+   * upgraded (e.g., "Patisserie" for an upgrade that turns a Bakery into a
+   * Patisserie) — CG-0MT24MHGZ0025O20. Used by `purchaseUpgrade()`/`playUpgradeFromHand()`
+   * to set the business's `displayName`, and by the SVG texture pipeline to
+   * produce a display-name variant card face.
    */
   readonly newDisplayName?: string;
 }
@@ -1105,10 +1109,11 @@ export interface CommunitySpaceCard {
    */
   currentReputationPerTurn?: number;
   /**
-   * Display name shown on the card overlay when the community space has been upgraded.
-   * Set to the upgraded name by `purchaseUpgrade()` / `playUpgradeFromHand()`
-   * when an upgrade card is applied. Falls back to `name` (the original name)
-   * when the community space is at level 0 (un-upgraded).
+   * Display name baked into the card's SVG face when the community space has
+   * been upgraded (CG-0MT24MHGZ0025O20). Set to the upgraded name by
+   * `purchaseUpgrade()` / `playUpgradeFromHand()` when an upgrade card is
+   * applied. Falls back to `name` (the original name) when the community
+   * space is at level 0 (un-upgraded).
    */
   displayName?: string;
 }

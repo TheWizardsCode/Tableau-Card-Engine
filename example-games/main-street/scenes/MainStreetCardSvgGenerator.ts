@@ -76,6 +76,31 @@ function synergyIconSvg(type: SynergyType, x: number, y: number): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * Replaces the card title (the first `<text ...>...</text>` node) in a
+ * template SVG with the given display name, producing a variant card face.
+ *
+ * Used by the runtime texture pipeline to bake an upgraded business's
+ * display name into its card image (CG-0MT24MHGZ0025O20) — the upgraded
+ * name becomes part of the SVG itself, exactly like the base name is part
+ * of the template SVG.
+ *
+ * @param svgText   The template SVG string (e.g. base Bakery card).
+ * @param newTitle  The name to bake into the card (e.g. "Patisserie").
+ * @returns The variant SVG with the title node (and aria-label) updated.
+ */
+export function replaceCardTitleInSvg(svgText: string, newTitle: string): string {
+  if (!svgText) return svgText;
+  const escaped = esc(newTitle);
+  // The template SVGs (static assets and CSV regenerations) render the card
+  // name as the first <text> node. Replace its content only. Also update the
+  // root aria-label so the altered card reports the new name.
+  const titleNodeRe = /(<text[^>]*>)[^<]*(<\/text>)/;
+  const withTitle = svgText.replace(titleNodeRe, `$1${escaped}$2`);
+  const ariaRe = /(aria-label=")[^"]*(")/;
+  return withTitle.replace(ariaRe, `$1${escaped}$2`);
+}
+
+/**
  * Generate an SVG string for a BusinessCard or CommunitySpaceCard
  * reflecting its current state.
  *
@@ -110,9 +135,14 @@ export function generateBusinessCardSvg(
 
   // ── Dynamic text elements ────────────────────────────────
 
-  // Title: always present (name changes on upgrade)
+  // Title: always present (name changes on upgrade). The baked card face
+  // uses the upgraded display name (set by purchaseUpgrade/playUpgradeFromHand)
+  // so the upgraded name is part of the card image, like the base name
+  // (CG-0MT24MHGZ0025O20). Base (un-upgraded) cards have no displayName and
+  // fall back to the original business name.
+  const displayName = card.displayName ?? card.name;
   const titleY = 19;
-  const titleText = `<text x="${width / 2}" y="${titleY}" font-family="${FONT}" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">${esc(card.name)}</text>`;
+  const titleText = `<text x="${width / 2}" y="${titleY}" font-family="${FONT}" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">${esc(displayName)}</text>`;
 
   // Income label: centred horizontally, middle band of card, omitted when 0
   // Uses "Income: +X/turn" format for clarity
@@ -155,7 +185,7 @@ export function generateBusinessCardSvg(
   // ── Compose SVG ─────────────────────────────────────────
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(card.name)}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(displayName)}">
   <defs>
     <linearGradient id="g-gen-${card.id}" x1="0" x2="1">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>
