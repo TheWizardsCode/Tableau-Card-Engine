@@ -1459,7 +1459,7 @@ This is a **pure data module** with no Phaser or runtime dependencies. It define
 
 - **`OverlayTextSpec`** – Describes a text overlay with `text`, `x`, `y`, `fontSize`, `color`, and `fontStyle` properties.
 - **`OverlayBorderSpec`** – Describes a border/glow overlay with `color` (hex number) and `strokeWidth` (pixels).
-- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `incomeText`, `reputationText`, and `upgradeBorder`.
+- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `cashLine`, `reputationText`, and `upgradeBorder`.
 
 > **Note (CG-0MT24MHGZ0025O20):** The upgraded business **name is not part of
 > the overlay spec** — per manual review it must render as part of the card
@@ -1474,15 +1474,16 @@ The key function is `buildUpgradeOverlaySpec(biz: BusinessCard, width: number, h
 BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlaySpec
   (level, name,          (pure function,              (positioned text
    baseIncome,            no Phaser deps)               specs + border
-   incomeBonus)                                        spec)
+   incomeBonus,                                          spec)
+   ongoingCost)
 ```
 
 **Logic:**
-- Base cards (`level === 0`): All overlay fields are `null` — nothing extra is rendered.
+- Base cards (`level === 0`): level badge and border are `null`; the cash line is populated when income or cost > 0.
 - Upgraded cards (`level > 0`): The non-name overlays are populated:
   - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-right corner, 10px bold.
-  - **Income text** — `"Income: +N/turn"` (combined `baseIncome + incomeBonus`) in green (`#44ff44`), centre, 11px bold.
-  - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below income.
+  - **Cash line** — `"Cash: +X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) in green (`#44ff44`) when only income or only cost is present, yellow (`#dddd44`) when both are present; centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `Cash: +2`, `Cash: -0.75`) (CG-0MTCP76MP0088TQW).
+  - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below the cash line.
   - **Upgrade border** — Golden stroke (`0xffaa22`), 3px width, around the card perimeter.
   - **Name** — NOT an overlay: baked into the card's SVG via a display-name variant texture (CG-0MT24MHGZ0025O20).
 
@@ -1501,8 +1502,8 @@ UpgradeOverlaySpec ──► applyUpgradeOverlays() ──► Phaser text/graphi
 **Rendering order (back to front within the container):**
 1. Upgrade border (transparent fill, golden stroke) — drawn behind text but on top of card image.
 2. Level badge text (gold, top-right).
-3. Income text (green, centre).
-4. Reputation text (blue, below income).
+3. Cash line text (green/yellow, centre, above reputation).
+4. Reputation text (blue, below cash line).
 
 The upgraded card NAME is not an overlay — it is part of the card's SVG
 face (display-name variant texture, CG-0MT24MHGZ0025O20).
@@ -1514,7 +1515,7 @@ face (display-name variant texture, CG-0MT24MHGZ0025O20).
 // manager rasterises a display-name variant with the upgraded name baked in.
 mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH, biz.displayName);
 
-// Apply the remaining upgrade overlays (level badge, income, rep, border)
+// Apply the remaining upgrade overlays (level badge, cash line, rep, border)
 this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ```
 
@@ -1537,7 +1538,7 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 │                  drawBusinessSlot()                              │
 │  1. mainStreetRenderCardSvg(+ displayName) → variant SVG texture │
 │     (displayName baked in for upgraded cards, CG-0MT24MHGZ0025O20)  │
-│  2. applyUpgradeOverlays() → level/income/rep/border overlays    │
+│  2. applyUpgradeOverlays() → level/cash-line/rep/border overlays │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
               ┌────────────┴────────────┐
@@ -1545,7 +1546,7 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ┌─────────────────────┐     ┌─────────────────────────────┐
 │  Base SVG texture   │     │  buildUpgradeOverlaySpec()  │
 │  (cached, reused)   │     │  → levelBadge: "Lvl 2"      │
-│  + display-name     │     │  → incomeText: "+8"          │
+│  + display-name     │     │  → cashLine: "Cash: +8"    │
 │  variant (upgraded) │     │  → upgradeBorder: gold 3px   │
 │                     │     │  (name is baked into the     │
 │                     │     │   variant texture, not here) │
@@ -1556,7 +1557,7 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
                               │  applyUpgradeOverlays()     │
                               │  Creates Phaser objects:    │
                               │  - Rectangle (golden border)│
-                              │  - Text (level, income, rep)│
+                              │  - Text (level, cash line, rep)│
                               └─────────────────────────────┘
 ```
 
@@ -1594,7 +1595,7 @@ if (spec.starIcon) {
 
 ### Why Not SVG-Based Overlays?
 
-An alternative approach would be to generate composite SVGs with embedded level/income text and re-rasterize them per card state. This was considered but rejected because:
+An alternative approach would be to generate composite SVGs with embedded level/cash text and re-rasterize them per card state. This was considered but rejected because:
 
 - **Asset duplication**: Each card would need SVG variants for each level (Bookshop L1, L2, L3, etc.), multiplying asset count.
 - **Cache complexity**: Texture cache keys would need to encode card state, increasing cache miss rates.
