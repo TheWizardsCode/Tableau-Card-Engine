@@ -1,3 +1,30 @@
+/**
+ * Main Street Monte Carlo guardrail tests.
+ *
+ * ## Drift-report-then-ask workflow (CG-0MTD0F66A0005BEX)
+ *
+ * When this test detects drift from the committed baseline, the workflow is:
+ *
+ * 1. **Report drift** — run `npx vite-node scripts/balance/drift-report.ts`
+ *    (or `npm run balance:drift-report`) to get a structured delta report
+ *    showing winRate, coins/turn, and medianScore deviations per difficulty.
+ * 2. **Ask the operator** — present the drift report to the producer/balance
+ *    lead and let them decide:
+ *    - **Regenerate the baseline** if the drift reflects an intended balance
+ *      shift (new cards, rule changes, etc.). Run
+ *      `npx vite-node scripts/generate-main-street-monte-baseline.ts`.
+ *    - **Investigate a regression** if the drift indicates unintended balance
+ *      breakage (e.g. a card becoming too strong/weak). File a new work item
+ *      to investigate and fix.
+ * 3. **Do NOT silently regenerate the baseline** — doing so masks real balance
+ *    shifts and loses the audit trail of what changed.
+ *
+ * Tolerances: winRate ±0.25, coins ±30% of the baseline value.
+ * These tolerances are independent of this process; see
+ * `docs/main-street/balance-guardrail-recommendations.md` for the full
+ * decision tree and operator approval guidance.
+ */
+
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

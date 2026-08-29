@@ -8,6 +8,61 @@ This document reviews and defines the optimal **pass values** for the three main
 
 ---
 
+## 0. Drift Report & Operator Approval (CG-0MTD0F66A0005BEX)
+
+When the Monte Carlo guardrail test (`monte-carlo-guardrails.test.ts`) detects
+**drift** from the committed baseline (`docs/main-street/monte-carlo-baseline.json`),
+**do NOT silently regenerate the baseline**. Doing so masks real balance shifts
+and loses the audit trail of what changed.
+
+### The drift-report-then-ask workflow
+
+1. **Report drift** — run the drift report helper:
+   ```bash
+   npx vite-node scripts/balance/drift-report.ts
+   # or in JSON format for machine consumption:
+   npx vite-node scripts/balance/drift-report.ts --json
+   ```
+   This compares current simulation results against the committed baseline and
+   prints drift deltas per difficulty (winRate, coins/turn, medianScore) with
+   percentage deviation.
+
+2. **Review the report** — examine which difficulty levels drifted and by how
+   much. The report flags entries exceeding tolerance (winRate ±0.25, coins ±30%)
+   with a warning.
+
+3. **Ask the operator** — present the drift report to the producer/balance lead
+   and let them decide (see the decision tree below).
+
+### Decision tree: regenerate vs investigate
+
+```
+Drift detected in guardrail test?
+│
+├─ Was there an intentional balance change?
+│  ├─ YES (new cards, rule changes, difficulty retuning) → Regenerate baseline
+│  │  └─ Run: npx vite-node scripts/generate-main-street-monte-baseline.ts
+│  │  └─ Commit the new baseline with a note explaining the change.
+│  │
+│  └─ NO (no intentional change) → Investigate regression
+│     └─ File a new work item to identify and fix the root cause.
+│     └─ Do NOT regenerate the baseline until the cause is understood.
+```
+
+### Key files
+
+| File | Purpose |
+|------|--------|
+| `scripts/balance/drift-report.ts` | Compare current results vs. baseline |
+| `scripts/generate-main-street-monte-baseline.ts` | Regenerate the baseline |
+| `tests/main-street/monte-carlo-guardrails.test.ts` | Guardrail test (reads baseline, asserts drift bounds) |
+| `docs/main-street/monte-carlo-baseline.json` | Committed regression snapshot |
+
+> **Note:** Tolerance values (winRate ±0.25, coins ±30%) are independent of
+> this process. Updating them is a separate concern documented in §1 below.
+
+---
+
 ## 1. Recommended pass values (summary)
 
 All values below are **enforced in the guardrail test suite** (`tests/main-street/monte-carlo-greedy-guardrail.test.ts`) **and** documented in PRD §3.3 and `scripts/balance/guards/thresholds.ts` — the same number never appears with two different meanings.

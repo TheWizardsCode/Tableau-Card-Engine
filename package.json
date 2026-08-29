@@ -25,7 +25,8 @@
     "package": "npm run build:electron && npm run build:electron-main && electron-builder --publish never",
     "package:win": "npm run build:electron && npm run build:electron-main && electron-builder --win --publish never",
     "package:linux": "npm run build:electron && npm run build:electron-main && electron-builder --linux --publish never",
-    "package:mac": "npm run build:electron && npm run build:electron-main && electron-builder --mac --publish never"
+    "package:mac": "npm run build:electron && npm run build:electron-main && electron-builder --mac --publish never",
+    "balance:drift-report": "vite-node scripts/balance/drift-report.ts"
   },
   "dependencies": {
     "phaser": "4.0.0-rc.7"
