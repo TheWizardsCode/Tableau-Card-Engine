@@ -126,7 +126,7 @@ function forceGameOver(scene: Phaser.Scene, isWin = false): void {
   }
 
   const result: TurnResult = {
-    income: { total: 0, breakdown: [], handSynergyTotal: 0 },
+    income: { total: 0, breakdown: [], handSynergyTotal: 0, phaseBreakdown: { perSlotBreakdown: [], handSynergyTotal: 0 } },
     incident: null,
     incidentCoinChange: 0,
     incidentRepChange: 0,
@@ -338,7 +338,7 @@ describe('Main Street overlay button tests', () => {
     // Force game-over with a newly unlocked tier that has newCardIds.
     // Using 'tier-2' which has newCardIds in TIER_DEFINITIONS.
     const result: TurnResult = {
-      income: { total: 0, breakdown: [], handSynergyTotal: 0 },
+      income: { total: 0, breakdown: [], handSynergyTotal: 0, phaseBreakdown: { perSlotBreakdown: [], handSynergyTotal: 0 } },
       incident: null,
       incidentCoinChange: 0,
       incidentRepChange: 0,

@@ -196,7 +196,25 @@ export function getIncomeResult(state: MainStreetState): IncomeResult {
     total += slotTotal;
   }
 
-  return { total, breakdown, handSynergyTotal: 0 };
+  return {
+    total,
+    breakdown,
+    handSynergyTotal: 0,
+    // Preview-only path: no multipliers/effects applied, so phase data is
+    // base-only with zero rep/event/upcoming contributions.
+    phaseBreakdown: {
+      perSlotBreakdown: breakdown.map(b => ({
+        slotIndex: b.slotIndex,
+        businessName: b.businessName,
+        baseIncome: b.total,
+        synergyBonus: 0,
+        repBonus: 0,
+        eventDeltas: [],
+        upcomingDeltas: [],
+      })),
+      handSynergyTotal: 0,
+    },
+  };
 }
 
 /**

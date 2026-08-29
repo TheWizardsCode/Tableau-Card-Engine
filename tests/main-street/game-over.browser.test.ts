@@ -65,7 +65,7 @@ async function waitForCondition(
 /** Build a minimal TurnResult for a forced game-over. */
 function gameOverResult(isWin: boolean): TurnResult {
   return {
-    income: { total: 0, breakdown: [], handSynergyTotal: 0 },
+    income: { total: 0, breakdown: [], handSynergyTotal: 0, phaseBreakdown: { perSlotBreakdown: [], handSynergyTotal: 0 } },
     incident: null,
     incidentCoinChange: 0,
     incidentRepChange: 0,

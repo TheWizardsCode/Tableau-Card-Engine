@@ -568,7 +568,32 @@ export function computeIncome(
     }
   }
 
-  return { total, breakdown, handSynergyTotal };
+  // ── Per-phase breakdown (CG-0MT23O6W8003AXWJ) ──────────────
+  // computeIncome is a preview/read-only path (no multipliers / active
+  // effects), so phase data is base + synergy only; rep/event/upcoming
+  // phases are zero. Slots keep the exact totals used above.
+  const perSlotBreakdown: SlotPhaseBreakdown[] = breakdown.map(b => ({
+    slotIndex: b.slotIndex,
+    businessName: b.businessName,
+    baseIncome: b.total,
+    synergyBonus: 0,
+    repBonus: 0,
+    eventDeltas: [],
+    upcomingDeltas: [],
+  }));
+  const sumBase = perSlotBreakdown.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
+  if (handSynergyTotal > 0) {
+    for (const pd of perSlotBreakdown) {
+      if (sumBase > 0) pd.synergyBonus = handSynergyTotal * (pd.baseIncome / sumBase);
+    }
+  }
+
+  return {
+    total,
+    breakdown,
+    handSynergyTotal,
+    phaseBreakdown: { perSlotBreakdown, handSynergyTotal },
+  };
 }
 
 /**
@@ -656,16 +681,41 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     total += buffedIncome;
   }
 
+  // ── Per-phase breakdown for animated income (CG-0MT23O6W8003AXWJ) ──
+  // Build phase data alongside the existing breakdown.
+  // Each field holds exact fractional values — rounding to nearest 0.5
+  // is done at the animation layer, not here.
+  const phaseSlotData: SlotPhaseBreakdown[] = breakdown.map(b => ({
+    slotIndex: b.slotIndex,
+    businessName: b.businessName,
+    baseIncome: b.total,  // buffedIncome is the effective base
+    synergyBonus: 0,
+    repBonus: 0,
+    eventDeltas: [],
+    upcomingDeltas: [],
+  }));
+
   // Apply active effect income modifiers per-slot, before reputation multiplier.
   // Each slot's income is individually multiplied, then summed.
+  // Also compute per-event deltas for the phase breakdown.
   let modifiedTotal = 0;
-  for (const slot of breakdown) {
-    const modifiedSlotIncome = applyActiveEffectMultiplier(
-      state.activeEffects,
-      'income-multiplier',
-      slot.total,
-    );
-    modifiedTotal += modifiedSlotIncome;
+  for (let bi = 0; bi < breakdown.length; bi++) {
+    const slot = breakdown[bi];
+    const phaseSlot = phaseSlotData[bi];
+    // Apply each income-multiplier effect individually to track per-effect deltas
+    let runningValue = slot.total;
+    for (const effect of state.activeEffects) {
+      if (effect.effectType !== 'income-multiplier') continue;
+      const newVal = runningValue * effect.multiplier;
+      const delta = newVal - runningValue;
+      phaseSlot.eventDeltas.push({
+        cardId: effect.sourceEventId,
+        name: effect.description,
+        delta,
+      });
+      runningValue = newVal;
+    }
+    modifiedTotal += runningValue;
   }
 
   const multiplied = applyReputationMultiplier(
@@ -716,6 +766,28 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     total += handSynergyTotal;
   }
 
+  // ── Distribute rep bonus + hand synergy across producing slots ──
+  // `multiplied` is the actual credited amount; `modifiedTotal` is the total
+  // after income-multiplier effects. The reputation phase contributes
+  // `multiplied - modifiedTotal`, distributed proportionally to each slot's
+  // post-effect income. Hand synergy is distributed proportionally to base
+  // income. Exact fractional values throughout (Q8: rounding at animation).
+  const repBonus = multiplied - modifiedTotal;
+  const sumPhaseTotal = phaseSlotData.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
+  const modifiedSlotTotals = phaseSlotData.map(
+    (d) => d.baseIncome + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
+  );
+  const sumModifiedSlotTotals = modifiedSlotTotals.reduce((acc, v) => acc + v, 0) || 0;
+  for (let i = 0; i < phaseSlotData.length; i++) {
+    const pd = phaseSlotData[i];
+    if (sumModifiedSlotTotals > 0) {
+      pd.repBonus = repBonus * (modifiedSlotTotals[i] / sumModifiedSlotTotals);
+    }
+    if (sumPhaseTotal > 0 && handSynergyTotal > 0) {
+      pd.synergyBonus = handSynergyTotal * (pd.baseIncome / sumPhaseTotal);
+    }
+  }
+
   syncResourceBankToLedger(state);
   if (multiplied > 0) {
     // CG-0MREYZO7E00729S0: show 3 decimal places for fractional coin values
@@ -729,7 +801,15 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   if (handSynergyTotal > 0) {
     addLog(state, `Hand card synergy: +${handSynergyTotal} coins`, 'gain');
   }
-  return { total, breakdown, handSynergyTotal };
+  return {
+    total,
+    breakdown,
+    handSynergyTotal,
+    phaseBreakdown: {
+      perSlotBreakdown: phaseSlotData,
+      handSynergyTotal,
+    },
+  };
 }
 
 // ── Synergy Pairs for Visual Lines ──────────────────────────
@@ -847,6 +927,50 @@ export interface SlotIncome {
   total: number;
 }
 
+/** Per-event income-multiplier delta for a single slot. */
+export interface SlotEventDelta {
+  /** The card/event ID that created this active effect. */
+  cardId: string;
+  /** Human-readable effect name. */
+  name: string;
+  /** The net coin delta contributed by this effect (negative = reduction). */
+  delta: number;
+}
+
+/**
+ * Per-slot phase breakdown for the phased income animation (CG-0MT23O6W8003AXWJ).
+ *
+ * Each field represents an exact fractional amount — per-phase rounding to
+ * nearest 0.5 is applied at the animation layer, not here.
+ */
+export interface SlotPhaseBreakdown {
+  slotIndex: number;
+  businessName: string;
+  /** Base income for this slot (after staff buffs, before event/rep multipliers). */
+  baseIncome: number;
+  /** Hand-card synergy bonus distributed to this slot. */
+  synergyBonus: number;
+  /** Additional coins from the reputation multiplier. */
+  repBonus: number;
+  /** Per-event income-multiplier deltas (e.g. Flu Outbreak 0.8×). */
+  eventDeltas: SlotEventDelta[];
+  /** Upcoming-card income deltas (placeholder — not yet wired). */
+  upcomingDeltas: SlotEventDelta[];
+}
+
+/**
+ * Phase-based breakdown of income contributions for the animated income system.
+ *
+ * Used by `MainStreetAnimator.animateIncomePhases()` to render the phased
+ * coin-grid animation (base → synergy → reputation → events → upcoming).
+ */
+export interface PhaseBreakdown {
+  /** Per-slot phase data for all producing slots. */
+  perSlotBreakdown: SlotPhaseBreakdown[];
+  /** Total synergy contributed by hand cards (distributed proportionally across slots). */
+  handSynergyTotal: number;
+}
+
 /** Full income computation result. */
 export interface IncomeResult {
   /** Total coins earned from all businesses (includes hand synergy if provided). */
@@ -855,4 +979,11 @@ export interface IncomeResult {
   breakdown: SlotIncome[];
   /** Total synergy contributed by hand cards. */
   handSynergyTotal: number;
+  /**
+   * Per-phase contribution breakdown for animated income presentation.
+   *
+   * Each phase value is an exact fractional number; rounding to nearest 0.5
+   * is done at the animation layer.
+   */
+  phaseBreakdown: PhaseBreakdown;
 }
