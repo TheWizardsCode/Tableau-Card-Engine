@@ -1482,7 +1482,7 @@ BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlayS
 - Base cards (`level === 0`): level badge and border are `null`; the cash line is populated when income or cost > 0.
 - Upgraded cards (`level > 0`): The non-name overlays are populated:
   - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-right corner, 10px bold.
-  - **Cash line** — `"Cash: +X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) in green (`#44ff44`) when only income or only cost is present, yellow (`#dddd44`) when both are present; centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `Cash: +2`, `Cash: -0.75`) (CG-0MTCP76MP0088TQW).
+  - **Cash line** — `"Cash: +X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the `Cash:` prefix and ` / ` separator in neutral grey (`#dddddd`). The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `Cash: +2`, `Cash: -0.75`) (CG-0MTCP76MP0088TQW).
   - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below the cash line.
   - **Upgrade border** — Golden stroke (`0xffaa22`), 3px width, around the card perimeter.
   - **Name** — NOT an overlay: baked into the card's SVG via a display-name variant texture (CG-0MT24MHGZ0025O20).
@@ -1502,11 +1502,16 @@ UpgradeOverlaySpec ──► applyUpgradeOverlays() ──► Phaser text/graphi
 **Rendering order (back to front within the container):**
 1. Upgrade border (transparent fill, golden stroke) — drawn behind text but on top of card image.
 2. Level badge text (gold, top-right).
-3. Cash line text (green/yellow, centre, above reputation).
+3. Cash line text (two-tone: green income / red cost, centre, above reputation).
 4. Reputation text (blue, below cash line).
 
 The upgraded card NAME is not an overlay — it is part of the card's SVG
 face (display-name variant texture, CG-0MT24MHGZ0025O20).
+
+The per-turn ongoing cost is **not** baked into the business/community-space
+card SVG face — it is shown by the two-tone cash line overlay
+(CG-0MTDMOYOL008IQVO). Staff cards keep their baked `-X/turn` cost text since
+they have no overlay pipeline.
 
 **Call site:** `drawBusinessSlot()` in `MainStreetRenderer.ts`:
 

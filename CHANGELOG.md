@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+### Features
+- Main Street: remove the baked `-X/turn` cost text from business/community-space card faces and render the overlay cash line two-tone (green income / red cost) (CG-0MTDMOYOL008IQVO)
+
 ## v0.1.14 (2026-08-27)
 ### Features
 - Main Street: business cards incur ongoing per-turn cost (1/4 purchase price, min 0.25), even in hand (CG-0MSVYPEZ90085SHE)

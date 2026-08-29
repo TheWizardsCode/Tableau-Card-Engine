@@ -32,8 +32,26 @@
 import type { BusinessCard, CommunitySpaceCard } from '../MainStreetCards';
 
 // ---------------------------------------------------------------------------
+// Colour constants
+// ---------------------------------------------------------------------------
+
+/** Neutral prefix/separator colour for the two-tone cash line (CG-0MTDMOYOL008IQVO). */
+export const CASH_LINE_NEUTRAL = '#dddddd';
+/** Green income colour for the cash line. */
+export const CASH_LINE_INCOME = '#44ff44';
+/** Red ongoing-cost colour for the cash line. */
+export const CASH_LINE_COST = '#ff6644';
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** A single coloured segment of a multi-tone text overlay. */
+export interface OverlayTextSegmentSpec {
+  text: string;
+  /** Segment colour; defaults to the parent spec's `color` when unset. */
+  color?: string;
+}
 
 /** Describes a text overlay to be rendered on top of a card. */
 export interface OverlayTextSpec {
@@ -47,6 +65,12 @@ export interface OverlayTextSpec {
   originX?: number;
   /** Vertical origin offset (0=top, 0.5=center, 1=bottom). Default 0. */
   originY?: number;
+  /**
+   * Optional per-segment colouring (e.g. two-tone cash line). When present,
+   * the renderer draws each segment as its own text object laid out
+   * left-to-right, so colours can differ within a single line (CG-0MTDMOYOL008IQVO).
+   */
+  segments?: OverlayTextSegmentSpec[];
 }
 
 /** Describes a border/glow overlay for upgraded cards. */
@@ -119,6 +143,9 @@ export function buildUpgradeOverlaySpec(
   // Shown only when totalIncome > 0 OR ongoingCost > 0.
   // Format: integers without decimals, fractions up to 2 decimal places with
   // trailing zeros stripped (e.g. 0.75, 0.5, not 0.8 or 0.750).
+  // Two-tone rendering (CG-0MTDMOYOL008IQVO): income green (#44ff44),
+  // ongoing cost red (#ff6644), prefix/separator neutral (#dddddd). The
+  // renderer draws each segment as its own text object side-by-side.
   const cashLine: OverlayTextSpec | null = (totalIncome > 0 || biz.ongoingCost > 0)
     ? (() => {
         const fmt = (n: number): string =>
@@ -126,15 +153,24 @@ export function buildUpgradeOverlaySpec(
         const hasIncome = totalIncome > 0;
         const hasCost = biz.ongoingCost > 0;
         const parts: string[] = [];
-        if (hasIncome) parts.push(`+${fmt(totalIncome)}`);
-        if (hasCost) parts.push(`-${fmt(biz.ongoingCost)}`);
+        const segments: OverlayTextSegmentSpec[] = [{ text: 'Cash: ', color: CASH_LINE_NEUTRAL }];
+        if (hasIncome) {
+          parts.push(`+${fmt(totalIncome)}`);
+          segments.push({ text: `+${fmt(totalIncome)}`, color: CASH_LINE_INCOME });
+        }
+        if (hasCost) {
+          parts.push(`-${fmt(biz.ongoingCost)}`);
+          if (hasIncome) segments.push({ text: ' / ', color: CASH_LINE_NEUTRAL });
+          segments.push({ text: `-${fmt(biz.ongoingCost)}`, color: CASH_LINE_COST });
+        }
         const text = `Cash: ${parts.join(' / ')}`;
         return {
           text,
+          segments,
           x: 0,
           y: Math.round(-height * 0.04),
           fontSize: '11px',
-          color: totalIncome > 0 && biz.ongoingCost > 0 ? '#dddd44' : '#44ff44',
+          color: CASH_LINE_NEUTRAL,
           fontStyle: 'bold',
           originX: 0.5,
           originY: 0.5,

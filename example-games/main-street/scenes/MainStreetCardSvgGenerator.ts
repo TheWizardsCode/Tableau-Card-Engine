@@ -157,14 +157,6 @@ export function generateBusinessCardSvg(
       ? `<text x="${width / 2}" y="47" font-family="${FONT}" font-size="10" fill="#88bbff" font-weight="bold" text-anchor="middle">+${fmtRep(totalRep)}/turn</text>`
       : '';
 
-  // Ongoing cost label: centred, below rep, omitted when 0
-  // Uses orange/red text (same color as staff/community-space cards)
-  const ongoingCost = (card as BusinessCard).ongoingCost ?? 0;
-  const ongoingCostLabel =
-    ongoingCost > 0
-      ? `<text x="${width / 2}" y="59" font-family="${FONT}" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-${ongoingCost}/turn</text>`
-      : '';
-
   // Level badge: top-right, only for upgraded cards
   const levelBadge =
     isUpgraded
@@ -198,7 +190,6 @@ export function generateBusinessCardSvg(
   ${titleText}
   ${incomeLabel}
   ${repLabel}
-  ${ongoingCostLabel}
   ${levelBadge}
   ${costCircle}
   ${costText}
@@ -375,15 +366,13 @@ export function generateCardSvgFromCsvRow(
     }
   }
 
-  // Community space ongoing cost (reputation-asset cards, e.g. Library -0.25/turn)
-  if (family === 'community-space' && row.ongoingCost && Number(row.ongoingCost) > 0) {
-    inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
-  }
+  // Community space ongoing cost: no longer baked into the card face — the
+  // overlay cash line (`Cash: +X / -Y`, CG-0MTCP76MP0088TQW) shows it in the
+  // two-tone line instead (CG-0MTDMOYOL008IQVO). Staff cards keep the baked
+  // label above because they have no overlay pipeline.
 
-  // Business ongoing cost (cards charged whether placed or held in hand, CG-0MSVYPEZ90085SHE)
-  if (family === 'business' && row.ongoingCost && Number(row.ongoingCost) > 0) {
-    inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
-  }
+  // Business ongoing cost: same as community space — removed from the baked
+  // face; the overlay cash line handles display (CG-0MSVYPEZ90085SHE + CG-0MTDMOYOL008IQVO).
 
   // Cost badge
   if (cost !== null) {

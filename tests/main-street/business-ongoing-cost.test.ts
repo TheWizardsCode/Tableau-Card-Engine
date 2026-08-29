@@ -232,8 +232,8 @@ describe('applyBusinessOngoingCosts — deduction logic', () => {
 
 // ── AC (d): SVG display ─────────────────────────────────────
 
-describe('SVG display — ongoing cost on business card art', () => {
-  it('should include ongoing-cost text in SVG when ongoingCost > 0', () => {
+describe('SVG display — ongoing cost NOT baked on business/community-space art', () => {
+  it('should NOT include ongoing-cost text in SVG when ongoingCost > 0 (CG-0MTDMOYOL008IQVO)', () => {
     const biz: BusinessCard = {
       family: 'business',
       ...getBusinessTemplates()[0],
@@ -243,11 +243,13 @@ describe('SVG display — ongoing cost on business card art', () => {
     };
 
     const svg = generateBusinessCardSvg(biz);
-    expect(svg).toContain('-0.5/turn');
-    expect(svg).toContain('#ff8844'); // orange/red color for cost
+    // The `-X/turn` label is no longer baked into the card face — the overlay
+    // cash line (`Cash: +X / -Y`) now carries the cost (CG-0MTDMOYOL008IQVO).
+    expect(svg).not.toContain('-0.5/turn');
+    expect(svg).not.toContain('#ff8844'); // orange/red cost colour removed
   });
 
-  it('should omit ongoing-cost text when ongoingCost is 0', () => {
+  it('should not bake the cost even when ongoingCost is 0', () => {
     const biz: BusinessCard = {
       family: 'business',
       ...getBusinessTemplates()[0],
@@ -257,11 +259,13 @@ describe('SVG display — ongoing cost on business card art', () => {
     };
 
     const svg = generateBusinessCardSvg(biz);
-    // The ongoing-cost label (orange `-X/turn`) must not appear
+    // Income/reputation `/turn` labels may still be baked; the negative ongoing
+    // cost label and its orange colour must never appear (CG-0MTDMOYOL008IQVO).
+    expect(svg).not.toMatch(/-[0-9.]+\/turn/);
     expect(svg).not.toContain('#ff8844');
   });
 
-  it('should include ongoing-cost text in CSV-row SVG generation (runtime fallback path)', () => {
+  it('should NOT include ongoing-cost text in CSV-row SVG generation for business (runtime fallback path)', () => {
     const row: Record<string, string> = {
       id: 'biz-test-ongoing',
       name: 'Test Business',
@@ -271,22 +275,36 @@ describe('SVG display — ongoing cost on business card art', () => {
     };
 
     const svg = generateCardSvgFromCsvRow(row);
-    expect(svg).toContain('-0.5/turn');
-    expect(svg).toContain('#ff8844');
+    expect(svg).not.toContain('-0.5/turn');
+    expect(svg).not.toContain('#ff8844');
   });
 
-  it('should omit ongoing-cost text in CSV-row SVG generation when empty', () => {
+  it('should NOT include ongoing-cost text in CSV-row SVG generation for community-space', () => {
     const row: Record<string, string> = {
-      id: 'biz-test-zero',
-      name: 'Test Business',
-      family: 'business',
+      id: 'cs-test-ongoing',
+      name: 'Test Community Space',
+      family: 'community-space',
       cost: '6',
-      ongoingCost: '',
+      ongoingCost: '0.25',
     };
 
     const svg = generateCardSvgFromCsvRow(row);
-    expect(svg).not.toContain('/turn');
+    expect(svg).not.toContain('-0.25/turn');
     expect(svg).not.toContain('#ff8844');
+  });
+
+  it('should KEEP the baked ongoing-cost text for staff cards (only cost display, CG-0MTDMOYOL008IQVO)', () => {
+    const row: Record<string, string> = {
+      id: 'staff-test-ongoing',
+      name: 'Test Staff',
+      family: 'staff',
+      cost: '3',
+      ongoingCost: '1',
+    };
+
+    const svg = generateCardSvgFromCsvRow(row);
+    expect(svg).toContain('-1/turn');
+    expect(svg).toContain('#ff8844');
   });
 });
 

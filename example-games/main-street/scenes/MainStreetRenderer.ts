@@ -758,20 +758,44 @@ export class MainStreetRenderer {
 
     // Combined cash line (centred on card, above reputation) — CG-0MTCP76MP0088TQW
     // Replaces the former separate income/cost overlays that visually overlapped.
+    // Two-tone rendering (CG-0MTDMOYOL008IQVO): when `segments` is present each
+    // segment is drawn as its own text object laid out left-to-right, so income
+    // renders green and ongoing cost red within the same line. The group is
+    // horizontally centred at spec x (originX 0.5 default).
     if (spec.cashLine) {
-      const cashText = this.scene.add.text(
-        spec.cashLine.x,
-        spec.cashLine.y,
-        spec.cashLine.text,
-        {
-          fontSize: spec.cashLine.fontSize ?? '11px',
-          fontStyle: spec.cashLine.fontStyle,
-          color: spec.cashLine.color,
-          fontFamily: FONT_FAMILY,
-        },
-      );
-      cashText.setOrigin(spec.cashLine.originX ?? 0, spec.cashLine.originY ?? 0);
-      container.add(cashText);
+      const size = spec.cashLine.fontSize ?? '11px';
+      const fontStyle = spec.cashLine.fontStyle;
+      const fontFamily = FONT_FAMILY;
+      const originY = spec.cashLine.originY ?? 0;
+      const segs = spec.cashLine.segments;
+      if (segs && segs.length > 0) {
+        const texts = segs.map((seg) =>
+          this.scene.add.text(0, 0, seg.text, {
+            fontSize: size,
+            fontStyle,
+            color: seg.color ?? spec.cashLine!.color,
+            fontFamily,
+          }),
+        );
+        const totalWidth = texts.reduce((acc, t) => acc + t.width, 0);
+        const originX = spec.cashLine.originX ?? 0;
+        let cursorX = spec.cashLine.x - totalWidth * originX;
+        for (const t of texts) {
+          t.setPosition(cursorX, spec.cashLine.y);
+          t.setOrigin(0, originY);
+          container.add(t);
+          cursorX += t.width;
+        }
+      } else {
+        const cashText = this.scene.add.text(
+          spec.cashLine.x,
+          spec.cashLine.y,
+          spec.cashLine.text,
+          { fontSize: size, fontStyle, color: spec.cashLine.color, fontFamily },
+        );
+        cashText.setOrigin(spec.cashLine.originX ?? 0, originY);
+        container.add(cashText);
+      }
     }
 
     // Reputation text (centred below income)

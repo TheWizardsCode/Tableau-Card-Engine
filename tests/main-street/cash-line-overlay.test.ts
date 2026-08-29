@@ -133,6 +133,59 @@ describe('AC1: Single combined cash line format', () => {
   });
 });
 
+// ── Two-tone segments: income green, cost red (CG-0MTDMOYOL008IQVO) ──
+
+describe('Two-tone cash line segments', () => {
+  it('income-only: Cash: prefix neutral, income green', () => {
+    const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0 });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
+    expect(spec.cashLine!.segments).toEqual([
+      { text: 'Cash: ', color: '#dddddd' },
+      { text: '+2', color: '#44ff44' },
+    ]);
+    expect(spec.cashLine!.color).toBe('#dddddd');
+  });
+
+  it('cost-only: Cash: prefix neutral, cost red', () => {
+    const biz = makeBusiness({ level: 1, baseIncome: 0, ongoingCost: 0.5 });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
+    expect(spec.cashLine!.segments).toEqual([
+      { text: 'Cash: ', color: '#dddddd' },
+      { text: '-0.5', color: '#ff6644' },
+    ]);
+  });
+
+  it('both present: Cash: neutral, income green, separator neutral, cost red', () => {
+    const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0.75 });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
+    expect(spec.cashLine!.segments).toEqual([
+      { text: 'Cash: ', color: '#dddddd' },
+      { text: '+2', color: '#44ff44' },
+      { text: ' / ', color: '#dddddd' },
+      { text: '-0.75', color: '#ff6644' },
+    ]);
+  });
+
+  it('segment texts concatenate to the full cashLine text', () => {
+    const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0.75 });
+    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
+    const joined = spec.cashLine!.segments!.map((s) => s.text).join('');
+    expect(joined).toBe(spec.cashLine!.text);
+    expect(joined).toBe('Cash: +2 / -0.75');
+  });
+
+  it('community-space card segments use the same two-tone colours', () => {
+    const cs = makeCommunitySpace({ level: 1, baseIncome: 1, ongoingCost: 0.25 });
+    const spec = buildUpgradeOverlaySpec(cs, WIDTH, HEIGHT);
+    expect(spec.cashLine!.segments).toEqual([
+      { text: 'Cash: ', color: '#dddddd' },
+      { text: '+1', color: '#44ff44' },
+      { text: ' / ', color: '#dddddd' },
+      { text: '-0.25', color: '#ff6644' },
+    ]);
+  });
+});
+
 // ── AC2: No overlap with other overlays ───────────────────────
 
 describe('AC2: Cash line does not overlap other overlays', () => {
