@@ -23,7 +23,18 @@ import {
   executeDayStart,
   executeAction,
   processEndOfTurn,
+  buyAndPlaceBusiness,
 } from '../../example-games/main-street/MainStreetEngine';
+import {
+  refillMarket,
+  playBusinessFromHand,
+} from '../../example-games/main-street/MainStreetMarket';
+import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import {
+  moveToHandCommand,
+  playBusinessFromHandCommand,
+  buyAndPlaceBusinessCommand,
+} from '../../example-games/main-street/MainStreetCommands';
 import {
   getStaffCardTemplates,
 } from '../../example-games/main-street/MainStreetCards';
@@ -42,6 +53,24 @@ function gmTemplate() {
  */
 function startDay(state: ReturnType<typeof setupMainStreetGame>): void {
   executeDayStart(state);
+}
+
+/** A non-staff market card (staff cards cannot move to hand). */
+function firstMovableMarketCard(state: ReturnType<typeof setupMainStreetGame>) {
+  const card = state.market.cards.find(c => c.family !== 'staff');
+  if (!card) throw new Error('No movable card in market');
+  return card;
+}
+
+/**
+ * Relax the hand-size limit and top up the market so a test can take many
+ * move-to-hand actions in one day without hitting capacity or emptiness.
+ */
+function prepareForManyActions(state: ReturnType<typeof setupMainStreetGame>): void {
+  state.maxHandSize = 10;
+  // 100 coins is ample for free move-to-hand actions yet stays well below
+  // the score-threshold win condition (high coin balances inflate score).
+  state.resourceBank.coins = 100;
 }
 
 // ── AC1 · Banking on end-of-turn ────────────────────────────
@@ -174,20 +203,22 @@ describe('AC3 · day-start composition', () => {
     startDay(state);
     expect(state.actionsRemaining).toBe(4);
 
-    // Spend 2 actions (should draw from the combined budget)
+    // Spend 2 actions — each consumes 1 from banked (floor 0)
     state.resourceBank.coins = 100;
     const card1 = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card1.id });
     expect(state.actionsRemaining).toBe(3);
+    expect(state.bankedActions).toBe(1); // consumed 1
 
     const card2 = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card2.id });
     expect(state.actionsRemaining).toBe(2);
+    expect(state.bankedActions).toBe(0); // consumed 1 more, now 0
 
-    // After the day, bankable should be 2 (still have 2 remaining)
+    // bankable = min(2, 1) = 1, so banked = min(2, 0 + 1) = 1
     processEndOfTurn(state);
     startDay(state);
-    expect(state.bankedActions).toBe(2); // capped, but had 2 to bank
+    expect(state.bankedActions).toBe(1);
   });
 });
 
@@ -311,16 +342,14 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
     const card = state.market.cards[0];
 
     // The undo/redo commands capture bankedActions in the snapshot
-    // After undo, bankedActions should match the pre-action value
-    const savedBanked = state.bankedActions;
+    // After executeAction, banked should be consumed (savedBanked - 1 = 0)
+    const savedBanked = state.bankedActions; // = 1
 
     // Move-to-hand action
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
 
-    // Undo should restore bankedActions
-    // Note: executeAction doesn't directly support undo; the command layer does.
-    // This test verifies the snapshot includes bankedActions.
-    expect(state.bankedActions).toBe(savedBanked);
+    // After the action, bankedActions should have been decremented
+    expect(state.bankedActions).toBe(savedBanked - 1); // consumed 1 from banked
   });
 });
 
@@ -339,5 +368,263 @@ describe('AC4 edge cases', () => {
         expect(state.bankedActions).toBe(2); // capped
       }
     }
+  });
+});
+
+// ── Banked Consumption Regressions (CG-0MTCP7F9S009HARC) ───
+
+/**
+ * Regression suite for "Banked actions not reduced": every action-consuming
+ * operation must decrement `bankedActions` (floor 0) alongside
+ * `actionsRemaining`, via a single shared helper so the engine and command
+ * paths never diverge. Premium placements and free operations are excluded.
+ */
+describe('banked consumption regressions', () => {
+  it('every action-consuming operation decrements banked by 1 (floor 0)', () => {
+    const state = setupMainStreetGame({ seed: 'banked-decrement' });
+    state.bankedActions = 2;
+    state.phase = 'DayStart';
+    startDay(state);
+    prepareForManyActions(state);
+
+    expect(state.actionsRemaining).toBe(3); // 1 base + 2 banked
+
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    expect(state.bankedActions).toBe(1);
+
+    // moveToHand does not refill the market — top up between actions
+    refillMarket(state);
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    expect(state.bankedActions).toBe(0);
+
+    refillMarket(state);
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    expect(state.bankedActions).toBe(0); // floored at 0, never negative
+  });
+
+  it('floors at 0: taking more actions than banked never goes negative', () => {
+    const state = setupMainStreetGame({ seed: 'banked-floor' });
+    state.bankedActions = 1;
+    state.phase = 'DayStart';
+    startDay(state);
+    prepareForManyActions(state);
+
+    expect(state.actionsRemaining).toBe(2); // 1 base + 1 banked
+
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    expect(state.bankedActions).toBe(0);
+
+    refillMarket(state);
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    expect(state.bankedActions).toBe(0); // floor, not -1
+  });
+
+  it('full-spend day drains the bank to 0', () => {
+    const state = setupMainStreetGame({ seed: 'banked-full-spend' });
+    state.bankedActions = 2;
+    state.phase = 'DayStart';
+    startDay(state);
+    prepareForManyActions(state);
+
+    expect(state.actionsRemaining).toBe(3);
+
+    // Spend all 3 actions (top up the market between moves)
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    refillMarket(state);
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    refillMarket(state);
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    expect(state.bankedActions).toBe(0);
+    expect(state.actionsRemaining).toBe(0);
+
+    // Day-end: nothing banked (0 actions remaining), bank stays at 0
+    processEndOfTurn(state);
+    startDay(state);
+    expect(state.bankedActions).toBe(0);
+    expect(state.actionsRemaining).toBe(1); // 1 base only
+  });
+
+  it('GM games drain the bank too (budget = 1 base + 1 GM + 2 banked = 4)', () => {
+    const state = setupMainStreetGame({ seed: 'banked-gm-drain' });
+    state.staffCards.push({ ...gmTemplate() });
+    state.bankedActions = 2;
+    state.phase = 'DayStart';
+    startDay(state);
+    prepareForManyActions(state);
+
+    expect(state.actionsRemaining).toBe(4); // 1 base + 1 GM + 2 banked
+    expect(state.bankedActions).toBe(2);
+
+    // All 4 actions deplete banked to 0 (top up the market between moves)
+    for (let i = 0; i < 4; i++) {
+      executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+      refillMarket(state);
+    }
+    expect(state.actionsRemaining).toBe(0);
+    expect(state.bankedActions).toBe(0);
+  });
+
+  it('staff actions consume the bank regardless of budget source', () => {
+    // With GM only (no banked), taking the staff-supplied action reduces
+    // banked from 0 to 0 (floor) — the important part is the budget is
+    // still drawn from banked when available (covered above). This asserts
+    // a single GM-only action day never lets banked go negative and the
+    // action still spends normally.
+    const state = setupMainStreetGame({ seed: 'banked-gm-only' });
+    state.staffCards.push({ ...gmTemplate() });
+    state.phase = 'DayStart';
+    startDay(state);
+    prepareForManyActions(state);
+
+    expect(state.actionsRemaining).toBe(2); // 1 base + 1 GM, no banked
+    expect(state.bankedActions).toBe(0);
+
+    executeAction(state, { type: 'move-to-hand', cardId: firstMovableMarketCard(state).id });
+    expect(state.actionsRemaining).toBe(1);
+    expect(state.bankedActions).toBe(0); // floor at 0
+  });
+
+  it('peek-incident-deck consumes banked (staff peek gate)', () => {
+    const state = setupMainStreetGame({ seed: 'banked-peek' });
+    // Lookout staff enables the peek gate (staff-lookout, peekOncePerTurn)
+    const lookout = getStaffCardTemplates().find(t => t.id === 'staff-lookout');
+    expect(lookout).toBeDefined();
+    state.staffCards.push({ ...lookout! });
+    state.bankedActions = 1;
+    state.phase = 'DayStart';
+    startDay(state);
+
+    // Ensure incident deck non-empty so the peek is not a no-op
+    expect(state.incidentDeck.length).toBeGreaterThan(0);
+
+    executeAction(state, { type: 'peek-incident-deck' });
+    expect(state.actionsRemaining).toBe(1); // consumed 1
+    expect(state.bankedActions).toBe(0); // consumed banked too
+  });
+
+  it('premium buy-and-place path leaves banked untouched', () => {
+    const state = setupMainStreetGame({ seed: 'banked-premium-bap' });
+    state.bankedActions = 2;
+    state.phase = 'DayStart';
+    startDay(state);
+
+    state.resourceBank.coins = 1000;
+    const savedBanked = state.bankedActions;
+    // Find a business/community-space card (buy-and-place only applies to those)
+    const biz = state.market.cards.find(
+      c => c.family === 'business' || c.family === 'community-space',
+    );
+    expect(biz).toBeDefined();
+
+    // Direct engine call = the premium placement (no consumeAction).
+    // This must NOT decrement bankedActions.
+    buyAndPlaceBusiness(state, biz!.id, 0);
+    expect(state.bankedActions).toBe(savedBanked);
+  });
+
+  it('premium play-from-hand path leaves banked untouched', () => {
+    const state = setupMainStreetGame({ seed: 'banked-premium-pfh' });
+    state.bankedActions = 2;
+    state.phase = 'DayStart';
+    startDay(state);
+
+    // Get a business into hand: move-to-hand consumes 1 action + 1 banked.
+    // The premium placement then replaces the SECOND action — banked must
+    // reflect only the single move consumption, not a second decrement.
+    state.resourceBank.coins = 1000;
+    const biz = state.market.cards.find(
+      c => c.family === 'business' || c.family === 'community-space',
+    );
+    expect(biz).toBeDefined();
+
+    executeAction(state, { type: 'move-to-hand', cardId: biz!.id });
+    expect(state.bankedActions).toBe(1); // consumed 1 by the move
+    const savedBankedAfterMove = state.bankedActions;
+
+    const handIndex = state.hand!.findIndex(c => c.id === biz!.id);
+    expect(handIndex).toBeGreaterThanOrEqual(0);
+
+    // Premium cost skips consumeAction — banked must stay at 1.
+    playBusinessFromHand(state, handIndex, 0, 1000);
+    expect(state.bankedActions).toBe(savedBankedAfterMove);
+  });
+
+  it('command-layer undo/redo restores banked (move-to-hand)', () => {
+    const state = setupMainStreetGame({ seed: 'banked-undo-command' });
+    state.bankedActions = 2;
+    state.phase = 'DayStart';
+    startDay(state);
+    prepareForManyActions(state);
+
+    expect(state.actionsRemaining).toBe(3);
+    expect(state.bankedActions).toBe(2);
+
+    const card = firstMovableMarketCard(state);
+    const mgr = new UndoRedoManager();
+
+    mgr.execute(moveToHandCommand(state, card.id));
+    expect(state.actionsRemaining).toBe(2);
+    expect(state.bankedActions).toBe(1); // command layer decrements banked
+
+    mgr.undo();
+    expect(state.actionsRemaining).toBe(3);
+    expect(state.bankedActions).toBe(2); // restored from undo snapshot
+
+    mgr.redo();
+    expect(state.actionsRemaining).toBe(2);
+    expect(state.bankedActions).toBe(1);
+  });
+
+  it('command-layer undo restores banked for buy-and-place', () => {
+    const state = setupMainStreetGame({ seed: 'banked-undo-bap' });
+    state.bankedActions = 2;
+    state.phase = 'DayStart';
+    startDay(state);
+    prepareForManyActions(state);
+
+    const biz = state.market.cards.find(
+      c => c.family === 'business' || c.family === 'community-space',
+    );
+    expect(biz).toBeDefined();
+    // Fund the drag premium so the placement is legal
+    state.resourceBank.coins = Math.max(state.resourceBank.coins, Math.ceil(biz!.cost * 1.5 * 2) / 2);
+
+    const mgr = new UndoRedoManager();
+    mgr.execute(buyAndPlaceBusinessCommand(state, biz!.id, 0));
+    expect(state.actionsRemaining).toBe(2); // consumed 1
+    expect(state.bankedActions).toBe(1); // consumed banked too
+
+    mgr.undo();
+    expect(state.actionsRemaining).toBe(3);
+    expect(state.bankedActions).toBe(2); // restored from undo snapshot
+    expect(state.streetGrid[0]).toBeNull();
+  });
+
+  it('command-layer undo of premium play-from-hand keeps banked stable', () => {
+    const state = setupMainStreetGame({ seed: 'banked-undo-premium-pfh' });
+    state.bankedActions = 2;
+    state.phase = 'DayStart';
+    startDay(state);
+    prepareForManyActions(state);
+    state.resourceBank.coins = 1000; // fund the premium override
+
+    // Move a business to hand first (consumes 1 action + 1 banked)
+    const biz = state.market.cards.find(
+      c => c.family === 'business' || c.family === 'community-space',
+    );
+    expect(biz).toBeDefined();
+    executeAction(state, { type: 'move-to-hand', cardId: biz!.id });
+    expect(state.bankedActions).toBe(1);
+    const handIndex = state.hand!.findIndex(c => c.id === biz!.id);
+    expect(handIndex).toBeGreaterThanOrEqual(0);
+
+    // Premium placement replaces the action — banked must stay at 1
+    const mgr = new UndoRedoManager();
+    mgr.execute(playBusinessFromHandCommand(state, handIndex, 0, 1000));
+    expect(state.bankedActions).toBe(1); // no action consumed by premium path
+
+    mgr.undo();
+    expect(state.bankedActions).toBe(1); // snapshot restore keeps it at 1
+    expect(state.streetGrid[0]).toBeNull();
   });
 });

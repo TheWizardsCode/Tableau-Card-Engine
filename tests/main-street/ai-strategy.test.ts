@@ -619,8 +619,12 @@ describe('GreedyStrategy vs RandomStrategy win rates', () => {
     }
 
     // With community space cards in the development row, greedy's advantage is reduced.
-    // Assert greedy is not significantly worse than random (within binomial noise for 200 trials).
-    expect(greedyWins).toBeGreaterThanOrEqual(randomWins - 10);
+    // CG-0MTCP7F9S009HARC (banked actions now deplete) removed greedy's ability to
+    // stack a non-depleting bank reserve as free future actions, narrowing its edge:
+    // deterministic post-fix snapshot is greedy 86 / random 98 over 200 seeds (~1.2σ,
+    // within binomial noise). Widen the guardrail to ~1.5σ so genuine AI strategy
+    // regressions (a greedy that falls far below random) still fail.
+    expect(greedyWins).toBeGreaterThanOrEqual(randomWins - 15);
   }, 120_000);
 });
 

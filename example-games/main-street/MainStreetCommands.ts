@@ -23,19 +23,25 @@ import {
   playEventFromHand,
   discardFromHand,
 } from './MainStreetMarket';
-import { buyAndPlaceBusiness, hireStaffCard, peekIncidentDeck } from './MainStreetEngine';
+import {
+  buyAndPlaceBusiness,
+  hireStaffCard,
+  peekIncidentDeck,
+  consumeAction as consumeEngineAction,
+} from './MainStreetEngine';
 
 // ── Action Budget Enforcement ────────────────────────────────
 
 /**
  * Consume one action from the state budget. Throws if no actions remain.
- * This is the central enforcement point for the command layer.
+ *
+ * Delegates to the engine's single shared `consumeAction` helper
+ * (CG-0MTCP7F9S009HARC) so the command layer and the engine `executeAction`
+ * path decrement `actionsRemaining` AND `bankedActions` (floor 0) in
+ * lock-step — one enforcement point, no divergence, no double-decrement.
  */
 export function consumeAction(state: MainStreetState): void {
-  if (state.actionsRemaining <= 0) {
-    throw new Error('No actions remaining today. End your turn to start a new day.');
-  }
-  state.actionsRemaining -= 1;
+  consumeEngineAction(state);
 }
 
 /** Snapshot of the portions of state affected by market actions. */

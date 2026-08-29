@@ -237,6 +237,32 @@ export function setPhase(state: MainStreetState, phase: DayPhase): void {
 // ── Action Execution ────────────────────────────────────────
 
 /**
+ * Consumes one action from the daily budget — the single enforcement point
+ * for the action economy (CG-0MTCP7F9S009HARC).
+ *
+ * Decrements both `actionsRemaining` (existing behaviour) and
+ * `bankedActions` (floored at 0) so the bank acts as a finite reserve that
+ * depletes as the player acts. Every action-consuming operation — the
+ * engine `executeAction` switch, `peekIncidentDeck`, and the command
+ * layer's `consumeAction` — goes through this one helper, so the engine
+ * and command paths can never diverge or double-decrement.
+ *
+ * Premium placements (which replace the action with a +50% coin charge)
+ * and free operations do NOT call this helper and therefore leave
+ * `bankedActions` untouched.
+ *
+ * @param state Current game state (mutated in-place).
+ * @throws Error if no actions remain today.
+ */
+export function consumeAction(state: MainStreetState): void {
+  if (state.actionsRemaining <= 0) {
+    throw new Error('No actions remaining today. End your turn to start a new day.');
+  }
+  state.actionsRemaining -= 1;
+  state.bankedActions = Math.max(0, (state.bankedActions ?? 0) - 1);
+}
+
+/**
  * Validates and executes a player action during the MarketPhase.
  *
  * @param state   Current game state (mutated in-place).
@@ -265,24 +291,19 @@ export function executeAction(
 
   switch (action.type) {
     case 'move-to-hand':
-      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
-      state.actionsRemaining -= 1;
+      consumeAction(state);
       return moveToHand(state, action.cardId);
     case 'buy-business':
-      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
-      state.actionsRemaining -= 1;
+      consumeAction(state);
       return purchaseBusiness(state, action.cardId, action.slotIndex);
     case 'play-business-from-hand':
-      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
-      state.actionsRemaining -= 1;
+      consumeAction(state);
       return playBusinessFromHand(state, action.handIndex, action.slotIndex);
     case 'buy-and-place':
-      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
-      state.actionsRemaining -= 1;
+      consumeAction(state);
       return buyAndPlaceBusiness(state, action.cardId, action.slotIndex);
     case 'hire-staff':
-      if (state.actionsRemaining <= 0) throw new Error('No actions remaining today. End your turn to start a new day.');
-      state.actionsRemaining -= 1;
+      consumeAction(state);
       return hireStaffCard(state, action.cardId);
     case 'buy-upgrade':
       return purchaseUpgrade(state, action.cardId, action.targetSlot);
@@ -768,7 +789,7 @@ export function peekIncidentDeck(state: MainStreetState): EventCard | null {
   // Nothing to peek: no-op (no action consumed, gate stays closed).
   if (state.incidentDeck.length === 0) return null;
 
-  state.actionsRemaining -= 1;
+  consumeAction(state);
   state.peekUsedThisTurn = true;
   addLog(state, 'Peeked at the top card of the incident deck.', 'neutral');
 
