@@ -221,6 +221,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 - The **base action banks**: any unused base action at end of day is banked, up to a **bank cap of 2**.
 - **Staff actions never bank.** Staff-derived actions (e.g. the General Manager's +1 `actionsPerTurn`) are **consumed first** and are not bankable — an idle GM day banks exactly 1 (the base), not 2.
 - Spending during the day draws down the combined budget (base + staff + banked share one counter).
+- **Banked is consumed 1-per-action.** Every action-type operation decrements the banked reserve by 1 (floor 0) alongside the daily counter (CG-0MTCP7F9S009HARC) — banked actions are spent as the player acts, so a banked day grants only its carried-over actions, never an endless reserve. Premium same-day placements (which replace the action with a +50% coin charge) do **not** consume the bank.
 - **No expiry:** banked actions persist indefinitely across days until spent. They reset to 0 only on a new game.
 - At day end, at most **1** action can bank (only the base portion), so reaching the cap takes two idle days; overflow beyond the cap is discarded.
 
