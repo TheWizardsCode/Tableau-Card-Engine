@@ -177,12 +177,11 @@ describe('enumerateLegalActions', () => {
       coinDelta: 2,
       reputationDelta: 0,
     }];
-    // Generous coins so affordability does not depend on which event the
-    // seeded market draws (the expanded pool shifted the seed's row).
-    state.resourceBank.coins = 100;
-    // Inject an affordable event into the market so the enumeration has one
-    // to consider regardless of the seeded row composition (the General
-    // Manager card addition shifted the seed's market draw).
+    // Taking to hand is free (CG-0MT5W1V4D007NN8Q) — no coin gate here; coins
+    // stay at the seeded amount. Inject an affordable event into the market
+    // so the enumeration has one to consider regardless of the seeded row
+    // composition (the General Manager card addition shifted the seed's
+    // market draw).
     state.market.cards.push({
       family: 'event',
       id: 'buyable-event',
@@ -195,16 +194,19 @@ describe('enumerateLegalActions', () => {
       reputationDelta: 0,
     } as never);
     const actions = enumerateLegalActions(state);
-    // Hand holds one card (< maxHandSize 2), so another event purchase is legal.
+    // Hand holds one card (< maxHandSize 3), so another event taking is legal.
     expect(actions.some(a => a.type === 'buy-event')).toBe(true);
   });
 
   it('excludes buy-event when the hand is full', () => {
     const state = createTestState();
-    // Fill the hand to maxHandSize (2) so no further purchases are legal.
+    // Fill the hand to maxHandSize (3) so no further takings are legal.
+    // Note: taking an Investment event to hand is FREE (CG-0MT5W1V4D007NN8Q),
+    // so hand capacity is the only gate on buy-event enumeration now.
     state.hand = [
       { family: 'event', id: 'held-1', name: 'Event 1', trigger: 'Investment', cost: 0, effect: 'x', target: 'All', coinDelta: 1, reputationDelta: 0 },
       { family: 'event', id: 'held-2', name: 'Event 2', trigger: 'Investment', cost: 0, effect: 'x', target: 'All', coinDelta: 1, reputationDelta: 0 },
+      { family: 'business', id: 'held-biz', name: 'Biz', cost: 0 } as never,
     ];
     const actions = enumerateLegalActions(state);
     expect(actions.some(a => a.type === 'buy-event')).toBe(false);
@@ -461,14 +463,17 @@ describe('scoreAction', () => {
     expect(actual).toBe(expected);
   });
 
-  it('scores buy-event using coinDelta + reputationDelta - cost (reputation counts plainly)', () => {
+  it('scores buy-event using coinDelta + reputationDelta (free take; no cost at acquisition)', () => {
     const state = createTestState();
     state.hand = [];
     const eventCard = state.market.cards.find(c => c.family === 'event');
     if (!eventCard) return; // skip if no event in market for this seed
 
-    const { coinDelta, reputationDelta, cost } = eventCard as import('../../example-games/main-street/MainStreetCards').EventCard;
-    const expected = coinDelta + reputationDelta - cost;
+    const { coinDelta, reputationDelta } = eventCard as import('../../example-games/main-street/MainStreetCards').EventCard;
+    // Acquisition to hand is free (CG-0MT5W1V4D007NN8Q); the listed cost is
+    // charged only when the event is played from hand, so the buy score does
+    // NOT subtract card.cost (that would double-count it in the play score).
+    const expected = coinDelta + reputationDelta;
     const actual = scoreAction(state, { type: 'buy-event', cardId: eventCard.id });
     expect(actual).toBe(expected);
   });

@@ -145,12 +145,15 @@ export function canPurchaseUpgrade(
 }
 
 /**
- * Checks whether the player can purchase an Event card from the market.
+ * Checks whether the player can take an Event card from the market into their
+ * hand.
  *
- * Investment events are purchased from the market and added to the player's
- * hand (any mix of business and event cards, up to `maxHandSize` total) until
- * the player chooses to play them during the MarketPhase.
- * Incident events are drawn automatically (not purchased).
+ * Taking an Investment event is FREE (CG-0MT5W1V4D007NN8Q) — it is held in
+ * the player's hand (any mix of business and event cards, up to `maxHandSize`
+ * total) and its listed cost is paid only when the event is played from hand
+ * during the MarketPhase. This is the same free acquisition model as
+ * `moveToHand`, so there is NO coin requirement here.
+ * Incident events are drawn automatically (not taken by hand).
  *
  * @param state   Current game state.
  * @param cardId  ID of the Event card in the market.
@@ -168,7 +171,7 @@ export function canPurchaseEvent(
     return { legal: false, reason: 'Card not found in the event market.' };
   }
 
-  // Only Investment-trigger events can be purchased
+  // Only Investment-trigger events can be taken
   if (card.trigger !== 'Investment') {
     return { legal: false, reason: 'Incident events cannot be purchased; they are drawn automatically.' };
   }
@@ -179,10 +182,8 @@ export function canPurchaseEvent(
     return handCheck;
   }
 
-  // Check coins
-  if (state.resourceBank.coins < card.cost) {
-    return { legal: false, reason: `Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.` };
-  }
+  // No coin check: taking the event to hand is free; the cost is paid when
+  // the event is executed from hand (CG-0MT5W1V4D007NN8Q).
 
   return { legal: true };
 }
@@ -717,8 +718,10 @@ export function purchaseUpgrade(
 }
 
 /**
- * Purchases an Investment-trigger Event card from the market and adds it to
- * the player's hand for the player to play later during the MarketPhase.
+ * Takes an Investment-trigger Event card from the market into the player's
+ * hand for FREE (cost is paid at play time). The player may execute it later
+ * during the MarketPhase via `playEventFromHand` (which charges the event's
+ * listed cost when it is played).
  *
  * @param state   Current game state (mutated in-place).
  * @param cardId  ID of the Event card in the market.
@@ -739,8 +742,9 @@ export function purchaseEvent(
   );
   const card = state.market.cards[marketIndex] as EventCard;
 
-  // Deduct cost
-  state.resourceBank.coins -= card.cost;
+  // Free acquisition: NO coins are deducted here (CG-0MT5W1V4D007NN8Q).
+  // The event's listed cost is paid only when it is executed from hand via
+  // `playEventFromHand`.
 
   // Remove from market
   state.market.cards.splice(marketIndex, 1);
@@ -751,10 +755,9 @@ export function purchaseEvent(
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  const costLabel = card.cost > 0 ? ` (-€${card.cost})` : '';
-  addLog(state, `Bought event: ${card.name}${costLabel} (to hand)`, 'neutral');
+  addLog(state, `Moved event ${card.name} to hand (free, pay on play)`, 'neutral');
 
-  return { card, cost: card.cost, refilled };
+  return { card, cost: 0, refilled };
 }
 
 /**

@@ -1152,14 +1152,10 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseEvent(s.state, card.id);
     if (!legality.legal) {
-      const reason = (legality.reason ?? '').toLowerCase();
-      // Insufficient-coins rejection → play illegal-move feedback.
-      if (reason.includes('not enough coins')) {
-        const containers = s.msRenderer?.getMarketRowCards?.();
-        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
-        const target = containers?.[cardIndex] ?? null;
-        playIllegalFeedback(target, s);
-      }
+      // Taking an Investment event to hand is free (CG-0MT5W1V4D007NN8Q), so
+      // there is no insufficient-coins rejection here — canPurchaseEvent no
+      // longer checks coins. Remaining rejections (hand full, incident event)
+      // keep their existing instruction-text-only behaviour.
       s.instructionText.setText(`Cannot buy event: ${legality.reason ?? 'unknown'}`);
       return;
     }

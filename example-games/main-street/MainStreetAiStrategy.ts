@@ -126,8 +126,9 @@ export interface MainStreetAiStrategy extends AiStrategyBase {
  *
  * Covers all action types for the single-row market
  * (CG-0MSTOATDT009BRX2):
- *   - `buy-business` / `buy-upgrade` / `buy-event`: direct buy-and-place
- *     (pays immediately), one entry per (affordable card × valid target)
+ *   - `buy-business` / `buy-upgrade`: direct buy-and-place (pays immediately)
+ *   - `buy-event`: free take-to-hand (pays at play), one entry per event in
+ *     the market row
  *   - `move-to-hand`: free acquisition, bounded only by hand capacity
  *   - `play-*-from-hand`: cost-at-play placement/activation from the hand
  *   - `discard-from-hand`: free discard (only enumerated when the hand is
@@ -208,7 +209,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
-  // ── buy-event (direct, pays immediately) ──────────────────
+  // ── buy-event (free take-to-hand; cost paid at play) ─────
   const eventCards = state.market.cards.filter(
     c => c.family === 'event',
   ) as EventCard[];
@@ -572,10 +573,15 @@ function scoreBusinessAction(
 }
 
 /**
- * Score an event purchase using the final-score value heuristic:
- *   score = coinDelta + reputationDelta - cost
+ * Score taking an Investment event from the market to the player's hand
+ * using the final-score value heuristic:
+ *   score = coinDelta + reputationDelta
  *
- * A score > 0 means the event has positive expected value and is worth buying.
+ * A score > 0 means the event adds positive final-score value. NO cost is
+ * subtracted here: taking the event to hand is FREE (CG-0MT5W1V4D007NN8Q) —
+ * the event's listed cost is charged only when it is PLAYED from hand, and
+ * `scorePlayEventFromHandAction` accounts for it there. Subtracting the cost
+ * in both places would double-count it in the AI's evaluations.
  * Reputation is valued at 1 point per unit (plain count), matching the
  * final score function (CG-0MT3J8FXG006RCOA).
  */
@@ -588,7 +594,7 @@ function scoreEventAction(
   ) as EventCard | undefined;
   if (!card) return 0;
 
-  return card.coinDelta + card.reputationDelta - card.cost;
+  return card.coinDelta + card.reputationDelta;
 }
 
 /**
@@ -649,7 +655,7 @@ function scorePlayEventFromHandAction(
  * Scores are in "net coin-equivalent value" units:
  *   - `buy-upgrade`:  `incomeBonus * horizon - cost`
  *   - `buy-business`: `(baseIncome + projectedSynergyBonus) * horizon - cost`
- *   - `buy-event`:    `coinDelta + reputationDelta - cost` (reputation counts plainly)
+ *   - `buy-event`:    `coinDelta + reputationDelta` (free take; cost at play)
  *   - `play-event`:   fixed bonus of 5 (prefer playing over end-turn)
  *   - `end-turn`:     0 (baseline / fallback)
  *

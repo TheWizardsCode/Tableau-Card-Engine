@@ -291,20 +291,19 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
       }
     });
 
-    it('should reject event purchase when coins are insufficient', () => {
+    it('does not require coins to take an Investment event (free take-to-hand)', () => {
       const state = createTestState();
       const investmentEvent = state.market.cards.find(
         c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
       ) as EventCard | undefined;
       if (!investmentEvent) return;
 
-      state.resourceBank.coins = investmentEvent.cost - 1;
+      // Zero coins is fine: taking an Investment event to hand is FREE
+      // (CG-0MT5W1V4D007NN8Q) — its cost is paid only when played from hand.
+      state.resourceBank.coins = 0;
       const result = canPurchaseEvent(state, investmentEvent.id);
-      expect(result.legal).toBe(false);
-      if (!result.legal) {
-        expect(result.reason).toContain('Not enough coins');
-        expect(result.reason).toContain(String(investmentEvent.cost));
-      }
+      // Free acquisition: legal with zero coins, and no rejection reason.
+      expect(result.legal).toBe(true);
     });
   });
 
@@ -498,8 +497,8 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
     });
   });
 
-  describe('purchaseEvent — success', () => {
-    it('should add event to hand and remove it from investments row', () => {
+  describe('purchaseEvent — free acquisition', () => {
+    it('should add event to hand (free) and remove it from investments row', () => {
       const state = createTestState();
       const investmentEvt: EventCard = {
         family: 'event',
@@ -519,7 +518,9 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
       purchaseEvent(state, investmentEvt.id);
 
       expect(state.hand.some(c => c.family === 'event' && c.id === investmentEvt.id)).toBe(true);
-      expect(state.resourceBank.coins).toBe(coinsBefore - investmentEvt.cost);
+      // Taking an Investment event to hand is FREE (CG-0MT5W1V4D007NN8Q);
+      // the listed cost is paid only when the event is executed from hand.
+      expect(state.resourceBank.coins).toBe(coinsBefore);
       expect(state.market.cards).toHaveLength(0);
     });
   });
@@ -625,16 +626,18 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
     });
   });
 
-  describe('purchaseEvent — insufficient coins', () => {
-    it('should throw when buying event with insufficient coins', () => {
+  describe('purchaseEvent — free acquisition has no coin requirement', () => {
+    it('should take the event to hand even with zero coins (cost paid at play)', () => {
       const state = createTestState();
       const investmentEvent = state.market.cards.find(
         c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
       ) as EventCard | undefined;
       if (!investmentEvent) return;
 
-      state.resourceBank.coins = investmentEvent.cost - 1;
-      expect(() => purchaseEvent(state, investmentEvent.id)).toThrow('Not enough coins');
+      state.resourceBank.coins = 0;
+      expect(() => purchaseEvent(state, investmentEvent.id)).not.toThrow();
+      expect(state.hand.some(c => c.family === 'event' && c.id === investmentEvent.id)).toBe(true);
+      expect(state.resourceBank.coins).toBe(0);
     });
   });
 

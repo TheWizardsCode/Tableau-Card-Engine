@@ -170,7 +170,7 @@ describe('Activity Log', () => {
   });
 
   describe('event purchase', () => {
-    it('should log a neutral entry when an Investment event is purchased', () => {
+    it('should log a neutral entry when an Investment event is moved to hand (free)', () => {
       const state = createTestState();
       executeDayStart(state);
 
@@ -181,7 +181,9 @@ describe('Activity Log', () => {
 
       const entry = lastLog(state);
       expect(entry.type).toBe('neutral');
-      expect(entry.text).toContain('Bought event');
+      // Taking the event to hand is free (CG-0MT5W1V4D007NN8Q) — the log
+      // reflects the move, not a coin deduction.
+      expect(entry.text).toContain('Moved event');
       expect(entry.text).toContain('Test Fest');
     });
   });
