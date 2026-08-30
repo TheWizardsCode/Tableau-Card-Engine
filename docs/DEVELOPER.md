@@ -333,6 +333,19 @@ Two mitigations are in place in this repository:
      business card (e.g. undo-redo's affordable-card finder) fail unless the
      checkpoint is cleared first (the ≥1-business guarantee applies at
      refill time only).
+     The tutorial boot (`bootGameWithTutorial()` in
+     `tests/helpers/main-street-tutorial-e2e.ts`) additionally wipes stale
+     `run-checkpoint`/`campaign` records **before** creating the game
+     (CG-0MTFREYSJ005EW43): a preceding file in the same vitest browser
+     session (one Playwright context per session — same-origin IndexedDB is
+     shared across files) can leave a turn-end autosave that lands after its
+     own `destroyGame` clear, routing the next tutorial boot down the resume
+     path and suppressing the `[ Start Tutorial ]` offer. This wipe uses
+     plain readwrite transactions on the same-version `save-load-store` DB
+     — deliberately **not** `deleteDatabase`, whose pending version-change
+     delete would block the tutorial boot's own `SaveLoadStore.open()`
+     (the boot uniquely awaits the campaign-load promise) and wedge the
+     suite with a 90s hook timeout.
    - **Content-aware render gates**: fixed-frame waits (`waitFrames(24)`)
      with a hard 2s fallback resolve while a CPU-starved RAF loop has only
      produced a couple of frames, so pixel-analysis assertions can sample an
