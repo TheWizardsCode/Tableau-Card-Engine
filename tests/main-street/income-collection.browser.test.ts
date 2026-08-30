@@ -29,6 +29,7 @@ import {
   type BusinessCard,
 } from '../../example-games/main-street/MainStreetCards';
 import { UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
+import { SFX_KEYS } from '../../example-games/main-street/scenes/MainStreetConstants';
 
 /**
  * Waits until the street container stops being re-rendered (boot-time SVG
@@ -122,6 +123,10 @@ function makeProducingBiz(id: string): BusinessCard {
 
 /** Phased choreography duration: 5 phase gaps + collection, default gap 2200ms. */
 const PHASED_SHOW_MS = 5 * 2200 + 600;
+// The choreography wall-clock can stretch under CPU contention (Phaser
+// rAF timers lag), so the post-show wait uses a generous margin on top of
+// the nominal show duration — the test's 40s hook still bounds the total.
+const PHASED_SHOW_WAIT_MS = PHASED_SHOW_MS + 16000;
 
 describe('MainStreet end-of-turn income presentation (controller wiring)', () => {
   let game: Phaser.Game | null = null;
@@ -170,6 +175,13 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
       scene.msAnimator as unknown as { animateIncomePhases: (params: unknown) => void },
       'animateIncomePhases',
     );
+    // AC2: SFX must play for the choreography (count-out pops + final
+    // credit). Spy the scene SoundManager (cast: soundManager lives on
+    // CardGameScene) and assert the shared COMMON_SFX_KEYS keys later.
+    const sfxSpy = vi.spyOn(
+      (scene as unknown as { soundManager: { play: (key: string) => void } }).soundManager,
+      'play',
+    );
 
     (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
 
@@ -193,6 +205,11 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
     expect(scene.incomeCollectionActive).toBe(true);
     expect(state.phase).toBe('DayStart');
 
+    // Mid-show: the count-out has already staged coin icons, so the
+    // per-coin pop SFX must have fired. (The final positive credit plays
+    // only at collection, which is asserted after the show completes.)
+    expect(sfxSpy.mock.calls.some(([key]) => key === SFX_KEYS.COIN_POP)).toBe(true);
+
     // VFX only — the post-income bank value must not change while the show
     // runs, and the day must advance only after the flag clears.
     const coinsAfterIncome = (state.resourceBank.coins as number);
@@ -200,13 +217,16 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
     // Wait for the full show AND the deferred day start (the controller polls
     // on a 250ms cadence, so MarketPhase can land up to ~250ms after clear).
     await waitForCondition(() => scene.incomeCollectionActive === false && state.phase === 'MarketPhase', {
-      timeoutMs: PHASED_SHOW_MS + 9000,
+      timeoutMs: PHASED_SHOW_WAIT_MS,
       label: 'phased income show to complete and the day to start',
     });
 
     expect(state.resourceBank.coins).toBe(coinsAfterIncome);
     expect(state.turn).toBe(turnBefore + 1);
     expect(state.phase).toBe('MarketPhase');
+
+    // Final collection played the dedicated positive income sound.
+    expect(sfxSpy.mock.calls.some(([key]) => key === SFX_KEYS.INCOME_POSITIVE)).toBe(true);
   }, 40_000);
 
   it('keeps the compact collection during the tutorial (day start inside the usual window)', async () => {
