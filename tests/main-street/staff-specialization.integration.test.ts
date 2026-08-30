@@ -65,12 +65,19 @@ describe('D1: staff specialization end-to-end integration', () => {
         employed = null;
       }
     }
-    if (!employed || !(employed.specializationSkillIds ?? []).some(id => getSkill(id).category === 'income-boost')) {
-      // Fall back to a deterministic synthetic member with a chef skill.
+
+    // Per-business buffs apply ONLY to the business a member is employed at
+    // (CG-0MSTOATDU006UGAX): employ the income-skill member at slot 0, or fall
+    // back to a deterministic synthetic Chef employed there.
+    const hasIncomeSkill = employed && (employed.specializationSkillIds ?? []).some(id => getSkill(id).category === 'income-boost');
+    if (hasIncomeSkill) {
+      employed!.employedAtSlot = 0;
+    } else {
       a.staffCards.push({
         ...a.decks.staff[0],
         id: 'staff-d1-chef',
         specializationSkillIds: ['skill-town-gossip', 'skill-chef'],
+        employedAtSlot: 0,
       });
     }
     a.streetGrid[0] = {
@@ -81,13 +88,14 @@ describe('D1: staff specialization end-to-end integration', () => {
     syncCardCurrentIncome(a.streetGrid, 0);
 
     const employedSkills = getEmployedSpecializationSkills(a);
-    const hasIncome = employedSkills.some(s => s.category === 'income-boost');
+    const hasChefEmployed = employedSkills.some(s => s.id === 'skill-chef');
     const result = applyIncome(a);
     const slotTotal = result.breakdown?.find((s: { slotIndex: number }) => s.slotIndex === 0)?.total ?? 0;
-    if (hasIncome) {
-      // Chef (+20%) → 2.4; Sales Champion (+0.5) → 2.5; DJ/Food → 2.
-      expect(slotTotal).toBeGreaterThanOrEqual(2.4 - 1e-9);
+    if (hasChefEmployed) {
+      // Chef (+20%) on the Food fixture → 2 * 1.2 = 2.4.
+      expect(slotTotal).toBeCloseTo(2.4);
     } else {
+      // No Chef employed at the Food business → unbuffed baseline.
       expect(slotTotal).toBe(2);
     }
   });

@@ -50,18 +50,39 @@ function staffWithSkills(name: string, skillIds: string[]): StaffCard {
   return { ...base, id: `${base.id}-${name}`, name, specializationSkillIds: [...skillIds] };
 }
 
-/** Hires a forced-skill staff member into the state. */
+/** Hires a forced-skill staff member into the state (hand-slot staff). */
 function hireSynthetic(state: ReturnType<typeof setupMainStreetGame>, name: string, skillIds: string[]): void {
   const card = staffWithSkills(name, skillIds);
   state.staffCards.push(card);
 }
 
+/** Employs a forced-skill staff member AT a business slot (employedAtSlot). */
+function employSynthetic(
+  state: ReturnType<typeof setupMainStreetGame>,
+  name: string,
+  skillIds: string[],
+  slotIndex: number,
+): void {
+  const card = staffWithSkills(name, skillIds);
+  state.staffCards.push({ ...card, employedAtSlot: slotIndex });
+}
+
 /** Places a business of the given synergy type at slot 0 and syncs caches. */
 function placeBusiness(state: ReturnType<typeof setupMainStreetGame>, synergyTypes: string[], baseIncome = 2): BusinessCard {
+  return placeBusinessAt(state, 0, synergyTypes, baseIncome);
+}
+
+/** Places a business of the given synergy type at a specific slot and syncs caches. */
+function placeBusinessAt(
+  state: ReturnType<typeof setupMainStreetGame>,
+  slotIndex: number,
+  synergyTypes: string[],
+  baseIncome = 2,
+): BusinessCard {
   const biz: BusinessCard = {
     family: 'business',
-    id: `biz-test-${synergyTypes.join('-')}`,
-    name: `Test ${synergyTypes.join('/')}`,
+    id: `biz-${slotIndex}-${synergyTypes.join('-')}`,
+    name: `Test ${synergyTypes.join('/')} @${slotIndex}`,
     cost: 3,
     baseIncome,
     synergyTypes: [...synergyTypes] as BusinessCard['synergyTypes'],
@@ -73,8 +94,8 @@ function placeBusiness(state: ReturnType<typeof setupMainStreetGame>, synergyTyp
     description: 'I4 fixture business.',
     ongoingCost: 1,
   };
-  state.streetGrid[0] = biz;
-  syncCardCurrentIncome(state.streetGrid, 0);
+  state.streetGrid[slotIndex] = biz;
+  syncCardCurrentIncome(state.streetGrid, slotIndex);
   return biz;
 }
 
@@ -88,7 +109,8 @@ describe('I4: income-boost skills fold into applyIncome without cache mutation',
     const baseline = computeBusinessIncome(state.streetGrid, 0);
     expect(baseline).toBe(2);
 
-    hireSynthetic(state, 'chef', ['skill-chef']);
+    // Per-business buffs require employment at the buffed slot (CG-0MSTOATDU006UGAX).
+    employSynthetic(state, 'chef', ['skill-chef'], 0);
     const result = applyIncome(state);
     // Chef +20% → slot income 2 * 1.2 = 2.4.
     const slot = result.breakdown?.find((s: { slotIndex: number }) => s.slotIndex === 0);
@@ -103,7 +125,7 @@ describe('I4: income-boost skills fold into applyIncome without cache mutation',
     const state = setupMainStreetGame({ seed: 'i4-sales' });
     executeDayStart(state);
     placeBusiness(state, ['Commerce'], 2);
-    hireSynthetic(state, 'sales', ['skill-sales-champion']);
+    employSynthetic(state, 'sales', ['skill-sales-champion'], 0);
     const result = applyIncome(state);
     const slot = result.breakdown?.find((s: { slotIndex: number }) => s.slotIndex === 0);
     if (slot) {
@@ -128,7 +150,7 @@ describe('I4: income-boost skills fold into applyIncome without cache mutation',
       const state = setupMainStreetGame({ seed: 'i4-replay' });
       executeDayStart(state);
       placeBusiness(state, ['Entertainment'], 3);
-      hireSynthetic(state, 'dj', ['skill-dj']);
+      employSynthetic(state, 'dj', ['skill-dj'], 0);
       return applyIncome(state).total;
     };
     expect(run()).toBeCloseTo(3.6);
@@ -144,7 +166,7 @@ describe('I4: reputation-boost skills accrue during the income phase', () => {
     executeDayStart(state);
     placeBusiness(state, ['Food'], 2);
     const before = state.resourceBank.reputation;
-    hireSynthetic(state, 'cb', ['skill-community-builder']);
+    employSynthetic(state, 'cb', ['skill-community-builder'], 0);
     applyIncome(state);
     expect(state.resourceBank.reputation).toBeCloseTo(before + 0.1);
   });
@@ -154,7 +176,7 @@ describe('I4: reputation-boost skills accrue during the income phase', () => {
     executeDayStart(state);
     placeBusiness(state, ['Service'], 2);
     const before = state.resourceBank.reputation;
-    hireSynthetic(state, 'pr', ['skill-pr-strategist']);
+    employSynthetic(state, 'pr', ['skill-pr-strategist'], 0);
     applyIncome(state);
     expect(state.resourceBank.reputation).toBeCloseTo(before + 0.15);
 
@@ -163,7 +185,7 @@ describe('I4: reputation-boost skills accrue during the income phase', () => {
     executeDayStart(state2);
     placeBusiness(state2, ['Food'], 2);
     const before2 = state2.resourceBank.reputation;
-    hireSynthetic(state2, 'pr2', ['skill-pr-strategist']);
+    employSynthetic(state2, 'pr2', ['skill-pr-strategist'], 0);
     applyIncome(state2);
     expect(state2.resourceBank.reputation).toBeCloseTo(before2);
   });
@@ -357,6 +379,68 @@ describe('I4: Brand Ambassador scales positive reputation gains (+50%)', () => {
   });
 });
 
+// ── Per-business employment scoping (CG-0MSTOATDU006UGAX) ────
+
+describe('per-business buff scoping in applyIncome (CG-0MSTOATDU006UGAX)', () => {
+  it('an employed Chef buffs ONLY the business slot where employed, not a second Food business', () => {
+    const state = setupMainStreetGame({ seed: 'scope-two-food' });
+    executeDayStart(state);
+    placeBusinessAt(state, 0, ['Food'], 2);
+    placeBusinessAt(state, 2, ['Food'], 2); // non-adjacent (avoid same-type penalty)
+    employSynthetic(state, 'chef', ['skill-chef'], 0);
+
+    const result = applyIncome(state);
+    const bySlot = new Map(result.breakdown.map((s: { slotIndex: number; total: number }) => [s.slotIndex, s.total]));
+    expect(bySlot.get(0)).toBeCloseTo(2.4); // employed here → buffed
+    expect(bySlot.get(2)).toBeCloseTo(2); // another Food business → untouched
+  });
+
+  it('hand-slot market staff contribute NO per-business income buffs', () => {
+    const state = setupMainStreetGame({ seed: 'scope-hand-income' });
+    executeDayStart(state);
+    placeBusiness(state, ['Food'], 2);
+    hireSynthetic(state, 'chef', ['skill-chef']); // NOT employed at any slot
+
+    const result = applyIncome(state);
+    const slot = result.breakdown?.find((s: { slotIndex: number }) => s.slotIndex === 0);
+    if (slot) {
+      expect(slot.total).toBe(2);
+    }
+  });
+
+  it('hand-slot market staff contribute NO per-business reputation buffs', () => {
+    const state = setupMainStreetGame({ seed: 'scope-hand-rep' });
+    executeDayStart(state);
+    placeBusiness(state, ['Food'], 2);
+    const before = state.resourceBank.reputation;
+    hireSynthetic(state, 'cb', ['skill-community-builder']); // hand-slot
+    applyIncome(state);
+    expect(state.resourceBank.reputation).toBeCloseTo(before);
+
+    // Same member employed → +0.1 rep/turn resumes.
+    const state2 = setupMainStreetGame({ seed: 'scope-hand-rep' });
+    executeDayStart(state2);
+    placeBusiness(state2, ['Food'], 2);
+    const before2 = state2.resourceBank.reputation;
+    employSynthetic(state2, 'cb', ['skill-community-builder'], 0);
+    applyIncome(state2);
+    expect(state2.resourceBank.reputation).toBeCloseTo(before2 + 0.1);
+  });
+
+  it('street-wide incident skills still aggregate across ALL staff (hand-slot + employed)', () => {
+    const withCommerce = (s: ReturnType<typeof setupMainStreetGame>) => placeBusiness(s, ['Commerce'], 2);
+    // Hand-slot Compliance Officer + employed Risk Manager both contribute.
+    const state = setupMainStreetGame({ seed: 'scope-incident' });
+    executeDayStart(state);
+    withCommerce(state);
+    hireSynthetic(state, 'compliance', ['skill-compliance']);
+    employSynthetic(state, 'risk', ['skill-risk-manager'], 0);
+    const ids = getEmployedSpecializationSkills(state).map(s => s.id);
+    expect(ids).toContain('skill-compliance');
+    expect(ids).toContain('skill-risk-manager');
+  });
+});
+
 // ── Cache/legacy guarantees ─────────────────────────────────
 
 describe('I4: caching & legacy guarantees', () => {
@@ -382,7 +466,7 @@ describe('I4: caching & legacy guarantees', () => {
     const state = setupMainStreetGame({ seed: 'i4-save' });
     executeDayStart(state);
     placeBusiness(state, ['Food'], 2);
-    hireSynthetic(state, 'chef', ['skill-chef']);
+    employSynthetic(state, 'chef', ['skill-chef'], 0);
     const saved = serializeMainStreetState(state);
     const restored = deserializeMainStreetState(saved);
     const result = applyIncome(restored);

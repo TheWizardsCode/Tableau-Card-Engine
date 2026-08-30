@@ -482,6 +482,15 @@ export interface StaffCard {
    */
   specializationSkillIds?: string[];
   /**
+   * Street-grid slot index of the deployed business this staff member is
+   * employed at (CG-0MSTOATDU006UGAX). Per-business specialization buffs
+   * (income/reputation) apply ONLY to this business; undefined = hand-slot
+   * staff (existing mechanic) who contribute no per-business income/rep
+   * buffs but whose street-wide skills still aggregate (cost cutter,
+   * incidents, brand ambassador, negotiator, ops-manager salary).
+   */
+  employedAtSlot?: number;
+  /**
    * Optional reputation granted per turn during the income phase
    * (e.g. the Socialite's +0.1 rep/turn ability — Group F,
    * CG-0MSQJ7VL9009JHF4).

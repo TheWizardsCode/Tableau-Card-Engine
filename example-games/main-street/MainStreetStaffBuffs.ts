@@ -182,9 +182,17 @@ export function computePerBusinessSkillBuffs(
 
 /**
  * Flattens the specialization skills of every currently employed staff
- * member (hired cards in `state.staffCards`) into one skill list. Skills are
- * read from the card's locked `specializationSkillIds` (I3); members without
- * the field (legacy saves / hand-built fixtures) contribute nothing.
+ * member (hired cards in `state.staffCards`) into one skill list — the
+ * STREET-WIDE aggregation used for buffs that are not business-scoped
+ * (cost-cutter, incident mitigation, brand-ambassador, negotiator,
+ * ops-manager salary, networker, tech-guru). Skills are read from the
+ * card's locked `specializationSkillIds` (I3); members without the field
+ * (legacy saves / hand-built fixtures) contribute nothing.
+ *
+ * Per-business income/reputation buffs use
+ * {@link getEmployedSpecializationSkillsForBusiness} instead, so hand-slot
+ * staff (no `employedAtSlot`) never leak income/rep buffs onto the street
+ * (CG-0MSTOATDU006UGAX).
  */
 export function getEmployedSpecializationSkills(state: MainStreetState): SpecializationSkill[] {
   return (state.staffCards ?? []).flatMap(card => {
@@ -194,6 +202,35 @@ export function getEmployedSpecializationSkills(state: MainStreetState): Special
     } catch {
       // A stale/unknown skill id on a saved member must not break the income
       // phase; skip the member's skills (documented forward-compat path).
+      return [];
+    }
+  });
+}
+
+/**
+ * Flattens the specialization skills of ONLY the staff member(s) employed at
+ * the given street-grid slot (`employedAtSlot === slotIndex`). Per-business
+ * income/reputation buffs in `applyIncome` are derived from this per-slot
+ * pool, so a Chef employed at one Food business never buffs another Food
+ * business elsewhere on the street, and hand-slot staff (no `employedAtSlot`)
+ * contribute no per-business buffs (CG-0MSTOATDU006UGAX).
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street-grid slot index of the target business.
+ * @returns The employed specialization skills at that slot (empty when none).
+ */
+export function getEmployedSpecializationSkillsForBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+): SpecializationSkill[] {
+  return (state.staffCards ?? []).flatMap(card => {
+    if (card.employedAtSlot !== slotIndex) return [];
+    const ids = Array.isArray(card.specializationSkillIds) ? card.specializationSkillIds : [];
+    try {
+      return deserializeSkillIds(ids);
+    } catch {
+      // Stale/unknown skill ids are skipped (same forward-compat path as the
+      // street-wide aggregator).
       return [];
     }
   });

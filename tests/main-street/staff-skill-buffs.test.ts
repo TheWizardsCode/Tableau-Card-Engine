@@ -20,7 +20,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
+import { createStaffDeck, type BusinessCard } from '../../example-games/main-street/MainStreetCards';
 import {
   computePerBusinessSkillBuffs,
   computeStreetOngoingCostReductionPct,
@@ -28,6 +28,8 @@ import {
   computeStaffSalaryDiscount,
   computeStaffSalaryCost,
   computeReputationGainMultiplier,
+  getEmployedSpecializationSkills,
+  getEmployedSpecializationSkillsForBusiness,
   type BusinessBuffProfile,
 } from '../../example-games/main-street/MainStreetStaffBuffs';
 import { getSkill, BASELINE_SKILL_ID } from '../../example-games/main-street/MainStreetStaffSkills';
@@ -244,5 +246,57 @@ describe('buff module is side-effect free w.r.t. adjacency caches', () => {
     // The engine's cached value remains the unbuffed baseline until wiring
     // folds the buffs in (I4) — proving no premature mutation.
     expect(card.currentIncome).toBeCloseTo(baseline);
+  });
+});
+
+// ── Per-business employment scoping (CG-0MSTOATDU006UGAX) ────
+
+/** Builds an employed staff member (employedAtSlot) with a forced skill roster. */
+function employedMember(name: string, skillIds: string[], slotIndex: number) {
+  const base = createStaffDeck(1)[0];
+  return { ...base, id: `${base.id}-${name}`, name, specializationSkillIds: [...skillIds], employedAtSlot: slotIndex };
+}
+
+describe('per-business employment scoping (CG-0MSTOATDU006UGAX)', () => {
+  it('getEmployedSpecializationSkillsForBusiness returns only skills of staff employed AT that slot', () => {
+    const state = setupMainStreetGame({ seed: 'scope-helper' });
+    state.staffCards.push(employedMember('chef', ['skill-chef'], 3));
+    state.staffCards.push(employedMember('dj', ['skill-dj'], 7));
+
+    expect(getEmployedSpecializationSkillsForBusiness(state, 3).map(s => s.id)).toEqual(['skill-chef']);
+    expect(getEmployedSpecializationSkillsForBusiness(state, 7).map(s => s.id)).toEqual(['skill-dj']);
+    // Slots with no employees (and empty slots) contribute nothing.
+    expect(getEmployedSpecializationSkillsForBusiness(state, 0)).toHaveLength(0);
+    expect(getEmployedSpecializationSkillsForBusiness(state, 5)).toHaveLength(0);
+  });
+
+  it('hand-slot market staff (no employedAtSlot) contribute NO per-business skills', () => {
+    const state = setupMainStreetGame({ seed: 'scope-hand' });
+    state.staffCards.push({ ...createStaffDeck(1)[0], id: 'staff-hand', name: 'Hand Chef', specializationSkillIds: ['skill-chef'] });
+
+    // The hand-slot member's Chef must never reach any business's buff pool.
+    expect(getEmployedSpecializationSkillsForBusiness(state, 0)).toHaveLength(0);
+    expect(getEmployedSpecializationSkillsForBusiness(state, 4)).toHaveLength(0);
+  });
+
+  it('street-wide aggregation still includes hand-slot + employed staff', () => {
+    const state = setupMainStreetGame({ seed: 'scope-street' });
+    state.staffCards.push(employedMember('cutter', ['skill-cost-cutter'], 2));
+    state.staffCards.push({ ...createStaffDeck(1)[0], id: 'staff-hand', name: 'Hand Negotiator', specializationSkillIds: ['skill-negotiator'] });
+
+    const allIds = getEmployedSpecializationSkills(state).map(s => s.id);
+    expect(allIds).toContain('skill-cost-cutter');
+    expect(allIds).toContain('skill-negotiator');
+
+    // Street-wide skills on an employed member stay street-wide: them appearing
+    // in the business's per-business pool must not reshape the business income
+    // profile (cost-cutter is a % reduction, computed separately).
+    const buffs = computePerBusinessSkillBuffs(
+      getEmployedSpecializationSkillsForBusiness(state, 2),
+      profile(['Food']),
+    );
+    expect(buffs.income.percent).toBe(0);
+    expect(buffs.reputation.flat).toBe(0);
+    expect(buffs.ongoingCosts.reductionPct).toBeCloseTo(0.15);
   });
 });
