@@ -1002,7 +1002,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // Apply community space ongoing costs (reputation-asset cards, e.g. Library)
   applyCommunitySpaceOngoingCosts(state);
 
-  // Apply business card ongoing costs (held in hand or placed on grid)
+  // Apply business card ongoing costs (street-placed cards only)
   applyBusinessOngoingCosts(state);
 
   // Phase: IncidentPhase
@@ -1509,18 +1509,10 @@ export function applyBusinessOngoingCosts(state: MainStreetState): void {
   let totalCost = 0;
   let bizCount = 0;
 
-  // Sum ongoing costs from business cards in hand
-  const hand = state.hand ?? [];
-  for (const card of hand) {
-    if (card.family !== 'business') continue;
-    const cost = (card as BusinessCard).ongoingCost ?? 0;
-    if (cost > 0) {
-      totalCost += cost;
-      bizCount += 1;
-    }
-  }
-
-  // Sum ongoing costs from business cards on the street grid
+  // Ongoing costs apply only to business cards placed on the street grid —
+  // cards held in hand are not yet active and incur no running cost
+  // (CG-0MTC31LN3000UHDY). Mirrors applyStaffOngoingCosts() /
+  // applyCommunitySpaceOngoingCosts().
   const grid = state.streetGrid;
   for (const slot of grid) {
     if (!slot || slot.family !== 'business') continue;

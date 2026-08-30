@@ -2,12 +2,13 @@
  * Business Card Ongoing-Cost Tests (CG-0MSVYPEZ90085SHE)
  *
  * Validates that every business card gains a `ongoingCost` field that is
- * deducted from coins every turn during the income phase — whether the card
- * is placed on the street grid or held in the player's hand.
+ * deducted from coins every turn during the income phase — but only for cards
+ * placed on the street grid. Business cards held in the player's hand are not
+ * yet active and do NOT incur running costs (CG-0MTC31LN3000UHDY).
  *
  * Acceptance criteria covered:
  *   (a) `ongoingCost` is parsed from CSV for business cards
- *   (b) `applyBusinessOngoingCosts` deducts from both hand and street cards
+ *   (b) `applyBusinessOngoingCosts` deducts from street-placed cards only
  *   (c) coins are clamped at 0
  *   (d) the cost appears in card SVG and tooltip
  *   (e) `processEndOfTurn` correctly chains the new function
@@ -54,6 +55,23 @@ function placeBusinessOnGrid(state: MainStreetState, biz: BusinessCard): void {
 /** Adds a business card to the player's hand with a known ongoingCost. */
 function addBusinessToHand(state: MainStreetState, biz: BusinessCard): void {
   state.hand.push(biz);
+}
+
+/** Creates a business card with a known ongoingCost (for tests). */
+function makeBusiness(
+  ongoingCost: number,
+  id: string = 'test-biz',
+  baseIncome: number = 0,
+): BusinessCard {
+  return {
+    family: 'business',
+    ...getBusinessTemplates()[0],
+    ongoingCost,
+    baseIncome,
+    id,
+    level: 0, incomeBonus: 0, synergyRangeBonus: 0,
+    reputationBonus: 0, appliedUpgrades: [],
+  };
 }
 
 // ── AC (a): CSV Parsing ─────────────────────────────────────
@@ -106,7 +124,7 @@ describe('CSV parsing — ongoingCost on business cards', () => {
     // Simulate a legacy card that lacks the property entirely (`?? 0` applies).
     const legacyNoField = { ...legacy } as BusinessCard & { ongoingCost?: number };
     delete (legacyNoField as { ongoingCost?: number }).ongoingCost;
-    addBusinessToHand(state, legacyNoField);
+    placeBusinessOnGrid(state, legacyNoField);
 
     const coinsBefore = state.resourceBank.coins;
     applyBusinessOngoingCosts(state);
@@ -117,64 +135,72 @@ describe('CSV parsing — ongoingCost on business cards', () => {
 // ── AC (b)-(c): applyBusinessOngoingCosts ──────────────────
 
 describe('applyBusinessOngoingCosts — deduction logic', () => {
-  it('should deduct ongoing costs from both hand and street business cards', () => {
-    const state = createTestState('hand-street-costs');
+  it('should deduct ongoing costs from street-placed business cards', () => {
+    const state = createTestState('street-costs');
     // Give the player enough coins to cover all costs
     state.resourceBank.coins = 100;
 
-    // Create business cards with known ongoing costs
-    const streetBiz: BusinessCard = {
-      family: 'business',
-      ...getBusinessTemplates()[0],
-      ongoingCost: 1.0,
-      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
-      reputationBonus: 0, appliedUpgrades: [],
-    };
-    const handBiz1: BusinessCard = {
-      family: 'business',
-      ...getBusinessTemplates()[1] ?? getBusinessTemplates()[0],
-      ongoingCost: 0.5,
-      id: 'test-hand-biz-1',
-      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
-      reputationBonus: 0, appliedUpgrades: [],
-    };
-    const handBiz2: BusinessCard = {
-      family: 'business',
-      ...getBusinessTemplates()[0],
-      ongoingCost: 0.5,
-      id: 'test-hand-biz-2',
-      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
-      reputationBonus: 0, appliedUpgrades: [],
-    };
-
+    const streetBiz = makeBusiness(1.0, 'test-street-biz-1');
     placeBusinessOnGrid(state, streetBiz);
-    addBusinessToHand(state, handBiz1);
-    addBusinessToHand(state, handBiz2);
 
     const coinsBefore = state.resourceBank.coins;
     applyBusinessOngoingCosts(state);
 
-    // Total ongoing cost = 1.0 (street) + 0.5 (hand1) + 0.5 (hand2) = 2.0
-    expect(state.resourceBank.coins).toBe(coinsBefore - 2.0);
+    // Total ongoing cost = 1.0 (street)
+    expect(state.resourceBank.coins).toBe(coinsBefore - 1.0);
+  });
+
+  it('should NOT deduct ongoing costs from business cards held in hand (CG-0MTC31LN3000UHDY)', () => {
+    const state = createTestState('hand-only-costs');
+    state.resourceBank.coins = 100;
+
+    addBusinessToHand(state, makeBusiness(0.5, 'test-hand-biz-1'));
+    addBusinessToHand(state, makeBusiness(0.5, 'test-hand-biz-2'));
+
+    const coinsBefore = state.resourceBank.coins;
+    applyBusinessOngoingCosts(state);
+
+    // Hand cards incur NO ongoing cost
+    expect(state.resourceBank.coins).toBe(coinsBefore);
+  });
+
+  it('should deduct only street cards when hand cards are also present', () => {
+    const state = createTestState('mix-costs');
+    state.resourceBank.coins = 100;
+
+    placeBusinessOnGrid(state, makeBusiness(1.0, 'test-street-biz'));
+    addBusinessToHand(state, makeBusiness(0.5, 'test-hand-biz-1'));
+    addBusinessToHand(state, makeBusiness(0.5, 'test-hand-biz-2'));
+
+    const coinsBefore = state.resourceBank.coins;
+    applyBusinessOngoingCosts(state);
+
+    // Only the street card is charged: 1.0
+    expect(state.resourceBank.coins).toBe(coinsBefore - 1.0);
   });
 
   it('should clamp coins at 0 when costs exceed available coins', () => {
     const state = createTestState('clamp-at-zero');
     state.resourceBank.coins = 0.5;
 
-    const biz: BusinessCard = {
-      family: 'business',
-      ...getBusinessTemplates()[0],
-      ongoingCost: 2.0,
-      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
-      reputationBonus: 0, appliedUpgrades: [],
-    };
-
-    addBusinessToHand(state, biz);
+    placeBusinessOnGrid(state, makeBusiness(2.0));
 
     applyBusinessOngoingCosts(state);
 
     // Coins should be clamped at 0, not go negative
+    expect(state.resourceBank.coins).toBe(0);
+  });
+
+  it('should NOT deduct for hand cards when street costs clamp coins at 0', () => {
+    const state = createTestState('clamp-with-hand');
+    state.resourceBank.coins = 0.5;
+
+    placeBusinessOnGrid(state, makeBusiness(2.0));
+    addBusinessToHand(state, makeBusiness(0.5, 'test-hand-biz'));
+
+    applyBusinessOngoingCosts(state);
+
+    // Street card clamps coins at 0; hand card adds nothing
     expect(state.resourceBank.coins).toBe(0);
   });
 
@@ -183,15 +209,8 @@ describe('applyBusinessOngoingCosts — deduction logic', () => {
     state.resourceBank.coins = 100;
 
     // Only business cards should be charged
-    const biz: BusinessCard = {
-      family: 'business',
-      ...getBusinessTemplates()[0],
-      ongoingCost: 0.5,
-      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
-      reputationBonus: 0, appliedUpgrades: [],
-    };
-
-    addBusinessToHand(state, biz);
+    const biz = makeBusiness(0.5);
+    placeBusinessOnGrid(state, biz);
 
     const coinsBefore = state.resourceBank.coins;
     applyBusinessOngoingCosts(state);
@@ -199,7 +218,7 @@ describe('applyBusinessOngoingCosts — deduction logic', () => {
     expect(state.resourceBank.coins).toBe(coinsBefore - 0.5);
   });
 
-  it('should be a no-op when there are no business cards in hand or on grid', () => {
+  it('should be a no-op when there are no business cards on grid', () => {
     const state = createTestState('no-business-cards');
     state.resourceBank.coins = 100;
 
@@ -213,15 +232,7 @@ describe('applyBusinessOngoingCosts — deduction logic', () => {
     const state = createTestState('zero-cost');
     state.resourceBank.coins = 100;
 
-    const biz: BusinessCard = {
-      family: 'business',
-      ...getBusinessTemplates()[0],
-      ongoingCost: 0,
-      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
-      reputationBonus: 0, appliedUpgrades: [],
-    };
-
-    addBusinessToHand(state, biz);
+    placeBusinessOnGrid(state, makeBusiness(0));
 
     const coinsBefore = state.resourceBank.coins;
     applyBusinessOngoingCosts(state);
@@ -338,12 +349,12 @@ describe('Tooltip — ongoing cost in card tooltip info', () => {
   });
 });
 
-// ── Producer regression: Tea house held in hand (real CSV data) ──────
+// ── Producer regression: business card held in hand (real CSV data) ──────
 
-describe('producer regression — business card in hand costs 1/4 purchase price per turn', () => {
-  it('should deduct 1.75/turn for the Tea house (cost 7) held in hand', () => {
+describe('producer regression — business card in hand costs nothing per turn (CG-0MTC31LN3000UHDY)', () => {
+  it('should NOT deduct for the Tea house (cost 7) held in hand', () => {
     // Producer scenario: a business card in hand, no income from built
-    // businesses, 6 coins in the bank. Expected loss: 7 * 0.25 = 1.75.
+    // businesses, 6 coins in the bank. Hand-held cards incur NO ongoing cost.
     const state = createTestState('teahouse-in-hand');
     state.resourceBank.coins = 6;
     // No built businesses → base income of 0 for everything on the street grid
@@ -359,25 +370,31 @@ describe('producer regression — business card in hand costs 1/4 purchase price
     const result = processEndOfTurn(state);
 
     expect(result.income).toBeDefined();
-    expect(state.resourceBank.coins).toBeCloseTo(6 - 1.75, 5);
-    expect(state.activityLog.some(l => l.text.includes('Business costs: -1.75'))).toBe(true);
+    expect(state.resourceBank.coins).toBeCloseTo(6, 5);
+    expect(state.activityLog.some(l => l.text.includes('Business costs'))).toBe(false);
   });
 
-  it('should clamp coins at 0 when a hand card costs more than available coins', () => {
-    const state = createTestState('teahouse-clamp');
-    state.resourceBank.coins = 0.5;
+  it('should deduct ongoing cost once the same card is placed on the grid', () => {
+    const state = createTestState('teahouse-placed');
+    state.resourceBank.coins = 6;
     state.streetGrid = [];
     state.incidentDeck = [];
 
     const deck = createBusinessDeck(1);
     const teahouse = deck.find(c => c.id.startsWith('biz-teahouse'));
-    addBusinessToHand(state, teahouse!);
+    expect(teahouse).toBeDefined();
+    // Isolate the ongoing-cost effect: build a copy with zero intrinsic income
+    // (baseIncome is readonly on BusinessCard, so it is re-declared here) so
+    // the turn only credits what this test asserts.
+    const teahouseCopy: BusinessCard = { ...teahouse!, baseIncome: 0 };
+    placeBusinessOnGrid(state, teahouseCopy);
     state.phase = 'MarketPhase';
 
-    processEndOfTurn(state);
+    const result = processEndOfTurn(state);
 
-    expect(state.resourceBank.coins).toBe(0);
-    expect(state.activityLog.some(l => l.text.includes('Insufficient coins'))).toBe(true);
+    expect(result.income).toBeDefined();
+    expect(state.resourceBank.coins).toBeCloseTo(6 - 1.75, 5);
+    expect(state.activityLog.some(l => l.text.includes('Business costs: -1.75'))).toBe(true);
   });
 });
 
@@ -413,26 +430,12 @@ describe('processEndOfTurn — income phase chains applyBusinessOngoingCosts', (
     expect(state.activityLog.some(l => l.text.includes('Business costs'))).toBe(true);
   });
 
-  it('should deduct both hand and street business costs through the full turn loop', () => {
+  it('should deduct only street business costs through the full turn loop (hand cards free)', () => {
     const state = createTestState('end-of-turn-hand-and-street');
     state.resourceBank.coins = 20;
 
-    const streetBiz: BusinessCard = {
-      family: 'business',
-      ...getBusinessTemplates()[0],
-      ongoingCost: 1.0,
-      baseIncome: 0,
-      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
-      reputationBonus: 0, appliedUpgrades: [],
-    };
-    const handBiz: BusinessCard = {
-      family: 'business',
-      ...getBusinessTemplates()[0],
-      ongoingCost: 0.5,
-      baseIncome: 0,
-      level: 0, incomeBonus: 0, synergyRangeBonus: 0,
-      reputationBonus: 0, appliedUpgrades: [],
-    };
+    const streetBiz = makeBusiness(1.0, 'test-street-biz');
+    const handBiz = makeBusiness(0.5, 'test-hand-biz');
 
     placeBusinessOnGrid(state, streetBiz);
     addBusinessToHand(state, handBiz);
@@ -442,8 +445,8 @@ describe('processEndOfTurn — income phase chains applyBusinessOngoingCosts', (
 
     processEndOfTurn(state);
 
-    // Total business ongoing cost = 1.0 (street) + 0.5 (hand) = 1.5
-    expect(state.resourceBank.coins).toBeCloseTo(18.5, 5);
+    // Only the street card is charged: 1.0 (hand card is free)
+    expect(state.resourceBank.coins).toBeCloseTo(19, 5);
     expect(state.activityLog.some(l => l.text.includes('Business costs'))).toBe(true);
   });
 });
