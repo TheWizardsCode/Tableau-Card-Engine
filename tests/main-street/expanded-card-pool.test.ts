@@ -235,6 +235,57 @@ describe('Expanded Card Pool: Multi-Synergy Bridge Cards', () => {
   });
 });
 
+// ── Florist Income rebalance (CG-0MT6EQSPW002E7RC) ─────────
+
+describe('Florist income rebalance (CG-0MT6EQSPW002E7RC)', () => {
+  it('locks the rebalanced template income at tier-5 parity (baseIncome 3.5, ongoing 1.25)', () => {
+    const florist = businessDeck.find(c => c.name === 'Florist');
+    expect(florist).toBeDefined();
+    expect(florist!.baseIncome).toBe(3.5);
+    expect(florist!.ongoingCost).toBe(1.25);
+    // Net per-turn income after the ongoing cost meets the tier-5 floor (≥ 2.0/turn)
+    expect(florist!.baseIncome - florist!.ongoingCost).toBeGreaterThanOrEqual(2.0);
+  });
+
+  it('matches peer tier-5 net income (Cinema / Juice Bar)', () => {
+    const florist = businessDeck.find(c => c.name === 'Florist')!;
+    const cinema = businessDeck.find(c => c.name === 'Cinema')!;
+    const juiceBar = businessDeck.find(c => c.name === 'Juice Bar')!;
+    expect(florist.baseIncome - florist.ongoingCost)
+      .toBe(cinema.baseIncome - cinema.ongoingCost);
+    expect(florist.baseIncome - florist.ongoingCost)
+      .toBe(juiceBar.baseIncome - juiceBar.ongoingCost);
+  });
+
+  it('computes positive solo income at runtime via computeBusinessIncome (AC1)', () => {
+    const florist = businessDeck.find(c => c.name === 'Florist')!;
+    const grid: (BusinessCard | null)[] = new Array(GRID_SIZE).fill(null);
+    grid[0] = florist;
+    expect(computeBusinessIncome(grid, 0)).toBe(3.5);
+  });
+});
+
+describe('Business templates never carry zero base income (CG-0MT6EQSPW002E7RC)', () => {
+  it('every business template has baseIncome > 0 unless it is a documented rep-only card', () => {
+    // Rep-only exception: cards that earn reputation instead of coins.
+    // Only biz-clinic today (AC3); add to the set deliberately when a new
+    // rep-only business is introduced.
+    const repOnlyBusinessIds = new Set(['biz-clinic']);
+    for (const card of businessDeck) {
+      const baseId = card.id.replace(/-\d+$/, '');
+      if (repOnlyBusinessIds.has(baseId)) continue;
+      expect(card.baseIncome, `${card.id} must provide income`).toBeGreaterThan(0);
+    }
+  });
+
+  it('the rep-only zero-income exception set is exactly biz-clinic today', () => {
+    const zeroIncome = businessDeck
+      .filter(c => c.baseIncome <= 0)
+      .map(c => c.id.replace(/-\d+$/, ''));
+    expect(zeroIncome).toEqual(['biz-clinic']);
+  });
+});
+
 // ── Bridge Card Adjacency Bonuses ───────────────────────────
 
 describe('Expanded Card Pool: Bridge Card Adjacency', () => {

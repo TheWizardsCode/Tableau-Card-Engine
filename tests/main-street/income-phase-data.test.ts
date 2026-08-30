@@ -11,7 +11,10 @@ import {
   type IncomeResult,
 } from '../../example-games/main-street/MainStreetAdjacency';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
+import {
+  createBusinessDeck,
+  type BusinessCard,
+} from '../../example-games/main-street/MainStreetCards';
 import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -250,5 +253,34 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
       // total is the pre-multiplier sum of buffedIncomes (not the multiplied amount)
       expect(result.total).toBe(4); // no buffs at default difficulty
     });
+  });
+});
+
+// ── Florist end-of-turn income crediting (CG-0MT6EQSPW002E7RC) ──
+
+describe('Florist end-of-turn income crediting (CG-0MT6EQSPW002E7RC)', () => {
+  it('credits positive income for a solo Florist placement (AC2)', () => {
+    const state = setupMainStreetGame({ seed: 'florist-income' });
+    // Pin the reputation coin multiplier to 1.0 so the credited amount is exact.
+    state.resourceBank.reputation = 0;
+
+    const florist = createBusinessDeck(1).find(c => c.name === 'Florist')!;
+    expect(florist).toBeDefined();
+
+    const coinsBefore = state.resourceBank.coins;
+    placeOnGrid(state, florist);
+    const result = applyIncome(state);
+
+    // IncomeResult includes the Florist slot with a positive total
+    const floristSlot = result.breakdown.find(s => s.businessName === 'Florist');
+    expect(floristSlot).toBeDefined();
+    expect(floristSlot!.total).toBeGreaterThan(0);
+
+    // Coins increase by the florist's income (3.5 at tier-5 parity)
+    const credited = state.resourceBank.coins - coinsBefore;
+    expect(credited).toBe(florist.baseIncome); // rep multiplier 1.0 at rep 0
+
+    // Net after the ongoing cost still meets the tier-parity baseline (≥ 2.0/turn)
+    expect(florist.baseIncome - florist.ongoingCost).toBeGreaterThanOrEqual(2.0);
   });
 });

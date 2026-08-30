@@ -233,7 +233,7 @@ Where:
 costToIncomeRatio = cardCost / baseIncomePerTurn
 ```
 
-For cards with zero base income (e.g., Florist, Clinic), use the effective income including synergy bonuses from optimal placement, documented separately.
+For cards with zero base income (e.g., Clinic), use the effective income including synergy bonuses from optimal placement, documented separately.
 
 **Data Sources:**
 - `cardCost` from `card-data.csv` (cost column)

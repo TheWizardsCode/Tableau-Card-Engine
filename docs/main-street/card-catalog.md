@@ -134,7 +134,7 @@ Bridge cards belong to two synergy types simultaneously, enabling cross-type adj
 | `biz-food-truck` | Food Truck | 4 | 2.9 (rep +0.05/turn, ongoing −1/turn) | Food + Entertainment | Food Truck | Street eats with flair. | Cheapest bridge card; low risk, low reward. |
 | `biz-gallery` | Art Gallery | 14 | 9.4 (rep +0.25/turn, ongoing −3.5/turn) | Culture + Entertainment | Art Gallery | Showcases local artists. | Connects M1 Culture with new Entertainment. |
 | `biz-spa` | Day Spa | 14 | 9.4 (rep +0.25/turn, ongoing −3.5/turn) | Service + Entertainment | Day Spa | Relaxation and pampering. | Premium bridge; high synergy potential across 2 new types. |
-| `biz-florist` | Florist | 5 | 3 (rep +0.1/turn, ongoing −1.25/turn) | Commerce + Culture | Florist | Arrangements for every occasion. | Budget bridge linking Commerce and Culture. |
+| `biz-florist` | Florist | 5 | 3.5 (rep +0.1/turn, ongoing −1.25/turn) | Commerce + Culture | Florist | Arrangements for every occasion. | Commerce–Culture bridge at tier-5 income parity (CG-0MT6EQSPW002E7RC). |
 
 ### M3 Business Templates (12) — Group A expansion (CG-0MSQJ1XIB0004QVN)
 

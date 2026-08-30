@@ -13,7 +13,7 @@ business,biz-cafe,Cafe,7,5.2,Food|Culture,Cafe,1,0.1,,,Coffee and conversation. 
 business,biz-food-truck,Food Truck,4,2.9,Food|Entertainment,Food Truck,1,0.05,,,Street eats with flair. Bridges Food and Entertainment synergies.,4,,,,,,,,,,,,,,,,1,,,,
 business,biz-gallery,Art Gallery,14,9.4,Culture|Entertainment,Art Gallery,1,0.25,0.5,0.1,Showcases local artists. Bridges Culture and Entertainment synergies.,12,,,,,,,,,,,,,,,,3.5,,,,
 business,biz-spa,Day Spa,14,9.4,Service|Entertainment,Day Spa,2,0.25,0.5,0.1,Relaxation and pampering. Bridges Service and Entertainment synergies.,11,,,,,,,,,,,,,,,,3.5,,,,
-business,biz-florist,Florist,5,3.0,Commerce|Culture,Florist,1,0.1,,,Beautiful arrangements for every occasion. Bridges Commerce and Culture synergies.,5,,,,,,,,,,,,,,,,1.25,,,,
+business,biz-florist,Florist,5,3.5,Commerce|Culture,Florist,1,0.1,,,Beautiful arrangements for every occasion. Bridges Commerce and Culture synergies.,5,,,,,,,,,,,,,,,,1.25,,,,
 business,biz-clinic,Clinic,9,0,Health,Clinic,1,0.4,0.5,0.1,Walk-in medical care for the community. Provides +0.2 reputation per turn. Gains {SYNERGY_RATE} of base income per adjacent Health business.,10,,,,,,,,,,,,,,,,0.5,,,,
 business,biz-private-clinic,Private Clinic,14,10.9,Health,Private Clinic,1,0.25,0.5,0.1,A private medical practice focused on profitability. Gains {SYNERGY_RATE} of base income per adjacent Health business.,12,,,,,,,,,,,,,,,,3.5,,,,
 business,biz-pharmacy,Pharmacy,7,5.2,Health,,0,0.1,,,Provides essential medications. Gains {SYNERGY_RATE} of base income per adjacent Health business.,8,,,,,,,,,,,,,,,,1.75,,,,
