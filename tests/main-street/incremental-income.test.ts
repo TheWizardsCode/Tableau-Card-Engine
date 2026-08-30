@@ -254,7 +254,7 @@ describe('Per-card incremental income/reputation tracking', () => {
   // ── AC4: Sale triggers neighbor recalculation ──────────────
 
   describe('AC4: updateNeighborsOnSale recalculates affected cards', () => {
-    it('decreases neighbor\'s currentIncome when synergy-matching card is sold', () => {
+    it('keeps neighbor\'s currentIncome unchanged when synergy-matching card is sold', () => {
       const state = createRichState();
       // Place two synergy-matching cards with different base types
       state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
@@ -268,15 +268,18 @@ describe('Per-card incremental income/reputation tracking', () => {
       state.soldSlots[1] = true;
       updateNeighborsOnSale(state, 1);
 
-      // Slot 0's income should decrease (lost synergy from sold neighbor)
+      // Slot 0's income stays the same — the sold card still provides synergy
+      // (CG-0MT5XUE2200047IJ: sold cards act as synergy anchors)
       const incomeAfter = state.streetGrid[0]!.currentIncome!;
-      expect(incomeAfter).toBeLessThan(incomeBefore);
+      expect(incomeAfter).toBe(incomeBefore);
 
-      // After sale, slot 0 income should equal its solo income
-      const expectedSolo = computeBusinessIncome(
+      // After sale, slot 0 keeps the sold neighbor's synergy contribution
+      const expected = computeBusinessIncome(
         state.streetGrid, 0, state.config.synergyBonusPerNeighbor, state.soldSlots,
       );
-      expect(incomeAfter).toBe(expectedSolo);
+      expect(incomeAfter).toBe(expected);
+      // ...and still exceeds its solo base income (3), proving synergy is retained
+      expect(incomeAfter).toBeGreaterThan(3);
     });
 
     it('updates remaining card\'s currentReputationPerTurn after neighbor sale', () => {
@@ -304,8 +307,8 @@ describe('Per-card incremental income/reputation tracking', () => {
       state.soldSlots[1] = true;
       updateNeighborsOnSale(state, 1);
 
-      // Clinic loses the synergy rep bonus from gym
-      expect(state.streetGrid[0]!.currentReputationPerTurn).toBeCloseTo(0.2);
+      // Clinic keeps the synergy rep bonus from gym (sold card is a synergy anchor)
+      expect(state.streetGrid[0]!.currentReputationPerTurn).toBeCloseTo(0.3);
     });
 
     it('handles sale of a card with no neighbors gracefully', () => {
@@ -403,7 +406,7 @@ describe('Per-card incremental income/reputation tracking', () => {
       expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(1.2); // 2 * 0.6
     });
 
-    it('removes penalty from remaining card when same-type neighbor is sold', () => {
+    it('keeps same-type penalty on remaining card when same-type neighbor is sold', () => {
       const state = createRichState('same-type-sell');
       state.streetGrid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
       state.streetGrid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, synergyTypes: ['Food'] });
@@ -418,8 +421,9 @@ describe('Per-card incremental income/reputation tracking', () => {
       state.soldSlots[1] = true;
       updateNeighborsOnSale(state, 1);
 
-      // Slot 0 should now have full income (no penalty)
-      expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(2);
+      // Same-type penalty persists: sold same-type neighbour still counts
+      // (CG-0MT5XUE2200047IJ Q1 = Remains)
+      expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(1.2);
     });
   });
 
@@ -525,7 +529,7 @@ describe('Per-card incremental income/reputation tracking', () => {
   // ── Integration: sellBusiness triggers recalcs ─────────────
 
   describe('Integration: sellBusiness triggers recalculations', () => {
-    it('decreases remaining card income after selling an adjacent synergy card', () => {
+    it('keeps remaining card income unchanged after selling an adjacent synergy card', () => {
       const state = createRichState('sell-syn-update');
       state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
       state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
@@ -538,11 +542,11 @@ describe('Per-card incremental income/reputation tracking', () => {
       sellBusiness(state, 1);
       const incomeAfter = state.streetGrid[0]!.currentIncome!;
 
-      // Income should decrease after losing synergy
-      expect(incomeAfter).toBeLessThan(incomeBefore);
-      // Slot 0 should now have only its base income (3)
-      // with bonusPerNeighbor applied (no effect for base only)
-      expect(incomeAfter).toBe(3);
+      // Income is unchanged — the sold card still provides synergy
+      // (CG-0MT5XUE2200047IJ: sold cards act as synergy anchors)
+      expect(incomeAfter).toBe(incomeBefore);
+      // Slot 0 keeps the synergy bonus from the sold neighbour (base 3 + synergy)
+      expect(incomeAfter).toBeGreaterThan(3);
     });
   });
 

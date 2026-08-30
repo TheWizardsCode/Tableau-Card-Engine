@@ -93,7 +93,8 @@ function effectiveSynergyRepBonus(card: BusinessCard | CommunitySpaceCard): numb
  * same base type (template ID). Used to determine when synergy is nullified and
  * the 60% base-income penalty applies.
  *
- * Sold slots are excluded from the check.
+ * Sold neighbours still count (they remain on the grid and contribute to the
+ * same-type penalty for non-sold neighbours).
  */
 function hasAdjacentSameType(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
@@ -109,7 +110,6 @@ function hasAdjacentSameType(
   const neighborIndices = neighbors(index, 1);
 
   for (const ni of neighborIndices) {
-    if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
     if (getBaseTypeId(neighbor.id) === baseType) {
@@ -138,6 +138,9 @@ function hasAdjacentSameType(
  * **Same-type rule:** Neighbors with the same base type (template ID) as the source
  * business are not counted toward N, preserving the 0.6 base-income penalty.
  *
+ * **Sold neighbours:** a sold neighbour still counts toward N (the sold card stays a
+ * synergy anchor — CG-0MT5XUE2200047IJ); only the sold card itself yields 0 synergy.
+ *
  * @param grid               The street grid.
  * @param index              The slot index of the business.
  * @param bonusPerNeighbor   Global multiplier on per-card coin synergy (defaults to 1).
@@ -149,7 +152,8 @@ export function computeSynergyBonus(
   bonusPerNeighbor: number = 1,
   soldSlots: boolean[] = [],
 ): number {
-  // If this slot or the business itself is sold, it contributes no synergy
+  // Source-slot guard: a sold card earns no synergy income itself
+  // (its neighbours, however, keep receiving synergy from it — CG-0MT5XUE2200047IJ)
   if (soldSlots[index]) return 0;
   const business = grid[index];
   if (!business) return 0;
@@ -163,10 +167,9 @@ export function computeSynergyBonus(
   const neighborIndices = neighbors(index, range);
 
   // Count matching, different-type neighbors (N)
+  // Sold neighbours still contribute synergy (they act as synergy anchors on the grid).
   let matchingCount = 0;
   for (const ni of neighborIndices) {
-    // Skip sold neighbor slots
-    if (soldSlots[ni]) continue;
     const neighbor = grid[ni];
     if (!neighbor) continue;
 
@@ -219,7 +222,8 @@ export function computeSynergyRepBonus(
   index: number,
   soldSlots: boolean[] = [],
 ): number {
-  // If this slot is sold, it contributes no synergy reputation
+  // Source-slot guard: a sold card earns no synergy reputation itself
+  // (its neighbours keep receiving rep synergy from it — CG-0MT5XUE2200047IJ)
   if (soldSlots[index]) return 0;
   const business = grid[index];
   if (!business) return 0;
@@ -236,8 +240,7 @@ export function computeSynergyRepBonus(
 
   let bonus = 0;
   for (const ni of neighborIndices) {
-    // Skip sold neighbor slots
-    if (soldSlots[ni]) continue;
+    // Sold neighbours still contribute synergy reputation (synergy anchors).
     const neighbor = grid[ni];
     if (!neighbor) continue;
 
@@ -416,8 +419,11 @@ export function updateNeighborsOnPlacement(
  * sale of a card at `index`.
  *
  * The sold card is already marked in `soldSlots`; this function recalculates
- * all other occupied non-sold slots since any neighbor could have lost synergy
- * or had a same-type penalty removed.
+ * all other occupied non-sold slots. With the sold-neighbour-synergy-fix,
+ * sold cards still act as synergy anchors — so in most cases the neighbours'
+ * cached values will remain unchanged (the recalculation simply confirms the
+ * status quo). However, any same-type penalty or synergy-type interactions
+ * that involved the sold card are re-evaluated to ensure consistency.
  *
  * @param state Current game state.
  * @param index The slot index of the sold card.
@@ -837,19 +843,23 @@ export interface SynergyPair {
  *
  * Community-space cards are included in the same manner as business cards.
  *
+ * Sold cards still participate as pair endpoints (synergy anchors): a pair
+ * between a sold business and its non-sold neighbour stays visible, and any
+ * pair where both endpoints are sold is emitted symmetrically too (both are
+ * inert but the line is harmless and consistent — CG-0MT5XUE2200047IJ).
+ *
  * @param grid  The street grid.
  * @returns Array of synergy pairs for visual line drawing.
  */
 export function computeSynergyPairs(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
-  soldSlots: boolean[] = [],
+  // soldSlots retained for API compat — sold cards now participate fully as pair endpoints (CG-0MT5XUE2200047IJ)
+  _soldSlots: boolean[] = [],
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
   const seen = new Set<string>();
 
   for (let i = 0; i < grid.length; i++) {
-    // Skip sold slots (sold cards don't participate in synergy)
-    if (soldSlots[i]) continue;
     const card = grid[i];
     if (!card) continue;
 
@@ -863,8 +873,7 @@ export function computeSynergyPairs(
 
     for (const ni of neighborIndices) {
       if (ni <= i) continue; // avoid duplicates and self-pairs
-      // Skip sold neighbor slots
-      if (soldSlots[ni]) continue;
+      // Sold neighbours still form synergy pairs (visual link remains visible).
       const neighbor = grid[ni];
       if (!neighbor) continue;
 

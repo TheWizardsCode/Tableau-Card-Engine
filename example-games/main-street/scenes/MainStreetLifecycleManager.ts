@@ -344,7 +344,9 @@ export class MainStreetLifecycleManager {
             'Synergy bonuses stack additively per matching neighbor. ' +
             'Some cards bridge multiple synergy types and count for both. ' +
             'Upgrades can increase range and value. ' +
-            'Plan placements to cluster synergies for higher returns.';
+            'Plan placements to cluster synergies for higher returns. ' +
+            'Selling a business stops its own income, but it stays on the street ' +
+            'and keeps providing synergy to its neighbours (CG-0MT5XUE2200047IJ).';
 
           const paraStyle: Phaser.Types.GameObjects.Text.TextStyle = {
             fontSize: '14px',

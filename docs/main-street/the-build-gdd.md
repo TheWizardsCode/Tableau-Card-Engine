@@ -183,6 +183,7 @@ stateDiagram-v2
 5. **IncomePhase** – For each placed Business, compute:
    - `totalIncome = effectiveBase + synergyBonus` where `effectiveBase = (baseIncome + incomeBonus) * sameTypePenalty` (0.6 for same-type neighbors) and `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount` (percentage-based: `synergyCoinBonus` is the card's rate, defaulting to 0.5 = 50% of base income per matching neighbor; `bonusPerNeighbor` is the difficulty multiplier — 0.5 Easy / 0.35 Medium / 0.25 Hard (re-tuned by CG-0MSP26Q5N002EH8P)). `matchingNeighborCount` counts 8‑way adjacent neighbors (orthogonal **and diagonal**, Chebyshev distance ≤ range).
    - `resourceBank.coins += totalIncome`.
+   - **Sold businesses** (CG-0MT5XUE2200047IJ): a sold card produces **0 income and 0 reputation for itself**, but remains a **synergy anchor** — its non‑sold neighbours keep the exact coin synergy, reputation synergy, and same‑type penalty they had before the sale (the sold card still counts as a matching neighbour and as a same‑type neighbour). Selling a business therefore never degrades the rest of the street.
 6. **IncidentPhase** – Resolve the front Incident card from the visible FIFO incident queue. After resolution, draw a replacement Incident from the event deck to the back of the queue (maintaining queue size of 2). If the deck has no more Incidents, the queue shrinks naturally.
 7. **EndCheck** – Evaluate win/loss conditions.
 8. Loop back to **DayStart** for the next turn.

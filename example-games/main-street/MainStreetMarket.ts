@@ -968,7 +968,10 @@ export function sellBusiness(
   // Mark slot as sold
   state.soldSlots[slotIndex] = true;
 
-  // Incrementally update all affected neighbors' cached values (they lost synergy/same-type from this card)
+  // Incrementally update all affected neighbors' cached values.
+  // With the sold-neighbour-synergy fix, sold cards remain synergy anchors
+  // — neighbours typically retain their synergy bonuses (values stay stable),
+  // but recalculation ensures consistency for same-type penalty and type-matching.
   updateNeighborsOnSale(state, slotIndex);
 
   addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (50% of €${purchasePrice + upgradeCosts})`, 'gain');

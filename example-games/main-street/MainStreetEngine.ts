@@ -1382,9 +1382,10 @@ export function canSellFromTableau(
 /**
  * Executes a sell of a business/community-space card from the street grid.
  *
- * The card remains on the grid but is marked as sold and no longer produces
- * income, synergy, or reputation. The player receives
- * `Math.ceil((card.cost + totalUpgradeCost) / 2)` coins.
+ * The card remains on the grid but is marked as sold: it no longer produces
+ * income or reputation for itself, but still provides synergy to its
+ * neighbours (it stays a synergy anchor — CG-0MT5XUE2200047IJ). The player
+ * receives `Math.ceil((card.cost + totalUpgradeCost) / 2)` coins.
  *
  * @param state     Current game state (mutated in-place).
  * @param slotIndex Street grid slot index of the card to sell.

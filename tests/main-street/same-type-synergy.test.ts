@@ -456,7 +456,7 @@ describe('Same-type synergy nullification', () => {
   });
 
   describe('Edge cases', () => {
-    it('handles sold slots correctly — sold same-type neighbor does not trigger penalty', () => {
+    it('sold same-type neighbor still triggers the penalty (CG-0MT5XUE2200047IJ)', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
       grid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, synergyTypes: ['Food'] });
@@ -465,8 +465,10 @@ describe('Same-type synergy nullification', () => {
       const soldSlots = new Array(GRID_SIZE).fill(false);
       soldSlots[1] = true;
 
-      // Sold slots are skipped, so slot 0 has no neighbors, no penalty
+      // Same-type rule gives slot 0 no synergy; the sold neighbour still
+      // counts for the 0.6 base-income penalty (Q1 = Remains).
       expect(computeSynergyBonus(grid, 0, 1, soldSlots)).toBe(0);
+      expect(computeBusinessIncome(grid, 0, 1, soldSlots)).toBeCloseTo(2 * 0.6, 5);
       // Sold slots produce no income
       expect(computeBusinessIncome(grid, 1, 1, soldSlots)).toBe(0);
     });

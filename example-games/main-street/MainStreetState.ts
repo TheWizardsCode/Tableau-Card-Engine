@@ -255,7 +255,9 @@ export interface MainStreetState {
   skipMarketCycleOnEndTurn: boolean;
   /**
    * Tracks which street grid slots have been sold. Length = GRID_SIZE.
-   * true = card in this slot has been sold (non-functional, no income/synergy).
+   * true = card in this slot has been sold (no income/reputation for itself,
+   * but still acts as a synergy anchor — its neighbours retain synergy bonuses
+   * and same-type penalties as if the card were active).
    * false = card is active (default).
    */
   soldSlots: boolean[];
