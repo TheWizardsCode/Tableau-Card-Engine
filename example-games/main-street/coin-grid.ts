@@ -70,6 +70,11 @@ export const MIN_COIN_SIZE = 4;
 export const COIN_GRID_FULL_KEY = 'ms-coin-grid-full';
 export const COIN_GRID_HALF_KEY = 'ms-coin-grid-half';
 
+/** Rounds a fractional amount to the nearest 0.5 for display at the animation layer. */
+export function roundHalf(x: number): number {
+  return Math.round(x * 2) / 2;
+}
+
 /** Split an income amount into whole coins plus one optional half coin. */
 export function splitCoins(count: number): { fullCoins: number; halfCoin: boolean } {
   const fullCoins = Math.max(0, Math.floor(count));

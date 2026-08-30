@@ -10,8 +10,30 @@ import { describe, expect, it } from 'vitest';
 import {
   gridColumns,
   packCoins,
+  roundHalf,
   splitCoins,
 } from '../../example-games/main-street/coin-grid';
+
+describe('roundHalf', () => {
+  it('rounds whole and half amounts unchanged', () => {
+    expect(roundHalf(0)).toBe(0);
+    expect(roundHalf(1)).toBe(1);
+    expect(roundHalf(2.5)).toBe(2.5);
+  });
+
+  it('rounds fractional income to the nearest 0.5 (animation layer, Q8)', () => {
+    expect(roundHalf(0.6)).toBe(0.5);
+    expect(roundHalf(0.9)).toBe(1);
+    expect(roundHalf(2.1)).toBe(2);
+    expect(roundHalf(2.75)).toBe(3);
+    expect(roundHalf(1.2)).toBe(1);
+  });
+
+  it('uses half-up ties', () => {
+    expect(roundHalf(2.25)).toBe(2.5);
+    expect(roundHalf(3.75)).toBe(4);
+  });
+});
 
 describe('splitCoins', () => {
   it('returns no icons for zero', () => {

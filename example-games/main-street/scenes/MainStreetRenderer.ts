@@ -1466,6 +1466,83 @@ export class MainStreetRenderer {
     }
   }
 
+  /**
+   * Adds an animated effect line into the Upcoming panel (income phase,
+   * CG-0MT23O6W8003AXWJ).
+   *
+   * Duration-effect (income-multiplier) events that contributed a delta
+   * this turn reveal their line one letter at a time — each character
+   * grows (scale 0 → 1) with a slight overshoot, then the whole line
+   * settles with a small shrink pulse. The line sits below the panel's
+   * existing static effect lines at the same x as the deck-count/effect
+   * text (`contentX`).
+   *
+   * The lines are parented into `incidentQueueContainer`, so the next
+   * panel re-render (`drawUpcomingPanel` `removeAll`) cleans them up.
+   *
+   * @param effect    Active effect whose description becomes the line.
+   * @param rowIndex  Total row index (static effect lines + delta effects
+   *                  before this one) — same `+=16` row math as the panel.
+   * @returns The per-letter text objects (for tests/cleanup).
+   */
+  public animateUpcomingEffectLine(
+    effect: { sourceEventId: string; description: string },
+    rowIndex: number,
+  ): Phaser.GameObjects.Text[] {
+    const s = this.scene;
+    // Mirror drawUpcomingPanel's layout math so the animated line lands in
+    // the same row the static effect lines use.
+    const { logX, queueTop } = s.layout;
+    const panelX = logX;
+    const pad = 8;
+    const titleH = 22;
+    const contentX = panelX + pad;
+    const rowStartY = queueTop + titleH + pad + s.layout.queueCardH + 6 + 18;
+    const lineY = rowStartY + 16 * rowIndex;
+
+    const warnIcon = String.fromCodePoint(0x26A0);
+    const dash = String.fromCodePoint(0x2014);
+    const text = warnIcon + ' ' + effect.description + ' ' + dash + ' New';
+
+    const chars: Phaser.GameObjects.Text[] = [];
+    for (let i = 0; i < text.length; i++) {
+      const char = s.add.text(contentX + i * 7, lineY, text[i], {
+        fontSize: '10px',
+        color: '#ff6644',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0, 0).setScale(0);
+      s.incidentQueueContainer.add(char);
+      chars.push(char);
+
+      // Grow in (one-letter reveal): scale 0 → 1 with a Back overshoot.
+      s.time.delayedCall(i * 40, () => {
+        try {
+          s.tweens.add({
+            targets: char,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 180,
+            ease: 'Back.easeOut',
+          });
+        } catch { /* ignore */ }
+      });
+
+      // Shrink settle for new effects: a quick scale pulse after the grow.
+      s.time.delayedCall(i * 40 + 260, () => {
+        try {
+          s.tweens.add({
+            targets: char,
+            scaleX: 0.92,
+            scaleY: 0.92,
+            duration: 120,
+            yoyo: true,
+          });
+        } catch { /* ignore */ }
+      });
+    }
+    return chars;
+  }
+
   public refreshPlayerHand(): void {
     const s = this.scene;
     // handContainer zone kept for backward-compat (zone-metadata tests)

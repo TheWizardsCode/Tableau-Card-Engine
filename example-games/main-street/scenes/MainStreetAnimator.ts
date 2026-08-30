@@ -1,10 +1,51 @@
 import Phaser from 'phaser';
 import { CARD_TEMPLATE_NAMES, synergyColor } from '../MainStreetCards';
 import { FONT_FAMILY, popTextOrIcon, moveGameObject } from '../../../src/ui';
-import type { SlotIncome, SynergyPair } from '../MainStreetAdjacency';
+import type { SlotIncome, SlotPhaseBreakdown, SynergyPair } from '../MainStreetAdjacency';
+import { computeSynergyPairs } from '../MainStreetAdjacency';
 import { SFX_KEYS, CARD_BACK_TEMPLATE } from './MainStreetConstants';
 import { synergyLineEndpoints } from './synergyLineEndpoints';
 import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
+import { createCoinGrid, roundHalf, splitCoins, type CoinGridHandle } from '../coin-grid';
+
+// ── Income phase animation timing (CG-0MT23O6W8003AXWJ) ────────────────
+// Tune these constants to adjust the phased income choreography pacing.
+
+/** Gap between income phase starts (~2-3s apart per AC1). */
+const INCOME_PHASE_GAP_MS = 2200;
+/** How long each phase's on-screen label stays visible. */
+const INCOME_PHASE_LABEL_MS = 1400;
+/** Stagger between coins as they count out of a card (base phase). */
+const INCOME_BASE_COUNT_STAGGER_MS = 90;
+/** Duration of a coin flight tween (synergy/rep/event/collection). */
+const INCOME_FLIGHT_MS = 600;
+/** Stagger between coins in a multi-coin flight. */
+const INCOME_FLIGHT_STAGGER_MS = 60;
+/** Stagger between grid-to-HUD collection flights. */
+const INCOME_COLLECT_STAGGER_MS = 80;
+
+/** Phase keys for the phased income animation (base → … → collect). */
+export type IncomePhaseKey = 'base' | 'synergy' | 'reputation' | 'events' | 'upcoming' | 'collect';
+
+/** Options for {@link MainStreetAnimator.animateIncomePhases}. */
+export interface IncomePhaseOptions {
+  /** Milliseconds between phase starts (default `INCOME_PHASE_GAP_MS`). */
+  phaseGapMs?: number;
+  /** Initial delay before the first phase (default 0). */
+  startDelayMs?: number;
+  /**
+   * Lifecycle hook called at each phase start (including `collect`), in
+   * both full and reduced-motion modes. Never throws into the choreography.
+   */
+  onPhase?: (phase: IncomePhaseKey, index: number) => void;
+}
+
+/** A producing slot resolved to its live card container + coin grid handle. */
+interface IncomePhaseSlot {
+  pd: SlotPhaseBreakdown;
+  card: Phaser.GameObjects.Container;
+  handle: CoinGridHandle;
+}
 
 /** MainStreetAnimator -- animation and HUD-delta helper for Main Street scene. */
 export class MainStreetAnimator {
@@ -303,6 +344,519 @@ export class MainStreetAnimator {
     params.repSources.forEach((slot, i) => {
       launch(this.getStreetSlotCenter(slot.slotIndex), { x: repX, y: hudY }, 'rep', (coinSources.length + i) * staggerMs);
     });
+  }
+
+  // ── Phased income animation (CG-0MT23O6W8003AXWJ) ───────────────────
+
+  /**
+   * Orchestrates the full phased income choreography: base → synergy →
+   * reputation → events → upcoming, then grid-to-HUD collection.
+   *
+   * Phase semantics (each phase's coins land on the affected cards' on-card
+   * coin grids from child 2):
+   *
+   * 1. **Base** — each producing slot's base coins "count out" of the card
+   *    into its on-card grid, one coin at a time (`COIN_POP` SFX per coin).
+   * 2. **Synergy** — hand-card synergy coins fly from the synergy line
+   *    midpoints (`synergyLineEndpoints`) into the affected grids.
+   * 3. **Reputation** — reputation bonus coins fly from the reputation HUD
+   *    counter into the affected grids.
+   * 4. **Events** — duration-effect (income-multiplier) events show animated
+   *    effect text lines in the Upcoming panel (one-letter grow/shrink
+   *    reveal, added via `MainStreetRenderer.animateUpcomingEffectLine`);
+   *    their coins fly in (positive delta) or out (negative delta) of the
+   *    affected business grids.
+   * 5. **Upcoming** — upcoming-card income deltas fly coins in/out
+   *    (placeholder data is not yet wired upstream, so this phase normally
+   *    only paces + labels).
+   * 6. **Collect** — remaining grid coins fly to the HUD coins counter with
+   *    the existing final `+<total>` pop and coin-pop SFX (AC7);
+   *    `scene.incomeCollectionActive` runs true for the choreography and
+   *    clears at the end, suppressing the immediate HUD delta pop.
+   *
+   * Accessibility (AC8, reduced motion): every phase still runs on the same
+   * schedule and shows its phase label — text/phase progression only, no
+   * coin flights or count-out tweens.
+   *
+   * Headless/replay exemption (AGENTS.md rule 8 / AC10): presentation-only
+   * effect; returns immediately in replay/headless mode (`scene.replayMode`)
+   * — no rendering, no audio. Documented exemption.
+   *
+   * Non-blocking (AC9): the choreography never mutates game state, the
+   * transcript, or the turn flow; every step is defensive and failures are
+   * swallowed so the turn always advances.
+   *
+   * @param phaseData  Per-slot phase contributions (from `IncomeResult.phaseBreakdown`).
+   * @param options    Tuning + lifecycle hook (phaseGapMs/startDelayMs for
+   *                   tests, onPhase for progress observation).
+   */
+  public animateIncomePhases(phaseData: SlotPhaseBreakdown[], options: IncomePhaseOptions = {}): void {
+    const s = this.scene;
+
+    // Headless/replay exemption (AC10): no rendering or audio in those modes.
+    if (s.replayMode) return;
+
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+    const gap = Math.max(1, options.phaseGapMs ?? INCOME_PHASE_GAP_MS);
+    const startAt = Math.max(0, options.startDelayMs ?? 0);
+
+    try {
+      // Resolve producing slots to live card containers and create their
+      // grids up front. Grids are parented to the card containers (child 2)
+      // so coins move with the cards; later phases mutate them in place.
+      const slots: IncomePhaseSlot[] = [];
+      for (const pd of phaseData) {
+        const card = this.findStreetCardContainer(pd.slotIndex);
+        if (!card) continue;
+        slots.push({ pd, card, handle: createCoinGrid(s, card) });
+      }
+      if (slots.length === 0) return;
+
+      s.incomeCollectionActive = true;
+
+      const emit = (phase: IncomePhaseKey, index: number): void => {
+        try {
+          options.onPhase?.(phase, index);
+        } catch { /* ignore */ }
+      };
+
+      const phaseMeta: Array<{ key: IncomePhaseKey; label: string; color: number }> = [
+        { key: 'base', label: 'Base income', color: 0xffdd66 },
+        { key: 'synergy', label: 'Synergy', color: 0xb89bff },
+        { key: 'reputation', label: 'Reputation', color: 0x88bbff },
+        { key: 'events', label: 'Events', color: 0xff7744 },
+        { key: 'upcoming', label: 'Upcoming', color: 0x55ddaa },
+      ];
+
+      let t = startAt;
+      phaseMeta.forEach((meta, i) => {
+        const at = t;
+        s.time.delayedCall(at, () => {
+          try {
+            emit(meta.key, i);
+            this.showIncomePhaseLabel(meta.label, meta.color);
+            this.runIncomePhase(meta.key, slots, { reducedMotion });
+          } catch { /* ignore */ }
+        });
+        t += gap;
+      });
+
+      s.time.delayedCall(t, () => {
+        try {
+          emit('collect', phaseMeta.length);
+          this.collectIncomeGrids(slots, {
+            reducedMotion,
+            creditedTotal: this.creditedIncomeTotal(phaseData),
+          });
+        } catch { /* ignore */ }
+      });
+    } catch {
+      s.incomeCollectionActive = false;
+    }
+  }
+
+  /**
+   * Executes one income phase's visual work. Reduced motion runs the phases
+   * on the same schedule with text progression only (AC8) — no flights.
+   */
+  private runIncomePhase(phase: IncomePhaseKey, slots: IncomePhaseSlot[], ctx: {
+    reducedMotion: boolean;
+  }): void {
+    const s = this.scene;
+
+    switch (phase) {
+      case 'base': {
+        if (ctx.reducedMotion) return;
+        slots.forEach((slot, si) => {
+          const amount = Math.max(0, roundHalf(slot.pd.baseIncome));
+          if (splitCoins(amount).fullCoins === 0 && !splitCoins(amount).halfCoin) return;
+          this.countOutCoins(slot, amount, si * INCOME_BASE_COUNT_STAGGER_MS);
+        });
+        break;
+      }
+      case 'synergy': {
+        if (ctx.reducedMotion) return;
+        if (!slots.some((sl) => roundHalf(sl.pd.synergyBonus) > 0)) return;
+        const sources = this.synergyPhaseSources();
+        slots.forEach((slot, si) => {
+          const amount = Math.max(0, roundHalf(slot.pd.synergyBonus));
+          if (splitCoins(amount).fullCoins === 0 && !splitCoins(amount).halfCoin) return;
+          const from = sources.get(slot.pd.slotIndex) ?? sources.get('fallback')!;
+          this.flyCoinsIn(slot, amount, from, si * INCOME_FLIGHT_STAGGER_MS);
+        });
+        break;
+      }
+      case 'reputation': {
+        if (ctx.reducedMotion) return;
+        if (!slots.some((sl) => roundHalf(sl.pd.repBonus) > 0)) return;
+        const from = { x: s.layout.gameW * 0.5, y: s.layout.hudY };
+        slots.forEach((slot, si) => {
+          const amount = Math.max(0, roundHalf(slot.pd.repBonus));
+          if (splitCoins(amount).fullCoins === 0 && !splitCoins(amount).halfCoin) return;
+          this.flyCoinsIn(slot, amount, from, si * INCOME_FLIGHT_STAGGER_MS);
+        });
+        break;
+      }
+      case 'events': {
+        if (ctx.reducedMotion) return;
+        // Duration-effect (income-multiplier) events that contributed a
+        // delta this turn: animated line reveals in the Upcoming panel +
+        // coins fly in (positive) or out (negative) of affected grids.
+        // Driven by the phase data's `eventDeltas` (authoritative for the
+        // credits shown) — active-effect descriptions are preferred for the
+        // line text when still present (effects may have decayed by now).
+        const deltaEffects = this.eventDeltaEffects(slots);
+        if (deltaEffects.length === 0) return;
+        const lineStartRow = (s.state.activeEffects ?? []).length;
+        deltaEffects.forEach((effect, ei) => {
+          try {
+            s.msRenderer?.animateUpcomingEffectLine?.(effect, lineStartRow + ei);
+          } catch { /* ignore */ }
+          // Coins in/out per affected slot for this effect.
+          slots.forEach((slot, si) => {
+            const delta = slot.pd.eventDeltas.reduce(
+              (acc, d) => (d.cardId === effect.sourceEventId ? acc + d.delta : acc),
+              0,
+            );
+            if (delta === 0) return;
+            const amount = Math.abs(roundHalf(delta));
+            const icons = splitCoins(amount);
+            if (icons.fullCoins === 0 && !icons.halfCoin) return;
+            const at = (ei * deltaEffects.length + si) * INCOME_FLIGHT_STAGGER_MS;
+            if (delta > 0) {
+              this.flyCoinsIn(slot, amount, this.eventSourcePoint(), at);
+            } else {
+              this.flyCoinsOut(slot, icons.fullCoins + (icons.halfCoin ? 1 : 0), this.eventSourcePoint(), at);
+            }
+          });
+        });
+        break;
+      }
+      case 'upcoming': {
+        if (ctx.reducedMotion) return;
+        // Upcoming-card deltas are placeholder data today (not yet wired
+        // upstream); implement the general in/out mechanism so the phase
+        // flies coins whenever a future data source fills `upcomingDeltas`.
+        const from = { x: s.layout.gameW * 0.5, y: s.layout.queueTop };
+        slots.forEach((slot, si) => {
+          for (const d of slot.pd.upcomingDeltas ?? []) {
+            const amount = Math.abs(roundHalf(d.delta));
+            const icons = splitCoins(amount);
+            if (icons.fullCoins === 0 && !icons.halfCoin) continue;
+            const at = si * INCOME_FLIGHT_STAGGER_MS;
+            if (d.delta > 0) {
+              this.flyCoinsIn(slot, amount, from, at);
+            } else {
+              this.flyCoinsOut(slot, icons.fullCoins + (icons.halfCoin ? 1 : 0), from, at);
+            }
+          }
+        });
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Income-multiplier effects that produced event deltas this turn, keyed
+   * by the phase data (authoritative). Active-effect descriptions are
+   * preferred for the line text when the effect is still active.
+   */
+  private eventDeltaEffects(slots: IncomePhaseSlot[]): Array<{
+    sourceEventId: string;
+    description: string;
+  }> {
+    const s = this.scene;
+    const byId = new Map<string, string>();
+    for (const slot of slots) {
+      for (const d of slot.pd.eventDeltas ?? []) {
+        if (!byId.has(d.cardId)) byId.set(d.cardId, d.name);
+      }
+    }
+    for (const effect of s.state.activeEffects ?? []) {
+      if (effect.effectType === 'income-multiplier' && byId.has(effect.sourceEventId)) {
+        byId.set(effect.sourceEventId, effect.description);
+      }
+    }
+    return [...byId.entries()].map(([sourceEventId, description]) => ({ sourceEventId, description }));
+  }
+
+  /** Source point for event-phase coin flights (near the Upcoming panel). */
+  private eventSourcePoint(): { x: number; y: number } {
+    const s = this.scene;
+    return { x: s.layout.logX + 40, y: s.layout.queueTop + 26 };
+  }
+
+  /**
+   * Synergy flight sources: midpoint of each synergy pair whose cards have
+   * a synergy contribution; fallback is above the street (no pairs → no
+   * street-adjacent anchor for hand synergy).
+   */
+  private synergyPhaseSources(): Map<number | 'fallback', { x: number; y: number }> {
+    const s = this.scene;
+    const sources = new Map<number | 'fallback', { x: number; y: number }>();
+    try {
+      const pairs = computeSynergyPairs(s.state.streetGrid ?? [], s.state.soldSlots ?? []);
+      for (const pair of pairs) {
+        const { mid } = synergyLineEndpoints(pair, s.layout);
+        if (!sources.has(pair.fromIndex)) sources.set(pair.fromIndex, mid);
+        if (!sources.has(pair.toIndex)) sources.set(pair.toIndex, mid);
+      }
+    } catch { /* ignore */ }
+    sources.set('fallback', { x: s.layout.gameW * 0.5, y: Math.max(24, s.layout.streetTop + 6) });
+    return sources;
+  }
+
+  /**
+   * Base phase: count a slot's coins out of its card one at a time. Each
+   * step re-packs the grid with the cumulative amount; the final fractional
+   * amount renders the half coin last. Newly added coin pops in.
+   */
+  private countOutCoins(slot: IncomePhaseSlot, amount: number, at: number): void {
+    const s = this.scene;
+    const { fullCoins, halfCoin } = splitCoins(amount);
+    const iconCount = fullCoins + (halfCoin ? 1 : 0);
+    if (iconCount === 0) return;
+    for (let n = 1; n <= iconCount; n++) {
+      s.time.delayedCall(at + (n - 1) * INCOME_BASE_COUNT_STAGGER_MS, () => {
+        try {
+          // Intermediate steps show whole-coin amounts; the final step shows
+          // the fractional amount so the half coin renders last.
+          const cumulative = n <= fullCoins ? n : amount;
+          this.revealInGrid(slot, cumulative);
+        } catch { /* ignore */ }
+      });
+    }
+  }
+
+  /** Adds the cumulative amount to a slot's grid with a pop-in + coin SFX. */
+  private revealInGrid(slot: IncomePhaseSlot, cumulativeAmount: number): void {
+    const s = this.scene;
+    const layout = slot.handle.addCoins(cumulativeAmount);
+    if (!layout) return;
+    const icons = slot.handle.container.list;
+    const last = icons[icons.length - 1] as Phaser.GameObjects.Image | undefined;
+    if (last) {
+      last.setScale(0);
+      s.tweens.add({
+        targets: last,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 220,
+        ease: 'Back.easeOut',
+      });
+    }
+    try { s.soundManager?.play(SFX_KEYS.COIN_POP); } catch { /* ignore */ }
+  }
+
+  /**
+   * Flies `amount` coins from a source point into a slot's grid, landing on
+   * the grid transform origin (bottom-right quadrant).
+   */
+  private flyCoinsIn(slot: IncomePhaseSlot, amount: number, from: { x: number; y: number }, at: number): void {
+    const s = this.scene;
+    const { fullCoins, halfCoin } = splitCoins(amount);
+    const iconCount = fullCoins + (halfCoin ? 1 : 0);
+    if (iconCount === 0) return;
+    const m = slot.handle.container.getWorldTransformMatrix();
+    const to = { x: m.getX(0, 0), y: m.getY(0, 0) };
+    for (let i = 0; i < iconCount; i++) {
+      s.time.delayedCall(at + i * INCOME_FLIGHT_STAGGER_MS, () => {
+        try {
+          const visual = s.add.circle(from.x, from.y, 6, 0xffcc44, 1).setDepth(3000);
+          moveGameObject({
+            scene: s,
+            target: visual,
+            destX: to.x,
+            destY: to.y,
+            duration: INCOME_FLIGHT_MS,
+            ease: 'Quad.easeIn',
+            soundManager: s.soundManager,
+            sfx: { start: SFX_KEYS.COIN_POP, moveIntervalMs: 200 },
+            onComplete: () => {
+              try {
+                visual.destroy();
+                // Cumulative landed amount: whole coins then the fractional
+                // amount (half coin last) — same as the count-out path.
+                this.revealInGrid(slot, i + 1 <= fullCoins ? i + 1 : amount);
+              } catch { /* ignore */ }
+            },
+          });
+        } catch { /* ignore */ }
+      });
+    }
+  }
+
+  /**
+   * Removes `iconCount` coins from a slot's grid, flying each out toward a
+   * target point where it fades. Used by negative event/upcoming deltas.
+   * Clamps to the coins actually present in the grid.
+   */
+  private flyCoinsOut(slot: IncomePhaseSlot, iconCount: number, to: { x: number; y: number }, at: number): void {
+    const s = this.scene;
+    const grid = slot.handle.container;
+    for (let i = 0; i < iconCount; i++) {
+      s.time.delayedCall(at + i * INCOME_FLIGHT_STAGGER_MS, () => {
+        try {
+          const icon = grid.list[grid.list.length - 1] as Phaser.GameObjects.Image | undefined;
+          if (!icon) return; // no coins left in the grid to remove
+          const m = icon.getWorldTransformMatrix();
+          const from = { x: m.getX(0, 0), y: m.getY(0, 0) };
+          grid.remove(icon);
+          s.add.existing(icon);
+          icon.setPosition(from.x, from.y).setDepth(3000);
+          moveGameObject({
+            scene: s,
+            target: icon,
+            destX: to.x,
+            destY: to.y,
+            duration: INCOME_FLIGHT_MS,
+            ease: 'Quad.easeIn',
+            onComplete: () => {
+              try { icon.destroy(); } catch { /* ignore */ }
+            },
+          });
+          s.tweens.add({ targets: icon, alpha: 0, duration: INCOME_FLIGHT_MS, delay: INCOME_FLIGHT_MS * 0.4 });
+        } catch { /* ignore */ }
+      });
+    }
+  }
+
+  /**
+   * Grid-to-HUD collection (AC7): every remaining grid coin flies to the
+   * HUD coins counter (staggered, `COIN_POP` SFX); when the last coin lands
+   * the final `+<total>` pop plays and `incomeCollectionActive` clears.
+   * Reduced motion: no flights — the final `+<total>` text pop only.
+   */
+  private collectIncomeGrids(slots: IncomePhaseSlot[], ctx: {
+    reducedMotion: boolean;
+    creditedTotal: number;
+  }): void {
+    const s = this.scene;
+    const { gameW, hudY } = s.layout;
+    const coinX = gameW * 0.25 + 70;
+
+    let pending = 0;
+    const finalize = (): void => {
+      try {
+        if (!ctx.reducedMotion || pending === 0) {
+          const totalText = s.add.text(coinX, hudY - 8, `+${ctx.creditedTotal}`, {
+            fontSize: '18px',
+            fontStyle: 'bold',
+            color: '#ffdd66',
+            fontFamily: FONT_FAMILY,
+          }).setOrigin(0.5).setDepth(500);
+          void popTextOrIcon({
+            scene: s,
+            target: totalText,
+            duration: 1000,
+            riseY: 24,
+            scale: 1.3,
+            reducedMotion: false,
+          });
+          try { s.soundManager?.play(SFX_KEYS.INCOME_POSITIVE); } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+      for (const slot of slots) {
+        try { slot.handle.container.destroy(); } catch { /* ignore */ }
+      }
+      s.incomeCollectionActive = false;
+    };
+
+    if (ctx.reducedMotion) {
+      finalize();
+      return;
+    }
+
+    // Fly each grid icon to the HUD counter; the last landing finalizes.
+    for (const slot of slots) {
+      const grid = slot.handle.container;
+      const icons = [...grid.list];
+      for (let i = 0; i < icons.length; i++) {
+        const icon = icons[i] as Phaser.GameObjects.Image;
+        pending += 1;
+        s.time.delayedCall(i * INCOME_COLLECT_STAGGER_MS, () => {
+          try {
+            const m = icon.getWorldTransformMatrix();
+            const from = { x: m.getX(0, 0), y: m.getY(0, 0) };
+            grid.remove(icon);
+            s.add.existing(icon);
+            icon.setPosition(from.x, from.y).setDepth(3000);
+            moveGameObject({
+              scene: s,
+              target: icon,
+              destX: coinX,
+              destY: hudY,
+              duration: INCOME_FLIGHT_MS,
+              ease: 'Quad.easeIn',
+              soundManager: s.soundManager,
+              sfx: { start: SFX_KEYS.COIN_POP, moveIntervalMs: 200 },
+              onComplete: () => {
+                try { icon.destroy(); } catch { /* ignore */ }
+                pending -= 1;
+                if (pending <= 0) finalize();
+              },
+            });
+          } catch {
+            pending -= 1;
+            if (pending <= 0) finalize();
+          }
+        });
+      }
+    }
+    if (pending === 0) finalize();
+  }
+
+  /**
+   * Exact credited total from the per-slot phase data, rounded to nearest
+   * 0.5 for the final `+<total>` display pop (Q8: rounding at animation).
+   *
+   * = Σ per slot (base + synergy + rep + event deltas + upcoming deltas)
+   * — this equals the coins actually credited to the bank (`multiplied`).
+   */
+  private creditedIncomeTotal(phaseData: SlotPhaseBreakdown[]): number {
+    let sum = 0;
+    for (const pd of phaseData) {
+      sum += pd.baseIncome + pd.synergyBonus + pd.repBonus;
+      for (const d of pd.eventDeltas ?? []) sum += d.delta;
+      for (const d of pd.upcomingDeltas ?? []) sum += d.delta;
+    }
+    return roundHalf(Math.max(0, sum));
+  }
+
+  /**
+   * Shows a small phase label above the street that fades in/out. Used by
+   * both the full and reduced-motion paths (text progression per AC8).
+   */
+  private showIncomePhaseLabel(text: string, color: number): void {
+    const s = this.scene;
+    try {
+      const label = s.add.text(
+        s.layout.gameW * 0.5,
+        Math.max(24, s.layout.streetTop - 10),
+        text,
+        {
+          fontSize: '15px',
+          fontStyle: 'bold',
+          color: '#' + color.toString(16).padStart(6, '0'),
+          fontFamily: FONT_FAMILY,
+        },
+      ).setOrigin(0.5).setDepth(510).setAlpha(0);
+      s.tweens.add({ targets: label, alpha: 1, duration: 160, ease: 'Quad.easeOut' });
+      s.time.delayedCall(INCOME_PHASE_LABEL_MS, () => {
+        try {
+          s.tweens.add({
+            targets: label,
+            alpha: 0,
+            duration: 220,
+            onComplete: () => {
+              try { label.destroy(); } catch { /* ignore */ }
+            },
+          });
+        } catch { /* ignore */ }
+      });
+    } catch { /* ignore */ }
   }
 
   /**
