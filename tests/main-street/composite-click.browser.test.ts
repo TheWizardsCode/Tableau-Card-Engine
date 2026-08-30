@@ -138,12 +138,28 @@ async function waitForCondition(
  * latency grows under parallel-browser CPU contention. Use a generous
  * timeout (each test gets an explicit 90s budget).
  */
+/**
+ * Wait for the premium dialog to become visible. The dialog is created by
+ * showBuyAndPlacePremiumDialog immediately after the street-slot placement
+ * resolves, but rendering it needs the next RAF frame — and under
+ * parallel-browser CPU contention a starved frame chain can stall for
+ * seconds at a time (or die outright via a step exception; see
+ * clickCompositeToSlot). So factor loop liveness INTO the deadline: sample
+ * the game loop and, while it is frozen, wait for it to revive instead of
+ * burning the budget. The 60s wall-clock budget still bounds the total wait
+ * (the enclosing test's 90s hook leaves headroom).
+ */
 async function waitForPremiumDialog(scene: Scene, label = 'premium dialog to appear'): Promise<void> {
-  const ok = await waitForCondition(() => isDialogOpen(scene), label, 45_000).then(
-    () => true,
-    () => false,
-  );
-  if (!ok) throw new Error(`Timed out waiting for ${label}`);
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (isDialogOpen(scene)) return;
+    if (await loopIsFrozen(scene)) {
+      await waitForLoopRevival(scene, Math.min(2_000, deadline - Date.now()));
+      continue;
+    }
+    await wait(250);
+  }
+  throw new Error(`Timed out waiting for ${label}`);
 }
 
 type Scene = Phaser.Scene & Record<string, any>;

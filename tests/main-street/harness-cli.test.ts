@@ -78,7 +78,7 @@ describe('Main Street harness CLI scripts (vite-node)', () => {
     expect(report.metrics.runs).toBe(4);
     expect(report.metrics.winRate).toBeGreaterThanOrEqual(0);
     expect(report.metrics.winRate).toBeLessThanOrEqual(1);
-  });
+  }, 180_000);
 
   it('monte-carlo.ts sweep mode runs all strategy×difficulty combos via vite-node and writes per-combo outputs', () => {
     const jsonBase = path.join(tmpDir, 'sweep.json');
@@ -110,7 +110,7 @@ describe('Main Street harness CLI scripts (vite-node)', () => {
     expect(report.metrics.runs).toBe(2);
     expect(report.strategy).toBe('greedy');
     expect(report.difficulty).toBe('Easy');
-  });
+  }, 180_000);
 
   it('npm run save-load-smoke completes green via vite-node (deterministic restore, 0 failures)', () => {
     // The npm script itself is the interface under test (its runner was the
@@ -130,5 +130,5 @@ describe('Main Street harness CLI scripts (vite-node)', () => {
     expect(report.failures).toBe(0);
     expect(report.deterministic).toBe(true);
     expect(report.campaignRoundTrip).toBe(true);
-  });
+  }, 180_000);
 });

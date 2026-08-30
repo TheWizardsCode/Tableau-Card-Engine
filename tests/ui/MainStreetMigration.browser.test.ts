@@ -13,6 +13,45 @@ import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
 import { waitForScene } from '../helpers/waitForScene';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
+
+/**
+ * Clear persistent storage (localStorage + IndexedDB) so a checkpoint saved
+ * by another test/file/run in the shared browser profile cannot surface the
+ * resume overlay (depth-2000 full-screen interactive backdrop) during the
+ * tests. The overlay's semi-transparent black backdrop flattens the whole
+ * canvas to near-uniform dark, which the pixel-analysis assertions read as
+ * "solid colour" (CG-0MTF70V9X002CAYH). Non-blocking: deleteDatabase
+ * resolves on `onblocked` instead of waiting for the previous connection.
+ */
+async function clearPersistentStorage(): Promise<void> {
+  try { localStorage.clear(); } catch { /* ignore */ }
+  try {
+    let names: string[] = ['save-load-store'];
+    if (typeof indexedDB !== 'undefined' && typeof indexedDB.databases === 'function') {
+      try {
+        names = (await Promise.race([
+          indexedDB.databases(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('databases timeout')), 2000)),
+        ])).map((d: IDBDatabaseInfo) => d.name).filter((n): n is string => !!n);
+      } catch { /* fall back to the default name */ }
+    }
+    await Promise.race([
+      Promise.all(
+        names.map(
+          (n: string) =>
+            new Promise<void>((resolve) => {
+              const req = indexedDB.deleteDatabase(n);
+              req.onsuccess = () => resolve();
+              req.onerror = () => resolve();
+              req.onblocked = () => resolve();
+            }),
+        ),
+      ),
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  } catch { /* ignore non-browser environments */ }
+}
+
 import { page } from '@vitest/browser/context';
 
 // ── Deterministic seed ─────────────────────────────────────
@@ -38,6 +77,7 @@ async function withSeededRandom<T>(seed: number, fn: () => Promise<T>): Promise<
 // ── Boot helper ────────────────────────────────────────────
 
 async function bootGame(): Promise<Phaser.Game> {
+  await clearPersistentStorage();  // stale checkpoint → resume overlay → pixel reads see "solid colour"
   let container = document.getElementById('game-container');
   if (container) container.remove();
   container = document.createElement('div');
@@ -77,6 +117,29 @@ function waitFrames(n: number, fallbackMs = 2000): Promise<void> {
     };
     requestAnimationFrame(tick);
   });
+}
+
+/**
+ * Content-aware render gate: keep waiting until the market container holds
+ * rendered card objects (they only appear after the boot-time SVG
+ * regeneration / market render pass completes). A fixed frame count
+ * (`waitFrames`) can elapse while a CPU-starved RAF loop has only produced
+ * a couple of frames — the 2s fallback resolves and the pixel pass then
+ * samples an unrendered canvas, read as "solid colour" under parallel
+ * full-suite load (CG-0MTF70V9X002CAYH). The pixel assertions below then
+ * give the definitive verdict; this gate merely removes the timing race.
+ */
+async function waitForSceneContent(scene: Phaser.Scene, timeoutMs = 15_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const withContainer = scene as { marketContainer?: { list: unknown[] } };
+  while (Date.now() < deadline) {
+    const cards = (withContainer.marketContainer?.list ?? []).filter(
+      (c) => typeof c === 'object' && c !== null && (c as { name?: string }).name?.startsWith?.('ms-market-card-'),
+    );
+    if (cards.length > 0) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  // Fall through — the pixel assertion gives the definitive verdict.
 }
 
 // ── Screenshot / pixel helpers ─────────────────────────────
@@ -164,6 +227,7 @@ describe('Main Street migration smoke (browser)', () => {
       game = await bootGame();
     });
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await waitForSceneContent(scene);
     await waitFrames(24);
 
     const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
@@ -190,6 +254,7 @@ describe('Main Street migration smoke (browser)', () => {
       game = await bootGame();
     });
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await waitForSceneContent(scene);
     await waitFrames(24);
 
     const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
@@ -213,6 +278,7 @@ describe('Main Street migration smoke (browser)', () => {
       game = await bootGame();
     });
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
+    await waitForSceneContent(scene);
     await waitFrames(24);
 
     const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;

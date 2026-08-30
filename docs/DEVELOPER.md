@@ -313,16 +313,60 @@ Two mitigations are in place in this repository:
      default boot is not guaranteed to contain an affordable
      business/community-space card (see `tests/main-street/undo-redo.browser.test.ts`).
    - **Clear stale persistent checkpoints before boot**: a Main Street boot
-     checks for a saved run checkpoint and, if one exists, shows the resume
-     overlay — a full-screen interactive backdrop (depth 2000, no pointerdown
-     handler) that swallows every street-slot click under `topOnly`. An
-     end-of-turn auto-save from an earlier test/file/run therefore turns any
-     later slot-clicking suite into a click-swallowing failure until the
-     checkpoint is cleared. Tests that drive real clicks wipe IndexedDB +
-     localStorage at boot (non-blocking `deleteDatabase`, resolving on
-     `onblocked`) — see `clearPersistentStorage()` in
-     `tests/main-street/click-place.browser.test.ts` and
-     `tests/main-street/composite-click.browser.test.ts`.
+     checks for a saved run checkpoint (tutorial mode included) and, if one
+     exists, shows the resume overlay — a full-screen interactive backdrop
+     (depth 2000, no pointerdown handler) that hides the start UI and
+     swallows every street-slot click under `topOnly`. An end-of-turn
+     auto-save from an earlier test/file/run therefore turns any later
+     booting/interaction suite into a false failure until the checkpoint is
+     cleared. Tests that boot Main Street wipe IndexedDB + localStorage at
+     boot (non-blocking `deleteDatabase`, resolving on `onblocked`) — see
+     `clearPersistentStorage()` in
+     `tests/main-street/click-place.browser.test.ts`,
+     `tests/main-street/composite-click.browser.test.ts`,
+     `tests/main-street/drag.browser.test.ts`,
+     `tests/main-street/hint-bar-placement.browser.test.ts`,
+     `tests/main-street/undo-redo.browser.test.ts`, and
+     `tests/ui/MainStreetMigration.browser.test.ts`. This is not just a
+     visual-overlay hazard: a mid-day checkpoint restores a partially-sold
+     market row with no business cards, so tests that assume a buyable
+     business card (e.g. undo-redo's affordable-card finder) fail unless the
+     checkpoint is cleared first (the ≥1-business guarantee applies at
+     refill time only).
+   - **Content-aware render gates**: fixed-frame waits (`waitFrames(24)`)
+     with a hard 2s fallback resolve while a CPU-starved RAF loop has only
+     produced a couple of frames, so pixel-analysis assertions can sample an
+     unrendered canvas. `MainStreetMigration.browser.test.ts` first waits
+     until the market container actually holds rendered card objects
+     (`waitForSceneContent`, 15s budget) before the frame wait and the pixel
+     pass — see the migration smoke suite.
+   - **Generous boot/UI budgets for every Phaser scene**: boot-time work
+     (SVG regeneration, tutorial offer flow) and RAF-gated UI waits stretch
+     under parallel-browser contention. The coldest Main Street boot
+     (first boot of a file, all-scene SVG regeneration plus the tutorial
+     offer flow) has been observed to exceed 30s under full-suite
+     contention, so the tutorial boot wait uses a 40s budget with a 90s
+     beforeEach hook
+     (`waitForStartButton(..., 40_000)` in
+     `tests/main-street/TutorialOverlayClickThrough.browser.test.ts`);
+     composite's premium-dialog wait factors loop liveness (frozen RAF
+     detection) into a 60s deadline instead of a blind timer
+     (`tests/main-street/composite-click.browser.test.ts`); and peek's
+     tween-completion waits use 10s budgets
+     (`tests/main-street/peek.browser.test.ts`), matching the 5-10s
+     per-wait convention. A beforeEach hook that boots a game plus waits for
+     UI must raise its own budget beyond Vitest's default 30s (e.g. 90s for
+     the tutorial file) or the hook itself times out while the boot is still
+     legitimately progressing.
+   - **Subprocess-launching unit tests need generous per-test timeouts**: a
+     unit test that spawns a vite-node / npm child process (cold TS
+     transpile of the whole module graph) can exceed the unit project's 15s
+     default `testTimeout` under parallel-suite saturation — the child has
+     its own generous `runCmd` budget (180s) but the vitest cap fires
+     first. `tests/main-street/harness-cli.test.ts` therefore sets an
+     explicit `180_000` per-test timeout on its monte-carlo and
+     save-load-smoke subprocess tests (matching the `replay-e2e` project's
+     `180_000` precedent).
 
    References (CG-0MTF70V9X002CAYH): `tests/main-street/incident-reveal.browser.test.ts`
    and `tests/main-street/composite-click.browser.test.ts`.

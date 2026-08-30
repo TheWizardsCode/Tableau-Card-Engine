@@ -84,7 +84,7 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene;
-    const startBtn = await waitForStartButton(scene, 10_000);
+    const startBtn = await waitForStartButton(scene, 40_000);
     expect(startBtn).toBeTruthy();
     startBtn!.emit('pointerdown', {
       x: startBtn!.x,
@@ -94,7 +94,7 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
     });
     await waitForTutorialOverlay(15_000);
     expect(getStepIndex(scene)).toBe(0);
-  });
+  }, 90_000);
 
   afterEach(async () => {
     await destroyGame(game);
@@ -184,6 +184,13 @@ async function waitForStartButton(
   scene: Phaser.Scene,
   timeoutMs = 8_000,
 ): Promise<Phaser.GameObjects.Text | null> {
+  // Start Tutorial renders after the boot-time SVG regeneration (154 card
+  // SVGs) plus the tutorial offer/deferred-banner flow. Under
+  // parallel-browser CPU contention (multiple Chromium instances on the
+  // build machine) that boot work can stretch well past the old 10s budget
+  // — observed 2/2 full-suite failures at load 10+ (CG-0MTF70V9X002CAYH)
+  // — so callers pass a generous budget (20s) while keeping the default
+  // conservative.
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const btn = findPhaserTextByLabel(scene, '[ Start Tutorial ]');
