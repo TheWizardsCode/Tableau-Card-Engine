@@ -56,7 +56,7 @@ const NEW_COMMUNITY_SPACE_CONTRACTS: NewCommunitySpaceContract[] = [
   { id: 'cs-community-garden', name: 'Community Garden', cost: 5, baseIncome: 0, ongoingCost: 0.1, synergyTypes: ['Food'], tier: '4', reputationPerTurn: 0.1 },
   { id: 'cs-fountain', name: 'Town Fountain', cost: 5, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Culture'], tier: '5', reputationPerTurn: 0.1 },
   { id: 'cs-health-kiosk', name: 'Health Kiosk', cost: 6, baseIncome: 0, ongoingCost: 0.15, synergyTypes: ['Health'], tier: '8', reputationPerTurn: 0.15 },
-  { id: 'cs-shelter', name: 'Community Shelter', cost: 6, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Service'], tier: '6', reputationPerTurn: 0.15 },
+  { id: 'cs-shelter', name: 'Community Shelter', cost: 6, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Service'], tier: '3', reputationPerTurn: 0.15 }, // retiered T6->T3 (CG-0MT5VZJLS000B8KI) so T3 keeps a non-Entertainment synergy type
   { id: 'cs-public-art', name: 'Public Art', cost: 8, baseIncome: 0, ongoingCost: 0.25, synergyTypes: ['Culture', 'Entertainment'], tier: '12', reputationPerTurn: 0.2 },
 ];
 

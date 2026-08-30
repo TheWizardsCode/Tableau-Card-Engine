@@ -74,13 +74,13 @@ Community-space cards are placed on the street grid like businesses but generate
 | Community Garden | 5 | 0.1 | Food | 4 | 0.1 | A shared garden plot for the neighbourhood. *(Group B.)* |
 | Town Fountain | 5 | 0 | Culture | 5 | 0.1 | A gathering spot around the fountain. *(Group B.)* |
 | Health Kiosk | 6 | 0.15 | Health | 8 | 0.15 | A walk-up health advice kiosk. *(Group B.)* |
-| Community Shelter | 6 | 0 | Service | 6 | 0.15 | A warm shelter for those in need. *(Group B.)* |
+| Community Shelter | 6 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. *(Group B; retiered T6→T3 (CG-0MT5VZJLS000B8KI) as the neighbourhood amenity anchoring T3's Service leg.)* |
 | Library | 7 | 0.25 | Culture | 1 | 0.1 | Quiet community space for reading and learning. |
 | Public Art | 8 | 0.25 | Culture, Entertainment | 12 | 0.2 | A vibrant public sculpture. Bridges Culture and Entertainment community spaces. *(Group B.)* |
 
-> 12-tier expansion (CG-0MT3C744B009DS84): community-space cards are spread across 7 of the 12 tiers (8 cards cannot cover every tier); Park and Library are Tier-1 because the tutorial requires them in the tier-1 card pool.
+> 12-tier expansion (CG-0MT3C744B009DS84): community-space cards are spread across 6 of the 12 tiers (8 cards cannot cover every tier; the Community Shelter retiered T6→T3, CG-0MT5VZJLS000B8KI); Park and Library are Tier-1 because the tutorial requires them in the tier-1 card pool.
 
-> **Per-tier synergy balance (CG-0MT3IPFSF005KEFB):** across business + community-space cards, every tier spans ≥ 2 distinct synergy types, and no type's assignment count within a tier exceeds 2× any other type's count (bridge cards count once per type they carry, e.g. the T3 Arcade Entertainment|Service bridge). The three sparse tiers were stretched without new cards: T1 Park Culture→Entertainment, T2 Hardware Store Commerce→Service, T3 Arcade → Entertainment|Service. See `card-catalog.md` "Synergy Type Coverage" and `tests/main-street/tier-synergy-balance.test.ts`.
+> **Per-tier synergy balance (CG-0MT3IPFSF005KEFB):** across business + community-space cards, every tier spans ≥ 2 distinct synergy types, and no type's assignment count within a tier exceeds 2× any other type's count (bridge cards count once per type they carry). The three sparse tiers were stretched without new cards: T1 Park Culture→Entertainment, T2 Hardware Store Commerce→Service, T3 Arcade stays Entertainment with the Community Shelter retiered 6→3 (CG-0MT5VZJLS000B8KI) → Entertainment 2 / Service 1. See `card-catalog.md` "Synergy Type Coverage" and `tests/main-street/tier-synergy-balance.test.ts`.
 
 ### 1.3 Upgrade Cards
 | Name | Target Business | Cost (coins) | Income Bonus | Synergy Range Bonus | Description |

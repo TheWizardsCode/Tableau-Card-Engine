@@ -12,9 +12,11 @@
  *   Culture 2 / Food 2 / Service 1 / Entertainment 1.
  * - T2 had Commerce 3 (single type) -> Hardware Store retagged to Service
  *   (supplies tools = tool-supply service), giving Commerce 2 / Service 1.
- * - T3 had Entertainment 2 (single type) -> Arcade became an
- *   Entertainment|Service bridge ("retro fun" as an entertainment service),
- *   giving Entertainment 2 / Service 1.
+ * - T3 had Entertainment 2 (single type, Arcade + Playground) -> Community
+ *   Shelter (Service) retiered T6->T3 (CG-0MT5VZJLS000B8KI, a neighbourhood
+ *   amenity), giving Entertainment 2 / Service 1. (To keep T6's event share
+ *   under the 42% family-mix rule, Good Press (Incident) also moved T6->T3:
+ *   local news coverage is a neighbourhood-scale event.)
  *
  * Rule enforced (per the work item): every tier's synergy-bearing cards
  * span >= 2 distinct types, and no type's assignment count within a tier
@@ -115,8 +117,11 @@ describe('Main Street tier synergy-type balance (CG-0MT3IPFSF005KEFB)', () => {
     expect(byCard.get('cs-park')).not.toContain('Culture');
     // Hardware Store: Commerce -> Service retag (T2, "supplies tools" = tool-supply service).
     expect(byCard.get('biz-hardware')).toEqual(['Service']);
-    // Arcade: Entertainment -> Entertainment|Service bridge (T3).
-    expect(byCard.get('biz-arcade')).toEqual(['Entertainment', 'Service']);
+    // Arcade: Entertainment-only (T3) — the Entertainment|Service bridge was
+    // removed (CG-0MT5VZJLS000B8KI): an arcade is purely an entertainment
+    // business, and T3's Service type now comes from relocated Community Shelter.
+    expect(byCard.get('biz-arcade')).toEqual(['Entertainment']);
+    expect(byCard.get('cs-shelter')).toEqual(['Service']);
   });
 
   it('every synergy type still appears somewhere on the tier ladder', () => {
