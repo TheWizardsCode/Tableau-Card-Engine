@@ -112,6 +112,12 @@ describe('MainStreet undo/redo feedback', () => {
       executeDayStart(state);
     }
 
+    // Generous coins so an affordable business/community-space card always
+    // exists in the row regardless of the random seed's market draw (mirror
+    // of MainStreetScene.browser.test.ts; the default boot is not guaranteed
+    // to yield a buyable card at starting coins).
+    state.resourceBank.coins = 100;
+
     const emptySlot = state.streetGrid.findIndex((cell) => cell === null);
     expect(emptySlot).toBeGreaterThanOrEqual(0);
     // The cheapest *purchasable-on-street* card (business/community-space) —

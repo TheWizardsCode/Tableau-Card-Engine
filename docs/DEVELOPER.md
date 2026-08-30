@@ -287,6 +287,46 @@ Two mitigations are in place in this repository:
    summary before a retry is allowed, so a genuine test failure can never be
    hidden by a retry.
 
+3. **Test-side hardening (browser tests)** — beyond the runner-level
+   mitigations above, browser tests that drive the real Phaser pointer
+   pipeline (dispatched DOM events at layout-derived canvas coordinates, e.g.
+   the Main Street slot-click suites) can intermittently have their click
+   dropped or delayed when the RAF-driven game loop is starved of frames by
+   parallel full-suite runs. Two conventions keep these suites green under
+   contention without masking real regressions:
+
+   - **Generous per-wait budgets**: animation- or frame-loop-gated waits (a
+     triggered reveal, a dialog created by a transfer-completion callback)
+     use multi-second budgets (5-10s per step) instead of tight sub-second
+     expects, bounded by an explicit per-test timeout (e.g. 90s) rather than
+     Vitest's default.
+   - **Retry a dropped click**: when a real-pointer click is expected to move
+     the scene out of an interaction phase (e.g. `uiPhase` leaves
+     `'placing-from-hand'`), poll for the phase change and re-dispatch the
+     click on a short interval if the phase has not moved, within a generous
+     retry window (30s) that leaves headroom under the test's total budget.
+     Re-dispatch is safe because the interaction handler no-ops once the
+     phase has moved.
+   - **Deterministic boot conditions**: tests that assume a buyable market
+     card at boot set generous coins (e.g. `resourceBank.coins = 100`)
+     rather than relying on the random seed's initial market draw — the
+     default boot is not guaranteed to contain an affordable
+     business/community-space card (see `tests/main-street/undo-redo.browser.test.ts`).
+   - **Clear stale persistent checkpoints before boot**: a Main Street boot
+     checks for a saved run checkpoint and, if one exists, shows the resume
+     overlay — a full-screen interactive backdrop (depth 2000, no pointerdown
+     handler) that swallows every street-slot click under `topOnly`. An
+     end-of-turn auto-save from an earlier test/file/run therefore turns any
+     later slot-clicking suite into a click-swallowing failure until the
+     checkpoint is cleared. Tests that drive real clicks wipe IndexedDB +
+     localStorage at boot (non-blocking `deleteDatabase`, resolving on
+     `onblocked`) — see `clearPersistentStorage()` in
+     `tests/main-street/click-place.browser.test.ts` and
+     `tests/main-street/composite-click.browser.test.ts`.
+
+   References (CG-0MTF70V9X002CAYH): `tests/main-street/incident-reveal.browser.test.ts`
+   and `tests/main-street/composite-click.browser.test.ts`.
+
 #### Hang timeout (bounded wall-clock abort)
 
 The transient signatures above cover runs that **exit** non-zero. A different

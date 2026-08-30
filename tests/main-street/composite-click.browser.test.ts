@@ -29,11 +29,48 @@ import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/Ma
 const GAME_W = 1280;
 const GAME_H = 720;
 
+/**
+ * Clear persistent storage (localStorage + IndexedDB) so a checkpoint saved
+ * by another test (or a previous run) cannot surface the resume overlay
+ * (depth-2000 full-screen input-blocking backdrop) during the tests. The
+ * resume overlay's backdrop has no pointerdown handler, so with topOnly it
+ * silently swallows every street-slot click (CG-0MTF70V9X002CAYH).
+ */
+async function clearPersistentStorage(): Promise<void> {
+  try { localStorage.clear(); } catch { /* ignore */ }
+  try {
+    let names: string[] = ['save-load-store'];
+    if (typeof indexedDB !== 'undefined' && typeof indexedDB.databases === 'function') {
+      try {
+        names = (await Promise.race([
+          indexedDB.databases(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('databases timeout')), 2000)),
+        ])).map((d: IDBDatabaseInfo) => d.name).filter((n): n is string => !!n);
+      } catch { /* fall back to the default name */ }
+    }
+    await Promise.race([
+      Promise.all(
+        names.map(
+          (n) =>
+            new Promise<void>((resolve) => {
+              const req = indexedDB.deleteDatabase(n);
+              req.onsuccess = () => resolve();
+              req.onerror = () => resolve();
+              req.onblocked = () => resolve();
+            }),
+        ),
+      ),
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  } catch { /* ignore */ }
+}
+
 async function bootGame(): Promise<Phaser.Game> {
-  // No persistent-storage wipe: MainStreetScene.browser.test.ts (17 boots)
-  // boots directly and the resume overlay only surfaces when a checkpoint
-  // was actually saved. Deleting IndexedDB here blocks once a previous game's
-  // save-store connection lingers (deleteDatabase waits for onblocked).
+  // Wipe any stale checkpoint before boot so the resume overlay cannot
+  // swallow street-slot clicks (see clearPersistentStorage). Non-blocking:
+  // deleteDatabase resolves on `onblocked` instead of waiting for the
+  // previous save-store connection to close.
+  await clearPersistentStorage();
   localStorage.setItem(
     TUTORIAL_STATE_STORAGE_KEY,
     JSON.stringify({ schemaVersion: 1, status: 'skipped', completedAt: null, lastStepId: null }),
@@ -102,7 +139,11 @@ async function waitForCondition(
  * timeout (each test gets an explicit 90s budget).
  */
 async function waitForPremiumDialog(scene: Scene, label = 'premium dialog to appear'): Promise<void> {
-  await waitForCondition(() => isDialogOpen(scene), label, 45_000);
+  const ok = await waitForCondition(() => isDialogOpen(scene), label, 45_000).then(
+    () => true,
+    () => false,
+  );
+  if (!ok) throw new Error(`Timed out waiting for ${label}`);
 }
 
 type Scene = Phaser.Scene & Record<string, any>;
@@ -204,7 +245,77 @@ async function clickCompositeToSlot(scene: Scene, card: any, targetSlot: number)
     'hand card selected (placing-from-hand phase)',
   );
   await wait(120);
-  await clickAt(scene.getStreetSlotCenter(targetSlot).x, scene.getStreetSlotCenter(targetSlot).y);
+  const slotCenter = scene.getStreetSlotCenter(targetSlot);
+  const slotClickDeadline = Date.now() + 30_000;
+  let slotClicked = false;
+  while (Date.now() < slotClickDeadline) {
+    // The slot click runs through the REAL Phaser pointer pipeline: the
+    // dispatched DOM event is only processed on a game-loop (RAF) step. Under
+    // parallel-browser CPU contention (multiple Phaser games booted
+    // simultaneously on the build machine), an exception inside a starved
+    // step kills the RAF chain for good — Phaser schedules the next frame
+    // AFTER the step callback (src/dom/RequestAnimationFrame.js), so a throw
+    // never re-arms it and NO further frames (hence no input processing) ever
+    // happen, while the test's own timers keep running. Detect the frozen
+    // loop (monotonic frame counter / loop clock not advancing) and wait for
+    // it to revive instead of spamming clicks into a dead pipeline.
+    if (await loopIsFrozen(scene)) {
+      await waitForLoopRevival(scene, Math.min(2000, slotClickDeadline - Date.now()));
+      continue;
+    }
+    await clickAt(slotCenter.x, slotCenter.y);
+    const registered = await waitForCondition(
+      () => scene.uiPhase !== 'placing-from-hand',
+      'slot click registered (phase left placing-from-hand)',
+      750,
+    ).then(
+      () => true,
+      () => false,
+    );
+    if (registered) {
+      slotClicked = true;
+      break;
+    }
+  }
+  if (!slotClicked) {
+    const loop = (scene.game as any)?.loop as { frame?: number; time?: number } | undefined;
+    const loopDesc = loop ? `frame=${loop.frame}, time=${loop.time}` : 'unavailable';
+    throw new Error(
+      `Timed out waiting for slot click to register (phase stuck in placing-from-hand; game loop ${loopDesc}; lastPhaseAtEnd=${scene.uiPhase})`,
+    );
+  }
+}
+
+
+/**
+ * Monotonic game-loop progress: the TimeStep frame counter + accumulated
+ * clock. Both only advance on RAF callbacks, so two samples taken ~150ms
+ * apart that are identical mean the loop is not stepping (RAF dead).
+ */
+function loopSample(scene: Scene): { frame: number; time: number } | undefined {
+  const timeStep = (scene.game as any)?.loop as { frame?: number; time?: number } | undefined;
+  if (timeStep && typeof timeStep.frame === 'number' && typeof timeStep.time === 'number') {
+    return { frame: timeStep.frame, time: timeStep.time };
+  }
+  return undefined;
+}
+
+/** True when the game loop has not stepped for ~150ms (RAF frozen/starved). */
+async function loopIsFrozen(scene: Scene): Promise<boolean> {
+  const before = loopSample(scene);
+  if (!before) return false; // loop introspection unavailable — carry on as before
+  await wait(150);
+  const after = loopSample(scene);
+  return after ? after.frame === before.frame && after.time === before.time : false;
+}
+
+/** Wait until the game loop steps again, up to `budgetMs`; returns false on timeout. */
+async function waitForLoopRevival(scene: Scene, budgetMs: number): Promise<boolean> {
+  const deadline = Date.now() + budgetMs;
+  while (Date.now() < deadline) {
+    if (!(await loopIsFrozen(scene))) return true;
+  }
+  return false;
 }
 
 /** Find an interactive Text by its exact label anywhere in the HUD container. */
