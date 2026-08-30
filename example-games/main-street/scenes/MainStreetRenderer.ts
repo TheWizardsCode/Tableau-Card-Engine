@@ -321,6 +321,24 @@ export class MainStreetRenderer {
     s.updateSvgDebugOverlay();
   }
 
+  /**
+   * `refreshAll()` minus the street grid — used while the phased income
+   * show (child 4) keeps its on-card coin grids alive until collection
+   * completes. The street is unchanged during the income phase, so a full
+   * `refreshAll()` happens once the choreography finishes.
+   */
+  public refreshAllExceptStreet(): void {
+    const s = this.scene;
+    this.refreshHud();
+    this.refreshMarket();
+    this.refreshIncidentQueue();
+    this.refreshPlayerHand();
+    this.refreshActionButtons();
+    this.refreshChallengeTracker();
+    this.refreshLog();
+    s.updateSvgDebugOverlay();
+  }
+
   public refreshHud(): void {
     const s = this.scene;
 

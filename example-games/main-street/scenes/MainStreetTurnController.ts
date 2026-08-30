@@ -228,28 +228,40 @@ export class MainStreetTurnController {
       s.state.skipMarketCycleOnEndTurn = false;
     }
 
-    // ── Income Collection Animation ────────────────────────────
-    // Presentation-only VFX (AGENTS.md rule 8): each producing slot emits a
-    // coin that arcs to the HUD coins counter with staggered coin-pop SFX,
-    // reputation-earning cards emit a pip to the rep counter, and a final
-    // "+total" pop lands when collection completes. Skipped under reduced
-    // motion and in replay/headless modes (handled inside the animator).
-    // Runs inside the existing 400ms→800ms turn-advance window so turn
-    // timing is unchanged; never mutates state or transcript — failures are
-    // swallowed so the turn always advances.
+    // ── Income Phase Animation ──────────────────────────────────────
+    // Presentation-only VFX (AGENTS.md rule 8 + epic CG-0MT23O6W8003AXWJ):
+    // the phased income show — base → synergy → reputation → events →
+    // upcoming → grid-to-HUD collection (~11s) — runs when the turn ends
+    // with producing slots. `scene.incomeCollectionActive` gates the HUD
+    // delta pop and defers the street refresh + day start below so the
+    // on-card coin grids survive the whole choreography. Never mutates
+    // state or the transcript; failures are swallowed so the turn always
+    // advances. Reduced-motion and replay/headless modes are handled
+    // inside the animator (text-only progression / no-op).
+    // Tutorial exemption: the tutorial keeps the compact window-safe
+    // collection (`animateIncomeCollection`) so tutorial step pacing is
+    // unchanged — precedent: the day banner is also skipped during the
+    // tutorial (startDayPhase); the full phased show runs in normal play.
     try {
-      if (result.income && result.income.total > 0) {
-        const grid: Array<{ currentReputationPerTurn?: number } | null> = s.state.streetGrid ?? [];
-        const repSources = grid
-          .map((card, slotIndex) => ({ slotIndex, rep: card?.currentReputationPerTurn ?? 0 }))
-          .filter((src) => src.rep > 0);
-        s.msAnimator.animateIncomeCollection({
-          income: result.income,
-          repSources,
-        });
+      const inTutorial = (s as { tutorialController?: { isActive?: boolean } }).tutorialController?.isActive === true;
+      const phaseBreakdown = result.income?.phaseBreakdown?.perSlotBreakdown ?? [];
+      if (inTutorial) {
+        if (result.income && result.income.total > 0) {
+          const grid: Array<{ currentReputationPerTurn?: number } | null> = s.state.streetGrid ?? [];
+          const repSources = grid
+            .map((card, slotIndex) => ({ slotIndex, rep: card?.currentReputationPerTurn ?? 0 }))
+            .filter((src) => src.rep > 0);
+          s.msAnimator.animateIncomeCollection({
+            income: result.income,
+            repSources,
+          });
+        }
+      } else if (phaseBreakdown.length > 0) {
+        s.msAnimator.animateIncomePhases(phaseBreakdown);
       }
     } catch (_) {
       // Presentation-only: never block the turn on animation failures.
+      s.incomeCollectionActive = false;
     }
 
     // Save checkpoint after each completed turn (fire-and-forget)
@@ -278,7 +290,7 @@ export class MainStreetTurnController {
       // Refresh the challenge tracker after all celebrations
       s.time.delayedCall(
         result.newlyCompletedChallenges.length * 600 + 200,
-        () => s.refreshAll(),
+        () => (s.incomeCollectionActive ? s.msRenderer.refreshAllExceptStreet() : s.refreshAll()),
       );
     }
 
@@ -328,7 +340,15 @@ export class MainStreetTurnController {
         } else if (result.incident) {
           s.instructionText.setText(`Incident: ${result.incident.name}`);
         }
-        s.refreshAll();
+        // While the phased income show runs, the street cards host the
+        // on-card coin grids (child 2); refresh everything EXCEPT the
+        // street so those grids survive until collection completes, then
+        // refresh fully once the choreography finishes.
+        if (s.incomeCollectionActive) {
+          s.msRenderer.refreshAllExceptStreet();
+        } else {
+          s.refreshAll();
+        }
         // Incident reveal presentation (AGENTS.md rule 8): non-blocking VFX —
         // the resolved incident card flies from the face-down incident-deck
         // panel (CG-0MSTOATDP000JNHH) to the
@@ -352,7 +372,27 @@ export class MainStreetTurnController {
         }
         // Tutorial: mark end-turn step complete if active
         (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
-        s.time.delayedCall(800, () => this.startDayPhase());
+        // The income show is the turn's closing moment (~11s): defer the
+        // day start until the choreography completes so it isn't cut short
+        // by the market/street refresh.
+        if (s.incomeCollectionActive) {
+          // Bounded deferral: start the next day once the choreography
+          // completes (AC7 collect clears the flag); a safety cap forces
+          // the day start even if the flag is somehow never cleared, so
+          // end-of-turn can never hang the game (AC5).
+          const startAt = s.time.now + 16_000;
+          const startAfterIncomeShow = (): void => {
+            if (s.incomeCollectionActive && s.time.now < startAt) {
+              s.time.delayedCall(250, startAfterIncomeShow);
+            } else {
+              s.incomeCollectionActive = false;
+              this.startDayPhase();
+            }
+          };
+          startAfterIncomeShow();
+        } else {
+          s.time.delayedCall(800, () => this.startDayPhase());
+        }
       }
     });
   }
