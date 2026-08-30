@@ -18,7 +18,7 @@
     "monte-carlo-sweep": "vite-node scripts/monte-carlo.ts --sweep --seeds 100 --seed-prefix mc-balance --maxTurns 25 --out results/sweep.json --csv-out results/sweep.csv",
     "replay": "tsx scripts/replay.ts",
     "transcripts:export": "tsx scripts/export-transcripts.ts",
-    "save-load-smoke": "tsx scripts/save-load-smoke.ts",
+    "save-load-smoke": "vite-node scripts/save-load-smoke.ts",
     "tf:generate": "scripts/tf-generate-synths.sh",
     "build:electron-main": "node scripts/build-electron-main.mjs",
     "start:electron": "npm run build:electron && npm run build:electron-main && electron .",

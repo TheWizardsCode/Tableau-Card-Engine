@@ -433,6 +433,11 @@ For the dedicated balance harness and report outputs, use:
 npm run monte-carlo
 ```
 
+_(runs via `vite-node` — the Vite-aware ESM loader — because the harness imports
+deck-building functions from `MainStreetCards.ts`, which loads `card-data.csv`
+through Vite's `?raw` suffix; the same reason the manifest generator above uses
+`npx vite-node`.)_
+
 This writes per-run and aggregate metrics to:
 - `results/main-street-monte-carlo.json`
 - `results/main-street-monte-carlo.csv`

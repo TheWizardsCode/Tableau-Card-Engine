@@ -11,7 +11,7 @@ npm run monte-carlo
 Equivalent explicit command:
 
 ```bash
-npx tsx scripts/monte-carlo.ts --runs 200 --seed-prefix mc-balance --max-turns 25 --strategy market-greedy --out results/main-street-monte-carlo.json --csv-out results/main-street-monte-carlo.csv
+npx vite-node scripts/monte-carlo.ts --runs 200 --seed-prefix mc-balance --max-turns 25 --strategy market-greedy --out results/main-street-monte-carlo.json --csv-out results/main-street-monte-carlo.csv
 ```
 
 ## Sample output snapshot
@@ -42,10 +42,10 @@ The harness now supports a `--sweep` flag that runs all 12 strategy×difficulty 
 
 ```bash
 # Run all 12 combinations with 100 seeds each
-npx tsx scripts/monte-carlo.ts --sweep --runs 100 --seed-prefix mc-balance --max-turns 25 --out results/sweep.json
+npx vite-node scripts/monte-carlo.ts --sweep --runs 100 --seed-prefix mc-balance --max-turns 25 --out results/sweep.json
 
 # Filter to specific strategies and/or difficulties
-npx tsx scripts/monte-carlo.ts --sweep --runs 100 --sweep-strategies greedy,random --sweep-difficulties medium,hard --out results/sweep-filtered.json
+npx vite-node scripts/monte-carlo.ts --sweep --runs 100 --sweep-strategies greedy,random --sweep-difficulties medium,hard --out results/sweep-filtered.json
 ```
 
 Output files are named with a strategy-difficulty slug, e.g.:
