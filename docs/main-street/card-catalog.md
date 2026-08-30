@@ -224,7 +224,7 @@ Every Group A business and Group B community space gets an upgrade path (targets
 ## Event Cards
 
 Events fall into two categories:
-- **Investment** events are purchased from the market, held in the player's hand, and played voluntarily. They have a coin cost and generally positive effects.
+- **Investment** events are taken from the market into the player's hand **for free** (CG-0MT5W1V4D007NN8Q); the listed coin cost is paid when the event is played from hand during MarketPhase. They have generally positive effects.
 - **Incident** events live in a hidden face-down incident deck (card back + count only, CG-0MSTOATDP000JNHH). The top card is revealed and resolved at the end of each turn. Most are negative disruptions; a few are positive surprises.
 
 ### M1 Event Templates (5)

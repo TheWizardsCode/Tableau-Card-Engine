@@ -114,6 +114,18 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
       }
     }
   } catch { /* ignore non-browser environments */ }
+
+  // Stale-checkpoint hardening (CG-0MTFREYSJ005EW43): each vitest browser
+  // session runs its file queue sequentially in ONE browser context, so a
+  // previously executed file's game can leave 'run-checkpoint'/'campaign'
+  // records behind (a turn-end autosave resolving after its own destroyGame
+  // clear, ~50% under parallel-browser CPU contention). That routes this
+  // boot into checkAndResume(), suppressing the '[ Start Tutorial ]' offer
+  // and failing waitForStartButton. Wipe the two slots with plain readwrite
+  // transactions (NO deleteDatabase: a version-change delete would block
+  // this boot's own SaveLoadStore.open() — see CG-0MTFREYSJ005EW43 wedge
+  // note). Best-effort, race-capped so the boot can never hang on it.
+  await clearStaleMainStreetSaves();
   const container = document.createElement('div');
   container.id = 'game-container';
   document.body.appendChild(container);
@@ -182,6 +194,65 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
   }
 
   return game;
+}
+
+/**
+ * Best-effort removal of stale Main Street 'run-checkpoint' and 'campaign'
+ * records from the shared-session IndexedDB. Uses a plain readwrite
+ * transaction on the same-version DB so it can never block subsequent opens
+ * (unlike deleteDatabase). Abandoned (race-capped) wipes leave only an idle
+ * connection in this context, which is torn down with the session.
+ */
+async function clearStaleMainStreetSaves(): Promise<void> {
+  const deadline = () =>
+    new Promise<void>((resolve) => setTimeout(resolve, 5000));
+  try {
+    if (typeof indexedDB === 'undefined') return;
+    const db = await Promise.race([
+      new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open('save-load-store', 1);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('open timeout')), 5000),
+      ),
+    ]);
+    try {
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          const tx = db.transaction('saves', 'readwrite');
+          const store = tx.objectStore('saves');
+          const index = store.index('domain_gameType_slot');
+          const keysToDelete: IDBValidKey[] = [];
+          for (const domain of ['run-checkpoint', 'campaign']) {
+            const req = index.getAll(IDBKeyRange.only([domain, 'main-street']));
+            req.onsuccess = () => {
+              for (const r of req.result as Array<{ id: IDBValidKey }>) {
+                keysToDelete.push(r.id);
+              }
+            };
+            req.onerror = () => { /* keep going */ };
+          }
+          tx.oncomplete = () => {
+            // Delete after reads complete, in a follow-up transaction so the
+            // read transaction's completion carries the deletions atomically.
+            const delTx = db.transaction('saves', 'readwrite');
+            const delStore = delTx.objectStore('saves');
+            for (const k of keysToDelete) delStore.delete(k);
+            delTx.oncomplete = () => resolve();
+            delTx.onerror = () => resolve();
+            delTx.onabort = () => resolve();
+          };
+          tx.onerror = () => resolve();
+          tx.onabort = () => resolve();
+        }),
+        deadline(),
+      ]);
+    } finally {
+      db.close();
+    }
+  } catch { /* non-browser / IndexedDB unavailable — proceed without wipe */ }
 }
 
 /**
