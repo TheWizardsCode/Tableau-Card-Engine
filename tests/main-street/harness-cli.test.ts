@@ -80,6 +80,38 @@ describe('Main Street harness CLI scripts (vite-node)', () => {
     expect(report.metrics.winRate).toBeLessThanOrEqual(1);
   });
 
+  it('monte-carlo.ts sweep mode runs all strategy×difficulty combos via vite-node and writes per-combo outputs', () => {
+    const jsonBase = path.join(tmpDir, 'sweep.json');
+    const csvBase = path.join(tmpDir, 'sweep.csv');
+    const res = runCmd(VITE_NODE_BIN, [
+      'scripts/monte-carlo.ts',
+      '--sweep',
+      '--seeds',
+      '2',
+      '--seed-prefix',
+      'sweep-cli-regression',
+      '--maxTurns',
+      '15',
+      '--sweep-strategies',
+      'greedy,random',
+      '--sweep-difficulties',
+      'Easy,Medium',
+      '--out',
+      jsonBase,
+      '--csv-out',
+      csvBase,
+    ]);
+    expect(res.exitCode, res.stderr).toBe(0);
+    for (const combo of ['greedy-easy', 'greedy-medium', 'random-easy', 'random-medium']) {
+      expect(fs.existsSync(jsonBase.replace('.json', `-${combo}.json`)), `missing ${combo}.json`).toBe(true);
+      expect(fs.existsSync(csvBase.replace('.csv', `-${combo}.csv`)), `missing ${combo}.csv`).toBe(true);
+    }
+    const report = JSON.parse(fs.readFileSync(jsonBase.replace('.json', '-greedy-easy.json'), 'utf8'));
+    expect(report.metrics.runs).toBe(2);
+    expect(report.strategy).toBe('greedy');
+    expect(report.difficulty).toBe('Easy');
+  });
+
   it('npm run save-load-smoke completes green via vite-node (deterministic restore, 0 failures)', () => {
     // The npm script itself is the interface under test (its runner was the
     // bug — tsx cannot load the ?raw CSV); it writes nothing to the repo.

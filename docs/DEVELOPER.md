@@ -193,10 +193,16 @@ TCE_SMOKE_BINARY=/path/to/binary npx vitest run --project electron
 ## Testing
 
 ```bash
+npm run monte-carlo       # run the Main Street Monte Carlo harness (JSON + CSV outputs)
+npm run monte-carlo-sweep  # sweep strategy × difficulty combinations (per-combo JSON + CSV in results/)
+npm run save-load-smoke    # deterministic save/restore + campaign round-trip smoke (exit 0 = pass)
 npm test            # run all tests once (unit + browser, no tracked-asset restore step)
-npm run monte-carlo # run Main Street Monte Carlo harness via vite-node (JSON + CSV outputs)
 npm run tf:generate # generate tf audio artifacts (out-of-repo build/tf-synths)
 ```
+
+The MC harness scripts import deck-building functions from `MainStreetCards.ts` (which loads
+`card-data.csv` via Vite's `?raw`), so all three run under `vite-node` — the Vite-aware ESM
+loader — never tsx (see the same rationale in `docs/main-street/card-catalog.md`).
 
 `npm test` is intentionally non-destructive and must not mutate tracked source assets such as `public/assets/games/main-street/svg/cards`. If asset regeneration is needed, run the dedicated generation scripts explicitly.
 
