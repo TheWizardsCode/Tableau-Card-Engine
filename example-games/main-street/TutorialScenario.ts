@@ -324,6 +324,10 @@ export function createTutorialScenario(
       coins: initCoins,
       reputation: initRep,
     },
+    // Day-start snapshot (see setupMainStreetGame): becomes authoritative at
+    // the first executeDayStart (CG-0MT5W7UJJ0065MEZ AC3).
+    dayStartCoins: initCoins,
+    dayStartRep: initRep,
     ledger: createEconomyLedger({
       coins: initCoins,
       reputation: initRep,

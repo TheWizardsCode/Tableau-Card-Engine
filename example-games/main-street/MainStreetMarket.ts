@@ -15,7 +15,7 @@
 import type { LegalityResult } from '../../src/rule-engine';
 import { shuffleArray } from '../../src/card-system';
 import type { MainStreetState } from './MainStreetState';
-import { addLog } from './MainStreetState';
+import { addLog, describeEventEffects, classifyEffect } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard, StaffCard } from './MainStreetCards';
 import {
   GRID_SIZE,
@@ -282,7 +282,7 @@ export function refreshMarket(state: MainStreetState): RefreshResult {
     const name = (c as any).name ?? c.id;
     return `${c.id}${name ? ` (${name})` : ''}`;
   });
-  addLog(state, `Re-rolled market (-€${cost}): replaced ${replacedStrings.join(', ')}`, 'loss');
+  addLog(state, `Re-rolled market (-€${cost}): replaced ${replacedStrings.join(', ')} (${describeEventEffects(-cost, 0)})`, classifyEffect(-cost, 0));
 
   return { replaced: removed, cost };
 }
@@ -408,7 +408,7 @@ export function purchaseBusiness(
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  addLog(state, `Placed ${card.name} in slot ${slotIndex} (-€${card.cost})`, 'loss');
+  addLog(state, `Placed ${card.name} in slot ${slotIndex} (-€${card.cost}, ${describeEventEffects(-card.cost, 0)})`, classifyEffect(-card.cost, 0));
 
   return { card, cost: card.cost, refilled };
 }
@@ -585,7 +585,7 @@ export function playUpgradeFromHand(
   business.displayName = upgrade.newDisplayName || business.displayName;
   updateNeighborsOnPlacement(state, businessIndex);
 
-  addLog(state, `Played upgrade ${upgrade.name} from hand onto ${business.name} (-€${upgrade.cost})`, 'loss');
+  addLog(state, `Played upgrade ${upgrade.name} from hand onto ${business.name} (-€${upgrade.cost}, ${describeEventEffects(-upgrade.cost, 0)})`, classifyEffect(-upgrade.cost, 0));
 
   return { card: upgrade, cost: upgrade.cost, refilled: false };
 }
@@ -611,11 +611,23 @@ export function playEventFromHand(
     throw new Error(`Not enough coins to play ${event.name} from hand. Need ${event.cost}, have ${state.resourceBank.coins}.`);
   }
 
+  // Capture pre-action resources so the log can show the event's effective
+  // deltas (cost + resolved effects, all mitigations applied — AC2,
+  // CG-0MT5W7UJJ0065MEZ).
+  const coinsBefore = state.resourceBank.coins;
+  const repBefore = state.resourceBank.reputation;
+
   state.resourceBank.coins -= event.cost;
   resolveEvent(state, event);
   state.hand.splice(handIndex, 1);
 
-  addLog(state, `Played event ${event.name} from hand (-€${event.cost})`, 'loss');
+  const coinDelta = state.resourceBank.coins - coinsBefore;
+  const repDelta = state.resourceBank.reputation - repBefore;
+  addLog(
+    state,
+    `Played event ${event.name} from hand (-€${event.cost}, ${describeEventEffects(coinDelta, repDelta)})`,
+    classifyEffect(coinDelta, repDelta),
+  );
 
   return { card: event, cost: event.cost, refilled: false };
 }
@@ -712,7 +724,7 @@ export function purchaseUpgrade(
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  addLog(state, `Upgraded ${business.name} with ${card.name} (-€${card.cost})`, 'loss');
+  addLog(state, `Upgraded ${business.name} with ${card.name} (-€${card.cost}, ${describeEventEffects(-card.cost, 0)})`, classifyEffect(-card.cost, 0));
 
   return { card, cost: card.cost, refilled };
 }
@@ -908,7 +920,7 @@ export function purchaseStaffCard(
   // Increase max hand size
   state.maxHandSize += card.handSlotsAdded;
 
-  addLog(state, `Hired ${card.name} (+${card.handSlotsAdded} hand slots, -€${card.cost}, ongoing €${card.ongoingCost}/turn)`, 'loss');
+  addLog(state, `Hired ${card.name} (+${card.handSlotsAdded} hand slots, -€${card.cost}, ongoing €${card.ongoingCost}/turn) (${describeEventEffects(-card.cost, 0)})`, classifyEffect(-card.cost, 0));
 }
 
 // ── Sell Business (Street Grid) ──────────────────────────────
@@ -974,7 +986,7 @@ export function sellBusiness(
   // but recalculation ensures consistency for same-type penalty and type-matching.
   updateNeighborsOnSale(state, slotIndex);
 
-  addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (50% of €${purchasePrice + upgradeCosts})`, 'gain');
+  addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (50% of €${purchasePrice + upgradeCosts}) (${describeEventEffects(refund, 0)})`, classifyEffect(refund, 0));
 
   return { card, refund, slotIndex };
 }

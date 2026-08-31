@@ -13,7 +13,7 @@ import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, SynergyT
 import { getBaseTypeId } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
-import { addLog, syncResourceBankToLedger } from './MainStreetState';
+import { addLog, describeEventEffects, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier } from './MainStreetDifficulty';
 import { applyActiveEffectMultiplier } from '../../src/core-engine/ActiveEffect';
 import {
@@ -796,16 +796,17 @@ export function applyIncome(state: MainStreetState): IncomeResult {
 
   syncResourceBankToLedger(state);
   if (multiplied > 0) {
-    // CG-0MREYZO7E00729S0: show 3 decimal places for fractional coin values
-    addLog(state, `Income: +${multiplied.toFixed(3)} coins`, 'gain');
+    // CG-0MREYZO7E00729S0: show 3 decimal places for fractional coin values.
+    // Enriched with the effective coin delta (CG-0MT5W7UJJ0065MEZ).
+    addLog(state, `Income: +${multiplied.toFixed(3)} coins (${describeEventEffects(multiplied, 0)})`, 'gain');
   } else {
-    addLog(state, `Income: +0.000 coins`, 'neutral');
+    addLog(state, `Income: +0.000 coins (${describeEventEffects(0, 0)})`, 'neutral');
   }
   if (repPerTurn > 0) {
-    addLog(state, `Reputation from cards: +${repPerTurn}`, 'gain');
+    addLog(state, `Reputation from cards: +${repPerTurn} (${describeEventEffects(0, repPerTurn)})`, 'gain');
   }
   if (handSynergyTotal > 0) {
-    addLog(state, `Hand card synergy: +${handSynergyTotal} coins`, 'gain');
+    addLog(state, `Hand card synergy: +${handSynergyTotal} coins (${describeEventEffects(handSynergyTotal, 0)})`, 'gain');
   }
   return {
     total,

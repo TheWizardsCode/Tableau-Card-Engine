@@ -70,6 +70,43 @@ export interface LogEntry {
 }
 
 /**
+ * Builds a compact, human-readable description of an effective (post-mitigation)
+ * coin/reputation change pair for activity-log entries (CG-0MT5W7UJJ0065MEZ).
+ *
+ * Examples:
+ *   - `+3.000 coins, +2 rep` for a gain of 3 coins and 2 reputation
+ *   - `-1.000 coins` for a pure coin loss
+ *   - `+1 rep` for a pure reputation gain
+ *   - `no effect` when both deltas are zero
+ *
+ * @param coinChange Effective coins delta (fractional values kept to 3 dp).
+ * @param repChange  Effective reputation delta.
+ */
+export function describeEventEffects(coinChange: number, repChange: number): string {
+  const parts: string[] = [];
+  if (coinChange !== 0) parts.push(`${coinChange > 0 ? '+' : ''}${coinChange.toFixed(3)} coins`);
+  if (repChange !== 0) parts.push(`${repChange > 0 ? '+' : ''}${repChange} rep`);
+  return parts.length > 0 ? parts.join(', ') : 'no effect';
+}
+
+/**
+ * Classifies a coin/rep change pair as gain, loss, or neutral for log coloring.
+ *
+ * Uses the NET coin+rep heuristic (sum of both deltas); shared by every
+ * enriched log site so a mixed exchange (e.g. -2 coins +1 rep) colours
+ * consistently with its effective net effect.
+ */
+export function classifyEffect(
+  coinChange: number,
+  repChange: number,
+): 'gain' | 'loss' | 'neutral' {
+  const net = coinChange + repChange;
+  if (net > 0) return 'gain';
+  if (net < 0) return 'loss';
+  return 'neutral';
+}
+
+/**
  * Appends a log entry to the activity log.
  *
  * Convenience helper so engine/market functions don't need to
@@ -190,6 +227,15 @@ export interface MainStreetState {
   resourceBank: ResourceBank;
   /** Shared EconomyLedger for resource mutation (synced with resourceBank). */
   ledger: EconomyLedger;
+  /**
+   * Coins at the start of the current turn (day-start snapshot). Used to
+   * compute the per-turn net summary row in the activity log; must survive
+   * save/load so the resumed turn's net is computed against the snapshot
+   * taken when the turn began (CG-0MT5W7UJJ0065MEZ AC3).
+   */
+  dayStartCoins: number;
+  /** Reputation at the start of the current turn (day-start snapshot). */
+  dayStartRep: number;
   /** Remaining cards in each deck (draw from end = top). */
   decks: {
     business: BusinessCard[];
@@ -301,6 +347,10 @@ export interface MainStreetSerializedState {
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
   market: MarketState;
   resourceBank: ResourceBank;
+  /** Day-start coin snapshot for the per-turn net summary row (see MainStreetState). */
+  dayStartCoins: number;
+  /** Day-start reputation snapshot for the per-turn net summary row. */
+  dayStartRep: number;
   decks: {
     business: BusinessCard[];
     communitySpace: CommunitySpaceCard[];
@@ -724,6 +774,10 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
       coins: initCoins,
       reputation: initRep,
     },
+    // Day-start snapshot initialised to the opening resources; overwritten by
+    // executeDayStart each turn (CG-0MT5W7UJJ0065MEZ AC3).
+    dayStartCoins: initCoins,
+    dayStartRep: initRep,
     ledger: createEconomyLedger({
       coins: initCoins,
       reputation: initRep,
@@ -833,6 +887,8 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     streetGrid: structuredClone(state.streetGrid),
     market: structuredClone(state.market),
     resourceBank: structuredClone(state.resourceBank),
+    dayStartCoins: state.dayStartCoins,
+    dayStartRep: state.dayStartRep,
     decks: structuredClone(state.decks),
     discards: structuredClone(state.discards),
     challengesCompleted: [...state.challengesCompleted],
@@ -1184,6 +1240,11 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     streetGrid: structuredClone(saved.streetGrid),
     market: structuredClone(saved.market),
     resourceBank: structuredClone(saved.resourceBank),
+    // Legacy saves predate the day-start snapshot; fall back to the current
+    // resources so a resumed turn's net row measures from the resume point
+    // (CG-0MT5W7UJJ0065MEZ AC3).
+    dayStartCoins: saved.dayStartCoins ?? saved.resourceBank.coins,
+    dayStartRep: saved.dayStartRep ?? saved.resourceBank.reputation,
     ledger: createEconomyLedger({
       coins: saved.resourceBank.coins,
       reputation: saved.resourceBank.reputation,

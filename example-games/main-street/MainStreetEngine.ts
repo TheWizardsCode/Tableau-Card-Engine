@@ -16,7 +16,13 @@
  */
 
 import type { MainStreetState, DayPhase } from './MainStreetState';
-import { PHASE_ORDER, addLog, syncResourceBankToLedger } from './MainStreetState';
+import {
+  PHASE_ORDER,
+  addLog,
+  syncResourceBankToLedger,
+  describeEventEffects,
+  classifyEffect,
+} from './MainStreetState';
 import type { BusinessCard, EventCard, SynergyType } from './MainStreetCards';
 import {
   SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
@@ -343,23 +349,15 @@ export function executeAction(
 
 /**
  * Builds a human-readable effect description for event log entries.
+ *
+ * Re-exported from MainStreetState (where the pure formatter lives) so log
+ * sites and tests keep the canonical entry point for enriched entry text
+ * (CG-0MT5W7UJJ0065MEZ).
  */
-function describeEventEffects(coinChange: number, repChange: number): string {
-  const parts: string[] = [];
-  if (coinChange !== 0) parts.push(`${coinChange > 0 ? '+' : ''}${coinChange.toFixed(3)} coins`);
-  if (repChange !== 0) parts.push(`${repChange > 0 ? '+' : ''}${repChange} rep`);
-  return parts.length > 0 ? parts.join(', ') : 'no effect';
-}
+export { describeEventEffects, classifyEffect } from './MainStreetState';
 
 /**
- * Classifies a coin/rep change as gain, loss, or neutral for log coloring.
- */
-function classifyEffect(coinChange: number, repChange: number): 'gain' | 'loss' | 'neutral' {
-  const net = coinChange + repChange;
-  if (net > 0) return 'gain';
-  if (net < 0) return 'loss';
-  return 'neutral';
-}
+ * Computes the effective duration for a DurationEventCard by scanning
 
 /**
  * Resolves a single event card's effects on the game state.
@@ -722,7 +720,14 @@ export function executeCommunityFavour(
     }
     state.resourceBank.coins -= cost;
     state.resourceBank.reputation += 1;
-    addLog(state, `Community Favour: spent ${cost} coins for 1 reputation.`, 'neutral');
+    // Enriched with effective deltas (CG-0MT5W7UJJ0065MEZ).
+    const coinDelta = -cost;
+    const repDelta = 1;
+    addLog(
+      state,
+      `Community Favour: spent ${cost} coins for 1 reputation (${describeEventEffects(coinDelta, repDelta)})`,
+      classifyEffect(coinDelta, repDelta),
+    );
   } else {
     // rep-to-coins
     const repCost = config.favourRepToCoinsRepCost;
@@ -734,7 +739,14 @@ export function executeCommunityFavour(
     }
     state.resourceBank.reputation -= repCost;
     state.resourceBank.coins += coinGain;
-    addLog(state, `Community Favour: spent ${repCost} reputation for ${coinGain} coins.`, 'neutral');
+    // Enriched with effective deltas (CG-0MT5W7UJJ0065MEZ).
+    const coinDelta = coinGain;
+    const repDelta = -repCost;
+    addLog(
+      state,
+      `Community Favour: spent ${repCost} reputation for ${coinGain} coins (${describeEventEffects(coinDelta, repDelta)})`,
+      classifyEffect(coinDelta, repDelta),
+    );
   }
 
   // Sync the ledger so the exchange is visible to other engine systems.
@@ -949,7 +961,36 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   // Community Favour gate (CG-0MSTOATDQ005XDET): one resource exchange per turn.
   state.favourUsedThisTurn = false;
 
+  // Day-start snapshot for the per-turn net summary row (CG-0MT5W7UJJ0065MEZ
+  // AC3): resources exactly as the player's turn begins. Persisted with the
+  // save so a resumed turn's net row measures against the original snapshot.
+  state.dayStartCoins = state.resourceBank.coins;
+  state.dayStartRep = state.resourceBank.reputation;
+
   state.phase = 'MarketPhase';
+}
+
+/**
+ * Computes and appends the per-turn net summary row to the activity log:
+ * the effective (post-mitigation) coin/reputation deltas for the turn just
+ * played, measured against the day-start snapshot (CG-0MT5W7UJJ0065MEZ AC3).
+ *
+ * @param state     Current game state (mutated in-place — appends to the log).
+ * @param turnEnded The turn number the row summarises (the turn just played).
+ */
+export function appendTurnNetRow(state: MainStreetState, turnEnded: number): void {
+  // Fall back to the current resources if no snapshot exists (defensive:
+  // processEndOfTurn is only reachable from MarketPhase, i.e. after a
+  // day start, so the snapshot is normally always present).
+  const startCoins = state.dayStartCoins ?? state.resourceBank.coins;
+  const startRep = state.dayStartRep ?? state.resourceBank.reputation;
+  const deltaCoins = state.resourceBank.coins - startCoins;
+  const deltaRep = state.resourceBank.reputation - startRep;
+  addLog(
+    state,
+    `Turn ${turnEnded} net: ${describeEventEffects(deltaCoins, deltaRep)}`,
+    classifyEffect(deltaCoins, deltaRep),
+  );
 }
 
 /**
@@ -963,6 +1004,10 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   if (state.phase !== 'MarketPhase') {
     throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
   }
+
+  // The turn being summarised by the net row (turn is incremented below on
+  // a continuing game, so capture it before that happens).
+  const turnEnded = state.turn;
 
   // Cycle unpurchased market cards to discard piles before advancing phases.
   // During the tutorial (before T7 completes), market cycling is skipped to
@@ -979,7 +1024,12 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // persist across turns.
   state.phase = 'InvestmentResolution';
 
-  // Check for immediate loss after events
+  // Check for immediate loss after events. When the game is about to end
+  // prematurely, emit the per-turn net row BEFORE the game-over banner so
+  // the summary precedes the loss entry (CG-0MT5W7UJJ0065MEZ AC3).
+  if (state.resourceBank.coins < 0 || (state.turn > 1 && state.resourceBank.reputation <= 0)) {
+    appendTurnNetRow(state, turnEnded);
+  }
   if (checkImmediateLoss(state)) {
     return {
       income: null,
@@ -1015,7 +1065,11 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   const incidentCoinChange = state.resourceBank.coins - coinsBeforeIncident;
   const incidentRepChange = state.resourceBank.reputation - repBeforeIncident;
 
-  // Check for immediate loss after incident
+  // Check for immediate loss after incident. Mirror the premature-exit
+  // ordering above: net row precedes the game-over banner (AC3).
+  if (state.resourceBank.coins < 0 || (state.turn > 1 && state.resourceBank.reputation <= 0)) {
+    appendTurnNetRow(state, turnEnded);
+  }
   if (checkImmediateLoss(state)) {
     return {
       income,
@@ -1061,6 +1115,10 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
 
     state.phase = 'DayStart';
   }
+
+  // Per-turn net summary row — the final log entry of a completed turn
+  // (CG-0MT5W7UJJ0065MEZ AC3).
+  appendTurnNetRow(state, turnEnded);
 
   return {
     income,
@@ -1167,9 +1225,9 @@ export function placeFromHand(
   addLog(
     state,
     premiumCost !== undefined
-      ? `Placed ${card.name} from hand in slot ${slotIndex} (-€${price}, 50% premium)`
-      : `Placed ${card.name} from hand in slot ${slotIndex} (-€${price})`,
-    'loss',
+      ? `Placed ${card.name} from hand in slot ${slotIndex} (-€${price}, 50% premium, ${describeEventEffects(-price, 0)})`
+      : `Placed ${card.name} from hand in slot ${slotIndex} (-€${price}, ${describeEventEffects(-price, 0)})`,
+    classifyEffect(-price, 0),
   );
 }
 
@@ -1211,7 +1269,7 @@ export function sellFromHand(
   // Add to discard pile
   state.discardPile.push(card as any);
 
-  addLog(state, `Sold ${card.name} from hand for +${sellValue} coins`, 'gain');
+  addLog(state, `Sold ${card.name} from hand for +${sellValue} coins (${describeEventEffects(sellValue, 0)})`, classifyEffect(sellValue, 0));
 }
 
 /**
@@ -1256,7 +1314,7 @@ export function sellFromTableau(
   // Add to discard pile
   state.discardPile.push(card as any);
 
-  addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${sellValue} coins`, 'gain');
+  addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${sellValue} coins (${describeEventEffects(sellValue, 0)})`, classifyEffect(sellValue, 0));
 }
 
 // ── Legality Checks (Multi-Use Card Economy) ─────────────────
@@ -1447,10 +1505,19 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
     state.resourceBank.coins -= actualDeduction;
     if (actualDeduction > 0) {
-      addLog(state, `Staff costs: -${actualDeduction} coins (${staffCards.length} staff)`, 'loss');
+      // Enriched with the effective deduction delta (CG-0MT5W7UJJ0065MEZ).
+      addLog(
+        state,
+        `Staff costs: -${actualDeduction} coins (${staffCards.length} staff) (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
     }
     if (actualDeduction < totalCost) {
-      addLog(state, `Insufficient coins for staff costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
+      addLog(
+        state,
+        `Insufficient coins for staff costs: owed ${totalCost}, paid ${actualDeduction} (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
     }
   }
 }
@@ -1487,10 +1554,19 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
     state.resourceBank.coins -= actualDeduction;
     if (actualDeduction > 0) {
-      addLog(state, `Community space costs: -${actualDeduction} coins (${spaceCount} spaces)`, 'loss');
+      // Enriched with the effective deduction delta (CG-0MT5W7UJJ0065MEZ).
+      addLog(
+        state,
+        `Community space costs: -${actualDeduction} coins (${spaceCount} spaces) (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
     }
     if (actualDeduction < totalCost) {
-      addLog(state, `Insufficient coins for community space costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
+      addLog(
+        state,
+        `Insufficient coins for community space costs: owed ${totalCost}, paid ${actualDeduction} (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
     }
   }
 }
@@ -1533,10 +1609,19 @@ export function applyBusinessOngoingCosts(state: MainStreetState): void {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
     state.resourceBank.coins -= actualDeduction;
     if (actualDeduction > 0) {
-      addLog(state, `Business costs: -${actualDeduction} coins (${bizCount} businesses)`, 'loss');
+      // Enriched with the effective deduction delta (CG-0MT5W7UJJ0065MEZ).
+      addLog(
+        state,
+        `Business costs: -${actualDeduction} coins (${bizCount} businesses) (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
     }
     if (actualDeduction < totalCost) {
-      addLog(state, `Insufficient coins for business costs: owed ${totalCost}, paid ${actualDeduction}`, 'loss');
+      addLog(
+        state,
+        `Insufficient coins for business costs: owed ${totalCost}, paid ${actualDeduction} (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
     }
   }
 }
@@ -1657,7 +1742,11 @@ export function buyAndPlaceBusiness(
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
-  addLog(state, `Bought & placed ${card.name} in slot ${slotIndex} (-€${price}, ${price === premiumCost ? '50% premium' : 'listed'})`, 'loss');
+  addLog(
+    state,
+    `Bought & placed ${card.name} in slot ${slotIndex} (-€${price}, ${price === premiumCost ? '50% premium' : 'listed'}, ${describeEventEffects(-price, 0)})`,
+    classifyEffect(-price, 0),
+  );
 
   return { card, cost: price, refilled: false };
 }

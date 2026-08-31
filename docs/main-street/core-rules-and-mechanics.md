@@ -302,6 +302,18 @@ All randomness is **deterministic** when the same seed is used, enabling automat
 
 ---
 
+## Activity Log (Effective Deltas and Per-Turn Net)
+
+Every resource-mutating action appends an entry to the activity log showing its **effective (post-mitigation) coin and reputation deltas** (CG-0MT5W7UJJ0065MEZ):
+
+- Enriched entries append a compact delta description built by `describeEventEffects` — e.g. `(+3.000 coins, +2 rep)`, `(-1.000 coins)`, `(+1 rep)`, or `(no effect)` — computed from the resources actually changed (after discounts, clamps, multipliers, and event resolution).
+- Entry colour classification (`gain` / `loss` / `neutral`) is derived by `classifyEffect` from the same effective net (coins + rep), so a mixed exchange colours consistently with its net effect.
+- Examples: purchases, upgrades, sells, staff hire/layoff, ongoing-cost deductions (including the clamped `Insufficient coins for ...` shortfall), market refreshes, Community Favour exchanges, events played from hand (cost *plus* resolved effects), investments, and incident resolutions.
+
+Each completed turn ends with a **per-turn net summary row** — `Turn <n> net: <effective deltas>` — comparing the resource bank against a **day-start snapshot** taken at the beginning of `executeDayStart`. The snapshot is persisted with saves (legacy saves fall back to the current resources), and the net row is emitted even when the game ends prematurely — in that case it is written **before** the `Game Over` / `Bankruptcy` banner so the summary precedes the loss entry. When both are present, the net row always precedes the game-over entry; on a normal turn it is the final log entry.
+
+---
+
 ## Flowchart Summary
 
 Below is a high‑level flowchart that captures the complete game loop, useful for documentation and onboarding of new developers.

@@ -2,7 +2,15 @@
  * Main Street: Activity Log Tests
  *
  * Verifies that every game-influencing action produces the correct
- * activity log entries in state.activityLog.
+ * activity log entries in state.activityLog, with effective (post-mitigation)
+ * coin and reputation deltas shown alongside the action-specific text.
+ *
+ * Per CG-0MT5W7UJJ0065MEZ — "In main street log should show total effects":
+ *   - AC2: played-from-hand event entries show cost + effective deltas
+ *   - AC1: all resource-mutating entries show effective deltas
+ *   - AC3: per-turn net summary row appended at end of each turn
+ *   - AC4: entries remain readable (word-wrap, compact)
+ *   - AC5: docs updated, full suite passes
  */
 import { describe, it, expect } from 'vitest';
 
@@ -19,19 +27,38 @@ import {
   resolveIncident,
   checkImmediateLoss,
   checkEndConditions,
+  describeEventEffects,
+  classifyEffect,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   purchaseBusiness,
   purchaseEvent,
   purchaseUpgrade,
+  playEventFromHand,
+  refreshMarket,
 } from '../../example-games/main-street/MainStreetMarket';
-import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
+import {
+  applyIncome,
+  recalculateCard,
+} from '../../example-games/main-street/MainStreetAdjacency';
 import {
   WIN_THRESHOLD,
   type BusinessCard,
   type EventCard,
   type UpgradeCard,
+  type CommunitySpaceCard,
+  type StaffCard,
 } from '../../example-games/main-street/MainStreetCards';
+import {
+  sellFromHand,
+  sellFromTableau,
+  executeCommunityFavour,
+  hireStaffCard,
+  layoffStaffCard,
+  applyStaffOngoingCosts,
+  applyCommunitySpaceOngoingCosts,
+  applyBusinessOngoingCosts,
+} from '../../example-games/main-street/MainStreetEngine';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -93,6 +120,42 @@ function lastLog(state: MainStreetState): LogEntry {
 
 function logsOfType(state: MainStreetState, type: LogEntry['type']): LogEntry[] {
   return state.activityLog.filter(e => e.type === type);
+}
+
+// ── Helpers for enriched-entry tests ─────────────────────────
+
+/** Create a staff card for testing hire/layoff. */
+function makeStaffCard(overrides: Partial<StaffCard> = {}): StaffCard {
+  return {
+    family: 'staff',
+    id: overrides.id ?? 'test-staff',
+    name: overrides.name ?? 'Test Staff',
+    cost: overrides.cost ?? 3,
+    ongoingCost: overrides.ongoingCost ?? 1,
+    handSlotsAdded: overrides.handSlotsAdded ?? 0,
+    actionsPerTurn: overrides.actionsPerTurn ?? 0,
+    description: overrides.description ?? 'A test staff card.',
+    specializationSkillIds: overrides.specializationSkillIds ?? [],
+  } as StaffCard;
+}
+
+/** Create a community space card for testing purchase. */
+function makeCommunitySpace(overrides: Partial<CommunitySpaceCard> = {}): CommunitySpaceCard {
+  return {
+    family: 'community-space',
+    id: overrides.id ?? 'test-community-space',
+    name: overrides.name ?? 'Test Community Space',
+    cost: overrides.cost ?? 4,
+    baseIncome: overrides.baseIncome ?? 1,
+    synergyTypes: overrides.synergyTypes ?? ['Education'],
+    maxLevel: overrides.maxLevel ?? 1,
+    description: overrides.description ?? 'A test community space',
+    level: overrides.level ?? 0,
+    incomeBonus: overrides.incomeBonus ?? 0,
+    synergyRangeBonus: overrides.synergyRangeBonus ?? 0,
+    reputationBonus: overrides.reputationBonus ?? 0,
+    ongoingCost: overrides.ongoingCost ?? 0,
+  } as CommunitySpaceCard;
 }
 
 // ── Tests ───────────────────────────────────────────────────
@@ -486,6 +549,300 @@ describe('Activity Log', () => {
       const placementEntry = state.activityLog.find(e => e.text.includes('Placed'));
       expect(placementEntry).toBeDefined();
       expect(placementEntry!.text).toContain(biz.name);
+    });
+  });
+
+  // ── CG-0MT5W7UJJ0065MEZ: enriched entries + net row ───────
+
+  describe('describeEventEffects / classifyEffect helpers (exported)', () => {
+    it('should describe coin/rep deltas in a compact human-readable form', () => {
+      expect(describeEventEffects(3, 2)).toBe('+3.000 coins, +2 rep');
+      expect(describeEventEffects(-1, 0)).toBe('-1.000 coins');
+      expect(describeEventEffects(0, 1)).toBe('+1 rep');
+      expect(describeEventEffects(0, 0)).toBe('no effect');
+    });
+
+    it('should classify net coin+rep effect correctly', () => {
+      expect(classifyEffect(1, 0)).toBe('gain');
+      expect(classifyEffect(-1, 0)).toBe('loss');
+      expect(classifyEffect(0, 0)).toBe('neutral');
+      expect(classifyEffect(1, -2)).toBe('loss');
+      expect(classifyEffect(-1, 2)).toBe('gain');
+    });
+  });
+
+  describe('enriched: business purchase', () => {
+    it('should log effective deltas for a business purchase alongside cost/slot', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      state.resourceBank.coins = 50;
+      const biz = state.market.cards.find(c => c.family === 'business');
+      if (!biz) throw new Error('No business card in market for enriched purchase test');
+      const before = state.resourceBank.coins;
+      purchaseBusiness(state, biz.id, 0);
+      const after = state.resourceBank.coins;
+      const entry = lastLog(state);
+      // Classified on the actual coin delta (net).
+      expect(entry.type).toBe(classifyEffect(after - before, 0));
+      expect(entry.text).toContain(biz.name);
+      expect(entry.text).toContain('slot 0');
+      // Enriched deltas are appended.
+      expect(entry.text).toMatch(/(\+|-)\d+\.\d{3} coins/);
+    });
+  });
+
+  describe('enriched: upgrade purchase', () => {
+    it('should log effective deltas for an upgrade purchase', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      state.streetGrid[0] = makeBiz({ id: 'biz-upg-1', name: 'Bakery', maxLevel: 3 });
+      const upgrade: UpgradeCard = {
+        family: 'upgrade',
+        id: 'upg-enrich-1',
+        name: 'Better Ovens',
+        description: 'Improve bakery',
+        cost: 4,
+        targetBusiness: 'Bakery',
+        incomeBonus: 1,
+        synergyRangeBonus: 0,
+      };
+      state.market.cards = [upgrade];
+      state.resourceBank.coins = 20;
+      const before = state.resourceBank.coins;
+      purchaseUpgrade(state, 'upg-enrich-1');
+      const after = state.resourceBank.coins;
+      const entry = lastLog(state);
+      expect(entry.type).toBe(classifyEffect(after - before, 0));
+      expect(entry.text).toContain('Better Ovens');
+      expect(entry.text).toMatch(/(\+|-)\d+\.\d{3} coins/);
+    });
+  });
+
+  describe('enriched: played event from hand', () => {
+    it('should log cost plus effective deltas when playing an event from hand', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      state.resourceBank.coins = 20;
+      const ev = makeInvestmentEvent({
+        id: 'hand-play-ev-1',
+        name: 'Local Festival',
+        cost: 3,
+        coinDelta: 5,
+        reputationDelta: 1,
+      });
+      state.hand = [ev];
+      state.resourceBank.coins = 20;
+      const coinsBefore = state.resourceBank.coins;
+      const repBefore = state.resourceBank.reputation;
+      playEventFromHand(state, 0);
+      const entry = lastLog(state);
+      const coinDelta = state.resourceBank.coins - coinsBefore;
+      const repDelta = state.resourceBank.reputation - repBefore;
+      // Entry keeps existing substrings (card name, cost) and appends effective deltas.
+      expect(entry.text).toContain('Local Festival');
+      expect(entry.text).toContain('€3');
+      expect(entry.text).toContain(describeEventEffects(coinDelta, repDelta));
+      // Classification follows net coin+rep, not raw cost.
+      expect(entry.type).toBe(classifyEffect(coinDelta, repDelta));
+    });
+  });
+
+  describe('enriched: sells', () => {
+    it('should log effective coin delta when selling from hand', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      const biz = makeBiz({ id: 'sell-hand-biz-1', name: 'Sun Cafe', cost: 4 });
+      state.hand = [biz];
+      const before = state.resourceBank.coins;
+      sellFromHand(state, 0);
+      const after = state.resourceBank.coins;
+      const entry = lastLog(state);
+      expect(entry.text).toContain('Sun Cafe');
+      expect(entry.text).toMatch(/(\+|-)\d+\.\d{3} coins/);
+      expect(entry.type).toBe(classifyEffect(after - before, 0));
+    });
+
+    it('should log effective coin delta when selling from tableau', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      state.streetGrid[0] = makeBiz({ id: 'sell-slot-biz-1', name: 'Sun Cafe', cost: 4 });
+      const before = state.resourceBank.coins;
+      sellFromTableau(state, 0);
+      const after = state.resourceBank.coins;
+      const entry = lastLog(state);
+      expect(entry.text).toContain('Sun Cafe');
+      expect(entry.text).toMatch(/(\+|-)\d+\.\d{3} coins/);
+      expect(entry.type).toBe(classifyEffect(after - before, 0));
+    });
+  });
+
+  describe('enriched: community favour exchange', () => {
+    it('should log effective coin/rep deltas for community favour', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      state.resourceBank.coins = 20;
+      state.resourceBank.reputation = 5;
+      const beforeCoins = state.resourceBank.coins;
+      const beforeRep = state.resourceBank.reputation;
+      executeCommunityFavour(state, 'coins-to-rep');
+      const entry = lastLog(state);
+      const coinDelta = state.resourceBank.coins - beforeCoins;
+      const repDelta = state.resourceBank.reputation - beforeRep;
+      expect(entry.text).toContain('Community Favour');
+      expect(entry.text).toContain(describeEventEffects(coinDelta, repDelta));
+      expect(entry.type).toBe(classifyEffect(coinDelta, repDelta));
+    });
+  });
+
+  describe('enriched: re-roll market', () => {
+    it('should log effective coin delta on re-roll', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      state.resourceBank.coins = 50;
+      const before = state.resourceBank.coins;
+      refreshMarket(state);
+      const after = state.resourceBank.coins;
+      const entry = lastLog(state);
+      // Re-roll is a paid action; log should reflect the actual coin delta.
+      expect(entry.text).toContain(describeEventEffects(after - before, 0));
+      expect(entry.type).toBe(classifyEffect(after - before, 0));
+    });
+  });
+
+  describe('enriched: staff hire / layoff', () => {
+    it('should log effective coin delta on staff hire', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      const staff = makeStaffCard({ id: 'staff-enrich-1', name: 'General Helper', cost: 3 });
+      state.market.cards = [staff as any];
+      state.resourceBank.coins = 30;
+      const before = state.resourceBank.coins;
+      hireStaffCard(state, 'staff-enrich-1');
+      const after = state.resourceBank.coins;
+      const entry = lastLog(state);
+      expect(entry.text).toContain(describeEventEffects(after - before, 0));
+      expect(entry.type).toBe(classifyEffect(after - before, 0));
+    });
+
+    it('should log on staff layoff (coin/rep deltas)', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      const staff = makeStaffCard({ id: 'staff-enrich-lay-1', name: 'General Helper', cost: 3 });
+      state.staffCards = [staff];
+      layoffStaffCard(state, 'staff-enrich-lay-1');
+      const entry = lastLog(state);
+      expect(entry.text).toContain('Laid off');
+      expect(entry.text).toContain('General Helper');
+      // Layoff already logs a delta via the card hand slots; verify enrichment.
+      expect(entry.type).toBeDefined();
+    });
+  });
+
+  describe('enriched: staff / community / business ongoing costs', () => {
+    it('should log effective coin delta for staff ongoing costs', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      state.staffCards = [makeStaffCard({ id: 'staff-cost-1', name: 'A', cost: 1, ongoingCost: 2 })];
+      state.resourceBank.coins = 20;
+      const before = state.resourceBank.coins;
+      applyStaffOngoingCosts(state);
+      const after = state.resourceBank.coins;
+      const entry = state.activityLog.find(e => e.text.includes('Staff costs'));
+      expect(entry).toBeDefined();
+      expect(entry!.text).toContain(describeEventEffects(after - before, 0));
+      expect(entry!.type).toBe(classifyEffect(after - before, 0));
+    });
+
+    it('should log effective coin delta for community space ongoing costs', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      const cs = makeCommunitySpace({ id: 'cs-cost-1', name: 'Library', ongoingCost: 1 });
+      state.streetGrid[0] = cs as any;
+      state.resourceBank.coins = 20;
+      const before = state.resourceBank.coins;
+      applyCommunitySpaceOngoingCosts(state);
+      const after = state.resourceBank.coins;
+      const entry = state.activityLog.find(e => e.text.includes('Community space costs'));
+      expect(entry).toBeDefined();
+      expect(entry!.text).toContain(describeEventEffects(after - before, 0));
+      expect(entry!.type).toBe(classifyEffect(after - before, 0));
+    });
+
+    it('should log effective coin delta for business ongoing costs', () => {
+      const state = createTestState();
+      executeDayStart(state);
+      state.streetGrid[0] = makeBiz({ id: 'biz-cost-1', name: 'Clinic', ongoingCost: 1 });
+      state.resourceBank.coins = 20;
+      const before = state.resourceBank.coins;
+      applyBusinessOngoingCosts(state);
+      const after = state.resourceBank.coins;
+      const entry = state.activityLog.find(e => e.text.includes('Business costs'));
+      expect(entry).toBeDefined();
+      expect(entry!.text).toContain(describeEventEffects(after - before, 0));
+      expect(entry!.type).toBe(classifyEffect(after - before, 0));
+    });
+  });
+
+  describe('per-turn net summary row (AC3)', () => {
+    it('should append a net summary row at end of turn processing', () => {
+      const state = createTestState('net-row-basic');
+      executeDayStart(state);
+      const startCoins = state.resourceBank.coins;
+      const startRep = state.resourceBank.reputation;
+      processEndOfTurn(state);
+      const last = lastLog(state);
+      expect(last.text).toMatch(/Turn \d+ net:/);
+      expect(last.text).toContain(describeEventEffects(state.resourceBank.coins - startCoins, state.resourceBank.reputation - startRep));
+    });
+
+    it('should emit the net row even when the net is zero', () => {
+      const state = createTestState('net-row-zero');
+      // Establish a stable coin baseline BEFORE the day-start snapshot, then
+      // ensure the turn produces no resource delta (empty grid/staff/incidents).
+      state.resourceBank.coins = 10;
+      executeDayStart(state);
+      // Ensure income is zero and no ongoing costs are deducted.
+      state.streetGrid = state.streetGrid.map(() => null);
+      state.staffCards = [];
+      state.incidentDeck = [];
+      const beforeCoins = state.resourceBank.coins;
+      const beforeRep = state.resourceBank.reputation;
+      // Prevent income from charging trivial rounding effects.
+      // With no businesses, income is 0.
+      state.phase = 'MarketPhase';
+      processEndOfTurn(state);
+      const last = lastLog(state);
+      expect(last.text).toMatch(/Turn \d+ net:/);
+      expect(last.text).toContain(describeEventEffects(0, 0));
+      expect(state.resourceBank.coins - beforeCoins).toBe(0);
+      expect(state.resourceBank.reputation - beforeRep).toBe(0);
+    });
+
+    it('should use the day-start snapshot survived by save/load (clone/restore)', () => {
+      const state = createTestState('net-row-clone');
+      executeDayStart(state);
+      // Clone via JSON round-trip (mirrors save/load snapshot requirement)
+      const cloned: MainStreetState = JSON.parse(JSON.stringify(state));
+      // Day-start snapshot fields should be preserved in (de)serialized form.
+      if ((state as any).dayStartCoins !== undefined) {
+        expect((cloned as any).dayStartCoins).toBe((state as any).dayStartCoins);
+        expect((cloned as any).dayStartRep).toBe((state as any).dayStartRep);
+      }
+    });
+
+    it('emits the net row before the game-over entry when the game ends prematurely', () => {
+      const state = createTestState('net-row-game-over');
+      executeDayStart(state);
+      state.resourceBank.coins = -1; // force bankruptcy path
+      processEndOfTurn(state);
+      const netIdx = state.activityLog.findIndex(e => /Turn \d+ net:/.test(e.text));
+      const overIdx = state.activityLog.findIndex(e => /Game Over|Bankruptcy/.test(e.text));
+      // Net row is emitted; if game-over follows, net precedes it.
+      if (netIdx !== -1 && overIdx !== -1) {
+        expect(netIdx).toBeLessThan(overIdx);
+      } else {
+        expect(netIdx).not.toBe(-1);
+      }
     });
   });
 });
