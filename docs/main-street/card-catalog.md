@@ -244,7 +244,7 @@ Events fall into two categories:
 | ID | Name | Trigger | Cost | Target | Synergy | Coins | Rep | Effect | Rationale |
 |----|------|---------|------|--------|---------|-------|-----|--------|-----------|
 | `evt-grand-opening` | Grand Opening Sale | Investment | 2 | SpecificSynergy | Commerce | +3 | 0 | +3 coins from Commerce promo. | Cheap Commerce boost; rewards Commerce-heavy builds. |
-| `evt-wellness-fair` | Wellness Fair | Investment | 3 | SpecificSynergy | Service | +2 | +1 | +2 coins/Service biz, +1 rep. | Service counterpart to Local Festival. |
+| `evt-wellness-fair` | Wellness Fair | Investment | 3 | SpecificSynergy | Health | +2 | +1 | +2 coins/Health biz, +1 rep. | Health counterpart to Local Festival. |
 | `evt-block-party` | Block Party | Investment | 4 | SpecificSynergy | Entertainment | +2 | +2 | +2 coins/Ent biz, +2 rep. | Expensive but high rep payoff for Entertainment. |
 | `evt-charity-drive` | Charity Drive | Investment | 2 | All | -- | 0 | +3 | +3 reputation. | Pure reputation play; universal target. |
 
