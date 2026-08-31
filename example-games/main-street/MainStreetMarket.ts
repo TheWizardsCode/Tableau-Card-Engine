@@ -188,6 +188,36 @@ export function canPurchaseEvent(
   return { legal: true };
 }
 
+/**
+ * Whether the Investment event at handIndex can be played this turn.
+ * Same-day composite (CG-0MTFWBNL30043ZBM): playing the event just moved
+ * to hand this day (justMovedEventCardId) is free; otherwise costs 1 action.
+ */
+export function canPlayEvent(
+  state: MainStreetState,
+  handIndex: number,
+): LegalityResult {
+  const hand = state.hand ?? [];
+  if (handIndex < 0 || handIndex >= hand.length) {
+    return { legal: false, reason: `Invalid hand index: ${handIndex}.` };
+  }
+  const card = hand[handIndex] as any;
+  if (!card || card.family !== 'event') {
+    return { legal: false, reason: `Card at hand index ${handIndex} is not an Investment event.` };
+  }
+  if ((card as any).trigger !== 'Investment') {
+    return { legal: false, reason: 'Incident events cannot be played from hand.' };
+  }
+  const isSameDay = (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+  if (!isSameDay && (state.actionsRemaining ?? 0) <= 0) {
+    return { legal: false, reason: 'No actions remaining today. End your turn to start a new day.' };
+  }
+  if (state.resourceBank.coins < card.cost) {
+    return { legal: false, reason: `Not enough coins to play ${card.name} from hand. Need ${card.cost}, have ${state.resourceBank.coins}.` };
+  }
+  return { legal: true };
+}
+
 // ── Market Refill ───────────────────────────────────────────
 
 /**
@@ -620,6 +650,9 @@ export function playEventFromHand(
   state.resourceBank.coins -= event.cost;
   resolveEvent(state, event);
   state.hand.splice(handIndex, 1);
+  if ((state as any).justMovedEventCardId === event.id) {
+    (state as any).justMovedEventCardId = null;
+  }
 
   const coinDelta = state.resourceBank.coins - coinsBefore;
   const repDelta = state.resourceBank.reputation - repBefore;
@@ -766,6 +799,8 @@ export function purchaseEvent(
 
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
+
+  (state as any).justMovedEventCardId = card.id;
 
   addLog(state, `Moved event ${card.name} to hand (free, pay on play)`, 'neutral');
 

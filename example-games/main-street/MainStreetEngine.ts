@@ -28,6 +28,7 @@ import {
   SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
   type DurationEventCard,
 } from './MainStreetCards';
+
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
@@ -313,12 +314,19 @@ export function executeAction(
       return hireStaffCard(state, action.cardId);
     case 'buy-upgrade':
       return purchaseUpgrade(state, action.cardId, action.targetSlot);
-    case 'buy-event':
+    case 'buy-event': {
+      consumeAction(state);
       return purchaseEvent(state, action.cardId);
+    }
     case 'play-upgrade-from-hand':
       return playUpgradeFromHand(state, action.handIndex, action.targetSlot);
-    case 'play-event-from-hand':
+    case 'play-event-from-hand': {
+      const hand = state.hand ?? [];
+      const card = hand[action.handIndex] as any;
+      const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+      if (!isSameDay) consumeAction(state);
       return playEventFromHand(state, action.handIndex);
+    }
     case 'discard-from-hand':
       discardFromHand(state, action.handIndex);
       return null;
@@ -327,6 +335,9 @@ export function executeAction(
       if (handIndex < 0) {
         throw new Error('No Investment event is currently held in hand.');
       }
+      const card = (state.hand ?? [])[handIndex] as any;
+      const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+      if (!isSameDay) consumeAction(state);
       return playEventFromHand(state, handIndex);
     }
     case 'peek-incident-deck':
@@ -960,6 +971,9 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
 
   // Community Favour gate (CG-0MSTOATDQ005XDET): one resource exchange per turn.
   state.favourUsedThisTurn = false;
+
+  // Same-day Investment composite (CG-0MTFWBNL30043ZBM): new day clears the tracker.
+  (state as any).justMovedEventCardId = null;
 
   // Day-start snapshot for the per-turn net summary row (CG-0MT5W7UJJ0065MEZ
   // AC3): resources exactly as the player's turn begins. Persisted with the

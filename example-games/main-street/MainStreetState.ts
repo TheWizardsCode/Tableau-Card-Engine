@@ -338,6 +338,13 @@ export interface MainStreetState {
    * Reset to false at DayStart.
    */
   favourUsedThisTurn: boolean;
+  /**
+   * Same-day Investment event composite (CG-0MTFWBNL30043ZBM): ID of the
+   * event card just moved from the market to hand this day. Playing that
+   * same card later this day is free (move+play = 1 action total). Cleared
+   * at DayStart / after play / on undo.
+   */
+  justMovedEventCardId: string | null;
 }
 
 export interface MainStreetSerializedState {
@@ -422,6 +429,8 @@ export interface MainStreetSerializedState {
   revealedPeekedCard: EventCard | null;
   /** Whether the once-per-turn Community Favour exchange has been used this turn. */
   favourUsedThisTurn: boolean;
+  /** Same-day Investment event composite (CG-0MTFWBNL30043ZBM). */
+  justMovedEventCardId: string | null;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -822,6 +831,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     peekUsedThisTurn: false,
     revealedPeekedCard: null,
     favourUsedThisTurn: false,
+    justMovedEventCardId: null,
   };
 
   // Refill the single-row market with its initial composition.
@@ -919,6 +929,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     peekUsedThisTurn: state.peekUsedThisTurn,
     revealedPeekedCard: state.revealedPeekedCard ?? null,
     favourUsedThisTurn: state.favourUsedThisTurn,
+    justMovedEventCardId: state.justMovedEventCardId ?? null,
   };
 }
 
@@ -1123,6 +1134,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).favourUsedThisTurn = false;
   }
 
+  // ── justMovedEventCardId (CG-0MTFWBNL30043ZBM): backfill default ──
+  if (!('justMovedEventCardId' in saved)) {
+    (saved as Record<string, unknown>).justMovedEventCardId = null;
+  }
+
   // ── incidentBalance (CG-0MSL0OP040043KKZ): backfill from the queue for ──
   // legacy saves that predate the balance state. The queue cards are recorded
   // in draw order so subsequent constrained draws see the actual sequence.
@@ -1289,6 +1305,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     bankedActions: saved.bankedActions ?? 0,
     peekUsedThisTurn: saved.peekUsedThisTurn ?? false,
     favourUsedThisTurn: saved.favourUsedThisTurn ?? false,
+    justMovedEventCardId: (saved as any).justMovedEventCardId ?? null,
     revealedPeekedCard: (saved.revealedPeekedCard as EventCard | null) ?? null,
   };
 

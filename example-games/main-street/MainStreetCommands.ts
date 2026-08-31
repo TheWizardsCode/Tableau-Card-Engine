@@ -209,7 +209,11 @@ export function moveEventToHandCommand(
   return toCommand(
     state,
     snapshotAction(
-      (s) => moveToHand(s, cardId),
+      (s) => {
+        consumeAction(s);
+        moveToHand(s, cardId);
+        (s as any).justMovedEventCardId = cardId;
+      },
       `MoveEventToHand ${cardId}`,
     ),
   );
@@ -236,6 +240,9 @@ export function playEventCommand(state: MainStreetState, handIndex?: number) {
     snapshotAction(
       (s) => {
         const idx = handIndex ?? (s.hand ?? []).findIndex(c => c.family === 'event');
+        const card = (s.hand ?? [])[idx] as any;
+        const isSameDay = card && (s as any).justMovedEventCardId != null && (s as any).justMovedEventCardId === card.id;
+        if (!isSameDay) consumeAction(s);
         return playEventFromHand(s, idx);
       },
       'PlayEventFromHand',
