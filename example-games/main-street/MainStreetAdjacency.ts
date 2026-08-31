@@ -997,3 +997,62 @@ export interface IncomeResult {
    */
   phaseBreakdown: PhaseBreakdown;
 }
+
+// ═══════════════════════════════════════════════════════════
+// Expanded Grid Topology — Contract Stubs (CG-0MTH9OQSZ003O1R6)
+// ═══════════════════════════════════════════════════════════
+// These exports are stubs for the test-first contract suite.
+// They throw until the implementation slice populates them.
+// See tests/main-street/expanded-grid-contract.test.ts.
+
+/**
+ * Contract stub — throws until implementation.
+ * See expanded-grid-contract.test.ts AC1.
+ */
+export function toWorldPosition(
+  _streetX: number,
+  _streetY: number,
+  _slotIndex: number,
+): { worldX: number; worldY: number } {
+  throw new Error(
+    'toWorldPosition not yet implemented (CG-0MTH9OQSZ003O1R6 stub)',
+  );
+}
+
+/**
+ * Contract stub — throws until implementation.
+ * See expanded-grid-contract.test.ts AC1.
+ */
+export function fromWorldPosition(
+  _worldPos: { worldX: number; worldY: number },
+): { streetX: number; streetY: number; slotIndex: number } | null {
+  throw new Error(
+    'fromWorldPosition not yet implemented (CG-0MTH9OQSZ003O1R6 stub)',
+  );
+}
+
+/**
+ * Contract stub — throws until implementation.
+ * See expanded-grid-contract.test.ts AC2.
+ */
+export function expandedNeighbors(
+  _worldPos: { worldX: number; worldY: number },
+  _range: number = 1,
+): { streetX: number; streetY: number; slotIndex: number }[] {
+  throw new Error(
+    'expandedNeighbors not yet implemented (CG-0MTH9OQSZ003O1R6 stub)',
+  );
+}
+
+/**
+ * Contract stub — throws until implementation.
+ * See expanded-grid-contract.test.ts AC3.
+ */
+export function worldSlotCount(
+  _streetCols: number,
+  _streetRows: number,
+): number {
+  throw new Error(
+    'worldSlotCount not yet implemented (CG-0MTH9OQSZ003O1R6 stub)',
+  );
+}
