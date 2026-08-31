@@ -522,9 +522,9 @@ export function playBusinessFromHand(
   addLog(
     state,
     premiumCost !== undefined
-      ? `Played ${card.name} from hand into slot ${slotIndex} (-€${price}, 50% premium)`
-      : `Played ${card.name} from hand into slot ${slotIndex} (-€${price})`,
-    'loss',
+      ? `Played ${card.name} from hand into slot ${slotIndex} (-€${price}, 50% premium, ${describeEventEffects(-price, 0)})`
+      : `Played ${card.name} from hand into slot ${slotIndex} (-€${price}, ${describeEventEffects(-price, 0)})`,
+    classifyEffect(-price, 0),
   );
 
   return { card, cost: price, refilled: false };
