@@ -172,7 +172,8 @@ describe('buildCardTooltipInfo - cost formatting', () => {
       { includeEventDetail: true },
     );
     expect(info).toContain('Cost: €5');
-    expect(info).toContain('Coins: +2.000');
+    // CG-0MT5Y9AD2001MKWZ: formatted cleanly, no spurious trailing zeros.
+    expect(info).toContain('Coins: +2');
     expect(info).toContain('Rep: +0.5');
   });
 
