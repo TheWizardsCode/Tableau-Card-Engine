@@ -697,7 +697,7 @@ export class MainStreetRenderer {
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
         if (isSold) {
-          const info = `Sold: ${biz.name}\nThis card no longer produces income or synergy.`;
+          const info = `Sold: ${biz.name}\nThis card no longer produces income, but still provides synergy to adjacent businesses.`;
           s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
           return;
         }
