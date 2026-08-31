@@ -346,6 +346,18 @@ Two mitigations are in place in this repository:
      delete would block the tutorial boot's own `SaveLoadStore.open()`
      (the boot uniquely awaits the campaign-load promise) and wedge the
      suite with a 90s hook timeout.
+   - **Boot retry + modal poll** (CG-0MTGHZWOO001WWOU): `bootGameWithTutorial`
+     wraps the boot in up to 3 attempts (full `destroyGame` + 1 s GC-settle
+     between attempts), because under full-suite resource pressure the
+     async tutorial-offer chain can stall: `checkAndResume()` runs
+     fire-and-forget inside the `_campaignLoadPromise` `.then` callback, so
+     that promise can resolve before the offer modal's `show()` executes.
+     After awaiting it, the helper polls up to 15 s for the modal (a
+     late-but-healthy show is not a failure), clicking the resume overlay's
+     `[ New Game ]` button if a stale checkpoint surfaces instead. Only when
+     the poll and all retries fail does it throw a diagnostic error (with
+     checkpoint/display-list state) instead of leaving `waitForStartButton`
+     to time out silently after 40 s.
    - **Content-aware render gates**: fixed-frame waits (`waitFrames(24)`)
      with a hard 2s fallback resolve while a CPU-starved RAF loop has only
      produced a couple of frames, so pixel-analysis assertions can sample an
