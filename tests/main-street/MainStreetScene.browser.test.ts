@@ -400,6 +400,12 @@ describe('MainStreetScene browser tests', () => {
       expect(scene.getHiddenTransferSourceCardCountForTest()).toBe(0);
       expect(hideSpy).toHaveBeenCalled();
 
+      // Restore action budget for event purchase (business buy consumed the
+      // action; the composite placement used the +50% premium path so no
+      // action was consumed there).
+      state.actionsRemaining = 1;
+      state.bankedActions = 0;
+
       const eventCard = state.market.cards.find((card: any) =>
         card && card.family === 'event' && canPurchaseEvent(state, card.id).legal,
       );
