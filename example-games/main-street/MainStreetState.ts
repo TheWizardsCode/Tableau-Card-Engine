@@ -345,6 +345,15 @@ export interface MainStreetState {
    * at DayStart / after play / on undo.
    */
   justMovedEventCardId: string | null;
+  /**
+   * Tracks the upgrade card moved to hand this turn for same-day composite
+   * detection (CG-0MT3IYSRL001VVUP). When an upgrade is moved to hand via
+   * `move-to-hand`, this is set to its cardId; `play-upgrade-from-hand` then
+   * checks if the playing card matches — if so, the action is free (no
+   * additional action consumed). Cleared after the composite play or on
+   * DayStart.
+   */
+  justMovedUpgradeCardId?: string | null;
 }
 
 export interface MainStreetSerializedState {
@@ -431,6 +440,12 @@ export interface MainStreetSerializedState {
   favourUsedThisTurn: boolean;
   /** Same-day Investment event composite (CG-0MTFWBNL30043ZBM). */
   justMovedEventCardId: string | null;
+  /**
+   * Same-day upgrade composite tracking (CG-0MT3IYSRL001VVUP): cardId of
+   * the upgrade just moved to hand this turn. `play-upgrade-from-hand`
+   * checks this to decide whether the play is free.
+   */
+  justMovedUpgradeCardId?: string | null;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -832,6 +847,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     revealedPeekedCard: null,
     favourUsedThisTurn: false,
     justMovedEventCardId: null,
+    justMovedUpgradeCardId: null,
   };
 
   // Refill the single-row market with its initial composition.
@@ -930,6 +946,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     revealedPeekedCard: state.revealedPeekedCard ?? null,
     favourUsedThisTurn: state.favourUsedThisTurn,
     justMovedEventCardId: state.justMovedEventCardId ?? null,
+    justMovedUpgradeCardId: state.justMovedUpgradeCardId ?? null,
   };
 }
 
@@ -1307,6 +1324,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     favourUsedThisTurn: saved.favourUsedThisTurn ?? false,
     justMovedEventCardId: (saved as any).justMovedEventCardId ?? null,
     revealedPeekedCard: (saved.revealedPeekedCard as EventCard | null) ?? null,
+    justMovedUpgradeCardId: (saved as unknown as { justMovedUpgradeCardId?: string | null })?.justMovedUpgradeCardId ?? null,
   };
 
   return state;

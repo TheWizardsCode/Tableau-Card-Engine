@@ -491,6 +491,13 @@ export function moveToHand(state: MainStreetState, cardId: string): PurchaseResu
   state.market.cards.splice(marketIndex, 1);
   state.hand.push({ ...card } as any);
 
+  // Track same-day composite for upgrades (CG-0MT3IYSRL001VVUP): when an
+  // upgrade is moved to hand, record its id so `play-upgrade-from-hand`
+  // can detect a same-day move+play composite and skip the action cost.
+  if (card.family === 'upgrade') {
+    state.justMovedUpgradeCardId = card.id;
+  }
+
   addLog(state, `Moved ${card.name} to hand (free, pay on play)`, 'neutral');
 
   return { card, cost: 0, refilled: false };
@@ -760,6 +767,89 @@ export function purchaseUpgrade(
   addLog(state, `Upgraded ${business.name} with ${card.name} (-€${card.cost}, ${describeEventEffects(-card.cost, 0)})`, classifyEffect(-card.cost, 0));
 
   return { card, cost: card.cost, refilled };
+}
+
+/**
+ * Buys an upgrade from the market and applies it in one step (drag-drop
+ * path, CG-0MT3IYSRL001VVUP). Charges a +50% premium on the upgrade's
+ * cost.
+ *
+ * @param state      Current game state (mutated in-place).
+ * @param cardId     ID of the Upgrade card in the market.
+ * @param targetSlot Optional: specific grid slot of the business to upgrade.
+ * @returns PurchaseResult on success.
+ * @throws Error if the action is illegal or coins are insufficient.
+ */
+export function buyAndPlaceUpgrade(
+  state: MainStreetState,
+  cardId: string,
+  targetSlot?: number,
+): PurchaseResult {
+  const legality = canPurchaseUpgrade(state, cardId);
+  if (!legality.legal) {
+    throw new Error(legality.reason);
+  }
+
+  const marketIndex = state.market.cards.findIndex(
+    c => c.id === cardId && c.family === 'upgrade',
+  );
+  const card = state.market.cards[marketIndex] as UpgradeCard;
+
+  // Find the target business
+  const requiredLevel = card.requiredLevel ?? 0;
+  let businessIndex: number;
+  if (targetSlot !== undefined) {
+    const biz = state.streetGrid[targetSlot];
+    if (
+      !biz ||
+      biz.name !== card.targetBusiness ||
+      biz.level !== requiredLevel ||
+      biz.level >= biz.maxLevel
+    ) {
+      throw new Error(`Business at slot ${targetSlot} is not a valid target for this upgrade.`);
+    }
+    businessIndex = targetSlot;
+  } else {
+    businessIndex = findTargetBusinessSlot(state, card);
+  }
+
+  const business = state.streetGrid[businessIndex]!;
+
+  // Calculate +50% premium (CG-0MT3IYSRL001VVUP): round up to nearest 0.5
+  const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+  if (state.resourceBank.coins < premiumCost) {
+    throw new Error(`Not enough coins to buy-and-place ${card.name} at premium. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
+  }
+
+  // Deduct premium cost
+  state.resourceBank.coins -= premiumCost;
+
+  // Remove from market
+  state.market.cards.splice(marketIndex, 1);
+
+  // Apply upgrade to business
+  business.level += 1;
+  business.incomeBonus += card.incomeBonus;
+  business.synergyRangeBonus += card.synergyRangeBonus;
+  business.reputationBonus += card.reputationBonus ?? 0;
+  if (!business.appliedUpgrades) {
+    business.appliedUpgrades = [];
+  }
+  business.appliedUpgrades.push(card.id);
+  (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + card.cost;
+  business.displayName = card.newDisplayName || business.displayName;
+
+  // Recalculate the upgraded card's cached values
+  updateNeighborsOnPlacement(state, businessIndex);
+
+  // Clear same-day composite tracker — drag-drop is not a composite path.
+  state.justMovedUpgradeCardId = null;
+
+  const refilled = false;
+
+  addLog(state, `Bought and placed upgrade ${card.name} on ${business.name} (-€${premiumCost}, +50% premium, ${describeEventEffects(-premiumCost, 0)})`, classifyEffect(-premiumCost, 0));
+
+  return { card, cost: premiumCost, refilled };
 }
 
 /**

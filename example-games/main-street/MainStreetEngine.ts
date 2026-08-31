@@ -44,6 +44,7 @@ import {
   purchaseBusiness,
   moveToHand,
   purchaseUpgrade,
+  buyAndPlaceUpgrade,
   purchaseEvent,
   refillMarket,
   replenishIncidentDeck,
@@ -130,6 +131,17 @@ export interface BuyAndPlaceAction {
   slotIndex: number;
 }
 
+/**
+ * Buy an upgrade from the market and apply it in one step (drag-drop path,
+ * CG-0MT3IYSRL001VVUP). Charges a +50% premium on the upgrade's cost and
+ * consumes 1 action.
+ */
+export interface BuyAndPlaceUpgradeAction {
+  type: 'buy-and-place-upgrade';
+  cardId: string;
+  targetSlot?: number;
+}
+
 /** Hire a staff card from the general market row. */
 export interface HireStaffAction {
   type: 'hire-staff';
@@ -168,6 +180,7 @@ export type PlayerAction =
   | PlayEventFromHandAction
   | DiscardFromHandAction
   | BuyAndPlaceAction
+  | BuyAndPlaceUpgradeAction
   | HireStaffAction
   | PlayEventAction
   | PeekIncidentAction
@@ -318,8 +331,25 @@ export function executeAction(
       consumeAction(state);
       return purchaseEvent(state, action.cardId);
     }
-    case 'play-upgrade-from-hand':
+    case 'play-upgrade-from-hand': {
+      // Same-day composite detection (CG-0MT3IYSRL001VVUP): if the upgrade
+      // was just moved to hand this turn (same card id), the play is free
+      // — the move already consumed the action.
+      const card = (state.hand ?? [])[action.handIndex];
+      const isSameDayComposite = card && state.justMovedUpgradeCardId === card.id;
+      if (!isSameDayComposite) {
+        consumeAction(state);
+      }
+      // Clear the composite tracker after play (whether same-day or not).
+      if (state.justMovedUpgradeCardId === card?.id) {
+        state.justMovedUpgradeCardId = null;
+      }
       return playUpgradeFromHand(state, action.handIndex, action.targetSlot);
+    }
+    case 'buy-and-place-upgrade': {
+      consumeAction(state);
+      return buyAndPlaceUpgrade(state, action.cardId, action.targetSlot);
+    }
     case 'play-event-from-hand': {
       const hand = state.hand ?? [];
       const card = hand[action.handIndex] as any;
@@ -974,6 +1004,8 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
 
   // Same-day Investment composite (CG-0MTFWBNL30043ZBM): new day clears the tracker.
   (state as any).justMovedEventCardId = null;
+  // Clear same-day upgrade composite tracking (CG-0MT3IYSRL001VVUP).
+  state.justMovedUpgradeCardId = null;
 
   // Day-start snapshot for the per-turn net summary row (CG-0MT5W7UJJ0065MEZ
   // AC3): resources exactly as the player's turn begins. Persisted with the

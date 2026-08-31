@@ -732,6 +732,10 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       // coins-to-rep: spending scarce coins on reputation is rarely better
       // than buying cards; stays as a legal fallback at the low default.
       return 1;
+    case 'buy-and-place-upgrade':
+      return scoreUpgradeAction(state, { type: 'buy-upgrade', cardId: action.cardId, targetSlot: action.targetSlot });
+    default:
+      return 0;
   }
 }
 

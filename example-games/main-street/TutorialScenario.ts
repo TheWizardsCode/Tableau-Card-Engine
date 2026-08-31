@@ -375,6 +375,7 @@ export function createTutorialScenario(
     revealedPeekedCard: null,
     favourUsedThisTurn: false,
     justMovedEventCardId: null,
+    justMovedUpgradeCardId: null,
   };
 
   // Select challenges for this run using seeded RNG
