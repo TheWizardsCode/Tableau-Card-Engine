@@ -23,6 +23,11 @@ import {
   type SceneLayout,
   STREET_ROWS,
 } from './MainStreetConstants';
+import { createMarketCardCheatTool } from '../../../src/ui/debug/MarketCardCheatOverlay';
+import { createSessionExportTool } from '../../../src/ui/debug/SessionExportTool';
+import { createStateInspectorTool } from '../../../src/ui/debug/StateInspectorOverlay';
+import { createGameEventLogTool } from '../../../src/ui/debug/GameEventLogOverlay';
+import { createAiDecisionViewerTool } from '../../../src/ui/debug/AiDecisionOverlay';
 
 type UIPhase =
   | 'idle'               // Waiting for DayStart
@@ -52,22 +57,6 @@ export class MainStreetScene extends CardGameScene {
       return;
     }
     if (import.meta.env.DEV) {
-      // Dynamic import keeps the cheat module out of the base chunk unless DEV.
-      // The imports are inside the DEV-guarded branch; Vite tree-shakes the
-      // branch (and the lazily-imported chunk) from production.
-      // We use `await import` via sync require shim — acceptable because this
-      // path is only entered in dev where the registry eagerly resolves them.
-      // Fall through to sync requires for compat with the scene's sync init.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- dev-only, tree-shaken
-      const { createMarketCardCheatTool } = require('../../../src/ui/debug/MarketCardCheatOverlay');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { createSessionExportTool } = require('../../../src/ui/debug/SessionExportTool');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { createStateInspectorTool } = require('../../../src/ui/debug/StateInspectorOverlay');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { createGameEventLogTool } = require('../../../src/ui/debug/GameEventLogOverlay');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { createAiDecisionViewerTool } = require('../../../src/ui/debug/AiDecisionOverlay');
       super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, [
         createSessionExportTool(),
         createStateInspectorTool(),
