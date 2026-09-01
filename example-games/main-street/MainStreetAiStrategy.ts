@@ -97,6 +97,147 @@ export function aiPlanningHorizon(state: MainStreetState): number {
   return Math.min(AI_HORIZON_CAP, Math.max(AI_HORIZON_FLOOR, raw));
 }
 
+// ── Banking heuristic (CG-0MT3JMGA60091J8W) ──────────────────
+
+/** Maximum banked actions (mirrors the engine cap). */
+const BANK_CAP = 2;
+
+/**
+ * Scores the implicit "bank actions" option — the expected value of ending
+ * the turn early with `actionsRemaining > 0` and banking the unused actions
+ * for a future high-value play (CG-0MT3JMGA60091J8W).
+ *
+ * Heuristic factors (work item AC2):
+ *   - Current bank level — at cap (2) the option has no value (0).
+ *   - Unaffordable high-value target — the best unaffordable card (by the
+ *     same placement/income heuristic used for spending) in hand or market
+ *     drives the score. No unaffordable valuable target → 0.
+ *   - Closeness — `1 - gap/cost`; targets almost in reach score higher
+ *     than those far away, scaled by the target\'s absolute value.
+ *   - Planning horizon — normalised `horizon / cap`; banking is worth more
+ *     early in the game when future income has more turns to compound.
+ *   - Bank headroom — `(cap - banked)/cap`; the emptier the bank, the more
+ *     valuable a new deposit is.
+ *
+ * @param state Current game state (read-only by convention).
+ * @returns Score for the bank option (0 means no reason to bank).
+ */
+export function scoreBankOption(state: MainStreetState): number {
+  const banked = state.bankedActions ?? 0;
+  if (banked >= BANK_CAP) return 0;
+  if ((state.actionsRemaining ?? 1) <= 0) return 0;
+
+  const coins = state.resourceBank.coins;
+  const hand = state.hand ?? [];
+  const horizon = aiPlanningHorizon(state);
+  const horizonFactor = horizon / AI_HORIZON_CAP;
+  const bankHeadroom = (BANK_CAP - banked) / BANK_CAP;
+
+  let bestScore = -Infinity;
+  let bestCost = 0;
+
+  // Hand: business/community-space cards whose play-from-hand cost exceeds coins
+  for (let i = 0; i < hand.length; i++) {
+    const card = hand[i] as BusinessCard & { cost: number; family: string };
+    if (card.family !== 'business' && card.family !== 'community-space') continue;
+    if (card.cost <= coins) continue; // already affordable — not a banking target
+    // Simulate placement at best slot (max synergy) to estimate value
+    let maxSynergy = 0;
+    for (let slot = 0; slot < GRID_SIZE; slot++) {
+      if (state.streetGrid[slot] !== null) continue;
+      const sim = [...state.streetGrid];
+      sim[slot] = card as unknown as BusinessCard;
+      const s = computeSynergyBonus(sim, slot, state.config.synergyBonusPerNeighbor);
+      if (s > maxSynergy) maxSynergy = s;
+    }
+    const score = (card.baseIncome + maxSynergy) * horizon - card.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = card.cost;
+    }
+  }
+
+  // Hand: upgrade cards whose cost exceeds coins
+  for (let i = 0; i < hand.length; i++) {
+    const card = hand[i] as UpgradeCard & { cost: number; family: string };
+    if (card.family !== 'upgrade') continue;
+    if (card.cost <= coins) continue;
+    const score = card.incomeBonus * horizon - card.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = card.cost;
+    }
+  }
+
+  // Hand: Investment events whose cost exceeds coins
+  for (let i = 0; i < hand.length; i++) {
+    const card = hand[i] as EventCard & { cost: number; family: string };
+    if (card.family !== 'event') continue;
+    if (card.cost <= coins) continue;
+    const score = card.coinDelta + card.reputationDelta - card.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = card.cost;
+    }
+  }
+
+  // Market: business/community-space cards that are unaffordable
+  for (const card of state.market.cards) {
+    if (card.family !== 'business' && card.family !== 'community-space') continue;
+    if (card.cost <= coins) continue;
+    // Need at least one empty slot for placement relevance
+    const emptyCount = state.streetGrid.filter(s => s === null).length;
+    if (emptyCount === 0) continue;
+    let maxSynergy = 0;
+    for (let slot = 0; slot < GRID_SIZE; slot++) {
+      if (state.streetGrid[slot] !== null) continue;
+      const sim = [...state.streetGrid];
+      sim[slot] = card as unknown as BusinessCard;
+      const s = computeSynergyBonus(sim, slot, state.config.synergyBonusPerNeighbor);
+      if (s > maxSynergy) maxSynergy = s;
+    }
+    const biz = card as BusinessCard;
+    const score = (biz.baseIncome + maxSynergy) * horizon - biz.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = biz.cost;
+    }
+  }
+
+  // Market: upgrade cards that are unaffordable and have a valid target slot
+  for (const card of state.market.cards) {
+    if (card.family !== 'upgrade') continue;
+    if (card.cost <= coins) continue;
+    const upg = card as UpgradeCard;
+    const hasTarget = state.streetGrid.some(
+      b => b !== null && b.name === upg.targetBusiness && b.level === (upg.requiredLevel ?? 0) && b.level < b.maxLevel,
+    );
+    // Even without an immediate target, the upgrade may become valid later;
+    // still consider it, but do not require hasTarget strictly — score it anyway
+    // if the upgrade itself is high-value. We only skip if no slot and no hand value.
+    void hasTarget;
+    const score = upg.incomeBonus * horizon - upg.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = upg.cost;
+    }
+  }
+
+  if (!Number.isFinite(bestScore) || bestScore <= 0) return 0;
+
+  const gap = bestCost - coins; // > 0 by construction
+  const closeness = Math.max(0, 1 - gap / bestCost);
+  // Far targets (closeness near 0) should not dominate marginal spends.
+  // Clamp very low closeness to 0 to avoid banking for wildly unaffordable cards.
+  if (closeness < 0.05) return 0;
+
+  const raw = bestScore * closeness * horizonFactor * bankHeadroom;
+  // Threshold: banking must exceed a minimal value to be preferred over
+  // zero-income spends. Values < 1 are noise — do not bank.
+  if (raw < 1) return 0;
+  return raw;
+}
+
 // ── Strategy Interface ──────────────────────────────────────
 
 /**
@@ -358,6 +499,24 @@ export const GreedyStrategy: MainStreetAiStrategy = {
 
   chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
     const legalActions = enumerateLegalActions(state);
+
+    // ── Banking-aware hoarding (CG-0MT3JMGA60091J8W) ─────────
+    // Evaluate an implicit "bank actions" option alongside spending.
+    // If the expected value of banked actions exceeds the value of the
+    // best immediate spend, deliberately end the turn with actions
+    // remaining so the engine can bank them for a future high-value play.
+    const bankScore = scoreBankOption(state);
+    if (bankScore > 0) {
+      const bestSpend = Math.max(
+        0,
+        ...legalActions
+          .filter(a => a.type !== 'end-turn')
+          .map(a => scoreAction(state, a)),
+      );
+      if (bankScore > bestSpend) {
+        return { type: 'end-turn' };
+      }
+    }
 
     // Priority 1: play an affordable business from hand (cost-at-play) with
     // the best synergy placement score.
