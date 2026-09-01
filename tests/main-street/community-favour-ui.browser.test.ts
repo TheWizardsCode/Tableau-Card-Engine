@@ -134,7 +134,7 @@ describe('Main Street Community Favour UI', () => {
     expect(favourLabels.some(l => /^\d+r → \d+c$/.test(l.trim()))).toBe(true);
   }, 30_000);
 
-  it('active exchange updates resources, sets the gate, and does not consume an action', async () => {
+  it('active exchange updates resources, sets the gate, and consumes one action', async () => {
     const scene = await bootScene();
 
     // Give enough resources for both directions.
@@ -150,11 +150,11 @@ describe('Main Street Community Favour UI', () => {
 
     scene.msTurnController.onCommunityFavourClick('coins-to-rep');
 
-    // Exchange applied: coins spent, rep gained, gate set, action preserved.
+    // Exchange applied: coins spent, rep gained, gate set, one action consumed (CG-0MT5UPQGX005GWRP).
     expect(scene.state.resourceBank.coins).toBe(coinsBefore - cost);
     expect(scene.state.resourceBank.reputation).toBe(repBefore + 1);
     expect(scene.state.favourUsedThisTurn).toBe(true);
-    expect(scene.state.actionsRemaining).toBe(actionsBefore);
+    expect(scene.state.actionsRemaining).toBe(actionsBefore - 1);
 
     // UI returns to market phase after the exchange.
     expect(scene.uiPhase).toBe('market');
