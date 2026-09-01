@@ -143,8 +143,11 @@ describe('regression guard: dev-server watcher never tracks transcript output', 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('the watch-ignore patterns cover the transcript tree', () => {
+  it('the watch-ignore patterns cover the transcript tree and worktrees (AC3)', () => {
     expect(DEV_WATCH_IGNORE_PATTERNS).toContain('**/data/**');
+    // Ensure dev-worktree checkouts are excluded so many concurrent worktrees
+    // do not exhaust inotify's max_user_watches budget (CG-0MTJ7A4Z3000MFMV).
+    expect(DEV_WATCH_IGNORE_PATTERNS).toContain('**/.worklog/**');
     const watched = server.watcher.getWatched();
     const keys = Object.keys(watched);
     // sanity: the project root IS watched (so the assertion below is meaningful)
