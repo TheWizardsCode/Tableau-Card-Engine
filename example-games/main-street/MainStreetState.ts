@@ -260,8 +260,17 @@ export interface MainStreetState {
   turn: number;
   /** Current phase within the turn. */
   phase: DayPhase;
-  /** The 10-slot linear street grid (null = empty slot). Supports BusinessCard and CommunitySpaceCard. */
+  /**
+   * The street grid — world-indexed flat array of unique world slots after
+   * shared-corner dedup (see MainStreetAdjacency.worldSlotCount). For 1×1
+   * this is the legacy 10-slot linear grid; for expanded grids it is
+   * worldSlotCount(cols,rows) long. Indexed by world order, not per-street
+   * slot index; use toWorldPosition/fromWorldPosition for mapping.
+   */
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
+  /** World grid dimensions (cols × rows of 5×2 street cells). Null/omitted → 1×1 legacy (10 slots). Max 5×5. */
+  streetGridCols: number;
+  streetGridRows: number;
   /** Face-up cards available for purchase. */
   market: MarketState;
   /** Player resources. */
@@ -409,6 +418,9 @@ export interface MainStreetSerializedState {
   turn: number;
   phase: DayPhase;
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
+  /** World grid dimensions for save/load (see MainStreetState). */
+  streetGridCols: number;
+  streetGridRows: number;
   market: MarketState;
   resourceBank: ResourceBank;
   /** Day-start coin snapshot for the per-turn net summary row (see MainStreetState). */
@@ -858,6 +870,8 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     turn: 1,
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
+    streetGridCols: 1,
+    streetGridRows: 1,
     market,
     resourceBank: {
       coins: initCoins,
@@ -1032,6 +1046,8 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     turn: state.turn,
     phase: state.phase,
     streetGrid: structuredClone(state.streetGrid),
+    streetGridCols: state.streetGridCols,
+    streetGridRows: state.streetGridRows,
     market: structuredClone(state.market),
     resourceBank: structuredClone(state.resourceBank),
     dayStartCoins: state.dayStartCoins,
@@ -1326,6 +1342,14 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     savedConfig.endlessMode = false;
   }
 
+  // ── streetGridCols/Rows: backfill for pre-expanded saves (1×1) ──
+  if (!('streetGridCols' in saved)) {
+    (saved as Record<string, unknown>).streetGridCols = 1;
+  }
+  if (!('streetGridRows' in saved)) {
+    (saved as Record<string, unknown>).streetGridRows = 1;
+  }
+
   // ── ongoingCost: default to 0 for legacy community-space cards ─
   // Added by CG-0MRXYGM9B006I3PE (community-space ongoing costs). Community space
   // cards serialized before this field existed must default to 0 so the income
@@ -1448,6 +1472,8 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     staffCards: structuredClone(saved.staffCards),
     skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
+    streetGridCols: (saved as unknown as { streetGridCols?: number }).streetGridCols ?? 1,
+    streetGridRows: (saved as unknown as { streetGridRows?: number }).streetGridRows ?? 1,
     actionsRemaining: saved.actionsRemaining ?? 1,
     bankedActions: saved.bankedActions ?? 0,
     peekUsedThisTurn: saved.peekUsedThisTurn ?? false,

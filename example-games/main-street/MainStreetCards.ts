@@ -900,8 +900,11 @@ export function orderIncidentDeck(
 
 // ── Constants ───────────────────────────────────────────────
 
-/** Number of slots in the street grid. */
+/** Number of slots in the street grid (1×1 legacy alias; prefer worldSlotCount for expanded grids). */
 export const GRID_SIZE = 10;
+/** Slots per street (5×2) — re-exported for GridTopology helpers. */
+export const STREET_COLS = 5;
+export const STREET_ROWS = 2;
 
 /**
  * Legacy default turn cap (20). Kept for backward compatibility; default

@@ -317,6 +317,8 @@ export function createTutorialScenario(
     turn: 1,
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
+    streetGridCols: 1,
+    streetGridRows: 1,
     market: {
       cards: marketCards,
     },

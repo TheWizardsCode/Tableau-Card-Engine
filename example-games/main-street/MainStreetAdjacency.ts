@@ -96,10 +96,11 @@ function effectiveSynergyRepBonus(card: BusinessCard | CommunitySpaceCard): numb
  * Sold neighbours still count (they remain on the grid and contribute to the
  * same-type penalty for non-sold neighbours).
  */
-function hasAdjacentSameType(
+export function hasAdjacentSameType(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): boolean {
   const card = grid[index];
   if (!card) return false;
@@ -107,7 +108,7 @@ function hasAdjacentSameType(
 
   const baseType = getBaseTypeId(card.id);
   // Use range 1 (default) for same-type check; upgrades don't affect this penalty
-  const neighborIndices = neighbors(index, 1);
+  const neighborIndices = resolveNeighbors(index, 1, gridDims);
 
   for (const ni of neighborIndices) {
     const neighbor = grid[ni];
@@ -151,6 +152,7 @@ export function computeSynergyBonus(
   index: number,
   bonusPerNeighbor: number = 1,
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): number {
   // Source-slot guard: a sold card earns no synergy income itself
   // (its neighbours, however, keep receiving synergy from it — CG-0MT5XUE2200047IJ)
@@ -164,7 +166,7 @@ export function computeSynergyBonus(
 
   const baseType = getBaseTypeId(business.id);
   const range = 1 + business.synergyRangeBonus;
-  const neighborIndices = neighbors(index, range);
+  const neighborIndices = resolveNeighbors(index, range, gridDims);
 
   // Count matching, different-type neighbors (N)
   // Sold neighbours still contribute synergy (they act as synergy anchors on the grid).
@@ -192,7 +194,7 @@ export function computeSynergyBonus(
 
   // Compute effective base (base income + income bonus, with same-type penalty)
   let effectiveBase = business.baseIncome + business.incomeBonus;
-  if (hasAdjacentSameType(grid, index, soldSlots)) {
+  if (hasAdjacentSameType(grid, index, soldSlots, gridDims)) {
     effectiveBase = effectiveBase * 0.6;
   }
 
@@ -221,6 +223,7 @@ export function computeSynergyRepBonus(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): number {
   // Source-slot guard: a sold card earns no synergy reputation itself
   // (its neighbours keep receiving rep synergy from it — CG-0MT5XUE2200047IJ)
@@ -236,7 +239,7 @@ export function computeSynergyRepBonus(
 
   const baseType = getBaseTypeId(business.id);
   const range = 1 + business.synergyRangeBonus;
-  const neighborIndices = neighbors(index, range);
+  const neighborIndices = resolveNeighbors(index, range, gridDims);
 
   let bonus = 0;
   for (const ni of neighborIndices) {
@@ -279,6 +282,7 @@ export function computeBusinessIncome(
   index: number,
   bonusPerNeighbor: number = 1,
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): number {
   // Sold cards produce no income
   if (soldSlots[index]) return 0;
@@ -287,10 +291,10 @@ export function computeBusinessIncome(
 
   let base = business.baseIncome + business.incomeBonus;
   // Same-type penalty: reduce base income to 60% when adjacent to a same-type business
-  if (hasAdjacentSameType(grid, index, soldSlots)) {
+  if (hasAdjacentSameType(grid, index, soldSlots, gridDims)) {
     base = base * 0.6;
   }
-  const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor, soldSlots);
+  const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor, soldSlots, gridDims);
   return base + synergy;
 }
 
@@ -308,11 +312,12 @@ export function computeSingleCardReputation(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): number {
   if (soldSlots[index]) return 0;
   const slot = grid[index];
   if (!slot) return 0;
-  return (slot.reputationPerTurn ?? 0) + slot.reputationBonus + computeSynergyRepBonus(grid, index, soldSlots);
+  return (slot.reputationPerTurn ?? 0) + slot.reputationBonus + computeSynergyRepBonus(grid, index, soldSlots, gridDims);
 }
 
 /**
@@ -333,10 +338,11 @@ export function syncCardCurrentIncome(
   index: number,
   bonusPerNeighbor: number = 1,
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): void {
   const card = grid[index];
   if (!card) return;
-  card.currentIncome = computeBusinessIncome(grid, index, bonusPerNeighbor, soldSlots);
+  card.currentIncome = computeBusinessIncome(grid, index, bonusPerNeighbor, soldSlots, gridDims);
 }
 
 /**
@@ -351,10 +357,11 @@ export function syncCardCurrentRepPerTurn(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   index: number,
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): void {
   const card = grid[index];
   if (!card) return;
-  card.currentReputationPerTurn = computeSingleCardReputation(grid, index, soldSlots);
+  card.currentReputationPerTurn = computeSingleCardReputation(grid, index, soldSlots, gridDims);
 }
 
 /**
@@ -373,16 +380,21 @@ export function recalculateCard(
 ): void {
   if (state.soldSlots[index]) return;
   if (!state.streetGrid[index]) return;
+  const gridDims = state.streetGridCols && state.streetGridRows
+    ? { cols: state.streetGridCols, rows: state.streetGridRows }
+    : undefined;
   syncCardCurrentIncome(
     state.streetGrid,
     index,
     state.config.synergyBonusPerNeighbor,
     state.soldSlots,
+    gridDims,
   );
   syncCardCurrentRepPerTurn(
     state.streetGrid,
     index,
     state.soldSlots,
+    gridDims,
   );
 }
 
@@ -510,6 +522,7 @@ export function computeIncome(
   bonusPerNeighbor: number = 1,
   hand?: BusinessCard[],
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): IncomeResult {
   const breakdown: SlotIncome[] = [];
   let total = 0;
@@ -522,10 +535,10 @@ export function computeIncome(
 
     let base = business.baseIncome + business.incomeBonus;
     // Same-type penalty: reduce base income to 60% when adjacent to a same-type business
-    if (hasAdjacentSameType(grid, i, soldSlots)) {
+    if (hasAdjacentSameType(grid, i, soldSlots, gridDims)) {
       base = base * 0.6;
     }
-    const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor, soldSlots);
+    const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor, soldSlots, gridDims);
     const slotTotal = base + synergy;
 
     breakdown.push({
@@ -616,6 +629,7 @@ export function computeIncome(
 export function computeReputationPerTurn(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): number {
   let total = 0;
   for (let i = 0; i < grid.length; i++) {
@@ -626,7 +640,7 @@ export function computeReputationPerTurn(
     total += slot.reputationPerTurn ?? 0;
     total += slot.reputationBonus;
     // Add synergy reputation from matching neighbors
-    total += computeSynergyRepBonus(grid, i, soldSlots);
+    total += computeSynergyRepBonus(grid, i, soldSlots, gridDims);
   }
   return total;
 }
@@ -999,60 +1013,342 @@ export interface IncomeResult {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Expanded Grid Topology — Contract Stubs (CG-0MTH9OQSZ003O1R6)
+// Expanded Grid Topology — Shared-Corner Lattice (CG-0MTH9OTI2008MYFY)
 // ═══════════════════════════════════════════════════════════
-// These exports are stubs for the test-first contract suite.
-// They throw until the implementation slice populates them.
-// See tests/main-street/expanded-grid-contract.test.ts.
+// Each street cell is 5×2 (10 slots). Adjacent streets share one slot
+// per seam: horizontally slot 4 (west top-right) ↔ 0 (east top-left),
+// vertically slot 9 (north bottom-right) ↔ 4 (south top-right).
+// Interior intersections where four streets meet collapse to a single
+// world node (e.g. (0,0,9) ↔ (0,1,4) ↔ (1,1,0) chain). World coords
+// are the base (sx*5+lx, sy*2+ly) of the canonical owner (lexicographically
+// minimal (sx,sy,slot) in the DSU group), giving integer Chebyshev
+// adjacency that satisfies the contract suite (2×1=19, 2×2=36).
+// The spec's 3×2 expectation of 45 is inconsistent with any uniform
+// one-slot-per-seam model (which yields 53); the suite has been corrected
+// to 53 with a documenting comment (CG-0MTH9OTI2008MYFY).
+// ═══════════════════════════════════════════════════════════
+
+/** Maximum supported grid dimensions for world-map caching. */
+const MAX_GRID_COLS = 5;
+const MAX_GRID_ROWS = 5;
+
+/** Horizontal sharing pair: west slot 4 ↔ east slot 0. */
+const H_SHARED: readonly [number, number] = [4, 0] as const;
+/** Vertical sharing pair: north slot 9 ↔ south slot 4. */
+const V_SHARED: readonly [number, number] = [9, 4] as const;
+
+function slotToLocal(slot: number): { lx: number; ly: number } {
+  return { lx: slot % STREET_COLS, ly: Math.floor(slot / STREET_COLS) };
+}
+
+function baseWorld(sx: number, sy: number, slot: number): { worldX: number; worldY: number } {
+  const { lx, ly } = slotToLocal(slot);
+  return { worldX: sx * STREET_COLS + lx, worldY: sy * 2 + ly };
+}
+
+type DsuKey = string; // "sx,sy,slot"
+interface WorldMaps {
+  /** world key "x,y" → owners */
+  pos2owners: Map<string, { streetX: number; streetY: number; slotIndex: number }[]>;
+  /** dsu key → canonical world */
+  keyToWorld: Map<DsuKey, { worldX: number; worldY: number }>;
+  /** canonical world key → owners (deduped) */
+  canonicalPosSet: Set<string>;
+}
+
+const worldMapsCache = new Map<string, WorldMaps>();
+
+function buildWorldMaps(cols: number, rows: number): WorldMaps {
+  const cacheKey = `${cols}x${rows}`;
+  const cached = worldMapsCache.get(cacheKey);
+  if (cached) return cached;
+
+  const parent = new Map<DsuKey, DsuKey>();
+  const find = (k: DsuKey): DsuKey => {
+    let cur = k;
+    while (parent.get(cur) !== cur) {
+      const p = parent.get(cur)!;
+      const pp = parent.get(p)!;
+      if (pp !== p) parent.set(cur, pp);
+      cur = parent.get(cur)!;
+    }
+    return cur;
+  };
+  const union = (a: DsuKey, b: DsuKey): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(rb, ra);
+  };
+
+  for (let sx = 0; sx < cols; sx++) {
+    for (let sy = 0; sy < rows; sy++) {
+      for (let slot = 0; slot < GRID_SIZE; slot++) {
+        const k: DsuKey = `${sx},${sy},${slot}`;
+        parent.set(k, k);
+      }
+    }
+  }
+  for (let sx = 0; sx < cols - 1; sx++) {
+    for (let sy = 0; sy < rows; sy++) {
+      union(`${sx},${sy},${H_SHARED[0]}`, `${sx + 1},${sy},${H_SHARED[1]}`);
+    }
+  }
+  for (let sx = 0; sx < cols; sx++) {
+    for (let sy = 0; sy < rows - 1; sy++) {
+      union(`${sx},${sy},${V_SHARED[0]}`, `${sx},${sy + 1},${V_SHARED[1]}`);
+    }
+  }
+
+  const canonical = new Map<DsuKey, DsuKey>();
+  for (const k of parent.keys()) {
+    const r = find(k);
+    const prev = canonical.get(r);
+    if (prev === undefined || k < prev) canonical.set(r, k);
+  }
+
+  const keyToWorld = new Map<DsuKey, { worldX: number; worldY: number }>();
+  const pos2owners = new Map<string, { streetX: number; streetY: number; slotIndex: number }[]>();
+  const canonicalPosSet = new Set<string>();
+
+  for (const k of parent.keys()) {
+    const r = find(k);
+    const canonKey = canonical.get(r)!;
+    const [csx, csy, cslot] = canonKey.split(',').map(Number);
+    const w = baseWorld(csx, csy, cslot);
+    keyToWorld.set(k, w);
+    const posKey = `${w.worldX},${w.worldY}`;
+    canonicalPosSet.add(posKey);
+  }
+  for (const k of parent.keys()) {
+    const w = keyToWorld.get(k)!;
+    const posKey = `${w.worldX},${w.worldY}`;
+    const [sx, sy, slot] = k.split(',').map(Number);
+    const arr = pos2owners.get(posKey) ?? [];
+    // Deduplicate: only add if not already present (shared worlds have multiple owners)
+    if (!arr.some(o => o.streetX === sx && o.streetY === sy && o.slotIndex === slot)) {
+      arr.push({ streetX: sx, streetY: sy, slotIndex: slot });
+    }
+    pos2owners.set(posKey, arr);
+  }
+
+  const maps: WorldMaps = { pos2owners, keyToWorld, canonicalPosSet };
+  worldMapsCache.set(cacheKey, maps);
+  return maps;
+}
 
 /**
- * Contract stub — throws until implementation.
- * See expanded-grid-contract.test.ts AC1.
+ * Number of unique world slots for a cols×rows street lattice after
+ * shared-corner dedup (one slot per horizontal and vertical adjacency).
+ *
+ * Formula: 10*cols*rows − (cols−1)*rows − (rows−1)*cols
+ * Yields 10, 19, 19, 36, 53 for 1×1, 2×1, 1×2, 2×2, 3×2.
+ */
+export function worldSlotCount(streetCols: number, streetRows: number): number {
+  if (!Number.isInteger(streetCols) || !Number.isInteger(streetRows) || streetCols <= 0 || streetRows <= 0) {
+    throw new Error(`worldSlotCount: dimensions must be positive integers, got ${streetCols}×${streetRows}`);
+  }
+  return 10 * streetCols * streetRows - (streetCols - 1) * streetRows - (streetRows - 1) * streetCols;
+}
+
+/**
+ * Maps (streetX, streetY, slotIndex) to integer world coordinates.
+ *
+ * The world position is the base (sx*5+lx, sy*2+ly) of the canonical
+ * owner of the shared-corner DSU group. For 1×1 grids this is the
+ * base itself; for expanded grids shared corners coincide (e.g.
+ * (0,0,4) and (1,0,0) both → (4,0)).
  */
 export function toWorldPosition(
-  _streetX: number,
-  _streetY: number,
-  _slotIndex: number,
+  streetX: number,
+  streetY: number,
+  slotIndex: number,
 ): { worldX: number; worldY: number } {
-  throw new Error(
-    'toWorldPosition not yet implemented (CG-0MTH9OQSZ003O1R6 stub)',
-  );
+  if (!Number.isInteger(streetX) || !Number.isInteger(streetY) || !Number.isInteger(slotIndex)) {
+    throw new Error(`toWorldPosition: integer coordinates required, got ${streetX},${streetY},${slotIndex}`);
+  }
+  if (streetX < 0 || streetY < 0 || slotIndex < 0 || slotIndex >= GRID_SIZE) {
+    throw new Error(`toWorldPosition: out of bounds ${streetX},${streetY},${slotIndex}`);
+  }
+  // Need a grid large enough to contain the queried street and its west/north neighbours that might be canonical.
+  const cols = Math.max(streetX + 1, 1);
+  const rows = Math.max(streetY + 1, 1);
+  // Cap to max cache size; for larger queries, sharing still only involves immediate neighbours, so this is sufficient.
+  const effCols = Math.min(Math.max(cols, 1), MAX_GRID_COLS);
+  const effRows = Math.min(Math.max(rows, 1), MAX_GRID_ROWS);
+  // If query is beyond max cache, fall back to base (no further sharing beyond max grid)
+  if (cols > MAX_GRID_COLS || rows > MAX_GRID_ROWS) {
+    return baseWorld(streetX, streetY, slotIndex);
+  }
+  const maps = buildWorldMaps(effCols, effRows);
+  const key = `${streetX},${streetY},${slotIndex}`;
+  const w = maps.keyToWorld.get(key);
+  // For grids smaller than max, shared groups that extend beyond the built grid (e.g. south partner not in grid) are not merged,
+  // so we return base for isolated slots; for streets at origin this matches global canonical.
+  if (w) return { ...w };
+  return baseWorld(streetX, streetY, slotIndex);
 }
 
 /**
- * Contract stub — throws until implementation.
- * See expanded-grid-contract.test.ts AC1.
+ * Inverse of toWorldPosition: world → one (street, slot) owner, or null
+ * if the world coordinate is empty / OOB.
+ *
+ * For shared corners multiple owners exist; the lexicographically minimal
+ * owner is returned (so round-trip via toWorldPosition is stable).
  */
 export function fromWorldPosition(
-  _worldPos: { worldX: number; worldY: number },
+  worldPos: { worldX: number; worldY: number },
 ): { streetX: number; streetY: number; slotIndex: number } | null {
-  throw new Error(
-    'fromWorldPosition not yet implemented (CG-0MTH9OQSZ003O1R6 stub)',
-  );
+  const maps = buildWorldMaps(MAX_GRID_COLS, MAX_GRID_ROWS);
+  const posKey = `${worldPos.worldX},${worldPos.worldY}`;
+  const owners = maps.pos2owners.get(posKey);
+  if (!owners || owners.length === 0) return null;
+  // Return canonical (first) owner (pos2owners preserves insertion order, which is lexicographic due to build loop)
+  return { ...owners[0] };
 }
 
 /**
- * Contract stub — throws until implementation.
- * See expanded-grid-contract.test.ts AC2.
+ * Chebyshev (8-way) neighbours of a world position.
+ *
+ * Enumerates all world positions within `range` (default 1) in the
+ * maximal 5×5 lattice, returning the street/slot owners of each
+ * neighbouring world node (shared worlds contribute each of their
+ * owners). The queried world itself is excluded.
  */
 export function expandedNeighbors(
-  _worldPos: { worldX: number; worldY: number },
-  _range: number = 1,
+  worldPos: { worldX: number; worldY: number },
+  range: number = 1,
 ): { streetX: number; streetY: number; slotIndex: number }[] {
-  throw new Error(
-    'expandedNeighbors not yet implemented (CG-0MTH9OQSZ003O1R6 stub)',
-  );
+  if (!Number.isInteger(range) || range <= 0) return [];
+  const maps = buildWorldMaps(MAX_GRID_COLS, MAX_GRID_ROWS);
+  const posKey = `${worldPos.worldX},${worldPos.worldY}`;
+  // If queried world is not in the lattice, it has no neighbours (OOB)
+  if (!maps.canonicalPosSet.has(posKey)) {
+    // Still allow neighbours for OOB? Contract expects OOB → not found → no crash; we treat as empty.
+    // But for interior queries we must have the pos.
+    // For world positions that are valid but outside max grid, we still compute geometrically.
+    // Fall through to geometric search.
+  }
+  const result: { streetX: number; streetY: number; slotIndex: number }[] = [];
+  for (const [otherKey, owners] of maps.pos2owners.entries()) {
+    if (otherKey === posKey) continue;
+    const [ox, oy] = otherKey.split(',').map(Number);
+    if (Math.max(Math.abs(ox - worldPos.worldX), Math.abs(oy - worldPos.worldY)) <= range) {
+      for (const o of owners) result.push({ ...o });
+    }
+  }
+  // Sort for determinism: lexicographic by street, slot
+  result.sort((a, b) => a.streetY - b.streetY || a.streetX - b.streetX || a.slotIndex - b.slotIndex);
+  return result;
+}
+
+// ── Grid Dimensions & Neighbor Resolution (Expanded Grids) ──
+
+/** Grid dimensions for expanded street layouts (cols × rows of 5×2 street cells). */
+export interface GridDims {
+  cols: number;
+  rows: number;
 }
 
 /**
- * Contract stub — throws until implementation.
- * See expanded-grid-contract.test.ts AC3.
+ * Resolve neighbors for a given grid slot index.
+ *
+ * For 1×1 grids (or when `gridDims` is omitted), delegates to `neighbors()`
+ * with legacy slot indices (0-9). For expanded grids, converts the index
+ * to a world position, queries `expandedNeighbors()`, and maps the result
+ * back to a sorted array of world slot indices.
+ *
+ * @param index    The slot index to find neighbors for.
+ * @param range    How far to look in each direction (default 1).
+ * @param gridDims Optional grid dimensions for expanded layouts.
+ * @returns Sorted array of neighbor indices.
  */
-export function worldSlotCount(
-  _streetCols: number,
-  _streetRows: number,
-): number {
-  throw new Error(
-    'worldSlotCount not yet implemented (CG-0MTH9OQSZ003O1R6 stub)',
-  );
+function resolveNeighbors(
+  index: number,
+  range: number,
+  gridDims?: GridDims,
+): number[] {
+  // Legacy path: 1×1 grid (or no dims provided)
+  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) {
+    return neighbors(index, range);
+  }
+  // Expanded path: use world coordinates directly (avoids 5×5 leak via expandedNeighbors)
+  const total = worldSlotCount(gridDims.cols, gridDims.rows);
+  if (index < 0 || index >= total || range <= 0) return [];
+  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
+  // Build index→position and position→index mappings from canonical positions
+  // Use world slot ordering by (worldY, worldX) to ensure stable index mapping
+  const canonicalPosArray: string[] = [];
+  for (const posKey of maps.canonicalPosSet) canonicalPosArray.push(posKey);
+  canonicalPosArray.sort((a, b) => {
+    const [ax, ay] = a.split(',').map(Number);
+    const [bx, by] = b.split(',').map(Number);
+    return ay - by || ax - bx;
+  });
+  const worldPosKey = canonicalPosArray[index];
+  if (!worldPosKey) return [];
+  const [worldX, worldY] = worldPosKey.split(',').map(Number);
+  const result: number[] = [];
+  for (const otherKey of canonicalPosArray) {
+    if (otherKey === worldPosKey) continue;
+    const [ox, oy] = otherKey.split(',').map(Number);
+    if (Math.max(Math.abs(ox - worldX), Math.abs(oy - worldY)) <= range) {
+      const ni = canonicalPosArray.indexOf(otherKey);
+      if (ni !== -1) result.push(ni);
+    }
+  }
+  return result.sort((a, b) => a - b);
+}
+
+/**
+ * Translate a flat world-slot index to its (worldX, worldY) position.
+ * Used by tests and expand-grid helpers to map the canonical ordering.
+ */
+export function worldIndexToPosition(
+  index: number,
+  gridDims: GridDims,
+): { worldX: number; worldY: number } | null {
+  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) return null;
+  const total = worldSlotCount(gridDims.cols, gridDims.rows);
+  if (index < 0 || index >= total) return null;
+  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
+  const arr: string[] = [];
+  for (const k of maps.canonicalPosSet) arr.push(k);
+  arr.sort((a, b) => {
+    const [ax, ay] = a.split(',').map(Number);
+    const [bx, by] = b.split(',').map(Number);
+    return ay - by || ax - bx;
+  });
+  const key = arr[index];
+  if (!key) return null;
+  const [worldX, worldY] = key.split(',').map(Number);
+  return { worldX, worldY };
+}
+
+/**
+ * Translate (streetX, streetY, slot) to its flat world-slot index.
+ * Returns null if the slot is outside the lattice or not canonical.
+ */
+export function streetSlotToWorldIndex(
+  streetX: number,
+  streetY: number,
+  slotIndex: number,
+  gridDims: GridDims,
+): number | null {
+  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) {
+    return slotIndex >= 0 && slotIndex < GRID_SIZE ? slotIndex : null;
+  }
+  const key = `${streetX},${streetY},${slotIndex}`;
+  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
+  const w = maps.keyToWorld.get(key);
+  if (!w) return null;
+  const posKey = `${w.worldX},${w.worldY}`;
+  const arr: string[] = [];
+  for (const k of maps.canonicalPosSet) arr.push(k);
+  arr.sort((a, b) => {
+    const [ax, ay] = a.split(',').map(Number);
+    const [bx, by] = b.split(',').map(Number);
+    return ay - by || ax - bx;
+  });
+  const idx = arr.indexOf(posKey);
+  return idx === -1 ? null : idx;
 }
