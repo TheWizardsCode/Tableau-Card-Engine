@@ -200,6 +200,40 @@ export type EndReason =
   | 'turn_exhaustion' // opt-in: only when a config sets maxTurns (CG-0MSLXJCHH001DLIO)
   | null;
 
+// ── Competitive State (CG-0MT5X3GMA007EG30) ─────────────────
+
+/** Per-player record for competitive mode (N-player-ready). */
+export interface PlayerRecord {
+  /** Zero-based owner index; also the index into PlayerRecord[]. */
+  playerId: number;
+  /** Coins owned by this player. */
+  coins: number;
+  /** Reputation owned by this player. */
+  reputation: number;
+  /** Cards held in this player's hand. */
+  hand: (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[];
+  /** Active staff cards owned by this player. */
+  staffCards: StaffCard[];
+  /** Remaining actions this player can take this turn. */
+  actionBudget: number;
+  /** Computed score for this player (updated each EndCheck). */
+  score: number;
+}
+
+/** A single street slot tagged with its owner. */
+export interface OwnerTaggedSlot {
+  /** Card occupying the slot, or null when empty. */
+  card: BusinessCard | CommunitySpaceCard | null;
+  /** Owner index of the occupying card, or null when empty/unowned. */
+  ownerId: number | null;
+}
+
+/** Options for creating a competitive game. */
+export interface CompetitiveStateOptions extends MainStreetSetupOptions {
+  /** Number of players (N >= 1); each gets a PlayerRecord. Must be >= 1. */
+  playerCount: number;
+}
+
 // ── Main Street State ───────────────────────────────────────
 
 /**
@@ -354,6 +388,13 @@ export interface MainStreetState {
    * DayStart.
    */
   justMovedUpgradeCardId?: string | null;
+  // ── Competitive mode (CG-0MT5X3GMA007EG30) ─────────────────
+  /** Per-player records; undefined in single-player mode. */
+  players?: PlayerRecord[] | null;
+  /** Owner-tagged street grid; undefined in single-player mode. */
+  ownerTaggedGrid?: OwnerTaggedSlot[];
+  /** Number of players; 1 in single-player mode is implicit when players is undefined. */
+  playerCount?: number;
 }
 
 export interface MainStreetSerializedState {
@@ -446,6 +487,13 @@ export interface MainStreetSerializedState {
    * checks this to decide whether the play is free.
    */
   justMovedUpgradeCardId?: string | null;
+  // ── Competitive (CG-0MT5X3GMA007EG30) ───────────────────────
+  /** Per-player records; undefined in single-player saves. */
+  players?: PlayerRecord[] | null;
+  /** Owner-tagged street grid; undefined in single-player saves. */
+  ownerTaggedGrid?: OwnerTaggedSlot[];
+  /** Number of players; undefined in single-player saves. */
+  playerCount?: number;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -788,7 +836,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   // Build initial state -- use config values instead of hard-coded constants
   const initCoins = config.startingCoins;
   const initRep = config.startingReputation;
-  state = {
+  const baseState: MainStreetState = {
     config,
     turn: 1,
     phase: 'DayStart',
@@ -848,7 +896,11 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     favourUsedThisTurn: false,
     justMovedEventCardId: null,
     justMovedUpgradeCardId: null,
+    players: undefined,
+    ownerTaggedGrid: undefined,
+    playerCount: undefined,
   };
+  state = baseState;
 
   // Refill the single-row market with its initial composition.
   refillSingleRowMarket(state);
@@ -866,6 +918,52 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
 
   return state;
 }
+
+// ── Competitive State (CG-0MT5X3GMA007EG30) ─────────────────
+
+/**
+ * Creates a competitive game state with N per-player records.
+ *
+ * N-player-ready (parallel PlayerRecord[] indexed by ownerId): shared
+ * market, decks, and incidentDeck remain single-owner and unchanged.
+ * Each player's starting coins/reputation comes from the preset.
+ */
+export function createCompetitiveState(
+  options: CompetitiveStateOptions,
+): MainStreetState {
+  if (!Number.isInteger(options.playerCount) || options.playerCount < 1) {
+    throw new Error(`playerCount must be an integer >= 1, got ${options.playerCount}`);
+  }
+
+  // Reuse single-player setup so seeded deck order / RNG semantics are
+  // identical to MainStreet; then overlay the per-player layer.
+  const { playerCount, ...singlePlayerOptions } = options;
+  const state = setupMainStreetGame(singlePlayerOptions);
+
+  const initCoins = state.config.startingCoins;
+  const initRep = state.config.startingReputation;
+
+  state.players = Array.from({ length: playerCount }, (_, playerId) => ({
+    playerId,
+    coins: initCoins,
+    reputation: initRep,
+    hand: [],
+    staffCards: [],
+    actionBudget: 1,
+    score: 0,
+  } as PlayerRecord));
+
+  state.ownerTaggedGrid = Array.from(
+    { length: GRID_SIZE },
+    (): OwnerTaggedSlot => ({ card: null, ownerId: null }),
+  );
+
+  state.playerCount = playerCount;
+
+  return state;
+}
+
+
 
 /**
  * Live mid-session hook to adjust the incident-draw balance limits.
@@ -947,6 +1045,9 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     favourUsedThisTurn: state.favourUsedThisTurn,
     justMovedEventCardId: state.justMovedEventCardId ?? null,
     justMovedUpgradeCardId: state.justMovedUpgradeCardId ?? null,
+    players: state.players ? structuredClone(state.players) : undefined,
+    ownerTaggedGrid: state.ownerTaggedGrid ? structuredClone(state.ownerTaggedGrid) : undefined,
+    playerCount: state.playerCount,
   };
 }
 
@@ -1325,6 +1426,13 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     justMovedEventCardId: (saved as any).justMovedEventCardId ?? null,
     revealedPeekedCard: (saved.revealedPeekedCard as EventCard | null) ?? null,
     justMovedUpgradeCardId: (saved as unknown as { justMovedUpgradeCardId?: string | null })?.justMovedUpgradeCardId ?? null,
+    players: (saved as unknown as { players?: PlayerRecord[] | null })?.players
+      ? structuredClone((saved as unknown as { players: PlayerRecord[] })?.players)
+      : undefined,
+    ownerTaggedGrid: (saved as unknown as { ownerTaggedGrid?: OwnerTaggedSlot[] })?.ownerTaggedGrid
+      ? structuredClone((saved as unknown as { ownerTaggedGrid: OwnerTaggedSlot[] })?.ownerTaggedGrid)
+      : undefined,
+    playerCount: (saved as unknown as { playerCount?: number })?.playerCount,
   };
 
   return state;
