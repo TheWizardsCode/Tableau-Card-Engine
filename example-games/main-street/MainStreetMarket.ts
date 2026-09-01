@@ -1116,6 +1116,52 @@ export function sellBusiness(
   return { card, refund, slotIndex };
 }
 
+// ── Dev-mode Cheat: Replace Random Market Card ───────────────
+
+let cheatNonce = 0;
+
+/**
+ * Dev-mode cheat helper: replace a uniformly-random slot from
+ * `state.market.cards` with a shallow copy of the chosen template
+ * (unique id `${templateId}--cheat-${nonce}`), push the displaced
+ * card to its family's discard pile, and return the displaced card.
+ *
+ * The market row is NOT refilled here; callers should re-render via
+ * the existing renderer path (e.g. `scene.refreshMarket()`).
+ */
+export function cheatReplaceMarketCard(
+  state: MainStreetState,
+  template: AnyCard,
+  family: string,
+  rng?: () => number,
+): AnyCard | null {
+  const slots = state.market.cards.length;
+  if (slots === 0) return null;
+  const slotIndex = Math.floor((rng?.() ?? Math.random()) * slots);
+  const displaced = state.market.cards[slotIndex] ?? null;
+  const baseId = (template as any).id ?? family;
+  const newCard: AnyCard = { ...(template as any), id: `${baseId}--cheat-${cheatNonce++}` } as AnyCard;
+  if (family === 'business' || family === 'community-space') {
+    (newCard as any).level = 0;
+    (newCard as any).incomeBonus = 0;
+    (newCard as any).synergyRangeBonus = 0;
+    (newCard as any).reputationBonus = 0;
+    (newCard as any).ongoingCost = (newCard as any).ongoingCost ?? 0;
+    (newCard as any).appliedUpgrades = [];
+    (newCard as any).totalUpgradeCost = 0;
+  }
+  state.market.cards[slotIndex] = newCard;
+  if (displaced) {
+    const fam = (displaced as any).family as string;
+    if (fam === 'business') state.discards.business.push(displaced as BusinessCard);
+    else if (fam === 'community-space') state.discards.communitySpace.push(displaced as CommunitySpaceCard);
+    else if (fam === 'event') state.discards.event.push(displaced as EventCard);
+    else if (fam === 'upgrade') state.discards.upgrade.push(displaced as UpgradeCard);
+    else if (fam === 'staff') state.discards.staff.push(displaced as StaffCard);
+  }
+  return displaced;
+}
+
 /**
  * Checks whether a business at the given slot can be sold.
  *
