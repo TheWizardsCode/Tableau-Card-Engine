@@ -46,6 +46,8 @@ interface CheatPickerState {
 
 let activeOverlay: OverlayDialogHandle | null = null;
 let activeState: CheatPickerState | null = null;
+let footerReplaceBtn: Phaser.GameObjects.Text | null = null;
+let footerStatusText: Phaser.GameObjects.Text | null = null;
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -125,9 +127,11 @@ function getFamilyColor(family: string): string {
   }
 }
 
-function showStatus(overlay: OverlayDialogHandle, message: string): void {
-  const statusText = (overlay.scrollContainer as any)._statusText as Phaser.GameObjects.Text | undefined;
-  if (statusText) statusText.setText(message);
+function showStatus(_overlay: OverlayDialogHandle, message: string): void {
+  if (footerStatusText) footerStatusText.setText(message);
+  // Also keep scroll-container status in sync if present (backward compat)
+  const legacy = (_overlay.scrollContainer as any)._statusText as Phaser.GameObjects.Text | undefined;
+  if (legacy) legacy.setText(message);
 }
 
 function handleReplace(
@@ -161,6 +165,31 @@ function handleReplace(
     else if (msScene.msRenderer && typeof msScene.msRenderer.refreshMarket === 'function') msScene.msRenderer.refreshMarket();
     else if (typeof msScene.refreshAll === 'function') msScene.refreshAll();
   } catch { /* ignore */ }
+}
+
+function updateFooter(
+  scene: Phaser.Scene,
+  overlay: OverlayDialogHandle,
+  state: CheatPickerState,
+  filtered: CardEntry[],
+): void {
+  if (!footerReplaceBtn) return;
+  const enabled = filtered.length > 0;
+  footerReplaceBtn.setColor(enabled ? '#88ccff' : '#555555');
+  // Reset interactivity then re-apply if enabled
+  try { footerReplaceBtn.removeAllListeners('pointerdown'); } catch { /* ignore */ }
+  try { footerReplaceBtn.removeAllListeners('pointerover'); } catch { /* ignore */ }
+  try { footerReplaceBtn.removeAllListeners('pointerout'); } catch { /* ignore */ }
+  footerReplaceBtn.disableInteractive();
+  if (enabled) {
+    footerReplaceBtn.setInteractive({ useHandCursor: true });
+    footerReplaceBtn.on('pointerdown', () => {
+      handleReplace(scene, overlay, state, filtered);
+      renderPicker(scene, overlay, state);
+    });
+    footerReplaceBtn.on('pointerover', () => footerReplaceBtn!.setColor('#aaddff'));
+    footerReplaceBtn.on('pointerout', () => footerReplaceBtn!.setColor('#88ccff'));
+  }
 }
 
 function renderPicker(
@@ -242,7 +271,6 @@ function renderPicker(
         // Re-render to reflect highlight + status update
         renderPicker(scene, overlay, state);
         // Restore status after re-render (which clears it)
-        // handleReplace already set status; re-apply after render
         const entry2 = filtered[i];
         showStatus(overlay, `Replaced with ${entry2.label}.`);
       });
@@ -261,37 +289,10 @@ function renderPicker(
     }
   }
 
-  // ── Replace button ─────────────────────────────────────
-  const btnY = listY + 10;
-  const replaceBtn = scene.add.text(contentWidth / 2, btnY, '[ Replace Market Slot ]', {
-    fontSize: '14px',
-    color: filtered.length === 0 ? '#555555' : '#88ccff',
-    fontFamily: 'Arial, sans-serif',
-  });
-  replaceBtn.setOrigin(0.5, 0);
-  replaceBtn.setDepth(overlay.depthBase + 2);
-  if (filtered.length > 0) {
-    replaceBtn.setInteractive({ useHandCursor: true });
-    replaceBtn.on('pointerdown', () => {
-      handleReplace(scene, overlay, state, filtered);
-      renderPicker(scene, overlay, state);
-    });
-    replaceBtn.on('pointerover', () => replaceBtn.setColor('#aaddff'));
-    replaceBtn.on('pointerout', () => replaceBtn.setColor('#88ccff'));
-  }
-  overlay.scrollContainer.add(replaceBtn);
+  // Footer is pinned outside the scroll container; update it in place
+  updateFooter(scene, overlay, state, filtered);
 
-  // ── Status text ────────────────────────────────────────
-  const statusText = scene.add.text(10, btnY + 26, '', {
-    fontSize: '12px',
-    color: '#aaaaaa',
-    fontFamily: 'Arial, sans-serif',
-  });
-  statusText.setDepth(overlay.depthBase + 2);
-  overlay.scrollContainer.add(statusText);
-  (overlay.scrollContainer as any)._statusText = statusText;
-
-  const totalHeight = btnY + 50;
+  const totalHeight = listY + 10;
   overlay.refresh(totalHeight);
 }
 
@@ -309,7 +310,7 @@ function createFilterInput(
   input.style.position = 'absolute';
   input.style.left = `${overlay.boxX + 10}px`;
   input.style.top = `${overlay.boxY + 46}px`;
-  input.style.width = `${overlay.boxWidth - 180}px`;
+  input.style.width = `${overlay.boxWidth - 20}px`;
   input.style.height = '24px';
   input.style.fontSize = '13px';
   input.style.padding = '2px 8px';
@@ -373,6 +374,8 @@ function closeActiveOverlay(): void {
     }
     activeOverlay = null;
     activeState = null;
+    footerReplaceBtn = null;
+    footerStatusText = null;
   }
 }
 
@@ -412,9 +415,39 @@ export function createMarketCardCheatTool(): DebugToolsEntry {
           }
           activeOverlay = null;
           activeState = null;
+          footerReplaceBtn = null;
+          footerStatusText = null;
         },
       });
       activeOverlay = overlay;
+
+      // ── Fixed footer: status text + Replace button (pinned, not scrolled) ──
+      footerStatusText = scene.add.text(overlay.boxX + 10, overlay.boxY + overlay.boxHeight - 34, '', {
+        fontSize: '12px',
+        color: '#aaaaaa',
+        fontFamily: 'Arial, sans-serif',
+      });
+      footerStatusText.setDepth(overlay.depthBase + 2);
+      // 720x520 box: status at boxY+480, button at boxY+502 inside 46px footer strip
+      footerReplaceBtn = scene.add.text(overlay.boxX + overlay.boxWidth / 2, overlay.boxY + overlay.boxHeight - 18, '[ Replace Market Slot ]', {
+        fontSize: '14px',
+        color: '#88ccff',
+        fontFamily: 'Arial, sans-serif',
+      });
+      footerReplaceBtn.setOrigin(0.5, 0);
+      footerReplaceBtn.setDepth(overlay.depthBase + 2);
+      footerReplaceBtn.setInteractive({ useHandCursor: true });
+      footerReplaceBtn.on('pointerover', () => footerReplaceBtn!.setColor('#aaddff'));
+      footerReplaceBtn.on('pointerout', () => footerReplaceBtn!.setColor('#88ccff'));
+      // Parent into hudContainer for correct z-ordering and track for cleanup
+      try {
+        const hud: any = (scene as any).hudContainer;
+        if (hud && typeof hud.add === 'function') {
+          hud.add(footerStatusText);
+          hud.add(footerReplaceBtn);
+        }
+      } catch { /* ignore */ }
+      overlay.objects.push(footerStatusText, footerReplaceBtn);
 
       const filterInput = createFilterInput(scene, overlay, state);
       state.filterInput = filterInput;

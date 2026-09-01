@@ -211,7 +211,7 @@ export class MainStreetSvgTextureManager {
   }
 
   public templateIdFromCardId(cardId: string): string {
-    return cardId.replace(/-\d+$/, '');
+    return cardId.replace(/--cheat-\d+$/, '').replace(/-\d+$/, '');
   }
 
   /**
@@ -265,7 +265,7 @@ export class MainStreetSvgTextureManager {
   }
 
   public templateKeyForCard(cardId: string, width?: number, height?: number, displayName?: string): string {
-    const base = cardId.replace(/-\d+$/, '');
+    const base = this.templateIdFromCardId(cardId);
     const id = this.variantKeyId(base, displayName);
     if (width !== undefined && height !== undefined) {
       const dpr = this.getCurrentDevicePixelRatio();
