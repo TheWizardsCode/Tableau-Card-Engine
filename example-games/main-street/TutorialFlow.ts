@@ -62,7 +62,7 @@
  */
 
 import { t, formatCurrency } from '../../src/core-engine/I18n';
-import { tutorialKey } from './i18n/tutorial-en';
+import { bankingHintKey, tutorialKey } from './i18n/tutorial-en';
 import { getCsvRows, getBaseTypeId } from './MainStreetCards';
 import type { BusinessCard, CommunitySpaceCard } from './MainStreetCards';
 import { neighbors } from './MainStreetAdjacency';
@@ -448,6 +448,17 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     gate: 'confirm',
   },
 ] as const;
+
+/** Contextual first-bank hint (CG-0MT3JK16W006A66P). Not part of the fixed
+ * 23-step count: triggered once from `MainStreetTurnController.endTurn()` when
+ * `actionsRemaining > 0` at turn end, exactly when a bank would occur. */
+export const BANKING_HINT_STEP: UnifiedTutorialStepDef = {
+  id: 'BANKING',
+  titleKey: bankingHintKey('title'),
+  bodyKey: bankingHintKey('body'),
+  highlightZone: 'hud',
+  gate: 'confirm',
+};
 
 /** Total number of unified tutorial steps. */
 export const UNIFIED_TUTORIAL_STEP_COUNT = UNIFIED_TUTORIAL_STEPS.length; // 23

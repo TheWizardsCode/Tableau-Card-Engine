@@ -90,6 +90,10 @@ export function overlayKey(field: string): string {
   return `${TUTORIAL_I18N_KEY_PREFIX}.overlay.${field}`;
 }
 
+export function bankingHintKey(field: string): string {
+  return `${TUTORIAL_I18N_KEY_PREFIX}.bankingHint.${field}`;
+}
+
 /**
  * English locale bundle for all 17 tutorial step strings.
  *
@@ -116,6 +120,14 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [overlayKey('startFullGame')]:
     "Let's play!",
 
+  // ── Banking Hint (contextual first-bank trigger, CG-0MT3JK16W006A66P) ──
+  // Editorial: ≤3 sentences, exactly one point (cap-2 + carry-forward + HUD cue).
+  // Staff-first rule softened in T5 (early-game caveat); the hint itself
+  // reads naturally even when the player owns no staff yet.
+  [bankingHintKey('title')]:
+    'Bank your spare action',
+  [bankingHintKey('body')]:
+    'Any unused action banks up to 2 and carries into future days. Check the "(1 banked)" count in the action counter above.',
 
   // ── T1: Welcome ─────────────────────────────────────────────
   [tutorialKey('T1', 'title')]:
@@ -156,8 +168,11 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // CG-0MT53NXGZ004H5AE moved this informational step before T6 End Turn.
   [tutorialKey('T5', 'title')]:
     'Upcoming Incidents',
+  // Staff-first wording softened (CG-0MT3JK16W006A66P): the engine spends
+  // staff-granted actions first, but the player likely owns no staff yet, so
+  // the current bank is from unused base actions.
   [tutorialKey('T5', 'body')]:
-    'Incidents hide in a face-down deck \u2014 you see only how many are left, not what is next. The top card is revealed and resolved at the end of each turn. Some help you, some hurt you; a peek staff member can look at the top card once per turn.',
+    'Incidents hide in a face-down deck \u2014 you see only how many are left, not what is next. The top card is revealed and resolved at the end of each turn. Some staff grant +1 action (spent first, never banked \u2014 but you likely have none yet), and a peek staffer can look at the top card once per turn.',
 
   // ── T6: End Turn (day 1 → day 2) ───────────────────────────
   [tutorialKey('T6', 'title')]:
