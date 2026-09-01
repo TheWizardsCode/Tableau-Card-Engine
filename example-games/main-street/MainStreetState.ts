@@ -139,12 +139,42 @@ export function syncResourceBankToLedger(state: MainStreetState): void {
 /**
  * The phases of a Main Street turn (simplified for walking skeleton).
  *
- * DayStart              -> MarketPhase (combined with ActionPhase)
- * MarketPhase           -> InvestmentResolution
- * InvestmentResolution  -> IncomePhase
- * IncomePhase           -> IncidentPhase
- * IncidentPhase         -> EndCheck
- * EndCheck              -> DayStart (next turn) | GameOver
+ * Single-player:
+ *   DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
+ *   EndCheck -> DayStart (next turn) | GameOver
+ *
+ * Competitive (CG-0MT5X3GMA007EG30 — Option A, shared day):
+ *   MarketPhases ALTERNATE within the same shared day; the closing phases
+ *   run ONCE after every active player has taken a MarketPhase. In code
+ *   this is modelled as a per-day loop over PlayerRecord[] (N-player-ready;
+ *   the current player is state.activePlayerId):
+ *
+ *            DayStart
+ *               |
+ *       +-------+--------+
+ *       |   activePlayerId = 0
+ *       |   MarketPhase (player 0 acts, actionsRemaining consumed, may end)
+ *       |   InvestmentResolution (per-owner if needed — sibling)
+ *       +-------+--------+
+ *               |  activePlayerId = 1 .. N-1 (repeat Market for each player)
+ *       +-------+--------+
+ *       |   MarketPhase (player 1) → ... → MarketPhase (player N-1)
+ *       +-------+--------+
+ *               |
+ *           IncomePhase   (shared; per-owner income routed by slot owner)
+ *           IncidentPhase (shared; face-down incidentDeck, shared balance)
+ *           EndCheck      (shared; first-to-threshold — first player whose
+ *                          per-owner score >= winThreshold wins; winnerId
+ *                          stored as state.competitiveWinnerId; N=1 uses
+ *                          the existing single-player end check)
+ *               |
+ *           DayStart (next turn) | GameOver
+ *
+ * N=1 is identical to the legacy single-player sequence (one MarketPhase).
+ * The shared day’s market/decks/incidentDeck remain single-owner and
+ * unchanged (see createCompetitiveState). Diagrams here and in
+ * MainStreetEngine.executeCompetitiveDay are the canonical reference for
+ * transition tests (tests/main-street/competitive-phase.test.ts).
  */
 export type DayPhase =
   | 'DayStart'
@@ -411,6 +441,10 @@ export interface MainStreetState {
   ownerTaggedGrid?: OwnerTaggedSlot[];
   /** Number of players; 1 in single-player mode is implicit when players is undefined. */
   playerCount?: number;
+  /** Active player within the shared day (index into players[]). 0 in single-player. */
+  activePlayerId?: number | null;
+  /** Winning player in competitive mode (first-to-threshold). null while playing or in single-player. */
+  competitiveWinnerId?: number | null;
 }
 
 export interface MainStreetSerializedState {
@@ -513,6 +547,10 @@ export interface MainStreetSerializedState {
   ownerTaggedGrid?: OwnerTaggedSlot[];
   /** Number of players; undefined in single-player saves. */
   playerCount?: number;
+  /** Active player within the shared day (index into players[]). */
+  activePlayerId?: number | null;
+  /** Winning player in competitive mode (first-to-threshold). */
+  competitiveWinnerId?: number | null;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -930,6 +968,8 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     players: undefined,
     ownerTaggedGrid: undefined,
     playerCount: undefined,
+    activePlayerId: undefined,
+    competitiveWinnerId: undefined,
   };
   // Endless-mode opt-in (CG-0MTIILU5V006GCN4): overrides the preset's
   // win-threshold semantics. Default is false (existing behaviour).
@@ -996,6 +1036,8 @@ export function createCompetitiveState(
   );
 
   state.playerCount = playerCount;
+  state.activePlayerId = 0;
+  state.competitiveWinnerId = null;
 
   return state;
 }
@@ -1087,6 +1129,8 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     players: state.players ? structuredClone(state.players) : undefined,
     ownerTaggedGrid: state.ownerTaggedGrid ? structuredClone(state.ownerTaggedGrid) : undefined,
     playerCount: state.playerCount,
+    activePlayerId: state.activePlayerId ?? null,
+    competitiveWinnerId: state.competitiveWinnerId ?? null,
   };
 }
 
@@ -1488,6 +1532,8 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
       ? structuredClone((saved as unknown as { ownerTaggedGrid: OwnerTaggedSlot[] })?.ownerTaggedGrid)
       : undefined,
     playerCount: (saved as unknown as { playerCount?: number })?.playerCount,
+    activePlayerId: (saved as unknown as { activePlayerId?: number | null })?.activePlayerId ?? null,
+    competitiveWinnerId: (saved as unknown as { competitiveWinnerId?: number | null })?.competitiveWinnerId ?? null,
   };
 
   return state;

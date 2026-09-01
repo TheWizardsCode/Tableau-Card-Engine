@@ -4,8 +4,28 @@
  * Implements the turn flow, phase transitions, core action handlers,
  * event resolution, win/loss detection, and score calculation.
  *
- * The walking skeleton uses a simplified 6-phase turn structure:
+ * Single-player sequence (6 phases):
  *   DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
+ *
+ * Competitive (CG-0MT5X3GMA007EG30 — Option A, shared day — alternating
+ * MarketPhases, shared closing phases; see MainStreetState phase diagram):
+ *
+ *   DayStart
+ *     |  refill(market), activePlayerId = 0
+ *     v
+ *   MarketPhase (player 0) — executeAction(player 0 actions), activePlayerId = 1
+ *   MarketPhase (player 1) — executeAction(player 1 actions), ... up to N-1
+ *     |  (one MarketPhase per active PlayerRecord entry — N-player-ready)
+ *     v
+ *   InvestmentResolution  (shared; Investment events are per-owner where
+ *                         applicable — sibling routes per-owner effects)
+ *   IncomePhase           (shared; applyIncome is per-owner by slot owner)
+ *   IncidentPhase         (shared; single face-down incidentDeck)
+ *   EndCheck              (shared; first-to-threshold across per-player
+ *                          scores; winnerId = state.competitiveWinnerId;
+ *                          N=1 delegates to legacy single-player check)
+ *     |
+ *   DayStart(next) | GameOver
  *
  * Held Investment events are NOT auto-resolved. The player must actively play
  * them by clicking during the MarketPhase. Unplayed events persist across turns.
@@ -909,6 +929,97 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
  * @returns true if a game-ending condition was detected (false in endless
  *          continuation when the score threshold is crossed but play continues).
  */
+/**
+ * Competitive EndCheck — first to threshold (CG-0MT5X3GMA007EG30).
+ *
+ * Scores every PlayerRecord via per-owner coins+rep+challenges; the
+ * shared ledger/finalScore is kept in sync as max-per-player so headless
+ * consumers still read one score. The first player whose per-owner score
+ * reaches `config.winThreshold` wins in player-index order (lowest index
+ * wins on a tie in the same EndCheck). The winner is stored as
+ * `competitiveWinnerId`.
+ *
+ * In single-player (no players[]), delegates to the legacy checkEndConditions.
+ */
+export function checkCompetitiveEndConditions(state: MainStreetState): boolean {
+  if (!state.players || state.players.length === 0) {
+    return checkEndConditions(state);
+  }
+
+  if (checkImmediateLoss(state)) return true;
+
+  updateCompetitiveScores(state);
+
+  // Win: all challenges complete — shared milestone; lowest-index player takes it.
+  if (
+    state.activeChallenges.length > 0 &&
+    state.activeChallenges.every(ac => ac.completed)
+  ) {
+    state.gameResult = 'win';
+    state.endReason = 'all_challenges';
+    state.competitiveWinnerId = 0;
+    addLog(state, `Victory: All challenges completed! (Player ${0})`, 'gain');
+    return true;
+  }
+
+  for (let i = 0; i < state.players.length; i++) {
+    if (state.players[i].score >= state.config.winThreshold) {
+      state.gameResult = 'win';
+      state.endReason = 'score_threshold';
+      state.competitiveWinnerId = i;
+      addLog(state, `Victory: Player ${i} reached threshold (${state.players[i].score} pts)`, 'gain');
+      return true;
+    }
+  }
+
+  if (state.config.maxTurns !== undefined && state.turn >= state.config.maxTurns) {
+    let bestIdx = -1;
+    let bestScore = -Infinity;
+    for (let i = 0; i < state.players.length; i++) {
+      if (state.players[i].score > bestScore) {
+        bestScore = state.players[i].score;
+        bestIdx = i;
+      }
+    }
+    if (
+      bestIdx !== -1 &&
+      state.players[bestIdx].reputation > 0 &&
+      state.players[bestIdx].coins >= 0
+    ) {
+      state.gameResult = 'win';
+      state.endReason = 'turn_limit_victory';
+      state.competitiveWinnerId = bestIdx;
+      addLog(state, `Victory: Player ${bestIdx} survived ${state.config.maxTurns} turns (${bestScore} pts)`, 'gain');
+      return true;
+    }
+    state.gameResult = 'loss';
+    state.endReason = 'turn_exhaustion';
+    state.competitiveWinnerId = null;
+    addLog(state, 'Game Over: Turn limit exhausted', 'loss');
+    return true;
+  }
+
+  return false;
+}
+
+/** Recomputes every PlayerRecord.score and syncs the shared ledger/finalScore. */
+export function updateCompetitiveScores(state: MainStreetState): void {
+  if (!state.players || state.players.length === 0) {
+    updateScore(state);
+    return;
+  }
+  const bonus = state.challengesCompleted.length * state.config.challengeBonusPoints;
+  let maxScore = -Infinity;
+  for (const p of state.players) {
+    p.score = p.coins + p.reputation + bonus;
+    if (p.score > maxScore) maxScore = p.score;
+  }
+  // Keep the shared ledger/finalScore as the current best (open single-player API).
+  syncResourceBankToLedger(state);
+  state.finalScore = maxScore;
+  // Also mirror max into shared coins/rep history where used.
+}
+
 export function checkEndConditions(state: MainStreetState): boolean {
   // First check immediate loss conditions
   if (checkImmediateLoss(state)) return true;
@@ -1006,6 +1117,209 @@ export function checkEndConditions(state: MainStreetState): boolean {
  * @param skipMarketRefill  When true, skips refillMarket. Used during
  *                          checkpoint resume to preserve saved market state.
  */
+// ── Competitive shared-day phase machine (CG-0MT5X3GMA007EG30) ──
+
+/**
+ * The active player within the shared day (read-only). 0 in single-player
+ * (when players[] is absent). Exposed for scene/AI turn alternation.
+ */
+export function getActivePlayerId(state: MainStreetState): number {
+  return state.activePlayerId ?? 0;
+}
+
+/** Sets the active player (internal use; tests may set it directly). */
+export function setActivePlayerId(state: MainStreetState, playerId: number): void {
+  if (state.players && (playerId < 0 || playerId >= state.players.length)) {
+    throw new Error(`activePlayerId ${playerId} out of range (0..${state.players.length - 1})`);
+  }
+  state.activePlayerId = playerId;
+}
+
+/**
+ * Begins the shared day (CG-0MT5X3GMA007EG30): refills the shared market,
+ * resets the shared action budgets and peek/favour gates, and arms the
+ * first player's MarketPhase. Competitive winner is cleared. In
+ * single-player the behaviour is identical to executeDayStart.
+ */
+export function executeCompetitiveDayStart(
+  state: MainStreetState,
+  skipMarketRefill: boolean = false,
+): void {
+  executeDayStart(state, skipMarketRefill);
+  if (state.players && state.players.length > 0) {
+    state.activePlayerId = 0;
+    // Per-player action budgets: reset each day from staff actions + bank.
+    for (const p of state.players) {
+      const bonus = (p.staffCards ?? []).reduce((s, c) => s + (c.actionsPerTurn ?? 0), 0);
+      p.actionBudget = 1 + bonus + Math.min(2, state.bankedActions ?? 0);
+    }
+    state.competitiveWinnerId = null;
+  }
+}
+
+/**
+ * Ends one player's MarketPhase within the shared day.
+ *
+ * Invariant: must be called when phase is MarketPhase and the active
+ * player's actions are consumed. Advances activePlayerId (round-robins
+ * across PlayerRecord[]) and either arms the next player's MarketPhase
+ * or transitions to InvestmentResolution so shared closing phases run once
+ * after every player has acted. Does NOT run Income/Incident/EndCheck
+ * — call resolveCompetitiveClosingPhases after the final player.
+ *
+ * Single-player (no players[]): throws — use processEndOfTurn instead.
+ */
+export function endCompetitiveMarketTurn(state: MainStreetState): void {
+  if (state.phase !== 'MarketPhase') {
+    throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
+  }
+  if (!state.players || state.players.length === 0) {
+    throw new Error('endCompetitiveMarketTurn requires competitive state (players)');
+  }
+  const n = state.players.length;
+  const cur = state.activePlayerId ?? 0;
+  const next = cur + 1;
+  if (next < n) {
+    state.activePlayerId = next;
+    state.phase = 'MarketPhase';
+  } else {
+    state.phase = 'InvestmentResolution';
+  }
+}
+
+/**
+ * Resolves the shared closing phases (InvestmentResolution → IncomePhase
+ * → IncidentPhase → EndCheck) once after every player has alternated
+ * through MarketPhases within the shared day (CG-0MT5X3GMA007EG30).
+ *
+ * Precondition: phase is InvestmentResolution and competitive state has
+ * players[]. Delegates income/incident/event routing to the sibling
+ * (per-owner application) — here it runs the existing shared effects
+ * plus the competitive first-to-threshold EndCheck.
+ *
+ * Postcondition: on continue, phase becomes DayStart (next shared day)
+ * and activePlayerId resets to 0; on game over, phase remains EndCheck
+ * and competitiveWinnerId records the first-to-threshold winner.
+ */
+export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnResult {
+  if (state.phase !== 'InvestmentResolution') {
+    throw new Error(`resolveCompetitiveClosingPhases requires InvestmentResolution, got ${state.phase}`);
+  }
+  if (!state.players || state.players.length === 0) {
+    throw new Error('resolveCompetitiveClosingPhases requires competitive state (players)');
+  }
+  const turnEnded = state.turn;
+  if (!state.skipMarketCycleOnEndTurn) cycleMarketCards(state);
+  if (checkImmediateLoss(state)) {
+    appendTurnNetRow(state, turnEnded);
+    return {
+      income: null,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+    };
+  }
+  state.phase = 'IncomePhase';
+  const income = applyIncome(state);
+  applyStaffOngoingCosts(state);
+  applyCommunitySpaceOngoingCosts(state);
+  applyBusinessOngoingCosts(state);
+  state.phase = 'IncidentPhase';
+  const coinsBefore = state.resourceBank.coins;
+  const repBefore = state.resourceBank.reputation;
+  const incident = resolveIncident(state);
+  const incidentCoinChange = state.resourceBank.coins - coinsBefore;
+  const incidentRepChange = state.resourceBank.reputation - repBefore;
+  if (checkImmediateLoss(state)) {
+    appendTurnNetRow(state, turnEnded);
+    return {
+      income,
+      incident,
+      incidentCoinChange,
+      incidentRepChange,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+    };
+  }
+  state.phase = 'EndCheck';
+  const decayResult = decayActiveEffects(state.activeEffects);
+  state.activeEffects = decayResult.active;
+  for (const expired of decayResult.expired) {
+    addLog(state, `${expired.description} has expired.`, 'neutral');
+    recordMainStreetEvent({ type: 'info', turn: state.turn, message: `${expired.description} has expired.` });
+  }
+  const newlyCompletedChallenges = evaluateChallenges(state.activeChallenges, state);
+  checkCompetitiveEndConditions(state);
+  if (state.gameResult === 'playing') {
+    state.turn += 1;
+    const bankable = Math.min(state.actionsRemaining, 1);
+    state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
+    // Mirror shared banked value into each player's budget for next day's costing.
+    // (Per-player budgets are re-derived from staff+bank at next day start.)
+    state.phase = 'DayStart';
+    state.activePlayerId = 0;
+  }
+  appendTurnNetRow(state, turnEnded);
+  // Keep per-player scores fresh for callers that read them after resolution.
+  updateCompetitiveScores(state);
+  return {
+    income,
+    incident,
+    incidentCoinChange,
+    incidentRepChange,
+    gameResult: state.gameResult,
+    finalScore: state.finalScore,
+    newlyCompletedChallenges,
+  };
+}
+
+/**
+ * Convenience: runs a full shared day (CG-0MT5X3GMA007EG30).
+ *
+ * Sequences DayStart → N alternating MarketPhases (each driven by
+ * `playerActions[playerId]` then endCompetitiveMarketTurn) → shared
+ * closing phases. Shared market/decks/incidentDeck are unchanged.
+ *
+ * Example (N=2, producer-confirmed Option A):
+ *   Turn 1: DayStart → P0-Market → P1-Market → Income → Incident → EndCheck → DayStart(next)
+ *
+ * N=1 collapses to the single-player path (executeDayStart + processEndOfTurn).
+ */
+export function executeCompetitiveDay(
+  state: MainStreetState,
+  playerActions: PlayerAction[][],
+): TurnResult {
+  executeCompetitiveDayStart(state);
+  const n = state.players?.length ?? 1;
+  if (n === 1) {
+    for (const action of playerActions[0] ?? []) {
+      if (action.type === 'end-turn') break;
+      executeAction(state, action);
+    }
+    return processEndOfTurn(state);
+  }
+  for (let playerId = 0; playerId < n; playerId++) {
+    state.phase = 'MarketPhase';
+    state.activePlayerId = playerId;
+    for (const action of playerActions[playerId] ?? []) {
+      if (action.type === 'end-turn') break;
+      executeAction(state, action);
+    }
+    if (playerId < n - 1) {
+      endCompetitiveMarketTurn(state);
+    }
+  }
+  // Final player's Market must advance to InvestmentResolution before closing.
+  if (state.phase === 'MarketPhase') {
+    endCompetitiveMarketTurn(state);
+  }
+  return resolveCompetitiveClosingPhases(state);
+}
+
 export function executeDayStart(state: MainStreetState, skipMarketRefill: boolean = false): void {
   if (state.phase !== 'DayStart') {
     throw new Error(`Expected DayStart phase, got ${state.phase}`);
