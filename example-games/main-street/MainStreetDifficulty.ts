@@ -71,6 +71,21 @@ export interface GameConfig extends DifficultyConfig {
    */
   readonly maxTurns?: number;
 
+  // ── Endless Mode ────────────────────────────────────────
+  /**
+   * When true, reaching the score threshold does NOT end the game.
+   *
+   * The engine sets `endReason` to `'score_threshold_continue'` when the
+   * threshold is first reached, but keeps `gameResult` as `'playing'` so
+   * the player (or players in competitive mode) can continue building.
+   * The game only ends via other conditions (bankruptcy, reputation
+   * collapse, all challenges complete, or turn limit).
+   *
+   * Default: `false` — the game ends at the threshold (existing behaviour,
+   * CG-0MTIILU5V006GCN4). This is the producer's opt-in "endless mode".
+   */
+  readonly endlessMode: boolean;
+
   // ── Scoring ─────────────────────────────────────────────
   /** Score required for a win via score threshold. */
   readonly winThreshold: number;
@@ -156,6 +171,7 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Easy',
   startingCoins: 10,
   startingReputation: 5,
+  endlessMode: false,
   winThreshold: 100,
   challengeBonusPoints: 15,
   synergyBonusPerNeighbor: 0.5,
@@ -182,6 +198,7 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Medium',
   startingCoins: 6,
   startingReputation: 3,
+  endlessMode: false,
   winThreshold: 120,
   challengeBonusPoints: 10,
   synergyBonusPerNeighbor: 0.35,
@@ -210,6 +227,7 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Hard',
   startingCoins: 4,
   startingReputation: 2,
+  endlessMode: false,
   winThreshold: 150,
   challengeBonusPoints: 8,
   synergyBonusPerNeighbor: 0.25,

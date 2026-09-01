@@ -891,7 +891,11 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
  *
  * Win conditions (checked in order):
  * 1. All challenges complete (activeChallenges.length > 0 and all completed)
- * 2. Score threshold: finalScore >= config.winThreshold
+ * 2. Score threshold: finalScore >= config.winThreshold — unless endless
+ *    mode is enabled (`config.endlessMode === true`, CG-0MTIILU5V006GCN4),
+ *    in which case the threshold sets `endReason` to
+ *    `score_threshold_continue` but keeps `gameResult` as `playing` so
+ *    the player (or players in competitive mode) may continue building.
  * 3. Turn limit (opt-in): turn >= config.maxTurns with positive reputation and
  *    coins >= 0 — only fires when a config explicitly sets `maxTurns`
  *    (default presets impose no turn limit, CG-0MSLXJCHH001DLIO).
@@ -902,7 +906,8 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
  * 3. Turn exhaustion (opt-in): turn >= config.maxTurns and no win condition
  *    met — only fires when a config explicitly sets `maxTurns`.
  *
- * @returns true if a game-ending condition was detected.
+ * @returns true if a game-ending condition was detected (false in endless
+ *          continuation when the score threshold is crossed but play continues).
  */
 export function checkEndConditions(state: MainStreetState): boolean {
   // First check immediate loss conditions
@@ -922,8 +927,40 @@ export function checkEndConditions(state: MainStreetState): boolean {
     return true;
   }
 
-  // Win: score threshold
+  // Score threshold — endless-mode branch (CG-0MTIILU5V006GCN4)
   if (state.finalScore >= state.config.winThreshold) {
+    if (state.config.endlessMode) {
+      // Record the crossing (idempotent: the first crossing sets the
+      // winner-declared signal; subsequent turns keep it).
+      if (state.endReason === null) {
+        // First time the threshold is crossed in this run
+        state.endReason = 'score_threshold_continue';
+        addLog(
+          state,
+          `Threshold crossed (${state.finalScore} pts) — endless mode continues.`,
+          'gain',
+        );
+      } else if (state.endReason === 'score_threshold_continue') {
+        // Already beyond threshold — keep the signal and continue.
+        addLog(
+          state,
+          `Endless mode: score ${state.finalScore} pts (threshold ${state.config.winThreshold}).`,
+          'gain',
+        );
+      } else {
+        // A terminal reason was already set (e.g. all_challenges) —
+        // let that earlier terminal reason stand; no additional log.
+      }
+      // Do NOT end the game when endless mode is on — play continues.
+      // Return false so the caller (processEndOfTurn) proceeds to the
+      // next turn instead of reporting game over.
+      // Exception: if a terminal reason was already set, treat as terminal.
+      // But at this point we only reach here with endReason being null or
+      // score_threshold_continue — any other terminal reason was handled
+      // above (all_challenges). So we keep playing.
+      return false;
+    }
+    // Non-endless (default): threshold wins end the game.
     state.gameResult = 'win';
     state.endReason = 'score_threshold';
     addLog(state, `Victory: Score threshold reached (${state.finalScore} pts)`, 'gain');

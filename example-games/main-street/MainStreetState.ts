@@ -190,9 +190,16 @@ export interface ResourceBank {
 /** Possible game outcomes. */
 export type GameResult = 'playing' | 'win' | 'loss';
 
-/** Reason for game ending. */
+/** Reason for game ending (or threshold continuation in endless mode). */
 export type EndReason =
   | 'score_threshold'
+  // Endless mode (CG-0MTIILU5V006GCN4): threshold reached but play continues
+  // (`config.endlessMode === true`). `gameResult` stays `playing` while
+  // `endReason` records that the threshold was crossed — winner-declared-
+  // but-still-playing. Score keeps accruing and the game only ends via
+  // the remaining conditions (bankruptcy, reputation collapse, all
+  // challenges, turn limit).
+  | 'score_threshold_continue'
   | 'all_challenges'
   | 'turn_limit_victory' // opt-in: only when a config sets maxTurns (CG-0MSLXJCHH001DLIO)
   | 'bankruptcy'
@@ -557,6 +564,16 @@ export interface MainStreetSetupOptions {
    * the full card pool is used (non-campaign / backward-compatible mode).
    */
   unlockedCardIds?: string[];
+  /**
+   * Endless continuation beyond the win threshold (CG-0MTIILU5V006GCN4).
+   *
+   * When true, reaching `config.winThreshold` does NOT end the game.
+   * The engine sets `endReason` to `score_threshold_continue` but keeps
+   * `gameResult` as `playing` so the player can continue building.
+   * Default: `false` (existing behaviour — threshold ends the game).
+   * Overrides `config.endlessMode` from the difficulty preset when set.
+   */
+  endlessMode?: boolean;
 }
 
 // ── Seed Helpers ────────────────────────────────────────────
@@ -900,6 +917,12 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     ownerTaggedGrid: undefined,
     playerCount: undefined,
   };
+  // Endless-mode opt-in (CG-0MTIILU5V006GCN4): overrides the preset's
+  // win-threshold semantics. Default is false (existing behaviour).
+  if (options.endlessMode !== undefined) {
+    baseState.config = { ...baseState.config, endlessMode: options.endlessMode };
+  }
+
   state = baseState;
 
   // Refill the single-row market with its initial composition.
@@ -1296,6 +1319,12 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   // can detect them and fall back to computing from scratch. After any placement or
   // sale, the incremental update system will populate them correctly.
   // No explicit migration needed — undefined is the natural default.
+
+  // ── endlessMode (CG-0MTIILU5V006GCN4): old saves predate the flag; default to false.
+  const savedConfig = saved.config as Record<string, unknown> | undefined;
+  if (savedConfig && !('endlessMode' in savedConfig)) {
+    savedConfig.endlessMode = false;
+  }
 
   // ── ongoingCost: default to 0 for legacy community-space cards ─
   // Added by CG-0MRXYGM9B006I3PE (community-space ongoing costs). Community space
