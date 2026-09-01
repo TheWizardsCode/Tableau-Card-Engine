@@ -45,6 +45,8 @@ interface IncomePhaseSlot {
   pd: SlotPhaseBreakdown;
   card: Phaser.GameObjects.Container;
   handle: CoinGridHandle;
+  /** Coins currently shown in the on-card grid (rounded to 0.5). */
+  displayed: number;
 }
 
 /** MainStreetAnimator -- animation and HUD-delta helper for Main Street scene. */
@@ -408,7 +410,7 @@ export class MainStreetAnimator {
       for (const pd of phaseData) {
         const card = this.findStreetCardContainer(pd.slotIndex);
         if (!card) continue;
-        slots.push({ pd, card, handle: createCoinGrid(s, card) });
+        slots.push({ pd, card, handle: createCoinGrid(s, card), displayed: 0 });
       }
       if (slots.length === 0) return;
 
@@ -526,7 +528,7 @@ export class MainStreetAnimator {
             if (delta > 0) {
               this.flyCoinsIn(slot, amount, this.eventSourcePoint(), at);
             } else {
-              this.flyCoinsOut(slot, icons.fullCoins + (icons.halfCoin ? 1 : 0), this.eventSourcePoint(), at);
+              this.flyCoinsOut(slot, amount, this.eventSourcePoint(), at);
             }
           });
         });
@@ -547,7 +549,7 @@ export class MainStreetAnimator {
             if (d.delta > 0) {
               this.flyCoinsIn(slot, amount, from, at);
             } else {
-              this.flyCoinsOut(slot, icons.fullCoins + (icons.halfCoin ? 1 : 0), from, at);
+              this.flyCoinsOut(slot, amount, from, at);
             }
           }
         });
@@ -621,10 +623,10 @@ export class MainStreetAnimator {
     for (let n = 1; n <= iconCount; n++) {
       s.time.delayedCall(at + (n - 1) * INCOME_BASE_COUNT_STAGGER_MS, () => {
         try {
-          // Intermediate steps show whole-coin amounts; the final step shows
-          // the fractional amount so the half coin renders last.
-          const cumulative = n <= fullCoins ? n : amount;
-          this.revealInGrid(slot, cumulative);
+          // Incrementally add one coin at a time (half coin last) so the
+          // grid accumulates across phases (AC: stay visible until collect).
+          const increment = n <= fullCoins ? 1 : 0.5;
+          this.revealInGrid(slot, roundHalf(slot.displayed + increment));
         } catch { /* ignore */ }
       });
     }
@@ -633,6 +635,7 @@ export class MainStreetAnimator {
   /** Adds the cumulative amount to a slot's grid with a pop-in + coin SFX. */
   private revealInGrid(slot: IncomePhaseSlot, cumulativeAmount: number): void {
     const s = this.scene;
+    slot.displayed = cumulativeAmount;
     const layout = slot.handle.addCoins(cumulativeAmount);
     if (!layout) return;
     const icons = slot.handle.container.list;
@@ -677,9 +680,10 @@ export class MainStreetAnimator {
             onComplete: () => {
               try {
                 visual.destroy();
-                // Cumulative landed amount: whole coins then the fractional
-                // amount (half coin last) — same as the count-out path.
-                this.revealInGrid(slot, i + 1 <= fullCoins ? i + 1 : amount);
+                // Incrementally add one landed coin (half coin last) so
+                // concurrent phases accumulate robustly.
+                const increment = i < fullCoins ? 1 : 0.5;
+                this.revealInGrid(slot, roundHalf(slot.displayed + increment));
               } catch { /* ignore */ }
             },
           });
@@ -689,18 +693,29 @@ export class MainStreetAnimator {
   }
 
   /**
-   * Removes `iconCount` coins from a slot's grid, flying each out toward a
+   * Removes `amount` coins from a slot's grid, flying each out toward a
    * target point where it fades. Used by negative event/upcoming deltas.
-   * Clamps to the coins actually present in the grid.
+   * Clamps to the coins actually present in the grid. The half coin (when
+   * present) is the last icon in the layout so it is removed first.
    */
-  private flyCoinsOut(slot: IncomePhaseSlot, iconCount: number, to: { x: number; y: number }, at: number): void {
+  private flyCoinsOut(slot: IncomePhaseSlot, amount: number, to: { x: number; y: number }, at: number): void {
     const s = this.scene;
     const grid = slot.handle.container;
+    const { fullCoins, halfCoin } = splitCoins(amount);
+    const iconCount = fullCoins + (halfCoin ? 1 : 0);
+    if (iconCount === 0) return;
+    // Decrement sequence: half coin first (0.5) then whole coins (1).
+    const decrements: number[] = [];
+    if (halfCoin) decrements.push(0.5);
+    for (let k = 0; k < fullCoins; k++) decrements.push(1);
     for (let i = 0; i < iconCount; i++) {
       s.time.delayedCall(at + i * INCOME_FLIGHT_STAGGER_MS, () => {
         try {
           const icon = grid.list[grid.list.length - 1] as Phaser.GameObjects.Image | undefined;
           if (!icon) return; // no coins left in the grid to remove
+          // Decrement incrementally from the live displayed total so
+          // concurrent negative deltas accumulate correctly.
+          slot.displayed = roundHalf(Math.max(0, slot.displayed - decrements[i]));
           const m = icon.getWorldTransformMatrix();
           const from = { x: m.getX(0, 0), y: m.getY(0, 0) };
           grid.remove(icon);
