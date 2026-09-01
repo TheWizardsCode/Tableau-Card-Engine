@@ -1338,7 +1338,15 @@ export class HandView {
       const pos = positions[i];
       const rect = this.scene.add.rectangle(pos.x, pos.y, CARD_W, CARD_H, 0x000000, 0);
       rect.setOrigin(0.5, 0.5);
-      rect.setStrokeStyle(2, 0x666666, 0.5);
+      // Rounded ghost slot (radius 8) matching the card texture so the outline
+      // reads as a placeholder — previous 0x666666 at 0.5 blended to #404840
+      // on the #1a2a1a felt and was judged invisible in manual review. White
+      // at 0.45 + faint fill gives empty slots a clear presence.
+      if (typeof (rect as any).setRounded === 'function') {
+        (rect as any).setRounded(8);
+      }
+      rect.setStrokeStyle(2, 0xffffff, 0.45);
+      (rect as any).setFillStyle(0xffffff, 0.06);
       rect.setDepth(i - 0.5);
       this.outlineRects.push(rect as unknown as Phaser.GameObjects.Rectangle);
     }

@@ -111,6 +111,11 @@ function createMockScene(): any {
               rect.rotation = r;
               return rect;
             }),
+            setRounded: vi.fn().mockImplementation((r: number) => {
+              (rect as any).radius = r;
+              (rect as any).isRounded = r > 0;
+              return rect;
+            }),
             setStrokeStyle: vi.fn().mockImplementation((w2: number, c: number, a?: number) => {
               rect.strokeWidth = w2;
               rect.strokeColor = c;
@@ -183,7 +188,7 @@ function getOutlineRects(scene: any): any[] {
     (r: any) =>
       r.active &&
       r.isOutline === true &&
-      r.strokeColor === 0x666666,
+      r.strokeColor === 0xffffff,
   );
 }
 
@@ -262,8 +267,12 @@ describe('HandView position outlines', () => {
     expect(outline.width).toBe(96);
     expect(outline.height).toBe(130);
 
-    // Stroke-only: stroke at 0.5 alpha, no fill
-    expect(outline.strokeAlpha).toBe(0.5);
+    // White outline: 0.45 stroke alpha + faint fill (0.06), rounded corners (radius 8)
+    expect(outline.strokeAlpha).toBe(0.45);
+    expect(outline.strokeColor).toBe(0xffffff);
+    expect((outline as any).radius).toBe(8);
+    expect((outline as any).isRounded).toBe(true);
+    expect(outline.fillAlpha).toBeCloseTo(0.06, 3);
 
     hv.destroy();
   });
