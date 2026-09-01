@@ -354,9 +354,11 @@ describe('GreedyStrategy', () => {
 
   it('ends turn when no beneficial actions are available', () => {
     const state = createTestState();
-    // Remove all market cards and events
+    // Remove all market cards and events, and drain reputation so
+    // neither Community Favour direction is legal (CG-0MT5UPQGX005GWRP).
     state.market.cards = [];
     state.market.cards = [];
+    state.resourceBank.reputation = 0;
     state.hand = [];
     const rng = makeRng();
     const action = GreedyStrategy.chooseAction(state, rng);

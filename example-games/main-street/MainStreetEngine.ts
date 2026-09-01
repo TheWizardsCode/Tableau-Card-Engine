@@ -793,6 +793,8 @@ export function executeCommunityFavour(
   // Sync the ledger so the exchange is visible to other engine systems.
   syncResourceBankToLedger(state);
 
+  // Community Favour is a daily action — consume an action before marking it used.
+  consumeAction(state);
   state.favourUsedThisTurn = true;
   return null;
 }

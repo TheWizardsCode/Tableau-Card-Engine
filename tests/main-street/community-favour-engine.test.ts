@@ -86,13 +86,54 @@ describe('coins-to-rep exchange', () => {
     expect(state.favourUsedThisTurn).toBe(true);
   });
 
-  it('does not decrement actionsRemaining', () => {
+  it('decrements actionsRemaining by 1', () => {
     const state = createTestState();
     const actionsBefore = state.actionsRemaining;
 
     executeAction(state, makeCommunityFavourAction('coins-to-rep'));
 
-    expect(state.actionsRemaining).toBe(actionsBefore);
+    expect(state.actionsRemaining).toBe(actionsBefore - 1);
+  });
+
+  it('decrements bankedActions (capped at 0)', () => {
+    const state = createTestState();
+    const bankedBefore = state.bankedActions ?? 0;
+
+    executeAction(state, makeCommunityFavourAction('coins-to-rep'));
+
+    // consumeAction uses Math.max(0, bankedActions - 1) so it never goes negative.
+    expect(state.bankedActions).toBe(Math.max(0, bankedBefore - 1));
+  });
+});
+
+// ── AC4: No actions remaining → illegal ──────────────────────
+
+describe('No actions remaining throws', () => {
+  it('rejects coins-to-rep when actionsRemaining is 0', () => {
+    const state = createTestState();
+    state.actionsRemaining = 0;
+
+    expect(() =>
+      executeAction(state, makeCommunityFavourAction('coins-to-rep')),
+    ).toThrow('No actions remaining today');
+  });
+
+  it('rejects rep-to-coins when actionsRemaining is 0', () => {
+    const state = createTestState();
+    state.actionsRemaining = 0;
+
+    expect(() =>
+      executeAction(state, makeCommunityFavourAction('rep-to-coins')),
+    ).toThrow('No actions remaining today');
+  });
+
+  it('rejects when actionsRemaining is negative', () => {
+    const state = createTestState();
+    state.actionsRemaining = -1;
+
+    expect(() =>
+      executeAction(state, makeCommunityFavourAction('coins-to-rep')),
+    ).toThrow('No actions remaining today');
   });
 });
 

@@ -144,9 +144,11 @@ describe('generateHint', () => {
 
   it('returns end-turn hint when no action remains (empty market + empty hand)', () => {
     const state = makeMarketState('no-coins');
-    // Drain all coins so no purchase/play is affordable, and clear the market
-    // and hand so the free move-to-hand / discard actions are also unavailable.
+    // Drain all coins and reputation so no purchase/play and no Community Favour
+    // exchange is affordable, and clear the market/hand so even move-to-hand / discard
+    // are unavailable.
     state.resourceBank.coins = 0;
+    state.resourceBank.reputation = 0;
     state.market.cards = [];
     state.hand = [];
     const result = generateHint(state);
@@ -155,15 +157,19 @@ describe('generateHint', () => {
     expect(result!.rationale).toBe('No good buys available -- end your turn');
   });
 
-  it('recommends rep-to-coins Community Favour when stalled with actions spent but reputation available', () => {
+  it('recommends rep-to-coins Community Favour when stalled with actions remaining and reputation available', () => {
     const state = makeMarketState('cf-hint');
-    // Action budget spent and nothing affordable: the free Community Favour
-    // exchange is the only meaningful non-end-turn action left.
-    state.actionsRemaining = 0;
+    // Stalled and nothing affordable, but an action remains: the action-gated
+    // Community Favour exchange is the only meaningful non-end-turn action left.
+    // Hand-block move-to-hand so the stalled fallback is reachable (Greedy picks
+    // move-to-hand at Priority 5 before Community Favour at Priority 9).
+    state.actionsRemaining = 1;
     state.resourceBank.coins = 0;
     state.resourceBank.reputation = 5;
     state.favourUsedThisTurn = false;
-    state.market.cards.forEach(c => { (c as { cost: number }).cost = 10; });
+    // Empty the market so move-to-hand/discard are not enumerated and the
+    // stalled rep-to-coins fallback is reachable (Greedy priority 9).
+    state.market.cards = [];
     state.hand = [];
     const result = generateHint(state);
     expect(result).not.toBeNull();

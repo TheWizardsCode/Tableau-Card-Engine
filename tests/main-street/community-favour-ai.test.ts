@@ -87,16 +87,18 @@ describe('enumerateLegalActions: Community Favour', () => {
     expect(favourActions(enumerateLegalActions(state))).toHaveLength(0);
   });
 
-  it('stays available even when the daily action budget is spent (free action)', () => {
+  it('is NOT available when the daily action budget is spent (now costs an action)', () => {
     const state = createTestState();
     state.resourceBank.coins = 100;
     state.resourceBank.reputation = 100;
     state.favourUsedThisTurn = false;
     state.actionsRemaining = 0;
 
+    // Community Favour now consumes an action, so it should NOT be available
+    // when actionsRemaining === 0 (consumeAction would throw).
     const favs = favourActions(enumerateLegalActions(state));
-    expect(favs.length).toBeGreaterThan(0);
-    // end-turn also present so the AI loop still terminates.
+    expect(favs.length).toBe(0);
+    // end-turn still present so the AI loop terminates.
     expect(enumerateLegalActions(state).some(a => a.type === 'end-turn')).toBe(true);
   });
 });
@@ -180,13 +182,18 @@ describe('scoreAction: Community Favour', () => {
 // ── AC3/AC4: AI executes the favour fallback without stalling ──
 
 describe('AI Community Favour integration', () => {
-  it('an AI turn in an unaffordable market makes progress via Community Favour', () => {
+  it('an AI turn without move options makes progress via Community Favour', () => {
     const state = createTestState();
-    // Deplete coins so no market purchase is affordable, but keep reputation.
+    // Deplete coins so no market purchase is affordable.
     state.resourceBank.coins = 0;
     state.resourceBank.reputation = 100;
     state.favourUsedThisTurn = false;
-    state.actionsRemaining = 1;
+    // Start with 2 actions: one for Community Favour, one for end-turn.
+    state.actionsRemaining = 2;
+    // Empty the market and hand so the AI is genuinely stalled at
+    // Community Favour priority (no purchases/plays/moves to outrank it).
+    state.market.cards = [];
+    state.hand = [];
 
     const beforeCoins = state.resourceBank.coins;
     const aiPlayer = new MainStreetAiPlayer(GreedyStrategy, createSeededRng(1234));
@@ -204,8 +211,8 @@ describe('AI Community Favour integration', () => {
       safety += 1;
     }
 
-    // The AI should have used Community Favour to gain coins (free fallback),
-    // setting the gate, rather than stalling with nothing productive.
+    // The AI should have used Community Favour to gain coins (action-gated
+    // fallback), setting the gate, rather than stalling with nothing to do.
     expect(state.favourUsedThisTurn).toBe(true);
     expect(state.resourceBank.coins).toBeGreaterThan(beforeCoins);
     expect(state.resourceBank.coins).toBe(

@@ -287,14 +287,13 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   const emptySlots = getEmptySlots(state);
 
   // ── Community Favour (CG-0MSTOATDQ005XDET) ────────────────
-  // A FREE once-per-turn resource exchange (does not consume actionsRemaining),
-  // so it stays available even when the daily action budget is spent — as a
-  // fallback when the player cannot afford any market purchase. Legal only
+  // A once-per-turn resource exchange that consumes one action, so it is
+  // only offered when the daily action budget is not exhausted. Legal only
   // during MarketPhase, once per turn, and when the input resource suffices.
   if (
     state.phase === 'MarketPhase' &&
     !state.favourUsedThisTurn &&
-    state.actionsRemaining >= 0
+    state.actionsRemaining > 0
   ) {
     if (state.resourceBank.coins >= state.config.favourCoinsToRepCost) {
       actions.push({ type: 'community-favour', direction: 'coins-to-rep' });
@@ -585,7 +584,7 @@ export const GreedyStrategy: MainStreetAiStrategy = {
     }
 
     // Priority 9: Community Favour fallback (CG-0MSTOATDQ005XDET).
-    // A FREE once-per-turn exchange, reached only when nothing more
+    // An action-gated once-per-turn exchange, reached only when nothing more
     // productive is available (no purchases/plays/moves). Only fires when
     // the best favour action is genuinely value-creating (score > 1:
     // e.g. rep-to-coins when cash-strapped). Neutral conversions (score 1)
@@ -866,7 +865,7 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       // below most productive actions.
       return 1;
     case 'community-favour':
-      // Community Favour (CG-0MSTOATDQ005XDET): a free fallback when the
+      // Community Favour (CG-0MSTOATDQ005XDET): an action-gated fallback when the
       // player cannot afford purchases. rep-to-coins is genuinely valuable
       // only when the player is STALLED (cannot afford the cheapest market
       // card) AND the conversion leaves a reputation buffer (reputation
@@ -880,8 +879,7 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
         // (reputation after the exchange stays >= 1) — burning the last
         // reputation would trigger reputation-collapse loss.
         if (
-          Number.isFinite(cheapestCardCost) &&
-          state.resourceBank.coins < cheapestCardCost &&
+          (cheapestCardCost === Infinity || state.resourceBank.coins < cheapestCardCost) &&
           state.resourceBank.reputation >= state.config.favourRepToCoinsRepCost + 1
         ) {
           return 3; // useful fallback when stalled with rep to spare
