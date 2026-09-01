@@ -168,6 +168,8 @@ export class GymHandPileScene extends GymSceneBase {
   private dragEnabled: boolean = true;
   private dragLabel!: Phaser.GameObjects.Text;
   private dragButton!: Phaser.GameObjects.Text;
+  private outlinesButton!: Phaser.GameObjects.Text;
+  private outlinesEnabled: boolean = true;
 
   constructor() {
     super({ key: GYM_HAND_PILE_KEY });
@@ -197,6 +199,8 @@ export class GymHandPileScene extends GymSceneBase {
       showLabels: false,
       maxRotationDegrees: this.ROTATION_DEGREES_DEFAULT,
       reducedMotion: this.reducedMotion,
+      showPositionOutlines: true,
+      maxSlots: HAND_SIZE + 2,
     });
 
     // Wire selection click handler
@@ -265,19 +269,19 @@ export class GymHandPileScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'Demonstrates HandView and PileView reusable UI components for card movement, selection, and animation. These components provide draggable hands, arc layouts, pile management, and a rich set of card animations (deal, discard, flip, move tween, illegal-move shake). In a real game like Golf or Lost Cities, HandView renders the player hand and PileView shows draw/discard piles with click-to-interact support.'
+        body: 'Demonstrates HandView and PileView reusable UI components for card movement, selection, and animation. These components provide draggable hands, arc layouts, pile management, and a rich set of card animations (deal, discard, flip, move tween, illegal-move shake). Ghost position outlines (stroke-only rectangles, depth index−0.5) render behind every card and empty slot so players always see hand capacity, even in an empty hand when maxSlots is set. In a real game like Golf or Lost Cities, HandView renders the player hand and PileView shows draw/discard piles with click-to-interact support.'
       },
       {
         heading: 'Controls',
-        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile (animates based on mode).\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Disable Drag ] / [ Enable Drag ]: Toggle drag-and-drop mode (ON by default). When enabled, drag a card from hand to the discard pile. When disabled, click a card to select it, then click the discard pile to discard it.\n[ Toggle Discard Mode ]: Switch between animate (move+flip to discard pile, default) and shrink (fade+shrink in place).\n[ Toggle Face Up ]: Toggle the discard pile between face-up and face-down display. The order of cards is preserved — only the visible face changes.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\nRaise slider: Adjust how far the selected card lifts out of the hand (default 60px, max 180px; 0 = off). The raise follows the card rotation in arc layout (straight up at 0°); in vertical cascade the selected card shifts right by the slider amount.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
+        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile (animates based on mode).\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Disable Drag ] / [ Enable Drag ]: Toggle drag-and-drop mode (ON by default). When enabled, drag a card from hand to the discard pile. When disabled, click a card to select it, then click the discard pile to discard it.\n[ Toggle Discard Mode ]: Switch between animate (move+flip to discard pile, default) and shrink (fade+shrink in place).\n[ Toggle Face Up ]: Toggle the discard pile between face-up and face-down display. The order of cards is preserved — only the visible face changes.\n[ Outlines ON/OFF ]: Toggle the ghost card-position outlines. When ON, semi-transparent stroke-only outlines render behind every card and empty slot (maxSlots=HAND_SIZE+2). Press again to hide.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\nRaise slider: Adjust how far the selected card lifts out of the hand (default 60px, max 180px; 0 = off). The raise follows the card rotation in arc layout (straight up at 0°); in vertical cascade the selected card shifts right by the slider amount.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
       },
       {
         heading: 'Usage Example',
-        body: 'In a game of Golf, the player needs to draw from a deck, discard unwanted cards, and flip face-down cards. The animated draw and discard demonstrated here show how cards arc-visually move between piles, while the flip animation reveals hidden cards. The illegal-move shake provides instant feedback when the player tries an invalid action like drawing from an empty pile.'
+        body: 'In a game of Golf, the player needs to draw from a deck, discard unwanted cards, and flip face-down cards. The animated draw and discard demonstrated here show how cards arc-visually move between piles, while the flip animation reveals hidden cards. The illegal-move shake provides instant feedback when the player tries an invalid action like drawing from an empty pile. Ghost position outlines show every slot in the tableau even before cards are dealt, so the player can always see hand capacity.'
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card animates to discard pile (animate mode by default)\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Toggle Discard Mode ] → switches to shrink mode\n9. Press [ Discard ] → card fades+shrinks in place (shrink mode)\n10. Press [ Toggle Discard Mode ] → switches back to animate mode\n11. Verify drag is ON by default → drag a card from hand to discard pile, verify log shows acceptance\n12. Press [ Disable Drag ] → drag off; click a card then the discard pile to discard it\n13. Adjust Arc slider → hand curvature changes live\n14. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n15. Press [ Toggle Face Up ] → discard pile shows face-down; press again → face-up\n16. Adjust Raise slider → selected card lifts out of the hand (horizontal: straight up at 0° rotation); select an edge card and verify the raise follows the rotation; switch to vertical cascade and verify the selected card shifts right\n17. Press [ Reset ] → new hand dealt, all state cleared, raise resets to the 60px default, face-up state resets to face-up'
+        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card animates to discard pile (animate mode by default)\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Toggle Discard Mode ] → switches to shrink mode\n9. Press [ Discard ] → card fades+shrinks in place (shrink mode)\n10. Press [ Toggle Discard Mode ] → switches back to animate mode\n11. Verify drag is ON by default → drag a card from hand to discard pile, verify log shows acceptance\n12. Press [ Disable Drag ] → drag off; click a card then the discard pile to discard it\n13. Adjust Arc slider → hand curvature changes live\n14. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n15. Press [ Toggle Face Up ] → discard pile shows face-down; press again → face-up\n16. Adjust Raise slider → selected card lifts out of the hand (horizontal: straight up at 0° rotation); select an edge card and verify the raise follows the rotation; switch to vertical cascade and verify the selected card shifts right\n17. Press [ Reset ] → new hand dealt, all state cleared, raise resets to the 60px default, face-up state resets to face-up\n18. Verify outlines ON by default → semi-transparent 2px outlines render behind every card slot (5 cards + 2 empty slots)\n19. Press [ Outlines OFF ] → outlines disappear; drag label shows Outlines: OFF\n20. Press [ Outlines ON ] → outlines re-appear at current layout positions\n21. Toggle layout to vertical cascade → outlines cascade vertically and reposition correctly'
       }
     ]);
 
@@ -306,10 +310,11 @@ export class GymHandPileScene extends GymSceneBase {
     this.buttonBar!.addButton('[ Toggle Discard Mode ]', () => this.toggleDiscardMode(), { zone: 'center' });
     this.buttonBar!.addButton('[ Toggle Face Up ]', () => this.toggleDiscardFaceUp(), { zone: 'right' });
     this.buttonBar!.addButton('[ Toggle Layout ]', () => this.toggleLayoutDirection(), { zone: 'right' });
+    this.outlinesButton = this.buttonBar!.addButton('[ Outlines ON ]', () => this.toggleOutlines(), { zone: 'right' });
 
     // Status/info line below the buttons — never overlaps the buttons.
     const infoY = HAND_INFO_Y;
-    this.dragLabel = createHudText(this, HAND_DRAG_LABEL_X, infoY, 'Drag: ON  (drag card to the discard pile)', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
+    this.dragLabel = createHudText(this, HAND_DRAG_LABEL_X, infoY, 'Drag: ON  (drag card to the discard pile)  |  Outlines: ON', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
     this.discardModeLabel = createHudText(this, HAND_DISCARD_MODE_LABEL_X, infoY, 'Discard: animate', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
     this.faceUpLabel = createHudText(this, HAND_FACE_UP_LABEL_X, infoY, 'Face: up', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
     this.layoutLabel = createHudText(this, HAND_LAYOUT_LABEL_X, infoY, 'Layout: horizontal', '#88ff88', { fontSize: HAND_LAYOUT_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
@@ -990,6 +995,17 @@ export class GymHandPileScene extends GymSceneBase {
     this.applyDragState();
   }
 
+  private toggleOutlines(): void {
+    this.outlinesEnabled = !this.outlinesEnabled;
+    this.handView.setShowPositionOutlines(this.outlinesEnabled);
+    this.outlinesButton.setText(this.outlinesEnabled ? '[ Outlines ON ]' : '[ Outlines OFF ]');
+    this.dragLabel.setText(
+      `Drag: ${this.dragEnabled ? 'ON  (drag card to the discard pile)' : 'off  (click card, then click discard pile)'}  |  Outlines: ${this.outlinesEnabled ? 'ON' : 'OFF'}`,
+    );
+    this.dragLabel.setColor(this.outlinesEnabled ? '#88ff88' : '#777777');
+    this.logEvent(`Position outlines ${this.outlinesEnabled ? 'ON' : 'OFF'}`);
+  }
+
   /**
    * Apply the current dragEnabled state to HandView and the demo UI.
    *
@@ -1001,15 +1017,15 @@ export class GymHandPileScene extends GymSceneBase {
 
     if (this.dragEnabled) {
       this.dragButton.setText('[ Disable Drag ]');
-      this.dragLabel.setText('Drag: ON  (drag card to the discard pile)');
-      this.dragLabel.setColor('#88ff88');
+      this.dragLabel.setText(`Drag: ON  (drag card to the discard pile)  |  Outlines: ${this.outlinesEnabled ? 'ON' : 'OFF'}`);
+      this.dragLabel.setColor(this.outlinesEnabled ? '#88ff88' : '#777777');
       // Validator always returns true — the scene decides what to do in dragend
       this.handView.setDragValidator(() => true);
       this.logEvent('Drag mode ON — cards are draggable to the discard pile');
     } else {
       this.dragButton.setText('[ Enable Drag ]');
-      this.dragLabel.setText('Drag: off  (click card, then click discard pile)');
-      this.dragLabel.setColor('#777777');
+      this.dragLabel.setText(`Drag: off  (click card, then click discard pile)  |  Outlines: ${this.outlinesEnabled ? 'ON' : 'OFF'}`);
+      this.dragLabel.setColor(this.outlinesEnabled ? '#88ff88' : '#777777');
       this.handView.setDragValidator(null);
       this.handView.setSelected(null);
       this.clearHighlights();
@@ -1160,6 +1176,7 @@ export class GymHandPileScene extends GymSceneBase {
     try { this.layoutLabel?.destroy(); } catch (_) { /* ignore */ }
     try { this.dragLabel?.destroy(); } catch (_) { /* ignore */ }
     try { this.dragButton?.destroy(); } catch (_) { /* ignore */ }
+    try { this.outlinesButton?.destroy(); } catch (_) { /* ignore */ }
     try { this.discardModeLabel?.destroy(); } catch (_) { /* ignore */ }
     try { this.faceUpLabel?.destroy(); } catch (_) { /* ignore */ }
 

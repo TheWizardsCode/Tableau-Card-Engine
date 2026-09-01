@@ -207,6 +207,18 @@ export interface HandViewOptions {
    * @default undefined (use baseX-derived centre)
    */
   centerX?: number;
+
+  /**
+   * Whether to render ghost card-position outlines behind cards.
+   * @default false
+   */
+  showPositionOutlines?: boolean;
+
+  /**
+   * Total number of slots to outline when `showPositionOutlines` is true.
+   * When omitted, outlines render one per current card.
+   */
+  maxSlots?: number;
 }
 
 /** Options for the {@link HandView.addCard} method. */
@@ -417,6 +429,15 @@ export class HandView {
   /** Whether this HandView instance has been destroyed. */
   public destroyed: boolean = false;
 
+  /** Whether to render ghost card-position outlines. */
+  private showPositionOutlines: boolean = false;
+
+  /** Total slots to outline (or undefined = card count). */
+  private maxSlots: number | undefined;
+
+  /** Outline rectangles (stroke-only ghost slots). */
+  private outlineRects: Phaser.GameObjects.Rectangle[] = [];
+
   /** Maximum rotation (degrees) applied proportionally based on card offset from centre. */
   private maxRotationDegrees: number = 0;
 
@@ -499,6 +520,8 @@ export class HandView {
     this._renderCardFn = opts.renderCard;
     this._customHoverFn = opts.customHoverFn;
     this._customClickFn = opts.customClickFn;
+    this.showPositionOutlines = opts.showPositionOutlines ?? false;
+    this.maxSlots = opts.maxSlots;
     // If renderCard is provided, also set cardType to 'custom'
     // so that the existing texture resolution path is bypassed.
     if (opts.renderCard) {
@@ -974,6 +997,35 @@ export class HandView {
   }
 
   /**
+   * Toggle display of semi-transparent card-position outlines behind cards.
+   */
+  setShowPositionOutlines(enabled: boolean): void {
+    if (enabled === this.showPositionOutlines) return;
+    this.showPositionOutlines = enabled;
+    this._rebuildOutlines();
+  }
+
+  /** Whether position outlines are currently enabled. */
+  getShowPositionOutlines(): boolean {
+    return this.showPositionOutlines;
+  }
+
+  /**
+   * Update the maximum number of outline slots. Use `undefined` to fall
+   * back to one outline per current card.
+   */
+  setMaxSlots(maxSlots: number | undefined): void {
+    if (maxSlots === this.maxSlots) return;
+    this.maxSlots = maxSlots;
+    if (this.showPositionOutlines) this._rebuildOutlines();
+  }
+
+  /** Current maximum outline slot count. */
+  getMaxSlots(): number | undefined {
+    return this.maxSlots;
+  }
+
+  /**
    * Set arc radius for hand layout.
    * `0` means straight horizontal layout at `baseY`.
    */
@@ -1221,11 +1273,101 @@ export class HandView {
     }
   }
 
+  // ── Outline helpers ─────────────────────────────────────
+
+  /** Number of outline slots to render. */
+  private _outlineCount(): number {
+    if (!this.showPositionOutlines) return 0;
+    if (this.maxSlots !== undefined) return Math.max(0, this.maxSlots);
+    return this.cards.length;
+  }
+
+  /** Compute centre positions for outline rectangles. */
+  private _computeOutlinePositions(): Array<{ x: number; y: number }> {
+    const count = this._outlineCount();
+    if (count === 0) return [];
+
+    if (this.layoutDirection === 'vertical') {
+      return Array.from({ length: count }, (_, i) => ({
+        x: this.baseX,
+        y: this.baseY + i * this.spacing,
+      }));
+    }
+
+    const gap = this.spacing - this.cardWidth;
+    const centerX = this._centerX ?? this.baseX;
+    const { positions } = layoutCardPositions({
+      count,
+      cardWidth: this.cardWidth,
+      gap,
+      centerX,
+      maxWidth: this.maxWidth,
+    });
+    const xs =
+      positions.length > 0
+        ? positions
+        : Array.from({ length: count }, (_, i) => this.baseX + i * this.spacing);
+
+    if (this.arcRadius <= 0 || xs.length < 3) {
+      return xs.map((x) => ({ x, y: this.baseY }));
+    }
+
+    const first = xs[0];
+    const last = xs[xs.length - 1];
+    const arcCenterX = (first + last) / 2;
+    const halfSpan = Math.max((last - first) / 2, 1);
+    return xs.map((x) => {
+      const normalized = (x - arcCenterX) / halfSpan;
+      const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
+      return { x, y: this.baseY - offsetY };
+    });
+  }
+
+  /** Destroy old outlines and create new ones at current positions. */
+  private _rebuildOutlines(): void {
+    for (const r of this.outlineRects) {
+      try {
+        r.destroy();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    this.outlineRects = [];
+    const positions = this._computeOutlinePositions();
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      const rect = this.scene.add.rectangle(pos.x, pos.y, CARD_W, CARD_H, 0x000000, 0);
+      rect.setOrigin(0.5, 0.5);
+      rect.setStrokeStyle(2, 0x666666, 0.5);
+      rect.setDepth(i - 0.5);
+      this.outlineRects.push(rect as unknown as Phaser.GameObjects.Rectangle);
+    }
+  }
+
+  /** Reposition existing outlines; rebuilds if count changed. */
+  private _updateOutlinePositions(): void {
+    if (!this.showPositionOutlines) return;
+    const positions = this._computeOutlinePositions();
+    if (positions.length !== this.outlineRects.length) {
+      this._rebuildOutlines();
+      return;
+    }
+    for (let i = 0; i < positions.length && i < this.outlineRects.length; i++) {
+      const rect = this.outlineRects[i];
+      if (!rect || !(rect as any).active) continue;
+      (rect as any).setPosition(positions[i].x, positions[i].y);
+      (rect as any).setDepth(i - 0.5);
+    }
+  }
+
   /** Clear and recreate all card sprites and labels. */
   private rebuildDisplay(): void {
     this.clearDisplay();
 
-    if (this.cards.length === 0) return;
+    if (this.cards.length === 0) {
+      this._rebuildOutlines();
+      return;
+    }
 
     const positions = this.computeCardPositions();
     this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
@@ -1269,6 +1411,7 @@ export class HandView {
 
     // Apply the selection-raise offset instantly to the fresh sprites.
     this.applySelectionRaise(false);
+    this._rebuildOutlines();
   }
 
   /**
@@ -1513,7 +1656,11 @@ export class HandView {
 
   /** Apply current layout to existing display objects. */
   private applyLayout(): void {
-    if (this.sprites.length === 0 || this.cards.length === 0) return;
+    const hasSprites = this.sprites.length > 0 && this.cards.length > 0;
+    if (!hasSprites) {
+      this._updateOutlinePositions();
+      return;
+    }
 
     const positions = this.computeCardPositions();
     this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
@@ -1555,6 +1702,8 @@ export class HandView {
     // Update tint overlay positions to stay aligned with repositioned sprites
     this._updateTintOverlayPositions();
 
+    this._updateOutlinePositions();
+
     // Re-apply the selection raise on top of the new base positions.
     this.applySelectionRaise(false);
   }
@@ -1576,6 +1725,11 @@ export class HandView {
     }
     this._tintOverlays = [];
     this._basePositions = [];
+
+    for (const r of this.outlineRects) {
+      try { r.destroy(); } catch (_) { /* ignore */ }
+    }
+    this.outlineRects = [];
   }
 
   // ── Canvas-compatible tint overlay helpers ───────────────
