@@ -2171,3 +2171,43 @@ export function hireStaffCard(state: MainStreetState, cardId: string): PurchaseR
   purchaseStaffCard(state, cardId);
   return { card, cost: card.cost, refilled: false };
 }
+
+// ── Employment-capacity helpers (CG-0MSTOATDU006UGAX) ──────
+
+/**
+ * Returns the maximum number of staff members that may be employed at the
+ * given street-grid slot (business level 0 → 1 slot, +1 per level).
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street-grid slot index.
+ * @returns Maximum employment slots for that business (≥ 1).
+ */
+export function getEmploymentCapacity(state: MainStreetState, slotIndex: number): number {
+  const business = state.streetGrid[slotIndex];
+  if (!business || business.family !== 'business') return 1;
+  return Math.max(1, (business.level ?? 0) + 1);
+}
+
+/**
+ * Counts how many staff members are currently employed at the given
+ * street-grid slot (employedAtSlot === slotIndex).
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street-grid slot index.
+ * @returns Number of employed staff at that slot.
+ */
+export function getEmployedStaffCountAt(state: MainStreetState, slotIndex: number): number {
+  return (state.staffCards ?? []).filter(m => m.employedAtSlot === slotIndex).length;
+}
+
+/**
+ * Checks whether the business at the given slot has at least one free
+ * employment slot (employed count < capacity).
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street-grid slot index.
+ * @returns True when the business can accept another staff member.
+ */
+export function hasFreeEmploymentSlot(state: MainStreetState, slotIndex: number): boolean {
+  return getEmployedStaffCountAt(state, slotIndex) < getEmploymentCapacity(state, slotIndex);
+}

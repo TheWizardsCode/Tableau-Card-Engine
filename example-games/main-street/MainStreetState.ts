@@ -445,6 +445,25 @@ export interface MainStreetState {
   activePlayerId?: number | null;
   /** Winning player in competitive mode (first-to-threshold). null while playing or in single-player. */
   competitiveWinnerId?: number | null;
+  /**
+   * Pending staff applicant for the current day (CG-0MSTOATDU006UGAX).
+   * Populated during DayStart when the applicant trigger fires and a business
+   * has a free employment slot. The scene renders the applicant overlay and
+   * resolves it via hireStaffApplicant or declineStaffApplicant.
+   * Cleared on hire, decline, or at the next DayStart.
+   */
+  pendingApplicant: PendingApplicant | null;
+}
+
+/**
+ * A staff applicant triggered at DayStart, awaiting the player's hire or
+ * decline decision (CG-0MSTOATDU006UGAX).
+ */
+export interface PendingApplicant {
+  /** The staff card template offered to the player. */
+  card: StaffCard;
+  /** Street-grid slot index where the business has a free employment slot. */
+  targetSlotIndex: number;
 }
 
 export interface MainStreetSerializedState {
@@ -551,6 +570,8 @@ export interface MainStreetSerializedState {
   activePlayerId?: number | null;
   /** Winning player in competitive mode (first-to-threshold). */
   competitiveWinnerId?: number | null;
+  /** Pending staff applicant for the current day (CG-0MSTOATDU006UGAX). */
+  pendingApplicant: PendingApplicant | null;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -970,6 +991,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     playerCount: undefined,
     activePlayerId: undefined,
     competitiveWinnerId: undefined,
+    pendingApplicant: null,
   };
   // Endless-mode opt-in (CG-0MTIILU5V006GCN4): overrides the preset's
   // win-threshold semantics. Default is false (existing behaviour).
@@ -1131,6 +1153,9 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     playerCount: state.playerCount,
     activePlayerId: state.activePlayerId ?? null,
     competitiveWinnerId: state.competitiveWinnerId ?? null,
+    pendingApplicant: state.pendingApplicant
+      ? { card: structuredClone(state.pendingApplicant.card), targetSlotIndex: state.pendingApplicant.targetSlotIndex }
+      : null,
   };
 }
 
@@ -1534,6 +1559,11 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     playerCount: (saved as unknown as { playerCount?: number })?.playerCount,
     activePlayerId: (saved as unknown as { activePlayerId?: number | null })?.activePlayerId ?? null,
     competitiveWinnerId: (saved as unknown as { competitiveWinnerId?: number | null })?.competitiveWinnerId ?? null,
+    pendingApplicant: (saved as unknown as { pendingApplicant?: { card: StaffCard; targetSlotIndex: number } | null })?.pendingApplicant
+      ? { card: structuredClone((saved as unknown as { pendingApplicant: { card: StaffCard; targetSlotIndex: number } }).pendingApplicant!.card),
+          targetSlotIndex: (saved as unknown as { pendingApplicant: { card: StaffCard; targetSlotIndex: number } }).pendingApplicant!.targetSlotIndex,
+        }
+      : null,
   };
 
   return state;
