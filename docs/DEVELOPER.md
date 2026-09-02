@@ -2618,6 +2618,48 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   - `src/ui/debug/AiDecisionRecorder.ts` — Recording singleton
   - `src/ui/debug/AiDecisionOverlay.ts` — Display overlay
 
+#### Market Card Cheat (Main Street only)
+
+- **Label:** "Market Card Cheat"
+- **Location:** Debug Tools section of the Settings panel — appears only in
+  `MainStreetScene` (injected via a Main-Street-specific override of
+  `CardGameScene.initSettingsPanel`; other example games do not show it).
+  Visible only when running under `npm run dev` (`import.meta.env.DEV === true`).
+- **Function:** Replaces a random card in the 3-card market row with any card
+  from the live Main Street pool (all 5 families — Business, Community Space,
+  Event, Upgrade, Staff — derived from the CSV-backed template registry in
+  `MainStreetCards.ts`). The picker provides:
+  - **Type filter:** Checkboxes for one or more families (composes as an
+    intersection with the text filter, `type ∩ text`).
+  - **Title filter:** A text field that filters by case-insensitive substring
+    against the card display name; clearing it restores the full grouped list.
+  - **Mouse + keyboard:** Click a card to select-and-confirm, or use
+    Arrow Up/Down to move focus and Enter to confirm; a pinned
+    `[ Replace Market Slot ]` button in the dialog footer also confirms the
+    highlighted card. `Escape` dismisses the overlay. A DOM input at the top
+    of the dialog holds keyboard focus on open.
+  - **Market replacement:** On confirm a uniformly-random slot from
+    `state.market.cards` is replaced with a freshly-instantiated card
+    (`${templateId}--cheat-<nonce>` unique id; business/community-space fields
+    like level/bonuses are reset), the displaced card is returned to its
+    family's discard pile, and the market row re-renders via the existing renderer path
+    (`refreshMarket` / `refreshAll`). The operation is a direct state mutation
+    and goes through the normal deck/discard lifecycle so save/load, transcript
+    recording, and subsequent market refills continue to work.
+- **When to use:** Force a rare or tier-gated card into the market to reproduce
+  synergy, progression-gating, economy, or staff-skill edge cases without
+  manipulating saves or seeds. Open the Settings panel (gear icon) → scroll to
+  Debug Tools → click **Market Card Cheat** → pick a card → Replace.
+- **Implementation:**
+  - `src/ui/debug/MarketCardCheatOverlay.ts` — Overlay, picker, filtering
+    (`filterEntries()`), keyboard navigation, and `createMarketCardCheatTool()`
+    factory (label/description matched to the acceptance criteria).
+  - `example-games/main-street/MainStreetMarket.ts` — `cheatReplaceMarketCard()`
+    helper that performs the random-slot replacement and discard routing.
+  - `example-games/main-street/scenes/MainStreetScene.ts` — Dev-gated wiring
+    (`import.meta.env.DEV` branch in `initSettingsPanel`) so the tool is
+    absent/tree-shaken from production bundles.
+
 ### Adding a New Debug Tool
 
 Adding a new debug tool requires minimal code:
@@ -2689,6 +2731,8 @@ To verify production safety:
 | `src/ui/debug/GameEventLogOverlay.ts` | Game event log overlay |
 | `src/ui/debug/AiDecisionRecorder.ts` | AI decision recording singleton |
 | `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
+| `src/ui/debug/MarketCardCheatOverlay.ts` | Market Card Cheat overlay (Main Street market-replacement picker) |
+| `example-games/main-street/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
 | `src/ui/debug/index.ts` | Debug tools barrel file |
 | `src/ui/CardGameScene.ts` | Default debug tool registration |
 | `src/ui/SettingsPanel.ts` | Debug section rendering in Settings panel |
