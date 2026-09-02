@@ -22,6 +22,7 @@ import {
   REFRESH_MARKET_COST,
 } from './MainStreetCards';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale, hasAdjacentSameType } from './MainStreetAdjacency';
+import { roundInt } from './MainStreetDifficulty';
 import {
   computeRefreshCostDiscount,
   getEmployedSpecializationSkills,
@@ -815,8 +816,8 @@ export function buyAndPlaceUpgrade(
 
   const business = state.streetGrid[businessIndex]!;
 
-  // Calculate +50% premium (CG-0MT3IYSRL001VVUP): round up to nearest 0.5
-  const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+  // Calculate +50% premium (CG-0MT3IYSRL001VVUP) — integer-rounded (AC3)
+  const premiumCost = Math.ceil(card.cost * 1.5);
   if (state.resourceBank.coins < premiumCost) {
     throw new Error(`Not enough coins to buy-and-place ${card.name} at premium. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
   }
@@ -1110,7 +1111,7 @@ export function computeSellRefund(
     : undefined;
   let effectiveBase = card.baseIncome + card.incomeBonus;
   if (hasAdjacentSameType(state.streetGrid, slotIndex, soldSlots, gridDims)) {
-    effectiveBase = effectiveBase * 0.6;
+    effectiveBase = roundInt(effectiveBase * 0.6);
   }
 
   // Synergy income component: the portion of currentIncome above effectiveBase

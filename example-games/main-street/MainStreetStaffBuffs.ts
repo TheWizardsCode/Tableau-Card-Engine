@@ -15,16 +15,16 @@
  *
  * Skill → effect mapping follows the CG-0MT1CIWSD003VBPK catalog:
  * - Income: skill-chef (+20% Food), skill-dj (+20% Entertainment),
- *   skill-sales-champion (+0.5 Commerce per turn); skill-networker and
+ *   skill-sales-champion (+50 Commerce per turn); skill-networker and
  *   skill-tech-guru are adjacency-scoped and NOT part of the per-business
  *   income profile.
- * - Reputation: skill-community-builder (+0.1 all), skill-pr-strategist
- *   (+0.15 Service); skill-brand-ambassador is a +50% event-source
+ * - Reputation: skill-community-builder (+10 all), skill-pr-strategist
+ *   (+15 Service); skill-brand-ambassador is a +50% event-source
  *   multiplier (incidents/investments), exposed separately.
  * - Costs: skill-cost-cutter (-15% street-wide ongoing), skill-negotiator
- *   (-1 refresh), skill-operations-manager (-0.5 staff salary).
+ *   (-100 refresh), skill-operations-manager (-50 staff salary).
  * - Incidents: skill-quality-inspector (-30% coin), skill-compliance
- *   (-0.5 rep), skill-risk-manager (-15% probability), skill-security-
+ *   (-50 rep), skill-risk-manager (-15% probability), skill-security-
  *   consultant (theft/loss immunity on the home business).
  *
  * @module
@@ -53,7 +53,7 @@ export interface BusinessBuffProfile {
 
 /** Income buffs for one business. */
 export interface IncomeSkillBuffs {
-  /** Flat coins added per turn (e.g. Sales Champion +0.5). */
+  /** Flat coins added per turn (e.g. Sales Champion +50). */
   readonly flat: number;
   /** Fractional multiplier on pre-skill income (0.2 = +20%). */
   readonly percent: number;
@@ -61,7 +61,7 @@ export interface IncomeSkillBuffs {
 
 /** Reputation buffs for one business. */
 export interface ReputationSkillBuffs {
-  /** Flat reputation added per turn (e.g. Community Builder +0.1). */
+  /** Flat reputation added per turn (e.g. Community Builder +10). */
   readonly flat: number;
 }
 
@@ -75,7 +75,7 @@ export interface OngoingCostSkillBuffs {
 export interface IncidentSkillBuffs {
   /** Fraction of incident coin damage removed (0.3 = -30%). */
   readonly coinDamageReductionPct: number;
-  /** Flat incident reputation damage removed (0.5). */
+  /** Flat incident reputation damage removed (50). */
   readonly reputationDamageReductionFlat: number;
   /** Fraction of incident probability removed (0.15 = -15%). */
   readonly probabilityReductionPct: number;
@@ -95,14 +95,14 @@ export interface PerBusinessSkillBuffs {
 
 export const CHEF_INCOME_BOOST_PCT = 0.2;
 export const DJ_INCOME_BOOST_PCT = 0.2;
-export const SALES_CHAMPION_FLAT = 0.5;
-export const COMMUNITY_BUILDER_REP = 0.1;
-export const PR_STRATEGIST_REP = 0.15;
+export const SALES_CHAMPION_FLAT = 50;
+export const COMMUNITY_BUILDER_REP = 10;
+export const PR_STRATEGIST_REP = 15;
 export const COST_CUTTER_ONGOING_PCT = 0.15;
-export const NEGOTIATOR_REFRESH_DISCOUNT = 1;
-export const OPERATIONS_MANAGER_SALARY_DISCOUNT = 0.5;
+export const NEGOTIATOR_REFRESH_DISCOUNT = 100;
+export const OPERATIONS_MANAGER_SALARY_DISCOUNT = 50;
 export const QUALITY_INSPECTOR_COIN_PCT = 0.3;
-export const COMPLIANCE_REP_FLAT = 0.5;
+export const COMPLIANCE_REP_FLAT = 50;
 export const RISK_MANAGER_PROBABILITY_PCT = 0.15;
 export const BRAND_AMBASSADOR_REP_MULTIPLIER = 1.5;
 
@@ -279,12 +279,12 @@ export function computeStreetOngoingCostReductionPct(
   return skills.filter(s => s.id === 'skill-cost-cutter').length * COST_CUTTER_ONGOING_PCT;
 }
 
-/** Flat discount on each business-card refresh (Negotiator, -1). */
+/** Flat discount on each business-card refresh (Negotiator, -100). */
 export function computeRefreshCostDiscount(skills: readonly SpecializationSkill[]): number {
   return skills.filter(s => s.id === 'skill-negotiator').length * NEGOTIATOR_REFRESH_DISCOUNT;
 }
 
-/** Flat salary discount for THIS employed staff member (Operations Manager, -0.5). */
+/** Flat salary discount for THIS employed staff member (Operations Manager, -50). */
 export function computeStaffSalaryDiscount(skills: readonly SpecializationSkill[]): number {
   return skills.filter(s => s.id === 'skill-operations-manager').length * OPERATIONS_MANAGER_SALARY_DISCOUNT;
 }
@@ -307,7 +307,7 @@ export function computeEntertainmentSynergyRangeBoost(skills: readonly Specializ
   return skills.filter(s => s.id === 'skill-tech-guru').length;
 }
 
-/** Flat coins per adjacent matching synergy (Networker, +0.2 per adjacency). */
+/** Flat coins per adjacent matching synergy (Networker, +20 per adjacency). */
 export function computeAdjacencyCoinBonus(skills: readonly SpecializationSkill[]): number {
-  return skills.filter(s => s.id === 'skill-networker').length * 0.2;
+  return skills.filter(s => s.id === 'skill-networker').length * 20;
 }

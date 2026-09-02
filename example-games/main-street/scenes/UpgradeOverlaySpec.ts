@@ -184,7 +184,7 @@ export function buildUpgradeOverlaySpec(
 
   // Format to at most 1 decimal place, stripping trailing zeros (e.g. 0.2, 0.3, 1.0 -> 1)
   const repFormatted = totalReputation > 0
-    ? (Number.isInteger(totalReputation) ? `${totalReputation}` : totalReputation.toFixed(1))
+    ? String(Math.round(totalReputation))
     : '0';
   const reputationText: OverlayTextSpec | null = totalReputation > 0
     ? {

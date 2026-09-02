@@ -2,8 +2,8 @@
  * Unit tests for the on-card coin grid component (CG-0MTDE9H0C0061D51).
  *
  * Covers the pure, Phaser-free packing algorithm (`packCoins` / `splitCoins`
- * / `gridColumns`): dynamic 5×3 → 10×3 → 15×3 packing, half-coin handling,
- * and the "never clipped" overflow guarantee.
+ * / `gridColumns`): dynamic 5×3 → 10×3 → 15×3 packing, integer coins,
+ * and the "never clipped" overflow guarantee. CG-0MTIO1M15001E9Y6: integer economy.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -15,14 +15,14 @@ import {
 } from '../../example-games/main-street/coin-grid';
 
 describe('roundHalf', () => {
-  it('rounds whole and half amounts unchanged', () => {
+  it('rounds whole amounts unchanged (integer economy)', () => {
     expect(roundHalf(0)).toBe(0);
     expect(roundHalf(1)).toBe(1);
-    expect(roundHalf(2.5)).toBe(2.5);
+    expect(roundHalf(2)).toBe(2);
   });
 
-  it('rounds fractional income to the nearest 0.5 (animation layer, Q8)', () => {
-    expect(roundHalf(0.6)).toBe(0.5);
+  it('rounds fractional income to the nearest integer (integer economy)', () => {
+    expect(roundHalf(0.6)).toBe(1);
     expect(roundHalf(0.9)).toBe(1);
     expect(roundHalf(2.1)).toBe(2);
     expect(roundHalf(2.75)).toBe(3);
@@ -30,8 +30,8 @@ describe('roundHalf', () => {
   });
 
   it('uses half-up ties', () => {
-    expect(roundHalf(2.25)).toBe(2.5);
-    expect(roundHalf(3.75)).toBe(4);
+    expect(roundHalf(2.5)).toBe(3);
+    expect(roundHalf(3.5)).toBe(4);
   });
 });
 
@@ -40,8 +40,8 @@ describe('splitCoins', () => {
     expect(splitCoins(0)).toEqual({ fullCoins: 0, halfCoin: false });
   });
 
-  it('renders a single half coin for a 0.5 remainder', () => {
-    expect(splitCoins(0.5)).toEqual({ fullCoins: 0, halfCoin: true });
+  it('rounds fractional amounts to integer (integer economy: no half coins)', () => {
+    expect(splitCoins(0.5)).toEqual({ fullCoins: 1, halfCoin: false });
   });
 
   it('renders full coins for whole amounts', () => {
@@ -49,10 +49,10 @@ describe('splitCoins', () => {
     expect(splitCoins(3)).toEqual({ fullCoins: 3, halfCoin: false });
   });
 
-  it('renders full coins plus one half coin for x.5 amounts', () => {
-    expect(splitCoins(1.5)).toEqual({ fullCoins: 1, halfCoin: true });
-    expect(splitCoins(2.5)).toEqual({ fullCoins: 2, halfCoin: true });
-    expect(splitCoins(15.5)).toEqual({ fullCoins: 15, halfCoin: true });
+  it('renders full coins for integer amounts (integer economy: no half coins)', () => {
+    expect(splitCoins(1.5)).toEqual({ fullCoins: 2, halfCoin: false });
+    expect(splitCoins(2.5)).toEqual({ fullCoins: 3, halfCoin: false });
+    expect(splitCoins(15.5)).toEqual({ fullCoins: 16, halfCoin: false });
   });
 
   it('clamps negative amounts to an empty grid', () => {
@@ -125,16 +125,14 @@ describe('packCoins', () => {
     expect(packCoins(46, AREA.availableWidth, AREA.availableHeight).rows).toBe(4);
   });
 
-  it('places the half coin last when a remainder exists', () => {
-    const half = packCoins(2.5, AREA.availableWidth, AREA.availableHeight);
+  it('never produces half coins (integer economy)', () => {
+    const half = packCoins(3, AREA.availableWidth, AREA.availableHeight);
     expect(half.iconCount).toBe(3);
-    expect(half.placements[0].half).toBe(false);
-    expect(half.placements[1].half).toBe(false);
-    expect(half.placements[2].half).toBe(true);
+    expect(half.placements.every(p => !p.half)).toBe(true);
 
-    const single = packCoins(0.5, AREA.availableWidth, AREA.availableHeight);
+    const single = packCoins(1, AREA.availableWidth, AREA.availableHeight);
     expect(single.iconCount).toBe(1);
-    expect(single.placements[0].half).toBe(true);
+    expect(single.placements[0].half).toBe(false);
   });
 
   it('never clips: all placements fit the available area for 1-60+ coins', () => {
@@ -186,8 +184,8 @@ describe('packCoins', () => {
   });
 
   it('is deterministic for the same inputs', () => {
-    const a = packCoins(12.5, 70, 40);
-    const b = packCoins(12.5, 70, 40);
+    const a = packCoins(12, 70, 40);
+    const b = packCoins(12, 70, 40);
     expect(a.placements).toEqual(b.placements);
     expect(a.coinSize).toBe(b.coinSize);
     expect(a.spacing).toBe(b.spacing);

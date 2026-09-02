@@ -11,7 +11,7 @@
   <rect x="4" y="4" width="132" height="20" rx="3" ry="3" fill="#1ABC9C" opacity="0.18" />
   <text x="70" y="19" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">Dentist</text>
 <circle cx="124" cy="56" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="1.5" />
-<text x="124" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">12</text>
+<text x="124" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">1200</text>
   <circle class="ms-synergy-fallback" cx="14" cy="70" r="6" fill="#1ABC9C" aria-hidden="true" />
 
 </svg>

@@ -64,25 +64,25 @@ export const STAFF_SKILL_CHIP_COLORS: Readonly<Record<SpecializationSkillCategor
 /** The global specialization-skill pool (locked at game start). */
 export const STAFF_SKILL_CATALOG: readonly SpecializationSkill[] = [
   // Category A: Income Boosts
-  { id: 'skill-networker', name: 'Networker', category: 'income-boost', description: '+0.2 coins per adjacent business synergy (passive).', effect: 'adjacency-coin-bonus' },
+  { id: 'skill-networker', name: 'Networker', category: 'income-boost', description: '+20 coins per adjacent business synergy (passive).', effect: 'adjacency-coin-bonus' },
   { id: 'skill-chef', name: 'Chef de Cuisine', category: 'income-boost', description: '+20% income from Food businesses.', effect: 'income-percent-food' },
   { id: 'skill-dj', name: 'DJ', category: 'income-boost', description: '+20% income from Entertainment businesses.', effect: 'income-percent-entertainment' },
-  { id: 'skill-sales-champion', name: 'Sales Champion', category: 'income-boost', description: '+0.5 coins per turn from Commerce businesses.', effect: 'income-flat-commerce' },
+  { id: 'skill-sales-champion', name: 'Sales Champion', category: 'income-boost', description: '+50 coins per turn from Commerce businesses.', effect: 'income-flat-commerce' },
   { id: 'skill-tech-guru', name: 'Tech Guru', category: 'income-boost', description: 'Unlocks +1 synergy range for Entertainment businesses.', effect: 'synergy-range-entertainment' },
   // Category B: Reputation Boosts
   { id: 'skill-town-gossip', name: 'Town Gossip', category: 'reputation-boost', description: 'Peek at the top incident-deck card once per turn (baseline).', effect: 'peek-incident-deck' },
-  { id: 'skill-community-builder', name: 'Community Builder', category: 'reputation-boost', description: '+0.1 reputation per turn from all businesses.', effect: 'reputation-flat-all' },
+  { id: 'skill-community-builder', name: 'Community Builder', category: 'reputation-boost', description: '+10 reputation per turn from all businesses.', effect: 'reputation-flat-all' },
   { id: 'skill-brand-ambassador', name: 'Brand Ambassador', category: 'reputation-boost', description: '+50% reputation gain from incidents and investments.', effect: 'reputation-multiplier-sources' },
-  { id: 'skill-pr-strategist', name: 'PR Strategist', category: 'reputation-boost', description: '+0.15 reputation per turn from Service businesses.', effect: 'reputation-flat-service' },
+  { id: 'skill-pr-strategist', name: 'PR Strategist', category: 'reputation-boost', description: '+15 reputation per turn from Service businesses.', effect: 'reputation-flat-service' },
   // Category C: Cost Reductions
   { id: 'skill-cost-cutter', name: 'Cost Cutter', category: 'cost-reduction', description: '-15% ongoing costs for the entire street (flagged for extra balance testing).', effect: 'ongoing-cost-street-pct' },
-  { id: 'skill-negotiator', name: 'Negotiator', category: 'cost-reduction', description: '-1 cost on business card refreshes.', effect: 'refresh-cost-flat' },
-  { id: 'skill-operations-manager', name: 'Operations Manager', category: 'cost-reduction', description: '-0.5 salary cost for this employed staff member.', effect: 'salary-flat' },
+  { id: 'skill-negotiator', name: 'Negotiator', category: 'cost-reduction', description: '-100 cost on business card refreshes.', effect: 'refresh-cost-flat' },
+  { id: 'skill-operations-manager', name: 'Operations Manager', category: 'cost-reduction', description: '-50 salary cost for this employed staff member.', effect: 'salary-flat' },
   // Category D: Incident Mitigation
   { id: 'skill-quality-inspector', name: 'Quality Inspector', category: 'incident-mitigation', description: '-30% coin damage from all incidents.', effect: 'incident-coin-damage-pct' },
   { id: 'skill-risk-manager', name: 'Risk Manager', category: 'incident-mitigation', description: 'Reduces incident probability by 15%.', effect: 'incident-probability-pct' },
   { id: 'skill-security-consultant', name: 'Security Consultant', category: 'incident-mitigation', description: 'Immunity to theft/loss incidents on the home business.', effect: 'incident-theft-immunity' },
-  { id: 'skill-compliance', name: 'Compliance Officer', category: 'incident-mitigation', description: 'Reduces incident reputation damage by 0.5.', effect: 'incident-rep-damage-flat' },
+  { id: 'skill-compliance', name: 'Compliance Officer', category: 'incident-mitigation', description: 'Reduces incident reputation damage by 50.', effect: 'incident-rep-damage-flat' },
 ];
 
 /** O(1) lookup of a specialization skill by id. */

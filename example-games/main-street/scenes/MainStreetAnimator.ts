@@ -45,7 +45,7 @@ interface IncomePhaseSlot {
   pd: SlotPhaseBreakdown;
   card: Phaser.GameObjects.Container;
   handle: CoinGridHandle;
-  /** Coins currently shown in the on-card grid (rounded to 0.5). */
+  /** Coins currently shown in the on-card grid (integer). */
   displayed: number;
 }
 
@@ -625,8 +625,8 @@ export class MainStreetAnimator {
         try {
           // Incrementally add one coin at a time (half coin last) so the
           // grid accumulates across phases (AC: stay visible until collect).
-          const increment = n <= fullCoins ? 1 : 0.5;
-          this.revealInGrid(slot, roundHalf(slot.displayed + increment));
+          const increment = 1;
+          this.revealInGrid(slot, Math.round(slot.displayed + increment));
         } catch { /* ignore */ }
       });
     }
@@ -682,8 +682,8 @@ export class MainStreetAnimator {
                 visual.destroy();
                 // Incrementally add one landed coin (half coin last) so
                 // concurrent phases accumulate robustly.
-                const increment = i < fullCoins ? 1 : 0.5;
-                this.revealInGrid(slot, roundHalf(slot.displayed + increment));
+                const increment = 1;
+                this.revealInGrid(slot, Math.round(slot.displayed + increment));
               } catch { /* ignore */ }
             },
           });
@@ -704,9 +704,8 @@ export class MainStreetAnimator {
     const { fullCoins, halfCoin } = splitCoins(amount);
     const iconCount = fullCoins + (halfCoin ? 1 : 0);
     if (iconCount === 0) return;
-    // Decrement sequence: half coin first (0.5) then whole coins (1).
+    // Decrement sequence: whole coins (integer economy).
     const decrements: number[] = [];
-    if (halfCoin) decrements.push(0.5);
     for (let k = 0; k < fullCoins; k++) decrements.push(1);
     for (let i = 0; i < iconCount; i++) {
       s.time.delayedCall(at + i * INCOME_FLIGHT_STAGGER_MS, () => {
@@ -715,7 +714,7 @@ export class MainStreetAnimator {
           if (!icon) return; // no coins left in the grid to remove
           // Decrement incrementally from the live displayed total so
           // concurrent negative deltas accumulate correctly.
-          slot.displayed = roundHalf(Math.max(0, slot.displayed - decrements[i]));
+          slot.displayed = Math.round(Math.max(0, slot.displayed - decrements[i]));
           const m = icon.getWorldTransformMatrix();
           const from = { x: m.getX(0, 0), y: m.getY(0, 0) };
           grid.remove(icon);
@@ -825,7 +824,7 @@ export class MainStreetAnimator {
 
   /**
    * Exact credited total from the per-slot phase data, rounded to nearest
-   * 0.5 for the final `+<total>` display pop (Q8: rounding at animation).
+   * integer for the final `+<total>` display pop (integer economy).
    *
    * = Σ per slot (base + synergy + rep + event deltas + upcoming deltas)
    * — this equals the coins actually credited to the bank (`multiplied`).
@@ -837,7 +836,7 @@ export class MainStreetAnimator {
       for (const d of pd.eventDeltas ?? []) sum += d.delta;
       for (const d of pd.upcomingDeltas ?? []) sum += d.delta;
     }
-    return roundHalf(Math.max(0, sum));
+    return Math.round(Math.max(0, sum));
   }
 
   /**

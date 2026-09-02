@@ -103,8 +103,7 @@ export interface CardTooltipInfoOptions {
 /**
  * Formats a coin/reputation delta value for tooltip display.
  *
- * - Whole numbers render without decimals (e.g. `+5`, `-3`).
- * - Fractional values render with up to one decimal place (e.g. `+2.5`, `-1.5`).
+ * Values are integers (e.g. `+5`, `-3`).
  *
  * This avoids the spurious `toFixed(3)` output (`5.000`) that previously
  * confused players alongside the per-match `effect` text on SpecificSynergy
@@ -114,11 +113,8 @@ export interface CardTooltipInfoOptions {
  * @returns The formatted string with a sign prefix.
  */
 export function formatTooltipDelta(value: number): string {
-  const rounded = Math.round(value * 10) / 10;
-  if (Number.isInteger(rounded)) {
-    return `${value >= 0 ? '+' : ''}${rounded}`;
-  }
-  return `${value >= 0 ? '+' : ''}${rounded.toFixed(1)}`;
+  const rounded = Math.round(value);
+  return `${rounded >= 0 ? '+' : ''}${rounded}`;
 }
 
 /**

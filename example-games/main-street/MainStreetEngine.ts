@@ -43,7 +43,7 @@ import {
   describeEventEffects,
   classifyEffect,
 } from './MainStreetState';
-import type { BusinessCard, EventCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, EventCard, StaffCard, SynergyType } from './MainStreetCards';
 import {
   SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
   type DurationEventCard,
@@ -79,7 +79,7 @@ import {
   type PurchaseResult,
 } from './MainStreetMarket';
 import { evaluateChallenges } from './MainStreetChallenges';
-import { applyReputationMultiplier, reputationCoinMultiplier } from './MainStreetDifficulty';
+import { applyReputationMultiplier, reputationCoinMultiplier, roundInt } from './MainStreetDifficulty';
 
 // Re-export for convenience (tests import from the engine module).
 export { reputationCoinMultiplier, applyReputationMultiplier, cycleMarketCards };
@@ -552,17 +552,17 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
   const incidentBuffs = event.trigger === 'Incident' ? computeIncidentSkillBuffs(employedSkills) : null;
   const theftNeutralized =
     incidentBuffs !== null && incidentBuffs.immuneToTheftLoss && isTheftLossIncident(event);
-  /** Effective coin delta after quality-inspector / security-consultant mitigation. */
+  /** Effective coin delta after quality-inspector / security-consultant mitigation (integer). */
   const cDelta = (effect: number): number => {
     if (theftNeutralized && effect < 0) return 0; // theft immunity: no coin loss
-    if (incidentBuffs === null || effect >= 0) return effect;
-    return effect + Math.abs(effect) * incidentBuffs.coinDamageReductionPct;
+    if (incidentBuffs === null || effect >= 0) return roundInt(effect);
+    return roundInt(effect + Math.abs(effect) * incidentBuffs.coinDamageReductionPct);
   };
-  /** Effective reputation delta after brand-ambassador / compliance mitigation. */
+  /** Effective reputation delta after brand-ambassador / compliance mitigation (integer). */
   const rDelta = (effect: number): number => {
-    if (effect > 0) return effect * repGainMultiplier;
-    if (incidentBuffs === null) return effect;
-    return Math.min(0, effect + incidentBuffs.reputationDamageReductionFlat);
+    if (effect > 0) return roundInt(effect * repGainMultiplier);
+    if (incidentBuffs === null) return roundInt(effect);
+    return roundInt(Math.min(0, effect + incidentBuffs.reputationDamageReductionFlat));
   };
   const rep = state.resourceBank.reputation;
   const cfg = state.config;
@@ -890,7 +890,7 @@ export function checkImmediateLoss(state: MainStreetState): boolean {
     state.gameResult = 'loss';
     state.endReason = 'bankruptcy';
     updateScore(state);
-    addLog(state, `Game Over: Bankruptcy (coins: ${state.resourceBank.coins.toFixed(3)})`, 'loss');
+    addLog(state, `Game Over: Bankruptcy (coins: ${state.resourceBank.coins})`, 'loss');
     return true;
   }
 
@@ -1908,11 +1908,11 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
 
   let totalCost = 0;
   for (const card of staffCards) {
-    // Operations Manager: -0.5 of THIS member's own salary (computeStaffSalaryCost).
+    // Operations Manager: -50 of THIS member's own salary (computeStaffSalaryCost).
     const memberSkills = Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [];
     totalCost += computeStaffSalaryCost(memberSkills, card.ongoingCost);
   }
-  totalCost *= 1 - streetReduction;
+  totalCost = roundInt(totalCost * (1 - streetReduction));
 
   if (totalCost > 0) {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
@@ -1938,7 +1938,7 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
 /**
  * Applies community space ongoing costs for the current turn.
  * Deducts each placed community space's `ongoingCost` (e.g. the Library's
- * 0.25 coins/turn running cost) from coins, alongside staff costs.
+ * 25 coins/turn running cost) from coins, alongside staff costs.
  * If coins are insufficient, deducts what's available (down to 0).
  *
  * Mirrors {@link applyStaffOngoingCosts} clamping/log conventions.
@@ -1960,7 +1960,7 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
       spaceCount += 1;
     }
   }
-  totalCost *= 1 - streetReduction;
+  totalCost = roundInt(totalCost * (1 - streetReduction));
   if (spaceCount === 0) return;
 
   if (totalCost > 0) {
@@ -1986,7 +1986,7 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
 
 /**
  * Applies ongoing costs for business cards each turn.
- * Deducts each business card's `ongoingCost` (e.g. 0.5 coins/turn) from coins,
+ * Deducts each business card's `ongoingCost` (e.g. 50 coins/turn) from coins,
  * for every business card held in hand OR placed on the street grid.
  * If coins are insufficient, deducts what's available (down to 0).
  *
@@ -2015,8 +2015,8 @@ export function applyBusinessOngoingCosts(state: MainStreetState): void {
 
   if (bizCount === 0) return;
 
-  // Cost Cutter: -15% street-wide ongoing costs (I4).
-  totalCost *= 1 - computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state));
+  // Cost Cutter: -15% street-wide ongoing costs (I4) — integer-rounded (AC3).
+  totalCost = roundInt(totalCost * (1 - computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state))));
 
   if (totalCost > 0) {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
@@ -2107,7 +2107,7 @@ export function layoffStaffCard(
  * listed cost (CG-0MSTOF1N5005PK2R). Consumes one daily action.
  *
  * Premium pricing: `Math.ceil(cost * 1.5 * 2) / 2` — the listed cost × 1.5,
- * rounded up to the nearest 0.5 (e.g. 3 → 4.5, 7 → 10.5). When
+ * rounded up to the nearest integer. When
  * `premiumCost` is supplied (Golden Mile 2-action days, where the
  * equivalent composite placement consumes an action at listed cost —
  * CG-0MT24X0SX007RLHN), that price replaces the premium.

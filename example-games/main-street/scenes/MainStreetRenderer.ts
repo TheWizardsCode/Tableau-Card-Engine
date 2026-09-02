@@ -361,8 +361,8 @@ export class MainStreetRenderer {
     // Coins - left-aligned in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    // HUD displays coins and reputation to 2 decimal places (presentation only; internal precision is 3dp). Score remains rounded to whole numbers.
-    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${coins.toFixed(2)}`, {
+    // Integer economy — HUD shows whole numbers (CG-0MTIO1M15001E9Y6).
+    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${Math.round(coins)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
@@ -384,7 +384,7 @@ export class MainStreetRenderer {
     s.hudContainer.add(actionText);
 
     // Reputation - centered in strip
-    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation.toFixed(2)}`, {
+    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${Math.round(reputation)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 0.5));
     s.hudContainer.add(repText);

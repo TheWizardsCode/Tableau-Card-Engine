@@ -10,8 +10,7 @@
  *  - the grid starts at 5 columns per row; when space runs out it grows to
  *    10 columns, then 15 columns, and beyond that continues scaling (more
  *    rows, then shrinking coin size, then overlap as a last resort);
- *  - a 0.5 remainder renders as one half-coin sprite (full coins for whole
- *    amounts);
+ *  - economy is integer-only: each coin represents 1 whole coin;
  *  - overflow is always visible: the layout is fit inside the available
  *    region so coins are never clipped.
  *
@@ -26,7 +25,7 @@ import type Phaser from 'phaser';
 export interface CoinPlacement {
   x: number;
   y: number;
-  /** True for the single half-coin icon used for a 0.5 remainder. */
+  /** True for a half-coin icon (integer economy: always false, kept for API compatibility). */
   half: boolean;
 }
 
@@ -34,9 +33,9 @@ export interface CoinPlacement {
 export interface CoinGridLayout {
   /** Whole coins (each represents 1.0 of value). */
   fullCoins: number;
-  /** True when a 0.5 remainder is shown as a half coin. */
+  /** True when a half coin is shown (integer economy: always false). */
   halfCoin: boolean;
-  /** Total icons rendered (`fullCoins` + 1 when `halfCoin`). */
+  /** Total icons rendered (`fullCoins`; integer-only). */
   iconCount: number;
   columns: number;
   rows: number;
@@ -70,16 +69,16 @@ export const MIN_COIN_SIZE = 4;
 export const COIN_GRID_FULL_KEY = 'ms-coin-grid-full';
 export const COIN_GRID_HALF_KEY = 'ms-coin-grid-half';
 
-/** Rounds a fractional amount to the nearest 0.5 for display at the animation layer. */
+/** Round to the nearest integer — shared integer-economy primitive for the coin grid.
+ *  Kept as `roundHalf` for API compatibility; new code should prefer `Math.round` / `roundInt`. */
 export function roundHalf(x: number): number {
-  return Math.round(x * 2) / 2;
+  return Math.round(x);
 }
 
-/** Split an income amount into whole coins plus one optional half coin. */
+/** Split an integer coin amount into whole coins (halfCoin is always false in integer economy). */
 export function splitCoins(count: number): { fullCoins: number; halfCoin: boolean } {
-  const fullCoins = Math.max(0, Math.floor(count));
-  const halfCoin = count - fullCoins >= 0.5;
-  return { fullCoins, halfCoin };
+  const fullCoins = Math.max(0, Math.round(count));
+  return { fullCoins, halfCoin: false };
 }
 
 /**
@@ -93,8 +92,7 @@ export function gridColumns(iconCount: number): number {
 }
 
 /**
- * Pure packing computation: lays `count` coins (which may be fractional, e.g.
- * 2.5 ⇒ two full coins + one half coin) into a grid that always fits inside
+ * Pure packing computation: lays `count` integer coins into a grid that always fits inside
  * the available region, so no coin is ever clipped.
  *
  * The returned placements are relative to the grid centre; the caller anchors

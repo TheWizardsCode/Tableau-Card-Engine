@@ -303,7 +303,7 @@ export interface BusinessCard {
   reputationBonus: number;
   /**
    * Base reputation generated per turn by this business (without upgrades).
-   * Fractional values are supported (e.g. 0.2 for the Clinic).
+   * Integer values (×100, e.g. 20 for the Clinic).
    */
   reputationPerTurn?: number;
   /**
@@ -447,7 +447,7 @@ export interface UpgradeCard {
   /**
    * Additional reputation generated per turn when this upgrade is applied.
    * Works like incomeBonus but for reputation instead of coins.
-   * Fractional values are supported (e.g. 0.1 for the Medical Center upgrade).
+   * Integer values (×100, e.g. 10 for the Medical Center upgrade).
    */
   readonly reputationBonus?: number;
   /**
@@ -1084,7 +1084,7 @@ export interface CommunitySpaceCard {
   reputationBonus: number;
   /**
    * Base reputation generated per turn by this community space (without upgrades).
-   * Fractional values are supported (e.g. 0.2).
+   * Integer values (×100, e.g. 20).
    */
   reputationPerTurn?: number;
   /**
@@ -1306,7 +1306,7 @@ export function createCommunitySpaceDeck(
  * @param copies          Number of copies per template (default 3).
  * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
  * @param positiveIncidentMultiplier Multiplier applied to positive Incident templates (>=1).
- * @param rng             Seeded random function used for deterministic fractional distribution.
+ * @param rng             Seeded random function used for deterministic distribution.
  */
 export function createEventDeck(
   copies: number = 3,
@@ -1319,9 +1319,9 @@ export function createEventDeck(
     : _EVENT_TEMPLATES;
 
   // If multiplier > 1, positive Incident templates should appear more often.
-  // Implement fractional multipliers deterministically without introducing
+  // Implement multipliers deterministically without introducing
   // a seeded RNG dependency: we give every positive Incident template
-  // `baseDup = floor(multiplier)` repeats, then distribute the fractional
+  // `baseDup = floor(multiplier)` repeats, then distribute the remainder
   // remainder by granting one extra repeat to `extraCount` templates. The
   // selection is deterministic (first N positive templates in template
   // order) so behavior is stable across runs.
@@ -1333,7 +1333,7 @@ export function createEventDeck(
   const fraction = mult - baseDup;
 
   // Identify positions (indices) of positive Incident templates in the
-  // `templates` array so we can select which ones receive the fractional
+  // `templates` array so we can select which ones receive the remainder
   // extra duplicates.
   const positiveIndices: number[] = [];
   for (let i = 0; i < templates.length; i++) {
@@ -1348,7 +1348,7 @@ export function createEventDeck(
 
   // Decide which positive template indices receive the extra +1 duplicate.
   // Always use the provided seeded RNG to shuffle and choose extraCount
-  // indices. This makes the fractional distribution deterministic per-game
+  // indices. This makes the distribution deterministic per-game
   // seed and removes order bias.
   const extraSet = new Set<number>();
   if (extraCount > 0 && positiveCount > 0) {

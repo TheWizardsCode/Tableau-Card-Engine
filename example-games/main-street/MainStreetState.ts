@@ -79,13 +79,13 @@ export interface LogEntry {
  *   - `+1 rep` for a pure reputation gain
  *   - `no effect` when both deltas are zero
  *
- * @param coinChange Effective coins delta (fractional values kept to 3 dp).
+ * @param coinChange Effective coins delta (integer).
  * @param repChange  Effective reputation delta.
  */
 export function describeEventEffects(coinChange: number, repChange: number): string {
   const parts: string[] = [];
-  if (coinChange !== 0) parts.push(`${coinChange > 0 ? '+' : ''}${coinChange.toFixed(3)} coins`);
-  if (repChange !== 0) parts.push(`${repChange > 0 ? '+' : ''}${repChange} rep`);
+  if (coinChange !== 0) parts.push(`${coinChange > 0 ? '+' : ''}${Math.round(coinChange)} coins`);
+  if (repChange !== 0) parts.push(`${repChange > 0 ? '+' : ''}${Math.round(repChange)} rep`);
   return parts.length > 0 ? parts.join(', ') : 'no effect';
 }
 
@@ -862,7 +862,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   const businessDeck = createBusinessDeck(3, options.unlockedCardIds);
   const communitySpaceDeck = createCommunitySpaceDeck(3, options.unlockedCardIds);
   // Apply positive-incident weighting from the runtime difficulty config.
-  // Pass the game's seeded RNG into createEventDeck so fractional duplicates
+  // Pass the game's seeded RNG into createEventDeck so duplicate
   // are selected deterministically per-game-seed rather than by template order.
   const eventDeck = createEventDeck(3, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);

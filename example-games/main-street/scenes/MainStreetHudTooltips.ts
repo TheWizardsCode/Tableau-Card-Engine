@@ -157,8 +157,8 @@ export function buildCoinsTooltip(state: MainStreetState): string {
   const multiplier = reputationCoinMultiplier(state.resourceBank.reputation, state.config);
   const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
 
-  const preMultiplierStr = Number.isFinite(baseIncome) ? baseIncome.toFixed(3) : '0.000';
-  const postMultiplierStr = Number.isFinite(multipliedIncome) ? multipliedIncome.toFixed(3) : '0.000';
+  const preMultiplierStr = Number.isFinite(baseIncome) ? String(Math.round(baseIncome)) : '0';
+  const postMultiplierStr = Number.isFinite(multipliedIncome) ? String(Math.round(multipliedIncome)) : '0';
 
   const lines = [
     t(HUD_TOOLTIP_I18N_KEYS.coinsTitle),

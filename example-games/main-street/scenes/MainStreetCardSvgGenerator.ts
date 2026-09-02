@@ -201,10 +201,9 @@ export function generateBusinessCardSvg(
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/** Format a reputation value to at most 1 decimal place, stripping trailing zeros. */
+/** Format a reputation value as an integer string. */
 function fmtRep(v: number): string {
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(1);
+  return String(Math.round(v));
 }
 
 /**

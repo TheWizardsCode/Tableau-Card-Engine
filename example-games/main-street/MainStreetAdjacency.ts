@@ -14,7 +14,7 @@ import { getBaseTypeId } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, syncResourceBankToLedger } from './MainStreetState';
-import { applyReputationMultiplier } from './MainStreetDifficulty';
+import { applyReputationMultiplier, roundInt } from './MainStreetDifficulty';
 import { applyActiveEffectMultiplier } from '../../src/core-engine/ActiveEffect';
 import {
   computePerBusinessSkillBuffs,
@@ -195,11 +195,11 @@ export function computeSynergyBonus(
   // Compute effective base (base income + income bonus, with same-type penalty)
   let effectiveBase = business.baseIncome + business.incomeBonus;
   if (hasAdjacentSameType(grid, index, soldSlots, gridDims)) {
-    effectiveBase = effectiveBase * 0.6;
+    effectiveBase = roundInt(effectiveBase * 0.6);
   }
 
-  // Percentage-based synergy: effectiveBase * rate * bonusPerNeighbor * N
-  return effectiveBase * rate * bonusPerNeighbor * matchingCount;
+  // Percentage-based synergy → rounded to nearest integer (AC3)
+  return roundInt(effectiveBase * rate * bonusPerNeighbor * matchingCount);
 }
 
 /**
@@ -292,9 +292,10 @@ export function computeBusinessIncome(
   let base = business.baseIncome + business.incomeBonus;
   // Same-type penalty: reduce base income to 60% when adjacent to a same-type business
   if (hasAdjacentSameType(grid, index, soldSlots, gridDims)) {
-    base = base * 0.6;
+    base = roundInt(base * 0.6);
   }
   const synergy = computeSynergyBonus(grid, index, bonusPerNeighbor, soldSlots, gridDims);
+  // base already integer, synergy rounded above; final sum stays integer
   return base + synergy;
 }
 
@@ -536,7 +537,7 @@ export function computeIncome(
     let base = business.baseIncome + business.incomeBonus;
     // Same-type penalty: reduce base income to 60% when adjacent to a same-type business
     if (hasAdjacentSameType(grid, i, soldSlots, gridDims)) {
-      base = base * 0.6;
+      base = roundInt(base * 0.6);
     }
     const synergy = computeSynergyBonus(grid, i, bonusPerNeighbor, soldSlots, gridDims);
     const slotTotal = base + synergy;
@@ -702,7 +703,7 @@ export function applyIncome(state: MainStreetState): IncomeResult {
 
   // ── Per-phase breakdown for animated income (CG-0MT23O6W8003AXWJ) ──
   // Build phase data alongside the existing breakdown.
-  // Each field holds exact fractional values — rounding to nearest 0.5
+  // Each field holds exact integer values
   // is done at the animation layer, not here.
   const phaseSlotData: SlotPhaseBreakdown[] = breakdown.map(b => ({
     slotIndex: b.slotIndex,
@@ -715,8 +716,8 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   }));
 
   // Apply active effect income modifiers per-slot, before reputation multiplier.
-  // Each slot's income is individually multiplied, then summed.
-  // Also compute per-event deltas for the phase breakdown.
+  // Each slot's income is individually multiplied (integer-rounded — AC3),
+  // then summed. Also compute per-event deltas for the phase breakdown.
   let modifiedTotal = 0;
   for (let bi = 0; bi < breakdown.length; bi++) {
     const slot = breakdown[bi];
@@ -725,7 +726,7 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     let runningValue = slot.total;
     for (const effect of state.activeEffects) {
       if (effect.effectType !== 'income-multiplier') continue;
-      const newVal = runningValue * effect.multiplier;
+      const newVal = roundInt(runningValue * effect.multiplier);
       const delta = newVal - runningValue;
       phaseSlot.eventDeltas.push({
         cardId: effect.sourceEventId,
@@ -769,11 +770,11 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   // Apply active effect rep modifiers (e.g. Community Renovation's
   // rep-multiplier 1.2x — Group C, CG-0MSQJ244M0055X7S). Multipliers are
   // composed multiplicatively, matching the income-multiplier behaviour.
-  const modifiedRepPerTurn = applyActiveEffectMultiplier(
+  const modifiedRepPerTurn = roundInt(applyActiveEffectMultiplier(
     state.activeEffects,
     'rep-multiplier',
     repPerTurn,
-  );
+  ));
   if (modifiedRepPerTurn !== 0) {
     state.resourceBank.reputation += modifiedRepPerTurn;
   }
@@ -791,7 +792,7 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   // after income-multiplier effects. The reputation phase contributes
   // `multiplied - modifiedTotal`, distributed proportionally to each slot's
   // post-effect income. Hand synergy is distributed proportionally to base
-  // income. Exact fractional values throughout (Q8: rounding at animation).
+  // income. Exact integer values throughout.
   const repBonus = multiplied - modifiedTotal;
   const sumPhaseTotal = phaseSlotData.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
   const modifiedSlotTotals = phaseSlotData.map(
@@ -810,11 +811,11 @@ export function applyIncome(state: MainStreetState): IncomeResult {
 
   syncResourceBankToLedger(state);
   if (multiplied > 0) {
-    // CG-0MREYZO7E00729S0: show 3 decimal places for fractional coin values.
+    // Integer economy: no decimal formatting (CG-0MTIO1M15001E9Y6).
     // Enriched with the effective coin delta (CG-0MT5W7UJJ0065MEZ).
-    addLog(state, `Income: +${multiplied.toFixed(3)} coins (${describeEventEffects(multiplied, 0)})`, 'gain');
+    addLog(state, `Income: +${multiplied} coins (${describeEventEffects(multiplied, 0)})`, 'gain');
   } else {
-    addLog(state, `Income: +0.000 coins (${describeEventEffects(0, 0)})`, 'neutral');
+    addLog(state, `Income: +0 coins (${describeEventEffects(0, 0)})`, 'neutral');
   }
   if (repPerTurn > 0) {
     addLog(state, `Reputation from cards: +${repPerTurn} (${describeEventEffects(0, repPerTurn)})`, 'gain');
@@ -964,8 +965,7 @@ export interface SlotEventDelta {
 /**
  * Per-slot phase breakdown for the phased income animation (CG-0MT23O6W8003AXWJ).
  *
- * Each field represents an exact fractional amount — per-phase rounding to
- * nearest 0.5 is applied at the animation layer, not here.
+ * Each field represents an exact integer amount.
  */
 export interface SlotPhaseBreakdown {
   slotIndex: number;
@@ -1006,7 +1006,7 @@ export interface IncomeResult {
   /**
    * Per-phase contribution breakdown for animated income presentation.
    *
-   * Each phase value is an exact fractional number; rounding to nearest 0.5
+   * Each phase value is an integer; no fractional rounding needed
    * is done at the animation layer.
    */
   phaseBreakdown: PhaseBreakdown;
