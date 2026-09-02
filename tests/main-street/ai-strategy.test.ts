@@ -496,7 +496,7 @@ describe('scoreAction', () => {
 describe('aiPlanningHorizon', () => {
   it('is always within [floor=5, cap=25]', () => {
     const state = createTestState();
-    for (const score of [0, 5, 40, 75, 120, 145, 149, 150, 200]) {
+    for (const score of [0, 500, 4000, 7500, 12000, 14500, 14900, 15000, 20000]) {
       state.resourceBank.coins = score;
       state.resourceBank.reputation = 0;
       state.challengesCompleted = [];
@@ -534,10 +534,10 @@ describe('aiPlanningHorizon', () => {
 
   it('derives the horizon from distance to the threshold (documented formula)', () => {
     const state = createTestState();
-    state.resourceBank.coins = 70;
+    state.resourceBank.coins = 7000;
     state.resourceBank.reputation = 0;
     state.challengesCompleted = [];
-    // Medium winThreshold=120, scorePace=8: ceil((120-70)/8) = ceil(6.25) = 7
+    // Medium winThreshold=12000, scorePace=800: ceil((12000-7000)/800) = ceil(6.25) = 7
     expect(aiPlanningHorizon(state)).toBe(7);
   });
 

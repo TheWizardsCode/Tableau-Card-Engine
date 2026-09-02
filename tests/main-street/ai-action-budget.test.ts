@@ -166,7 +166,7 @@ describe('Monte Carlo-style loop respects the action cap', () => {
       gm = state.market.cards.find((c: any) => c.id.startsWith('staff-general-manager'));
     }
     expect(gm).toBeTruthy();
-    state.resourceBank.coins = 30; // enough for the GM (cost 20), far below the win threshold
+    state.resourceBank.coins = 3000; // enough for the GM (cost 2000), far below the win threshold
     hireStaffCard(state, gm!.id);
     processEndOfTurn(state); // Day 1 ends
     expect(state.phase).toBe('DayStart'); // game not ended by the hire

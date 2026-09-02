@@ -62,13 +62,13 @@ describe('AC1 · deliberate hoarding behaviour', () => {
       family: 'business',
       id: 'expensive-biz',
       name: 'Mega Mall',
-      cost: 50,
-      baseIncome: 10,
+      cost: 5000,
+      baseIncome: 1000,
       synergyTypes: [],
       description: 'Very expensive business.',
       maxLevel: 1,
       level: 0,
-      incomeBonus: 5,
+      incomeBonus: 500,
       synergyRangeBonus: 0,
       reputationBonus: 0,
       ongoingCost: 0,
@@ -98,7 +98,7 @@ describe('AC1 · deliberate hoarding behaviour', () => {
       name: 'Valuable Upgrade',
       targetBusiness: 'Bakery',
       cost: 3,
-      incomeBonus: 5,
+      incomeBonus: 500,
       synergyRangeBonus: 0,
       description: 'High-value upgrade.',
       requiredLevel: 0,
@@ -195,13 +195,13 @@ describe('AC2 · banking heuristic considers key factors', () => {
       family: 'business',
       id: 'near-target',
       name: 'Neat Nook',
-      cost: 15,
-      baseIncome: 5,
+      cost: 1500,
+      baseIncome: 500,
       synergyTypes: [],
       description: 'Nearby target.',
       maxLevel: 1,
       level: 0,
-      incomeBonus: 2,
+      incomeBonus: 200,
       synergyRangeBonus: 0,
       reputationBonus: 0,
       ongoingCost: 0,
@@ -211,13 +211,13 @@ describe('AC2 · banking heuristic considers key factors', () => {
       family: 'business',
       id: 'far-target',
       name: 'Distant Dome',
-      cost: 50,
-      baseIncome: 10,
+      cost: 5000,
+      baseIncome: 1000,
       synergyTypes: [],
       description: 'Distant target.',
       maxLevel: 1,
       level: 0,
-      incomeBonus: 5,
+      incomeBonus: 500,
       synergyRangeBonus: 0,
       reputationBonus: 0,
       ongoingCost: 0,
@@ -249,7 +249,7 @@ describe('AC2 · banking heuristic considers key factors', () => {
     const earlyHorizon = aiPlanningHorizon(state);
 
     // Late game: near threshold → short horizon → banking less valuable.
-    state.resourceBank.coins = 140;
+    state.resourceBank.coins = 14000;
     state.resourceBank.reputation = 0;
     state.challengesCompleted = [];
     const lateHorizon = aiPlanningHorizon(state);
@@ -266,12 +266,12 @@ describe('AC2 · banking heuristic considers key factors', () => {
       id: 'mid-target',
       name: 'Mid-range Store',
       cost: 10,
-      baseIncome: 3,
+      baseIncome: 300,
       synergyTypes: [],
       description: 'Mid-range target.',
       maxLevel: 1,
       level: 0,
-      incomeBonus: 1,
+      incomeBonus: 100,
       synergyRangeBonus: 0,
       reputationBonus: 0,
       ongoingCost: 0,
@@ -281,13 +281,13 @@ describe('AC2 · banking heuristic considers key factors', () => {
       family: 'business',
       id: 'high-target',
       name: 'Premium Plaza',
-      cost: 30,
-      baseIncome: 7,
+      cost: 3000,
+      baseIncome: 700,
       synergyTypes: [],
       description: 'High-cost target.',
       maxLevel: 1,
       level: 0,
-      incomeBonus: 3,
+      incomeBonus: 300,
       synergyRangeBonus: 0,
       reputationBonus: 0,
       ongoingCost: 0,
@@ -360,19 +360,19 @@ describe('AC5 · banking heuristic unit tests', () => {
     it('banks when the only market card costs 50 and the AI has 10 coins', () => {
       const state = createTestState('hoard-50-cost');
       state.bankedActions = 0;
-      state.resourceBank.coins = 10;
+      state.resourceBank.coins = 1000;
 
       const highCostCard: BusinessCard = {
         family: 'business',
         id: 'mega-biz',
         name: 'Mega Business',
-        cost: 50,
-        baseIncome: 8,
+        cost: 5000,
+        baseIncome: 800,
         synergyTypes: [],
         description: 'High-cost business.',
         maxLevel: 1,
         level: 0,
-        incomeBonus: 4,
+        incomeBonus: 400,
         synergyRangeBonus: 0,
         reputationBonus: 0,
         ongoingCost: 0,
@@ -389,7 +389,7 @@ describe('AC5 · banking heuristic unit tests', () => {
     it('banks when the best affordable action has very low value', () => {
       const state = createTestState('hoard-low-value');
       state.bankedActions = 0;
-      state.resourceBank.coins = 10;
+      state.resourceBank.coins = 1000;
 
       // A cheap business with low income — marginal value.
       const lowValueCard: BusinessCard = {
@@ -430,7 +430,7 @@ describe('AC5 · banking heuristic unit tests', () => {
         name: 'Good Upgrade',
         targetBusiness: 'Bakery',
         cost: 5,
-        incomeBonus: 3,
+        incomeBonus: 300,
         synergyRangeBonus: 0,
         description: 'Solid upgrade.',
         requiredLevel: 0,

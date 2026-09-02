@@ -72,9 +72,10 @@ const AI_HORIZON_CAP = 25;
  * Expected score gained per turn (pts/turn). Used to convert the distance
  * to the win threshold into a turn count. Calibrated from the balance
  * baseline: the Medium threshold (150) is reached in ~18 turns on average,
- * i.e. ~8.3 pts/turn; 8 is the rounded constant.
+ * i.e. ~8.3 pts/turn; 8 is the rounded constant. Scaled ×100 to 800
+ * for the integer economy (CG-0MTIO1M15001E9Y6: winThreshold 120→12000).
  */
-const AI_SCORE_PACE = 8;
+const AI_SCORE_PACE = 800;
 
 /**
  * Computes the AI planning horizon — the number of future turns whose

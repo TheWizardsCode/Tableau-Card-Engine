@@ -70,7 +70,7 @@ function prepareForManyActions(state: ReturnType<typeof setupMainStreetGame>): v
   state.maxHandSize = 10;
   // 100 coins is ample for free move-to-hand actions yet stays well below
   // the score-threshold win condition (high coin balances inflate score).
-  state.resourceBank.coins = 100;
+  state.resourceBank.coins = 10000;
 }
 
 // ── AC1 · Banking on end-of-turn ────────────────────────────
@@ -98,7 +98,7 @@ describe('AC1 · banking on end-of-turn', () => {
     expect(state.actionsRemaining).toBe(3); // 1 base + 2 banked
 
     // Spend 1 action
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(2);
@@ -111,7 +111,7 @@ describe('AC1 · banking on end-of-turn', () => {
   it('banks zero when the player spends all actions', () => {
     const state = setupMainStreetGame({ seed: 'ac1-all-spent' });
     startDay(state);
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(0);
@@ -204,7 +204,7 @@ describe('AC3 · day-start composition', () => {
     expect(state.actionsRemaining).toBe(4);
 
     // Spend 2 actions — each consumes 1 from banked (floor 0)
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 10000;
     const card1 = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card1.id });
     expect(state.actionsRemaining).toBe(3);
@@ -241,7 +241,7 @@ describe('AC4 · staff actions never bank', () => {
     state.staffCards.push({ ...gmTemplate() });
 
     startDay(state);
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(1);
@@ -338,7 +338,7 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
 
     // New day: take and undo an action
     startDay(state);
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
 
     // The undo/redo commands capture bankedActions in the snapshot
@@ -508,7 +508,7 @@ describe('banked consumption regressions', () => {
     state.phase = 'DayStart';
     startDay(state);
 
-    state.resourceBank.coins = 1000;
+    state.resourceBank.coins = 100000;
     const savedBanked = state.bankedActions;
     // Find a business/community-space card (buy-and-place only applies to those)
     const biz = state.market.cards.find(
@@ -531,7 +531,7 @@ describe('banked consumption regressions', () => {
     // Get a business into hand: move-to-hand consumes 1 action + 1 banked.
     // The premium placement then replaces the SECOND action — banked must
     // reflect only the single move consumption, not a second decrement.
-    state.resourceBank.coins = 1000;
+    state.resourceBank.coins = 100000;
     const biz = state.market.cards.find(
       c => c.family === 'business' || c.family === 'community-space',
     );
@@ -606,7 +606,7 @@ describe('banked consumption regressions', () => {
     state.phase = 'DayStart';
     startDay(state);
     prepareForManyActions(state);
-    state.resourceBank.coins = 1000; // fund the premium override
+    state.resourceBank.coins = 100000; // fund the premium override
 
     // Move a business to hand first (consumes 1 action + 1 banked)
     const biz = state.market.cards.find(

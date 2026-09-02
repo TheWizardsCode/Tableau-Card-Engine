@@ -165,7 +165,7 @@ describe('generateHint', () => {
     // move-to-hand at Priority 5 before Community Favour at Priority 9).
     state.actionsRemaining = 1;
     state.resourceBank.coins = 0;
-    state.resourceBank.reputation = 5;
+    state.resourceBank.reputation = 500;
     state.favourUsedThisTurn = false;
     // Empty the market so move-to-hand/discard are not enumerated and the
     // stalled rep-to-coins fallback is reachable (Greedy priority 9).
