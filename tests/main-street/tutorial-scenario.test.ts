@@ -49,15 +49,15 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.difficulty).toBe('Easy');
   });
 
-  it('starts with 12 coins (list-cost two-turn flow stays positive)', () => {
-    // The two-turn tutorial (CG-0MT53NXGZ004H5AE) buys Laundromat $4 +
-    // Bookshop $3 + Library $7 + Local Festival $3 at LISTED cost (every
+  it('starts with 1200 coins (list-cost two-turn flow stays positive)', () => {
+    // The two-turn tutorial (CG-0MT53NXGZ004H5AE) buys Laundromat $400 +
+    // Bookshop $300 + Library $700 + Local Festival $300 at LISTED cost (every
     // placement follows an End Turn, so no +50% premium is charged); income
-    // across the five end-turn steps keeps every balance positive. 12 is
-    // higher than Easy's 10 so the tutorial survives holding a card overnight.
-    expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(12);
+    // across the five end-turn steps keeps every balance positive. 1200 is
+    // higher than Easy's 500 so the tutorial survives holding a card overnight.
+    expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(1200);
     const preset = getPreset('Easy');
-    expect(12).toBeGreaterThan(preset.startingCoins);
+    expect(1200).toBeGreaterThan(preset.startingCoins);
   });
 
   it('defines starting reputation matching Easy preset', () => {
@@ -145,13 +145,13 @@ describe('createTutorialScenario', () => {
     expect(state.config.difficultyName).toBe('Easy');
   });
 
-  it('has correct starting resources (12 coins, 5 reputation per scenario)', () => {
+  it('has correct starting resources (1200 coins, 500 reputation per scenario)', () => {
     const state = createTutorialScenario();
-    // 12 coins (CG-0MSTOATDQ005XDET reduced from 16 so the T13 Community
-    // Favour rep→coins conversion is REQUIRED for the $7 Library); reputation
-    // stays 5 so the conversion spends 2 and leaves a safe 3.
-    expect(state.resourceBank.coins).toBe(12);
-    expect(state.resourceBank.reputation).toBe(5);
+    // 1200 coins (CG-0MSTOATDQ005XDET reduced from 1600 so the T13 Community
+    // Favour rep→coins conversion is REQUIRED for the $700 Library); reputation
+    // stays 500 so the conversion spends 200 and leaves a safe 300.
+    expect(state.resourceBank.coins).toBe(1200);
+    expect(state.resourceBank.reputation).toBe(500);
   });
 
   it('has exactly MARKET_TOTAL_SLOTS cards in development row', () => {
@@ -216,25 +216,25 @@ describe('createTutorialScenario', () => {
 
   it('provides sufficient coin budget for the 23-step two-turn flow (listed-cost placements, positive balances)', () => {
     const state = createTutorialScenario();
-    // Scenario starts with 12 coins (higher than Easy's 10 so holding a card
-    // overnight overhead (−1/−0.75/−0.25 ongoing costs) never goes negative).
-    expect(state.resourceBank.coins).toBe(12);
+    // Scenario starts with 1200 coins (higher than Easy's 500 so holding a card
+    // overnight overhead (−100/−75/−25 ongoing costs) never goes negative).
+    expect(state.resourceBank.coins).toBe(1200);
 
-    // The Laundromat referenced in T3 must exist and cost ≤ 4
+    // The Laundromat referenced in T3 must exist and cost ≤ 400
     const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
     const laundromat = state.market.cards.find(
       c => matchesTemplate(c.id, t3.requiredCardId ?? ''),
     );
     expect(laundromat).toBeDefined();
-    expect(laundromat!.cost).toBeLessThanOrEqual(4);
+    expect(laundromat!.cost).toBeLessThanOrEqual(400);
 
     // The two-turn flow places each card the day AFTER its move at listed
-    // cost (no same-turn premium): Laundromat $4 (T7), Bookshop $3 (T15),
-    // Library $7 (T19). Income accrues across five end-turns and the T13
+    // cost (no same-turn premium): Laundromat $400 (T7), Bookshop $300 (T15),
+    // Library $700 (T19). Income accrues across five end-turns and the T13
     // Community Favour exchange tops up the wallet; the deterministic
     // 5-incident deck (award ×3, rainy ×2 — both non-negative on the
     // tutorial street) never drains it.
-    expect(12 - 4 - 3 - 7).toBe(-2); // pre-income, covered by end-turn income
+    expect(1200 - 400 - 300 - 700).toBe(-200); // pre-income, covered by end-turn income
   });
 
   it('ensureTutorialMarketForUpcomingSteps puts the Library in the row when T17 is upcoming', () => {
@@ -258,8 +258,8 @@ describe('createTutorialScenario', () => {
     // The row never exceeds 3 cards — a filler was displaced back to a deck.
     expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
     // Looked-up listed cost is affordable in the two-turn budget (income +
-    // favour cover the $7 Library; see TutorialScenario budget table).
-    expect(library!.cost).toBeLessThanOrEqual(12);
+    // favour cover the $700 Library; see TutorialScenario budget table).
+    expect(library!.cost).toBeLessThanOrEqual(1200);
   });
 
   // ── Market card integration with tutorial steps ──────────────
@@ -278,7 +278,7 @@ describe('createTutorialScenario', () => {
     // Verify it's the Laundromat
     const laundromat = marketCard as BusinessCard;
     expect(laundromat.name).toBe('Laundromat');
-    expect(laundromat.cost).toBe(4);
+    expect(laundromat.cost).toBe(400);
   });
 
   it('the Local Festival event card is in the investments row matching T9', () => {
@@ -295,8 +295,8 @@ describe('createTutorialScenario', () => {
     expect(festival).toBeDefined();
     expect(festival!.name).toBe('Local Festival');
     // The event should be affordable after buying Laundromat + one income turn
-    expect(festival!.cost).toBeGreaterThanOrEqual(2);
-    expect(festival!.cost).toBeLessThanOrEqual(4);
+    expect(festival!.cost).toBeGreaterThanOrEqual(200);
+    expect(festival!.cost).toBeLessThanOrEqual(400);
   });
 
   // ── Deck consistency ────────────────────────────────────────

@@ -923,13 +923,13 @@ export const STREET_ROWS = 2;
 export const MAX_TURNS = 20;
 
 /** Score required for a win via score threshold (Medium preset default, retuned to 120 by CG-0MT3J8FXG006RCOA). */
-export const WIN_THRESHOLD = 120;
+export const WIN_THRESHOLD = 12000;
 
 /** Starting coin balance (Medium preset default). */
-export const STARTING_COINS = 6;
+export const STARTING_COINS = 600;
 
 /** Starting reputation. */
-export const STARTING_REPUTATION = 3;
+export const STARTING_REPUTATION = 300;
 
 /**
  * Total number of cards visible in the single-row marketplace.
@@ -980,7 +980,7 @@ export const REFRESH_MARKET_COST = 5;
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 
 /** Points awarded per completed challenge. */
-export const CHALLENGE_BONUS_POINTS = 10;
+export const CHALLENGE_BONUS_POINTS = 1000;
 
 // ── Multi-Use Card Economy Ratios ───────────────────────────
 

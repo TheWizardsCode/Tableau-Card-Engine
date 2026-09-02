@@ -164,13 +164,13 @@ export interface TutorialScenario {
  */
 export const STANDARD_TUTORIAL_SCENARIO: TutorialScenario = {
   difficulty: 'Easy',
-  // 12 starting coins: the 18-step flow places four cards (Laundromat $4 +
-  // Bookshop $3 + Library $7 + Local Festival $3) and earns ~1.9 income +
-  // one Community Favour conversion (2 rep → 3 coins) at T13, which is
-  // REQUIRED to afford the $7 Library (6.875 + 3 = 9.875 ≥ 7). Reputation
-  // starts at 5 (the conversion spends 2, leaving 3 — safely above the
+  // 1200 starting coins: the 18-step flow places four cards (Laundromat $400 +
+  // Bookshop $300 + Library $700 + Local Festival $300) and earns ~190 income +
+  // one Community Favour conversion (200 rep → 300 coins) at T13, which is
+  // REQUIRED to afford the $700 Library (687.5 + 300 = 987.5 ≥ 700). Reputation
+  // starts at 500 (the conversion spends 200, leaving 300 — safely above the
   // reputation-collapse threshold).
-  resourceBank: { coins: 12, reputation: 5 },
+  resourceBank: { coins: 1200, reputation: 500 },
   market: {
     cards: [
       'biz-bakery',

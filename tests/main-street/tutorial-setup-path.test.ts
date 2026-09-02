@@ -136,12 +136,12 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
 
   it('scenario state has correct starting resources for tutorial', () => {
     const state = createTutorialScenario();
-    // Tutorial starts with the scenario's 12 coins (CG-0MSTOATDQ005XDET
-    // reduced from 16 so the T13 Community Favour rep→coins conversion is
-    // REQUIRED for the $7 Library) and 5 reputation (2 spent by the
-    // conversion, leaving a safe 3).
-    expect(state.resourceBank.coins).toBe(12);
-    expect(state.resourceBank.reputation).toBe(5);
+    // Tutorial starts with the scenario's 1200 coins (CG-0MSTOATDQ005XDET
+    // reduced from 1600 so the T13 Community Favour rep→coins conversion is
+    // REQUIRED for the $700 Library) and 500 reputation (200 spent by the
+    // conversion, leaving a safe 300).
+    expect(state.resourceBank.coins).toBe(1200);
+    expect(state.resourceBank.reputation).toBe(500);
   });
 
   it('scenario state has an empty street grid (no pre-placed businesses)', () => {
@@ -284,12 +284,12 @@ describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => 
     expect(invTemplateIds).toContain(stripSerialSuffix(invEvent!.id));
   });
 
-  it('scenario state provides sufficient coins for the 23-step two-turn purchases (Laundromat $4 + Bookshop $3 + Library $7 at listed cost)', () => {
+  it('scenario state provides sufficient coins for the 23-step two-turn purchases (Laundromat $400 + Bookshop $300 + Library $700 at listed cost)', () => {
     const state = createTutorialScenario();
 
-    // Starting coins: 12 (scenario; the two-turn flow places every card the
+    // Starting coins: 1200 (scenario; the two-turn flow places every card the
     // day after its move at LISTED cost — no same-turn +50% premium)
-    expect(state.resourceBank.coins).toBe(12);
+    expect(state.resourceBank.coins).toBe(1200);
 
     // After moving the Laundromat to hand (day 1) and placing it at listed
     // cost (day 2): 8 coins remaining — positive even after holding it
@@ -393,8 +393,8 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     // turn limit (maxTurns is optional and unset — CG-0MSLXJCHH001DLIO).
     expect(state.config.difficultyName).toBe('Easy');
     expect(state.config.maxTurns).toBeUndefined();
-    expect(state.config.startingCoins).toBe(10);
-    expect(state.config.startingReputation).toBe(5);
+    expect(state.config.startingCoins).toBe(1000);
+    expect(state.config.startingReputation).toBe(500);
 
     // State has all four decks
     expect(state.decks.business.length).toBeGreaterThan(0);

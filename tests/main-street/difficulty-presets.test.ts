@@ -158,7 +158,7 @@ describe('DifficultyPresets Module', () => {
 
     it('should match WIN_THRESHOLD (retuned to 120 by CG-0MT3J8FXG006RCOA)', () => {
       expect(MEDIUM_PRESET.winThreshold).toBe(WIN_THRESHOLD);
-      expect(WIN_THRESHOLD).toBe(120);
+      expect(WIN_THRESHOLD).toBe(12000);
     });
 
     it('should match the re-tuned synergy bonus per neighbor (CG-0MSP26Q5N002EH8P)', () => {
@@ -189,7 +189,7 @@ describe('DifficultyPresets Module', () => {
 
     it('should have a lower win threshold (retuned to 100 by CG-0MT3J8FXG006RCOA)', () => {
       expect(EASY_PRESET.winThreshold).toBeLessThan(MEDIUM_PRESET.winThreshold);
-      expect(EASY_PRESET.winThreshold).toBe(100);
+      expect(EASY_PRESET.winThreshold).toBe(10000);
     });
 
     it('should have higher synergy bonus per neighbor', () => {
@@ -214,7 +214,7 @@ describe('DifficultyPresets Module', () => {
 
     it('should have a higher win threshold (retuned to 150 by CG-0MT3J8FXG006RCOA)', () => {
       expect(HARD_PRESET.winThreshold).toBeGreaterThan(MEDIUM_PRESET.winThreshold);
-      expect(HARD_PRESET.winThreshold).toBe(150);
+      expect(HARD_PRESET.winThreshold).toBe(15000);
     });
 
     it('should have more challenges per run', () => {
