@@ -105,13 +105,13 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
   describe('reputation bonus', () => {
     it('repBonus is computed from reputation multiplier', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
-      state.resourceBank.reputation = 20; // reputation = 20 → multiplier = 1 + 20/20 = 2.0
-      placeOnGrid(state, makeBiz({ baseIncome: 3 }));
+      state.resourceBank.reputation = 2000; // rep 2000 → 1 + 2000/8000 = 1.25× (integer economy)
+      placeOnGrid(state, makeBiz({ baseIncome: 300 }));
       const result = applyIncome(state);
       const slot = result.phaseBreakdown.perSlotBreakdown[0];
       expect(slot).toBeDefined();
-      // At rep 20, rep coin multiplier = 2.0, so repBonus should be positive
-      // baseIncome = 3, after buffs = 3, rep multiplier doubles it → 6, repBonus = 3
+      // At rep 2000, rep coin multiplier = 1.25, so repBonus should be positive
+      // baseIncome = 300, after buffs = 300, rep 1.25× → 375, repBonus = 75
       expect(slot.repBonus).toBeGreaterThan(0);
     });
 
@@ -126,8 +126,8 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
 
     it('total equals sum of all phases across all slots + handSynergyTotal', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
-      state.resourceBank.reputation = 20;
-      placeOnGrid(state, makeBiz({ baseIncome: 3 }));
+      state.resourceBank.reputation = 2000;
+      placeOnGrid(state, makeBiz({ baseIncome: 300 }));
       const result = applyIncome(state);
       const slot = result.phaseBreakdown.perSlotBreakdown[0];
       const phaseSum = slot.baseIncome + slot.repBonus + slot.eventDeltas.reduce((s, d) => s + d.delta, 0);
@@ -139,7 +139,7 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
   describe('event delta tracking', () => {
     it('tracks income-multiplier active effects as eventDeltas', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
-      placeOnGrid(state, makeBiz({ baseIncome: 4 }));
+      placeOnGrid(state, makeBiz({ baseIncome: 400 }));
       // Add a Flu Outbreak effect: 0.8× income multiplier
       const effect = createActiveEffect(
         'income-multiplier',
@@ -161,7 +161,7 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
 
     it('tracks multiple income-multiplier effects separately', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
-      placeOnGrid(state, makeBiz({ baseIncome: 4 }));
+      placeOnGrid(state, makeBiz({ baseIncome: 400 }));
       state.activeEffects.push(createActiveEffect('income-multiplier', 0.8, 5, 'flu-outbreak', 'Flu Outbreak'));
       state.activeEffects.push(createActiveEffect('income-multiplier', 1.15, 3, 'tourist-season', 'Tourist Season'));
       const result = applyIncome(state);
@@ -199,12 +199,12 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
   describe('combined effects', () => {
     it('correctly handles base + reputation + income-multiplier together', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
-      state.resourceBank.reputation = 40; // rep multiplier = 1 + 40/20 = 3.0
-      placeOnGrid(state, makeBiz({ baseIncome: 2 }));
+      state.resourceBank.reputation = 4000; // rep 4000 → 1 + 4000/8000 = 1.5× (cap, integer economy)
+      placeOnGrid(state, makeBiz({ baseIncome: 200 }));
       state.activeEffects.push(createActiveEffect('income-multiplier', 0.8, 3, 'flu-outbreak', 'Flu Outbreak'));
       const result = applyIncome(state);
       const slot = result.phaseBreakdown.perSlotBreakdown[0];
-      expect(slot.baseIncome).toBe(2);
+      expect(slot.baseIncome).toBe(200);
       expect(slot.repBonus).toBeGreaterThan(0);
       expect(slot.eventDeltas.length).toBe(1);
       expect(slot.eventDeltas[0].delta).toBeLessThan(0);
@@ -212,8 +212,8 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
 
     it('slot totals sum approximately to the credited total', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
-      state.resourceBank.reputation = 30;
-      placeOnGrid(state, makeBiz({ baseIncome: 3, id: 'a' }), makeBiz({ baseIncome: 4, id: 'b' }));
+      state.resourceBank.reputation = 3000;
+      placeOnGrid(state, makeBiz({ baseIncome: 300, id: 'a' }), makeBiz({ baseIncome: 400, id: 'b' }));
       const coinsBefore = state.resourceBank.coins;
       const result = applyIncome(state);
       // Sum of phase values (base + repBonus + eventDeltas) should equal
