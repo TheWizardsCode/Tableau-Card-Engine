@@ -239,11 +239,14 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 **Free operations (never consume an action):**
 
 - Market re-roll/refresh
-- Selling a business
+- Selling a business — refund formula (CG-0MT5XO7DI0066QCT): `Math.ceil((card.cost + totalUpgradeCost) * 1.5) + Math.max(0, currentIncome − effectiveBase) + Math.max(0, currentReputationPerTurn − (repPerTurn + reputationBonus))` where `effectiveBase = (baseIncome + incomeBonus) × (hasAdjacentSameType ? 0.6 : 1)` and the 1.5× is the same +50% buy-and-place premium; applies to business **and** community-space cards; synergy comps are 0 when undefined and never negative.
+  The sell dialog and activity log show the breakdown (base, synergy income, synergy rep).
 - Hint (still 1/day)
 - Discarding from hand
 - Buying/playing upgrade cards and Investment events
 - Ending the turn
+
+> Sell price (CG-0MT5XO7DI0066QCT): the sell refund mirrors the buy-and-place premium (1.5× purchase + upgrades) and adds the card's current synergy value, so emergency cash reflects what the card actually earns on the grid. A card with no synergies still recovers more than before (`/2 → ×1.5`); a well-synergised card recovers coins **plus** rep-derived value automatically. The breakdown is visible before the player confirms.
 
 > Same-day composite pricing (CG-0MT24X0SX007RLHN): clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase**. If the move consumed the daily action (0 actions left), the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**; an explainer dialog fires first (Proceed commits, Cancel aborts with no cost, "Don't show this again" persists the preference). If an action **remains** (Golden Mile 2-action days), the placement consumes it at **listed cost**. A card left in hand and placed on a **later** day costs that day's action at listed cost, with no dialog. Business and community-space cards are priced identically.
 

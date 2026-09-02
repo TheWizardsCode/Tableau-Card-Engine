@@ -36,7 +36,7 @@ import {
 
 // ── Constants ───────────────────────────────────────────────
 
-const SELL_REFUND_RATIO = 0.5; // 50% refund
+const SELL_REFUND_RATIO = 1.5; // new formula: 1.5x base + synergy components (CG-0MT5XO7DI0066QCT)
 
 // ── Feature Detection ───────────────────────────────────────
 
@@ -339,13 +339,13 @@ describe('MainStreet Sell Cards', () => {
         } as BusinessCard;
 
         const coinsBefore = state.resourceBank.coins;
-        const expectedRefund = Math.ceil(oddCost * SELL_REFUND_RATIO); // ceil(3.5) = 4
+        const expectedRefund = Math.ceil(oddCost * SELL_REFUND_RATIO); // 7 * 1.5 = 10.5, ceil = 11
 
         const market = await import('../../example-games/main-street/MainStreetMarket');
         (market as any).sellBusiness(state, 0);
 
         expect(state.resourceBank.coins).toBe(coinsBefore + expectedRefund);
-        expect(expectedRefund).toBe(4); // Verify: 7/2 = 3.5, ceil = 4
+        expect(expectedRefund).toBe(11); // Verify: 7*1.5 = 10.5, ceil = 11
       },
     );
   });

@@ -21,7 +21,7 @@ import {
   GRID_SIZE,
   REFRESH_MARKET_COST,
 } from './MainStreetCards';
-import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
+import { updateNeighborsOnPlacement, updateNeighborsOnSale, hasAdjacentSameType } from './MainStreetAdjacency';
 import {
   computeRefreshCostDiscount,
   getEmployedSpecializationSkills,
@@ -1050,6 +1050,18 @@ export function purchaseStaffCard(
 
 // ── Sell Business (Street Grid) ──────────────────────────────
 
+/** Breakdown of a sell refund into its component parts. */
+export interface SellRefundBreakdown {
+  /** The base refund: Math.ceil((card.cost + totalUpgradeCost) * 1.5). */
+  baseRefund: number;
+  /** Synergy income component: Math.max(0, currentIncome - effectiveBase). */
+  synergyIncomeComponent: number;
+  /** Synergy reputation component: Math.max(0, currentRep - (repPerTurn + repBonus)). */
+  synergyRepComponent: number;
+  /** Total refund (sum of all components). */
+  totalRefund: number;
+}
+
 /** Result returned after selling a business from the street grid. */
 export interface SellResult {
   /** The card that was sold. */
@@ -1061,11 +1073,73 @@ export interface SellResult {
 }
 
 /**
+ * Computes the sell refund for a card using the new formula (CG-0MT5XO7DI0066QCT).
+ *
+ * Refund = baseRefund + synergyIncomeComponent + synergyRepComponent
+ *
+ * Where:
+ *   baseRefund = Math.ceil((card.cost + totalUpgradeCost) * 1.5)
+ *   synergyIncomeComponent = Math.max(0, currentIncome - effectiveBase)
+ *   synergyRepComponent = Math.max(0, currentReputationPerTurn - (repPerTurn + repBonus))
+ *   effectiveBase = (baseIncome + incomeBonus) * (hasAdjacentSameType ? 0.6 : 1)
+ *
+ * Synergy components use Math.max(0, ...) to avoid negative contributions
+ * (e.g. when same-type penalty reduces income below base).
+ * If currentIncome or currentReputationPerTurn is undefined, the respective
+ * component is treated as 0 (defensive guard).
+ *
+ * @param state     Current game state.
+ * @param card      The card being sold.
+ * @param slotIndex The grid slot index of the card.
+ * @returns SellRefundBreakdown with the total refund and component breakdown.
+ */
+export function computeSellRefund(
+  state: MainStreetState,
+  card: BusinessCard | CommunitySpaceCard,
+  slotIndex: number,
+): SellRefundBreakdown {
+  const upgradeCosts = (card as any).totalUpgradeCost ?? 0;
+
+  // Base refund: 1.5× the total cost (purchase + upgrades)
+  const baseRefund = Math.ceil((card.cost + upgradeCosts) * 1.5);
+
+  // Compute effectiveBase (base income + upgrade bonus, with same-type penalty)
+  const soldSlots: boolean[] = state.soldSlots ?? [];
+  const gridDims = state.streetGridCols && state.streetGridRows
+    ? { cols: state.streetGridCols, rows: state.streetGridRows }
+    : undefined;
+  let effectiveBase = card.baseIncome + card.incomeBonus;
+  if (hasAdjacentSameType(state.streetGrid, slotIndex, soldSlots, gridDims)) {
+    effectiveBase = effectiveBase * 0.6;
+  }
+
+  // Synergy income component: the portion of currentIncome above effectiveBase
+  const synergyIncomeComponent = Math.max(0, (card.currentIncome ?? 0) - effectiveBase);
+
+  // Synergy reputation component: the portion above base rep + upgrade bonus
+  const synergyRepComponent = Math.max(
+    0,
+    (card.currentReputationPerTurn ?? 0) - (card.reputationPerTurn ?? 0) - card.reputationBonus,
+  );
+
+  const totalRefund = baseRefund + synergyIncomeComponent + synergyRepComponent;
+
+  return { baseRefund, synergyIncomeComponent, synergyRepComponent, totalRefund };
+}
+
+/**
  * Sells a business or community-space card from the street grid.
  *
  * The card remains on the grid but is marked as sold (non-functional).
- * The player receives `Math.ceil((card.cost + totalUpgradeCost) / 2)` coins.
- * Upgrades are lost (included in the refund calculation but no longer provide benefits).
+ * The player receives a refund calculated as:
+ *   baseRefund = Math.ceil((card.cost + totalUpgradeCost) * 1.5)
+ *   + synergy income component (currentIncome - effectiveBase, clamped ≥ 0)
+ *   + synergy reputation component (currentRep - (repPerTurn + repBonus), clamped ≥ 0)
+ *
+ * where effectiveBase = (baseIncome + incomeBonus) × (same-type adjacent ? 0.6 : 1).
+ *
+ * This is the same +50% premium multiplier used for same-day composite
+ * and drag-and-drop placements (CG-0MT5XO7DI0066QCT).
  *
  * @param state     Current game state (mutated in-place).
  * @param slotIndex Street grid slot index of the card to sell.
@@ -1094,10 +1168,9 @@ export function sellBusiness(
     throw new Error(`Slot ${slotIndex} has already been sold.`);
   }
 
-  // Calculate refund: Math.ceil((purchasePrice + sumOfAllUpgradeCosts) / 2)
-  const purchasePrice = card.cost;
-  const upgradeCosts = (card as any).totalUpgradeCost ?? 0;
-  const refund = Math.ceil((purchasePrice + upgradeCosts) / 2);
+  // Calculate refund using the new formula (CG-0MT5XO7DI0066QCT)
+  const breakdown = computeSellRefund(state, card, slotIndex);
+  const refund = breakdown.totalRefund;
 
   // Credit coins
   state.resourceBank.coins += refund;
@@ -1111,7 +1184,11 @@ export function sellBusiness(
   // but recalculation ensures consistency for same-type penalty and type-matching.
   updateNeighborsOnSale(state, slotIndex);
 
-  addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (50% of €${purchasePrice + upgradeCosts}) (${describeEventEffects(refund, 0)})`, classifyEffect(refund, 0));
+  addLog(
+    state,
+    `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (€${breakdown.baseRefund} base + ${breakdown.synergyIncomeComponent} synergy income + ${breakdown.synergyRepComponent} synergy rep) (${describeEventEffects(refund, 0)})`,
+    classifyEffect(refund, 0),
+  );
 
   return { card, refund, slotIndex };
 }

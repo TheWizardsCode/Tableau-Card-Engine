@@ -230,6 +230,7 @@ void popTextOrIcon({
      `hudY`) with `SFX_KEYS.COIN_POP` via `moveGameObject`.
   3. A "+€refund" pop lands at the HUD counter (`popTextOrIcon`) and the
      coin SFX pops on landing.
+- Sell-price formula (CG-0MT5XO7DI0066QCT): refund = `ceil((cost + totalUpgradeCost) * 1.5) + max(0, currentIncome − effectiveBase) + max(0, currentRep − (repPerTurn + repBonus))`; `effectiveBase = (baseIncome + incomeBonus) * 0.6` when same-type adjacent, else ×1; applies to business + community-space. Dialog shows breakdown (panel 360×300, base / synergy-income / synergy-rep) before confirm; log mirrors the breakdown.
 - Accessibility (reduced motion): demolition + coin flight are skipped; a
   single "+€refund" pop + coin SFX remain (spec AC2).
 - Headless/replay exemption (AGENTS.md rule 8): presentation-only — the

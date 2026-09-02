@@ -283,7 +283,7 @@ export class MainStreetOverlayContent {
     const s = this.scene;
 
     const panelW = 360;
-    const panelH = 260;
+    const panelH = 300;
     const panelY = s.layout.gameH / 2 - panelH / 2;
 
     // Overlay background with semi-transparent backdrop

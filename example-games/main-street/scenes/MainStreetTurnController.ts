@@ -11,6 +11,7 @@ import {
   canPurchaseStaff,
   canRefreshMarket,
   canSellBusiness,
+  computeSellRefund,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
@@ -1757,17 +1758,20 @@ export class MainStreetTurnController {
       return;
     }
 
-    // Calculate refund for display
-    const upgradeCosts = (card as any).totalUpgradeCost ?? 0;
-    const refund = Math.ceil((card.cost + upgradeCosts) / 2);
+    // Calculate refund for display using the new formula (CG-0MT5XO7DI0066QCT)
+    const breakdown = computeSellRefund(s.state, card, slotIndex);
+    const refund = breakdown.totalRefund;
 
-    // Build card info for dialog
+    // Build card info for dialog with breakdown
     const isCommunitySpace = card.family === 'community-space';
     const cardLabel = isCommunitySpace ? 'Community Space' : 'Business';
     const info = `${cardLabel}: ${card.name}\n` +
       `Purchase: €${card.cost}\n` +
-      `Upgrades: €${upgradeCosts}\n` +
-      `Refund: €${refund} (50%)\n\n` +
+      `Upgrades: €${(card as any).totalUpgradeCost ?? 0}\n` +
+      `Refund: €${refund}\n\n` +
+      `  Base: €${breakdown.baseRefund} (1.5× purchase + upgrades)\n` +
+      `  Synergy income: +€${breakdown.synergyIncomeComponent}\n` +
+      `  Synergy reputation: +€${breakdown.synergyRepComponent}\n\n` +
       `Sell this card? It will remain on the grid but produce no further income.`;
 
     // Show sell confirmation via overlay
