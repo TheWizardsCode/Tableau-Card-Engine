@@ -6,7 +6,7 @@ import { computeSynergyPairs } from '../MainStreetAdjacency';
 import { SFX_KEYS, CARD_BACK_TEMPLATE } from './MainStreetConstants';
 import { synergyLineEndpoints } from './synergyLineEndpoints';
 import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
-import { createCoinGrid, roundHalf, splitCoins, type CoinGridHandle } from '../coin-grid';
+import { createCoinGrid, iconsForAmount, roundHalf, type CoinGridHandle } from '../coin-grid';
 
 // ── Income phase animation timing (CG-0MT23O6W8003AXWJ) ────────────────
 // Tune these constants to adjust the phased income choreography pacing.
@@ -471,18 +471,18 @@ export class MainStreetAnimator {
         if (ctx.reducedMotion) return;
         slots.forEach((slot, si) => {
           const amount = Math.max(0, roundHalf(slot.pd.baseIncome));
-          if (splitCoins(amount).fullCoins === 0 && !splitCoins(amount).halfCoin) return;
+          if (iconsForAmount(amount) === 0) return;
           this.countOutCoins(slot, amount, si * INCOME_BASE_COUNT_STAGGER_MS);
         });
         break;
       }
       case 'synergy': {
         if (ctx.reducedMotion) return;
-        if (!slots.some((sl) => roundHalf(sl.pd.synergyBonus) > 0)) return;
+        if (!slots.some((sl) => iconsForAmount(roundHalf(sl.pd.synergyBonus)) > 0)) return;
         const sources = this.synergyPhaseSources();
         slots.forEach((slot, si) => {
           const amount = Math.max(0, roundHalf(slot.pd.synergyBonus));
-          if (splitCoins(amount).fullCoins === 0 && !splitCoins(amount).halfCoin) return;
+          if (iconsForAmount(amount) === 0) return;
           const from = sources.get(slot.pd.slotIndex) ?? sources.get('fallback')!;
           this.flyCoinsIn(slot, amount, from, si * INCOME_FLIGHT_STAGGER_MS);
         });
@@ -490,11 +490,11 @@ export class MainStreetAnimator {
       }
       case 'reputation': {
         if (ctx.reducedMotion) return;
-        if (!slots.some((sl) => roundHalf(sl.pd.repBonus) > 0)) return;
+        if (!slots.some((sl) => iconsForAmount(roundHalf(sl.pd.repBonus)) > 0)) return;
         const from = { x: s.layout.gameW * 0.5, y: s.layout.hudY };
         slots.forEach((slot, si) => {
           const amount = Math.max(0, roundHalf(slot.pd.repBonus));
-          if (splitCoins(amount).fullCoins === 0 && !splitCoins(amount).halfCoin) return;
+          if (iconsForAmount(amount) === 0) return;
           this.flyCoinsIn(slot, amount, from, si * INCOME_FLIGHT_STAGGER_MS);
         });
         break;
@@ -521,9 +521,8 @@ export class MainStreetAnimator {
               0,
             );
             if (delta === 0) return;
+            if (iconsForAmount(Math.abs(roundHalf(delta))) === 0) return;
             const amount = Math.abs(roundHalf(delta));
-            const icons = splitCoins(amount);
-            if (icons.fullCoins === 0 && !icons.halfCoin) return;
             const at = (ei * deltaEffects.length + si) * INCOME_FLIGHT_STAGGER_MS;
             if (delta > 0) {
               this.flyCoinsIn(slot, amount, this.eventSourcePoint(), at);
@@ -542,9 +541,8 @@ export class MainStreetAnimator {
         const from = { x: s.layout.gameW * 0.5, y: s.layout.queueTop };
         slots.forEach((slot, si) => {
           for (const d of slot.pd.upcomingDeltas ?? []) {
+            if (iconsForAmount(Math.abs(roundHalf(d.delta))) === 0) continue;
             const amount = Math.abs(roundHalf(d.delta));
-            const icons = splitCoins(amount);
-            if (icons.fullCoins === 0 && !icons.halfCoin) continue;
             const at = si * INCOME_FLIGHT_STAGGER_MS;
             if (d.delta > 0) {
               this.flyCoinsIn(slot, amount, from, at);
@@ -617,8 +615,7 @@ export class MainStreetAnimator {
    */
   private countOutCoins(slot: IncomePhaseSlot, amount: number, at: number): void {
     const s = this.scene;
-    const { fullCoins, halfCoin } = splitCoins(amount);
-    const iconCount = fullCoins + (halfCoin ? 1 : 0);
+    const iconCount = iconsForAmount(amount);
     if (iconCount === 0) return;
     for (let n = 1; n <= iconCount; n++) {
       s.time.delayedCall(at + (n - 1) * INCOME_BASE_COUNT_STAGGER_MS, () => {
@@ -659,8 +656,7 @@ export class MainStreetAnimator {
    */
   private flyCoinsIn(slot: IncomePhaseSlot, amount: number, from: { x: number; y: number }, at: number): void {
     const s = this.scene;
-    const { fullCoins, halfCoin } = splitCoins(amount);
-    const iconCount = fullCoins + (halfCoin ? 1 : 0);
+    const iconCount = iconsForAmount(amount);
     if (iconCount === 0) return;
     const m = slot.handle.container.getWorldTransformMatrix();
     const to = { x: m.getX(0, 0), y: m.getY(0, 0) };
@@ -701,12 +697,11 @@ export class MainStreetAnimator {
   private flyCoinsOut(slot: IncomePhaseSlot, amount: number, to: { x: number; y: number }, at: number): void {
     const s = this.scene;
     const grid = slot.handle.container;
-    const { fullCoins, halfCoin } = splitCoins(amount);
-    const iconCount = fullCoins + (halfCoin ? 1 : 0);
+    const iconCount = iconsForAmount(amount);
     if (iconCount === 0) return;
-    // Decrement sequence: whole coins (integer economy).
+    // Decrement sequence: 1 icon per 100 coins (x100 economy presentation scaling).
     const decrements: number[] = [];
-    for (let k = 0; k < fullCoins; k++) decrements.push(1);
+    for (let k = 0; k < iconCount; k++) decrements.push(1);
     for (let i = 0; i < iconCount; i++) {
       s.time.delayedCall(at + i * INCOME_FLIGHT_STAGGER_MS, () => {
         try {

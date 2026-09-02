@@ -65,6 +65,26 @@ export const COIN_GRID_SPACING = 2;
 /** Smallest acceptable coin diameter before overlap kicks in. */
 export const MIN_COIN_SIZE = 4;
 
+/**
+ * Presentation divisor: 1 icon/SFX per 100 integer coins — post ×100 economy (CG-0MTIO1M15001E9Y6).
+ * Income VFX/SFX (animateIncomePhases + legacy animateIncomeCollection) render
+ * `iconsForAmount(amount)` icons/SFX per phase amount, a presentation-only scaling.
+ * Small positive coins still surface ≥1 icon (the clamp in iconsForAmount).
+ */
+export const COINS_PER_ICON = 100;
+
+/**
+ * Integer coin amount → icon/SFX count for income VFX/SFX.
+ * Presentation-only; credited coin totals and transcript entries are unaffected.
+ * Mapping: Math.round(max(0, amount) / COINS_PER_ICON), clamped so >0 always yields ≥1 icon.
+ * 230 → 2, 50 → 1, 0 → 0. Negative amounts (not expected in VFX) map to 0.
+ */
+export function iconsForAmount(amount: number): number {
+  const raw = Math.round(Math.max(0, Math.round(amount)) / COINS_PER_ICON);
+  if (Math.round(amount) > 0 && raw === 0) return 1;
+  return raw;
+}
+
 /** Texture keys generated lazily by `createCoinGrid`. */
 export const COIN_GRID_FULL_KEY = 'ms-coin-grid-full';
 export const COIN_GRID_HALF_KEY = 'ms-coin-grid-half';
