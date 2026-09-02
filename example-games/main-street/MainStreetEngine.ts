@@ -59,7 +59,7 @@ import {
   computeStreetOngoingCostReductionPct,
   getEmployedSpecializationSkills,
 } from './MainStreetStaffBuffs';
-import { deserializeSkillIds, hasPeekCapableStaff } from './MainStreetStaffSkills';
+import { deserializeSkillIds, hasPeekCapableStaff, assignSkillsToApplicant, serializeSkillIds } from './MainStreetStaffSkills';
 import {
   purchaseBusiness,
   moveToHand,
@@ -1366,6 +1366,13 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   state.dayStartCoins = state.resourceBank.coins;
   state.dayStartRep = state.resourceBank.reputation;
 
+  // Staff applicant trigger (CG-0MSTOATDU006UGAX): resolved after market
+  // refill so the player sees the applicant during MarketPhase. Suppressed
+  // in tutorial/headless when suppressApplicant is true.
+  if (!(state as any).suppressApplicant) {
+    resolveStaffApplicant(state);
+  }
+
   state.phase = 'MarketPhase';
 }
 
@@ -1402,6 +1409,13 @@ export function appendTurnNetRow(state: MainStreetState, turnEnded: number): voi
 export function processEndOfTurn(state: MainStreetState): TurnResult {
   if (state.phase !== 'MarketPhase') {
     throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
+  }
+
+  // Auto-decline pending applicant at end of turn (CG-0MSTOATDU006UGAX).
+  // If the player didn't respond to the applicant, decline automatically.
+  const pending = (state as any).pendingApplicant;
+  if (pending) {
+    declineStaffApplicant(state);
   }
 
   // The turn being summarised by the net row (turn is incremented below on
@@ -2211,3 +2225,220 @@ export function getEmployedStaffCountAt(state: MainStreetState, slotIndex: numbe
 export function hasFreeEmploymentSlot(state: MainStreetState, slotIndex: number): boolean {
   return getEmployedStaffCountAt(state, slotIndex) < getEmploymentCapacity(state, slotIndex);
 }
+
+// ── Staff Applicant Trigger (CG-0MSTOATDU006UGAX) ──────────
+
+/**
+ * Chance (in percent) that a staff applicant appears. Formula: min(
+ * reputationPerTurn + incomePerTurn, 15). Capped at 15% per AC.
+ */
+const APPLICANT_CHANCE_CAP = 15;
+
+/**
+ * Returns the effective per-turn income+reputation for the applicant
+ * trigger chance calculation. Sum of baseIncome from all placed businesses
+ * plus all reputationPerTurn (business + staff) on the street.
+ *
+ * @param state     Current game state.
+ * @returns Effective income+reputation sum (before the 15% cap).
+ */
+function computeApplicantChance(state: MainStreetState): number {
+  // Sum business baseIncome
+  let totalIncome = 0;
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const card = state.streetGrid[i];
+    if (card && (card.family === 'business' || card.family === 'community-space')) {
+      totalIncome += card.baseIncome;
+    }
+  }
+  // Add reputationPerTurn from businesses
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const card = state.streetGrid[i];
+    if (card && (card.family === 'business' || card.family === 'community-space')) {
+      totalIncome += card.reputationPerTurn ?? 0;
+    }
+  }
+  return Math.min(totalIncome, APPLICANT_CHANCE_CAP);
+}
+
+/**
+ * Checks whether there is at least one business with a free employment slot.
+ *
+ * @param state     Current game state.
+ * @returns True when at least one eligible business exists.
+ */
+function hasEligibleBusiness(state: MainStreetState): boolean {
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const card = state.streetGrid[i];
+    if (card && (card.family === 'business' || card.family === 'community-space')) {
+      if (hasFreeEmploymentSlot(state, i)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Picks a random eligible business slot (one with a free employment slot),
+ * weighted uniformly across eligible slots.
+ *
+ * @param state     Current game state.
+ * @returns The chosen slot index, or -1 when no eligible slot exists.
+ */
+function pickTargetSlot(state: MainStreetState): number {
+  const eligible: number[] = [];
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const card = state.streetGrid[i];
+    if (card && (card.family === 'business' || card.family === 'community-space')) {
+      if (hasFreeEmploymentSlot(state, i)) eligible.push(i);
+    }
+  }
+  if (eligible.length === 0) return -1;
+  const idx = state.rng() * eligible.length;
+  return eligible[Math.floor(idx)];
+}
+
+/**
+ * Resolves whether a staff applicant appears at day start. Uses the seeded
+ * `state.rng` for determinism. Chance = min(income+rep, 15)%.
+ *
+ * When triggered:
+ * - Picks a random business with a free employment slot as the target.
+ * - Draws a random StaffCard from the staff deck (no removal — the pool
+ *   persists for future days).
+ * - Sets `pendingApplicant = { card, targetSlotIndex }`.
+ *
+ * When no eligible business exists or the RNG roll fails, nothing happens.
+ *
+ * @param state     Current game state (mutated — sets pendingApplicant).
+ */
+export function resolveStaffApplicant(state: MainStreetState): void {
+  // Must have at least one eligible business
+  if (!hasEligibleBusiness(state)) return;
+
+  // Chance = min(income+rep, 15)%
+  const chance = computeApplicantChance(state);
+  if (chance <= 0) return;
+
+  // Deterministic roll: roll in [0, 100), trigger if < chance
+  const roll = state.rng() * 100;
+  if (roll >= chance) return;
+
+  // Pick a target slot
+  const targetSlot = pickTargetSlot(state);
+  if (targetSlot < 0) return;
+
+  // Draw a random staff card from the deck
+  const staffDeck = state.decks?.staff;
+  if (!staffDeck || staffDeck.length === 0) return;
+
+  // Pick a random card from the deck
+  const deckIdx = Math.floor(state.rng() * staffDeck.length);
+  const card = { ...staffDeck[deckIdx] } as StaffCard;
+
+  // Assign specialization skills if not already present
+  if (!Array.isArray(card.specializationSkillIds)) {
+    card.specializationSkillIds = serializeSkillIds(
+      assignSkillsToApplicant(state.rng),
+    );
+  }
+
+  // Set pending applicant
+  (state as any).pendingApplicant = { card, targetSlotIndex: targetSlot };
+}
+
+/**
+ * Checks whether the pending applicant can be hired (target slot has capacity).
+ *
+ * @param state     Current game state.
+ * @returns True when the pending applicant can be hired.
+ */
+export function canHireStaffApplicant(state: MainStreetState): boolean {
+  const pending = (state as any).pendingApplicant;
+  if (!pending || pending.targetSlotIndex == null) return false;
+  const slot = pending.targetSlotIndex as number;
+  if (slot < 0 || slot >= state.streetGrid.length) return false;
+  return hasFreeEmploymentSlot(state, slot);
+}
+
+/**
+ * Hires the pending staff applicant: adds to staffCards with employedAtSlot,
+ * costs 0 coins (no maxHandSize increase), and clears pendingApplicant.
+ *
+ * Salary is deducted in the next income phase via applyStaffOngoingCosts.
+ *
+ * @param state     Current game state (mutated).
+ * @throws Error if no pending applicant or slot is at capacity.
+ */
+export function hireStaffApplicant(state: MainStreetState): void {
+  const pending = (state as any).pendingApplicant;
+  if (!pending) {
+    throw new Error('No pending applicant to hire');
+  }
+  if (!canHireStaffApplicant(state)) {
+    throw new Error('Target slot is at employment capacity');
+  }
+
+  const card = { ...(pending.card as StaffCard), employedAtSlot: pending.targetSlotIndex } as StaffCard;
+
+  // Add to staffCards with employedAtSlot
+  state.staffCards.push(card);
+
+  // Clear pending applicant
+  (state as any).pendingApplicant = null;
+}
+
+/**
+ * Declines the pending staff applicant: clears pendingApplicant with no
+ * other effects. The declined card leaves the applicant pool (it is not
+ * restored to the staff deck — the pool persists independently).
+ *
+ * @param state     Current game state (mutated).
+ */
+export function declineStaffApplicant(state: MainStreetState): void {
+  (state as any).pendingApplicant = null;
+}
+
+/**
+ * Lets go a staff member at the given index: removes from staffCards,
+ * deducts 1 turn's salary (clamped at 0) from coins, and deducts 1
+ * reputation. Buffs from this member stop applying from the next income
+ * phase (handled automatically — the member is removed before income).
+ *
+ * @param state     Current game state (mutated).
+ * @param idx       Index of the staff member to let go.
+ */
+export function letGoStaffMember(state: MainStreetState, idx: number): void {
+  if (idx < 0 || idx >= state.staffCards.length) {
+    throw new Error(`Invalid staff index: ${idx}`);
+  }
+
+  const member = state.staffCards[idx];
+  const skills = Array.isArray((member as any).specializationSkillIds)
+    ? deserializeSkillIds((member as any).specializationSkillIds)
+    : [];
+  const salary = computeStaffSalaryCost(skills, member.ongoingCost);
+
+  // Deduct salary (clamped at 0) and 1 reputation
+  state.resourceBank.coins = Math.max(0, state.resourceBank.coins - salary);
+  state.resourceBank.reputation = Math.max(0, state.resourceBank.reputation - 1);
+
+  // Remove from staffCards
+  state.staffCards.splice(idx, 1);
+}
+
+/** Mutates: consumes a pending applicant into staffCards with employedAtSlot (no hand slots). */
+export function hireApplicantAction(state: MainStreetState): void {
+  hireStaffApplicant(state);
+}
+
+/** Mutates: clears the pending applicant without effect. */
+export function declineApplicantAction(state: MainStreetState): void {
+  declineStaffApplicant(state);
+}
+
+/** Mutates: lets go of a staff member by index. */
+export function letGoStaffAction(state: MainStreetState, idx: number): void {
+  letGoStaffMember(state, idx);
+}
+
+

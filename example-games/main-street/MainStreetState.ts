@@ -453,6 +453,8 @@ export interface MainStreetState {
    * Cleared on hire, decline, or at the next DayStart.
    */
   pendingApplicant: PendingApplicant | null;
+  /** Suppresses the staff-applicant trigger at DayStart (CG-0MSTOATDU006UGAX: tutorial/headless). */
+  suppressApplicant?: boolean;
 }
 
 /**
@@ -1417,6 +1419,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   }
   if (!('streetGridRows' in saved)) {
     (saved as Record<string, unknown>).streetGridRows = 1;
+  }
+
+  // ── pendingApplicant (CG-0MSTOATDU006UGAX): backfill default ─
+  if (!('pendingApplicant' in saved)) {
+    (saved as Record<string, unknown>).pendingApplicant = null;
   }
 
   // ── ongoingCost: default to 0 for legacy community-space cards ─

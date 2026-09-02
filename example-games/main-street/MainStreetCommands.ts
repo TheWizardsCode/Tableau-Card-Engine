@@ -28,6 +28,9 @@ import {
   hireStaffCard,
   peekIncidentDeck,
   consumeAction as consumeEngineAction,
+  hireApplicantAction,
+  declineApplicantAction,
+  letGoStaffAction,
 } from './MainStreetEngine';
 
 // ── Action Budget Enforcement ────────────────────────────────
@@ -62,6 +65,10 @@ interface MarketActionSnapshot {
   peekUsedThisTurn: boolean | null;
   /** Staff peek reveal — captured so undo clears a pending reveal. */
   revealedPeekedCard: any | null;
+  /** Staff applicant — captured so undo restores pending/hired state. */
+  pendingApplicant: any | null;
+  /** Staff roster — captured so undo restores the staff list. */
+  staffCards: any | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -93,6 +100,8 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     bankedActions: state.bankedActions ?? 0,
     peekUsedThisTurn: state.peekUsedThisTurn ?? false,
     revealedPeekedCard: state.revealedPeekedCard ?? null,
+    pendingApplicant: safeClone((state as any).pendingApplicant ?? null),
+    staffCards: safeClone(state.staffCards ?? []),
   };
 }
 
@@ -120,6 +129,12 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   }
   if ('revealedPeekedCard' in snap) {
     state.revealedPeekedCard = snap.revealedPeekedCard;
+  }
+  if ('pendingApplicant' in snap) {
+    (state as any).pendingApplicant = snap.pendingApplicant;
+  }
+  if ('staffCards' in snap) {
+    state.staffCards = snap.staffCards;
   }
 }
 
@@ -382,6 +397,45 @@ export function sellBusinessCommand(
     snapshotAction(
       (s) => sellBusiness(s, slotIndex),
       `SellBusiness slot ${slotIndex}`,
+    ),
+  );
+}
+
+/**
+ * Command: Hire the pending staff applicant (CG-0MSTOATDU006UGAX, 0 cost, no hand slots).
+ */
+export function hireApplicantCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { hireApplicantAction(s); },
+      'HireApplicant',
+    ),
+  );
+}
+
+/**
+ * Command: Decline the pending staff applicant (CG-0MSTOATDU006UGAX, free, no other effects).
+ */
+export function declineApplicantCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { declineApplicantAction(s); },
+      'DeclineApplicant',
+    ),
+  );
+}
+
+/**
+ * Command: Let go a staff member (CG-0MSTOATDU006UGAX, -salary coins, -1 rep).
+ */
+export function letGoStaffCommand(state: MainStreetState, idx: number) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { letGoStaffAction(s, idx); },
+      `LetGoStaff ${idx}`,
     ),
   );
 }
