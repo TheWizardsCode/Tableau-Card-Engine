@@ -47,9 +47,9 @@ describe('Reader\'s Café Upgrade (upg-readers-cafe)', () => {
     expect(repBonus).toBeGreaterThan(0);
   });
 
-  it('should have cost 3 and incomeBonus 1', () => {
-    expect(upg!.cost).toBe(3);
-    expect(upg!.incomeBonus).toBe(1);
+  it('should have cost 300 and incomeBonus 100', () => {
+    expect(upg!.cost).toBe(300);
+    expect(upg!.incomeBonus).toBe(100);
   });
 
   it('should have requiredLevel 0 (can be applied to base Bookshop)', () => {

@@ -45,7 +45,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     id: 'test-biz-0',
     name: 'Test Biz',
     cost: 3,
-    baseIncome: 2,
+    baseIncome: 200,
     synergyTypes: ['Food'] as readonly import('../../example-games/main-street/MainStreetCards').SynergyType[],
     maxLevel: 1,
     description: 'A test business',
@@ -67,8 +67,8 @@ function emptyGrid(): (BusinessCard | CommunitySpaceCard | null)[] {
 /** Creates a game state with high coins for convenient testing. */
 function createRichState(seed: string = 'inc-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  state.resourceBank.coins = 200;
-  state.resourceBank.reputation = 5;
+  state.resourceBank.coins = 20000;
+  state.resourceBank.reputation = 500;
   return state;
 }
 
@@ -81,7 +81,7 @@ describe('Per-card incremental income/reputation tracking', () => {
     it('cards created via makeBiz have undefined currentIncome/currentReputationPerTurn by default', () => {
       const card = makeBiz({
         id: 'biz-cafe-0',
-        baseIncome: 3,
+        baseIncome: 300,
         synergyTypes: ['Food'],
       });
       // Cached values are undefined until recalculateCard is called
@@ -91,7 +91,7 @@ describe('Per-card incremental income/reputation tracking', () => {
 
     it('recalculateCard sets cached values on a card', () => {
       const state = createRichState();
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
       
       // Before recalculate: undefined
       expect(state.streetGrid[0]!.currentIncome).toBeUndefined();
@@ -99,7 +99,7 @@ describe('Per-card incremental income/reputation tracking', () => {
       recalculateCard(state, 0);
       
       // After recalculate: computed
-      expect(state.streetGrid[0]!.currentIncome).toBe(3);
+      expect(state.streetGrid[0]!.currentIncome).toBe(300);
       expect(state.streetGrid[0]!.currentReputationPerTurn).toBe(0);
     });
 
@@ -122,8 +122,8 @@ describe('Per-card incremental income/reputation tracking', () => {
   describe('AC2: syncCardCurrentIncome / recalculateCard', () => {
     it('syncCardCurrentIncome sets currentIncome to match computeBusinessIncome', () => {
       const grid = emptyGrid();
-      grid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
-      grid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
+      grid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
+      grid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
 
       // Manually sync
       syncCardCurrentIncome(grid, 0);
@@ -139,31 +139,31 @@ describe('Per-card incremental income/reputation tracking', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({
         id: 'biz-clinic-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.2,
+        baseIncome: 200,
+        reputationPerTurn: 20,
         synergyTypes: ['Health'],
       });
       grid[1] = makeBiz({
         id: 'biz-gym-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.1,
-        synergyRepBonus: 0.1,
+        baseIncome: 200,
+        reputationPerTurn: 10,
+        synergyRepBonus: 10,
         synergyTypes: ['Health'],
       });
 
       syncCardCurrentRepPerTurn(grid, 0);
       syncCardCurrentRepPerTurn(grid, 1);
 
-      // Clinic: 0.2 + synergyRep(0.1 from gym) = 0.3
-      expect(grid[0]!.currentReputationPerTurn).toBeCloseTo(0.3);
-      // Gym: 0.1 + synergyRep(0 from clinic) = 0.1
-      expect(grid[1]!.currentReputationPerTurn).toBeCloseTo(0.1);
+      // Clinic: 20 + synergyRep(10 from gym) = 30
+      expect(grid[0]!.currentReputationPerTurn).toBeCloseTo(30);
+      // Gym: 10 + synergyRep(0 from clinic) = 10
+      expect(grid[1]!.currentReputationPerTurn).toBeCloseTo(10);
     });
 
     it('recalculateCard updates both fields for a single card', () => {
       const state = createRichState();
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
-      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
 
       recalculateCard(state, 0);
 
@@ -184,10 +184,10 @@ describe('Per-card incremental income/reputation tracking', () => {
   describe('AC3: updateNeighborsOnPlacement recalculates affected cards', () => {
     it('sets the newly placed card\'s currentIncome to the full computed value', () => {
       const state = createRichState();
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
 
       // Place a new card at slot 1
-      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
       updateNeighborsOnPlacement(state, 1);
 
       // New card's income should include synergy from slot 0
@@ -198,12 +198,12 @@ describe('Per-card incremental income/reputation tracking', () => {
     it('increases existing neighbor\'s currentIncome when synergy-matching card is placed adjacent', () => {
       const state = createRichState();
       // Place first card at slot 0
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
       recalculateCard(state, 0);
       const incomeBefore = state.streetGrid[0]!.currentIncome!;
 
       // Place a Food synergy neighbor at slot 1 with different base type
-      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
       updateNeighborsOnPlacement(state, 1);
 
       // Existing card's income should increase due to synergy
@@ -213,12 +213,12 @@ describe('Per-card incremental income/reputation tracking', () => {
 
     it('does not modify non-adjacent cards\' currentIncome', () => {
       const state = createRichState();
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
       recalculateCard(state, 0);
       const incomeSlot0 = state.streetGrid[0]!.currentIncome;
 
       // Place card at slot 9 (far away, no adjacency)
-      state.streetGrid[9] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[9] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
       updateNeighborsOnPlacement(state, 9);
 
       // Slot 0 should be unaffected
@@ -229,9 +229,9 @@ describe('Per-card incremental income/reputation tracking', () => {
       const state = createRichState();
       state.streetGrid[0] = makeBiz({
         id: 'biz-clinic-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.2,
-        synergyRepBonus: 0.1,
+        baseIncome: 200,
+        reputationPerTurn: 20,
+        synergyRepBonus: 10,
         synergyTypes: ['Health'],
       });
       recalculateCard(state, 0);
@@ -239,15 +239,15 @@ describe('Per-card incremental income/reputation tracking', () => {
       // Place a Health synergy business adjacent
       state.streetGrid[1] = makeBiz({
         id: 'biz-gym-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.1,
-        synergyRepBonus: 0.1,
+        baseIncome: 200,
+        reputationPerTurn: 10,
+        synergyRepBonus: 10,
         synergyTypes: ['Health'],
       });
       updateNeighborsOnPlacement(state, 1);
 
       // Clinic should now receive synergy rep from gym
-      expect(state.streetGrid[0]!.currentReputationPerTurn).toBeCloseTo(0.3); // 0.2 + 0.1
+      expect(state.streetGrid[0]!.currentReputationPerTurn).toBeCloseTo(30); // 0.2 + 0.1
     });
   });
 
@@ -257,8 +257,8 @@ describe('Per-card incremental income/reputation tracking', () => {
     it('keeps neighbor\'s currentIncome unchanged when synergy-matching card is sold', () => {
       const state = createRichState();
       // Place two synergy-matching cards with different base types
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
-      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
       updateNeighborsOnPlacement(state, 0);
       updateNeighborsOnPlacement(state, 1);
 
@@ -279,41 +279,41 @@ describe('Per-card incremental income/reputation tracking', () => {
       );
       expect(incomeAfter).toBe(expected);
       // ...and still exceeds its solo base income (3), proving synergy is retained
-      expect(incomeAfter).toBeGreaterThan(3);
+      expect(incomeAfter).toBeGreaterThan(300);
     });
 
     it('updates remaining card\'s currentReputationPerTurn after neighbor sale', () => {
       const state = createRichState();
       state.streetGrid[0] = makeBiz({
         id: 'biz-clinic-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.2,
-        synergyRepBonus: 0.1,
+        baseIncome: 200,
+        reputationPerTurn: 20,
+        synergyRepBonus: 10,
         synergyTypes: ['Health'],
       });
       state.streetGrid[1] = makeBiz({
         id: 'biz-gym-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.1,
-        synergyRepBonus: 0.1,
+        baseIncome: 200,
+        reputationPerTurn: 10,
+        synergyRepBonus: 10,
         synergyTypes: ['Health'],
       });
       updateNeighborsOnPlacement(state, 0);
       updateNeighborsOnPlacement(state, 1);
 
-      expect(state.streetGrid[0]!.currentReputationPerTurn).toBeCloseTo(0.3); // 0.2 + 0.1 synergy
+      expect(state.streetGrid[0]!.currentReputationPerTurn).toBeCloseTo(30); // 0.2 + 0.1 synergy
 
       // Sell the neighbor
       state.soldSlots[1] = true;
       updateNeighborsOnSale(state, 1);
 
       // Clinic keeps the synergy rep bonus from gym (sold card is a synergy anchor)
-      expect(state.streetGrid[0]!.currentReputationPerTurn).toBeCloseTo(0.3);
+      expect(state.streetGrid[0]!.currentReputationPerTurn).toBeCloseTo(30);
     });
 
     it('handles sale of a card with no neighbors gracefully', () => {
       const state = createRichState();
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
       recalculateCard(state, 0);
 
       // No neighbors to affect, should not throw
@@ -328,7 +328,7 @@ describe('Per-card incremental income/reputation tracking', () => {
     it('produces same total income as old approach for equivalent state', () => {
       const state = createRichState('income-parity');
       // Place a business
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
       recalculateCard(state, 0);
 
       // Run income phase
@@ -342,8 +342,8 @@ describe('Per-card incremental income/reputation tracking', () => {
 
     it('uses currentIncome for each slot rather than calling computeBusinessIncome fresh', () => {
       const state = createRichState('cached-income');
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
-      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
       updateNeighborsOnPlacement(state, 0);
       updateNeighborsOnPlacement(state, 1);
 
@@ -365,15 +365,15 @@ describe('Per-card incremental income/reputation tracking', () => {
       const state = createRichState('cached-rep');
       state.streetGrid[0] = makeBiz({
         id: 'biz-clinic-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.2,
+        baseIncome: 200,
+        reputationPerTurn: 20,
         synergyTypes: ['Health'],
       });
       state.streetGrid[1] = makeBiz({
         id: 'biz-gym-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.1,
-        synergyRepBonus: 0.1,
+        baseIncome: 200,
+        reputationPerTurn: 10,
+        synergyRepBonus: 10,
         synergyTypes: ['Health'],
       });
       updateNeighborsOnPlacement(state, 0);
@@ -383,10 +383,10 @@ describe('Per-card incremental income/reputation tracking', () => {
       applyIncome(state);
 
       // Rep should have increased (clinic rep 0.2 + gym rep 0.1 + gym synergy rep 0.1 to clinic)
-      // Clinic: 0.2 + 0.1 (synergy from gym) = 0.3
-      // Gym: 0.1 + 0 (no synergyRep from clinic) = 0.1
-      // Total: 0.4
-      expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 0.4);
+      // Clinic: 20 + 10 (synergy from gym) = 30
+      // Gym: 10 + 0 (no synergyRep from clinic) = 10
+      // Total: 40
+      expect(state.resourceBank.reputation).toBeCloseTo(repBefore + 40);
     });
   });
 
@@ -395,27 +395,27 @@ describe('Per-card incremental income/reputation tracking', () => {
   describe('AC6: Same-type penalty reflected in cached values', () => {
     it('correctly shows penalty when same-type card is placed adjacent', () => {
       const state = createRichState('same-type-place');
-      state.streetGrid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
-      state.streetGrid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 200, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 200, synergyTypes: ['Food'] });
       updateNeighborsOnPlacement(state, 0);
       updateNeighborsOnPlacement(state, 1);
 
       // Same-type penalty: base * 0.6, synergy = 0
       const expected = computeBusinessIncome(state.streetGrid, 0, state.config.synergyBonusPerNeighbor, state.soldSlots);
       expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(expected);
-      expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(1.2); // 2 * 0.6
+      expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(120); // 2 * 0.6
     });
 
     it('keeps same-type penalty on remaining card when same-type neighbor is sold', () => {
       const state = createRichState('same-type-sell');
-      state.streetGrid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
-      state.streetGrid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 200, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 200, synergyTypes: ['Food'] });
       updateNeighborsOnPlacement(state, 0);
       updateNeighborsOnPlacement(state, 1);
 
       // Both have the penalty initially
-      expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(1.2);
-      expect(state.streetGrid[1]!.currentIncome).toBeCloseTo(1.2);
+      expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(120);
+      expect(state.streetGrid[1]!.currentIncome).toBeCloseTo(120);
 
       // Sell slot 1
       state.soldSlots[1] = true;
@@ -423,7 +423,7 @@ describe('Per-card incremental income/reputation tracking', () => {
 
       // Same-type penalty persists: sold same-type neighbour still counts
       // (CG-0MT5XUE2200047IJ Q1 = Remains)
-      expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(1.2);
+      expect(state.streetGrid[0]!.currentIncome).toBeCloseTo(120);
     });
   });
 
@@ -432,21 +432,21 @@ describe('Per-card incremental income/reputation tracking', () => {
   describe('AC7: Save/load round-trip preserves fields', () => {
     it('serializeMainStreetState includes currentIncome and currentReputationPerTurn', () => {
       const state = createRichState('save-fields');
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
       recalculateCard(state, 0);
 
       const serialized = serializeMainStreetState(state);
       expect(serialized.streetGrid[0]).toHaveProperty('currentIncome');
-      expect(serialized.streetGrid[0]!.currentIncome).toBe(3);
+      expect(serialized.streetGrid[0]!.currentIncome).toBe(300);
     });
 
     it('deserialized state preserves currentIncome and currentReputationPerTurn', () => {
       const state = createRichState('deser-fields');
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
       state.streetGrid[1] = makeBiz({
         id: 'biz-clinic-0',
-        baseIncome: 2,
-        reputationPerTurn: 0.2,
+        baseIncome: 200,
+        reputationPerTurn: 20,
         synergyTypes: ['Health'],
       });
       updateNeighborsOnPlacement(state, 0);
@@ -463,7 +463,7 @@ describe('Per-card incremental income/reputation tracking', () => {
 
     it('legacy serialized data (missing fields) produces zero income', () => {
       const state = createRichState('legacy-zero');
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
 
       // Simulate legacy save: serialize, then strip the new fields
       const serialized = serializeMainStreetState(state) as any;
@@ -503,7 +503,7 @@ describe('Per-card incremental income/reputation tracking', () => {
     it('updates existing neighbor when synergy-matching card is purchased', () => {
       const state = createRichState('purchase-syn-update');
       // Place first card with a distinct base type different from any market card
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, name: 'Cafe', synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, name: 'Cafe', synergyTypes: ['Food'] });
       recalculateCard(state, 0);
       const incomeBefore = state.streetGrid[0]!.currentIncome!;
 
@@ -531,8 +531,8 @@ describe('Per-card incremental income/reputation tracking', () => {
   describe('Integration: sellBusiness triggers recalculations', () => {
     it('keeps remaining card income unchanged after selling an adjacent synergy card', () => {
       const state = createRichState('sell-syn-update');
-      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 3, synergyTypes: ['Food'] });
-      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-cafe-0', baseIncome: 300, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
       updateNeighborsOnPlacement(state, 0);
       updateNeighborsOnPlacement(state, 1);
 
@@ -546,7 +546,7 @@ describe('Per-card incremental income/reputation tracking', () => {
       // (CG-0MT5XUE2200047IJ: sold cards act as synergy anchors)
       expect(incomeAfter).toBe(incomeBefore);
       // Slot 0 keeps the synergy bonus from the sold neighbour (base 3 + synergy)
-      expect(incomeAfter).toBeGreaterThan(3);
+      expect(incomeAfter).toBeGreaterThan(300);
     });
   });
 
@@ -556,9 +556,9 @@ describe('Per-card incremental income/reputation tracking', () => {
     it('produces identical total income for equivalent multi-card states', () => {
       const state = createRichState('income-parity-full');
       // Place three cards with mixed synergies
-      state.streetGrid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
-      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
-      state.streetGrid[5] = makeBiz({ id: 'biz-clinic-0', baseIncome: 2, synergyTypes: ['Health'] });
+      state.streetGrid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 200, synergyTypes: ['Food'] });
+      state.streetGrid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 200, synergyTypes: ['Food'] });
+      state.streetGrid[5] = makeBiz({ id: 'biz-clinic-0', baseIncome: 200, synergyTypes: ['Health'] });
 
       // Set up cached values
       updateNeighborsOnPlacement(state, 0);
