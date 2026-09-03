@@ -71,7 +71,7 @@ describe('AC1: multi-category stacks compose additively, without runaway compoun
       skills('skill-community-builder', 'skill-quality-inspector'),
       foodProfile(),
     );
-    expect(buffs.reputation.flat).toBeCloseTo(0.1);
+    expect(buffs.reputation.flat).toBeCloseTo(10);
     expect(buffs.incidents.coinDamageReductionPct).toBeCloseTo(0.3);
   });
 
@@ -82,7 +82,7 @@ describe('AC1: multi-category stacks compose additively, without runaway compoun
     );
     expect(buffs.income.percent).toBeCloseTo(0.2);
     expect(buffs.ongoingCosts.reductionPct).toBeCloseTo(0.15);
-    expect(buffs.reputation.flat).toBeCloseTo(0.1);
+    expect(buffs.reputation.flat).toBeCloseTo(10);
   });
 
   it('percentage income skills never compound onto each other (additive, not multiplicative)', () => {
@@ -100,9 +100,9 @@ describe('AC1: multi-category stacks compose additively, without runaway compoun
     // Chef + Sales Champion on a Food+Commerce business.
     const buffs = computePerBusinessSkillBuffs(skills('skill-chef', 'skill-sales-champion'), foodProfile(['Commerce']));
     const expected = foodProfile().baseIncome * (1 + buffs.income.percent) + buffs.income.flat;
-    expect(expected).toBeCloseTo(2 * 1.2 + 0.5);
+    expect(expected).toBeCloseTo(2 * 1.2 + 50);
     expect(buffs.income.percent).toBeCloseTo(0.2);
-    expect(buffs.income.flat).toBeCloseTo(0.5);
+    expect(buffs.income.flat).toBeCloseTo(50);
   });
 
   it('cost-reduction and incident-mitigation skills stack with income on a full member', () => {
@@ -112,7 +112,7 @@ describe('AC1: multi-category stacks compose additively, without runaway compoun
     const buffs = computePerBusinessSkillBuffs(stack, foodProfile());
     expect(buffs.income.percent).toBeCloseTo(0.2);
     expect(buffs.incidents.probabilityReductionPct).toBeCloseTo(0.15);
-    expect(computeRefreshCostDiscount(stack)).toBe(1);
+    expect(computeRefreshCostDiscount(stack)).toBe(100);
   });
 
   it('multi-staff stacks add up across members (allowed — constraint is per member)', () => {
@@ -189,17 +189,17 @@ describe('AC3: synergy-enhancement skills compose with income/reputation skills'
 
   it('Networker adjacency bonus composes with a per-business income buff', () => {
     const stack = skills('skill-networker', 'skill-dj');
-    expect(computeAdjacencyCoinBonus(stack)).toBeCloseTo(0.2);
+    expect(computeAdjacencyCoinBonus(stack)).toBeCloseTo(20);
     const buffs = computePerBusinessSkillBuffs(stack, foodProfile(['Entertainment']));
     expect(buffs.income.percent).toBeCloseTo(0.2);
   });
 
   it('Operations Manager salary discount composes with the staff salary cost', () => {
     const stack = skills('skill-operations-manager', 'skill-community-builder');
-    expect(computeStaffSalaryCost(stack, 2.5)).toBeCloseTo(2);
+    expect(computeStaffSalaryCost(stack, 250)).toBeCloseTo(200);
     // The rep buff is unrelated to the salary discount.
     const buffs = computePerBusinessSkillBuffs(stack, foodProfile());
-    expect(buffs.reputation.flat).toBeCloseTo(0.1);
+    expect(buffs.reputation.flat).toBeCloseTo(10);
   });
 });
 

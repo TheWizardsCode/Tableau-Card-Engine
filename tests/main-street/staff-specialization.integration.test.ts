@@ -56,7 +56,7 @@ describe('D1: staff specialization end-to-end integration', () => {
     const rowStaff = a.market.cards.filter(c => c.family === 'staff') as StaffCard[];
     let employed: StaffCard | null = null;
     if (rowStaff.length > 0) {
-      a.resourceBank.coins = 999;
+      a.resourceBank.coins = 99999;
       a.phase = 'MarketPhase';
       try {
         hireStaffCard(a, rowStaff[0].id);
@@ -81,9 +81,9 @@ describe('D1: staff specialization end-to-end integration', () => {
       });
     }
     a.streetGrid[0] = {
-      family: 'business', id: 'biz-d1', name: 'D1 Bistro', cost: 3, baseIncome: 2,
+      family: 'business', id: 'biz-d1', name: 'D1 Bistro', cost: 300, baseIncome: 200,
       synergyTypes: ['Food'], maxLevel: 0, level: 0, incomeBonus: 0,
-      synergyRangeBonus: 0, reputationBonus: 0, description: 'D1 fixture.', ongoingCost: 1,
+      synergyRangeBonus: 0, reputationBonus: 0, description: 'D1 fixture.', ongoingCost: 100,
     };
     syncCardCurrentIncome(a.streetGrid, 0);
 
@@ -92,11 +92,11 @@ describe('D1: staff specialization end-to-end integration', () => {
     const result = applyIncome(a);
     const slotTotal = result.breakdown?.find((s: { slotIndex: number }) => s.slotIndex === 0)?.total ?? 0;
     if (hasChefEmployed) {
-      // Chef (+20%) on the Food fixture → 2 * 1.2 = 2.4.
-      expect(slotTotal).toBeCloseTo(2.4);
+      // Chef (+20%) on the Food fixture → 200 * 1.2 = 240.
+      expect(slotTotal).toBeCloseTo(240);
     } else {
       // No Chef employed at the Food business → unbuffed baseline.
-      expect(slotTotal).toBe(2);
+      expect(slotTotal).toBe(200);
     }
   });
 
@@ -104,7 +104,7 @@ describe('D1: staff specialization end-to-end integration', () => {
     const state = setupMainStreetGame({ seed: 'd1-persist' });
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 999;
+    state.resourceBank.coins = 99999;
     const rowStaff = state.market.cards.filter(c => c.family === 'staff') as StaffCard[];
     if (rowStaff.length > 0) {
       hireStaffCard(state, rowStaff[0].id);
@@ -123,7 +123,7 @@ describe('D1: staff specialization end-to-end integration', () => {
     const state = setupMainStreetGame({ seed: 'd1-peek' });
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 999;
+    state.resourceBank.coins = 99999;
 
     // Every market staff member carries the baseline peek skill.
     for (const card of state.market.cards.filter(c => c.family === 'staff') as StaffCard[]) {
@@ -177,31 +177,31 @@ describe('D1: staff specialization end-to-end integration', () => {
     const state = setupMainStreetGame({ seed: 'd1-costs' });
     executeDayStart(state);
     state.streetGrid[0] = {
-      family: 'community-space', id: 'cs-d1', name: 'D1 Plaza', cost: 4, baseIncome: 0,
+      family: 'community-space', id: 'cs-d1', name: 'D1 Plaza', cost: 400, baseIncome: 0,
       synergyTypes: ['Culture'], maxLevel: 0, level: 0, incomeBonus: 0,
-      synergyRangeBonus: 0, reputationBonus: 0, description: 'D1 fixture.', ongoingCost: 1,
+      synergyRangeBonus: 0, reputationBonus: 0, description: 'D1 fixture.', ongoingCost: 100,
     };
     state.staffCards.push({
       ...state.decks.staff[0],
       id: 'staff-d1-cutter',
       specializationSkillIds: ['skill-cost-cutter'],
     });
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 10000;
     processEndOfTurn(state);
 
     const control = setupMainStreetGame({ seed: 'd1-costs' });
     executeDayStart(control);
     control.streetGrid[0] = {
-      family: 'community-space', id: 'cs-d1', name: 'D1 Plaza', cost: 4, baseIncome: 0,
+      family: 'community-space', id: 'cs-d1', name: 'D1 Plaza', cost: 400, baseIncome: 0,
       synergyTypes: ['Culture'], maxLevel: 0, level: 0, incomeBonus: 0,
-      synergyRangeBonus: 0, reputationBonus: 0, description: 'D1 fixture.', ongoingCost: 1,
+      synergyRangeBonus: 0, reputationBonus: 0, description: 'D1 fixture.', ongoingCost: 100,
     };
     control.staffCards.push({ ...control.decks.staff[0], id: 'staff-d1-cutter', specializationSkillIds: [] });
-    control.resourceBank.coins = 100;
+    control.resourceBank.coins = 10000;
     processEndOfTurn(control);
 
     // Identical flow; the cutter member saves 15% on the community-space cost
-    // AND on its own salary (1.0) → the buffed run keeps 0.30 coins more.
-    expect(state.resourceBank.coins).toBeCloseTo(control.resourceBank.coins + 0.3);
+    // AND on its own salary (100) → the buffed run keeps ~15 coins more (integer-rounded).
+    expect(state.resourceBank.coins).toBeCloseTo(control.resourceBank.coins + 30, 1);
   });
 });

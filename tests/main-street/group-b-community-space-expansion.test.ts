@@ -52,12 +52,12 @@ interface NewCommunitySpaceContract {
 }
 
 const NEW_COMMUNITY_SPACE_CONTRACTS: NewCommunitySpaceContract[] = [
-  { id: 'cs-playground', name: 'Playground', cost: 4, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Entertainment'], tier: '3', reputationPerTurn: 0.05 },
-  { id: 'cs-community-garden', name: 'Community Garden', cost: 5, baseIncome: 0, ongoingCost: 0.1, synergyTypes: ['Food'], tier: '4', reputationPerTurn: 0.1 },
-  { id: 'cs-fountain', name: 'Town Fountain', cost: 5, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Culture'], tier: '5', reputationPerTurn: 0.1 },
-  { id: 'cs-health-kiosk', name: 'Health Kiosk', cost: 6, baseIncome: 0, ongoingCost: 0.15, synergyTypes: ['Health'], tier: '8', reputationPerTurn: 0.15 },
-  { id: 'cs-shelter', name: 'Community Shelter', cost: 6, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Service'], tier: '3', reputationPerTurn: 0.15 }, // retiered T6->T3 (CG-0MT5VZJLS000B8KI) so T3 keeps a non-Entertainment synergy type
-  { id: 'cs-public-art', name: 'Public Art', cost: 8, baseIncome: 0, ongoingCost: 0.25, synergyTypes: ['Culture', 'Entertainment'], tier: '12', reputationPerTurn: 0.2 },
+  { id: 'cs-playground', name: 'Playground', cost: 400, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Entertainment'], tier: '3', reputationPerTurn: 5 },
+  { id: 'cs-community-garden', name: 'Community Garden', cost: 500, baseIncome: 0, ongoingCost: 10, synergyTypes: ['Food'], tier: '4', reputationPerTurn: 10 },
+  { id: 'cs-fountain', name: 'Town Fountain', cost: 500, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Culture'], tier: '5', reputationPerTurn: 10 },
+  { id: 'cs-health-kiosk', name: 'Health Kiosk', cost: 600, baseIncome: 0, ongoingCost: 15, synergyTypes: ['Health'], tier: '8', reputationPerTurn: 15 },
+  { id: 'cs-shelter', name: 'Community Shelter', cost: 600, baseIncome: 0, ongoingCost: 0, synergyTypes: ['Service'], tier: '3', reputationPerTurn: 15 }, // retiered T6->T3 (CG-0MT5VZJLS000B8KI) so T3 keeps a non-Entertainment synergy type
+  { id: 'cs-public-art', name: 'Public Art', cost: 800, baseIncome: 0, ongoingCost: 25, synergyTypes: ['Culture', 'Entertainment'], tier: '12', reputationPerTurn: 20 },
 ];
 
 function byId(templates: readonly { id: string }[], id: string): CommunitySpaceCard | undefined {
@@ -192,25 +192,25 @@ describe('Group B community-space expansion: deck generation', () => {
 describe('Group B community-space expansion: ongoing-cost behaviour (AC4)', () => {
   it('deducts the ongoing cost for cards with a running cost', () => {
     const state = setupMainStreetGame({ seed: 'group-b-ongoing' });
-    state.resourceBank.coins = 10;
+    state.resourceBank.coins = 1000;
     const grid = state.streetGrid;
 
     const garden = createCommunitySpaceDeck(1).find(c => c.id.startsWith('cs-community-garden'))!;
     const kiosk = createCommunitySpaceDeck(1).find(c => c.id.startsWith('cs-health-kiosk'))!;
     const art = createCommunitySpaceDeck(1).find(c => c.id.startsWith('cs-public-art'))!;
 
-    // Place three new cards with ongoing costs: 0.1 + 0.15 + 0.25 = 0.5.
+    // Place three new cards with ongoing costs: 10 + 15 + 25 = 50.
     grid[0] = { ...garden, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
     grid[1] = { ...kiosk, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
     grid[2] = { ...art, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
 
     applyCommunitySpaceOngoingCosts(state);
-    expect(state.resourceBank.coins).toBeCloseTo(10 - 0.5);
+    expect(state.resourceBank.coins).toBeCloseTo(1000 - 50);
   });
 
   it('does not deduct for zero-ongoing-cost cards', () => {
     const state = setupMainStreetGame({ seed: 'group-b-ongoing-zero' });
-    state.resourceBank.coins = 10;
+    state.resourceBank.coins = 1000;
     const grid = state.streetGrid;
 
     const playground = createCommunitySpaceDeck(1).find(c => c.id.startsWith('cs-playground'))!;
@@ -222,12 +222,12 @@ describe('Group B community-space expansion: ongoing-cost behaviour (AC4)', () =
     grid[2] = { ...shelter, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
 
     applyCommunitySpaceOngoingCosts(state);
-    expect(state.resourceBank.coins).toBe(10);
+    expect(state.resourceBank.coins).toBe(1000);
   });
 
   it('clamps the deduction at the available coins (no negative balance)', () => {
     const state = setupMainStreetGame({ seed: 'group-b-ongoing-clamp' });
-    state.resourceBank.coins = 0.1;
+    state.resourceBank.coins = 10;
     const grid = state.streetGrid;
     const art = createCommunitySpaceDeck(1).find(c => c.id.startsWith('cs-public-art'))!;
     grid[0] = { ...art, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };

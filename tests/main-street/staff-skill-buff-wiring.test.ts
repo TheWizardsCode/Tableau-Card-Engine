@@ -121,7 +121,7 @@ describe('I4: income-boost skills fold into applyIncome without cache mutation',
     expect(biz.currentIncome).toBe(2);
   });
 
-  it('Sales Champion (+0.5 flat) boosts Commerce business income', () => {
+  it('Sales Champion (+50 flat) boosts Commerce business income', () => {
     const state = setupMainStreetGame({ seed: 'i4-sales' });
     executeDayStart(state);
     placeBusiness(state, ['Commerce'], 2);
@@ -129,7 +129,7 @@ describe('I4: income-boost skills fold into applyIncome without cache mutation',
     const result = applyIncome(state);
     const slot = result.breakdown?.find((s: { slotIndex: number }) => s.slotIndex === 0);
     if (slot) {
-      expect(slot.total).toBeCloseTo(2.5);
+      expect(slot.total).toBeCloseTo(52);
     }
   });
 
@@ -161,24 +161,24 @@ describe('I4: income-boost skills fold into applyIncome without cache mutation',
 // ── Reputation buffs (AC: rep-boost skills modify reputation) ─
 
 describe('I4: reputation-boost skills accrue during the income phase', () => {
-  it('Community Builder adds +0.1 rep/turn per placed business', () => {
+  it('Community Builder adds +10 rep/turn per placed business', () => {
     const state = setupMainStreetGame({ seed: 'i4-cb' });
     executeDayStart(state);
     placeBusiness(state, ['Food'], 2);
     const before = state.resourceBank.reputation;
     employSynthetic(state, 'cb', ['skill-community-builder'], 0);
     applyIncome(state);
-    expect(state.resourceBank.reputation).toBeCloseTo(before + 0.1);
+    expect(state.resourceBank.reputation).toBeCloseTo(before + 10);
   });
 
-  it('PR Strategist adds +0.15 rep/turn only to Service businesses', () => {
+  it('PR Strategist adds +15 rep/turn only to Service businesses', () => {
     const state = setupMainStreetGame({ seed: 'i4-pr' });
     executeDayStart(state);
     placeBusiness(state, ['Service'], 2);
     const before = state.resourceBank.reputation;
     employSynthetic(state, 'pr', ['skill-pr-strategist'], 0);
     applyIncome(state);
-    expect(state.resourceBank.reputation).toBeCloseTo(before + 0.15);
+    expect(state.resourceBank.reputation).toBeCloseTo(before + 15);
 
     // Non-Service business: no buff.
     const state2 = setupMainStreetGame({ seed: 'i4-pr2' });
@@ -195,9 +195,9 @@ describe('I4: reputation-boost skills accrue during the income phase', () => {
 
 describe('I4: cost-reduction skills apply to ongoing/refresh costs', () => {
   it('Operations Manager discounts its own salary (staff ongoing costs)', () => {
-    // Pure salary math first: assistant salary 1.0 - 0.5 = 0.5.
-    expect(computeStaffSalaryCost([], 1)).toBe(1);
-    expect(computeStaffSalaryCost([getSkill('skill-operations-manager')], 1)).toBe(0.5);
+    // Pure salary math first: assistant salary 100 - 50 = 50.
+    expect(computeStaffSalaryCost([], 100)).toBe(100);
+    expect(computeStaffSalaryCost([getSkill('skill-operations-manager')], 100)).toBe(50);
 
     // Engine path: hiring the member reduces the staff-cost deduction by 0.5.
     const state = setupMainStreetGame({ seed: 'i4-ops' });
@@ -210,8 +210,8 @@ describe('I4: cost-reduction skills apply to ongoing/refresh costs', () => {
     control.resourceBank.coins = 100;
     processEndOfTurn(state);
     processEndOfTurn(control);
-    // Identical seeded flow; only the salary differs by the 0.5 discount.
-    expect(state.resourceBank.coins).toBeCloseTo(control.resourceBank.coins + 0.5);
+    // Identical seeded flow; only the salary differs by the 50 discount.
+    expect(state.resourceBank.coins).toBeCloseTo(control.resourceBank.coins + 50);
   });
 
   // Cost Cutter removes 15% of EVERY ongoing-cost family (street-wide flag).
@@ -233,21 +233,21 @@ describe('I4: cost-reduction skills apply to ongoing/refresh costs', () => {
     processEndOfTurn(control);
     const coinsControl = control.resourceBank.coins;
 
-    // Same seeded income; cutter saves 0.15 on the business (1.0) AND on the
-    // member's own salary (1.0) → the buffed run ends with 0.30 coins more.
-    expect(coinsAfter).toBeCloseTo(coinsControl + 0.3);
+    // Same seeded income; cutter saves 15% on the business (1) AND on the
+    // member's own salary (100) → the buffed run ends with ~15 coins more.
+    expect(coinsAfter).toBeCloseTo(coinsControl + 15);
   });
 
-  it('Negotiator discounts market refresh cost by 1', () => {
+  it('Negotiator discounts market refresh cost by 100 (clamped at 0)', () => {
     const state = setupMainStreetGame({ seed: 'i4-neg' });
     executeDayStart(state);
     expect(refreshMarketCost(state)).toBe(5);
     hireSynthetic(state, 'neg', ['skill-negotiator']);
-    expect(refreshMarketCost(state)).toBe(4);
+    expect(refreshMarketCost(state)).toBe(0);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 100;
     refreshMarket(state);
-    expect(state.resourceBank.coins).toBe(96);
+    expect(state.resourceBank.coins).toBe(100);
   });
 });
 
@@ -261,10 +261,10 @@ describe('I4: incident-mitigation skills modify incident damage/probability', ()
     name: 'Fixture Shoplifting',
     trigger: 'Incident',
     cost: 0,
-    effect: '-2 coins per Commerce business from theft losses.',
+    effect: '-200 coins per Commerce business from theft losses.',
     target: 'SpecificSynergy',
     targetSynergy: 'Commerce',
-    coinDelta: -2,
+    coinDelta: -200,
     reputationDelta: 0,
   });
   const vandalism = (): EventCard => ({
@@ -273,10 +273,10 @@ describe('I4: incident-mitigation skills modify incident damage/probability', ()
     name: 'Fixture Vandalism',
     trigger: 'Incident',
     cost: 0,
-    effect: '-1 reputation across the street.',
+    effect: '-100 reputation across the street.',
     target: 'All',
     coinDelta: 0,
-    reputationDelta: -1,
+    reputationDelta: -100,
   });
 
   /** Resolves the given synthetic incident on a fresh seeded state. */
@@ -309,11 +309,11 @@ describe('I4: incident-mitigation skills modify incident damage/probability', ()
   it('Compliance Officer reduces incident reputation damage (clamped at 0)', () => {
     const plain = resolveOnFresh(vandalism());
     const lossPlain = plain.rep - plain.state.resourceBank.reputation;
-    expect(lossPlain).toBeCloseTo(1);
+    expect(lossPlain).toBeCloseTo(100);
 
     const buffed = resolveOnFresh(vandalism(), s => hireSynthetic(s, 'compliance', ['skill-compliance']));
     const lossBuffed = buffed.rep - buffed.state.resourceBank.reputation;
-    expect(lossBuffed).toBeCloseTo(0.5);
+    expect(lossBuffed).toBeCloseTo(50);
   });
 
   it('Security Consultant fully neutralizes theft/loss incidents', () => {
@@ -417,14 +417,14 @@ describe('per-business buff scoping in applyIncome (CG-0MSTOATDU006UGAX)', () =>
     applyIncome(state);
     expect(state.resourceBank.reputation).toBeCloseTo(before);
 
-    // Same member employed → +0.1 rep/turn resumes.
+    // Same member employed → +10 rep/turn resumes.
     const state2 = setupMainStreetGame({ seed: 'scope-hand-rep' });
     executeDayStart(state2);
     placeBusiness(state2, ['Food'], 2);
     const before2 = state2.resourceBank.reputation;
     employSynthetic(state2, 'cb', ['skill-community-builder'], 0);
     applyIncome(state2);
-    expect(state2.resourceBank.reputation).toBeCloseTo(before2 + 0.1);
+    expect(state2.resourceBank.reputation).toBeCloseTo(before2 + 10);
   });
 
   it('street-wide incident skills still aggregate across ALL staff (hand-slot + employed)', () => {

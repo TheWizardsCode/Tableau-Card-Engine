@@ -62,14 +62,14 @@ describe('Library card stats (reputation asset)', () => {
     const library = createCommunitySpaceDeck(1).find(c => c.name === 'Library');
     expect(library).toBeDefined();
     expect(library!.baseIncome).toBe(0);
-    expect(library!.ongoingCost).toBe(0.25);
-    expect(library!.reputationPerTurn).toBe(0.1);
+    expect(library!.ongoingCost).toBe(25);
+    expect(library!.reputationPerTurn).toBe(10);
     // Empty synergy fields (Park pattern) default to a 0.5 coin synergy rate,
     // so the Library participates in neighbours' Culture synergy (reversed by
     // CG-0MSKS963N000ZSTU).
     expect(library!.synergyCoinBonus).toBeUndefined();
     expect(library!.synergyRepBonus).toBeUndefined();
-    expect(library!.cost).toBe(7);
+    expect(library!.cost).toBe(700);
   });
 });
 
@@ -92,14 +92,14 @@ describe('Library synergy participation (behavioral, Park model)', () => {
   it('should receive reputation synergy from a Culture neighbor with a rep bonus', () => {
     const state = createTestState('library-rep-synergy');
     const library = placeLibrary(state);
-    // Art Gallery has synergyRepBonus 0.1 — the Library now receives rep
+    // Art Gallery has synergyRepBonus 10 — the Library now receives rep
     // synergy from it (reversed by CG-0MSKS963N000ZSTU).
     const gallery = createBusinessDeck(1).find(c => c.name === 'Art Gallery')!;
-    expect(gallery.synergyRepBonus).toBe(0.1);
+    expect(gallery.synergyRepBonus).toBe(10);
     state.streetGrid[1] = gallery;
 
     const slot = state.streetGrid.indexOf(library);
-    expect(computeSynergyRepBonus(state.streetGrid, slot)).toBe(0.1);
+    expect(computeSynergyRepBonus(state.streetGrid, slot)).toBe(10);
   });
 
   it('should be counted toward a neighbor\'s synergy (contributes like the Park)', () => {
@@ -111,9 +111,9 @@ describe('Library synergy participation (behavioral, Park model)', () => {
     state.streetGrid[1] = library;
 
     // The Library participates in synergy now, so it is counted toward N:
-    // Cafe earns 5.2 base income × 0.5 default rate × 1 neighbor = 2.6 coins
-    // (base income raised by CG-0MSVYPEZ90085SHE: 1 → 5.2).
-    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(2.6);
+    // Cafe earns 520 base income × 0.5 default rate × 1 neighbor = 260 coins
+    // (base income raised by CG-0MSVYPEZ90085SHE: 5.2 → 520).
+    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(260);
   });
 
   it('should give a Bookshop 1.15 Culture synergy when placed adjacent', () => {
@@ -124,9 +124,9 @@ describe('Library synergy participation (behavioral, Park model)', () => {
     state.streetGrid[0] = bookshop;
     state.streetGrid[1] = library;
 
-    // 2.3 base income × 0.5 default rate × 1 neighbor = 1.15 coins/turn
-    // (base income raised by CG-0MSVYPEZ90085SHE: 0.5 → 2.3).
-    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(1.15);
+    // 230 base income × 0.5 default rate × 1 neighbor = 115 coins/turn
+    // (base income raised by CG-0MSVYPEZ90085SHE: 2.3 → 230).
+    expect(computeSynergyBonus(state.streetGrid, 0)).toBe(115);
   });
 
   it('should draw a Culture synergy line between a Bookshop and the Library', () => {
@@ -151,22 +151,22 @@ describe('Community space ongoing-cost deduction', () => {
   it('should deduct the total ongoingCost of placed community spaces from coins', () => {
     const state = createTestState();
     const library = placeLibrary(state);
-    expect(library.ongoingCost).toBe(0.25);
+    expect(library.ongoingCost).toBe(25);
 
-    state.resourceBank.coins = 10;
+    state.resourceBank.coins = 1000;
     applyCommunitySpaceOngoingCosts(state);
 
-    expect(state.resourceBank.coins).toBe(9.75);
+    expect(state.resourceBank.coins).toBe(975);
     const log = state.activityLog.find(l => l.text.includes('Community space costs'));
     expect(log).toBeDefined();
-    expect(log!.text).toContain('-0.25');
+    expect(log!.text).toContain('-25');
   });
 
   it('should clamp the deduction at 0 coins and log insufficient funds', () => {
     const state = createTestState();
     placeLibrary(state);
 
-    state.resourceBank.coins = 0.1;
+    state.resourceBank.coins = 10;
     applyCommunitySpaceOngoingCosts(state);
 
     expect(state.resourceBank.coins).toBe(0);
@@ -198,7 +198,7 @@ describe('Community space ongoing-cost deduction', () => {
       id: 'staff-tester',
       name: 'Tester',
       cost: 3,
-      ongoingCost: 0.5,
+      ongoingCost: 50,
       handSlotsAdded: 1,
       description: 'Test staff',
     });
@@ -207,11 +207,11 @@ describe('Community space ongoing-cost deduction', () => {
     state.incidentDeck = [];
     state.phase = 'MarketPhase';
 
-    state.resourceBank.coins = 10;
+    state.resourceBank.coins = 1000;
     processEndOfTurn(state);
 
-    // Library costs 0.25 + staff 0.5 = 0.75 total ongoing costs
-    expect(state.resourceBank.coins).toBeCloseTo(9.25, 5);
+    // Library costs 25 + staff 50 = 75 total ongoing costs
+    expect(state.resourceBank.coins).toBeCloseTo(925, 5);
     expect(state.activityLog.some(l => l.text.includes('Community space costs'))).toBe(true);
     expect(state.activityLog.some(l => l.text.includes('Staff costs'))).toBe(true);
   });
@@ -222,7 +222,7 @@ describe('Community space ongoing-cost deduction', () => {
     state.incidentDeck = [];
     state.phase = 'MarketPhase';
 
-    state.resourceBank.coins = 0.1;
+    state.resourceBank.coins = 10;
     processEndOfTurn(state);
 
     expect(state.resourceBank.coins).toBe(0);
@@ -235,7 +235,7 @@ describe('Community Hub upgrade (upg-community-hub)', () => {
   it('should grant +0.1 reputation/turn with no income or synergy-range bonus', () => {
     const state = createTestState('community-hub-upgrade');
     const library = placeLibrary(state);
-    state.resourceBank.coins = 10;
+    state.resourceBank.coins = 1000;
 
     // Put the Community Hub upgrade into the investments row
     const communityHub = createUpgradeDeck(1).find(u => u.targetBusiness === 'Library')!;
@@ -246,13 +246,13 @@ describe('Community Hub upgrade (upg-community-hub)', () => {
 
     expect(library.incomeBonus).toBe(0);
     expect(library.synergyRangeBonus).toBe(0);
-    expect(library.reputationBonus).toBe(0.1);
-    // Effective reputation per turn = base 0.1 + upgrade bonus 0.1
-    expect((library.reputationPerTurn ?? 0) + library.reputationBonus).toBeCloseTo(0.2, 5);
+    expect(library.reputationBonus).toBe(10);
+    // Effective reputation per turn = base 10 + upgrade bonus 10
+    expect((library.reputationPerTurn ?? 0) + library.reputationBonus).toBeCloseTo(20, 5);
   });
 
   it('should have a rebalanced cost per the upgrade formula', () => {
     const communityHub = createUpgradeDeck(1).find(u => u.targetBusiness === 'Library')!;
-    expect(communityHub.cost).toBe(4);
+    expect(communityHub.cost).toBe(400);
   });
 });
