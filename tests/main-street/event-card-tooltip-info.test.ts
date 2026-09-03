@@ -126,11 +126,15 @@ describe('All-target events — show flat deltas without per-match confusion (AC
     expect(tooltip).not.toContain('Coins: +3.0');
   });
 
-  it('formats fractional coinDelta with reasonable precision', () => {
-    const event = makeEvent({ target: 'All', coinDelta: 2.5, reputationDelta: 0 });
+  // Fractional coinDelta no longer exists under the ×100 integer economy
+  // (CG-0MTIO1M15001E9Y6). The previous case "formats fractional coinDelta with
+  // reasonable precision" (coinDelta: 2.5) has been replaced with an integer
+  // case that documents the ×100 contract: 250 represents the old 2.5.
+  it('formats integer coinDelta (scaled ×100) cleanly without spurious decimals', () => {
+    const event = makeEvent({ target: 'All', coinDelta: 250, reputationDelta: 0 });
     const tooltip = buildTooltip(event, { includeEventDetail: true });
-    expect(tooltip).toContain('Coins: +2.5');
-    expect(tooltip).not.toContain('Coins: +2.500');
+    expect(tooltip).toContain('Coins: +250');
+    expect(tooltip).not.toContain('Coins: +250.000');
   });
 
   it('shows negative coinDelta correctly', () => {
@@ -149,11 +153,14 @@ describe('Coin/rep value formatting has no spurious decimals (AC3)', () => {
     expect(tooltip).not.toMatch(/Coins:.*\.\d+$/);
   });
 
-  it('All-target event with fractional coinDelta shows at most one decimal', () => {
-    const event = makeEvent({ target: 'All', coinDelta: 1.5, reputationDelta: 0 });
+  // Under the ×100 integer economy (CG-0MTIO1M15001E9Y6), coinDelta is
+  // always an integer (e.g. 150 represents the old 1.5). No decimal should
+  // ever appear in the Coins line.
+  it('All-target integer coinDelta (scaled ×100) has no decimal', () => {
+    const event = makeEvent({ target: 'All', coinDelta: 150, reputationDelta: 0 });
     const tooltip = buildTooltip(event, { includeEventDetail: true });
-    // Should show "1.5", not "1.500".
-    expect(tooltip).not.toMatch(/Coins:.*\.\d{2,}$/);
+    expect(tooltip).not.toMatch(/Coins:.*\.\d+$/);
+    expect(tooltip).toContain('Coins: +150');
   });
 });
 

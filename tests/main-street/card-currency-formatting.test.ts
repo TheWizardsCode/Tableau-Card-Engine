@@ -167,14 +167,17 @@ describe('buildCardTooltipInfo - cost formatting', () => {
 
   it('event tooltip (market, includeEventDetail) adds coin/reputation lines', () => {
     const info = buildCardTooltipInfo(
-      makeEvent({ cost: 5, coinDelta: 2, reputationDelta: 0.5 }),
+      makeEvent({ cost: 5, coinDelta: 200, reputationDelta: 50 }),
       config,
       { includeEventDetail: true },
     );
     expect(info).toContain('Cost: €5');
     // CG-0MT5Y9AD2001MKWZ: formatted cleanly, no spurious trailing zeros.
-    expect(info).toContain('Coins: +2');
-    expect(info).toContain('Rep: +0.5');
+    // After the ×100 integer economy (CG-0MTIO1M15001E9Y6), coinDelta and
+    // reputationDelta are stored as integers (×100 of the original fractional
+    // values), so expectations are scaled accordingly.
+    expect(info).toContain('Coins: +200');
+    expect(info).toContain('Rep: +50');
   });
 
   it('upgrade tooltip renders cost via formatCurrency', () => {

@@ -266,10 +266,10 @@ describe('AC4: Ongoing cost included in overlay pipeline', () => {
 
 describe('AC5: Reputation overlay unchanged', () => {
   it('reputationText still renders correctly', () => {
-    const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0, reputationPerTurn: 0.3 });
+    const biz = makeBusiness({ level: 1, baseIncome: 200, ongoingCost: 0, reputationPerTurn: 30 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.reputationText).not.toBeNull();
-    expect(spec.reputationText!.text).toBe('+0.3/turn');
+    expect(spec.reputationText!.text).toBe('+30/turn');
     expect(spec.reputationText!.color).toBe('#88bbff');
   });
 

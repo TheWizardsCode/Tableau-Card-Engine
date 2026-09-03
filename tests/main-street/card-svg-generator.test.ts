@@ -81,9 +81,9 @@ describe('generateBusinessCardSvg - base cards (level === 0)', () => {
   });
 
   it('should show reputation text when reputationPerTurn > 0', () => {
-    const biz = makeBiz({ reputationPerTurn: 0.2, level: 0 });
+    const biz = makeBiz({ reputationPerTurn: 20, level: 0 });
     const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
-    expect(svg).toContain('+0.2/turn');
+    expect(svg).toContain('+20/turn');
   });
 
   it('should omit reputation text when total reputation is 0', () => {
@@ -148,9 +148,9 @@ describe('generateBusinessCardSvg - upgraded cards (level > 0)', () => {
   });
 
   it('should show combined reputation (base + bonus)', () => {
-    const biz = makeBiz({ reputationPerTurn: 0.2, reputationBonus: 0.1, level: 1 });
+    const biz = makeBiz({ reputationPerTurn: 20, reputationBonus: 10, level: 1 });
     const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
-    expect(svg).toContain('+0.3/turn');
+    expect(svg).toContain('+30/turn');
   });
 
   it('should show cost value formatted with the currency symbol', () => {
@@ -174,9 +174,9 @@ describe('generateBusinessCardSvg - community space cards', () => {
   });
 
   it('should show reputation for community spaces with reputation', () => {
-    const cs = makeCommunitySpace({ reputationPerTurn: 0.1, level: 0 });
+    const cs = makeCommunitySpace({ reputationPerTurn: 10, level: 0 });
     const svg = generateBusinessCardSvg(cs, CARD_W, CARD_H);
-    expect(svg).toContain('+0.1/turn');
+    expect(svg).toContain('+10/turn');
   });
 
   it('should show level badge when upgraded', () => {
@@ -188,17 +188,16 @@ describe('generateBusinessCardSvg - community space cards', () => {
 
 describe('generateBusinessCardSvg - formatting', () => {
   it('should format integer reputation without decimal', () => {
-    const biz = makeBiz({ reputationPerTurn: 1.0, level: 0 });
+    const biz = makeBiz({ reputationPerTurn: 100, level: 0 });
     const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
-    expect(svg).toContain('+1/turn');
-    expect(svg).not.toContain('+1.0/turn');
+    expect(svg).toContain('+100/turn');
+    expect(svg).not.toContain('+100.0/turn');
   });
 
-  it('should format fractional reputation with one decimal', () => {
-    const biz = makeBiz({ reputationPerTurn: 0.3, level: 0 });
-    const svg = generateBusinessCardSvg(biz, CARD_W, CARD_H);
-    expect(svg).toContain('+0.3/turn');
-  });
+  // After the ×100 integer economy (CG-0MTIO1M15001E9Y6), all reputation
+  // values are integers — no fractional reputation exists in the data.
+  // The previous test "format fractional reputation with one decimal"
+  // has been removed as fractional reputation is no longer supported.
 
   it('should produce valid SVG with proper XML structure', () => {
     const biz = makeBiz({ level: 0 });
