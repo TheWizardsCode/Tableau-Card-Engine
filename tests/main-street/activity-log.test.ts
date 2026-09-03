@@ -220,7 +220,7 @@ describe('Activity Log', () => {
       const biz = state.market.cards[0];
       const cost = biz.cost;
       const name = biz.name;
-      state.resourceBank.coins = 20; // ensure enough coins
+      state.resourceBank.coins = 5000; // ensure enough coins
       purchaseBusiness(state, biz.id, 0);
 
       const entry = lastLog(state);
@@ -348,8 +348,8 @@ describe('Activity Log', () => {
       const entry = state.activityLog[logBefore];
       expect(entry.type).toBe('gain');
       expect(entry.text).toContain('Income');
-      // CG-0MREYZO7E00729S0: fractional coin format uses 3 decimal places
-      expect(entry.text).toMatch(/\+\d+\.\d{3} coins/);
+      // CG-0MREYZO7E00729S0: integer coin format (no decimals)
+      expect(entry.text).toMatch(/\+\d+ coins/);
     });
 
     it('should log neutral when income is zero', () => {
@@ -363,8 +363,8 @@ describe('Activity Log', () => {
 
       const entry = state.activityLog[logBefore];
       expect(entry.type).toBe('neutral');
-      // CG-0MREYZO7E00729S0: zero income logged as +0.000 coins
-      expect(entry.text).toContain('0.000 coins');
+      // CG-0MREYZO7E00729S0: zero income logged as +0 coins
+      expect(entry.text).toContain('+0 coins');
     });
   });
 
@@ -409,7 +409,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
 
       // Force score above threshold
-      state.resourceBank.coins = WIN_THRESHOLD + 50;
+      state.resourceBank.coins = WIN_THRESHOLD + 5000;
       state.phase = 'EndCheck';
 
       const logBefore = state.activityLog.length;
@@ -542,7 +542,7 @@ describe('Activity Log', () => {
 
       // Find an affordable business and place it
       const biz = state.market.cards[0];
-      state.resourceBank.coins = 50;
+      state.resourceBank.coins = 5000;
 
       purchaseBusiness(state, biz.id, 0);
 
@@ -556,8 +556,8 @@ describe('Activity Log', () => {
 
   describe('describeEventEffects / classifyEffect helpers (exported)', () => {
     it('should describe coin/rep deltas in a compact human-readable form', () => {
-      expect(describeEventEffects(3, 2)).toBe('+3.000 coins, +2 rep');
-      expect(describeEventEffects(-1, 0)).toBe('-1.000 coins');
+      expect(describeEventEffects(3, 2)).toBe('+3 coins, +2 rep');
+      expect(describeEventEffects(-1, 0)).toBe('-1 coins');
       expect(describeEventEffects(0, 1)).toBe('+1 rep');
       expect(describeEventEffects(0, 0)).toBe('no effect');
     });
@@ -575,7 +575,7 @@ describe('Activity Log', () => {
     it('should log effective deltas for a business purchase alongside cost/slot', () => {
       const state = createTestState();
       executeDayStart(state);
-      state.resourceBank.coins = 50;
+      state.resourceBank.coins = 5000;
       const biz = state.market.cards.find(c => c.family === 'business');
       if (!biz) throw new Error('No business card in market for enriched purchase test');
       const before = state.resourceBank.coins;
@@ -587,7 +587,7 @@ describe('Activity Log', () => {
       expect(entry.text).toContain(biz.name);
       expect(entry.text).toContain('slot 0');
       // Enriched deltas are appended.
-      expect(entry.text).toMatch(/(\+|-)\d+\.\d{3} coins/);
+      expect(entry.text).toMatch(/(\+|-)\d+ coins/);
     });
   });
 
@@ -607,14 +607,14 @@ describe('Activity Log', () => {
         synergyRangeBonus: 0,
       };
       state.market.cards = [upgrade];
-      state.resourceBank.coins = 20;
+      state.resourceBank.coins = 5000;
       const before = state.resourceBank.coins;
       purchaseUpgrade(state, 'upg-enrich-1');
       const after = state.resourceBank.coins;
       const entry = lastLog(state);
       expect(entry.type).toBe(classifyEffect(after - before, 0));
       expect(entry.text).toContain('Better Ovens');
-      expect(entry.text).toMatch(/(\+|-)\d+\.\d{3} coins/);
+      expect(entry.text).toMatch(/(\+|-)\d+ coins/);
     });
   });
 
@@ -658,7 +658,7 @@ describe('Activity Log', () => {
       const after = state.resourceBank.coins;
       const entry = lastLog(state);
       expect(entry.text).toContain('Sun Cafe');
-      expect(entry.text).toMatch(/(\+|-)\d+\.\d{3} coins/);
+      expect(entry.text).toMatch(/(\+|-)\d+ coins/);
       expect(entry.type).toBe(classifyEffect(after - before, 0));
     });
 
@@ -671,7 +671,7 @@ describe('Activity Log', () => {
       const after = state.resourceBank.coins;
       const entry = lastLog(state);
       expect(entry.text).toContain('Sun Cafe');
-      expect(entry.text).toMatch(/(\+|-)\d+\.\d{3} coins/);
+      expect(entry.text).toMatch(/(\+|-)\d+ coins/);
       expect(entry.type).toBe(classifyEffect(after - before, 0));
     });
   });
@@ -680,7 +680,7 @@ describe('Activity Log', () => {
     it('should log effective coin/rep deltas for community favour', () => {
       const state = createTestState();
       executeDayStart(state);
-      state.resourceBank.coins = 20;
+      state.resourceBank.coins = 500;
       state.resourceBank.reputation = 5;
       const beforeCoins = state.resourceBank.coins;
       const beforeRep = state.resourceBank.reputation;
@@ -698,7 +698,7 @@ describe('Activity Log', () => {
     it('should log effective coin delta on re-roll', () => {
       const state = createTestState();
       executeDayStart(state);
-      state.resourceBank.coins = 50;
+      state.resourceBank.coins = 5000;
       const before = state.resourceBank.coins;
       refreshMarket(state);
       const after = state.resourceBank.coins;
@@ -715,7 +715,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
       const staff = makeStaffCard({ id: 'staff-enrich-1', name: 'General Helper', cost: 3 });
       state.market.cards = [staff as any];
-      state.resourceBank.coins = 30;
+      state.resourceBank.coins = 3000;
       const before = state.resourceBank.coins;
       hireStaffCard(state, 'staff-enrich-1');
       const after = state.resourceBank.coins;
