@@ -37,7 +37,7 @@ function moveCardToHand(state: any): { cardId: string; handIndex: number; card: 
   const mgr = new UndoRedoManager();
   // moveToHandCommand only consumes an action — no coin check at this stage.
   // Ensure coins are sufficient for subsequent premium play (CG-0MTC2804X004TA74).
-  state.resourceBank.coins = 100;
+  state.resourceBank.coins = 5000;
   const card = state.market.cards.find((c: any) => c.family === 'business');
   expect(card).toBeTruthy();
   mgr.execute(moveToHandCommand(state, card.id));
@@ -137,7 +137,7 @@ describe('premium-aware playBusinessFromHandCommand', () => {
     // Manufacture a community-space card in the market and move it to hand.
     const cs = { id: 'cs-prem', name: 'Library', cost: 10, family: 'community-space', tier: 1 } as any;
     state.market.cards = [cs];
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 5000;
     const mgrMove = new UndoRedoManager();
     mgrMove.execute(moveToHandCommand(state, cs.id));
     const handIndex = state.hand!.findIndex((c: any) => c.id === cs.id);

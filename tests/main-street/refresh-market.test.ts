@@ -167,7 +167,7 @@ describe('AC2: refreshMarket re-roll', () => {
     expect(accountant).toBeTruthy();
     // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
     state.market.cards.push({ ...accountant! });
-    state.resourceBank.coins = 20;
+    state.resourceBank.coins = 5000;
     purchaseStaffCard(state, accountant!.id);
 
     expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST - 1);
@@ -304,12 +304,12 @@ describe('AC4: cost-at-play from hand', () => {
     const state = createTestState('pay-on-place');
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 5000;
 
     const card = state.market.cards.find(c => c.family === 'business' || c.family === 'community-space')!;
     moveToHand(state, card.id);
     // Moving is free — no deduction yet.
-    expect(state.resourceBank.coins).toBe(100);
+    expect(state.resourceBank.coins).toBe(5000);
 
     const coinsBefore = state.resourceBank.coins;
     const slot = state.streetGrid.findIndex(s => s === null);
@@ -341,7 +341,7 @@ describe('AC4: cost-at-play from hand', () => {
     const state = createTestState('pay-upgrade');
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 5000;
 
     // Place a business first so an upgrade has a target.
     const biz = state.market.cards.find(c => c.family === 'business' || c.family === 'community-space');
@@ -366,7 +366,7 @@ describe('AC4: cost-at-play from hand', () => {
     const state = createTestState('pay-event');
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 5000;
 
     // Deterministic SpecificSynergy event (Local Festival): with an empty
     // street grid its resolution grants 0 coins, so the exact cost is charged.
@@ -442,7 +442,7 @@ describe('AC6: maxHandSize base 3, growable', () => {
 
   it('grows via staff handSlotsAdded (no hard cap)', () => {
     const state = createTestState('hand-grow');
-    state.resourceBank.coins = 50;
+    state.resourceBank.coins = 5000;
 
     const assistant = createStaffDeck(1).find(c => c.id.startsWith('staff-assistant'))!;
     // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
@@ -465,7 +465,7 @@ describe('AC6: maxHandSize base 3, growable', () => {
     const assistant = createStaffDeck(1).find(c => c.id.startsWith('staff-assistant'))!;
     // Staff cards are hired from the general market row (CG-0MT3KZOBZ005IRYE)
     state.market.cards.push({ ...assistant });
-    state.resourceBank.coins = 20;
+    state.resourceBank.coins = 5000;
     purchaseStaffCard(state, assistant.id);
     const capacity = state.maxHandSize;
     expect(capacity).toBe(4);

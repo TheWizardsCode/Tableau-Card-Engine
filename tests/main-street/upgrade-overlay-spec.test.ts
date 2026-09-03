@@ -179,11 +179,11 @@ describe('Overlay spec structure', () => {
   it('reputation overlay reflects upgrade reputationBonus', () => {
     const biz = makeBusiness({
       level: 1,
-      reputationPerTurn: 0.2,
-      reputationBonus: 0.1,
+      reputationPerTurn: 20,
+      reputationBonus: 10,
     });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.reputationText).not.toBeNull();
-    expect(spec.reputationText!.text).toBe('+0.3/turn');
+    expect(spec.reputationText!.text).toBe('+30/turn');
   });
 });

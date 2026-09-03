@@ -235,7 +235,7 @@ describe('buy-and-place-upgrade (drag-drop)', () => {
       targetSlot: 0,
     });
 
-    expect(state.resourceBank.coins).toBe(1000 - 7.5);
+    expect(state.resourceBank.coins).toBe(1000 - 8);
   });
 
   it('rejects when actionsRemaining is 0', () => {

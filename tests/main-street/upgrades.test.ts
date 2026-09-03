@@ -183,7 +183,7 @@ describe('purchaseUpgrade state persistence', () => {
     // Level 0 → 1
     const biz = makeBiz({ level: 0, maxLevel: 2 });
     state.streetGrid[5] = biz;
-    state.resourceBank.coins = 200;
+    state.resourceBank.coins = 5000;
 
     const upg0 = makeUpg({ id: 'upg-lvl0', requiredLevel: 0, incomeBonus: 1, synergyRangeBonus: 1 });
     injectUpgrade(state, upg0);
@@ -235,7 +235,7 @@ describe('purchaseUpgrade state persistence', () => {
     const state = createTestState();
     const biz = makeBiz({ level: 0, maxLevel: 3, name: 'Hardware Store' });
     state.streetGrid[0] = biz;
-    state.resourceBank.coins = 200;
+    state.resourceBank.coins = 5000;
 
     const upg0 = makeUpg({ id: 'upg-home-improvement-display', targetBusiness: 'Hardware Store', requiredLevel: 0, newDisplayName: 'Home Improvement' });
     injectUpgrade(state, upg0);
@@ -387,7 +387,7 @@ describe('multi-level chain with real upgrade templates', () => {
 
     const biz: BusinessCard = { ...bakeryTemplate!, id: 'biz-bakery-chain', level: 0, incomeBonus: 0, synergyRangeBonus: 0, appliedUpgrades: [] };
     state.streetGrid[0] = biz;
-    state.resourceBank.coins = 200;
+    state.resourceBank.coins = 5000;
 
     // Find a level-0 upgrade for Bakery in the full upgrade deck
     const level0Upg = state.decks.upgrade.find(

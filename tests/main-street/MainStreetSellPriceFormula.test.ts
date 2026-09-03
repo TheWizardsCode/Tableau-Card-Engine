@@ -92,8 +92,8 @@ function recalculateCard(state: MainStreetState, slotIndex: number): void {
 describe('computeSellRefund — new formula', () => {
   it('should compute base-only refund for a card with no upgrades and no synergy', () => {
     const state = createTestState('sell-price-no-synergy-2');
-    // Give enough coins to afford any market card
-    state.resourceBank.coins = 100;
+    // Give enough coins to afford any market card (×100 economy)
+    state.resourceBank.coins = 5000;
     const card = placeCardOnGrid(state, 0) as BusinessCard;
     expect(card).not.toBeNull();
     if (!card) return;

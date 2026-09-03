@@ -138,7 +138,7 @@ staff,staff-director,Director,1400,,,,,,,,An experienced director oversees your 
 staff,staff-apprentice,Apprentice,200,,,,,,,,A budget hire who frees up a hand slot with a small ongoing cost.,1,,,,,,,,,,,,,,,,50,1,,,
 staff,staff-executive,Executive,2000,,,,,,,,An experienced executive adds major hand capacity at a high ongoing cost.,10,,,,,,,,,,,,,,,,500,4,,,
 staff,staff-socialite,Socialite,800,,,,,10,,,A charming socialite adds +1 hand slot and +10 reputation per turn.,4,,,,,,,,,,,,,,,,150,1,,,
-staff,staff-accountant,Accountant,800,,,,,,,,A meticulous accountant adds +1 hand slot and makes investment refreshes cost 1 less.,6,,,,,,,,,,,,,,,,150,1,100,,
+staff,staff-accountant,Accountant,800,,,,,,,,A meticulous accountant adds +1 hand slot and makes investment refreshes cost 1 less.,6,,,,,,,,,,,,,,,,150,1,1,,
 staff,staff-general-manager,General Manager,2000,,,,,,,,Hire an experienced manager who grants an extra action per day. Adds +4 hand slots with a moderate ongoing cost.,12,,,,,,,,,,,,,,,,500,4,,1,
 staff,staff-lookout,Lookout,1000,,,,,,,,A sharp-eyed lookout can peek at the top card of the incident deck once per turn.,7,,,,,,,,,,,,,,,,200,1,,,1
 staff,staff-barista,Barista,300,,,,,,,,A skilled barista brings warmth to any business. Adjacent Food businesses gain +20 synergy coins.,2,,,,,,,,,,,,,,,,50,,,,

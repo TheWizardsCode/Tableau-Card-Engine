@@ -166,7 +166,7 @@ describe('MarketOfferEngine — row retrieval', () => {
       const biz = state.decks.business.find(b => b.name === upgrade.targetBusiness);
       if (!biz) return;
       state.streetGrid[0] = { ...biz, level: upgrade.requiredLevel ?? 0 };
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
 
       const affordable = getAffordableUpgradeCards(state);
       const affordableIds = affordable.map(c => c.id);
@@ -193,7 +193,7 @@ describe('MarketOfferEngine — row retrieval', () => {
 
     it('should exclude upgrades when no valid target business exists', () => {
       const state = createTestState();
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
       // Street is empty — no targets
       const affordable = getAffordableUpgradeCards(state);
       // Any returned upgrades must have valid targets (the filter checks this)
@@ -449,7 +449,7 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
     it('should deduct coins, place card in slot, and remove from market', () => {
       const state = createTestState();
       const card = state.market.cards[0];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = card.cost;
       const coinsBefore = state.resourceBank.coins;
 
       const result = purchaseBusiness(state, card.id, 0);
@@ -465,7 +465,7 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
     it('should not refill the market immediately after purchase', () => {
       const state = createTestState();
       const card = state.market.cards[0];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = card.cost;
       purchaseBusiness(state, card.id, 0);
       expect(state.market.cards).toHaveLength(MARKET_TOTAL_SLOTS - 1);
     });
@@ -482,7 +482,7 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
       const biz = state.decks.business.find(b => b.name === upgrade.targetBusiness);
       if (!biz) return;
       state.streetGrid[0] = { ...biz, level: upgrade.requiredLevel ?? 0 };
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = upgrade.cost;
       const coinsBefore = state.resourceBank.coins;
       const levelBefore = state.streetGrid[0]!.level;
       const incomeBefore = state.streetGrid[0]!.incomeBonus;
@@ -566,21 +566,21 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
     it('should throw when slot index equals GRID_SIZE', () => {
       const state = createTestState();
       const card = state.market.cards[0];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = card.cost;
       expect(() => purchaseBusiness(state, card.id, GRID_SIZE)).toThrow('Invalid slot');
     });
 
     it('should throw when slot index is negative', () => {
       const state = createTestState();
       const card = state.market.cards[0];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = card.cost;
       expect(() => purchaseBusiness(state, card.id, -1)).toThrow('Invalid slot');
     });
 
     it('should throw when slot is occupied', () => {
       const state = createTestState();
       const card = state.market.cards[0];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = card.cost;
       state.streetGrid[0] = state.decks.business[0];
       expect(() => purchaseBusiness(state, card.id, 0)).toThrow('occupied');
     });
@@ -619,8 +619,7 @@ describe('MarketOfferEngine — negative-path invalid row/slot', () => {
       if (!matchingBiz) return;
       state.streetGrid[1] = { ...matchingBiz, level: upgrade.requiredLevel ?? 0 };
 
-      state.resourceBank.coins = 100;
-
+      state.resourceBank.coins = upgrade.cost;
       // Targeting slot 0 (non-matching) should throw
       expect(() => purchaseUpgrade(state, upgrade.id, 0)).toThrow('not a valid target');
     });
@@ -906,7 +905,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
   describe('purchase → end-turn → refill cycle', () => {
     it('should refill the business market at DayStart after a purchase', () => {
       const state = createTestState('flow-refill-1');
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
 
       // Day 1: buy a business
       executeDayStart(state);
@@ -926,7 +925,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
 
     it('should refill the investments row at DayStart after purchasing an upgrade', () => {
       const state = createTestState('flow-refill-2');
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
 
       // Place a target business
       const upgrade = state.market.cards.find(
