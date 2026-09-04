@@ -131,7 +131,7 @@ describe('MainStreet upgrade level-up animation', () => {
     };
     state.streetGrid[0] = biz;
     state.market.cards[0] = upgrade;
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 2000;
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
     const { calls } = spyOnLevelUp(scene);

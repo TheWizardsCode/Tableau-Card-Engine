@@ -155,7 +155,7 @@ describe('MainStreet undo/redo feedback', () => {
     // exists in the row regardless of the random seed's market draw (mirror
     // of MainStreetScene.browser.test.ts; the default boot is not guaranteed
     // to yield a buyable card at starting coins).
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 2000;
 
     const emptySlot = state.streetGrid.findIndex((cell) => cell === null);
     expect(emptySlot).toBeGreaterThanOrEqual(0);

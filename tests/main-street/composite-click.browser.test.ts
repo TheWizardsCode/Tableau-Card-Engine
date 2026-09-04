@@ -363,7 +363,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     const scene = getScene(game);
     await waitForMarketReady(scene);
     await waitForSettled(scene);
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
 
     // ── Same-day BUSINESS card: dialog appears, Proceed places at +50%. ──
     const card = firstBuyableCard(scene);
@@ -412,7 +412,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     const scene = getScene(game);
     await waitForMarketReady(scene);
     await waitForSettled(scene);
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
 
     // ── Cancel aborts the premium placement. ──
     const card = firstBuyableCard(scene);
@@ -461,7 +461,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     const scene = getScene(game);
     await waitForMarketReady(scene);
     await waitForSettled(scene);
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
 
     // First premium placement: tick "Don't show again" and Proceed, which
     // persists the preference.
@@ -483,7 +483,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     // business card (clone of a real row card).
     scene.state.actionsRemaining = 1;
     const base2 = firstBuyableCard(scene);
-    const card2 = { ...base2, id: 'biz-dismissed-2', name: 'Dismissed2', cost: 6 };
+    const card2 = { ...base2, id: 'biz-dismissed-2', name: 'Dismissed2', cost: 300 };
     scene.state.market.cards.push(card2);
     const target2 = getEmptySlots(scene.state)[0];
     await clickCompositeToSlot(scene, card2, target2);

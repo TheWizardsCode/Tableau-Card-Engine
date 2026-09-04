@@ -202,7 +202,7 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
     await waitForSettled(scene);
 
     // Plenty of coins so affordability is not a factor.
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
 
     // Same-day composite buy-and-play now incurs the +50% premium with a
     // one-time explainer dialog (CG-0MT24X0SX007RLHN). Dismiss it here so

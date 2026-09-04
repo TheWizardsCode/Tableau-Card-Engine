@@ -327,7 +327,7 @@ describe('MainStreetScene browser tests', () => {
 
       // Generous coins so an affordable business always exists in the row
       // regardless of the random seed's market draw.
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 2000;
       // Same-day composite placement now incurs the +50% premium with a
       // one-time explainer dialog (CG-0MT24X0SX007RLHN) — dismiss it so
       // this test focuses on the transfer-visual mechanics.
@@ -458,7 +458,7 @@ describe('MainStreetScene browser tests', () => {
       const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
       const state = scene.state;
       // Ensure affordability across the whole test.
-      state.resourceBank.coins = 200;
+      state.resourceBank.coins = 2000;
 
       // Capture the destination argument of every market→hand transfer.
       const transferSpy = vi.spyOn(scene, 'animateTransferFromMarket');
@@ -725,7 +725,7 @@ describe('MainStreetScene browser tests', () => {
 
     // Generous coins so an affordable market card always exists. Both
     // business and community-space cards take the hand card path under test.
-    state.resourceBank.coins = 200;
+    state.resourceBank.coins = 2000;
     const business = state.market.cards.find(
       (card: any) => card && (card.family === 'business' || card.family === 'community-space'),
     );
@@ -867,8 +867,8 @@ describe('MainStreetScene browser tests', () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
 
-    // Give the player a fractional coin balance (3-decimal precision)
-    scene.state.resourceBank.coins = 123.456;
+    // Integer economy: whole-number display (CG-0MTIO1M15001E9Y6).
+    scene.state.resourceBank.coins = 123;
     scene.refreshHud();
 
     // Find the transient HUD coin text
@@ -880,8 +880,8 @@ describe('MainStreetScene browser tests', () => {
     ) as Phaser.GameObjects.Text | undefined;
 
     expect(coinText).toBeTruthy();
-    // 2 decimal places (e.g. "Coins: 123.46")
-    expect(coinText!.text).toBe('Coins: 123.46');
+    // Integer economy: whole-number display.
+    expect(coinText!.text).toBe('Coins: 123');
 
     destroyGame(game);
     game = null;

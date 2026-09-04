@@ -13,7 +13,6 @@ import { waitForScene } from '../helpers/waitForScene';
 import { mainStreetRenderCardSvg } from '../../src/ui/Renderer/adapters/MainStreetAdapter';
 import {
   COIN_GRID_FULL_KEY,
-  COIN_GRID_HALF_KEY,
   createCoinGrid,
 } from '../../example-games/main-street/coin-grid';
 
@@ -135,7 +134,7 @@ describe('Main Street on-card coin grid', () => {
     expect(coinIcons(grid)).toHaveLength(20);
   });
 
-  it('renders a half coin for a 0.5 remainder (last icon)', async () => {
+  it('rounds fractional coin counts to whole coins (integer economy)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & {
       streetContainer: Phaser.GameObjects.Container;
@@ -143,17 +142,16 @@ describe('Main Street on-card coin grid', () => {
     const card = createCardFace(scene, 400, 300, 140, 80);
     const grid = createCoinGrid(scene, card);
 
+    // Integer economy: half coins are gone (CG-0MTIO1M15001E9Y6); 2.5 rounds to 3 whole coins.
     const layout = grid.addCoins(2.5);
     expect(layout.iconCount).toBe(3);
+    expect(layout.halfCoin).toBe(false);
 
     const icons = coinIcons(grid);
     expect(icons).toHaveLength(3);
-    const halfIcons = icons.filter((i) => (i as Phaser.GameObjects.Image).texture.key === COIN_GRID_HALF_KEY);
-    expect(halfIcons).toHaveLength(1);
-    // The half coin is the last (right-most) icon.
-    const halfIcon = halfIcons[0] as Phaser.GameObjects.Image;
-    const fullIcon = (icons.find((i) => i !== halfIcons[0]) as Phaser.GameObjects.Image);
-    expect(halfIcon.x).toBeGreaterThan(fullIcon.x);
+    for (const icon of icons) {
+      expect((icon as Phaser.GameObjects.Image).texture.key).toBe(COIN_GRID_FULL_KEY);
+    }
 
     await waitForCondition(() => icons.every((i) => (i as Phaser.GameObjects.Image).visible));
   });
