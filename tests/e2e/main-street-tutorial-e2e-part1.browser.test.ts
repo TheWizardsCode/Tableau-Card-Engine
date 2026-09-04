@@ -54,7 +54,7 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     game = null;
   });
 
-  it('Tutorial uses scenario: market cards match STANDARD_TUTORIAL_SCENARIO (12 coins)', async () => {
+  it('Tutorial uses scenario: market cards match STANDARD_TUTORIAL_SCENARIO (1200 coins)', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     expect(getStepIndex(scene)).toBe(0);
     const s = scene as any;
@@ -63,11 +63,11 @@ describe('Main Street Tutorial E2E — Part 1', () => {
     expect(marketCards).toBeTruthy();
     expect(marketCards.length).toBe(3);
     expect(marketCards[0].id).toBe('biz-bakery-0');
-    // 12 coins (CG-0MSTOATDQ005XDET — the two-turn flow stays positive).
-    expect(s.state.resourceBank.coins).toBe(12);
+    // 1200 coins (CG-0MTIO1M15001E9Y6 ×100 — the two-turn flow stays positive).
+    expect(s.state.resourceBank.coins).toBe(1200);
     const localFestival = marketCards.find((c: any) => c.name === 'Local Festival');
     expect(localFestival).toBeTruthy();
-    expect(localFestival.cost).toBe(3);
+    expect(localFestival.cost).toBe(300);
   }, 30_000);
 
   it('T1: Welcome shows and advances to T2', async () => {
