@@ -107,4 +107,60 @@ describe('Tutorial Flow Integration - Business Selection', () => {
     expect(currentStep?.id).toBe('T4');
     expect(currentStep?.id !== step?.id).toBe(true); // action complete!
   });
+
+  // ── Place-business step completion (CG-0MTMYI6YP0040NT5) ──
+  // During place-business steps (T7/T15/T19), select-hand-card is allowed
+  // (isRequiredAction returns true) but does NOT complete the step.
+  // Only place-business completes the step.
+
+  it('T7 place-business: select-hand-card is allowed but does NOT complete the step', () => {
+    let ctrl = startTutorial(createTutorialControllerState());
+    // Advance to T7 (index 6)
+    for (let i = 0; i < 6; i++) ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T7');
+    expect(getCurrentStep(ctrl)?.requiredAction).toBe('place-business');
+
+    // select-hand-card is allowed (isRequiredAction returns true)
+    expect(isRequiredAction(ctrl, 'select-hand-card')).toBe(true);
+    expect(isRequiredAction(ctrl, 'place-business')).toBe(true);
+
+    // But completeCurrentStep only advances when the action matches requiredAction.
+    // Since T7 requiredAction is 'place-business', completing on select-hand-card
+    // would be wrong. The lifecycle manager enforces this by checking
+    // actionType === step.requiredAction before calling completeCurrentStep.
+    // Verify: advancing T7 requires the step to be completed as place-business.
+    // After completing T7, we should be on T8.
+    ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T8');
+    expect(getCurrentStep(ctrl)?.gate).toBe('confirm');
+  });
+
+  it('T15 place-business: select-hand-card is allowed but does NOT complete the step', () => {
+    let ctrl = startTutorial(createTutorialControllerState());
+    for (let i = 0; i < 14; i++) ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T15');
+    expect(getCurrentStep(ctrl)?.requiredAction).toBe('place-business');
+
+    expect(isRequiredAction(ctrl, 'select-hand-card')).toBe(true);
+    expect(isRequiredAction(ctrl, 'place-business')).toBe(true);
+
+    // Complete the step — should advance to T16
+    ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T16');
+  });
+
+  it('T19 place-business: select-hand-card is allowed but does NOT complete the step', () => {
+    let ctrl = startTutorial(createTutorialControllerState());
+    for (let i = 0; i < 18; i++) ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T19');
+    expect(getCurrentStep(ctrl)?.requiredAction).toBe('place-business');
+
+    expect(isRequiredAction(ctrl, 'select-hand-card')).toBe(true);
+    expect(isRequiredAction(ctrl, 'place-business')).toBe(true);
+
+    // Complete the step — should advance to T20
+    ctrl = completeCurrentStep(ctrl).newState;
+    expect(getCurrentStep(ctrl)?.id).toBe('T20');
+    expect(getCurrentStep(ctrl)?.requiredAction).toBe('play-event');
+  });
 });

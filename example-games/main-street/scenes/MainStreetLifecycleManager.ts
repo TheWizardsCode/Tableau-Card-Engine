@@ -763,6 +763,16 @@ export class MainStreetLifecycleManager {
       return;
     }
 
+    // Only complete the step when the action matches the requiredAction.
+    // During place-business steps (T7/T15/T19), select-hand-card is allowed
+    // (isRequiredAction returns true) but does NOT complete the step — only
+    // the actual placement (place-business) advances the tutorial.
+    // (CG-0MTMYI6YP0040NT5 — tutorial place-business step was completing on
+    // hand selection, soft-locking the player before they could place.)
+    if (actionType !== step.requiredAction) {
+      return;
+    }
+
     const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
 
