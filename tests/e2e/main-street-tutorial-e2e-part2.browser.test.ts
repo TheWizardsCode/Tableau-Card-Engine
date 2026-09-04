@@ -95,8 +95,8 @@ describe('Main Street Tutorial E2E — Part 2', () => {
     await new Promise((r) => setTimeout(r, 500));
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(7); // T8 Investments
-    // Listed-cost deduction ($4), not the $6 same-day premium.
-    expect(s.state.resourceBank.coins).toBe(coinsBefore - 4);
+    // Listed-cost deduction (400, CG-0MTIO1M15001E9Y6 ×100), not 600 same-day premium.
+    expect(s.state.resourceBank.coins).toBe(coinsBefore - 400);
     await saveScreenshot('t7-t8');
   }, 30_000);
 });
