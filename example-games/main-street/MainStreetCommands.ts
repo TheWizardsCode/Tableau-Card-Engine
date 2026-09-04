@@ -57,6 +57,8 @@ interface MarketActionSnapshot {
   incidentDeck: any | null;
   activityLog: any | null;
   soldSlots: boolean[] | null;
+  /** Grand Opening placement gate — captured so undo restores the per-turn flag. */
+  businessPlacedThisTurn: boolean | null;
   /** Daily action budget — captured so undo restores the spent action. */
   actionsRemaining: number | null;
   /** Banked actions — captured so undo restores the banking state. */
@@ -96,6 +98,7 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     incidentDeck: safeClone(state.incidentDeck),
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
+    businessPlacedThisTurn: (state as any).businessPlacedThisTurn ?? false,
     actionsRemaining: state.actionsRemaining,
     bankedActions: state.bankedActions ?? 0,
     peekUsedThisTurn: state.peekUsedThisTurn ?? false,
@@ -118,6 +121,9 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.incidentDeck = snap.incidentDeck as any;
   state.activityLog = snap.activityLog as any;
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
+  if (snap.businessPlacedThisTurn !== null && snap.businessPlacedThisTurn !== undefined) {
+    (state as any).businessPlacedThisTurn = snap.businessPlacedThisTurn;
+  }
   if (snap.actionsRemaining !== null && snap.actionsRemaining !== undefined) {
     state.actionsRemaining = snap.actionsRemaining;
   }

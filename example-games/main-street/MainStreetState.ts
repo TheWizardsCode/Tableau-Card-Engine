@@ -434,6 +434,15 @@ export interface MainStreetState {
    * DayStart.
    */
   justMovedUpgradeCardId?: string | null;
+  /**
+   * Whether a business or community-space card has been placed onto the
+   * street grid this turn (CG-0MTIOCBH400970OB). Gates `evt-grand-opening`
+   * (Grand Opening Sale) play: the event can only be played from hand on a
+   * turn where a business was placed. Set to true whenever a card is
+   * placed on `streetGrid` (via `purchaseBusiness`, `playBusinessFromHand`,
+   * or `buyAndPlaceBusiness`); reset to false at `DayStart`.
+   */
+  businessPlacedThisTurn?: boolean;
   // ── Competitive mode (CG-0MT5X3GMA007EG30) ─────────────────
   /** Per-player records; undefined in single-player mode. */
   players?: PlayerRecord[] | null;
@@ -561,6 +570,8 @@ export interface MainStreetSerializedState {
    * checks this to decide whether the play is free.
    */
   justMovedUpgradeCardId?: string | null;
+  /** Whether a business has been placed onto the street grid this turn (CG-0MTIOCBH400970OB). Gates Grand Opening Sale. */
+  businessPlacedThisTurn?: boolean;
   // ── Competitive (CG-0MT5X3GMA007EG30) ───────────────────────
   /** Per-player records; undefined in single-player saves. */
   players?: PlayerRecord[] | null;
@@ -988,6 +999,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     favourUsedThisTurn: false,
     justMovedEventCardId: null,
     justMovedUpgradeCardId: null,
+    businessPlacedThisTurn: false,
     players: undefined,
     ownerTaggedGrid: undefined,
     playerCount: undefined,
@@ -1150,6 +1162,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     favourUsedThisTurn: state.favourUsedThisTurn,
     justMovedEventCardId: state.justMovedEventCardId ?? null,
     justMovedUpgradeCardId: state.justMovedUpgradeCardId ?? null,
+    businessPlacedThisTurn: state.businessPlacedThisTurn ?? false,
     players: state.players ? structuredClone(state.players) : undefined,
     ownerTaggedGrid: state.ownerTaggedGrid ? structuredClone(state.ownerTaggedGrid) : undefined,
     playerCount: state.playerCount,
@@ -1367,6 +1380,14 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).justMovedEventCardId = null;
   }
 
+  // ── businessPlacedThisTurn (CG-0MTIOCBH400970OB): backfill default ──
+  // Legacy saves predate the Grand Opening placement gate; default to false
+  // (not yet placed this turn) so old saves remain loadable and Grand
+  // Opening starts gated for the current turn.
+  if (!('businessPlacedThisTurn' in saved)) {
+    (saved as Record<string, unknown>).businessPlacedThisTurn = false;
+  }
+
   // ── incidentBalance (CG-0MSL0OP040043KKZ): backfill from the queue for ──
   // legacy saves that predate the balance state. The queue cards are recorded
   // in draw order so subsequent constrained draws see the actual sequence.
@@ -1556,6 +1577,7 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     favourUsedThisTurn: saved.favourUsedThisTurn ?? false,
     justMovedEventCardId: (saved as any).justMovedEventCardId ?? null,
     revealedPeekedCard: (saved.revealedPeekedCard as EventCard | null) ?? null,
+    businessPlacedThisTurn: (saved as unknown as { businessPlacedThisTurn?: boolean })?.businessPlacedThisTurn ?? false,
     justMovedUpgradeCardId: (saved as unknown as { justMovedUpgradeCardId?: string | null })?.justMovedUpgradeCardId ?? null,
     players: (saved as unknown as { players?: PlayerRecord[] | null })?.players
       ? structuredClone((saved as unknown as { players: PlayerRecord[] })?.players)

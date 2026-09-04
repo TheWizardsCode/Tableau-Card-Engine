@@ -411,6 +411,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
         }
       }
     } else if (card.family === 'event' && card.trigger === 'Investment') {
+      if (String((card as any).id).startsWith('evt-grand-opening') && !(state as any).businessPlacedThisTurn) return;
       if (state.resourceBank.coins >= card.cost) {
         actions.push({ type: 'play-event-from-hand', handIndex });
       }

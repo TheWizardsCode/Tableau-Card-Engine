@@ -243,7 +243,7 @@ Events fall into two categories:
 
 | ID | Name | Trigger | Cost | Target | Synergy | Coins | Rep | Effect | Rationale |
 |----|------|---------|------|--------|---------|-------|-----|--------|-----------|
-| `evt-grand-opening` | Grand Opening Sale | Investment | 2 | SpecificSynergy | Commerce | +3 | 0 | +3 coins from Commerce promo. | Cheap Commerce boost; rewards Commerce-heavy builds. |
+| `evt-grand-opening` | Grand Opening Sale | Investment | 3 | SpecificSynergy | Commerce | +4.5 | 0 | +3 coins from a Commerce promotion. **Same-turn only:** can only be played from hand on a turn where a business was placed onto the street grid (CG-0MTIOCBH400970OB). | Commerce boost with a same-turn placement gate; rewards coordinated play. |
 | `evt-wellness-fair` | Wellness Fair | Investment | 3 | SpecificSynergy | Health | +2 | +1 | +2 coins/Health biz, +1 rep. | Health counterpart to Local Festival. |
 | `evt-block-party` | Block Party | Investment | 4 | SpecificSynergy | Entertainment | +2 | +2 | +2 coins/Ent biz, +2 rep. | Expensive but high rep payoff for Entertainment. |
 | `evt-charity-drive` | Charity Drive | Investment | 2 | All | -- | 0 | +3 | +3 reputation. | Pure reputation play; universal target. |

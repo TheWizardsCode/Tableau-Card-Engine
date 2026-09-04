@@ -1359,6 +1359,8 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   (state as any).justMovedEventCardId = null;
   // Clear same-day upgrade composite tracking (CG-0MT3IYSRL001VVUP).
   state.justMovedUpgradeCardId = null;
+  // Grand Opening placement gate (CG-0MTIOCBH400970OB): new day resets the flag.
+  (state as any).businessPlacedThisTurn = false;
 
   // Day-start snapshot for the per-turn net summary row (CG-0MT5W7UJJ0065MEZ
   // AC3): resources exactly as the player's turn begins. Persisted with the
@@ -2154,6 +2156,7 @@ export function buyAndPlaceBusiness(
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
+  (state as any).businessPlacedThisTurn = true;
 
   addLog(
     state,

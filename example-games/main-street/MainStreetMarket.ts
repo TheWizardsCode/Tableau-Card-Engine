@@ -216,6 +216,14 @@ export function canPlayEvent(
   if (state.resourceBank.coins < card.cost) {
     return { legal: false, reason: `Not enough coins to play ${card.name} from hand. Need ${card.cost}, have ${state.resourceBank.coins}.` };
   }
+  // ── Grand Opening placement gate (CG-0MTIOCBH400970OB) ──
+  // Grand Opening Sale can only be played from hand during a turn where a
+  // business was placed onto the street grid. The gate arms when any
+  // placement path succeeds (purchaseBusiness / playBusinessFromHand /
+  // buyAndPlaceBusiness) and resets at DayStart.
+  if (String((card as any).id).startsWith('evt-grand-opening') && !(state as any).businessPlacedThisTurn) {
+    return { legal: false, reason: `Grand Opening Sale can only be played on a turn where a business was placed on the street grid.` };
+  }
   return { legal: true };
 }
 
@@ -436,6 +444,9 @@ export function purchaseBusiness(
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
+  // Arm Grand Opening placement gate (CG-0MTIOCBH400970OB).
+  (state as any).businessPlacedThisTurn = true;
+
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
@@ -556,6 +567,7 @@ export function playBusinessFromHand(
   state.hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card as BusinessCard;
   updateNeighborsOnPlacement(state, slotIndex);
+  (state as any).businessPlacedThisTurn = true;
 
   addLog(
     state,
@@ -644,6 +656,9 @@ export function playEventFromHand(
   const event = card as EventCard;
   if (event.trigger !== 'Investment') {
     throw new Error('Incident events cannot be played from hand.');
+  }
+  if (String((event as any).id).startsWith('evt-grand-opening') && !(state as any).businessPlacedThisTurn) {
+    throw new Error('Grand Opening Sale can only be played on a turn where a business was placed on the street grid.');
   }
   if (state.resourceBank.coins < event.cost) {
     throw new Error(`Not enough coins to play ${event.name} from hand. Need ${event.cost}, have ${state.resourceBank.coins}.`);
