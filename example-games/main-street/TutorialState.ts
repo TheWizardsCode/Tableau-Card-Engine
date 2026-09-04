@@ -35,6 +35,8 @@ export interface MainStreetTutorialStateV1 {
   status: TutorialStatus;
   completedAt: string | null;
   lastStepId: string | null;
+  /** ISO timestamp when the first-bank hint overlay was shown (null = not yet shown). Legacy saves may omit it (defaults to null). */
+  bankingHintShownAt?: string | null;
 }
 
 // ── Options ─────────────────────────────────────────────────
@@ -91,6 +93,7 @@ export function createDefaultTutorialState(): MainStreetTutorialStateV1 {
     status: 'not_seen',
     completedAt: null,
     lastStepId: null,
+    bankingHintShownAt: null,
   };
 }
 
@@ -122,11 +125,17 @@ export function parseTutorialState(
       return createDefaultTutorialState();
     }
 
+    // Ensure bankingHintShownAt is present (defaults to null for legacy saves)
+    if (parsed.bankingHintShownAt === undefined) {
+      parsed.bankingHintShownAt = null;
+    }
+
     return {
       schemaVersion: TUTORIAL_STATE_SCHEMA_VERSION,
       status: parsed.status as TutorialStatus,
       completedAt: parsed.completedAt ?? null,
       lastStepId: parsed.lastStepId ?? null,
+      bankingHintShownAt: parsed.bankingHintShownAt ?? null,
     };
   } catch {
     return createDefaultTutorialState();
@@ -162,6 +171,7 @@ export function updateTutorialStatus(
       opts?.lastStepId !== undefined
         ? opts.lastStepId
         : current.lastStepId,
+    bankingHintShownAt: current.bankingHintShownAt ?? null,
   };
 }
 
@@ -217,6 +227,39 @@ export async function saveTutorialState(
 }
 
 /**
+ * Returns true if the contextual banking hint has been shown at least once.
+ */
+export function hasSeenBankingHint(state: MainStreetTutorialStateV1): boolean {
+  return state.bankingHintShownAt != null;
+}
+
+/**
+ * Returns a new tutorial state with the banking hint timestamp set.
+ * No-ops (returns the original state) if the hint was already recorded.
+ */
+export function markBankingHintShown(
+  current: MainStreetTutorialStateV1,
+  opts?: { now?: string },
+): MainStreetTutorialStateV1 {
+  if (current.bankingHintShownAt != null) return current;
+  return {
+    ...current,
+    bankingHintShownAt: opts?.now ?? new Date().toISOString(),
+  };
+}
+
+/**
+ * Clears only the banking hint flag (e.g. when the tutorial is reset).
+ * Resets `bankingHintShownAt` to null without touching any other field.
+ */
+export function clearBankingHint(
+  current: MainStreetTutorialStateV1,
+): MainStreetTutorialStateV1 {
+  if (current.bankingHintShownAt == null) return current;
+  return { ...current, bankingHintShownAt: null };
+}
+
+/**
  * Clears the tutorial state from storage.
  */
 export function clearTutorialState(
@@ -263,6 +306,7 @@ export function bridgeLegacyTutorialSeen(
       status: 'completed',
       completedAt: null,
       lastStepId: null,
+      bankingHintShownAt: null,
     };
   }
 

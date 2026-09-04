@@ -26,12 +26,14 @@ import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
 import { type LayoutViewport } from '../../../src/ui/screen-layout';
 
 import {
+  BANKING_HINT_STEP,
   UNIFIED_TUTORIAL_STEP_COUNT,
   UNIFIED_TUTORIAL_STEPS,
   advanceTutorialStep,
   resolveTutorialStepText,
   type TutorialControllerState,
   type TutorialHighlightZone,
+  type UnifiedTutorialStepDef,
 } from '../TutorialFlow';
 import { TUTORIAL_EN_BUNDLE } from '../i18n/tutorial-en';
 import baseLayout from '../layouts/main-street.layout.json';
@@ -250,6 +252,163 @@ export class MainStreetTutorialHints {
     this.currentStep = 0;
     this.visible = true;
     this.showStep(this.currentStep);
+  }
+
+  // ── Banking hint (CG-0MT3JK16W006A66P) ─────────────────────
+  // Contextual first-bank overlay: not part of the fixed 23-step count.
+  // Mutually exclusive with the main flow — callers must not show both at once.
+
+  /**
+   * Show the contextual banking hint overlay (cap-2 + carry-forward + HUD cue).
+   *
+   * The overlay uses the standard confirm-mode rendering and highlights the
+   * HUD action counter where the "(1 banked)" suffix appears.
+   */
+  public showBankingHint(): void {
+    this.renderBankingHint();
+  }
+
+  private renderBankingHint(): boolean {
+    const overlay = this as any;
+    if (!overlay || typeof overlay.clearObjects !== 'function') return false;
+    try {
+      // Coerce rendering through showStep's confirmed path by temporarily injecting the hint step.
+      // Store/restore currentStep so the 23-step flow is unaffected.
+      const saved = this.currentStep;
+      const wasVisible = this.visible;
+      this.clearObjects();
+      this.visible = true;
+      // Render as if it were a confirm step at a synthetic index
+      this.renderStepOverlay(BANKING_HINT_STEP, () => {
+        // On dismiss: tear down just the overlay, do not advance the main flow
+        this.clearObjects();
+        this.visible = false;
+        // Restore flow visibility/stale step to whatever was active before
+        if (wasVisible && saved >= 0 && saved < UNIFIED_TUTORIAL_STEP_COUNT) {
+          try { this.showStep(saved); } catch (_) { /* ignore */ }
+        }
+      });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  /**
+   * Low-level step overlay rendering factored out so `showStep` and
+   * `renderBankingHint` can share a single code path.
+   */
+  private renderStepOverlay(step: UnifiedTutorialStepDef, onNext: () => void): void {
+    // Banking hint is not in UNIFIED_TUTORIAL_STEPS — no index gating needed.
+    // Fall through to inline rendering of the supplied step.
+    const s = this.scene;
+    if (!s || !s.add) {
+      setTimeout(() => { try { this.renderStepOverlay(step, onNext); } catch (_) {} }, 60);
+      return;
+    }
+    const layout = s.layout ?? {};
+    const gameW: number = layout.gameW ?? 1280;
+    const gameH: number = layout.gameH ?? 720;
+    const anchor = this.zoneToAnchor(step.highlightZone, s);
+    if (anchor) {
+      const highlight = s.add.graphics();
+      highlight.setDepth(TOOLTIP_DEPTH - 1);
+      highlight.fillStyle(HIGHLIGHT_COLOR, HIGHLIGHT_ALPHA);
+      highlight.fillRect(anchor.x, anchor.y, anchor.w, anchor.h);
+      highlight.lineStyle(2, HIGHLIGHT_COLOR, HIGHLIGHT_BORDER_ALPHA);
+      highlight.strokeRect(anchor.x, anchor.y, anchor.w, anchor.h);
+      this.objects.push(highlight);
+    }
+    const padTop = 12;
+    const padSides = 16;
+    const padBetweenTitleAndBody = 8;
+    const padBottom = 12;
+    try {
+      const container = document.createElement('div');
+      container.className = 'ms-tutorial-tooltip';
+      container.style.width = TOOLTIP_W + 'px';
+      container.style.boxSizing = 'border-box';
+      container.style.padding = `${padTop}px ${padSides}px ${padBottom}px ${padSides}px`;
+      container.style.background = '#1a2a1a';
+      container.style.border = '2px solid #44aa44';
+      container.style.borderRadius = '8px';
+      container.style.color = '#ddccbb';
+      container.style.fontFamily = FONT_FAMILY;
+      container.style.fontSize = '13px';
+      container.style.lineHeight = '1.25';
+      container.style.overflow = 'auto';
+      container.style.pointerEvents = 'auto';
+      const stopTooltipPropagation = (ev: Event): void => { ev.stopPropagation(); };
+      for (const evt of ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','touchcancel'] as const) {
+        container.addEventListener(evt, stopTooltipPropagation);
+      }
+      const titleEl = document.createElement('div');
+      titleEl.style.fontWeight = '700';
+      titleEl.style.color = '#aaffaa';
+      titleEl.style.marginBottom = `${padBetweenTitleAndBody}px`;
+      titleEl.textContent = resolveTutorialStepText(step).title;
+      container.appendChild(titleEl);
+      const bodyEl = document.createElement('div');
+      bodyEl.style.whiteSpace = 'pre-wrap';
+      bodyEl.style.color = '#ddccbb';
+      bodyEl.textContent = resolveTutorialStepText(step).body;
+      container.appendChild(bodyEl);
+      const btnRow = document.createElement('div');
+      btnRow.style.display = 'flex';
+      btnRow.style.justifyContent = 'space-between';
+      btnRow.style.alignItems = 'center';
+      btnRow.style.marginTop = '12px';
+      const leftGroup = document.createElement('div');
+      const dismissBtn = document.createElement('button');
+      dismissBtn.textContent = t('tutorial.overlay.dismiss');
+      dismissBtn.style.background = '#2a2a1a';
+      dismissBtn.style.color = '#aa8866';
+      dismissBtn.style.border = 'none';
+      dismissBtn.style.padding = '6px 8px';
+      dismissBtn.style.borderRadius = '6px';
+      dismissBtn.style.cursor = 'pointer';
+      dismissBtn.onclick = () => { try { onNext(); } catch(_) {} };
+      leftGroup.appendChild(dismissBtn);
+      btnRow.appendChild(leftGroup);
+      const rightGroup = document.createElement('div');
+      const nextBtn = document.createElement('button');
+      nextBtn.textContent = ``;
+      // Banking hint uses a single Dismiss action; hide the Next button
+      nextBtn.style.display = 'none';
+      rightGroup.appendChild(nextBtn);
+      btnRow.appendChild(rightGroup);
+      container.appendChild(btnRow);
+      document.body.appendChild(container);
+      const measuredH = Math.min(container.offsetHeight || TOOLTIP_H_BASE, Math.max(80, gameH - 40));
+      document.body.removeChild(container);
+      const tooltipH = measuredH;
+      let tooltipY: number;
+      let domX = gameW / 2 - TOOLTIP_W / 2;
+      if (anchor) {
+        const rightX = anchor.x + anchor.w + 12;
+        const leftX = anchor.x - TOOLTIP_W - 12;
+        const centerYBased = anchor.y + Math.floor((anchor.h - tooltipH) / 2);
+        if (rightX + TOOLTIP_W < gameW - 12) { domX = Math.max(12, rightX); tooltipY = Math.max(12, Math.min(centerYBased, gameH - tooltipH - 12)); }
+        else if (leftX > 12) { domX = Math.max(12, leftX); tooltipY = Math.max(12, Math.min(centerYBased, gameH - tooltipH - 12)); }
+        else { const belowY = anchor.y + anchor.h + 12; const aboveY = anchor.y - tooltipH - 12; tooltipY = belowY + tooltipH < gameH ? belowY : Math.max(12, aboveY); }
+      } else { domX = Math.max(12, Math.floor(gameW / 2 - TOOLTIP_W / 2)); tooltipY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2)); }
+      const dom = s.add.dom(domX, tooltipY, container) as Phaser.GameObjects.DOMElement;
+      dom.setOrigin(0, 0);
+      try { dom.setDepth(TOOLTIP_DEPTH + 1000); } catch {}
+      this.objects.push(dom);
+      const stepLabel = s.add.text(domX + TOOLTIP_W - 12, tooltipY + 10, `hint`, { fontSize: '11px', color: '#669966', fontFamily: FONT_FAMILY }).setOrigin(1, 0).setDepth(TOOLTIP_DEPTH + 1);
+      this.objects.push(stepLabel);
+    } catch(e) {
+      const tooltipH = TOOLTIP_H_BASE;
+      const domX = Math.max(12, Math.floor(gameW / 2 - TOOLTIP_W / 2));
+      const tooltipY = Math.max(12, Math.floor(gameH / 2 - tooltipH / 2));
+      const bg = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH, 0x1a2a1a).setDepth(TOOLTIP_DEPTH + 1000);
+      const border = s.add.rectangle(domX + TOOLTIP_W / 2, tooltipY + tooltipH / 2, TOOLTIP_W, tooltipH).setStrokeStyle(2, 0x44aa44).setDepth(TOOLTIP_DEPTH + 1001);
+      const stepText = resolveTutorialStepText(step);
+      const titleTxt = s.add.text(domX + 12, tooltipY + 12, stepText.title, { fontSize: '16px', color: '#aaffaa', fontFamily: FONT_FAMILY }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const bodyTxt = s.add.text(domX + 12, tooltipY + 40, stepText.body, { fontSize: '13px', color: '#ddccbb', fontFamily: FONT_FAMILY, wordWrap: { width: TOOLTIP_W - 24 } as any }).setDepth(TOOLTIP_DEPTH + 1002).setOrigin(0, 0);
+      const dismissBtn = s.add.text(domX + 12, tooltipY + tooltipH - 30, t('tutorial.overlay.dismiss'), { fontSize: '13px', color: '#aa8866', fontFamily: FONT_FAMILY }).setInteractive({ useHandCursor: true }).setDepth(TOOLTIP_DEPTH + 1003);
+      dismissBtn.on('pointerdown', () => { try { onNext(); } catch(_) {} });
+      this.objects.push(bg, border, titleTxt, bodyTxt, dismissBtn);
+    }
   }
 
   /** Toggle the tutorial overlay on/off. */

@@ -419,6 +419,7 @@ describe('AC5: Existing TutorialState types remain compatible with scenario setu
       status: 'completed',
       completedAt: '2026-06-27T00:00:00.000Z',
       lastStepId: 'T13',
+      bankingHintShownAt: null,
     };
     const serialized = serializeTutorialState(original);
     const parsed = parseTutorialState(serialized);
@@ -477,6 +478,7 @@ describe('AC5: Existing TutorialState types remain compatible with scenario setu
       status: 'skipped',
       completedAt: null,
       lastStepId: 'T2',
+      bankingHintShownAt: null,
     };
     void saveTutorialState(storage, state);
     const loaded = loadTutorialState(storage);

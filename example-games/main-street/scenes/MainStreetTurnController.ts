@@ -28,6 +28,7 @@ import {
   type DragDropPayload,
 } from '../../../src/ui/dragDrop';
 import { getCurrentStep, isSynergyAdjacentPlacement, resolveTutorialCardParams, type TutorialActionType } from '../TutorialFlow';
+import { BrowserLocalStorageAdapter, hasSeenBankingHint, loadTutorialState, markBankingHintShown, saveTutorialState } from '../TutorialState';
 import { ensureTutorialMarketForUpcomingSteps } from '../TutorialScenario';
 import { computeDragTransferDuration } from './MainStreetConstants';
 
@@ -194,6 +195,26 @@ export class MainStreetTurnController {
     s.uiPhase = 'animating';
     s.instructionText.setText('Processing end of turn...');
     s.refreshActionButtons();
+
+    // ── Banking hint trigger (CG-0MT3JK16W006A66P) ────────────────
+    // Contextual one-shot hint: when the tutorial is active, the player
+    // ends a turn with at least one unused action (a bankable action), and
+    // the hint has not yet been shown, remember the candidate and fire the
+    // HUD-highlighting hint AFTER the non-blocking `processEndOfTurn` runs.
+    // The flag is persisted via TutorialState so a restart does not replay
+    // it; legacy saves default to "not shown" (AC2).
+    let pendingBankingHint = false;
+    try {
+      const tut = (s as any).tutorialController as any;
+      if (tut?.isActive && s.state.actionsRemaining > 0) {
+        const ts = loadTutorialState(new BrowserLocalStorageAdapter());
+        if (!hasSeenBankingHint(ts)) {
+          pendingBankingHint = true;
+          const next = markBankingHintShown(ts);
+          void saveTutorialState(new BrowserLocalStorageAdapter(), next).catch(() => {});
+        }
+      }
+    } catch { /* banking hint trigger must never block the turn */ }
 
     // ── Tutorial guard: prevent market cycling before T7 ──────────
     // When the tutorial is active and the current step is action 'end-turn'
@@ -373,6 +394,13 @@ export class MainStreetTurnController {
         }
         // Tutorial: mark end-turn step complete if active
         (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
+        // ── Banking hint presentation (CG-0MT3JK16W006A66P) ─────
+        // Non-blocking HUD-highlighting overlay, once per save. Fires after
+        // the turn's gated step has advanced so it does not compete with
+        // the step's own overlay. Never blocks the day start.
+        if (pendingBankingHint) {
+          try { (s as any).tutorialOverlay?.showBankingHint?.(); } catch { /* presentation-only */ }
+        }
         // The income show is the turn's closing moment (~11s): defer the
         // day start until the choreography completes so it isn't cut short
         // by the market/street refresh.
