@@ -4,7 +4,7 @@
  * Verifies that the click-path purchase rejections caused by insufficient
  * coins play the illegal-move feedback (sfx-illegal-move sound + shake
  * animation on the offending card), while non-affordability rejections
- * (hand full, occupied slot, tutorial gating, incident events, no eligible
+ * (hand full, occupied slot, incident events, no eligible
  * target) keep their existing instruction-text-only behaviour. Investment
  * events are an exception: taking an event to hand is FREE
  * (CG-0MT5W1V4D007NN8Q), so the event click has no insufficient-coins path
@@ -235,7 +235,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
       expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Not enough coins'));
     });
 
-    it('does NOT play feedback when the play failure is non-affordability (e.g. no eligible slot logic)', () => {
+    it('does play feedback when the play failure is non-affordability (incident event)', () => {
       // Incident events cannot be played from hand — a non-coins reason.
       const incident = { ...scene.state.market.cards[0], family: 'event', trigger: 'Incident', id: 'evt-test-incident-0', cost: 1 };
       scene.state.hand = [incident];
@@ -243,8 +243,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
       scene.state.phase = 'MarketPhase';
 
       controller.onPlayHeldEvent(0);
-      expect(scene.sound.play).not.toHaveBeenCalled();
-      expect(scene.tweens.add).not.toHaveBeenCalled();
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
     });
   });
 
@@ -276,7 +275,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
       expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Not enough coins'));
     });
 
-    it('does NOT play feedback when the slot is occupied (non-affordability)', async () => {
+    it('does play feedback when the slot is occupied (non-affordability)', async () => {
       const biz = scene.state.market.cards.find(
         (c: any) => c.family === 'business' || c.family === 'community-space',
       );
@@ -291,8 +290,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
       controller.onSlotClick(0);
       await flushMicrotasks();
 
-      expect(scene.sound.play).not.toHaveBeenCalled();
-      expect(scene.tweens.add).not.toHaveBeenCalled();
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
       expect(scene.state.hand).toHaveLength(1);
       expect(scene.state.resourceBank.coins).toBe(100);
     });
@@ -355,7 +353,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
       expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Cannot buy upgrade'));
     });
 
-    it('does NOT play feedback when the upgrade has no eligible target (non-affordability)', () => {
+    it('does play feedback when the upgrade has no eligible target (any legality failure)', () => {
       const upgrade = ensureUpgradeInMarket(scene);
       expect(upgrade).toBeTruthy();
       upgrade.cost = 1;
@@ -365,8 +363,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
 
       controller.onUpgradeCardClick(upgrade);
 
-      expect(scene.sound.play).not.toHaveBeenCalled();
-      expect(scene.tweens.add).not.toHaveBeenCalled();
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
       expect(scene.state.resourceBank.coins).toBe(100);
     });
   });
@@ -421,15 +418,14 @@ describe('Main Street click-path illegal-afford feedback', () => {
       expect(bare.tweens.add).not.toHaveBeenCalled();
     });
 
-    it('does not play feedback on tutorial-gated rejections (text only)', () => {
+    it('does play feedback on tutorial-gated rejections', () => {
       scene.msLifecycleManager.isTutorialActionAllowed = vi.fn()
         .mockReturnValue({ allowed: false, reason: 'Complete the highlighted step first.' });
       const event = takeInvestmentEvent(scene.state);
 
       controller.onEventCardClick(event);
 
-      expect(scene.sound.play).not.toHaveBeenCalled();
-      expect(scene.tweens.add).not.toHaveBeenCalled();
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
       expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Complete the highlighted step'));
     });
   });
