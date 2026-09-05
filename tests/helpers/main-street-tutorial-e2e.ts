@@ -18,7 +18,13 @@ import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/Ma
 
 // ── Constants ────────────────────────────────────────────
 
-export const SCENE_LOAD_TIMEOUT = 30_000;
+/**
+ * Scene-load wait inside bootGameWithTutorial. Under CPU contention the
+ * scene boot + lifecycle init (TutorialOfferModal construction, HUD wiring,
+ * SVG prewarm) stretches well past the old 30s; this only affects failure
+ * latency, never correctness (CG-0MTG4EAVR005JB3W).
+ */
+export const SCENE_LOAD_TIMEOUT = 90_000;
 export const UI_TRANSITION_TIMEOUT = 5_000;
 export const SCREENSHOT_DIR = 'main-street-tutorial-e2e';
 

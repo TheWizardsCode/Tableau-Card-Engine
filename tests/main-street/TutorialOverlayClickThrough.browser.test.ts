@@ -69,6 +69,46 @@ import {
 } from '../helpers/main-street-tutorial-e2e';
 import { resolveMarketCardAnchor } from '../../example-games/main-street/scenes/MainStreetTutorialHints';
 
+/**
+ * Contention-safe caps for boot-path waits and hooks (CG-0MTG4EAVR005JB3W).
+ *
+ * Boot flow: `bootGameWithTutorial` awaits `_campaignLoadPromise`, but the
+ * tutorial OFFER modal is not part of that awaited chain — it fires later in
+ * the day-start flow, after the fire-and-forget SVG prewarm/rasterise storm
+ * (`void s.cardSvgLoadPromise.then(() => s.prewarmVisibleCardTextures())`,
+ * ~154 cards) runs to completion. The game clock advances on rAF, and in a
+ * CPU-starved headless Chromium (concurrent full-suite runs push the host
+ * load avg to 6-14 on 16 cores) rAF stalls stretch every step of that chain
+ * well past wall-clock caps — the start button appeared >45s late in 4/4
+ * full-suite runs while passing 3/3 in isolation (docs/DEVELOPER.md notes
+ * stage stretch, "more per heavy boot").
+ *
+ * Two layers were binding at different times:
+ * 1. Vitest's default hook timeout (30s) killed `beforeEach` outright
+ *    (`Hook timed out in 30000ms`) before any poll could complete.
+ * 2. With an explicit hook envelope, the start-button poll cap itself
+ *    became the binding constraint — the rasterise storm alone exceeded it.
+ *
+ * The caps below give both layers generous headroom: the start button can
+ * take up to BOOT_WAIT_TIMEOUT_MS (storm + modal creation), the post-click
+ * overlay poll needs only a fraction of that (the storm is done), and the
+ * hook envelope covers both polls plus the click plus margin. They are
+ * deliberately asymmetric: only the waits that actually stretch see the big
+ * caps, so a genuine hang still fails promptly.
+ */
+/** Poll cap for the start-button wait: day-start SVG rasterise storm + modal. */
+const BOOT_WAIT_TIMEOUT_MS = 120_000;
+/** Poll cap for the tutorial-overlay wait after clicking Start (storm done). */
+const OVERLAY_WAIT_TIMEOUT_MS = 30_000;
+/** Cap for UI step transitions inside a test body (Next-click step changes). */
+const STEP_TRANSITION_TIMEOUT_MS = 45_000;
+/** `beforeEach` hook envelope: boot wait + overlay wait + click + margin. */
+const BOOT_HOOK_TIMEOUT_MS = 240_000;
+/** `afterEach` teardown envelope (destroyGame + GC under load). */
+const TEARDOWN_TIMEOUT_MS = 60_000;
+/** Per-test body envelope: step transitions + clicks + polls (rAF-driven). */
+const TEST_BODY_TIMEOUT_MS = 120_000;
+
 /** UNIFIED_TUTORIAL_STEPS[2] === T3 "Buy the Laundromat" (action: select-business). */
 const T3_INDEX = 2;
 /** Starting coin balance in STANDARD_TUTORIAL_SCENARIO (1200 after CG-0MTIO1M15001E9Y6 integer economy). */
@@ -84,7 +124,7 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene;
-    const startBtn = await waitForStartButton(scene, 40_000);
+    const startBtn = await waitForStartButton(scene, BOOT_WAIT_TIMEOUT_MS);
     expect(startBtn).toBeTruthy();
     startBtn!.emit('pointerdown', {
       x: startBtn!.x,
@@ -92,14 +132,14 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
       worldX: startBtn!.x,
       worldY: startBtn!.y,
     });
-    await waitForTutorialOverlay(15_000);
+    await waitForTutorialOverlay(OVERLAY_WAIT_TIMEOUT_MS);
     expect(getStepIndex(scene)).toBe(0);
-  }, 90_000);
+  }, BOOT_HOOK_TIMEOUT_MS);
 
   afterEach(async () => {
     await destroyGame(game);
     game = null;
-  });
+  }, TEARDOWN_TIMEOUT_MS);
 
   it('mouse pointer down/up on a tutorial button does not pass through to the card beneath', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -127,7 +167,7 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
 
       assertNoPassThrough(scene);
     });
-  }, 30_000);
+  }, TEST_BODY_TIMEOUT_MS);
 
   it('touch pointer down/up on a tutorial button does not pass through to the card beneath', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -146,7 +186,7 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
 
       assertNoPassThrough(scene);
     });
-  }, 30_000);
+  }, TEST_BODY_TIMEOUT_MS);
 
   it('mouse pointer down/up on the tooltip box itself (not a button) does not pass through', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -175,7 +215,7 @@ describe('Tutorial tooltip click-through isolation (CG-0MSTB03U6009J2WV)', () =>
       );
       expect(laundromat).toBeTruthy();
     });
-  }, 30_000);
+  }, TEST_BODY_TIMEOUT_MS);
 });
 
 // ── Helpers ────────────────────────────────────────────────
@@ -184,13 +224,6 @@ async function waitForStartButton(
   scene: Phaser.Scene,
   timeoutMs = 8_000,
 ): Promise<Phaser.GameObjects.Text | null> {
-  // Start Tutorial renders after the boot-time SVG regeneration (154 card
-  // SVGs) plus the tutorial offer/deferred-banner flow. Under
-  // parallel-browser CPU contention (multiple Chromium instances on the
-  // build machine) that boot work can stretch well past the old 10s budget
-  // — observed 2/2 full-suite failures at load 10+ (CG-0MTF70V9X002CAYH)
-  // — so callers pass a generous budget (20s) while keeping the default
-  // conservative.
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const btn = findPhaserTextByLabel(scene, '[ Start Tutorial ]');
@@ -205,7 +238,7 @@ async function advanceToStep(scene: Phaser.Scene, targetIndex: number): Promise<
   let guard = 0;
   while (getStepIndex(scene) < targetIndex && guard++ < targetIndex + 2) {
     await clickOverlayButtonByText(NEXT_LABEL);
-    await waitForOverlayVisible();
+    await waitForOverlayVisible(STEP_TRANSITION_TIMEOUT_MS);
   }
   expect(getStepIndex(scene)).toBe(targetIndex);
 }
