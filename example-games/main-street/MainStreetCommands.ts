@@ -22,6 +22,7 @@ import {
   playUpgradeFromHand,
   playEventFromHand,
   discardFromHand,
+  buyAndPlaceUpgrade,
 } from './MainStreetMarket';
 import {
   buyAndPlaceBusiness,
@@ -71,6 +72,10 @@ interface MarketActionSnapshot {
   pendingApplicant: any | null;
   /** Staff roster — captured so undo restores the staff list. */
   staffCards: any | null;
+  /** Same-day upgrade composite tracker (CG-0MT3IYSRL001VVUP). */
+  justMovedUpgradeCardId: string | null;
+  /** Same-day event composite tracker (CG-0MTFWBNL30043ZBM). */
+  justMovedEventCardId: string | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -105,6 +110,8 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     revealedPeekedCard: state.revealedPeekedCard ?? null,
     pendingApplicant: safeClone((state as any).pendingApplicant ?? null),
     staffCards: safeClone(state.staffCards ?? []),
+    justMovedUpgradeCardId: (state as any).justMovedUpgradeCardId ?? null,
+    justMovedEventCardId: (state as any).justMovedEventCardId ?? null,
   };
 }
 
@@ -141,6 +148,12 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   }
   if ('staffCards' in snap) {
     state.staffCards = snap.staffCards;
+  }
+  if ('justMovedUpgradeCardId' in snap) {
+    (state as any).justMovedUpgradeCardId = snap.justMovedUpgradeCardId;
+  }
+  if ('justMovedEventCardId' in snap) {
+    (state as any).justMovedEventCardId = snap.justMovedEventCardId;
   }
 }
 
@@ -304,17 +317,47 @@ export function playBusinessFromHandCommand(
   );
 }
 
-/** Command: Play Upgrade from Hand (cost-at-play) */
+/**
+ * Command: Play Upgrade from Hand (cost-at-play).
+ *
+ * Same-day composite (CG-0MT3IYSRL001VVUP): if the upgrade at handIndex is
+ * the same card just moved from market to hand this turn (justMovedUpgradeCardId),
+ * the play is free — the move already consumed the action. Otherwise consumes 1 action.
+ *
+ * Premium-aware: when `premiumCost` is supplied the +50% premium REPLACES
+ * the action (drag buy-and-play at 0 actions remaining) — no action consumed.
+ */
 export function playUpgradeFromHandCommand(
   state: MainStreetState,
   handIndex: number,
   targetSlot?: number,
+  premiumCost?: number,
 ) {
   return toCommand(
     state,
     snapshotAction(
-      (s) => playUpgradeFromHand(s, handIndex, targetSlot),
-      `PlayUpgradeFromHand ${handIndex}`,
+      (s) => {
+        if (premiumCost !== undefined) {
+          // Premium replaces the action — no consumeAction (mirrors playBusinessFromHandCommand).
+        } else {
+          const card = (s.hand ?? [])[handIndex];
+          const isSameDayComposite = card != null && s.justMovedUpgradeCardId != null && s.justMovedUpgradeCardId === (card as any).id;
+          if (!isSameDayComposite) {
+            consumeAction(s);
+          }
+          // Clear composite tracker after play (whether same-day or held).
+          if (s.justMovedUpgradeCardId != null && card != null && s.justMovedUpgradeCardId === (card as any).id) {
+            s.justMovedUpgradeCardId = null;
+          }
+        }
+        // Delegate to engine helper — premiumCost currently not threading into
+        // playUpgradeFromHand (upgrade premium is charged in buyAndPlaceUpgrade only);
+        // kept for API parity with playBusinessFromHandCommand.
+        playUpgradeFromHand(s, handIndex, targetSlot);
+      },
+      premiumCost !== undefined
+        ? `PlayUpgradeFromHand ${handIndex} (premium ${premiumCost})`
+        : `PlayUpgradeFromHand ${handIndex}`,
     ),
   );
 }
@@ -361,6 +404,37 @@ export function buyAndPlaceBusinessCommand(
         buyAndPlaceBusiness(s, cardId, slotIndex, priceOverride);
       },
       `BuyAndPlace ${cardId} -> slot ${slotIndex}`,
+    ),
+  );
+}
+
+/**
+ * Command: Buy & Place Upgrade directly onto a business (drag-drop path,
+ * CG-0MT3IYSRL001VVUP). Consumes 1 action and charges the +50% premium
+ * (Math.ceil(cost * 1.5 * 2) / 2, matching business buy-and-place).
+ *
+ * @param priceOverride Optional price to charge instead of the +50% premium
+ *                      (listed cost for GM parity on 2-action days — when
+ *                      supplied, still consumes 1 action).
+ * @param extraActions  Additional daily actions to consume (GM parity — 1 on
+ *                      Golden Mile days where the composite consumes 2 actions).
+ */
+export function buyAndPlaceUpgradeCommand(
+  state: MainStreetState,
+  cardId: string,
+  targetSlot?: number,
+  priceOverride?: number,
+  extraActions: number = 0,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => {
+        for (let i = 0; i < extraActions; i += 1) consumeAction(s);
+        consumeAction(s);
+        buyAndPlaceUpgrade(s, cardId, targetSlot, priceOverride);
+      },
+      `BuyAndPlaceUpgrade ${cardId} -> slot ${targetSlot ?? 'auto'}`,
     ),
   );
 }

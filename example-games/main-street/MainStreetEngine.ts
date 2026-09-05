@@ -160,6 +160,10 @@ export interface BuyAndPlaceUpgradeAction {
   type: 'buy-and-place-upgrade';
   cardId: string;
   targetSlot?: number;
+  /** Optional listed-price override for GM 2-action parity (see buyAndPlaceUpgrade). */
+  priceOverride?: number;
+  /** Additional daily actions to consume alongside the drag's action (GM parity). */
+  extraActions?: number;
 }
 
 /** Hire a staff card from the general market row. */
@@ -367,8 +371,9 @@ export function executeAction(
       return playUpgradeFromHand(state, action.handIndex, action.targetSlot);
     }
     case 'buy-and-place-upgrade': {
+      for (let i = 0; i < (action.extraActions ?? 0); i += 1) consumeAction(state);
       consumeAction(state);
-      return buyAndPlaceUpgrade(state, action.cardId, action.targetSlot);
+      return buyAndPlaceUpgrade(state, action.cardId, action.targetSlot, action.priceOverride);
     }
     case 'play-event-from-hand': {
       const hand = state.hand ?? [];

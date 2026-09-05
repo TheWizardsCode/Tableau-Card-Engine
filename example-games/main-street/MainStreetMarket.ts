@@ -800,6 +800,7 @@ export function buyAndPlaceUpgrade(
   state: MainStreetState,
   cardId: string,
   targetSlot?: number,
+  priceOverride?: number,
 ): PurchaseResult {
   const legality = canPurchaseUpgrade(state, cardId);
   if (!legality.legal) {
@@ -831,14 +832,16 @@ export function buyAndPlaceUpgrade(
 
   const business = state.streetGrid[businessIndex]!;
 
-  // Calculate +50% premium (CG-0MT3IYSRL001VVUP) — integer-rounded (AC3)
+  // +50% premium — integer ceil (matches current dev's buyAndPlaceUpgrade impl;
+  // the final alignment to Math.ceil(cost * 1.5 * 2) / 2 is done in CG-0MT42HHAB000VJUK
+  // together with the odd-cost assertion fix). See also buyAndPlaceBusiness.
   const premiumCost = Math.ceil(card.cost * 1.5);
-  if (state.resourceBank.coins < premiumCost) {
-    throw new Error(`Not enough coins to buy-and-place ${card.name} at premium. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
+  const price = priceOverride ?? premiumCost;
+  if (state.resourceBank.coins < price) {
+    throw new Error(`Not enough coins to buy-and-place ${card.name}${priceOverride !== undefined ? '' : ' at premium'}. Need ${price}, have ${state.resourceBank.coins}.`);
   }
 
-  // Deduct premium cost
-  state.resourceBank.coins -= premiumCost;
+  state.resourceBank.coins -= price;
 
   // Remove from market
   state.market.cards.splice(marketIndex, 1);
@@ -863,9 +866,13 @@ export function buyAndPlaceUpgrade(
 
   const refilled = false;
 
-  addLog(state, `Bought and placed upgrade ${card.name} on ${business.name} (-€${premiumCost}, +50% premium, ${describeEventEffects(-premiumCost, 0)})`, classifyEffect(-premiumCost, 0));
+  addLog(
+    state,
+    `Bought and placed upgrade ${card.name} on ${business.name} (-€${price}, ${price === premiumCost ? '50% premium' : 'listed'}, ${describeEventEffects(-price, 0)})`,
+    classifyEffect(-price, 0),
+  );
 
-  return { card, cost: premiumCost, refilled };
+  return { card, cost: price, refilled };
 }
 
 /**
