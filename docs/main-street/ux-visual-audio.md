@@ -43,29 +43,58 @@ void popTextOrIcon({
 });
 ```
 
-### End-of-turn income collection (coin fly-to-HUD)
+### End-of-turn income presentation (phased coin-grid animation, CG-0MT23O6W8003AXWJ)
 
 - Trigger: `MainStreetTurnController.endTurn()` after `processEndOfTurn()`
   resolves with `income.total > 0` (CG-0MSRGTUSK003GDGE).
-- Helper: `MainStreetAnimator.animateIncomeCollection()` — launches one coin
-  icon per producing street slot (from `IncomeResult.breakdown`) that arcs to
-  the HUD coins counter, plus one reputation pip per rep-earning card to the
-  reputation HUD value.
-- SFX: staggered `SFX_KEYS.COIN_POP` (`sfx-coin-pop`) per flight, played via
-  the scene `SoundManager` through `moveGameObject`'s `sfx.start`.
-- Landing: when every flight completes, a final `+total` pop
-  (`popTextOrIcon`) lands at the coin counter. While collection is running
+- Primary helper (non-tutorial play):
+  `MainStreetAnimator.animateIncomePhases(perSlotBreakdown, options)` — a
+  phased choreography that breaks the income into its contribution phases
+  (`IncomeResult.phaseBreakdown`, child 1) and reveals each phase in order:
+  **base → synergy → reputation → events → upcoming → collect**.
+  - Each producing street slot hosts an on-card coin grid
+    (`createCoinGrid`, child 2) in its bottom-right quadrant; the grid
+    fills progressively as base coins count out (staggered reveal,
+    rounded to nearest 0.5 at the animation layer only).
+  - Synergy / reputation / event contributions fly in/out of the grids;
+    events also light up their `Upcoming`-panel effect lines
+    (`animateUpcomingEffectLine`).
+  - Phase pace: `INCOME_PHASE_GAP_MS` (default 2200ms) between phases;
+    collection lands at ≈11s — **this pacing is part of the feature's
+    acceptance criteria and MUST NOT be shortened** (the turn controller
+    defers the day start until the show completes, so gameplay timing is
+    unaffected).
+  - Non-blocking (AC9): VFX only — never mutates game state, the transcript,
+    or the turn flow; every step is defensive and failures are swallowed so
+    the turn always advances (a throwing animator cannot stall the day).
+- Tutorial-mode helper (unchanged compact path):
+  `MainStreetAnimator.animateIncomeCollection()` — the window-safe
+  coin-fly-to-HUD used during the tutorial (the phased choreography is
+  gated to non-tutorial play so E2E tutorial pacing is untouched, mirroring
+  the day-banner skip precedent).
+- SFX: per-action sounds via the scene `SoundManager` — staggered
+  `SFX_KEYS.COIN_POP` (`sfx-coin-pop`) per count-out coin and per flight
+  (`moveGameObject`'s `sfx.start`), and a final `SFX_KEYS.INCOME_POSITIVE`
+  (`sfx-income-positive`) on collection. All keys follow the shared
+  `COMMON_SFX_KEYS` convention (`sfx-` prefix, no game-scoped literals).
+- Landing: collection finalizes with a `+total` pop (`popTextOrIcon`) at
+  the coin counter. While the show is running
   (`scene.incomeCollectionActive === true`) the immediate HUD delta pop is
   suppressed so the final pop is the single landing feedback — the income
   sound/event routing (`income-gained` → `sfx-income-positive`) still runs.
-- Timing budget: flights run inside the existing 400ms → 800ms turn-advance
-  window (600ms flight, 50ms stagger — ≤1050ms for a full 10-slot street),
-  so turn timing is unchanged and the effect is non-blocking.
-- Accessibility (reduced motion): flights are skipped entirely; the HUD
-  refresh path still provides the single final pop + income sound.
+- Day-start deferral: the controller polls `incomeCollectionActive` on a
+  250ms cadence (with a 16s safety cap) before starting the next day, so
+  the street refresh + HUD update never cut the show short; the street
+  render itself is deferred via `refreshAllExceptStreet` while the show runs.
+- Accessibility (reduced motion): the coin grids and flights are skipped;
+  the phase labels still progress and the single final pop + income sound
+  still play.
 - Headless/replay exemption (AGENTS.md rule 8): presentation-only — never
   mutates state or transcript; returns immediately in replay/headless mode
   (`scene.replayMode`), no rendering or audio.
+- Reuse: `createCoinGrid` (`example-games/main-street/coin-grid.ts`) +
+  `moveGameObject` + `SoundManager` + `popTextOrIcon`; no new engine
+  infrastructure.
 - Reuse: `moveGameObject` + `SoundManager` + `popTextOrIcon`, `SFX_KEYS`
   (`COMMON_SFX_KEYS` convention); no new SFX keys or engine infrastructure.
 
@@ -201,6 +230,7 @@ void popTextOrIcon({
      `hudY`) with `SFX_KEYS.COIN_POP` via `moveGameObject`.
   3. A "+€refund" pop lands at the HUD counter (`popTextOrIcon`) and the
      coin SFX pops on landing.
+- Sell-price formula (CG-0MT5XO7DI0066QCT): refund = `ceil((cost + totalUpgradeCost) * 1.5) + max(0, currentIncome − effectiveBase) + max(0, currentRep − (repPerTurn + repBonus))`; `effectiveBase = (baseIncome + incomeBonus) * 0.6` when same-type adjacent, else ×1; applies to business + community-space. Dialog shows breakdown (panel 360×300, base / synergy-income / synergy-rep) before confirm; log mirrors the breakdown.
 - Accessibility (reduced motion): demolition + coin flight are skipped; a
   single "+€refund" pop + coin SFX remain (spec AC2).
 - Headless/replay exemption (AGENTS.md rule 8): presentation-only — the

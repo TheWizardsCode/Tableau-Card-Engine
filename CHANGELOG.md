@@ -1,36 +1,8 @@
 # Changelog
 
-## v0.1.15 (2026-09-05)
+## Unreleased
 ### Features
-- Incidents are now drawn fairly at runtime, keeping the same seed for consistent outcomes. (CG-0MSZDD2TP003TZS5)
-- Business cards in your hand no longer cost coins each turn—only placed ones do. (CG-0MTC31LN3000UHDY)
-- Events in Main Street now cost coins when played from your hand. (CG-0MT5W1V4D007NN8Q)
-- Sold businesses now keep boosting their neighbors' synergy bonuses. (CG-0MT5XUE2200047IJ)
-- Dev mode lets testers swap any market card for a specific one. (CG-0MTINKHUT009KHK5)
-- Tutorial now teaches you to end your turn before placing the Laundromat, matching the two-turn plan-ahead pattern used later in the game. (CG-0MTNG21EX005BUPL)
-- Selling businesses now pays more, reflecting their full value including synergy bonuses. (CG-0MT5XO7DI0066QCT)
-- Coins and reputation now display as clean whole numbers everywhere. (CG-0MTIO1M15001E9Y6)
-- The activity log now shows the full coin and reputation impact of every action, plus a net summary each turn. (CG-0MT5W7UJJ0065MEZ)
-- Grand Opening Sale can now only be played on the turn you open a business. (CG-0MTIOCBH400970OB)
-### Bug Fixes
-- Business cards now show income and upkeep costs together on one clear line. (CG-0MTCP76MP0088TQW)
-- Fixed a test failure caused by running out of file system space. (CG-0MTJ560IZ005XAZC)
-- Florist now earns income on par with other tier-5 businesses. (CG-0MT6EQSPW002E7RC)
-- Wellness Fair now boosts Health businesses instead of Service ones. (CG-0MT6EQYYM005V4AA)
-- Income animations now show one coin and sound per 100 earned, keeping feedback clear without clutter. (CG-0MTK2JHXD004KNQI)
-- Tutorial placement steps now wait for you to actually place the business on the street before advancing. (CG-0MTMYI6YP0040NT5)
-- Tooltips now show accurate potential earnings based on your current businesses. (CG-0MT5Y9AD2001MKWZ)
-- Banked actions now actually get used up when you spend them. (CG-0MTCP7F9S009HARC)
-- Fixed coin and reputation values showing wrong amounts after economy update. (CG-0MTK38DA20099NCI)
-- Arcades now only boost and benefit from Entertainment businesses, not Services. (CG-0MT5VZJLS000B8KI)
-- Fixed a test flake that could fail under heavy workloads. (CG-0MTJ7A4Z3000MFMV)
-- Fixed an issue where buying business and community cards didn't charge the correct premium. (CG-0MTG8W0F0009HS1K)
-- Placement instructions now appear at the bottom of the screen instead of behind your hand. (CG-0MT24DCPS0034610)
-- Fixed the balance-checking tools so they run correctly with card data again. (CG-0MT4RBHQR006C5GR)
-- Fixed an issue that was blocking all code pushes due to a documentation size limit. (CG-0MTCRF0K2006N0HR)
-- Using Community Favour now costs one of your daily actions. (CG-0MT5UPQGX005GWRP)
-- Upgraded businesses now show their new name on the card. (CG-0MT24MHGZ0025O20)
-- Fixed the balance testing tool so it runs correctly again. (CG-0MT4RBCE2001DVCY)
+- Main Street: remove the baked `-X/turn` cost text from business/community-space card faces and render the overlay cash line two-tone (green income / red cost) (CG-0MTDMOYOL008IQVO)
 
 ## v0.1.14 (2026-08-27)
 ### Features

@@ -48,6 +48,9 @@ export type { ActionButtonOptions };
  * @param cardId - Logical card identifier.
  * @param width - Display width in pixels.
  * @param height - Display height in pixels.
+ * @param displayName - Optional upgraded display name (e.g. "Patisserie"). When
+ *   provided, the card face is rendered from a display-name variant texture so
+ *   the upgraded name is part of the card image itself (CG-0MT24MHGZ0025O20).
  * @returns The created game object — `Image` when the texture exists, `Rectangle` as fallback.
  */
 export function mainStreetRenderCardSvg(
@@ -56,14 +59,15 @@ export function mainStreetRenderCardSvg(
   cardId: string,
   width: number,
   height: number,
+  displayName?: string,
 ): Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle {
   const msScene = scene as any;
 
   return renderCardSvg(scene, container, cardId, width, height, {
     makeKey: (templateId: string, w: number, h: number) =>
-      msScene.templateKeyForCard(templateId, w, h),
+      msScene.templateKeyForCard(templateId, w, h, displayName),
     requestTexture: (_scene: Phaser.Scene, templateId: string, w: number, h: number) => {
-      msScene.requestCardTexture(templateId, w, h);
+      msScene.requestCardTexture(templateId, w, h, displayName);
     },
   });
 }

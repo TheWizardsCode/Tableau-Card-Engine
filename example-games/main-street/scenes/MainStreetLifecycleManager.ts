@@ -344,7 +344,9 @@ export class MainStreetLifecycleManager {
             'Synergy bonuses stack additively per matching neighbor. ' +
             'Some cards bridge multiple synergy types and count for both. ' +
             'Upgrades can increase range and value. ' +
-            'Plan placements to cluster synergies for higher returns.';
+            'Plan placements to cluster synergies for higher returns. ' +
+            'Selling a business stops its own income, but it stays on the street ' +
+            'and keeps providing synergy to its neighbours (CG-0MT5XUE2200047IJ).';
 
           const paraStyle: Phaser.Types.GameObjects.Text.TextStyle = {
             fontSize: '14px',
@@ -436,7 +438,7 @@ export class MainStreetLifecycleManager {
     // Note: The help button gating for the removed "Help + Hint Tools" step (old T10)
     // has been removed. The tutorial no longer has an open-help action step.
     // The HelpPanel toggle no longer needs tutorial intercept.
-    // Provide the ordered difficulty names so the Settings panel can render a selector
+    // Provide the ordered difficulty names so the Settings panel can render a selector.
     s.initSettingsPanel(DIFFICULTY_NAMES, 'Medium');
     // Drag-and-drop buy-to-slot (business cards → street slots): wire the
     // reusable core-engine drag-drop module after the settings panel exists
@@ -761,6 +763,16 @@ export class MainStreetLifecycleManager {
       return;
     }
 
+    // Only complete the step when the action matches the requiredAction.
+    // During place-business steps (T7/T15/T19), select-hand-card is allowed
+    // (isRequiredAction returns true) but does NOT complete the step — only
+    // the actual placement (place-business) advances the tutorial.
+    // (CG-0MTMYI6YP0040NT5 — tutorial place-business step was completing on
+    // hand selection, soft-locking the player before they could place.)
+    if (actionType !== step.requiredAction) {
+      return;
+    }
+
     const { newState } = completeCurrentStep(controller);
     Object.assign(s, { tutorialController: newState });
 
@@ -851,14 +863,27 @@ export class MainStreetLifecycleManager {
           // player actions and causing End Turn to hang.
           // Suppress the day-banner — it was deferred at boot and should
           // only fire after the player commits (skip/start tutorial).
-          try { s.startDayPhase(false, true); } catch (_) { /* ignore */ }
+          // Guard (CG-0MTDEETZE0056JS5): the campaign load resolves
+          // asynchronously and can land AFTER the player has already ended
+          // the boot day — a fast end-turn leaves the engine in DayStart
+          // for turn 2, which a late boot startDayPhase would consume and
+          // skip (phase -> MarketPhase without the day flow). Only start
+          // the day while the boot state is still pending (turn 1).
+          if (s.state.phase === 'DayStart' && s.state.turn === 1) {
+            try { s.startDayPhase(false, true); } catch (_) { /* ignore */ }
+          }
         } else {
           // Even with no saved campaign, startDayPhase() must be called so
           // the game transitions from DayStart -> MarketPhase and the market
           // is populated. Without this the tutorial offer modal shows but
           // the market is empty, making interactive tutorial steps impossible.
           // Suppress the day-banner — same reason as above.
-          try { s.startDayPhase(false, true); } catch (_) { /* ignore */ }
+          // Same turn-1 guard as the saved-campaign branch above
+          // (CG-0MTDEETZE0056JS5): never let a late boot startDayPhase
+          // consume a live turn's DayStart phase.
+          if (s.state.phase === 'DayStart' && s.state.turn === 1) {
+            try { s.startDayPhase(false, true); } catch (_) { /* ignore */ }
+          }
         }
         // Check for a saved run checkpoint. If one exists, the resume overlay
         // takes priority over the tutorial offer modal.

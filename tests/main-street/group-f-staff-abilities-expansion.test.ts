@@ -48,10 +48,10 @@ interface NewStaffContract {
 }
 
 const NEW_STAFF_CONTRACTS: NewStaffContract[] = [
-  { id: 'staff-apprentice', name: 'Apprentice', cost: 2, ongoingCost: 0.5, handSlotsAdded: 1 },
-  { id: 'staff-executive', name: 'Executive', cost: 20, ongoingCost: 5, handSlotsAdded: 4 },
-  { id: 'staff-socialite', name: 'Socialite', cost: 8, ongoingCost: 1.5, handSlotsAdded: 1, reputationPerTurn: 0.1 },
-  { id: 'staff-accountant', name: 'Accountant', cost: 8, ongoingCost: 1.5, handSlotsAdded: 1, refreshCostDiscount: 1 },
+  { id: 'staff-apprentice', name: 'Apprentice', cost: 200, ongoingCost: 50, handSlotsAdded: 1 },
+  { id: 'staff-executive', name: 'Executive', cost: 2000, ongoingCost: 500, handSlotsAdded: 4 },
+  { id: 'staff-socialite', name: 'Socialite', cost: 800, ongoingCost: 150, handSlotsAdded: 1, reputationPerTurn: 10 },
+  { id: 'staff-accountant', name: 'Accountant', cost: 800, ongoingCost: 150, handSlotsAdded: 1, refreshCostDiscount: 1 },
 ];
 
 function findStaff(deck: readonly StaffCard[], id: string): StaffCard | undefined {
@@ -135,7 +135,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     family: 'business',
     id: overrides.id ?? 'test-biz',
     name: overrides.name ?? 'Test Biz',
-    cost: 3,
+    cost: 300,
     baseIncome: 0,
     synergyTypes: ['Food'],
     upgradePath: undefined,
@@ -152,7 +152,7 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
 }
 
 describe('Group F: Socialite reputation ability (AC2)', () => {
-  it('grants +0.1 reputation per turn during the income phase', () => {
+  it('grants +10 reputation per turn during the income phase', () => {
     const state = setupMainStreetGame({ seed: 'group-f-socialite' });
     // Place one zero-income business so the income phase runs normally.
     state.streetGrid[0] = makeBiz({ baseIncome: 0, id: 'biz-test-staff' });
@@ -164,7 +164,7 @@ describe('Group F: Socialite reputation ability (AC2)', () => {
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
     const repGain = state.resourceBank.reputation - repBefore;
-    expect(repGain).toBeCloseTo(0.1, 5);
+    expect(repGain).toBeCloseTo(10, 5);
   });
 
   it('adds no reputation for staff without the ability', () => {
@@ -228,9 +228,9 @@ describe('Group F: existing staff no-regression (AC3)', () => {
   it('Assistant/Manager/Director keep their original stats and no abilities', () => {
     const deck = createStaffDeck(1);
     const expected = [
-      { id: 'staff-assistant', cost: 3, ongoingCost: 1, slots: 1 },
-      { id: 'staff-manager', cost: 7, ongoingCost: 2.5, slots: 2 },
-      { id: 'staff-director', cost: 14, ongoingCost: 4, slots: 3 },
+      { id: 'staff-assistant', cost: 300, ongoingCost: 100, slots: 1 },
+      { id: 'staff-manager', cost: 700, ongoingCost: 250, slots: 2 },
+      { id: 'staff-director', cost: 1400, ongoingCost: 400, slots: 3 },
     ];
     for (const e of expected) {
       const card = findStaff(deck, e.id)!;

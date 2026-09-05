@@ -234,7 +234,7 @@ For deterministic balance reports with persisted artifacts:
 npm run monte-carlo
 
 # Custom run size and output files
-npx tsx scripts/monte-carlo.ts --runs 100 --seed-prefix "mc-balance" --max-turns 25 --strategy market-greedy --out results/main-street-monte-carlo-100.json --csv-out results/main-street-monte-carlo-100.csv
+npx vite-node scripts/monte-carlo.ts --runs 100 --seed-prefix "mc-balance" --max-turns 25 --strategy market-greedy --out results/main-street-monte-carlo-100.json --csv-out results/main-street-monte-carlo-100.csv
 ```
 
 Latest baseline interpretation is tracked in `docs/main-street/monte-carlo-sample-results.md`.

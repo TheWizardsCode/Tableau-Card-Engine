@@ -76,6 +76,31 @@ function synergyIconSvg(type: SynergyType, x: number, y: number): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * Replaces the card title (the first `<text ...>...</text>` node) in a
+ * template SVG with the given display name, producing a variant card face.
+ *
+ * Used by the runtime texture pipeline to bake an upgraded business's
+ * display name into its card image (CG-0MT24MHGZ0025O20) — the upgraded
+ * name becomes part of the SVG itself, exactly like the base name is part
+ * of the template SVG.
+ *
+ * @param svgText   The template SVG string (e.g. base Bakery card).
+ * @param newTitle  The name to bake into the card (e.g. "Patisserie").
+ * @returns The variant SVG with the title node (and aria-label) updated.
+ */
+export function replaceCardTitleInSvg(svgText: string, newTitle: string): string {
+  if (!svgText) return svgText;
+  const escaped = esc(newTitle);
+  // The template SVGs (static assets and CSV regenerations) render the card
+  // name as the first <text> node. Replace its content only. Also update the
+  // root aria-label so the altered card reports the new name.
+  const titleNodeRe = /(<text[^>]*>)[^<]*(<\/text>)/;
+  const withTitle = svgText.replace(titleNodeRe, `$1${escaped}$2`);
+  const ariaRe = /(aria-label=")[^"]*(")/;
+  return withTitle.replace(ariaRe, `$1${escaped}$2`);
+}
+
+/**
  * Generate an SVG string for a BusinessCard or CommunitySpaceCard
  * reflecting its current state.
  *
@@ -110,9 +135,14 @@ export function generateBusinessCardSvg(
 
   // ── Dynamic text elements ────────────────────────────────
 
-  // Title: always present (name changes on upgrade)
+  // Title: always present (name changes on upgrade). The baked card face
+  // uses the upgraded display name (set by purchaseUpgrade/playUpgradeFromHand)
+  // so the upgraded name is part of the card image, like the base name
+  // (CG-0MT24MHGZ0025O20). Base (un-upgraded) cards have no displayName and
+  // fall back to the original business name.
+  const displayName = card.displayName ?? card.name;
   const titleY = 19;
-  const titleText = `<text x="${width / 2}" y="${titleY}" font-family="${FONT}" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">${esc(card.name)}</text>`;
+  const titleText = `<text x="${width / 2}" y="${titleY}" font-family="${FONT}" font-size="11" fill="#ffffff" font-weight="400" text-anchor="middle">${esc(displayName)}</text>`;
 
   // Income label: centred horizontally, middle band of card, omitted when 0
   // Uses "Income: +X/turn" format for clarity
@@ -125,14 +155,6 @@ export function generateBusinessCardSvg(
   const repLabel =
     totalRep > 0
       ? `<text x="${width / 2}" y="47" font-family="${FONT}" font-size="10" fill="#88bbff" font-weight="bold" text-anchor="middle">+${fmtRep(totalRep)}/turn</text>`
-      : '';
-
-  // Ongoing cost label: centred, below rep, omitted when 0
-  // Uses orange/red text (same color as staff/community-space cards)
-  const ongoingCost = (card as BusinessCard).ongoingCost ?? 0;
-  const ongoingCostLabel =
-    ongoingCost > 0
-      ? `<text x="${width / 2}" y="59" font-family="${FONT}" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-${ongoingCost}/turn</text>`
       : '';
 
   // Level badge: top-right, only for upgraded cards
@@ -155,7 +177,7 @@ export function generateBusinessCardSvg(
   // ── Compose SVG ─────────────────────────────────────────
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(card.name)}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(displayName)}">
   <defs>
     <linearGradient id="g-gen-${card.id}" x1="0" x2="1">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>
@@ -168,7 +190,6 @@ export function generateBusinessCardSvg(
   ${titleText}
   ${incomeLabel}
   ${repLabel}
-  ${ongoingCostLabel}
   ${levelBadge}
   ${costCircle}
   ${costText}
@@ -180,10 +201,9 @@ export function generateBusinessCardSvg(
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/** Format a reputation value to at most 1 decimal place, stripping trailing zeros. */
+/** Format a reputation value as an integer string. */
 function fmtRep(v: number): string {
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(1);
+  return String(Math.round(v));
 }
 
 /**
@@ -345,15 +365,13 @@ export function generateCardSvgFromCsvRow(
     }
   }
 
-  // Community space ongoing cost (reputation-asset cards, e.g. Library -0.25/turn)
-  if (family === 'community-space' && row.ongoingCost && Number(row.ongoingCost) > 0) {
-    inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
-  }
+  // Community space ongoing cost: no longer baked into the card face — the
+  // overlay cash line (`Cash: +X / -Y`, CG-0MTCP76MP0088TQW) shows it in the
+  // two-tone line instead (CG-0MTDMOYOL008IQVO). Staff cards keep the baked
+  // label above because they have no overlay pipeline.
 
-  // Business ongoing cost (cards charged whether placed or held in hand, CG-0MSVYPEZ90085SHE)
-  if (family === 'business' && row.ongoingCost && Number(row.ongoingCost) > 0) {
-    inner.push('  <text x="' + (width / 2) + '" y="38" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
-  }
+  // Business ongoing cost: same as community space — removed from the baked
+  // face; the overlay cash line handles display (CG-0MSVYPEZ90085SHE + CG-0MTDMOYOL008IQVO).
 
   // Cost badge
   if (cost !== null) {

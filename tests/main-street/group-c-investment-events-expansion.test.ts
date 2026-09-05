@@ -55,14 +55,14 @@ interface NewEventContract {
 }
 
 const NEW_EVENT_CONTRACTS: NewEventContract[] = [
-  { id: 'evt-health-carnival', name: 'Health Carnival', cost: 5, tier: '7', targetSynergy: 'Health', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-food-tasting', name: 'Food Tasting Tour', cost: 5, tier: '7', targetSynergy: 'Food', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-art-sale', name: 'Art Sale', cost: 5, tier: '7', targetSynergy: 'Culture', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-shopping-spree', name: 'Shopping Spree', cost: 7, tier: '8', targetSynergy: 'Commerce', coinDelta: 2.5, reputationDelta: 0 },
-  { id: 'evt-summer-fest', name: 'Summer Fest', cost: 7, tier: '8', targetSynergy: 'Entertainment', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-service-week', name: 'Service Week', cost: 7, tier: '8', targetSynergy: 'Service', coinDelta: 2, reputationDelta: 1 },
-  { id: 'evt-tourist-season', name: 'Tourist Season', cost: 10, tier: '12', coinDelta: 0, reputationDelta: 0, duration: 3, effectType: 'income-multiplier', multiplier: 1.15 },
-  { id: 'evt-community-renovation', name: 'Community Renovation', cost: 10, tier: '12', coinDelta: 0, reputationDelta: 0, duration: 4, effectType: 'rep-multiplier', multiplier: 1.2 },
+  { id: 'evt-health-carnival', name: 'Health Carnival', cost: 500, tier: '7', targetSynergy: 'Health', coinDelta: 200, reputationDelta: 100 },
+  { id: 'evt-food-tasting', name: 'Food Tasting Tour', cost: 500, tier: '7', targetSynergy: 'Food', coinDelta: 200, reputationDelta: 100 },
+  { id: 'evt-art-sale', name: 'Art Sale', cost: 500, tier: '7', targetSynergy: 'Culture', coinDelta: 200, reputationDelta: 100 },
+  { id: 'evt-shopping-spree', name: 'Shopping Spree', cost: 700, tier: '8', targetSynergy: 'Commerce', coinDelta: 250, reputationDelta: 0 },
+  { id: 'evt-summer-fest', name: 'Summer Fest', cost: 700, tier: '8', targetSynergy: 'Entertainment', coinDelta: 200, reputationDelta: 100 },
+  { id: 'evt-service-week', name: 'Service Week', cost: 700, tier: '8', targetSynergy: 'Service', coinDelta: 200, reputationDelta: 100 },
+  { id: 'evt-tourist-season', name: 'Tourist Season', cost: 1000, tier: '12', coinDelta: 0, reputationDelta: 0, duration: 3, effectType: 'income-multiplier', multiplier: 1.15 },
+  { id: 'evt-community-renovation', name: 'Community Renovation', cost: 1000, tier: '12', coinDelta: 0, reputationDelta: 0, duration: 4, effectType: 'rep-multiplier', multiplier: 1.2 },
 ];
 
 function findTemplate<T extends EventCard>(cards: readonly T[], id: string): T | undefined {
@@ -155,8 +155,8 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     family: 'business',
     id: overrides.id ?? 'test-biz',
     name: overrides.name ?? 'Test Biz',
-    cost: 3,
-    baseIncome: 10,
+    cost: 300,
+    baseIncome: 1000,
     synergyTypes: ['Food'],
     upgradePath: undefined,
     maxLevel: 1,
@@ -177,7 +177,7 @@ function makeDurationEvent(id: string, effectType: string, multiplier: number, d
     id,
     name: id,
     trigger: 'Investment',
-    cost: 10,
+    cost: 1000,
     effect: `${id} effect`,
     target: 'All',
     coinDelta: 0,
@@ -191,7 +191,7 @@ function makeDurationEvent(id: string, effectType: string, multiplier: number, d
 describe('Group C: positive income-multiplier (Tourist Season)', () => {
   it('boosts income above the base when resolved and income is applied', () => {
     const state = setupMainStreetGame({ seed: 'group-c-income-boost' });
-    state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-test-income' });
+    state.streetGrid[0] = makeBiz({ baseIncome: 1000, id: 'biz-test-income' });
     recalculateCard(state, 0);
 
     // Baseline income (no effect)
@@ -210,26 +210,26 @@ describe('Group C: positive income-multiplier (Tourist Season)', () => {
     applyIncome(state);
     const boostedIncome = state.resourceBank.coins - coinsBeforeBoost;
 
-    // 10 base × 1.15 = 11.5 > 10
+    // 1000 base × 1.15 = 1150 > 1000 (integer-rounded).
     expect(boostedIncome).toBeGreaterThan(normalIncome);
-    expect(boostedIncome).toBeCloseTo(normalIncome * 1.15, 5);
+    expect(boostedIncome).toBeCloseTo(normalIncome * 1.15, -1);
   });
 });
 
 describe('Group C: rep-multiplier (Community Renovation)', () => {
   it('scales per-turn reputation income by the multiplier', () => {
     const state = setupMainStreetGame({ seed: 'group-c-rep-boost' });
-    // A card with +0.1 rep/turn (e.g. Clinic-style reputation asset)
+    // A card with +10 rep/turn (e.g. Clinic-style reputation asset)
     state.streetGrid[0] = makeBiz({ baseIncome: 0, id: 'biz-test-rep' });
-    state.streetGrid[0].reputationPerTurn = 0.1;
-    state.streetGrid[0].currentReputationPerTurn = 0.1;
+    state.streetGrid[0].reputationPerTurn = 10;
+    state.streetGrid[0].currentReputationPerTurn = 10;
     recalculateCard(state, 0);
 
     // Baseline rep gain (no effect)
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
     const normalRepGain = state.resourceBank.reputation - repBefore;
-    expect(normalRepGain).toBeCloseTo(0.1, 5);
+    expect(normalRepGain).toBeCloseTo(10, 5);
 
     // Resolve Community Renovation: +20% reputation for 4 turns
     resolveEvent(state, makeDurationEvent('evt-community-renovation', 'rep-multiplier', 1.2, 4));
@@ -243,7 +243,7 @@ describe('Group C: rep-multiplier (Community Renovation)', () => {
     const boostedRepGain = state.resourceBank.reputation - repBeforeBoost;
 
     expect(boostedRepGain).toBeGreaterThan(normalRepGain);
-    expect(boostedRepGain).toBeCloseTo(normalRepGain * 1.2, 5);
+    expect(boostedRepGain).toBeCloseTo(normalRepGain * 1.2, 0);
   });
 
   it('applies no rep bonus when no rep-producing cards are placed', () => {
@@ -263,9 +263,9 @@ describe('Group C: duration expiry (AC2)', () => {
     // effect and break the expiry window assertion. This test is scoped to the
     // two manually-resolved duration effects.
     state.incidentDeck = [];
-    state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-test-exp' });
-    state.streetGrid[0].reputationPerTurn = 0.1;
-    state.streetGrid[0].currentReputationPerTurn = 0.1;
+    state.streetGrid[0] = makeBiz({ baseIncome: 1000, id: 'biz-test-exp' });
+    state.streetGrid[0].reputationPerTurn = 10;
+    state.streetGrid[0].currentReputationPerTurn = 10;
     recalculateCard(state, 0);
 
     // Tourist Season (3 turns) + Community Renovation (4 turns)
@@ -304,7 +304,7 @@ describe('Group C: clinic does NOT shorten positive duration effects', () => {
 describe('Group C: existing negative income-multiplier (regression)', () => {
   it('still reduces income when a flu-style effect is resolved', () => {
     const state = setupMainStreetGame({ seed: 'group-c-negative' });
-    state.streetGrid[0] = makeBiz({ baseIncome: 10, id: 'biz-test-neg' });
+    state.streetGrid[0] = makeBiz({ baseIncome: 1000, id: 'biz-test-neg' });
     recalculateCard(state, 0);
 
     const coinsBefore = state.resourceBank.coins;
@@ -317,7 +317,7 @@ describe('Group C: existing negative income-multiplier (regression)', () => {
     const reducedIncome = state.resourceBank.coins - coinsBeforeReduced;
 
     expect(reducedIncome).toBeLessThan(normalIncome);
-    expect(reducedIncome).toBeCloseTo(normalIncome * 0.8, 5);
+    expect(reducedIncome).toBeCloseTo(normalIncome * 0.8, 0);
   });
 
   it('keeps the clinic duration reduction for negative effects', () => {

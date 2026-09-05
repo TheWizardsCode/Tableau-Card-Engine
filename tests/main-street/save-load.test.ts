@@ -59,7 +59,7 @@ describe('Main Street save/load integration', () => {
     const state = setupMainStreetGame({ seed: 'save-load-turn-start' });
 
     executeDayStart(state);
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 1000;
     const card = state.market.cards.find(
       c =>
         (c.family === 'business' || c.family === 'community-space') &&
@@ -74,7 +74,7 @@ describe('Main Street save/load integration', () => {
 
     const expected = setupMainStreetGame({ seed: 'save-load-turn-start' });
     executeDayStart(expected);
-    expected.resourceBank.coins = 100;
+    expected.resourceBank.coins = 1000;
     const expectedCard = expected.market.cards.find(
       c =>
         (c.family === 'business' || c.family === 'community-space') &&

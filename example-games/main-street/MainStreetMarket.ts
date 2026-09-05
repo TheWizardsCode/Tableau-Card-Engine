@@ -13,15 +13,16 @@
  */
 
 import type { LegalityResult } from '../../src/rule-engine';
+import { shuffleArray } from '../../src/card-system';
 import type { MainStreetState } from './MainStreetState';
-import { addLog } from './MainStreetState';
+import { addLog, describeEventEffects, classifyEffect } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard, StaffCard } from './MainStreetCards';
 import {
   GRID_SIZE,
   REFRESH_MARKET_COST,
-  orderIncidentDeck,
 } from './MainStreetCards';
-import { updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
+import { updateNeighborsOnPlacement, updateNeighborsOnSale, hasAdjacentSameType } from './MainStreetAdjacency';
+import { roundInt } from './MainStreetDifficulty';
 import {
   computeRefreshCostDiscount,
   getEmployedSpecializationSkills,
@@ -145,12 +146,15 @@ export function canPurchaseUpgrade(
 }
 
 /**
- * Checks whether the player can purchase an Event card from the market.
+ * Checks whether the player can take an Event card from the market into their
+ * hand.
  *
- * Investment events are purchased from the market and added to the player's
- * hand (any mix of business and event cards, up to `maxHandSize` total) until
- * the player chooses to play them during the MarketPhase.
- * Incident events are drawn automatically (not purchased).
+ * Taking an Investment event is FREE (CG-0MT5W1V4D007NN8Q) — it is held in
+ * the player's hand (any mix of business and event cards, up to `maxHandSize`
+ * total) and its listed cost is paid only when the event is played from hand
+ * during the MarketPhase. This is the same free acquisition model as
+ * `moveToHand`, so there is NO coin requirement here.
+ * Incident events are drawn automatically (not taken by hand).
  *
  * @param state   Current game state.
  * @param cardId  ID of the Event card in the market.
@@ -168,7 +172,7 @@ export function canPurchaseEvent(
     return { legal: false, reason: 'Card not found in the event market.' };
   }
 
-  // Only Investment-trigger events can be purchased
+  // Only Investment-trigger events can be taken
   if (card.trigger !== 'Investment') {
     return { legal: false, reason: 'Incident events cannot be purchased; they are drawn automatically.' };
   }
@@ -179,11 +183,47 @@ export function canPurchaseEvent(
     return handCheck;
   }
 
-  // Check coins
-  if (state.resourceBank.coins < card.cost) {
-    return { legal: false, reason: `Not enough coins. Need ${card.cost}, have ${state.resourceBank.coins}.` };
-  }
+  // No coin check: taking the event to hand is free; the cost is paid when
+  // the event is executed from hand (CG-0MT5W1V4D007NN8Q).
 
+  return { legal: true };
+}
+
+/**
+ * Whether the Investment event at handIndex can be played this turn.
+ * Same-day composite (CG-0MTFWBNL30043ZBM): playing the event just moved
+ * to hand this day (justMovedEventCardId) is free; otherwise costs 1 action.
+ */
+export function canPlayEvent(
+  state: MainStreetState,
+  handIndex: number,
+): LegalityResult {
+  const hand = state.hand ?? [];
+  if (handIndex < 0 || handIndex >= hand.length) {
+    return { legal: false, reason: `Invalid hand index: ${handIndex}.` };
+  }
+  const card = hand[handIndex] as any;
+  if (!card || card.family !== 'event') {
+    return { legal: false, reason: `Card at hand index ${handIndex} is not an Investment event.` };
+  }
+  if ((card as any).trigger !== 'Investment') {
+    return { legal: false, reason: 'Incident events cannot be played from hand.' };
+  }
+  const isSameDay = (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+  if (!isSameDay && (state.actionsRemaining ?? 0) <= 0) {
+    return { legal: false, reason: 'No actions remaining today. End your turn to start a new day.' };
+  }
+  if (state.resourceBank.coins < card.cost) {
+    return { legal: false, reason: `Not enough coins to play ${card.name} from hand. Need ${card.cost}, have ${state.resourceBank.coins}.` };
+  }
+  // ── Grand Opening placement gate (CG-0MTIOCBH400970OB) ──
+  // Grand Opening Sale can only be played from hand during a turn where a
+  // business was placed onto the street grid. The gate arms when any
+  // placement path succeeds (purchaseBusiness / playBusinessFromHand /
+  // buyAndPlaceBusiness) and resets at DayStart.
+  if (String((card as any).id).startsWith('evt-grand-opening') && !(state as any).businessPlacedThisTurn) {
+    return { legal: false, reason: `Grand Opening Sale can only be played on a turn where a business was placed on the street grid.` };
+  }
   return { legal: true };
 }
 
@@ -281,7 +321,7 @@ export function refreshMarket(state: MainStreetState): RefreshResult {
     const name = (c as any).name ?? c.id;
     return `${c.id}${name ? ` (${name})` : ''}`;
   });
-  addLog(state, `Re-rolled market (-€${cost}): replaced ${replacedStrings.join(', ')}`, 'loss');
+  addLog(state, `Re-rolled market (-€${cost}): replaced ${replacedStrings.join(', ')} (${describeEventEffects(-cost, 0)})`, classifyEffect(-cost, 0));
 
   return { replaced: removed, cost };
 }
@@ -332,12 +372,10 @@ export function cycleMarketCards(state: MainStreetState): void {
 /**
  * Replenishes the face-down incident deck when it is exhausted: gathers
  * remaining Incident-trigger cards from the event deck and event discards
- * and rebuilds the deck constraint-aware via `orderIncidentDeck` (seeded
- * from the resolved-draw balance history, so the rebuilt deck stays
- * consistent with what was already resolved) — CG-0MSTOATDP000JNHH,
- * option (a). No RNG is consumed here: the pool order is deterministic
- * (gather order from the seeded decks/discards) and the selector scans
- * deterministically.
+ * and shuffles them into a new face-down deck (seeded, so the order is
+ * deterministic per game seed). Constraint satisfaction (repeat spacing /
+ * streak) happens at draw time via `findConstrainedIncidentIndex`, not by
+ * pre-ordering the deck (CG-0MSZDD2TP003TZS5).
  *
  * No visible refill loop: the deck is face-down and only its remaining
  * count is shown. Called by `resolveIncident` when `incidentDeck` is empty.
@@ -361,7 +399,11 @@ export function replenishIncidentDeck(state: MainStreetState): void {
   }
   if (pool.length === 0) return;
 
-  state.incidentDeck = orderIncidentDeck(pool, state.incidentBalance);
+  // Seeded shuffle only — no pre-ordering. `resolveIncident` selects each
+  // card at draw time via `findConstrainedIncidentIndex` (deterministic,
+  // consumes no RNG), so the deck order here only sets the candidate order.
+  shuffleArray(pool, state.rng);
+  state.incidentDeck = pool;
   addLog(state, 'Reshuffled incident deck from event cards', 'neutral');
 }
 
@@ -402,10 +444,13 @@ export function purchaseBusiness(
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
 
+  // Arm Grand Opening placement gate (CG-0MTIOCBH400970OB).
+  (state as any).businessPlacedThisTurn = true;
+
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  addLog(state, `Placed ${card.name} in slot ${slotIndex} (-€${card.cost})`, 'loss');
+  addLog(state, `Placed ${card.name} in slot ${slotIndex} (-€${card.cost}, ${describeEventEffects(-card.cost, 0)})`, classifyEffect(-card.cost, 0));
 
   return { card, cost: card.cost, refilled };
 }
@@ -457,6 +502,13 @@ export function moveToHand(state: MainStreetState, cardId: string): PurchaseResu
 
   state.market.cards.splice(marketIndex, 1);
   state.hand.push({ ...card } as any);
+
+  // Track same-day composite for upgrades (CG-0MT3IYSRL001VVUP): when an
+  // upgrade is moved to hand, record its id so `play-upgrade-from-hand`
+  // can detect a same-day move+play composite and skip the action cost.
+  if (card.family === 'upgrade') {
+    state.justMovedUpgradeCardId = card.id;
+  }
 
   addLog(state, `Moved ${card.name} to hand (free, pay on play)`, 'neutral');
 
@@ -515,13 +567,14 @@ export function playBusinessFromHand(
   state.hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card as BusinessCard;
   updateNeighborsOnPlacement(state, slotIndex);
+  (state as any).businessPlacedThisTurn = true;
 
   addLog(
     state,
     premiumCost !== undefined
-      ? `Played ${card.name} from hand into slot ${slotIndex} (-€${price}, 50% premium)`
-      : `Played ${card.name} from hand into slot ${slotIndex} (-€${price})`,
-    'loss',
+      ? `Played ${card.name} from hand into slot ${slotIndex} (-€${price}, 50% premium, ${describeEventEffects(-price, 0)})`
+      : `Played ${card.name} from hand into slot ${slotIndex} (-€${price}, ${describeEventEffects(-price, 0)})`,
+    classifyEffect(-price, 0),
   );
 
   return { card, cost: price, refilled: false };
@@ -582,7 +635,7 @@ export function playUpgradeFromHand(
   business.displayName = upgrade.newDisplayName || business.displayName;
   updateNeighborsOnPlacement(state, businessIndex);
 
-  addLog(state, `Played upgrade ${upgrade.name} from hand onto ${business.name} (-€${upgrade.cost})`, 'loss');
+  addLog(state, `Played upgrade ${upgrade.name} from hand onto ${business.name} (-€${upgrade.cost}, ${describeEventEffects(-upgrade.cost, 0)})`, classifyEffect(-upgrade.cost, 0));
 
   return { card: upgrade, cost: upgrade.cost, refilled: false };
 }
@@ -604,15 +657,33 @@ export function playEventFromHand(
   if (event.trigger !== 'Investment') {
     throw new Error('Incident events cannot be played from hand.');
   }
+  if (String((event as any).id).startsWith('evt-grand-opening') && !(state as any).businessPlacedThisTurn) {
+    throw new Error('Grand Opening Sale can only be played on a turn where a business was placed on the street grid.');
+  }
   if (state.resourceBank.coins < event.cost) {
     throw new Error(`Not enough coins to play ${event.name} from hand. Need ${event.cost}, have ${state.resourceBank.coins}.`);
   }
 
+  // Capture pre-action resources so the log can show the event's effective
+  // deltas (cost + resolved effects, all mitigations applied — AC2,
+  // CG-0MT5W7UJJ0065MEZ).
+  const coinsBefore = state.resourceBank.coins;
+  const repBefore = state.resourceBank.reputation;
+
   state.resourceBank.coins -= event.cost;
   resolveEvent(state, event);
   state.hand.splice(handIndex, 1);
+  if ((state as any).justMovedEventCardId === event.id) {
+    (state as any).justMovedEventCardId = null;
+  }
 
-  addLog(state, `Played event ${event.name} from hand (-€${event.cost})`, 'loss');
+  const coinDelta = state.resourceBank.coins - coinsBefore;
+  const repDelta = state.resourceBank.reputation - repBefore;
+  addLog(
+    state,
+    `Played event ${event.name} from hand (-€${event.cost}, ${describeEventEffects(coinDelta, repDelta)})`,
+    classifyEffect(coinDelta, repDelta),
+  );
 
   return { card: event, cost: event.cost, refilled: false };
 }
@@ -709,14 +780,99 @@ export function purchaseUpgrade(
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  addLog(state, `Upgraded ${business.name} with ${card.name} (-€${card.cost})`, 'loss');
+  addLog(state, `Upgraded ${business.name} with ${card.name} (-€${card.cost}, ${describeEventEffects(-card.cost, 0)})`, classifyEffect(-card.cost, 0));
 
   return { card, cost: card.cost, refilled };
 }
 
 /**
- * Purchases an Investment-trigger Event card from the market and adds it to
- * the player's hand for the player to play later during the MarketPhase.
+ * Buys an upgrade from the market and applies it in one step (drag-drop
+ * path, CG-0MT3IYSRL001VVUP). Charges a +50% premium on the upgrade's
+ * cost.
+ *
+ * @param state      Current game state (mutated in-place).
+ * @param cardId     ID of the Upgrade card in the market.
+ * @param targetSlot Optional: specific grid slot of the business to upgrade.
+ * @returns PurchaseResult on success.
+ * @throws Error if the action is illegal or coins are insufficient.
+ */
+export function buyAndPlaceUpgrade(
+  state: MainStreetState,
+  cardId: string,
+  targetSlot?: number,
+): PurchaseResult {
+  const legality = canPurchaseUpgrade(state, cardId);
+  if (!legality.legal) {
+    throw new Error(legality.reason);
+  }
+
+  const marketIndex = state.market.cards.findIndex(
+    c => c.id === cardId && c.family === 'upgrade',
+  );
+  const card = state.market.cards[marketIndex] as UpgradeCard;
+
+  // Find the target business
+  const requiredLevel = card.requiredLevel ?? 0;
+  let businessIndex: number;
+  if (targetSlot !== undefined) {
+    const biz = state.streetGrid[targetSlot];
+    if (
+      !biz ||
+      biz.name !== card.targetBusiness ||
+      biz.level !== requiredLevel ||
+      biz.level >= biz.maxLevel
+    ) {
+      throw new Error(`Business at slot ${targetSlot} is not a valid target for this upgrade.`);
+    }
+    businessIndex = targetSlot;
+  } else {
+    businessIndex = findTargetBusinessSlot(state, card);
+  }
+
+  const business = state.streetGrid[businessIndex]!;
+
+  // Calculate +50% premium (CG-0MT3IYSRL001VVUP) — integer-rounded (AC3)
+  const premiumCost = Math.ceil(card.cost * 1.5);
+  if (state.resourceBank.coins < premiumCost) {
+    throw new Error(`Not enough coins to buy-and-place ${card.name} at premium. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
+  }
+
+  // Deduct premium cost
+  state.resourceBank.coins -= premiumCost;
+
+  // Remove from market
+  state.market.cards.splice(marketIndex, 1);
+
+  // Apply upgrade to business
+  business.level += 1;
+  business.incomeBonus += card.incomeBonus;
+  business.synergyRangeBonus += card.synergyRangeBonus;
+  business.reputationBonus += card.reputationBonus ?? 0;
+  if (!business.appliedUpgrades) {
+    business.appliedUpgrades = [];
+  }
+  business.appliedUpgrades.push(card.id);
+  (business as any).totalUpgradeCost = ((business as any).totalUpgradeCost ?? 0) + card.cost;
+  business.displayName = card.newDisplayName || business.displayName;
+
+  // Recalculate the upgraded card's cached values
+  updateNeighborsOnPlacement(state, businessIndex);
+
+  // Clear same-day composite tracker — drag-drop is not a composite path.
+  state.justMovedUpgradeCardId = null;
+
+  const refilled = false;
+
+  addLog(state, `Bought and placed upgrade ${card.name} on ${business.name} (-€${premiumCost}, +50% premium, ${describeEventEffects(-premiumCost, 0)})`, classifyEffect(-premiumCost, 0));
+
+  return { card, cost: premiumCost, refilled };
+}
+
+/**
+ * Takes an Investment-trigger Event card from the market into the player's
+ * hand for FREE (cost is paid at play time). The player may execute it later
+ * during the MarketPhase via `playEventFromHand` (which charges the event's
+ * listed cost when it is played).
  *
  * @param state   Current game state (mutated in-place).
  * @param cardId  ID of the Event card in the market.
@@ -737,8 +893,9 @@ export function purchaseEvent(
   );
   const card = state.market.cards[marketIndex] as EventCard;
 
-  // Deduct cost
-  state.resourceBank.coins -= card.cost;
+  // Free acquisition: NO coins are deducted here (CG-0MT5W1V4D007NN8Q).
+  // The event's listed cost is paid only when it is executed from hand via
+  // `playEventFromHand`.
 
   // Remove from market
   state.market.cards.splice(marketIndex, 1);
@@ -749,10 +906,11 @@ export function purchaseEvent(
   // Note: market is not refilled immediately. Replenishment occurs at start of next turn.
   const refilled = false;
 
-  const costLabel = card.cost > 0 ? ` (-€${card.cost})` : '';
-  addLog(state, `Bought event: ${card.name}${costLabel} (to hand)`, 'neutral');
+  (state as any).justMovedEventCardId = card.id;
 
-  return { card, cost: card.cost, refilled };
+  addLog(state, `Moved event ${card.name} to hand (free, pay on play)`, 'neutral');
+
+  return { card, cost: 0, refilled };
 }
 
 /**
@@ -903,10 +1061,22 @@ export function purchaseStaffCard(
   // Increase max hand size
   state.maxHandSize += card.handSlotsAdded;
 
-  addLog(state, `Hired ${card.name} (+${card.handSlotsAdded} hand slots, -€${card.cost}, ongoing €${card.ongoingCost}/turn)`, 'loss');
+  addLog(state, `Hired ${card.name} (+${card.handSlotsAdded} hand slots, -€${card.cost}, ongoing €${card.ongoingCost}/turn) (${describeEventEffects(-card.cost, 0)})`, classifyEffect(-card.cost, 0));
 }
 
 // ── Sell Business (Street Grid) ──────────────────────────────
+
+/** Breakdown of a sell refund into its component parts. */
+export interface SellRefundBreakdown {
+  /** The base refund: Math.ceil((card.cost + totalUpgradeCost) * 1.5). */
+  baseRefund: number;
+  /** Synergy income component: Math.max(0, currentIncome - effectiveBase). */
+  synergyIncomeComponent: number;
+  /** Synergy reputation component: Math.max(0, currentRep - (repPerTurn + repBonus)). */
+  synergyRepComponent: number;
+  /** Total refund (sum of all components). */
+  totalRefund: number;
+}
 
 /** Result returned after selling a business from the street grid. */
 export interface SellResult {
@@ -919,11 +1089,73 @@ export interface SellResult {
 }
 
 /**
+ * Computes the sell refund for a card using the new formula (CG-0MT5XO7DI0066QCT).
+ *
+ * Refund = baseRefund + synergyIncomeComponent + synergyRepComponent
+ *
+ * Where:
+ *   baseRefund = Math.ceil((card.cost + totalUpgradeCost) * 1.5)
+ *   synergyIncomeComponent = Math.max(0, currentIncome - effectiveBase)
+ *   synergyRepComponent = Math.max(0, currentReputationPerTurn - (repPerTurn + repBonus))
+ *   effectiveBase = (baseIncome + incomeBonus) * (hasAdjacentSameType ? 0.6 : 1)
+ *
+ * Synergy components use Math.max(0, ...) to avoid negative contributions
+ * (e.g. when same-type penalty reduces income below base).
+ * If currentIncome or currentReputationPerTurn is undefined, the respective
+ * component is treated as 0 (defensive guard).
+ *
+ * @param state     Current game state.
+ * @param card      The card being sold.
+ * @param slotIndex The grid slot index of the card.
+ * @returns SellRefundBreakdown with the total refund and component breakdown.
+ */
+export function computeSellRefund(
+  state: MainStreetState,
+  card: BusinessCard | CommunitySpaceCard,
+  slotIndex: number,
+): SellRefundBreakdown {
+  const upgradeCosts = (card as any).totalUpgradeCost ?? 0;
+
+  // Base refund: 1.5× the total cost (purchase + upgrades)
+  const baseRefund = Math.ceil((card.cost + upgradeCosts) * 1.5);
+
+  // Compute effectiveBase (base income + upgrade bonus, with same-type penalty)
+  const soldSlots: boolean[] = state.soldSlots ?? [];
+  const gridDims = state.streetGridCols && state.streetGridRows
+    ? { cols: state.streetGridCols, rows: state.streetGridRows }
+    : undefined;
+  let effectiveBase = card.baseIncome + card.incomeBonus;
+  if (hasAdjacentSameType(state.streetGrid, slotIndex, soldSlots, gridDims)) {
+    effectiveBase = roundInt(effectiveBase * 0.6);
+  }
+
+  // Synergy income component: the portion of currentIncome above effectiveBase
+  const synergyIncomeComponent = Math.max(0, (card.currentIncome ?? 0) - effectiveBase);
+
+  // Synergy reputation component: the portion above base rep + upgrade bonus
+  const synergyRepComponent = Math.max(
+    0,
+    (card.currentReputationPerTurn ?? 0) - (card.reputationPerTurn ?? 0) - card.reputationBonus,
+  );
+
+  const totalRefund = baseRefund + synergyIncomeComponent + synergyRepComponent;
+
+  return { baseRefund, synergyIncomeComponent, synergyRepComponent, totalRefund };
+}
+
+/**
  * Sells a business or community-space card from the street grid.
  *
  * The card remains on the grid but is marked as sold (non-functional).
- * The player receives `Math.ceil((card.cost + totalUpgradeCost) / 2)` coins.
- * Upgrades are lost (included in the refund calculation but no longer provide benefits).
+ * The player receives a refund calculated as:
+ *   baseRefund = Math.ceil((card.cost + totalUpgradeCost) * 1.5)
+ *   + synergy income component (currentIncome - effectiveBase, clamped ≥ 0)
+ *   + synergy reputation component (currentRep - (repPerTurn + repBonus), clamped ≥ 0)
+ *
+ * where effectiveBase = (baseIncome + incomeBonus) × (same-type adjacent ? 0.6 : 1).
+ *
+ * This is the same +50% premium multiplier used for same-day composite
+ * and drag-and-drop placements (CG-0MT5XO7DI0066QCT).
  *
  * @param state     Current game state (mutated in-place).
  * @param slotIndex Street grid slot index of the card to sell.
@@ -952,10 +1184,9 @@ export function sellBusiness(
     throw new Error(`Slot ${slotIndex} has already been sold.`);
   }
 
-  // Calculate refund: Math.ceil((purchasePrice + sumOfAllUpgradeCosts) / 2)
-  const purchasePrice = card.cost;
-  const upgradeCosts = (card as any).totalUpgradeCost ?? 0;
-  const refund = Math.ceil((purchasePrice + upgradeCosts) / 2);
+  // Calculate refund using the new formula (CG-0MT5XO7DI0066QCT)
+  const breakdown = computeSellRefund(state, card, slotIndex);
+  const refund = breakdown.totalRefund;
 
   // Credit coins
   state.resourceBank.coins += refund;
@@ -963,12 +1194,65 @@ export function sellBusiness(
   // Mark slot as sold
   state.soldSlots[slotIndex] = true;
 
-  // Incrementally update all affected neighbors' cached values (they lost synergy/same-type from this card)
+  // Incrementally update all affected neighbors' cached values.
+  // With the sold-neighbour-synergy fix, sold cards remain synergy anchors
+  // — neighbours typically retain their synergy bonuses (values stay stable),
+  // but recalculation ensures consistency for same-type penalty and type-matching.
   updateNeighborsOnSale(state, slotIndex);
 
-  addLog(state, `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (50% of €${purchasePrice + upgradeCosts})`, 'gain');
+  addLog(
+    state,
+    `Sold ${card.name} from slot ${slotIndex} for +${refund} coins (€${breakdown.baseRefund} base + ${breakdown.synergyIncomeComponent} synergy income + ${breakdown.synergyRepComponent} synergy rep) (${describeEventEffects(refund, 0)})`,
+    classifyEffect(refund, 0),
+  );
 
   return { card, refund, slotIndex };
+}
+
+// ── Dev-mode Cheat: Replace Random Market Card ───────────────
+
+let cheatNonce = 0;
+
+/**
+ * Dev-mode cheat helper: replace a uniformly-random slot from
+ * `state.market.cards` with a shallow copy of the chosen template
+ * (unique id `${templateId}--cheat-${nonce}`), push the displaced
+ * card to its family's discard pile, and return the displaced card.
+ *
+ * The market row is NOT refilled here; callers should re-render via
+ * the existing renderer path (e.g. `scene.refreshMarket()`).
+ */
+export function cheatReplaceMarketCard(
+  state: MainStreetState,
+  template: AnyCard,
+  family: string,
+  rng?: () => number,
+): AnyCard | null {
+  const slots = state.market.cards.length;
+  if (slots === 0) return null;
+  const slotIndex = Math.floor((rng?.() ?? Math.random()) * slots);
+  const displaced = state.market.cards[slotIndex] ?? null;
+  const baseId = (template as any).id ?? family;
+  const newCard: AnyCard = { ...(template as any), id: `${baseId}--cheat-${cheatNonce++}` } as AnyCard;
+  if (family === 'business' || family === 'community-space') {
+    (newCard as any).level = 0;
+    (newCard as any).incomeBonus = 0;
+    (newCard as any).synergyRangeBonus = 0;
+    (newCard as any).reputationBonus = 0;
+    (newCard as any).ongoingCost = (newCard as any).ongoingCost ?? 0;
+    (newCard as any).appliedUpgrades = [];
+    (newCard as any).totalUpgradeCost = 0;
+  }
+  state.market.cards[slotIndex] = newCard;
+  if (displaced) {
+    const fam = (displaced as any).family as string;
+    if (fam === 'business') state.discards.business.push(displaced as BusinessCard);
+    else if (fam === 'community-space') state.discards.communitySpace.push(displaced as CommunitySpaceCard);
+    else if (fam === 'event') state.discards.event.push(displaced as EventCard);
+    else if (fam === 'upgrade') state.discards.upgrade.push(displaced as UpgradeCard);
+    else if (fam === 'staff') state.discards.staff.push(displaced as StaffCard);
+  }
+  return displaced;
 }
 
 /**

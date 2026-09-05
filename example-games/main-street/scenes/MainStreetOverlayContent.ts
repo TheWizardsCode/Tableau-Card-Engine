@@ -98,9 +98,9 @@ export class MainStreetOverlayContent {
     const challenges = s.state.challengesCompleted.length;
     const cfg = s.state.config;
     const lines = [
-      // HUD bar displays coins and reputation to 2 decimal places; game-over overlay is consistent.
-      `Coins: ${coins.toFixed(2)}`,
-      `Reputation: ${reputation.toFixed(2)}`,
+      // Integer economy — whole-number display (CG-0MTIO1M15001E9Y6).
+      `Coins: ${Math.round(coins)}`,
+      `Reputation: ${Math.round(reputation)}`,
       `Challenges: ${challenges} (x${cfg.challengeBonusPoints} = ${challenges * cfg.challengeBonusPoints})`,
       `Final Score: ${Math.round(result.finalScore)}`,
     ];
@@ -283,7 +283,7 @@ export class MainStreetOverlayContent {
     const s = this.scene;
 
     const panelW = 360;
-    const panelH = 260;
+    const panelH = 300;
     const panelY = s.layout.gameH / 2 - panelH / 2;
 
     // Overlay background with semi-transparent backdrop

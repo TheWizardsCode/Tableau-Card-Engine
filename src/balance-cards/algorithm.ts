@@ -55,7 +55,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function roundHalf(value: number): number {
-  return Math.round(value * 2) / 2;
+  return Math.round(value);
 }
 
 function countSynergyTypes(synergyTypes: string): number {

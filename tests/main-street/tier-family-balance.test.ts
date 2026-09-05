@@ -47,7 +47,9 @@ describe('Main Street tier family balance (CG-0MT3C744B009DS84)', () => {
 
   it('community-space appears in most tiers (>= 6) and staff in most tiers (>= 8)', () => {
     // 8 community-space + 9 staff cards spread across the 12-tier ladder:
-    // cs in T1, T3, T4, T5, T6, T8, T12 (7 tiers); staff in 9 tiers.
+    // cs in T1, T3, T4, T5, T8, T12 (6 tiers; Community Shelter T6->T3,
+    // CG-0MT5VZJLS000B8KI, and Good Press T6->T3 keeps T6's event share under
+    // the 42% ceiling); staff in 9 tiers.
     let csTiers = 0;
     let staffTiers = 0;
     for (const tierDef of Object.values(TIER_DEFINITIONS)) {

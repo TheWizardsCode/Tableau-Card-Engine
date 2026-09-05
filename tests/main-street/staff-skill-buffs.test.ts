@@ -20,7 +20,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
+import { createStaffDeck, type BusinessCard } from '../../example-games/main-street/MainStreetCards';
 import {
   computePerBusinessSkillBuffs,
   computeStreetOngoingCostReductionPct,
@@ -28,6 +28,8 @@ import {
   computeStaffSalaryDiscount,
   computeStaffSalaryCost,
   computeReputationGainMultiplier,
+  getEmployedSpecializationSkills,
+  getEmployedSpecializationSkillsForBusiness,
   type BusinessBuffProfile,
 } from '../../example-games/main-street/MainStreetStaffBuffs';
 import { getSkill, BASELINE_SKILL_ID } from '../../example-games/main-street/MainStreetStaffSkills';
@@ -95,9 +97,9 @@ describe('income-boost skills apply per-business', () => {
     expect(health.income.percent).toBe(0);
   });
 
-  it('Sales Champion adds +0.5 flat coins per turn to Commerce businesses only', () => {
+  it('Sales Champion adds +50 flat coins per turn to Commerce businesses only', () => {
     const commerce = computePerBusinessSkillBuffs(skills('skill-sales-champion'), profile(['Commerce']));
-    expect(commerce.income.flat).toBeCloseTo(0.5);
+    expect(commerce.income.flat).toBeCloseTo(50);
 
     const service = computePerBusinessSkillBuffs(skills('skill-sales-champion'), profile(['Service']));
     expect(service.income.flat).toBe(0);
@@ -123,16 +125,16 @@ describe('income-boost skills apply per-business', () => {
 // ── Reputation boosts (Category B) ──────────────────────────
 
 describe('reputation-boost skills apply per-business', () => {
-  it('Community Builder adds +0.1 reputation per turn to every business', () => {
+  it('Community Builder adds +10 reputation per turn to every business', () => {
     const commerce = computePerBusinessSkillBuffs(skills('skill-community-builder'), profile(['Commerce']));
-    expect(commerce.reputation.flat).toBeCloseTo(0.1);
+    expect(commerce.reputation.flat).toBeCloseTo(10);
     const health = computePerBusinessSkillBuffs(skills('skill-community-builder'), profile(['Health']));
-    expect(health.reputation.flat).toBeCloseTo(0.1);
+    expect(health.reputation.flat).toBeCloseTo(10);
   });
 
-  it('PR Strategist adds +0.15 reputation per turn to Service businesses only', () => {
+  it('PR Strategist adds +15 reputation per turn to Service businesses only', () => {
     const service = computePerBusinessSkillBuffs(skills('skill-pr-strategist'), profile(['Service']));
-    expect(service.reputation.flat).toBeCloseTo(0.15);
+    expect(service.reputation.flat).toBeCloseTo(15);
     const food = computePerBusinessSkillBuffs(skills('skill-pr-strategist'), profile(['Food']));
     expect(food.reputation.flat).toBe(0);
   });
@@ -158,16 +160,16 @@ describe('cost-reduction skills apply to ongoing / refresh / salary costs', () =
     expect(computeStreetOngoingCostReductionPct(skills('skill-cost-cutter'))).toBeCloseTo(0.15);
   });
 
-  it('Negotiator discounts business-card refreshes by 1', () => {
-    expect(computeRefreshCostDiscount(skills('skill-negotiator'))).toBe(1);
+  it('Negotiator discounts business-card refreshes by 100', () => {
+    expect(computeRefreshCostDiscount(skills('skill-negotiator'))).toBe(100);
     expect(computeRefreshCostDiscount(skills(BASELINE_SKILL_ID))).toBe(0);
   });
 
-  it('Operations Manager discounts this staff member salary by 0.5 (clamped at 0)', () => {
-    expect(computeStaffSalaryDiscount(skills('skill-operations-manager'))).toBeCloseTo(0.5);
-    expect(computeStaffSalaryCost(skills('skill-operations-manager'), 2.5)).toBeCloseTo(2);
-    expect(computeStaffSalaryCost(skills('skill-operations-manager'), 0.25)).toBe(0);
-    expect(computeStaffSalaryCost(skills(BASELINE_SKILL_ID), 2.5)).toBeCloseTo(2.5);
+  it('Operations Manager discounts this staff member salary by 50 (clamped at 0)', () => {
+    expect(computeStaffSalaryDiscount(skills('skill-operations-manager'))).toBeCloseTo(50);
+    expect(computeStaffSalaryCost(skills('skill-operations-manager'), 250)).toBeCloseTo(200);
+    expect(computeStaffSalaryCost(skills('skill-operations-manager'), 25)).toBe(0);
+    expect(computeStaffSalaryCost(skills(BASELINE_SKILL_ID), 250)).toBeCloseTo(250);
   });
 });
 
@@ -179,9 +181,9 @@ describe('incident-mitigation skills apply to incident damage / probability', ()
     expect(buffs.incidents.coinDamageReductionPct).toBeCloseTo(0.3);
   });
 
-  it('Compliance Officer removes 0.5 incident reputation damage', () => {
+  it('Compliance Officer removes 50 incident reputation damage', () => {
     const buffs = computePerBusinessSkillBuffs(skills('skill-compliance'), profile(['Food']));
-    expect(buffs.incidents.reputationDamageReductionFlat).toBeCloseTo(0.5);
+    expect(buffs.incidents.reputationDamageReductionFlat).toBeCloseTo(50);
   });
 
   it('Risk Manager reduces incident probability by 15%', () => {
@@ -217,7 +219,7 @@ describe('buff module is side-effect free w.r.t. adjacency caches', () => {
     const card = state.streetGrid[0] as BusinessCard;
     computePerBusinessSkillBuffs(
       skills('skill-chef', 'skill-community-builder', 'skill-cost-cutter'),
-      { synergyTypes: card.synergyTypes, baseIncome: card.baseIncome + card.incomeBonus, ongoingCost: 0.5 },
+      { synergyTypes: card.synergyTypes, baseIncome: card.baseIncome + card.incomeBonus, ongoingCost: 50 },
     );
 
     expect(state.streetGrid[0]!.currentIncome).toBe(cachedBefore);
@@ -235,14 +237,66 @@ describe('buff module is side-effect free w.r.t. adjacency caches', () => {
 
     const buffs = computePerBusinessSkillBuffs(
       skills('skill-chef', 'skill-sales-champion'),
-      { synergyTypes: card.synergyTypes, baseIncome: card.baseIncome + card.incomeBonus, ongoingCost: 0.5 },
+      { synergyTypes: card.synergyTypes, baseIncome: card.baseIncome + card.incomeBonus, ongoingCost: 50 },
     );
 
     const buffed = baseline * (1 + buffs.income.percent) + buffs.income.flat;
-    // Chef +20% of pre-skill income plus Sales Champion +0.5 flat:
-    expect(buffed).toBeCloseTo(baseline * 1.2 + 0.5);
+    // Chef +20% of pre-skill income plus Sales Champion +50 flat:
+    expect(buffed).toBeCloseTo(baseline * 1.2 + 50);
     // The engine's cached value remains the unbuffed baseline until wiring
     // folds the buffs in (I4) — proving no premature mutation.
     expect(card.currentIncome).toBeCloseTo(baseline);
+  });
+});
+
+// ── Per-business employment scoping (CG-0MSTOATDU006UGAX) ────
+
+/** Builds an employed staff member (employedAtSlot) with a forced skill roster. */
+function employedMember(name: string, skillIds: string[], slotIndex: number) {
+  const base = createStaffDeck(1)[0];
+  return { ...base, id: `${base.id}-${name}`, name, specializationSkillIds: [...skillIds], employedAtSlot: slotIndex };
+}
+
+describe('per-business employment scoping (CG-0MSTOATDU006UGAX)', () => {
+  it('getEmployedSpecializationSkillsForBusiness returns only skills of staff employed AT that slot', () => {
+    const state = setupMainStreetGame({ seed: 'scope-helper' });
+    state.staffCards.push(employedMember('chef', ['skill-chef'], 3));
+    state.staffCards.push(employedMember('dj', ['skill-dj'], 7));
+
+    expect(getEmployedSpecializationSkillsForBusiness(state, 3).map(s => s.id)).toEqual(['skill-chef']);
+    expect(getEmployedSpecializationSkillsForBusiness(state, 7).map(s => s.id)).toEqual(['skill-dj']);
+    // Slots with no employees (and empty slots) contribute nothing.
+    expect(getEmployedSpecializationSkillsForBusiness(state, 0)).toHaveLength(0);
+    expect(getEmployedSpecializationSkillsForBusiness(state, 5)).toHaveLength(0);
+  });
+
+  it('hand-slot market staff (no employedAtSlot) contribute NO per-business skills', () => {
+    const state = setupMainStreetGame({ seed: 'scope-hand' });
+    state.staffCards.push({ ...createStaffDeck(1)[0], id: 'staff-hand', name: 'Hand Chef', specializationSkillIds: ['skill-chef'] });
+
+    // The hand-slot member's Chef must never reach any business's buff pool.
+    expect(getEmployedSpecializationSkillsForBusiness(state, 0)).toHaveLength(0);
+    expect(getEmployedSpecializationSkillsForBusiness(state, 4)).toHaveLength(0);
+  });
+
+  it('street-wide aggregation still includes hand-slot + employed staff', () => {
+    const state = setupMainStreetGame({ seed: 'scope-street' });
+    state.staffCards.push(employedMember('cutter', ['skill-cost-cutter'], 2));
+    state.staffCards.push({ ...createStaffDeck(1)[0], id: 'staff-hand', name: 'Hand Negotiator', specializationSkillIds: ['skill-negotiator'] });
+
+    const allIds = getEmployedSpecializationSkills(state).map(s => s.id);
+    expect(allIds).toContain('skill-cost-cutter');
+    expect(allIds).toContain('skill-negotiator');
+
+    // Street-wide skills on an employed member stay street-wide: them appearing
+    // in the business's per-business pool must not reshape the business income
+    // profile (cost-cutter is a % reduction, computed separately).
+    const buffs = computePerBusinessSkillBuffs(
+      getEmployedSpecializationSkillsForBusiness(state, 2),
+      profile(['Food']),
+    );
+    expect(buffs.income.percent).toBe(0);
+    expect(buffs.reputation.flat).toBe(0);
+    expect(buffs.ongoingCosts.reductionPct).toBeCloseTo(0.15);
   });
 });

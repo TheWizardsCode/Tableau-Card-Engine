@@ -101,7 +101,7 @@ export const HUD_TOOLTIP_STRINGS = {
   actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff',
   actionFreeOpsLabel: 'Free: re-roll market, sell, discard, end turn',
   actionBankedLabel: 'Banked actions',
-  actionBankingExplain: "1 action per turn, with up to two turns' unused actions banked",
+  actionBankingExplain: "1 action per turn, with up to two turns' unused actions banked — every action you take spends 1 from the bank (down to 0), so banked actions are a finite reserve, not a permanent bonus",
   actionBankingGmNote: '+1 action per turn from General Manager (staff actions are used first, never banked)',
 } as const;
 
@@ -157,8 +157,8 @@ export function buildCoinsTooltip(state: MainStreetState): string {
   const multiplier = reputationCoinMultiplier(state.resourceBank.reputation, state.config);
   const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
 
-  const preMultiplierStr = Number.isFinite(baseIncome) ? baseIncome.toFixed(3) : '0.000';
-  const postMultiplierStr = Number.isFinite(multipliedIncome) ? multipliedIncome.toFixed(3) : '0.000';
+  const preMultiplierStr = Number.isFinite(baseIncome) ? String(Math.round(baseIncome)) : '0';
+  const postMultiplierStr = Number.isFinite(multipliedIncome) ? String(Math.round(multipliedIncome)) : '0';
 
   const lines = [
     t(HUD_TOOLTIP_I18N_KEYS.coinsTitle),
@@ -196,7 +196,25 @@ export function getIncomeResult(state: MainStreetState): IncomeResult {
     total += slotTotal;
   }
 
-  return { total, breakdown, handSynergyTotal: 0 };
+  return {
+    total,
+    breakdown,
+    handSynergyTotal: 0,
+    // Preview-only path: no multipliers/effects applied, so phase data is
+    // base-only with zero rep/event/upcoming contributions.
+    phaseBreakdown: {
+      perSlotBreakdown: breakdown.map(b => ({
+        slotIndex: b.slotIndex,
+        businessName: b.businessName,
+        baseIncome: b.total,
+        synergyBonus: 0,
+        repBonus: 0,
+        eventDeltas: [],
+        upcomingDeltas: [],
+      })),
+      handSynergyTotal: 0,
+    },
+  };
 }
 
 /**

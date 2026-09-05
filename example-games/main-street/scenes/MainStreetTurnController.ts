@@ -11,6 +11,7 @@ import {
   canPurchaseStaff,
   canRefreshMarket,
   canSellBusiness,
+  computeSellRefund,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
@@ -27,6 +28,7 @@ import {
   type DragDropPayload,
 } from '../../../src/ui/dragDrop';
 import { getCurrentStep, isSynergyAdjacentPlacement, resolveTutorialCardParams, type TutorialActionType } from '../TutorialFlow';
+import { BrowserLocalStorageAdapter, hasSeenBankingHint, loadTutorialState, markBankingHintShown, saveTutorialState } from '../TutorialState';
 import { ensureTutorialMarketForUpcomingSteps } from '../TutorialScenario';
 import { computeDragTransferDuration } from './MainStreetConstants';
 
@@ -194,6 +196,26 @@ export class MainStreetTurnController {
     s.instructionText.setText('Processing end of turn...');
     s.refreshActionButtons();
 
+    // ── Banking hint trigger (CG-0MT3JK16W006A66P) ────────────────
+    // Contextual one-shot hint: when the tutorial is active, the player
+    // ends a turn with at least one unused action (a bankable action), and
+    // the hint has not yet been shown, remember the candidate and fire the
+    // HUD-highlighting hint AFTER the non-blocking `processEndOfTurn` runs.
+    // The flag is persisted via TutorialState so a restart does not replay
+    // it; legacy saves default to "not shown" (AC2).
+    let pendingBankingHint = false;
+    try {
+      const tut = (s as any).tutorialController as any;
+      if (tut?.isActive && s.state.actionsRemaining > 0) {
+        const ts = loadTutorialState(new BrowserLocalStorageAdapter());
+        if (!hasSeenBankingHint(ts)) {
+          pendingBankingHint = true;
+          const next = markBankingHintShown(ts);
+          void saveTutorialState(new BrowserLocalStorageAdapter(), next).catch(() => {});
+        }
+      }
+    } catch { /* banking hint trigger must never block the turn */ }
+
     // ── Tutorial guard: prevent market cycling before T7 ──────────
     // When the tutorial is active and the current step is action 'end-turn'
     // (T6), the upcoming processEndOfTurn would call cycleMarketCards(),
@@ -228,28 +250,40 @@ export class MainStreetTurnController {
       s.state.skipMarketCycleOnEndTurn = false;
     }
 
-    // ── Income Collection Animation ────────────────────────────
-    // Presentation-only VFX (AGENTS.md rule 8): each producing slot emits a
-    // coin that arcs to the HUD coins counter with staggered coin-pop SFX,
-    // reputation-earning cards emit a pip to the rep counter, and a final
-    // "+total" pop lands when collection completes. Skipped under reduced
-    // motion and in replay/headless modes (handled inside the animator).
-    // Runs inside the existing 400ms→800ms turn-advance window so turn
-    // timing is unchanged; never mutates state or transcript — failures are
-    // swallowed so the turn always advances.
+    // ── Income Phase Animation ──────────────────────────────────────
+    // Presentation-only VFX (AGENTS.md rule 8 + epic CG-0MT23O6W8003AXWJ):
+    // the phased income show — base → synergy → reputation → events →
+    // upcoming → grid-to-HUD collection (~11s) — runs when the turn ends
+    // with producing slots. `scene.incomeCollectionActive` gates the HUD
+    // delta pop and defers the street refresh + day start below so the
+    // on-card coin grids survive the whole choreography. Never mutates
+    // state or the transcript; failures are swallowed so the turn always
+    // advances. Reduced-motion and replay/headless modes are handled
+    // inside the animator (text-only progression / no-op).
+    // Tutorial exemption: the tutorial keeps the compact window-safe
+    // collection (`animateIncomeCollection`) so tutorial step pacing is
+    // unchanged — precedent: the day banner is also skipped during the
+    // tutorial (startDayPhase); the full phased show runs in normal play.
     try {
-      if (result.income && result.income.total > 0) {
-        const grid: Array<{ currentReputationPerTurn?: number } | null> = s.state.streetGrid ?? [];
-        const repSources = grid
-          .map((card, slotIndex) => ({ slotIndex, rep: card?.currentReputationPerTurn ?? 0 }))
-          .filter((src) => src.rep > 0);
-        s.msAnimator.animateIncomeCollection({
-          income: result.income,
-          repSources,
-        });
+      const inTutorial = (s as { tutorialController?: { isActive?: boolean } }).tutorialController?.isActive === true;
+      const phaseBreakdown = result.income?.phaseBreakdown?.perSlotBreakdown ?? [];
+      if (inTutorial) {
+        if (result.income && result.income.total > 0) {
+          const grid: Array<{ currentReputationPerTurn?: number } | null> = s.state.streetGrid ?? [];
+          const repSources = grid
+            .map((card, slotIndex) => ({ slotIndex, rep: card?.currentReputationPerTurn ?? 0 }))
+            .filter((src) => src.rep > 0);
+          s.msAnimator.animateIncomeCollection({
+            income: result.income,
+            repSources,
+          });
+        }
+      } else if (phaseBreakdown.length > 0) {
+        s.msAnimator.animateIncomePhases(phaseBreakdown);
       }
     } catch (_) {
       // Presentation-only: never block the turn on animation failures.
+      s.incomeCollectionActive = false;
     }
 
     // Save checkpoint after each completed turn (fire-and-forget)
@@ -278,7 +312,7 @@ export class MainStreetTurnController {
       // Refresh the challenge tracker after all celebrations
       s.time.delayedCall(
         result.newlyCompletedChallenges.length * 600 + 200,
-        () => s.refreshAll(),
+        () => (s.incomeCollectionActive ? s.msRenderer.refreshAllExceptStreet() : s.refreshAll()),
       );
     }
 
@@ -328,7 +362,15 @@ export class MainStreetTurnController {
         } else if (result.incident) {
           s.instructionText.setText(`Incident: ${result.incident.name}`);
         }
-        s.refreshAll();
+        // While the phased income show runs, the street cards host the
+        // on-card coin grids (child 2); refresh everything EXCEPT the
+        // street so those grids survive until collection completes, then
+        // refresh fully once the choreography finishes.
+        if (s.incomeCollectionActive) {
+          s.msRenderer.refreshAllExceptStreet();
+        } else {
+          s.refreshAll();
+        }
         // Incident reveal presentation (AGENTS.md rule 8): non-blocking VFX —
         // the resolved incident card flies from the face-down incident-deck
         // panel (CG-0MSTOATDP000JNHH) to the
@@ -352,7 +394,34 @@ export class MainStreetTurnController {
         }
         // Tutorial: mark end-turn step complete if active
         (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
-        s.time.delayedCall(800, () => this.startDayPhase());
+        // ── Banking hint presentation (CG-0MT3JK16W006A66P) ─────
+        // Non-blocking HUD-highlighting overlay, once per save. Fires after
+        // the turn's gated step has advanced so it does not compete with
+        // the step's own overlay. Never blocks the day start.
+        if (pendingBankingHint) {
+          try { (s as any).tutorialOverlay?.showBankingHint?.(); } catch { /* presentation-only */ }
+        }
+        // The income show is the turn's closing moment (~11s): defer the
+        // day start until the choreography completes so it isn't cut short
+        // by the market/street refresh.
+        if (s.incomeCollectionActive) {
+          // Bounded deferral: start the next day once the choreography
+          // completes (AC7 collect clears the flag); a safety cap forces
+          // the day start even if the flag is somehow never cleared, so
+          // end-of-turn can never hang the game (AC5).
+          const startAt = s.time.now + 16_000;
+          const startAfterIncomeShow = (): void => {
+            if (s.incomeCollectionActive && s.time.now < startAt) {
+              s.time.delayedCall(250, startAfterIncomeShow);
+            } else {
+              s.incomeCollectionActive = false;
+              this.startDayPhase();
+            }
+          };
+          startAfterIncomeShow();
+        } else {
+          s.time.delayedCall(800, () => this.startDayPhase());
+        }
       }
     });
   }
@@ -1112,14 +1181,10 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseEvent(s.state, card.id);
     if (!legality.legal) {
-      const reason = (legality.reason ?? '').toLowerCase();
-      // Insufficient-coins rejection → play illegal-move feedback.
-      if (reason.includes('not enough coins')) {
-        const containers = s.msRenderer?.getMarketRowCards?.();
-        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
-        const target = containers?.[cardIndex] ?? null;
-        playIllegalFeedback(target, s);
-      }
+      // Taking an Investment event to hand is free (CG-0MT5W1V4D007NN8Q), so
+      // there is no insufficient-coins rejection here — canPurchaseEvent no
+      // longer checks coins. Remaining rejections (hand full, incident event)
+      // keep their existing instruction-text-only behaviour.
       s.instructionText.setText(`Cannot buy event: ${legality.reason ?? 'unknown'}`);
       return;
     }
@@ -1721,17 +1786,20 @@ export class MainStreetTurnController {
       return;
     }
 
-    // Calculate refund for display
-    const upgradeCosts = (card as any).totalUpgradeCost ?? 0;
-    const refund = Math.ceil((card.cost + upgradeCosts) / 2);
+    // Calculate refund for display using the new formula (CG-0MT5XO7DI0066QCT)
+    const breakdown = computeSellRefund(s.state, card, slotIndex);
+    const refund = breakdown.totalRefund;
 
-    // Build card info for dialog
+    // Build card info for dialog with breakdown
     const isCommunitySpace = card.family === 'community-space';
     const cardLabel = isCommunitySpace ? 'Community Space' : 'Business';
     const info = `${cardLabel}: ${card.name}\n` +
       `Purchase: €${card.cost}\n` +
-      `Upgrades: €${upgradeCosts}\n` +
-      `Refund: €${refund} (50%)\n\n` +
+      `Upgrades: €${(card as any).totalUpgradeCost ?? 0}\n` +
+      `Refund: €${refund}\n\n` +
+      `  Base: €${breakdown.baseRefund} (1.5× purchase + upgrades)\n` +
+      `  Synergy income: +€${breakdown.synergyIncomeComponent}\n` +
+      `  Synergy reputation: +€${breakdown.synergyRepComponent}\n\n` +
       `Sell this card? It will remain on the grid but produce no further income.`;
 
     // Show sell confirmation via overlay

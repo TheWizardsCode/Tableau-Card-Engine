@@ -138,7 +138,10 @@ describe('MainStreet incident reveal presentation', () => {
     (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
 
     // The controller calls the animator with the resolved incident details.
-    await waitForCondition(() => calls.length >= 1, { label: 'incident reveal trigger' });
+    // Under heavy CPU contention (multiple Chromium instances on the build
+    // machine) Phaser's 400ms delayedCall can stretch beyond the default 5s
+    // window, so use a 10s budget (still well within the 30s test timeout).
+    await waitForCondition(() => calls.length >= 1, { timeoutMs: 10_000, label: 'incident reveal trigger' });
     expect(calls).toHaveLength(1);
     expect(calls[0].cardId).toBe('inc-browser-reveal-test');
     expect(calls[0].incidentName).toBe('Power Outage');
@@ -155,9 +158,10 @@ describe('MainStreet incident reveal presentation', () => {
     expect(visualArgs[3]).toBeCloseTo(expectedFrom.y, 0);
 
     // The next day still starts after the usual turn-advance window — the
-    // reveal never blocks the turn flow.
+    // reveal never blocks the turn flow. Bump to 10s to tolerate contention-
+    // induced RAF stalls (see incident-reveal run failures under load 16+).
     await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
-      timeoutMs: 5000,
+      timeoutMs: 10_000,
       label: 'next day start (phase back to MarketPhase)',
     });
   }, 30_000);

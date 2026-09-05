@@ -235,6 +235,57 @@ describe('Expanded Card Pool: Multi-Synergy Bridge Cards', () => {
   });
 });
 
+// ── Florist Income rebalance (CG-0MT6EQSPW002E7RC) ─────────
+
+describe('Florist income rebalance (CG-0MT6EQSPW002E7RC)', () => {
+  it('locks the rebalanced template income at tier-5 parity (baseIncome 350, ongoing 125) (×100)', () => {
+    const florist = businessDeck.find(c => c.name === 'Florist');
+    expect(florist).toBeDefined();
+    expect(florist!.baseIncome).toBe(350); // ×100: 3.5 → 350
+    expect(florist!.ongoingCost).toBe(125); // ×100: 1.25 → 125
+    // Net per-turn income after the ongoing cost meets the tier-5 floor (≥ 200/turn) (×100)
+    expect(florist!.baseIncome - florist!.ongoingCost).toBeGreaterThanOrEqual(200);
+  });
+
+  it('matches peer tier-5 net income (Cinema / Juice Bar)', () => {
+    const florist = businessDeck.find(c => c.name === 'Florist')!;
+    const cinema = businessDeck.find(c => c.name === 'Cinema')!;
+    const juiceBar = businessDeck.find(c => c.name === 'Juice Bar')!;
+    expect(florist.baseIncome - florist.ongoingCost)
+      .toBe(cinema.baseIncome - cinema.ongoingCost);
+    expect(florist.baseIncome - florist.ongoingCost)
+      .toBe(juiceBar.baseIncome - juiceBar.ongoingCost);
+  });
+
+  it('computes positive solo income at runtime via computeBusinessIncome (AC1)', () => {
+    const florist = businessDeck.find(c => c.name === 'Florist')!;
+    const grid: (BusinessCard | null)[] = new Array(GRID_SIZE).fill(null);
+    grid[0] = florist;
+    expect(computeBusinessIncome(grid, 0)).toBe(350); // ×100: 3.5 → 350
+  });
+});
+
+describe('Business templates never carry zero base income (CG-0MT6EQSPW002E7RC)', () => {
+  it('every business template has baseIncome > 0 unless it is a documented rep-only card', () => {
+    // Rep-only exception: cards that earn reputation instead of coins.
+    // Only biz-clinic today (AC3); add to the set deliberately when a new
+    // rep-only business is introduced.
+    const repOnlyBusinessIds = new Set(['biz-clinic']);
+    for (const card of businessDeck) {
+      const baseId = card.id.replace(/-\d+$/, '');
+      if (repOnlyBusinessIds.has(baseId)) continue;
+      expect(card.baseIncome, `${card.id} must provide income`).toBeGreaterThan(0);
+    }
+  });
+
+  it('the rep-only zero-income exception set is exactly biz-clinic today', () => {
+    const zeroIncome = businessDeck
+      .filter(c => c.baseIncome <= 0)
+      .map(c => c.id.replace(/-\d+$/, ''));
+    expect(zeroIncome).toEqual(['biz-clinic']);
+  });
+});
+
 // ── Bridge Card Adjacency Bonuses ───────────────────────────
 
 describe('Expanded Card Pool: Bridge Card Adjacency', () => {
@@ -303,8 +354,8 @@ describe('Expanded Card Pool: Service & Entertainment Income', () => {
     expect(computeBusinessIncome(grid, 0)).toBe(3);
     // Barbershop: base 2 + 2 (Laundromat+Clinic) = 4
     expect(computeBusinessIncome(grid, 1)).toBe(4);
-    // Clinic: base 3 + 1.5 (Barbershop 50%) = 4.5
-    expect(computeBusinessIncome(grid, 2)).toBe(4.5);
+    // Clinic: base 3 + round(3*0.5)=2 → 5 (integer rounding: 1.5 → 2)
+    expect(computeBusinessIncome(grid, 2)).toBe(5);
   });
 
   it('Entertainment cluster should generate synergy income', () => {
@@ -313,7 +364,7 @@ describe('Expanded Card Pool: Service & Entertainment Income', () => {
     grid[1] = makeBiz({ name: 'Cinema', synergyTypes: ['Entertainment'], baseIncome: 3 });
 
     expect(computeBusinessIncome(grid, 0)).toBe(3); // 2 + 1
-    expect(computeBusinessIncome(grid, 1)).toBe(4.5); // 3 + 1.5
+    expect(computeBusinessIncome(grid, 1)).toBe(5); // 3 + round(1.5)=2 → 5 (integer rounding)
   });
 });
 
@@ -476,8 +527,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     const bakeries = deck.filter(c => c.name === 'Bakery');
     expect(bakeries).toHaveLength(2);
     for (const b of bakeries) {
-      expect(b.cost).toBe(3);
-      expect(b.baseIncome).toBe(2.3); // raised 0.5 → 2.3 by CG-0MSVYPEZ90085SHE
+      expect(b.cost).toBe(300); // ×100: 3 → 300
+      expect(b.baseIncome).toBe(230); // ×100: 2.3 → 230 (raised 0.5 → 2.3 by CG-0MSVYPEZ90085SHE)
       expect(b.synergyTypes).toEqual(['Food']);
     }
   });
@@ -582,9 +633,9 @@ describe('Expanded Card Pool: Synergy Coverage', () => {
     }
   });
 
-  it('cost distribution should span at least 4-10 range', () => {
+  it('cost distribution should span at least 400-1000 range (×100)', () => {
     const costs = businessDeck.map(c => c.cost);
-    expect(Math.min(...costs)).toBeLessThanOrEqual(4);
-    expect(Math.max(...costs)).toBeGreaterThanOrEqual(10);
+    expect(Math.min(...costs)).toBeLessThanOrEqual(400); // ×100: 4 → 400
+    expect(Math.max(...costs)).toBeGreaterThanOrEqual(1000); // ×100: 10 → 1000
   });
 });

@@ -303,7 +303,7 @@ export interface BusinessCard {
   reputationBonus: number;
   /**
    * Base reputation generated per turn by this business (without upgrades).
-   * Fractional values are supported (e.g. 0.2 for the Clinic).
+   * Integer values (×100, e.g. 20 for the Clinic).
    */
   reputationPerTurn?: number;
   /**
@@ -332,10 +332,12 @@ export interface BusinessCard {
    */
   totalUpgradeCost?: number;
   /**
-   * Display name shown on the card overlay when the business has been upgraded.
-   * Set to the upgraded business name by `purchaseUpgrade()` / `playUpgradeFromHand()`
-   * when an upgrade card is applied. Falls back to `name` (the original business name)
-   * when the business is at level 0 (un-upgraded).
+   * Display name baked into the card's SVG face when the business has been
+   * upgraded (CG-0MT24MHGZ0025O20). Set to the upgraded business name by
+   * `purchaseUpgrade()` / `playUpgradeFromHand()` when an upgrade card is
+   * applied. Falls back to `name` (the original business name) when the
+   * business is at level 0 (un-upgraded). The overlay spec intentionally
+   * carries NO name overlay — the name renders as part of the card image.
    */
   displayName?: string;
 
@@ -445,14 +447,16 @@ export interface UpgradeCard {
   /**
    * Additional reputation generated per turn when this upgrade is applied.
    * Works like incomeBonus but for reputation instead of coins.
-   * Fractional values are supported (e.g. 0.1 for the Medical Center upgrade).
+   * Integer values (×100, e.g. 10 for the Medical Center upgrade).
    */
   readonly reputationBonus?: number;
   /**
    * The new display name for the target business when this upgrade is applied.
-   * This is the name shown on the card overlay (e.g., "Patisserie" for an
-   * upgrade that turns a Bakery into a Patisserie). Used by
-   * `buildUpgradeOverlaySpec()` to compute the name overlay text.
+   * This is the name baked into the card's SVG face when the business is
+   * upgraded (e.g., "Patisserie" for an upgrade that turns a Bakery into a
+   * Patisserie) — CG-0MT24MHGZ0025O20. Used by `purchaseUpgrade()`/`playUpgradeFromHand()`
+   * to set the business's `displayName`, and by the SVG texture pipeline to
+   * produce a display-name variant card face.
    */
   readonly newDisplayName?: string;
 }
@@ -477,6 +481,15 @@ export interface StaffCard {
    * full game. Absent (undefined) on legacy saves — treat as no skills.
    */
   specializationSkillIds?: string[];
+  /**
+   * Street-grid slot index of the deployed business this staff member is
+   * employed at (CG-0MSTOATDU006UGAX). Per-business specialization buffs
+   * (income/reputation) apply ONLY to this business; undefined = hand-slot
+   * staff (existing mechanic) who contribute no per-business income/rep
+   * buffs but whose street-wide skills still aggregate (cost cutter,
+   * incidents, brand ambassador, negotiator, ops-manager salary).
+   */
+  employedAtSlot?: number;
   /**
    * Optional reputation granted per turn during the income phase
    * (e.g. the Socialite's +0.1 rep/turn ability — Group F,
@@ -730,6 +743,12 @@ export function findConstrainedIncidentIndex(
 }
 
 /**
+ * @deprecated Replaced by runtime selection via `findConstrainedIncidentIndex`
+ * (CG-0MSZDD2TP003TZS5). The incident deck is now shuffled once at setup/
+ * reshuffle time and each draw is selected at runtime by evaluating constraints
+ * against the resolved-draw balance history. This pre-ordering function is
+ * retained only for reference — it is no longer called in production code.
+ *
  * Orders an incident card pool into a face-down, balance-aware deck
  * (CG-0MSTOATDP000JNHH, option (a)).
  *
@@ -890,8 +909,11 @@ export function orderIncidentDeck(
 
 // ── Constants ───────────────────────────────────────────────
 
-/** Number of slots in the street grid. */
+/** Number of slots in the street grid (1×1 legacy alias; prefer worldSlotCount for expanded grids). */
 export const GRID_SIZE = 10;
+/** Slots per street (5×2) — re-exported for GridTopology helpers. */
+export const STREET_COLS = 5;
+export const STREET_ROWS = 2;
 
 /**
  * Legacy default turn cap (20). Kept for backward compatibility; default
@@ -901,13 +923,13 @@ export const GRID_SIZE = 10;
 export const MAX_TURNS = 20;
 
 /** Score required for a win via score threshold (Medium preset default, retuned to 120 by CG-0MT3J8FXG006RCOA). */
-export const WIN_THRESHOLD = 120;
+export const WIN_THRESHOLD = 12000;
 
 /** Starting coin balance (Medium preset default). */
-export const STARTING_COINS = 6;
+export const STARTING_COINS = 600;
 
 /** Starting reputation. */
-export const STARTING_REPUTATION = 3;
+export const STARTING_REPUTATION = 300;
 
 /**
  * Total number of cards visible in the single-row marketplace.
@@ -958,7 +980,7 @@ export const REFRESH_MARKET_COST = 5;
 export const SYNERGY_BONUS_PER_NEIGHBOR = 1;
 
 /** Points awarded per completed challenge. */
-export const CHALLENGE_BONUS_POINTS = 10;
+export const CHALLENGE_BONUS_POINTS = 1000;
 
 // ── Multi-Use Card Economy Ratios ───────────────────────────
 
@@ -1062,7 +1084,7 @@ export interface CommunitySpaceCard {
   reputationBonus: number;
   /**
    * Base reputation generated per turn by this community space (without upgrades).
-   * Fractional values are supported (e.g. 0.2).
+   * Integer values (×100, e.g. 20).
    */
   reputationPerTurn?: number;
   /**
@@ -1099,10 +1121,11 @@ export interface CommunitySpaceCard {
    */
   currentReputationPerTurn?: number;
   /**
-   * Display name shown on the card overlay when the community space has been upgraded.
-   * Set to the upgraded name by `purchaseUpgrade()` / `playUpgradeFromHand()`
-   * when an upgrade card is applied. Falls back to `name` (the original name)
-   * when the community space is at level 0 (un-upgraded).
+   * Display name baked into the card's SVG face when the community space has
+   * been upgraded (CG-0MT24MHGZ0025O20). Set to the upgraded name by
+   * `purchaseUpgrade()` / `playUpgradeFromHand()` when an upgrade card is
+   * applied. Falls back to `name` (the original name) when the community
+   * space is at level 0 (un-upgraded).
    */
   displayName?: string;
 }
@@ -1283,7 +1306,7 @@ export function createCommunitySpaceDeck(
  * @param copies          Number of copies per template (default 3).
  * @param unlockedCardIds Optional list of unlocked card IDs for tier filtering.
  * @param positiveIncidentMultiplier Multiplier applied to positive Incident templates (>=1).
- * @param rng             Seeded random function used for deterministic fractional distribution.
+ * @param rng             Seeded random function used for deterministic distribution.
  */
 export function createEventDeck(
   copies: number = 3,
@@ -1296,9 +1319,9 @@ export function createEventDeck(
     : _EVENT_TEMPLATES;
 
   // If multiplier > 1, positive Incident templates should appear more often.
-  // Implement fractional multipliers deterministically without introducing
+  // Implement multipliers deterministically without introducing
   // a seeded RNG dependency: we give every positive Incident template
-  // `baseDup = floor(multiplier)` repeats, then distribute the fractional
+  // `baseDup = floor(multiplier)` repeats, then distribute the remainder
   // remainder by granting one extra repeat to `extraCount` templates. The
   // selection is deterministic (first N positive templates in template
   // order) so behavior is stable across runs.
@@ -1310,7 +1333,7 @@ export function createEventDeck(
   const fraction = mult - baseDup;
 
   // Identify positions (indices) of positive Incident templates in the
-  // `templates` array so we can select which ones receive the fractional
+  // `templates` array so we can select which ones receive the remainder
   // extra duplicates.
   const positiveIndices: number[] = [];
   for (let i = 0; i < templates.length; i++) {
@@ -1325,7 +1348,7 @@ export function createEventDeck(
 
   // Decide which positive template indices receive the extra +1 duplicate.
   // Always use the provided seeded RNG to shuffle and choose extraCount
-  // indices. This makes the fractional distribution deterministic per-game
+  // indices. This makes the distribution deterministic per-game
   // seed and removes order bias.
   const extraSet = new Set<number>();
   if (extraCount > 0 && positiveCount > 0) {

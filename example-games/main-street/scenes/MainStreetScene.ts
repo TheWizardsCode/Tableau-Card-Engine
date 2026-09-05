@@ -23,6 +23,11 @@ import {
   type SceneLayout,
   STREET_ROWS,
 } from './MainStreetConstants';
+import { createMarketCardCheatTool } from '../../../src/ui/debug/MarketCardCheatOverlay';
+import { createSessionExportTool } from '../../../src/ui/debug/SessionExportTool';
+import { createStateInspectorTool } from '../../../src/ui/debug/StateInspectorOverlay';
+import { createGameEventLogTool } from '../../../src/ui/debug/GameEventLogOverlay';
+import { createAiDecisionViewerTool } from '../../../src/ui/debug/AiDecisionOverlay';
 
 type UIPhase =
   | 'idle'               // Waiting for DayStart
@@ -33,6 +38,36 @@ type UIPhase =
   | 'game-over';         // Final overlay
 
 export class MainStreetScene extends CardGameScene {
+  /**
+   * Dev-gated debug-tools override: the Main-Street-only Market Card Cheat
+   * is injected alongside the base tools. The entire factory-call branch is
+   * guarded by `import.meta.env.DEV` so Vite's `define` replacement removes
+   * it from the production chunk (same pattern CardGameScene uses for its
+   * own default tools). Other games don't call this branch.
+   */
+  protected override initSettingsPanel(
+    difficultyNames?: readonly string[],
+    defaultDifficulty?: string,
+    hasTooltips?: boolean,
+    skillRating?: import('../../../src/ui/SettingsPanel').SkillRatingConfig,
+    debugTools?: import('../../../src/ui/debug/DebugToolsRegistry').DebugToolsEntry[],
+  ): void {
+    if (debugTools !== undefined) {
+      super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools);
+      return;
+    }
+    if (import.meta.env.DEV) {
+      super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, [
+        createSessionExportTool(),
+        createStateInspectorTool(),
+        createGameEventLogTool(),
+        createAiDecisionViewerTool(),
+        createMarketCardCheatTool(),
+      ]);
+      return;
+    }
+    super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools);
+  }
   public tooltipManager?: TooltipManager;
   public msRenderer!: MainStreetRenderer;
   public msAnimator!: MainStreetAnimator;

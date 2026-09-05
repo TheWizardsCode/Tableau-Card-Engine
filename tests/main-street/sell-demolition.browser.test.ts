@@ -139,12 +139,13 @@ describe('MainStreet sell demolition animation', () => {
     expect(calls[0].family).toBe('business');
     expect(calls[0].cardId).toBe(biz.id);
 
-    // Refund = ceil((cost + upgrades) / 2); no upgrades here.
-    const expectedRefund = Math.ceil(biz.cost / 2);
-    expect(calls[0].refund).toBe(expectedRefund);
+    // Refund = 1.5× cost + synergy components (CG-0MT5XO7DI0066QCT).
+    const { computeSellRefund } = await import('../../example-games/main-street/MainStreetMarket');
+    const breakdown = computeSellRefund(scene.state as never, biz as never, 0);
+    expect(calls[0].refund).toBe(breakdown.totalRefund);
 
     // The sale committed: slot sold, coins credited.
     expect(state.soldSlots[0]).toBe(true);
-    expect(state.resourceBank.coins).toBe(50 + expectedRefund);
+    expect(state.resourceBank.coins).toBe(50 + breakdown.totalRefund);
   }, 30_000);
 });

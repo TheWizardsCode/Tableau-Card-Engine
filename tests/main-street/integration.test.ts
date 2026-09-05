@@ -198,8 +198,8 @@ describe('Integration: Full Game', () => {
   it('reaches score threshold with enough income to survive', () => {
     // Manually set up a state with high coins to survive
     const state = setupMainStreetGame({ seed: 'integration-survive' });
-    state.resourceBank.coins = 100;
-    state.resourceBank.reputation = 5;
+    state.resourceBank.coins = 10000;
+    state.resourceBank.reputation = 500;
 
     const { totalTurns: _totalTurns } = playFullGame(state);
 
@@ -553,7 +553,8 @@ describe('Integration: Held Investment Event', () => {
     // CG-0MRER3RE300418SG: Math.floor removed; 5 * 1.0625 = 5.3125 (was 6 before fix)
     // CG-0MSTOATDT009BRX2: cost-at-play — playing the event charges its cost (3).
     // (CG-0MT3J80HV0084IF1: divisor quartered 20→80.)
-    expect(coinsAfterPlay).toBeCloseTo(50 - 3 + 5.3125); // -cost + delta scaled by reputation multiplier
+    // Integer economy (CG-0MTIO1M15001E9Y6): 5.3125 rounds to 5 via roundInt.
+    expect(coinsAfterPlay).toBe(52); // 50 -3 + 5 (rounded)
 
     // End turn — InvestmentResolution should have nothing to auto-resolve
     const result = processEndOfTurn(state);
@@ -692,8 +693,8 @@ describe('Integration: Challenge System', () => {
 
   it('all-challenges win triggers before turn limit in a rigged scenario', () => {
     const state = setupMainStreetGame({ seed: 'challenge-all-win' });
-    state.resourceBank.coins = 200;
-    state.resourceBank.reputation = 30;
+    state.resourceBank.coins = 10000;
+    state.resourceBank.reputation = 3000;
 
     // Pre-complete all but one challenge
     for (let i = 0; i < state.activeChallenges.length - 1; i++) {
@@ -701,7 +702,7 @@ describe('Integration: Challenge System', () => {
       state.challengesCompleted.push(state.activeChallenges[i].challenge.id);
     }
 
-    // Force the last challenge to be Deep Pockets (coins >= 25)
+    // Force the last challenge to be Deep Pockets (coins >= 3000)
     const lastAc = state.activeChallenges[state.activeChallenges.length - 1];
     const deepPockets = CHALLENGE_TEMPLATES.find(t => t.id === 'ch-deep-pockets')!;
     // Replace with Deep Pockets if different
@@ -712,7 +713,7 @@ describe('Integration: Challenge System', () => {
       };
     }
 
-    // With 200 coins, Deep Pockets (>= 25 coins) should complete on next EndCheck
+    // With 10000 coins, Deep Pockets (>= 3000 coins) should complete on next EndCheck
     executeDayStart(state);
     const result = processEndOfTurn(state);
 
@@ -723,14 +724,14 @@ describe('Integration: Challenge System', () => {
 
   it('challenge completions survive across turns (no revocation)', () => {
     const state = setupMainStreetGame({ seed: 'challenge-no-revoke' });
-    state.resourceBank.coins = 200;
-    state.resourceBank.reputation = 20;
+    state.resourceBank.coins = 10000;
+    state.resourceBank.reputation = 2000;
 
     // Find and rig a Deep Pockets challenge
     const deepPockets = CHALLENGE_TEMPLATES.find(t => t.id === 'ch-deep-pockets')!;
     state.activeChallenges = [{ challenge: deepPockets, completed: false }];
 
-    // Turn 1: coins >= 25, should complete
+    // Turn 1: coins >= 3000, should complete
     executeDayStart(state);
     processEndOfTurn(state);
 
@@ -742,7 +743,7 @@ describe('Integration: Challenge System', () => {
     // Drain coins below threshold
     state.resourceBank.coins = 5;
 
-    // Turn 2: challenge should remain completed despite coins < 25
+    // Turn 2: challenge should remain completed despite coins < 3000
     executeDayStart(state);
     processEndOfTurn(state);
 

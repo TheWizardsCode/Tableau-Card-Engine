@@ -60,10 +60,11 @@ describe('Scenario Validation: requiredCardId references', () => {
     expect(stepsWithRequiredCardId.length).toBeGreaterThan(0);
 
     // The single-row market (CG-0MSTOATDT009BRX2) holds only 3 cards. The
-    // two-turn tutorial (CG-0MT53NXGZ004H5AE) places each card the day after
-    // its move: day-1/2 targets (T3 Laundromat, T9 Local Festival) are
-    // scenario-placed; the Bookshop (T11) and Library (T17) move-to-hand
-    // targets are forced into the visible line at day start by
+    // two-turn tutorial (CG-0MTNMBX5Z002U0MH, 26 steps) places each card the
+    // day after its move: day-1/3 targets (T3 Laundromat, T10 Local Festival)
+    // are scenario-placed / market-refillable; the Bookshop (T12) and Library
+    // (T19) move-to-hand targets are forced into the visible line at day
+    // start by
     // ensureTutorialMarketForUpcomingSteps. Both paths are valid.
     const hookCovered = new Set(['biz-bookshop', 'cs-library']);
 
@@ -99,13 +100,13 @@ describe('Scenario Validation: requiredCardId references', () => {
   });
 
   it('the day-start hook actually guarantees the hook-covered targets appear in the row', () => {
-    // Day-5 start: T17 (Library move-to-hand) is upcoming; the hook must put
-    // cs-library into the visible row.
-    const t17Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T17');
+    // Day-7 start: T19 (Library move-to-hand) is upcoming; the hook must put
+    // cs-library into the visible row (CG-0MTNMBX5Z002U0MH: T18→T19).
+    const t18Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T19');
     const controller: TutorialControllerState = {
       isActive: true,
-      currentStepIndex: t17Index,
-      lastCompletedStepId: 'T16',
+      currentStepIndex: t18Index,
+      lastCompletedStepId: 'T18',
       exited: false,
     };
     const state = setupMainStreetGame({ seed: 'scenario-hook-validation' });
@@ -122,14 +123,14 @@ describe('Scenario Validation: requiredCardId references', () => {
     }
   });
 
-  it('T3/T9/T11/T17 are the action steps with a requiredCardId (current invariant)', () => {
+  it('T3/T10/T12/T19 are the action steps with a requiredCardId (current invariant)', () => {
     const actionStepsWithRequiredCardId = UNIFIED_TUTORIAL_STEPS.filter(
       (step) => step.gate === 'action' && step.requiredCardId !== undefined,
     );
-    // Two-turn flow (CG-0MT53NXGZ004H5AE): T3 (Laundromat), T9 (Local
-    // Festival), T11 (Bookshop move-to-hand), T17 (Library move-to-hand).
+    // Two-turn 26-step flow (CG-0MTNMBX5Z002U0MH): T3 (Laundromat), T10 (Local
+    // Festival), T12 (Bookshop move-to-hand), T19 (Library move-to-hand).
     expect(actionStepsWithRequiredCardId.length).toBe(4);
-    expect(actionStepsWithRequiredCardId.map(s => s.id)).toEqual(['T3', 'T9', 'T11', 'T17']);
+    expect(actionStepsWithRequiredCardId.map(s => s.id)).toEqual(['T3', 'T10', 'T12', 'T19']);
     expect(actionStepsWithRequiredCardId[0].requiredCardId).toBe('biz-laundromat-0');
     expect(actionStepsWithRequiredCardId[1].requiredCardId).toBe('evt-festival-0');
     expect(actionStepsWithRequiredCardId[2].requiredCardId).toBe('biz-bookshop-0');

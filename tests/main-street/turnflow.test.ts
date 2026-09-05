@@ -122,8 +122,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 50;
       state.resourceBank.reputation = 10;
       state.challengesCompleted = ['ch1', 'ch2'];
-      // 50 + 10 + (2 * 10) = 50 + 10 + 20 = 80
-      expect(computeScore(state)).toBe(80);
+      // 50 + 10 + (2 * 1000) = 50 + 10 + 2000 = 2060 (CHALLENGE_BONUS_POINTS 1000 ×100)
+      expect(computeScore(state)).toBe(2060);
     });
 
     it('should compute score with zero reputation and no challenges', () => {
@@ -151,8 +151,8 @@ describe('MainStreetEngine', () => {
       state.resourceBank.reputation = 5;
       state.challengesCompleted = ['ch1'];
       updateScore(state);
-      // 100 + 5 + 10 = 115
-      expect(state.finalScore).toBe(115);
+      // 100 + 5 + 1000 = 1105 (CHALLENGE_BONUS_POINTS 1000 ×100)
+      expect(state.finalScore).toBe(1105);
     });
   });
 
@@ -184,7 +184,7 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
       const card = state.market.cards[0];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 1000;
 
       const result = executeAction(state, {
         type: 'buy-business',
@@ -225,7 +225,7 @@ describe('MainStreetEngine', () => {
     it('should execute buy-upgrade action', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 1000;
 
       // Place a target business. The single 3-card row may not contain an
       // upgrade at all (CG-0MSTOATDT009BRX2), so pick the first upgrade from
@@ -287,10 +287,10 @@ describe('MainStreetEngine', () => {
       // held event's cost is charged at play time) instead of null.
       expect(result).not.toBeNull();
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
-      // CG-0MRER3RE300418SG: event coinDelta is now multiplied by reputation and not floored
-      // Medium preset rep=3 → multiplier=1.0375, 4 * 1.0375 = 4.15 (quartered, CG-0MT3J80HV0084IF1)
+      // CG-0MTKLQ9P9007G5BM: integer economy — applyReputationMultiplier rounds via roundInt
+      // Medium preset rep=300 → multiplier=1.0375 (reputationCoinDivisor 8000), 4 * 1.0375 = 4.15 → roundInt 4
       // makeInvestmentEvent defaults cost to 0, so only the delta applies.
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.15);
+      expect(state.resourceBank.coins).toBe(coinsBefore + 4);
     });
 
     it('should throw play-event action when no Investment is held', () => {
@@ -329,9 +329,9 @@ describe('MainStreetEngine', () => {
       resolveEvent(state, event);
 
       // 2 Food businesses * 2 coinDelta = +4 raw
-      // CG-0MRER3RE300418SG: raw delta multiplied by reputation, not floored
-      // 4 * 1.0375 = 4.15 (quartered, CG-0MT3J80HV0084IF1)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 4.15);
+      // CG-0MTKLQ9P9007G5BM: integer economy — applyReputationMultiplier via roundInt
+      // 4 * 1.0375 (rep=300, divisor 8000) = 4.15 → roundInt 4
+      expect(state.resourceBank.coins).toBe(coinsBefore + 4);
     });
 
     it('should apply reputationDelta', () => {
@@ -367,9 +367,9 @@ describe('MainStreetEngine', () => {
       expect(resolved).not.toBeNull();
       expect(resolved!.id).toBe('e1');
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
-      // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
-      // 5 * 1.0375 = 5.1875 (quartered, CG-0MT3J80HV0084IF1)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 5.1875);
+      // CG-0MTKLQ9P9007G5BM: integer economy — applyReputationMultiplier via roundInt
+      // 5 * 1.0375 (rep=300, divisor 8000) = 5.1875 → roundInt 5
+      expect(state.resourceBank.coins).toBe(coinsBefore + 5);
     });
 
     it('should return null when no event is held', () => {
@@ -388,9 +388,9 @@ describe('MainStreetEngine', () => {
       playHeldEvent(state);
 
       expect(state.hand.some(c => c.family === 'event')).toBe(false);
-      // CG-0MRER3RE300418SG: event coinDelta scaled by reputation, not floored
-      // 3 * 1.0375 = 3.1125 (quartered, CG-0MT3J80HV0084IF1)
-      expect(state.resourceBank.coins).toBeCloseTo(coinsBefore + 3.1125);
+      // CG-0MTKLQ9P9007G5BM: integer economy — applyReputationMultiplier via roundInt
+      // 3 * 1.0375 (rep=300, divisor 8000) = 3.1125 → roundInt 3
+      expect(state.resourceBank.coins).toBe(coinsBefore + 3);
     });
 
     it('should throw when no event is held', () => {
@@ -695,7 +695,7 @@ describe('MainStreetEngine', () => {
   describe('executeFullTurn', () => {
     it('should execute a complete turn with purchases', () => {
       const state = createTestState();
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 1000;
 
       const card = state.market.cards[0];
       const actions: PlayerAction[] = [
@@ -776,7 +776,7 @@ describe('MainStreetEngine', () => {
   describe('multi-turn simulation', () => {
     it('should run multiple turns without errors', () => {
       const state = createTestState('multi-turn');
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 9999;
 
       for (let t = 0; t < 5; t++) {
         if (state.gameResult !== 'playing') break;
@@ -815,7 +815,7 @@ describe('MainStreetEngine', () => {
 
       function runGame(gameSeed: string): MainStreetState {
         const s = setupMainStreetGame({ seed: gameSeed });
-        s.resourceBank.coins = 50;
+        s.resourceBank.coins = 9999;
 
         for (let t = 0; t < 3; t++) {
           if (s.gameResult !== 'playing') break;
@@ -849,15 +849,15 @@ describe('MainStreetEngine', () => {
   describe('challenge evaluation during EndCheck', () => {
     it('should evaluate challenges during processEndOfTurn', () => {
       const state = createTestState('challenge-endcheck');
-      // Give the state an active challenge that will pass: ch-deep-pockets requires coins >= 25
-      // Set coins high enough to survive income/incident phases
+      // Give the state an active challenge that will pass: ch-deep-pockets requires coins >= 3000 (×100)
+      // Seed 'challenge-endcheck' front incident is Graffiti (-100), so start above 3000 to survive the turn
       state.activeChallenges = [
         {
           challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
           completed: false,
         },
       ];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 4000;
 
       // Run a turn
       executeDayStart(state);
@@ -876,7 +876,7 @@ describe('MainStreetEngine', () => {
           completed: false,
         },
       ];
-      state.resourceBank.coins = 5; // Below 25 threshold
+      state.resourceBank.coins = 5; // Below 3000 threshold (ch-deep-pockets ×100)
 
       executeDayStart(state);
       processEndOfTurn(state);
@@ -893,7 +893,7 @@ describe('MainStreetEngine', () => {
           completed: false,
         },
       ];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 4000;
 
       const scoreBefore = computeScore(state);
       executeDayStart(state);
@@ -906,7 +906,7 @@ describe('MainStreetEngine', () => {
       // The bonus should be reflected
       expect(state.finalScore).toBe(computeScore(state));
       expect(state.finalScore).toBeGreaterThanOrEqual(scoreBefore + CHALLENGE_BONUS_POINTS - 20);
-      // More precisely: at minimum, 1 challenge = +10 bonus points
+      // More precisely: at minimum, 1 challenge = +1000 bonus points (CHALLENGE_BONUS_POINTS ×100)
       expect(state.challengesCompleted.length * CHALLENGE_BONUS_POINTS).toBe(CHALLENGE_BONUS_POINTS);
     });
 
@@ -918,7 +918,7 @@ describe('MainStreetEngine', () => {
           completed: false,
         },
       ];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 4000;
 
       // Turn 1: complete the challenge
       executeDayStart(state);
@@ -944,7 +944,7 @@ describe('MainStreetEngine', () => {
           completed: false,
         },
       ];
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 4000;
 
       executeDayStart(state);
       processEndOfTurn(state);

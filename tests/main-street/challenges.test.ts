@@ -307,15 +307,15 @@ describe('MainStreetChallenges', () => {
     describe('Deep Pockets', () => {
       const ch = CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!;
 
-      it('should return true with 30+ coins', () => {
+      it('should return true with 3000+ coins', () => {
         const state = createEmptyState();
-        state.resourceBank.coins = 30;
+        state.resourceBank.coins = 3000;
         expect(ch.evaluator(state)).toBe(true);
       });
 
-      it('should return false with 29 coins', () => {
+      it('should return false with 2999 coins', () => {
         const state = createEmptyState();
-        state.resourceBank.coins = 29;
+        state.resourceBank.coins = 2999;
         expect(ch.evaluator(state)).toBe(false);
       });
     });
@@ -323,15 +323,15 @@ describe('MainStreetChallenges', () => {
     describe('Beloved Mayor', () => {
       const ch = CHALLENGE_TEMPLATES.find(c => c.id === 'ch-beloved-mayor')!;
 
-      it('should return true with 10+ reputation', () => {
+      it('should return true with 1000+ reputation', () => {
         const state = createEmptyState();
-        state.resourceBank.reputation = 10;
+        state.resourceBank.reputation = 1000;
         expect(ch.evaluator(state)).toBe(true);
       });
 
-      it('should return false with 9 reputation', () => {
+      it('should return false with 999 reputation', () => {
         const state = createEmptyState();
-        state.resourceBank.reputation = 9;
+        state.resourceBank.reputation = 999;
         expect(ch.evaluator(state)).toBe(false);
       });
     });
@@ -543,7 +543,7 @@ describe('MainStreetChallenges', () => {
   describe('evaluateChallenges', () => {
     it('should mark a challenge complete when evaluator returns true', () => {
       const state = createEmptyState();
-      state.resourceBank.coins = 30;
+      state.resourceBank.coins = 3000;
       const activeChallenges: ActiveChallenge[] = [
         {
           challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
@@ -575,7 +575,7 @@ describe('MainStreetChallenges', () => {
 
     it('should skip already-completed challenges', () => {
       const state = createEmptyState();
-      state.resourceBank.coins = 30;
+      state.resourceBank.coins = 3000;
       state.challengesCompleted = ['ch-deep-pockets'];
       const activeChallenges: ActiveChallenge[] = [
         {
@@ -592,7 +592,7 @@ describe('MainStreetChallenges', () => {
 
     it('should add activity log entry when challenge is completed', () => {
       const state = createEmptyState();
-      state.resourceBank.coins = 30;
+      state.resourceBank.coins = 3000;
       const activeChallenges: ActiveChallenge[] = [
         {
           challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
@@ -615,7 +615,7 @@ describe('MainStreetChallenges', () => {
 
     it('should evaluate multiple challenges and complete only those that pass', () => {
       const state = createEmptyState();
-      state.resourceBank.coins = 30;
+      state.resourceBank.coins = 3000;
       state.resourceBank.reputation = 5; // not enough for Beloved Mayor
 
       const activeChallenges: ActiveChallenge[] = [
@@ -637,7 +637,7 @@ describe('MainStreetChallenges', () => {
 
     it('should persist completion across evaluations (no revocation)', () => {
       const state = createEmptyState();
-      state.resourceBank.coins = 30;
+      state.resourceBank.coins = 3000;
 
       const activeChallenges: ActiveChallenge[] = [
         {
@@ -691,7 +691,7 @@ describe('MainStreetChallenges', () => {
         challenge: CHALLENGE_TEMPLATES.find(t => t.id === 'ch-deep-pockets')!,
         completed: false,
       };
-      state.resourceBank.coins = 30;
+      state.resourceBank.coins = 3000;
       evaluateChallenges([ac], state);
 
       // After completion, fields still present
@@ -751,7 +751,7 @@ describe('Challenge adapter conformance to core-engine generics', () => {
 
   it('evaluateChallenges works with ActiveChallenge[] (adapter delegation)', () => {
     const state = createEmptyState('conformance');
-    state.resourceBank.coins = 30;
+    state.resourceBank.coins = 3000;
     const ac: ActiveChallenge = {
       challenge: CHALLENGE_TEMPLATES.find(t => t.id === 'ch-deep-pockets')!,
       completed: false,

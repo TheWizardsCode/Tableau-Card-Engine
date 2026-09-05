@@ -36,7 +36,6 @@ import {
   type IncidentBalanceState,
   createIncidentBalanceState,
   createIncidentBalanceFromQueue,
-  orderIncidentDeck,
 } from './MainStreetCards';
 import {
   type ActiveChallenge,
@@ -68,6 +67,43 @@ export interface LogEntry {
   text: string;
   /** Classification for UI color coding. */
   type: LogEntryType;
+}
+
+/**
+ * Builds a compact, human-readable description of an effective (post-mitigation)
+ * coin/reputation change pair for activity-log entries (CG-0MT5W7UJJ0065MEZ).
+ *
+ * Examples:
+ *   - `+3.000 coins, +2 rep` for a gain of 3 coins and 2 reputation
+ *   - `-1.000 coins` for a pure coin loss
+ *   - `+1 rep` for a pure reputation gain
+ *   - `no effect` when both deltas are zero
+ *
+ * @param coinChange Effective coins delta (integer).
+ * @param repChange  Effective reputation delta.
+ */
+export function describeEventEffects(coinChange: number, repChange: number): string {
+  const parts: string[] = [];
+  if (coinChange !== 0) parts.push(`${coinChange > 0 ? '+' : ''}${Math.round(coinChange)} coins`);
+  if (repChange !== 0) parts.push(`${repChange > 0 ? '+' : ''}${Math.round(repChange)} rep`);
+  return parts.length > 0 ? parts.join(', ') : 'no effect';
+}
+
+/**
+ * Classifies a coin/rep change pair as gain, loss, or neutral for log coloring.
+ *
+ * Uses the NET coin+rep heuristic (sum of both deltas); shared by every
+ * enriched log site so a mixed exchange (e.g. -2 coins +1 rep) colours
+ * consistently with its effective net effect.
+ */
+export function classifyEffect(
+  coinChange: number,
+  repChange: number,
+): 'gain' | 'loss' | 'neutral' {
+  const net = coinChange + repChange;
+  if (net > 0) return 'gain';
+  if (net < 0) return 'loss';
+  return 'neutral';
 }
 
 /**
@@ -103,12 +139,42 @@ export function syncResourceBankToLedger(state: MainStreetState): void {
 /**
  * The phases of a Main Street turn (simplified for walking skeleton).
  *
- * DayStart              -> MarketPhase (combined with ActionPhase)
- * MarketPhase           -> InvestmentResolution
- * InvestmentResolution  -> IncomePhase
- * IncomePhase           -> IncidentPhase
- * IncidentPhase         -> EndCheck
- * EndCheck              -> DayStart (next turn) | GameOver
+ * Single-player:
+ *   DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
+ *   EndCheck -> DayStart (next turn) | GameOver
+ *
+ * Competitive (CG-0MT5X3GMA007EG30 — Option A, shared day):
+ *   MarketPhases ALTERNATE within the same shared day; the closing phases
+ *   run ONCE after every active player has taken a MarketPhase. In code
+ *   this is modelled as a per-day loop over PlayerRecord[] (N-player-ready;
+ *   the current player is state.activePlayerId):
+ *
+ *            DayStart
+ *               |
+ *       +-------+--------+
+ *       |   activePlayerId = 0
+ *       |   MarketPhase (player 0 acts, actionsRemaining consumed, may end)
+ *       |   InvestmentResolution (per-owner if needed — sibling)
+ *       +-------+--------+
+ *               |  activePlayerId = 1 .. N-1 (repeat Market for each player)
+ *       +-------+--------+
+ *       |   MarketPhase (player 1) → ... → MarketPhase (player N-1)
+ *       +-------+--------+
+ *               |
+ *           IncomePhase   (shared; per-owner income routed by slot owner)
+ *           IncidentPhase (shared; face-down incidentDeck, shared balance)
+ *           EndCheck      (shared; first-to-threshold — first player whose
+ *                          per-owner score >= winThreshold wins; winnerId
+ *                          stored as state.competitiveWinnerId; N=1 uses
+ *                          the existing single-player end check)
+ *               |
+ *           DayStart (next turn) | GameOver
+ *
+ * N=1 is identical to the legacy single-player sequence (one MarketPhase).
+ * The shared day’s market/decks/incidentDeck remain single-owner and
+ * unchanged (see createCompetitiveState). Diagrams here and in
+ * MainStreetEngine.executeCompetitiveDay are the canonical reference for
+ * transition tests (tests/main-street/competitive-phase.test.ts).
  */
 export type DayPhase =
   | 'DayStart'
@@ -154,15 +220,56 @@ export interface ResourceBank {
 /** Possible game outcomes. */
 export type GameResult = 'playing' | 'win' | 'loss';
 
-/** Reason for game ending. */
+/** Reason for game ending (or threshold continuation in endless mode). */
 export type EndReason =
   | 'score_threshold'
+  // Endless mode (CG-0MTIILU5V006GCN4): threshold reached but play continues
+  // (`config.endlessMode === true`). `gameResult` stays `playing` while
+  // `endReason` records that the threshold was crossed — winner-declared-
+  // but-still-playing. Score keeps accruing and the game only ends via
+  // the remaining conditions (bankruptcy, reputation collapse, all
+  // challenges, turn limit).
+  | 'score_threshold_continue'
   | 'all_challenges'
   | 'turn_limit_victory' // opt-in: only when a config sets maxTurns (CG-0MSLXJCHH001DLIO)
   | 'bankruptcy'
   | 'reputation_collapse'
   | 'turn_exhaustion' // opt-in: only when a config sets maxTurns (CG-0MSLXJCHH001DLIO)
   | null;
+
+// ── Competitive State (CG-0MT5X3GMA007EG30) ─────────────────
+
+/** Per-player record for competitive mode (N-player-ready). */
+export interface PlayerRecord {
+  /** Zero-based owner index; also the index into PlayerRecord[]. */
+  playerId: number;
+  /** Coins owned by this player. */
+  coins: number;
+  /** Reputation owned by this player. */
+  reputation: number;
+  /** Cards held in this player's hand. */
+  hand: (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[];
+  /** Active staff cards owned by this player. */
+  staffCards: StaffCard[];
+  /** Remaining actions this player can take this turn. */
+  actionBudget: number;
+  /** Computed score for this player (updated each EndCheck). */
+  score: number;
+}
+
+/** A single street slot tagged with its owner. */
+export interface OwnerTaggedSlot {
+  /** Card occupying the slot, or null when empty. */
+  card: BusinessCard | CommunitySpaceCard | null;
+  /** Owner index of the occupying card, or null when empty/unowned. */
+  ownerId: number | null;
+}
+
+/** Options for creating a competitive game. */
+export interface CompetitiveStateOptions extends MainStreetSetupOptions {
+  /** Number of players (N >= 1); each gets a PlayerRecord. Must be >= 1. */
+  playerCount: number;
+}
 
 // ── Main Street State ───────────────────────────────────────
 
@@ -183,14 +290,32 @@ export interface MainStreetState {
   turn: number;
   /** Current phase within the turn. */
   phase: DayPhase;
-  /** The 10-slot linear street grid (null = empty slot). Supports BusinessCard and CommunitySpaceCard. */
+  /**
+   * The street grid — world-indexed flat array of unique world slots after
+   * shared-corner dedup (see MainStreetAdjacency.worldSlotCount). For 1×1
+   * this is the legacy 10-slot linear grid; for expanded grids it is
+   * worldSlotCount(cols,rows) long. Indexed by world order, not per-street
+   * slot index; use toWorldPosition/fromWorldPosition for mapping.
+   */
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
+  /** World grid dimensions (cols × rows of 5×2 street cells). Null/omitted → 1×1 legacy (10 slots). Max 5×5. */
+  streetGridCols: number;
+  streetGridRows: number;
   /** Face-up cards available for purchase. */
   market: MarketState;
   /** Player resources. */
   resourceBank: ResourceBank;
   /** Shared EconomyLedger for resource mutation (synced with resourceBank). */
   ledger: EconomyLedger;
+  /**
+   * Coins at the start of the current turn (day-start snapshot). Used to
+   * compute the per-turn net summary row in the activity log; must survive
+   * save/load so the resumed turn's net is computed against the snapshot
+   * taken when the turn began (CG-0MT5W7UJJ0065MEZ AC3).
+   */
+  dayStartCoins: number;
+  /** Reputation at the start of the current turn (day-start snapshot). */
+  dayStartRep: number;
   /** Remaining cards in each deck (draw from end = top). */
   decks: {
     business: BusinessCard[];
@@ -256,7 +381,9 @@ export interface MainStreetState {
   skipMarketCycleOnEndTurn: boolean;
   /**
    * Tracks which street grid slots have been sold. Length = GRID_SIZE.
-   * true = card in this slot has been sold (non-functional, no income/synergy).
+   * true = card in this slot has been sold (no income/reputation for itself,
+   * but still acts as a synergy anchor — its neighbours retain synergy bonuses
+   * and same-type penalties as if the card were active).
    * false = card is active (default).
    */
   soldSlots: boolean[];
@@ -291,6 +418,63 @@ export interface MainStreetState {
    * Reset to false at DayStart.
    */
   favourUsedThisTurn: boolean;
+  /**
+   * Same-day Investment event composite (CG-0MTFWBNL30043ZBM): ID of the
+   * event card just moved from the market to hand this day. Playing that
+   * same card later this day is free (move+play = 1 action total). Cleared
+   * at DayStart / after play / on undo.
+   */
+  justMovedEventCardId: string | null;
+  /**
+   * Tracks the upgrade card moved to hand this turn for same-day composite
+   * detection (CG-0MT3IYSRL001VVUP). When an upgrade is moved to hand via
+   * `move-to-hand`, this is set to its cardId; `play-upgrade-from-hand` then
+   * checks if the playing card matches — if so, the action is free (no
+   * additional action consumed). Cleared after the composite play or on
+   * DayStart.
+   */
+  justMovedUpgradeCardId?: string | null;
+  /**
+   * Whether a business or community-space card has been placed onto the
+   * street grid this turn (CG-0MTIOCBH400970OB). Gates `evt-grand-opening`
+   * (Grand Opening Sale) play: the event can only be played from hand on a
+   * turn where a business was placed. Set to true whenever a card is
+   * placed on `streetGrid` (via `purchaseBusiness`, `playBusinessFromHand`,
+   * or `buyAndPlaceBusiness`); reset to false at `DayStart`.
+   */
+  businessPlacedThisTurn?: boolean;
+  // ── Competitive mode (CG-0MT5X3GMA007EG30) ─────────────────
+  /** Per-player records; undefined in single-player mode. */
+  players?: PlayerRecord[] | null;
+  /** Owner-tagged street grid; undefined in single-player mode. */
+  ownerTaggedGrid?: OwnerTaggedSlot[];
+  /** Number of players; 1 in single-player mode is implicit when players is undefined. */
+  playerCount?: number;
+  /** Active player within the shared day (index into players[]). 0 in single-player. */
+  activePlayerId?: number | null;
+  /** Winning player in competitive mode (first-to-threshold). null while playing or in single-player. */
+  competitiveWinnerId?: number | null;
+  /**
+   * Pending staff applicant for the current day (CG-0MSTOATDU006UGAX).
+   * Populated during DayStart when the applicant trigger fires and a business
+   * has a free employment slot. The scene renders the applicant overlay and
+   * resolves it via hireStaffApplicant or declineStaffApplicant.
+   * Cleared on hire, decline, or at the next DayStart.
+   */
+  pendingApplicant: PendingApplicant | null;
+  /** Suppresses the staff-applicant trigger at DayStart (CG-0MSTOATDU006UGAX: tutorial/headless). */
+  suppressApplicant?: boolean;
+}
+
+/**
+ * A staff applicant triggered at DayStart, awaiting the player's hire or
+ * decline decision (CG-0MSTOATDU006UGAX).
+ */
+export interface PendingApplicant {
+  /** The staff card template offered to the player. */
+  card: StaffCard;
+  /** Street-grid slot index where the business has a free employment slot. */
+  targetSlotIndex: number;
 }
 
 export interface MainStreetSerializedState {
@@ -298,8 +482,15 @@ export interface MainStreetSerializedState {
   turn: number;
   phase: DayPhase;
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
+  /** World grid dimensions for save/load (see MainStreetState). */
+  streetGridCols: number;
+  streetGridRows: number;
   market: MarketState;
   resourceBank: ResourceBank;
+  /** Day-start coin snapshot for the per-turn net summary row (see MainStreetState). */
+  dayStartCoins: number;
+  /** Day-start reputation snapshot for the per-turn net summary row. */
+  dayStartRep: number;
   decks: {
     business: BusinessCard[];
     communitySpace: CommunitySpaceCard[];
@@ -371,6 +562,29 @@ export interface MainStreetSerializedState {
   revealedPeekedCard: EventCard | null;
   /** Whether the once-per-turn Community Favour exchange has been used this turn. */
   favourUsedThisTurn: boolean;
+  /** Same-day Investment event composite (CG-0MTFWBNL30043ZBM). */
+  justMovedEventCardId: string | null;
+  /**
+   * Same-day upgrade composite tracking (CG-0MT3IYSRL001VVUP): cardId of
+   * the upgrade just moved to hand this turn. `play-upgrade-from-hand`
+   * checks this to decide whether the play is free.
+   */
+  justMovedUpgradeCardId?: string | null;
+  /** Whether a business has been placed onto the street grid this turn (CG-0MTIOCBH400970OB). Gates Grand Opening Sale. */
+  businessPlacedThisTurn?: boolean;
+  // ── Competitive (CG-0MT5X3GMA007EG30) ───────────────────────
+  /** Per-player records; undefined in single-player saves. */
+  players?: PlayerRecord[] | null;
+  /** Owner-tagged street grid; undefined in single-player saves. */
+  ownerTaggedGrid?: OwnerTaggedSlot[];
+  /** Number of players; undefined in single-player saves. */
+  playerCount?: number;
+  /** Active player within the shared day (index into players[]). */
+  activePlayerId?: number | null;
+  /** Winning player in competitive mode (first-to-threshold). */
+  competitiveWinnerId?: number | null;
+  /** Pending staff applicant for the current day (CG-0MSTOATDU006UGAX). */
+  pendingApplicant: PendingApplicant | null;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -434,6 +648,16 @@ export interface MainStreetSetupOptions {
    * the full card pool is used (non-campaign / backward-compatible mode).
    */
   unlockedCardIds?: string[];
+  /**
+   * Endless continuation beyond the win threshold (CG-0MTIILU5V006GCN4).
+   *
+   * When true, reaching `config.winThreshold` does NOT end the game.
+   * The engine sets `endReason` to `score_threshold_continue` but keeps
+   * `gameResult` as `playing` so the player can continue building.
+   * Default: `false` (existing behaviour — threshold ends the game).
+   * Overrides `config.endlessMode` from the difficulty preset when set.
+   */
+  endlessMode?: boolean;
 }
 
 // ── Seed Helpers ────────────────────────────────────────────
@@ -649,7 +873,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   const businessDeck = createBusinessDeck(3, options.unlockedCardIds);
   const communitySpaceDeck = createCommunitySpaceDeck(3, options.unlockedCardIds);
   // Apply positive-incident weighting from the runtime difficulty config.
-  // Pass the game's seeded RNG into createEventDeck so fractional duplicates
+  // Pass the game's seeded RNG into createEventDeck so duplicate
   // are selected deterministically per-game-seed rather than by template order.
   const eventDeck = createEventDeck(3, options.unlockedCardIds, rng, config.positiveIncidentMultiplier);
   const upgradeDeck = createUpgradeDeck(2, options.unlockedCardIds);
@@ -676,11 +900,9 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   const market: MarketState = { cards: [] };
 
   // Build the face-down incident deck: move every Incident-trigger card from
-  // the seeded event deck into `incidentDeck` (front = next to resolve). The
-  // remaining Investment-trigger cards stay in the event deck for the market.
-  // Deck order is deterministic (same seed ⇒ same shuffle ⇒ same deck); the
-  // constraint-aware ordering (repeat spacing / streak) is applied at deck
-  // build/reshuffle time by orderIncidentDeck (CG-0MSXOVQFL007G3VH).
+  // the seeded event deck into `incidentDeck` (candidate pool for runtime
+  // selection). The remaining Investment-trigger cards stay in the event
+  // deck for the market.
   // Incident-draw balance limits come from the difficulty preset's config
   // (per-difficulty tuning, CG-0MSL0OU1E005WFJB). Configs that omit the
   // fields (legacy saves) fall back to the engine defaults N=3, M=2 via ??
@@ -703,25 +925,34 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   eventDeck.length = 0;
   eventDeck.push(...remainingEventCards);
 
-  // Constraint-aware deck ordering (option (a), CG-0MSXOVQFL007G3VH): the full
-  // pre-arranged draw sequence satisfies repeatSpacing (N) / maxStreak (M).
-  // Deterministic — orderIncidentDeck consumes no RNG (pool order comes from
-  // the seeded shuffle), so same seed ⇒ same deck order.
-  const incidentDeck = orderIncidentDeck(incidentPool, incidentBalance);
+  // Constraint-aware deck ordering replaced by runtime selection
+  // (CG-0MSZDD2TP003TZS5): the incident pool is shuffled once (seeded —
+  // same seed ⇒ same deck order) and each draw is selected at runtime by
+  // `findConstrainedIncidentIndex` against the resolved-draw balance
+  // history. No pre-ordering; constraints (repeatSpacing / maxStreak) are
+  // enforced at draw time.
+  shuffleArray(incidentPool, rng);
+  const incidentDeck = incidentPool;
 
   // Build initial state -- use config values instead of hard-coded constants
   const initCoins = config.startingCoins;
   const initRep = config.startingReputation;
-  state = {
+  const baseState: MainStreetState = {
     config,
     turn: 1,
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
+    streetGridCols: 1,
+    streetGridRows: 1,
     market,
     resourceBank: {
       coins: initCoins,
       reputation: initRep,
     },
+    // Day-start snapshot initialised to the opening resources; overwritten by
+    // executeDayStart each turn (CG-0MT5W7UJJ0065MEZ AC3).
+    dayStartCoins: initCoins,
+    dayStartRep: initRep,
     ledger: createEconomyLedger({
       coins: initCoins,
       reputation: initRep,
@@ -766,7 +997,23 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     peekUsedThisTurn: false,
     revealedPeekedCard: null,
     favourUsedThisTurn: false,
+    justMovedEventCardId: null,
+    justMovedUpgradeCardId: null,
+    businessPlacedThisTurn: false,
+    players: undefined,
+    ownerTaggedGrid: undefined,
+    playerCount: undefined,
+    activePlayerId: undefined,
+    competitiveWinnerId: undefined,
+    pendingApplicant: null,
   };
+  // Endless-mode opt-in (CG-0MTIILU5V006GCN4): overrides the preset's
+  // win-threshold semantics. Default is false (existing behaviour).
+  if (options.endlessMode !== undefined) {
+    baseState.config = { ...baseState.config, endlessMode: options.endlessMode };
+  }
+
+  state = baseState;
 
   // Refill the single-row market with its initial composition.
   refillSingleRowMarket(state);
@@ -784,6 +1031,54 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
 
   return state;
 }
+
+// ── Competitive State (CG-0MT5X3GMA007EG30) ─────────────────
+
+/**
+ * Creates a competitive game state with N per-player records.
+ *
+ * N-player-ready (parallel PlayerRecord[] indexed by ownerId): shared
+ * market, decks, and incidentDeck remain single-owner and unchanged.
+ * Each player's starting coins/reputation comes from the preset.
+ */
+export function createCompetitiveState(
+  options: CompetitiveStateOptions,
+): MainStreetState {
+  if (!Number.isInteger(options.playerCount) || options.playerCount < 1) {
+    throw new Error(`playerCount must be an integer >= 1, got ${options.playerCount}`);
+  }
+
+  // Reuse single-player setup so seeded deck order / RNG semantics are
+  // identical to MainStreet; then overlay the per-player layer.
+  const { playerCount, ...singlePlayerOptions } = options;
+  const state = setupMainStreetGame(singlePlayerOptions);
+
+  const initCoins = state.config.startingCoins;
+  const initRep = state.config.startingReputation;
+
+  state.players = Array.from({ length: playerCount }, (_, playerId) => ({
+    playerId,
+    coins: initCoins,
+    reputation: initRep,
+    hand: [],
+    staffCards: [],
+    actionBudget: 1,
+    score: 0,
+  } as PlayerRecord));
+
+  state.ownerTaggedGrid = Array.from(
+    { length: GRID_SIZE },
+    (): OwnerTaggedSlot => ({ card: null, ownerId: null }),
+  );
+
+  state.playerCount = playerCount;
+  state.activePlayerId = 0;
+  state.competitiveWinnerId = null;
+
+  return state;
+}
+
+
 
 /**
  * Live mid-session hook to adjust the incident-draw balance limits.
@@ -829,8 +1124,12 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     turn: state.turn,
     phase: state.phase,
     streetGrid: structuredClone(state.streetGrid),
+    streetGridCols: state.streetGridCols,
+    streetGridRows: state.streetGridRows,
     market: structuredClone(state.market),
     resourceBank: structuredClone(state.resourceBank),
+    dayStartCoins: state.dayStartCoins,
+    dayStartRep: state.dayStartRep,
     decks: structuredClone(state.decks),
     discards: structuredClone(state.discards),
     challengesCompleted: [...state.challengesCompleted],
@@ -861,6 +1160,17 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     peekUsedThisTurn: state.peekUsedThisTurn,
     revealedPeekedCard: state.revealedPeekedCard ?? null,
     favourUsedThisTurn: state.favourUsedThisTurn,
+    justMovedEventCardId: state.justMovedEventCardId ?? null,
+    justMovedUpgradeCardId: state.justMovedUpgradeCardId ?? null,
+    businessPlacedThisTurn: state.businessPlacedThisTurn ?? false,
+    players: state.players ? structuredClone(state.players) : undefined,
+    ownerTaggedGrid: state.ownerTaggedGrid ? structuredClone(state.ownerTaggedGrid) : undefined,
+    playerCount: state.playerCount,
+    activePlayerId: state.activePlayerId ?? null,
+    competitiveWinnerId: state.competitiveWinnerId ?? null,
+    pendingApplicant: state.pendingApplicant
+      ? { card: structuredClone(state.pendingApplicant.card), targetSlotIndex: state.pendingApplicant.targetSlotIndex }
+      : null,
   };
 }
 
@@ -1065,6 +1375,19 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).favourUsedThisTurn = false;
   }
 
+  // ── justMovedEventCardId (CG-0MTFWBNL30043ZBM): backfill default ──
+  if (!('justMovedEventCardId' in saved)) {
+    (saved as Record<string, unknown>).justMovedEventCardId = null;
+  }
+
+  // ── businessPlacedThisTurn (CG-0MTIOCBH400970OB): backfill default ──
+  // Legacy saves predate the Grand Opening placement gate; default to false
+  // (not yet placed this turn) so old saves remain loadable and Grand
+  // Opening starts gated for the current turn.
+  if (!('businessPlacedThisTurn' in saved)) {
+    (saved as Record<string, unknown>).businessPlacedThisTurn = false;
+  }
+
   // ── incidentBalance (CG-0MSL0OP040043KKZ): backfill from the queue for ──
   // legacy saves that predate the balance state. The queue cards are recorded
   // in draw order so subsequent constrained draws see the actual sequence.
@@ -1104,6 +1427,25 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
   // can detect them and fall back to computing from scratch. After any placement or
   // sale, the incremental update system will populate them correctly.
   // No explicit migration needed — undefined is the natural default.
+
+  // ── endlessMode (CG-0MTIILU5V006GCN4): old saves predate the flag; default to false.
+  const savedConfig = saved.config as Record<string, unknown> | undefined;
+  if (savedConfig && !('endlessMode' in savedConfig)) {
+    savedConfig.endlessMode = false;
+  }
+
+  // ── streetGridCols/Rows: backfill for pre-expanded saves (1×1) ──
+  if (!('streetGridCols' in saved)) {
+    (saved as Record<string, unknown>).streetGridCols = 1;
+  }
+  if (!('streetGridRows' in saved)) {
+    (saved as Record<string, unknown>).streetGridRows = 1;
+  }
+
+  // ── pendingApplicant (CG-0MSTOATDU006UGAX): backfill default ─
+  if (!('pendingApplicant' in saved)) {
+    (saved as Record<string, unknown>).pendingApplicant = null;
+  }
 
   // ── ongoingCost: default to 0 for legacy community-space cards ─
   // Added by CG-0MRXYGM9B006I3PE (community-space ongoing costs). Community space
@@ -1182,6 +1524,11 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     streetGrid: structuredClone(saved.streetGrid),
     market: structuredClone(saved.market),
     resourceBank: structuredClone(saved.resourceBank),
+    // Legacy saves predate the day-start snapshot; fall back to the current
+    // resources so a resumed turn's net row measures from the resume point
+    // (CG-0MT5W7UJJ0065MEZ AC3).
+    dayStartCoins: saved.dayStartCoins ?? saved.resourceBank.coins,
+    dayStartRep: saved.dayStartRep ?? saved.resourceBank.reputation,
     ledger: createEconomyLedger({
       coins: saved.resourceBank.coins,
       reputation: saved.resourceBank.reputation,
@@ -1222,11 +1569,30 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     staffCards: structuredClone(saved.staffCards),
     skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
+    streetGridCols: (saved as unknown as { streetGridCols?: number }).streetGridCols ?? 1,
+    streetGridRows: (saved as unknown as { streetGridRows?: number }).streetGridRows ?? 1,
     actionsRemaining: saved.actionsRemaining ?? 1,
     bankedActions: saved.bankedActions ?? 0,
     peekUsedThisTurn: saved.peekUsedThisTurn ?? false,
     favourUsedThisTurn: saved.favourUsedThisTurn ?? false,
+    justMovedEventCardId: (saved as any).justMovedEventCardId ?? null,
     revealedPeekedCard: (saved.revealedPeekedCard as EventCard | null) ?? null,
+    businessPlacedThisTurn: (saved as unknown as { businessPlacedThisTurn?: boolean })?.businessPlacedThisTurn ?? false,
+    justMovedUpgradeCardId: (saved as unknown as { justMovedUpgradeCardId?: string | null })?.justMovedUpgradeCardId ?? null,
+    players: (saved as unknown as { players?: PlayerRecord[] | null })?.players
+      ? structuredClone((saved as unknown as { players: PlayerRecord[] })?.players)
+      : undefined,
+    ownerTaggedGrid: (saved as unknown as { ownerTaggedGrid?: OwnerTaggedSlot[] })?.ownerTaggedGrid
+      ? structuredClone((saved as unknown as { ownerTaggedGrid: OwnerTaggedSlot[] })?.ownerTaggedGrid)
+      : undefined,
+    playerCount: (saved as unknown as { playerCount?: number })?.playerCount,
+    activePlayerId: (saved as unknown as { activePlayerId?: number | null })?.activePlayerId ?? null,
+    competitiveWinnerId: (saved as unknown as { competitiveWinnerId?: number | null })?.competitiveWinnerId ?? null,
+    pendingApplicant: (saved as unknown as { pendingApplicant?: { card: StaffCard; targetSlotIndex: number } | null })?.pendingApplicant
+      ? { card: structuredClone((saved as unknown as { pendingApplicant: { card: StaffCard; targetSlotIndex: number } }).pendingApplicant!.card),
+          targetSlotIndex: (saved as unknown as { pendingApplicant: { card: StaffCard; targetSlotIndex: number } }).pendingApplicant!.targetSlotIndex,
+        }
+      : null,
   };
 
   return state;

@@ -8,13 +8,13 @@
  * reputation-only.
  *
  * - Template contract in card-data.csv (AC1): family `event`, trigger
- *   `Incident`, cost 0, tier 3, `coinDelta 0`, `reputationDelta +1`,
- *   target `All` (partial mirror of Graffiti's -1/-1).
+ *   `Incident`, cost 0, tier 3, `coinDelta 0`, `reputationDelta +100`,
+ *   target `All` (partial mirror of Graffiti's -100/-100).
  * - Deck integration (AC2): event templates grow 55 -> 56, incidents
  *   34 -> 35; the card is drawn with `target: 'All'` and no duration.
  * - System polarity (AC1): the net-delta formula classifies Graffiti Art as
  *   `good` (reverse of Graffiti's `bad`), and resolution grants +0 coins and
- *   +1 reputation while Graffiti costs -1/-1 (partial mirror relation).
+ *   +100 reputation while Graffiti costs -100/-100 (partial mirror relation).
  * - Balance guardrails (AC3): card IDs stay unique and the balance validator
  *   accepts the extended CSV.
  *
@@ -45,7 +45,7 @@ const GRAFFITI_ART_CONTRACT = {
   cost: '0',
   tier: '3',
   coinDelta: '0',
-  reputationDelta: '1',
+  reputationDelta: '100',
   target: 'All',
 };
 
@@ -74,7 +74,7 @@ describe('Graffiti Art: CSV template contract (AC1)', () => {
     expect(graffiti.family).toBe('event');
     expect(graffiti.trigger).toBe('Incident');
     // Graffiti Art is reputation-only: coinDelta 0 is NOT the negation of
-    // Graffiti's -1.  Reputation is reversed as expected.
+    // Graffiti's -100.  Reputation is reversed as expected (×100).
     expect(Number(art.reputationDelta)).toBe(-Number(graffiti.reputationDelta));
     expect(art.target).toBe(graffiti.target);
     // Graffiti Art unlocks at/after Graffiti (Graffiti T2, Art T3 in the
@@ -103,7 +103,7 @@ describe('Graffiti Art: deck integration (AC2)', () => {
     expect(card!.trigger).toBe('Incident');
     expect(card!.target).toBe('All');
     expect(card!.coinDelta).toBe(0);
-    expect(card!.reputationDelta).toBe(1);
+    expect(card!.reputationDelta).toBe(100);
     expect(isDurationEventCard(card!)).toBe(false);
   });
 
@@ -125,7 +125,7 @@ describe('Graffiti Art: polarity & resolution (AC1)', () => {
     expect(incidentPolarity(graffiti)).toBe('bad');
   });
 
-  it('grants +0 coins and +1 reputation when resolved', () => {
+  it('grants +0 coins and +100 reputation when resolved', () => {
     const state = setupMainStreetGame({ seed: 'graffiti-art-resolve' });
     // Pin reputation to 0 so the reputation coin multiplier is exactly 1.0
     // (the seed's default preset would scale positive deltas otherwise).
@@ -135,12 +135,12 @@ describe('Graffiti Art: polarity & resolution (AC1)', () => {
 
     resolveEvent(state, art);
 
-    // Graffiti Art grants reputation only: no coin change, +1 reputation
+    // Graffiti Art grants reputation only: no coin change, +100 reputation (×100)
     expect(state.resourceBank.coins).toBe(coinsBefore);
-    expect(state.resourceBank.reputation).toBe(repBefore + 1);
+    expect(state.resourceBank.reputation).toBe(repBefore + 100);
   });
 
-  it('mirrors Graffiti exactly (Graffiti costs -1/-1)', () => {
+  it('mirrors Graffiti exactly (Graffiti costs -100/-100)', () => {
     const state = setupMainStreetGame({ seed: 'graffiti-resolve' });
     state.resourceBank.reputation = 0;
     const coinsBefore = state.resourceBank.coins;
@@ -148,8 +148,8 @@ describe('Graffiti Art: polarity & resolution (AC1)', () => {
 
     resolveEvent(state, graffiti);
 
-    expect(state.resourceBank.coins).toBe(coinsBefore - 1);
-    expect(state.resourceBank.reputation).toBe(repBefore - 1);
+    expect(state.resourceBank.coins).toBe(coinsBefore - 100);
+    expect(state.resourceBank.reputation).toBe(repBefore - 100);
   });
 });
 

@@ -194,7 +194,7 @@ describe('Main Street placement hint is shown via HintBar (browser)', () => {
     await waitForMarketReady(scene);
     await waitForSettled(scene);
 
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
 
     const targetSlot = getEmptySlots(scene.state)[0];
     expect(targetSlot).toBeGreaterThanOrEqual(0);

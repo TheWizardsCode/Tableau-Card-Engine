@@ -153,10 +153,10 @@ describe('Same-type synergy nullification', () => {
       grid[2] = makeBiz({ id: 'biz-diner-0', synergyTypes: ['Food'], synergyCoinBonus: 0.5 });
 
       // Bakery at slot 1 has same-type neighbor (slot 0) and diff-type neighbor (slot 2).
-      // Same-type penalty reduces base to 60%: effectiveBase = 2 * 0.6 = 1.2
+      // Same-type penalty reduces base to 60%: effectiveBase = 2 * 0.6 = 1.2 → round(1.2)=1
       // Only the Diner (diff-type) counts: N=1
-      // synergy = 1.2 * 0.5 * 1 * 1 = 0.6
-      expect(computeSynergyBonus(grid, 1)).toBe(0.6);
+      // synergy = 1 * 0.5 * 1 * 1 = 0.5 → round(0.5)=1 (×100 integer rounding)
+      expect(computeSynergyBonus(grid, 1)).toBe(1);
     });
 
     // AC #5: Upgraded business next to base same-type business
@@ -270,10 +270,10 @@ describe('Same-type synergy nullification', () => {
       grid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
       grid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, synergyTypes: ['Food'] });
 
-      // baseIncome = 2, 60% = 1.2, synergy = 0 (same-type nullified)
-      // total = 1.2 + 0 = 1.2
-      expect(computeBusinessIncome(grid, 0)).toBeCloseTo(1.2);
-      expect(computeBusinessIncome(grid, 1)).toBeCloseTo(1.2);
+      // baseIncome = 2, 60% = 1.2→1 (×100 integer rounding), synergy = 0 (same-type nullified)
+      // total = 1 + 0 = 1
+      expect(computeBusinessIncome(grid, 0)).toBe(1);
+      expect(computeBusinessIncome(grid, 1)).toBe(1);
     });
 
     it('does not apply 0.6 multiplier for different-type adjacent businesses', () => {
@@ -281,7 +281,7 @@ describe('Same-type synergy nullification', () => {
       grid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
       grid[1] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
 
-      // base = 2, synergy = 1, total = 3 (no 0.6 multiplier)
+      // base = 2, synergy = round(2*0.5)=1, total = 3 (no 0.6 multiplier)
       expect(computeBusinessIncome(grid, 0)).toBe(3);
       expect(computeBusinessIncome(grid, 1)).toBe(3);
     });
@@ -304,9 +304,9 @@ describe('Same-type synergy nullification', () => {
       grid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
       grid[6] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, synergyTypes: ['Food'] });
 
-      // Same-type diagonal neighbor -> base = 2 * 0.6 = 1.2, synergy = 0
-      expect(computeBusinessIncome(grid, 0)).toBeCloseTo(1.2);
-      expect(computeBusinessIncome(grid, 6)).toBeCloseTo(1.2);
+      // Same-type diagonal neighbor -> base = 2 * 0.6 = 1.2→1 (×100 integer rounding), synergy = 0
+      expect(computeBusinessIncome(grid, 0)).toBe(1);
+      expect(computeBusinessIncome(grid, 6)).toBe(1);
     });
 
     // AC #5: Mixed same-type and different-type — 0.6 multiplier applies
@@ -317,8 +317,8 @@ describe('Same-type synergy nullification', () => {
       grid[2] = makeBiz({ id: 'biz-diner-0', baseIncome: 2, synergyTypes: ['Food'] });
 
       // Slot 1 has: same-type neighbor (slot 0) + diff-type neighbor (slot 2)
-      // effectiveBase = 2 * 0.6 = 1.2, rate=0.5, N=1, synergy = 1.2 * 0.5 * 1 * 1 = 0.6, total = 1.2 + 0.6 = 1.8
-      expect(computeBusinessIncome(grid, 1)).toBeCloseTo(1.8);
+      // effectiveBase = 2 * 0.6 = 1.2→1 (×100), rate=0.5, N=1, synergy = 1 * 0.5 =0.5→1, total = 1 + 1 = 2 (integer rounding)
+      expect(computeBusinessIncome(grid, 1)).toBe(2);
     });
 
     // AC #5: Income bonus from upgrades is included in the base before 0.6 multiplier
@@ -327,9 +327,9 @@ describe('Same-type synergy nullification', () => {
       grid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, incomeBonus: 1, synergyTypes: ['Food'] });
       grid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, incomeBonus: 1, synergyTypes: ['Food'] });
 
-      // base = 2 + 1 = 3, 60% = 1.8, synergy = 0, total = 1.8
-      expect(computeBusinessIncome(grid, 0)).toBeCloseTo(1.8);
-      expect(computeBusinessIncome(grid, 1)).toBeCloseTo(1.8);
+      // base = 2 + 1 = 3, 60% = 1.8→2 (×100 integer rounding), synergy = 0, total = 2
+      expect(computeBusinessIncome(grid, 0)).toBe(2);
+      expect(computeBusinessIncome(grid, 1)).toBe(2);
     });
 
     // Multiplier is applied once, not stacked multiplicatively with multiple same-type neighbors
@@ -341,9 +341,9 @@ describe('Same-type synergy nullification', () => {
       grid[5] = makeBiz({ id: 'biz-bakery-2', baseIncome: 2, synergyTypes: ['Food'] });
 
       // Slot 0 has two same-type neighbors (slot 1 and slot 5)
-      // base = 2 * 0.6 = 1.2 (once, not 2 * 0.6 * 0.6 = 0.72)
+      // base = 2 * 0.6 = 1.2→1 (once, not 2 * 0.6 * 0.6 = 0.72) (×100 integer rounding)
       // synergy = 0 (both are same-type)
-      expect(computeBusinessIncome(grid, 0)).toBeCloseTo(1.2);
+      expect(computeBusinessIncome(grid, 0)).toBe(1);
     });
 
     // CommunitySpaceCard same-type 0.6 multiplier
@@ -352,9 +352,9 @@ describe('Same-type synergy nullification', () => {
       grid[0] = makeCommunitySpace({ id: 'cs-park-0', baseIncome: 2, synergyTypes: ['Culture'] });
       grid[1] = makeCommunitySpace({ id: 'cs-park-1', baseIncome: 2, synergyTypes: ['Culture'] });
 
-      // base = 2 * 0.6 = 1.2, synergy = 0, total = 1.2
-      expect(computeBusinessIncome(grid, 0)).toBeCloseTo(1.2);
-      expect(computeBusinessIncome(grid, 1)).toBeCloseTo(1.2);
+      // base = 2 * 0.6 = 1.2→1 (×100 integer rounding), synergy = 0, total = 1
+      expect(computeBusinessIncome(grid, 0)).toBe(1);
+      expect(computeBusinessIncome(grid, 1)).toBe(1);
     });
   });
 
@@ -370,14 +370,14 @@ describe('Same-type synergy nullification', () => {
       const slot0 = result.breakdown.find(s => s.slotIndex === 0)!;
       const slot1 = result.breakdown.find(s => s.slotIndex === 1)!;
 
-      // baseIncome should reflect the 0.6 multiplier: 2 * 0.6 = 1.2
-      expect(slot0.baseIncome).toBeCloseTo(1.2);
-      expect(slot1.baseIncome).toBeCloseTo(1.2);
+      // baseIncome should reflect the 0.6 multiplier: 2 * 0.6 = 1.2→1 (×100 integer rounding)
+      expect(slot0.baseIncome).toBe(1);
+      expect(slot1.baseIncome).toBe(1);
       // synergyBonus should be 0 (same-type)
       expect(slot0.synergyBonus).toBe(0);
       expect(slot1.synergyBonus).toBe(0);
-      // total = 1.2
-      expect(slot0.total).toBeCloseTo(1.2);
+      // total = 1 (×100 integer rounding)
+      expect(slot0.total).toBe(1);
     });
 
     it('shows standard base income in breakdown for different-type businesses', () => {
@@ -456,7 +456,7 @@ describe('Same-type synergy nullification', () => {
   });
 
   describe('Edge cases', () => {
-    it('handles sold slots correctly — sold same-type neighbor does not trigger penalty', () => {
+    it('sold same-type neighbor still triggers the penalty (CG-0MT5XUE2200047IJ)', () => {
       const grid = emptyGrid();
       grid[0] = makeBiz({ id: 'biz-bakery-0', baseIncome: 2, synergyTypes: ['Food'] });
       grid[1] = makeBiz({ id: 'biz-bakery-1', baseIncome: 2, synergyTypes: ['Food'] });
@@ -465,8 +465,11 @@ describe('Same-type synergy nullification', () => {
       const soldSlots = new Array(GRID_SIZE).fill(false);
       soldSlots[1] = true;
 
-      // Sold slots are skipped, so slot 0 has no neighbors, no penalty
+      // Same-type rule gives slot 0 no synergy; the sold neighbour still
+      // counts for the 0.6 base-income penalty (Q1 = Remains).
+      // ×100 integer rounding: 2*0.6=1.2→1
       expect(computeSynergyBonus(grid, 0, 1, soldSlots)).toBe(0);
+      expect(computeBusinessIncome(grid, 0, 1, soldSlots)).toBe(1);
       // Sold slots produce no income
       expect(computeBusinessIncome(grid, 1, 1, soldSlots)).toBe(0);
     });

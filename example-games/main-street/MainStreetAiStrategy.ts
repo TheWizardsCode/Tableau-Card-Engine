@@ -72,9 +72,10 @@ const AI_HORIZON_CAP = 25;
  * Expected score gained per turn (pts/turn). Used to convert the distance
  * to the win threshold into a turn count. Calibrated from the balance
  * baseline: the Medium threshold (150) is reached in ~18 turns on average,
- * i.e. ~8.3 pts/turn; 8 is the rounded constant.
+ * i.e. ~8.3 pts/turn; 8 is the rounded constant. Scaled ×100 to 800
+ * for the integer economy (CG-0MTIO1M15001E9Y6: winThreshold 120→12000).
  */
-const AI_SCORE_PACE = 8;
+const AI_SCORE_PACE = 800;
 
 /**
  * Computes the AI planning horizon — the number of future turns whose
@@ -95,6 +96,147 @@ export function aiPlanningHorizon(state: MainStreetState): number {
   const distance = state.config.winThreshold - computeScore(state);
   const raw = Math.ceil(distance / AI_SCORE_PACE);
   return Math.min(AI_HORIZON_CAP, Math.max(AI_HORIZON_FLOOR, raw));
+}
+
+// ── Banking heuristic (CG-0MT3JMGA60091J8W) ──────────────────
+
+/** Maximum banked actions (mirrors the engine cap). */
+const BANK_CAP = 2;
+
+/**
+ * Scores the implicit "bank actions" option — the expected value of ending
+ * the turn early with `actionsRemaining > 0` and banking the unused actions
+ * for a future high-value play (CG-0MT3JMGA60091J8W).
+ *
+ * Heuristic factors (work item AC2):
+ *   - Current bank level — at cap (2) the option has no value (0).
+ *   - Unaffordable high-value target — the best unaffordable card (by the
+ *     same placement/income heuristic used for spending) in hand or market
+ *     drives the score. No unaffordable valuable target → 0.
+ *   - Closeness — `1 - gap/cost`; targets almost in reach score higher
+ *     than those far away, scaled by the target\'s absolute value.
+ *   - Planning horizon — normalised `horizon / cap`; banking is worth more
+ *     early in the game when future income has more turns to compound.
+ *   - Bank headroom — `(cap - banked)/cap`; the emptier the bank, the more
+ *     valuable a new deposit is.
+ *
+ * @param state Current game state (read-only by convention).
+ * @returns Score for the bank option (0 means no reason to bank).
+ */
+export function scoreBankOption(state: MainStreetState): number {
+  const banked = state.bankedActions ?? 0;
+  if (banked >= BANK_CAP) return 0;
+  if ((state.actionsRemaining ?? 1) <= 0) return 0;
+
+  const coins = state.resourceBank.coins;
+  const hand = state.hand ?? [];
+  const horizon = aiPlanningHorizon(state);
+  const horizonFactor = horizon / AI_HORIZON_CAP;
+  const bankHeadroom = (BANK_CAP - banked) / BANK_CAP;
+
+  let bestScore = -Infinity;
+  let bestCost = 0;
+
+  // Hand: business/community-space cards whose play-from-hand cost exceeds coins
+  for (let i = 0; i < hand.length; i++) {
+    const card = hand[i] as BusinessCard & { cost: number; family: string };
+    if (card.family !== 'business' && card.family !== 'community-space') continue;
+    if (card.cost <= coins) continue; // already affordable — not a banking target
+    // Simulate placement at best slot (max synergy) to estimate value
+    let maxSynergy = 0;
+    for (let slot = 0; slot < GRID_SIZE; slot++) {
+      if (state.streetGrid[slot] !== null) continue;
+      const sim = [...state.streetGrid];
+      sim[slot] = card as unknown as BusinessCard;
+      const s = computeSynergyBonus(sim, slot, state.config.synergyBonusPerNeighbor);
+      if (s > maxSynergy) maxSynergy = s;
+    }
+    const score = (card.baseIncome + maxSynergy) * horizon - card.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = card.cost;
+    }
+  }
+
+  // Hand: upgrade cards whose cost exceeds coins
+  for (let i = 0; i < hand.length; i++) {
+    const card = hand[i] as UpgradeCard & { cost: number; family: string };
+    if (card.family !== 'upgrade') continue;
+    if (card.cost <= coins) continue;
+    const score = card.incomeBonus * horizon - card.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = card.cost;
+    }
+  }
+
+  // Hand: Investment events whose cost exceeds coins
+  for (let i = 0; i < hand.length; i++) {
+    const card = hand[i] as EventCard & { cost: number; family: string };
+    if (card.family !== 'event') continue;
+    if (card.cost <= coins) continue;
+    const score = card.coinDelta + card.reputationDelta - card.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = card.cost;
+    }
+  }
+
+  // Market: business/community-space cards that are unaffordable
+  for (const card of state.market.cards) {
+    if (card.family !== 'business' && card.family !== 'community-space') continue;
+    if (card.cost <= coins) continue;
+    // Need at least one empty slot for placement relevance
+    const emptyCount = state.streetGrid.filter(s => s === null).length;
+    if (emptyCount === 0) continue;
+    let maxSynergy = 0;
+    for (let slot = 0; slot < GRID_SIZE; slot++) {
+      if (state.streetGrid[slot] !== null) continue;
+      const sim = [...state.streetGrid];
+      sim[slot] = card as unknown as BusinessCard;
+      const s = computeSynergyBonus(sim, slot, state.config.synergyBonusPerNeighbor);
+      if (s > maxSynergy) maxSynergy = s;
+    }
+    const biz = card as BusinessCard;
+    const score = (biz.baseIncome + maxSynergy) * horizon - biz.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = biz.cost;
+    }
+  }
+
+  // Market: upgrade cards that are unaffordable and have a valid target slot
+  for (const card of state.market.cards) {
+    if (card.family !== 'upgrade') continue;
+    if (card.cost <= coins) continue;
+    const upg = card as UpgradeCard;
+    const hasTarget = state.streetGrid.some(
+      b => b !== null && b.name === upg.targetBusiness && b.level === (upg.requiredLevel ?? 0) && b.level < b.maxLevel,
+    );
+    // Even without an immediate target, the upgrade may become valid later;
+    // still consider it, but do not require hasTarget strictly — score it anyway
+    // if the upgrade itself is high-value. We only skip if no slot and no hand value.
+    void hasTarget;
+    const score = upg.incomeBonus * horizon - upg.cost;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCost = upg.cost;
+    }
+  }
+
+  if (!Number.isFinite(bestScore) || bestScore <= 0) return 0;
+
+  const gap = bestCost - coins; // > 0 by construction
+  const closeness = Math.max(0, 1 - gap / bestCost);
+  // Far targets (closeness near 0) should not dominate marginal spends.
+  // Clamp very low closeness to 0 to avoid banking for wildly unaffordable cards.
+  if (closeness < 0.05) return 0;
+
+  const raw = bestScore * closeness * horizonFactor * bankHeadroom;
+  // Threshold: banking must exceed a minimal value to be preferred over
+  // zero-income spends. Values < 1 are noise — do not bank.
+  if (raw < 1) return 0;
+  return raw;
 }
 
 // ── Strategy Interface ──────────────────────────────────────
@@ -126,8 +268,9 @@ export interface MainStreetAiStrategy extends AiStrategyBase {
  *
  * Covers all action types for the single-row market
  * (CG-0MSTOATDT009BRX2):
- *   - `buy-business` / `buy-upgrade` / `buy-event`: direct buy-and-place
- *     (pays immediately), one entry per (affordable card × valid target)
+ *   - `buy-business` / `buy-upgrade`: direct buy-and-place (pays immediately)
+ *   - `buy-event`: free take-to-hand (pays at play), one entry per event in
+ *     the market row
  *   - `move-to-hand`: free acquisition, bounded only by hand capacity
  *   - `play-*-from-hand`: cost-at-play placement/activation from the hand
  *   - `discard-from-hand`: free discard (only enumerated when the hand is
@@ -145,14 +288,13 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   const emptySlots = getEmptySlots(state);
 
   // ── Community Favour (CG-0MSTOATDQ005XDET) ────────────────
-  // A FREE once-per-turn resource exchange (does not consume actionsRemaining),
-  // so it stays available even when the daily action budget is spent — as a
-  // fallback when the player cannot afford any market purchase. Legal only
+  // A once-per-turn resource exchange that consumes one action, so it is
+  // only offered when the daily action budget is not exhausted. Legal only
   // during MarketPhase, once per turn, and when the input resource suffices.
   if (
     state.phase === 'MarketPhase' &&
     !state.favourUsedThisTurn &&
-    state.actionsRemaining >= 0
+    state.actionsRemaining > 0
   ) {
     if (state.resourceBank.coins >= state.config.favourCoinsToRepCost) {
       actions.push({ type: 'community-favour', direction: 'coins-to-rep' });
@@ -208,7 +350,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
-  // ── buy-event (direct, pays immediately) ──────────────────
+  // ── buy-event (free take-to-hand; cost paid at play) ─────
   const eventCards = state.market.cards.filter(
     c => c.family === 'event',
   ) as EventCard[];
@@ -269,6 +411,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
         }
       }
     } else if (card.family === 'event' && card.trigger === 'Investment') {
+      if (String((card as any).id).startsWith('evt-grand-opening') && !(state as any).businessPlacedThisTurn) return;
       if (state.resourceBank.coins >= card.cost) {
         actions.push({ type: 'play-event-from-hand', handIndex });
       }
@@ -358,6 +501,24 @@ export const GreedyStrategy: MainStreetAiStrategy = {
   chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
     const legalActions = enumerateLegalActions(state);
 
+    // ── Banking-aware hoarding (CG-0MT3JMGA60091J8W) ─────────
+    // Evaluate an implicit "bank actions" option alongside spending.
+    // If the expected value of banked actions exceeds the value of the
+    // best immediate spend, deliberately end the turn with actions
+    // remaining so the engine can bank them for a future high-value play.
+    const bankScore = scoreBankOption(state);
+    if (bankScore > 0) {
+      const bestSpend = Math.max(
+        0,
+        ...legalActions
+          .filter(a => a.type !== 'end-turn')
+          .map(a => scoreAction(state, a)),
+      );
+      if (bankScore > bestSpend) {
+        return { type: 'end-turn' };
+      }
+    }
+
     // Priority 1: play an affordable business from hand (cost-at-play) with
     // the best synergy placement score.
     const handBusinessActions = legalActions.filter(
@@ -425,7 +586,7 @@ export const GreedyStrategy: MainStreetAiStrategy = {
     }
 
     // Priority 9: Community Favour fallback (CG-0MSTOATDQ005XDET).
-    // A FREE once-per-turn exchange, reached only when nothing more
+    // An action-gated once-per-turn exchange, reached only when nothing more
     // productive is available (no purchases/plays/moves). Only fires when
     // the best favour action is genuinely value-creating (score > 1:
     // e.g. rep-to-coins when cash-strapped). Neutral conversions (score 1)
@@ -572,10 +733,15 @@ function scoreBusinessAction(
 }
 
 /**
- * Score an event purchase using the final-score value heuristic:
- *   score = coinDelta + reputationDelta - cost
+ * Score taking an Investment event from the market to the player's hand
+ * using the final-score value heuristic:
+ *   score = coinDelta + reputationDelta
  *
- * A score > 0 means the event has positive expected value and is worth buying.
+ * A score > 0 means the event adds positive final-score value. NO cost is
+ * subtracted here: taking the event to hand is FREE (CG-0MT5W1V4D007NN8Q) —
+ * the event's listed cost is charged only when it is PLAYED from hand, and
+ * `scorePlayEventFromHandAction` accounts for it there. Subtracting the cost
+ * in both places would double-count it in the AI's evaluations.
  * Reputation is valued at 1 point per unit (plain count), matching the
  * final score function (CG-0MT3J8FXG006RCOA).
  */
@@ -588,7 +754,7 @@ function scoreEventAction(
   ) as EventCard | undefined;
   if (!card) return 0;
 
-  return card.coinDelta + card.reputationDelta - card.cost;
+  return card.coinDelta + card.reputationDelta;
 }
 
 /**
@@ -649,7 +815,7 @@ function scorePlayEventFromHandAction(
  * Scores are in "net coin-equivalent value" units:
  *   - `buy-upgrade`:  `incomeBonus * horizon - cost`
  *   - `buy-business`: `(baseIncome + projectedSynergyBonus) * horizon - cost`
- *   - `buy-event`:    `coinDelta + reputationDelta - cost` (reputation counts plainly)
+ *   - `buy-event`:    `coinDelta + reputationDelta` (free take; cost at play)
  *   - `play-event`:   fixed bonus of 5 (prefer playing over end-turn)
  *   - `end-turn`:     0 (baseline / fallback)
  *
@@ -701,7 +867,7 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       // below most productive actions.
       return 1;
     case 'community-favour':
-      // Community Favour (CG-0MSTOATDQ005XDET): a free fallback when the
+      // Community Favour (CG-0MSTOATDQ005XDET): an action-gated fallback when the
       // player cannot afford purchases. rep-to-coins is genuinely valuable
       // only when the player is STALLED (cannot afford the cheapest market
       // card) AND the conversion leaves a reputation buffer (reputation
@@ -715,8 +881,7 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
         // (reputation after the exchange stays >= 1) — burning the last
         // reputation would trigger reputation-collapse loss.
         if (
-          Number.isFinite(cheapestCardCost) &&
-          state.resourceBank.coins < cheapestCardCost &&
+          (cheapestCardCost === Infinity || state.resourceBank.coins < cheapestCardCost) &&
           state.resourceBank.reputation >= state.config.favourRepToCoinsRepCost + 1
         ) {
           return 3; // useful fallback when stalled with rep to spare
@@ -726,6 +891,10 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
       // coins-to-rep: spending scarce coins on reputation is rarely better
       // than buying cards; stays as a legal fallback at the low default.
       return 1;
+    case 'buy-and-place-upgrade':
+      return scoreUpgradeAction(state, { type: 'buy-upgrade', cardId: action.cardId, targetSlot: action.targetSlot });
+    default:
+      return 0;
   }
 }
 

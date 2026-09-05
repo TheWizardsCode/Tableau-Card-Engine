@@ -71,8 +71,8 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot is occupied', () => {
       const state = createTestState();
-      state.resourceBank.coins = 100;
       const card = state.market.cards[0];
+      state.resourceBank.coins = card.cost;
       // Place a dummy business in slot 0
       state.streetGrid[0] = { ...card, id: 'dummy' } as BusinessCard;
       const result = canPurchaseBusiness(state, card.id, 0);
@@ -84,8 +84,8 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot index is out of range', () => {
       const state = createTestState();
-      state.resourceBank.coins = 100;
       const card = state.market.cards[0];
+      state.resourceBank.coins = card.cost;
       const result = canPurchaseBusiness(state, card.id, GRID_SIZE);
       expect(result.legal).toBe(false);
       if (!result.legal) {
@@ -95,8 +95,8 @@ describe('MainStreetMarket', () => {
 
     it('should reject purchase when slot index is negative', () => {
       const state = createTestState();
-      state.resourceBank.coins = 100;
       const card = state.market.cards[0];
+      state.resourceBank.coins = card.cost;
       const result = canPurchaseBusiness(state, card.id, -1);
       expect(result.legal).toBe(false);
       if (!result.legal) {
@@ -125,7 +125,8 @@ describe('MainStreetMarket', () => {
 
     it('should not refill the market slot immediately (refill occurs at start of next turn)', () => {
       const state = createTestState();
-      state.resourceBank.coins = 100;
+      const _c0 = state.market.cards[0];
+      state.resourceBank.coins = _c0.cost;
       const deckSizeBefore = state.decks.business.length;
       const card = state.market.cards[0];
 
@@ -140,7 +141,8 @@ describe('MainStreetMarket', () => {
 
     it('should not refill when deck is empty', () => {
       const state = createTestState();
-      state.resourceBank.coins = 100;
+      const _c1 = state.market.cards[0];
+      state.resourceBank.coins = _c1.cost;
       // Empty the deck
       state.decks.business.length = 0;
       const card = state.market.cards[0];
@@ -164,8 +166,8 @@ describe('MainStreetMarket', () => {
       const card2 = state2.market.cards[0];
       expect(card1.id).toBe(card2.id);
 
-      state1.resourceBank.coins = 100;
-      state2.resourceBank.coins = 100;
+      state1.resourceBank.coins = card1.cost;
+      state2.resourceBank.coins = card2.cost;
       purchaseBusiness(state1, card1.id, 0);
       purchaseBusiness(state2, card2.id, 0);
 
@@ -192,7 +194,7 @@ describe('MainStreetMarket', () => {
       if (biz) {
         // Ensure the placed business meets the upgrade's requiredLevel
         state.streetGrid[0] = { ...biz, level: (upgrade.requiredLevel ?? 0) } as BusinessCard;
-        state.resourceBank.coins = 100; // Ensure enough coins
+        state.resourceBank.coins = 5000; // Ensure enough coins (×100 economy)
         const result = canPurchaseUpgrade(state, upgrade.id);
         expect(result.legal).toBe(true);
       }
@@ -205,7 +207,7 @@ describe('MainStreetMarket', () => {
       // Street is empty, no targets. Use a large coin balance so the only
       // rejection reason is the missing-eligible-target one (the seed's
       // investment-row upgrade can be unaffordable at the 8 starting coins).
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
       const result = canPurchaseUpgrade(state, upgrade.id);
       expect(result.legal).toBe(false);
       if (!result.legal) {
@@ -223,7 +225,7 @@ describe('MainStreetMarket', () => {
       const biz = state.decks.business.find(b => b.name === targetName);
       if (biz) {
         state.streetGrid[0] = { ...biz, level: biz.maxLevel };
-        state.resourceBank.coins = 100;
+        state.resourceBank.coins = 5000;
         const result = canPurchaseUpgrade(state, upgrade.id);
         expect(result.legal).toBe(false);
       }
@@ -249,7 +251,7 @@ describe('MainStreetMarket', () => {
       expect(biz).toBeDefined();
       // Ensure the placed business meets the upgrade's requiredLevel
       state.streetGrid[0] = { ...biz!, level: (upgrade.requiredLevel ?? 0) };
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
 
       const incomeBefore = state.streetGrid[0]!.incomeBonus;
       const rangeBefore = state.streetGrid[0]!.synergyRangeBonus;
@@ -274,7 +276,7 @@ describe('MainStreetMarket', () => {
       // purchase is legal regardless of which upgrade variant appears in the market.
       state.streetGrid[2] = { ...biz!, id: 'target-2', level: (upgrade.requiredLevel ?? 0) };
       state.streetGrid[5] = { ...biz!, id: 'target-5', level: (upgrade.requiredLevel ?? 0) };
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
 
       const level2Before = state.streetGrid[2]!.level;
       const level5Before = state.streetGrid[5]!.level;
@@ -294,7 +296,7 @@ describe('MainStreetMarket', () => {
       const state = createTestState();
       // Generous coins so affordability does not depend on which event the
       // seeded investments row draws (the expanded pool shifted the seed's row).
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
       // Find an Investment-trigger event in investments row
       const investmentEvent = state.market.cards.find(
         c => c.family === 'event' && (c as import('../../example-games/main-street/MainStreetCards').EventCard).trigger === 'Investment',
@@ -344,7 +346,7 @@ describe('MainStreetMarket', () => {
         c => c.family === 'event' && (c as import('../../example-games/main-street/MainStreetCards').EventCard).trigger === 'Investment',
       );
       if (investmentEvent) {
-        state.resourceBank.coins = 100;
+        state.resourceBank.coins = 5000;
         const result = canPurchaseEvent(state, investmentEvent.id);
         expect(result.legal).toBe(true);
       }
@@ -458,7 +460,7 @@ describe('MainStreetMarket', () => {
       if (!biz) return;
       // Ensure the placed business meets the upgrade's requiredLevel
       state.streetGrid[0] = { ...biz, level: (upgrade.requiredLevel ?? 0) };
-      state.resourceBank.coins = 100;
+      state.resourceBank.coins = 5000;
 
       const beforeLen = state.market.cards.length;
       purchaseUpgrade(state, upgrade.id);
@@ -544,10 +546,10 @@ describe('MainStreetMarket', () => {
   describe('getAffordableBusinessCards', () => {
     it('should return cards the player can afford', () => {
       const state = createTestState();
-      state.resourceBank.coins = 3;
+      state.resourceBank.coins = 400;
       const affordable = getAffordableBusinessCards(state);
       for (const card of affordable) {
-        expect(card.cost).toBeLessThanOrEqual(3);
+        expect(card.cost).toBeLessThanOrEqual(400);
       }
     });
 

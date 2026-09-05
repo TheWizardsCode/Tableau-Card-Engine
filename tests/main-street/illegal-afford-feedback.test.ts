@@ -1,17 +1,20 @@
 /**
  * Main Street click-path illegal-afford feedback tests (unit).
  *
- * Verifies that the four click-path purchase rejections caused by
- * insufficient coins play the illegal-move feedback (sfx-illegal-move
- * sound + shake animation on the offending card), while non-affordability
- * rejections (hand full, occupied slot, tutorial gating, incident events,
- * no eligible target) keep their existing instruction-text-only behaviour.
+ * Verifies that the click-path purchase rejections caused by insufficient
+ * coins play the illegal-move feedback (sfx-illegal-move sound + shake
+ * animation on the offending card), while non-affordability rejections
+ * (hand full, occupied slot, tutorial gating, incident events, no eligible
+ * target) keep their existing instruction-text-only behaviour. Investment
+ * events are an exception: taking an event to hand is FREE
+ * (CG-0MT5W1V4D007NN8Q), so the event click has no insufficient-coins path
+ * at all — its cost is charged only when played from hand.
  *
  * Scope of paths under test (see CG-0MSXIA61S00686G5):
  *  - onPlayHeldEvent    — playEventCommand throws "Not enough coins…"
  *  - onSlotClick        — placeFromHand throws "Not enough coins…"
- *  - onEventCardClick   — canPurchaseEvent fails with "Not enough coins…"
  *  - onUpgradeCardClick — canPurchaseUpgrade fails with "Not enough coins…"
+ *  - onEventCardClick   — free take-to-hand; no coins gate (cost at play)
  *
  * @module tests/main-street/illegal-afford-feedback
  */
@@ -140,6 +143,9 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
     time: { delayedCall: vi.fn().mockReturnValue({ remove: vi.fn() }) },
     animateTransferFromMarket: vi.fn().mockResolvedValue(undefined),
     getStreetSlotCenter: vi.fn((slotIndex: number) => ({ x: 500 + slotIndex, y: 260 })),
+    // Event-click take-to-hand animates to the merged handView-predicted
+    // position; provide a deterministic insertion point for those tests.
+    getEventHandInsertionPosition: vi.fn((handIndex: number) => ({ x: 300 + handIndex * 110, y: 240 })),
     msRenderer: {
       getMarketRowCards: vi.fn(() => marketContainers),
       getMarketSlotCenter: vi.fn(() => ({ x: 300, y: 150 })),
@@ -292,21 +298,24 @@ describe('Main Street click-path illegal-afford feedback', () => {
     });
   });
 
-  describe('onEventCardClick (insufficient coins to buy event)', () => {
-    it('plays sfx-illegal-move and shakes the market card container', () => {
+  describe('onEventCardClick (free take-to-hand; cost charged at play)', () => {
+    it('moves the event to hand for free even with zero coins (no illegal-move feedback)', async () => {
       const event = takeInvestmentEvent(scene.state);
       event.cost = 5;
       scene.state.resourceBank.coins = 0;
       scene.state.phase = 'MarketPhase';
 
       controller.onEventCardClick(event);
+      await flushMicrotasks();
 
-      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
-      expect(scene.tweens.add).toHaveBeenCalled();
-      // No state mutation: event still in market, coins unchanged.
-      expect(scene.state.market.cards.find((c: any) => c.id === event.id)).toBeTruthy();
+      // Free acquisition (CG-0MT5W1V4D007NN8Q): no feedback, event moved to
+      // hand, coins untouched — the cost is paid only when played from hand.
+      expect(scene.sound.play).not.toHaveBeenCalled();
+      expect(scene.tweens.add).not.toHaveBeenCalled();
+      expect(scene.state.market.cards.find((c: any) => c.id === event.id)).toBeUndefined();
+      expect(scene.state.hand.some((c: any) => c.id === event.id)).toBe(true);
       expect(scene.state.resourceBank.coins).toBe(0);
-      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Cannot buy event'));
+      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Moved event to hand (free)'));
     });
   });
 
@@ -392,16 +401,21 @@ describe('Main Street click-path illegal-afford feedback', () => {
 
   describe('feedback safety', () => {
     it('does not throw when the shake target is unavailable (headless/replay)', async () => {
-      // Strip the renderer so getMarketRowCards/getSpriteAt return undefined.
+      // Strip the renderer so handView.getSpriteAt returns undefined. The
+      // event click itself no longer has an insufficient-coins path (free
+      // take-to-hand), but PLAYING a held event still charges its cost at
+      // play time, so onPlayHeldEvent exercises the same headless-safety
+      // concern: feedback must be skipped without throwing.
       const bare = createMockScene();
       bare.msRenderer = undefined as any;
       const ev = takeInvestmentEvent(bare.state);
       ev.cost = 5;
+      bare.state.hand = [ev];
       bare.state.resourceBank.coins = 0;
       bare.state.phase = 'MarketPhase';
 
       const ctrl = new MainStreetTurnController(bare);
-      expect(() => ctrl.onEventCardClick(ev)).not.toThrow();
+      expect(() => ctrl.onPlayHeldEvent(0)).not.toThrow();
       expect(bare.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
       // No tween attempted, but the game loop continues.
       expect(bare.tweens.add).not.toHaveBeenCalled();

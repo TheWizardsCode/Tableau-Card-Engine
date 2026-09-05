@@ -49,15 +49,15 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.difficulty).toBe('Easy');
   });
 
-  it('starts with 12 coins (list-cost two-turn flow stays positive)', () => {
-    // The two-turn tutorial (CG-0MT53NXGZ004H5AE) buys Laundromat $4 +
-    // Bookshop $3 + Library $7 + Local Festival $3 at LISTED cost (every
+  it('starts with 1200 coins (list-cost two-turn flow stays positive)', () => {
+    // The two-turn tutorial (CG-0MT53NXGZ004H5AE) buys Laundromat $400 +
+    // Bookshop $300 + Library $700 + Local Festival $300 at LISTED cost (every
     // placement follows an End Turn, so no +50% premium is charged); income
-    // across the five end-turn steps keeps every balance positive. 12 is
-    // higher than Easy's 10 so the tutorial survives holding a card overnight.
-    expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(12);
+    // across the five end-turn steps keeps every balance positive. 1200 is
+    // higher than Easy's 500 so the tutorial survives holding a card overnight.
+    expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(1200);
     const preset = getPreset('Easy');
-    expect(12).toBeGreaterThan(preset.startingCoins);
+    expect(1200).toBeGreaterThan(preset.startingCoins);
   });
 
   it('defines starting reputation matching Easy preset', () => {
@@ -86,10 +86,10 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     expect(STANDARD_TUTORIAL_SCENARIO.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
   });
 
-  it('defines exactly 5 incident deck cards (one per End Turn, two-turn flow)', () => {
-    // CG-0MT53NXGZ004H5AE: the tutorial runs 6 days with 5 End Turns
-    // (T6, T10, T14, T16, T18), so the deterministic deck holds 5 incidents.
-    expect(STANDARD_TUTORIAL_SCENARIO.incidentDeck.length).toBe(5);
+  it('defines exactly 8 incident deck cards (one per End Turn, two-turn flow)', () => {
+    // CG-0MTNMBX5Z002U0MH: the 26-step tutorial runs 9 days with 8 End Turns
+    // (T6, T8, T11, T14, T16, T18, T20, T22), so the deterministic deck holds 8 incidents.
+    expect(STANDARD_TUTORIAL_SCENARIO.incidentDeck.length).toBe(8);
   });
 
   it('all development row card template IDs are from Tier-1 pool', () => {
@@ -145,13 +145,13 @@ describe('createTutorialScenario', () => {
     expect(state.config.difficultyName).toBe('Easy');
   });
 
-  it('has correct starting resources (12 coins, 5 reputation per scenario)', () => {
+  it('has correct starting resources (1200 coins, 500 reputation per scenario)', () => {
     const state = createTutorialScenario();
-    // 12 coins (CG-0MSTOATDQ005XDET reduced from 16 so the T13 Community
-    // Favour rep→coins conversion is REQUIRED for the $7 Library); reputation
-    // stays 5 so the conversion spends 2 and leaves a safe 3.
-    expect(state.resourceBank.coins).toBe(12);
-    expect(state.resourceBank.reputation).toBe(5);
+    // 1200 coins (CG-0MSTOATDQ005XDET reduced from 1600 so the T13 Community
+    // Favour rep→coins conversion is REQUIRED for the $700 Library); reputation
+    // stays 500 so the conversion spends 200 and leaves a safe 300.
+    expect(state.resourceBank.coins).toBe(1200);
+    expect(state.resourceBank.reputation).toBe(500);
   });
 
   it('has exactly MARKET_TOTAL_SLOTS cards in development row', () => {
@@ -168,9 +168,9 @@ describe('createTutorialScenario', () => {
     expect(events.length).toBe(1);
   });
 
-  it('has exactly 5 cards in incident deck (one per End Turn)', () => {
+  it('has exactly 8 cards in incident deck (one per End Turn)', () => {
     const state = createTutorialScenario();
-    expect(state.incidentDeck.length).toBe(5);
+    expect(state.incidentDeck.length).toBe(8);
   });
 
   it('has all incident cards as Incident-trigger events', () => {
@@ -214,40 +214,43 @@ describe('createTutorialScenario', () => {
 
   // ── Coin budget verification (AC5: 12-coin flow + required conversion) ──
 
-  it('provides sufficient coin budget for the 23-step two-turn flow (listed-cost placements, positive balances)', () => {
+  it('provides sufficient coin budget for the 26-step two-turn flow (listed-cost placements, positive balances)', () => {
     const state = createTutorialScenario();
-    // Scenario starts with 12 coins (higher than Easy's 10 so holding a card
-    // overnight overhead (−1/−0.75/−0.25 ongoing costs) never goes negative).
-    expect(state.resourceBank.coins).toBe(12);
+    // Scenario starts with 1200 coins (higher than Easy's 500 so holding a card
+    // overnight overhead (−100/−75/−25 ongoing costs) never goes negative).
+    expect(state.resourceBank.coins).toBe(1200);
 
-    // The Laundromat referenced in T3 must exist and cost ≤ 4
+    // 26-step flow (CG-0MTNMBX5Z002U0MH): 9 days, 8 End Turns, budget verified
+    // in tutorial-action-economy.test.ts as well.
+    // The Laundromat referenced in T3 must exist and cost ≤ 400
     const t3 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!;
     const laundromat = state.market.cards.find(
       c => matchesTemplate(c.id, t3.requiredCardId ?? ''),
     );
     expect(laundromat).toBeDefined();
-    expect(laundromat!.cost).toBeLessThanOrEqual(4);
+    expect(laundromat!.cost).toBeLessThanOrEqual(400);
 
     // The two-turn flow places each card the day AFTER its move at listed
-    // cost (no same-turn premium): Laundromat $4 (T7), Bookshop $3 (T15),
-    // Library $7 (T19). Income accrues across five end-turns and the T13
+    // cost (no same-turn premium): Laundromat $400 (T7), Bookshop $300 (T17),
+    // Library $700 (T21). Income accrues across eight end-turns and the T15
     // Community Favour exchange tops up the wallet; the deterministic
-    // 5-incident deck (award ×3, rainy ×2 — both non-negative on the
-    // tutorial street) never drains it.
-    expect(12 - 4 - 3 - 7).toBe(-2); // pre-income, covered by end-turn income
+    // 8-incident deck (award ×4, rainy ×4 — all non-negative on the tutorial
+    // street) never drains it.
+    expect(1200 - 400 - 300 - 700).toBe(-200); // pre-income, covered by end-turn income
   });
 
-  it('ensureTutorialMarketForUpcomingSteps puts the Library in the row when T17 is upcoming', () => {
-    // Day-1 state has no Library (3-slot single row). Before T17 (the Library
-    // move-to-hand step) the day-start hook forces cs-library into the line.
+  it('ensureTutorialMarketForUpcomingSteps puts the Library in the row when T19 is upcoming', () => {
+    // Day-1 state has no Library (3-slot single row). Before T19 (the Library
+    // move-to-hand step, CG-0MTNMBX5Z002U0MH) the day-start hook forces
+    // cs-library into the line.
     const state = createTutorialScenario();
     expect(state.market.cards.some(c => matchesTemplate(c.id, 'cs-library'))).toBe(false);
 
-    const t17Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T17');
+    const t18Index = UNIFIED_TUTORIAL_STEPS.findIndex(s => s.id === 'T19');
     const controller = {
       isActive: true,
-      currentStepIndex: t17Index,
-      lastCompletedStepId: 'T16',
+      currentStepIndex: t18Index,
+      lastCompletedStepId: 'T18',
       exited: false,
     };
     ensureTutorialMarketForUpcomingSteps(state, controller);
@@ -258,8 +261,8 @@ describe('createTutorialScenario', () => {
     // The row never exceeds 3 cards — a filler was displaced back to a deck.
     expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
     // Looked-up listed cost is affordable in the two-turn budget (income +
-    // favour cover the $7 Library; see TutorialScenario budget table).
-    expect(library!.cost).toBeLessThanOrEqual(12);
+    // favour cover the $700 Library; see TutorialScenario budget table).
+    expect(library!.cost).toBeLessThanOrEqual(1200);
   });
 
   // ── Market card integration with tutorial steps ──────────────
@@ -278,25 +281,25 @@ describe('createTutorialScenario', () => {
     // Verify it's the Laundromat
     const laundromat = marketCard as BusinessCard;
     expect(laundromat.name).toBe('Laundromat');
-    expect(laundromat.cost).toBe(4);
+    expect(laundromat.cost).toBe(400);
   });
 
-  it('the Local Festival event card is in the investments row matching T9', () => {
+  it('the Local Festival event card is in the investments row matching T10', () => {
     const state = createTutorialScenario();
     const invEvents = state.market.cards.filter(
       c => c.family === 'event',
     ) as EventCard[];
     expect(invEvents.length).toBe(1);
 
-    const t9 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T9')!;
+    const t10 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!;
     const festival = state.market.cards.find(
-      c => matchesTemplate(c.id, t9.requiredCardId ?? ''),
+      c => matchesTemplate(c.id, t10.requiredCardId ?? ''),
     );
     expect(festival).toBeDefined();
     expect(festival!.name).toBe('Local Festival');
     // The event should be affordable after buying Laundromat + one income turn
-    expect(festival!.cost).toBeGreaterThanOrEqual(2);
-    expect(festival!.cost).toBeLessThanOrEqual(4);
+    expect(festival!.cost).toBeGreaterThanOrEqual(200);
+    expect(festival!.cost).toBeLessThanOrEqual(400);
   });
 
   // ── Deck consistency ────────────────────────────────────────

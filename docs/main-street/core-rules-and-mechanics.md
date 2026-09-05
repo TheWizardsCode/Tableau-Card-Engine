@@ -38,10 +38,10 @@
 | **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this business. |
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
 | **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g., Clinic provides +0.2 rep/turn). Default 0. |
-| **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase**, whether the card is placed on the street grid **or held in hand**. Defaults to 0 for cards without a CSV value. Mirrors the StaffCard/CommunitySpaceCard `ongoingCost` mechanic. |
+| **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase** for business cards placed on the street grid. Cards held in hand are not charged (CG-0MTC31LN3000UHDY). Defaults to 0 for cards without a CSV value. Mirrors the StaffCard/CommunitySpaceCard `ongoingCost` mechanic. |
 | **Description** | string | Flavor text and any special rules. |
 
-> **Business ongoing costs are deducted in the IncomePhase.** Business cards with `ongoingCost > 0` — held in hand or placed on the street grid — have their total running cost deducted from coins each turn, alongside staff and community-space costs (CG-0MSVYPEZ90085SHE). The deduction is **clamped at 0 coins** — the player is never driven below zero — and both the deduction and any shortfall are logged to the activity log.
+> **Business ongoing costs are deducted in the IncomePhase.** Business cards with `ongoingCost > 0` **placed on the street grid** have their total running cost deducted from coins each turn, alongside staff and community-space costs (CG-0MSVYPEZ90085SHE). Business cards held in the player's hand are not yet active and do **not** incur running costs (CG-0MTC31LN3000UHDY). The deduction is **clamped at 0 coins** — the player is never driven below zero — and both the deduction and any shortfall are logged to the activity log.
 
 **Example Business Card (JSON‑like)**
 ```json
@@ -193,7 +193,7 @@ stateDiagram-v2
    - `resourceBank.coins += totalIncome`.
    - `totalReputationPerTurn` is calculated from all placed cards (some Health-synergy cards like the Clinic provide `reputationPerTurn`). Upgrades may also contribute `reputationBonus`. Synergy reputation from adjacent neighbors is only earned from **different-type** businesses; same-type neighbors contribute 0 reputation synergy.
    - `resourceBank.reputation += totalReputationPerTurn`.
-   - **Ongoing costs** (staff cards, community-space cards, and business cards with `ongoingCost > 0` — e.g. the Library's 0.25 coins/turn; business cards are charged whether placed or held in hand) are deducted from coins after income. Deductions are clamped at 0 coins (the player is never driven below zero) and logged.
+   - **Ongoing costs** (staff cards, community-space cards, and business cards **placed on the street grid** with `ongoingCost > 0` — e.g. the Library's 0.25 coins/turn; business cards held in hand are not charged, CG-0MTC31LN3000UHDY) are deducted from coins after income. Deductions are clamped at 0 coins (the player is never driven below zero) and logged.
 6. **IncidentPhase** – Reveal and resolve the top card of the face‑down incident deck. The player knows only how many incidents remain (card back + count); the revealed card's effect posts to the activity log. When the deck is exhausted, resolved events are reshuffled back in with the order rebuilt constraint‑aware (CG-0MSTOATDP000JNHH).
 7. **EndCheck** – Evaluate win/loss conditions.
 8. Loop back to **DayStart** for the next turn.
@@ -221,6 +221,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 - The **base action banks**: any unused base action at end of day is banked, up to a **bank cap of 2**.
 - **Staff actions never bank.** Staff-derived actions (e.g. the General Manager's +1 `actionsPerTurn`) are **consumed first** and are not bankable — an idle GM day banks exactly 1 (the base), not 2.
 - Spending during the day draws down the combined budget (base + staff + banked share one counter).
+- **Banked is consumed 1-per-action.** Every action-type operation decrements the banked reserve by 1 (floor 0) alongside the daily counter (CG-0MTCP7F9S009HARC) — banked actions are spent as the player acts, so a banked day grants only its carried-over actions, never an endless reserve. Premium same-day placements (which replace the action with a +50% coin charge) do **not** consume the bank.
 - **No expiry:** banked actions persist indefinitely across days until spent. They reset to 0 only on a new game.
 - At day end, at most **1** action can bank (only the base portion), so reaching the cap takes two idle days; overflow beyond the cap is discarded.
 
@@ -238,11 +239,14 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 **Free operations (never consume an action):**
 
 - Market re-roll/refresh
-- Selling a business
+- Selling a business — refund formula (CG-0MT5XO7DI0066QCT): `Math.ceil((card.cost + totalUpgradeCost) * 1.5) + Math.max(0, currentIncome − effectiveBase) + Math.max(0, currentReputationPerTurn − (repPerTurn + reputationBonus))` where `effectiveBase = (baseIncome + incomeBonus) × (hasAdjacentSameType ? 0.6 : 1)` and the 1.5× is the same +50% buy-and-place premium; applies to business **and** community-space cards; synergy comps are 0 when undefined and never negative.
+  The sell dialog and activity log show the breakdown (base, synergy income, synergy rep).
 - Hint (still 1/day)
 - Discarding from hand
 - Buying/playing upgrade cards and Investment events
 - Ending the turn
+
+> Sell price (CG-0MT5XO7DI0066QCT): the sell refund mirrors the buy-and-place premium (1.5× purchase + upgrades) and adds the card's current synergy value, so emergency cash reflects what the card actually earns on the grid. A card with no synergies still recovers more than before (`/2 → ×1.5`); a well-synergised card recovers coins **plus** rep-derived value automatically. The breakdown is visible before the player confirms.
 
 > Same-day composite pricing (CG-0MT24X0SX007RLHN): clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase**. If the move consumed the daily action (0 actions left), the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**; an explainer dialog fires first (Proceed commits, Cancel aborts with no cost, "Don't show this again" persists the preference). If an action **remains** (Golden Mile 2-action days), the placement consumes it at **listed cost**. A card left in hand and placed on a **later** day costs that day's action at listed cost, with no dialog. Business and community-space cards are priced identically.
 
@@ -252,7 +256,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 |--------|-------------|---------------|--------|
 | **Buy Business** | Spend coins to acquire a Business card from the market and place it on an empty slot. | Market contains Business card; `resourceBank.coins >= cost`; at least one empty slot. | Business placed; coins deducted; slot becomes occupied. |
 | **Buy Upgrade** | Spend coins to upgrade an existing Business card. | Market contains Upgrade card targeting a placed Business; `resourceBank.coins >= cost`. | Business card upgraded (income bonus and/or synergy range increased); coins deducted. |
-| **Buy Event** | Spend coins to acquire an Investment event card and add it to the hand. | Market contains Investment event card; `resourceBank.coins >= cost`; hand has room (`hand.length < maxHandSize`). | Event appended to hand; coins deducted. Player may play it during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
+| **Buy Event** | Take an Investment event card from the market into the hand **for free** (cost is paid when the event is executed from hand). | Market contains Investment event card; hand has room (`hand.length < maxHandSize`). | Event appended to hand; **no coins deducted** at take time. Player pays the event's listed cost when it is played during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
 | **Play Event (from hand)** | Play an Investment event card from the hand during MarketPhase. | Player holds an Investment event card in hand; current phase is MarketPhase. | Event resolved and removed from hand. |
 | **Place Business** | Choose an empty slot and put the purchased Business card there. | Business card in hand; slot is empty. | Card is now part of `streetGrid`. |
 | **Resolve Event** | Apply the effect described on an Event card. | Event card active. | Game state mutated per effect (coins, reputation, temporary modifiers). |
@@ -298,6 +302,18 @@ Loss conditions are evaluated at the end of the **Night Income** phase before ch
 | **RNG Seed** | Determined by the **Game Engine** on startup (`Math.seedrandom(seedString)`). | The seed is displayed on the title screen for reproducibility.
 
 All randomness is **deterministic** when the same seed is used, enabling automated testing of the core loop.
+
+---
+
+## Activity Log (Effective Deltas and Per-Turn Net)
+
+Every resource-mutating action appends an entry to the activity log showing its **effective (post-mitigation) coin and reputation deltas** (CG-0MT5W7UJJ0065MEZ):
+
+- Enriched entries append a compact delta description built by `describeEventEffects` — e.g. `(+3.000 coins, +2 rep)`, `(-1.000 coins)`, `(+1 rep)`, or `(no effect)` — computed from the resources actually changed (after discounts, clamps, multipliers, and event resolution).
+- Entry colour classification (`gain` / `loss` / `neutral`) is derived by `classifyEffect` from the same effective net (coins + rep), so a mixed exchange colours consistently with its net effect.
+- Examples: purchases, upgrades, sells, staff hire/layoff, ongoing-cost deductions (including the clamped `Insufficient coins for ...` shortfall), market refreshes, Community Favour exchanges, events played from hand (cost *plus* resolved effects), investments, and incident resolutions.
+
+Each completed turn ends with a **per-turn net summary row** — `Turn <n> net: <effective deltas>` — comparing the resource bank against a **day-start snapshot** taken at the beginning of `executeDayStart`. The snapshot is persisted with saves (legacy saves fall back to the current resources), and the net row is emitted even when the game ends prematurely — in that case it is written **before** the `Game Over` / `Bankruptcy` banner so the summary precedes the loss entry. When both are present, the net row always precedes the game-over entry; on a normal turn it is the final log entry.
 
 ---
 

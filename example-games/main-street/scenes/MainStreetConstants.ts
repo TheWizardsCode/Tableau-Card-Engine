@@ -35,6 +35,15 @@ export const BASE_SLOT_H = 80;
 export const BASE_SLOT_GAP = 20;
 export const STREET_COLS = 5;
 export const STREET_ROWS = 2;
+/** Slots per street (STREET_COLS × STREET_ROWS). */
+export const SLOTS_PER_STREET = STREET_COLS * STREET_ROWS;
+/** Default number of street columns in the world grid (1×1 preserves legacy 10-slot behavior). */
+export const STREET_GRID_COLS = 1;
+/** Default number of street rows in the world grid. */
+export const STREET_GRID_ROWS = 1;
+/** Maximum supported grid dimensions (≥3×3 per AC). */
+export const MAX_GRID_COLS = 5;
+export const MAX_GRID_ROWS = 5;
 export const STREET_ROW_GAP = 12;
 // Make hand slot match placeholder size as requested
 export const BASE_HAND_CARD_W = 140;
