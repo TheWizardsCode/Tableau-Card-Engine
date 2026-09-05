@@ -189,6 +189,7 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('end-turn' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      playIllegalFeedback(s.actionContainer, s);
       return;
     }
 
@@ -435,6 +436,7 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('play-event' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      playIllegalFeedback(s.actionContainer, s);
       return;
     }
 
@@ -475,10 +477,7 @@ export class MainStreetTurnController {
     } catch (e) {
       const msg = (e as Error).message;
       console.error('[MS] PlayEvent failed', e);
-      // Insufficient-coins rejection → play illegal-move feedback.
-      if (msg.toLowerCase().includes('not enough coins')) {
-        playIllegalFeedback(handSpriteSprite, s);
-      }
+      playIllegalFeedback(handSpriteSprite, s);
       s.instructionText.setText(`Error: ${msg}`);
     }
 
@@ -548,6 +547,10 @@ export class MainStreetTurnController {
     // player gets immediate feedback instead of a mid-flight error.
     if (s.state.actionsRemaining <= 0) {
       s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      const containers0 = s.msRenderer?.getMarketRowCards?.();
+      const cardIndex0 = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const target0 = containers0?.[cardIndex0] ?? null;
+      playIllegalFeedback(target0, s);
       return;
     }
 
@@ -555,6 +558,10 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-business' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      const containers1 = s.msRenderer?.getMarketRowCards?.();
+      const cardIndex1 = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const target1 = containers1?.[cardIndex1] ?? null;
+      playIllegalFeedback(target1, s);
       return;
     }
 
@@ -574,6 +581,10 @@ export class MainStreetTurnController {
         const requiredName = requiredCard?.name ?? 'the specified card';
         const msg = `This is not the card you should buy right now. Please buy ${requiredName} first.`;
         s.instructionText.setText(msg);
+        const containers2 = s.msRenderer?.getMarketRowCards?.();
+        const cardIndex2 = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+        const target2 = containers2?.[cardIndex2] ?? null;
+        playIllegalFeedback(target2, s);
         // Clear the error message after 2 seconds so the overlay remains visible
         s.time.delayedCall(2000, () => {
           if (s.instructionText?.text === msg) {
@@ -631,6 +642,7 @@ export class MainStreetTurnController {
         s.instructionText.setText(`"${cardName}" is in hand — click the card to select it, then an empty slot to place.`);
       } catch (e) {
         console.error('[MS] BuyBusinessToHand failed', e);
+        playIllegalFeedback(s.actionContainer, s);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
         s.uiPhase = 'market';
       }
@@ -856,12 +868,9 @@ export class MainStreetTurnController {
             : `Placed "${cardName}" on slot ${slotIndex}`);
         } catch (e) {
           console.error('[MS] DragBuyBusiness failed', e);
-          // Insufficient-coins rejection → play illegal-move feedback.
           const msg = (e as Error).message;
-          if (msg.toLowerCase().includes('not enough coins')) {
-            const container = s.msRenderer?.getMarketRowCards?.()?.[sourceIndex] ?? null;
-            playIllegalFeedback(container, s);
-          }
+          const container = s.msRenderer?.getMarketRowCards?.()?.[sourceIndex] ?? s.actionContainer ?? null;
+          playIllegalFeedback(container, s);
           s.instructionText.setText(`Error: ${msg}`);
         }
 
@@ -924,6 +933,8 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      const handSpriteGating = s.msRenderer?.handView?.getSpriteAt?.(s.pendingHandIndex ?? -1) as any;
+      playIllegalFeedback(handSpriteGating ?? s.actionContainer, s);
       return;
     }
 
@@ -943,6 +954,8 @@ export class MainStreetTurnController {
       const cardName = params?.cardName ?? 'this card';
       const synergyName = params?.synergyCardName ?? 'the partner card';
       s.instructionText.setText(`Place ${cardName} next to ${synergyName} for a Culture bonus.`);
+      const handSpriteSynergy = s.msRenderer?.handView?.getSpriteAt?.(s.pendingHandIndex ?? -1) as any;
+      playIllegalFeedback(handSpriteSynergy ?? s.actionContainer, s);
       return;
     }
 
@@ -1029,11 +1042,8 @@ export class MainStreetTurnController {
           } catch (e) {
             const msg = (e as Error).message;
             console.error('[MS] playBusinessFromHandCommand failed', e);
-            // Insufficient-coins rejection → play illegal-move feedback.
-            if (msg.toLowerCase().includes('not enough coins')) {
-              const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex);
-              playIllegalFeedback(handSprite, s);
-            }
+            const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex) as any;
+            playIllegalFeedback(handSprite ?? s.actionContainer, s);
             s.instructionText.setText(`Error: ${msg}`);
           }
           finish();
@@ -1082,6 +1092,7 @@ export class MainStreetTurnController {
       if (tutController?.isActive) {
         const msg = 'You must first buy a business card. Click on a business card in the market.';
         s.instructionText.setText(msg);
+        playIllegalFeedback(s.actionContainer, s);
         s.time.delayedCall(2000, () => {
           if (s.instructionText?.text === msg) {
             s.instructionText.setText('Complete the highlighted step.');
@@ -1146,6 +1157,10 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('buy-event' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      const containersE = s.msRenderer?.getMarketRowCards?.();
+      const cardIndexE = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const targetE = containersE?.[cardIndexE] ?? s.actionContainer ?? null;
+      playIllegalFeedback(targetE, s);
       return;
     }
 
@@ -1164,6 +1179,10 @@ export class MainStreetTurnController {
         const requiredName = requiredCard?.name ?? 'the specified event card';
         const msg = `This is not the card you should buy right now. Please buy ${requiredName} first.`;
         s.instructionText.setText(msg);
+        const containersE2 = s.msRenderer?.getMarketRowCards?.();
+        const cardIndexE2 = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+        const targetE2 = containersE2?.[cardIndexE2] ?? s.actionContainer ?? null;
+        playIllegalFeedback(targetE2, s);
         // Clear the error message after 2 seconds
         s.time.delayedCall(2000, () => {
           if (s.instructionText?.text === msg) {
@@ -1181,10 +1200,10 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseEvent(s.state, card.id);
     if (!legality.legal) {
-      // Taking an Investment event to hand is free (CG-0MT5W1V4D007NN8Q), so
-      // there is no insufficient-coins rejection here — canPurchaseEvent no
-      // longer checks coins. Remaining rejections (hand full, incident event)
-      // keep their existing instruction-text-only behaviour.
+      const containersE3 = s.msRenderer?.getMarketRowCards?.();
+      const cardIndexE3 = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const targetE3 = containersE3?.[cardIndexE3] ?? s.actionContainer ?? null;
+      playIllegalFeedback(targetE3, s);
       s.instructionText.setText(`Cannot buy event: ${legality.reason ?? 'unknown'}`);
       return;
     }
@@ -1206,6 +1225,7 @@ export class MainStreetTurnController {
         s.instructionText.setText(`Moved event to hand (free): "${card.name}"`);
       } catch (e) {
         console.error('[MS] MoveEventToHand failed', e);
+        playIllegalFeedback(s.actionContainer, s);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
       }
 
@@ -1242,6 +1262,7 @@ export class MainStreetTurnController {
     const legality = canRefreshMarket(s.state);
     if (!legality.legal) {
       s.instructionText.setText(`Cannot re-roll: ${legality.reason ?? 'unknown'}`);
+      playIllegalFeedback(s.actionContainer, s);
       return;
     }
 
@@ -1518,6 +1539,10 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('apply-upgrade' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      const containersU = s.msRenderer?.getMarketRowCards?.();
+      const cardIndexU = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const targetU = containersU?.[cardIndexU] ?? s.actionContainer ?? null;
+      playIllegalFeedback(targetU, s);
       return;
     }
 
@@ -1528,14 +1553,10 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseUpgrade(s.state, card.id);
     if (!legality.legal) {
-      const reason = (legality.reason ?? '').toLowerCase();
-      // Insufficient-coins rejection → play illegal-move feedback.
-      if (reason.includes('not enough coins')) {
-        const containers = s.msRenderer?.getMarketRowCards?.();
-        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
-        const target = containers?.[cardIndex] ?? null;
-        playIllegalFeedback(target, s);
-      }
+      const containers = s.msRenderer?.getMarketRowCards?.();
+      const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const target = containers?.[cardIndex] ?? s.actionContainer ?? null;
+      playIllegalFeedback(target, s);
       s.instructionText.setText(`Cannot buy upgrade: ${legality.reason ?? 'unknown'}`);
       return;
     }
@@ -1564,6 +1585,7 @@ export class MainStreetTurnController {
         upgraded = true;
       } catch (e) {
         console.error('[MS] BuyUpgrade failed', e);
+        playIllegalFeedback(s.actionContainer, s);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
       }
 
@@ -1617,6 +1639,10 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('hire-staff' as TutorialActionType);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      const containersS = s.msRenderer?.getMarketRowCards?.();
+      const cardIndexS = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const targetS = containersS?.[cardIndexS] ?? s.actionContainer ?? null;
+      playIllegalFeedback(targetS, s);
       return;
     }
 
@@ -1627,14 +1653,10 @@ export class MainStreetTurnController {
 
     const legality = canPurchaseStaff(s.state, card.id);
     if (!legality.legal) {
-      const reason = (legality.reason ?? '').toLowerCase();
-      // Insufficient-coins rejection → play illegal-move feedback.
-      if (reason.includes('not enough coins')) {
-        const containers = s.msRenderer?.getMarketRowCards?.();
-        const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
-        const target = containers?.[cardIndex] ?? null;
-        playIllegalFeedback(target, s);
-      }
+      const containers = s.msRenderer?.getMarketRowCards?.();
+      const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      const target = containers?.[cardIndex] ?? s.actionContainer ?? null;
+      playIllegalFeedback(target, s);
       s.instructionText.setText(`Cannot hire: ${legality.reason ?? 'unknown'}`);
       return;
     }
@@ -1662,6 +1684,7 @@ export class MainStreetTurnController {
         hired = true;
       } catch (e) {
         console.error('[MS] HireStaff failed', e);
+        playIllegalFeedback(s.actionContainer, s);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
       }
 
@@ -1720,6 +1743,8 @@ export class MainStreetTurnController {
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-hand-card' as any);
     if (check && !check.allowed) {
       s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      const handSpriteH = s.msRenderer?.handView?.getSpriteAt?.(index) as any;
+      playIllegalFeedback(handSpriteH ?? s.actionContainer, s);
       return;
     }
 
@@ -1783,6 +1808,7 @@ export class MainStreetTurnController {
     const legality = canSellBusiness(s.state, slotIndex, false);
     if (!legality.legal) {
       s.instructionText.setText(`Cannot sell: ${legality.reason ?? 'unknown'}`);
+      playIllegalFeedback(s.actionContainer, s);
       return;
     }
 
