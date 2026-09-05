@@ -168,7 +168,7 @@ describe('Community space card tooltip content (AC2)', () => {
 
     // Must contain key information
     expect(tooltip).toContain('Community Space: Park');
-    expect(tooltip).toContain('Cost: 3');
+    expect(tooltip).toContain('Cost: 300');
     expect(tooltip).toContain('Income: +0');
     expect(tooltip).toContain('Synergy: Entertainment');
     expect(tooltip).toContain(resolvedDescription(park!));
@@ -194,7 +194,7 @@ describe('Community space card tooltip content (AC2)', () => {
     expect(library).toBeDefined();
 
     const tooltip = buildCommunitySpaceTooltip(library!);
-    expect(tooltip).toContain('Ongoing cost: -0.25/turn');
+    expect(tooltip).toContain('Ongoing cost: -25/turn');
   });
 
   it('Park tooltip has no ongoing-cost line', () => {
@@ -306,7 +306,7 @@ describe('Community Hub upgrade (repurposed, AC4)', () => {
   it('should grant reputationBonus 0.1 and no income/range bonus', () => {
     const communityHub = upgradeDeck.find(u => u.targetBusiness === 'Library');
     expect(communityHub).toBeDefined();
-    expect(communityHub!.reputationBonus).toBe(0.1);
+    expect(communityHub!.reputationBonus).toBe(10);
     expect(communityHub!.incomeBonus).toBe(0);
     expect(communityHub!.synergyRangeBonus).toBe(0);
   });

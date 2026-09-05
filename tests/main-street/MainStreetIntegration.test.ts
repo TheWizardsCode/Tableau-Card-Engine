@@ -120,8 +120,8 @@ describe('Multi-Use Card Economy Integration', () => {
 
       // Each gains 50% of base income as synergy from the diagonal partner,
       // scaled by the Medium multiplier (0.35 after CG-0MSP26Q5N002EH8P):
-      // 2 + (2*0.5*0.35) = 2.35 each → 4.7 total.
-      expect(result.total).toBeCloseTo(4.7, 5);
+      // 2 + (2*0.5*0.35) = 2.35 each → 4.7 before integer rounding, 4 after roundInt (0.35 rounds to 0).
+      expect(result.total).toBe(4);
     });
 
     it('should complete multiple turns with mixed tableau and hand purchases', () => {

@@ -96,8 +96,8 @@ describe('Main Street Tutorial E2E — T13-T19', () => {
 
     // The exchange spent 2 rep and gained 3 coins; the gate is spent.
     expect(s.state.favourUsedThisTurn).toBe(true);
-    expect(s.state.resourceBank.coins).toBe(coinsBefore + 3);
-    expect(s.state.resourceBank.reputation).toBe(repBefore - 2);
+    expect(s.state.resourceBank.coins).toBe(coinsBefore + 300);
+    expect(s.state.resourceBank.reputation).toBe(repBefore - 200);
     expect(getStepIndex(scene)).toBe(13); // T14 End this turn
     await saveScreenshot('t13-favour-t14');
   }, 30_000);
@@ -115,13 +115,13 @@ describe('Main Street Tutorial E2E — T13-T19', () => {
     await waitForOverlayVisible(10_000);
     expect(getStepIndex(scene)).toBe(14); // T15 Place the Bookshop
 
-    // T15: place the held Bookshop at LISTED $3 (plan-ahead, not premium).
+    // T15: place the held Bookshop at LISTED 300 (×100, plan-ahead, not premium).
     const coinsBeforeB = s.state.resourceBank.coins;
     await clickStreetSlot(scene, 1);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(15); // T16 End this turn
     expect(s.state.streetGrid[1]?.id.startsWith('biz-bookshop')).toBe(true);
-    expect(s.state.resourceBank.coins).toBe(coinsBeforeB - 3);
+    expect(s.state.resourceBank.coins).toBe(coinsBeforeB - 300);
     await saveScreenshot('t15-place-bookshop');
   }, 30_000);
 
@@ -150,13 +150,13 @@ describe('Main Street Tutorial E2E — T13-T19', () => {
     expect(library).toBeTruthy();
 
     // Place the Library next to the Bookshop (slot 1 → slot 2 orthogonal;
-    // 8-way adjacency). Listed cost $7.
+    // 8-way adjacency). Listed cost 700 (×100).
     const coinsBeforeL = s.state.resourceBank.coins;
     await clickStreetSlot(scene, 2);
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(19); // T20 Triggering Events
     expect(s.state.streetGrid[2]?.id.startsWith('cs-library')).toBe(true);
-    expect(s.state.resourceBank.coins).toBe(coinsBeforeL - 7);
+    expect(s.state.resourceBank.coins).toBe(coinsBeforeL - 700);
     await saveScreenshot('t19-t20');
   }, 30_000);
 

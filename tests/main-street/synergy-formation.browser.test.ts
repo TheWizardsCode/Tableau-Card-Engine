@@ -218,7 +218,7 @@ describe('MainStreet synergy formation animation', () => {
     };
     state.streetGrid[0] = cardA;
     state.market.cards[0] = cardB;
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 2000;
     // Drag buy-and-place on a 1-action day incurs the +50% premium explainer
     // dialog (CG-0MT24X0SX007RLHN) — dismiss it so this test focuses on the
     // synergy-formation animation.
@@ -273,7 +273,7 @@ describe('MainStreet synergy formation animation', () => {
     };
     state.streetGrid[0] = cardA;
     state.streetGrid[1] = cardB;
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 2000;
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
     // Expected clipped endpoints for the (0,1) pair (shared helper geometry).
@@ -323,7 +323,7 @@ describe('MainStreet synergy formation animation', () => {
     };
     state.streetGrid[0] = cardA;
     state.market.cards[0] = cardB;
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 2000;
     // Drag buy-and-place on a 1-action day incurs the +50% premium explainer
     // dialog (CG-0MT24X0SX007RLHN) — dismiss it so this test focuses on the
     // synergy-formation animation.

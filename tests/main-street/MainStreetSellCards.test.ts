@@ -3,15 +3,17 @@
  *
  * Tests for selling placed business and community-space cards from the street
  * grid during the MarketPhase. Sold cards remain visually on the grid but are
- * marked as sold (dimmed) and no longer contribute income, synergy, or reputation.
+ * marked as sold (dimmed) and no longer contribute income or reputation for
+ * themselves — however, they still act as synergy anchors for their neighbours
+ * (CG-0MT5XUE2200047IJ).
  *
  * AC references:
  *   AC1: Clicking a placed card during MarketPhase opens a sell dialog
  *   AC2: Player receives Math.ceil((purchasePrice + sumOfAllUpgradeCosts) / 2) coins
- *   AC3: Sold card remains on grid but dimmed, no income/synergy/reputation
+ *   AC3: Sold card remains on grid but dimmed, no income/reputation; synergy for neighbours retained
  *   AC4: Sell action is undoable via existing undo system
  *   AC5: Upgrades are lost when selling (included in refund calc)
- *   AC6: Sold cards treated as non-functional for all game calculations
+ *   AC6: Sold cards treated as non-functional for self-income, but still provide synergy
  *   AC7: Selling only valid during MarketPhase, not in card-placement mode
  *
  * @module
@@ -34,7 +36,7 @@ import {
 
 // ── Constants ───────────────────────────────────────────────
 
-const SELL_REFUND_RATIO = 0.5; // 50% refund
+const SELL_REFUND_RATIO = 1.5; // new formula: 1.5x base + synergy components (CG-0MT5XO7DI0066QCT)
 
 // ── Feature Detection ───────────────────────────────────────
 
@@ -337,13 +339,13 @@ describe('MainStreet Sell Cards', () => {
         } as BusinessCard;
 
         const coinsBefore = state.resourceBank.coins;
-        const expectedRefund = Math.ceil(oddCost * SELL_REFUND_RATIO); // ceil(3.5) = 4
+        const expectedRefund = Math.ceil(oddCost * SELL_REFUND_RATIO); // 7 * 1.5 = 10.5, ceil = 11
 
         const market = await import('../../example-games/main-street/MainStreetMarket');
         (market as any).sellBusiness(state, 0);
 
         expect(state.resourceBank.coins).toBe(coinsBefore + expectedRefund);
-        expect(expectedRefund).toBe(4); // Verify: 7/2 = 3.5, ceil = 4
+        expect(expectedRefund).toBe(11); // Verify: 7*1.5 = 10.5, ceil = 11
       },
     );
   });
@@ -438,7 +440,7 @@ describe('MainStreet Sell Cards', () => {
     );
 
     it.runIf(SELL_MARKET_AVAILABLE)(
-      'should not include sold cards in synergy calculations',
+      'sold cards still provide synergy to neighbours',
       async () => {
         // Place two synergistic cards next to each other
         const card1 = placeCardOnGrid(state, 0);
@@ -454,24 +456,31 @@ describe('MainStreet Sell Cards', () => {
         state.market.cards.splice(marketIdx, 1);
         state.streetGrid[1] = { ...card2 } as BusinessCard;
 
+        // Compute synergy before sale
+        const { computeSynergyBonus } =
+          await import('../../example-games/main-street/MainStreetAdjacency');
+        const synergyBefore = computeSynergyBonus(
+          state.streetGrid,
+          1,
+          state.config.synergyBonusPerNeighbor,
+          [],
+        );
+
         // Sell the first card
         const market = await import('../../example-games/main-street/MainStreetMarket');
         (market as any).sellBusiness(state, 0);
         const soldSlots: boolean[] = (state as any).soldSlots;
 
-        // The second card should not get synergy from the sold first card
-        const { computeSynergyBonus } =
-          await import('../../example-games/main-street/MainStreetAdjacency');
-        const synergyForCard2 = computeSynergyBonus(
+        // The second card should still get synergy from the sold first card
+        // (sold cards act as synergy anchors — CG-0MT5XUE2200047IJ)
+        const synergyAfter = computeSynergyBonus(
           state.streetGrid,
           1,
           state.config.synergyBonusPerNeighbor,
           soldSlots,
         );
 
-        // If the cards shared synergy, this would be > 0 if the sold card
-        // contributed. It should be 0.
-        expect(synergyForCard2).toBe(0);
+        expect(synergyAfter).toBe(synergyBefore);
       },
     );
 

@@ -70,6 +70,13 @@ export const DEV_WATCH_IGNORE_PATTERNS: readonly string[] = [
   '**/results/**',
   '**/dist/**',
   '**/dist-electron/**',
+  // Exclude worktree checkouts created by the implement/plan/audit skills.
+  // Each worktree (node_modules, assets, layouts) contributes watchers to the
+  // repo-level inotify budget; under 10+ concurrent worktrees the default
+  // fs.inotify.max_user_watches (typically 8192) is exhausted, causing ENOSPC
+  // failures in the vite-transcript-plugin-regression dev-server smoke and
+  // other Vite-backed test suites (CG-0MTJ560IZ005XAZC / CG-0MTJ7A4Z3000MFMV).
+  '**/.worklog/**',
 ] as const;
 
 /** Options for {@link createTranscriptRequestHandler}. */

@@ -233,11 +233,11 @@ describe('Full pipeline: runs → metrics → baseline → comparison', () => {
     expect(comparison.comparisons).toHaveLength(6);
 
     // 7. Evaluate guardrails on the current metrics
-    // Use a fixed value above the revised critical band (45–75) to exercise the
-    // critical-severity failure path.
-    const guardResult = evaluateGuardrails({ winRate_greedy_medium: 80 });
+    // Use a fixed value above the revised critical band (45–95) to exercise
+    // the critical-severity failure path (CG-0MTC31LN3000UHDY re-baseline).
+    const guardResult = evaluateGuardrails({ winRate_greedy_medium: 97 });
     expect(guardResult.perMetric).toHaveLength(1);
-    // 80 > 75 → breached; winRate_greedy_medium is critical severity
+    // 97 > 95 → breached; winRate_greedy_medium is critical severity
     if (guardResult.perMetric[0]) {
       expect(guardResult.perMetric[0].breached).toBe(true);
       expect(guardResult.perMetric[0].status).toBe('fail');

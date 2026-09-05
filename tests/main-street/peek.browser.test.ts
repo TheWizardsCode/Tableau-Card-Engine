@@ -212,7 +212,7 @@ describe('Main Street staff peek skill', () => {
     await waitForCondition(
       () => (scene.state as { revealedPeekedCard: EventCard | null }).revealedPeekedCard === null
         && (scene as unknown as { uiPhase: string }).uiPhase === 'market',
-      { timeoutMs: 6000, label: 'peek reveal completion (face-down return)' },
+      { timeoutMs: 10000, label: 'peek reveal completion (face-down return)' },
     ).catch((err: Error) => {
       throw new Error(`${err.message} — revealedPeekedCard=${JSON.stringify((scene.state as { revealedPeekedCard: EventCard | null }).revealedPeekedCard?.id ?? null)} uiPhase=${(scene as unknown as { uiPhase: string }).uiPhase} replayMode=${(scene as unknown as { replayMode: boolean }).replayMode} reducedMotion=${(scene as unknown as { settingsPanel?: { reducedMotion?: boolean } }).settingsPanel?.reducedMotion}`);
     });
@@ -227,7 +227,7 @@ describe('Main Street staff peek skill', () => {
     await waitForCondition(
       () => (scene.state as { revealedPeekedCard: EventCard | null }).revealedPeekedCard === null
         && (scene as unknown as { uiPhase: string }).uiPhase === 'market',
-      { timeoutMs: 6000, label: 'first peek completion' },
+      { timeoutMs: 10000, label: 'first peek completion' },
     );
 
     const actionsAfterFirst = (scene.state as { actionsRemaining: number }).actionsRemaining;

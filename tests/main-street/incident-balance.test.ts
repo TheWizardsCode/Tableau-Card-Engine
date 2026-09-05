@@ -36,8 +36,8 @@ import {
   createIncidentBalanceFromQueue,
   findConstrainedIncidentIndex,
   recordIncidentDraw,
-  orderIncidentDeck,
 } from '../../example-games/main-street/MainStreetCards';
+import { shuffleArray } from '../../src/card-system';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -73,13 +73,8 @@ function neutral(name: string, id = name): EventCard {
 }
 
 /**
- * Builds a constraint-aware incident deck from a pool via the production
- * `orderIncidentDeck` (CG-0MSXOVQFL007G3VH). Front of the returned array
- * = next to resolve.
- */
-/**
- * Replaces the incident deck with a controlled pool (constraint-aware build)
- * and resets balance history, returning the state ready for deck-top
+ * Replaces the incident deck with a controlled pool (seeded shuffle) and
+ * resets balance history, returning the state ready for deck-top
  * resolution. The event deck is left untouched (no visible refill loop).
  */
 function setupControlledDeck(
@@ -91,7 +86,11 @@ function setupControlledDeck(
   if (limits) setIncidentBalanceLimits(state, limits);
   state.incidentBalance.recentNames = [];
   state.incidentBalance.polarityRun = null;
-  state.incidentDeck = orderIncidentDeck(pool, state.incidentBalance);
+  // Runtime selection: shuffle the pool deterministically; constraints are
+  // enforced at draw time by findConstrainedIncidentIndex.
+  const deck = pool.filter(c => c.trigger === 'Incident');
+  shuffleArray(deck, state.rng);
+  state.incidentDeck = deck;
   return state;
 }
 
@@ -318,16 +317,14 @@ describe('deck exhaustion and reshuffle fallback', () => {
 // ── Integration: setup + refills respect constraints ────────
 
 describe('constrained draws in the full game loop', () => {
-  it('constraint-built deck resolves with repeat-spacing and streak rules', () => {
-    // Mirror what orderIncidentDeck (child CG-0MSXOVQFL007G3VH) will do:
-    // build the incident deck constraint-aware from the setup incident pool.
+  it('runtime-selection deck resolves with repeat-spacing and streak rules', () => {
+    // With runtime selection (CG-0MSZDD2TP003TZS5), the deck is shuffled once
+    // and constraints are enforced per-draw by findConstrainedIncidentIndex.
     const state = setupMainStreetGame({ seed: 'constraint-integration' });
     state.incidentBalance.recentNames = [];
     state.incidentBalance.polarityRun = null;
-    state.incidentDeck = orderIncidentDeck(
-      state.incidentDeck,
-      state.incidentBalance,
-    );
+    // Shuffle the incident pool (same as setupMainStreetGame does now).
+    shuffleArray(state.incidentDeck, state.rng);
     const { names, polarities } = resolveMany(state, 30);
 
     expect(names.length).toBeGreaterThan(10);
@@ -350,17 +347,21 @@ describe('constrained draws in the full game loop', () => {
     }
   });
 
-  it('constraint-built deck front never contains the same name twice (N=3)', () => {
+  it('runtime-selection deck never returns a duplicate name within repeatSpacing', () => {
     for (const seed of ['setup-a', 'setup-b', 'setup-c', 'setup-d', 'setup-e']) {
       const state = setupMainStreetGame({ seed });
       state.incidentBalance.recentNames = [];
       state.incidentBalance.polarityRun = null;
-      state.incidentDeck = orderIncidentDeck(
-        state.incidentDeck,
-        state.incidentBalance,
-      );
-      expect(state.incidentDeck.length).toBeGreaterThan(1);
-      expect(state.incidentDeck[0].name).not.toBe(state.incidentDeck[1].name);
+      shuffleArray(state.incidentDeck, state.rng);
+      const { names } = resolveMany(state, 20);
+      expect(names.length).toBeGreaterThan(0);
+
+      // Verify repeat spacing via the runtime selection:
+      // no name within 2 previous positions (N=3 => window 2)
+      for (let i = 2; i < names.length; i++) {
+        expect(names[i]).not.toBe(names[i - 1]);
+        expect(names[i]).not.toBe(names[i - 2]);
+      }
     }
   });
 });
@@ -368,21 +369,18 @@ describe('constrained draws in the full game loop', () => {
 // ── Preset-driven limits (CG-0MSL0OU1E005WFJB) ─────────────
 
 describe('preset-driven incident limits at setup and refill', () => {
-  /** Builds the state's incident deck constraint-aware from the event pool. */
-  function buildConstrainedSetupDeck(state: MainStreetState): void {
+  /** Shuffles the state's incident deck for runtime constraint evaluation. */
+  function shuffleSetupDeck(state: MainStreetState): void {
     state.incidentBalance.recentNames = [];
     state.incidentBalance.polarityRun = null;
-    state.incidentDeck = orderIncidentDeck(
-      state.incidentDeck,
-      state.incidentBalance,
-    );
+    shuffleArray(state.incidentDeck, state.rng);
   }
 
   it('Easy (N=4, M=2): wider repeat spacing holds through setup and refills', () => {
     const state = setupMainStreetGame({ seed: 'preset-easy-limits', difficulty: 'Easy' });
     expect(state.incidentBalance.repeatSpacing).toBe(4);
     expect(state.incidentBalance.maxStreak).toBe(2);
-    buildConstrainedSetupDeck(state);
+    shuffleSetupDeck(state);
     const { names, polarities } = resolveMany(state, 30);
     expect(names.length).toBeGreaterThan(10);
 
@@ -408,7 +406,7 @@ describe('preset-driven incident limits at setup and refill', () => {
     const state = setupMainStreetGame({ seed: 'preset-hard-limits', difficulty: 'Hard' });
     expect(state.incidentBalance.repeatSpacing).toBe(2);
     expect(state.incidentBalance.maxStreak).toBe(3);
-    buildConstrainedSetupDeck(state);
+    shuffleSetupDeck(state);
     const { names, polarities } = resolveMany(state, 30);
     expect(names.length).toBeGreaterThan(10);
 
@@ -527,15 +525,12 @@ describe('serialization and legacy restore', () => {
     // Constrained draws continue to honor the restored limits.
     // maxStreak=3 means "never MORE than 3 consecutive same-polarity" — so a
     // 3-in-a-row is legal; the invariant violated is a 4-in-a-row (M+1).
-    // Constraints are enforced at deck-build time (orderIncidentDeck, child
-    // CG-0MSXOVQFL007G3VH); mirror that here so the restored limits are
-    // honored through the new deck model.
+    // Constraints are enforced at draw time via findConstrainedIncidentIndex
+    // (CG-0MSZDD2TP003TZS5); shuffle the deck so the draw-time selector can
+    // pick constrained candidates.
     restored.incidentBalance.recentNames = [];
     restored.incidentBalance.polarityRun = null;
-    restored.incidentDeck = orderIncidentDeck(
-      restored.incidentDeck,
-      restored.incidentBalance,
-    );
+    shuffleArray(restored.incidentDeck, restored.rng);
     const { polarities } = resolveMany(restored, 8);
     for (let i = 3; i < polarities.length; i++) {
       const a = polarities[i - 3];

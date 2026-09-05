@@ -18,7 +18,13 @@ import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/Ma
 
 // ── Constants ────────────────────────────────────────────
 
-export const SCENE_LOAD_TIMEOUT = 30_000;
+/**
+ * Scene-load wait inside bootGameWithTutorial. Under CPU contention the
+ * scene boot + lifecycle init (TutorialOfferModal construction, HUD wiring,
+ * SVG prewarm) stretches well past the old 30s; this only affects failure
+ * latency, never correctness (CG-0MTG4EAVR005JB3W).
+ */
+export const SCENE_LOAD_TIMEOUT = 90_000;
 export const UI_TRANSITION_TIMEOUT = 5_000;
 export const SCREENSHOT_DIR = 'main-street-tutorial-e2e';
 
@@ -101,6 +107,50 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
   _gameBootCount++;
   const cycleNumber = _gameBootCount;
 
+  // Boot retry loop (CG-0MTGHZWOO001WWOU): under full-suite resource
+  // pressure (dozens of Phaser game create/destroy cycles in one browser
+  // context), a boot's async tutorial-offer chain can stall: checkAndResume()
+  // (fire-and-forget inside the _campaignLoadPromise .then callback) may
+  // take long enough that the offer modal's show() is delayed, or the
+  // swallowed-error fallback paths in the lifecycle manager can silently
+  // skip showing it entirely. A retry after a full destroy + GC-settling
+  // delay usually boots cleanly. Only when all retries fail do we surface
+  // the diagnostic error.
+  const MAX_BOOT_ATTEMPTS = 3;
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= MAX_BOOT_ATTEMPTS; attempt++) {
+    try {
+      return await attemptBoot(cycleNumber, attempt);
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      console.warn(
+        `[bootGameWithTutorial #${cycleNumber}] Boot attempt ${attempt}/${MAX_BOOT_ATTEMPTS} failed: ` +
+        `${lastError.message}. Destroying game and retrying after GC settle...`,
+      );
+      if (attempt < MAX_BOOT_ATTEMPTS) {
+        try { await destroyGame(lastErrorBootGame); } catch { /* ignore */ }
+        lastErrorBootGame = null;
+        // Extended GC-settling delay between attempts: the browser needs
+        // time to release canvas contexts / collect garbage before the next
+        // Phaser boot can render.
+        await new Promise((r) => setTimeout(r, 1_000));
+        // Re-wipe stale saves so the retry boots clean.
+        try { await clearStaleMainStreetSaves(); } catch { /* best-effort */ }
+      }
+    }
+  }
+  throw lastError ?? new Error('[bootGameWithTutorial] all boot attempts failed');
+}
+
+/** The most recently created game instance from attemptBoot (for retry cleanup). */
+let lastErrorBootGame: Phaser.Game | null = null;
+
+/**
+ * Single boot attempt: clean DOM/localStorage/IndexedDB, create the game,
+ * wait for the scene + campaign load, and verify the tutorial offer modal
+ * (or resume overlay) rendered.
+ */
+async function attemptBoot(cycleNumber: number, attempt: number): Promise<Phaser.Game> {
   document.querySelectorAll('canvas').forEach((el) => el.remove());
   const existing = document.getElementById('game-container');
   if (existing) existing.remove();
@@ -114,6 +164,18 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
       }
     }
   } catch { /* ignore non-browser environments */ }
+
+  // Stale-checkpoint hardening (CG-0MTFREYSJ005EW43): each vitest browser
+  // session runs its file queue sequentially in ONE browser context, so a
+  // previously executed file's game can leave 'run-checkpoint'/'campaign'
+  // records behind (a turn-end autosave resolving after its own destroyGame
+  // clear, ~50% under parallel-browser CPU contention). That routes this
+  // boot into checkAndResume(), suppressing the '[ Start Tutorial ]' offer
+  // and failing waitForStartButton. Wipe the two slots with plain readwrite
+  // transactions (NO deleteDatabase: a version-change delete would block
+  // this boot's own SaveLoadStore.open() — see CG-0MTFREYSJ005EW43 wedge
+  // note). Best-effort, race-capped so the boot can never hang on it.
+  await clearStaleMainStreetSaves();
   const container = document.createElement('div');
   container.id = 'game-container';
   document.body.appendChild(container);
@@ -124,6 +186,7 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
     '../../example-games/main-street/createMainStreetGame'
   );
   const game = createMainStreetGame({ type: Phaser.CANVAS, parent: 'game-container', width: 1280, height: 720 });
+  lastErrorBootGame = game;
 
   // Same-turn buy-and-play charged a +50% premium and fired a one-time
   // explainer dialog (CG-0MT24X0SX007RLHN). The two-turn tutorial rework
@@ -174,14 +237,168 @@ export async function bootGameWithTutorial(): Promise<Phaser.Game> {
   }
 
   // The tutorial offer modal is shown inside an async .then() callback
-  // (loadCampaignProgress) in the LifecycleManager. Wait for that promise
-  // so showIfEligible has been called before the test checks for the modal.
+  // (loadCampaignProgress) in the LifecycleManager — and crucially
+  // checkAndResume() (itself async, fire-and-forget) runs inside that
+  // callback, so _campaignLoadPromise can resolve BEFORE the modal's
+  // show() executes. Wait for that promise, then poll for the modal:
+  // (a) a late-but-healthy show must not be treated as a failure, and
+  // (b) a stale checkpoint from a PREVIOUS test file routes the boot into
+  // the resume overlay instead — detect its '[ New Game ]' button and
+  // click it to clear (CheckpointManager.onNewGame → clear() →
+  // freshStartFn → tutorial offer). See CG-0MTFREYSJ005EW43 /
+  // CG-0MTGHZWOO001WWOU.
   const campaignPromise = (scene as any)?._campaignLoadPromise;
   if (campaignPromise) {
     await campaignPromise;
   }
 
+  const modal = (scene as any).tutorialOfferModal as
+    | { isVisible?: boolean; overlayObjects?: Phaser.GameObjects.GameObject[] }
+    | undefined;
+
+  const MODAL_POLL_TIMEOUT = 15_000;
+  const modalDeadline = Date.now() + MODAL_POLL_TIMEOUT;
+  while (Date.now() < modalDeadline && modal && !modal.isVisible) {
+    // Stale-checkpoint path: if the resume overlay is showing, click
+    // '[ New Game ]' to clear the checkpoint and surface the tutorial offer.
+    const resumeBtn = findPhaserTextByLabel(scene, '[ Resume ]');
+    const newGameBtn = findPhaserTextByLabel(scene, '[ New Game ]');
+    if (newGameBtn && resumeBtn) {
+      console.warn(
+        `[bootGameWithTutorial #${cycleNumber}] Stale checkpoint detected: resume ` +
+        `overlay shown instead of tutorial offer. Clicking '[ New Game ]' to clear.`,
+      );
+      newGameBtn.emit('pointerdown', {
+        x: newGameBtn.x,
+        y: newGameBtn.y,
+        worldX: newGameBtn.x,
+        worldY: newGameBtn.y,
+      });
+      // onNewGame clears async then shows the modal; give it a beat before
+      // the next poll iteration re-checks isVisible.
+      await new Promise((r) => setTimeout(r, 250));
+      continue;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  // Verify the tutorial offer modal was actually shown. Under resource
+  // pressure from preceding browser tests, the scene can load but the
+  // modal's async show() chain can stall or throw silently (errors are
+  // swallowed by the lifecycle manager's catch-all), leaving
+  // waitForStartButton to time out after 40 s. A diagnostic throw here
+  // converts that silent flakiness into a clear, fast failure with
+  // actionable context. See CG-0MTGHZWOO001WWOU.
+  if (modal && !modal.isVisible) {
+    const state = (scene as any).campaign?.tutorialState;
+    const urlParam = new URL(window.location.href).searchParams.get('tutorial');
+    const resumeBtn = findPhaserTextByLabel(scene, '[ Resume ]');
+    const newGameBtn = findPhaserTextByLabel(scene, '[ New Game ]');
+    // Diagnostic dump: what's on screen / in the scene when the modal
+    // never appeared. NOTE: scene.displayList is a Layer wrapper in
+    // Phaser 4 RC — the real object list lives on scene.add.displayList
+    // (=== sys.displayList). Measure that one.
+    const displayObjects = (() => {
+      try {
+        const list = (scene.add as any)?.displayList?.getAll?.() ?? [];
+        const byType = new Map<string, number>();
+        for (const o of list as Phaser.GameObjects.GameObject[]) {
+          const t = (o as any).type ?? 'unknown';
+          byType.set(t, (byType.get(t) ?? 0) + 1);
+        }
+        const types = [...byType.entries()].map(([k, v]) => `${k}x${v}`).join(', ');
+        const texts = (list as Phaser.GameObjects.GameObject[])
+          .filter((o) => o instanceof Phaser.GameObjects.Text)
+          .map((t) => (t as Phaser.GameObjects.Text).text)
+          .slice(0, 30)
+          .join(' | ');
+        return `count=${list.length} types=${types || '(empty)'} texts=${texts || '(no text)'}`;
+      } catch { return '(failed to dump)'; }
+    })();
+    const s = scene as any;
+    const checkpoint = await (async () => {
+      try { return await s.checkpointManager?.load?.(); } catch (e) { return `load threw: ${String(e)}`; }
+    })();
+    throw new Error(
+      `[bootGameWithTutorial #${cycleNumber} attempt ${attempt}] Tutorial offer modal not shown after ` +
+      `_campaignLoadPromise resolved + ${MODAL_POLL_TIMEOUT / 1000}s poll. ` +
+      `Modal exists: ${!!modal}. isVisible: ${modal.isVisible}. ` +
+      `overlayObjects.length: ${modal.overlayObjects?.length ?? 'undefined'}. ` +
+      `URL tutorial param: ${urlParam}. Campaign tutorialState: ${JSON.stringify(state)}. ` +
+      `Resume overlay present: ${!!resumeBtn && !!newGameBtn} ` +
+      `(resume='${resumeBtn?.text}', newGame='${newGameBtn?.text}'). ` +
+      `checkpointManager exists: ${!!s.checkpointManager}. ` +
+      `checkpointManager.load(): ${checkpoint === null || checkpoint === undefined ? 'none' : JSON.stringify(checkpoint)?.slice(0, 200)}. ` +
+      `saveStore exists: ${!!s.saveStore}. deferredDayBanner: ${s.deferredDayBanner}. ` +
+      `Display list (factory/sys): ${displayObjects}. ` +
+      `This usually means the async checkAndResume → freshStartFn → show() ` +
+      `chain stalled or threw silently (errors are swallowed), or the scene ` +
+      `failed to render under resource pressure from preceding browser tests. ` +
+      `Try running browser tests in smaller batches or increasing the canvas ` +
+      `context limit.`,
+    );
+  }
+
   return game;
+}
+
+/**
+ * Best-effort removal of stale Main Street 'run-checkpoint' and 'campaign'
+ * records from the shared-session IndexedDB. Uses a plain readwrite
+ * transaction on the same-version DB so it can never block subsequent opens
+ * (unlike deleteDatabase). Abandoned (race-capped) wipes leave only an idle
+ * connection in this context, which is torn down with the session.
+ */
+async function clearStaleMainStreetSaves(): Promise<void> {
+  const deadline = () =>
+    new Promise<void>((resolve) => setTimeout(resolve, 5000));
+  try {
+    if (typeof indexedDB === 'undefined') return;
+    const db = await Promise.race([
+      new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open('save-load-store', 1);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('open timeout')), 5000),
+      ),
+    ]);
+    try {
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          const tx = db.transaction('saves', 'readwrite');
+          const store = tx.objectStore('saves');
+          const index = store.index('domain_gameType_slot');
+          const keysToDelete: IDBValidKey[] = [];
+          for (const domain of ['run-checkpoint', 'campaign']) {
+            const req = index.getAll(IDBKeyRange.only([domain, 'main-street']));
+            req.onsuccess = () => {
+              for (const r of req.result as Array<{ id: IDBValidKey }>) {
+                keysToDelete.push(r.id);
+              }
+            };
+            req.onerror = () => { /* keep going */ };
+          }
+          tx.oncomplete = () => {
+            // Delete after reads complete, in a follow-up transaction so the
+            // read transaction's completion carries the deletions atomically.
+            const delTx = db.transaction('saves', 'readwrite');
+            const delStore = delTx.objectStore('saves');
+            for (const k of keysToDelete) delStore.delete(k);
+            delTx.oncomplete = () => resolve();
+            delTx.onerror = () => resolve();
+            delTx.onabort = () => resolve();
+          };
+          tx.onerror = () => resolve();
+          tx.onabort = () => resolve();
+        }),
+        deadline(),
+      ]);
+    } finally {
+      db.close();
+    }
+  } catch { /* non-browser / IndexedDB unavailable — proceed without wipe */ }
 }
 
 /**

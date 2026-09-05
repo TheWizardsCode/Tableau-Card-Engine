@@ -1,6 +1,6 @@
 import { CARD_TEMPLATE_NAMES, getCsvRows } from '../MainStreetCards';
 import { rasteriseSvgToTexture, makeTextureKey } from '../../../src/core-engine';
-import { generateCardSvgFromCsvRow } from './MainStreetCardSvgGenerator';
+import { generateCardSvgFromCsvRow, replaceCardTitleInSvg } from './MainStreetCardSvgGenerator';
 import { CARD_BACK_TEMPLATE } from './MainStreetConstants';
 
 export class MainStreetSvgTextureManager {
@@ -131,6 +131,19 @@ export class MainStreetSvgTextureManager {
       if (biz) visibleTemplates.add(this.templateIdFromCardId(biz.id));
     }
 
+    // Upgraded businesses on the street render a **variant** face with their
+    // display name baked in (CG-0MT24MHGZ0025O20). Prewarm those variants so
+    // the upgraded name is visible immediately (no base-name flash).
+    const upgradeVariants: Array<{ templateId: string; displayName: string }> = [];
+    for (const biz of s.state.streetGrid) {
+      if (!biz || !biz.displayName) continue;
+      const templateId = this.templateIdFromCardId(biz.id);
+      const baseName = CARD_TEMPLATE_NAMES.get(templateId);
+      if (biz.displayName !== baseName) {
+        upgradeVariants.push({ templateId, displayName: biz.displayName });
+      }
+    }
+
     // Include event cards in the player's hand in the visible template set
     for (const card of s.state.hand ?? []) {
       if (card.family === 'event') {
@@ -140,6 +153,13 @@ export class MainStreetSvgTextureManager {
 
     const dpr = this.getCurrentDevicePixelRatio();
     const rasterizePromises: Promise<void>[] = [];
+
+    const sizes = [
+      { w: s.layout.marketCardW, h: s.layout.marketCardH },
+      { w: s.layout.slotW, h: s.layout.slotH },
+      { w: s.layout.handW, h: s.layout.handH },
+      { w: s.layout.queueCardW, h: s.layout.queueCardH },
+    ];
 
     // Face-down incident-deck card back (CG-0MSXOWLHU0099QF6): prewarm at
     // the queue size so the deck stack renders immediately.
@@ -156,13 +176,6 @@ export class MainStreetSvgTextureManager {
     for (const templateId of visibleTemplates) {
       const svgText = s.cardSvgSources.get(templateId);
       if (!svgText) continue;
-
-      const sizes = [
-        { w: s.layout.marketCardW, h: s.layout.marketCardH },
-        { w: s.layout.slotW, h: s.layout.slotH },
-        { w: s.layout.handW, h: s.layout.handH },
-        { w: s.layout.queueCardW, h: s.layout.queueCardH },
-      ];
 
       for (const size of sizes) {
         const key = makeTextureKey(templateId, size.w, size.h, dpr);
@@ -181,22 +194,66 @@ export class MainStreetSvgTextureManager {
       }
     }
 
+    for (const variant of upgradeVariants) {
+      const base = s.cardSvgSources.get(variant.templateId);
+      if (!base) continue;
+      const variantSvg = replaceCardTitleInSvg(base, variant.displayName);
+      for (const size of sizes) {
+        const key = this.variantTextureKey(variant.templateId, variant.displayName, size.w, size.h, dpr);
+        if (s.textures.exists(key)) continue;
+        const p = rasteriseSvgToTexture(s, key, variantSvg, size.w, size.h, dpr)
+          .catch(() => {});
+        rasterizePromises.push(p);
+      }
+    }
+
     await Promise.all(rasterizePromises);
   }
 
   public templateIdFromCardId(cardId: string): string {
-    return cardId.replace(/-\d+$/, '');
+    return cardId.replace(/--cheat-\d+$/, '').replace(/-\d+$/, '');
   }
 
-  public requestCardTexture(cardId: string, renderW: number, renderH: number): void {
+  /**
+   * Texture cache key for an upgraded business whose face has displayName
+   * baked in (CG-0MT24MHGZ0025O20). Kept distinct from the base template's
+   * key so base and upgraded copies of the same business get their own
+   * textures. Falls back to the plain template id when no variant requested
+   * (i.e. printable base cards).
+   */
+  private variantKeyId(templateId: string, displayName?: string): string {
+    if (!displayName) return templateId;
+    const baseName = CARD_TEMPLATE_NAMES.get(templateId);
+    if (displayName === baseName) return templateId;
+    return `${templateId}~~${displayName}`;
+  }
+
+  private variantTextureKey(
+    templateId: string,
+    displayName: string,
+    renderW: number,
+    renderH: number,
+    dpr: number,
+  ): string {
+    return makeTextureKey(this.variantKeyId(templateId, displayName), renderW, renderH, dpr);
+  }
+
+  public requestCardTexture(cardId: string, renderW: number, renderH: number, displayName?: string): void {
     const s = this.scene;
     const templateId = this.templateIdFromCardId(cardId);
-    const svgText = s.cardSvgSources.get(templateId);
-    if (!svgText) return;
+    const baseSvg = s.cardSvgSources.get(templateId);
+    if (!baseSvg) return;
 
     const dpr = this.getCurrentDevicePixelRatio();
-    const key = makeTextureKey(templateId, renderW, renderH, dpr);
+    const key = this.variantTextureKey(templateId, displayName ?? '', renderW, renderH, dpr);
     if (s.textures.exists(key)) return;
+
+    // Upgraded cards (displayName set) render a variant face with the upgraded
+    // name baked into the SVG, exactly like the base name is baked into the
+    // template (CG-0MT24MHGZ0025O20).
+    const svgText = displayName
+      ? replaceCardTitleInSvg(baseSvg, displayName)
+      : baseSvg;
 
     void rasteriseSvgToTexture(s, key, svgText, renderW, renderH, dpr).then(() => {
       try {
@@ -207,13 +264,14 @@ export class MainStreetSvgTextureManager {
     });
   }
 
-  public templateKeyForCard(cardId: string, width?: number, height?: number): string {
-    const base = cardId.replace(/-\d+$/, '');
+  public templateKeyForCard(cardId: string, width?: number, height?: number, displayName?: string): string {
+    const base = this.templateIdFromCardId(cardId);
+    const id = this.variantKeyId(base, displayName);
     if (width !== undefined && height !== undefined) {
       const dpr = this.getCurrentDevicePixelRatio();
-      return makeTextureKey(base, width, height, dpr);
+      return makeTextureKey(id, width, height, dpr);
     }
-    return `ms_card_${base}`;
+    return `ms_card_${id}`;
   }
 
 }

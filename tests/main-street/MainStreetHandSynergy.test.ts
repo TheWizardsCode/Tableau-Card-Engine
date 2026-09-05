@@ -393,8 +393,8 @@ describe('MainStreet Hand Card Synergy Bonus', () => {
 
       const result = computeIncome(state.streetGrid);
 
-      // Percentage-based: each gets 1 base + 0.5 synergy = 1.5, total = 3
-      expect(result.total).toBe(3);
+      // Percentage-based (×100 integer rounding: 0.5→1): each gets 1 base + round(1*0.5)=1, total 4
+      expect(result.total).toBe(4);
     });
   });
 

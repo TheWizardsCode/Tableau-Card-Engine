@@ -119,7 +119,7 @@ Deliver AI auto-play, a player-facing hint system, and undo/redo functionality f
 
 **Acceptance Criteria:**
 - [ ] AC-2.1: `GreedyStrategy` implements `MainStreetAiStrategy` and evaluates all legal actions using a scoring function.
-- [ ] AC-2.2: Greedy strategy follows the priority chain: upgrade (if available and affordable) > buy business (best placement score) > buy event (positive ROI) > play event from hand > end turn.
+- [ ] AC-2.2: Greedy strategy follows the priority chain: upgrade (if available and affordable) > buy business (best placement score) > buy event (free take-to-hand, positive expected value) > play event from hand > end turn.
 - [ ] AC-2.3: Business placement scoring considers adjacency synergy bonus for each candidate slot.
 - [ ] AC-2.4: Given 100 different seeds, `GreedyStrategy` achieves a higher win rate than `RandomStrategy`.
 - [ ] AC-2.5: Given the same seed, Greedy strategy produces identical game outcomes across repeated runs (deterministic).
@@ -247,7 +247,7 @@ The Greedy strategy follows a priority chain, evaluating all legal actions and s
 
 **Priority 2: Buy Business** -- For each affordable business card, evaluate every empty slot. Score = `(baseIncome + projectedSynergyBonus) * remainingTurns - cost`. The projected synergy bonus is computed by `computeSynergyBonus()` assuming the card is placed at that slot.
 
-**Priority 3: Buy Event** -- If an affordable Investment event has positive expected value (`coinDelta + reputationDelta > cost`), buy it. Score = `expectedValue - cost`.
+**Priority 3: Buy Event** -- Take an Investment event from the market into the hand **for free** (CG-0MT5W1V4D007NN8Q); the event's listed cost is paid when it is played from hand (Priority 4). Score = `coinDelta + reputationDelta` (no cost subtracted at take time).
 
 **Priority 4: Play Event from Hand** -- If the player holds an Investment event card in hand, play it. Score = a fixed bonus (ensures events are played before end-of-turn).
 
@@ -739,10 +739,10 @@ For branching upgrades, evaluate each branch independently and pick the higher-s
 #### Buy Event (Investment)
 
 ```
-score = coinDelta + reputationDelta - cost
+score = coinDelta + reputationDelta
 ```
 
-Only consider events with positive score (i.e., expected value exceeds cost).
+Taking an Investment event to hand is **free** (CG-0MT5W1V4D007NN8Q) — no cost is subtracted here; the event's listed cost is charged when it is played from hand (see Play Held Event). Only take events with a positive score.
 
 #### Play Held Event
 

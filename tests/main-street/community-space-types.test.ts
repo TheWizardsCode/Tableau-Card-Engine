@@ -255,7 +255,7 @@ describe('Park reclassification to community-space (AC4)', () => {
     expect(park).toBeDefined();
 
     // These stats should remain unchanged from original business card
-    expect(park!.cost).toBe(3);
+    expect(park!.cost).toBe(300);
     expect(park!.baseIncome).toBe(0);
     // Synergy rebalanced Culture -> Entertainment (CG-0MT3IPFSF005KEFB):
     // Park's "leisure space" flavour now feeds the Entertainment type.
@@ -332,7 +332,7 @@ describe('Library card design and stats (AC5)', () => {
     expect(libraryUpgrade!.cost).toBeGreaterThan(0);
     expect(libraryUpgrade!.incomeBonus).toBe(0);
     expect(libraryUpgrade!.synergyRangeBonus).toBe(0);
-    expect(libraryUpgrade!.reputationBonus).toBe(0.1);
+    expect(libraryUpgrade!.reputationBonus).toBe(10);
     expect(libraryUpgrade!.description.length).toBeGreaterThan(0);
     expect(libraryUpgrade!.family).toBe('upgrade');
   });
@@ -340,10 +340,10 @@ describe('Library card design and stats (AC5)', () => {
   it('Library should be a reputation asset: cost 7, no income, ongoing cost, +0.1 rep/turn', () => {
     const library = communitySpaceDeck.find(c => c.name === 'Library');
     expect(library).toBeDefined();
-    expect(library!.cost).toBe(7);
+    expect(library!.cost).toBe(700);
     expect(library!.baseIncome).toBe(0);
-    expect(library!.ongoingCost).toBe(0.25);
-    expect(library!.reputationPerTurn).toBe(0.1);
+    expect(library!.ongoingCost).toBe(25);
+    expect(library!.reputationPerTurn).toBe(10);
   });
 
   it('Library should participate in Culture synergy (Park model, default rates)', () => {
@@ -359,8 +359,8 @@ describe('Library card design and stats (AC5)', () => {
   it('Library description should mention the running cost and reputation', () => {
     const library = communitySpaceDeck.find(c => c.name === 'Library');
     expect(library).toBeDefined();
-    expect(library!.description).toMatch(/0\.25/);
-    expect(library!.description).toMatch(/0\.1/);
+    expect(library!.description).toMatch(/25/);
+    expect(library!.description).toMatch(/10/);
   });
 });
 

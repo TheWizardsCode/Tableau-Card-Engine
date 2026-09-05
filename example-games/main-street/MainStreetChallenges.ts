@@ -224,20 +224,20 @@ export const CHALLENGE_TEMPLATES: readonly Challenge[] = [
   {
     id: 'ch-deep-pockets',
     title: 'Deep Pockets',
-    description: 'Accumulate 30 or more coins at any point.',
+    description: 'Accumulate 3000 or more coins at any point.',
     category: 'resource',
     evaluator: (state: MainStreetState): boolean => {
-      return state.resourceBank.coins >= 30;
+      return state.resourceBank.coins >= 3000;
     },
     rewardPoints: CHALLENGE_BONUS_POINTS,
   },
   {
     id: 'ch-beloved-mayor',
     title: 'Beloved Mayor',
-    description: 'Reach 10 or more reputation.',
+    description: 'Reach 1000 or more reputation.',
     category: 'resource',
     evaluator: (state: MainStreetState): boolean => {
-      return state.resourceBank.reputation >= 10;
+      return state.resourceBank.reputation >= 1000;
     },
     rewardPoints: CHALLENGE_BONUS_POINTS,
   },

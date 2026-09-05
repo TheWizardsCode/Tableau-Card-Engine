@@ -193,10 +193,16 @@ TCE_SMOKE_BINARY=/path/to/binary npx vitest run --project electron
 ## Testing
 
 ```bash
+npm run monte-carlo       # run the Main Street Monte Carlo harness (JSON + CSV outputs)
+npm run monte-carlo-sweep  # sweep strategy × difficulty combinations (per-combo JSON + CSV in results/)
+npm run save-load-smoke    # deterministic save/restore + campaign round-trip smoke (exit 0 = pass)
 npm test            # run all tests once (unit + browser, no tracked-asset restore step)
-npm run monte-carlo # run Main Street Monte Carlo harness (JSON + CSV outputs)
 npm run tf:generate # generate tf audio artifacts (out-of-repo build/tf-synths)
 ```
+
+The MC harness scripts import deck-building functions from `MainStreetCards.ts` (which loads
+`card-data.csv` via Vite's `?raw`), so all three run under `vite-node` — the Vite-aware ESM
+loader — never tsx (see the same rationale in `docs/main-street/card-catalog.md`).
 
 `npm test` is intentionally non-destructive and must not mutate tracked source assets such as `public/assets/games/main-street/svg/cards`. If asset regeneration is needed, run the dedicated generation scripts explicitly.
 
@@ -280,6 +286,115 @@ Two mitigations are in place in this repository:
    `tests/scripts/vitest-run-with-retry.test.ts`) proves "all passed" from the
    summary before a retry is allowed, so a genuine test failure can never be
    hidden by a retry.
+
+3. **Test-side hardening (browser tests)** — beyond the runner-level
+   mitigations above, browser tests that drive the real Phaser pointer
+   pipeline (dispatched DOM events at layout-derived canvas coordinates, e.g.
+   the Main Street slot-click suites) can intermittently have their click
+   dropped or delayed when the RAF-driven game loop is starved of frames by
+   parallel full-suite runs. Two conventions keep these suites green under
+   contention without masking real regressions:
+
+   - **Generous per-wait budgets**: animation- or frame-loop-gated waits (a
+     triggered reveal, a dialog created by a transfer-completion callback)
+     use multi-second budgets (5-10s per step) instead of tight sub-second
+     expects, bounded by an explicit per-test timeout (e.g. 90s) rather than
+     Vitest's default.
+   - **Retry a dropped click**: when a real-pointer click is expected to move
+     the scene out of an interaction phase (e.g. `uiPhase` leaves
+     `'placing-from-hand'`), poll for the phase change and re-dispatch the
+     click on a short interval if the phase has not moved, within a generous
+     retry window (30s) that leaves headroom under the test's total budget.
+     Re-dispatch is safe because the interaction handler no-ops once the
+     phase has moved.
+   - **Deterministic boot conditions**: tests that assume a buyable market
+     card at boot set generous coins (e.g. `resourceBank.coins = 100`)
+     rather than relying on the random seed's initial market draw — the
+     default boot is not guaranteed to contain an affordable
+     business/community-space card (see `tests/main-street/undo-redo.browser.test.ts`).
+   - **Clear stale persistent checkpoints before boot**: a Main Street boot
+     checks for a saved run checkpoint (tutorial mode included) and, if one
+     exists, shows the resume overlay — a full-screen interactive backdrop
+     (depth 2000, no pointerdown handler) that hides the start UI and
+     swallows every street-slot click under `topOnly`. An end-of-turn
+     auto-save from an earlier test/file/run therefore turns any later
+     booting/interaction suite into a false failure until the checkpoint is
+     cleared. Tests that boot Main Street wipe IndexedDB + localStorage at
+     boot (non-blocking `deleteDatabase`, resolving on `onblocked`) — see
+     `clearPersistentStorage()` in
+     `tests/main-street/click-place.browser.test.ts`,
+     `tests/main-street/composite-click.browser.test.ts`,
+     `tests/main-street/drag.browser.test.ts`,
+     `tests/main-street/hint-bar-placement.browser.test.ts`,
+     `tests/main-street/undo-redo.browser.test.ts`, and
+     `tests/ui/MainStreetMigration.browser.test.ts`. This is not just a
+     visual-overlay hazard: a mid-day checkpoint restores a partially-sold
+     market row with no business cards, so tests that assume a buyable
+     business card (e.g. undo-redo's affordable-card finder) fail unless the
+     checkpoint is cleared first (the ≥1-business guarantee applies at
+     refill time only).
+     The tutorial boot (`bootGameWithTutorial()` in
+     `tests/helpers/main-street-tutorial-e2e.ts`) additionally wipes stale
+     `run-checkpoint`/`campaign` records **before** creating the game
+     (CG-0MTFREYSJ005EW43): a preceding file in the same vitest browser
+     session (one Playwright context per session — same-origin IndexedDB is
+     shared across files) can leave a turn-end autosave that lands after its
+     own `destroyGame` clear, routing the next tutorial boot down the resume
+     path and suppressing the `[ Start Tutorial ]` offer. This wipe uses
+     plain readwrite transactions on the same-version `save-load-store` DB
+     — deliberately **not** `deleteDatabase`, whose pending version-change
+     delete would block the tutorial boot's own `SaveLoadStore.open()`
+     (the boot uniquely awaits the campaign-load promise) and wedge the
+     suite with a 90s hook timeout.
+   - **Boot retry + modal poll** (CG-0MTGHZWOO001WWOU): `bootGameWithTutorial`
+     wraps the boot in up to 3 attempts (full `destroyGame` + 1 s GC-settle
+     between attempts), because under full-suite resource pressure the
+     async tutorial-offer chain can stall: `checkAndResume()` runs
+     fire-and-forget inside the `_campaignLoadPromise` `.then` callback, so
+     that promise can resolve before the offer modal's `show()` executes.
+     After awaiting it, the helper polls up to 15 s for the modal (a
+     late-but-healthy show is not a failure), clicking the resume overlay's
+     `[ New Game ]` button if a stale checkpoint surfaces instead. Only when
+     the poll and all retries fail does it throw a diagnostic error (with
+     checkpoint/display-list state) instead of leaving `waitForStartButton`
+     to time out silently after 40 s.
+   - **Content-aware render gates**: fixed-frame waits (`waitFrames(24)`)
+     with a hard 2s fallback resolve while a CPU-starved RAF loop has only
+     produced a couple of frames, so pixel-analysis assertions can sample an
+     unrendered canvas. `MainStreetMigration.browser.test.ts` first waits
+     until the market container actually holds rendered card objects
+     (`waitForSceneContent`, 15s budget) before the frame wait and the pixel
+     pass — see the migration smoke suite.
+   - **Generous boot/UI budgets for every Phaser scene**: boot-time work
+     (SVG regeneration, tutorial offer flow) and RAF-gated UI waits stretch
+     under parallel-browser contention. The coldest Main Street boot
+     (first boot of a file, all-scene SVG regeneration plus the tutorial
+     offer flow) has been observed to exceed 30s under full-suite
+     contention, so the tutorial boot wait uses a 40s budget with a 90s
+     beforeEach hook
+     (`waitForStartButton(..., 40_000)` in
+     `tests/main-street/TutorialOverlayClickThrough.browser.test.ts`);
+     composite's premium-dialog wait factors loop liveness (frozen RAF
+     detection) into a 60s deadline instead of a blind timer
+     (`tests/main-street/composite-click.browser.test.ts`); and peek's
+     tween-completion waits use 10s budgets
+     (`tests/main-street/peek.browser.test.ts`), matching the 5-10s
+     per-wait convention. A beforeEach hook that boots a game plus waits for
+     UI must raise its own budget beyond Vitest's default 30s (e.g. 90s for
+     the tutorial file) or the hook itself times out while the boot is still
+     legitimately progressing.
+   - **Subprocess-launching unit tests need generous per-test timeouts**: a
+     unit test that spawns a vite-node / npm child process (cold TS
+     transpile of the whole module graph) can exceed the unit project's 15s
+     default `testTimeout` under parallel-suite saturation — the child has
+     its own generous `runCmd` budget (180s) but the vitest cap fires
+     first. `tests/main-street/harness-cli.test.ts` therefore sets an
+     explicit `180_000` per-test timeout on its monte-carlo and
+     save-load-smoke subprocess tests (matching the `replay-e2e` project's
+     `180_000` precedent).
+
+   References (CG-0MTF70V9X002CAYH): `tests/main-street/incident-reveal.browser.test.ts`
+   and `tests/main-street/composite-click.browser.test.ts`.
 
 #### Hang timeout (bounded wall-clock abort)
 
@@ -1459,7 +1574,14 @@ This is a **pure data module** with no Phaser or runtime dependencies. It define
 
 - **`OverlayTextSpec`** – Describes a text overlay with `text`, `x`, `y`, `fontSize`, `color`, and `fontStyle` properties.
 - **`OverlayBorderSpec`** – Describes a border/glow overlay with `color` (hex number) and `strokeWidth` (pixels).
-- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `incomeText`, `nameText`, and `upgradeBorder`.
+- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `cashLine`, `reputationText`, and `upgradeBorder`.
+
+> **Note (CG-0MT24MHGZ0025O20):** The upgraded business **name is not part of
+> the overlay spec** — per manual review it must render as part of the card
+> image. The renderer bakes it in via a **display-name variant texture**: the
+> texture manager generates an SVG variant of the base template whose title is
+> the card's `displayName` (e.g. `Patisserie`), keyed by template+displayName,
+> so the upgraded card's face shows the new name exactly like the base name.
 
 The key function is `buildUpgradeOverlaySpec(biz: BusinessCard, width: number, height: number): UpgradeOverlaySpec`:
 
@@ -1467,16 +1589,18 @@ The key function is `buildUpgradeOverlaySpec(biz: BusinessCard, width: number, h
 BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlaySpec
   (level, name,          (pure function,              (positioned text
    baseIncome,            no Phaser deps)               specs + border
-   incomeBonus)                                        spec)
+   incomeBonus,                                          spec)
+   ongoingCost)
 ```
 
 **Logic:**
-- Base cards (`level === 0`): All overlay fields are `null` — nothing extra is rendered.
-- Upgraded cards (`level > 0`): All four overlay specs are populated:
+- Base cards (`level === 0`): level badge and border are `null`; the cash line is populated when income or cost > 0.
+- Upgraded cards (`level > 0`): The non-name overlays are populated:
   - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-right corner, 10px bold.
-  - **Income text** — `"+N"` (combined `baseIncome + incomeBonus`) in green (`#44ff44`), bottom-center, 12px bold.
-  - **Name overlay** — Upgraded card name in white (`#ffffff`), top-center, 10px bold, with a dark semi-transparent background rectangle for readability.
+  - **Cash line** — `"Cash: +X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the `Cash:` prefix and ` / ` separator in neutral grey (`#dddddd`). The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `Cash: +2`, `Cash: -0.75`) (CG-0MTCP76MP0088TQW).
+  - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below the cash line.
   - **Upgrade border** — Golden stroke (`0xffaa22`), 3px width, around the card perimeter.
+  - **Name** — NOT an overlay: baked into the card's SVG via a display-name variant texture (CG-0MT24MHGZ0025O20).
 
 #### Layer 2: Overlay Rendering (`MainStreetRenderer.applyUpgradeOverlays()`)
 
@@ -1492,18 +1616,26 @@ UpgradeOverlaySpec ──► applyUpgradeOverlays() ──► Phaser text/graphi
 
 **Rendering order (back to front within the container):**
 1. Upgrade border (transparent fill, golden stroke) — drawn behind text but on top of card image.
-2. Name overlay background (dark semi-transparent rectangle) — for readability.
-3. Name text (white bold).
-4. Level badge text (gold, top-right).
-5. Income text (green, bottom-center).
+2. Level badge text (gold, top-right).
+3. Cash line text (two-tone: green income / red cost, centre, above reputation).
+4. Reputation text (blue, below cash line).
+
+The upgraded card NAME is not an overlay — it is part of the card's SVG
+face (display-name variant texture, CG-0MT24MHGZ0025O20).
+
+The per-turn ongoing cost is **not** baked into the business/community-space
+card SVG face — it is shown by the two-tone cash line overlay
+(CG-0MTDMOYOL008IQVO). Staff cards keep their baked `-X/turn` cost text since
+they have no overlay pipeline.
 
 **Call site:** `drawBusinessSlot()` in `MainStreetRenderer.ts`:
 
 ```typescript
-// Render base card SVG
-mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
+// Render card SVG. Upgraded businesses pass displayName so the texture
+// manager rasterises a display-name variant with the upgraded name baked in.
+mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH, biz.displayName);
 
-// Apply upgrade overlays on top
+// Apply the remaining upgrade overlays (level badge, cash line, rep, border)
 this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ```
 
@@ -1524,8 +1656,9 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  drawBusinessSlot()                              │
-│  1. mainStreetRenderCardSvg() → base SVG texture (cached)       │
-│  2. applyUpgradeOverlays() → Phaser overlays on top             │
+│  1. mainStreetRenderCardSvg(+ displayName) → variant SVG texture │
+│     (displayName baked in for upgraded cards, CG-0MT24MHGZ0025O20)  │
+│  2. applyUpgradeOverlays() → level/cash-line/rep/border overlays │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
               ┌────────────┴────────────┐
@@ -1533,9 +1666,10 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ┌─────────────────────┐     ┌─────────────────────────────┐
 │  Base SVG texture   │     │  buildUpgradeOverlaySpec()  │
 │  (cached, reused)   │     │  → levelBadge: "Lvl 2"      │
-│                     │     │  → incomeText: "+8"          │
-│                     │     │  → nameText: "Library"       │
-│                     │     │  → upgradeBorder: gold 3px   │
+│  + display-name     │     │  → cashLine: "Cash: +8"    │
+│  variant (upgraded) │     │  → upgradeBorder: gold 3px   │
+│                     │     │  (name is baked into the     │
+│                     │     │   variant texture, not here) │
 └─────────────────────┘     └──────────────┬──────────────┘
                                            │
                                            ▼
@@ -1543,8 +1677,7 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
                               │  applyUpgradeOverlays()     │
                               │  Creates Phaser objects:    │
                               │  - Rectangle (golden border)│
-                              │  - Graphics (name bg)       │
-                              │  - Text (name, level, income)│
+                              │  - Text (level, cash line, rep)│
                               └─────────────────────────────┘
 ```
 
@@ -1582,7 +1715,7 @@ if (spec.starIcon) {
 
 ### Why Not SVG-Based Overlays?
 
-An alternative approach would be to generate composite SVGs with embedded level/income text and re-rasterize them per card state. This was considered but rejected because:
+An alternative approach would be to generate composite SVGs with embedded level/cash text and re-rasterize them per card state. This was considered but rejected because:
 
 - **Asset duplication**: Each card would need SVG variants for each level (Bookshop L1, L2, L3, etc.), multiplying asset count.
 - **Cache complexity**: Texture cache keys would need to encode card state, increasing cache miss rates.
@@ -1952,7 +2085,7 @@ reusing base layout zones through composition.
 | `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
 | `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
 | `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T23 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types |
+| `example-games/main-street/TutorialFlow.ts` | T1-T24 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
 
 #### How composition works
 
@@ -2485,6 +2618,48 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   - `src/ui/debug/AiDecisionRecorder.ts` — Recording singleton
   - `src/ui/debug/AiDecisionOverlay.ts` — Display overlay
 
+#### Market Card Cheat (Main Street only)
+
+- **Label:** "Market Card Cheat"
+- **Location:** Debug Tools section of the Settings panel — appears only in
+  `MainStreetScene` (injected via a Main-Street-specific override of
+  `CardGameScene.initSettingsPanel`; other example games do not show it).
+  Visible only when running under `npm run dev` (`import.meta.env.DEV === true`).
+- **Function:** Replaces a random card in the 3-card market row with any card
+  from the live Main Street pool (all 5 families — Business, Community Space,
+  Event, Upgrade, Staff — derived from the CSV-backed template registry in
+  `MainStreetCards.ts`). The picker provides:
+  - **Type filter:** Checkboxes for one or more families (composes as an
+    intersection with the text filter, `type ∩ text`).
+  - **Title filter:** A text field that filters by case-insensitive substring
+    against the card display name; clearing it restores the full grouped list.
+  - **Mouse + keyboard:** Click a card to select-and-confirm, or use
+    Arrow Up/Down to move focus and Enter to confirm; a pinned
+    `[ Replace Market Slot ]` button in the dialog footer also confirms the
+    highlighted card. `Escape` dismisses the overlay. A DOM input at the top
+    of the dialog holds keyboard focus on open.
+  - **Market replacement:** On confirm a uniformly-random slot from
+    `state.market.cards` is replaced with a freshly-instantiated card
+    (`${templateId}--cheat-<nonce>` unique id; business/community-space fields
+    like level/bonuses are reset), the displaced card is returned to its
+    family's discard pile, and the market row re-renders via the existing renderer path
+    (`refreshMarket` / `refreshAll`). The operation is a direct state mutation
+    and goes through the normal deck/discard lifecycle so save/load, transcript
+    recording, and subsequent market refills continue to work.
+- **When to use:** Force a rare or tier-gated card into the market to reproduce
+  synergy, progression-gating, economy, or staff-skill edge cases without
+  manipulating saves or seeds. Open the Settings panel (gear icon) → scroll to
+  Debug Tools → click **Market Card Cheat** → pick a card → Replace.
+- **Implementation:**
+  - `src/ui/debug/MarketCardCheatOverlay.ts` — Overlay, picker, filtering
+    (`filterEntries()`), keyboard navigation, and `createMarketCardCheatTool()`
+    factory (label/description matched to the acceptance criteria).
+  - `example-games/main-street/MainStreetMarket.ts` — `cheatReplaceMarketCard()`
+    helper that performs the random-slot replacement and discard routing.
+  - `example-games/main-street/scenes/MainStreetScene.ts` — Dev-gated wiring
+    (`import.meta.env.DEV` branch in `initSettingsPanel`) so the tool is
+    absent/tree-shaken from production bundles.
+
 ### Adding a New Debug Tool
 
 Adding a new debug tool requires minimal code:
@@ -2556,6 +2731,8 @@ To verify production safety:
 | `src/ui/debug/GameEventLogOverlay.ts` | Game event log overlay |
 | `src/ui/debug/AiDecisionRecorder.ts` | AI decision recording singleton |
 | `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
+| `src/ui/debug/MarketCardCheatOverlay.ts` | Market Card Cheat overlay (Main Street market-replacement picker) |
+| `example-games/main-street/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
 | `src/ui/debug/index.ts` | Debug tools barrel file |
 | `src/ui/CardGameScene.ts` | Default debug tool registration |
 | `src/ui/SettingsPanel.ts` | Debug section rendering in Settings panel |

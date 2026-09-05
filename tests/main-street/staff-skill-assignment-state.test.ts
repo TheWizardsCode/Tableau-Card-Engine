@@ -100,7 +100,7 @@ describe('I3: game-start skill assignment (CG-0MT4WXSWG0023VR0)', () => {
   it('AC1: assignments are locked — hires and market refills never re-roll', () => {
     const state = setupMainStreetGame({ seed: 'i3-locked' });
     executeDayStart(state);
-    state.resourceBank.coins = 999;
+    state.resourceBank.coins = 9999;
     state.phase = 'MarketPhase';
 
     // Snapshot the visible row staff skills.
@@ -131,7 +131,7 @@ describe('I3: game-start skill assignment (CG-0MT4WXSWG0023VR0)', () => {
   it('serialization: locked rosters survive save → restore on deck and hired cards', () => {
     const state = setupMainStreetGame({ seed: 'i3-saveload' });
     executeDayStart(state);
-    state.resourceBank.coins = 999;
+    state.resourceBank.coins = 9999;
     state.phase = 'MarketPhase';
     const row = state.market.cards.filter(c => c.family === 'staff') as StaffCard[];
     if (row.length > 0) {

@@ -71,6 +71,21 @@ export interface GameConfig extends DifficultyConfig {
    */
   readonly maxTurns?: number;
 
+  // ── Endless Mode ────────────────────────────────────────
+  /**
+   * When true, reaching the score threshold does NOT end the game.
+   *
+   * The engine sets `endReason` to `'score_threshold_continue'` when the
+   * threshold is first reached, but keeps `gameResult` as `'playing'` so
+   * the player (or players in competitive mode) can continue building.
+   * The game only ends via other conditions (bankruptcy, reputation
+   * collapse, all challenges complete, or turn limit).
+   *
+   * Default: `false` — the game ends at the threshold (existing behaviour,
+   * CG-0MTIILU5V006GCN4). This is the producer's opt-in "endless mode".
+   */
+  readonly endlessMode: boolean;
+
   // ── Scoring ─────────────────────────────────────────────
   /** Score required for a win via score threshold. */
   readonly winThreshold: number;
@@ -114,7 +129,7 @@ export interface GameConfig extends DifficultyConfig {
    *   multiplier = 1 + (reputation / reputationCoinDivisor)
    *
    * Higher values make reputation less impactful on coin rewards.
-   * Default 80 (CG-0MT3J80HV0084IF1: quartered from 20) means rep=20
+   * Default 8000 (integer economy: 80×100) means rep=2000
    * yields a 1.25x multiplier.
    */
   readonly reputationCoinDivisor: number;
@@ -154,10 +169,11 @@ export interface GameConfig extends DifficultyConfig {
  */
 export const EASY_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Easy',
-  startingCoins: 10,
-  startingReputation: 5,
-  winThreshold: 100,
-  challengeBonusPoints: 15,
+  startingCoins: 1000,
+  startingReputation: 500,
+  endlessMode: false,
+  winThreshold: 10000,
+  challengeBonusPoints: 1500,
   synergyBonusPerNeighbor: 0.5,
   challengesPerRun: 2,
   positiveIncidentMultiplier: 1.2,
@@ -165,12 +181,12 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   // repeats, calmer variety; standard bad-run protection (M=2).
   incidentRepeatSpacing: 4,
   incidentMaxStreak: 2,
-  reputationCoinDivisor: 80,
+  reputationCoinDivisor: 8000,
   maxReputationCoinMultiplier: 1.5,
   // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
-  favourCoinsToRepCost: 2,
-  favourRepToCoinsRepCost: 2,
-  favourRepToCoinsCoinGain: 3,
+  favourCoinsToRepCost: 200,
+  favourRepToCoinsRepCost: 200,
+  favourRepToCoinsCoinGain: 300,
 };
 
 /**
@@ -180,10 +196,11 @@ export const EASY_PRESET: Readonly<GameConfig> = {
  */
 export const MEDIUM_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Medium',
-  startingCoins: 6,
-  startingReputation: 3,
-  winThreshold: 120,
-  challengeBonusPoints: 10,
+  startingCoins: 600,
+  startingReputation: 300,
+  endlessMode: false,
+  winThreshold: 12000,
+  challengeBonusPoints: 1000,
   synergyBonusPerNeighbor: 0.35,
   challengesPerRun: 3,
   // Increase positive incident frequency by 50% for the Medium baseline
@@ -193,12 +210,12 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   // "Medium = original hard-coded constants" backward-compat invariant.
   incidentRepeatSpacing: 3,
   incidentMaxStreak: 2,
-  reputationCoinDivisor: 80,
+  reputationCoinDivisor: 8000,
   maxReputationCoinMultiplier: 1.5,
   // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
-  favourCoinsToRepCost: 2,
-  favourRepToCoinsRepCost: 2,
-  favourRepToCoinsCoinGain: 3,
+  favourCoinsToRepCost: 200,
+  favourRepToCoinsRepCost: 200,
+  favourRepToCoinsCoinGain: 300,
 };
 
 /**
@@ -208,10 +225,11 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
  */
 export const HARD_PRESET: Readonly<GameConfig> = {
   difficultyName: 'Hard',
-  startingCoins: 4,
-  startingReputation: 2,
-  winThreshold: 150,
-  challengeBonusPoints: 8,
+  startingCoins: 400,
+  startingReputation: 200,
+  endlessMode: false,
+  winThreshold: 15000,
+  challengeBonusPoints: 800,
   synergyBonusPerNeighbor: 0.25,
   challengesPerRun: 4,
   positiveIncidentMultiplier: 1,
@@ -221,12 +239,12 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   // "longer good streaks on Hard" profile.
   incidentRepeatSpacing: 2,
   incidentMaxStreak: 3,
-  reputationCoinDivisor: 80,
+  reputationCoinDivisor: 8000,
   maxReputationCoinMultiplier: 1.5,
   // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
-  favourCoinsToRepCost: 2,
-  favourRepToCoinsRepCost: 2,
-  favourRepToCoinsCoinGain: 3,
+  favourCoinsToRepCost: 200,
+  favourRepToCoinsRepCost: 200,
+  favourRepToCoinsCoinGain: 300,
 };
 
 // ── Preset Registry ─────────────────────────────────────────
@@ -285,10 +303,10 @@ export const DIFFICULTY_NAMES: readonly DifficultyName[] = ['Easy', 'Medium', 'H
  * additive bonus above the 1.0x baseline.)
  *
  * - reputation=0  -> 1.0x (baseline preserved)
- * - reputation=10 -> 1.125x (with divisor=80)
- * - reputation=20 -> 1.25x
- * - reputation=40 -> 1.5x (capped at maxMultiplier=1.5)
- * - reputation=60 -> 1.5x (capped)
+ * - reputation=1000 -> 1.125x (with divisor=8000)
+ * - reputation=2000 -> 1.25x
+ * - reputation=4000 -> 1.5x (capped at maxMultiplier=1.5)
+ * - reputation=6000 -> 1.5x (capped)
  *
  * Negative reputation clamps the multiplier at 1.0 (no penalty via
  * this channel -- reputation collapse is handled elsewhere).
@@ -312,22 +330,29 @@ export function reputationCoinMultiplier(
  * Only positive coin deltas are scaled -- negative deltas (penalties)
  * pass through unchanged so that reputation does not amplify losses.
  *
- * CG-0MRER3RE300418SG: Removed Math.floor to preserve fractional income
- * values. The coins field is a JavaScript number (double) and can hold
- * fractional values. All coin comparisons (<, >=, etc.) work correctly
- * with fractional values. UI display rounds to 2 decimal places in the
- * HUD tooltip.
+ * CG-0MTIO1M15001E9Y6: Economy is integer-only. All coin/reputation
+ * values are integers; applyReputationMultiplier rounds to the nearest
+ * integer at the per-event/per-card boundary (AC3).
  *
  * @param rawCoinDelta  The base coin amount (positive = gain, negative = penalty).
  * @param reputation    Current player reputation.
  * @param config        Game config with multiplier tuning constants.
- * @returns The adjusted coin delta (may be fractional).
+ * @returns The adjusted coin delta (integer).
  */
+/** Round the nearest integer (Math.round) — the shared integer-economy primitive (AC3). */
+export function roundInt(value: number): number {
+  return Math.round(value);
+}
+
 export function applyReputationMultiplier(
   rawCoinDelta: number,
   reputation: number,
   config: Pick<GameConfig, 'reputationCoinDivisor' | 'maxReputationCoinMultiplier'>,
 ): number {
   if (rawCoinDelta <= 0) return rawCoinDelta;
-  return rawCoinDelta * reputationCoinMultiplier(reputation, config);
+  // Economy is integer-only (AC3): synergy products, reputation
+  // multiplier, event deltas, and ongoing-cost deductions round to the
+  // nearest integer at the per-event / per-card / per-turn boundary so
+  // state.resourceBank.coins/reputation never accumulate fractional drift.
+  return roundInt(rawCoinDelta * reputationCoinMultiplier(reputation, config));
 }

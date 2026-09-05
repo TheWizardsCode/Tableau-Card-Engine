@@ -4,6 +4,30 @@ Main Street now uses the shared **Screen Layout Language (SLL)** as its canonica
 
 The street is a 10-slot grid rendered as **2 rows × 5 columns**; synergy adjacency is **8-way (Chebyshev)** — orthogonally *and* diagonally adjacent slots count as neighbors (CG-0MSP1HCAS00785MP).
 
+## End-of-turn income: phased presentation (CG-0MT23O6W8003AXWJ)
+
+Ending a turn with producing businesses on the street plays a **phased
+income choreography** instead of a single fly-to-HUD burst:
+
+- **Phases:** base → synergy → reputation → events → upcoming → collect,
+  driven by `IncomeResult.phaseBreakdown` (`MainStreetAdjacency.ts`).
+- **On-card coin grids** (`createCoinGrid`, `example-games/main-street/coin-grid.ts`)
+  render each producing slot's contribution in the card's bottom-right
+  quadrant, filling progressively; phase contributions fly in/out; the
+  collection finale lands a `+total` pop at the HUD coins counter.
+- **Pacing:** `INCOME_PHASE_GAP_MS` (2200ms) between phases — collection at
+  ≈11s. The turn controller defers the day start (250ms poll, 16s cap)
+  until the show completes, so gameplay timing is unchanged; the street
+  render is deferred via `refreshAllExceptStreet` while the show runs.
+- **Tutorial:** the tutorial keeps the compact window-safe
+  `animateIncomeCollection` fly-to-HUD (phased show is non-tutorial only),
+  so tutorial/E2E pacing is untouched.
+- **SFX:** per-action — `sfx-coin-pop` per count-out coin and flight,
+  `sfx-income-positive` on collection, via the scene `SoundManager`.
+- **Reduced motion:** grids/flights skipped, phase labels + final pop +
+  income sound retained. **Headless/replay:** returns immediately
+  (presentation-only, no state/transcript mutation).
+
 ## Community Favour (CG-0MSTOATDQ005XDET)
 
 Main Street has a **Community Favour** resource exchange available once per turn during the market phase (a **FREE** action — it does **not** consume `actionsRemaining`):
@@ -229,7 +253,7 @@ Main Street Milestone 5 (CG-0MOY5TOJK008JFJM) adds a first-time player onboardin
 
 ### Action-Gated Tutorial Flow
 
-- **Module:** `TutorialFlow.ts` — T1-T23 step definitions with pure progression controller.
+- **Module:** `TutorialFlow.ts` — T1-T24 step definitions with pure progression controller (CG-0MTNMBX5Z002U0MH).
 - Each step gates on a specific player action (confirm, select-business, place-business, end-turn, etc.)
 - Invalid actions show: "Complete the highlighted step first."
 

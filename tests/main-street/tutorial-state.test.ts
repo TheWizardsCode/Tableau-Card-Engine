@@ -45,6 +45,7 @@ describe('createDefaultTutorialState', () => {
       status: 'not_seen',
       completedAt: null,
       lastStepId: null,
+      bankingHintShownAt: null,
     });
   });
 
@@ -147,6 +148,7 @@ describe('serializeTutorialState', () => {
       status: 'completed',
       completedAt: '2026-05-20T10:30:00.000Z',
       lastStepId: 'T10',
+      bankingHintShownAt: null,
     };
     const serialized = serializeTutorialState(state);
     const parsed = parseTutorialState(serialized);
@@ -196,6 +198,7 @@ describe('updateTutorialStatus', () => {
       status: 'not_seen',
       completedAt: null,
       lastStepId: 'T3',
+      bankingHintShownAt: null,
     };
     const updated = updateTutorialStatus(state, 'skipped');
     expect(updated.lastStepId).toBe('T3');
@@ -213,6 +216,7 @@ describe('updateTutorialStatus', () => {
       status: 'not_seen',
       completedAt: null,
       lastStepId: 'T5',
+      bankingHintShownAt: null,
     };
     const updated = updateTutorialStatus(state, 'skipped', { lastStepId: null });
     expect(updated.lastStepId).toBeNull();
@@ -224,6 +228,7 @@ describe('updateTutorialStatus', () => {
       status: 'skipped',
       completedAt: '2026-01-01T00:00:00.000Z',
       lastStepId: null,
+      bankingHintShownAt: null,
     };
     const updated = updateTutorialStatus(state, 'not_seen');
     expect(updated.completedAt).toBe('2026-01-01T00:00:00.000Z');
@@ -252,6 +257,7 @@ describe('shouldShowTutorialOffer', () => {
       status: 'skipped',
       completedAt: null,
       lastStepId: null,
+      bankingHintShownAt: null,
     };
     expect(shouldShowTutorialOffer(state)).toBe(false);
   });
@@ -262,6 +268,7 @@ describe('shouldShowTutorialOffer', () => {
       status: 'completed',
       completedAt: '2026-05-20T10:00:00.000Z',
       lastStepId: 'T10',
+      bankingHintShownAt: null,
     };
     expect(shouldShowTutorialOffer(state)).toBe(false);
   });
@@ -282,6 +289,7 @@ describe('shouldShowTutorialOffer', () => {
       status: 'completed',
       completedAt: '2026-05-20T10:00:00.000Z',
       lastStepId: 'T10',
+      bankingHintShownAt: null,
     };
     expect(shouldShowTutorialOffer(state, { forceShowOffer: true })).toBe(true);
   });
@@ -313,6 +321,7 @@ describe('loadTutorialState', () => {
       status: 'skipped',
       completedAt: null,
       lastStepId: 'T2',
+      bankingHintShownAt: null,
     };
     storage.setItem(TUTORIAL_STATE_STORAGE_KEY, JSON.stringify(state));
     const result = loadTutorialState(storage);
@@ -334,6 +343,7 @@ describe('loadTutorialState', () => {
       status: 'completed',
       completedAt: null,
       lastStepId: null,
+      bankingHintShownAt: null,
     };
     storage.setItem(customKey, JSON.stringify(state));
     const result = loadTutorialState(storage, customKey);
@@ -351,6 +361,7 @@ describe('saveTutorialState', () => {
       status: 'completed',
       completedAt: '2026-06-01T00:00:00.000Z',
       lastStepId: 'T10',
+      bankingHintShownAt: null,
     };
     await saveTutorialState(storage, state);
     const loaded = loadTutorialState(storage);
@@ -407,6 +418,7 @@ describe('bridgeLegacyTutorialSeen', () => {
       status: 'skipped',
       completedAt: null,
       lastStepId: 'T3',
+      bankingHintShownAt: null,
     };
     storage.setItem(TUTORIAL_STATE_STORAGE_KEY, JSON.stringify(existing));
     // Even though legacy says true (completed), new-style takes precedence

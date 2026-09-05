@@ -51,10 +51,10 @@ describe('Diagonal synergy: Diner at slot 3 + Bakery at slot 9 (manual-review re
     grid[3] = diner;
     grid[9] = bakery;
 
-    // 2.3 (base income, raised by CG-0MSVYPEZ90085SHE) x 0.5 (default
-    // synergy rate) x 1.0 (preset) x 1 neighbor = 1.15
-    expect(computeSynergyBonus(grid, 3, 1, [])).toBeCloseTo(1.15, 5);
-    expect(computeSynergyBonus(grid, 9, 1, [])).toBeCloseTo(1.15, 5);
+    // 230 (base income, raised by CG-0MSVYPEZ90085SHE, ×100: 2.3 → 230) x 0.5 (default
+    // synergy rate) x 1.0 (preset) x 1 neighbor = 115 (×100)
+    expect(computeSynergyBonus(grid, 3, 1, [])).toBeCloseTo(115, 5);
+    expect(computeSynergyBonus(grid, 9, 1, [])).toBeCloseTo(115, 5);
   });
 
   it('reports the diagonal pair for the visual synergy line', () => {

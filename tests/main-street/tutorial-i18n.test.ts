@@ -85,13 +85,13 @@ describe('Tutorial i18n: English bundle registration', () => {
     expect(body).toContain(formatCurrency(Number(row.cost)));
   });
 
-  it('T21 title resolves to "Success and Failure"', () => {
-    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T21')!;
+  it('T24 title resolves to "Success and Failure"', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T24')!;
     expect(t(step.titleKey)).toBe('Success and Failure');
   });
 
-  it('T23 title resolves to "Tutorial Complete"', () => {
-    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T23')!;
+  it('T26 title resolves to "Tutorial Complete"', () => {
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T26')!;
     expect(t(step.titleKey)).toBe('Tutorial Complete');
   });
 
@@ -189,11 +189,11 @@ describe('Tutorial i18n: resolveTutorialStepText', () => {
 
   it('reflects locale changes', () => {
     registerLocale('de', {
-      [tutorialKey('T17', 'title')]: 'Tutorial abgeschlossen',
+      [tutorialKey('T18', 'title')]: 'Tutorial abgeschlossen',
     });
     setLocale('de');
 
-    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T17')!;
+    const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T18')!;
     const { title } = resolveTutorialStepText(step);
     expect(title).toBe('Tutorial abgeschlossen');
   });

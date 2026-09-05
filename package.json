@@ -1,6 +1,6 @@
 {
   "name": "tableau-card-engine",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Tableau Card Engine (TCE) -- a modular game engine for building single-player tableau card games using Phaser 4 RC and TypeScript",
   "author": "TheWizardsCode",
   "private": true,
@@ -14,18 +14,19 @@
     "test": "bash scripts/run-ci-tests.sh",
     "test:smoke": "bash scripts/run-smoke-tests.sh",
     "test:dev": "bash scripts/run-dev-tests.sh",
-    "monte-carlo": "tsx scripts/monte-carlo.ts --seeds 200 --seed-prefix mc-balance --maxTurns 25 --strategy greedy --out results/main-street-monte-carlo.json --csv-out results/main-street-monte-carlo.csv",
-    "monte-carlo-sweep": "tsx scripts/monte-carlo.ts --sweep --seeds 100 --seed-prefix mc-balance --maxTurns 25 --out results/sweep.json --csv-out results/sweep.csv",
+    "monte-carlo": "vite-node scripts/monte-carlo.ts --seeds 200 --seed-prefix mc-balance --maxTurns 25 --strategy greedy --out results/main-street-monte-carlo.json --csv-out results/main-street-monte-carlo.csv",
+    "monte-carlo-sweep": "vite-node scripts/monte-carlo.ts --sweep --seeds 100 --seed-prefix mc-balance --maxTurns 25 --out results/sweep.json --csv-out results/sweep.csv",
     "replay": "tsx scripts/replay.ts",
     "transcripts:export": "tsx scripts/export-transcripts.ts",
-    "save-load-smoke": "tsx scripts/save-load-smoke.ts",
+    "save-load-smoke": "vite-node scripts/save-load-smoke.ts",
     "tf:generate": "scripts/tf-generate-synths.sh",
     "build:electron-main": "node scripts/build-electron-main.mjs",
     "start:electron": "npm run build:electron && npm run build:electron-main && electron .",
     "package": "npm run build:electron && npm run build:electron-main && electron-builder --publish never",
     "package:win": "npm run build:electron && npm run build:electron-main && electron-builder --win --publish never",
     "package:linux": "npm run build:electron && npm run build:electron-main && electron-builder --linux --publish never",
-    "package:mac": "npm run build:electron && npm run build:electron-main && electron-builder --mac --publish never"
+    "package:mac": "npm run build:electron && npm run build:electron-main && electron-builder --mac --publish never",
+    "balance:drift-report": "vite-node scripts/balance/drift-report.ts"
   },
   "dependencies": {
     "phaser": "4.0.0-rc.7"

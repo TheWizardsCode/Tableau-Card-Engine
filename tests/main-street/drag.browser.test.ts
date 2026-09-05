@@ -223,7 +223,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     try { localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true'); } catch { /* ignore */ }
 
     // Plenty of coins so affordability is not a factor.
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
     const card = firstBusinessCard(scene);
     const slot = scene.state.streetGrid.findIndex((s: any) => s === null);
     expect(slot).toBeGreaterThanOrEqual(0);
@@ -256,7 +256,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     // Drag-drop buy-and-place pays a +50% premium over the listed cost
     // (CG-0MSTOF1N5005PK2R): 100 − ceil(cost × 1.5 × 2)/2.
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-    expect(scene.state.resourceBank.coins).toBe(100 - premiumCost);
+    expect(scene.state.resourceBank.coins).toBe(2000 - premiumCost);
     // Single undoable command (direct buy-to-slot path).
     expect(scene.undoManager.canUndo()).toBe(true);
     // Back in the market phase for further play.
@@ -290,7 +290,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     await waitForMarketReady(scene);
     await waitForSettled(scene);
 
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
     const card = firstBusinessCard(scene);
     const container = cardContainer(scene, card.id);
 
@@ -308,7 +308,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     await waitForMarketReady(scene);
     await waitForSettled(scene);
 
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
     const card = firstBusinessCard(scene);
 
     // Occupy the first empty slot, then refresh so drop zones are re-registered.
@@ -337,7 +337,7 @@ describe('MainStreet drag-to-buy/place (browser)', () => {
     await waitForMarketReady(scene);
     await waitForSettled(scene);
 
-    scene.state.resourceBank.coins = 100;
+    scene.state.resourceBank.coins = 2000;
     const card = firstBusinessCard(scene);
     const container = cardContainer(scene, card.id);
 

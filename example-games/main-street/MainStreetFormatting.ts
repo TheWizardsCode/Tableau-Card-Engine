@@ -101,6 +101,23 @@ export interface CardTooltipInfoOptions {
 }
 
 /**
+ * Formats a coin/reputation delta value for tooltip display.
+ *
+ * Values are integers (e.g. `+5`, `-3`).
+ *
+ * This avoids the spurious `toFixed(3)` output (`5.000`) that previously
+ * confused players alongside the per-match `effect` text on SpecificSynergy
+ * event cards.
+ *
+ * @param value  The delta value (positive or negative).
+ * @returns The formatted string with a sign prefix.
+ */
+export function formatTooltipDelta(value: number): string {
+  const rounded = Math.round(value);
+  return `${rounded >= 0 ? '+' : ''}${rounded}`;
+}
+
+/**
  * Build the hover tooltip text for a Main Street card.
  *
  * All families render their cost line through `formatCurrency()` so the
@@ -136,9 +153,22 @@ export function buildCardTooltipInfo(
     }
     case 'event': {
       const e = card;
-      const detail = options.includeEventDetail
-        ? `\nCoins: ${e.coinDelta >= 0 ? '+' : ''}${e.coinDelta.toFixed(3)}, Rep: ${e.reputationDelta >= 0 ? '+' : ''}${e.reputationDelta}`
-        : '';
+      // For SpecificSynergy events the raw coinDelta is a per-match value
+      // (the engine multiplies it by the count of matching businesses).
+      // Showing the raw delta alongside the per-match effect text is
+      // confusing — players see "Coins: +5.000" even when there are zero
+      // matching businesses on the street (effective gain = 0).  The
+      // effect text already describes the per-match behaviour, so we
+      // suppress the detail line for these events entirely.
+      //
+      // For 'All' and 'RandomBusiness' targets the delta is board-independent
+      // and can be shown as a flat value.
+      let detail = '';
+      if (options.includeEventDetail && e.target !== 'SpecificSynergy') {
+        const coins = formatTooltipDelta(e.coinDelta);
+        const rep = formatTooltipDelta(e.reputationDelta);
+        detail = `\nCoins: ${coins}, Rep: ${rep}`;
+      }
       return `Event: ${e.name}\nCost: ${formatCurrency(e.cost)}\nEffect: ${e.effect}${detail}`;
     }
     case 'upgrade': {

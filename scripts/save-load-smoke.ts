@@ -12,8 +12,8 @@
  *   6. Exercise campaign-persistence save/load round-trip.
  *
  * Usage:
- *   npx tsx scripts/save-load-smoke.ts
- *   npx tsx scripts/save-load-smoke.ts --seed MySeed --checkpoint-after 3
+ *   npx vite-node scripts/save-load-smoke.ts
+ *   npx vite-node scripts/save-load-smoke.ts --seed MySeed --checkpoint-after 3
  *
  * Exit code 0 = all assertions passed. Non-zero = failure.
  *
@@ -21,7 +21,7 @@
  */
 
 // ── Node.js localStorage stub ───────────────────────────────
-// SaveLoadStore requires browser globals. In Node (tsx) we stub
+// SaveLoadStore requires browser globals. In Node (vite-node) we stub
 // localStorage the same way the test suite does.
 
 function createLocalStorageMock(): Storage {

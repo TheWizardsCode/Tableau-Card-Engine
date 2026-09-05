@@ -23,19 +23,28 @@ import {
   playEventFromHand,
   discardFromHand,
 } from './MainStreetMarket';
-import { buyAndPlaceBusiness, hireStaffCard, peekIncidentDeck } from './MainStreetEngine';
+import {
+  buyAndPlaceBusiness,
+  hireStaffCard,
+  peekIncidentDeck,
+  consumeAction as consumeEngineAction,
+  hireApplicantAction,
+  declineApplicantAction,
+  letGoStaffAction,
+} from './MainStreetEngine';
 
 // ── Action Budget Enforcement ────────────────────────────────
 
 /**
  * Consume one action from the state budget. Throws if no actions remain.
- * This is the central enforcement point for the command layer.
+ *
+ * Delegates to the engine's single shared `consumeAction` helper
+ * (CG-0MTCP7F9S009HARC) so the command layer and the engine `executeAction`
+ * path decrement `actionsRemaining` AND `bankedActions` (floor 0) in
+ * lock-step — one enforcement point, no divergence, no double-decrement.
  */
 export function consumeAction(state: MainStreetState): void {
-  if (state.actionsRemaining <= 0) {
-    throw new Error('No actions remaining today. End your turn to start a new day.');
-  }
-  state.actionsRemaining -= 1;
+  consumeEngineAction(state);
 }
 
 /** Snapshot of the portions of state affected by market actions. */
@@ -48,6 +57,8 @@ interface MarketActionSnapshot {
   incidentDeck: any | null;
   activityLog: any | null;
   soldSlots: boolean[] | null;
+  /** Grand Opening placement gate — captured so undo restores the per-turn flag. */
+  businessPlacedThisTurn: boolean | null;
   /** Daily action budget — captured so undo restores the spent action. */
   actionsRemaining: number | null;
   /** Banked actions — captured so undo restores the banking state. */
@@ -56,6 +67,10 @@ interface MarketActionSnapshot {
   peekUsedThisTurn: boolean | null;
   /** Staff peek reveal — captured so undo clears a pending reveal. */
   revealedPeekedCard: any | null;
+  /** Staff applicant — captured so undo restores pending/hired state. */
+  pendingApplicant: any | null;
+  /** Staff roster — captured so undo restores the staff list. */
+  staffCards: any | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -83,10 +98,13 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     incidentDeck: safeClone(state.incidentDeck),
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
+    businessPlacedThisTurn: (state as any).businessPlacedThisTurn ?? false,
     actionsRemaining: state.actionsRemaining,
     bankedActions: state.bankedActions ?? 0,
     peekUsedThisTurn: state.peekUsedThisTurn ?? false,
     revealedPeekedCard: state.revealedPeekedCard ?? null,
+    pendingApplicant: safeClone((state as any).pendingApplicant ?? null),
+    staffCards: safeClone(state.staffCards ?? []),
   };
 }
 
@@ -103,6 +121,9 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.incidentDeck = snap.incidentDeck as any;
   state.activityLog = snap.activityLog as any;
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
+  if (snap.businessPlacedThisTurn !== null && snap.businessPlacedThisTurn !== undefined) {
+    (state as any).businessPlacedThisTurn = snap.businessPlacedThisTurn;
+  }
   if (snap.actionsRemaining !== null && snap.actionsRemaining !== undefined) {
     state.actionsRemaining = snap.actionsRemaining;
   }
@@ -114,6 +135,12 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   }
   if ('revealedPeekedCard' in snap) {
     state.revealedPeekedCard = snap.revealedPeekedCard;
+  }
+  if ('pendingApplicant' in snap) {
+    (state as any).pendingApplicant = snap.pendingApplicant;
+  }
+  if ('staffCards' in snap) {
+    state.staffCards = snap.staffCards;
   }
 }
 
@@ -203,7 +230,11 @@ export function moveEventToHandCommand(
   return toCommand(
     state,
     snapshotAction(
-      (s) => moveToHand(s, cardId),
+      (s) => {
+        consumeAction(s);
+        moveToHand(s, cardId);
+        (s as any).justMovedEventCardId = cardId;
+      },
       `MoveEventToHand ${cardId}`,
     ),
   );
@@ -230,6 +261,9 @@ export function playEventCommand(state: MainStreetState, handIndex?: number) {
     snapshotAction(
       (s) => {
         const idx = handIndex ?? (s.hand ?? []).findIndex(c => c.family === 'event');
+        const card = (s.hand ?? [])[idx] as any;
+        const isSameDay = card && (s as any).justMovedEventCardId != null && (s as any).justMovedEventCardId === card.id;
+        if (!isSameDay) consumeAction(s);
         return playEventFromHand(s, idx);
       },
       'PlayEventFromHand',
@@ -369,6 +403,45 @@ export function sellBusinessCommand(
     snapshotAction(
       (s) => sellBusiness(s, slotIndex),
       `SellBusiness slot ${slotIndex}`,
+    ),
+  );
+}
+
+/**
+ * Command: Hire the pending staff applicant (CG-0MSTOATDU006UGAX, 0 cost, no hand slots).
+ */
+export function hireApplicantCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { hireApplicantAction(s); },
+      'HireApplicant',
+    ),
+  );
+}
+
+/**
+ * Command: Decline the pending staff applicant (CG-0MSTOATDU006UGAX, free, no other effects).
+ */
+export function declineApplicantCommand(state: MainStreetState) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { declineApplicantAction(s); },
+      'DeclineApplicant',
+    ),
+  );
+}
+
+/**
+ * Command: Let go a staff member (CG-0MSTOATDU006UGAX, -salary coins, -1 rep).
+ */
+export function letGoStaffCommand(state: MainStreetState, idx: number) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { letGoStaffAction(s, idx); },
+      `LetGoStaff ${idx}`,
     ),
   );
 }

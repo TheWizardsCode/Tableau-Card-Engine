@@ -45,18 +45,18 @@ interface NewUpgradeContract {
 }
 
 const NEW_UPGRADE_CONTRACTS: NewUpgradeContract[] = [
-  { id: 'upg-smoothie-bar', name: 'Upgrade to Smoothie Bar', target: 'Juice Bar', cost: 4, incomeBonus: 1, synergyRangeBonus: 0, requiredLevel: 0, tier: '5' },
-  { id: 'upg-wellness-retreat', name: 'Upgrade to Wellness Retreat', target: 'Yoga Studio', cost: 5, incomeBonus: 1.5, synergyRangeBonus: 1, requiredLevel: 0, tier: '9' },
-  { id: 'upg-fitness-center', name: 'Upgrade to Fitness Center', target: 'Gym', cost: 5, incomeBonus: 1.5, synergyRangeBonus: 1, requiredLevel: 0, tier: '9' },
-  { id: 'upg-dental-clinic', name: 'Upgrade to Dental Clinic', target: 'Dentist', cost: 7, incomeBonus: 2, synergyRangeBonus: 1, requiredLevel: 0, tier: '11' },
-  { id: 'upg-bespoke-tailor', name: 'Upgrade to Bespoke Tailor', target: 'Tailor', cost: 4, incomeBonus: 1, synergyRangeBonus: 0, requiredLevel: 0, tier: '6' },
-  { id: 'upg-toy-warehouse', name: 'Upgrade to Toy Warehouse', target: 'Toy Store', cost: 4, incomeBonus: 1, synergyRangeBonus: 1, requiredLevel: 0, tier: '6' },
-  { id: 'upg-tea-lounge', name: 'Upgrade to Tea Lounge', target: 'Teahouse', cost: 4, incomeBonus: 1, synergyRangeBonus: 0, requiredLevel: 0, tier: '7', reputationBonus: 0.1 },
-  { id: 'upg-gourmet-deli', name: 'Upgrade to Gourmet Deli', target: 'Delicatessen', cost: 4, incomeBonus: 1.5, synergyRangeBonus: 0, requiredLevel: 0, tier: '7' },
-  { id: 'upg-adventure-park', name: 'Upgrade to Adventure Park', target: 'Playground', cost: 3, incomeBonus: 0, synergyRangeBonus: 0, requiredLevel: 0, tier: '4', reputationBonus: 0.05 },
-  { id: 'upg-orchard', name: 'Upgrade to Orchard', target: 'Community Garden', cost: 3, incomeBonus: 0, synergyRangeBonus: 0, requiredLevel: 0, tier: '5', reputationBonus: 0.05 },
-  { id: 'upg-grand-fountain', name: 'Upgrade to Grand Fountain', target: 'Town Fountain', cost: 3, incomeBonus: 0, synergyRangeBonus: 0, requiredLevel: 0, tier: '5', reputationBonus: 0.05 },
-  { id: 'upg-health-center', name: 'Upgrade to Health Center', target: 'Health Kiosk', cost: 4, incomeBonus: 0, synergyRangeBonus: 0, requiredLevel: 0, tier: '8', reputationBonus: 0.05 },
+  { id: 'upg-smoothie-bar', name: 'Upgrade to Smoothie Bar', target: 'Juice Bar', cost: 400, incomeBonus: 100, synergyRangeBonus: 0, requiredLevel: 0, tier: '5' },
+  { id: 'upg-wellness-retreat', name: 'Upgrade to Wellness Retreat', target: 'Yoga Studio', cost: 500, incomeBonus: 150, synergyRangeBonus: 1, requiredLevel: 0, tier: '9' },
+  { id: 'upg-fitness-center', name: 'Upgrade to Fitness Center', target: 'Gym', cost: 500, incomeBonus: 150, synergyRangeBonus: 1, requiredLevel: 0, tier: '9' },
+  { id: 'upg-dental-clinic', name: 'Upgrade to Dental Clinic', target: 'Dentist', cost: 700, incomeBonus: 200, synergyRangeBonus: 1, requiredLevel: 0, tier: '11' },
+  { id: 'upg-bespoke-tailor', name: 'Upgrade to Bespoke Tailor', target: 'Tailor', cost: 400, incomeBonus: 100, synergyRangeBonus: 0, requiredLevel: 0, tier: '6' },
+  { id: 'upg-toy-warehouse', name: 'Upgrade to Toy Warehouse', target: 'Toy Store', cost: 400, incomeBonus: 100, synergyRangeBonus: 1, requiredLevel: 0, tier: '6' },
+  { id: 'upg-tea-lounge', name: 'Upgrade to Tea Lounge', target: 'Teahouse', cost: 400, incomeBonus: 100, synergyRangeBonus: 0, requiredLevel: 0, tier: '7', reputationBonus: 10 },
+  { id: 'upg-gourmet-deli', name: 'Upgrade to Gourmet Deli', target: 'Delicatessen', cost: 400, incomeBonus: 150, synergyRangeBonus: 0, requiredLevel: 0, tier: '7' },
+  { id: 'upg-adventure-park', name: 'Upgrade to Adventure Park', target: 'Playground', cost: 300, incomeBonus: 0, synergyRangeBonus: 0, requiredLevel: 0, tier: '4', reputationBonus: 5 },
+  { id: 'upg-orchard', name: 'Upgrade to Orchard', target: 'Community Garden', cost: 300, incomeBonus: 0, synergyRangeBonus: 0, requiredLevel: 0, tier: '5', reputationBonus: 5 },
+  { id: 'upg-grand-fountain', name: 'Upgrade to Grand Fountain', target: 'Town Fountain', cost: 300, incomeBonus: 0, synergyRangeBonus: 0, requiredLevel: 0, tier: '5', reputationBonus: 5 },
+  { id: 'upg-health-center', name: 'Upgrade to Health Center', target: 'Health Kiosk', cost: 400, incomeBonus: 0, synergyRangeBonus: 0, requiredLevel: 0, tier: '8', reputationBonus: 5 },
 ];
 
 // ── AC1: Template count ───────────────────────────────────────────────

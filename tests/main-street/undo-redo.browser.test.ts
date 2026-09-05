@@ -22,7 +22,46 @@ import type { MainStreetState } from '../../example-games/main-street/MainStreet
 
 // ── Boot helpers (mirrors MainStreetScene.browser.test.ts) ──
 
+/**
+ * Clear persistent storage (localStorage + IndexedDB) so a checkpoint saved
+ * by another test in the shared browser profile cannot surface the resume
+ * overlay during the tests (CG-0MTF70V9X002CAYH). A mid-day checkpoint can
+ * restore a partially-sold market row with no business cards, which makes
+ * the affordable-card finder below come up empty (the ≥1-business rule only
+ * applies at refill time). Same helper as the other MainStreet browser
+ * tests (composite / click-place / drag / hint-bar-placement / migration).
+ */
+async function clearPersistentStorage(): Promise<void> {
+  try { localStorage.clear(); } catch { /* ignore */ }
+  try {
+    let names: string[] = ['save-load-store'];
+    if (typeof indexedDB !== 'undefined' && typeof indexedDB.databases === 'function') {
+      try {
+        names = (await Promise.race([
+          indexedDB.databases(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('databases timeout')), 2000)),
+        ])).map((d: IDBDatabaseInfo) => d.name).filter((n): n is string => !!n);
+      } catch { /* fall back to the default name */ }
+    }
+    await Promise.race([
+      Promise.all(
+        names.map(
+          (n: string) =>
+            new Promise<void>((resolve) => {
+              const req = indexedDB.deleteDatabase(n);
+              req.onsuccess = () => resolve();
+              req.onerror = () => resolve();
+              req.onblocked = () => resolve();
+            }),
+        ),
+      ),
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  } catch { /* ignore non-browser environments */ }
+}
+
 async function bootGame(): Promise<Phaser.Game> {
+  await clearPersistentStorage();  // stale checkpoint → resume overlay → stale market state
   let container = document.getElementById('game-container');
   if (container) container.remove();
   container = document.createElement('div');
@@ -111,6 +150,12 @@ describe('MainStreet undo/redo feedback', () => {
       const { executeDayStart } = await import('../../example-games/main-street/MainStreetEngine');
       executeDayStart(state);
     }
+
+    // Generous coins so an affordable business/community-space card always
+    // exists in the row regardless of the random seed's market draw (mirror
+    // of MainStreetScene.browser.test.ts; the default boot is not guaranteed
+    // to yield a buyable card at starting coins).
+    state.resourceBank.coins = 2000;
 
     const emptySlot = state.streetGrid.findIndex((cell) => cell === null);
     expect(emptySlot).toBeGreaterThanOrEqual(0);

@@ -166,8 +166,11 @@ export class MainStreetRenderer {
           return container;
         }
 
-        // Render SVG card via shared adapter
-        mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
+        // Render SVG card via shared adapter. Hand business cards are never
+        // upgraded (upgrades target street businesses), so displayName is
+        // always undefined here; passing it keeps the street renderer the
+        // single display-name-aware site (CG-0MT24MHGZ0025O20).
+        mainStreetRenderCardSvg(s, container, card.id, renderW, renderH, card.displayName);
 
         if (card.family === 'event') {
           // ── Event card path: tooltip + play-event click (market phase only) ──
@@ -318,6 +321,24 @@ export class MainStreetRenderer {
     s.updateSvgDebugOverlay();
   }
 
+  /**
+   * `refreshAll()` minus the street grid — used while the phased income
+   * show (child 4) keeps its on-card coin grids alive until collection
+   * completes. The street is unchanged during the income phase, so a full
+   * `refreshAll()` happens once the choreography finishes.
+   */
+  public refreshAllExceptStreet(): void {
+    const s = this.scene;
+    this.refreshHud();
+    this.refreshMarket();
+    this.refreshIncidentQueue();
+    this.refreshPlayerHand();
+    this.refreshActionButtons();
+    this.refreshChallengeTracker();
+    this.refreshLog();
+    s.updateSvgDebugOverlay();
+  }
+
   public refreshHud(): void {
     const s = this.scene;
 
@@ -340,8 +361,8 @@ export class MainStreetRenderer {
     // Coins - left-aligned in strip
     const stripWidth = gameW * 0.5;
     const stripLeft = (gameW - stripWidth) / 2;
-    // HUD displays coins and reputation to 2 decimal places (presentation only; internal precision is 3dp). Score remains rounded to whole numbers.
-    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${coins.toFixed(2)}`, {
+    // Integer economy — HUD shows whole numbers (CG-0MTIO1M15001E9Y6).
+    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${Math.round(coins)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
@@ -363,7 +384,7 @@ export class MainStreetRenderer {
     s.hudContainer.add(actionText);
 
     // Reputation - centered in strip
-    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${reputation.toFixed(2)}`, {
+    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${Math.round(reputation)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 0.5));
     s.hudContainer.add(repText);
@@ -623,9 +644,11 @@ export class MainStreetRenderer {
     const renderW = Math.max(1, Math.round(slotW - 4));
     const renderH = Math.max(1, Math.round(slotH - 4));
 
-    // Render card via shared adapter
+    // Render card via shared adapter. Upgraded businesses (level > 0) get a
+    // display-name variant texture so the upgraded name is baked into the card
+    // image like the base name (CG-0MT24MHGZ0025O20).
     const cardContainer = s.add.container(Math.round(x + slotW / 2), Math.round(y + slotH / 2));
-    mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH);
+    mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH, biz.displayName);
 
     // Tag the container with its slot index so the synergy-formation
     // animation (`MainStreetAnimator.animateSynergyFormation`) can find and
@@ -674,7 +697,7 @@ export class MainStreetRenderer {
       tooltipZone.setInteractive({ useHandCursor: true });
       tooltipZone.on('pointerover', () => {
         if (isSold) {
-          const info = `Sold: ${biz.name}\nThis card no longer produces income or synergy.`;
+          const info = `Sold: ${biz.name}\nThis card no longer produces income, but still provides synergy to adjacent businesses.`;
           s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
           return;
         }
@@ -746,51 +769,51 @@ export class MainStreetRenderer {
       container.add(lvlText);
     }
 
-    // Name overlay (top center) for upgraded cards
-    if (spec.nameText) {
-      const nameText = this.scene.add.text(
-        spec.nameText.x,
-        spec.nameText.y,
-        spec.nameText.text,
-        {
-          fontSize: spec.nameText.fontSize ?? '10px',
-          fontStyle: spec.nameText.fontStyle,
-          color: spec.nameText.color,
-          fontFamily: FONT_FAMILY,
-        },
-      );
-      nameText.setOrigin(0.5, 0);
-      // Add a subtle dark background for readability
-      const bg = this.scene.add.graphics();
-      const textWidth = nameText.width + 8;
-      const textHeight = nameText.height + 2;
-      bg.fillStyle(0x000000, 0.6);
-      bg.fillRoundedRect(
-        spec.nameText.x - textWidth / 2,
-        spec.nameText.y - 1,
-        textWidth,
-        textHeight,
-        2,
-      );
-      container.add(bg);
-      container.add(nameText);
-    }
+    // Name overlay (top center) for upgraded cards — REMOVED per manual
+    // review (CG-0MT24MHGZ0025O20): the upgraded name is now baked into the
+    // card's SVG texture via a display-name variant, so it renders as part of
+    // the card image exactly like the base name. No Phaser text overlay.
 
-    // Income text (centred on card)
-    if (spec.incomeText) {
-      const incomeText = this.scene.add.text(
-        spec.incomeText.x,
-        spec.incomeText.y,
-        spec.incomeText.text,
-        {
-          fontSize: spec.incomeText.fontSize ?? '11px',
-          fontStyle: spec.incomeText.fontStyle,
-          color: spec.incomeText.color,
-          fontFamily: FONT_FAMILY,
-        },
-      );
-      incomeText.setOrigin(spec.incomeText.originX ?? 0, spec.incomeText.originY ?? 0);
-      container.add(incomeText);
+    // Combined cash line (centred on card, above reputation) — CG-0MTCP76MP0088TQW
+    // Replaces the former separate income/cost overlays that visually overlapped.
+    // Two-tone rendering (CG-0MTDMOYOL008IQVO): when `segments` is present each
+    // segment is drawn as its own text object laid out left-to-right, so income
+    // renders green and ongoing cost red within the same line. The group is
+    // horizontally centred at spec x (originX 0.5 default).
+    if (spec.cashLine) {
+      const size = spec.cashLine.fontSize ?? '11px';
+      const fontStyle = spec.cashLine.fontStyle;
+      const fontFamily = FONT_FAMILY;
+      const originY = spec.cashLine.originY ?? 0;
+      const segs = spec.cashLine.segments;
+      if (segs && segs.length > 0) {
+        const texts = segs.map((seg) =>
+          this.scene.add.text(0, 0, seg.text, {
+            fontSize: size,
+            fontStyle,
+            color: seg.color ?? spec.cashLine!.color,
+            fontFamily,
+          }),
+        );
+        const totalWidth = texts.reduce((acc, t) => acc + t.width, 0);
+        const originX = spec.cashLine.originX ?? 0;
+        let cursorX = spec.cashLine.x - totalWidth * originX;
+        for (const t of texts) {
+          t.setPosition(cursorX, spec.cashLine.y);
+          t.setOrigin(0, originY);
+          container.add(t);
+          cursorX += t.width;
+        }
+      } else {
+        const cashText = this.scene.add.text(
+          spec.cashLine.x,
+          spec.cashLine.y,
+          spec.cashLine.text,
+          { fontSize: size, fontStyle, color: spec.cashLine.color, fontFamily },
+        );
+        cashText.setOrigin(spec.cashLine.originX ?? 0, originY);
+        container.add(cashText);
+      }
     }
 
     // Reputation text (centred below income)
@@ -1119,8 +1142,11 @@ export class MainStreetRenderer {
     const renderH = Math.max(1, Math.round(marketCardH - 4));
     const baseStrokeColor = isHinted ? 0x44ffff : (isIncidentEvent ? 0x556688 : 0x888877);
 
-    // Render card via shared adapter
-    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH);
+    // Render card via shared adapter. Market business cards are always base
+    // copies (never upgraded), so displayName is undefined for them; passing
+    // it keeps the street renderer the primary display-name-aware site
+    // (CG-0MT24MHGZ0025O20).
+    mainStreetRenderCardSvg(s, container, card.id, renderW, renderH, (card as Partial<BusinessCard>).displayName);
 
     // For upgrade cards, add a dynamic text overlay showing the target business
     if (card.family === 'upgrade') {
@@ -1456,6 +1482,83 @@ export class MainStreetRenderer {
         cardY += 16;
       }
     }
+  }
+
+  /**
+   * Adds an animated effect line into the Upcoming panel (income phase,
+   * CG-0MT23O6W8003AXWJ).
+   *
+   * Duration-effect (income-multiplier) events that contributed a delta
+   * this turn reveal their line one letter at a time — each character
+   * grows (scale 0 → 1) with a slight overshoot, then the whole line
+   * settles with a small shrink pulse. The line sits below the panel's
+   * existing static effect lines at the same x as the deck-count/effect
+   * text (`contentX`).
+   *
+   * The lines are parented into `incidentQueueContainer`, so the next
+   * panel re-render (`drawUpcomingPanel` `removeAll`) cleans them up.
+   *
+   * @param effect    Active effect whose description becomes the line.
+   * @param rowIndex  Total row index (static effect lines + delta effects
+   *                  before this one) — same `+=16` row math as the panel.
+   * @returns The per-letter text objects (for tests/cleanup).
+   */
+  public animateUpcomingEffectLine(
+    effect: { sourceEventId: string; description: string },
+    rowIndex: number,
+  ): Phaser.GameObjects.Text[] {
+    const s = this.scene;
+    // Mirror drawUpcomingPanel's layout math so the animated line lands in
+    // the same row the static effect lines use.
+    const { logX, queueTop } = s.layout;
+    const panelX = logX;
+    const pad = 8;
+    const titleH = 22;
+    const contentX = panelX + pad;
+    const rowStartY = queueTop + titleH + pad + s.layout.queueCardH + 6 + 18;
+    const lineY = rowStartY + 16 * rowIndex;
+
+    const warnIcon = String.fromCodePoint(0x26A0);
+    const dash = String.fromCodePoint(0x2014);
+    const text = warnIcon + ' ' + effect.description + ' ' + dash + ' New';
+
+    const chars: Phaser.GameObjects.Text[] = [];
+    for (let i = 0; i < text.length; i++) {
+      const char = s.add.text(contentX + i * 7, lineY, text[i], {
+        fontSize: '10px',
+        color: '#ff6644',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0, 0).setScale(0);
+      s.incidentQueueContainer.add(char);
+      chars.push(char);
+
+      // Grow in (one-letter reveal): scale 0 → 1 with a Back overshoot.
+      s.time.delayedCall(i * 40, () => {
+        try {
+          s.tweens.add({
+            targets: char,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 180,
+            ease: 'Back.easeOut',
+          });
+        } catch { /* ignore */ }
+      });
+
+      // Shrink settle for new effects: a quick scale pulse after the grow.
+      s.time.delayedCall(i * 40 + 260, () => {
+        try {
+          s.tweens.add({
+            targets: char,
+            scaleX: 0.92,
+            scaleY: 0.92,
+            duration: 120,
+            yoyo: true,
+          });
+        } catch { /* ignore */ }
+      });
+    }
+    return chars;
   }
 
   public refreshPlayerHand(): void {

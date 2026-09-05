@@ -12,5 +12,6 @@ export { createSessionExportTool } from './SessionExportTool';
 export { createStateInspectorTool } from './StateInspectorOverlay';
 export { createGameEventLogTool } from './GameEventLogOverlay';
 export { createAiDecisionViewerTool } from './AiDecisionOverlay';
+export { createMarketCardCheatTool } from './MarketCardCheatOverlay';
 export { AiDecisionRecorder } from './AiDecisionRecorder';
 export type { AiDecisionRecord } from './AiDecisionRecorder';

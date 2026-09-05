@@ -42,19 +42,19 @@ function makeCommunityFavourAction(
 describe('GameConfig Community Favour constants', () => {
   for (const [name, preset] of Object.entries(DIFFICULTY_PRESETS)) {
     it(`${name} preset has favourCoinsToRepCost`, () => {
-      expect(preset.favourCoinsToRepCost).toBe(2);
+      expect(preset.favourCoinsToRepCost).toBe(200);
     });
     it(`${name} preset has favourRepToCoinsRepCost`, () => {
-      expect(preset.favourRepToCoinsRepCost).toBe(2);
+      expect(preset.favourRepToCoinsRepCost).toBe(200);
     });
     it(`${name} preset has favourRepToCoinsCoinGain`, () => {
-      expect(preset.favourRepToCoinsCoinGain).toBe(3);
+      expect(preset.favourRepToCoinsCoinGain).toBe(300);
     });
   }
 
   it('getPreset returns config with favour fields', () => {
     const cfg = getPreset('Easy');
-    expect(cfg.favourCoinsToRepCost).toBe(2);
+    expect(cfg.favourCoinsToRepCost).toBe(200);
   });
 });
 
@@ -86,13 +86,54 @@ describe('coins-to-rep exchange', () => {
     expect(state.favourUsedThisTurn).toBe(true);
   });
 
-  it('does not decrement actionsRemaining', () => {
+  it('decrements actionsRemaining by 1', () => {
     const state = createTestState();
     const actionsBefore = state.actionsRemaining;
 
     executeAction(state, makeCommunityFavourAction('coins-to-rep'));
 
-    expect(state.actionsRemaining).toBe(actionsBefore);
+    expect(state.actionsRemaining).toBe(actionsBefore - 1);
+  });
+
+  it('decrements bankedActions (capped at 0)', () => {
+    const state = createTestState();
+    const bankedBefore = state.bankedActions ?? 0;
+
+    executeAction(state, makeCommunityFavourAction('coins-to-rep'));
+
+    // consumeAction uses Math.max(0, bankedActions - 1) so it never goes negative.
+    expect(state.bankedActions).toBe(Math.max(0, bankedBefore - 1));
+  });
+});
+
+// ── AC4: No actions remaining → illegal ──────────────────────
+
+describe('No actions remaining throws', () => {
+  it('rejects coins-to-rep when actionsRemaining is 0', () => {
+    const state = createTestState();
+    state.actionsRemaining = 0;
+
+    expect(() =>
+      executeAction(state, makeCommunityFavourAction('coins-to-rep')),
+    ).toThrow('No actions remaining today');
+  });
+
+  it('rejects rep-to-coins when actionsRemaining is 0', () => {
+    const state = createTestState();
+    state.actionsRemaining = 0;
+
+    expect(() =>
+      executeAction(state, makeCommunityFavourAction('rep-to-coins')),
+    ).toThrow('No actions remaining today');
+  });
+
+  it('rejects when actionsRemaining is negative', () => {
+    const state = createTestState();
+    state.actionsRemaining = -1;
+
+    expect(() =>
+      executeAction(state, makeCommunityFavourAction('coins-to-rep')),
+    ).toThrow('No actions remaining today');
   });
 });
 
@@ -258,28 +299,28 @@ describe('Round-trip is lossy (no arbitrage)', () => {
     const repCost = state.config.favourRepToCoinsRepCost;
     const coinGain = state.config.favourRepToCoinsCoinGain;
 
-    // Precondition: defaults are 2 coins → 1 rep and 2 rep → 3 coins.
-    // A full 2-coin → 1-rep → 1.5-coin cycle is lossy (0.5 coins lost),
+    // Precondition: defaults are 200 coins → 1 rep and 200 rep → 300 coins.
+    // A full 200-coin → 1-rep → 1.5-coin cycle is lossy (50 coins lost),
     // so the exchange cannot be arbitraged for profit.
-    expect(cost).toBe(2);
-    expect(repCost).toBe(2);
-    expect(coinGain).toBe(3);
+    expect(cost).toBe(200);
+    expect(repCost).toBe(200);
+    expect(coinGain).toBe(300);
 
     // Value check: the coins gained from spending 1 rep (coinGain / repCost
-    // = 1.5) is strictly less than the coins spent to buy 1 rep (cost = 2).
+    // = 1.5) is strictly less than the coins spent to buy 1 rep (cost = 200).
     // Hence a full cycle destroys value: no infinite arbitrage.
     const coinPerRepGained = coinGain / repCost; // 1.5
-    const coinPerRepCost = cost; // 2
+    const coinPerRepCost = cost; // 200
     expect(coinPerRepGained).toBeLessThan(coinPerRepCost);
 
     // Confirm the exchange works in isolation (single exchange only — the
     // once-per-turn gate prevents cycling within a turn, reinforcing the
     // anti-arbitrage guarantee).
-    state.resourceBank.coins = 10;
-    state.resourceBank.reputation = 5;
+    state.resourceBank.coins = 1000;
+    state.resourceBank.reputation = 500;
 
     executeAction(state, makeCommunityFavourAction('coins-to-rep'));
-    expect(state.resourceBank.coins).toBe(8);
-    expect(state.resourceBank.reputation).toBe(6);
+    expect(state.resourceBank.coins).toBe(800);
+    expect(state.resourceBank.reputation).toBe(501);
   });
 });

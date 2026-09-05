@@ -121,7 +121,7 @@ Park has been reclassified as a **Community Space** card (see below).
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-arcade` | Arcade | 4 | 2.9 (rep +0.05/turn, ongoing −1/turn) | Entertainment + Service | Arcade | Retro fun. Bridges Entertainment and Service synergies. | Entertainment→Service bridge (CG-0MT3IPFSF005KEFB) so T3 spans two types; an arcade is an entertainment service. |
+| `biz-arcade` | Arcade | 4 | 2.9 (rep +0.05/turn, ongoing −1/turn) | Entertainment | Arcade | Retro fun for all ages. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | No longer a Service bridge (CG-0MT5VZJLS000B8KI): an arcade is a family entertainment venue, matching Cinema/Music Store's standard Entertainment template; T3 spans two types via the retiered Community Shelter. |
 | `biz-cinema` | Cinema | 5 | 3.5 (rep +0.08/turn, ongoing −1.25/turn) | Entertainment | Cinema | Latest films. Gains 50% of base income per adjacent Entertainment business (scales with difficulty). | Premium Entertainment; anchors the type. |
 
 #### Multi-Synergy Bridge Cards
@@ -134,7 +134,7 @@ Bridge cards belong to two synergy types simultaneously, enabling cross-type adj
 | `biz-food-truck` | Food Truck | 4 | 2.9 (rep +0.05/turn, ongoing −1/turn) | Food + Entertainment | Food Truck | Street eats with flair. | Cheapest bridge card; low risk, low reward. |
 | `biz-gallery` | Art Gallery | 14 | 9.4 (rep +0.25/turn, ongoing −3.5/turn) | Culture + Entertainment | Art Gallery | Showcases local artists. | Connects M1 Culture with new Entertainment. |
 | `biz-spa` | Day Spa | 14 | 9.4 (rep +0.25/turn, ongoing −3.5/turn) | Service + Entertainment | Day Spa | Relaxation and pampering. | Premium bridge; high synergy potential across 2 new types. |
-| `biz-florist` | Florist | 5 | 3 (rep +0.1/turn, ongoing −1.25/turn) | Commerce + Culture | Florist | Arrangements for every occasion. | Budget bridge linking Commerce and Culture. |
+| `biz-florist` | Florist | 5 | 3.5 (rep +0.1/turn, ongoing −1.25/turn) | Commerce + Culture | Florist | Arrangements for every occasion. | Commerce–Culture bridge at tier-5 income parity (CG-0MT6EQSPW002E7RC). |
 
 ### M3 Business Templates (12) — Group A expansion (CG-0MSQJ1XIB0004QVN)
 
@@ -191,7 +191,7 @@ Adds reputation assets across five synergies, including the family's first bridg
 | `cs-community-garden` | Community Garden | 5 | 0 | 0.1 | Food | 2 | 0.1 | A shared garden plot for the neighbourhood. Costs 0.1 coins/turn to run; +0.1 rep/turn. | Food reputation asset with a small running cost. |
 | `cs-fountain` | Town Fountain | 5 | 0 | 0 | Culture | 3 | 0.1 | A gathering spot around the fountain. Provides +0.1 reputation per turn. | Culture reputation asset (rebalanced from T2). |
 | `cs-health-kiosk` | Health Kiosk | 6 | 0 | 0.15 | Health | 3 | 0.15 | A walk-up health advice kiosk. Costs 0.15 coins/turn to run; +0.15 rep/turn. | Health reputation asset; deepens the Health family. |
-| `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 4 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset (rebalanced from T3). |
+| `cs-shelter` | Community Shelter | 6 | 0 | 0 | Service | 3 | 0.15 | A warm shelter for those in need. Provides +0.15 reputation per turn. | Service reputation asset; retiered T6→T3 (CG-0MT5VZJLS000B8KI) as the neighbourhood amenity anchoring T3's Service leg. |
 | `cs-public-art` | Public Art | 8 | 0 | 0.25 | Culture + Entertainment | 5 | 0.2 | A vibrant public sculpture. Costs 0.25 coins/turn to run; +0.2 rep/turn. Bridges Culture and Entertainment community spaces. | Bridge community space; highest ongoing cost and rep yield (rebalanced from T4). |
 
 ### M3 Upgrade Templates (12) — Group E expansion (CG-0MSQJ7SYD008U3EE)
@@ -224,7 +224,7 @@ Every Group A business and Group B community space gets an upgrade path (targets
 ## Event Cards
 
 Events fall into two categories:
-- **Investment** events are purchased from the market, held in the player's hand, and played voluntarily. They have a coin cost and generally positive effects.
+- **Investment** events are taken from the market into the player's hand **for free** (CG-0MT5W1V4D007NN8Q); the listed coin cost is paid when the event is played from hand during MarketPhase. They have generally positive effects.
 - **Incident** events live in a hidden face-down incident deck (card back + count only, CG-0MSTOATDP000JNHH). The top card is revealed and resolved at the end of each turn. Most are negative disruptions; a few are positive surprises.
 
 ### M1 Event Templates (5)
@@ -243,8 +243,8 @@ Events fall into two categories:
 
 | ID | Name | Trigger | Cost | Target | Synergy | Coins | Rep | Effect | Rationale |
 |----|------|---------|------|--------|---------|-------|-----|--------|-----------|
-| `evt-grand-opening` | Grand Opening Sale | Investment | 2 | SpecificSynergy | Commerce | +3 | 0 | +3 coins from Commerce promo. | Cheap Commerce boost; rewards Commerce-heavy builds. |
-| `evt-wellness-fair` | Wellness Fair | Investment | 3 | SpecificSynergy | Service | +2 | +1 | +2 coins/Service biz, +1 rep. | Service counterpart to Local Festival. |
+| `evt-grand-opening` | Grand Opening Sale | Investment | 3 | SpecificSynergy | Commerce | +4.5 | 0 | +3 coins from a Commerce promotion. **Same-turn only:** can only be played from hand on a turn where a business was placed onto the street grid (CG-0MTIOCBH400970OB). | Commerce boost with a same-turn placement gate; rewards coordinated play. |
+| `evt-wellness-fair` | Wellness Fair | Investment | 3 | SpecificSynergy | Health | +2 | +1 | +2 coins/Health biz, +1 rep. | Health counterpart to Local Festival. |
 | `evt-block-party` | Block Party | Investment | 4 | SpecificSynergy | Entertainment | +2 | +2 | +2 coins/Ent biz, +2 rep. | Expensive but high rep payoff for Entertainment. |
 | `evt-charity-drive` | Charity Drive | Investment | 2 | All | -- | 0 | +3 | +3 reputation. | Pure reputation play; universal target. |
 
@@ -375,7 +375,7 @@ Multi-level upgrades require the business to already be at Level 1 (`requiredLev
 
 ### Multi-Synergy Bridge Cards
 
-The adjacency resolver (`MainStreetAdjacency.ts`) uses `some()` to check if any synergy type matches, so bridge cards earn bonuses from neighbours of either type — a Cafe (Food+Culture) placed between a Bakery and a Bookshop earns bonuses from both sides. Bridges are also the primary lever for spreading synergy types across sparse tiers: since a bridge counts one card toward two types, a 2-card tier can span 3–4 types (e.g. the Arcade, Entertainment|Service, stretches T3 to Entertainment 2 / Service 1, CG-0MT3IPFSF005KEFB).
+The adjacency resolver (`MainStreetAdjacency.ts`) uses `some()` to check if any synergy type matches, so bridge cards earn bonuses from neighbours of either type — a Cafe (Food+Culture) placed between a Bakery and a Bookshop earns bonuses from both sides. Bridges are also the primary lever for spreading synergy types across sparse tiers: since a bridge counts one card toward two types, a 2-card tier can span 3–4 types. T3's Entertainment 2 / Service 1 span now comes from the retiered Community Shelter rather than a bridge (Arcade is Entertainment-only since CG-0MT5VZJLS000B8KI).
 
 ### Synergy Type Coverage
 
@@ -384,13 +384,13 @@ The adjacency resolver (`MainStreetAdjacency.ts`) uses `some()` to check if any 
 | Food | 4 (Bakery, Community Garden, Delicatessen, Diner) | 4 (Cafe, Food Truck, Juice Bar, Teahouse) | 8 |
 | Culture | 4 (Bookshop, Craft Shop, Library, Town Fountain) | 6 (Art Gallery, Cafe, Florist, Public Art, Teahouse, Yoga Studio) | 10 |
 | Commerce | 3 (Boutique, Pawn Shop, Toy Store) | 1 (Florist) | 4 |
-| Service | 6 (Barbershop, Community Shelter, Grand Hotel, Hardware Store, Laundromat, Tailor) | 3 (Arcade, Day Spa, Physiotherapy) | 9 |
-| Entertainment | 4 (Cinema, Music Store, Park, Playground) | 5 (Arcade, Art Gallery, Day Spa, Food Truck, Public Art) | 9 |
+| Service | 6 (Barbershop, Community Shelter, Grand Hotel, Hardware Store, Laundromat, Tailor) | 2 (Day Spa, Physiotherapy) | 8 |
+| Entertainment | 5 (Arcade, Cinema, Music Store, Park, Playground) | 4 (Art Gallery, Day Spa, Food Truck, Public Art) | 9 |
 | Health | 6 (Clinic, Dentist, Gym, Health Kiosk, Pharmacy, Private Clinic) | 3 (Juice Bar, Physiotherapy, Yoga Studio) | 9 |
 
 Service and Health now have bridge representation on a par with the other types, while Commerce remains the most single-type reliant (its only bridge is the Florist). Global totals are intentionally not balanced per type (Culture 10 vs Commerce 4) — the balance rule is defined **per tier**, mirroring the family rebalance (CG-0MT2WU0CX005Z143) along the synergy-type axis.
 
-> **Per-tier synergy balance (CG-0MT3IPFSF005KEFB):** every tier's synergy-bearing cards (business + community-space) span ≥ 2 distinct types, and no type's assignment count within a tier exceeds 2× any other type's count in that tier (bridge cards count once per type they carry). Sparse tiers are stretched with retags/bridges rather than new cards: T1 Park Culture→Entertainment, T2 Hardware Store Commerce→Service, T3 Arcade → Entertainment|Service bridge. Enforced by `tests/main-street/tier-synergy-balance.test.ts`.
+> **Per-tier synergy balance (CG-0MT3IPFSF005KEFB):** every tier's synergy-bearing cards (business + community-space) span ≥ 2 distinct types, and no type's assignment count within a tier exceeds 2× any other type's count in that tier (bridge cards count once per type they carry). Sparse tiers are stretched with retags/retiers rather than new cards: T1 Park Culture→Entertainment, T2 Hardware Store Commerce→Service, T3 Arcade stays Entertainment with the Community Shelter retiered 6→3 (CG-0MT5VZJLS000B8KI) → Entertainment 2 / Service 1. Enforced by `tests/main-street/tier-synergy-balance.test.ts`.
 
 ### Branching & Multi-Level Upgrades
 
@@ -432,6 +432,11 @@ For the dedicated balance harness and report outputs, use:
 ```bash
 npm run monte-carlo
 ```
+
+_(runs via `vite-node` — the Vite-aware ESM loader — because the harness imports
+deck-building functions from `MainStreetCards.ts`, which loads `card-data.csv`
+through Vite's `?raw` suffix; the same reason the manifest generator above uses
+`npx vite-node`.)_
 
 This writes per-run and aggregate metrics to:
 - `results/main-street-monte-carlo.json`

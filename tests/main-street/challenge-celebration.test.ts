@@ -57,7 +57,7 @@ function fillGrid(state: MainStreetState): void {
 
 /** Manually give the state enough coins so resource challenges pass. */
 function giveWealth(state: MainStreetState): void {
-  state.resourceBank.coins = 100;
+  state.resourceBank.coins = 10000;
 }
 
 // ── Tests ───────────────────────────────────────────────────
@@ -67,7 +67,7 @@ describe('Challenge Celebration Integration', () => {
     it('should return newly completed challenge IDs when challenges are completed during end-of-turn', () => {
       const state = createState('celebrate-1');
 
-      // Set up a challenge that will definitively pass: ch-deep-pockets (coins >= 25)
+      // Set up a challenge that will definitively pass: ch-deep-pockets (coins >= 3000)
       state.activeChallenges = [
         {
           challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
@@ -89,14 +89,14 @@ describe('Challenge Celebration Integration', () => {
     it('should return an empty array when no challenges are completed', () => {
       const state = createState('celebrate-2');
 
-      // Set up a challenge that will NOT pass: ch-deep-pockets requires coins >= 25
+      // Set up a challenge that will NOT pass: ch-deep-pockets requires coins >= 3000
       state.activeChallenges = [
         {
           challenge: CHALLENGE_TEMPLATES.find(c => c.id === 'ch-deep-pockets')!,
           completed: false,
         },
       ];
-      state.resourceBank.coins = 5; // Below 25 threshold
+      state.resourceBank.coins = 5; // Below 3000 threshold
       executeDayStart(state);
 
       const result = processEndOfTurn(state);

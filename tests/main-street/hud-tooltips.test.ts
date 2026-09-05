@@ -113,21 +113,21 @@ describe('findNextLockedTier', () => {
     expect(result).toBeDefined();
     expect(result!.id).toBe('tier-2');
     expect(result!.name).toBe('Rising Street');
-    expect(result!.reputationThreshold).toBe(4);
+    expect(result!.reputationThreshold).toBe(400);
   });
 
   it('returns tier-3 when tier-1 and tier-2 are unlocked', () => {
     const result = findNextLockedTier(['tier-1', 'tier-2']);
     expect(result).toBeDefined();
     expect(result!.id).toBe('tier-3');
-    expect(result!.reputationThreshold).toBe(8);
+    expect(result!.reputationThreshold).toBe(800);
   });
 
   it('returns tier-5 when tier-1 through tier-4 are unlocked', () => {
     const result = findNextLockedTier(['tier-1', 'tier-2', 'tier-3', 'tier-4']);
     expect(result).toBeDefined();
     expect(result!.id).toBe('tier-5');
-    expect(result!.reputationThreshold).toBe(16);
+    expect(result!.reputationThreshold).toBe(1600);
   });
 
   it('returns undefined when all tiers are unlocked', () => {
@@ -251,9 +251,9 @@ describe('buildCoinsTooltip', () => {
 
   it('reflects multiplier changes with different reputation values', () => {
     const state = setupMainStreetGame({ seed: 'test-rep' });
-    state.resourceBank.reputation = 20; // → 1.25x multiplier (quartered, CG-0MT3J80HV0084IF1)
+    state.resourceBank.reputation = 2000; // → 1.25x multiplier (quartered, CG-0MT3J80HV0084IF1)
 
-    const mult = reputationCoinMultiplier(20, state.config);
+    const mult = reputationCoinMultiplier(2000, state.config);
     expect(mult).toBeCloseTo(1.25);
 
     const tooltip = buildCoinsTooltip(state);
@@ -329,7 +329,7 @@ describe('buildReputationTooltip', () => {
 
   it('shows capped multiplier for high reputation', () => {
     const state = setupMainStreetGame({ seed: 'test-rep-high' });
-    state.resourceBank.reputation = 100; // capped at maxReputationCoinMultiplier
+    state.resourceBank.reputation = 10000; // capped at maxReputationCoinMultiplier
 
     const tooltip = buildReputationTooltip(state);
     // With default config, max multiplier is 1.5 (quartered cap, CG-0MT3J80HV0084IF1)
@@ -362,7 +362,7 @@ describe('buildScoreTooltip', () => {
 
     // Should mention tier-2 (next locked after tier-1)
     expect(tooltip).toContain('Rising Street');
-    expect(tooltip).toContain('Rep ≥ 4');
+    expect(tooltip).toContain('Rep ≥ 400');
   });
 
   it('shows "All tiers unlocked" when all tiers are unlocked', () => {

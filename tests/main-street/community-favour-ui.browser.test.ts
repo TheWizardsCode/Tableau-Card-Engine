@@ -134,12 +134,12 @@ describe('Main Street Community Favour UI', () => {
     expect(favourLabels.some(l => /^\d+r → \d+c$/.test(l.trim()))).toBe(true);
   }, 30_000);
 
-  it('active exchange updates resources, sets the gate, and does not consume an action', async () => {
+  it('active exchange updates resources, sets the gate, and consumes one action', async () => {
     const scene = await bootScene();
 
-    // Give enough resources for both directions.
-    scene.state.resourceBank.coins = 20;
-    scene.state.resourceBank.reputation = 5;
+    // Give enough resources for both directions (×100 integer economy).
+    scene.state.resourceBank.coins = 2000;
+    scene.state.resourceBank.reputation = 500;
     scene.state.favourUsedThisTurn = false;
     scene.refreshAll();
 
@@ -150,11 +150,11 @@ describe('Main Street Community Favour UI', () => {
 
     scene.msTurnController.onCommunityFavourClick('coins-to-rep');
 
-    // Exchange applied: coins spent, rep gained, gate set, action preserved.
+    // Exchange applied: coins spent, rep gained, gate set, one action consumed (CG-0MT5UPQGX005GWRP).
     expect(scene.state.resourceBank.coins).toBe(coinsBefore - cost);
     expect(scene.state.resourceBank.reputation).toBe(repBefore + 1);
     expect(scene.state.favourUsedThisTurn).toBe(true);
-    expect(scene.state.actionsRemaining).toBe(actionsBefore);
+    expect(scene.state.actionsRemaining).toBe(actionsBefore - 1);
 
     // UI returns to market phase after the exchange.
     expect(scene.uiPhase).toBe('market');
@@ -181,14 +181,14 @@ describe('Main Street Community Favour UI', () => {
 
     // After using the gate, a second click (rep → coins) is rejected with
     // feedback and no mutation.
-    scene.state.resourceBank.coins = 20;
-    scene.state.resourceBank.reputation = 5;
+    scene.state.resourceBank.coins = 2000;
+    scene.state.resourceBank.reputation = 500;
     scene.state.favourUsedThisTurn = false;
     scene.refreshAll();
     scene.msTurnController.onCommunityFavourClick('rep-to-coins');
     expect(scene.state.favourUsedThisTurn).toBe(true);
-    // Successful exchange: reputation spent, coins gained (20 + config gain).
-    expect(scene.state.resourceBank.coins).toBe(20 + scene.state.config.favourRepToCoinsCoinGain);
+    // Successful exchange: reputation spent, coins gained.
+    expect(scene.state.resourceBank.coins).toBe(2000 + scene.state.config.favourRepToCoinsCoinGain);
     const coinsAfterFirst = scene.state.resourceBank.coins;
     const repAfterFirst = scene.state.resourceBank.reputation;
     // Second attempt in the same turn is rejected — nothing more changes.
@@ -201,9 +201,9 @@ describe('Main Street Community Favour UI', () => {
   it('full rep-to-coins exchange round', async () => {
     const scene = await bootScene();
 
-    // rep → coins: spend the config rep cost, gain the config coin gain.
-    scene.state.resourceBank.coins = 4;
-    scene.state.resourceBank.reputation = 5;
+    // rep → coins: spend the config rep cost, gain the config coin gain (×100 scale).
+    scene.state.resourceBank.coins = 400;
+    scene.state.resourceBank.reputation = 500;
     scene.state.favourUsedThisTurn = false;
     scene.refreshAll();
 
@@ -212,16 +212,16 @@ describe('Main Street Community Favour UI', () => {
 
     scene.msTurnController.onCommunityFavourClick('rep-to-coins');
 
-    expect(scene.state.resourceBank.reputation).toBe(5 - repCost);
-    expect(scene.state.resourceBank.coins).toBe(4 + coinGain);
+    expect(scene.state.resourceBank.reputation).toBe(500 - repCost);
+    expect(scene.state.resourceBank.coins).toBe(400 + coinGain);
     expect(scene.state.favourUsedThisTurn).toBe(true);
   }, 30_000);
 
   it('buttons re-enable on a new day (DayStart resets the gate)', async () => {
     const scene = await bootScene();
 
-    scene.state.resourceBank.coins = 20;
-    scene.state.resourceBank.reputation = 5;
+    scene.state.resourceBank.coins = 2000;
+    scene.state.resourceBank.reputation = 500;
     scene.state.favourUsedThisTurn = false;
     scene.refreshAll();
 

@@ -136,12 +136,12 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
 
   it('scenario state has correct starting resources for tutorial', () => {
     const state = createTutorialScenario();
-    // Tutorial starts with the scenario's 12 coins (CG-0MSTOATDQ005XDET
-    // reduced from 16 so the T13 Community Favour rep→coins conversion is
-    // REQUIRED for the $7 Library) and 5 reputation (2 spent by the
-    // conversion, leaving a safe 3).
-    expect(state.resourceBank.coins).toBe(12);
-    expect(state.resourceBank.reputation).toBe(5);
+    // Tutorial starts with the scenario's 1200 coins (CG-0MSTOATDQ005XDET
+    // reduced from 1600 so the T13 Community Favour rep→coins conversion is
+    // REQUIRED for the $700 Library) and 500 reputation (200 spent by the
+    // conversion, leaving a safe 300).
+    expect(state.resourceBank.coins).toBe(1200);
+    expect(state.resourceBank.reputation).toBe(500);
   });
 
   it('scenario state has an empty street grid (no pre-placed businesses)', () => {
@@ -201,21 +201,21 @@ describe('AC2: TUTORIAL_SEED is deprecated and not used in tutorial setup path',
 // ── AC3: All 13 tutorial steps complete with scenario setup ──
 
 describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => {
-  it('UNIFIED_TUTORIAL_STEPS contains exactly 23 steps (T1-T23)', () => {
-    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(23);
-    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(23);
+  it('UNIFIED_TUTORIAL_STEPS contains exactly 26 steps (T1-T26)', () => {
+    expect(UNIFIED_TUTORIAL_STEPS.length).toBe(26);
+    expect(UNIFIED_TUTORIAL_STEP_COUNT).toBe(26);
 
-    for (let i = 0; i < 23; i++) {
+    for (let i = 0; i < 26; i++) {
       expect(UNIFIED_TUTORIAL_STEPS[i].id).toBe(`T${i + 1}`);
     }
   });
 
-  it('tutorial controller walks through all 23 steps via completeCurrentStep', () => {
+  it('tutorial controller walks through all 26 steps via completeCurrentStep', () => {
     let controller = startTutorial(createTutorialControllerState());
 
-    // Walk through all 23 steps
+    // Walk through all 26 steps
     const completedIds: string[] = [];
-    for (let i = 0; i < 23; i++) {
+    for (let i = 0; i < 26; i++) {
       expect(controller.isActive).toBe(true);
       const currentStep = getCurrentStep(controller);
       expect(currentStep).toBeDefined();
@@ -226,15 +226,15 @@ describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => 
       controller = result.newState;
     }
 
-    // Verify all 23 steps were completed in order
+    // Verify all 26 steps were completed in order
     expect(completedIds).toEqual([
       'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8',
-      'T9', 'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18', 'T19', 'T20', 'T21', 'T22', 'T23',
+      'T9', 'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17', 'T18', 'T19', 'T20', 'T21', 'T22', 'T23', 'T24', 'T25', 'T26',
     ]);
 
-    // After the 23rd step completes, the controller has advanced past the end
-    expect(controller.lastCompletedStepId).toBe('T23');
-    expect(controller.currentStepIndex).toBe(23); // Past the end
+    // After the 24th step completes, the controller has advanced past the end
+    expect(controller.lastCompletedStepId).toBe('T26');
+    expect(controller.currentStepIndex).toBe(26); // Past the end
     // isActive stays true (only exitTutorial sets it to false)
     // Verify the controller is at end by checking getCurrentStep returns null
     const afterComplete = getCurrentStep(controller);
@@ -247,8 +247,9 @@ describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => 
     // Build lookup sets for quick checking
     const rowTemplateIds = new Set(state.market.cards.map(c => stripSerialSuffix(c.id)));
 
-    // Day-2/3 targets (Bookshop T10, Library T13) are guaranteed by the
-    // day-start hook rather than the day-1 row (CG-0MSTOATDT009BRX2).
+    // Day-4/6 targets (Bookshop T12, Library T19) are guaranteed by the
+    // day-start hook rather than the day-1 row (CG-0MSTOATDT009BRX2,
+    // CG-0MTNMBX5Z002U0MH renumber).
     const hookCovered = new Set(['biz-bookshop', 'cs-library']);
 
     // Find all action steps with requiredCardId
@@ -270,26 +271,25 @@ describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => 
     expect(devTemplateIds).toContain(templateId);
   });
 
-  it('T9 requiredCardId (Local Festival) is in the scenario investments row', () => {
+  it('T10 requiredCardId (Local Festival) is in the scenario investments row', () => {
     const state = createTutorialScenario();
-    const t9 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T9')!;
-    expect(t9).toBeDefined();
+    const t10 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!;
+    expect(t10).toBeDefined();
 
-    const invTemplateIds = state.market.cards.map(c => stripSerialSuffix(c.id));
-
-    // T9 requires buying an event from the investments row
-    // The scenario has 'evt-festival' as its investment event
+    // T10 requires buying an event from the investments row
+    // The scenario has 'evt-festival' as its investment event; the step's
+    // required card matches the visible event after the renumber.
     const invEvent = state.market.cards.find(c => c.family === 'event');
     expect(invEvent).toBeDefined();
-    expect(invTemplateIds).toContain(stripSerialSuffix(invEvent!.id));
+    expect(stripSerialSuffix(invEvent!.id)).toBe(stripSerialSuffix(t10.requiredCardId!));
   });
 
-  it('scenario state provides sufficient coins for the 23-step two-turn purchases (Laundromat $4 + Bookshop $3 + Library $7 at listed cost)', () => {
+  it('scenario state provides sufficient coins for the 26-step two-turn purchases (Laundromat $400 + Bookshop $300 + Library $700 at listed cost)', () => {
     const state = createTutorialScenario();
 
-    // Starting coins: 12 (scenario; the two-turn flow places every card the
+    // Starting coins: 1200 (scenario; the two-turn flow places every card the
     // day after its move at LISTED cost — no same-turn +50% premium)
-    expect(state.resourceBank.coins).toBe(12);
+    expect(state.resourceBank.coins).toBe(1200);
 
     // After moving the Laundromat to hand (day 1) and placing it at listed
     // cost (day 2): 8 coins remaining — positive even after holding it
@@ -369,15 +369,15 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     );
     expect(business.length).toBe(2);
 
-    // The single event is the Local Festival (T9 target)
+    // The single event is the Local Festival (T10 target, CG-0MTNMBX5Z002U0MH).
     const events = state.market.cards.filter(c => c.family === 'event');
     expect(events.length).toBe(1);
     const upgrades = state.market.cards.filter(c => c.family === 'upgrade');
     expect(upgrades.length).toBe(0);
 
-    // Incident deck: exactly 5 Incident-trigger events (one per End Turn
-    // in the two-turn flow, CG-0MT53NXGZ004H5AE)
-    expect(state.incidentDeck.length).toBe(5);
+    // Incident deck: exactly 8 Incident-trigger events (one per End Turn
+    // in the 26-step two-turn flow, CG-0MTNMBX5Z002U0MH: T6, T8, T11, T14, T16, T18, T20, T22)
+    expect(state.incidentDeck.length).toBe(8);
     for (const card of state.incidentDeck) {
       expect(card.family).toBe('event');
       expect(card.trigger).toBe('Incident');
@@ -393,8 +393,8 @@ describe('AC4: Scenario-built state produces consistent market indices (backward
     // turn limit (maxTurns is optional and unset — CG-0MSLXJCHH001DLIO).
     expect(state.config.difficultyName).toBe('Easy');
     expect(state.config.maxTurns).toBeUndefined();
-    expect(state.config.startingCoins).toBe(10);
-    expect(state.config.startingReputation).toBe(5);
+    expect(state.config.startingCoins).toBe(1000);
+    expect(state.config.startingReputation).toBe(500);
 
     // State has all four decks
     expect(state.decks.business.length).toBeGreaterThan(0);
@@ -419,6 +419,7 @@ describe('AC5: Existing TutorialState types remain compatible with scenario setu
       status: 'completed',
       completedAt: '2026-06-27T00:00:00.000Z',
       lastStepId: 'T13',
+      bankingHintShownAt: null,
     };
     const serialized = serializeTutorialState(original);
     const parsed = parseTutorialState(serialized);
@@ -477,6 +478,7 @@ describe('AC5: Existing TutorialState types remain compatible with scenario setu
       status: 'skipped',
       completedAt: null,
       lastStepId: 'T2',
+      bankingHintShownAt: null,
     };
     void saveTutorialState(storage, state);
     const loaded = loadTutorialState(storage);

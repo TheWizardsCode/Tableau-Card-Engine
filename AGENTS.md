@@ -73,7 +73,7 @@ npm run dev          # Start Vite dev server with hot-reload (port 3000)
 npm test             # Run Vitest test suite (non-destructive: does not modify tracked assets)
 npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally (binds to all interfaces, reachable via Tailscale/LAN)
-npm run monte-carlo  # Run Main Street Monte Carlo harness (JSON + CSV)
+npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
 npm run start:electron   # Build + launch the Electron desktop app locally
@@ -82,12 +82,30 @@ npm run package          # Package a desktop binary for the host platform (packa
 
 ### Quality Gates
 
-Before pushing any change to the git origin you must have ensured that:
+**Release (promoting `dev` to `main`):** run the full test suite (`npm test`) and build (`npm run build`). Full suite is the **only** time the complete test suite is required.
 
-1. `npm test` passes -- all tests across the core engine AND example games must pass.
-2. `npm run build` succeeds -- TypeScript compilation and Vite production build must complete without errors.
+**During implementation:** unit tests are the minimum. Run the appropriate test profile for your context (see [Running Test Profiles](#running-test-profiles) below).
+
+**Before any push to origin:** ensure unit tests pass (`npm test -- --project unit`) and the build succeeds (`npm run build`). Full browser + tutorial E2E suites are not required on every push.
 
 Each example game should have its own set of tests to ensure that the game mechanics work as expected and to prevent regressions as the engine evolves. Additionally, the core engine should have comprehensive tests covering all critical functionalities.
+
+#### Running Test Profiles
+
+Three test profiles are available, selected via `--project` (or the npm scripts):
+
+| Profile | Command | Runtime | What it runs | When to use |
+|---------|---------|---------|--------------|-------------|
+| **Unit** | `npx vitest run --project unit tests/<game>/` | seconds | Node.js logic/data/integration tests | **Minimum required** whenever a skill or task calls for testing; run during implementation and before any push |
+| **Smoke** | `npm run test:smoke` | ~2 min | One representative file per game + core/UI smoke tests | Quick validation during active implementation |
+| **Dev** | `npm run test:dev` | ~3.5 min | Smoke + key E2E per game | Pre-audit / pre-commit check |
+| **Full** | `npm test` | ~15 min | Complete unit + browser + tutorial E2E suite | **Only required on release** (promoting `dev` to `main`) |
+
+Rules of thumb:
+
+- **A skill calls for testing  → run unit tests.** They are the minimum bar and give fast feedback.
+- **Full tests are only required on release.** Do not wait 15 min for feedback during normal implementation.
+- Tutorial E2E parts (`tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`) are excluded from smoke/dev profiles. See `docs/DEVELOPER.md#smoke-tests` / `#dev-tests` for the full project table.
 
 #### When to run which tests
 
@@ -102,10 +120,14 @@ The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, whic
 - **During implementation** — prefer targeted runs for fast feedback (seconds, not minutes):
   - Unit: `npx vitest run --project unit tests/<game>/` or `npx vitest run --project unit tests/<game>/<name>.test.ts`
   - Browser: `npx vitest run --project browser tests/<game>/<name>.browser.test.ts`
-  - **Profiles**: `npm run test:smoke` (~2 min, one representative file per game + core/UI smoke, `--project smoke`) or `npm run test:dev` (~3.5 min, smoke + key E2E per game, `--project dev`). Tutorial E2E parts are excluded from both profiles. Full project table in `docs/DEVELOPER.md#smoke-tests` / `#dev-tests`.
-- **Before any push to origin** — always run the full `npm test` and `npm run build` (see the quality gates above).
+  - **Profiles** (see [Running Test Profiles](#running-test-profiles) for full guidance):
+    - `npm run test:smoke` (~2 min) — **quick validation** during active implementation. One representative file per game + core/UI smoke tests.
+    - `npm run test:dev` (~3.5 min) — **pre-audit / pre-commit** check. Smoke + key E2E per game.
+    - `npm run test` (full suite, ~15 min) — **release only**. Full browser + tutorial E2E suites.
+  Tutorial E2E parts are excluded from smoke/dev profiles. Full project table in `docs/DEVELOPER.md#smoke-tests` / `#dev-tests`.
+- **Before any push to origin** — run unit tests (`npm test -- --project unit`) and `npm run build`. Full suite (`npm test`) is only required on release.
 
-> **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only (TypeScript compile + Vite bundle). The full test suite is run **locally** before every push (per the quality gates above) and is intentionally NOT re-run in PR CI — the Phaser 4 browser suite has outgrown the single-Chromium-instance context budget in constrained CI environments. `deploy.yml` on `main` also builds only; `package.yml` smoke-tests the packaged Windows binary separately.
+> **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only (TypeScript compile + Vite bundle). The full test suite is run **locally** before every push only on release (per the quality gates above) and is intentionally NOT re-run in PR CI — the Phaser 4 browser suite has outgrown the single-Chromium-instance context budget in constrained CI environments. `deploy.yml` on `main` also builds only; `package.yml` smoke-tests the packaged Windows binary separately.
 
 #### Browser tests
 

@@ -126,7 +126,7 @@ function forceGameOver(scene: Phaser.Scene, isWin = false): void {
   }
 
   const result: TurnResult = {
-    income: { total: 0, breakdown: [], handSynergyTotal: 0 },
+    income: { total: 0, breakdown: [], handSynergyTotal: 0, phaseBreakdown: { perSlotBreakdown: [], handSynergyTotal: 0 } },
     incident: null,
     incidentCoinChange: 0,
     incidentRepChange: 0,
@@ -292,9 +292,9 @@ describe('Main Street overlay button tests', () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene')!;
 
-    // Give the player a fractional coin balance (3-decimal precision)
+    // Integer economy: whole-number display (CG-0MTIO1M15001E9Y6).
     const s = scene as any;
-    s.state.resourceBank.coins = 123.456;
+    s.state.resourceBank.coins = 123;
     forceGameOver(scene);
     await waitFrames(3);
 
@@ -309,8 +309,8 @@ describe('Main Street overlay button tests', () => {
     // The breakdown block contains Coins and Final Score lines
     const breakdown = allTexts.find((t) => t.text.includes('Coins:') && t.text.includes('Final Score:'));
     expect(breakdown).toBeDefined();
-    // Coins displayed to 2 decimal places for consistency with HUD bar.
-    expect(breakdown!.text).toContain('Coins: 123.46');
+    // Integer economy: whole-number display.
+    expect(breakdown!.text).toContain('Coins: 123');
   });
 
   it('should show count-only line for unlocked tiers (no per-card names)', async () => {
@@ -338,7 +338,7 @@ describe('Main Street overlay button tests', () => {
     // Force game-over with a newly unlocked tier that has newCardIds.
     // Using 'tier-2' which has newCardIds in TIER_DEFINITIONS.
     const result: TurnResult = {
-      income: { total: 0, breakdown: [], handSynergyTotal: 0 },
+      income: { total: 0, breakdown: [], handSynergyTotal: 0, phaseBreakdown: { perSlotBreakdown: [], handSynergyTotal: 0 } },
       incident: null,
       incidentCoinChange: 0,
       incidentRepChange: 0,
