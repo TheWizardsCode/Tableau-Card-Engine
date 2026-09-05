@@ -255,7 +255,7 @@ export class MainStreetTutorialHints {
   }
 
   // ── Banking hint (CG-0MT3JK16W006A66P) ─────────────────────
-  // Contextual first-bank overlay: not part of the fixed 23-step count.
+  // Contextual first-bank overlay: not part of the fixed 26-step count.
   // Mutually exclusive with the main flow — callers must not show both at once.
 
   /**
@@ -273,7 +273,7 @@ export class MainStreetTutorialHints {
     if (!overlay || typeof overlay.clearObjects !== 'function') return false;
     try {
       // Coerce rendering through showStep's confirmed path by temporarily injecting the hint step.
-      // Store/restore currentStep so the 23-step flow is unaffected.
+      // Store/restore currentStep so the 26-step flow is unaffected.
       const saved = this.currentStep;
       const wasVisible = this.visible;
       this.clearObjects();

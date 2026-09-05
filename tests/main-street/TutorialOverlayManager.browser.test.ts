@@ -5,14 +5,15 @@
  * cover the correct UI areas for each TutorialHighlightZone in the
  * unified T1–T18 tutorial system.
  *
- * Unified step mapping (18 steps):
- *   0=T1 centerModal(confirm)  1=T2 developmentRow(confirm)
- *   2=T3 laundromatCard(action)  3=T4 hand(confirm)  4=T5 streetGrid(action)
- *   5=T6 incidentQueue(confirm)  6=T7 endTurnButton(action)  7=T8 investmentsRow(confirm)
- *   8=T9 festivalCard(action)  9=T10 developmentRow(action)  10=T11 endTurnButton(action)
- *   11=T12 developmentRow(confirm)  12=T13 actionButtons(action, Community Favour)
- *   13=T14 developmentRow(action)  14=T15 hand(action)  15=T16 hud(confirm)
- *   16=T17 challengePanel(confirm)  17=T18 completionModal(confirm)
+ * Unified step mapping (26 steps, CG-0MTNMBX5Z002U0MH renumber — stale
+ * * indices below are historical; see TutorialFlow.ts T1-T26 for the
+ * * authoritative mapping: T1 centerModal, T2 developmentRow, T3
+ * * laundromatCard, T4 hand, T5 incidentQueue, T6 endTurnButton, T7
+ * * streetGrid, T8 endTurnButton, T9 investmentsRow, T10 festivalCard,
+ * * T11 endTurnButton, T12 developmentRow, T13 developmentRow, T14
+ * * actionButtons, T15 endTurnButton, T16 streetGrid, T17 endTurnButton,
+ * * T18 developmentRow, T19 endTurnButton, T20 streetGrid, T21 hand,
+ * * T24 hud, T25 challengePanel, T26 completionModal).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
@@ -469,7 +470,7 @@ describe('TutorialOverlayManager highlight zones', () => {
 
   // ── AC 14: completionModal zone (T18, null anchor) ─────────
 
-  it('completionModal zone (T23) returns null anchor (no highlight graphics drawn)', async () => {
+  it('completionModal zone (T26) returns null anchor (no highlight graphics drawn)', async () => {
     const mgr = scene.tutorialOverlay as { showStep?: (index: number) => void; dismiss?: () => void };
 
     if (mgr && typeof mgr.showStep === 'function') {
@@ -477,7 +478,7 @@ describe('TutorialOverlayManager highlight zones', () => {
         mgr.dismiss();
       }
 
-      mgr.showStep(stepIdToIndex('T23'));
+      mgr.showStep(stepIdToIndex('T26'));
 
       // completionModal should not draw any highlight graphics at depth 199
       const highlights = findHighlightGraphics(scene);
