@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KLQD001TBMH
+// smell: god_class
+// severity: medium
+// description: MainStreet god modules: Engine 2452, Animator 1942, Renderer 1902, TurnController 1834, State 1599, Cards 1469, Adjacency 1354, Market 1307, LifecycleManager 1111 lines — decompose per-concern helpers; threshold 800; prior CG-0MM1OP07Q16TUTHI covered different scene files, not these modules.
+// -->
 /**
  * MainStreetRenderer -- extracted UI/layout rendering helper for Main Street.
  */

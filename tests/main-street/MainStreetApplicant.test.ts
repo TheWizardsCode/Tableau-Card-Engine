@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KUL80008VMR
+// smell: unused_eslint_disable
+// severity: low
+// description: Stale disable batch: Applicant 44, community-space-types 226, LegalityResult 43,50 — remove or convert to valid handling; part of CG-0MTP6KUL80008VMR.
+// -->
 /**
  * Main Street: Staff applicant trigger, hire/decline, and let-go economics
  * (CG-0MTFO4HGQ008VAQR — leaf of CG-0MSTOATDU006UGAX).

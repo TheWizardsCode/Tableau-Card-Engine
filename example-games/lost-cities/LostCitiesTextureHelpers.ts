@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6K42C0010G7F
+// smell: unused_eslint_disable
+// severity: low
+// description: 4 stale @typescript-eslint/no-var-requires disables (LostCitiesTextureHelpers 254,256,296,298) — remove directives; eslint --fix buggy strips to empty lines, manual removal required.
+// -->
 /**
  * LostCitiesTextureHelpers — Inline SVG texture helpers for Lost Cities.
  *

@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KUL80008VMR
+// smell: unused_eslint_disable
+// severity: low
+// description: Stale disable batch: Applicant 44, community-space-types 226, LegalityResult 43,50 — remove or convert to valid handling; part of CG-0MTP6KUL80008VMR.
+// -->
 import { describe, it, expect } from 'vitest';
 import type { LegalityResult } from '../../src/rule-engine/index';
 import { RULE_ENGINE_VERSION } from '../../src/rule-engine/index';
