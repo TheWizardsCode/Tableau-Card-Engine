@@ -1598,13 +1598,13 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // persist across turns.
   state.phase = 'InvestmentResolution';
 
-  // Check for immediate loss after events. When the game is about to end
-  // prematurely, emit the per-turn net row BEFORE the game-over banner so
-  // the summary precedes the loss entry (CG-0MT5W7UJJ0065MEZ AC3).
-  if (state.resourceBank.coins < 0 || (state.turn > 1 && state.resourceBank.reputation <= 0)) {
-    appendTurnNetRow(state, turnEnded);
-  }
+  // Check for immediate loss before income (e.g. coins already < 0 from
+  // purchases, or rep already <= 0 at turn > 1). The game-over banner is
+  // emitted first, then the per-turn net row as the final entry so the
+  // summary remains the authoritative closing record even on premature
+  // exits (CG-0MTJP6XU5009KN5L fixes inverted ordering).
   if (checkImmediateLoss(state)) {
+    appendTurnNetRow(state, turnEnded);
     return {
       income: null,
       incident: null,
@@ -1639,12 +1639,12 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   const incidentCoinChange = state.resourceBank.coins - coinsBeforeIncident;
   const incidentRepChange = state.resourceBank.reputation - repBeforeIncident;
 
-  // Check for immediate loss after incident. Mirror the premature-exit
-  // ordering above: net row precedes the game-over banner (AC3).
-  if (state.resourceBank.coins < 0 || (state.turn > 1 && state.resourceBank.reputation <= 0)) {
-    appendTurnNetRow(state, turnEnded);
-  }
+  // Check for immediate loss after incident. Banner is emitted first,
+  // then the per-turn net row as the final entry (mirrors the pre-income
+  // ordering fix above and keeps the net row as the canonical closing
+  // record; CG-0MTJP6XU5009KN5L).
   if (checkImmediateLoss(state)) {
+    appendTurnNetRow(state, turnEnded);
     return {
       income,
       incident,
