@@ -21,7 +21,7 @@ import {
   GRID_SIZE,
   REFRESH_MARKET_COST,
 } from './MainStreetCards';
-import { updateNeighborsOnPlacement, updateNeighborsOnSale, hasAdjacentSameType } from './MainStreetAdjacency';
+import { updateNeighborsOnPlacement, updateNeighborsOnSale, hasAdjacentSameType, tagSlotOwnerIfCompetitive } from './MainStreetAdjacency';
 import { roundInt } from './MainStreetDifficulty';
 import {
   computeRefreshCostDiscount,
@@ -443,6 +443,8 @@ export function purchaseBusiness(
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
+  // Record ownership on the owner-tagged grid (competitive; no-op single-player).
+  tagSlotOwnerIfCompetitive(state, slotIndex);
 
   // Arm Grand Opening placement gate (CG-0MTIOCBH400970OB).
   (state as any).businessPlacedThisTurn = true;
@@ -567,6 +569,8 @@ export function playBusinessFromHand(
   state.hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card as BusinessCard;
   updateNeighborsOnPlacement(state, slotIndex);
+  // Record ownership on the owner-tagged grid (competitive; no-op single-player).
+  tagSlotOwnerIfCompetitive(state, slotIndex);
   (state as any).businessPlacedThisTurn = true;
 
   addLog(

@@ -834,6 +834,230 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   };
 }
 
+// ── Per-Owner Income Routing (competitive, CG-0MTIIL6J200291ZQ) ──
+
+/**
+ * Resolves the owner of a street slot in competitive mode.
+ *
+ * Reads the owner-tagged grid (state-model sibling) and falls back to the
+ * active player (0 in single-player) when a slot is not yet tagged — this
+ * keeps headless flows that place cards through the shared single-wallet
+ * path deterministic even before ownership tagging lands at every site.
+ *
+ * @param state      Current game state.
+ * @param slotIndex  Street grid slot index.
+ * @returns The owning player index (always an integer).
+ */
+export function getSlotOwnerId(state: MainStreetState, slotIndex: number): number {
+  const tag = state.ownerTaggedGrid?.[slotIndex];
+  if (tag && tag.ownerId !== null) return tag.ownerId;
+  return state.activePlayerId ?? 0;
+}
+
+/**
+ * Tags a street slot with its owner when the state is competitive
+ * (`ownerTaggedGrid` present). No-op in single-player state. The card
+ * reference is kept in sync with `streetGrid` so the tag never drifts.
+ *
+ * @param state      Current game state (mutated in-place when competitive).
+ * @param slotIndex  Street grid slot index just occupied.
+ * @param ownerId    Owner index (defaults to the active player / 0).
+ * @returns True when the tag was written (competitive state).
+ */
+export function tagSlotOwnerIfCompetitive(
+  state: MainStreetState,
+  slotIndex: number,
+  ownerId: number = state.activePlayerId ?? 0,
+): boolean {
+  if (!state.ownerTaggedGrid) return false;
+  state.ownerTaggedGrid[slotIndex] = {
+    card: state.streetGrid[slotIndex] ?? null,
+    ownerId,
+  };
+  return true;
+}
+
+/** Per-owner income result: owner index + that owner's IncomeResult. */
+export interface OwnerIncomeResult {
+  /** The player index this income belongs to (index into state.players). */
+  ownerId: number;
+  /** Standard IncomeResult computed over the owner's own slots/wallet. */
+  income: IncomeResult;
+}
+
+/**
+ * Applies income per-owner for competitive states (N >= 2).
+ *
+ * Each placed business's income (base + adjacency synergy + upgrades — all
+ * folded into the `currentIncome` cache by the adjacency system — plus
+ * per-business staff buffs and hand-card synergy from the owner's own hand)
+ * accrues ONLY to the slot's owning player (`ownerTaggedGrid`, falling back
+ * to the active player for untagged slots). Per-owner reputation drives the
+ * reputation coin multiplier independently; shared `activeEffects`
+ * income/rep multipliers apply to every owner's income phase (board-wide
+ * duration effects, unchanged semantics).
+ *
+ * `applyIncome(state)` above is left byte-identical for single-player / N=1
+ * (AC4 regression: the N=1 flow delegates to the legacy path and never
+ * reaches this function).
+ *
+ * Determinism: consumes no RNG — pure function of the current grid/state,
+ * so seeded replay reproduces identical per-owner sequences (AC3).
+ *
+ * @param state  Competitive game state (players[] wallets mutated in-place).
+ * @returns Per-owner income results (empty when not competitive).
+ */
+export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResult[] {
+  // Single-player / N=1 fallback: keep the shared income path unchanged.
+  if (!state.players || state.players.length < 2) {
+    applyIncome(state);
+    return [];
+  }
+
+  const soldSlots = state.soldSlots ?? [];
+  const grid = state.streetGrid;
+  const results: OwnerIncomeResult[] = [];
+
+  for (const player of state.players) {
+    const ownerId = player.playerId;
+    const hand = player.hand ?? [];
+    const breakdown: SlotIncome[] = [];
+    let total = 0;
+    let repPerTurn = 0;
+
+    // Income / reputation from slots THIS owner owns (skip sold).
+    for (let i = 0; i < grid.length; i++) {
+      if (soldSlots[i]) continue;
+      const card = grid[i];
+      if (!card) continue;
+      if (getSlotOwnerId(state, i) !== ownerId) continue;
+
+      const slotIncome = card.currentIncome ?? 0;
+      const profile = {
+        synergyTypes: (card as BusinessCard).synergyTypes ?? [],
+        baseIncome: (card as BusinessCard).baseIncome ?? 0,
+        ongoingCost: (card as BusinessCard).ongoingCost ?? 0,
+      };
+      const buffs = computePerBusinessSkillBuffs(
+        getEmployedSpecializationSkillsForBusiness(state, i),
+        profile,
+      );
+      const buffedIncome = slotIncome * (1 + buffs.income.percent) + buffs.income.flat;
+      breakdown.push({
+        slotIndex: i,
+        businessName: card.name,
+        baseIncome: slotIncome,
+        synergyBonus: 0,
+        total: buffedIncome,
+      });
+      total += buffedIncome;
+
+      const baseRep = card.currentReputationPerTurn ?? 0;
+      const repBuffs = computePerBusinessSkillBuffs(
+        getEmployedSpecializationSkillsForBusiness(state, i),
+        profile,
+      );
+      repPerTurn += baseRep + repBuffs.reputation.flat;
+    }
+
+    // Staff reputation abilities owned by THIS player (per-player staff).
+    for (const staff of player.staffCards ?? []) {
+      repPerTurn += staff.reputationPerTurn ?? 0;
+    }
+
+    // ── Phase breakdown + active-effect income multipliers (mirrors applyIncome) ──
+    const phaseSlotData: SlotPhaseBreakdown[] = breakdown.map(b => ({
+      slotIndex: b.slotIndex,
+      businessName: b.businessName,
+      baseIncome: b.total,
+      synergyBonus: 0,
+      repBonus: 0,
+      eventDeltas: [],
+      upcomingDeltas: [],
+    }));
+    let modifiedTotal = 0;
+    for (let bi = 0; bi < breakdown.length; bi++) {
+      const slot = breakdown[bi];
+      const phaseSlot = phaseSlotData[bi];
+      let runningValue = slot.total;
+      for (const effect of state.activeEffects) {
+        if (effect.effectType !== 'income-multiplier') continue;
+        const newVal = roundInt(runningValue * effect.multiplier);
+        const delta = newVal - runningValue;
+        phaseSlot.eventDeltas.push({
+          cardId: effect.sourceEventId,
+          name: effect.description,
+          delta,
+        });
+        runningValue = newVal;
+      }
+      modifiedTotal += runningValue;
+    }
+
+    const multiplied = applyReputationMultiplier(modifiedTotal, player.reputation, state.config);
+    player.coins += multiplied;
+
+    const modifiedRepPerTurn = roundInt(applyActiveEffectMultiplier(
+      state.activeEffects,
+      'rep-multiplier',
+      repPerTurn,
+    ));
+    if (modifiedRepPerTurn !== 0) {
+      player.reputation += modifiedRepPerTurn;
+    }
+
+    // Hand-card synergy from the owner's OWN hand.
+    let handSynergyTotal = 0;
+    if (hand && hand.length > 0) {
+      handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
+      total += handSynergyTotal;
+    }
+
+    const repBonus = multiplied - modifiedTotal;
+    const sumPhaseTotal = phaseSlotData.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
+    const modifiedSlotTotals = phaseSlotData.map(
+      (d) => d.baseIncome + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
+    );
+    const sumModifiedSlotTotals = modifiedSlotTotals.reduce((acc, v) => acc + v, 0) || 0;
+    for (let i = 0; i < phaseSlotData.length; i++) {
+      const pd = phaseSlotData[i];
+      if (sumModifiedSlotTotals > 0) {
+        pd.repBonus = repBonus * (modifiedSlotTotals[i] / sumModifiedSlotTotals);
+      }
+      if (sumPhaseTotal > 0 && handSynergyTotal > 0) {
+        pd.synergyBonus = handSynergyTotal * (pd.baseIncome / sumPhaseTotal);
+      }
+    }
+
+    if (multiplied > 0) {
+      addLog(state, `P${ownerId} Income: +${multiplied} coins (${describeEventEffects(multiplied, 0)})`, 'gain');
+    } else {
+      addLog(state, `P${ownerId} Income: +0 coins (${describeEventEffects(0, 0)})`, 'neutral');
+    }
+    if (modifiedRepPerTurn > 0) {
+      addLog(state, `P${ownerId} Reputation from cards: +${modifiedRepPerTurn} (${describeEventEffects(0, modifiedRepPerTurn)})`, 'gain');
+    }
+    if (handSynergyTotal > 0) {
+      addLog(state, `P${ownerId} Hand card synergy: +${handSynergyTotal} coins (${describeEventEffects(handSynergyTotal, 0)})`, 'gain');
+    }
+
+    results.push({
+      ownerId,
+      income: {
+        total,
+        breakdown,
+        handSynergyTotal,
+        phaseBreakdown: {
+          perSlotBreakdown: phaseSlotData,
+          handSynergyTotal,
+        },
+      },
+    });
+  }
+
+  return results;
+}
+
 // ── Synergy Pairs for Visual Lines ──────────────────────────
 
 /**

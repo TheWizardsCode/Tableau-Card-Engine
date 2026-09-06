@@ -49,7 +49,7 @@ import {
   describeEventEffects,
   classifyEffect,
 } from './MainStreetState';
-import type { BusinessCard, EventCard, StaffCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, EventCard, StaffCard, SynergyType, SpecializationSkill } from './MainStreetCards';
 import {
   SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
   type DurationEventCard,
@@ -57,7 +57,7 @@ import {
 
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
-import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
+import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale, applyCompetitiveIncome, tagSlotOwnerIfCompetitive, getSlotOwnerId } from './MainStreetAdjacency';
 import {
   computeIncidentSkillBuffs,
   computeReputationGainMultiplier,
@@ -386,7 +386,14 @@ export function executeAction(
       const card = hand[action.handIndex] as any;
       const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
       if (!isSameDay) consumeAction(state);
-      return playEventFromHand(state, action.handIndex);
+      const result = playEventFromHand(state, action.handIndex);
+      // Investment played by the active player: route the benefit to their
+      // own wallet in competitive mode (CG-0MTIIL6J200291ZQ). SpecificSynergy
+      // coin deltas are routed per-business to slot owners inside the helper.
+      if ((state.players?.length ?? 0) > 1) {
+        applyCompetitiveEventEffects(state, card as EventCard, state.activePlayerId ?? 0);
+      }
+      return result;
     }
     case 'discard-from-hand':
       discardFromHand(state, action.handIndex);
@@ -399,7 +406,12 @@ export function executeAction(
       const card = (state.hand ?? [])[handIndex] as any;
       const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
       if (!isSameDay) consumeAction(state);
-      return playEventFromHand(state, handIndex);
+      const result = playEventFromHand(state, handIndex);
+      // Investment played by the active player: per-owner routing (see above).
+      if ((state.players?.length ?? 0) > 1) {
+        applyCompetitiveEventEffects(state, card as EventCard, state.activePlayerId ?? 0);
+      }
+      return result;
     }
     case 'peek-incident-deck':
       // Consumes one action and enforces the once-per-turn gate inside
@@ -643,6 +655,11 @@ export function playHeldEvent(state: MainStreetState, handIndex?: number): void 
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   resolveEvent(state, event);
+  // Investment played by the active player: per-owner routing in competitive
+  // mode (CG-0MTIIL6J200291ZQ) — benefit lands in the acting player's wallet.
+  if ((state.players?.length ?? 0) > 1) {
+    applyCompetitiveEventEffects(state, event, state.activePlayerId ?? 0);
+  }
   const coinChange = state.resourceBank.coins - coinsBefore;
   const repChange = state.resourceBank.reputation - repBefore;
   addLog(
@@ -738,6 +755,127 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
   );
 
   return event;
+}
+
+/**
+ * Routes a shared Investment/Incident event's effects per-owner for
+ * competitive states (N >= 2, CG-0MTIIL6J200291ZQ).
+ *
+ * Retains the shared resolution semantics of {@link resolveEvent} but applies
+ * the deltas to each owning player's wallet rather than the shared host
+ * wallet (which is left unchanged — the host path already resolved the event
+ * on the resourceBank before this helper runs):
+ *
+ *  - Duration events are board-wide ActiveEffects (the shared activeEffects
+ *    list) and are NOT re-routed here — they are applied once by the host
+ *    path and influence every owner's income phase via
+ *    {@link applyCompetitiveIncome}.
+ *  - `All` / `RandomBusiness`:
+ *      - Investment events (actingPlayerId provided): the acting player's own
+ *        wallet receives the delta (playing the event benefits the acting
+ *        player).
+ *      - Incidents (shared deck, no acting player): every owner's wallet
+ *        receives the delta, each scaled by its OWN reputation multiplier and
+ *        staff mitigation (street-wide semantics). RandomBusiness resolves
+ *        deterministically to the owner of the lowest-index placed business
+ *        without consuming RNG (no such cards ship in the CSV today —
+ *        verified — so this path is a documented fallback).
+ *  - `SpecificSynergy` (both triggers): coinDelta is multiplied by the count
+ *    of matching businesses OWNED by that player (per-match rule retained)
+ *    and credited to each slot owner; the reputation delta applies once per
+ *    owner that owns at least one matching business (mirrors the shared
+ *    resolution where rep is applied once regardless of match count).
+ *
+ * Consumes no RNG (deterministic replay, AC3).
+ *
+ * @param state           Competitive game state (players[] mutated in-place).
+ * @param event           The already-resolved shared event card to route.
+ * @param actingPlayerId  Owner index of the player who played the event
+ *                        (Investment trigger). Omit for shared incidents.
+ */
+export function applyCompetitiveEventEffects(
+  state: MainStreetState,
+  event: EventCard,
+  actingPlayerId?: number,
+): void {
+  if (!state.players || state.players.length < 2) return;
+  if (isDurationEventCard(event)) return; // board-wide effect, host-applied only
+
+  const cfg = state.config;
+  const target = event.target;
+  const actingId = event.trigger === 'Investment' ? actingPlayerId ?? 0 : undefined;
+
+  // Pre-compute per-owner staff mitigation (mirrors resolveEvent).
+  const owners = state.players.map((player) => {
+    const ownerId = player.playerId;
+    const skills = (player.staffCards ?? []).flatMap((card) =>
+      Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [],
+    );
+    const incidentBuffs =
+      event.trigger === 'Incident' ? computeIncidentSkillBuffs(skills) : null;
+    const theftNeutralized =
+      incidentBuffs !== null && incidentBuffs.immuneToTheftLoss && isTheftLossIncident(event);
+    return { ownerId, player, skills, incidentBuffs, theftNeutralized };
+  });
+
+  const coinDeltaFor = (owner: { incidentBuffs: ReturnType<typeof computeIncidentSkillBuffs> | null; theftNeutralized: boolean }, effect: number): number => {
+    if (owner.theftNeutralized && effect < 0) return 0; // theft immunity
+    if (owner.incidentBuffs === null || effect >= 0) return roundInt(effect);
+    return roundInt(effect + Math.abs(effect) * owner.incidentBuffs.coinDamageReductionPct);
+  };
+  const repDeltaFor = (owner: { skills: readonly SpecializationSkill[]; incidentBuffs: ReturnType<typeof computeIncidentSkillBuffs> | null }, effect: number): number => {
+    if (effect > 0) return roundInt(effect * computeReputationGainMultiplier(owner.skills));
+    if (owner.incidentBuffs === null) return roundInt(effect);
+    return roundInt(Math.min(0, effect + owner.incidentBuffs.reputationDamageReductionFlat));
+  };
+
+  const changed: { ownerId: number; coins: number; rep: number }[] = [];
+  for (const owner of owners) {
+    let coinsGained = 0;
+    let repGained = 0;
+
+    switch (target) {
+      case 'SpecificSynergy': {
+        let matchCount = 0;
+        for (let i = 0; i < state.streetGrid.length; i++) {
+          const b = state.streetGrid[i];
+          if (!b || !b.synergyTypes) continue;
+          if (getSlotOwnerId(state, i) !== owner.ownerId) continue;
+          if (b.synergyTypes.includes(event.targetSynergy as SynergyType)) matchCount += 1;
+        }
+        if (matchCount > 0) {
+          const rawDelta = event.coinDelta * matchCount;
+          coinsGained += applyReputationMultiplier(coinDeltaFor(owner, rawDelta), owner.player.reputation, cfg);
+          repGained += repDeltaFor(owner, event.reputationDelta);
+        }
+        break;
+      }
+      case 'All':
+      case 'RandomBusiness': {
+        // Investment → acting player only; incident → every owner once.
+        if (actingId !== undefined && owner.ownerId !== actingId) break;
+        coinsGained += applyReputationMultiplier(coinDeltaFor(owner, event.coinDelta), owner.player.reputation, cfg);
+        repGained += repDeltaFor(owner, event.reputationDelta);
+        break;
+      }
+      default:
+        break;
+    }
+
+    if (coinsGained !== 0 || repGained !== 0) {
+      owner.player.coins += coinsGained;
+      owner.player.reputation += repGained;
+      changed.push({ ownerId: owner.ownerId, coins: coinsGained, rep: repGained });
+    }
+  }
+
+  for (const c of changed) {
+    addLog(
+      state,
+      `P${c.ownerId} ${event.trigger}: ${event.name} (${describeEventEffects(c.coins, c.rep)})`,
+      classifyEffect(c.coins, c.rep),
+    );
+  }
 }
 
 // ── Community Favour (CG-0MSTOATDQ005XDET) ─────────────────
@@ -1238,12 +1376,28 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
   applyStaffOngoingCosts(state);
   applyCommunitySpaceOngoingCosts(state);
   applyBusinessOngoingCosts(state);
+  // Per-owner economy layer (competitive N>=2, CG-0MTIIL6J200291ZQ): in
+  // parallel with the shared host wallet above, route income and ongoing
+  // costs to each owner's own wallet (ownerTaggedGrid) so per-player
+  // economics stay authoritative for scoring / AI / deterministic replay.
+  // N=1 never reaches this function via the convenience flow
+  // (executeCompetitiveDay collapses to the legacy single-player path); the
+  // guard keeps direct N=1 calls legacy-identical (AC4). Consumes no RNG.
+  if ((state.players?.length ?? 0) > 1) {
+    applyCompetitiveIncome(state);
+    applyCompetitiveOngoingCosts(state);
+  }
   state.phase = 'IncidentPhase';
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   const incident = resolveIncident(state);
   const incidentCoinChange = state.resourceBank.coins - coinsBefore;
   const incidentRepChange = state.resourceBank.reputation - repBefore;
+  // Route the resolved shared incident to each owner's wallet per-owner
+  // (street-wide resolution semantics retained; CG-0MTIIL6J200291ZQ).
+  if ((state.players?.length ?? 0) > 1 && incident) {
+    applyCompetitiveEventEffects(state, incident);
+  }
   if (checkImmediateLoss(state)) {
     appendTurnNetRow(state, turnEnded);
     return {
@@ -1647,6 +1801,8 @@ export function placeFromHand(
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
+  // Record ownership on the owner-tagged grid (competitive; no-op single-player).
+  tagSlotOwnerIfCompetitive(state, slotIndex);
 
   addLog(
     state,
@@ -2053,6 +2209,116 @@ export function applyBusinessOngoingCosts(state: MainStreetState): void {
 }
 
 /**
+ * Applies ongoing costs per-owner for competitive states (N >= 2,
+ * CG-0MTIIL6J200291ZQ).
+ *
+ * Mirrors the three shared families above (staff salary, community-space
+ * running costs, business running costs) but deducts from the OWNING player's
+ * wallet instead of the shared host wallet:
+ *  - Staff salary is charged to the player who owns the staff member
+ *    (`players[i].staffCards`), with the Operations Manager per-member salary
+ *    discount and the Cost Cutter street-wide reduction derived from that
+ *    owner's own employed skills.
+ *  - Community-space and business running costs are charged to the slot's
+ *    owner (`ownerTaggedGrid` via getSlotOwnerId).
+ *
+ * The shared host-wallet functions above are left untouched (single-player /
+ * N=1 path); this function is additive parallel bookkeeping so per-player
+ * wallets stay authoritative for scoring / AI. Deduction clamping and log
+ * conventions mirror {@link applyStaffOngoingCosts} / {@link
+ * applyCommunitySpaceOngoingCosts} / {@link applyBusinessOngoingCosts}.
+ * Consumes no RNG (deterministic replay, AC3).
+ *
+ * @param state  Competitive game state (players[] wallets mutated in-place).
+ */
+export function applyCompetitiveOngoingCosts(state: MainStreetState): void {
+  if (!state.players || state.players.length < 2) return;
+  const hostReduction = computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state));
+
+  // Staff salary: charge each owner their own staff's salaries.
+  for (const player of state.players) {
+    const staffCards = player.staffCards ?? [];
+    if (staffCards.length === 0) continue;
+    const ownerSkills = staffCards.flatMap((card) =>
+      Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [],
+    );
+    let totalCost = 0;
+    for (const card of staffCards) {
+      const memberSkills = Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [];
+      totalCost += computeStaffSalaryCost(memberSkills, card.ongoingCost);
+    }
+    totalCost = roundInt(totalCost * (1 - computeStreetOngoingCostReductionPct(ownerSkills)));
+    if (totalCost <= 0) continue;
+    const actualDeduction = Math.min(totalCost, player.coins);
+    player.coins -= actualDeduction;
+    if (actualDeduction > 0) {
+      addLog(
+        state,
+        `P${player.playerId} Staff costs: -${actualDeduction} coins (${staffCards.length} staff) (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
+    }
+    if (actualDeduction < totalCost) {
+      addLog(
+        state,
+        `P${player.playerId} Insufficient coins for staff costs: owed ${totalCost}, paid ${actualDeduction} (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
+    }
+  }
+
+  // Community-space + business running costs: charge each slot's owner.
+  const grid = state.streetGrid;
+  const ownerCosts = new Map<number, number>();
+  const ownerCounts = new Map<number, { businesses: number; spaces: number }>();
+  for (let i = 0; i < grid.length; i++) {
+    const slot = grid[i];
+    if (!slot) continue;
+    if (slot.family !== 'business' && slot.family !== 'community-space') continue;
+    const cost = (slot as BusinessCard).ongoingCost ?? 0;
+    if (cost <= 0) continue;
+    const ownerId = getSlotOwnerId(state, i);
+    ownerCosts.set(ownerId, (ownerCosts.get(ownerId) ?? 0) + cost);
+    const counts = ownerCounts.get(ownerId) ?? { businesses: 0, spaces: 0 };
+    if (slot.family === 'community-space') counts.spaces += 1;
+    else counts.businesses += 1;
+    ownerCounts.set(ownerId, counts);
+  }
+  for (const [ownerId, rawCost] of ownerCosts) {
+    const player = state.players[ownerId];
+    if (!player) continue;
+    // Street-wide Cost Cutter reduction from the shared (host) staff set:
+    // staff hiring is single-wallet today (outside this leaf's scope), so the
+    // per-slot reduction stays consistent with the shared income/cost paths.
+    const totalCost = roundInt(rawCost * (1 - hostReduction));
+    if (totalCost <= 0) continue;
+    const actualDeduction = Math.min(totalCost, player.coins);
+    player.coins -= actualDeduction;
+    const counts = ownerCounts.get(ownerId)!;
+    const label =
+      counts.businesses > 0 && counts.spaces > 0
+        ? `${counts.businesses} businesses, ${counts.spaces} spaces`
+        : counts.businesses > 0
+          ? `${counts.businesses} businesses`
+          : `${counts.spaces} spaces`;
+    if (actualDeduction > 0) {
+      addLog(
+        state,
+        `P${ownerId} Ongoing costs: -${actualDeduction} coins (${label}) (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
+    }
+    if (actualDeduction < totalCost) {
+      addLog(
+        state,
+        `P${ownerId} Insufficient coins for ongoing costs: owed ${totalCost}, paid ${actualDeduction} (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
+    }
+  }
+}
+
+/**
  * Lays off (removes) a staff card, decreasing maxHandSize and randomly
  * removing hand cards equal to the staff card's handSlotsAdded.
  *
@@ -2167,6 +2433,8 @@ export function buyAndPlaceBusiness(
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
+  // Record ownership on the owner-tagged grid (competitive; no-op single-player).
+  tagSlotOwnerIfCompetitive(state, slotIndex);
   (state as any).businessPlacedThisTurn = true;
 
   addLog(
