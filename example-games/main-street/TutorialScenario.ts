@@ -375,7 +375,6 @@ export function createTutorialScenario(
     maxHandSize: 3,
     discardPile: [],
     staffCards: [],
-    skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
     bankedActions: 0,

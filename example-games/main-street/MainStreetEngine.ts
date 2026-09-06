@@ -1358,7 +1358,6 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
     throw new Error('resolveCompetitiveClosingPhases requires competitive state (players)');
   }
   const turnEnded = state.turn;
-  if (!state.skipMarketCycleOnEndTurn) cycleMarketCards(state);
   if (checkImmediateLoss(state)) {
     appendTurnNetRow(state, turnEnded);
     return {
@@ -1492,11 +1491,15 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
 
   // Turn 1 is already set by setup; subsequent turns increment here
   if (state.turn > 1 || state.phase === 'DayStart') {
-    // Refill market at start of each day (skip on checkpoint resume).
-    // Top-up semantics: visible cards are preserved (e.g. tutorial scenario
-    // cards kept via skipMarketCycleOnEndTurn); an already-full row stays.
+    // Cycle market at start of each new day (after the first turn — turn 1's
+    // row is already filled by setupMainStreetGame; cycling there would discard
+    // fresh cards the player hasn't seen yet).
     if (!skipMarketRefill) {
-      refillMarket(state);
+      if (state.turn > 1) {
+        cycleMarketCards(state);
+      } else {
+        refillMarket(state);
+      }
     }
   }
 
@@ -1588,15 +1591,6 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // The turn being summarised by the net row (turn is incremented below on
   // a continuing game, so capture it before that happens).
   const turnEnded = state.turn;
-
-  // Cycle unpurchased market cards to discard piles before advancing phases.
-  // During the tutorial (before T7 completes), market cycling is skipped to
-  // preserve scenario-placed cards (e.g. Local Festival for T7). The
-  // `skipMarketCycleOnEndTurn` flag is set by the turn controller when the
-  // tutorial is active and the current step requires the scenario cards.
-  if (!state.skipMarketCycleOnEndTurn) {
-    cycleMarketCards(state);
-  }
 
   // Phase: InvestmentResolution
   // Held Investment events are NO LONGER auto-resolved. The player must

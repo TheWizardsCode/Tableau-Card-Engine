@@ -40,16 +40,6 @@ function destroyGame(game: Phaser.Game | null): void {
   if (container) container.remove();
 }
 
-function findButtonByText(scene: Phaser.Scene, text: string): Phaser.GameObjects.Text | null {
-  const children = (scene as any).children?.getAll?.() ?? [];
-  for (const obj of children) {
-    if (obj instanceof Phaser.GameObjects.Text && typeof obj.text === 'string' && obj.text.includes(text)) {
-      return obj;
-    }
-  }
-  return null;
-}
-
 function getHandView(scene: Phaser.Scene): any {
   return (scene as any).handView;
 }
@@ -193,6 +183,7 @@ describe('GymHandPileScene outlines', () => {
     expect(outlineRects.length).toBeGreaterThan(1);
 
     const horizontalYs = outlineRects.map((r: any) => r.y);
+    expect(horizontalYs.length).toBeGreaterThan(0);
 
     // Switch to vertical layout via HandView API
     handView.setLayoutDirection('vertical');

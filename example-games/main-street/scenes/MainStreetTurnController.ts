@@ -223,22 +223,6 @@ export class MainStreetTurnController {
       }
     } catch { /* banking hint trigger must never block the turn */ }
 
-    // ── Tutorial guard: prevent market cycling before T7 ──────────
-    // When the tutorial is active and the current step is action 'end-turn'
-    // (T6), the upcoming processEndOfTurn would call cycleMarketCards(),
-    // which discards all scenario-placed market cards and refills from the
-    // random deck. This would lose the scenario's explicitly-placed
-    // investment event card (Local Festival) before T7 can reference it.
-    // Set skipMarketCycleOnEndTurn to preserve the market state until T7
-    // completes. The flag is reset after processEndOfTurn.
-    const tutController = (s as any).tutorialController as any;
-    if (tutController?.isActive) {
-      const step = getCurrentStep(tutController);
-      if (step?.requiredAction === 'end-turn') {
-        s.state.skipMarketCycleOnEndTurn = true;
-      }
-    }
-
     // Process end-of-turn phases (events, income, night, end check)
     let result: TurnResult;
     try {
@@ -252,9 +236,6 @@ export class MainStreetTurnController {
       s.instructionText.setText(`Error: ${(e as Error).message}`);
       s.refreshAll();
       return;
-    } finally {
-      // Reset the flag after processing so subsequent end-turns cycle normally
-      s.state.skipMarketCycleOnEndTurn = false;
     }
 
     // ── Income Phase Animation ──────────────────────────────────────

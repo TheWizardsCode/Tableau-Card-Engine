@@ -374,12 +374,6 @@ export interface MainStreetState {
   /** Active staff cards providing hand capacity bonuses. */
   staffCards: StaffCard[];
   /**
-   * If true, `processEndOfTurn()` will skip `cycleMarketCards()`.
-   * Used during the tutorial to preserve scenario-placed market cards
-   * until the T7 purchase step completes.
-   */
-  skipMarketCycleOnEndTurn: boolean;
-  /**
    * Tracks which street grid slots have been sold. Length = GRID_SIZE.
    * true = card in this slot has been sold (no income/reputation for itself,
    * but still acts as a synergy anchor — its neighbours retain synergy bonuses
@@ -531,8 +525,6 @@ export interface MainStreetSerializedState {
   discardPile: BusinessCard[];
   /** Serialized active staff cards. */
   staffCards: StaffCard[];
-  /** Whether market cycling should be skipped on next end-of-turn. */
-  skipMarketCycleOnEndTurn: boolean;
   /**
    * Checksum of the card-data.csv at the time this save was created.
    * Used to detect CSV changes between saves, triggering SVG regeneration.
@@ -733,11 +725,9 @@ function forceReshuffleFromDiscards<T>(state: MainStreetState, deck: T[], discar
  *     (empty decks reshuffle matching discards — staff included; Investment-trigger events
  *     are sought in the event deck like the legacy investments row).
  *
- * Visible cards are PRESERVED (top-up semantics), which mirrors the legacy
- * day-start refill behaviour relied on by the tutorial's
- * `skipMarketCycleOnEndTurn` flow (scenario-placed market cards survive into
- * the next day). Callers that want a full re-draw must clear the row first
- * (refreshMarket discards + clears; cycleMarketCards empties the row).
+ * Visible cards are PRESERVED (top-up semantics), so scenario-placed market
+ * cards survive into the next day. Callers that want a full re-draw must clear
+ * the row first (refreshMarket discards + clears; cycleMarketCards empties the row).
  *
  * @param state Current game state (mutated in-place).
  */
@@ -990,7 +980,6 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     maxHandSize: 3,
     discardPile: [],
     staffCards: [],
-    skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
     bankedActions: 0,
@@ -1151,7 +1140,6 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     maxHandSize: state.maxHandSize,
     discardPile: structuredClone(state.discardPile),
     staffCards: structuredClone(state.staffCards),
-    skipMarketCycleOnEndTurn: state.skipMarketCycleOnEndTurn,
     soldSlots: [...state.soldSlots],
     csvChecksum: CSV_CHECKSUM,
     csvData: CARD_DATA_RAW,
@@ -1325,10 +1313,6 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (discards as Record<string, unknown>).staff = [];
   }
 
-  // ── skipMarketCycleOnEndTurn: add missing flag (defaults to false) ─
-  if (!('skipMarketCycleOnEndTurn' in saved)) {
-    (saved as Record<string, unknown>).skipMarketCycleOnEndTurn = false;
-  }
 
   // ── csvChecksum: add missing field (defaults to '' for legacy saves) ─
   if (!('csvChecksum' in saved)) {
@@ -1567,7 +1551,6 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     maxHandSize: saved.maxHandSize,
     discardPile: structuredClone(saved.discardPile),
     staffCards: structuredClone(saved.staffCards),
-    skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
     soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
     streetGridCols: (saved as unknown as { streetGridCols?: number }).streetGridCols ?? 1,
     streetGridRows: (saved as unknown as { streetGridRows?: number }).streetGridRows ?? 1,
