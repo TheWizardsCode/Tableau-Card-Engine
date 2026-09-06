@@ -155,7 +155,9 @@ export function buildCoinsTooltip(state: MainStreetState): string {
     state.config,
   );
   const multiplier = reputationCoinMultiplier(state.resourceBank.reputation, state.config);
-  const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
+  // CG-0MTINZ5GG007BH44 (Q2): show 3 decimals so lifts like 1.0375 render as
+  // ×1.038 instead of the misleading ×1.0 from toFixed(1).
+  const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(3) : '1.000';
 
   const preMultiplierStr = Number.isFinite(baseIncome) ? String(Math.round(baseIncome)) : '0';
   const postMultiplierStr = Number.isFinite(multipliedIncome) ? String(Math.round(multipliedIncome)) : '0';
@@ -228,7 +230,8 @@ export function getIncomeResult(state: MainStreetState): IncomeResult {
 export function buildReputationTooltip(state: MainStreetState): string {
   const rep = state.resourceBank.reputation;
   const multiplier = reputationCoinMultiplier(rep, state.config);
-  const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
+  // CG-0MTINZ5GG007BH44 (Q2): 3-decimal display.
+  const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(3) : '1.000';
 
   const lines = [
     t(HUD_TOOLTIP_I18N_KEYS.repTitle),

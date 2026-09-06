@@ -157,12 +157,9 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
     const tooltipBefore = buildCoinsTooltip(state);
     const parsed = parseTooltip(tooltipBefore);
 
-    // BUG Q2: Tooltip formats multiplier to 1 decimal — hides ~1.0375 as ×1.0
-    // With rep=300, divisor=8000: multiplier = 1 + 300/8000 = 1.0375
-    // toFixed(1) → '1.0' — this is the display bug.
-    // After the fix, toFixed(3) should show '1.038'.
-    // For the repro: assert the bug exists (before fix).
-    expect(parsed.multiplierStr).toBe('1.0'); // BUG: should show 1.038
+    // CG-0MTINZ5GG007BH44 (Q2): Tooltip now renders 3 decimals so the lift
+    // is visible: rep=300 → 1.0375 → ×1.038.
+    expect(parsed.multiplierStr).toBe('1.038');
 
     // Run income phase
     applyIncome(state);
@@ -275,8 +272,8 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
     // Pure math check: rep=300, divisor=8000 → 1 + 300/8000 = 1.0375
     const state = makeState(600, 300);
     expect(reputationCoinMultiplier(300, state.config)).toBeCloseTo(1.0375);
-    expect(reputationCoinMultiplier(300, state.config).toFixed(1)).toBe('1.0'); // BUG
-    expect(reputationCoinMultiplier(300, state.config).toFixed(3)).toBe('1.038'); // FIX
+    // Display now uses toFixed(3); toFixed(1) would have shown '1.0'.
+    expect(reputationCoinMultiplier(300, state.config).toFixed(3)).toBe('1.038');
   });
 
   it('net row decomposes exactly into income + costs and ordering is correct', () => {
