@@ -358,14 +358,7 @@ export function cycleMarketCards(state: MainStreetState): void {
     }
   }
 
-  // Log the cycle
-  if (visibleCards.length > 0) {
-    addLog(state, `Market cycled: ${visibleCards.length} unpurchased cards moved to discard`, 'neutral');
-  }
-
   // ── Refill the single row from decks ─────────────────────
-  // (refillMarket would also cycle the already-emptied row; call the raw
-  //  refill so the log line above is the canonical cycle record.)
   refillSingleRowMarket(state);
 }
 

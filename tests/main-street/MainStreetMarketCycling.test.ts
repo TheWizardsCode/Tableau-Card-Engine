@@ -119,6 +119,36 @@ describe('MainStreet Market Cycling', () => {
       },
     );
 
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should not append a Market cycled entry while still cycling cards to discard',
+      () => {
+        const state = createTestState();
+        executeDayStart(state);
+        const marketCount = state.market.cards.length;
+        expect(marketCount).toBeGreaterThan(0);
+        const logLenBefore = state.activityLog.length;
+        const idsBefore = state.market.cards.map(c => c.id);
+        cycleMarketCards(state);
+        // No log line for the cycle itself.
+        expect(state.activityLog.slice(logLenBefore).some(e => /Market cycled/.test(e.text))).toBe(false);
+        // But the visible cards still moved to discards and the market refilled.
+        expect(getTotalDiscardCount(state)).toBeGreaterThanOrEqual(idsBefore.length);
+        expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
+      },
+    );
+
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should not log Market cycled when the market is empty',
+      () => {
+        const state = createTestState();
+        executeDayStart(state);
+        state.market.cards.length = 0;
+        const logLenBefore = state.activityLog.length;
+        cycleMarketCards(state);
+        expect(state.activityLog.slice(logLenBefore).some(e => /Market cycled/.test(e.text))).toBe(false);
+      },
+    );
+
     it('should not remove player-owned tableau cards during cycling', () => {
       const state = createTestState();
       executeDayStart(state);
