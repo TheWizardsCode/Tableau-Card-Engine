@@ -177,10 +177,6 @@ const GRAPHIC_H = 64;
 const TEXT_MIN_X = GRAPHIC_X + GRAPHIC_W + 8; // 80
 const FONT = 'Inter, Segoe UI, Arial, sans-serif';
 
-function rightColCenterStatic(w) {
-  return TEXT_MIN_X + Math.round((w - (TEXT_MIN_X + 8)) / 2);
-}
-
 function escapeXml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

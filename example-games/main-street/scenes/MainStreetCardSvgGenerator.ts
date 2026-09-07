@@ -203,20 +203,19 @@ export function generateBusinessCardSvg(
   const titleY = 19;
   const titleText = `<text x="${TEXT_MIN_X}" y="${titleY}" font-family="${FONT}" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">${esc(displayName)}</text>`;
 
-  // Right column anchors: centred in the text area to the right of the graphic
-  // (TEXT_MIN_X … width-8). Mid-point ≈ TEXT_MIN_X + (width-TEXT_MIN_X-8)/2.
-  const rightColCx = TEXT_MIN_X + Math.round((width - (TEXT_MIN_X + 8)) / 2);
-
+  // Right column: left-anchored at TEXT_MIN_X so text never extends into
+  // the 64×64 graphic/icon space (x < 72). Keeps title, income, and rep
+  // aligned in the same text column to the right of the graphic.
   // Income label: right column, omitted when 0. Uses "Income: +X/turn" format.
   const incomeLabel =
     totalIncome > 0
-      ? `<text x="${rightColCx}" y="35" font-family="${FONT}" font-size="9" fill="#44ff44" font-weight="bold" text-anchor="middle">Income: +${totalIncome}/turn</text>`
+      ? `<text x="${TEXT_MIN_X}" y="35" font-family="${FONT}" font-size="9" fill="#44ff44" font-weight="bold" text-anchor="start">Income: +${totalIncome}/turn</text>`
       : '';
 
   // Reputation label: right column, below income, omitted when 0
   const repLabel =
     totalRep > 0
-      ? `<text x="${rightColCx}" y="47" font-family="${FONT}" font-size="9" fill="#88bbff" font-weight="bold" text-anchor="middle">+${fmtRep(totalRep)}/turn</text>`
+      ? `<text x="${TEXT_MIN_X}" y="47" font-family="${FONT}" font-size="9" fill="#88bbff" font-weight="bold" text-anchor="start">+${fmtRep(totalRep)}/turn</text>`
       : '';
 
   // Level badge: top-right, only for upgraded cards
@@ -269,11 +268,6 @@ function fmtRep(v: number): string {
   return String(Math.round(v));
 }
 
-/** Right-column centre X for the 64×64 left-art text column (TEXT_MIN_X … width-8). */
-function rightColCenter(width: number): number {
-  return TEXT_MIN_X + Math.round((width - (TEXT_MIN_X + 8)) / 2);
-}
-
 /**
  * Generate an SVG string for an EventCard from template data.
  * Shows card name, trigger type, and cost.
@@ -286,13 +280,12 @@ export function generateEventCardSvg(
 ): string {
   const bgFill = card.trigger === 'Incident' ? '#2B3A67' : '#8B4513';
   const graphicFill = card.trigger === 'Incident' ? '#3D5A80' : '#A0522D';
-  const rcx = rightColCenter(width);
   const inner: string[] = [];
 
   inner.push(graphicZoneSvg(graphicFill, card.name.trim().charAt(0).toUpperCase()));
   inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#cccccc" opacity="0.18" />');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="19" font-family="' + FONT + '" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">' + esc(card.name) + '</text>');
-  inner.push('  <text x="' + rcx + '" y="35" font-family="' + FONT + '" font-size="9" fill="#aaaacc" font-weight="400" text-anchor="middle">[' + esc(card.trigger) + ']</text>');
+  inner.push('  <text x="' + TEXT_MIN_X + '" y="35" font-family="' + FONT + '" font-size="9" fill="#aaaacc" font-weight="400" text-anchor="start">[' + esc(card.trigger) + ']</text>');
   inner.push('  ' + costBadgeSvg(card.cost, width, height));
 
   return svgShell(card.id, card.name, bgFill, inner, width, height);
@@ -308,12 +301,11 @@ export function generateUpgradeCardSvg(
   width: number = CARD_W,
   height: number = CARD_H,
 ): string {
-  const rcx = rightColCenter(width);
   const inner: string[] = [];
   inner.push(graphicZoneSvg('#8B5CBF', card.name.trim().charAt(0).toUpperCase()));
   inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#9B59B6" opacity="0.18" />');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="19" font-family="' + FONT + '" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">' + esc(card.name) + '</text>');
-  inner.push('  <text x="' + rcx + '" y="35" font-family="' + FONT + '" font-size="9" fill="#bb99dd" font-weight="400" text-anchor="middle">for ' + esc(card.targetBusiness) + '</text>');
+  inner.push('  <text x="' + TEXT_MIN_X + '" y="35" font-family="' + FONT + '" font-size="9" fill="#bb99dd" font-weight="400" text-anchor="start">for ' + esc(card.targetBusiness) + '</text>');
   inner.push('  ' + costBadgeSvg(card.cost, width, height));
 
   return svgShell(card.id, card.name, '#6B4C9A', inner, width, height);
@@ -329,18 +321,17 @@ export function generateStaffCardSvg(
   width: number = CARD_W,
   height: number = CARD_H,
 ): string {
-  const rcx = rightColCenter(width);
   const inner: string[] = [];
   inner.push(graphicZoneSvg('#777777', card.name.trim().charAt(0).toUpperCase()));
   inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#888888" opacity="0.18" />');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="19" font-family="' + FONT + '" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">' + esc(card.name) + '</text>');
-  inner.push('  <text x="' + rcx + '" y="35" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + card.ongoingCost + '/turn</text>');
+  inner.push('  <text x="' + TEXT_MIN_X + '" y="35" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="start">-' + card.ongoingCost + '/turn</text>');
   if (card.handSlotsAdded > 0) {
-    inner.push('  <text x="' + rcx + '" y="47" font-family="' + FONT + '" font-size="9" fill="#88bbff" font-weight="400" text-anchor="middle">+' + card.handSlotsAdded + ' slots</text>');
+    inner.push('  <text x="' + TEXT_MIN_X + '" y="47" font-family="' + FONT + '" font-size="9" fill="#88bbff" font-weight="400" text-anchor="start">+' + card.handSlotsAdded + ' slots</text>');
   }
   if ((card as unknown as Record<string, unknown>).peekOncePerTurn) {
     const peek = (card as unknown as Record<string, unknown>).peekOncePerTurn as number;
-    if (peek > 0) inner.push('  <text x="' + rcx + '" y="59" font-family="' + FONT + '" font-size="9" fill="#ffcc66" font-weight="400" text-anchor="middle">peek 1/turn</text>');
+    if (peek > 0) inner.push('  <text x="' + TEXT_MIN_X + '" y="59" font-family="' + FONT + '" font-size="9" fill="#ffcc66" font-weight="400" text-anchor="start">peek 1/turn</text>');
   }
   inner.push('  ' + costBadgeSvg(card.cost, width, height));
 
@@ -425,7 +416,6 @@ export function generateCardSvgFromCsvRow(
   const trigger = row.trigger || undefined;
 
   const scheme = cardColorScheme(family, trigger);
-  const rcx = rightColCenter(width);
   const inner: string[] = [];
 
   // 64×64 left-art graphic — same stacking/overlap rules as concrete generators
@@ -438,22 +428,23 @@ export function generateCardSvgFromCsvRow(
   // Title: right of graphic, never inside 64×64 (x ≥ TEXT_MIN_X)
   inner.push('  <text x="' + TEXT_MIN_X + '" y="19" font-family="' + FONT + '" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">' + esc(name) + '</text>');
 
-  // Right-column details (never centred on card — always in text column)
+  // Right-column details — left-anchored at TEXT_MIN_X so they never
+  // extend into the 64×64 graphic/icon space.
   // Trigger label for event cards
   if (family === 'event' && trigger) {
-    inner.push('  <text x="' + rcx + '" y="35" font-family="' + FONT + '" font-size="9" fill="#aaaacc" font-weight="400" text-anchor="middle">[' + esc(trigger) + ']</text>');
+    inner.push('  <text x="' + TEXT_MIN_X + '" y="35" font-family="' + FONT + '" font-size="9" fill="#aaaacc" font-weight="400" text-anchor="start">[' + esc(trigger) + ']</text>');
   }
 
-  // Staff card details — right column
+  // Staff card details — right column, left-anchored
   if (family === 'staff') {
     if (row.ongoingCost && Number(row.ongoingCost) > 0) {
-      inner.push('  <text x="' + rcx + '" y="35" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="middle">-' + row.ongoingCost + '/turn</text>');
+      inner.push('  <text x="' + TEXT_MIN_X + '" y="35" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="start">-' + row.ongoingCost + '/turn</text>');
     }
     if (row.handSlotsAdded && Number(row.handSlotsAdded) > 0) {
-      inner.push('  <text x="' + rcx + '" y="47" font-family="' + FONT + '" font-size="9" fill="#88bbff" font-weight="400" text-anchor="middle">+' + row.handSlotsAdded + ' slots</text>');
+      inner.push('  <text x="' + TEXT_MIN_X + '" y="47" font-family="' + FONT + '" font-size="9" fill="#88bbff" font-weight="400" text-anchor="start">+' + row.handSlotsAdded + ' slots</text>');
     }
     if (row.peekOncePerTurn && Number(row.peekOncePerTurn) > 0) {
-      inner.push('  <text x="' + rcx + '" y="59" font-family="' + FONT + '" font-size="9" fill="#ffcc66" font-weight="400" text-anchor="middle">peek 1/turn</text>');
+      inner.push('  <text x="' + TEXT_MIN_X + '" y="59" font-family="' + FONT + '" font-size="9" fill="#ffcc66" font-weight="400" text-anchor="start">peek 1/turn</text>');
     }
   }
 
