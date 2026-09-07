@@ -837,9 +837,10 @@ describe('Activity Log', () => {
       processEndOfTurn(state);
       const netIdx = state.activityLog.findIndex(e => /Turn \d+ net:/.test(e.text));
       const overIdx = state.activityLog.findIndex(e => /Game Over|Bankruptcy/.test(e.text));
-      // Net row is emitted; if game-over follows, net precedes it.
+      // Net row is the final entry; if a game-over log appears (e.g. bankruptcy
+      // triggered by checkImmediateLoss before income), net row comes AFTER it.
       if (netIdx !== -1 && overIdx !== -1) {
-        expect(netIdx).toBeLessThan(overIdx);
+        expect(netIdx).toBeGreaterThan(overIdx);
       } else {
         expect(netIdx).not.toBe(-1);
       }
