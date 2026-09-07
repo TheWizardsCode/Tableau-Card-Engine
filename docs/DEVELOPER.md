@@ -1100,6 +1100,11 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
 
+#### Turn Economy (CG-0MTINZ5GG007BH44)
+
+Single-source turn cash formula (Q1=c — see `MainStreetDifficulty.ts` header):
+`dayStart snapshot (dayStartCoins/dayStartRep at DayStart) → placement deductions → applyIncome breakdown (staff buffs → income-multiplier effects → rep multiplier sampled AFTER income's own rep accrual → hand synergy) → ongoing costs (after income, before incident) → incident (or incident-averted log entry via Risk Manager per Q3) → net row (Turn N net: coinsNow-dayStartCoins / repNow-dayStartRep) as the final log entry, including premature bankruptcy/rep-collapse and competitive closing phases`. Invariants: Q1=c rep sampling, Q2 3-decimal tooltip (`toFixed(3)`), Q3 explicit averted entry, banner→net ordering on premature exits. Canonical sites: `reputationCoinMultiplier`/`applyReputationMultiplier` (`MainStreetDifficulty.ts`), `applyIncome` (`MainStreetAdjacency.ts`), `buildCoinsTooltip`/`buildReputationTooltip` (`MainStreetHudTooltips.ts`), `appendTurnNetRow`/`processEndOfTurn`/`resolveCompetitiveClosingPhases` (`MainStreetEngine.ts`).
+
 #### Community Favour (CG-0MSTOATDQ005XDET)
 
 The Community Favour resource exchange is a **free** once-per-turn action

@@ -289,9 +289,24 @@ export function getPreset(name: DifficultyName | string | undefined): Readonly<G
 export const DIFFICULTY_NAMES: readonly DifficultyName[] = ['Easy', 'Medium', 'Hard'];
 
 // ── Reputation-based Coin Multiplier ────────────────────────
+//
+// Canonical turn-economy formula (single source; CG-0MTINZ5GG007BH44, Q1=c):
+//   dayStart snapshot (dayStartCoins/dayStartRep at DayStart)
+//     → placement deductions (buy/place costs at market time)
+//     → applyIncome breakdown (staff buffs → income-multiplier effects
+//       → rep multiplier sampled AFTER income's own rep accrual → hand synergy)
+//     → ongoing costs (applyBusinessOngoingCosts, after income, before incident)
+//     → incident (resolveIncident; Risk-Manager averted emits explicit log per Q3)
+//     → net row (appendTurnNetRow = coinsNow-dayStartCoins / repNow-dayStartRep)
+// Q1=c: reputation for the multiplier is sampled AFTER applyIncome has credited
+// rep-per-turn (clinic/staff/rep-multiplier), so tooltip and engine agree.
+// See MainStreetAdjacency.applyIncome and MainStreetHudTooltips.buildCoinsTooltip.
 
 /**
  * Computes the reputation-based coin multiplier.
+ *
+ * Single source for the CG-0MTINZ5GG007BH44 economy (Q1=c — see module header
+ * above): sampled AFTER income's own rep accrual inside applyIncome.
  *
  * Formula: min(1 + reputation / divisor, cap)
  *
@@ -326,6 +341,11 @@ export function reputationCoinMultiplier(
 
 /**
  * Applies the reputation coin multiplier to a raw coin delta.
+ *
+ * Single-source wrapper for the header formula above; positive deltas are
+ * scaled at the per-event/per-card boundary (AC3) — see MainStreetAdjacency
+ * applyIncome and MainStreetHudTooltips.buildCoinsTooltip. Negative deltas
+ * (penalties) pass through unchanged so reputation does not amplify losses.
  *
  * Only positive coin deltas are scaled -- negative deltas (penalties)
  * pass through unchanged so that reputation does not amplify losses.

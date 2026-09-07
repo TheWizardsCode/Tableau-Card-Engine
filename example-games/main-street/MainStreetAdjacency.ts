@@ -648,13 +648,18 @@ export function computeReputationPerTurn(
 
 /**
  * Applies income to the player's resource bank.
+ *
+ * Canonical turn-economy segment (CG-0MTINZ5GG007BH44, Q1=c — see
+ * MainStreetDifficulty header): dayStart snapshot → placement deductions →
+ * this breakdown (staff buffs → income-multiplier effects → rep multiplier
+ * → hand synergy) → ongoing costs → incident → net row. The reputation
+ * multiplier is sampled here AFTER rep-per-turn has already been credited
+ * (Q1=c), so buildCoinsTooltip's preview and this credited path agree
+ * when both read the post-income rep.
+ *
  * Mutates state in-place. Uses config.synergyBonusPerNeighbor from the
- * active difficulty preset.
- *
- * Income is scaled by the reputation coin multiplier (CG-0MMLR38NJ1N11DOS)
- * so that higher reputation yields proportionally more income.
- *
- * Reputation-per-turn from cards (e.g. Clinic) is applied during this phase.
+ * active difficulty preset. Reputation-per-turn from cards (e.g. Clinic)
+ * is applied during this phase.
  *
  * @param state  Current game state (mutated).
  * @returns The IncomeResult for UI display (pre-multiplier breakdown,

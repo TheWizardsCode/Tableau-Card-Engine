@@ -132,10 +132,13 @@ registerLocale('en', enBundle);
 /**
  * Builds the tooltip content string for the Coins HUD element.
  *
- * Shows:
- * - Base income this turn (pre-reputation multiplier)
- * - Multiplied income (post-reputation multiplier)
- * - Brief calculation note
+ * Single source preview of the CG-0MTINZ5GG007BH44 economy (Q1=c — see
+ * MainStreetDifficulty header): sums cached currentIncome, then applies
+ * the same reputationCoinMultiplier / applyReputationMultiplier as
+ * MainStreetAdjacency.applyIncome so the tooltip's ×N and post-multiplier
+ * total agree with the credited income when the multiplier is sampled
+ * after income's own rep accrual. Q2 shows 3 decimals so lifts like
+ * 1.0375 render as ×1.038, not the misleading ×1.0 of toFixed(1).
  */
 export function buildCoinsTooltip(state: MainStreetState): string {
   const soldSlots = state.soldSlots ?? [];
@@ -174,6 +177,10 @@ export function buildCoinsTooltip(state: MainStreetState): string {
 
 /**
  * Builds the full IncomeResult for external use (e.g. tests).
+ *
+ * Preview-only base totals (no difficulty/buff/multiplier deltas); the
+ * credited path is applyIncome which samples the rep multiplier at Q1=c
+ * per the MainStreetDifficulty header.
  */
 export function getIncomeResult(state: MainStreetState): IncomeResult {
   const soldSlots = state.soldSlots ?? [];
@@ -222,10 +229,8 @@ export function getIncomeResult(state: MainStreetState): IncomeResult {
 /**
  * Builds the tooltip content string for the Reputation HUD element.
  *
- * Shows:
- * - Current reputation value
- * - Active coin multiplier (numeric)
- * - Short explanation of reputation effect on income
+ * Reads the same reputationCoinMultiplier single source (Q1=c) and
+ * Q2 3-decimal display as buildCoinsTooltip.
  */
 export function buildReputationTooltip(state: MainStreetState): string {
   const rep = state.resourceBank.reputation;
