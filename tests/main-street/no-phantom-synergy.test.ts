@@ -8,12 +8,12 @@
  *
  * Intended product rule (producer clarification, 2026-09-07): cards in the
  * hand are not in play — only businesses placed on the street contribute to
- * synergy.  Before the fix the matching-hand variant fails deterministically
- * (synergyBonus ≈ 1.33 instead of 0).  After CG-0MTRDX0DN004EECN removes the
- * hand-synergy path this suite should pass with the `.fails` modifier removed.
+ * synergy.  Before the fix the matching-hand variant failed deterministically
+ * (synergyBonus ≈ 1.33 instead of 0). CG-0MTRDX0DN004EECN removed the
+ * hand-synergy path; this suite now passes unmodified.
  *
  * Parent: CG-0MTR317Q2003YCDN
- * Child:  CG-0MTRDRPYV001971H
+ * Child:  CG-0MTRDRPYV001971H (regression), CG-0MTRDX0DN004EECN (fix)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -104,11 +104,7 @@ describe('AC1 — no phantom synergy when none exists', () => {
     expectNoPhantomSynergy(state);
   });
 
-  // FIXME (CG-0MTRDX0DN004EECN): before the hand-synergy removal this
-  // deterministically yields synergyBonus ≈ 1.33; marked `.fails` so the
-  // suite stays green while the regression is tracked.  Remove `.fails`
-  // once that item lands.
-  it.fails('matching hand (shares Food/Service with street) must still yield 0', () => {
+  it('matching hand (shares Food/Service with street) must still yield 0', () => {
     const state = setupTwoDisjoint({
       hand: [makeBiz({ id: 'hand-match', name: 'Match', baseIncome: 3, synergyTypes: ['Food', 'Service'] })],
     });

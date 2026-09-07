@@ -596,8 +596,9 @@ export class MainStreetAnimator {
 
   /**
    * Synergy flight sources: midpoint of each synergy pair whose cards have
-   * a synergy contribution; fallback is above the street (no pairs → no
-   * street-adjacent anchor for hand synergy).
+   * a synergy contribution; fallback is above the street. Hand cards never
+   * produce synergy (CG-0MTRDX0DN004EECN), so a run only fires when placed
+   * businesses share a synergy type.
    */
   private synergyPhaseSources(): Map<number | 'fallback', { x: number; y: number }> {
     const s = this.scene;

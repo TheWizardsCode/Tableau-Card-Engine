@@ -488,11 +488,11 @@ Main Street's economy was extended with a **multi-use card economy** where every
 - Cards purchased from the market can be placed in the hand instead of on the tableau.
 - Hand capacity is displayed in the UI as "Hand: N/M".
 
-### D.2 Hand Card Synergy
+### D.2 Hand Cards Do Not Generate Synergy
 
-- During IncomePhase, each hand card provides `Math.floor(card.baseIncome / 3)` coins to each tableau business sharing a synergy type.
-- Multiple hand cards stack their bonuses.
-- Pawn Shop cards are excluded from receiving hand synergy.
+- Cards in the hand are not in play and provide **no** income or synergy during the IncomePhase (CG-0MTR317Q2003YCDN / CG-0MTRDX0DN004EECN).
+- Synergy is generated only by placed businesses on the street: different-type businesses sharing a `SynergyType` on adjacent (8-way) slots earn percentage-based income synergy baked into `currentIncome`.
+- Hand cards begin contributing once placed onto the street.
 
 ### D.3 Market Cycling
 

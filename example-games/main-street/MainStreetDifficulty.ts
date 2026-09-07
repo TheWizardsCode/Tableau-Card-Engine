@@ -294,7 +294,8 @@ export const DIFFICULTY_NAMES: readonly DifficultyName[] = ['Easy', 'Medium', 'H
 //   dayStart snapshot (dayStartCoins/dayStartRep at DayStart)
 //     → placement deductions (buy/place costs at market time)
 //     → applyIncome breakdown (staff buffs → income-multiplier effects
-//       → rep multiplier sampled AFTER income's own rep accrual → hand synergy)
+//       → rep multiplier sampled AFTER income's own rep accrual;
+//       hand cards contribute no income — CG-0MTRDX0DN004EECN)
 //     → ongoing costs (applyBusinessOngoingCosts, after income, before incident)
 //     → incident (resolveIncident; Risk-Manager averted emits explicit log per Q3)
 //     → net row (appendTurnNetRow = coinsNow-dayStartCoins / repNow-dayStartRep)

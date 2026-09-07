@@ -44,7 +44,7 @@
  * │     - BUG (Q2): multiplier.toFixed(1) hides ~1.025 as ×1.0      │
  * │       FIX: toFixed(3) for 3-decimal display                        │
  * │     - BUG (divergence): tooltip sums cached currentIncome directly│
- * │       without staff-buff overlay or hand synergy; applyIncome()   │
+ * │       without staff-buff overlay; hand cards add nothing (CG-0MTRDX0DN004EECN); applyIncome()   │
  * │       uses buffed values. Must converge to single source.         │
  * └──────────────────────────────────────────────────────────────────────┘
  *
@@ -246,7 +246,7 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
     const phaseTotalBase = incomeResult.phaseBreakdown.perSlotBreakdown.reduce((sum, s) => sum + s.baseIncome, 0);
 
     // After the fix, these must agree (before fix they diverge due to
-    // tooltip not including staff buffs / hand synergy)
+    // tooltip not including staff buffs / hand synergy (hand adds nothing)
     expect(tooltipBase).toBe(phaseTotalBase);
   });
 

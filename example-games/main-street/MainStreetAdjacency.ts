@@ -9,7 +9,7 @@
  * @module
  */
 
-import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
 import { getBaseTypeId } from './MainStreetCards';
 import { GRID_SIZE } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
@@ -457,71 +457,23 @@ export function updateNeighborsOnSale(
 
 
 /**
- * Computes the total synergy bonus contributed by hand cards to tableau businesses.
+ * Computes the total income across all businesses on the street grid.
  *
- * Each hand card contributes Math.floor(card.baseIncome / 3) to each tableau
- * business that shares at least one synergy type.
- *
- * @param grid  The street grid (tableau businesses).
- * @param hand  Cards held in the player's hand.
- * @returns The total hand card synergy bonus added to all tableau businesses.
- */
-export function computeHandCardSynergyBonus(
-  grid: (BusinessCard | CommunitySpaceCard | null)[],
-  hand: (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
-  soldSlots: boolean[] = [],
-): number {
-  if (!hand || hand.length === 0) return 0;
-
-  let total = 0;
-
-  for (const handCard of hand) {
-    // Event and upgrade cards have no synergy types — only business cards contribute.
-    if (handCard.family === 'event' || handCard.family === 'upgrade') continue;
-    if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
-
-    // Each hand card provides floor(baseIncome/3) to each matching synergy business
-    const bonusPerMatch = Math.floor(handCard.baseIncome / 3);
-    if (bonusPerMatch <= 0) continue;
-
-    for (let i = 0; i < grid.length; i++) {
-      // Skip sold slots (sold cards don't benefit from synergy)
-      if (soldSlots[i]) continue;
-      const business = grid[i];
-      if (!business) continue;
-
-      // A card with zero synergy values does not participate in synergy
-      if (effectiveSynergyCoinBonus(business) === 0 && effectiveSynergyRepBonus(business) === 0) {
-        continue;
-      }
-      // Check if any of the hand card's synergy types match the business's types
-      const hasMatch = handCard.synergyTypes.some(
-        (st: SynergyType) => business.synergyTypes.includes(st),
-      );
-      if (hasMatch) {
-        total += bonusPerMatch;
-      }
-    }
-  }
-
-  return total;
-}
-
-/**
- * Computes the total income across all businesses on the street grid,
- * optionally including synergy bonuses from hand cards.
- *
- * Returns both the total and a per-slot breakdown for UI display.
+ * Returns both the total and a per-slot breakdown for UI display. Board
+ * adjacency synergy (computeSynergyBonus) is folded into each slot's total;
+ * hand cards never contribute (producer rule CG-0MTRDX0DN004EECN).
  *
  * @param grid               The street grid.
  * @param bonusPerNeighbor   Global multiplier on per-card coin synergy (defaults to 1).
- * @param hand               Optional: hand cards to include for synergy bonuses.
+ * @param hand               Retained for API compatibility; hand cards have no effect.
  * @returns Object with `total` income and `breakdown` per slot.
  */
 export function computeIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   bonusPerNeighbor: number = 1,
-  hand?: BusinessCard[],
+  // Hand cards are not in play and never contribute synergy (CG-0MTRDX0DN004EECN);
+  // the parameter is retained for positional-argument compatibility.
+  _hand?: BusinessCard[],
   soldSlots: boolean[] = [],
   gridDims?: GridDims,
 ): IncomeResult {
@@ -553,41 +505,6 @@ export function computeIncome(
     total += slotTotal;
   }
 
-  // Add hand card synergy bonuses to the total
-  let handSynergyTotal = 0;
-  if (hand && hand.length > 0) {
-    handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
-    total += handSynergyTotal;
-
-    // Add hand synergy to each slot's total in the breakdown
-    // Distribute proportionally for accurate per-slot display
-    if (handSynergyTotal > 0) {
-      for (let i = 0; i < grid.length; i++) {
-        const business = grid[i];
-        if (!business) continue;
-
-        // Calculate hand synergy contribution per business
-        let perSlotHandSynergy = 0;
-        for (const handCard of hand) {
-          if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
-              const hasMatch = handCard.synergyTypes.some(
-            (st: SynergyType) => business.synergyTypes.includes(st),
-          );
-          if (hasMatch) {
-            perSlotHandSynergy += Math.floor(handCard.baseIncome / 3);
-          }
-        }
-
-        if (perSlotHandSynergy > 0) {
-          const slot = breakdown.find(s => s.slotIndex === i);
-          if (slot) {
-            slot.total += perSlotHandSynergy;
-          }
-        }
-      }
-    }
-  }
-
   // ── Per-phase breakdown (CG-0MT23O6W8003AXWJ) ──────────────
   // computeIncome is a preview/read-only path (no multipliers / active
   // effects), so phase data is base + synergy only; rep/event/upcoming
@@ -601,12 +518,11 @@ export function computeIncome(
     eventDeltas: [],
     upcomingDeltas: [],
   }));
-  const sumBase = perSlotBreakdown.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
-  if (handSynergyTotal > 0) {
-    for (const pd of perSlotBreakdown) {
-      if (sumBase > 0) pd.synergyBonus = handSynergyTotal * (pd.baseIncome / sumBase);
-    }
-  }
+
+  // Hand cards are NOT in play and contribute no synergy (producer rule,
+  // 2026-09-07 — CG-0MTRDX0DN004EECN). The `hand` parameter is retained for
+  // API compatibility but is intentionally ignored.
+  const handSynergyTotal = 0;
 
   return {
     total,
@@ -651,11 +567,11 @@ export function computeReputationPerTurn(
  *
  * Canonical turn-economy segment (CG-0MTINZ5GG007BH44, Q1=c — see
  * MainStreetDifficulty header): dayStart snapshot → placement deductions →
- * this breakdown (staff buffs → income-multiplier effects → rep multiplier
- * → hand synergy) → ongoing costs → incident → net row. The reputation
- * multiplier is sampled here AFTER rep-per-turn has already been credited
- * (Q1=c), so buildCoinsTooltip's preview and this credited path agree
- * when both read the post-income rep.
+ * this breakdown (staff buffs → income-multiplier effects → rep multiplier)
+ * → ongoing costs → incident → net row. Hand cards contribute no income
+ * (CG-0MTRDX0DN004EECN). The reputation multiplier is sampled here AFTER
+ * rep-per-turn has already been credited (Q1=c), so buildCoinsTooltip's
+ * preview and this credited path agree when both read the post-income rep.
  *
  * Mutates state in-place. Uses config.synergyBonusPerNeighbor from the
  * active difficulty preset. Reputation-per-turn from cards (e.g. Clinic)
@@ -666,7 +582,6 @@ export function computeReputationPerTurn(
  *          but total reflects the multiplied amount actually credited).
  */
 export function applyIncome(state: MainStreetState): IncomeResult {
-  const hand = state.hand ?? [];
   const soldSlots = state.soldSlots ?? [];
   const grid = state.streetGrid;
 
@@ -784,22 +699,17 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     state.resourceBank.reputation += modifiedRepPerTurn;
   }
 
-  // Hand card synergy is still computed fresh each turn (it is not adjacency-based
-  // and operates on hand cards whose state changes independently).
-  let handSynergyTotal = 0;
-  if (hand && hand.length > 0) {
-    handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
-    total += handSynergyTotal;
-  }
+  // Hand cards are NOT in play — they contribute no street income. Only
+  // businesses placed on the street produce synergy (baked into currentIncome
+  // / baseIncome). handSynergyTotal is kept as a constant 0 for API compat.
+  const handSynergyTotal = 0;
 
-  // ── Distribute rep bonus + hand synergy across producing slots ──
+  // ── Distribute rep bonus across producing slots ──
   // `multiplied` is the actual credited amount; `modifiedTotal` is the total
   // after income-multiplier effects. The reputation phase contributes
   // `multiplied - modifiedTotal`, distributed proportionally to each slot's
-  // post-effect income. Hand synergy is distributed proportionally to base
-  // income. Exact integer values throughout.
+  // post-effect income. Exact integer values throughout.
   const repBonus = multiplied - modifiedTotal;
-  const sumPhaseTotal = phaseSlotData.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
   const modifiedSlotTotals = phaseSlotData.map(
     (d) => d.baseIncome + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
   );
@@ -808,9 +718,6 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     const pd = phaseSlotData[i];
     if (sumModifiedSlotTotals > 0) {
       pd.repBonus = repBonus * (modifiedSlotTotals[i] / sumModifiedSlotTotals);
-    }
-    if (sumPhaseTotal > 0 && handSynergyTotal > 0) {
-      pd.synergyBonus = handSynergyTotal * (pd.baseIncome / sumPhaseTotal);
     }
   }
 
@@ -824,9 +731,6 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   }
   if (repPerTurn > 0) {
     addLog(state, `Reputation from cards: +${repPerTurn} (${describeEventEffects(0, repPerTurn)})`, 'gain');
-  }
-  if (handSynergyTotal > 0) {
-    addLog(state, `Hand card synergy: +${handSynergyTotal} coins (${describeEventEffects(handSynergyTotal, 0)})`, 'gain');
   }
   return {
     total,
@@ -895,12 +799,12 @@ export interface OwnerIncomeResult {
  *
  * Each placed business's income (base + adjacency synergy + upgrades — all
  * folded into the `currentIncome` cache by the adjacency system — plus
- * per-business staff buffs and hand-card synergy from the owner's own hand)
- * accrues ONLY to the slot's owning player (`ownerTaggedGrid`, falling back
- * to the active player for untagged slots). Per-owner reputation drives the
- * reputation coin multiplier independently; shared `activeEffects`
- * income/rep multipliers apply to every owner's income phase (board-wide
- * duration effects, unchanged semantics).
+ * per-business staff buffs) accrues ONLY to the slot's owning player
+ * (`ownerTaggedGrid`, falling back to the active player for untagged slots).
+ * Hand cards contribute no income (CG-0MTRDX0DN004EECN). Per-owner
+ * reputation drives the reputation coin multiplier independently; shared
+ * `activeEffects` income/rep multipliers apply to every owner's income phase
+ * (board-wide duration effects, unchanged semantics).
  *
  * `applyIncome(state)` above is left byte-identical for single-player / N=1
  * (AC4 regression: the N=1 flow delegates to the legacy path and never
@@ -925,7 +829,6 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
 
   for (const player of state.players) {
     const ownerId = player.playerId;
-    const hand = player.hand ?? [];
     const breakdown: SlotIncome[] = [];
     let total = 0;
     let repPerTurn = 0;
@@ -1011,15 +914,11 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
       player.reputation += modifiedRepPerTurn;
     }
 
-    // Hand-card synergy from the owner's OWN hand.
-    let handSynergyTotal = 0;
-    if (hand && hand.length > 0) {
-      handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
-      total += handSynergyTotal;
-    }
+    // Hand cards are not in play — no hand synergy from any owner's hand
+    // (producer rule CG-0MTRDX0DN004EECN). Constant 0 for API compatibility.
+    const handSynergyTotal = 0;
 
     const repBonus = multiplied - modifiedTotal;
-    const sumPhaseTotal = phaseSlotData.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
     const modifiedSlotTotals = phaseSlotData.map(
       (d) => d.baseIncome + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
     );
@@ -1028,9 +927,6 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
       const pd = phaseSlotData[i];
       if (sumModifiedSlotTotals > 0) {
         pd.repBonus = repBonus * (modifiedSlotTotals[i] / sumModifiedSlotTotals);
-      }
-      if (sumPhaseTotal > 0 && handSynergyTotal > 0) {
-        pd.synergyBonus = handSynergyTotal * (pd.baseIncome / sumPhaseTotal);
       }
     }
 
@@ -1041,9 +937,6 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
     }
     if (modifiedRepPerTurn > 0) {
       addLog(state, `P${ownerId} Reputation from cards: +${modifiedRepPerTurn} (${describeEventEffects(0, modifiedRepPerTurn)})`, 'gain');
-    }
-    if (handSynergyTotal > 0) {
-      addLog(state, `P${ownerId} Hand card synergy: +${handSynergyTotal} coins (${describeEventEffects(handSynergyTotal, 0)})`, 'gain');
     }
 
     results.push({
@@ -1177,7 +1070,7 @@ export interface SlotIncome {
   businessName: string;
   baseIncome: number;
   synergyBonus: number;
-  /** Total income from this slot including hand synergy contributions. */
+  /** Total income from this slot (base + board adjacency synergy). */
   total: number;
 }
 
@@ -1201,7 +1094,12 @@ export interface SlotPhaseBreakdown {
   businessName: string;
   /** Base income for this slot (after staff buffs, before event/rep multipliers). */
   baseIncome: number;
-  /** Hand-card synergy bonus distributed to this slot. */
+  /**
+   * Reserved for a dedicated synergy income phase. Always 0 today — board
+   * adjacency synergy is folded into `baseIncome` (currentIncome), and
+   * hand-card synergy was removed (CG-0MTRDX0DN004EECN: cards in the hand
+   * are not in play).
+   */
   synergyBonus: number;
   /** Additional coins from the reputation multiplier. */
   repBonus: number;
@@ -1220,17 +1118,21 @@ export interface SlotPhaseBreakdown {
 export interface PhaseBreakdown {
   /** Per-slot phase data for all producing slots. */
   perSlotBreakdown: SlotPhaseBreakdown[];
-  /** Total synergy contributed by hand cards (distributed proportionally across slots). */
+  /**
+   * Total hand-card synergy. Always 0 — cards in the hand are not in play
+   * and contribute no street income (CG-0MTRDX0DN004EECN). Field retained
+   * for API compatibility.
+   */
   handSynergyTotal: number;
 }
 
 /** Full income computation result. */
 export interface IncomeResult {
-  /** Total coins earned from all businesses (includes hand synergy if provided). */
+  /** Total coins earned from all placed businesses (base + board synergy). */
   total: number;
   /** Per-slot breakdown. */
   breakdown: SlotIncome[];
-  /** Total synergy contributed by hand cards. */
+  /** Always 0 — hand cards are not in play (CG-0MTRDX0DN004EECN). */
   handSynergyTotal: number;
   /**
    * Per-phase contribution breakdown for animated income presentation.

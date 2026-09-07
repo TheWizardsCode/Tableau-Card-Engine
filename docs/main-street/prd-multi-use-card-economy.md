@@ -24,21 +24,19 @@ The multi-use economy is **additive** — the existing coin-based and reputation
 
 Players may choose to place a purchased business card into their hand instead of onto the tableau. Cards in hand are held for future placement or synergy generation.
 
-### 2. Hand Card Synergy Bonus
+### 2. Hand Cards Do Not Generate Synergy
 
-During the **IncomePhase**, each card held in hand contributes **`Math.floor(card.baseIncome / 3)`** coins to every tableau business that shares a synergy type with the hand card.
+Cards held in the hand are **not in play** and contribute **no** income or
+synergy during the IncomePhase (producer rule, CG-0MTR317Q2003YCDN /
+CG-0MTRDX0DN004EECN). Synergy bonuses come only from businesses **placed on
+the street**: two different-type businesses that share a `SynergyType` on
+adjacent (8-way / diagonal) slots generate percentage-based income synergy,
+folded into each card's `currentIncome`. A hand card starts contributing only
+once it is placed onto the street.
 
-**Examples:**
-- A Food hand card (baseIncome=3) adds +1 coin to each Food business on the tableau
-- A Food+Culture hand card (baseIncome=3) adds +1 coin to each Food AND each Culture business
-- Multiple hand cards of the same synergy type **stack**: 2 Food cards (baseIncome=3 each) = +2 coins per Food business
-- Pawn Shop cards do **not** receive hand card synergy (special rule)
-
-**Formula:**
-```
-perBusinessBonus = Math.floor(card.baseIncome / 3)
-totalHandSynergy = Σ perBusinessBonus for each (handCard, tableauBusiness) synergy match
-```
+Previously (pre-2026-09-07) each hand card granted
+`Math.floor(card.baseIncome / 3)` coins per matching tableau business during
+the IncomePhase; that mechanic was removed as phantom income.
 
 ### 3. Card Placement & Sell
 
