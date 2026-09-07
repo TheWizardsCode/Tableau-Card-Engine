@@ -257,9 +257,7 @@ async function resolveSvgText(scene: Phaser.Scene, templateId: string): Promise<
   // 3. Node fallback: try synchronously reading from disk
   if (typeof window === 'undefined') {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const fs = require('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const path = require('path');
       const filePath = path.join(process.cwd(), 'public', ASSET_PATH, `${templateId}.svg`);
       svgText = fs.readFileSync(filePath, 'utf8');
@@ -299,9 +297,7 @@ export function preloadLostCitiesAssets(scene: Phaser.Scene | null): void {
   if (typeof window === 'undefined') {
     // Node: synchronously read from the public assets directory.
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const fs = require('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const path = require('path');
       const base = path.join(process.cwd(), 'public', ASSET_PATH);
 

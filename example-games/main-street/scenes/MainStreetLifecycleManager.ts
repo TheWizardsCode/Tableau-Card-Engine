@@ -1053,7 +1053,7 @@ export class MainStreetLifecycleManager {
     }
 
     if (mismatch) {
-      console.log(`[MainStreetLifecycleManager] CSV mismatch detected (${source}), regenerating SVGs in-memory`);
+      console.info(`[MainStreetLifecycleManager] CSV mismatch detected (${source}), regenerating SVGs in-memory`);
       // Only update SVG sources — no texture clearing. Texture invalidation
       // is handled atomically by prewarmVisibleCardTextures() per-key.
       s.msSvgTextureManager.regenerateSvgSourcesFromCsv();

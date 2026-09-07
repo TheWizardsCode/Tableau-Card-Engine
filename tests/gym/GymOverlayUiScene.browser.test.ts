@@ -509,6 +509,6 @@ describe('GymOverlayUiScene browser integration', () => {
     await page.screenshot({ path: screenshotPath });
 
     // Log the screenshot path for CI artifact collection
-    console.log(`[screenshot:overlay-centered] path=${screenshotPath} canvas=${canvas!.width}x${canvas!.height}`);
+    console.info(`[screenshot:overlay-centered] path=${screenshotPath} canvas=${canvas!.width}x${canvas!.height}`);
   });
 });

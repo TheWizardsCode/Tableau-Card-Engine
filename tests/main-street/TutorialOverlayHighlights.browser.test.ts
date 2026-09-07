@@ -280,7 +280,7 @@ function assertAligned(
   const dxRight = Math.abs(actual.x + actual.w - (target.x + target.w));
   const dyBottom = Math.abs(actual.y + actual.h - (target.y + target.h));
   // Keep the logged diagnostic (actual-vs-target) for manual review.
-  console.log(
+  console.info(
     `[align:${label}] actual={x:${actual.x},y:${actual.y},w:${actual.w},h:${actual.h}} ` +
     `target={x:${target.x},y:${target.y},w:${target.w},h:${target.h}} ` +
     `dxLeft=${dxLeft} dyTop=${dyTop} dxRight=${dxRight} dyBottom=${dyBottom} (tol=${TOLERANCE_PX}px)`,
@@ -317,7 +317,7 @@ async function saveScreenshot(name: string): Promise<void> {
   const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
   expect(canvas).toBeTruthy();
   if (canvas) {
-    console.log(`[screenshot:${name}] canvas=${canvas.width}x${canvas.height}`);
+    console.info(`[screenshot:${name}] canvas=${canvas.width}x${canvas.height}`);
     await page.screenshot({ path: `__screenshots__/TutorialOverlayHighlights.browser.test.ts/${name}.png` });
   }
 }

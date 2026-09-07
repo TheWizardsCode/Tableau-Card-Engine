@@ -46,14 +46,12 @@ function _assertNarrowing(result: LegalityResult): string {
 
 /** A legal result constructed via legalAction() must also satisfy LegalityResult. */
 function _assertHelperLegal(): LegalityResult {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { legalAction } = require('../../src/rule-engine/index');
   return legalAction();
 }
 
 /** An illegal result constructed via illegalAction() must satisfy LegalityResult. */
 function _assertHelperIllegal(): LegalityResult {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { illegalAction } = require('../../src/rule-engine/index');
   return illegalAction('test reason');
 }

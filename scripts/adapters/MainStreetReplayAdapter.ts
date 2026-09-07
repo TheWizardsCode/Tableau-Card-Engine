@@ -88,7 +88,6 @@ export class MainStreetReplayAdapter implements ReplayAdapter {
   async startScene(page: Page): Promise<void> {
     // Start the MainStreet scene if not already active
     await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g = (window as any).__PHASER_GAME__;
       if (g) {
         try { g.scene.start('MainStreetScene'); } catch (_) { /* ignore */ }

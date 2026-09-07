@@ -159,11 +159,11 @@ function assertNoUnexpectedErrors(gameName: string): void {
   const unexpected = capturedErrors.filter((e) => !isBenignError(e));
 
   if (capturedErrors.length > 0) {
-    console.log(`[${gameName}] All captured console.error:`, JSON.stringify(capturedErrors, null, 2));
-    console.log(`[${gameName}] Unexpected errors:`, JSON.stringify(unexpected, null, 2));
+    console.info(`[${gameName}] All captured console.error:`, JSON.stringify(capturedErrors, null, 2));
+    console.info(`[${gameName}] Unexpected errors:`, JSON.stringify(unexpected, null, 2));
   }
   if (capturedWarns.length > 0) {
-    console.log(`[${gameName}] Captured console.warn:`, JSON.stringify(capturedWarns, null, 2));
+    console.info(`[${gameName}] Captured console.warn:`, JSON.stringify(capturedWarns, null, 2));
   }
 
   expect(

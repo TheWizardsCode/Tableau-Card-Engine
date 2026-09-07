@@ -229,7 +229,6 @@ describe('AnyCard union includes CommunitySpaceCard (AC3)', () => {
     // This test validates the structural compatibility at runtime.
     const communitySpace = createCommunitySpaceFixture();
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const anyCardPosition: AnyCard = businessDeck[0]; // BusinessCard is valid
     expect(anyCardPosition).toBeDefined();
 

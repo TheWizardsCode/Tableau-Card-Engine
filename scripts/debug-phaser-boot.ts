@@ -19,7 +19,6 @@ import { chromium } from 'playwright';
   console.log('__PHASER_GAME__ present?', hasGame);
   if (hasGame) {
     const info = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g: any = (window as any).__PHASER_GAME__;
       try {
         const sc = g.scene.getScene('MainStreetScene');

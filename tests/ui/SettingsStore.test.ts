@@ -32,7 +32,6 @@ describe('SettingsStore persistence', () => {
     const storage = createMockStorage();
     setSelectedDifficulty('Hard', storage);
     // ensure setItem was called when persisting
-    // @ts-ignore access underlying mock setItem spy
     expect(storage.setItem).toHaveBeenCalled();
     const restored = getSelectedDifficulty(storage);
     expect(restored).toBe('Hard');

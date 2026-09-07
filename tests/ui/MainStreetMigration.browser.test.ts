@@ -206,8 +206,7 @@ async function countDistinctColoursInRegion(
  * browser page API. Returns the path to the saved PNG.
  */
 async function saveScreenshot(canvas: HTMLCanvasElement, name: string): Promise<string> {
-  // eslint-disable-next-line no-console
-  console.log(`[screenshot:${name}] canvas=${canvas.width}x${canvas.height}`);
+  console.info(`[screenshot:${name}] canvas=${canvas.width}x${canvas.height}`);
   const path = await page.screenshot({ path: `__screenshots__/MainStreetMigration.browser.test.ts/${name}.png` });
   return path;
 }
