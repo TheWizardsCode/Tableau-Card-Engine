@@ -161,9 +161,12 @@ function parseCardCsv(csvText) {
     );
     const synergies = card.synergyTypes ? card.synergyTypes.split('|').filter(Boolean) : [];
     const cost = card.cost ? Number(card.cost) : null;
+    const ongoingCost = card.ongoingCost ? Number(card.ongoingCost) : null;
+    const handSlotsAdded = card.handSlotsAdded ? Number(card.handSlotsAdded) : null;
+    const peekOncePerTurn = card.peekOncePerTurn ? Number(card.peekOncePerTurn) : null;
     const trigger = card.trigger || null;
 
-    templates.push({ id: card.id, name: card.name, cost, family, trigger, synergies });
+    templates.push({ id: card.id, name: card.name, cost, family, trigger, synergies, ongoingCost, handSlotsAdded, peekOncePerTurn });
   }
 
   return templates;
@@ -195,7 +198,14 @@ function graphicZoneSvgStatic(name, accent) {
 // Generate a single card SVG string (CG-0MTORJ5FS006B0UN left-art)
 // ---------------------------------------------------------------------------
 
-function generateCardSvg(t) {
+/**
+ * Generate a single card SVG from template data.
+ * Exported for use by tests and runtime fallback (CG-0MTORJ5FS006B0UN).
+ *
+ * @param {object} t - Template object from parseCardCsv
+ * @returns {string} SVG markup
+ */
+export function generateCardSvg(t) {
   const w = 140, h = 80;
   const bg = familyColor(t.family, t.trigger);
   const accent = t.synergies && t.synergies.length > 0 ? (synergyColor[t.synergies[0]] || '#cccccc') : '#cccccc';
@@ -215,6 +225,20 @@ function generateCardSvg(t) {
     ? `<text x="${w - 16}" y="60" font-family="${FONT}" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">${t.cost}</text>`
     : '';
 
+  // Staff card details (CG-0MTDMOYOL008IQVO: baked cost text is the ONLY cost display for staff)
+  const staffLines = [];
+  if (t.family === 'staff' && t.ongoingCost && t.ongoingCost > 0) {
+    staffLines.push(`  <text x="${TEXT_MIN_X}" y="35" font-family="${FONT}" font-size="9" fill="#ff8844" font-weight="400" text-anchor="start">-${t.ongoingCost}/turn</text>`);
+  }
+  if (t.family === 'staff' && t.handSlotsAdded && t.handSlotsAdded > 0) {
+    staffLines.push(`  <text x="${TEXT_MIN_X}" y="47" font-family="${FONT}" font-size="9" fill="#88bbff" font-weight="400" text-anchor="start">+${t.handSlotsAdded} slots</text>`);
+  }
+  if (t.family === 'staff' && t.peekOncePerTurn && t.peekOncePerTurn > 0) {
+    staffLines.push(`  <text x="${TEXT_MIN_X}" y="59" font-family="${FONT}" font-size="9" fill="#ffcc66" font-weight="400" text-anchor="start">peek 1/turn</text>`);
+  }
+  // Prepend a line break so staff lines follow the title; empty for other families.
+  const staffTexts = staffLines.length > 0 ? '\n' + staffLines.join('\n') : '';
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${title}">
   <defs>
@@ -227,7 +251,7 @@ function generateCardSvg(t) {
   <rect x="4" y="4" width="${w - 8}" height="${h - 8}" rx="4" ry="4" fill="url(#g-${t.id})" />
   <rect x="4" y="4" width="${w - 8}" height="20" rx="3" ry="3" fill="${accent}" opacity="0.18" />
 ${glyph}
-${titleEl}
+${titleEl}${staffTexts}
 ${priceBadge}
 ${priceText}
 ${iconMarkup}

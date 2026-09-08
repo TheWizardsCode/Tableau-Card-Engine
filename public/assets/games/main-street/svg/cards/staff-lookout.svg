@@ -14,6 +14,9 @@
     <text x="40" y="42" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="28" fill="#ffffff" font-weight="800" text-anchor="middle" opacity="0.96">L</text>
   </g>
   <text x="80" y="19" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">Lookout</text>
+  <text x="80" y="35" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="9" fill="#ff8844" font-weight="400" text-anchor="start">-200/turn</text>
+  <text x="80" y="47" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="9" fill="#88bbff" font-weight="400" text-anchor="start">+1 slots</text>
+  <text x="80" y="59" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="9" fill="#ffcc66" font-weight="400" text-anchor="start">peek 1/turn</text>
 <circle cx="124" cy="56" r="12" fill="#e0c7a0" stroke="#c8b79a" stroke-width="1.5" />
 <text x="124" y="60" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="11" fill="#3a2a14" text-anchor="middle" font-weight="500">1000</text>
 
