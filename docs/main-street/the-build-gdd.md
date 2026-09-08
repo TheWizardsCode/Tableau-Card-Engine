@@ -480,7 +480,7 @@ All tests are run via `npm test` (Vitest). Build validation via `npm run build`.
 
 *Added in CG-0MQRXN2CT0076OW7 (v0.1.2+)*
 
-Main Street's economy was extended with a **multi-use card economy** where every purchased business card has dual purpose: tableau placement OR hand-held synergy generation. This section summarises the digital-only mechanics.
+Main Street's economy was extended with a **multi-use card economy** where every purchased business card has dual purpose: place it directly onto the tableau or hold it in hand for future placement. Hand cards contribute **no** synergy income (removed, CG-0MTR317Q2003YCDN / CG-0MTRDX0DN004EECN). This section summarises the digital-only mechanics.
 
 ### D.1 Player Hand
 

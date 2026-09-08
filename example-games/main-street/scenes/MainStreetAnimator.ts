@@ -365,8 +365,10 @@ export class MainStreetAnimator {
    *
    * 1. **Base** — each producing slot's base coins "count out" of the card
    *    into its on-card grid, one coin at a time (`COIN_POP` SFX per coin).
-   * 2. **Synergy** — hand-card synergy coins fly from the synergy line
-   *    midpoints (`synergyLineEndpoints`) into the affected grids.
+   * 2. **Synergy** — board adjacency synergy (currently 0 — hand-card
+   *    synergy was removed; see CG-0MTRDX0DN004EECN). When wired, coins
+   *    would fly from the synergy line midpoints (`synergyLineEndpoints`) into
+   *    the affected grids. Short-circuited when all `synergyBonus` values are 0.
    * 3. **Reputation** — reputation bonus coins fly from the reputation HUD
    *    counter into the affected grids.
    * 4. **Events** — duration-effect (income-multiplier) events show animated

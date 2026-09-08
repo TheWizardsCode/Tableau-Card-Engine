@@ -7,7 +7,7 @@
 
 ## Overview
 
-Main Street's economy has been extended from a single-use card model (cards purchased from the market are placed directly on the tableau) to a **multi-use card economy** where every card has dual purpose — tableau placement **OR** hand-held synergy. This adds meaningful strategic trade-offs without requiring a separate currency track.
+Main Street's economy has been extended from a single-use card model (cards purchased from the market are placed directly on the tableau) to a **multi-use card economy** where every purchased business card has dual purpose — place it directly onto the tableau **or** hold it in hand for future placement. Hand cards contribute **no** synergy income (removed, CG-0MTR317Q2003YCDN / CG-0MTRDX0DN004EECN: cards in hand are not in play). This adds meaningful strategic trade-offs without requiring a separate currency track.
 
 The multi-use economy is **additive** — the existing coin-based and reputation-based systems remain unchanged. All new mechanics are layered on top.
 
@@ -22,7 +22,7 @@ The multi-use economy is **additive** — the existing coin-based and reputation
 | Hand location | Below the tableau in the UI |
 | Card types allowed | Business cards (face-up) |
 
-Players may choose to place a purchased business card into their hand instead of onto the tableau. Cards in hand are held for future placement or synergy generation.
+Players may choose to place a purchased business card into their hand instead of onto the tableau. Cards in hand are held for future placement. Hand cards contribute no synergy (removed per CG-0MTRDX0DN004EECN).
 
 ### 2. Hand Cards Do Not Generate Synergy
 
@@ -110,7 +110,7 @@ start (shuffled deterministically).
 
 The physical card game uses a card-discard economy where cards are single-use and immediately consumed. The digital adaptation adds a hybrid approach:
 
-1. **No physical constraints** — Digital tracking of hands, synergy, and staff costs is effortless
+1. **No physical constraints** — Digital tracking of hands and staff costs is effortless
 2. **Deeper strategy** — Players must decide between immediate tableau income and future synergy potential
 3. **Staff as strategic lever** — Ongoing costs create tension between hand capacity and net income
 4. **Deterministic RNG** — All random elements use the seeded RNG for reproducibility
