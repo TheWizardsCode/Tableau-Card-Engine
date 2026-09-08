@@ -42,6 +42,11 @@ export const CASH_LINE_INCOME = '#44ff44';
 /** Red ongoing-cost colour for the cash line. */
 export const CASH_LINE_COST = '#ff6644';
 
+/** Right-column origin for card overlays — left edge of the text column
+ *  to the right of the 64×64 graphic (GRAPHIC_X 8 + GRAPHIC_W 64 + 8 gap).
+ *  In card-local coords (0,0 = centre) this is -width/2 + 80. */
+const TEXT_MIN_X_SVG = 80;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -164,15 +169,17 @@ export function buildUpgradeOverlaySpec(
           segments.push({ text: `-${fmt(biz.ongoingCost)}`, color: CASH_LINE_COST });
         }
         const text = `Cash: ${parts.join(' / ')}`;
+        // Right-column, left-anchored at TEXT_MIN_X (never inside the
+        // 64×64 graphic at SVG x < 72). In centre-origin coords: -w/2 + 80.
         return {
           text,
           segments,
-          x: 0,
+          x: Math.round(-width / 2 + TEXT_MIN_X_SVG),
           y: Math.round(-height * 0.04),
           fontSize: '11px',
           color: CASH_LINE_NEUTRAL,
           fontStyle: 'bold',
-          originX: 0.5,
+          originX: 0,
           originY: 0.5,
         };
       })()
@@ -189,12 +196,12 @@ export function buildUpgradeOverlaySpec(
   const reputationText: OverlayTextSpec | null = totalReputation > 0
     ? {
         text: `+${repFormatted}/turn`,
-        x: 0,
+        x: Math.round(-width / 2 + TEXT_MIN_X_SVG),
         y: Math.round(height * 0.1),
         fontSize: '11px',
         color: '#88bbff',
         fontStyle: 'bold',
-        originX: 0.5,
+        originX: 0,
         originY: 0.5,
       }
     : null;

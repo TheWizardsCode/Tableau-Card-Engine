@@ -1154,18 +1154,21 @@ export class MainStreetRenderer {
     // (CG-0MT24MHGZ0025O20).
     mainStreetRenderCardSvg(s, container, card.id, renderW, renderH, (card as Partial<BusinessCard>).displayName);
 
-    // For upgrade cards, add a dynamic text overlay showing the target business
+    // For upgrade cards, add dynamic target text in the right column
+    // (left-anchored at SVG TEXT_MIN_X 80 so it never bleeds into the
+    // 64×64 graphic, x < 72 in SVG coords / -w/2+80 in container coords).
     if (card.family === 'upgrade') {
       const u = card as UpgradeCard;
       const targetLabel = `for ${u.targetBusiness}`;
-      const targetText = s.add.text(0, Math.round(-renderH / 2 + 24), targetLabel, {
+      const rightColX = Math.round(-renderW / 2 + 80);
+      const targetText = s.add.text(rightColX, Math.round(-renderH / 2 + 24), targetLabel, {
         fontSize: '9px',
         color: '#ddbb88',
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
-        align: 'center',
+        align: 'left',
       });
-      targetText.setOrigin(0.5, 0);
+      targetText.setOrigin(0, 0);
       targetText.setName('upgradeTargetLabel');
       container.add(targetText);
     }
@@ -1178,15 +1181,16 @@ export class MainStreetRenderer {
       // market→street placement costs +50% over the listed cost. Shown as a
       // small badge at the bottom of business/community-space cards.
       const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-      const premiumLabel = s.add.text(0, Math.round(renderH / 2 - 11), `B&P €${premiumCost} (listed €${card.cost})`, {
+      const premiumRightX = Math.round(-renderW / 2 + 80);
+      const premiumLabel = s.add.text(premiumRightX, Math.round(renderH / 2 - 11), `B&P €${premiumCost} (listed €${card.cost})`, {
         fontSize: '9px',
         color: '#ffcc88',
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
-        align: 'center',
+        align: 'left',
         backgroundColor: '#000000aa',
       });
-      premiumLabel.setOrigin(0.5, 0.5);
+      premiumLabel.setOrigin(0, 0.5);
       premiumLabel.setName('buyAndPlacePremiumLabel');
       container.add(premiumLabel);
     }
