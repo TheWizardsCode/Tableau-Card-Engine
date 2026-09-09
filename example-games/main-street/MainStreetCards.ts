@@ -128,6 +128,9 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
   const evtTemplates: EventCard[] = rows
     .filter(r => r.family === 'event')
     .map(r => {
+      // Parse optional week-window columns (CG-0MTT0K9RX0004QTE / F1)
+      const ws = r.availableWeekStart ? Number(r.availableWeekStart) : undefined;
+      const we = r.availableWeekEnd ? Number(r.availableWeekEnd) : undefined;
       const base: EventCard = {
         family: 'event',
         id: r.id,
@@ -139,6 +142,9 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
         targetSynergy: (r.targetSynergy || undefined) as SynergyType | undefined,
         coinDelta: Number(r.coinDelta) || 0,
         reputationDelta: Number(r.reputationDelta) || 0,
+        ...(ws !== undefined && we !== undefined
+          ? { availableWeekStart: ws, availableWeekEnd: we }
+          : {}),
       };
       if (r.duration) {
         return {
@@ -380,6 +386,14 @@ export interface EventCard {
   readonly targetSynergy?: SynergyType;
   readonly coinDelta: number;
   readonly reputationDelta: number;
+  /**
+   * Optional week window for seasonal/holiday events.
+   * When present, the card is only offerable/drawable when the current
+   * game week falls within [availableWeekStart, availableWeekEnd] inclusive.
+   * When undefined, the card is year-round (always available).
+   */
+  readonly availableWeekStart?: number;
+  readonly availableWeekEnd?: number;
 }
 
 /**
@@ -415,6 +429,25 @@ export function isDurationEventCard(card: unknown): card is DurationEventCard {
     maybe.family === 'event' &&
     typeof maybe.duration === 'number'
   );
+}
+
+/**
+ * Check whether an EventCard is available during the given game week.
+ *
+ * Cards without a week window are year-round (always available).
+ * Cards with a window are available when `week` is in the inclusive
+ * range [availableWeekStart, availableWeekEnd].
+ *
+ * @param card   The event card to check.
+ * @param week   The current game week (1–52).
+ * @returns `true` if the card is available this week.
+ */
+export function isCardAvailableInWeek(card: EventCard, week: number): boolean {
+  const start = card.availableWeekStart;
+  const end = card.availableWeekEnd;
+  // No window defined → year-round
+  if (start === undefined || end === undefined) return true;
+  return week >= start && week <= end;
 }
 
 /**
