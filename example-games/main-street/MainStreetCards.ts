@@ -131,6 +131,10 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       // Parse optional week-window columns (CG-0MTT0K9RX0004QTE / F1)
       const ws = r.availableWeekStart ? Number(r.availableWeekStart) : undefined;
       const we = r.availableWeekEnd ? Number(r.availableWeekEnd) : undefined;
+      // Parse choice-event columns (CG-0MTSHG8RP008E128)
+      const hasChoices = r.hasChoices ? r.hasChoices.trim().toLowerCase() === 'true' : undefined;
+      const acceptNextCardId = r.acceptNextCardId ? r.acceptNextCardId.trim() || null : undefined;
+      const rejectNextCardId = r.rejectNextCardId ? r.rejectNextCardId.trim() || null : undefined;
       const base: EventCard = {
         family: 'event',
         id: r.id,
@@ -145,6 +149,9 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
         ...(ws !== undefined && we !== undefined
           ? { availableWeekStart: ws, availableWeekEnd: we }
           : {}),
+        ...(hasChoices === true ? { hasChoices: true } : {}),
+        ...(acceptNextCardId !== undefined ? { acceptNextCardId } : {}),
+        ...(rejectNextCardId !== undefined ? { rejectNextCardId } : {}),
       };
       if (r.duration) {
         return {
@@ -394,6 +401,22 @@ export interface EventCard {
    */
   readonly availableWeekStart?: number;
   readonly availableWeekEnd?: number;
+  /**
+   * When true, the event presents a choice dialog (Accept / Reject) at
+   * resolution time (AC2 CG-0MTSHG8RP008E128). Defaults to falsy / false
+   * for backward compatibility — cards without this field are non-choice.
+   */
+  readonly hasChoices?: boolean;
+  /**
+   * When the player chooses Accept, this card ID is added to the incident
+   * deck after the event's effect is applied. Null / absent ends the chain.
+   */
+  readonly acceptNextCardId?: string | null;
+  /**
+   * When the player chooses Reject, this card ID is added to the incident
+   * deck (the event's effect is NOT applied). Null / absent ends the chain.
+   */
+  readonly rejectNextCardId?: string | null;
 }
 
 /**
