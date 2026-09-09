@@ -462,6 +462,20 @@ export interface MainStreetState {
   pendingApplicant: PendingApplicant | null;
   /** Suppresses the staff-applicant trigger at DayStart (CG-0MSTOATDU006UGAX: tutorial/headless). */
   suppressApplicant?: boolean;
+  /**
+   * Pending dual-choice incident event (CG-0MTSHG8RP008E128).
+   *
+   * Populated when `resolveIncident()` draws an incident whose card has
+   * `hasChoices: true`. The event's effect is DEFERRED — `resolveIncident`
+   * returns null and `processEndOfTurn` pauses before EndCheck with
+   * `TurnResult.choicePending === true`. The scene presents the Accept/Reject
+   * dialog and resolves via {@link resolveEventChoice} (typed field per
+   * producer decision 2026-09-08 Q3 — NOT the `(state as any)` precedent).
+   *
+   * Cleared when the choice is resolved and the deferred closing phases run.
+   * Serialized/restored by save/load so an unresolved choice survives a save.
+   */
+  pendingEventChoice: PendingEventChoice | null;
 }
 
 /**
@@ -473,6 +487,20 @@ export interface PendingApplicant {
   card: StaffCard;
   /** Street-grid slot index where the business has a free employment slot. */
   targetSlotIndex: number;
+}
+
+/**
+ * A dual-choice incident event awaiting the player's Accept / Reject decision
+ * (CG-0MTSHG8RP008E128). Stored as a typed field on `MainStreetState`
+ * (`pendingEventChoice`) so it survives save/load and undo of the choice.
+ */
+export interface PendingEventChoice {
+  /** The choice event drawn from the incident deck (effect deferred). */
+  event: EventCard;
+  /** The player's decision, once made; null while the dialog is showing. */
+  chosenOption: null | 'accept' | 'reject';
+  /** False while the dialog is pending; true after the choice is applied. */
+  resolved: boolean;
 }
 
 export interface MainStreetSerializedState {
@@ -583,6 +611,8 @@ export interface MainStreetSerializedState {
   competitiveWinnerId?: number | null;
   /** Pending staff applicant for the current day (CG-0MSTOATDU006UGAX). */
   pendingApplicant: PendingApplicant | null;
+  /** Pending dual-choice incident event awaiting Accept/Reject (CG-0MTSHG8RP008E128). */
+  pendingEventChoice: PendingEventChoice | null;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -1043,6 +1073,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     activePlayerId: undefined,
     competitiveWinnerId: undefined,
     pendingApplicant: null,
+    pendingEventChoice: null,
   };
   // Endless-mode opt-in (CG-0MTIILU5V006GCN4): overrides the preset's
   // win-threshold semantics. Default is false (existing behaviour).
@@ -1208,6 +1239,13 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     competitiveWinnerId: state.competitiveWinnerId ?? null,
     pendingApplicant: state.pendingApplicant
       ? { card: structuredClone(state.pendingApplicant.card), targetSlotIndex: state.pendingApplicant.targetSlotIndex }
+      : null,
+    pendingEventChoice: state.pendingEventChoice
+      ? {
+          event: structuredClone(state.pendingEventChoice.event),
+          chosenOption: state.pendingEventChoice.chosenOption,
+          resolved: state.pendingEventChoice.resolved,
+        }
       : null,
   };
 }
@@ -1481,6 +1519,13 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).pendingApplicant = null;
   }
 
+  // ── pendingEventChoice (CG-0MTSHG8RP008E128): backfill default ─
+  // Legacy saves predate the dual-choice incident mechanic; default to null
+  // (no pending choice).
+  if (!('pendingEventChoice' in saved)) {
+    (saved as Record<string, unknown>).pendingEventChoice = null;
+  }
+
   // ── week/year (CG-0MTT0K9RX0004QTE): backfill for pre-calendar saves ─
   if (!('week' in saved)) {
     // Pre-calendar saves had no calendar; reconstruct a valid start week
@@ -1652,6 +1697,13 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     pendingApplicant: (saved as unknown as { pendingApplicant?: { card: StaffCard; targetSlotIndex: number } | null })?.pendingApplicant
       ? { card: structuredClone((saved as unknown as { pendingApplicant: { card: StaffCard; targetSlotIndex: number } }).pendingApplicant!.card),
           targetSlotIndex: (saved as unknown as { pendingApplicant: { card: StaffCard; targetSlotIndex: number } }).pendingApplicant!.targetSlotIndex,
+        }
+      : null,
+    pendingEventChoice: (saved as unknown as { pendingEventChoice?: { event: EventCard; chosenOption: null | 'accept' | 'reject'; resolved: boolean } | null })?.pendingEventChoice
+      ? {
+          event: structuredClone((saved as unknown as { pendingEventChoice: { event: EventCard; chosenOption: null | 'accept' | 'reject'; resolved: boolean } }).pendingEventChoice!.event),
+          chosenOption: (saved as unknown as { pendingEventChoice: { chosenOption: null | 'accept' | 'reject' } }).pendingEventChoice!.chosenOption,
+          resolved: (saved as unknown as { pendingEventChoice: { resolved: boolean } }).pendingEventChoice!.resolved,
         }
       : null,
   };

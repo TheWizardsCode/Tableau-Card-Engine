@@ -133,6 +133,7 @@ function forceGameOver(scene: Phaser.Scene, isWin = false): void {
     finalScore: isWin ? 100 : 0,
     gameResult: isWin ? 'win' : 'loss',
     newlyCompletedChallenges: [],
+    choicePending: false,
   };
 
   s.showGameOverOverlay(result, []);
@@ -345,6 +346,7 @@ describe('Main Street overlay button tests', () => {
       finalScore: 500,
       gameResult: 'win',
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
     s.showGameOverOverlay(result, ['tier-2']);
     await waitFrames(3);

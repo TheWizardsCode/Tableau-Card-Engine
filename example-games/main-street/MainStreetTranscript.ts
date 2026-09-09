@@ -12,7 +12,16 @@ export type MainStreetTranscriptEvent =
   | { type: 'turn-end'; turn: number }
   | { type: 'game-end'; turn: number; finalScore: number; result?: any }
   | { type: 'info'; turn: number; message: string }
-  | { type: 'active-effect'; turn: number; effectType: string; sourceEventId: string; duration: number; description: string };
+  | { type: 'active-effect'; turn: number; effectType: string; sourceEventId: string; duration: number; description: string }
+  | {
+      type: 'event-choice';
+      turn: number;
+      eventId: string;
+      cardName: string;
+      option: 'accept' | 'reject';
+      acceptNextCardId: string | null;
+      rejectNextCardId: string | null;
+    };
 
 export interface MainStreetTranscript {
   version: number;

@@ -386,6 +386,7 @@ export function createTutorialScenario(
     justMovedEventCardId: null,
     justMovedUpgradeCardId: null,
     pendingApplicant: null,
+    pendingEventChoice: null,
   };
 
   // Select challenges for this run using seeded RNG

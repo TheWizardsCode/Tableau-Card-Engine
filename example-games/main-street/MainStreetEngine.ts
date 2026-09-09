@@ -53,6 +53,7 @@ import {
 import type { BusinessCard, EventCard, StaffCard, SynergyType, SpecializationSkill } from './MainStreetCards';
 import {
   SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
+  getEventTemplates, getBaseTypeId,
   type DurationEventCard,
 } from './MainStreetCards';
 
@@ -236,6 +237,13 @@ export interface TurnResult {
   finalScore: number;
   /** Challenge IDs that were newly completed during this turn's evaluation. */
   newlyCompletedChallenges: string[];
+  /**
+   * True when the closing sequence paused because a dual-choice incident was
+   * drawn (CG-0MTSHG8RP008E128). When set, `state.pendingEventChoice` holds
+   * the drawn event and the UI must present the Accept/Reject dialog before
+   * the deferred closing (EndCheck / next day) can run.
+   */
+  choicePending: boolean;
 }
 
 // ── Score Calculation ───────────────────────────────────────
@@ -743,6 +751,18 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
 
   // Track the draw so the balance history mirrors the resolved sequence.
   recordIncidentDraw(state.incidentBalance, event);
+
+  // Dual-choice event interception (CG-0MTSHG8RP008E128 AC5): when the drawn
+  // incident has `hasChoices`, its effect is DEFERRED — stash the drawn event
+  // as `pendingEventChoice` (unresolved) and return null (no effect applied,
+  // no escalation yet). The caller (processEndOfTurn) pauses with
+  // TurnResult.choicePending so the UI can present the Accept/Reject dialog;
+  // resolveEventChoice applies the chosen path later.
+  if (event.hasChoices) {
+    state.pendingEventChoice = { event, chosenOption: null, resolved: false };
+    addLog(state, `Incident: ${event.name} — a decision is required.`, 'neutral');
+    return null;
+  }
 
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
@@ -1352,6 +1372,20 @@ export function endCompetitiveMarketTurn(state: MainStreetState): void {
  * and competitiveWinnerId records the first-to-threshold winner.
  */
 export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnResult {
+  // AC7 guard (CG-0MTSHG8RP008E128): a pending unresolved choice blocks the
+  // shared closing sequence regardless of mode.
+  if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    return {
+      income: null,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: true,
+    };
+  }
   if (state.phase !== 'InvestmentResolution') {
     throw new Error(`resolveCompetitiveClosingPhases requires InvestmentResolution, got ${state.phase}`);
   }
@@ -1369,6 +1403,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
   }
   state.phase = 'IncomePhase';
@@ -1398,6 +1433,20 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
   if ((state.players?.length ?? 0) > 1 && incident) {
     applyCompetitiveEventEffects(state, incident);
   }
+  // Dual-choice pause (CG-0MTSHG8RP008E128): resolveIncident deferred the
+  // drawn incident; stop before EndCheck and surface choicePending.
+  if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    return {
+      income,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: true,
+    };
+  }
   if (checkImmediateLoss(state)) {
     appendTurnNetRow(state, turnEnded);
     return {
@@ -1408,6 +1457,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
   }
   state.phase = 'EndCheck';
@@ -1440,6 +1490,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
     gameResult: state.gameResult,
     finalScore: state.finalScore,
     newlyCompletedChallenges,
+    choicePending: false,
   };
 }
 
@@ -1579,6 +1630,22 @@ export function appendTurnNetRow(state: MainStreetState, turnEnded: number): voi
  * @returns TurnResult with income, incident, and game result.
  */
 export function processEndOfTurn(state: MainStreetState): TurnResult {
+  // AC7 (CG-0MTSHG8RP008E128): while a dual-choice incident is pending and
+  // unresolved, the closing sequence must NOT proceed to IncomePhase — the
+  // player's decision comes first. Returns a choicePending result instead of
+  // throwing so stray/re-entrant end-turn calls stay deterministic.
+  if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    return {
+      income: null,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: true,
+    };
+  }
   if (state.phase !== 'MarketPhase') {
     throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
   }
@@ -1615,6 +1682,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
   }
 
@@ -1641,6 +1709,67 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   const incidentCoinChange = state.resourceBank.coins - coinsBeforeIncident;
   const incidentRepChange = state.resourceBank.reputation - repBeforeIncident;
 
+  // Dual-choice pause (CG-0MTSHG8RP008E128 AC7): when the drawn incident set a
+  // `pendingEventChoice` (resolveIncident deferred the effect), stop the closing
+  // sequence BEFORE EndCheck and return choicePending so the UI presents the
+  // Accept/Reject dialog. The deferred closing then runs via resolveEventChoice
+  // (apply the path) + finishDeferredEndOfTurn (EndCheck → next day).
+  if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    return {
+      income,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: true,
+    };
+  }
+
+  // EndCheck + decay + challenges + advance (shared with the deferred path).
+  return runSinglePlayerTurnClosing(state, {
+    income,
+    incident,
+    incidentCoinChange,
+    incidentRepChange,
+    turnEnded,
+  });
+}
+
+/**
+ * Context carried into the single-player closing tail (EndCheck → next day).
+ * Shared by the normal path (processEndOfTurn) and the deferred path
+ * (finishDeferredEndOfTurn after a dual-choice incident).
+ */
+interface SinglePlayerTurnClosingContext {
+  /** Income result of the turn being closed (null when no income ran). */
+  income: IncomeResult | null;
+  /** The resolved incident (null when deferred / no incident). */
+  incident: EventCard | null;
+  /** Net coin delta from the resolved incident. */
+  incidentCoinChange: number;
+  /** Net reputation delta from the resolved incident. */
+  incidentRepChange: number;
+  /** The turn being summarised by the net row. */
+  turnEnded: number;
+}
+
+/**
+ * Runs the closing tail of a single-player turn from the post-incident point:
+ * immediate-loss check, EndCheck, active-effect decay, challenge evaluation,
+ * end conditions, next-day advance, and the per-turn net summary row.
+ *
+ * @param state Current game state (mutated in-place).
+ * @param ctx   Closing context (income/incident/deltas/turnEnded).
+ * @returns The turn result for the UI.
+ */
+function runSinglePlayerTurnClosing(
+  state: MainStreetState,
+  ctx: SinglePlayerTurnClosingContext,
+): TurnResult {
+  const { income, incident, incidentCoinChange, incidentRepChange, turnEnded } = ctx;
+
   // Check for immediate loss after incident. Banner is emitted first,
   // then the per-turn net row as the final entry (mirrors the pre-income
   // ordering fix above and keeps the net row as the canonical closing
@@ -1655,6 +1784,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
   }
 
@@ -1705,7 +1835,159 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
     gameResult: state.gameResult,
     finalScore: state.finalScore,
     newlyCompletedChallenges,
+    choicePending: false,
   };
+}
+
+/**
+ * Result of applying an Accept / Reject decision for a pending dual-choice
+ * incident (CG-0MTSHG8RP008E128).
+ */
+export interface EventChoiceResolution {
+  /** The event the decision was made about. */
+  event: EventCard;
+  /** Which option the player chose. */
+  option: 'accept' | 'reject';
+  /** Net coin delta applied by the chosen path (0 for reject / durations). */
+  coinChange: number;
+  /** Net reputation delta applied by the chosen path. */
+  repChange: number;
+  /**
+   * The escalation card instance pushed onto the incident deck by the chosen
+   * path (null when the chain ends — no next card).
+   */
+  pushedCard: EventCard | null;
+}
+
+/**
+ * Builds a fresh instance of an escalation card (by template ID) and pushes it
+ * onto the TOP of the incident deck (next to be drawn). Deterministic: the
+ * serial suffix is derived from existing instances of the same base template,
+ * so no RNG / clock is consumed (replay-safe).
+ *
+ * @param state      Current game state (mutated — incidentDeck may grow).
+ * @param templateId The card template ID to add (acceptNextCardId / rejectNextCardId).
+ * @returns The pushed card instance, or null when no chain card was requested
+ *          or the template does not exist.
+ */
+function pushChainCard(state: MainStreetState, templateId: string | null | undefined): EventCard | null {
+  if (!templateId) return null; // chain ends — nothing added (AC4/AC9)
+  const template = getEventTemplates().find((t) => t.id === templateId);
+  if (!template) {
+    addLog(state, `Chain card ${templateId} not found in card data.`, 'neutral');
+    return null;
+  }
+  const base = getBaseTypeId(template.id);
+  // Deterministic serial: highest existing suffix for the base template across
+  // every event-card location, +1. Replay-safe (no RNG / wall clock).
+  let maxSerial = -1;
+  const scan = (cards: readonly EventCard[]): void => {
+    for (const c of cards) {
+      if (getBaseTypeId(c.id) !== base) continue;
+      const m = c.id.match(/-(\d+)$/);
+      const n = m ? Number(m[1]) : -1;
+      if (n > maxSerial) maxSerial = n;
+    }
+  };
+  scan(state.incidentDeck);
+  scan(state.decks.event);
+  scan(state.discards.event);
+  const card: EventCard = { ...template, id: `${base}-${maxSerial + 1}` };
+  state.incidentDeck.push(card);
+  return card;
+}
+
+/**
+ * Resolves a pending dual-choice incident (CG-0MTSHG8RP008E128 AC8/AC9).
+ *
+ * Accept applies the event's effect (via resolveEvent) then pushes the
+ * `acceptNextCardId` escalation onto the incident deck. Reject skips the
+ * effect entirely and pushes the `rejectNextCardId` escalation instead.
+ * Records the decision in the transcript and marks the pending choice
+ * resolved — the deferred closing (EndCheck → next day) is completed by
+ * {@link finishDeferredEndOfTurn}.
+ *
+ * @param state  Current game state (mutated). Must have a pending unresolved choice.
+ * @param option The player's decision.
+ * @throws Error when no unresolved choice is pending.
+ */
+export function resolveEventChoice(
+  state: MainStreetState,
+  option: 'accept' | 'reject',
+): EventChoiceResolution {
+  const pending = state.pendingEventChoice;
+  if (!pending) {
+    throw new Error('No pending event choice to resolve.');
+  }
+  if (pending.resolved) {
+    throw new Error(`Event choice for ${pending.event.name} is already resolved.`);
+  }
+  const event = pending.event;
+  const coinsBefore = state.resourceBank.coins;
+  const repBefore = state.resourceBank.reputation;
+
+  let pushedCard: EventCard | null;
+  if (option === 'accept') {
+    // Accept path (AC8): apply the event's stated effect, then chain on.
+    resolveEvent(state, event);
+    pushedCard = pushChainCard(state, event.acceptNextCardId);
+    addLog(state, `Chose to accept: ${event.name} consequences apply.`, 'neutral');
+  } else {
+    // Reject path (AC9): refuse the event's effect (nothing applied); the
+    // escalation (worse/better card) is added to the deck instead.
+    pushedCard = pushChainCard(state, event.rejectNextCardId);
+    addLog(state, `Chose to reject: ${event.name} consequences refused.`, 'neutral');
+  }
+
+  const coinChange = state.resourceBank.coins - coinsBefore;
+  const repChange = state.resourceBank.reputation - repBefore;
+  syncResourceBankToLedger(state);
+
+  // Transcript (AC12): the choice is recorded identically for player and AI.
+  recordMainStreetEvent({
+    type: 'event-choice',
+    turn: state.turn,
+    eventId: event.id,
+    cardName: event.name,
+    option,
+    acceptNextCardId: event.acceptNextCardId ?? null,
+    rejectNextCardId: event.rejectNextCardId ?? null,
+  });
+
+  pending.chosenOption = option;
+  pending.resolved = true;
+  return { event, option, coinChange, repChange, pushedCard };
+}
+
+/**
+ * Completes the deferred closing of a single-player turn after a dual-choice
+ * incident was resolved (CG-0MTSHG8RP008E128).
+ *
+ * Precondition: `state.pendingEventChoice` is set with `resolved === true`
+ * (resolveEventChoice was called). Consumes the pending choice (clears it) and
+ * runs the post-incident closing tail (immediate-loss check, EndCheck, decay,
+ * challenges, end conditions, next-day advance, net row).
+ *
+ * @param state Current game state (mutated).
+ * @returns The final turn result for the UI.
+ */
+export function finishDeferredEndOfTurn(state: MainStreetState): TurnResult {
+  const pending = state.pendingEventChoice;
+  if (!pending || !pending.resolved) {
+    throw new Error('finishDeferredEndOfTurn requires a resolved pending event choice.');
+  }
+  const turnEnded = state.turn;
+  // Consume the pending choice: the incident event is out of the deck (drawn),
+  // its effect applied (accept) or refused (reject), and the escalation (if
+  // any) is already on the deck top — nothing remains deferred.
+  state.pendingEventChoice = null;
+  return runSinglePlayerTurnClosing(state, {
+    income: null, // income for this turn was already applied & presented
+    incident: null, // the incident consequence was presented by resolveEventChoice
+    incidentCoinChange: 0,
+    incidentRepChange: 0,
+    turnEnded,
+  });
 }
 
 /**
