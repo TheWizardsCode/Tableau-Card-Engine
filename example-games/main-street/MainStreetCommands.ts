@@ -32,6 +32,7 @@ import {
   hireApplicantAction,
   declineApplicantAction,
   letGoStaffAction,
+  resolveEventChoice,
 } from './MainStreetEngine';
 
 // ── Action Budget Enforcement ────────────────────────────────
@@ -76,6 +77,17 @@ interface MarketActionSnapshot {
   justMovedUpgradeCardId: string | null;
   /** Same-day event composite tracker (CG-0MTFWBNL30043ZBM). */
   justMovedEventCardId: string | null;
+  /**
+   * Pending dual-choice incident (CG-0MTSHG8RP008E128). Captured so undoing
+   * a choice returns to the unresolved pending state with the event still in
+   * play (AC10 parent / AC1 undo child).
+   */
+  pendingEventChoice: any | null;
+  /**
+   * Active duration effects. Captured so undoing a choice that accepted a
+   * DurationEventCard removes the effect it pushed.
+   */
+  activeEffects: any | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -112,6 +124,8 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     staffCards: safeClone(state.staffCards ?? []),
     justMovedUpgradeCardId: (state as any).justMovedUpgradeCardId ?? null,
     justMovedEventCardId: (state as any).justMovedEventCardId ?? null,
+    pendingEventChoice: safeClone((state as any).pendingEventChoice ?? null),
+    activeEffects: safeClone(state.activeEffects ?? []),
   };
 }
 
@@ -154,6 +168,12 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   }
   if ('justMovedEventCardId' in snap) {
     (state as any).justMovedEventCardId = snap.justMovedEventCardId;
+  }
+  if ('pendingEventChoice' in snap) {
+    (state as any).pendingEventChoice = snap.pendingEventChoice;
+  }
+  if ('activeEffects' in snap) {
+    state.activeEffects = snap.activeEffects ?? [];
   }
 }
 
@@ -503,6 +523,35 @@ export function declineApplicantCommand(state: MainStreetState) {
     snapshotAction(
       (s) => { declineApplicantAction(s); },
       'DeclineApplicant',
+    ),
+  );
+}
+
+/**
+ * Command: Resolve the pending dual-choice incident (CG-0MTSHG8RP008E128).
+ *
+ * Accept applies the event's effect + pushes the accept-next card; Reject
+ * refuses the effect + pushes the reject-next card. Because the command is
+ * snapshot-based (pre-capture includes the unresolved `pendingEventChoice`,
+ * the incident deck WITHOUT the escalation, the resource bank BEFORE the
+ * effect, and active effects), undo returns to the unresolved pending state
+ * with the event still in play — escalation removed, resources restored
+ * (AC10 parent / AC1+AC4 undo child).
+ *
+ * @param state  Current game state.
+ * @param option The player's (or AI's) decision.
+ */
+export function resolveEventChoiceCommand(
+  state: MainStreetState,
+  option: 'accept' | 'reject',
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => {
+        resolveEventChoice(s, option);
+      },
+      `ResolveEventChoice ${option}`,
     ),
   );
 }

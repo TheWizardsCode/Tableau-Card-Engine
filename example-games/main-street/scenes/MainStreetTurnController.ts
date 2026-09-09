@@ -5,7 +5,7 @@
 // description: MainStreet god modules: Engine 2452, Animator 1942, Renderer 1902, TurnController 1834, State 1599, Cards 1469, Adjacency 1354, Market 1307, LifecycleManager 1111 lines — decompose per-concern helpers; threshold 800; prior CG-0MM1OP07Q16TUTHI covered different scene files, not these modules.
 // -->
 import { addLog } from '../MainStreetState';
-import { executeDayStart, processEndOfTurn, executeAction, resolveEventChoice, finishDeferredEndOfTurn, type TurnResult } from '../MainStreetEngine';
+import { executeDayStart, processEndOfTurn, executeAction, finishDeferredEndOfTurn, type TurnResult } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
 import { hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import {
@@ -21,7 +21,7 @@ import {
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, playBusinessFromHandCommand, peekIncidentDeckCommand, hireStaffCardCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, playBusinessFromHandCommand, peekIncidentDeckCommand, hireStaffCardCommand, resolveEventChoiceCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
@@ -499,21 +499,42 @@ export class MainStreetTurnController {
    */
   public onEventChoice(option: 'accept' | 'reject'): void {
     const s = this.scene;
+    const pending = s.state.pendingEventChoice;
+    if (!pending || pending.resolved) return;
+    const event = pending.event;
     try {
-      const res = resolveEventChoice(s.state, option);
+      // Resolve via the snapshot-based undoable command so the choice can be
+      // undone back to the unresolved pending state (AC10
+      // CG-0MTSHG8RP008E128 — escalation removed, resources restored). Runs
+      // through the undo manager when one is present.
+      const coinsBefore = s.state.resourceBank.coins;
+      const repBefore = s.state.resourceBank.reputation;
+      const deckBefore = s.state.incidentDeck.length;
+      const choiceCmd = resolveEventChoiceCommand(s.state, option);
+      if (s.undoManager) s.undoManager.execute(choiceCmd);
+      else choiceCmd.execute();
+      // Re-derive the consequence from the state diff (the command hides the
+      // engine resolution result): resource deltas + the pushed escalation.
+      const coinChange = s.state.resourceBank.coins - coinsBefore;
+      const repChange = s.state.resourceBank.reputation - repBefore;
+      const pushedCard =
+        s.state.incidentDeck.length === deckBefore + 1
+          ? s.state.incidentDeck[s.state.incidentDeck.length - 1]
+          : null;
+      void pushedCard;
       s.instructionText.setText(
-        `${res.event.name}: consequence ${option === 'accept' ? 'accepted' : 'refused'}.`,
+        `${event.name}: consequence ${option === 'accept' ? 'accepted' : 'refused'}.`,
       );
       // Visual consequence for resource deltas (accepted effect), mirroring
       // the standard incident reveal. Reject applies nothing (deltas 0) — the
       // instruction text above is the only feedback.
-      if (res.coinChange !== 0 || res.repChange !== 0) {
+      if (coinChange !== 0 || repChange !== 0) {
         try {
           s.msAnimator.animateIncidentReveal({
-            cardId: res.event.id,
-            incidentName: res.event.name,
-            coinChange: res.coinChange,
-            repChange: res.repChange,
+            cardId: event.id,
+            incidentName: event.name,
+            coinChange,
+            repChange,
             from: s.msRenderer.getFrontIncidentCardCenter(),
           });
         } catch (_) {
@@ -522,6 +543,10 @@ export class MainStreetTurnController {
       }
       // Complete the deferred closing (EndCheck → next day) and present it.
       const finalResult = finishDeferredEndOfTurn(s.state);
+      // The turn is now closed — the undo stack is cleared (mirrors the
+      // normal end-of-turn clear) so a choice cannot be undone after the day
+      // advanced (undo would resurrect the pending choice mid-market).
+      try { s.undoManager?.clear(); } catch (_) { /* ignore */ }
       this.finishTurnPresentation(finalResult, false);
     } catch (e) {
       // Resolution failed (should not happen in normal flow): recover by
