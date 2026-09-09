@@ -36,7 +36,7 @@ import {
 
 import {
   executeDayStart,
-  processEndOfTurn,
+  endTurnHeadless,
   resolveEvent,
   playHeldEvent,
   computeScore,
@@ -470,6 +470,9 @@ describe('EconomyLedger — Main Street integration parity', () => {
   describe('Purchase parity', () => {
     it('purchaseBusiness: ledger matches state after business purchase', () => {
       const state = setupMainStreetGame({ seed: 'ledger-purchase-biz' });
+      // Coin cushion so the seeded market row's business is always affordable
+      // regardless of the expanded pool's draw (content CG-0MTT7FC7A000AA58).
+      state.resourceBank.coins = 5000;
       const ledger = ledgerFromState(state);
 
       const coinsBefore = state.resourceBank.coins;
@@ -671,12 +674,16 @@ describe('EconomyLedger — Main Street integration parity', () => {
       state.streetGrid.fill(null);
       state.streetGrid[0] = { ...biz };
 
+      // Coin cushion: keeps the parity turns alive (incidents) and below the
+      // win threshold so the loop completes (content CG-0MTT7FC7A000AA58).
+      state.resourceBank.coins = 5000;
+
       const ledger = ledgerFromState(state);
       const coinsBefore = state.resourceBank.coins;
       const repBefore = state.resourceBank.reputation;
 
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       verifyParity(state, ledger, {
         coins: state.resourceBank.coins - coinsBefore,
@@ -692,6 +699,9 @@ describe('EconomyLedger — Main Street integration parity', () => {
       state.streetGrid[0] = { ...state.decks.business[0] };
       state.streetGrid[1] = { ...state.decks.business[1] };
 
+      // Coin cushion: keeps the parity turns alive and below the win threshold.
+      state.resourceBank.coins = 5000;
+
       const ledger = ledgerFromState(state);
 
       for (let turn = 0; turn < 3; turn++) {
@@ -699,7 +709,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
         const repBefore = state.resourceBank.reputation;
 
         executeDayStart(state);
-        processEndOfTurn(state);
+        endTurnHeadless(state);
 
         ledger.apply({
           coins: state.resourceBank.coins - coinsBefore,
@@ -733,11 +743,13 @@ describe('EconomyLedger — Main Street integration parity', () => {
     it('score updates correctly after resource changes', () => {
       const state = setupMainStreetGame({ seed: 'ledger-score-update' });
 
-      // Place a business and run a turn
+      // Place a business and run a turn (headless: content may draw a choice
+      // event; cushion coins so the turn survives incidents).
       state.streetGrid.fill(null);
       state.streetGrid[0] = { ...state.decks.business[0] };
+      state.resourceBank.coins = 5000;
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       // Compute score the Main Street way
       const expectedScore =
@@ -759,10 +771,11 @@ describe('EconomyLedger — Main Street integration parity', () => {
       state.streetGrid.fill(null);
       state.streetGrid[0] = { ...state.decks.business[0] };
       state.streetGrid[1] = { ...state.decks.business[1] };
+      state.resourceBank.coins = 5000;
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       // Call the actual computeScore function
       const actualScore = computeScore(state);

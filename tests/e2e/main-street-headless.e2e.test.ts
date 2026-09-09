@@ -6,7 +6,7 @@ import { setupMainStreetGame } from '../../example-games/main-street/MainStreetS
 import {
   executeDayStart,
   executeAction,
-  processEndOfTurn,
+  endTurnHeadless,
   computeScore,
   type PlayerAction,
   type TurnResult,
@@ -122,7 +122,7 @@ function runGreedyGame(seed: string, maxTurns = 30): {
       executed.push({ type: 'skip', detail: 'No affordable actions' });
     }
 
-    const turnResult: TurnResult = processEndOfTurn(state);
+    const turnResult: TurnResult = endTurnHeadless(state);
 
     turns.push({
       turn: turns.length + 1,
