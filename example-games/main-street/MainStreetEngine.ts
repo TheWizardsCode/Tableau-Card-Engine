@@ -46,6 +46,7 @@ import {
   PHASE_ORDER,
   addLog,
   syncResourceBankToLedger,
+  advanceWeek,
   describeEventEffects,
   classifyEffect,
 } from './MainStreetState';
@@ -1420,6 +1421,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
   checkCompetitiveEndConditions(state);
   if (state.gameResult === 'playing') {
     state.turn += 1;
+    advanceWeek(state);
     const bankable = Math.min(state.actionsRemaining, 1);
     state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
     // Mirror shared banked value into each player's budget for next day's costing.
@@ -1679,6 +1681,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // If game continues, advance to next turn
   if (state.gameResult === 'playing') {
     state.turn += 1;
+    advanceWeek(state);
 
     // ── Action Banking (CG-0MT3IOPZB005LNAR) ─────────────
     // Bank unused base actions (at most 1 per day) up to the cap of 2.

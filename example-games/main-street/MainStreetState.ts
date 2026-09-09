@@ -288,6 +288,10 @@ export interface MainStreetState {
    * CG-0MSLXJCHH001DLIO).
    */
   turn: number;
+  /** Current calendar week (1–52). Chosen at setup from the allowed set (CG-0MTT0K9RX0004QTE). */
+  week: number;
+  /** Current calendar year (>=1). Increments when week wraps 52→1. */
+  year: number;
   /** Current phase within the turn. */
   phase: DayPhase;
   /**
@@ -474,6 +478,8 @@ export interface PendingApplicant {
 export interface MainStreetSerializedState {
   config: GameConfig;
   turn: number;
+  week: number;
+  year: number;
   phase: DayPhase;
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
   /** World grid dimensions for save/load (see MainStreetState). */
@@ -664,6 +670,35 @@ export function seedToNumber(seed: string): number {
     hash = ((hash << 5) + hash + seed.charCodeAt(i)) | 0;
   }
   return hash;
+}
+
+/**
+ * Allowed starting weeks for a new game (CG-0MTT0K9RX0004QTE).
+ * Drawn uniformly at setup via the game's seeded RNG.
+ */
+export const ALLOWED_START_WEEKS: readonly number[] = [
+  1, 2, 3, 4, 5, 6, 7, 8, 16, 17, 18, 19, 20, 21, 22, 23, 24, 40, 41, 42, 43, 44, 45, 46,
+] as const;
+
+/**
+ * Rolls a start week from the allowed set using the game's seeded RNG.
+ * Consumes exactly one RNG call.
+ */
+export function rollStartWeek(rng: () => number): number {
+  const idx = Math.floor(rng() * ALLOWED_START_WEEKS.length);
+  return ALLOWED_START_WEEKS[idx];
+}
+
+/**
+ * Advances the calendar by one week (wraps 52→1, increments year on wrap).
+ */
+export function advanceWeek(state: MainStreetState): void {
+  if (state.week >= 52) {
+    state.week = 1;
+    state.year += 1;
+  } else {
+    state.week += 1;
+  }
 }
 
 /**
@@ -924,12 +959,25 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   shuffleArray(incidentPool, rng);
   const incidentDeck = incidentPool;
 
+  // Roll the start week from the allowed set BEFORE any RNG calls from deck
+  // shuffling/market refill/challenge selection, so same seed ⇒ same start week
+  // regardless of how the pool sizes evolve (CG-0MTT0K9RX0004QTE / F2).
+  // To preserve that invariant even after existing setup code adds further RNG
+  // consumption before this point (e.g. future shuffles), derive the start
+  // week from a dedicated seeded stream that shares the numeric seed — the
+  // main replay stream's rngCalls continue to count only main-stream draws.
+  const startWeekSeed = (numericSeed ^ 0x9e3779b9) >>> 0;
+  const startWeekRng = createSeededRng(startWeekSeed);
+  const startWeek = rollStartWeek(() => startWeekRng());
+
   // Build initial state -- use config values instead of hard-coded constants
   const initCoins = config.startingCoins;
   const initRep = config.startingReputation;
   const baseState: MainStreetState = {
     config,
     turn: 1,
+    week: startWeek,
+    year: 1,
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     streetGridCols: 1,
@@ -1111,6 +1159,8 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
   return {
     config: structuredClone(state.config),
     turn: state.turn,
+    week: state.week,
+    year: state.year,
     phase: state.phase,
     streetGrid: structuredClone(state.streetGrid),
     streetGridCols: state.streetGridCols,
@@ -1431,6 +1481,32 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).pendingApplicant = null;
   }
 
+  // ── week/year (CG-0MTT0K9RX0004QTE): backfill for pre-calendar saves ─
+  if (!('week' in saved)) {
+    // Pre-calendar saves had no calendar; reconstruct a valid start week
+    // from the legacy seed's dedicated start-week stream so the calendar is
+    // valid and deterministic after a reload. Mirrors createSeededRng's 5
+    // warm-up iterations + first draw, otherwise legacyWeek would not
+    // match setupMainStreetGame's rollStartWeek for the same seed.
+    const legacyWeek = (() => {
+      const numSeed = (saved as Record<string, unknown>).numericSeed as number | undefined;
+      if (typeof numSeed === 'number') {
+        const dedicated = (numSeed ^ 0x9e3779b9) | 0;
+        let s = dedicated;
+        for (let i = 0; i < 5; i++) s = (Math.imul(1664525, s) + 1013904223) | 0;
+        s = (Math.imul(1664525, s) + 1013904223) | 0;
+        const r = (s >>> 0) / 4294967296;
+        const w = ALLOWED_START_WEEKS[Math.floor(r * ALLOWED_START_WEEKS.length)];
+        return w ?? 1;
+      }
+      return 1;
+    })();
+    (saved as Record<string, unknown>).week = legacyWeek;
+  }
+  if (!('year' in saved)) {
+    (saved as Record<string, unknown>).year = 1;
+  }
+
   // ── ongoingCost: default to 0 for legacy community-space cards ─
   // Added by CG-0MRXYGM9B006I3PE (community-space ongoing costs). Community space
   // cards serialized before this field existed must default to 0 so the income
@@ -1504,6 +1580,8 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
   state = {
     config: structuredClone(saved.config),
     turn: saved.turn,
+    week: (saved as unknown as { week?: number }).week ?? 1,
+    year: (saved as unknown as { year?: number }).year ?? 1,
     phase: saved.phase,
     streetGrid: structuredClone(saved.streetGrid),
     market: structuredClone(saved.market),

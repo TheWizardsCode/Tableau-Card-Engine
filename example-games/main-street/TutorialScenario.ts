@@ -321,6 +321,8 @@ export function createTutorialScenario(
   state = {
     config,
     turn: 1,
+    week: 1,
+    year: 1,
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     streetGridCols: 1,
