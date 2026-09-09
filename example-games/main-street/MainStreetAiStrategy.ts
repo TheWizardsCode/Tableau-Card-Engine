@@ -24,6 +24,9 @@ import {
   executeDayStart,
   processEndOfTurn,
   executeAction,
+  resolveEventChoice,
+  finishDeferredEndOfTurn,
+  applyReputationMultiplier,
   type PlayerAction,
   type BuyBusinessAction,
   type BuyUpgradeAction,
@@ -35,6 +38,7 @@ import {
   type PlayEventFromHandAction,
   type CommunityFavourAction,
 } from './MainStreetEngine';
+import type { DifficultyName } from './MainStreetDifficulty';
 import {
   canPurchaseBusiness,
   canPurchaseUpgrade,
@@ -44,7 +48,7 @@ import {
   getEmptySlots,
 } from './MainStreetMarket';
 import type { BusinessCard, UpgradeCard, EventCard, StaffCard } from './MainStreetCards';
-import { GRID_SIZE } from './MainStreetCards';
+import { GRID_SIZE, getEventTemplates } from './MainStreetCards';
 import { computeSynergyBonus } from './MainStreetAdjacency';
 import { computeScore } from './MainStreetEngine';
 
@@ -671,8 +675,187 @@ export class MainStreetAiPlayer extends AiPlayerBase<MainStreetAiStrategy> {
       }
 
       processEndOfTurn(state);
+      // Dual-choice incident (CG-0MTSHG8RP008E128): processEndOfTurn pauses
+      // with choicePending when the drawn incident requires a decision.
+      // Resolve it per the difficulty strategy so the sim never stalls.
+      if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+        resolveAiEventChoice(state);
+      }
     }
   }
+}
+
+// ── Dual-Choice Event Evaluation (CG-0MTSHG8RP008E128) ────────
+
+/**
+ * Severity factor applied to a chain card's reputation delta when comparing
+ * event severities: reputation points are worth more than raw coins to the
+ * score (1 rep ≈ +1 score; 1 coin ≈ +1 score), but incident coin deltas are
+ * per-business multiples while reputation deltas are flat. The scale keeps
+ * both axes comparable for severity ranking. Internal heuristic constant.
+ */
+const REPUTATION_SEVERITY_SCALE = 100;
+
+/**
+ * "Significantly worse" guard (Hard AI): when the reject path's full chain
+ * cost exceeds the accept path's full chain cost by at least this ratio, the
+ * AI swallows the current manageable effect rather than risk the escalation
+ * (AC22 — "reject if the escalation card is significantly worse" maps onto
+ * rejecting being costlier). Exported for tests.
+ */
+export const AI_EVENT_CHOICE_SIGNIFICANTLY_WORSE_RATIO = 1.5;
+
+/**
+ * Non-mutating projection of the effective coin delta an event would apply
+ * RIGHT NOW, mirroring the engine's resolveEvent math WITHOUT staff
+ * mitigation (static effect-size comparison per producer decision
+ * 2026-09-08 Q1 — no turn simulation). Used for affordability checks.
+ *
+ * @param state Current game state (read-only).
+ * @param event The event whose coin effect is projected.
+ * @returns Projected coin delta (negative = loss).
+ */
+export function projectEventCoinDelta(state: MainStreetState, event: EventCard): number {
+  const cfg = state.config;
+  const rep = state.resourceBank.reputation;
+  let raw: number;
+  switch (event.target) {
+    case 'SpecificSynergy': {
+      const matchCount = state.streetGrid.filter(
+        (b) => b !== null && b.synergyTypes.includes(event.targetSynergy as never),
+      ).length;
+      raw = event.coinDelta * matchCount;
+      break;
+    }
+    case 'RandomBusiness': {
+      const placed = state.streetGrid.filter((b) => b !== null).length;
+      raw = placed > 0 ? event.coinDelta : 0;
+      break;
+    }
+    case 'All':
+    default:
+      raw = event.coinDelta;
+      break;
+  }
+  return applyReputationMultiplier(raw, rep, cfg);
+}
+
+/**
+ * Static severity of an event's net effect: magnitude of (coinDelta +
+ * reputationDelta) with reputation scaled up. Larger = worse for negative
+ * events / more impactful for positive ones.
+ */
+export function eventSeverity(event: EventCard): number {
+  return Math.abs(
+    event.coinDelta + event.reputationDelta * REPUTATION_SEVERITY_SCALE,
+  );
+}
+
+/**
+ * Looks up the next chain card template (registry lookup only — static, no
+ * simulation) and returns its severity; null/absent/missing template → 0.
+ */
+function chainCardSeverity(nextId: string | null | undefined): number {
+  if (!nextId) return 0;
+  const template = getEventTemplates().find((t) => t.id === nextId);
+  return template ? eventSeverity(template) : 0;
+}
+
+/**
+ * Difficulty-based Accept/Reject decision for a pending dual-choice incident
+ * (CG-0MTSHG8RP008E128 AC22). Deterministic and side-effect free.
+ *
+ * Strategy mapping:
+ * - Easy: always accept — avoid escalation risk, short-term thinking.
+ * - Medium: accept when the event's effect is affordable (coins stay > 0
+ *   after the projected delta); reject when it would be unaffordable.
+ * - Hard (static full-chain evaluation):
+ *   - Positive/neutral events (net >= 0): accept — a guaranteed benefit is
+ *     never refused (rejecting only defers value to a speculative draw).
+ *   - Negative events:
+ *       * accepting ends the chain (acceptNextCardId null) AND the current
+ *         effect is manageable → accept (the safe terminal).
+ *       * otherwise compare the full chain costs — accept pays the current
+ *         effect plus the accept-next card (if the chain continues); reject
+ *         skips the current effect and pays only the reject-next card.
+ *         Choose the cheaper path; when rejecting is `
+ *         AI_EVENT_CHOICE_SIGNIFICANTLY_WORSE_RATIO`× costlier, accept the
+ *         manageable hit instead (the escalation is "significantly worse").
+ *       * if the current effect is NOT manageable (would bankrupt), reject
+ *         (avoid the imminent loss) unless rejecting is also strictly worse
+ *         than accepting — both paths bad → accept (deterministic default).
+ *
+ * @param state      Current game state (read-only).
+ * @param event      The drawn choice event (effect deferred).
+ * @param difficulty Difficulty preset ('Easy' | 'Medium' | 'Hard').
+ * @returns 'accept' or 'reject'.
+ */
+export function decideEventChoice(
+  state: MainStreetState,
+  event: EventCard,
+  difficulty: DifficultyName,
+): 'accept' | 'reject' {
+  // Positive/neutral events: the benefit is guaranteed; no difficulty
+  // refuses a free gain (reject only delays value to an unknown later draw).
+  if (event.coinDelta + event.reputationDelta >= 0) return 'accept';
+
+  if (difficulty === 'Easy') return 'accept';
+
+  const projected = projectEventCoinDelta(state, event);
+  const manageable = state.resourceBank.coins + projected > 0;
+
+  if (difficulty === 'Medium') {
+    return manageable ? 'accept' : 'reject';
+  }
+
+  // ── Hard: static full-chain evaluation ──
+  const currentCost = eventSeverity(event);
+  const acceptChainCost = currentCost + chainCardSeverity(event.acceptNextCardId);
+  const rejectChainCost = chainCardSeverity(event.rejectNextCardId);
+
+  // Accepting ends the chain (no accept-next card): the known effect is the
+  // whole story — prefer the safe terminal when we can afford it (AC22).
+  if (event.acceptNextCardId === null || event.acceptNextCardId === undefined) {
+    if (manageable) return 'accept';
+    // Unaffordable terminal: refusing skips the loss entirely (nothing is
+    // added on reject either, since rejectChainCost == 0) → reject.
+    return rejectChainCost === 0 ? 'reject' : 'accept';
+  }
+
+  // Rejecting adds nothing — refusing the current effect is free.
+  if (rejectChainCost === 0) return 'reject';
+
+  if (!manageable) {
+    // Accepting bankrupts now. Reject delays the (potentially worse) card;
+    // prefer reject unless rejecting is also the strictly worse path.
+    return rejectChainCost < acceptChainCost ? 'reject' : 'accept';
+  }
+
+  if (rejectChainCost > acceptChainCost * AI_EVENT_CHOICE_SIGNIFICANTLY_WORSE_RATIO) {
+    // The escalation is significantly worse than accepting — swallow the
+    // manageable current effect (AC22 "reject if escalation significantly
+    // worse" ⇒ prefer accept here).
+    return 'accept';
+  }
+  if (rejectChainCost < acceptChainCost) return 'reject';
+  return 'accept';
+}
+
+/**
+ * Resolves a pending dual-choice incident using the AI's difficulty-based
+ * strategy (Easy/Medium/Hard from `state.config.difficultyName`) and
+ * completes the deferred closing, so headless/AI turns never stall on a
+ * pending choice (AC21-23). Records the decision via the engine's
+ * resolveEventChoice (identical transcript shape to a player choice).
+ *
+ * @param state Current game state (mutated). No-op when no choice is pending.
+ */
+export function resolveAiEventChoice(state: MainStreetState): void {
+  const pending = state.pendingEventChoice;
+  if (!pending || pending.resolved) return;
+  const option = decideEventChoice(state, pending.event, state.config.difficultyName);
+  resolveEventChoice(state, option);
+  finishDeferredEndOfTurn(state);
 }
 
 // ── Scoring Helpers ─────────────────────────────────────────

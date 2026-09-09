@@ -2,7 +2,7 @@ import { createSeededRng } from '../../src/core-engine';
 import { setupMainStreetGame, seedToNumber, type MainStreetState } from './MainStreetState';
 import { executeAction, executeDayStart, processEndOfTurn, type PlayerAction } from './MainStreetEngine';
 import { canPurchaseEvent, getAffordableBusinessCards, getAffordableUpgradeCards, getEmptySlots } from './MainStreetMarket';
-import { GreedyStrategy, RandomStrategy, MainStreetAiPlayer } from './MainStreetAiStrategy';
+import { GreedyStrategy, RandomStrategy, MainStreetAiPlayer, resolveAiEventChoice } from './MainStreetAiStrategy';
 import { DIFFICULTY_NAMES } from './MainStreetDifficulty';
 import type { DifficultyName } from './MainStreetDifficulty';
 
@@ -266,7 +266,12 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
       noActionTurns++;
     }
 
-    processEndOfTurn(state);
+    const turnResult = processEndOfTurn(state);
+    // Dual-choice incident (CG-0MTSHG8RP008E128): resolve any pending choice
+    // per the AI difficulty strategy so the sim never stalls.
+    if (turnResult.choicePending) {
+      resolveAiEventChoice(state);
+    }
     turns++;
 
     const occupied = state.streetGrid.filter(slot => slot !== null).length;
@@ -422,7 +427,12 @@ function runSeedWithDifficulty(
       noActionTurns++;
     }
 
-    processEndOfTurn(state);
+    const turnResult = processEndOfTurn(state);
+    // Dual-choice incident (CG-0MTSHG8RP008E128): resolve any pending choice
+    // per the AI difficulty strategy so the sim never stalls.
+    if (turnResult.choicePending) {
+      resolveAiEventChoice(state);
+    }
     turns++;
 
     const occupied = state.streetGrid.filter(slot => slot !== null).length;
