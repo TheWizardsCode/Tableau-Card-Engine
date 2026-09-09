@@ -297,7 +297,21 @@ export function createTutorialScenario(
   // why the deck is scripted rather than drawn from the event pool.
   const incidentDeck: EventCard[] = [];
   for (const templateId of scenario.incidentDeck) {
-    incidentDeck.push(findCardByTemplate(eventDeck, templateId));
+    const card = findCardByTemplate(eventDeck, templateId);
+    // Choice-event exclusion (CG-0MTT7FO7I009295E AC1, per producer decision
+    // 2026-09-08 Q2 — no choice events in the tutorial; no teaching step). The
+    // tutorial's scripted deck must never surface a hasChoices event: the
+    // flow has no dialog handling and a pending choice would stall the step
+    // pacing. Fail fast at scenario build so a choice card can never slip in
+    // silently when content is later retrofitted.
+    if (card.hasChoices) {
+      throw new Error(
+        `TutorialScenario: incident template "${templateId}" has hasChoices — ` +
+        'choice events are excluded from the tutorial deck (AC1 CG-0MTT7FO7I009295E). ' +
+        'Remove hasChoices from this template or pick a non-choice incident.',
+      );
+    }
+    incidentDeck.push(card);
   }
 
   // ── Setup deterministic RNG ───────────────────────────────

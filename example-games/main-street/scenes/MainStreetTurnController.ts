@@ -449,6 +449,17 @@ export class MainStreetTurnController {
     const pending = s.state.pendingEventChoice;
     if (!pending || pending.resolved) return; // nothing to decide
 
+    // Tutorial regression guard (CG-0MTT7FO7I009295E AC2): the tutorial
+    // scenario deck excludes choice events by construction, but if one were
+    // ever drawn in tutorial mode, auto-accept so the tutorial never hangs
+    // waiting for dialog input (no teaching step exists — producer decision
+    // 2026-09-08 Q2).
+    const tutController = (s as { tutorialController?: { isActive?: boolean } }).tutorialController;
+    if (tutController?.isActive) {
+      this.onEventChoice('accept');
+      return;
+    }
+
     const show = (): void => {
       const overlay = s.msOverlayManager as unknown as {
         showEventChoiceDialog?: (e: EventCard, onAccept: () => void, onReject: () => void) => void;
