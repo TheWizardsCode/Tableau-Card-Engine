@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {
-  processEndOfTurn,
+  endTurnHeadless,
   executeDayStart,
   executeAction,
   type PlayerAction,
@@ -79,7 +79,7 @@ function runDays(state: MainStreetState, chooseAction: (s: MainStreetState) => P
       action = chooseAction(state);
     }
     maxPerDay = Math.max(maxPerDay, actionCount);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
   }
   return maxPerDay;
 }
@@ -168,7 +168,7 @@ describe('Monte Carlo-style loop respects the action cap', () => {
     expect(gm).toBeTruthy();
     state.resourceBank.coins = 3000; // enough for the GM (cost 2000), far below the win threshold
     hireStaffCard(state, gm!.id);
-    processEndOfTurn(state); // Day 1 ends
+    endTurnHeadless(state); // Day 1 ends
     expect(state.phase).toBe('DayStart'); // game not ended by the hire
 
     // Day 2 → GM bonus applies: 1 base + 1 GM + 1 banked (from Day 1 idle remainder)
@@ -189,6 +189,6 @@ describe('Monte Carlo-style loop respects the action cap', () => {
     }
     expect(count).toBeLessThanOrEqual(3); // banking-aware upper bound (was 2 pre-banking)
     expect(count).toBeGreaterThan(0);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
   });
 });

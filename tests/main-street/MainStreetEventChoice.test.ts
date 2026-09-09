@@ -221,13 +221,24 @@ event,evt-reject-only,Reject Only,0,,,,,,,,,1,Incident,Reject only,All,,-300,0,,
     expect(t.acceptNextCardId).toBeUndefined();
   });
 
-  it('original bundled CSV still parses (existing 155 rows without choice values remain non-choice)', () => {
-    // No reload — bundled CSV is active; every incident card must still parse
-    // and be non-choice by default.
+  it('bundled CSV still parses; only the designed chain cards carry hasChoices (CG-0MTT7FC7A000AA58)', () => {
+    // Content child CG-0MTT7FC7A000AA58 ships the chain cards (approved by
+    // producer 2026-09-09). Cards WITHOUT the choice columns must remain
+    // non-choice; only the explicit chain/retrofit templates are flagged.
+    const choiceIds = new Set([
+      'evt-tax-error', 'evt-tax', 'evt-tax-inquiry',
+      'evt-strike-service',
+      'evt-popular-menu',
+      'evt-recession',
+      'evt-flu-outbreak',
+    ]);
     const all = getEventTemplates();
     for (const c of all) {
-      // No incident in the shipped data should accidentally be flagged
-      expect(Boolean(c.hasChoices)).toBe(false);
+      if (choiceIds.has(c.id)) {
+        expect(Boolean(c.hasChoices)).toBe(true);
+      } else {
+        expect(Boolean(c.hasChoices)).toBe(false);
+      }
     }
   });
 });

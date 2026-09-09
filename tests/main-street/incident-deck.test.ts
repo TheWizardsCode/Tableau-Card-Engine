@@ -20,7 +20,7 @@ import {
   type MainStreetSerializedState,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  resolveIncident,
+  resolveIncident, resolveEventChoice,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   INCIDENT_QUEUE_SIZE,
@@ -40,7 +40,18 @@ function resolveAndCountIncidents(state: MainStreetState, count: number): EventC
   const resolved: EventCard[] = [];
   for (let i = 0; i < count; i++) {
     const event = resolveIncident(state);
-    if (event) resolved.push(event);
+    if (event) {
+      resolved.push(event);
+      continue;
+    }
+    // Content era (CG-0MTT7FC7A000AA58): choice incidents defer (null + a
+    // pending choice). Resolve (accept) so the draw sequence continues.
+    const pending = state.pendingEventChoice;
+    if (pending && !pending.resolved) {
+      resolveEventChoice(state, 'accept');
+      resolved.push(pending.event);
+      continue;
+    }
   }
   return resolved;
 }

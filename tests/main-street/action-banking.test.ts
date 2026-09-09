@@ -20,9 +20,9 @@ import {
   deserializeMainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 import {
+  endTurnHeadless,
   executeDayStart,
   executeAction,
-  processEndOfTurn,
   buyAndPlaceBusiness,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
@@ -82,7 +82,7 @@ describe('AC1 · banking on end-of-turn', () => {
     expect(state.actionsRemaining).toBe(1);
     expect(state.bankedActions).toBe(0);
 
-    processEndOfTurn(state);
+    endTurnHeadless(state);
 
     // Next day starts
     startDay(state);
@@ -103,7 +103,7 @@ describe('AC1 · banking on end-of-turn', () => {
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(2);
 
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     startDay(state);
     expect(state.bankedActions).toBe(2); // capped at 2, had 2 remaining so banked 1 more but stays at 2
   });
@@ -116,7 +116,7 @@ describe('AC1 · banking on end-of-turn', () => {
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(0);
 
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     startDay(state);
     expect(state.bankedActions).toBe(0);
     expect(state.actionsRemaining).toBe(1);
@@ -127,17 +127,17 @@ describe('AC1 · banking on end-of-turn', () => {
 
     // Day 1: idle → banks 1
     startDay(state);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(1);
 
     // Day 2: idle → banks 1 more → total 2
     startDay(state);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(2);
 
     // Day 3: idle → at cap, no change
     startDay(state);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(2);
   });
 });
@@ -150,7 +150,7 @@ describe('AC2 · cap enforced', () => {
 
     for (let i = 0; i < 5; i++) {
       startDay(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       expect(state.bankedActions).toBeLessThanOrEqual(2);
     }
   });
@@ -162,7 +162,7 @@ describe('AC2 · cap enforced', () => {
     startDay(state);
     expect(state.actionsRemaining).toBe(3); // 1 + 2 banked
     // Don't spend anything
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(2); // stays at 2, overflow discarded
   });
 });
@@ -175,7 +175,7 @@ describe('AC3 · day-start composition', () => {
     // Bank 2 actions first
     for (let i = 0; i < 2; i++) {
       startDay(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
     }
     expect(state.bankedActions).toBe(2);
 
@@ -216,7 +216,7 @@ describe('AC3 · day-start composition', () => {
     expect(state.bankedActions).toBe(0); // consumed 1 more, now 0
 
     // bankable = min(2, 1) = 1, so banked = min(2, 0 + 1) = 1
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     startDay(state);
     expect(state.bankedActions).toBe(1);
   });
@@ -232,7 +232,7 @@ describe('AC4 · staff actions never bank', () => {
     startDay(state);
     expect(state.actionsRemaining).toBe(2); // 1 base + 1 GM
 
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(1); // only base banks
   });
 
@@ -246,7 +246,7 @@ describe('AC4 · staff actions never bank', () => {
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(1);
 
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(1); // base action still banked
   });
 
@@ -254,14 +254,14 @@ describe('AC4 · staff actions never bank', () => {
     // No GM
     const noGm = setupMainStreetGame({ seed: 'ac4-no-gm-idle' });
     startDay(noGm);
-    processEndOfTurn(noGm);
+    endTurnHeadless(noGm);
     expect(noGm.bankedActions).toBe(1);
 
     // With GM
     const withGm = setupMainStreetGame({ seed: 'ac4-gm-idle' });
     withGm.staffCards.push({ ...gmTemplate() });
     startDay(withGm);
-    processEndOfTurn(withGm);
+    endTurnHeadless(withGm);
     expect(withGm.bankedActions).toBe(1);
   });
 
@@ -271,12 +271,12 @@ describe('AC4 · staff actions never bank', () => {
     // Bank 2
     for (let i = 0; i < 2; i++) {
       startDay(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
     }
 
     // Idle again with GM
     startDay(state);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(2); // stays at cap
   });
 });
@@ -287,7 +287,7 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
   it('bankedActions round-trips through save/load', () => {
     const state = setupMainStreetGame({ seed: 'ac6-roundtrip' });
     startDay(state);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(1);
 
     const saved = serializeMainStreetState(state);
@@ -309,7 +309,7 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
 
     // Bank 1
     startDay(state);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(1);
 
     const saved1 = serializeMainStreetState(state);
@@ -318,7 +318,7 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
 
     // Bank another
     startDay(restored1);
-    processEndOfTurn(restored1);
+    endTurnHeadless(restored1);
     expect(restored1.bankedActions).toBe(2);
 
     const saved2 = serializeMainStreetState(restored1);
@@ -333,7 +333,7 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
     startDay(state);
 
     // Bank 1 action from previous day
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.bankedActions).toBe(1);
 
     // New day: take and undo an action
@@ -361,7 +361,7 @@ describe('AC4 edge cases', () => {
 
     for (let day = 1; day <= 3; day++) {
       startDay(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       // Each day banks 1 base action
       expect(state.bankedActions).toBeLessThanOrEqual(day);
       if (day >= 2) {
@@ -438,7 +438,7 @@ describe('banked consumption regressions', () => {
     expect(state.actionsRemaining).toBe(0);
 
     // Day-end: nothing banked (0 actions remaining), bank stays at 0
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     startDay(state);
     expect(state.bankedActions).toBe(0);
     expect(state.actionsRemaining).toBe(1); // 1 base only

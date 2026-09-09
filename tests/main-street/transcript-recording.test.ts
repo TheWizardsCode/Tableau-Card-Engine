@@ -14,6 +14,7 @@ import {
 describe('Main Street transcript recording (action, undo, redo)', () => {
   it('records action, undo, and redo events when invoked from UI-like flow', () => {
     const state = setupMainStreetGame({ seed: 'transcript-recording' });
+    state.resourceBank.coins = 9999; // content-era: any market business affordable
 
     // Move to MarketPhase so market is populated
     executeDayStart(state);
@@ -23,8 +24,11 @@ describe('Main Street transcript recording (action, undo, redo)', () => {
 
     const businessCards = state.market.cards;
     expect(businessCards.length).toBeGreaterThan(0);
-    // Pick an affordable business card for the test (avoid brittle cost assumptions)
-    const affordable = businessCards.find((b) => b.cost <= state.resourceBank.coins) ?? businessCards[0];
+    // Pick an affordable BUSINESS/community-space card (the market row can
+    // hold staff/event/upgrade cards in the content era).
+    const placeable = businessCards.filter((b) => b.family === 'business' || b.family === 'community-space');
+    expect(placeable.length).toBeGreaterThan(0);
+    const affordable = placeable.find((b) => b.cost <= state.resourceBank.coins) ?? placeable[0];
     const cardId = affordable.id;
     const slot = emptySlots[0];
 

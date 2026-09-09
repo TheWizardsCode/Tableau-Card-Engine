@@ -15,7 +15,10 @@ import {
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 
-import { processEndOfTurn, executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import {
+  endTurnHeadless,
+  executeDayStart,
+} from '../../example-games/main-street/MainStreetEngine';
 
 import { type BusinessCard, GRID_SIZE } from '../../example-games/main-street/MainStreetCards';
 
@@ -77,7 +80,7 @@ describe('Challenge Celebration Integration', () => {
       giveWealth(state);
       executeDayStart(state);
 
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       // Verify the challenge was completed
       expect(state.activeChallenges[0].completed).toBe(true);
@@ -99,7 +102,7 @@ describe('Challenge Celebration Integration', () => {
       state.resourceBank.coins = 5; // Below 3000 threshold
       executeDayStart(state);
 
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       expect(result.newlyCompletedChallenges).toEqual([]);
     });
@@ -122,7 +125,7 @@ describe('Challenge Celebration Integration', () => {
       fillGrid(state); // Fill all 10 slots for ch-bustling-street (requires >= 8)
       executeDayStart(state);
 
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       expect(result.newlyCompletedChallenges).toContain('ch-deep-pockets');
       expect(result.newlyCompletedChallenges).toContain('ch-bustling-street');
@@ -142,7 +145,7 @@ describe('Challenge Celebration Integration', () => {
       giveWealth(state);
       executeDayStart(state);
 
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       // Challenge stays completed but should NOT appear as newly completed
       expect(state.activeChallenges[0].completed).toBe(true);
@@ -155,7 +158,7 @@ describe('Challenge Celebration Integration', () => {
       executeDayStart(state);
 
       // Should not throw
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       expect(result.newlyCompletedChallenges).toEqual([]);
     });

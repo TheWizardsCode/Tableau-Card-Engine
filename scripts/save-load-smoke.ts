@@ -54,7 +54,7 @@ import type { MainStreetState } from '../example-games/main-street/MainStreetSta
 import {
   executeDayStart,
   executeAction,
-  processEndOfTurn,
+  endTurnHeadless,
   computeScore,
   type PlayerAction,
 } from '../example-games/main-street/MainStreetEngine';
@@ -169,7 +169,7 @@ function playToCompletion(state: MainStreetState): TurnSnapshot[] {
         // illegal action, skip
       }
     }
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     snapshots.push(snapshotTurn(state));
     if (state.gameResult !== 'playing') break;
   }
@@ -230,7 +230,7 @@ async function main() {
         // skip
       }
     }
-    processEndOfTurn(stateA);
+    endTurnHeadless(stateA);
     earlySnapshots.push(snapshotTurn(stateA));
   }
 

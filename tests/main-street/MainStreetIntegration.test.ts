@@ -408,7 +408,13 @@ describe('Multi-Use Card Economy Integration', () => {
       // Turn 2: tableau purchase
       if (state.gameResult === 'playing') {
         executeDayStart(state);
-        const card2 = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
+        // Only business/community-space cards can be bought onto the street —
+        // prefer the first purchasable one in the seeded row (content
+        // expansion re-rolls which families the market shows).
+        const card2 = state.market.cards.find(
+          c => (c.family === 'business' || c.family === 'community-space')
+            && c.cost <= state.resourceBank.coins,
+        );
         if (card2) {
           const slot = state.streetGrid.findIndex(s => s === null);
           if (slot >= 0) {

@@ -66,11 +66,13 @@ function getMarketIDs(state: MainStreetState): string[] {
  * Returns the total discard pile size across all deck types.
  */
 function getTotalDiscardCount(state: MainStreetState): number {
+  const staffDiscards = (state.discards as { staff?: unknown[] }).staff;
   return (
     state.discards.business.length +
     state.discards.communitySpace.length +
     state.discards.event.length +
-    state.discards.upgrade.length
+    state.discards.upgrade.length +
+    (staffDiscards ? staffDiscards.length : 0)
   );
 }
 

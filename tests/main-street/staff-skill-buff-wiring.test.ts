@@ -25,7 +25,7 @@ import {
 } from '../../example-games/main-street/MainStreetState';
 import {
   executeDayStart,
-  processEndOfTurn,
+  endTurnHeadless,
   resolveIncident,
   playHeldEvent,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -208,8 +208,8 @@ describe('I4: cost-reduction skills apply to ongoing/refresh costs', () => {
     control.staffCards.push({ ...staffWithSkills('ops', []) }); // same member, no skills
     state.resourceBank.coins = 100;
     control.resourceBank.coins = 100;
-    processEndOfTurn(state);
-    processEndOfTurn(control);
+    endTurnHeadless(state);
+    endTurnHeadless(control);
     // Identical seeded flow; only the salary differs by the 50 discount.
     expect(state.resourceBank.coins).toBeCloseTo(control.resourceBank.coins + 50);
   });
@@ -221,7 +221,7 @@ describe('I4: cost-reduction skills apply to ongoing/refresh costs', () => {
     placeBusiness(state, ['Food'], 2);
     hireSynthetic(state, 'cutter', ['skill-cost-cutter']);
     state.resourceBank.coins = 100;
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     const coinsAfter = state.resourceBank.coins;
 
     // Control: identical flow with the same member hired but NO skills.
@@ -230,7 +230,7 @@ describe('I4: cost-reduction skills apply to ongoing/refresh costs', () => {
     placeBusiness(control, ['Food'], 2);
     control.staffCards.push({ ...staffWithSkills('cutter', []) });
     control.resourceBank.coins = 100;
-    processEndOfTurn(control);
+    endTurnHeadless(control);
     const coinsControl = control.resourceBank.coins;
 
     // Same seeded income; cutter saves 15% on the business (1) AND on the
@@ -335,6 +335,17 @@ describe('I4: incident-mitigation skills modify incident damage/probability', ()
       const state = setupMainStreetGame({ seed: `i4-risk-${i}` });
       executeDayStart(state);
       hireSynthetic(state, 'risk', ['skill-risk-manager']);
+      // Controlled deck: three benign non-choice incidents so the aversion /
+      // draw bookkeeping is independent of content-era choice cards.
+      const benign: EventCard = {
+        family: 'event', id: 'evt-risk-benign', name: 'Calm Day', trigger: 'Incident',
+        cost: 0, effect: 'No effect.', target: 'All', coinDelta: 0, reputationDelta: 0,
+      };
+      state.incidentDeck = [
+        { ...benign, id: 'evt-risk-benign-0' },
+        { ...benign, id: 'evt-risk-benign-1' },
+        { ...benign, id: 'evt-risk-benign-2' },
+      ];
       const before = state.incidentDeck.length;
       const resolved = resolveIncident(state);
       if (resolved === null) {

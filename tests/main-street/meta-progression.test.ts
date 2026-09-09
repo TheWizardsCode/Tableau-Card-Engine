@@ -155,12 +155,13 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 1 has the starter set (15 cards incl. tutorial-pinned cards)', () => {
-      // 15 = 4 business + 2 community-space + 4 events + 1 staff + 4 upgrades.
+    it('Tier 1 has the starter set (16 cards incl. tutorial-pinned cards)', () => {
+      // 16 = 4 business + 2 community-space + 5 events (incl. Error in Tax
+      // Return, CG-0MTT7FC7A000AA58) + 1 staff + 4 upgrades.
       // Includes the tutorial-pinned tier-1 cards (bakery, laundromat,
       // bookshop, library, festival, award, rainy) - CG-0MT3C744B009DS84.
-      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(15);
-      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(15);
+      expect(TIER_DEFINITIONS['tier-1'].newCardIds).toHaveLength(16);
+      expect(TIER_DEFINITIONS['tier-1'].cumulativeCardIds).toHaveLength(16);
       const tier1 = new Set(TIER_DEFINITIONS['tier-1'].newCardIds);
       for (const pinned of ['biz-bakery', 'biz-laundromat', 'biz-bookshop',
         'cs-library', 'evt-festival', 'evt-award', 'evt-rainy']) {
@@ -174,11 +175,10 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 12 cumulative pool covers full catalog (154 tiered templates)', () => {
-      // 154 = 133 (post-Group-D tiered catalog) + 21 staff cards now assigned a
-      // tier (9 original + 12 specialization applicants, CG-0MT4WXNR80090FXZ).
-      // 12-tier expansion re-distributes across tiers 1-12.
-      expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(154);
+    it('Tier 12 cumulative pool covers full catalog (162 tiered templates)', () => {
+      // 162 = 154 (post-Group-D + 21 staff tiers) + 8 chain-event templates
+      // added by content child CG-0MTT7FC7A000AA58 (producer-approved 2026-09-09).
+      expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(162);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -838,7 +838,7 @@ describe('Meta-Progression System', () => {
         ...staffDeck.map((c) => c.id.replace(/-\d+$/, '')),
       ]);
 
-      expect(allBaseIds.size).toBe(146); // +1 Graffiti Art over 133 (pre Graffiti) + 12 specialization staff (CG-0MT4WXNR80090FXZ)incl. 9 staff)
+      expect(allBaseIds.size).toBe(154); // 146 baseline + 8 chain events (CG-0MTT7FC7A000AA58); staff overlap unchanged
     });
   });
 
@@ -853,13 +853,13 @@ describe('Meta-Progression System', () => {
       expect(campaign.schemaVersion).toBe(2);
     });
 
-    it('default campaign has tier-1 unlocked with all 15 tier-1 card IDs', () => {
+    it('default campaign has tier-1 unlocked with all 16 tier-1 card IDs', () => {
       const campaign = createDefaultCampaignProgress();
       expect(campaign.unlockedTiers).toEqual(['tier-1']);
-      // 15 tier-1 cards in the 12-tier design (CG-0MT3C744B009DS84).
+      // 16 tier-1 cards (15 baseline + Error in Tax Return, CG-0MTT7FC7A000AA58).
       const expected = deriveUnlockedCardIds(['tier-1']);
       expect(campaign.unlockedCardIds).toHaveLength(expected.length);
-      expect(campaign.unlockedCardIds).toHaveLength(15);
+      expect(campaign.unlockedCardIds).toHaveLength(16);
       expect(campaign.milestoneHistory).toEqual([]);
     });
 
@@ -1195,19 +1195,19 @@ describe('Meta-Progression System', () => {
   describe('deriveUnlockedCardIds', () => {
     it('returns tier-1 cards for ["tier-1"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1']);
-      expect(ids).toHaveLength(15); // 12-tier starter set (CG-0MT3C744B009DS84)
-      expect(new Set(ids).size).toBe(15); // no duplicates
+      expect(ids).toHaveLength(16); // 12-tier starter set + Error in Tax Return (CG-0MTT7FC7A000AA58)
+      expect(new Set(ids).size).toBe(16); // no duplicates
     });
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(31); // 15 (T1) + 16 (T2 new: 12 + 4 specialization staff, CG-0MT4WXNR80090FXZ)
+      expect(ids).toHaveLength(33); // 16 (T1) + 17 (T2 new incl. Inquiry Commission, CG-0MTT7FC7A000AA58)
     });
 
-    it('returns all 154 cards for all 12 tiers', () => {
+    it('returns all 162 cards for all 12 tiers', () => {
       const allTierIds = Array.from({ length: 12 }, (_, i) => `tier-${i + 1}`);
       const ids = deriveUnlockedCardIds(allTierIds);
-      expect(ids).toHaveLength(154); // full catalog incl. 21 staff
+      expect(ids).toHaveLength(162); // full catalog incl. 21 staff + 8 chain events (CG-0MTT7FC7A000AA58)
     });
 
     it('handles empty array', () => {
@@ -1217,7 +1217,7 @@ describe('Meta-Progression System', () => {
 
     it('ignores unknown tier IDs gracefully', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-99']);
-      expect(ids).toHaveLength(15); // only tier-1 cards
+      expect(ids).toHaveLength(16); // only tier-1 cards (incl. Error in Tax Return)
     });
 
     it('does not produce duplicates even if tiers are listed twice', () => {

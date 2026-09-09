@@ -18,7 +18,7 @@ import { setupMainStreetGame } from '../../example-games/main-street/MainStreetS
 import {
   executeDayStart,
   executeAction,
-  processEndOfTurn,
+  endTurnHeadless,
   computeScore,
   type PlayerAction,
   type TurnResult,
@@ -147,7 +147,7 @@ function runGreedyGame(seed: string, maxTurns = 30): RunSummary {
       executed.push({ type: 'skip', detail: 'No affordable actions' });
     }
 
-    const turnResult: TurnResult = processEndOfTurn(state);
+    const turnResult: TurnResult = endTurnHeadless(state);
 
     turns.push({
       turn: turns.length + 1,
@@ -233,7 +233,7 @@ describe('Smoke: Main Street Easy difficulty (Tutorial scenario baseline)', () =
           executeAction(state, { type: 'buy-business', cardId: affordable[0].id, slotIndex: emptySlots[0] });
         } catch { /* ignore illegal moves */ }
       }
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       turns++;
     }
 

@@ -12,7 +12,11 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setupMainStreetGame, serializeMainStreetState, deserializeMainStreetState, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart, processEndOfTurn, resolveIncident } from '../../example-games/main-street/MainStreetEngine';
+import {
+  endTurnHeadless,
+  executeDayStart,
+  resolveIncident,
+} from '../../example-games/main-street/MainStreetEngine';
 import { runMonteCarlo } from '../../example-games/main-street/MainStreetMonteCarlo';
 import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
 import type { EventCard, BusinessCard } from '../../example-games/main-street/MainStreetCards';
@@ -86,7 +90,7 @@ describe('Flu event: full lifecycle integration', () => {
     let decayCount = 0;
     for (let i = 0; i < 10; i++) {
       const beforeEffect = state.activeEffects[0]?.turnsRemaining;
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       const afterEffect = state.activeEffects[0]?.turnsRemaining;
       if (beforeEffect !== undefined && (afterEffect === undefined || afterEffect < beforeEffect)) {
         decayCount++;
@@ -202,7 +206,7 @@ describe('Flu event: full lifecycle integration', () => {
     state.phase = 'MarketPhase';
 
     for (let i = 0; i < 6; i++) {
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       // processEndOfTurn sets phase to DayStart if game is still playing
       if (state.gameResult === 'playing') {
         executeDayStart(state);

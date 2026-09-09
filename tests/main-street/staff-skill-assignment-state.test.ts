@@ -26,7 +26,7 @@ import {
   BASELINE_SKILL_ID,
   deserializeSkillIds,
 } from '../../example-games/main-street/MainStreetStaffSkills';
-import { executeDayStart, processEndOfTurn, hireStaffCard } from '../../example-games/main-street/MainStreetEngine';
+import { executeDayStart, endTurnHeadless, hireStaffCard } from '../../example-games/main-street/MainStreetEngine';
 import { refreshMarket } from '../../example-games/main-street/MainStreetMarket';
 import { createStaffDeck, type StaffCard } from '../../example-games/main-street/MainStreetCards';
 
@@ -117,10 +117,17 @@ describe('I3: game-start skill assignment (CG-0MT4WXSWG0023VR0)', () => {
 
     // Refill the market and confirm the previously visible cards (still in
     // play) never changed AND fresh staff drawn later carry their assignment.
-    const deckBefore = state.decks.staff.map(c => c.id + ':' + (c.specializationSkillIds ?? []).join(','));
+    // (Some deck copies are drawn into the row during the refill, so the deck
+    // membership can shrink in the content era — assignments for the copies
+    // that remain must be unchanged.)
+    const deckBeforeMap = new Map(state.decks.staff.map(c => [c.id, (c.specializationSkillIds ?? []).join(',')]));
     refreshMarket(state);
-    const deckAfter = state.decks.staff.map(c => c.id + ':' + (c.specializationSkillIds ?? []).join(','));
-    expect(deckAfter).toEqual(deckBefore);
+    for (const c of state.decks.staff) {
+      expect(
+        (c.specializationSkillIds ?? []).join(','),
+        `assignment locked for ${c.id}`,
+      ).toBe(deckBeforeMap.get(c.id));
+    }
     // New row staff (drawn from the deck) have assignments too.
     expect(before.length).toBeGreaterThanOrEqual(0);
     for (const c of state.market.cards.filter(c => c.family === 'staff') as StaffCard[]) {
@@ -137,7 +144,7 @@ describe('I3: game-start skill assignment (CG-0MT4WXSWG0023VR0)', () => {
     if (row.length > 0) {
       hireStaffCard(state, row[0].id);
     }
-    processEndOfTurn(state);
+    endTurnHeadless(state);
 
     const saved = serializeMainStreetState(state);
     const restored = deserializeMainStreetState(saved);

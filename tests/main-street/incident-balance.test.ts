@@ -24,7 +24,7 @@ import {
 import {
   replenishIncidentDeck,
 } from '../../example-games/main-street/MainStreetMarket';
-import { resolveIncident } from '../../example-games/main-street/MainStreetEngine';
+import { resolveIncident, resolveEventChoice } from '../../example-games/main-street/MainStreetEngine';
 import {
   type EventCard,
   type IncidentPolarity,
@@ -106,7 +106,21 @@ function resolveMany(
   for (let i = 0; i < count; i++) {
     if (state.incidentDeck.length === 0) break;
     const ev = resolveIncident(state);
-    if (!ev) break;
+    if (!ev) {
+      // Content era (CG-0MTT7FC7A000AA58): the shipped deck contains choice
+      // incidents. A choice draw defers (returns null + sets
+      // pendingEventChoice) — resolve it (accept; the banks here are huge so
+      // it is always affordable) and count it as a resolved incident so the
+      // balance sequence continues deterministically.
+      const pending = state.pendingEventChoice;
+      if (pending && !pending.resolved) {
+        names.push(pending.event.name);
+        polarities.push(incidentPolarity(pending.event));
+        resolveEventChoice(state, 'accept');
+        continue;
+      }
+      break;
+    }
     names.push(ev.name);
     polarities.push(incidentPolarity(ev));
   }

@@ -78,7 +78,7 @@ describe('Group C investment-event expansion: template count (AC1)', () => {
   const deck = createEventDeck(1, undefined, rng, 1);
 
   it('grows total event templates (56 after Group D + Graffiti Art)', () => {
-    expect(deck).toHaveLength(56); // +1 Graffiti Art (CG-0MSRC9UR9006FBXC)
+    expect(deck).toHaveLength(64); // +8 chain events (CG-0MTT7FC7A000AA58)
   });
 
   it('grows investment-event templates from 13 to exactly 21', () => {
@@ -334,8 +334,8 @@ describe('Group C: existing negative income-multiplier (regression)', () => {
 describe('Group C: deck generation & balance guardrails (AC6)', () => {
   const rng = createSeededRng(42);
 
-  it('builds a 165-card event deck at the default 3 copies', () => {
-    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(168); // 56 x 3 (+1 Graffiti Art)
+  it('builds a 192-card event deck at the default 3 copies', () => {
+    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(192); // 64 x 3 (+8 chain events CG-0MTT7FC7A000AA58)
   });
 
   it('includes every new card in a 1-copy (template) deck', () => {

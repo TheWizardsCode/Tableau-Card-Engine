@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
-import { executeDayStart, processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
+import { executeDayStart, endTurnHeadless } from '../../example-games/main-street/MainStreetEngine';
 import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
 
@@ -155,7 +155,7 @@ describe('Active effect income modifier', () => {
 
       // Advance to MarketPhase then process end of turn (should decay effects)
       advanceToEndOfTurn();
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       // After decay: 3 -> 2 (still active)
       expect(state.activeEffects).toHaveLength(1);
@@ -168,7 +168,7 @@ describe('Active effect income modifier', () => {
 
       // Advance to MarketPhase and process end of turn
       advanceToEndOfTurn();
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       // Effect should be expired and removed
       expect(state.activeEffects).toHaveLength(0);
@@ -189,7 +189,7 @@ describe('Active effect income modifier', () => {
 
       // Advance to MarketPhase and process end of turn
       advanceToEndOfTurn();
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       // After decay, the effect should be gone
       expect(state.activeEffects).toHaveLength(0);
