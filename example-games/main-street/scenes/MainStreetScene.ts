@@ -675,6 +675,26 @@ export class MainStreetScene extends CardGameScene {
     }
   }
 
+  /**
+   * Shows the dual-choice incident dialog for a pending `hasChoices` event
+   * (CG-0MTSHG8RP008E128). Accept applies the event's stated consequence;
+   * Reject refuses it and an unknown escalation card replaces it in the deck.
+   * Delegates to the overlay manager's showEventChoiceDialog.
+   *
+   * @param event    The pending choice event (effect deferred).
+   * @param onAccept Callback when the player accepts.
+   * @param onReject Callback when the player rejects.
+   */
+  public showEventChoiceDialog(
+    event: import('../MainStreetCards').EventCard,
+    onAccept: () => void,
+    onReject: () => void,
+  ): void {
+    if (this.msOverlayManager && typeof (this.msOverlayManager as any).showEventChoiceDialog === 'function') {
+      (this.msOverlayManager as any).showEventChoiceDialog(event, onAccept, onReject);
+    }
+  }
+
   // ── Tutorial Flow (Milestone 5 action-gated) ────────────
   public confirmTutorialStep(...args: any[]): any {
     return (this.msLifecycleManager as any).confirmTutorialStep.apply(this.msLifecycleManager, args);

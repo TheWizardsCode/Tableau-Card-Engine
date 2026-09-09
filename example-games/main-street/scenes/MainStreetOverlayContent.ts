@@ -1,8 +1,10 @@
 import { sellBusinessCommand } from '../MainStreetCommands';
 import { addLog } from '../MainStreetState';
+import type { EventCard } from '../MainStreetCards';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { TurnResult } from '../MainStreetEngine';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
+import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
 import { TIER_DEFINITIONS, ORDERED_TIER_DEFINITIONS, highestUnlockedTier } from '../MainStreetTiers';
 import {
   isBuyAndPlacePremiumDialogDismissed,
@@ -497,5 +499,114 @@ export class MainStreetOverlayContent {
       onCancel();
     });
     s.overlayObjects.push(cancelBtn);
+  }
+
+  /**
+   * Shows the dual-choice incident dialog (CG-0MTSHG8RP008E128).
+   *
+   * Presented when `processEndOfTurn` pauses with `choicePending` after a
+   * `hasChoices` incident was drawn (IncidentPhase). The player decides
+   * whether to Accept (the event's stated consequence applies) or Reject
+   * (the consequence is refused; an unknown escalation card is added to the
+   * incident deck). No preview of the escalation is shown — only the two
+   * buttons (AC13). Accepting or rejecting an incident is FREE (no action
+   * cost) — the player is forced to respond, not choosing to engage.
+   *
+   * Overlay pattern compliance (AGENTS.md UI Best Practices):
+   * createOverlayBackground + createOverlayButton from @ui; ALL elements are
+   * parented into `s.hudContainer`; depths 199 (backdrop) / 200 (box) /
+   * 201 (elements). Dialog appears instantly (no fade-in — reduced-motion
+   * safe); button SFX plays through safePlaySound (respects mute/volume).
+   * Cleanup on dismissal resets `s.overlayObjects`.
+   *
+   * @param event    The pending choice event (effect deferred).
+   * @param onAccept Called when the player accepts the consequence.
+   * @param onReject Called when the player refuses the consequence.
+   */
+  public showEventChoiceDialog(
+    event: EventCard,
+    onAccept: () => void,
+    onReject: () => void,
+  ): void {
+    const s = this.scene;
+    if (s.replayMode) return; // headless/replay: never present UI
+
+    const panelW = 500;
+    const panelH = 240;
+    const panelY = s.layout.gameH / 2 - panelH / 2;
+
+    // Overlay background with semi-transparent backdrop (199 / 200 / 201).
+    const boxConfig = {
+      width: panelW,
+      height: panelH,
+      color: 0x000000,
+      alpha: 1.0,
+      depth: 200,
+    };
+    const overlay = createOverlayBackground(
+      s,
+      { depth: 199, alpha: 0.6 },
+      boxConfig,
+    );
+    s.overlayObjects.push(...overlay.objects);
+
+    // Title: the event name (a decision is required).
+    const titleText = s.add.text(s.layout.gameW / 2, panelY + 28, event.name, {
+      fontSize: '21px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
+      align: 'center',
+      wordWrap: { width: panelW - 60 },
+    }).setOrigin(0.5).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(titleText);
+    s.overlayObjects.push(titleText);
+
+    // Body: what Accept does (the card's stated effect). No preview of the
+    // escalation either way — rejecting keeps the consequence unknown.
+    const bodyText = s.add.text(
+      s.layout.gameW / 2, panelY + 92,
+      `An incident has occurred.\nAccept: ${event.effect}\nReject: refuse this consequence — a different event will replace it.`,
+      {
+        fontSize: '13px',
+        color: '#ddccbb',
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        lineSpacing: 4,
+        wordWrap: { width: panelW - 70 },
+      },
+    ).setOrigin(0.5, 0).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(bodyText);
+    s.overlayObjects.push(bodyText);
+
+    // Accept button — label carries the event name per AC14: "Service Workers
+    // Strike (Accept)". Accepting is the safe path (no escalation).
+    const acceptBtn = createOverlayButton(
+      s, s.layout.gameW / 2 - 145, panelY + panelH - 45,
+      `${event.name} (Accept)`, 201,
+      { fontSize: '13px', color: '#88ff88', hoverColor: '#aaffaa' },
+    );
+    if (s.hudContainer) s.hudContainer.add(acceptBtn);
+    acceptBtn.on('pointerdown', () => {
+      // Button SFX always plays (reduced motion keeps sound).
+      safePlaySound(s, COMMON_SFX_KEYS.UI_CLICK);
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      onAccept();
+    });
+    s.overlayObjects.push(acceptBtn);
+
+    // Reject button — bare "Reject": the player accepts an unknown
+    // consequence may follow (AC15).
+    const rejectBtn = createOverlayButton(
+      s, s.layout.gameW / 2 + 145, panelY + panelH - 45,
+      'Reject', 201,
+      { fontSize: '13px', color: '#ffaa88', hoverColor: '#ffccaa' },
+    );
+    if (s.hudContainer) s.hudContainer.add(rejectBtn);
+    rejectBtn.on('pointerdown', () => {
+      safePlaySound(s, COMMON_SFX_KEYS.UI_CLICK);
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      onReject();
+    });
+    s.overlayObjects.push(rejectBtn);
   }
 }

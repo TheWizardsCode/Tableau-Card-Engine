@@ -5,7 +5,7 @@
 // description: MainStreet god modules: Engine 2452, Animator 1942, Renderer 1902, TurnController 1834, State 1599, Cards 1469, Adjacency 1354, Market 1307, LifecycleManager 1111 lines — decompose per-concern helpers; threshold 800; prior CG-0MM1OP07Q16TUTHI covered different scene files, not these modules.
 // -->
 import { addLog } from '../MainStreetState';
-import { executeDayStart, processEndOfTurn, executeAction, type TurnResult } from '../MainStreetEngine';
+import { executeDayStart, processEndOfTurn, executeAction, resolveEventChoice, finishDeferredEndOfTurn, type TurnResult } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
 import { hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import {
@@ -305,8 +305,33 @@ export class MainStreetTurnController {
     }
 
     // Brief delay then show result / advance
-    s.time.delayedCall(400, () => {
-      if (result.gameResult !== 'playing') {
+    this.finishTurnPresentation(result, pendingBankingHint);
+  }
+
+  /**
+   * Finishes the presentation of a completed (or paused) turn.
+   *
+   * Used by both the normal end-of-turn path and the dual-choice path
+   * (CG-0MTSHG8RP008E128): when `result.choicePending`, the drawn incident
+   * was a choice event — the next day must NOT start until the player
+   * accepts or rejects. Present the Accept/Reject dialog and return; on
+   * resolution (MainStreetTurnController.onEventChoice) the deferred closing
+   * runs and finishTurnPresentation is re-entered with the final result.
+   *
+   * @param result             TurnResult from processEndOfTurn /
+   *                           finishDeferredEndOfTurn.
+   * @param pendingBankingHint Banking-hint flag captured in endTurn.
+   */
+  private finishTurnPresentation(
+    result: TurnResult,
+    pendingBankingHint: boolean,
+  ): void {
+    const s = this.scene;
+    if (result.choicePending) {
+      this.presentEventChoiceDialog();
+      return;
+    }
+    if (result.gameResult !== 'playing') {
         // Snapshot tiers before the campaign update mutates them
         const tiersBefore = s.campaign
           ? [...s.campaign.unlockedTiers]
@@ -411,7 +436,101 @@ export class MainStreetTurnController {
           s.time.delayedCall(800, () => this.startDayPhase());
         }
       }
-    });
+  }
+
+  /**
+   * Presents the Accept/Reject dialog for the pending dual-choice incident
+   * (CG-0MTSHG8RP008E128). Waits (bounded) for the phased income show to
+   * finish so the dialog never competes with the closing choreography.
+   * Instant appearance (no fade-in) — reduced-motion safe.
+   */
+  private presentEventChoiceDialog(): void {
+    const s = this.scene;
+    const pending = s.state.pendingEventChoice;
+    if (!pending || pending.resolved) return; // nothing to decide
+
+    const show = (): void => {
+      const overlay = s.msOverlayManager as unknown as {
+        showEventChoiceDialog?: (e: EventCard, onAccept: () => void, onReject: () => void) => void;
+      };
+      if (overlay && typeof overlay.showEventChoiceDialog === 'function') {
+        overlay.showEventChoiceDialog(
+          pending.event,
+          () => this.onEventChoice('accept'),
+          () => this.onEventChoice('reject'),
+        );
+      } else {
+        // Defensive fallback: no dialog support — auto-accept so a pending
+        // choice can never hang the game loop (regression guard).
+        this.onEventChoice('accept');
+      }
+    };
+
+    if (s.incomeCollectionActive) {
+      // Bounded deferral: present once the income choreography completes; a
+      // safety cap forces the dialog even if the flag is never cleared, so a
+      // pending choice can never hang the game (AC5).
+      const startAt = s.time.now + 16_000;
+      const waitForIncome = (): void => {
+        if (s.incomeCollectionActive && s.time.now < startAt) {
+          s.time.delayedCall(250, waitForIncome);
+        } else {
+          s.incomeCollectionActive = false;
+          show();
+        }
+      };
+      waitForIncome();
+    } else {
+      show();
+    }
+  }
+
+  /**
+   * Applies the player's Accept/Reject decision for the pending dual-choice
+   * incident and completes the deferred closing (EndCheck → next day).
+   *
+   * Engine work is delegated to MainStreetEngine.resolveEventChoice +
+   * finishDeferredEndOfTurn. The consequence is presented with the standard
+   * incident-reveal choreography when the chosen path changes resources
+   * (AGENTS.md rule 8 — reduced motion keeps the pops + sound, replay /
+   * headless skip inside the animator).
+   *
+   * @param option 'accept' applies the event's effect; 'reject' refuses it.
+   */
+  public onEventChoice(option: 'accept' | 'reject'): void {
+    const s = this.scene;
+    try {
+      const res = resolveEventChoice(s.state, option);
+      s.instructionText.setText(
+        `${res.event.name}: consequence ${option === 'accept' ? 'accepted' : 'refused'}.`,
+      );
+      // Visual consequence for resource deltas (accepted effect), mirroring
+      // the standard incident reveal. Reject applies nothing (deltas 0) — the
+      // instruction text above is the only feedback.
+      if (res.coinChange !== 0 || res.repChange !== 0) {
+        try {
+          s.msAnimator.animateIncidentReveal({
+            cardId: res.event.id,
+            incidentName: res.event.name,
+            coinChange: res.coinChange,
+            repChange: res.repChange,
+            from: s.msRenderer.getFrontIncidentCardCenter(),
+          });
+        } catch (_) {
+          // presentation-only — ignore
+        }
+      }
+      // Complete the deferred closing (EndCheck → next day) and present it.
+      const finalResult = finishDeferredEndOfTurn(s.state);
+      this.finishTurnPresentation(finalResult, false);
+    } catch (e) {
+      // Resolution failed (should not happen in normal flow): recover by
+      // returning to the market instead of hanging on a dead dialog.
+      console.error('[EventChoice] resolve failed:', e);
+      s.uiPhase = 'market';
+      s.instructionText.setText(`Error: ${(e as Error).message}`);
+      s.refreshAll();
+    }
   }
 
   public onPlayHeldEvent(handIndex?: number): void {
