@@ -165,6 +165,9 @@ export interface SceneLayout {
   favourRepToCoinsX: number;
   /** Width of each Community Favour button. */
   favourButtonW: number;
+  /** X/Y of the staff-applicant overlay centre (SLL applicantOverlay zone). */
+  applicantCenterX: number;
+  applicantCenterY: number;
   challengeX: number;
   challengeY: number;
   challengeW: number;

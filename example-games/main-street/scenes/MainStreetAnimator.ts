@@ -2028,4 +2028,120 @@ export class MainStreetAnimator {
       s.activeTransferTweens.add(tween);
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // Applicant presentation animations (CG-0MSTOATDU006UGAX)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Animate the applicant card walking in from the left edge of the screen.
+   * Starts off-screen left and tweens to the target position. Respects
+   * reduced-motion (instant appearance).
+   */
+  public animateApplicantWalkOn(
+    container: Phaser.GameObjects.Container,
+    cardW: number,
+    _cardH: number,
+    reducedMotion?: boolean,
+  ): void {
+    const s = this.scene;
+    if (reducedMotion) {
+      container.setVisible(true);
+      try { s.soundManager?.play(SFX_KEYS.DEAL); } catch { /* ignore */ }
+      return;
+    }
+    const startX = -(cardW + 40);
+    const targetX = container.x;
+    const duration = 1000;
+    container.setPosition(startX, container.y);
+    moveGameObject({
+      scene: s,
+      target: container,
+      destX: targetX,
+      destY: container.y,
+      duration,
+      ease: 'Cubic.easeOut',
+      soundManager: s.soundManager,
+      sfx: { start: SFX_KEYS.DEAL },
+      reducedMotion,
+    });
+  }
+
+  /**
+   * Animate the applicant card walking off to the right on decline.
+   */
+  public animateApplicantWalkOff(
+    container: Phaser.GameObjects.Container,
+    cardW: number,
+    _cardH: number,
+    reducedMotion?: boolean,
+    onComplete?: () => void,
+  ): void {
+    const s = this.scene;
+    const endX = s.layout.gameW + cardW + 40;
+    if (reducedMotion) {
+      container.setVisible(false);
+      try { s.soundManager?.play(SFX_KEYS.DISCARD); } catch { /* ignore */ }
+      onComplete?.();
+      return;
+    }
+    moveGameObject({
+      scene: s,
+      target: container,
+      destX: endX,
+      destY: container.y,
+      duration: 800,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        container.setVisible(false);
+        try { s.soundManager?.play(SFX_KEYS.DISCARD); } catch { /* ignore */ }
+        onComplete?.();
+      },
+      soundManager: s.soundManager,
+      sfx: { end: SFX_KEYS.DISCARD },
+      reducedMotion,
+    });
+  }
+
+  /**
+   * Animate the applicant card into its target business slot on hire.
+   */
+  public animateApplicantWalkIn(
+    container: Phaser.GameObjects.Container,
+    targetSlotIndex: number,
+    _cardW: number,
+    _cardH: number,
+    reducedMotion?: boolean,
+    onComplete?: () => void,
+  ): void {
+    const s = this.scene;
+    // Target the centre of the business slot (matches the street renderer's
+    // slot geometry — streetX/streetTop/streetCols with slotW + slotGap).
+    const col = targetSlotIndex % (s.layout.streetCols || 1);
+    const row = Math.floor(targetSlotIndex / (s.layout.streetCols || 1));
+    const targetX = s.layout.streetX + col * (s.layout.slotW + s.layout.slotGap) + s.layout.slotW / 2;
+    const targetY = s.layout.streetTop + row * (s.layout.slotH + s.layout.streetRowGap) + s.layout.slotH / 2;
+    if (reducedMotion) {
+      container.setVisible(false);
+      try { s.soundManager?.play(SFX_KEYS.PLACE); } catch { /* ignore */ }
+      onComplete?.();
+      return;
+    }
+    moveGameObject({
+      scene: s,
+      target: container,
+      destX: targetX,
+      destY: targetY,
+      duration: 600,
+      ease: 'Cubic.easeInOut',
+      onComplete: () => {
+        container.setVisible(false);
+        try { s.soundManager?.play(SFX_KEYS.PLACE); } catch { /* ignore */ }
+        onComplete?.();
+      },
+      soundManager: s.soundManager,
+      sfx: { end: SFX_KEYS.PLACE },
+      reducedMotion,
+    });
+  }
 }

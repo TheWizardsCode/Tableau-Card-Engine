@@ -201,6 +201,35 @@ Duration events (e.g. Flu Outbreak) also use:
 | `ongoingCost` | number | Per-turn coin cost after hiring |
 | `handSlotsAdded` | number | Additional hand slots provided |
 
+### Job-applicant mechanic (CG-0MSTOATDU006UGAX)
+
+A second staff mechanic runs alongside the hand-slot staff above: **job
+applicants** who are employed at a specific deployed business and grant that
+business a passive specialization buff (per-business employment).
+
+- **Trigger:** at DayStart each turn there is a chance `(reputation + income
+  per turn)%` (capped at 15%) that a staff member applies for work. An
+  applicant only targets a deployed business with a free employment slot.
+- **Presentation:** the applicant card walks on from the **left** of the
+  screen with Hire / Decline buttons (SLL-positioned, animated with SFX and
+  reduced-motion fallbacks — AGENTS.md rule 8).
+- **Hire:** free (no coins, no action), but adds an ongoing per-turn salary
+  deducted during the income phase alongside other staff/community-space
+  ongoing costs (clamped at 0 coins).
+- **Decline / end-turn:** the card walks off to the right; an applicant left
+  unresolved at end-of-turn auto-declines without blocking the turn.
+- **Employment slots:** a business can employ one staff member per level
+  (`level + 1` slots, minimum 1).
+- **Let-go:** lay a member off for **1 turn's salary + 1 reputation**; the
+  member's buff stops applying from the next income phase.
+
+Engine functions: `resolveStaffApplicant`, `hireStaffApplicant`,
+`declineStaffApplicant`, `letGoStaffMember`, `getEmploymentCapacity`,
+`getEmployedStaffCountAt`, `canHireStaffApplicant` (all in
+`MainStreetEngine.ts`). Scene wiring: `MainStreetScene.onHireApplicant` /
+`onDeclineApplicant`, `MainStreetRenderer.refreshApplicant`,
+`MainStreetAnimator.animateApplicantWalkOn/WalkOff/WalkIn`.
+
 ### Editing the CSV
 
 To add, remove, or modify cards, edit `card-data.csv` directly. The CSV is

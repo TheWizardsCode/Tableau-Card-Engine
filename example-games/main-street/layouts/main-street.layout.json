@@ -9,7 +9,8 @@
     "market",
     "activityLog",
     "street",
-    "endTurnButton"
+    "endTurnButton",
+    "applicantOverlay"
   ],
   "zones": {
     "market": {
@@ -18,8 +19,14 @@
         "y": 0.125
       },
       "anchors": {
-        "topCenter": { "x": 0.5, "y": 0.125 },
-        "topLeft": { "x": 0.015625, "y": 0.125 }
+        "topCenter": {
+          "x": 0.5,
+          "y": 0.125
+        },
+        "topLeft": {
+          "x": 0.015625,
+          "y": 0.125
+        }
       }
     },
     "incidentQueue": {
@@ -28,8 +35,14 @@
         "y": 0.567
       },
       "anchors": {
-        "topLeft": { "x": 0.75, "y": 0.567 },
-        "bottomLeft": { "x": 0.75, "y": 0.861111 }
+        "topLeft": {
+          "x": 0.75,
+          "y": 0.567
+        },
+        "bottomLeft": {
+          "x": 0.75,
+          "y": 0.861111
+        }
       }
     },
     "street": {
@@ -38,8 +51,14 @@
         "y": 0.444444
       },
       "anchors": {
-        "topCenter": { "x": 0.3203125, "y": 0.444444 },
-        "bottomCenter": { "x": 0.3203125, "y": 0.716667 }
+        "topCenter": {
+          "x": 0.3203125,
+          "y": 0.444444
+        },
+        "bottomCenter": {
+          "x": 0.3203125,
+          "y": 0.716667
+        }
       }
     },
     "hand": {
@@ -48,7 +67,10 @@
         "y": 0.861111
       },
       "anchors": {
-        "topLeft": { "x": 0.03125, "y": 0.861111 }
+        "topLeft": {
+          "x": 0.03125,
+          "y": 0.861111
+        }
       }
     },
     "actions": {
@@ -57,7 +79,10 @@
         "y": 0.930556
       },
       "anchors": {
-        "rightCenter": { "x": 0.979688, "y": 0.954167 }
+        "rightCenter": {
+          "x": 0.979688,
+          "y": 0.954167
+        }
       }
     },
     "favourCoinsToRepButton": {
@@ -66,7 +91,10 @@
         "y": 0.905556
       },
       "anchors": {
-        "center": { "x": 0.408594, "y": 0.929167 }
+        "center": {
+          "x": 0.408594,
+          "y": 0.929167
+        }
       }
     },
     "favourRepToCoinsButton": {
@@ -75,7 +103,10 @@
         "y": 0.905556
       },
       "anchors": {
-        "center": { "x": 0.596094, "y": 0.929167 }
+        "center": {
+          "x": 0.596094,
+          "y": 0.929167
+        }
       }
     },
     "activityLog": {
@@ -84,8 +115,14 @@
         "y": 0.111111
       },
       "anchors": {
-        "topLeft": { "x": 0.75, "y": 0.111111 },
-        "bottomRight": { "x": 0.984375, "y": 0.414 }
+        "topLeft": {
+          "x": 0.75,
+          "y": 0.111111
+        },
+        "bottomRight": {
+          "x": 0.984375,
+          "y": 0.414
+        }
       }
     },
     "challengePanel": {
@@ -96,8 +133,14 @@
         "h": 0.153
       },
       "anchors": {
-        "topLeft": { "x": 0.75, "y": 0.414 },
-        "bottomRight": { "x": 0.984375, "y": 0.567 }
+        "topLeft": {
+          "x": 0.75,
+          "y": 0.414
+        },
+        "bottomRight": {
+          "x": 0.984375,
+          "y": 0.567
+        }
       }
     },
     "endTurnButton": {
@@ -106,7 +149,28 @@
         "y": 0.936111
       },
       "anchors": {
-        "center": { "x": 0.926563, "y": 0.959722 }
+        "center": {
+          "x": 0.926563,
+          "y": 0.959722
+        }
+      }
+    },
+    "applicantOverlay": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.35,
+        "w": 0.15625,
+        "h": 0.31
+      },
+      "anchors": {
+        "center": {
+          "x": 0.5,
+          "y": 0.4
+        },
+        "centerTop": {
+          "x": 0.5,
+          "y": 0.33
+        }
       }
     }
   }

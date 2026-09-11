@@ -160,6 +160,8 @@ export class MainStreetLifecycleManager {
     // Reset
     s.uiPhase = 'idle';
     s.pendingBusinessCard = null;
+    (s as any).pendingApplicant = null;
+    (s as any).applicantOverlayContainer = null;
     s.overlayObjects = [];
     s.previousCoins = null;
     s.previousReputation = null;

@@ -342,6 +342,7 @@ export class MainStreetRenderer {
     this.refreshActionButtons();
     this.refreshChallengeTracker();
     this.refreshLog();
+    this.refreshApplicant();
     s.updateSvgDebugOverlay();
   }
 
@@ -1843,6 +1844,52 @@ export class MainStreetRenderer {
         );
       });
       s.actionContainer.add(cancelBtn);
+    } else if (s.uiPhase === 'applicant') {
+      // ── Staff applicant overlay buttons (CG-0MSTOATDU006UGAX) ──────
+      // Hire (green) and Decline (red) buttons, action-free (no daily
+      // action consumed). The player may respond at any time during
+      // MarketPhase; if they end the turn without responding, the
+      // applicant auto-declines (MainStreetEngine.processEndOfTurn).
+      const rightX = s.layout.gameW - 24;
+      const by = s.layout.actionY;
+      const btnW = s.layout.actionButtonW;
+
+      // Hire button (green, right of Decline)
+      const hireBtn = createActionButton(
+        s, rightX - btnW * 2 - 12 - btnW, by + 4, btnW,
+        'Hire', () => { s.onHireApplicant(); },
+        {
+          height: s.layout.actionButtonH,
+          fillColor: 0x224422,
+          fillAlpha: 0.8,
+          strokeColor: 0x44aa44,
+          textColor: '#88ff88',
+          fontSize: '14px',
+        },
+      );
+      s.actionContainer.add(hireBtn);
+
+      // Decline button (red, right-aligned)
+      const declineBtn = createActionButton(
+        s, rightX - btnW, by + 4, btnW,
+        'Decline', () => { s.onDeclineApplicant(); },
+        {
+          height: s.layout.actionButtonH,
+          fillColor: 0x442222,
+          fillAlpha: 0.8,
+          strokeColor: 0xaa4444,
+          textColor: '#ff8888',
+          fontSize: '14px',
+        },
+      );
+      s.actionContainer.add(declineBtn);
+
+      const applicantCard = s.pendingApplicant?.card;
+      const name = applicantCard?.name ?? 'Staff Applicant';
+      const salary = applicantCard?.ongoingCost ?? 0;
+      s.hintBar.setText(
+        `${name} — Hire (no cost, salary ${salary}/turn) or Decline`,
+      );
     }
   }
 
@@ -1955,5 +2002,130 @@ export class MainStreetRenderer {
     }
 
     s.updateLogMask();
+  }
+
+  /**
+   * Render the pending staff-applicant overlay (CG-0MSTOATDU006UGAX).
+   *
+   * When `uiPhase === 'applicant'` and a `pendingApplicant` is set, this
+   * method renders the applicant card (face-up staff card with skill chips)
+   * centered above the street area with Hire and Decline buttons below.
+   *
+   * The card is parented into `hudContainer` so it renders above all
+   * gameplay containers. Interactive overlays are cleaned up on the next
+   * refresh when `uiPhase` is no longer `'applicant'`.
+   *
+   * @returns {boolean} True when an applicant overlay was rendered.
+   */
+  public refreshApplicant(): boolean {
+    const s = this.scene as any;
+    const pending = s.pendingApplicant;
+    const isApplicantPhase = s.uiPhase === 'applicant';
+
+    // ── Clear stale applicant overlay objects when no longer needed ──
+    if (!isApplicantPhase || !pending) {
+      // Remove any leftover applicant overlay containers from a previous
+      // render cycle so stale objects don't accumulate.
+      const stale = (s as any).applicantOverlayContainer;
+      if (stale && s.hudContainer) {
+        stale.removeAll(true);
+        s.hudContainer.remove(stale);
+        (s as any).applicantOverlayContainer = null;
+      }
+      return false;
+    }
+
+    // ── Reuse or create the applicant overlay container ──
+    let container: Phaser.GameObjects.Container;
+    if ((s as any).applicantOverlayContainer) {
+      container = (s as any).applicantOverlayContainer;
+    } else {
+      container = s.add.container(0, 0);
+      container.setName('applicantOverlay');
+      if (s.hudContainer) s.hudContainer.add(container);
+      (s as any).applicantOverlayContainer = container;
+    }
+    // Clear previous contents
+    container.removeAll(true);
+
+    const card = pending.card as StaffCard;
+    const cardW = s.layout.handCardW ?? 120;
+    const cardH = s.layout.handCardH ?? 170;
+
+    // ── Position: from the SLL applicantOverlay zone (CG-0MSTOATDU006UGAX) ──
+    const centerX = s.layout.applicantCenterX ?? Math.round(s.layout.gameW / 2);
+    const centerY = s.layout.applicantCenterY ?? Math.round(s.layout.gameH * 0.4);
+
+    container.setPosition(centerX, centerY);
+
+    // ── Render card SVG face ──
+    const cardImg = mainStreetRenderCardSvg(s, container, card.id, cardW, cardH);
+    cardImg.setOrigin(0.5, 0.5).setDepth(10);
+
+    // ── Skill-chip badges (same pattern as market-rendered staff cards) ──
+    const skillIds = Array.isArray(card.specializationSkillIds)
+      ? card.specializationSkillIds
+      : [];
+    const skills: SpecializationSkill[] = [];
+    for (const id of skillIds) {
+      try { skills.push(getSkill(id)); } catch { /* forward-compat */ }
+    }
+    let chipY = Math.round(cardH / 2 - 8);
+    for (const skill of skills) {
+      const chipBg = STAFF_SKILL_CHIP_COLORS[skill.category] ?? '#444455';
+      const chip = s.add.text(0, chipY, skill.name, {
+        fontSize: '8px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        backgroundColor: chipBg,
+        padding: { x: 3, y: 1 },
+      });
+      chip.setOrigin(0.5, 1);
+      chip.setName(`applicantSkillBadge-${skill.id}`);
+      chip.setDepth(11);
+      container.add(chip);
+      chipY -= 12;
+    }
+
+    // ── Interactive hover overlay (tooltip + pointer feedback) ──
+    if (!s.replayMode) {
+      const hover = s.add.rectangle(0, 0, cardW, cardH, 0x000000, 0.001);
+      hover.setInteractive({ useHandCursor: true, cursor: 'pointer' });
+      hover.on('pointerover', () => {
+        const info = buildCardTooltipInfo(card, s.state.config);
+        s.tooltipManager?.show(info, container.x, container.y);
+      });
+      hover.on('pointerout', () => s.tooltipManager?.hide());
+      hover.setDepth(12);
+      container.add(hover);
+    }
+
+    // ── Hint text above the card ──
+    const hintName = card.name || 'Staff Applicant';
+    const hint = s.add.text(centerX, centerY - cardH / 2 - 24, `Staff Applicant: ${hintName}`, {
+      fontSize: '14px',
+      fontStyle: 'bold',
+      color: '#ffdd88',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5, 0.5).setDepth(13);
+    container.add(hint);
+
+    // ── Animate walk-on (from left edge) ──
+    if (s.msAnimator && !s.replayMode) {
+      const reducedMotion = s.settingsPanel?.reducedMotion;
+      s.msAnimator.animateApplicantWalkOn(container, cardW, cardH, reducedMotion);
+    }
+
+    // ── Salary cost display below the card ──
+    const salaryText = s.add.text(centerX, centerY + cardH / 2 + 16, `Salary: ${card.ongoingCost ?? 0}/turn`, {
+      fontSize: '11px',
+      color: '#ccaa66',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5, 0.5).setDepth(14);
+    container.add(salaryText);
+
+    return true;
   }
 }

@@ -132,7 +132,10 @@ export class MainStreetTurnController {
     const s = this.scene;
     // Execute DayStart (optionally refills market, transitions to MarketPhase)
     executeDayStart(s.state, skipMarketRefill);
-    s.uiPhase = 'market';
+    // Staff applicant walk-on (CG-0MSTOATDU006UGAX): if a pending applicant
+    // arrived at DayStart the player must resolve it (hire or decline).
+    s.pendingApplicant = (s.state as any).pendingApplicant ?? null;
+    s.uiPhase = (s.pendingApplicant != null) ? 'applicant' : 'market';
     // A new day means no card is "just moved" anymore — any hand card
     // selected now costs an action to place (CG-0MSXIQIPJ000NDTL).
     s.justMovedHandCardId = null;
@@ -222,6 +225,23 @@ export class MainStreetTurnController {
     } catch { /* banking hint trigger must never block the turn */ }
 
     // Process end-of-turn phases (events, income, night, end check)
+    // Applicant auto-decline at end-of-turn (CG-0MSTOATDU006UGAX AC6):
+    // walk the unresolved card off to the right and clear the scene state.
+    // Doing it before processEndOfTurn's own decline guard covers both the
+    // immediate scene visuals (animated departure) and the engine fallback.
+    try {
+      if (s.pendingApplicant != null) {
+        const cardW = (s as any).layout?.handCardW ?? 120;
+        const cardH = (s as any).layout?.handCardH ?? 170;
+        const overlay = (s as any).applicantOverlayContainer as Phaser.GameObjects.Container | null;
+        const reducedMotion = (s as any).settingsPanel?.reducedMotion;
+        if (overlay && s.msAnimator) {
+          s.msAnimator.animateApplicantWalkOff(overlay, cardW, cardH, reducedMotion);
+        }
+        (s as any).pendingApplicant = null;
+      }
+    } catch { /* applicant cleanup never blocks end-turn */ }
+
     let result: TurnResult;
     try {
       result = processEndOfTurn(s.state);

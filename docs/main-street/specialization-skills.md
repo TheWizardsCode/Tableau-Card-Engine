@@ -74,3 +74,52 @@ skips members with stale ids so a future save never breaks the income phase. Leg
 - `balancing-methodology.md` — the general balance pass methodology.
 - Town Gossip peek: CG-0MSXOW6GN008ZSMN; Group F staff abilities: CG-0MSQJ7VL9009JHF4;
   ongoing per-turn costs: CG-0MSVYPEZ90085SHE.
+
+## Job-applicant flow & employment slots (CG-0MSTOATDU006UGAX)
+
+> The applicant presentation (walk-on/walk-off UI) is implemented in
+> `MainStreetRenderer.refreshApplicant()` + `MainStreetAnimator` walk tweens;
+> scene wiring lives in `MainStreetTurnController.startDayPhase()` (sets the
+> `applicant` UI phase when a pending applicant arrives) and
+> `MainStreetScene.onHireApplicant()` / `onDeclineApplicant()`. Engine rules
+> are in `MainStreetEngine.ts`.
+
+### Per-turn trigger
+
+At DayStart, after the market refill, `resolveStaffApplicant(state)` rolls a
+chance of `min(reputationPerTurn + incomePerTurn, 15)%` via the seeded
+`state.rng`. When it fires, it picks a deployed business with a free
+employment slot (`getEmploymentCapacity(state, slot)` = `max(1, level + 1)`
+slots; a business at level 0 has 1 slot) and draws an applicant card from the
+staff pool (`state.decks.staff`). The card is stored as
+`state.pendingApplicant = { card, targetSlotIndex }` and the scene switches to
+its `applicant` UI phase. The trigger is suppressed in tutorial / headless
+modes (`state.suppressApplicant`).
+
+### Hire / decline / let-go
+
+- **Hire** (`hireStaffApplicant`): pushes the member into `state.staffCards`
+  with `employedAtSlot = targetSlotIndex`, costs **0 coins** and consumes **no
+  action**. The member's passive specialization buff is folded into its
+  business's income / reputation at the next income phase. Salary is an
+  ongoing per-turn cost deducted alongside other staff / community-space
+  costs (clamped at 0).
+- **Decline** (`declineStaffApplicant`): clears `pendingApplicant` with no
+  other effect; the declined card leaves the applicant pool.
+- **End-of-turn auto-decline**: an unresolved applicant is auto-declined in
+  `processEndOfTurn`, so ending the turn is never blocked.
+- **Let-go** (`letGoStaffMember(state, idx)`): removes the member from
+  `staffCards`, deducts **1 turn's salary** (clamped at 0 coins) and **1
+  reputation**; buffs stop applying from the next income phase.
+
+### Scene & presentation contract (rule 8 compliant)
+
+- The applicant is rendered face-up (staff SVG + skill chips) at the SLL
+  `applicantOverlay` zone centre; the card walks on from the left
+  (~1.0s tween, instant under reduced motion) with the deal SFX.
+- **Hire** animates the card toward its target business slot (place SFX);
+  **Decline** walks it off to the right (discard SFX); both are action-free
+  and end with a full `refreshAll()`.
+- All sounds route through `SoundManager` with shared `SFX_KEYS`
+  (deal/place/discard) so settings mute/volume and reduced-motion are
+  respected.

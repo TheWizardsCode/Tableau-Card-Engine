@@ -11,6 +11,7 @@ import { SaveLoadStore, CheckpointManager } from '../../../src/core-engine';
 import { UndoRedoManager } from '../../../src/core-engine';
 import type { DragDropManager } from '../../../src/ui';
 import type { MainStreetSerializedState } from '../MainStreetState';
+import { hireStaffApplicant, declineStaffApplicant } from '../MainStreetEngine';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
@@ -35,7 +36,9 @@ type UIPhase =
   | 'placing-business'   // Player selected a business card, picking a slot
   | 'placing-from-hand'  // Player bought a card to hand, click a slot to place it
   | 'animating'          // Brief pause for feedback
-  | 'game-over';         // Final overlay
+  | 'game-over'          // Final overlay
+  | 'applicant'          // Staff applicant overlay: Hire / Decline (CG-0MSTOATDU006UGAX)
+  ;
 
 export class MainStreetScene extends CardGameScene {
   /**
@@ -128,6 +131,19 @@ export class MainStreetScene extends CardGameScene {
   // other held card still costs an action. Cleared on placement, cancel, new
   // day, or undo.
   public justMovedHandCardId: string | null = null;
+
+  /**
+   * Pending staff applicant for the current day (CG-0MSTOATDU006UGAX).
+   * Mirrored from `state.pendingApplicant` at startup / day-start for the
+   * scene's uiPhase decision. Null when no applicant is present.
+   */
+  public pendingApplicant: { card: any; targetSlotIndex: number } | null = null;
+
+  /**
+   * The applicant overlay container rendered by MainStreetRenderer.refreshApplicant.
+   * Created lazily on first applicant presentation, cleaned up when the phase ends.
+   */
+  public applicantOverlayContainer: Phaser.GameObjects.Container | null = null;
 
   // Computed responsive layout metrics
   public layout!: SceneLayout;
@@ -658,6 +674,82 @@ export class MainStreetScene extends CardGameScene {
     }
     // Fallback: if no overlay manager method exists, execute sell directly
     this.msTurnController?.onSlotClick?.(slotIndex);
+  }
+
+  /**
+   * Hire the pending staff applicant (CG-0MSTOATDU006UGAX).
+   * Action-free: no daily action consumed, 0 coins. Triggers the walk-in
+   * animation and refreshes the street/HUD when done.
+   */
+  public onHireApplicant(): void {
+    if (!this.pendingApplicant) return;
+    const reducedMotion = (this as any).settingsPanel?.reducedMotion;
+    const targetSlotIndex = this.pendingApplicant.targetSlotIndex;
+    const cardW = (this as any).layout?.handCardW ?? 120;
+    const cardH = (this as any).layout?.handCardH ?? 170;
+    const overlay = (this as any).applicantOverlayContainer as Phaser.GameObjects.Container | null;
+    try {
+      hireStaffApplicant(this.state as any);
+    } catch (e) {
+      console.error('[MainStreet] hire applicant failed:', e);
+      return;
+    }
+    const nextPending = (this.state as any).pendingApplicant ?? null;
+    // Engine rejected the hire (capacity race) — keep the phase.
+    if (nextPending != null) {
+      this.pendingApplicant = nextPending;
+      this.uiPhase = 'applicant';
+      this.refreshAll();
+      return;
+    }
+    this.pendingApplicant = null;
+    if (overlay && this.msAnimator) {
+      this.msAnimator.animateApplicantWalkIn(overlay, targetSlotIndex, cardW, cardH, reducedMotion, () => {
+        this.uiPhase = 'market';
+        if (overlay && (this as any).applicantOverlayContainer === overlay) {
+          overlay.removeAll(true);
+          try { (this as any).hudContainer?.remove(overlay); } catch (_) { /* ignore */ }
+          (this as any).applicantOverlayContainer = null;
+        }
+        this.refreshAll();
+      });
+    } else {
+      this.uiPhase = 'market';
+      this.refreshAll();
+    }
+  }
+
+  /**
+   * Decline the pending staff applicant (CG-0MSTOATDU006UGAX).
+   * Triggers the walk-off animation and refreshes the scene.
+   */
+  public onDeclineApplicant(): void {
+    if (!this.pendingApplicant && !(this.state as any).pendingApplicant) return;
+    const reducedMotion = (this as any).settingsPanel?.reducedMotion;
+    const cardW = (this as any).layout?.handCardW ?? 120;
+    const cardH = (this as any).layout?.handCardH ?? 170;
+    const overlay = (this as any).applicantOverlayContainer as Phaser.GameObjects.Container | null;
+    try {
+      declineStaffApplicant(this.state as any);
+    } catch (e) {
+      console.error('[MainStreet] decline applicant failed:', e);
+      return;
+    }
+    this.pendingApplicant = null;
+    if (overlay && this.msAnimator) {
+      this.msAnimator.animateApplicantWalkOff(overlay, cardW, cardH, reducedMotion, () => {
+        this.uiPhase = 'market';
+        if (overlay && (this as any).applicantOverlayContainer === overlay) {
+          overlay.removeAll(true);
+          try { (this as any).hudContainer?.remove(overlay); } catch (_) { /* ignore */ }
+          (this as any).applicantOverlayContainer = null;
+        }
+        this.refreshAll();
+      });
+    } else {
+      this.uiPhase = 'market';
+      this.refreshAll();
+    }
   }
 
   /**
