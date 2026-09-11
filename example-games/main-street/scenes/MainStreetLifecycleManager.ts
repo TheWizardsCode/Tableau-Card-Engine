@@ -160,8 +160,11 @@ export class MainStreetLifecycleManager {
     // Reset
     s.uiPhase = 'idle';
     s.pendingBusinessCard = null;
-    (s as any).pendingApplicant = null;
-    (s as any).applicantOverlayContainer = null;
+    // Staff applicant render state (CG-0MSTOATDU006UGAX): destroy the
+    // overlay rather than just dropping the reference, so a game restart
+    // does not leak orphaned game objects.
+    (s as any).applicantAnimating = false;
+    (s as any).clearApplicantOverlay?.();
     s.overlayObjects = [];
     s.previousCoins = null;
     s.previousReputation = null;

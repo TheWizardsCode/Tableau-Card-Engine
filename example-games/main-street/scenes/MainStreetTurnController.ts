@@ -235,10 +235,20 @@ export class MainStreetTurnController {
         const cardH = (s as any).layout?.handCardH ?? 170;
         const overlay = (s as any).applicantOverlayContainer as Phaser.GameObjects.Container | null;
         const reducedMotion = (s as any).settingsPanel?.reducedMotion;
+        // Clear the scene-side applicant immediately; `processEndOfTurn`
+        // clears the engine-side `state.pendingApplicant`.
+        s.pendingApplicant = null;
         if (overlay && s.msAnimator) {
-          s.msAnimator.animateApplicantWalkOff(overlay, cardW, cardH, reducedMotion);
+          // Guard the overlay from the refreshApplicant teardown while the
+          // exit tween plays, then destroy it on completion.
+          (s as any).applicantAnimating = true;
+          s.msAnimator.animateApplicantWalkOff(overlay, cardW, cardH, reducedMotion, () => {
+            (s as any).applicantAnimating = false;
+            (s as any).clearApplicantOverlay?.();
+          });
+        } else {
+          (s as any).clearApplicantOverlay?.();
         }
-        (s as any).pendingApplicant = null;
       }
     } catch { /* applicant cleanup never blocks end-turn */ }
 

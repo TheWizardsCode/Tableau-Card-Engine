@@ -14,12 +14,20 @@ import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
-import { processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
 import { createStaffDeck, type StaffCard } from '../../example-games/main-street/MainStreetCards';
 
 let game: Phaser.Game | null = null;
 
+/** Forces the reduced-motion path without replacing the SettingsPanel object. */
+function forceReducedMotion(scene: Phaser.Scene & Record<string, any>): void {
+  (scene.settingsPanel as { _reducedMotion: boolean })._reducedMotion = true;
+}
+
 async function bootGame(options: { width?: number; height?: number } = {}): Promise<Phaser.Scene & Record<string, any>> {
+  // Clear persisted checkpoints/tutorial state so each test boots a fresh
+  // game rather than resuming one saved by an earlier test's end-turn.
+  try { localStorage.clear(); } catch { /* ignore */ }
+
   let container = document.getElementById('game-container');
   if (container) container.remove();
 
@@ -96,6 +104,25 @@ describe('MainStreet applicant presentation (CG-0MTFO4IQO005673N)', () => {
     expect(inHud).toBe(true);
   });
 
+  it('reuses the rendered overlay across refreshes instead of replaying the walk-on', async () => {
+    const scene = await bootGame();
+    const card = makeApplicantCard();
+    scene.pendingApplicant = { card, targetSlotIndex: 0 };
+    scene.uiPhase = 'applicant';
+    scene.refreshAll();
+
+    const first = scene.applicantOverlayContainer;
+    expect(first).toBeTruthy();
+
+    // Repeated refreshes must not rebuild the overlay — a rebuild restarts
+    // the walk-on tween, yanking the card back off-screen on every refresh.
+    scene.refreshAll();
+    scene.refreshAll();
+
+    expect(scene.applicantOverlayContainer).toBe(first);
+    expect(scene.applicantRenderedId).toBe(card.id);
+  });
+
   it('hire employs the applicant at the target slot and consumes no daily action', async () => {
     const scene = await bootGame();
     ensureBusinessAtZero(scene);
@@ -128,7 +155,7 @@ describe('MainStreet applicant presentation (CG-0MTFO4IQO005673N)', () => {
     const staffBefore = scene.state.staffCards.length;
     // Reduced motion: the walk-off animation completes synchronously so the
     // uiPhase transition to 'market' is immediately observable.
-    scene.settingsPanel = { ...scene.settingsPanel, reducedMotion: true };
+    forceReducedMotion(scene);
     scene.uiPhase = 'applicant';
     scene.refreshAll();
     (scene as any).onDeclineApplicant?.();
@@ -146,16 +173,23 @@ describe('MainStreet applicant presentation (CG-0MTFO4IQO005673N)', () => {
     scene.pendingApplicant = { card, targetSlotIndex: 0 };
     (scene.state as any).pendingApplicant = { card, targetSlotIndex: 0 };
     scene.state.phase = 'MarketPhase';
+    // Reduced motion completes the walk-off synchronously, so the decline is
+    // fully observable the moment endTurn() returns.
+    forceReducedMotion(scene);
+
     const staffBefore = scene.state.staffCards.length;
-    const coinsBefore = scene.state.resourceBank.coins;
+    scene.uiPhase = 'applicant';
+    scene.refreshAll();
+    expect(scene.applicantOverlayContainer).toBeTruthy();
 
-    const result = processEndOfTurn(scene.state as any);
+    (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
 
-    expect(result.choicePending).not.toBe(true);
-    // The engine auto-declines an unresolved applicant without blocking end-turn.
+    // The applicant is declined (never employed) and its overlay torn down —
+    // and crucially the turn proceeded instead of blocking on the applicant.
     expect((scene.state as any).pendingApplicant).toBeNull();
+    expect(scene.pendingApplicant).toBeNull();
+    expect(scene.applicantOverlayContainer).toBeNull();
     expect(scene.state.staffCards).toHaveLength(staffBefore);
-    expect(scene.state.resourceBank.coins).toBeGreaterThanOrEqual(0);
-    void coinsBefore;
+    expect(scene.uiPhase).not.toBe('applicant');
   });
 });

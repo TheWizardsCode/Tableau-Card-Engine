@@ -11,6 +11,7 @@
 import Phaser from 'phaser';
 import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import type { SpecializationSkill } from '../MainStreetStaffSkills';
+import type { PendingApplicant } from '../MainStreetState';
 import { getSkill, hasPeekCapableStaff, STAFF_SKILL_CHIP_COLORS } from '../MainStreetStaffSkills';
 import {
   GRID_SIZE,
@@ -1685,7 +1686,10 @@ export class MainStreetRenderer {
     const s = this.scene;
     s.actionContainer.removeAll(true);
 
-    if (s.uiPhase === 'market') {
+    // The applicant phase (CG-0MSTOATDU006UGAX) deliberately shares the
+    // market action bar so End Turn stays reachable — ending the turn
+    // auto-declines an unresolved applicant instead of stranding the player.
+    if (s.uiPhase === 'market' || s.uiPhase === 'applicant') {
       const rightX = s.layout.gameW - 24;
       const by = s.layout.actionY;
 
@@ -1844,51 +1848,17 @@ export class MainStreetRenderer {
         );
       });
       s.actionContainer.add(cancelBtn);
-    } else if (s.uiPhase === 'applicant') {
-      // ── Staff applicant overlay buttons (CG-0MSTOATDU006UGAX) ──────
-      // Hire (green) and Decline (red) buttons, action-free (no daily
-      // action consumed). The player may respond at any time during
-      // MarketPhase; if they end the turn without responding, the
-      // applicant auto-declines (MainStreetEngine.processEndOfTurn).
-      const rightX = s.layout.gameW - 24;
-      const by = s.layout.actionY;
-      const btnW = s.layout.actionButtonW;
+    }
 
-      // Hire button (green, right of Decline)
-      const hireBtn = createActionButton(
-        s, rightX - btnW * 2 - 12 - btnW, by + 4, btnW,
-        'Hire', () => { s.onHireApplicant(); },
-        {
-          height: s.layout.actionButtonH,
-          fillColor: 0x224422,
-          fillAlpha: 0.8,
-          strokeColor: 0x44aa44,
-          textColor: '#88ff88',
-          fontSize: '14px',
-        },
-      );
-      s.actionContainer.add(hireBtn);
-
-      // Decline button (red, right-aligned)
-      const declineBtn = createActionButton(
-        s, rightX - btnW, by + 4, btnW,
-        'Decline', () => { s.onDeclineApplicant(); },
-        {
-          height: s.layout.actionButtonH,
-          fillColor: 0x442222,
-          fillAlpha: 0.8,
-          strokeColor: 0xaa4444,
-          textColor: '#ff8888',
-          fontSize: '14px',
-        },
-      );
-      s.actionContainer.add(declineBtn);
-
+    // Staff applicant phase (CG-0MSTOATDU006UGAX): the market action bar
+    // above stays available (Hire/Decline live on the applicant overlay
+    // itself) so the player can resolve the applicant or End Turn to skip.
+    if (s.uiPhase === 'applicant') {
       const applicantCard = s.pendingApplicant?.card;
       const name = applicantCard?.name ?? 'Staff Applicant';
       const salary = applicantCard?.ongoingCost ?? 0;
       s.hintBar.setText(
-        `${name} — Hire (no cost, salary ${salary}/turn) or Decline`,
+        `${name} — Hire (free, salary ${salary}/turn) or Decline; End Turn to skip`,
       );
     }
   }
@@ -2007,58 +1977,62 @@ export class MainStreetRenderer {
   /**
    * Render the pending staff-applicant overlay (CG-0MSTOATDU006UGAX).
    *
-   * When `uiPhase === 'applicant'` and a `pendingApplicant` is set, this
-   * method renders the applicant card (face-up staff card with skill chips)
-   * centered above the street area with Hire and Decline buttons below.
+   * When `uiPhase === 'applicant'` and a `pendingApplicant` is set, the
+   * applicant renders face-up (staff SVG + specialization skill chips) at
+   * the SLL `applicantOverlay` zone centre, with Hire / Decline buttons and
+   * the per-turn salary, and walks on from the left screen edge.
    *
-   * The card is parented into `hudContainer` so it renders above all
-   * gameplay containers. Interactive overlays are cleaned up on the next
-   * refresh when `uiPhase` is no longer `'applicant'`.
+   * The overlay is built **once per applicant card**, tracked by
+   * `applicantRenderedId`, so the many `refreshAll()` calls that happen
+   * during a turn never rebuild the card face nor replay the walk-on tween.
+   * While a hire/decline exit tween is playing (`applicantAnimating`) any
+   * existing overlay is left untouched so the tween target stays alive.
    *
-   * @returns {boolean} True when an applicant overlay was rendered.
+   * All child objects use container-local coordinates — the container itself
+   * is positioned at the SLL anchor, so every element travels with the card
+   * during the walk-on/walk-off tweens.
+   *
+   * @returns True when an applicant overlay is currently presented.
    */
   public refreshApplicant(): boolean {
     const s = this.scene as any;
-    const pending = s.pendingApplicant;
+    const pending = s.pendingApplicant as PendingApplicant | null;
     const isApplicantPhase = s.uiPhase === 'applicant';
 
-    // ── Clear stale applicant overlay objects when no longer needed ──
+    // ── Not presenting: tear down any stale overlay ──
+    // Skip the teardown while an exit tween is mid-flight, otherwise the
+    // tween would be animating a destroyed container.
     if (!isApplicantPhase || !pending) {
-      // Remove any leftover applicant overlay containers from a previous
-      // render cycle so stale objects don't accumulate.
-      const stale = (s as any).applicantOverlayContainer;
-      if (stale && s.hudContainer) {
-        stale.removeAll(true);
-        s.hudContainer.remove(stale);
-        (s as any).applicantOverlayContainer = null;
+      if (!s.applicantAnimating) {
+        (s as { clearApplicantOverlay?: () => void }).clearApplicantOverlay?.();
       }
       return false;
     }
 
-    // ── Reuse or create the applicant overlay container ──
-    let container: Phaser.GameObjects.Container;
-    if ((s as any).applicantOverlayContainer) {
-      container = (s as any).applicantOverlayContainer;
-    } else {
-      container = s.add.container(0, 0);
-      container.setName('applicantOverlay');
-      if (s.hudContainer) s.hudContainer.add(container);
-      (s as any).applicantOverlayContainer = container;
-    }
-    // Clear previous contents
-    container.removeAll(true);
-
     const card = pending.card as StaffCard;
+
+    // ── Already rendered this applicant → leave it alone (no re-animate) ──
+    if (s.applicantOverlayContainer && s.applicantRenderedId === card.id) {
+      return true;
+    }
+
+    // New/changed applicant: rebuild from scratch.
+    (s as { clearApplicantOverlay?: () => void }).clearApplicantOverlay?.();
+
+    const container: Phaser.GameObjects.Container = s.add.container(0, 0);
+    container.setName('applicantOverlay');
+    // Above the action bar / hint bar (depth 100 within hudContainer) but
+    // below modal overlays (199-201), so the applicant reads as a prominent
+    // in-play decision without covering dialogs.
+    container.setDepth(120);
+    if (s.hudContainer) s.hudContainer.add(container);
+    s.applicantOverlayContainer = container;
+    s.applicantRenderedId = card.id;
+
     const cardW = s.layout.handCardW ?? 120;
     const cardH = s.layout.handCardH ?? 170;
 
-    // ── Position: from the SLL applicantOverlay zone (CG-0MSTOATDU006UGAX) ──
-    const centerX = s.layout.applicantCenterX ?? Math.round(s.layout.gameW / 2);
-    const centerY = s.layout.applicantCenterY ?? Math.round(s.layout.gameH * 0.4);
-
-    container.setPosition(centerX, centerY);
-
-    // ── Render card SVG face ──
+    // ── Card face (local origin 0,0 = card centre) ──
     const cardImg = mainStreetRenderCardSvg(s, container, card.id, cardW, cardH);
     cardImg.setOrigin(0.5, 0.5).setDepth(10);
 
@@ -2102,9 +2076,42 @@ export class MainStreetRenderer {
       container.add(hover);
     }
 
-    // ── Hint text above the card ──
-    const hintName = card.name || 'Staff Applicant';
-    const hint = s.add.text(centerX, centerY - cardH / 2 - 24, `Staff Applicant: ${hintName}`, {
+    // ── Hire / Decline buttons, below the card (container-local coords) ──
+    const btnW = Math.round(cardW * 0.62);
+    const btnH = 30;
+    const btnY = cardH / 2 + 12;
+    const hireBtn = createActionButton(
+      s, -cardW / 2, btnY, btnW, 'Hire',
+      () => { s.onHireApplicant(); },
+      {
+        height: btnH,
+        fillColor: 0x224422,
+        fillAlpha: 0.9,
+        strokeColor: 0x44aa44,
+        textColor: '#88ff88',
+        fontSize: '13px',
+      },
+    );
+    hireBtn.setDepth(15);
+    container.add(hireBtn);
+
+    const declineBtn = createActionButton(
+      s, 0, btnY, btnW, 'Decline',
+      () => { s.onDeclineApplicant(); },
+      {
+        height: btnH,
+        fillColor: 0x442222,
+        fillAlpha: 0.9,
+        strokeColor: 0xaa4444,
+        textColor: '#ff8888',
+        fontSize: '13px',
+      },
+    );
+    declineBtn.setDepth(15);
+    container.add(declineBtn);
+
+    // ── Title + salary, above the card (container-local coords) ──
+    const hint = s.add.text(0, -cardH / 2 - 30, `Staff Applicant: ${card.name || 'Unknown'}`, {
       fontSize: '14px',
       fontStyle: 'bold',
       color: '#ffdd88',
@@ -2112,19 +2119,23 @@ export class MainStreetRenderer {
     }).setOrigin(0.5, 0.5).setDepth(13);
     container.add(hint);
 
-    // ── Animate walk-on (from left edge) ──
-    if (s.msAnimator && !s.replayMode) {
-      const reducedMotion = s.settingsPanel?.reducedMotion;
-      s.msAnimator.animateApplicantWalkOn(container, cardW, cardH, reducedMotion);
-    }
-
-    // ── Salary cost display below the card ──
-    const salaryText = s.add.text(centerX, centerY + cardH / 2 + 16, `Salary: ${card.ongoingCost ?? 0}/turn`, {
+    const salaryText = s.add.text(0, -cardH / 2 - 12, `Salary: ${card.ongoingCost ?? 0}/turn`, {
       fontSize: '11px',
       color: '#ccaa66',
       fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 0.5).setDepth(14);
     container.add(salaryText);
+
+    // ── Position from the SLL applicantOverlay zone, then walk on ──
+    // The container position must be set before the walk-on tween: the
+    // animator reads `container.x` as the destination.
+    const centerX = s.layout.applicantCenterX ?? Math.round(s.layout.gameW / 2);
+    const centerY = s.layout.applicantCenterY ?? Math.round(s.layout.gameH * 0.4);
+    container.setPosition(centerX, centerY);
+
+    if (s.msAnimator && !s.replayMode) {
+      s.msAnimator.animateApplicantWalkOn(container, cardW, cardH, s.settingsPanel?.reducedMotion);
+    }
 
     return true;
   }

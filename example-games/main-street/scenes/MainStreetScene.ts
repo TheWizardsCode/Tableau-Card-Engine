@@ -10,7 +10,7 @@ import type { SelectionController, SingleSelectionManager } from '../../../src/u
 import { SaveLoadStore, CheckpointManager } from '../../../src/core-engine';
 import { UndoRedoManager } from '../../../src/core-engine';
 import type { DragDropManager } from '../../../src/ui';
-import type { MainStreetSerializedState } from '../MainStreetState';
+import type { MainStreetSerializedState, PendingApplicant } from '../MainStreetState';
 import { hireStaffApplicant, declineStaffApplicant } from '../MainStreetEngine';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
@@ -137,13 +137,28 @@ export class MainStreetScene extends CardGameScene {
    * Mirrored from `state.pendingApplicant` at startup / day-start for the
    * scene's uiPhase decision. Null when no applicant is present.
    */
-  public pendingApplicant: { card: any; targetSlotIndex: number } | null = null;
+  public pendingApplicant: PendingApplicant | null = null;
 
   /**
    * The applicant overlay container rendered by MainStreetRenderer.refreshApplicant.
    * Created lazily on first applicant presentation, cleaned up when the phase ends.
    */
   public applicantOverlayContainer: Phaser.GameObjects.Container | null = null;
+
+  /**
+   * Id of the applicant card currently rendered in `applicantOverlayContainer`.
+   * `refreshApplicant()` renders each applicant exactly once, so a repeated
+   * `refreshAll()` never rebuilds the card face or replays the walk-on tween
+   * (CG-0MSTOATDU006UGAX).
+   */
+  public applicantRenderedId: string | null = null;
+
+  /**
+   * True while a hire/decline walk tween is playing. `refreshApplicant()`
+   * leaves the overlay untouched during the animation so the tween's target
+   * is never destroyed mid-flight (CG-0MSTOATDU006UGAX).
+   */
+  public applicantAnimating = false;
 
   // Computed responsive layout metrics
   public layout!: SceneLayout;
@@ -677,78 +692,123 @@ export class MainStreetScene extends CardGameScene {
   }
 
   /**
+   * Destroys the staff-applicant overlay and resets its render bookkeeping
+   * (CG-0MSTOATDU006UGAX). Safe to call when no overlay exists.
+   */
+  public clearApplicantOverlay(): void {
+    const overlay = this.applicantOverlayContainer;
+    if (overlay) {
+      overlay.removeAll(true);
+      try { this.hudContainer?.remove(overlay, true); } catch (_) { /* already detached */ }
+    }
+    this.applicantOverlayContainer = null;
+    this.applicantRenderedId = null;
+  }
+
+  /**
    * Hire the pending staff applicant (CG-0MSTOATDU006UGAX).
-   * Action-free: no daily action consumed, 0 coins. Triggers the walk-in
-   * animation and refreshes the street/HUD when done.
+   *
+   * Action-free: consumes no daily action and costs 0 coins. The member is
+   * employed at the applicant's target business slot (so its passive
+   * specialization buff applies from the next income phase) and its salary
+   * becomes an ongoing per-turn cost. Plays the walk-in tween toward that
+   * slot before refreshing the HUD. If the engine rejects the hire (the slot
+   * filled up since the applicant appeared) the applicant stays pending.
    */
   public onHireApplicant(): void {
-    if (!this.pendingApplicant) return;
-    const reducedMotion = (this as any).settingsPanel?.reducedMotion;
-    const targetSlotIndex = this.pendingApplicant.targetSlotIndex;
-    const cardW = (this as any).layout?.handCardW ?? 120;
-    const cardH = (this as any).layout?.handCardH ?? 170;
-    const overlay = (this as any).applicantOverlayContainer as Phaser.GameObjects.Container | null;
+    const pending = this.pendingApplicant
+      ?? ((this.state as { pendingApplicant?: PendingApplicant | null }).pendingApplicant ?? null);
+    if (!pending) return;
+
+    const targetSlotIndex = pending.targetSlotIndex;
+    const overlay = this.applicantOverlayContainer;
+
     try {
       hireStaffApplicant(this.state as any);
     } catch (e) {
       console.error('[MainStreet] hire applicant failed:', e);
+      this.refreshAll();
       return;
     }
-    const nextPending = (this.state as any).pendingApplicant ?? null;
-    // Engine rejected the hire (capacity race) — keep the phase.
-    if (nextPending != null) {
-      this.pendingApplicant = nextPending;
+
+    // The engine clears state.pendingApplicant on success; a still-set value
+    // means the target slot was full and the hire was rejected.
+    const stillPending = (this.state as { pendingApplicant?: PendingApplicant | null }).pendingApplicant ?? null;
+    if (stillPending != null) {
+      this.pendingApplicant = stillPending;
       this.uiPhase = 'applicant';
       this.refreshAll();
       return;
     }
+
     this.pendingApplicant = null;
-    if (overlay && this.msAnimator) {
-      this.msAnimator.animateApplicantWalkIn(overlay, targetSlotIndex, cardW, cardH, reducedMotion, () => {
-        this.uiPhase = 'market';
-        if (overlay && (this as any).applicantOverlayContainer === overlay) {
-          overlay.removeAll(true);
-          try { (this as any).hudContainer?.remove(overlay); } catch (_) { /* ignore */ }
-          (this as any).applicantOverlayContainer = null;
-        }
-        this.refreshAll();
-      });
-    } else {
-      this.uiPhase = 'market';
-      this.refreshAll();
-    }
+    this.uiPhase = 'market';
+    this.playApplicantExit('walk-in', overlay, targetSlotIndex);
   }
 
   /**
    * Decline the pending staff applicant (CG-0MSTOATDU006UGAX).
-   * Triggers the walk-off animation and refreshes the scene.
+   * Action-free and side-effect free: the card walks off to the right and
+   * leaves the applicant pool (it is not returned to the staff deck).
    */
   public onDeclineApplicant(): void {
-    if (!this.pendingApplicant && !(this.state as any).pendingApplicant) return;
-    const reducedMotion = (this as any).settingsPanel?.reducedMotion;
-    const cardW = (this as any).layout?.handCardW ?? 120;
-    const cardH = (this as any).layout?.handCardH ?? 170;
-    const overlay = (this as any).applicantOverlayContainer as Phaser.GameObjects.Container | null;
+    const pending = this.pendingApplicant
+      ?? ((this.state as { pendingApplicant?: PendingApplicant | null }).pendingApplicant ?? null);
+    if (!pending) return;
+
+    const overlay = this.applicantOverlayContainer;
+
     try {
       declineStaffApplicant(this.state as any);
     } catch (e) {
       console.error('[MainStreet] decline applicant failed:', e);
+      this.refreshAll();
       return;
     }
+
     this.pendingApplicant = null;
-    if (overlay && this.msAnimator) {
-      this.msAnimator.animateApplicantWalkOff(overlay, cardW, cardH, reducedMotion, () => {
-        this.uiPhase = 'market';
-        if (overlay && (this as any).applicantOverlayContainer === overlay) {
-          overlay.removeAll(true);
-          try { (this as any).hudContainer?.remove(overlay); } catch (_) { /* ignore */ }
-          (this as any).applicantOverlayContainer = null;
-        }
-        this.refreshAll();
-      });
-    } else {
-      this.uiPhase = 'market';
+    this.uiPhase = 'market';
+    this.playApplicantExit('walk-off', overlay, pending.targetSlotIndex);
+  }
+
+  /**
+   * Plays the applicant's exit tween — walk-in toward the target business
+   * slot on hire, walk-off to the right on decline — then destroys the
+   * overlay and refreshes the scene.
+   *
+   * Falls back to immediate cleanup when no overlay is rendered or no
+   * animator is available (replay/headless mode, or reduced motion, which
+   * completes synchronously inside the animator).
+   *
+   * @param direction 'walk-in' (hire) or 'walk-off' (decline).
+   * @param overlay   The rendered applicant overlay, if any.
+   * @param slotIndex Target business slot index (used by 'walk-in').
+   */
+  private playApplicantExit(
+    direction: 'walk-in' | 'walk-off',
+    overlay: Phaser.GameObjects.Container | null,
+    slotIndex: number,
+  ): void {
+    const reducedMotion = (this as any).settingsPanel?.reducedMotion;
+    const cardW = this.layout?.handCardW ?? 120;
+    const cardH = this.layout?.handCardH ?? 170;
+
+    const finish = (): void => {
+      this.applicantAnimating = false;
+      this.clearApplicantOverlay();
       this.refreshAll();
+    };
+
+    if (!overlay || !this.msAnimator) {
+      finish();
+      return;
+    }
+
+    this.applicantAnimating = true;
+    if (direction === 'walk-in') {
+      this.msAnimator.animateApplicantWalkIn(overlay, slotIndex, cardW, cardH, reducedMotion, finish);
+    } else {
+      this.msAnimator.animateApplicantWalkOff(overlay, cardW, cardH, reducedMotion, finish);
     }
   }
 
