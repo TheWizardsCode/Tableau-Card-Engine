@@ -235,11 +235,12 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 | Play a card from hand to the street | 1 action | Pays the card's listed cost at placement. |
 | Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`) when the move leaves **no action** for the placement (same pricing as the click composite). Triggered by dragging a market card straight onto a street slot. On a Golden Mile 2-action day the placement instead consumes the remaining action at **listed cost** — drag is never cheaper than click. |
 | Hire a staff card | 1 action | From the general market row. |
+| Close a business/community-space card | 1 action | **No refund.** Removes the card from the street entirely (slot → `null`, card → discard pile) so the slot can be re-filled on a later day. Only non-sold cards can be closed. Selling the *same* card is free but leaves an inert sold card occupying the slot (see below). |
 
 **Free operations (never consume an action):**
 
 - Market re-roll/refresh
-- Selling a business — refund formula (CG-0MT5XO7DI0066QCT): `Math.ceil((card.cost + totalUpgradeCost) * 1.5) + Math.max(0, currentIncome − effectiveBase) + Math.max(0, currentReputationPerTurn − (repPerTurn + reputationBonus))` where `effectiveBase = (baseIncome + incomeBonus) × (hasAdjacentSameType ? 0.6 : 1)` and the 1.5× is the same +50% buy-and-place premium; applies to business **and** community-space cards; synergy comps are 0 when undefined and never negative.
+- Selling a business — **free**, and the card **stays on the grid** as an inert *sold* marker (no income/reputation for itself, but still a synergy anchor for its neighbours; the slot stays occupied). Refund formula (CG-0MT5XO7DI0066QCT): `Math.ceil((card.cost + totalUpgradeCost) * 1.5) + Math.max(0, currentIncome − effectiveBase) + Math.max(0, currentReputationPerTurn − (repPerTurn + reputationBonus))` where `effectiveBase = (baseIncome + incomeBonus) × (hasAdjacentSameType ? 0.6 : 1)` and the 1.5× is the same +50% buy-and-place premium; applies to business **and** community-space cards; synergy comps are 0 when undefined and never negative.
   The sell dialog and activity log show the breakdown (base, synergy income, synergy rep).
 - Hint (still 1/day)
 - Discarding from hand
@@ -247,6 +248,8 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 - Ending the turn
 
 > Sell price (CG-0MT5XO7DI0066QCT): the sell refund mirrors the buy-and-place premium (1.5× purchase + upgrades) and adds the card's current synergy value, so emergency cash reflects what the card actually earns on the grid. A card with no synergies still recovers more than before (`/2 → ×1.5`); a well-synergised card recovers coins **plus** rep-derived value automatically. The breakdown is visible before the player confirms.
+
+> Close vs Sell (CG-0MT5XT7K3005IBBV): clicking a non-sold street card opens a **Manage Card** dialog with **[Sell] [Close] [Cancel]**. **Sell** is free and keeps the sold card on the grid as an inert synergy anchor (the slot remains occupied permanently). **Close** costs **1 action and no coins**, removes the card to the discard pile, recalculates its neighbours **without** the removed card's synergy, and frees the slot for a future placement. Sold cards cannot be closed — once sold, the only way past that slot is a future "clear sold card" capability (not yet implemented).
 
 > Same-day composite pricing (CG-0MT24X0SX007RLHN): clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase**. If the move consumed the daily action (0 actions left), the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**; an explainer dialog fires first (Proceed commits, Cancel aborts with no cost, "Don't show this again" persists the preference). If an action **remains** (Golden Mile 2-action days), the placement consumes it at **listed cost**. A card left in hand and placed on a **later** day costs that day's action at listed cost, with no dialog. Business and community-space cards are priced identically.
 

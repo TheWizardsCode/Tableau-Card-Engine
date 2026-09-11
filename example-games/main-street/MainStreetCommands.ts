@@ -18,6 +18,7 @@ import {
   purchaseEvent,
   refreshMarket,
   sellBusiness,
+  closeBusiness,
   playBusinessFromHand,
   playUpgradeFromHand,
   playEventFromHand,
@@ -59,11 +60,15 @@ interface MarketActionSnapshot {
   incidentDeck: any | null;
   activityLog: any | null;
   soldSlots: boolean[] | null;
+  /**
+   * Unified discard pile — captured so undoing a Close restores the removed
+   * card (`closeBusiness` pushes it to `discardPile`).
+   */
+  discardPile: any | null;
   /** Grand Opening placement gate — captured so undo restores the per-turn flag. */
   businessPlacedThisTurn: boolean | null;
   /** Daily action budget — captured so undo restores the spent action. */
-  actionsRemaining: number | null;
-  /** Banked actions — captured so undo restores the banking state. */
+  actionsRemaining: number | null;  /** Banked actions — captured so undo restores the banking state. */
   bankedActions: number | null;
   /** Staff peek gate — captured so undo restores the once-per-turn flag. */
   peekUsedThisTurn: boolean | null;
@@ -115,6 +120,9 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     incidentDeck: safeClone(state.incidentDeck),
     activityLog: safeClone(state.activityLog),
     soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
+    // Unified discard pile — captured so undoing a Close restores the removed
+    // card (the card is pushed to `discardPile` by `closeBusiness`).
+    discardPile: safeClone(state.discardPile ?? []),
     businessPlacedThisTurn: (state as any).businessPlacedThisTurn ?? false,
     actionsRemaining: state.actionsRemaining,
     bankedActions: state.bankedActions ?? 0,
@@ -142,6 +150,7 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.incidentDeck = snap.incidentDeck as any;
   state.activityLog = snap.activityLog as any;
   state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
+  state.discardPile = (snap.discardPile ?? []) as any;
   if (snap.businessPlacedThisTurn !== null && snap.businessPlacedThisTurn !== undefined) {
     (state as any).businessPlacedThisTurn = snap.businessPlacedThisTurn;
   }
@@ -497,6 +506,40 @@ export function sellBusinessCommand(
     snapshotAction(
       (s) => sellBusiness(s, slotIndex),
       `SellBusiness slot ${slotIndex}`,
+    ),
+  );
+}
+
+/**
+ * Command: Close Business (costs 1 daily action, no coins).
+ *
+ * The card is removed from the street grid entirely (slot -> null) and pushed
+ * to the unified `discardPile`, freeing the slot for later placement. The
+ * action cost goes through the command layer's `consumeAction` — the single
+ * shared enforcement point (CG-0MTCP7F9S009HARC) — so `actionsRemaining` and
+ * `bankedActions` (floor 0) decrement in lock-step with every other
+ * action-consuming operation. `closeBusiness` itself is free of action logic,
+ * so the cost is charged exactly once.
+ *
+ * The pre-snapshot (which now includes `discardPile`) makes the whole close
+ * reversible via the shared undo manager: undo restores the card, slot,
+ * discard pile, action budget, and activity log.
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street grid slot index of the card to close.
+ */
+export function closeBusinessCommand(
+  state: MainStreetState,
+  slotIndex: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => {
+        consumeAction(s);
+        closeBusiness(s, slotIndex);
+      },
+      `CloseBusiness slot ${slotIndex}`,
     ),
   );
 }

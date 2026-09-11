@@ -455,6 +455,31 @@ export function updateNeighborsOnSale(
   }
 }
 
+/**
+ * Updates all cards whose cached income/reputation could be affected by the
+ * close (full removal) of the card at `index`.
+ *
+ * The closed slot is already `null` when this runs. Unlike a sale — where the
+ * card remains on the grid as an inert synergy anchor — a closed card is gone
+ * entirely, so neighbours lose any synergy it previously contributed. Every
+ * remaining occupied, non-sold slot is recalculated.
+ *
+ * @param state Current game state.
+ * @param index The slot index the closed card occupied (now empty).
+ */
+export function updateNeighborsOnClose(
+  state: MainStreetState,
+  index: number,
+): void {
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    if (i === index) continue;
+    if (state.soldSlots[i]) continue;
+    if (state.streetGrid[i] !== null) {
+      recalculateCard(state, i);
+    }
+  }
+}
+
 
 /**
  * Computes the total income across all businesses on the street grid.

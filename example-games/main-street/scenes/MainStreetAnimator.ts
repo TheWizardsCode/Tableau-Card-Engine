@@ -1726,6 +1726,86 @@ export class MainStreetAnimator {
   }
 
   /**
+   * Animates a Close (coins-free demolition): the pre-close card snapshot
+   * shrinks and fades away and the discard SFX plays, then a brief "Closed"
+   * pop marks the freed slot. Unlike `animateSell` there is no refund coin
+   * fly and no "+€" pop — closing grants no coins.
+   *
+   * Accessibility (reduced motion): the demolition tween is skipped; a brief
+   * "Closed" pop + discard SFX remain (sound is not motion).
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
+   * resolves immediately in replay/headless mode (`scene.replayMode`) — no
+   * rendering, no audio. Never mutates game state or the transcript.
+   *
+   * Non-blocking: fire-and-forget; the removal is already committed to state
+   * by `closeBusinessCommand` when this runs.
+   *
+   * @param params  Closed street slot and the closed card's identity (for the
+   *                demolition snapshot's family colour).
+   * @returns Promise resolving when the presentation completes.
+   */
+  public animateClose(params: {
+    slotIndex: number;
+    cardId: string;
+    family: 'business' | 'community-space';
+  }): Promise<void> {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return Promise.resolve();
+
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+    const { x, y } = this.getStreetSlotCenter(params.slotIndex);
+
+    const playCloseFeedback = (): void => {
+      const text = s.add.text(x, y - 10, 'Closed', {
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: '#ffcc88',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: s,
+        target: text,
+        duration: 900,
+        riseY: 16,
+        scale: 1.1,
+        reducedMotion,
+      });
+      // The closed card goes to the discard pile — reuse the discard SFX.
+      try { s.soundManager?.play(SFX_KEYS.DISCARD); } catch (_) { /* ignore */ }
+    };
+
+    if (reducedMotion) {
+      playCloseFeedback();
+      return Promise.resolve();
+    }
+
+    // Demolition: pre-close card snapshot shrinks and fades (~380ms), then the
+    // discard SFX + "Closed" pop replay the outcome. No refund coin fly.
+    return new Promise<void>((resolveDemolition) => {
+      const demo = this.createTransferCardVisual(params.cardId, params.family, x, y) as unknown as {
+        destroy: () => void;
+      };
+      s.tweens.add({
+        targets: demo,
+        scaleX: 0.25,
+        scaleY: 0.25,
+        alpha: 0,
+        duration: 380,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          demo.destroy();
+          resolveDemolition();
+        },
+      });
+    }).then(() => {
+      playCloseFeedback();
+    });
+  }
+
+  /**
    * Hand-anchored slot centre (left edge of the hand zone + half a card).
    *
    * Kept for backward compatibility only — buy-transfer animations now use

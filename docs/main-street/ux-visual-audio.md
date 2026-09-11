@@ -230,7 +230,7 @@ void popTextOrIcon({
      `hudY`) with `SFX_KEYS.COIN_POP` via `moveGameObject`.
   3. A "+€refund" pop lands at the HUD counter (`popTextOrIcon`) and the
      coin SFX pops on landing.
-- Sell-price formula (CG-0MT5XO7DI0066QCT): refund = `ceil((cost + totalUpgradeCost) * 1.5) + max(0, currentIncome − effectiveBase) + max(0, currentRep − (repPerTurn + repBonus))`; `effectiveBase = (baseIncome + incomeBonus) * 0.6` when same-type adjacent, else ×1; applies to business + community-space. Dialog shows breakdown (panel 360×300, base / synergy-income / synergy-rep) before confirm; log mirrors the breakdown.
+- Sell-price formula (CG-0MT5XO7DI0066QCT): refund = `ceil((cost + totalUpgradeCost) * 1.5) + max(0, currentIncome − effectiveBase) + max(0, currentRep − (repPerTurn + repBonus))`; `effectiveBase = (baseIncome + incomeBonus) * 0.6` when same-type adjacent, else ×1; applies to business + community-space. The **Manage Card** dialog (`showSellConfirmation`, panel 480×360, [Sell] [Close] [Cancel]) shows the sell breakdown (base / synergy-income / synergy-rep) plus the explicit Close cost line before confirm; log mirrors the breakdown.
 - Accessibility (reduced motion): demolition + coin flight are skipped; a
   single "+€refund" pop + coin SFX remain (spec AC2).
 - Headless/replay exemption (AGENTS.md rule 8): presentation-only — the
@@ -240,6 +240,34 @@ void popTextOrIcon({
   are already committed to game state.
 - Reuse: `createTransferCardVisual` + `moveGameObject` + `popTextOrIcon` +
   `SFX_KEYS.COIN_POP`; no new engine infrastructure.
+
+### Close demolition (no refund)
+
+- Helper: `MainStreetAnimator.animateClose()` (CG-0MT5XT7K3005IBBV).
+- Trigger: the **Manage Card** dialog's [Close] button — fires
+  `animateClose({ slotIndex, cardId, family })` only when
+  `closeBusinessCommand` succeeded, after the overlay dismiss + synchronous
+  `refreshAll` (the freed empty slot renders immediately, hidden beneath the
+  demolition snapshot).
+- Behavior (reduced-motion OFF):
+  1. Demolition: a pre-close card snapshot (`createTransferCardVisual`,
+     depth 10000) shrinks and fades over ~380ms (`Cubic.easeIn`). The closed
+     card is gone from `streetGrid`, so the snapshot is built from the captured
+     `cardId`/`family`, not from live grid state.
+  2. No refund coin fly and no "+€" pop — **closing grants no coins**. Instead
+     a brief "Closed" pop marks the freed slot (`popTextOrIcon`).
+  3. Discard SFX (`SFX_KEYS.DISCARD`) plays as the card lands in the discard
+     pile.
+- Accessibility (reduced motion): the demolition tween is skipped; a brief
+  "Closed" pop + discard SFX remain (sound is not motion).
+- Headless/replay exemption (AGENTS.md rule 8): presentation-only — resolves
+  immediately in replay/headless mode (`scene.replayMode`), never mutates state
+  or transcript.
+- Non-blocking: fire-and-forget for the caller; the removal, discard-pile push,
+  neighbour recalculation, and spent action are already committed by
+  `closeBusinessCommand`.
+- Reuse: `createTransferCardVisual` + `popTextOrIcon` + `SFX_KEYS.DISCARD`; no
+  new engine infrastructure.
 
 ### Day transition banner
 

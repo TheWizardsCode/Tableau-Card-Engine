@@ -21,7 +21,7 @@ import {
   GRID_SIZE,
   REFRESH_MARKET_COST,
 } from './MainStreetCards';
-import { updateNeighborsOnPlacement, updateNeighborsOnSale, hasAdjacentSameType, tagSlotOwnerIfCompetitive } from './MainStreetAdjacency';
+import { updateNeighborsOnPlacement, updateNeighborsOnSale, updateNeighborsOnClose, hasAdjacentSameType, tagSlotOwnerIfCompetitive } from './MainStreetAdjacency';
 import { roundInt } from './MainStreetDifficulty';
 import {
   computeRefreshCostDiscount,
@@ -1301,4 +1301,123 @@ export function canSellBusiness(
   }
 
   return { legal: true };
+}
+
+// ── Close Business (Street Grid) ─────────────────────────────
+
+/** Result returned after closing a business on the street grid. */
+export interface CloseResult {
+  /** The card that was closed (removed from the grid). */
+  card: BusinessCard | CommunitySpaceCard;
+  /** The slot index the closed card occupied. */
+  slotIndex: number;
+}
+
+/**
+ * Checks whether a business or community-space card at the given slot can be
+ * closed.
+ *
+ * Closing is the counterpart to selling: it costs one daily action (charged
+ * by `closeBusinessCommand` via the shared `consumeAction` helper) and grants
+ * no coins, but removes the card from the street entirely so the slot becomes
+ * immediately placeable again. Sold cards are inert and must not be closeable.
+ *
+ * Gates on MarketPhase, not-placing-mode, slot bounds, slot occupied, card
+ * non-sold, and >=1 daily action available — the same `LegalityResult`
+ * pattern as `canSellBusiness`, plus the action-budget check.
+ *
+ * @param state         Current game state.
+ * @param slotIndex     Street grid slot index to check.
+ * @param isPlacingMode Whether the player is currently in card-placement mode (closing not allowed).
+ * @returns LegalityResult indicating whether the action is permitted.
+ */
+export function canCloseBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+  isPlacingMode: boolean = false,
+): LegalityResult {
+  if (state.phase !== 'MarketPhase') {
+    return { legal: false, reason: 'Closing is only allowed during the MarketPhase.' };
+  }
+
+  if (isPlacingMode) {
+    return { legal: false, reason: 'Cannot close a card while in card-placement mode.' };
+  }
+
+  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}.` };
+  }
+
+  const card = state.streetGrid[slotIndex];
+  if (card === null) {
+    return { legal: false, reason: `Slot ${slotIndex} is empty. Nothing to close.` };
+  }
+
+  const soldSlots: boolean[] = state.soldSlots ?? [];
+  if (soldSlots[slotIndex]) {
+    return { legal: false, reason: `Slot ${slotIndex} has already been sold and cannot be closed.` };
+  }
+
+  if ((state.actionsRemaining ?? 0) <= 0) {
+    return { legal: false, reason: 'No actions remaining today. Closing costs 1 action.' };
+  }
+
+  return { legal: true };
+}
+
+/**
+ * Closes (demolishes without refund) a business or community-space card on the
+ * street grid.
+ *
+ * The card is fully removed: the slot becomes `null` (immediately placeable
+ * again), the card is pushed to the unified `discardPile` (it is not removed
+ * from the game), affected neighbours' cached income/reputation are
+ * recalculated with the closed card no longer present, and an activity-log
+ * entry is written. No coins are credited and no action is consumed at this
+ * layer — the daily action is charged by `closeBusinessCommand` so that the
+ * engine and command paths share the single `consumeAction` enforcement point
+ * (CG-0MTCP7F9S009HARC).
+ *
+ * @param state     Current game state (mutated in-place).
+ * @param slotIndex Street grid slot index of the card to close.
+ * @returns CloseResult on success.
+ * @throws Error if the slot is out of bounds, empty, or already sold.
+ */
+export function closeBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+): CloseResult {
+  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  }
+
+  const card = state.streetGrid[slotIndex];
+  if (card === null) {
+    throw new Error(`Slot ${slotIndex} is empty. Nothing to close.`);
+  }
+
+  const soldSlots: boolean[] = state.soldSlots ?? [];
+  if (soldSlots[slotIndex]) {
+    throw new Error(`Slot ${slotIndex} has already been sold and cannot be closed.`);
+  }
+
+  // Send the card to the unified discard pile (community-space cards share the
+  // business card shape; the pile is typed as BusinessCard[]).
+  state.discardPile.push(card as unknown as BusinessCard);
+
+  // Remove from the grid; the slot becomes immediately placeable.
+  state.streetGrid[slotIndex] = null;
+  state.soldSlots[slotIndex] = false;
+
+  // Recalculate neighbours with the closed card fully removed (unlike a sale,
+  // where the card stays on the grid as an inert synergy anchor).
+  updateNeighborsOnClose(state, slotIndex);
+
+  addLog(
+    state,
+    `Closed ${card.name} from slot ${slotIndex} (no refund, 1 action) (${describeEventEffects(0, 0)})`,
+    classifyEffect(0, 0),
+  );
+
+  return { card, slotIndex };
 }

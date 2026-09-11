@@ -98,7 +98,7 @@ export const HUD_TOOLTIP_STRINGS = {
   scoreAllTiersUnlocked: 'All tiers unlocked',
   actionTitle: 'Actions This Day',
   actionRemainingLabel: 'Actions remaining',
-  actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff',
+  actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff, close business',
   actionFreeOpsLabel: 'Free: re-roll market, sell, discard, end turn',
   actionBankedLabel: 'Banked actions',
   actionBankingExplain: "1 action per turn, with up to two turns' unused actions banked — every action you take spends 1 from the bank (down to 0), so banked actions are a finite reserve, not a permanent bonus",

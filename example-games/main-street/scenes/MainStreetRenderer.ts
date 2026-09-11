@@ -731,7 +731,7 @@ export class MainStreetRenderer {
         const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
         const synergyRate = formatSynergyRate(biz, s.state.config);
         const synergyInfo = synergyRate !== null ? `\nSynergy bonus: ${synergyRate} of base income per adjacent matching business` : '';
-        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}`;
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}\nClick to manage: sell (free) or close (1 action)`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {

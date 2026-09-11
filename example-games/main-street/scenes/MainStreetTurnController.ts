@@ -2146,19 +2146,18 @@ export class MainStreetTurnController {
     const breakdown = computeSellRefund(s.state, card, slotIndex);
     const refund = breakdown.totalRefund;
 
-    // Build card info for dialog with breakdown
+    // Build card info for the Manage Card dialog. Kept compact (6 lines) so
+    // the refund highlight, the Close cost line, and the three buttons below
+    // it never overlap the info block.
     const isCommunitySpace = card.family === 'community-space';
     const cardLabel = isCommunitySpace ? 'Community Space' : 'Business';
     const info = `${cardLabel}: ${card.name}\n` +
-      `Purchase: €${card.cost}\n` +
-      `Upgrades: €${(card as any).totalUpgradeCost ?? 0}\n` +
-      `Refund: €${refund}\n\n` +
-      `  Base: €${breakdown.baseRefund} (1.5× purchase + upgrades)\n` +
-      `  Synergy income: +€${breakdown.synergyIncomeComponent}\n` +
-      `  Synergy reputation: +€${breakdown.synergyRepComponent}\n\n` +
-      `Sell this card? It will remain on the grid but produce no further income.`;
+      `Purchase €${card.cost} · Upgrades €${(card as any).totalUpgradeCost ?? 0}\n` +
+      `Sell refund €${refund} (base €${breakdown.baseRefund})\n` +
+      `Synergy: +€${breakdown.synergyIncomeComponent} income, +€${breakdown.synergyRepComponent} rep\n\n` +
+      `Sell: free, card stays on the grid (inert).`;
 
-    // Show sell confirmation via overlay
+    // Show the Manage Card dialog (Sell / Close / Cancel) via overlay
     s.showSellConfirmation(slotIndex, card.name, refund, info);
   }
 }

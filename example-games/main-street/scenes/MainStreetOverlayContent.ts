@@ -1,4 +1,5 @@
-import { sellBusinessCommand } from '../MainStreetCommands';
+import { sellBusinessCommand, closeBusinessCommand } from '../MainStreetCommands';
+import { canCloseBusiness } from '../MainStreetMarket';
 import { addLog } from '../MainStreetState';
 import type { EventCard } from '../MainStreetCards';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
@@ -268,12 +269,21 @@ export class MainStreetOverlayContent {
   }
 
   /**
-   * Shows a sell confirmation overlay for a card on the street grid.
-   * Presents card info, refund amount, and Sell / Cancel buttons.
+   * Shows the Manage Card overlay for a card on the street grid.
    *
-   * @param slotIndex The grid slot index of the card to sell.
+   * Presents card info, the sell refund, and [Sell] [Close] [Cancel] buttons.
+   * Sell keeps its existing free/refund behaviour (the card stays on the grid
+   * as an inert sold marker). Close spends exactly one daily action, grants no
+   * coins, and removes the card from the street entirely so the slot becomes
+   * placeable again — the action cost is charged by `closeBusinessCommand`
+   * through the shared `consumeAction` enforcement point.
+   *
+   * All text/buttons are parented into `hudContainer` and use the overlay
+   * depth convention (backdrop 199, box 200, interactive 201).
+   *
+   * @param slotIndex The grid slot index of the card to manage.
    * @param cardName  Display name of the card.
-   * @param refund    Calculated refund amount in coins.
+   * @param refund    Calculated sell refund amount in coins (Sell only).
    * @param info      Detailed card info text for display.
    */
   public showSellConfirmation(
@@ -284,9 +294,10 @@ export class MainStreetOverlayContent {
   ): void {
     const s = this.scene;
 
-    const panelW = 360;
-    const panelH = 300;
+    const panelW = 480;
+    const panelH = 360;
     const panelY = s.layout.gameH / 2 - panelH / 2;
+    const centerX = s.layout.gameW / 2;
 
     // Overlay background with semi-transparent backdrop
     const boxConfig = {
@@ -304,14 +315,14 @@ export class MainStreetOverlayContent {
     s.overlayObjects.push(...overlay.objects);
 
     // Title
-    const titleText = s.add.text(s.layout.gameW / 2, panelY + 25, 'Sell Card', {
+    const titleText = s.add.text(centerX, panelY + 24, 'Manage Card', {
       fontSize: '22px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(201);
     if (s.hudContainer) s.hudContainer.add(titleText);
     s.overlayObjects.push(titleText);
 
     // Card info text
-    const infoText = s.add.text(s.layout.gameW / 2, panelY + 65, info, {
+    const infoText = s.add.text(centerX, panelY + 58, info, {
       fontSize: '13px',
       color: '#ddccbb',
       fontFamily: FONT_FAMILY,
@@ -321,16 +332,25 @@ export class MainStreetOverlayContent {
     if (s.hudContainer) s.hudContainer.add(infoText);
     s.overlayObjects.push(infoText);
 
-    // Refund highlight
-    const refundText = s.add.text(s.layout.gameW / 2, panelY + 155, `Refund: +€${refund}`, {
+    // Sell refund highlight (Sell only — Close grants no coins)
+    const refundText = s.add.text(centerX, panelY + 186, `Sell refund: +€${refund}`, {
       fontSize: '20px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(201);
     if (s.hudContainer) s.hudContainer.add(refundText);
     s.overlayObjects.push(refundText);
 
-    // Sell button
+    // Close cost line — makes the 1-action / no-coins cost explicit
+    const closeCostText = s.add.text(
+      centerX, panelY + 214,
+      'Close: costs 1 action, no refund — removes the card and frees the slot.',
+      { fontSize: '12px', color: '#ffcc88', fontFamily: FONT_FAMILY, align: 'center' },
+    ).setOrigin(0.5).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(closeCostText);
+    s.overlayObjects.push(closeCostText);
+
+    // Sell button — existing free/refund behaviour, unchanged
     const sellBtn = createOverlayButton(
-      s, s.layout.gameW / 2 - 100, panelY + 190,
+      s, centerX - 150, panelY + 265,
       '[ Sell ]', 201,
     );
     if (s.hudContainer) s.hudContainer.add(sellBtn);
@@ -376,16 +396,76 @@ export class MainStreetOverlayContent {
     });
     s.overlayObjects.push(sellBtn);
 
+    // Close button — 1 action, no coins, removes the card from the street
+    const closeBtn = createOverlayButton(
+      s, centerX, panelY + 265,
+      '[ Close ]', 201,
+    );
+    if (s.hudContainer) s.hudContainer.add(closeBtn);
+    closeBtn.on('pointerdown', () => {
+      let closed = false;
+      let failureReason = 'unknown';
+      let closedCardId = '';
+      let closedFamily: 'business' | 'community-space' = 'business';
+      try {
+        const legality = canCloseBusiness(s.state, slotIndex, false);
+        if (!legality.legal) {
+          failureReason = legality.reason ?? 'unknown';
+        } else {
+          // Capture identity before the card is removed from the grid.
+          const cardNow = s.state.streetGrid[slotIndex];
+          closedCardId = cardNow?.id ?? '';
+          closedFamily = cardNow?.family === 'community-space' ? 'community-space' : 'business';
+
+          const cmd = closeBusinessCommand(s.state, slotIndex);
+          if (s.undoManager) {
+            s.undoManager.execute(cmd);
+          } else {
+            cmd.execute();
+          }
+          s.instructionText?.setText(`Closed ${cardName} (−1 action)`);
+          closed = true;
+        }
+      } catch (e) {
+        console.error('[Close] Failed:', e);
+        failureReason = (e as Error).message;
+      }
+
+      // Dismiss the overlay
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      s.refreshAll();
+
+      if (closed) {
+        // Demolition (card to discard) — no refund coin fly for a close.
+        try {
+          void s.msAnimator.animateClose({
+            slotIndex,
+            cardId: closedCardId,
+            family: closedFamily,
+          });
+        } catch (_) {
+          // presentation-only — ignore
+        }
+      } else {
+        // Illegal close (no actions, sold, empty, wrong phase): auditable
+        // feedback with no state mutation.
+        safePlaySound(s, COMMON_SFX_KEYS.ILLEGAL_MOVE);
+        s.instructionText?.setText(`Cannot close: ${failureReason}`);
+      }
+    });
+    s.overlayObjects.push(closeBtn);
+
     // Cancel button
     const cancelBtn = createOverlayButton(
-      s, s.layout.gameW / 2 + 30, panelY + 190,
+      s, centerX + 150, panelY + 265,
       '[ Cancel ]', 201,
     );
     if (s.hudContainer) s.hudContainer.add(cancelBtn);
     cancelBtn.on('pointerdown', () => {
       dismissOverlay(s.overlayObjects);
       s.overlayObjects = [];
-      s.instructionText?.setText('Sale cancelled.');
+      s.instructionText?.setText('Cancelled.');
     });
     s.overlayObjects.push(cancelBtn);
   }
