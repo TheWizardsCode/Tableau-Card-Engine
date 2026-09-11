@@ -9,9 +9,7 @@ import { executeDayStart, processEndOfTurn, executeAction, finishDeferredEndOfTu
 import { turnLabel } from '../MainStreetFormatting';
 import { hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import {
-  findTargetBusinessSlot,
   canAddToHand,
-  canPurchaseUpgrade,
   canPurchaseEvent,
   canPurchaseBusiness,
   canPurchaseStaff,
@@ -21,7 +19,7 @@ import {
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, buyUpgradeCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, playBusinessFromHandCommand, peekIncidentDeckCommand, hireStaffCardCommand, resolveEventChoiceCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, playBusinessFromHandCommand, playUpgradeFromHandCommand, peekIncidentDeckCommand, hireStaffCardCommand, resolveEventChoiceCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
@@ -1071,6 +1069,25 @@ export class MainStreetTurnController {
     const s = this.scene;
     if (s.uiPhase !== 'placing-from-hand' && s.uiPhase !== 'placing-business') return;
 
+    // Upgrade targeting (CG-0MT3IYSRL001VVUP): when the pending hand card is
+    // an upgrade, the street click chooses WHICH business to upgrade — a
+    // different gating action (`apply-upgrade`) and eligibility model from
+    // placing a business on an empty slot.
+    const pendingTargetCard = s.pendingHandIndex !== null
+      ? (s.state.hand ?? [])[s.pendingHandIndex]
+      : undefined;
+    if (pendingTargetCard && pendingTargetCard.family === 'upgrade') {
+      const checkU = (s.msLifecycleManager as any).isTutorialActionAllowed?.('apply-upgrade' as TutorialActionType);
+      if (checkU && !checkU.allowed) {
+        s.instructionText.setText(checkU.reason ?? 'Complete the highlighted step first.');
+        const handSpriteU = s.msRenderer?.handView?.getSpriteAt?.(s.pendingHandIndex ?? -1) as any;
+        playIllegalFeedback(handSpriteU ?? s.actionContainer, s);
+        return;
+      }
+      this.applyHandUpgradeToSlot(s.pendingHandIndex as number, slotIndex);
+      return;
+    }
+
     // Tutorial gating: only allow place-business if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('place-business' as TutorialActionType);
     if (check && !check.allowed) {
@@ -1677,6 +1694,20 @@ export class MainStreetTurnController {
   public onUpgradeCardClick(card: UpgradeCard): void {
     const s = this.scene;
     if (s.uiPhase !== 'market') return;
+
+    // Action economy (CG-0MT3IYSRL001VVUP): buying an upgrade follows the
+    // business two-step flow — the market click only MOVES the card to hand
+    // and spends the daily action; applying it to a business is a separate,
+    // explicit step. Gate before the transfer so the player gets immediate
+    // feedback instead of a mid-flight error.
+    if (s.state.actionsRemaining <= 0) {
+      s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      const containersNoActions = s.msRenderer?.getMarketRowCards?.();
+      const cardIndexNoActions = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+      playIllegalFeedback(containersNoActions?.[cardIndexNoActions] ?? s.actionContainer ?? null, s);
+      return;
+    }
+
     // Tutorial gating: only allow apply-upgrade if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('apply-upgrade' as TutorialActionType);
     if (check && !check.allowed) {
@@ -1691,77 +1722,228 @@ export class MainStreetTurnController {
     // Ensure stale hover tooltip is cleared when a card is played.
     s.tooltipManager?.hide();
 
-    s.selectMarketCardById(card.id);
-
-    const legality = canPurchaseUpgrade(s.state, card.id);
-    if (!legality.legal) {
+    // Hand capacity is the only constraint — coins are charged at play time,
+    // mirroring the business cost-at-play deferral model.
+    const handCheck = canAddToHand(s.state);
+    if (!handCheck.legal) {
       const containers = s.msRenderer?.getMarketRowCards?.();
       const cardIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
-      const target = containers?.[cardIndex] ?? s.actionContainer ?? null;
-      playIllegalFeedback(target, s);
-      s.instructionText.setText(`Cannot buy upgrade: ${legality.reason ?? 'unknown'}`);
+      playIllegalFeedback(containers?.[cardIndex] ?? s.actionContainer ?? null, s);
+      s.instructionText.setText(`Hand full: ${handCheck.reason ?? 'Place or sell a card first.'}`);
       return;
     }
 
     const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
+    const cardName = card.name;
 
-    // Determine which business slot this upgrade targets (first eligible match)
-    const targetSlot = findTargetBusinessSlot(s.state, card);
-
-    // Apply the upgrade directly — no intermediate choice modal.
-    // The player clicked the upgrade card; that is the upgrade to apply.
+    s.selectMarketCardById(card.id);
+    s.clearMarketSelection();
     s.uiPhase = 'animating';
-    s.instructionText.setText(`Applying upgrade "${card.name}"...`);
+    s.instructionText.setText(`Moving "${cardName}" to hand...`);
     s.hiddenTransferSourceCardIds.add(card.id);
     s.refreshAll();
 
     const afterTransfer = (): void => {
-      console.debug('[MS] onUpgradeCardClick: attempting BuyUpgrade', { cardId: card.id, targetSlot, coinsBefore: s.state.resourceBank.coins, marketBefore: s.state.market.cards.map((c: any)=>c.id), streetBefore: s.state.streetGrid.map((slot: any)=>slot?.id ?? null) });
-      let upgraded = false;
       try {
-        const cmd = buyUpgradeCommand(s.state, card.id, targetSlot);
+        const cmd = moveToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
-        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-upgrade', cardId: card.id, targetSlot }, description: cmd.description }); } catch (_) {}
-        try { s.gameEvents?.emit('card:placed', { cardId: card.id, targetSlot }); } catch (_) {}
-        s.instructionText.setText(`Applied upgrade: "${card.name}"`);
-        upgraded = true;
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'move-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
+
+        // No auto-selection (mirrors CG-0MSXIQIPJ000NDTL for business cards):
+        // the upgrade rests in the hand, unselected. `justMovedUpgradeCardId`
+        // (set by moveToHand) makes the later play a free same-day composite.
+        s.pendingHandIndex = null;
+        s.pendingHandJustMoved = false;
+        s.uiPhase = 'market';
+        s.instructionText.setText(`"${cardName}" is in hand — click the card, then a business to upgrade.`);
       } catch (e) {
-        console.error('[MS] BuyUpgrade failed', e);
+        console.error('[MS] MoveUpgradeToHand failed', e);
         playIllegalFeedback(s.actionContainer, s);
         s.instructionText.setText(`Error: ${(e as Error).message}`);
+        s.uiPhase = 'market';
       }
 
       s.hiddenTransferSourceCardIds.delete(card.id);
-      s.uiPhase = 'market';
       s.refreshAll();
-      // Level-up burst on the upgraded business when the upgrade actually
-      // landed (non-blocking presentation; reduced-motion / replay handling
-      // lives inside the animator).
-      if (upgraded && targetSlot >= 0) {
-        try {
-          const target = s.state.streetGrid[targetSlot] as { level?: number } | null;
-          if (target) {
-            s.msAnimator.animateLevelUp({ slotIndex: targetSlot, level: target.level ?? 1 });
-          }
-        } catch (_) {
-          // presentation-only — ignore
-        }
-      }
-      // Tutorial: mark apply-upgrade step complete if active
-      (s.msLifecycleManager as any).onTutorialActionComplete?.('apply-upgrade' as TutorialActionType);
+      s.refreshStreetGrid();
+      s.refreshActionButtons();
     };
 
     if (sourceIndex >= 0) {
+      const handIndex = (s.state.hand ?? []).length;
       void s.animateTransferFromMarket({
         cardId: card.id,
         family: 'upgrade',
         row: 'market',
         slotIndex: sourceIndex,
-        destination: s.getStreetSlotCenter(targetSlot),
+        destination: s.getBusinessHandInsertionPosition(handIndex),
       }).then(afterTransfer);
     } else {
       afterTransfer();
     }
+  }
+
+  /**
+   * Handles clicking an upgrade card in the player's hand
+   * (CG-0MT3IYSRL001VVUP): selects it as the pending hand card and switches
+   * the scene into `'placing-from-hand'` targeting, where the next street
+   * business click applies the upgrade. Mirrors `onHandBusinessCardClick`
+   * (CG-0MSXIQIPJ000NDTL) but targets an occupied business rather than an
+   * empty slot.
+   *
+   * @param index  Index of the upgrade card in `state.hand`.
+   */
+  public onHandUpgradeCardClick(index: number): void {
+    const s = this.scene;
+    const hand = s.state.hand ?? [];
+    if (index < 0 || index >= hand.length) return;
+    if (hand[index].family !== 'upgrade') return;
+
+    // Tutorial gating: only allow apply-upgrade if it's the required action
+    // or the tutorial is inactive.
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('apply-upgrade' as TutorialActionType);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      const handSpriteGating = s.msRenderer?.handView?.getSpriteAt?.(index) as any;
+      playIllegalFeedback(handSpriteGating ?? s.actionContainer, s);
+      return;
+    }
+
+    // Same-day composite (just moved from the market this turn) applies the
+    // upgrade without a second action; an upgrade held from a previous day
+    // costs one action.
+    const isSameDay = s.state.justMovedUpgradeCardId === hand[index]?.id;
+
+    // Switching selection while already targeting is allowed.
+    if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
+      s.pendingHandIndex = index;
+      s.pendingHandJustMoved = isSameDay;
+      s.instructionText.setText(`Click a business to apply "${hand[index]?.name ?? 'upgrade'}"`);
+      s.refreshAll();
+      if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
+        s.msRenderer.updateBusinessHandSelection(index);
+      }
+      return;
+    }
+
+    if (s.uiPhase !== 'market') return;
+
+    s.tooltipManager?.hide();
+
+    s.pendingHandIndex = index;
+    s.pendingHandJustMoved = isSameDay;
+    s.uiPhase = 'placing-from-hand';
+    s.instructionText.setText(`Click a business to apply "${hand[index]?.name ?? 'upgrade'}"`);
+    s.refreshAll();
+
+    if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
+      s.msRenderer.updateBusinessHandSelection(index);
+    }
+  }
+
+  /**
+   * Applies the pending hand upgrade to a street business
+   * (CG-0MT3IYSRL001VVUP). Eligibility mirrors `playUpgradeFromHand`: the
+   * target must be the upgrade's `targetBusiness` at its `requiredLevel` and
+   * below `maxLevel`. Ineligible targets keep the upgrade selected and play
+   * illegal-move feedback so the player can retry or cancel.
+   */
+  private applyHandUpgradeToSlot(handIndex: number, slotIndex: number): void {
+    const s = this.scene;
+    const handCard = (s.state.hand ?? [])[handIndex] as UpgradeCard | undefined;
+    if (!handCard) {
+      s.pendingHandIndex = null;
+      s.pendingHandJustMoved = false;
+      s.uiPhase = 'market';
+      s.instructionText.setText('Card no longer in hand.');
+      return;
+    }
+
+    const biz = s.state.streetGrid[slotIndex];
+    const requiredLevel = handCard.requiredLevel ?? 0;
+    const isEligible =
+      !!biz &&
+      biz.name === handCard.targetBusiness &&
+      biz.level === requiredLevel &&
+      biz.level < biz.maxLevel;
+
+    const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex) as any;
+
+    if (!isEligible) {
+      // Illegal target: no state mutation, upgrade stays selected for a retry.
+      playIllegalFeedback(handSprite ?? s.actionContainer ?? null, s);
+      s.instructionText.setText(
+        `"${handCard.name}" can only upgrade ${handCard.targetBusiness} at level ${requiredLevel}. Click another business.`,
+      );
+      return;
+    }
+
+    const cardId = handCard.id;
+    const cardName = handCard.name;
+    const handPos = s.msRenderer?.handView?.getBasePosition(handIndex);
+    const source = handPos
+      ? { x: handPos.x, y: handPos.y }
+      : { x: s.layout.handX + s.layout.handCardW / 2, y: s.layout.handY + s.layout.handCardH / 2 };
+
+    s.pendingHandIndex = null;
+    s.pendingHandJustMoved = false;
+    s.hiddenTransferSourceCardIds.add(cardId);
+    s.uiPhase = 'animating';
+    s.instructionText.setText(`Applying "${cardName}"...`);
+    s.refreshAll();
+
+    const afterTransfer = (): void => {
+      let applied = false;
+      try {
+        const cmd = playUpgradeFromHandCommand(s.state, handIndex, slotIndex);
+        s.undoManager.execute(cmd);
+        // Clear the same-day composite tracker once the upgrade has landed.
+        if (s.state.justMovedUpgradeCardId === cardId) {
+          s.state.justMovedUpgradeCardId = null;
+        }
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-upgrade-from-hand', handIndex, targetSlot: slotIndex }, description: cmd.description }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { cardId, targetSlot: slotIndex }); } catch (_) {}
+        s.instructionText.setText(`Applied upgrade: "${cardName}"`);
+        applied = true;
+      } catch (e) {
+        console.error('[MS] playUpgradeFromHandCommand failed', e);
+        playIllegalFeedback(handSprite ?? s.actionContainer, s);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      s.hiddenTransferSourceCardIds.delete(cardId);
+      s.uiPhase = 'market';
+      s.refreshAll();
+      s.refreshStreetGrid();
+      s.refreshActionButtons();
+
+      // Level-up burst on the upgraded business when the upgrade actually
+      // landed (non-blocking presentation; reduced-motion / replay handling
+      // lives inside the animator).
+      if (applied) {
+        try {
+          const target = s.state.streetGrid[slotIndex] as { level?: number } | null;
+          if (target) {
+            s.msAnimator.animateLevelUp({ slotIndex, level: target.level ?? 1 });
+          }
+        } catch (_) {
+          // presentation-only — ignore
+        }
+      }
+
+      // Tutorial: mark apply-upgrade step complete if active
+      (s.msLifecycleManager as any).onTutorialActionComplete?.('apply-upgrade' as TutorialActionType);
+    };
+
+    void s.animateTransferFromMarket({
+      cardId,
+      family: 'upgrade',
+      row: 'market',
+      slotIndex: handIndex,
+      source,
+      destination: s.getStreetSlotCenter(slotIndex),
+    }).then(afterTransfer);
   }
 
   /**
@@ -1880,6 +2062,12 @@ export class MainStreetTurnController {
 
     // Event cards are played (via onPlayHeldEvent), never placed on the street.
     if (hand[index].family === 'event') return;
+    // Upgrade cards are applied to a business via onHandUpgradeCardClick
+    // (CG-0MT3IYSRL001VVUP) — never placed on the street like a business.
+    if (hand[index].family === 'upgrade') {
+      this.onHandUpgradeCardClick(index);
+      return;
+    }
 
     // Tutorial gating: only allow if it's the required action or tutorial is inactive
     const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('select-hand-card' as any);

@@ -13,7 +13,9 @@
  * Scope of paths under test (see CG-0MSXIA61S00686G5):
  *  - onPlayHeldEvent    — playEventCommand throws "Not enough coins…"
  *  - onSlotClick        — placeFromHand throws "Not enough coins…"
- *  - onUpgradeCardClick — canPurchaseUpgrade fails with "Not enough coins…"
+ *  - onUpgradeCardClick — moves the upgrade to hand (free of coins; the
+ *                         listed cost is charged when it is played onto a
+ *                         business, mirroring the business deferral model)
  *  - onEventCardClick   — free take-to-hand; no coins gate (cost at play)
  *
  * @module tests/main-street/illegal-afford-feedback
@@ -146,6 +148,9 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
     // Event-click take-to-hand animates to the merged handView-predicted
     // position; provide a deterministic insertion point for those tests.
     getEventHandInsertionPosition: vi.fn((handIndex: number) => ({ x: 300 + handIndex * 110, y: 240 })),
+    // Market→hand transfers for upgrades animate to the same merged
+    // HandView insertion point (CG-0MT3IYSRL001VVUP).
+    getBusinessHandInsertionPosition: vi.fn((handIndex: number) => ({ x: 300 + handIndex * 110, y: 240 })),
     msRenderer: {
       getMarketRowCards: vi.fn(() => marketContainers),
       getMarketSlotCenter: vi.fn(() => ({ x: 300, y: 150 })),
@@ -317,7 +322,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
     });
   });
 
-  describe('onUpgradeCardClick (insufficient coins to buy upgrade)', () => {
+  describe('onUpgradeCardClick (upgrade cost is charged at play, not on take)', () => {
     // A market row may not contain an upgrade (staff takes a slot, CG-0MT3KZNQB0053K55),
     // so push one in from the deck when needed. Rebuild the market card
     // container mocks so the shake targets the pushed card's row index.
@@ -335,36 +340,68 @@ describe('Main Street click-path illegal-afford feedback', () => {
       return card;
     }
 
-    it('plays sfx-illegal-move and shakes the market card container', () => {
+    it('moves the upgrade to hand for free at zero coins (no illegal feedback)', async () => {
       const upgrade = ensureUpgradeInMarket(scene);
       expect(upgrade).toBeTruthy();
       upgrade.cost = 5;
-      // No eligible target business on the street for the upgrade.
       scene.state.streetGrid = scene.state.streetGrid.map(() => null);
+      scene.state.hand = [];
       scene.state.resourceBank.coins = 0;
+      scene.state.actionsRemaining = 1;
       scene.state.phase = 'MarketPhase';
 
       controller.onUpgradeCardClick(upgrade);
+      await flushMicrotasks();
 
-      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
-      expect(scene.tweens.add).toHaveBeenCalled();
-      expect(scene.state.market.cards.find((c: any) => c.id === upgrade.id)).toBeTruthy();
+      // Free acquisition (business deferral model): the market click only
+      // moves the card to hand, so an empty coin purse is not an error.
+      expect(scene.sound.play).not.toHaveBeenCalled();
+      expect(scene.state.market.cards.find((c: any) => c.id === upgrade.id)).toBeUndefined();
+      expect(scene.state.hand.some((c: any) => c.id === upgrade.id)).toBe(true);
       expect(scene.state.resourceBank.coins).toBe(0);
-      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Cannot buy upgrade'));
     });
 
-    it('does play feedback when the upgrade has no eligible target (any legality failure)', () => {
+    it('plays illegal feedback when a held upgrade is applied with insufficient coins', async () => {
       const upgrade = ensureUpgradeInMarket(scene);
       expect(upgrade).toBeTruthy();
-      upgrade.cost = 1;
-      scene.state.streetGrid = scene.state.streetGrid.map(() => null);
-      scene.state.resourceBank.coins = 100;
+      upgrade.cost = 5;
+
+      // An eligible target business so the failure is affordability, not
+      // target eligibility.
+      const requiredLevel = (upgrade as any).requiredLevel ?? 0;
+      scene.state.streetGrid[0] = {
+        family: 'business',
+        id: 'afford-target-biz',
+        name: (upgrade as any).targetBusiness,
+        cost: 10,
+        baseIncome: 1,
+        synergyTypes: [],
+        maxLevel: requiredLevel + 2,
+        description: 'test target',
+        level: requiredLevel,
+        incomeBonus: 0,
+        synergyRangeBonus: 0,
+        reputationBonus: 0,
+        ongoingCost: 0,
+        appliedUpgrades: [],
+      };
+      scene.state.market.cards = scene.state.market.cards.filter(
+        (c: any) => c.id !== upgrade.id,
+      );
+      scene.state.hand = [upgrade];
+      scene.state.justMovedUpgradeCardId = null;
+      scene.state.resourceBank.coins = 0;
+      scene.state.actionsRemaining = 1;
       scene.state.phase = 'MarketPhase';
 
-      controller.onUpgradeCardClick(upgrade);
+      controller.onHandUpgradeCardClick(0);
+      controller.onSlotClick(0);
+      await flushMicrotasks();
 
       expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
-      expect(scene.state.resourceBank.coins).toBe(100);
+      expect(scene.state.resourceBank.coins).toBe(0);
+      // The affordable-at-play failure keeps the upgrade in hand for a retry.
+      expect(scene.state.hand.some((c: any) => c.id === upgrade.id)).toBe(true);
     });
   });
 

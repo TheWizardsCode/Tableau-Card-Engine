@@ -3,9 +3,11 @@
  *
  * Verifies the upgrade-arrival feedback end to end in a real Phaser scene:
  *
- * 1. Applying an upgrade via `onUpgradeCardClick` triggers
- *    `MainStreetAnimator.animateLevelUp` on the target business once the
- *    transfer lands (sparkle burst + "Level N" pop).
+ * 1. Applying an upgrade through the hand-first click flow (market click →
+ *    `onUpgradeCardClick`, hand click → `onHandUpgradeCardClick`, business
+ *    click → `onSlotClick`) triggers `MainStreetAnimator.animateLevelUp` on
+ *    the target business once the transfer lands (sparkle burst + "Level N"
+ *    pop).
  * 2. Reduced motion still triggers the animation (the animator degrades
  *    internally — covered by unit tests).
  *
@@ -128,17 +130,34 @@ describe('MainStreet upgrade level-up animation', () => {
       streetGrid: Array<BusinessCard | null>;
       market: { cards: Array<UpgradeCard | null> };
       resourceBank: { coins: number };
+      hand: Array<UpgradeCard | null>;
+      actionsRemaining: number;
     };
     state.streetGrid[0] = biz;
     state.market.cards[0] = upgrade;
     state.resourceBank.coins = 2000;
+    state.actionsRemaining = 1;
+    state.hand = [];
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
     const { calls } = spyOnLevelUp(scene);
 
-    (scene.msTurnController as unknown as {
+    const controller = scene.msTurnController as unknown as {
       onUpgradeCardClick: (card: UpgradeCard) => void;
-    }).onUpgradeCardClick(upgrade);
+      onHandUpgradeCardClick: (index: number) => void;
+      onSlotClick: (slotIndex: number) => void;
+    };
+
+    // Hand-first flow (CG-0MT3IYSRL001VVUP): the market click moves the
+    // upgrade to hand, the hand click selects it, and the street-business
+    // click applies it — the level-up burst fires on that final step.
+    controller.onUpgradeCardClick(upgrade);
+    await waitForCondition(
+      () => state.hand.some((c) => c?.id === upgrade.id),
+      { label: 'upgrade moved to hand' },
+    );
+    controller.onHandUpgradeCardClick(state.hand.findIndex((c) => c?.id === upgrade.id));
+    controller.onSlotClick(0);
 
     await waitForCondition(() => calls.length >= 1, { timeoutMs: 10_000, label: 'level-up trigger' });
     expect(calls).toHaveLength(1);

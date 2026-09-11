@@ -193,6 +193,23 @@ export class MainStreetRenderer {
             }
             container.add(hover);
           }
+        } else if (card.family === 'upgrade') {
+          // ── Upgrade card path (CG-0MT3IYSRL001VVUP): hand-first targeting.
+          // Clicking the upgrade in hand starts 'placing-from-hand' — the
+          // player then clicks the business to upgrade.
+          if (!s.replayMode) {
+            const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+            hover.setInteractive({ useHandCursor: true });
+            hover.on('pointerover', () => {
+              const info = buildCardTooltipInfo(card, s.state.config);
+              s.tooltipManager?.show(info, container.x, container.y);
+            });
+            hover.on('pointerout', () => s.tooltipManager?.hide());
+            hover.on('pointerdown', () => {
+              s.onHandUpgradeCardClick(cardIndex);
+            });
+            container.add(hover);
+          }
         } else {
           // ── Business card path: upgrade overlays, tooltip, + placement click ──
           this.applyUpgradeOverlays(container, card, renderW, renderH);
@@ -220,9 +237,10 @@ export class MainStreetRenderer {
       },
       customClickFn: (cardIndex: number) => {
         const card = s.state.hand?.[cardIndex];
-        // Event cards are played (via onPlayHeldEvent), never placed — ignore
-        // HandView-level clicks on them here.
-        if (card && card.family === 'event') return;
+        // Event cards are played (via onPlayHeldEvent) and upgrade cards are
+        // applied to a business (onHandUpgradeCardClick) — neither is placed
+        // on the street, so ignore HandView-level clicks on them here.
+        if (card && (card.family === 'event' || card.family === 'upgrade')) return;
         // Allow selecting a different business card in the hand during placement
         if (s.uiPhase === 'placing-from-hand') {
           s.pendingHandIndex = cardIndex;
@@ -1137,6 +1155,10 @@ export class MainStreetRenderer {
     const s = this.scene;
     const { marketCardW, marketCardH } = s.layout;
     const container = s.add.container(Math.round(x + marketCardW / 2), Math.round(y + marketCardH / 2));
+    // Name every market card container up-front so it stays locatable
+    // regardless of the interactive/action-budget gate below (click-only
+    // cards such as upgrades would otherwise be unnamed once dimmed).
+    container.setName(`ms-market-card-${card.id}`);
 
     // Determine if this is a non-purchasable Incident event
     const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
@@ -1171,6 +1193,29 @@ export class MainStreetRenderer {
       targetText.setOrigin(0, 0);
       targetText.setName('upgradeTargetLabel');
       container.add(targetText);
+
+      // Buy-and-place premium indicator for upgrades (CG-0MT3IYSRL001VVUP):
+      // dragging an upgrade market→business is a same-turn buy-and-play that
+      // costs +50% over the listed price, exactly like business cards. Uses
+      // the same badge name so the two families stay visually/nominally
+      // consistent.
+      const premiumCost = Math.ceil(u.cost * 1.5 * 2) / 2;
+      const premiumLabel = s.add.text(
+        rightColX,
+        Math.round(renderH / 2 - 11),
+        `B&P €${premiumCost} (listed €${u.cost})`,
+        {
+          fontSize: '9px',
+          color: '#ffcc88',
+          fontFamily: FONT_FAMILY,
+          fontStyle: 'bold',
+          align: 'left',
+          backgroundColor: '#000000aa',
+        },
+      );
+      premiumLabel.setOrigin(0, 0.5);
+      premiumLabel.setName('buyAndPlacePremiumLabel');
+      container.add(premiumLabel);
     }
 
     // Apply income/reputation overlays for business and community-space cards
@@ -1239,12 +1284,13 @@ export class MainStreetRenderer {
 
     // Action economy gating (CG-0MSTOF1N5005PK2R): business/community-space
     // card purchases consume the daily action, so those cards are
-    // non-interactive (dimmed) when the budget is spent. Events/upgrades are
-    // free operations and stay interactive. Staff hires also consume an
-    // action (CG-0MT3KZOUX007GQ44), so they gate on the budget like business.
+    // non-interactive (dimmed) when the budget is spent. Staff hires also
+    // consume an action (CG-0MT3KZOUX007GQ44), and upgrades consume one when
+    // moved to hand (CG-0MT3IYSRL001VVUP) — all three gate on the budget.
+    // Events remain free operations and stay interactive.
     const noActions = s.state.actionsRemaining <= 0;
     const isBusinessLike = card.family === 'business' || card.family === 'community-space';
-    const consumesAction = isBusinessLike || card.family === 'staff';
+    const consumesAction = isBusinessLike || card.family === 'staff' || card.family === 'upgrade';
     const interactiveEnabled =
       s.uiPhase === 'market' && !isIncidentEvent && !(consumesAction && noActions);
     const selection = attachSelection(container, {
@@ -1353,7 +1399,8 @@ export class MainStreetRenderer {
     }
 
     // Dim visual feedback + tooltip for action-gaited cards (business /
-    // community-space / staff hire — CG-0MSTOF1N5005PK2R + CG-0MT3KZOUX007GQ44).
+    // community-space / staff hire / upgrades — CG-0MSTOF1N5005PK2R +
+    // CG-0MT3KZOUX007GQ44 + CG-0MT3IYSRL001VVUP).
     // The card is dimmed so the player understands it is unavailable, but
     // hovering it still shows the FULL card tooltip (regardless of
     // remaining actions, CG-0MT24RFIV007NQMP) instead of a generic
