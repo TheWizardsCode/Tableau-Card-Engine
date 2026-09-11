@@ -23,6 +23,35 @@ function forceReducedMotion(scene: Phaser.Scene & Record<string, any>): void {
   (scene.settingsPanel as { _reducedMotion: boolean })._reducedMotion = true;
 }
 
+/** Polls `predicate` until it is true, or throws after `timeoutMs`. */
+async function waitFor(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`waitFor timed out after ${timeoutMs}ms`);
+}
+
+/**
+ * Returns the labels of the buttons rendered inside the applicant overlay.
+ * `createActionButton` returns a Container holding its Text label, so button
+ * labels are found one level below the overlay container.
+ */
+function overlayButtonLabels(scene: Phaser.Scene & Record<string, any>): string[] {
+  const overlay = scene.applicantOverlayContainer as Phaser.GameObjects.Container | null;
+  if (!overlay) return [];
+  const labels: string[] = [];
+  for (const child of overlay.list as Phaser.GameObjects.GameObject[]) {
+    if (child instanceof Phaser.GameObjects.Container) {
+      for (const inner of child.list as Phaser.GameObjects.GameObject[]) {
+        if (inner instanceof Phaser.GameObjects.Text) labels.push(inner.text);
+      }
+    }
+  }
+  return labels;
+}
+
 async function bootGame(options: { width?: number; height?: number } = {}): Promise<Phaser.Scene & Record<string, any>> {
   // Clear persisted checkpoints/tutorial state so each test boots a fresh
   // game rather than resuming one saved by an earlier test's end-turn.
@@ -104,6 +133,40 @@ describe('MainStreet applicant presentation (CG-0MTFO4IQO005673N)', () => {
     expect(inHud).toBe(true);
   });
 
+  it('offers Hire and Decline actions on the applicant overlay', async () => {
+    const scene = await bootGame();
+    const card = makeApplicantCard();
+    scene.pendingApplicant = { card, targetSlotIndex: 0 };
+    scene.uiPhase = 'applicant';
+    scene.refreshAll();
+
+    const labels = overlayButtonLabels(scene);
+    expect(labels).toContain('Hire');
+    expect(labels).toContain('Decline');
+  });
+
+  it('walks the applicant on from the left screen edge to the SLL anchor centre', async () => {
+    const scene = await bootGame();
+    // Explicitly exercise the animated (non-reduced-motion) path.
+    (scene.settingsPanel as { _reducedMotion: boolean })._reducedMotion = false;
+    const card = makeApplicantCard();
+    scene.pendingApplicant = { card, targetSlotIndex: 0 };
+    scene.uiPhase = 'applicant';
+    scene.refreshAll();
+
+    const overlay = scene.applicantOverlayContainer as Phaser.GameObjects.Container;
+    expect(overlay).toBeTruthy();
+    const targetX = scene.layout.applicantCenterX as number;
+
+    // Enters from off the left edge — not already at its resting position.
+    expect(overlay.x).toBeLessThan(0);
+
+    // …and settles at the SLL applicantOverlay anchor centre.
+    await waitFor(() => Math.abs(overlay.x - targetX) <= 2);
+    expect(Math.abs(overlay.x - targetX)).toBeLessThanOrEqual(2);
+    expect(overlay.y).toBe(scene.layout.applicantCenterY);
+  });
+
   it('reuses the rendered overlay across refreshes instead of replaying the walk-on', async () => {
     const scene = await bootGame();
     const card = makeApplicantCard();
@@ -132,6 +195,9 @@ describe('MainStreet applicant presentation (CG-0MTFO4IQO005673N)', () => {
     const actionsBefore = scene.state.actionsRemaining;
     const coinsBefore = scene.state.resourceBank.coins;
     const staffBefore = scene.state.staffCards.length;
+    // Reduced motion completes the walk-in synchronously so the post-hire
+    // HUD update is observable immediately.
+    forceReducedMotion(scene);
 
     scene.uiPhase = 'applicant';
     scene.refreshAll();
@@ -143,6 +209,11 @@ describe('MainStreet applicant presentation (CG-0MTFO4IQO005673N)', () => {
     expect(scene.state.staffCards.length).toBe(staffBefore + 1);
     const hired = scene.state.staffCards[scene.state.staffCards.length - 1];
     expect((hired as any).employedAtSlot).toBe(0);
+
+    // The applicant decision is over: overlay gone, phase back to market.
+    expect(scene.applicantOverlayContainer).toBeNull();
+    expect(scene.pendingApplicant).toBeNull();
+    expect(scene.uiPhase).toBe('market');
   });
 
   it('decline walks the card off with no state side-effects', async () => {
