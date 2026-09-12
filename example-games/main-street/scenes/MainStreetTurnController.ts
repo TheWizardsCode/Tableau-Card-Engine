@@ -781,7 +781,7 @@ export class MainStreetTurnController {
       return;
     }
 
-    // ── Move to hand (free; cost paid at play) ────────────────
+    // ── Move to hand (1 action; cost paid at play) ────────────
     const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === card.id);
     const cardName = card.name;
 
@@ -800,7 +800,7 @@ export class MainStreetTurnController {
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'move-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
-        s.instructionText.setText(`"${cardName}" moved to hand (free)!`);
+        s.instructionText.setText(`"${cardName}" moved to hand (1 action)!`);
 
         // No auto-selection (CG-0MSXIQIPJ000NDTL): the card rests in hand,
         // unselected. The player must explicitly click the hand card when

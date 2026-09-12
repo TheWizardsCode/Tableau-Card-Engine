@@ -18,7 +18,7 @@
 | **Market** | The face‑up cards the player may purchase each turn. A single row of exactly **3 cards** (CG-0MSTOATDT009BRX2): 1–2 Business/Community‑Space cards, 0–1 Upgrade, 0–1 Investment event (combinations 2B+1U, 2B+1E, or 1B+1U+1E). Incidents are not purchasable; they populate a hidden face‑down **Incident Deck** instead (CG-0MSTOATDP000JNHH).
 | **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (plain score count). Coins start at 8 and Reputation starts at 3.
 | **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
-| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are taken from the single market row (free) and held until played (cost at play); **Incident** events resolve automatically from the face-down incident deck (CG-0MSTOATDP000JNHH).
+| **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are taken from the single market row (**1 action**, no coins at take) and held until played (cost at play); **Incident** events resolve automatically from the face-down incident deck (CG-0MSTOATDP000JNHH).
 | **Incident Deck** | A hidden face‑down deck of Incident cards (card back + remaining count only). Each turn the top card is revealed and resolved at the end of the turn; when the deck is exhausted, resolved events are reshuffled back in with the order rebuilt constraint‑aware (repeat‑spacing / streak limits, CG-0MSTOATDP000JNHH). A peek staff member (staff‑lookout) can look at the top card once per turn as an action.
 | **Upgrade Card** | A card that modifies a specific Business card (e.g., upgrade a Bakery to a Patisserie, increasing income and synergy range).
 | **Challenge** | A optional meta‑goal (e.g., *Build a Foodie Row*) that grants a bonus score at the end of the game if satisfied.
@@ -152,7 +152,7 @@ interface GameState {
 **Key components**
 - **Grid<T>** – generic NxM grid (used here as 1x10), now using the reusable `@core-engine` `Grid` type.
 - **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (8‑way / Chebyshev adjacency: orthogonal **and diagonal** neighbors at default range 1, extendable by upgrades) via `@core-engine/SpatialRules`.
-- **Market** – a single row of 3 face‑up cards drawn from the Business, Community Space, Upgrade, and Event (Investment‑trigger) decks, always with ≥1 Business/Community‑Space card. The row is refilled at day start; taking a card to hand is **free** (CG-0MSTOATDT009BRX2), and the listed cost is paid when the card is played or placed.
+- **Market** – a single row of 3 face‑up cards drawn from the Business, Community Space, Upgrade, and Event (Investment‑trigger) decks, always with ≥1 Business/Community‑Space card. The row is refilled at day start; taking a card to hand costs **1 action** (CG-0MSTOF1N5005PK2R businesses, CG-0MTFWBNL30043ZBM events) but no coins, and the listed cost is paid when the card is played or placed.
 - **Incident Deck** – hidden face-down deck of Incident cards, order rebuilt constraint-aware at build/reshuffle (CG-0MSTOATDP000JNHH). The top card reveals and resolves each turn during IncidentPhase; when the deck runs out, resolved events are shuffled back in.
 - **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
 - **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation also counts 1:1 toward the final score (`finalScore = coins + reputation + challengeBonuses`).
@@ -181,11 +181,11 @@ stateDiagram-v2
 
 **Phase details**
 1. **DayStart** – Increment `turn` counter, reset temporary flags, refill the single market row.
-2. **MarketPhase** – The market shows one 3‑card row (1–2 Business/Community‑Space, 0–1 Upgrade, 0–1 Investment event). Taking a card to hand is **free** (bounded only by hand capacity); the card's cost is paid when placed/played (cost‑at‑play).
+2. **MarketPhase** – The market shows one 3‑card row (1–2 Business/Community‑Space, 0–1 Upgrade, 0–1 Investment event). Taking a card to hand costs **1 action** (bounded additionally by hand capacity); the card's cost is paid when placed/played (cost‑at‑play).
 3. **ActionPhase** – The player resolves purchases:
    - **Buy Business** → `resourceBank.coins -= cost` → place card into a chosen empty slot.
    - **Buy Upgrade** → `resourceBank.coins -= cost` → apply upgrade effects to the targeted Business.
-   - **Take Event (Investment)** → add the event card to the player's hand for free (bounded by `maxHandSize`). The player may play it during MarketPhase via a `play-event` action, paying its cost then.
+   - **Take Event (Investment)** → add the event card to the player's hand for **1 action** (bounded by `maxHandSize`). The player may play it during MarketPhase via a `play-event` action, paying its cost then.
    - **Play Event (from hand)** → resolve an Investment event card from the hand immediately and remove it.
 4. **InvestmentResolution** – Reserved phase; Investment events are **not** auto‑resolved here. Unplayed events persist in the hand until the player plays them during a later MarketPhase.
 5. **IncomePhase** – For each placed Business, compute:
@@ -232,6 +232,8 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 | Operation | Cost | Notes |
 |-----------|------|-------|
 | Move a market card to hand | 1 action | Free of coins; pays the listed cost when placed. |
+| Take an Investment event to hand | 1 action | Free of coins; pays the event's listed cost when played. An event moved and played on the **same day** is the 1-action total composite below. |
+| Play a held Investment event | 1 action | Pays the event's listed cost at play. A **same-day** play of the event just moved to hand that day is a **free composite** (the move already spent the action); an event held from a previous day costs **1 action**. |
 | Play a card from hand to the street | 1 action | Pays the card's listed cost at placement. |
 | Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`) when the move leaves **no action** for the placement (same pricing as the click composite). Triggered by dragging a market card straight onto a street slot. On a Golden Mile 2-action day the placement instead consumes the remaining action at **listed cost** — drag is never cheaper than click. Upgrade cards use the same gesture, dropping onto the business they target (CG-0MT3IYSRL001VVUP). |
 | Hire a staff card | 1 action | From the general market row. |
@@ -262,7 +264,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 |--------|-------------|---------------|--------|
 | **Buy Business** | Spend coins to acquire a Business card from the market and place it on an empty slot. | Market contains Business card; `resourceBank.coins >= cost`; at least one empty slot. | Business placed; coins deducted; slot becomes occupied. |
 | **Buy Upgrade** | Move an Upgrade card from the market to the hand (the upgrade is then **applied from hand** by clicking the card and then the target business). | Market contains Upgrade card targeting a placed Business at the required level; hand has room. | Upgrade appended to hand; the daily action is spent on the move (the same-day application is then a free composite; an upgrade held from a previous day costs 1 action when applied). |
-| **Buy Event** | Take an Investment event card from the market into the hand **for free** (cost is paid when the event is executed from hand). | Market contains Investment event card; hand has room (`hand.length < maxHandSize`). | Event appended to hand; **no coins deducted** at take time. Player pays the event's listed cost when it is played during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
+| **Buy Event** | Take an Investment event card from the market into the hand for **1 action** (no coins at take; cost is paid when the event is executed from hand). | Market contains Investment event card; hand has room (`hand.length < maxHandSize`); at least 1 action remaining. | Event appended to hand; the daily action is spent; **no coins deducted** at take time. Player pays the event's listed cost when it is played during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
 | **Play Event (from hand)** | Play an Investment event card from the hand during MarketPhase. | Player holds an Investment event card in hand; current phase is MarketPhase. | Event resolved and removed from hand. |
 | **Place Business** | Choose an empty slot and put the purchased Business card there. | Business card in hand; slot is empty. | Card is now part of `streetGrid`. |
 | **Resolve Event** | Apply the effect described on an Event card. | Event card active. | Game state mutated per effect (coins, reputation, temporary modifiers). |
@@ -303,7 +305,7 @@ Loss conditions are evaluated at the end of the **Night Income** phase before ch
 | Aspect | Random Source | Visibility |
 |--------|----------------|------------|
 | **Market Draw** | Seeded RNG draws from the Business, Community Space, Upgrade, and Event decks to fill a single 3‑card market row (always ≥1 Business/Community‑Space card; 0–1 Upgrade; 0–1 Investment event). | Face‑up – player sees all options before taking.
-| **Event Cards** | Incident events populate a hidden face-down incident deck (card back + remaining count only, CG-0MSTOATDP000JNHH); the top card is revealed and resolved at the end of each turn. Investment events appear in the single market row and are taken to hand (free) and held until played (cost paid at play). | Incidents: face-down deck (count only). Investments: face-up in market, then held.
+| **Event Cards** | Incident events populate a hidden face-down incident deck (card back + remaining count only, CG-0MSTOATDP000JNHH); the top card is revealed and resolved at the end of each turn. Investment events appear in the single market row and are taken to hand (**1 action**) and held until played (cost paid at play). | Incidents: face-down deck (count only). Investments: face-up in market, then held.
 | **Challenge Generation** | Fixed set defined in `challenges.md`; no randomness.
 | **RNG Seed** | Determined by the **Game Engine** on startup (`Math.seedrandom(seedString)`). | The seed is displayed on the title screen for reproducibility.
 
