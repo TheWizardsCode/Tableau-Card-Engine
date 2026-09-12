@@ -4,6 +4,18 @@ Main Street now uses the shared **Screen Layout Language (SLL)** as its canonica
 
 The street is a 10-slot grid rendered as **2 rows × 5 columns**; synergy adjacency is **8-way (Chebyshev)** — orthogonally *and* diagonally adjacent slots count as neighbors (CG-0MSP1HCAS00785MP).
 
+## Upgrade cards: hand-first economy (CG-0MT3IYSRL001VVUP)
+
+Upgrade cards follow the business-card action economy — they are never a free second daily action:
+
+- **Click** a market upgrade → the card **moves to hand** for **1 daily action** and rests unselected.
+- **Play from hand** → click the upgrade, then a matching business. A **same-day** apply is a **free composite** (the move already spent the action); an upgrade **held from a previous day** costs **1 action** when applied.
+- **Drag** the upgrade from the market straight onto a matching business → **buy & apply now** for **1 action at the +50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`), identical to business buy-and-place. Illegal drops snap back with feedback and spend nothing.
+- When the action budget is spent the upgrade is dimmed and buying/playing it is rejected (unless a same-day composite is still pending).
+- **Escape** cancels an in-progress upgrade (or business) targeting phase — the card stays in hand and the same-day composite stays free. Escape only opens Settings when nothing is being targeted.
+
+Event cards moved the same way (each of move-to-hand / play-from-hand costs 1 action, CG-0MTFWBNL30043ZBM); refresh, sell, hint, discard, community favour and end-turn remain non-action operations.
+
 ## End-of-turn income: phased presentation (CG-0MT23O6W8003AXWJ)
 
 Ending a turn with producing businesses on the street plays a **phased

@@ -181,7 +181,11 @@ export function buildCardTooltipInfo(
     case 'upgrade': {
       const u = card;
       const noActions = options.noActionsRemaining ? '\nNo actions remaining today — end your turn.' : '';
-      return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}${noActions}`;
+      // CG-0MT3IYSRL001VVUP: upgrades follow the business-card economy — the
+      // market click moves the card to hand (1 action; same-day apply is a
+      // free composite, a held apply costs 1 action); dragging it onto a
+      // business buys-and-applies immediately at the +50% premium.
+      return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nClick: move to hand (1 action)\nDrag: buy & apply now (+50%)\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}${noActions}`;
     }
     case 'staff': {
       // Staff cards are hired directly from the general market row

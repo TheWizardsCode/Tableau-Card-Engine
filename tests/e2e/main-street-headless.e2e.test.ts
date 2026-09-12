@@ -57,35 +57,47 @@ function runGreedyGame(seed: string, maxTurns = 30): {
     const actions: PlayerAction[] = [];
     const executed: { type: string; detail: string }[] = [];
 
+    // Daily action budget for this turn (CG-0MT40HTYN008TJ6Q): every planned
+    // action below consumes one action — including `buy-upgrade`, which is the
+    // headless equivalent of the same-day click composite. Track the budget
+    // while planning so the harness never queues actions the engine would
+    // reject.
+    let actionBudget = state.actionsRemaining ?? 1;
+    const spendAction = (): boolean => {
+      if (actionBudget <= 0) return false;
+      actionBudget -= 1;
+      return true;
+    };
+
     const emptySlots = getEmptySlots(state);
     const affordable = getAffordableBusinessCards(state);
     affordable.sort((a, b) => a.cost - b.cost);
-    if (affordable.length > 0 && emptySlots.length > 0) {
+    if (affordable.length > 0 && emptySlots.length > 0 && spendAction()) {
       const card = affordable[0];
       const slot = emptySlots[0];
       actions.push({ type: 'buy-business', cardId: card.id, slotIndex: slot });
     }
 
-    if ((state.hand ?? []).some(c => c.family === 'event')) {
+    if ((state.hand ?? []).some(c => c.family === 'event') && spendAction()) {
       actions.push({ type: 'play-event' });
     }
 
     for (const card of state.market.cards) {
       if (card.family !== 'event') continue;
       const result = canPurchaseEvent(state, card.id);
-      if (result.legal) {
+      if (result.legal && spendAction()) {
         actions.push({ type: 'buy-event', cardId: card.id });
         break;
       }
     }
 
     const upgrades = getAffordableUpgradeCards(state);
-    if (upgrades.length > 0) {
+    if (upgrades.length > 0 && actionBudget > 0) {
       const upg = upgrades[0];
       const matchSlot = state.streetGrid.findIndex(
         b => b !== null && b.upgradePath === upg.targetBusiness && b.level < b.maxLevel,
       );
-      if (matchSlot >= 0) {
+      if (matchSlot >= 0 && spendAction()) {
         actions.push({ type: 'buy-upgrade', cardId: upg.id, targetSlot: matchSlot });
       }
     }
