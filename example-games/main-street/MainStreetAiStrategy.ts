@@ -270,9 +270,10 @@ export interface MainStreetAiStrategy extends AiStrategyBase {
  * Covers all action types for the single-row market
  * (CG-0MSTOATDT009BRX2):
  *   - `buy-business` / `buy-upgrade`: direct buy-and-place (pays immediately)
- *   - `buy-event`: free take-to-hand (pays at play), one entry per event in
- *     the market row
- *   - `move-to-hand`: free acquisition, bounded only by hand capacity
+ *   - `buy-event`: take an Investment event to hand (1 action — CG-0MTFWBNL30043ZBM;
+ *     pays the listed cost at play), one entry per event in the market row
+ *   - `move-to-hand`: take a non-event card to hand (1 action; bounded by hand
+ *     capacity)
  *   - `play-*-from-hand`: cost-at-play placement/activation from the hand
  *   - `discard-from-hand`: free discard (only enumerated when the hand is
  *     full, so the AI never gratuitously discards)
@@ -312,13 +313,19 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   // Favour fallback (added above) stays legal too — with end-turn always
   // present so the AI loop still terminates.
   //
-  // Same-day composite upgrade plays are the one exception
-  // (CG-0MT40HTYN008TJ6Q): applying an upgrade that was moved to hand this
-  // turn costs no action, so it stays legal (and valuable) even at zero
-  // remaining actions. Mirrors the human flow, where the composite remains
-  // playable after the move has spent the day's action.
+  // Same-day composite plays are the exception (CG-0MT40HTYN008TJ6Q,
+  // CG-0MTH5CC4H003Q4B3): applying an upgrade or playing an Investment event
+  // that was moved to hand this turn costs no action (the move already spent
+  // it), so they stay legal (and valuable) even at zero remaining actions.
+  // Mirrors the human flow, where the composite remains playable after the
+  // move has spent the day's action.
   if ((state.actionsRemaining ?? 1) <= 0) {
-    return [...actions, ...sameDayCompositeUpgradeActions(state), { type: 'end-turn' }];
+    return [
+      ...actions,
+      ...sameDayCompositeUpgradeActions(state),
+      ...sameDayCompositeEventActions(state),
+      { type: 'end-turn' },
+    ];
   }
 
   // ── buy-business (direct buy-and-place, pays immediately) ──
@@ -356,11 +363,13 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
-  // ── buy-event (free take-to-hand; cost paid at play) ─────
+  // ── buy-event (1 action; pays the listed cost at play) ───
   const eventCards = state.market.cards.filter(
     c => c.family === 'event',
   ) as EventCard[];
   for (const card of eventCards) {
+    // `canPurchaseEvent` includes the action-budget gate, so no event is
+    // offered once the day's action is spent (CG-0MTFWBNL30043ZBM).
     const result = canPurchaseEvent(state, card.id);
     if (result.legal) {
       actions.push({ type: 'buy-event', cardId: card.id });
@@ -385,12 +394,16 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   }
 
-  // ── move-to-hand (free; bounded only by hand capacity) ────
+  // ── move-to-hand (1 action; bounded by hand capacity) ────
   // Staff cards are hired directly from the market row, never moved to the
-  // hand (CG-0MT3KZNQB0053K55); skip them here.
+  // hand (CG-0MT3KZNQB0053K55); skip them here. Investment events are also
+  // skipped: they have their own `buy-event` action, which spends the same
+  // single action and records the same-day composite tracker
+  // (`justMovedEventCardId`) — enumerating them here too would let the AI
+  // acquire an event without that tracker and double-offer the same action.
   if (canAddToHand(state).legal) {
     for (const card of state.market.cards) {
-      if (card.family === 'staff') continue;
+      if (card.family === 'staff' || card.family === 'event') continue;
       actions.push({ type: 'move-to-hand', cardId: card.id });
     }
   }
@@ -526,6 +539,74 @@ function sameDayCompositeUpgradeActions(state: MainStreetState): PlayerAction[] 
 }
 
 /**
+ * Whether playing the hand card at `handIndex` is a free same-day event
+ * composite — i.e. the Investment event was taken to hand this turn, so the
+ * move already spent the day's action and the play costs nothing
+ * (CG-0MTFWBNL30043ZBM).
+ *
+ * @param state      Current game state (read-only by convention).
+ * @param handIndex  Index into `state.hand`.
+ * @returns `true` when the play would consume no action.
+ */
+export function isFreeSameDayEventPlay(state: MainStreetState, handIndex: number): boolean {
+  const card = (state.hand ?? [])[handIndex] as EventCard | undefined;
+  if (!card || card.family !== 'event' || card.trigger !== 'Investment') return false;
+  return state.justMovedEventCardId != null && state.justMovedEventCardId === card.id;
+}
+
+/**
+ * The legal free same-day composite event plays for the current state.
+ *
+ * These consume no daily action, so they are enumerated even when the budget
+ * is spent (unlike the action-consuming `buy-event` / held-event play paths).
+ * Eligibility mirrors `playEventFromHand`: an affordable Investment event that
+ * is not blocked by the Grand Opening placement gate.
+ *
+ * @param state Current game state (read-only by convention).
+ * @returns Legal `play-event-from-hand` actions that cost no action.
+ */
+function sameDayCompositeEventActions(state: MainStreetState): PlayerAction[] {
+  const actions: PlayerAction[] = [];
+  const hand = state.hand ?? [];
+  hand.forEach((card, handIndex) => {
+    if (!isFreeSameDayEventPlay(state, handIndex)) return;
+    const event = card as EventCard;
+    if (state.resourceBank.coins < event.cost) return;
+    if (
+      String((event as any).id).startsWith('evt-grand-opening') &&
+      !(state as any).businessPlacedThisTurn
+    ) {
+      return;
+    }
+    actions.push({ type: 'play-event-from-hand', handIndex });
+  });
+  return actions;
+}
+
+/**
+ * Value of spending the day's single action on a market acquisition — the
+ * one tier shared by `move-to-hand` (non-event cards) and `buy-event`
+ * (Investment events), because both cost the same action
+ * (CG-0MTFWBNL30043ZBM). Ranking them in one tier (rather than a fixed
+ * priority order) is what stops the event take from being starved now that
+ * it is no longer a free extra action.
+ *
+ * - `buy-event`: the event's net play value ({@link scoreEventAction}).
+ * - `move-to-hand`: the card's listed cost — a proxy for how valuable it is
+ *   to lock in ahead of payment (unchanged heuristic).
+ */
+function scoreMarketAcquisition(
+  state: MainStreetState,
+  action: MoveToHandAction | BuyEventAction,
+): number {
+  if (action.type === 'buy-event') {
+    return scoreEventAction(state, action);
+  }
+  const card = state.market.cards.find(c => c.id === action.cardId);
+  return card ? card.cost : 0;
+}
+
+/**
  * Selects a uniformly random legal action each turn.
  *
  * Baseline strategy used for Monte Carlo balance testing and as a
@@ -562,15 +643,20 @@ export const GreedyStrategy: MainStreetAiStrategy = {
     const handUpgradeActions = legalActions.filter(
       a => a.type === 'play-upgrade-from-hand',
     ) as PlayUpgradeFromHandAction[];
+    const handEventActions = legalActions.filter(
+      a => a.type === 'play-event-from-hand',
+    ) as PlayEventFromHandAction[];
 
-    // Priority 0: a free same-day composite upgrade play consumes no action,
-    // so it is taken before anything that spends the budget — the rest of the
-    // day's plays stay available (CG-0MT40HTYN008TJ6Q).
-    const freeCompositePlays = handUpgradeActions.filter(
-      a => isFreeSameDayUpgradePlay(state, a.handIndex),
-    );
+    // Priority 0: a free same-day composite play (upgrade apply or event
+    // play) consumes no action, so it is taken before anything that spends
+    // the budget — the rest of the day's plays stay available
+    // (CG-0MT40HTYN008TJ6Q, CG-0MTH5CC4H003Q4B3).
+    const freeCompositePlays: PlayerAction[] = [
+      ...handUpgradeActions.filter(a => isFreeSameDayUpgradePlay(state, a.handIndex)),
+      ...handEventActions.filter(a => isFreeSameDayEventPlay(state, a.handIndex)),
+    ];
     if (freeCompositePlays.length > 0) {
-      return pickBest(freeCompositePlays, a => scorePlayUpgradeFromHandAction(state, a), rng);
+      return pickBest(freeCompositePlays, a => scoreAction(state, a), rng);
     }
 
     // ── Banking-aware hoarding (CG-0MT3JMGA60091J8W) ─────────
@@ -619,32 +705,26 @@ export const GreedyStrategy: MainStreetAiStrategy = {
       return pickBest(businessActions, a => scoreBusinessAction(state, a), rng);
     }
 
-    // Priority 5: move market cards to hand for free (lock in valuable cards
-    // ahead of payment). Score by listed cost — the more expensive the card,
-    // the more valuable it is to reserve.
-    const moveActions = legalActions.filter(a => a.type === 'move-to-hand') as MoveToHandAction[];
-    if (moveActions.length > 0) {
-      return pickBest(moveActions, a => {
-        const card = state.market.cards.find(c => c.id === a.cardId);
-        return card ? card.cost : 0;
-      }, rng);
-    }
-
-    // Priority 6: buy Investment event with positive coinDelta ROI
-    const eventActions = legalActions.filter(a => a.type === 'buy-event') as BuyEventAction[];
-    if (eventActions.length > 0) {
-      const bestEvent = pickBest(eventActions, a => scoreEventAction(state, a), rng);
-      if (scoreEventAction(state, bestEvent) > 0) {
-        return bestEvent;
+    // Priority 5: spend the day's action on the best market acquisition.
+    // Moving a non-event card to hand and taking an Investment event to hand
+    // cost the same single action (CG-0MTFWBNL30043ZBM), so they compete in
+    // one value-ranked tier — a fixed priority order would starve the event
+    // path now that it is no longer a free extra action. The event score is
+    // its net play value (cost included); the move-to-hand score stays the
+    // card's listed cost (lock-in value). Value-negative acquisitions are
+    // skipped rather than taken for lack of anything else.
+    const acquisitionActions = legalActions.filter(
+      a => a.type === 'move-to-hand' || a.type === 'buy-event',
+    ) as (MoveToHandAction | BuyEventAction)[];
+    if (acquisitionActions.length > 0) {
+      const best = pickBest(acquisitionActions, a => scoreMarketAcquisition(state, a), rng);
+      if (scoreMarketAcquisition(state, best) > 0) {
+        return best;
       }
     }
-
-    // Priority 7: play a held Investment event with positive ROI
-    const playEventActions = legalActions.filter(
-      a => a.type === 'play-event-from-hand',
-    ) as PlayEventFromHandAction[];
-    if (playEventActions.length > 0) {
-      const bestEvent = pickBest(playEventActions, a => scorePlayEventFromHandAction(state, a), rng);
+    // Priority 6: play a held Investment event with positive ROI
+    if (handEventActions.length > 0) {
+      const bestEvent = pickBest(handEventActions, a => scorePlayEventFromHandAction(state, a), rng);
       if (scorePlayEventFromHandAction(state, bestEvent) > 0) {
         return bestEvent;
       }
@@ -838,17 +918,20 @@ function scoreBusinessAction(
 }
 
 /**
- * Score taking an Investment event from the market to the player's hand
- * using the final-score value heuristic:
- *   score = coinDelta + reputationDelta
+ * Score taking an Investment event from the market to the player's hand.
  *
- * A score > 0 means the event adds positive final-score value. NO cost is
- * subtracted here: taking the event to hand is FREE (CG-0MT5W1V4D007NN8Q) —
- * the event's listed cost is charged only when it is PLAYED from hand, and
- * `scorePlayEventFromHandAction` accounts for it there. Subtracting the cost
- * in both places would double-count it in the AI's evaluations.
- * Reputation is valued at 1 point per unit (plain count), matching the
- * final score function (CG-0MT3J8FXG006RCOA).
+ * The take costs the day's **one action** (CG-0MTFWBNL30043ZBM), exactly like
+ * a business `move-to-hand`, so the AI judges it as a competing use of that
+ * action rather than a free extra. The score is therefore the event's **net
+ * final-score value once played** — `coinDelta + reputationDelta - cost` —
+ * matching {@link scorePlayEventFromHandAction}: an event is only worth
+ * spending the action to acquire when playing it later is itself
+ * value-positive.
+ *
+ * No coins are deducted at take time (cost-at-play, CG-0MT5W1V4D007NN8Q): the
+ * subtraction is the deferred play cost, not an immediate charge. Reputation
+ * is valued at 1 point per unit (plain count), matching the final score
+ * function (CG-0MT3J8FXG006RCOA).
  */
 function scoreEventAction(
   state: MainStreetState,
@@ -859,7 +942,7 @@ function scoreEventAction(
   ) as EventCard | undefined;
   if (!card) return 0;
 
-  return card.coinDelta + card.reputationDelta;
+  return card.coinDelta + card.reputationDelta - card.cost;
 }
 
 /**
@@ -920,7 +1003,8 @@ function scorePlayEventFromHandAction(
  * Scores are in "net coin-equivalent value" units:
  *   - `buy-upgrade`:  `incomeBonus * horizon - cost`
  *   - `buy-business`: `(baseIncome + projectedSynergyBonus) * horizon - cost`
- *   - `buy-event`:    `coinDelta + reputationDelta` (free take; cost at play)
+ *   - `buy-event`:    `coinDelta + reputationDelta - cost` (net play value;
+ *                     the take itself spends the day's one action)
  *   - `play-event`:   fixed bonus of 5 (prefer playing over end-turn)
  *   - `end-turn`:     0 (baseline / fallback)
  *

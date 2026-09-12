@@ -465,19 +465,29 @@ describe('scoreAction', () => {
     expect(actual).toBe(expected);
   });
 
-  it('scores buy-event using coinDelta + reputationDelta (free take; no cost at acquisition)', () => {
+  it('scores buy-event as the net play value (cost included; the take spends the day\'s action)', () => {
     const state = createTestState();
     state.hand = [];
-    const eventCard = state.market.cards.find(c => c.family === 'event');
-    if (!eventCard) return; // skip if no event in market for this seed
+    // Inject a deterministic event so the assertion never silently skips.
+    state.market.cards.push({
+      family: 'event',
+      id: 'evt-ai-score',
+      name: 'Scored Event',
+      trigger: 'Investment',
+      cost: 5,
+      coinDelta: 2,
+      reputationDelta: 1,
+      effect: 'test effect',
+      target: 'All',
+    } as unknown as import('../../example-games/main-street/MainStreetCards').EventCard);
 
-    const { coinDelta, reputationDelta } = eventCard as import('../../example-games/main-street/MainStreetCards').EventCard;
-    // Acquisition to hand is free (CG-0MT5W1V4D007NN8Q); the listed cost is
-    // charged only when the event is played from hand, so the buy score does
-    // NOT subtract card.cost (that would double-count it in the play score).
-    const expected = coinDelta + reputationDelta;
-    const actual = scoreAction(state, { type: 'buy-event', cardId: eventCard.id });
-    expect(actual).toBe(expected);
+    // Taking an event to hand spends the day's one action
+    // (CG-0MTFWBNL30043ZBM), so the AI judges the eventual play value
+    // (coinDelta + reputationDelta - cost) rather than treating the take as
+    // a free extra action. Coins are still not deducted at take time
+    // (cost-at-play, CG-0MT5W1V4D007NN8Q) — the subtraction is the deferred
+    // play cost.
+    expect(scoreAction(state, { type: 'buy-event', cardId: 'evt-ai-score' })).toBe(2 + 1 - 5);
   });
 
   it('returns 0 for buy-upgrade with unknown cardId', () => {

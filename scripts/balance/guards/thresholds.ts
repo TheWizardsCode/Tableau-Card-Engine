@@ -92,6 +92,13 @@ export interface GuardrailResult {
  * (see docs/main-street/balance-guardrail-recommendations.md):
  *  - winRate_greedy_medium: 30–60 → 45–75 (measured 62 on the canonical 200-seed set)
  *  - winRate_greedy_easy:   60–85 → 60–90 (measured 83.5; Easy is the learning preset)
+ *
+ * CG-0MTH5CC4H003Q4B3 (event action economy re-baseline, 2026-09-12): the
+ * bands themselves are unchanged — Investment events now cost one daily
+ * action like every other acquisition, and the AI scores the take by the
+ * event's net play value. Measured on the regenerated canonical 200-seed
+ * baseline: Easy 85.5%, Medium 83.0%, Hard 56.5% — all comfortably inside
+ * their bands (Easy 60–100, Medium 45–95, Hard 15–75).
  *  - avgCoinsPerTurn_greedy_medium: 0–2, formalizing the producer ruling from
  *    CG-0MSP26Q5N002EH8P (net liquidity = finalCoins/turns).
  *    CG-0MSTOATDQ005XDET: widened to 0–2.5 after the Community Favour
