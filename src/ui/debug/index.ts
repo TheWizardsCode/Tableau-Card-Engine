@@ -13,5 +13,6 @@ export { createStateInspectorTool } from './StateInspectorOverlay';
 export { createGameEventLogTool } from './GameEventLogOverlay';
 export { createAiDecisionViewerTool } from './AiDecisionOverlay';
 export { createMarketCardCheatTool } from './MarketCardCheatOverlay';
+export { createStaffApplicantCheatTool } from './StaffApplicantCheatOverlay';
 export { AiDecisionRecorder } from './AiDecisionRecorder';
 export type { AiDecisionRecord } from './AiDecisionRecorder';

@@ -3023,14 +3023,15 @@ export function hasFreeEmploymentSlot(state: MainStreetState, slotIndex: number)
 const APPLICANT_CHANCE_CAP = 15;
 
 /**
- * Returns the effective per-turn income+reputation for the applicant
- * trigger chance calculation. Sum of baseIncome from all placed businesses
+ * Computes the staff-applicant trigger chance: min(income + reputation, 15).
+ *
+ * Sum of baseIncome from all placed businesses
  * plus all reputationPerTurn (business + staff) on the street.
  *
  * @param state     Current game state.
  * @returns Effective income+reputation sum (before the 15% cap).
  */
-function computeApplicantChance(state: MainStreetState): number {
+export function computeApplicantChance(state: MainStreetState): number {
   // Sum business baseIncome
   let totalIncome = 0;
   for (let i = 0; i < state.streetGrid.length; i++) {
@@ -3107,9 +3108,13 @@ export function resolveStaffApplicant(state: MainStreetState): void {
   const chance = computeApplicantChance(state);
   if (chance <= 0) return;
 
-  // Deterministic roll: roll in [0, 100), trigger if < chance
-  const roll = state.rng() * 100;
-  if (roll >= chance) return;
+  // Deterministic roll: roll in [0, 100), trigger if < chance.
+  // Dev-only forced applicant (CG-0MTY9PB51008OG5A) bypasses the roll
+  // while still respecting the eligible-slot and chance>0 guards above.
+  if (!state.forcedStaffApplicant) {
+    const roll = state.rng() * 100;
+    if (roll >= chance) return;
+  }
 
   // Pick a target slot
   const targetSlot = pickTargetSlot(state);

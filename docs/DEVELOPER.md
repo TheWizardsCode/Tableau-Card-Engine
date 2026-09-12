@@ -2665,6 +2665,42 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
     (`import.meta.env.DEV` branch in `initSettingsPanel`) so the tool is
     absent/tree-shaken from production bundles.
 
+#### Staff Application (Main Street only)
+
+- **Label:** "Staff Application"
+- **Location:** Debug Tools section of the Settings panel — appears only in
+  `MainStreetScene` (injected via a Main-Street-specific override of
+  `CardGameScene.initSettingsPanel`). Visible only when running under
+  `npm run dev` (`import.meta.env.DEV === true`).
+- **Function:** Toggles a dev-only `forcedStaffApplicant` flag that makes the
+  staff-applicant trigger fire deterministically at every day start, bypassing
+  the usual `min(income + reputation, 15)%` RNG roll. The overlay shows the
+  current state (`[ON]` / `[OFF]`) and the live computed chance
+  (e.g. `Staff Application [ON] — 12% chance`), which updates each time the
+  toggle is clicked as the underlying `computeApplicantChance(state)` value
+  changes.
+- **Constraints still respected:** Forced mode still requires at least one
+  eligible business with a free employment slot; if none exists — or the
+  computed chance is 0 — no applicant is spawned. The trigger is also
+  suppressed in tutorial/headless runs where `state.suppressApplicant` is
+  true, because `executeDayStart()` skips `resolveStaffApplicant()` entirely
+  in that case.
+- **Session-only:** The `forcedStaffApplicant` flag is not persisted by
+  save/load — it resets on a new game session.
+- **When to use:** Test the hire / decline / let-go applicant flow without
+  waiting for the random trigger. Open the Settings panel (gear icon) →
+  scroll to Debug Tools → click **Staff Application** → click `[  TOGGLE  ]`
+  to force an applicant on the next day start.
+- **Implementation:**
+  - `src/ui/debug/StaffApplicantCheatOverlay.ts` — Toggle overlay and
+    `createStaffApplicantCheatTool()` factory.
+  - `example-games/main-street/MainStreetState.ts` — `forcedStaffApplicant?:
+    boolean` dev-only field (not serialized).
+  - `example-games/main-street/MainStreetEngine.ts` — `computeApplicantChance()`
+    (exported) and the forced branch in `resolveStaffApplicant()`.
+  - `example-games/main-street/scenes/MainStreetScene.ts` — Dev-gated wiring
+    (`import.meta.env.DEV` branch in `initSettingsPanel`).
+
 ### Adding a New Debug Tool
 
 Adding a new debug tool requires minimal code:
@@ -2737,6 +2773,7 @@ To verify production safety:
 | `src/ui/debug/AiDecisionRecorder.ts` | AI decision recording singleton |
 | `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
 | `src/ui/debug/MarketCardCheatOverlay.ts` | Market Card Cheat overlay (Main Street market-replacement picker) |
+| `src/ui/debug/StaffApplicantCheatOverlay.ts` | Staff Application cheat overlay (Main Street forced-applicant toggle) |
 | `example-games/main-street/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
 | `src/ui/debug/index.ts` | Debug tools barrel file |
 | `src/ui/CardGameScene.ts` | Default debug tool registration |

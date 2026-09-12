@@ -277,6 +277,15 @@ Engine functions: `resolveStaffApplicant`, `hireStaffApplicant`,
 `onDeclineApplicant`, `MainStreetRenderer.refreshApplicant`,
 `MainStreetAnimator.animateApplicantWalkOn/WalkOff/WalkIn`.
 
+**Dev-only cheat (CG-0MTY9PB51008OG5A):** the Settings panel's Debug Tools
+section (dev builds only) includes a **Staff Application** toggle. Turning it
+on sets `state.forcedStaffApplicant = true`, which forces the applicant
+trigger at every day start (bypassing the `min(income+rep, 15)%` RNG roll)
+while still requiring an eligible business with a free employment slot. The
+overlay shows the live computed chance. The flag is session-only (not
+serialized) and is suppressed in tutorial/headless runs where
+`state.suppressApplicant` is true.
+
 ### Editing the CSV
 
 To add, remove, or modify cards, edit `card-data.csv` directly. The CSV is

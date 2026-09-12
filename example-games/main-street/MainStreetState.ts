@@ -463,6 +463,12 @@ export interface MainStreetState {
   /** Suppresses the staff-applicant trigger at DayStart (CG-0MSTOATDU006UGAX: tutorial/headless). */
   suppressApplicant?: boolean;
   /**
+   * Dev-only: forces a staff applicant to appear every day start, bypassing
+   * the RNG roll (CG-0MTY9PB51008OG5A). Must still satisfy the eligible-
+   * business constraint. Not serialized in save/load.
+   */
+  forcedStaffApplicant?: boolean;
+  /**
    * Pending dual-choice incident event (CG-0MTSHG8RP008E128).
    *
    * Populated when `resolveIncident()` draws an incident whose card has

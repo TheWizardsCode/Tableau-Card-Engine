@@ -38,6 +38,7 @@ import {
   zoomOutLevel,
 } from '../MainStreetMapView';
 import { createMarketCardCheatTool } from '../../../src/ui/debug/MarketCardCheatOverlay';
+import { createStaffApplicantCheatTool } from '../../../src/ui/debug/StaffApplicantCheatOverlay';
 import { createSessionExportTool } from '../../../src/ui/debug/SessionExportTool';
 import { createStateInspectorTool } from '../../../src/ui/debug/StateInspectorOverlay';
 import { createGameEventLogTool } from '../../../src/ui/debug/GameEventLogOverlay';
@@ -82,6 +83,7 @@ export class MainStreetScene extends CardGameScene {
         createGameEventLogTool(),
         createAiDecisionViewerTool(),
         createMarketCardCheatTool(),
+        createStaffApplicantCheatTool(),
       ], vetoToggle);
       return;
     }
