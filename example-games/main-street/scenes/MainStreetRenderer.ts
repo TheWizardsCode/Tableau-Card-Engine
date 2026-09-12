@@ -610,7 +610,16 @@ export class MainStreetRenderer {
     this.dragDropRegistered.clear();
   }
 
-  /** Register empty street slots as drag-drop zones for the market phase. */
+  /**
+   * Register street slots as drag-drop zones for the market phase.
+   *
+   * A single registration pass covers both drag models, dispatching on the
+   * dragged card's family inside `canAccept`:
+   *
+   * - business / community-space cards drop onto an EMPTY slot;
+   * - upgrade cards drop onto an OCCUPIED slot whose business is a legal
+   *   target for that upgrade (CG-0MT3IYSRL001VVUP).
+   */
   private refreshDragDropZones(): void {
     const s = this.scene;
     if (!s.dragDropManager || s.replayMode) return;
@@ -618,7 +627,6 @@ export class MainStreetRenderer {
 
     const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
     for (let i = 0; i < GRID_SIZE; i++) {
-      if (s.state.streetGrid[i]) continue; // occupied slots are invalid drop targets
       const col = i % streetCols;
       const row = Math.floor(i / streetCols);
       const cx = streetX + col * (slotW + slotGap) + slotW / 2;
@@ -628,30 +636,80 @@ export class MainStreetRenderer {
       s.dragDropManager.registerDropZone({
         zone,
         data: i,
-        canAccept: (payload: any) =>
-          s.msTurnController.canDropBusinessCard(payload.data as string, i),
+        canAccept: (payload: any) => {
+          const cardId = payload.data as string;
+          const card = s.state.market.cards.find((c: any) => c.id === cardId);
+          if (card?.family === 'upgrade') {
+            return s.msTurnController.canDropUpgradeCard(cardId, i);
+          }
+          // Occupied slots are never valid business drop targets.
+          return s.state.streetGrid[i] === null &&
+            s.msTurnController.canDropBusinessCard(cardId, i);
+        },
       });
       s.streetContainer.add(zone);
     }
   }
 
-  /** Outline empty street slots while a drag is active (valid-drop hint). */
-  public showDragHighlights(): void {
+  /**
+   * Outline the legal drop targets while a drag is active (valid-drop hint).
+   *
+   * Business drags highlight empty slots green. Upgrade drags highlight
+   * OCCUPIED business slots — green when the business is a legal target for
+   * that upgrade, red when it is not, so the player can see the eligible
+   * targets before releasing (CG-0MT3IYSRL001VVUP).
+   *
+   * @param cardId  The dragged market card's id (drives which model applies).
+   */
+  public showDragHighlights(cardId?: string): void {
     const s = this.scene;
     this.clearDragHighlights();
+    const card = cardId
+      ? s.state.market.cards.find((c: any) => c.id === cardId)
+      : undefined;
+    const isUpgrade = card?.family === 'upgrade';
+
     const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
     for (let i = 0; i < GRID_SIZE; i++) {
-      if (s.state.streetGrid[i]) continue;
+      const occupied = !!s.state.streetGrid[i];
+      let validity: 'valid' | 'invalid';
+      if (isUpgrade) {
+        if (!occupied) continue; // an upgrade can only land on a business
+        validity = s.msTurnController.canDropUpgradeCard(card!.id, i) ? 'valid' : 'invalid';
+      } else {
+        if (occupied) continue; // a business can only land on an empty slot
+        validity = 'valid';
+      }
+
       const col = i % streetCols;
       const row = Math.floor(i / streetCols);
       const x = streetX + col * (slotW + slotGap) + slotW / 2;
       const y = streetTop + row * (slotH + streetRowGap) + slotH / 2;
       const hl = s.add.rectangle(x, y, slotW, slotH);
-      hl.setStrokeStyle(2, 0x44ff66, 0.8);
+      hl.setStrokeStyle(2, validity === 'valid' ? 0x44ff66 : 0xff4444, 0.8);
       hl.setFillStyle(0x000000, 0);
+      hl.setData('slotIndex', i);
+      hl.setData('validity', validity);
       s.streetContainer.add(hl);
       this.dragHighlightRects.add(hl);
     }
+  }
+
+  /**
+   * The live drag highlights as `{ slotIndex, validity }` pairs (empty when no
+   * drag is in progress). Exposes the green/red drop-target feedback for
+   * introspection alongside `getMarketRowCards()`.
+   */
+  public getDragHighlights(): Array<{ slotIndex: number; validity: 'valid' | 'invalid' }> {
+    const highlights: Array<{ slotIndex: number; validity: 'valid' | 'invalid' }> = [];
+    for (const rect of this.dragHighlightRects) {
+      if (!rect?.active) continue;
+      highlights.push({
+        slotIndex: rect.getData('slotIndex'),
+        validity: rect.getData('validity'),
+      });
+    }
+    return highlights;
   }
 
   /** Remove drag highlights (called on dragend and defensively on refresh). */
@@ -1326,13 +1384,16 @@ export class MainStreetRenderer {
     if (interactiveEnabled) {
       s.marketSelectionByCardId.set(card.id, selection);
 
-      // Business AND community-space cards in the Development row are
-      // draggable (drag-to-buy/place). Events and upgrades stay click-only:
-      // they live in the market row but are not part of the drag-drop
-      // module's dev-row model (CG-0MSKSAREE007AYSZ + operator decision A
-      // for the T13 Library drag support).
+      // Business, community-space AND upgrade cards in the Development row
+      // are draggable. For business-like cards the gesture is drag-to-buy/
+      // place onto an empty slot; for upgrades it is the same-turn
+      // buy-and-play onto a matching business at the +50% premium
+      // (CG-0MSTOF1N5005PK2R + CG-0MT3IYSRL001VVUP). Events stay click-only:
+      // they are not part of the drag-drop row model (CG-0MSKSAREE007AYSZ +
+      // operator decision A for the T13 Library drag support).
+      const isUpgradeCard = card.family === 'upgrade';
       const isDraggableCard =
-        (card.family === 'business' || card.family === 'community-space') &&
+        (card.family === 'business' || card.family === 'community-space' || isUpgradeCard) &&
         !!s.dragDropManager && !s.replayMode;
 
       if (isDraggableCard) {
@@ -1349,8 +1410,14 @@ export class MainStreetRenderer {
           gameObject: container,
           data: card.id,
           hitArea: hitAreaRect,
-          canPickUp: () => s.msTurnController.canPickUpBusinessCard(card.id),
-          onDrop: (payload: any) => s.msTurnController.onDragDropBusiness(payload),
+          canPickUp: () =>
+            isUpgradeCard
+              ? s.msTurnController.canPickUpUpgradeCard(card.id)
+              : s.msTurnController.canPickUpBusinessCard(card.id),
+          onDrop: (payload: any) =>
+            isUpgradeCard
+              ? s.msTurnController.onDragDropUpgrade(payload)
+              : s.msTurnController.onDragDropBusiness(payload),
         });
         this.dragDropRegistered.add(container);
         container.setName(`ms-market-card-${card.id}`);
@@ -1376,8 +1443,9 @@ export class MainStreetRenderer {
         });
         s.marketSelectionManager.registerTarget(container);
       } else {
-        // ── Click-only card (event, upgrade) ────────────────
-        // Existing pointerdown-based path, unchanged.
+        // ── Click-only card (event) ────────────────
+        // Existing pointerdown-based path, unchanged. Upgrades take the
+        // draggable branch above when the action budget allows.
         const hitArea = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
         hitArea.setInteractive({ useHandCursor: true });
         hitArea.on('pointerdown', () => {
@@ -1420,7 +1488,13 @@ export class MainStreetRenderer {
         const hover = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
         hover.setInteractive({ useHandCursor: false });
         hover.on('pointerover', () => {
-          const info = buildCardTooltipInfo(card, s.state.config, { includeEventDetail: true });
+          // Upgrades additionally state WHY they are unavailable: the full card
+          // details stay (CG-0MT24RFIV007NQMP) and the blocking reason is added
+          // alongside (CG-0MT3IYSRL001VVUP).
+          const info = buildCardTooltipInfo(card, s.state.config, {
+            includeEventDetail: true,
+            noActionsRemaining: card.family === 'upgrade',
+          });
           s.tooltipManager?.show(info, container.x, container.y);
         });
         hover.on('pointerout', () => s.tooltipManager?.hide());

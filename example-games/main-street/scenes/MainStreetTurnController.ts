@@ -13,13 +13,14 @@ import {
   canPurchaseEvent,
   canPurchaseBusiness,
   canPurchaseStaff,
+  canBuyAndPlaceUpgrade,
   canRefreshMarket,
   canSellBusiness,
   computeSellRefund,
 } from '../MainStreetMarket';
 import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import { computeSynergyPairs, diffNewSynergyPairs, type SynergyPair } from '../MainStreetAdjacency';
-import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, playBusinessFromHandCommand, playUpgradeFromHandCommand, peekIncidentDeckCommand, hireStaffCardCommand, resolveEventChoiceCommand } from '../MainStreetCommands';
+import { buyBusinessCommand, moveToHandCommand, moveEventToHandCommand, playEventCommand, refreshMarketCommand, buyAndPlaceBusinessCommand, buyAndPlaceUpgradeCommand, playBusinessFromHandCommand, playUpgradeFromHandCommand, peekIncidentDeckCommand, hireStaffCardCommand, resolveEventChoiceCommand } from '../MainStreetCommands';
 import { recordMainStreetEvent, finalizeMainStreetTranscript } from '../MainStreetTranscript';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
@@ -876,8 +877,8 @@ export class MainStreetTurnController {
       scene: s,
       dragDistanceThreshold: DEFAULT_DRAG_DISTANCE_THRESHOLD,
       reducedMotion: !!s.settingsPanel?.reducedMotion,
-      onDragStart: () => {
-        try { s.msRenderer?.showDragHighlights?.(); } catch (_) { /* ignore */ }
+      onDragStart: (payload) => {
+        try { s.msRenderer?.showDragHighlights?.(payload?.data as string | undefined); } catch (_) { /* ignore */ }
       },
       onDragEnd: () => {
         try { s.msRenderer?.clearDragHighlights?.(); } catch (_) { /* ignore */ }
@@ -1093,6 +1094,134 @@ export class MainStreetTurnController {
       return;
     }
     startTransfer();
+  }
+
+  /**
+   * Drag-pickup validation for market upgrade cards (CG-0MT3IYSRL001VVUP).
+   *
+   * Upgrades join the Development row's drag-drop model: picking one up is the
+   * buy-and-play gesture, so the veto mirrors {@link canPickUpBusinessCard} —
+   * no pickup when the daily action budget is spent, when the player cannot
+   * afford the +50% premium, when no eligible business is on the street, or
+   * when the tutorial does not allow the `apply-upgrade` action.
+   *
+   * @param cardId  ID of the Upgrade card in the market row.
+   * @returns `true` when the upgrade may be dragged.
+   */
+  public canPickUpUpgradeCard(cardId: string): boolean {
+    const s = this.scene;
+    if (s.uiPhase !== 'market') return false;
+    // Drag-drop is a buy-and-place action — no pickup when the budget is spent.
+    if (s.state.actionsRemaining <= 0) return false;
+    const card = s.state.market.cards.find((c: any) => c.id === cardId);
+    if (!card || card.family !== 'upgrade') return false;
+
+    // The premium is charged up front, and at least one eligible business must
+    // exist to drop onto.
+    const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+    if (s.state.resourceBank.coins < premiumCost) return false;
+    const hasEligibleTarget = s.state.streetGrid.some((slot: any, index: number) =>
+      slot !== null && canBuyAndPlaceUpgrade(s.state, cardId, index).legal);
+    if (!hasEligibleTarget) return false;
+
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('apply-upgrade' as TutorialActionType);
+    if (check && !check.allowed) return false;
+
+    return true;
+  }
+
+  /**
+   * Drop-zone acceptance for a dragged upgrade (CG-0MT3IYSRL001VVUP).
+   *
+   * The drop must land on the business the upgrade targets, at the upgrade's
+   * required level and below max level, with the +50% premium affordable — the
+   * whole check is delegated to {@link canBuyAndPlaceUpgrade} so the drop gate
+   * and the executed command cannot diverge. The action budget and the
+   * tutorial `apply-upgrade` gate are enforced as well.
+   *
+   * @param cardId     ID of the dragged Upgrade card.
+   * @param slotIndex  Street slot under the pointer.
+   * @returns `true` when the drop is applied.
+   */
+  public canDropUpgradeCard(cardId: string, slotIndex: number): boolean {
+    const s = this.scene;
+    if (s.state.actionsRemaining <= 0) return false;
+    if (!canBuyAndPlaceUpgrade(s.state, cardId, slotIndex).legal) return false;
+
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('apply-upgrade' as TutorialActionType);
+    if (check && !check.allowed) return false;
+
+    return true;
+  }
+
+  /**
+   * Execute a drag-drop buy-and-play of an upgrade.
+   *
+   * Applies the dragged upgrade to the drop slot in a single undoable
+   * `buyAndPlaceUpgradeCommand`: one daily action and the +50% premium,
+   * identical to the business drag-drop path. The market→business transfer
+   * animation continues from where the card was released (so a card dropped
+   * next to its target settles quickly) and plays the upgrade SFX through the
+   * scene's SoundManager, so the action is both animated and audible
+   * (reduced-motion and mute settings are respected by the shared helpers).
+   *
+   * @param payload  Drag-drop payload carrying the card id and target slot.
+   */
+  public onDragDropUpgrade(payload: DragDropPayload): void {
+    const s = this.scene;
+    const cardId = payload.data as string;
+    const slotIndex = payload.zoneData as number;
+    const sourceIndex = s.state.market.cards.findIndex((c: any) => c.id === cardId);
+    const card = s.state.market.cards.find((c: any) => c.id === cardId);
+    if (!card || sourceIndex < 0 || slotIndex == null) return;
+
+    // The dragged container follows the pointer, so its position at drop time
+    // IS the drop location — capture it before refreshAll() rebuilds the row.
+    const dropSource = { x: payload.gameObject?.x ?? 0, y: payload.gameObject?.y ?? 0 };
+    const cardName = card.name;
+
+    s.tooltipManager?.hide();
+    s.clearMarketSelection();
+    s.hiddenTransferSourceCardIds.add(cardId);
+    s.uiPhase = 'animating';
+    s.instructionText.setText(`Applying "${cardName}"...`);
+    s.refreshAll();
+
+    const afterTransfer = (): void => {
+      try {
+        const cmd = buyAndPlaceUpgradeCommand(s.state, cardId, slotIndex);
+        s.undoManager.execute(cmd);
+        try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place-upgrade', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
+        try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
+        s.instructionText.setText(`Applied "${cardName}" to slot ${slotIndex} (50% premium)`);
+      } catch (e) {
+        console.error('[MS] DragBuyAndPlaceUpgrade failed', e);
+        const container = s.msRenderer?.getMarketRowCards?.()?.[sourceIndex] ?? s.actionContainer ?? null;
+        playIllegalFeedback(container, s);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+
+      s.hiddenTransferSourceCardIds.delete(cardId);
+      s.uiPhase = 'market';
+      s.refreshAll();
+      s.refreshStreetGrid();
+      s.refreshActionButtons();
+      try {
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('apply-upgrade' as TutorialActionType);
+      } catch (_) { /* ignore */ }
+    };
+
+    const destination = s.getStreetSlotCenter(slotIndex);
+    const distancePx = Math.hypot(destination.x - dropSource.x, destination.y - dropSource.y);
+    void s.animateTransferFromMarket({
+      cardId,
+      family: 'upgrade',
+      row: 'market',
+      slotIndex: sourceIndex,
+      source: dropSource,
+      destination,
+      duration: computeDragTransferDuration(distancePx),
+    }).then(afterTransfer);
   }
 
   public onSlotClick(slotIndex: number): void {

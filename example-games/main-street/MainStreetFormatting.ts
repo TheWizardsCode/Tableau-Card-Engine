@@ -98,6 +98,13 @@ export interface CardTooltipInfoOptions {
    * market-row tooltip). Hand-held event cards omit these lines.
    */
   includeEventDetail?: boolean;
+  /**
+   * Append the reason a card cannot be acted on right now (no daily actions
+   * left) to the full card details. Additive by design: the complete card
+   * tooltip is preserved (CG-0MT24RFIV007NQMP) and the blocking reason is
+   * added alongside it (CG-0MT3IYSRL001VVUP).
+   */
+  noActionsRemaining?: boolean;
 }
 
 /**
@@ -173,7 +180,8 @@ export function buildCardTooltipInfo(
     }
     case 'upgrade': {
       const u = card;
-      return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+      const noActions = options.noActionsRemaining ? '\nNo actions remaining today — end your turn.' : '';
+      return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}${noActions}`;
     }
     case 'staff': {
       // Staff cards are hired directly from the general market row

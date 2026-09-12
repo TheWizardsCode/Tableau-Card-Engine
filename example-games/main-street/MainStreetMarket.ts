@@ -783,6 +783,67 @@ export function purchaseUpgrade(
 }
 
 /**
+ * Whether the upgrade at `cardId` can be bought and applied to the business
+ * occupying `targetSlot` in one drag-drop gesture (CG-0MT3IYSRL001VVUP).
+ *
+ * This is the slot-specific legality gate for the drag-drop path: unlike
+ * {@link canPurchaseUpgrade} (which only requires *some* eligible business
+ * on the street), the drop must land on a business that matches the
+ * upgrade's `targetBusiness` at exactly its `requiredLevel` and is still
+ * below `maxLevel`. Affordability is checked against the +50% premium — the
+ * price the drag-drop actually charges, not the listed cost.
+ *
+ * @param state      Current game state (read-only).
+ * @param cardId     ID of the Upgrade card in the market.
+ * @param targetSlot Street grid slot the card was dropped on.
+ * @param priceOverride Optional price replacing the +50% premium (GC parity
+ *                      paths charge the listed cost instead).
+ * @returns LegalityResult indicating whether the drop may be applied.
+ */
+export function canBuyAndPlaceUpgrade(
+  state: MainStreetState,
+  cardId: string,
+  targetSlot: number,
+  priceOverride?: number,
+): LegalityResult {
+  const card = state.market.cards.find(
+    c => c.id === cardId && c.family === 'upgrade',
+  ) as UpgradeCard | undefined;
+  if (!card) {
+    return { legal: false, reason: 'Card not found in the upgrade market.' };
+  }
+
+  if (targetSlot < 0 || targetSlot >= GRID_SIZE) {
+    return { legal: false, reason: `Invalid slot index: ${targetSlot}.` };
+  }
+
+  const biz = state.streetGrid[targetSlot];
+  const requiredLevel = card.requiredLevel ?? 0;
+  if (
+    !biz ||
+    biz.name !== card.targetBusiness ||
+    biz.level !== requiredLevel ||
+    biz.level >= biz.maxLevel
+  ) {
+    return {
+      legal: false,
+      reason: `Business at slot ${targetSlot} is not a valid target for this upgrade.`,
+    };
+  }
+
+  const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+  const price = priceOverride ?? premiumCost;
+  if (state.resourceBank.coins < price) {
+    return {
+      legal: false,
+      reason: `Not enough coins to buy-and-place ${card.name}${priceOverride !== undefined ? '' : ' at premium'}. Need ${price}, have ${state.resourceBank.coins}.`,
+    };
+  }
+
+  return { legal: true };
+}
+
+/**
  * Buys an upgrade from the market and applies it in one step (drag-drop
  * path, CG-0MT3IYSRL001VVUP). Charges a +50% premium on the upgrade's
  * cost.
@@ -810,17 +871,14 @@ export function buyAndPlaceUpgrade(
   const card = state.market.cards[marketIndex] as UpgradeCard;
 
   // Find the target business
-  const requiredLevel = card.requiredLevel ?? 0;
   let businessIndex: number;
   if (targetSlot !== undefined) {
-    const biz = state.streetGrid[targetSlot];
-    if (
-      !biz ||
-      biz.name !== card.targetBusiness ||
-      biz.level !== requiredLevel ||
-      biz.level >= biz.maxLevel
-    ) {
-      throw new Error(`Business at slot ${targetSlot} is not a valid target for this upgrade.`);
+    // Slot-specific legality goes through the shared helper so the drag-drop
+    // gate and the execution path can never diverge (target match, level,
+    // max-level and premium affordability in one place).
+    const targetLegality = canBuyAndPlaceUpgrade(state, cardId, targetSlot, priceOverride);
+    if (!targetLegality.legal) {
+      throw new Error(targetLegality.reason);
     }
     businessIndex = targetSlot;
   } else {
@@ -829,10 +887,10 @@ export function buyAndPlaceUpgrade(
 
   const business = state.streetGrid[businessIndex]!;
 
-  // +50% premium — integer ceil (matches current dev's buyAndPlaceUpgrade impl;
-  // the final alignment to Math.ceil(cost * 1.5 * 2) / 2 is done in CG-0MT42HHAB000VJUK
-  // together with the odd-cost assertion fix). See also buyAndPlaceBusiness.
-  const premiumCost = Math.ceil(card.cost * 1.5);
+  // +50% premium — identical formula to business buy-and-place
+  // (`Math.ceil(cost * 1.5 * 2) / 2`, see buyAndPlaceBusiness), so an upgrade
+  // drag-drop is never priced differently from a business drag-drop.
+  const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
   const price = priceOverride ?? premiumCost;
   if (state.resourceBank.coins < price) {
     throw new Error(`Not enough coins to buy-and-place ${card.name}${priceOverride !== undefined ? '' : ' at premium'}. Need ${price}, have ${state.resourceBank.coins}.`);
