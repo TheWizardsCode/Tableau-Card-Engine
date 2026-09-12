@@ -1345,12 +1345,13 @@ export class MainStreetRenderer {
     // Action economy gating (CG-0MSTOF1N5005PK2R): business/community-space
     // card purchases consume the daily action, so those cards are
     // non-interactive (dimmed) when the budget is spent. Staff hires also
-    // consume an action (CG-0MT3KZOUX007GQ44), and upgrades consume one when
-    // moved to hand (CG-0MT3IYSRL001VVUP) — all three gate on the budget.
-    // Events remain free operations and stay interactive.
+    // consume an action (CG-0MT3KZOUX007GQ44), upgrades consume one when
+    // moved to hand (CG-0MT3IYSRL001VVUP), and Investment events consume one
+    // when taken to hand (CG-0MTFWBNL30043ZBM) — all gate on the budget.
     const noActions = s.state.actionsRemaining <= 0;
     const isBusinessLike = card.family === 'business' || card.family === 'community-space';
-    const consumesAction = isBusinessLike || card.family === 'staff' || card.family === 'upgrade';
+    const consumesAction =
+      isBusinessLike || card.family === 'staff' || card.family === 'upgrade' || card.family === 'event';
     const interactiveEnabled =
       s.uiPhase === 'market' && !isIncidentEvent && !(consumesAction && noActions);
     const selection = attachSelection(container, {

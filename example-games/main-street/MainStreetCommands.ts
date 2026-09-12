@@ -261,9 +261,9 @@ export function moveToHandCommand(
 }
 
 /**
- * Command: Move an event card to hand (FREE — buy-event is a non-action
- * operation per the action economy, CG-0MSTOF1N5005PK2R). Events use the
- * cost-at-play deferral model: the move itself costs no coins.
+ * Command: Move an event card to hand (costs 1 daily action — buy-event is
+ * an action-type operation under the action economy, CG-0MTFWBNL30043ZBM).
+ * Events use the cost-at-play deferral model: the move itself costs no coins.
  */
 export function moveEventToHandCommand(
   state: MainStreetState,

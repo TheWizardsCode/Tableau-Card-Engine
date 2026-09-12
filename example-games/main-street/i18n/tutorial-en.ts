@@ -201,12 +201,14 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T9', 'body')]:
     'The market row can also hold upgrade cards, which improve businesses you own, and event cards, which boost your street when played.',
 
-  // ── T9: Buy the Local Festival ─────────────────────────────
+  // ── T10: Buy the Local Festival ────────────────────────────
   [tutorialKey('T10', 'title')]:
     'Buy the Local Festival',
   // {cardName}/{cost}/{bonus} resolved from card-data.csv (evt-festival) at render time.
+  // Investment events cost 1 action to take to hand (CG-0MTFWBNL30043ZBM):
+  // T8 ended day 2 so this step spends day 3's fresh action.
   [tutorialKey('T10', 'body')]:
-    'Click the **{cardName}** card to add it to your hand — free now, and you pay **{cost}** when you play it. It waits in your hand for the right moment.',
+    'Click the **{cardName}** card to add it to your hand — it uses today\'s action, and you pay **{cost}** when you play it. It waits in your hand for the right moment.',
 
   // ── T10: End this turn (day 2 → day 3) ────────────────────
   [tutorialKey('T11', 'title')]:
@@ -317,8 +319,10 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T23', 'title')]:
     'Triggering Events',
   // {cardName} resolved from card-data.csv (evt-festival) at render time.
+  // Playing a held Investment event costs 1 action (CG-0MTFWBNL30043ZBM);
+  // T22 ended day 8 so this step spends day 9's fresh action.
   [tutorialKey('T23', 'body')]:
-    'Two Culture businesses on your street power the festival. Click the **{cardName}** in your hand to play it.',
+    'Two Culture businesses on your street power the festival. Click the **{cardName}** in your hand to play it — it uses today\'s action.',
 
   // ── T21: Success and Failure ───────────────────────────────
   [tutorialKey('T24', 'title')]:

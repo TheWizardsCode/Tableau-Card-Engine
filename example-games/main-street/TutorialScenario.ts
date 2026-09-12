@@ -39,7 +39,7 @@
  * | Step | Action                          | Coins In | Coins Out | Balance |
  * |------|---------------------------------|----------|-----------|---------|
  * | T1   | Start (Easy, 12 coins)          | 12       | 0         | 12      |
- * | T3   | Move Laundromat to hand (free)  | 0        | 0         | 12      |
+ * | T3   | Move Laundromat to hand (1 action) | 0     | 0         | 12      |
  * | T6   | End Turn (held-card cost -1)    | 0        | 1         | 11      |
  * | T7   | Place Laundromat (listed $4)    | 0        | 4         | 7       |
  * | T8   | End Turn (day 2 → 3)            | 0        | 0         | 7       |

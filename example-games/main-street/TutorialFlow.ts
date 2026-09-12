@@ -40,36 +40,25 @@
  * With the TutorialScenario system and Easy difficulty (12 coins, 5 reputation):
  *
  * - Market development row: Bakery ($3), **Laundromat ($4)**, **Bookshop ($3)**
- * - Local Festival ($3) bought free (event moves cost no action)
+ * - Local Festival ($3) bought on day 3 — the event move costs 1 action
+ *   (CG-0MTFWBNL30043ZBM), just like a business move-to-hand
  * - Incidents in queue (5 deterministic, all budget-safe for the tutorial
  *   street): Community Award (+2 rep) ×3, Rainy Day (0 coins — no Food
  *   businesses are placed) ×2. See TutorialScenario.ts.
  *
  * ### Budget Walkthrough (two-turn plan-ahead, listed-cost placements)
  *
- * | Step | Action                           | Coins In | Coins Out | Balance |
- * |------|----------------------------------|----------|-----------|---------|
- * | T1   | Start (Easy, 12 coins)           | 12       | 0         | 12      |
- * | T3   | Move Laundromat to hand (free)   | 0        | 0         | 12      |
- * | T6   | End Turn (held card cost -1)     | 0        | 1         | 11      |
- * | T7   | Place Laundromat (listed $4)     | 0        | 4         | 7       |
- * | T9   | End Turn (day 2 -> 3)            | 0        | 0         | 7       |
- * | T11  | Buy Local Festival (event, $3)   | 0        | 0         | 7       |
- * | T12  | End Turn + income (~2.15)        | 2.154    | 0         | 9.154   |
- * | T16  | End Turn + income (~1.2)         | 1.2      | 0         | 10.354  |
- * | T17  | Community Favour (+3, 1 action)  | 3        | 0         | 13.354  |            | 3        | 0         | 12.154  |
- * | T18  | End Turn + income (~1.33)        | 1.333    | 0         | 14.687  |
- * | T19  | Place Bookshop (listed $3)       | 0        | 3         | 11.687  |
- * | T20  | End Turn + income (~3.91)        | 3.911    | 0         | 15.598  |
- * | T23  | End Turn + income (~3.92)        | 3.918    | 0         | 19.516  |
- * | T24  | Place Library (listed $7)        | 0        | 7         | 12.516  |
- * | T25  | End Turn + income (~1)           | 1.0      | 0         | 13.516  |
- * | T26  | Play Local Festival (net +1)     | 1        | 0         | 14.516  |
+ * The authoritative per-step coin walkthrough lives in `TutorialScenario.ts`
+ * (`## Coin Budget`), kept in sync with the live card data. The per-day
+ * action budget for every step is asserted by
+ * `tests/main-street/tutorial-action-economy.test.ts`.
  *
- * **Conclusion:** Every step keeps a positive balance; no premium is ever
- * paid because each placement follows an End Turn (plan-ahead). The
- * Community Favour rep→coins exchange teaches the mechanic; the Library is
- * affordable even without it, keeping the lesson low-pressure.
+ * Event steps follow the same economy as business steps
+ * (CG-0MTFWBNL30043ZBM): **taking an Investment event to hand costs 1
+ * action** (T10, on day 3) and **playing a held event costs 1 action**
+ * (T23, on day 9). Each event step is the only action-consuming step on
+ * its day — T8 and T22 end the preceding days so both start with a fresh
+ * action, so no step ever overbooks its daily budget.
  *
  * @module
  */
@@ -317,8 +306,9 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     gate: 'action',
     requiredAction: 'buy-event',
     // The TutorialScenario system puts Local Festival (evt-festival, $3)
-    // on the market row. Events move to hand FREE (no action), so this can
-    // share day 2 with the Laundromat placement (T7).
+    // on the market row. Taking an Investment event to hand costs 1 action
+    // (CG-0MTFWBNL30043ZBM), so T8 ends day 2 first — T10 spends day 3's
+    // fresh action and T11 ends that day.
     requiredCardId: 'evt-festival-0',
   },
   {
