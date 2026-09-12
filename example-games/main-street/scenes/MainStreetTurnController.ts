@@ -1587,7 +1587,7 @@ export class MainStreetTurnController {
         s.undoManager.execute(cmd);
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
-        s.instructionText.setText(`Moved event to hand (free): "${card.name}"`);
+        s.instructionText.setText(`Moved event to hand (1 action): "${card.name}"`);
       } catch (e) {
         console.error('[MS] MoveEventToHand failed', e);
         playIllegalFeedback(s.actionContainer, s);

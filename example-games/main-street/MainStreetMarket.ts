@@ -146,21 +146,13 @@ export function canPurchaseUpgrade(
 }
 
 /**
- * Checks whether the player can take an Event card from the market into their
- * hand.
- *
- * Taking an Investment event is FREE (CG-0MT5W1V4D007NN8Q) — it is held in
- * the player's hand (any mix of business and event cards, up to `maxHandSize`
- * total) and its listed cost is paid only when the event is played from hand
- * during the MarketPhase. This is the same free acquisition model as
- * `moveToHand`, so there is NO coin requirement here.
- * Incident events are drawn automatically (not taken by hand).
- *
- * @param state   Current game state.
- * @param cardId  ID of the Event card in the market.
- * @returns LegalityResult indicating whether the action is permitted.
+ * Budget-independent event acquisition legality: card exists, is an
+ * Investment-trigger event, and the hand has room. Shared by
+ * `canPurchaseEvent` (player-facing eligibility, action-aware) and
+ * `purchaseEvent` (engine helper, invoked *after* `consumeAction` has
+ * already charged the action — so it must not re-check the budget).
  */
-export function canPurchaseEvent(
+function canTakeEventToHand(
   state: MainStreetState,
   cardId: string,
 ): LegalityResult {
@@ -177,14 +169,46 @@ export function canPurchaseEvent(
     return { legal: false, reason: 'Incident events cannot be purchased; they are drawn automatically.' };
   }
 
-  // Hand capacity is the only limit — no separate "max 1 held Investment" rule
-  const handCheck = canAddToHand(state);
-  if (!handCheck.legal) {
-    return handCheck;
+  // Hand capacity is the only card-level limit — no separate "max 1 held
+  // Investment" rule.
+  return canAddToHand(state);
+}
+
+/**
+ * Checks whether the player can take an Event card from the market into their
+ * hand.
+ *
+ * Taking an Investment event costs one daily action (CG-0MTFWBNL30043ZBM),
+ * matching the business-card move-to-hand economy: it is held in the
+ * player's hand (any mix of business and event cards, up to `maxHandSize`
+ * total) and its listed cost is paid only when the event is played from
+ * hand during the MarketPhase — the move itself costs no coins. Incident
+ * events are drawn automatically (not taken by hand).
+ *
+ * This is the player-facing (controller/AI) predicate and therefore includes
+ * the action-budget gate. The engine execution path charges the action via
+ * `consumeAction` and then calls `purchaseEvent`, which uses the
+ * budget-independent `canTakeEventToHand` instead.
+ *
+ * @param state   Current game state.
+ * @param cardId  ID of the Event card in the market.
+ * @returns LegalityResult indicating whether the action is permitted.
+ */
+export function canPurchaseEvent(
+  state: MainStreetState,
+  cardId: string,
+): LegalityResult {
+  const base = canTakeEventToHand(state, cardId);
+  if (!base.legal) {
+    return base;
   }
 
-  // No coin check: taking the event to hand is free; the cost is paid when
-  // the event is executed from hand (CG-0MT5W1V4D007NN8Q).
+  // One daily action, exactly like a business move-to-hand
+  // (CG-0MTFWBNL30043ZBM). No coin check: the cost is paid when the event is
+  // executed from hand (CG-0MT5W1V4D007NN8Q).
+  if ((state.actionsRemaining ?? 0) <= 0) {
+    return { legal: false, reason: 'No actions remaining today. End your turn to start a new day.' };
+  }
 
   return { legal: true };
 }
@@ -470,11 +494,13 @@ export function canAddToHand(state: MainStreetState): LegalityResult {
 }
 
 /**
- * Moves a card from the single-row market into the player's hand for free
- * (CG-0MSTOATDT009BRX2). Bounded only by hand capacity (`maxHandSize`); the
- * market is NOT refilled mid-turn after moves (day-start refill unchanged).
- * Payment is deferred — the card's listed cost is paid when it is played
- * from hand (business on placement; upgrade/event when played/triggered).
+ * Moves a card from the single-row market into the player's hand
+ * (CG-0MSTOATDT009BRX2). The move itself costs **one daily action**
+ * (CG-0MSTOF1N5005PK2R business, CG-0MTFWBNL30043ZBM event) but no coins.
+ * Bounded by hand capacity (`maxHandSize`); the market is NOT refilled
+ * mid-turn after moves (day-start refill unchanged). Payment is deferred —
+ * the card's listed cost is paid when it is played from hand (business on
+ * placement; upgrade/event when played/triggered).
  */
 export function moveToHand(state: MainStreetState, cardId: string): PurchaseResult {
   const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
@@ -505,7 +531,7 @@ export function moveToHand(state: MainStreetState, cardId: string): PurchaseResu
     state.justMovedUpgradeCardId = card.id;
   }
 
-  addLog(state, `Moved ${card.name} to hand (free, pay on play)`, 'neutral');
+  addLog(state, `Moved ${card.name} to hand (1 action, pay on play)`, 'neutral');
 
   return { card, cost: 0, refilled: false };
 }
@@ -932,9 +958,11 @@ export function buyAndPlaceUpgrade(
 
 /**
  * Takes an Investment-trigger Event card from the market into the player's
- * hand for FREE (cost is paid at play time). The player may execute it later
+ * hand (cost is paid at play time). The move itself costs one daily action
+ * (CG-0MTFWBNL30043ZBM) and no coins. The player may execute it later
  * during the MarketPhase via `playEventFromHand` (which charges the event's
- * listed cost when it is played).
+ * listed cost when it is played); a same-day move+play composite costs a
+ * single action in total (`justMovedEventCardId`).
  *
  * @param state   Current game state (mutated in-place).
  * @param cardId  ID of the Event card in the market.
@@ -945,7 +973,10 @@ export function purchaseEvent(
   state: MainStreetState,
   cardId: string,
 ): PurchaseResult {
-  const legality = canPurchaseEvent(state, cardId);
+  // The caller (`executeAction` 'buy-event' / `moveEventToHandCommand`) has
+  // already charged the daily action via `consumeAction`, so validate only
+  // the budget-independent preconditions here (CG-0MTFWBNL30043ZBM).
+  const legality = canTakeEventToHand(state, cardId);
   if (!legality.legal) {
     throw new Error(legality.reason);
   }
@@ -955,9 +986,10 @@ export function purchaseEvent(
   );
   const card = state.market.cards[marketIndex] as EventCard;
 
-  // Free acquisition: NO coins are deducted here (CG-0MT5W1V4D007NN8Q).
-  // The event's listed cost is paid only when it is executed from hand via
-  // `playEventFromHand`.
+  // Action-only acquisition: the daily action is charged by the caller
+  // (executeAction 'buy-event' / moveEventToHandCommand), and NO coins are
+  // deducted here (CG-0MT5W1V4D007NN8Q). The event's listed cost is paid
+  // only when it is executed from hand via `playEventFromHand`.
 
   // Remove from market
   state.market.cards.splice(marketIndex, 1);
@@ -970,7 +1002,7 @@ export function purchaseEvent(
 
   (state as any).justMovedEventCardId = card.id;
 
-  addLog(state, `Moved event ${card.name} to hand (free, pay on play)`, 'neutral');
+  addLog(state, `Moved event ${card.name} to hand (1 action, pay on play)`, 'neutral');
 
   return { card, cost: 0, refilled };
 }

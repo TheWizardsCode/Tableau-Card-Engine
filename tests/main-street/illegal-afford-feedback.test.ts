@@ -16,7 +16,8 @@
  *  - onUpgradeCardClick — moves the upgrade to hand (free of coins; the
  *                         listed cost is charged when it is played onto a
  *                         business, mirroring the business deferral model)
- *  - onEventCardClick   — free take-to-hand; no coins gate (cost at play)
+ *  - onEventCardClick   — take-to-hand costs 1 action but no coins
+ *                         (listed cost is charged at play)
  *
  * @module tests/main-street/illegal-afford-feedback
  */
@@ -301,24 +302,26 @@ describe('Main Street click-path illegal-afford feedback', () => {
     });
   });
 
-  describe('onEventCardClick (free take-to-hand; cost charged at play)', () => {
-    it('moves the event to hand for free even with zero coins (no illegal-move feedback)', async () => {
+  describe('onEventCardClick (1-action take-to-hand; no coins gate, cost charged at play)', () => {
+    it('moves the event to hand at zero coins with no illegal-move feedback (action charged, coins not)', async () => {
       const event = takeInvestmentEvent(scene.state);
       event.cost = 5;
       scene.state.resourceBank.coins = 0;
       scene.state.phase = 'MarketPhase';
+      expect(scene.state.actionsRemaining).toBe(1);
 
       controller.onEventCardClick(event);
       await flushMicrotasks();
 
-      // Free acquisition (CG-0MT5W1V4D007NN8Q): no feedback, event moved to
-      // hand, coins untouched — the cost is paid only when played from hand.
+      // One daily action is charged (CG-0MTFWBNL30043ZBM), but coins stay
+      // untouched (CG-0MT5W1V4D007NN8Q cost-at-play): no illegal feedback.
       expect(scene.sound.play).not.toHaveBeenCalled();
       expect(scene.tweens.add).not.toHaveBeenCalled();
       expect(scene.state.market.cards.find((c: any) => c.id === event.id)).toBeUndefined();
       expect(scene.state.hand.some((c: any) => c.id === event.id)).toBe(true);
       expect(scene.state.resourceBank.coins).toBe(0);
-      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Moved event to hand (free)'));
+      expect(scene.state.actionsRemaining).toBe(0);
+      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Moved event to hand (1 action)'));
     });
   });
 
