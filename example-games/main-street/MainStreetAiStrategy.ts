@@ -311,9 +311,14 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   // the day rather than cycling through non-actions. The free Community
   // Favour fallback (added above) stays legal too — with end-turn always
   // present so the AI loop still terminates.
+  //
+  // Same-day composite upgrade plays are the one exception
+  // (CG-0MT40HTYN008TJ6Q): applying an upgrade that was moved to hand this
+  // turn costs no action, so it stays legal (and valuable) even at zero
+  // remaining actions. Mirrors the human flow, where the composite remains
+  // playable after the move has spent the day's action.
   if ((state.actionsRemaining ?? 1) <= 0) {
-    if (actions.length === 0) return [{ type: 'end-turn' }];
-    return [...actions, { type: 'end-turn' }];
+    return [...actions, ...sameDayCompositeUpgradeActions(state), { type: 'end-turn' }];
   }
 
   // ── buy-business (direct buy-and-place, pays immediately) ──
@@ -468,6 +473,58 @@ function getCheapestMarketCost(state: MainStreetState): number {
 
 // ── RandomStrategy ──────────────────────────────────────────
 
+// ── Same-day composite helpers (CG-0MT40HTYN008TJ6Q) ────────
+
+/**
+ * Whether applying the hand card at `handIndex` is a free same-day composite
+ * — i.e. it was moved to the hand this turn, so the move already spent the
+ * day's action and the apply costs nothing.
+ *
+ * @param state      Current game state (read-only by convention).
+ * @param handIndex  Index into `state.hand`.
+ * @returns `true` when the play would consume no action.
+ */
+export function isFreeSameDayUpgradePlay(state: MainStreetState, handIndex: number): boolean {
+  const card = (state.hand ?? [])[handIndex] as UpgradeCard | undefined;
+  if (!card || card.family !== 'upgrade') return false;
+  return state.justMovedUpgradeCardId != null && state.justMovedUpgradeCardId === card.id;
+}
+
+/**
+ * The legal free same-day composite upgrade plays for the current state.
+ *
+ * These consume no daily action, so they are enumerated even when the budget
+ * is spent (unlike every other action-consuming upgrade path). Eligibility
+ * mirrors `playUpgradeFromHand`: enough coins, and a business matching the
+ * upgrade's target at exactly its required level and below max level.
+ *
+ * @param state Current game state (read-only by convention).
+ * @returns Legal `play-upgrade-from-hand` actions that cost no action.
+ */
+function sameDayCompositeUpgradeActions(state: MainStreetState): PlayerAction[] {
+  const actions: PlayerAction[] = [];
+  const hand = state.hand ?? [];
+  hand.forEach((card, handIndex) => {
+    if (card.family !== 'upgrade') return;
+    if (!isFreeSameDayUpgradePlay(state, handIndex)) return;
+    const upgrade = card as UpgradeCard;
+    if (state.resourceBank.coins < upgrade.cost) return;
+    const requiredLevel = upgrade.requiredLevel ?? 0;
+    for (let i = 0; i < GRID_SIZE; i++) {
+      const biz = state.streetGrid[i];
+      if (
+        biz !== null &&
+        biz.name === upgrade.targetBusiness &&
+        biz.level === requiredLevel &&
+        biz.level < biz.maxLevel
+      ) {
+        actions.push({ type: 'play-upgrade-from-hand', handIndex, targetSlot: i });
+      }
+    }
+  });
+  return actions;
+}
+
 /**
  * Selects a uniformly random legal action each turn.
  *
@@ -502,6 +559,20 @@ export const GreedyStrategy: MainStreetAiStrategy = {
   chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
     const legalActions = enumerateLegalActions(state);
 
+    const handUpgradeActions = legalActions.filter(
+      a => a.type === 'play-upgrade-from-hand',
+    ) as PlayUpgradeFromHandAction[];
+
+    // Priority 0: a free same-day composite upgrade play consumes no action,
+    // so it is taken before anything that spends the budget — the rest of the
+    // day's plays stay available (CG-0MT40HTYN008TJ6Q).
+    const freeCompositePlays = handUpgradeActions.filter(
+      a => isFreeSameDayUpgradePlay(state, a.handIndex),
+    );
+    if (freeCompositePlays.length > 0) {
+      return pickBest(freeCompositePlays, a => scorePlayUpgradeFromHandAction(state, a), rng);
+    }
+
     // ── Banking-aware hoarding (CG-0MT3JMGA60091J8W) ─────────
     // Evaluate an implicit "bank actions" option alongside spending.
     // If the expected value of banked actions exceeds the value of the
@@ -529,10 +600,9 @@ export const GreedyStrategy: MainStreetAiStrategy = {
       return pickBest(handBusinessActions, a => scorePlayBusinessFromHandAction(state, a), rng);
     }
 
-    // Priority 2: play an affordable upgrade from hand (cost-at-play).
-    const handUpgradeActions = legalActions.filter(
-      a => a.type === 'play-upgrade-from-hand',
-    ) as PlayUpgradeFromHandAction[];
+    // Priority 2: play an affordable upgrade from hand (cost-at-play). Upgrades
+    // held from a previous day consume the daily action; the free same-day
+    // composite was already handled by Priority 0 above.
     if (handUpgradeActions.length > 0) {
       return pickBest(handUpgradeActions, a => scorePlayUpgradeFromHandAction(state, a), rng);
     }

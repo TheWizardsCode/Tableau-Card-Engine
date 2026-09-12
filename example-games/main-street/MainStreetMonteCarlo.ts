@@ -119,8 +119,32 @@ function chooseMarketGreedyActions(state: MainStreetState): PlayerAction[] {
   return actions;
 }
 
-function chooseDemoGreedyActions(state: MainStreetState): PlayerAction[] {
+/**
+ * Legacy `demo-greedy` turn planner.
+ *
+ * Builds the whole turn's action list upfront, so it tracks the daily action
+ * budget itself: every action it plans except `end-turn` consumes one action
+ * (CG-0MSTOF1N5005PK2R / CG-0MT40HTYN008TJ6Q — `buy-upgrade` included, as the
+ * headless equivalent of the same-day click composite). Once the budget is
+ * committed the planner stops, so a plan can never over-commit actions that
+ * the engine would then reject.
+ *
+ * Exported for budget-accounting tests.
+ *
+ * @param state Current game state (read-only by convention).
+ * @returns The planned actions for this turn, always ending with `end-turn`.
+ */
+export function chooseDemoGreedyActions(state: MainStreetState): PlayerAction[] {
   const actions: PlayerAction[] = [];
+
+  // Daily action budget available to this plan. Every planned action below
+  // (except end-turn) spends one.
+  let actionBudget = state.actionsRemaining ?? 1;
+  const spendAction = (): boolean => {
+    if (actionBudget <= 0) return false;
+    actionBudget -= 1;
+    return true;
+  };
 
   const emptySlots = getEmptySlots(state);
   const affordable = getAffordableBusinessCards(state);
@@ -129,31 +153,32 @@ function chooseDemoGreedyActions(state: MainStreetState): PlayerAction[] {
   for (const card of affordable) {
     if (emptySlots.length === 0) break;
     if (state.resourceBank.coins < card.cost) break;
+    if (!spendAction()) break;
     const slot = emptySlots.shift()!;
     actions.push({ type: 'buy-business', cardId: card.id, slotIndex: slot });
     break;
   }
 
-  if ((state.hand ?? []).some(c => c.family === 'event')) {
+  if ((state.hand ?? []).some(c => c.family === 'event') && spendAction()) {
     actions.push({ type: 'play-event' });
   }
 
   for (const card of state.market.cards) {
     if (card.family !== 'event') continue;
     const result = canPurchaseEvent(state, card.id);
-    if (result.legal) {
+    if (result.legal && spendAction()) {
       actions.push({ type: 'buy-event', cardId: card.id });
       break;
     }
   }
 
   const upgrades = getAffordableUpgradeCards(state);
-  if (upgrades.length > 0) {
+  if (upgrades.length > 0 && actionBudget > 0) {
     const upg = upgrades[0];
     const matchSlot = state.streetGrid.findIndex(
       b => b !== null && b.upgradePath === upg.targetBusiness && b.level < b.maxLevel,
     );
-    if (matchSlot >= 0) {
+    if (matchSlot >= 0 && spendAction()) {
       actions.push({ type: 'buy-upgrade', cardId: upg.id, targetSlot: matchSlot });
     }
   }

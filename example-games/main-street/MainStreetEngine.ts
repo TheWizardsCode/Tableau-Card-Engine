@@ -106,7 +106,14 @@ export interface BuyBusinessAction {
   slotIndex: number;
 }
 
-/** Buy an upgrade card and apply it to a business. */
+/**
+ * Buy an upgrade card and apply it to a business.
+ *
+ * Headless equivalent of the same-day click composite
+ * (CG-0MT3IYSRL001VVUP): the market click moves the upgrade to hand (one
+ * daily action) and applying it the same day is free, so buying and applying
+ * in one step costs exactly **one daily action** at the listed cost.
+ */
 export interface BuyUpgradeAction {
   type: 'buy-upgrade';
   cardId: string;
@@ -370,6 +377,11 @@ export function executeAction(
       consumeAction(state);
       return hireStaffCard(state, action.cardId);
     case 'buy-upgrade':
+      // One daily action, exactly like the click composite it stands in for
+      // (move-to-hand 1 action + free same-day apply, listed cost). Without
+      // this the AI and Monte Carlo scored upgrades as free actions
+      // (CG-0MT40HTYN008TJ6Q).
+      consumeAction(state);
       return purchaseUpgrade(state, action.cardId, action.targetSlot);
     case 'buy-event': {
       consumeAction(state);
