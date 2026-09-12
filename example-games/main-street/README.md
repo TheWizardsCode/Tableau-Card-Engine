@@ -220,8 +220,11 @@ business a passive specialization buff (per-business employment).
   unresolved at end-of-turn auto-declines without blocking the turn.
 - **Employment slots:** a business can employ one staff member per level
   (`level + 1` slots, minimum 1).
-- **Let-go:** lay a member off for **1 turn's salary + 1 reputation**; the
-  member's buff stops applying from the next income phase.
+- **Let-go:** open the **Manage Card** dialog on a street card (click it to
+  sell/manage) and press **[ Lay off ]** — shown only when somebody is
+  employed there. It lists who is employed and costs **1 turn's salary + 1
+  reputation**; the member's buff stops applying from the next income phase.
+  The lay-off is undoable via the scene's undo stack.
 
 Engine functions: `resolveStaffApplicant`, `hireStaffApplicant`,
 `declineStaffApplicant`, `letGoStaffMember`, `getEmploymentCapacity`,

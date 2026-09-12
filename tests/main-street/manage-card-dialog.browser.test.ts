@@ -25,7 +25,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
-import { getBusinessTemplates, type BusinessCard } from '../../example-games/main-street/MainStreetCards';
+import { createStaffDeck, getBusinessTemplates, type BusinessCard, type StaffCard } from '../../example-games/main-street/MainStreetCards';
 
 // ── Boot helpers (mirrors sell-demolition.browser.test.ts) ──
 
@@ -86,12 +86,13 @@ function makeBusiness(): BusinessCard {
 interface ManageScene extends Phaser.Scene {
   state: {
     streetGrid: Array<BusinessCard | null>;
-    resourceBank: { coins: number };
+    resourceBank: { coins: number; reputation: number };
     soldSlots: boolean[];
     discardPile: Array<{ id: string }>;
     activityLog: Array<{ text: string }>;
     actionsRemaining: number;
     phase: string;
+    staffCards: StaffCard[];
   };
   overlayObjects: Phaser.GameObjects.GameObject[];
   hudContainer?: Phaser.GameObjects.Container;
@@ -250,6 +251,57 @@ describe('MainStreet Manage Card dialog', () => {
     expect(scene.state.actionsRemaining).toBe(1);
     expect(scene.state.resourceBank.coins).toBe(coinsBefore);
     expect(scene.state.discardPile).toHaveLength(discardBefore);
+  }, 30_000);
+
+  it('offers no lay-off affordance when the managed card employs nobody', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as ManageScene;
+    placeCard(scene, 0);
+    scene.state.staffCards = [];
+    scene.refreshAll();
+
+    scene.msTurnController.onSellCard(0);
+
+    const labels = overlayTexts(scene).map((o) => o.text);
+    expect(labels).not.toContain('[ Lay off ]');
+    expect(labels.some((t) => t.includes('Employed here'))).toBe(false);
+  }, 30_000);
+
+  it('[ Lay off ] lists employed staff and lets the member go for 1 salary + 1 reputation', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as ManageScene;
+    placeCard(scene, 0);
+
+    // Employ one job applicant at slot 0, with fewer coins than its salary so
+    // the salary deduction clamps at 0 (never negative).
+    const member: StaffCard = {
+      ...createStaffDeck(1)[0],
+      id: 'manage-dialog-employed-member',
+      name: 'Test Applicant',
+      employedAtSlot: 0,
+    };
+    scene.state.staffCards = [member];
+    scene.state.resourceBank.reputation = 5;
+    scene.state.resourceBank.coins = 0;
+    scene.refreshAll();
+
+    scene.msTurnController.onSellCard(0);
+
+    // The dialog names the employed member and offers the action.
+    const listing = overlayTexts(scene).find((o) => o.text.includes('Employed here'));
+    expect(listing?.text).toContain('Test Applicant');
+    const logBefore = scene.state.activityLog.length;
+
+    findOverlayButton(scene, '[ Lay off ]').emit('pointerdown');
+
+    // Member removed, 1 reputation spent, salary clamped at 0 coins, logged,
+    // and the overlay dismissed.
+    expect(scene.state.staffCards).toHaveLength(0);
+    expect(scene.state.resourceBank.reputation).toBe(4);
+    expect(scene.state.resourceBank.coins).toBe(0);
+    expect(scene.overlayObjects).toHaveLength(0);
+    expect(scene.state.activityLog).toHaveLength(logBefore + 1);
+    expect(scene.state.activityLog[scene.state.activityLog.length - 1].text).toContain('Laid off');
   }, 30_000);
 
   it('sold cards open no dialog; animateClose degrades safely under reduced motion and replay', async () => {

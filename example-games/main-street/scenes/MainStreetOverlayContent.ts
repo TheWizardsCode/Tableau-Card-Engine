@@ -1,7 +1,8 @@
-import { sellBusinessCommand, closeBusinessCommand } from '../MainStreetCommands';
+import { sellBusinessCommand, closeBusinessCommand, letGoStaffCommand } from '../MainStreetCommands';
 import { canCloseBusiness } from '../MainStreetMarket';
 import { addLog } from '../MainStreetState';
-import type { EventCard } from '../MainStreetCards';
+import type { EventCard, StaffCard } from '../MainStreetCards';
+import { SFX_KEYS } from './MainStreetConstants';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { TurnResult } from '../MainStreetEngine';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
@@ -281,6 +282,10 @@ export class MainStreetOverlayContent {
    * All text/buttons are parented into `hudContainer` and use the overlay
    * depth convention (backdrop 199, box 200, interactive 201).
    *
+   * When the card employs staff (job applicants, CG-0MSTOATDU006UGAX) the
+   * dialog also lists them and offers `[ Lay off ]`, which charges 1 turn's
+   * salary (clamped at 0 coins) + 1 reputation through `letGoStaffCommand`.
+   *
    * @param slotIndex The grid slot index of the card to manage.
    * @param cardName  Display name of the card.
    * @param refund    Calculated sell refund amount in coins (Sell only).
@@ -294,8 +299,17 @@ export class MainStreetOverlayContent {
   ): void {
     const s = this.scene;
 
+    // Staff employed at this street card (CG-0MSTOATDU006UGAX): surfaced here
+    // so the player can actually let a member go. Their index in
+    // `state.staffCards` is what `letGoStaffCommand` expects.
+    const allStaff: StaffCard[] = (s.state.staffCards ?? []) as StaffCard[];
+    const employedStaff = allStaff
+      .map((member, index) => ({ member, index }))
+      .filter(({ member }) => member.employedAtSlot === slotIndex);
+
     const panelW = 480;
-    const panelH = 360;
+    // Extra height for the employed-staff row when it is present.
+    const panelH = employedStaff.length > 0 ? 410 : 360;
     const panelY = s.layout.gameH / 2 - panelH / 2;
     const centerX = s.layout.gameW / 2;
 
@@ -468,6 +482,55 @@ export class MainStreetOverlayContent {
       s.instructionText?.setText('Cancelled.');
     });
     s.overlayObjects.push(cancelBtn);
+
+    // ── Employed staff / lay-off (CG-0MSTOATDU006UGAX) ──────────────
+    // Only rendered when somebody is actually employed here — no empty row
+    // and no button otherwise. Laying off the most recently hired member
+    // costs 1 turn's salary (clamped at 0 coins) + 1 reputation.
+    if (employedStaff.length > 0) {
+      const names = employedStaff.map(({ member }) => member.name).join(', ');
+      const staffLine = s.add.text(
+        centerX, panelY + 305,
+        `Employed here: ${names}\nLay off: costs 1 turn's salary + 1 reputation.`,
+        { fontSize: '12px', color: '#ffcc88', fontFamily: FONT_FAMILY, align: 'center' },
+      ).setOrigin(0.5).setDepth(201);
+      if (s.hudContainer) s.hudContainer.add(staffLine);
+      s.overlayObjects.push(staffLine);
+
+      const layOffBtn = createOverlayButton(s, centerX, panelY + 352, '[ Lay off ]', 201);
+      if (s.hudContainer) s.hudContainer.add(layOffBtn);
+      layOffBtn.on('pointerdown', () => {
+        const target = employedStaff[employedStaff.length - 1];
+        let laidOff = false;
+        try {
+          const cmd = letGoStaffCommand(s.state, target.index);
+          if (s.undoManager) {
+            s.undoManager.execute(cmd);
+          } else {
+            cmd.execute();
+          }
+          addLog(
+            s.state,
+            `Laid off ${target.member.name} (−1 salary, −1 reputation)`,
+            'loss',
+          );
+          s.instructionText?.setText(`Laid off ${target.member.name} (−1 reputation)`);
+          laidOff = true;
+        } catch (e) {
+          console.error('[LayOff] Failed:', e);
+          s.instructionText?.setText(`Error laying off: ${(e as Error).message}`);
+        }
+
+        dismissOverlay(s.overlayObjects);
+        s.overlayObjects = [];
+        s.refreshAll();
+
+        // The member leaves the business: discard SFX, illegal-move feedback
+        // on failure. Presentation-only — state is already committed above.
+        safePlaySound(s, laidOff ? SFX_KEYS.DISCARD : COMMON_SFX_KEYS.ILLEGAL_MOVE);
+      });
+      s.overlayObjects.push(layOffBtn);
+    }
   }
 
   /**

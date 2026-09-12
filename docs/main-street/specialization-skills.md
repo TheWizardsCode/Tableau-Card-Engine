@@ -110,7 +110,11 @@ modes (`state.suppressApplicant`).
   `processEndOfTurn`, so ending the turn is never blocked.
 - **Let-go** (`letGoStaffMember(state, idx)`): removes the member from
   `staffCards`, deducts **1 turn's salary** (clamped at 0 coins) and **1
-  reputation**; buffs stop applying from the next income phase.
+  reputation**; buffs stop applying from the next income phase. It is
+  reachable in play from the **Manage Card** dialog (`[ Lay off ]`, shown
+  only when the street card employs somebody), which runs
+  `letGoStaffCommand` through the undo stack
+  (CG-0MTXLTIPF000KFUA).
 
 ### Scene & presentation contract (rule 8 compliant)
 
