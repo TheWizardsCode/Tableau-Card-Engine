@@ -589,6 +589,31 @@ export class MainStreetLifecycleManager {
       window.addEventListener('keydown', endTurnKeyHandler as EventListener);
     }
 
+    // Global keyboard handler: Escape cancels an in-progress hand-card
+    // targeting phase (placing-from-hand / placing-business), returning to the
+    // market phase (CG-0MT3IYSRL001VVUP). Same overlay guards as End Turn so an
+    // open dialog keeps priority.
+    const escapeKeyHandler = (ev: KeyboardEvent) => {
+      try {
+        if (s.replayMode) return;
+        if (ev.key !== 'Escape') return;
+        const overlayOpen = Array.isArray(s.overlayObjects) && s.overlayObjects.length > 0;
+        if (overlayOpen) return;
+        if ((s as any).helpPanel?.isOpen) return;
+        if ((s as any).settingsPanel?.isOpen) return;
+        if ((s as any).statsOverlay?.isOpen) return;
+        s.msTurnController?.cancelPendingPlacement?.();
+      } catch (_) {
+        // ignore runtime errors in key handler
+      }
+    };
+
+    if (s.input && s.input.keyboard) {
+      s.input.keyboard.on('keydown', escapeKeyHandler);
+    } else if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', escapeKeyHandler as EventListener);
+    }
+
     s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       markSceneInvalid(s);
       s.cleanupTransferAnimations();
@@ -597,8 +622,10 @@ export class MainStreetLifecycleManager {
       try {
         if (s.input && s.input.keyboard) {
           s.input.keyboard.off('keydown', endTurnKeyHandler);
+          s.input.keyboard.off('keydown', escapeKeyHandler);
         } else if (typeof window !== 'undefined') {
           window.removeEventListener('keydown', endTurnKeyHandler as EventListener);
+          window.removeEventListener('keydown', escapeKeyHandler as EventListener);
         }
       } catch (_) { /* ignore */ }
     });

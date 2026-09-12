@@ -338,4 +338,119 @@ describe('Main Street upgrade hand-first click flow (browser)', () => {
     expect(scene.pendingHandIndex).toBeNull();
     expect(scene.uiPhase).toBe('market');
   }, 60_000);
+
+  it('Escape cancels upgrade targeting and keeps the same-day apply free', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    const { upgrade } = setupUpgradeScene(scene, { actions: 1 });
+
+    // Move the upgrade to hand (spends the action), then start targeting it.
+    scene.onUpgradeCardClick(upgrade);
+    await waitForCondition(
+      () => scene.state.hand.some((c: any) => c.id === upgrade.id) && scene.uiPhase === 'market',
+      'upgrade resting in hand',
+    );
+    scene.onHandUpgradeCardClick(0);
+    expect(scene.uiPhase).toBe('placing-from-hand');
+    expect(scene.pendingHandIndex).toBe(0);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    // Phaser processes queued keyboard events on the next game step.
+    await wait(150);
+
+    // Targeting is abandoned: back to the market phase with no pending card,
+    // and the settings panel did NOT open (the cancel consumed Escape).
+    expect(scene.uiPhase).toBe('market');
+    expect(scene.pendingHandIndex).toBeNull();
+    expect(scene.pendingHandJustMoved).toBe(false);
+    expect(scene.settingsPanel?.isOpen).toBe(false);
+    // The card is still held, the move's action is still spent, and the
+    // same-day composite marker survives the cancel.
+    expect(scene.state.hand.some((c: any) => c.id === upgrade.id)).toBe(true);
+    expect(scene.state.actionsRemaining).toBe(0);
+    expect(scene.state.justMovedUpgradeCardId).toBe(upgrade.id);
+
+    // Re-selecting and applying after the cancel is still a free composite.
+    scene.onHandUpgradeCardClick(0);
+    expect(scene.pendingHandJustMoved).toBe(true);
+    scene.onSlotClick(0);
+    await waitForCondition(
+      () => scene.state.streetGrid[0]?.level === 1,
+      'upgrade applied after cancelling targeting',
+    );
+    expect(scene.state.actionsRemaining).toBe(0);
+  }, 60_000);
+
+  it('Escape cancels held-upgrade targeting without spending or losing the card', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    const { upgrade } = setupUpgradeScene(scene, { actions: 1, upgradeInHand: true });
+
+    scene.onHandUpgradeCardClick(0);
+    expect(scene.uiPhase).toBe('placing-from-hand');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    // Phaser processes queued keyboard events on the next game step.
+    await wait(150);
+
+    // A held card's play was never executed, so the action is unspent and the
+    // card remains available for a later attempt.
+    expect(scene.uiPhase).toBe('market');
+    expect(scene.pendingHandIndex).toBeNull();
+    expect(scene.state.actionsRemaining).toBe(1);
+    expect(scene.state.hand.some((c: any) => c.id === upgrade.id)).toBe(true);
+    expect(scene.state.streetGrid[0]?.level).toBe(0);
+  }, 60_000);
+
+  it('Escape cancels a business hand-card placement targeting as well', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    setupUpgradeScene(scene, { actions: 1 });
+
+    // Put a plain business card in the hand and select it for placement.
+    const tpl = getBusinessTemplates()[0];
+    const handBiz: BusinessCard = {
+      ...tpl,
+      id: 'escape-hand-biz',
+      family: 'business',
+      level: 0,
+      incomeBonus: 0,
+      synergyRangeBonus: 0,
+      reputationBonus: 0,
+      appliedUpgrades: [],
+    };
+    scene.state.hand = [handBiz];
+    scene.justMovedHandCardId = null;
+    scene.refreshAll();
+
+    scene.onHandBusinessCardClick(0);
+    expect(scene.uiPhase).toBe('placing-from-hand');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    // Phaser processes queued keyboard events on the next game step.
+    await wait(150);
+
+    // The shared targeting phase is cancelled for business cards too.
+    expect(scene.uiPhase).toBe('market');
+    expect(scene.pendingHandIndex).toBeNull();
+    expect(scene.state.hand.some((c: any) => c.id === handBiz.id)).toBe(true);
+  }, 60_000);
+
+  it('Escape opens the settings panel when nothing is being targeted', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    const { upgrade } = setupUpgradeScene(scene, { actions: 1 });
+
+    // Nothing is being targeted, so Escape keeps its default meaning and
+    // toggles the settings panel instead of cancelling anything.
+    expect(scene.settingsPanel?.isOpen).toBe(false);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(150);
+
+    expect(scene.settingsPanel?.isOpen).toBe(true);
+    expect(scene.uiPhase).toBe('market');
+    expect(scene.pendingHandIndex).toBeNull();
+    expect(scene.state.actionsRemaining).toBe(1);
+    expect(scene.state.market.cards.some((c: any) => c.id === upgrade.id)).toBe(true);
+  }, 60_000);
 });

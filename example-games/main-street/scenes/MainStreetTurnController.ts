@@ -1224,6 +1224,53 @@ export class MainStreetTurnController {
     }).then(afterTransfer);
   }
 
+  /**
+   * Whether a hand-card targeting phase is currently in progress — i.e. a
+   * hand card is selected and the next street click would place or apply it.
+   *
+   * Used by the Escape handler and the settings-panel toggle veto so the
+   * cancel gesture takes priority over opening the settings panel
+   * (CG-0MT3IYSRL001VVUP).
+   *
+   * @returns `true` when targeting is active.
+   */
+  public hasPendingTargeting(): boolean {
+    const s = this.scene;
+    return (
+      (s.uiPhase === 'placing-from-hand' || s.uiPhase === 'placing-business') &&
+      s.pendingHandIndex !== null
+    );
+  }
+
+  /**
+   * Cancel an in-progress hand-card targeting phase.
+   *
+   * Bound to Escape (CG-0MT3IYSRL001VVUP): clears the pending hand selection
+   * and returns the scene to the market phase. The card stays in the hand and
+   * the same-day composite markers (`justMovedHandCardId` /
+   * `justMovedUpgradeCardId`) are deliberately preserved, so re-selecting and
+   * playing the card later in the same day is still free — cancelling only
+   * abandons the targeting, never the purchase.
+   *
+   * @returns `true` when a targeting phase was cancelled.
+   */
+  public cancelPendingPlacement(): boolean {
+    const s = this.scene;
+    if (!this.hasPendingTargeting()) return false;
+
+    s.pendingHandIndex = null;
+    s.pendingHandJustMoved = false;
+    s.uiPhase = 'market';
+    s.instructionText.setText('Selection cleared — click a card to continue.');
+
+    // Drop the hand selection highlight (null clears every border).
+    if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
+      s.msRenderer.updateBusinessHandSelection(null);
+    }
+    s.refreshAll();
+    return true;
+  }
+
   public onSlotClick(slotIndex: number): void {
     const s = this.scene;
     if (s.uiPhase !== 'placing-from-hand' && s.uiPhase !== 'placing-business') return;

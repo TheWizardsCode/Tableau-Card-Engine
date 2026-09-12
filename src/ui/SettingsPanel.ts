@@ -51,6 +51,13 @@ export interface SettingsPanelConfig {
   /** Keyboard shortcut key to toggle the panel. Default: 'Escape'. */
   toggleKey?: string;
   /**
+   * Optional veto for the keyboard toggle. When supplied and it returns
+   * `false`, the toggle key is ignored (the host game can then use that key
+   * for its own in-progress interaction, e.g. cancelling a card-targeting
+   * phase). Omit to always allow toggling.
+   */
+  canToggle?: () => boolean;
+  /**
    * When true (the default), automatically create a SettingsButton that
    * toggles this panel. Set to false to manage the button yourself.
    */
@@ -152,6 +159,7 @@ export class SettingsPanel {
     widthPercent: number;
     animationDuration: number;
     toggleKey: string;
+    canToggle?: () => boolean;
     difficultyNames?: readonly string[];
     showButton: boolean;
     buttonPosition: SettingsPanelConfig['buttonPosition'];
@@ -266,6 +274,7 @@ export class SettingsPanel {
       widthPercent: config.widthPercent ?? 30,
       animationDuration: config.animationDuration ?? 300,
       toggleKey: config.toggleKey ?? 'Escape',
+      canToggle: config.canToggle,
       showButton,
       buttonPosition: config.buttonPosition,
       debugTools: config.debugTools,
@@ -1489,7 +1498,7 @@ export class SettingsPanel {
     this.keyboardListener = (event: KeyboardEvent) => {
       if (this.destroyed) return;
 
-      if (event.key === this.config.toggleKey) {
+      if (event.key === this.config.toggleKey && (this.config.canToggle?.() ?? true)) {
         this.toggle();
       }
     };

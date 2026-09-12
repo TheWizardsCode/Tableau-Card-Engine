@@ -233,7 +233,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 |-----------|------|-------|
 | Move a market card to hand | 1 action | Free of coins; pays the listed cost when placed. |
 | Play a card from hand to the street | 1 action | Pays the card's listed cost at placement. |
-| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`) when the move leaves **no action** for the placement (same pricing as the click composite). Triggered by dragging a market card straight onto a street slot. On a Golden Mile 2-action day the placement instead consumes the remaining action at **listed cost** — drag is never cheaper than click. |
+| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`) when the move leaves **no action** for the placement (same pricing as the click composite). Triggered by dragging a market card straight onto a street slot. On a Golden Mile 2-action day the placement instead consumes the remaining action at **listed cost** — drag is never cheaper than click. Upgrade cards use the same gesture, dropping onto the business they target (CG-0MT3IYSRL001VVUP). |
 | Hire a staff card | 1 action | From the general market row. |
 | Close a business/community-space card | 1 action | **No refund.** Removes the card from the street entirely (slot → `null`, card → discard pile) so the slot can be re-filled on a later day. Only non-sold cards can be closed. Selling the *same* card is free but leaves an inert sold card occupying the slot (see below). |
 
@@ -244,8 +244,11 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
   The sell dialog and activity log show the breakdown (base, synergy income, synergy rep).
 - Hint (still 1/day)
 - Discarding from hand
-- Buying/playing upgrade cards and Investment events
 - Ending the turn
+
+> Upgrade and event actions (CG-0MT3IYSRL001VVUP, CG-0MTFWBNL30043ZBM): taking an **upgrade** or **Investment event** from the market into hand, and playing either from hand, each consume **1 action** — they are action-type operations, not free operations. They are listed in the action-economy table above.
+
+> Cancelling a pending selection (CG-0MT3IYSRL001VVUP): after selecting a hand card the next street click places (business) or applies (upgrade) it. Pressing **Escape** cancels that targeting and returns to the market phase; the card stays in hand and the daily action already spent on the move is unaffected, so re-selecting and playing it later the same day still costs no second action. Escape only toggles the Settings panel when no targeting is in progress.
 
 > Sell price (CG-0MT5XO7DI0066QCT): the sell refund mirrors the buy-and-place premium (1.5× purchase + upgrades) and adds the card's current synergy value, so emergency cash reflects what the card actually earns on the grid. A card with no synergies still recovers more than before (`/2 → ×1.5`); a well-synergised card recovers coins **plus** rep-derived value automatically. The breakdown is visible before the player confirms.
 
@@ -258,7 +261,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 | Action | Description | Preconditions | Result |
 |--------|-------------|---------------|--------|
 | **Buy Business** | Spend coins to acquire a Business card from the market and place it on an empty slot. | Market contains Business card; `resourceBank.coins >= cost`; at least one empty slot. | Business placed; coins deducted; slot becomes occupied. |
-| **Buy Upgrade** | Spend coins to upgrade an existing Business card. | Market contains Upgrade card targeting a placed Business; `resourceBank.coins >= cost`. | Business card upgraded (income bonus and/or synergy range increased); coins deducted. |
+| **Buy Upgrade** | Move an Upgrade card from the market to the hand (the upgrade is then **applied from hand** by clicking the card and then the target business). | Market contains Upgrade card targeting a placed Business at the required level; hand has room. | Upgrade appended to hand; the daily action is spent on the move (the same-day application is then a free composite; an upgrade held from a previous day costs 1 action when applied). |
 | **Buy Event** | Take an Investment event card from the market into the hand **for free** (cost is paid when the event is executed from hand). | Market contains Investment event card; hand has room (`hand.length < maxHandSize`). | Event appended to hand; **no coins deducted** at take time. Player pays the event's listed cost when it is played during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
 | **Play Event (from hand)** | Play an Investment event card from the hand during MarketPhase. | Player holds an Investment event card in hand; current phase is MarketPhase. | Event resolved and removed from hand. |
 | **Place Business** | Choose an empty slot and put the purchased Business card there. | Business card in hand; slot is empty. | Card is now part of `streetGrid`. |

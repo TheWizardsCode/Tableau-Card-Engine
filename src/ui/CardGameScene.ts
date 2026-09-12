@@ -275,6 +275,9 @@ export abstract class CardGameScene extends Phaser.Scene {
    * @param skillRating  Optional AI skill rating slider configuration.
    * @param debugTools   Optional list of debug tool entries to show in the
    *                     Debug Tools section (visible only in dev mode).
+   * @param settingsToggleVeto  Optional veto for the settings toggle key
+   *                     (e.g. to let the game cancel an in-progress
+   *                     targeting phase on Escape first).
    */
   protected initSettingsPanel(
     difficultyNames?: readonly string[],
@@ -282,6 +285,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     hasTooltips?: boolean,
     skillRating?: SkillRatingConfig,
     debugTools?: DebugToolsEntry[],
+    settingsToggleVeto?: () => boolean,
   ): void {
     if (!this.soundManager) return;
     // Provide default debug tools when none are explicitly specified.
@@ -301,6 +305,7 @@ export abstract class CardGameScene extends Phaser.Scene {
       hasTooltips: hasTooltips ?? true,
       skillRating,
       debugTools: effectiveDebugTools,
+      canToggle: settingsToggleVeto,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
   }

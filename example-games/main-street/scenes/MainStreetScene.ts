@@ -55,8 +55,11 @@ export class MainStreetScene extends CardGameScene {
     skillRating?: import('../../../src/ui/SettingsPanel').SkillRatingConfig,
     debugTools?: import('../../../src/ui/debug/DebugToolsRegistry').DebugToolsEntry[],
   ): void {
+    // Escape cancels an in-progress hand-card targeting phase before it opens
+    // the settings panel (CG-0MT3IYSRL001VVUP).
+    const vetoToggle = () => this.settingsToggleAllowed();
     if (debugTools !== undefined) {
-      super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools);
+      super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools, vetoToggle);
       return;
     }
     if (import.meta.env.DEV) {
@@ -66,10 +69,22 @@ export class MainStreetScene extends CardGameScene {
         createGameEventLogTool(),
         createAiDecisionViewerTool(),
         createMarketCardCheatTool(),
-      ]);
+      ], vetoToggle);
       return;
     }
-    super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools);
+    super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools, vetoToggle);
+  }
+
+  /**
+   * Whether the settings-panel toggle key may act.
+   *
+   * While a hand-card targeting phase is active, Escape is reserved for
+   * cancelling that targeting (CG-0MT3IYSRL001VVUP); otherwise Escape toggles
+   * the settings panel as usual. The panel can always be closed with Escape.
+   */
+  private settingsToggleAllowed(): boolean {
+    if (this.settingsPanel?.isOpen) return true;
+    return !(this.msTurnController?.hasPendingTargeting?.() ?? false);
   }
   public tooltipManager?: TooltipManager;
   public msRenderer!: MainStreetRenderer;
