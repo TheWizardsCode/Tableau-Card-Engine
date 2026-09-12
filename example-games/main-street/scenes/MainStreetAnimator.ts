@@ -13,6 +13,7 @@ import { SFX_KEYS, CARD_BACK_TEMPLATE } from './MainStreetConstants';
 import { synergyLineEndpoints } from './synergyLineEndpoints';
 import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
 import { createCoinGrid, iconsForAmount, roundHalf, type CoinGridHandle } from '../coin-grid';
+import { gameplayOriginCell, mapSlotCenter } from '../MainStreetMapView';
 
 // ── Income phase animation timing (CG-0MT23O6W8003AXWJ) ────────────────
 // Tune these constants to adjust the phased income choreography pacing.
@@ -1537,6 +1538,16 @@ export class MainStreetAnimator {
 
   public getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
     const s = this.scene;
+    // Camera-aware (CG-0MTH9OVMC001V44E): the playable board is the centred
+    // cell of the displayed street lattice, and its screen position follows
+    // the map camera transform. At the default 1× framing this is identical to
+    // the legacy layout maths, so animation targets are unchanged there.
+    if (typeof s.streetLocalToScreen === 'function' && s.layout) {
+      const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
+      const origin = gameplayOriginCell(lattice);
+      const local = mapSlotCenter(origin.x, origin.y, slotIndex, s.layout, lattice);
+      return s.streetLocalToScreen(local);
+    }
     const col = slotIndex % s.layout.streetCols;
     const row = Math.floor(slotIndex / s.layout.streetCols);
     const x = s.layout.streetX + col * (s.layout.slotW + s.layout.slotGap) + s.layout.slotW / 2;

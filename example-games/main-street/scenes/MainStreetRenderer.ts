@@ -86,6 +86,16 @@ import {
 export { buildUpgradeOverlaySpec, type UpgradeOverlaySpec };
 
 import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
+import {
+  type MapSlotNode,
+  MAX_ZOOM_LEVEL,
+  MIN_ZOOM_LEVEL,
+  containerTransform,
+  streetViewportRect,
+  visibleMapSlots,
+  zoomScale,
+} from '../MainStreetMapView';
+import { ZOOM_ANIMATION_MS } from './MainStreetConstants';
 
 // markHudTransient and clearTransientHud are now imported from src/ui/Renderer
 
@@ -519,15 +529,29 @@ export class MainStreetRenderer {
 
   public refreshStreetGrid(): void {
     const s = this.scene;
+    s.ensureStreetCamera?.();
     s.streetContainer.removeAll(true);
 
-    const { gameW, streetTop, streetX, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
+    const { gameW, streetTop } = s.layout;
+
+    // ── Street-map camera (CG-0MTH9OVMC001V44E) ──
+    // Render every slot of every street cell inside the viewport, de-duplicating
+    // the plots shared between neighbouring streets. At zoom level 1 on the
+    // default 1×1 lattice this yields exactly the legacy 10 slots in legacy
+    // positions, so the pre-camera framing is preserved bit-for-bit.
+    const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
+    const nodes = visibleMapSlots(s.streetCamera, s.layout, lattice);
 
     // Section label
     const label = s.add.text(gameW / 2, streetTop - 16, '', {
       fontSize: '14px', fontStyle: 'bold', color: '#aa9966', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     s.streetContainer.add(label);
+
+    // Idle backdrop: an interactive zone covering the street viewport. It is
+    // added first (and is only interactive while zoomed out), so Phaser's
+    // topOnly input delivers slot clicks to the slots themselves.
+    this.createStreetPanZone();
 
     // Register drag-drop drop zones BEFORE drawing slot rectangles. Phaser's
     // input system uses topOnly by default, meaning pointer events are delivered
@@ -539,22 +563,261 @@ export class MainStreetRenderer {
     // render order.
     this.refreshDragDropZones();
 
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const col = i % streetCols;
-      const row = Math.floor(i / streetCols);
-      const x = streetX + col * (slotW + slotGap);
-      const y = streetTop + row * (slotH + streetRowGap);
-      const biz = s.state.streetGrid[i];
-
-      if (biz) {
-        this.drawBusinessSlot(x, y, i, biz);
-      } else {
-        this.drawEmptySlot(x, y, i);
-      }
+    for (const node of nodes) {
+      this.drawMapSlot(node);
     }
 
     // Draw synergy lines between adjacent synergistic businesses
     this.drawSynergyLines();
+
+    // Re-clip the layer to the (possibly re-computed) street band, re-apply the
+    // camera transform, and keep the always-available zoom controls in sync.
+    this.updateStreetMapMask();
+    this.applyStreetCamera(false);
+    this.updateStreetZoomControls();
+  }
+
+  /**
+   * Draws one slot of the (possibly expanded) street map.
+   *
+   * Slots of the playable board render the placed card / drop target as
+   * before. Slots belonging to a revealed neighbouring street render as inert,
+   * dimmed plots (view-only until the expanded-grid slices make them playable).
+   */
+  private drawMapSlot(node: MapSlotNode): void {
+    const s = this.scene;
+    const { localX, localY, gameplayIndex } = node;
+
+    if (gameplayIndex === null) {
+      this.drawRevealedStreetSlot(localX, localY);
+      return;
+    }
+
+    const biz = s.state.streetGrid[gameplayIndex];
+    if (biz) {
+      this.drawBusinessSlot(localX, localY, gameplayIndex, biz);
+    } else {
+      this.drawEmptySlot(localX, localY, gameplayIndex);
+    }
+  }
+
+  /**
+   * Draws a revealed-but-unplayable neighbouring street plot: an inert,
+   * low-contrast slot outline so the player can see the street exists without
+   * implying it is interactive yet.
+   */
+  private drawRevealedStreetSlot(x: number, y: number): void {
+    const s = this.scene;
+    const { slotW, slotH } = s.layout;
+    const bg = s.add.rectangle(
+      x + slotW / 2, y + slotH / 2,
+      slotW, slotH, 0x2a2a1c, 0.12,
+    );
+    bg.setStrokeStyle(1, 0x444438, 0.5);
+    s.streetContainer.add(bg);
+  }
+
+  /**
+   * Creates (or refreshes) the drag-to-pan backdrop for the street map.
+   *
+   * The backdrop is only interactive while the map is zoomed out (scale < 1),
+   * where panning is meaningful; at the default 1× framing the street fills its
+   * viewport and a "drag-pan" gesture would be a no-op, so the backdrop stays
+   * inert and cannot swallow clicks.
+   */
+  private createStreetPanZone(): void {
+    const s = this.scene;
+    if (s.replayMode) return;
+    const viewport = streetViewportRect(s.layout);
+    const zone = s.add.zone(
+      viewport.x + viewport.w / 2,
+      viewport.y + viewport.h / 2,
+      Math.max(1, viewport.w - 8),
+      Math.max(1, viewport.h - 4),
+    ).setOrigin(0.5);
+    zone.setName('ms-street-pan-zone');
+    s.streetContainer.add(zone);
+    (s.msInputManager as any)?.attachStreetPanZone?.(zone);
+  }
+
+  /**
+   * Creates the street-map viewport mask (once) and applies the camera
+   * transform to the street layer.
+   *
+   * Only `streetContainer` is transformed, so the HUD chrome (market, hand,
+   * log, challenges) stays fixed while the map zooms/pans. The mask clips the
+   * map to the street band so zoomed-out neighbouring streets can never
+   * overdraw the HUD. Zoom animation is skipped under reduced motion
+   * (`settingsPanel.reducedMotion`), which applies the new framing instantly.
+   */
+  public applyStreetCamera(animate = false): void {
+    const s = this.scene;
+    if (!s.streetContainer || !s.layout) return;
+
+    this.installStreetMapMask();
+    const target = containerTransform(s.streetCamera, s.layout);
+    const reducedMotion = !!(s.settingsPanel?.reducedMotion);
+    const container = s.streetContainer;
+
+    try {
+      const tweening = s.tweens?.isTweening?.(container) ?? false;
+      if (animate && !reducedMotion) {
+        // Restart the transition from the current framing toward the target.
+        s.tweens?.killTweensOf(container);
+        s.tweens.add({
+          targets: container,
+          scaleX: target.scale,
+          scaleY: target.scale,
+          x: target.x,
+          y: target.y,
+          duration: ZOOM_ANIMATION_MS,
+          ease: 'Cubic.easeOut',
+        });
+      } else if (!tweening) {
+        // Never interrupt an in-flight zoom tween: a re-render triggered by the
+        // camera change must not snap the layer to the target mid-transition.
+        container.setScale(target.scale);
+        container.setPosition(target.x, target.y);
+      }
+    } catch (_) {
+      // Presentation-only: a failed transform must never break the game loop.
+    }
+
+    this.updateStreetMapMask();
+  }
+
+  /**
+   * Creates the street-map viewport mask on first use. Kept visible with a
+   * transparent fill (the same pattern as the activity-log mask) so the
+   * geometry is drawn to the canvas clip path without rendering anything.
+   */
+  public installStreetMapMask(): void {
+    const s = this.scene;
+    if (s.streetMapMaskGraphics || !s.streetContainer) return;
+    try {
+      s.streetMapMaskGraphics = s.add.graphics();
+      const mask = new Phaser.Display.Masks.GeometryMask(s, s.streetMapMaskGraphics);
+      s.streetContainer.setMask(mask);
+      this.updateStreetMapMask();
+    } catch (_) {
+      s.streetMapMaskGraphics = null;
+    }
+  }
+
+  /** Updates the street-map mask rectangle to the current layout's viewport. */
+  public updateStreetMapMask(): void {
+    const s = this.scene;
+    if (!s.streetMapMaskGraphics || !s.layout) return;
+    const viewport = streetViewportRect(s.layout);
+    try {
+      s.streetMapMaskGraphics.clear();
+      s.streetMapMaskGraphics.fillStyle(0xffffff, 0);
+      s.streetMapMaskGraphics.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
+    } catch (_) {
+      // ignore in constrained test environments
+    }
+  }
+
+  /**
+   * Creates the always-available zoom control cluster on first use.
+   *
+   * The controls live in `hudContainer` (not `streetContainer`) so they stay
+   * put while the map transforms, and sit at the top-right of the street band.
+   * Zoom is never gated: the buttons stay usable in every phase.
+   */
+  private installStreetZoomControls(): void {
+    const s = this.scene;
+    if (!s.hudContainer || s.replayMode) return;
+    const viewport = streetViewportRect(s.layout);
+    const size = 26;
+    const gap = 4;
+    const x = viewport.x + viewport.w - size;
+    const y = viewport.y - 2;
+
+    const zoomOut = this.createZoomButton(x, y, size, '−', 'ms-zoom-out', () => s.zoomStreetOut());
+    const zoomIn = this.createZoomButton(x, y + size + gap, size, '+', 'ms-zoom-in', () => s.zoomStreetIn());
+    const zoomLabel = s.add.text(
+      x + size / 2,
+      y + 2 * size + gap + 4,
+      '',
+      { fontSize: '10px', color: '#998866', fontFamily: FONT_FAMILY },
+    ).setOrigin(0.5, 0).setName('ms-zoom-label');
+
+    try {
+      s.hudContainer.add(zoomOut);
+      s.hudContainer.add(zoomIn);
+      s.hudContainer.add(zoomLabel);
+      s.streetZoomControls = [zoomOut, zoomIn, zoomLabel];
+    } catch (_) {
+      // ignore UI errors in constrained test environments
+    }
+  }
+
+  /** Creates one square zoom button and registers its click handler. */
+  private createZoomButton(
+    x: number,
+    y: number,
+    size: number,
+    text: string,
+    name: string,
+    onClick: () => void,
+  ): Phaser.GameObjects.Container {
+    const s = this.scene;
+    const container = s.add.container(x + size / 2, y + size / 2).setName(name);
+    const bg = s.add.rectangle(0, 0, size, size, 0x554422, 0.85);
+    bg.setStrokeStyle(1, 0xaa8855);
+    const label = s.add.text(0, 0, text, {
+      fontSize: '16px', fontStyle: 'bold', color: '#ffcc88', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    container.add(bg);
+    container.add(label);
+    bg.setInteractive({ useHandCursor: true });
+    bg.on('pointerdown', onClick);
+    bg.on('pointerover', () => bg.setStrokeStyle(2, 0xffdd44));
+    bg.on('pointerout', () => bg.setStrokeStyle(1, 0xaa8855));
+    return container;
+  }
+
+  /**
+   * Creates the zoom controls if needed and refreshes their enabled/disabled
+   * visuals plus the zoom percentage readout. Called on every street refresh
+   * so the controls always reflect the live camera without being rebuilt
+   * mid-click.
+   */
+  public updateStreetZoomControls(): void {
+    const s = this.scene;
+    if (!s.hudContainer || s.replayMode) return;
+    if (!s.hudContainer.getByName?.('ms-zoom-out')) this.installStreetZoomControls();
+
+    const zoomOut = s.hudContainer.getByName?.('ms-zoom-out') as Phaser.GameObjects.Container | null;
+    const zoomIn = s.hudContainer.getByName?.('ms-zoom-in') as Phaser.GameObjects.Container | null;
+    const zoomLabel = s.hudContainer.getByName?.('ms-zoom-label') as Phaser.GameObjects.Text | null;
+    const level = s.streetCamera.zoomLevel;
+
+    try {
+      this.setZoomButtonEnabled(zoomOut, level < MAX_ZOOM_LEVEL);
+      this.setZoomButtonEnabled(zoomIn, level > MIN_ZOOM_LEVEL);
+      zoomLabel?.setText(`${Math.round(zoomScale(level) * 100)}%`);
+    } catch (_) {
+      // ignore UI errors in constrained test environments
+    }
+  }
+
+  /** Applies the enabled/disabled look to a zoom button's background + label. */
+  private setZoomButtonEnabled(button: Phaser.GameObjects.Container | null, enabled: boolean): void {
+    if (!button) return;
+    const bg = button.list?.[0] as Phaser.GameObjects.Rectangle | undefined;
+    const label = button.list?.[1] as Phaser.GameObjects.Text | undefined;
+    bg?.setFillStyle(0x554422, enabled ? 0.85 : 0.4);
+    label?.setColor(enabled ? '#ffcc88' : '#776655');
+  }
+
+  /**
+   * Backwards-compatible alias used by the scene API: refresh the zoom control
+   * visuals (creating them when absent).
+   */
+  public refreshStreetZoomControls(): void {
+    this.updateStreetZoomControls();
   }
 
   /**

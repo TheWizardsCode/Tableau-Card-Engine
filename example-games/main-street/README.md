@@ -57,6 +57,34 @@ Rules:
 - **Tutorial:** T13 teaches the rep→coins exchange, which speeds up the $7 Library purchase under the 12-coin scenario budget; the tutorial starts with 12 coins so the exchange is available from the first day (the tutorial's two-turn plan-ahead flow budgets it, but it is not strictly required — the budget table comments in `TutorialScenario.ts` show the Library remains affordable without it).
 - **Persistence:** `favourUsedThisTurn` is serialized with legacy-save backfill to `false`.
 
+## Street map camera: zoom and pan (CG-0MTH9OVMC001V44E)
+
+The street board is viewed through a **map-style camera** (`MainStreetMapView.ts`,
+pure geometry/camera maths, plus the Phaser wiring in `MainStreetRenderer`).
+
+- **Zoom levels.** Level 1 is the legacy framing (container scale `1`, identity
+transform), so the pre-camera 10-slot layout is reproduced exactly. Each level
+up zooms the map *out* by `scale = 1 / level` (max level 4 → 50 %/33 %/25 %).
+- **Controls (always available).** Never gated by milestones, turns, or
+resources: mouse wheel over the street band, the on-screen `−`/`+` controls at
+the top-right of the street band, `+`/`-` keys, arrow keys to pan, and `0` to
+reset the framing. Dragging the street backdrop pans while zoomed out.
+- **Viewport clipping.** Only `streetContainer` is transformed; the street layer
+is clipped to the street band by a `GeometryMask`, so HUD chrome (market, hand,
+log, challenges) stays fixed and revealed neighbouring streets can never
+overdraw it.
+- **Lattice.** `scene.setStreetViewLattice(cols, rows)` sets how many street
+cells the map displays (default `1×1`). Neighbouring cells are **view-only**
+until the expanded-grid slices (viewport rendering / save-load) make them
+playable; the playable board always stays anchored at the legacy layout origin.
+Adjacent streets share their touching slot column/row, so a `3×3` lattice
+collapses to 52 unique plots.
+- **Reduced motion.** Zoom transitions are skipped
+(`settingsPanel.reducedMotion`), applying the new framing instantly.
+- **Input.** Phaser applies container transforms to input hit testing, so slot
+clicks and drag-drop keep working at any zoom/pan; `scene.getStreetSlotCenter()`
+returns camera-transformed coordinates for animations.
+
 ## Layout files and adapter
 
 - Canonical layout JSON: `example-games/main-street/layouts/main-street.layout.json`
@@ -87,6 +115,10 @@ npx vitest run tests/ui/screen-layout-schema.test.ts tests/ui/screen-layout-mapp
 # Main Street browser/layout coverage
 npx vitest run tests/main-street/MainStreetLayoutAnchors.browser.test.ts --project browser
 npx vitest run tests/main-street/MainStreetScene.browser.test.ts --project browser
+
+# Street map camera (zoom/pan, culling, camera-mapped input)
+npx vitest run tests/main-street/map-view.test.ts --project unit
+npx vitest run tests/main-street/camera-zoom.browser.test.ts --project browser
 
 # Replay-based canonical resolution assertion
 npx vitest run tests/e2e/replay-main-street.e2e.test.ts --project unit

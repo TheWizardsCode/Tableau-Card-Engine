@@ -309,6 +309,10 @@ export class MainStreetLifecycleManager {
     s.createHeader();
     s.createContainers();
     s.createInstructions();
+    // Street-map camera (CG-0MTH9OVMC001V44E): install the viewport mask and
+    // register the always-available zoom/pan controls once the street
+    // container exists.
+    s.initStreetCamera();
     s.initSvgDebugOverlay();
 
     s.scale.off(Phaser.Scale.Events.RESIZE, s.handleResize, s);

@@ -24,6 +24,19 @@ import {
   type SceneLayout,
   STREET_ROWS,
 } from './MainStreetConstants';
+import {
+  type StreetCameraState,
+  type StreetLatticeDims,
+  clampStreetCamera,
+  clampZoomLevel,
+  defaultStreetCamera,
+  localToScreen,
+  panStreetCamera,
+  screenToLocal,
+  visibleMapSlots,
+  zoomInLevel,
+  zoomOutLevel,
+} from '../MainStreetMapView';
 import { createMarketCardCheatTool } from '../../../src/ui/debug/MarketCardCheatOverlay';
 import { createSessionExportTool } from '../../../src/ui/debug/SessionExportTool';
 import { createStateInspectorTool } from '../../../src/ui/debug/StateInspectorOverlay';
@@ -177,6 +190,40 @@ export class MainStreetScene extends CardGameScene {
 
   // Computed responsive layout metrics
   public layout!: SceneLayout;
+
+  // ── Street-map camera (CG-0MTH9OVMC001V44E) ──────────────
+  //
+  // The street board is viewed through a map-style camera: zoom level 1 is the
+  // legacy framing (scale 1, identity transform) and each level up zooms the
+  // map out to reveal neighbouring street cells. Zoom/pan is always available
+  // — never gated by milestones, turns, or resources.
+  //
+  // The camera is scene-owned (not part of `state`) because it is a pure view
+  // concern: gameplay, adjacency, and save/load stay camera-independent. The
+  // serialization slice of this epic can persist it via
+  // `getStreetCameraForTest()` / `setStreetCameraState()`.
+  public streetCamera: StreetCameraState = { zoomLevel: 1, focusX: 0, focusY: 0 };
+  /** True once the camera has been seeded from the computed layout. */
+  private streetCameraReady = false;
+  /**
+   * Displayed street lattice, in street cells. A 1×1 lattice (the default and
+   * the shipping board) renders exactly the pre-camera 10-slot street. Larger
+   * lattices reveal neighbouring streets as view-only cells; making them
+   * playable is the viewport-rendering slice of the same epic.
+   */
+  public streetViewLattice: StreetLatticeDims = { cols: 1, rows: 1 };
+  /** Mask graphics clipping the street map to its viewport band. */
+  public streetMapMaskGraphics: Phaser.GameObjects.Graphics | null = null;
+  /** Zoom control objects (owned by `hudContainer`, rebuilt on refresh). */
+  public streetZoomControls: Phaser.GameObjects.GameObject[] = [];
+  /** Active drag-to-pan gesture on the street backdrop (null when idle). */
+  public streetPanDrag: { lastX: number; lastY: number } | null = null;
+  /**
+   * Signature of the street slot set currently rendered. Zooming/panning only
+   * rebuilds the street layer when the visible slot set actually changes, so
+   * smooth panning does not re-create game objects on every pointer move.
+   */
+  private streetRenderedKey = '';
 
   // Display containers
   public hudContainer!: Phaser.GameObjects.Container;
@@ -434,6 +481,201 @@ export class MainStreetScene extends CardGameScene {
   // ── Street Grid ─────────────────────────────────────────
   public refreshStreetGrid(...args: any[]): any {
     return (this.msRenderer as any).refreshStreetGrid.apply(this.msRenderer, args);
+  }
+
+  // ── Street-map camera (CG-0MTH9OVMC001V44E) ──────────────
+
+  /**
+   * Seeds the camera from the computed layout (once) and re-clamps it against
+   * the current layout/lattice. Safe to call repeatedly — `handleResize()`
+   * recomputes `layout`, and re-clamping keeps the map framed.
+   */
+  public ensureStreetCamera(): void {
+    if (!this.layout) return;
+    if (!this.streetCameraReady) {
+      this.streetCamera = defaultStreetCamera(this.layout);
+      this.streetCameraReady = true;
+    }
+    this.streetCamera = clampStreetCamera(this.streetCamera, this.layout, this.streetViewLattice);
+  }
+
+  /** Public snapshot of the camera state (used by tests and save/load). */
+  public getStreetCameraState(): StreetCameraState {
+    this.ensureStreetCamera();
+    return { ...this.streetCamera };
+  }
+
+  /**
+   * Restores a previously captured camera state (used by tests and, later, by
+   * checkpoint resume). The value is clamped to the current lattice.
+   */
+  public setStreetCameraState(camera: Partial<StreetCameraState> | null | undefined): void {
+    if (!camera || !this.layout) return;
+    this.streetCamera = clampStreetCamera(
+      {
+        zoomLevel: camera.zoomLevel ?? this.streetCamera.zoomLevel,
+        focusX: camera.focusX ?? this.streetCamera.focusX,
+        focusY: camera.focusY ?? this.streetCamera.focusY,
+      },
+      this.layout,
+      this.streetViewLattice,
+    );
+    this.streetCameraReady = true;
+    this.applyStreetCamera(false);
+    this.syncStreetRender();
+  }
+
+  /**
+   * Re-renders the street layer only when the set of visible slots changed.
+   * Called after every camera change; the transform itself is applied
+   * separately so panning stays cheap.
+   */
+  private syncStreetRender(): void {
+    if (!this.layout) return;
+    const key = visibleMapSlots(this.streetCamera, this.layout, this.streetViewLattice)
+      .map((node) => `${node.cellX},${node.cellY},${node.slotIndex}`)
+      .join('|');
+    if (key === this.streetRenderedKey) return;
+    this.streetRenderedKey = key;
+    this.refreshStreetGrid();
+  }
+
+  /**
+   * Sets the map zoom level (1 = legacy framing, higher = zoomed out) and
+   * re-applies the street transform. Zoom is always available.
+   */
+  public setStreetZoomLevel(zoomLevel: number, animate = true): void {
+    this.ensureStreetCamera();
+    this.streetCamera = clampStreetCamera(
+      { ...this.streetCamera, zoomLevel: clampZoomLevel(zoomLevel) },
+      this.layout,
+      this.streetViewLattice,
+    );
+    // Apply the transform first so an animated zoom tweens from the old
+    // framing; the visibility sync then re-renders without interrupting it.
+    this.applyStreetCamera(animate);
+    this.syncStreetRender();
+  }
+
+  /** Zooms the street map out by one level (reveals neighbouring streets). */
+  public zoomStreetOut(animate = true): void {
+    this.setStreetZoomLevel(zoomOutLevel(this.streetCamera.zoomLevel), animate);
+  }
+
+  /** Zooms the street map in by one level (back toward the legacy framing). */
+  public zoomStreetIn(animate = true): void {
+    this.setStreetZoomLevel(zoomInLevel(this.streetCamera.zoomLevel), animate);
+  }
+
+  /** Pans the street map by a screen-pixel delta (clamped to the map bounds). */
+  public panStreetBy(dxScreen: number, dyScreen: number): void {
+    this.ensureStreetCamera();
+    this.streetCamera = panStreetCamera(
+      this.streetCamera,
+      dxScreen,
+      dyScreen,
+      this.layout,
+      this.streetViewLattice,
+    );
+    this.applyStreetCamera(false);
+    this.syncStreetRender();
+  }
+
+  /** Returns the map to the default 1× framing. */
+  public resetStreetCamera(animate = true): void {
+    if (!this.layout) return;
+    this.streetCamera = defaultStreetCamera(this.layout);
+    this.streetCameraReady = true;
+    this.applyStreetCamera(animate);
+    this.syncStreetRender();
+  }
+
+  /**
+   * Sets the number of street cells displayed by the map (each cell is a 2×5
+   * street). Neighbouring cells are view-only until the expanded-grid slices
+   * make them playable. Always keeps the playable board's origin cell anchored
+   * so the 1× framing is unchanged.
+   */
+  public setStreetViewLattice(cols: number, rows: number): void {
+    const lattice: StreetLatticeDims = {
+      cols: Math.max(1, Math.floor(cols)),
+      rows: Math.max(1, Math.floor(rows)),
+    };
+    this.streetViewLattice = lattice;
+    this.ensureStreetCamera();
+    this.streetRenderedKey = '';
+    this.applyStreetCamera(true);
+    this.syncStreetRender();
+  }
+
+  /** Current displayed street lattice (view cells). */
+  public getStreetViewLattice(): StreetLatticeDims {
+    return { ...this.streetViewLattice };
+  }
+
+  /**
+   * Applies the camera to the street layer (container scale/position plus the
+   * viewport mask). Delegates to the renderer, which owns the Phaser objects.
+   * Zoom animations are skipped under reduced motion (`animate` is ignored).
+   */
+  public applyStreetCamera(animate = false): void {
+    this.ensureStreetCamera();
+    (this.msRenderer as any)?.applyStreetCamera?.(animate);
+  }
+
+  /** Rebuilds the zoom control cluster (always-available +/- buttons). */
+  public refreshStreetZoomControls(): void {
+    (this.msRenderer as any)?.refreshStreetZoomControls?.();
+  }
+
+  /** Converts a map-local point of the street layer to canvas coordinates. */
+  public streetLocalToScreen(point: { x: number; y: number }): { x: number; y: number } {
+    this.ensureStreetCamera();
+    return localToScreen(point, this.streetCamera, this.layout);
+  }
+
+  /** Converts canvas coordinates into street map-local space. */
+  public streetScreenToLocal(point: { x: number; y: number }): { x: number; y: number } {
+    this.ensureStreetCamera();
+    return screenToLocal(point, this.streetCamera, this.layout);
+  }
+
+  /**
+   * Test/API hook returning the current camera together with the derived
+   * container transform, so browser tests can assert the framed view.
+   */
+  public getStreetCameraForTest(): {
+    camera: StreetCameraState;
+    lattice: StreetLatticeDims;
+    scale: number;
+    containerX: number;
+    containerY: number;
+  } {
+    const camera = this.getStreetCameraState();
+    const container = this.streetContainer;
+    return {
+      camera,
+      lattice: this.getStreetViewLattice(),
+      scale: container?.scaleX ?? 1,
+      containerX: container?.x ?? 0,
+      containerY: container?.y ?? 0,
+    };
+  }
+
+  /**
+   * Initialises the street-map camera and its always-available controls.
+   * Called once from the lifecycle `create()` after the containers exist.
+   */
+  public initStreetCamera(): void {
+    this.ensureStreetCamera();
+    (this.msRenderer as any)?.installStreetMapMask?.();
+    (this.msInputManager as any)?.initStreetCameraControls?.();
+    this.streetRenderedKey = this.layout
+      ? visibleMapSlots(this.streetCamera, this.layout, this.streetViewLattice)
+          .map((node) => `${node.cellX},${node.cellY},${node.slotIndex}`)
+          .join('|')
+      : '';
+    this.applyStreetCamera(false);
   }
   public drawBusinessSlot(...args: any[]): any {
     return (this.msRenderer as any).drawBusinessSlot.apply(this.msRenderer, args);

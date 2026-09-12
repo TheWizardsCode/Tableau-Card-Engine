@@ -119,6 +119,13 @@ export function computeDragTransferDuration(distancePx: number): number {
   return Math.min(DRAG_TRANSFER_DURATION_MAX_MS, Math.max(DRAG_TRANSFER_DURATION_MIN_MS, raw));
 }
 
+/**
+ * Duration (ms) of the street-map zoom transition (CG-0MTH9OVMC001V44E).
+ * Skipped entirely under reduced motion, which applies the new zoom framing
+ * immediately.
+ */
+export const ZOOM_ANIMATION_MS = 220;
+
 // Challenge Tracker panel layout
 export const CHALLENGE_LINE_H = 20;
 export const CHALLENGE_PAD = 6;
