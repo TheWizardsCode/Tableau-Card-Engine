@@ -9,6 +9,7 @@
  */
 import Phaser from 'phaser';
 import type { SoundManager } from '../core-engine/SoundManager';
+import { ListenerRegistry } from '../core-engine/ListenerRegistry';
 import { SettingsButton } from './SettingsButton';
 import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips, getCardDesign, setCardDesign, getAvailableCardDesigns } from './SettingsStore';
 import { createVersionLabel } from './versionDisplay';
@@ -243,6 +244,8 @@ export class SettingsPanel {
   private currentTween: Phaser.Tweens.Tween | null = null;
   private destroyed = false;
 
+  // Event listener registry for automatic cleanup
+  private readonly registry = new ListenerRegistry();
   // Keyboard
   private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
   private _settingsButton: SettingsButton | null = null;
@@ -881,9 +884,9 @@ export class SettingsPanel {
       });
     }
 
-    // Scene-level pointer events for slider dragging
-    scene.input.on('pointermove', this.handlePointerMove, this);
-    scene.input.on('pointerup', this.handlePointerUp, this);
+    // Scene-level pointer events for slider dragging (tracked for automatic cleanup)
+    this.registry.on(scene.input, 'pointermove', this.handlePointerMove, this);
+    this.registry.on(scene.input, 'pointerup', this.handlePointerUp, this);
 
     // After constructing child objects, parent into HUD container and apply
     // absolute depths so the settings panel renders above gameplay content.
@@ -1090,9 +1093,8 @@ export class SettingsPanel {
       this._awaitingEndTurnKey = false;
     }
 
-    // Remove scene-level pointer listeners
-    this.scene.input.off('pointermove', this.handlePointerMove, this);
-    this.scene.input.off('pointerup', this.handlePointerUp, this);
+    // Clear all tracked listeners (scene-level pointer events, etc.)
+    this.registry.clear();
 
     // Stop any running tween
     if (this.currentTween) {

@@ -17,6 +17,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
 - [Example Games](#example-games)
 - [Transcript Persistence](#transcript-persistence)
+- [Listener Registry](#listener-registry)
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
@@ -602,6 +603,8 @@ src/
 │   ├── GameState.ts        GameState<T>, createGameState (deprecated for setup — use SetupOptions)
 │   ├── SetupOptions.ts     BaseSetupOptions, MultiplayerSetupOptions, resolveSetupOptions
 │   ├── SeededRng.ts        createSeededRng — deterministic PRNG (LCG) for shuffles and AI
+│   ├── ListenerRegistry.ts   Listener tracking + one-call cleanup (on/off/clear/size)
+│   ├── scene-registry.ts     getSceneRegistry — WeakMap + shutdown hook auto-cleanup for scenes
 │   ├── ActiveEffect.ts     Duration-based modifier system (create, decay, apply, query)
 │   ├── CheckpointManager.ts   Checkpoint save-and-resume abstraction (save, load, clear, checkAndResume)
 │   ├── CheckpointResumeOverlay.ts Built-in default resume overlay component
@@ -1133,8 +1136,48 @@ available during the market phase (it does not consume `actionsRemaining`):
   persistence) + `community-favour-ui.browser.test.ts` (buttons, disabled
   states, full exchange round).
 
-## Replay Tool
+## Listener Registry
 
+The `ListenerRegistry` module (`src/core-engine/ListenerRegistry.ts`) centralises
+event listener cleanup: instead of chained `.off()` calls in `destroy()`
+methods, components track every listener through the registry and remove them
+all with a single `.clear()` call.
+
+### API
+
+- **`on(emitter, event, handler, ctx?)`** – register a listener and track it.
+  Compatible with Phaser 4 RC emitters (`scene.events`, `scene.input`,
+  `scene.input.keyboard`) and any object with `.on()`/`.off()`.
+- **`off(emitter, event, handler)`** – remove a single tracked listener
+  (idempotent).
+- **`clear()`** – remove every tracked listener in one call (idempotent; the
+  registry remains usable so it is safe on scene restarts).
+- **`size`** – number of currently tracked listeners.
+
+### Scene scoping
+
+`getSceneRegistry(scene)` (`src/core-engine/scene-registry.ts`) returns a
+`ListenerRegistry` backed by a `WeakMap` and auto-clears it when the scene
+fires its `shutdown` event:
+
+```ts
+import { getSceneRegistry } from '@core-engine';
+
+const registry = getSceneRegistry(this);
+registry.on(this.input, 'pointerdown', this.onPointerDown, this);
+// No explicit cleanup needed — cleared on scene shutdown.
+```
+
+### Migration status
+
+`SettingsPanel` and `HelpPanel` (`src/ui/`) now use `ListenerRegistry` for
+scene-level listener cleanup. Listener-leak behaviour is verified in
+`tests/ui/ListenerLeaks.browser.test.ts` (component create/destroy asserts
+emitter listener counts return to baseline); unit tests live in
+`tests/core-engine/ListenerRegistry.test.ts` and
+`tests/core-engine/scene-registry.test.ts`.
+
+## Replay Tool
 The replay tool (`scripts/replay.ts`) replays a fixture transcript through the game's Phaser scene in a headless browser, capturing per-turn screenshots. It is the foundation for thumbnail generation and visual regression testing.
 
 ### Running a Replay
