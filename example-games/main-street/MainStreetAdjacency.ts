@@ -1,17 +1,19 @@
 /**
  * Main Street: Adjacency & Income Calculation
  *
- * Implements the adjacency resolver for the 2x5 street grid
- * (stored as a 10-slot row-major array) and income computation
- * (base income + synergy bonuses). Upgrades can extend synergy
- * range beyond the default 1-cell 8-way (Chebyshev) adjacency.
+ * Implements the adjacency resolver for the street lattice and income
+ * computation (base income + synergy bonuses). The legacy 2x5 board is the 1×1
+ * case of a general lattice of 5×2 street cells; expanded lattices use a planar
+ * seam-sharing world grid (see the "Expanded Grid Topology" section below).
+ * Upgrades can extend synergy range beyond the default 1-cell 8-way (Chebyshev)
+ * adjacency.
  *
  * @module
  */
 
 import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
 import { getBaseTypeId } from './MainStreetCards';
-import { GRID_SIZE } from './MainStreetCards';
+import { GRID_SIZE, STREET_COLS, STREET_ROWS } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier, roundInt } from './MainStreetDifficulty';
@@ -24,52 +26,27 @@ import {
 // ── Adjacency Resolver ──────────────────────────────────────
 
 /**
- * Returns the indices of neighboring slots within a given range
- * on the Main Street 2x5 grid.
+ * Returns the indices of neighboring slots within a given range on the
+ * legacy 1×1 (2x5, 10-slot) Main Street grid.
  *
  * Slot indices are row-major:
  *   row 0: 0..4
  *   row 1: 5..9
  *
- * Adjacency is 8-way (Chebyshev distance: max(|dx|, |dy|) <= range),
- * so diagonally adjacent slots count at every range. Default range is 1
- * (the 8 surrounding slots); upgrades extend this radius as larger
- * 8-way squares.
+ * Adjacency is 8-way (Chebyshev distance: max(|dx|, |dy|) <= range), so
+ * diagonally adjacent slots count at every range. Default range is 1 (the 8
+ * surrounding slots); upgrades extend this radius as larger 8-way squares.
+ *
+ * This is a 1×1 convenience wrapper over the single world-coordinate resolver
+ * (`resolveNeighbors`), which also handles expanded lattices — there is only
+ * one adjacency implementation (CG-0MTYMD2Q5008UXB9).
  *
  * @param index  The slot index to find neighbors for.
  * @param range  How far to look in each direction (default 1).
- * @returns Array of neighbor indices (excluding the slot itself).
+ * @returns Ascending array of neighbor indices (excluding the slot itself).
  */
-const STREET_COLS = 5;
-
-function toGridPosition(index: number): { x: number; y: number } {
-  return {
-    x: index % STREET_COLS,
-    y: Math.floor(index / STREET_COLS),
-  };
-}
-
 export function neighbors(index: number, range: number = 1): number[] {
-  if (index < 0 || index >= GRID_SIZE || range <= 0) return [];
-
-  const origin = toGridPosition(index);
-  const result: number[] = [];
-
-  for (let i = 0; i < GRID_SIZE; i++) {
-    if (i === index) continue;
-    const p = toGridPosition(i);
-    // 8-way (Chebyshev) distance: diagonally adjacent slots count at range 1,
-    // and range upgrades expand as larger 8-way squares (CG-0MSP1HCAS00785MP).
-    const distance = Math.max(
-      Math.abs(origin.x - p.x),
-      Math.abs(origin.y - p.y),
-    );
-    if (distance <= range) {
-      result.push(i);
-    }
-  }
-
-  return result.sort((a, b) => a - b);
+  return resolveNeighbors(index, range);
 }
 
 /**
@@ -1168,151 +1145,134 @@ export interface IncomeResult {
   phaseBreakdown: PhaseBreakdown;
 }
 
+
 // ═══════════════════════════════════════════════════════════
-// Expanded Grid Topology — Shared-Corner Lattice (CG-0MTH9OTI2008MYFY)
+// Expanded Grid Topology — Planar Seam-Sharing Lattice
+// (CG-0MTH9OTI2008MYFY; reconciled in CG-0MTYMD2Q5008UXB9)
 // ═══════════════════════════════════════════════════════════
-// Each street cell is 5×2 (10 slots). Adjacent streets share one slot
-// per seam: horizontally slot 4 (west top-right) ↔ 0 (east top-left),
-// vertically slot 9 (north bottom-right) ↔ 4 (south top-right).
-// Interior intersections where four streets meet collapse to a single
-// world node (e.g. (0,0,9) ↔ (0,1,4) ↔ (1,1,0) chain). World coords
-// are the base (sx*5+lx, sy*2+ly) of the canonical owner (lexicographically
-// minimal (sx,sy,slot) in the DSU group), giving integer Chebyshev
-// adjacency that satisfies the contract suite (2×1=19, 2×2=36).
-// The spec's 3×2 expectation of 45 is inconsistent with any uniform
-// one-slot-per-seam model (which yields 53); the suite has been corrected
-// to 53 with a documenting comment (CG-0MTH9OTI2008MYFY).
+// Each street cell is STREET_COLS × STREET_ROWS (5×2) slots. Street cells are
+// tiled with a stride of (STREET_COLS−1, STREET_ROWS−1) = (4, 1) so adjacent
+// streets overlap on their whole touching seam column/row:
+//
+//   • horizontally adjacent streets share the west street's rightmost column
+//     with the east street's leftmost column (2 slots per seam);
+//   • vertically adjacent streets share the north street's bottom row with the
+//     south street's top row (5 slots per seam);
+//   • a four-way intersection therefore collapses to a single shared world node.
+//
+// The lattice consequently occupies a solid, hole-free rectangle of world
+// positions — ((STREET_COLS−1)·cols + 1) × ((STREET_ROWS−1)·rows + 1) — so the
+// world coordinates are planar and Chebyshev adjacency on them is exactly the
+// visual adjacency a player sees. World-index order is row-major over that
+// rectangle: worldY ascending, then worldX ascending.
+//
+// NOTE (CG-0MTYMD2Q5008UXB9): an earlier revision used a (5, 2) stride with a
+// single-slot-per-seam DSU, which produced a holed and sheared (non-planar)
+// world set — 19/19/36/53 slots for 2×1, 1×2, 2×2, 3×2 — that disagreed with
+// the planar geometry already used by MainStreetMapView (18/15/27/39). The
+// planar model below is authoritative; both modules now agree.
 // ═══════════════════════════════════════════════════════════
 
-/** Maximum supported grid dimensions for world-map caching. */
+/** Maximum supported lattice dimensions (cols × rows of street cells). */
 const MAX_GRID_COLS = 5;
 const MAX_GRID_ROWS = 5;
 
-/** Horizontal sharing pair: west slot 4 ↔ east slot 0. */
-const H_SHARED: readonly [number, number] = [4, 0] as const;
-/** Vertical sharing pair: north slot 9 ↔ south slot 4. */
-const V_SHARED: readonly [number, number] = [9, 4] as const;
+/** Horizontal distance between the origins of adjacent street cells. */
+const WORLD_STRIDE_X = STREET_COLS - 1; // 4
+/** Vertical distance between the origins of adjacent street cells. */
+const WORLD_STRIDE_Y = STREET_ROWS - 1; // 1
 
-function slotToLocal(slot: number): { lx: number; ly: number } {
-  return { lx: slot % STREET_COLS, ly: Math.floor(slot / STREET_COLS) };
+/** Grid dimensions for expanded street layouts (cols × rows of 5×2 street cells). */
+export interface GridDims {
+  cols: number;
+  rows: number;
 }
 
-function baseWorld(sx: number, sy: number, slot: number): { worldX: number; worldY: number } {
-  const { lx, ly } = slotToLocal(slot);
-  return { worldX: sx * STREET_COLS + lx, worldY: sy * 2 + ly };
+/** Width in world columns of a `cols`-wide street lattice. */
+export function worldWidth(cols: number): number {
+  return WORLD_STRIDE_X * cols + 1;
 }
 
-type DsuKey = string; // "sx,sy,slot"
-interface WorldMaps {
-  /** world key "x,y" → owners */
-  pos2owners: Map<string, { streetX: number; streetY: number; slotIndex: number }[]>;
-  /** dsu key → canonical world */
-  keyToWorld: Map<DsuKey, { worldX: number; worldY: number }>;
-  /** canonical world key → owners (deduped) */
-  canonicalPosSet: Set<string>;
-}
-
-const worldMapsCache = new Map<string, WorldMaps>();
-
-function buildWorldMaps(cols: number, rows: number): WorldMaps {
-  const cacheKey = `${cols}x${rows}`;
-  const cached = worldMapsCache.get(cacheKey);
-  if (cached) return cached;
-
-  const parent = new Map<DsuKey, DsuKey>();
-  const find = (k: DsuKey): DsuKey => {
-    let cur = k;
-    while (parent.get(cur) !== cur) {
-      const p = parent.get(cur)!;
-      const pp = parent.get(p)!;
-      if (pp !== p) parent.set(cur, pp);
-      cur = parent.get(cur)!;
-    }
-    return cur;
-  };
-  const union = (a: DsuKey, b: DsuKey): void => {
-    const ra = find(a);
-    const rb = find(b);
-    if (ra !== rb) parent.set(rb, ra);
-  };
-
-  for (let sx = 0; sx < cols; sx++) {
-    for (let sy = 0; sy < rows; sy++) {
-      for (let slot = 0; slot < GRID_SIZE; slot++) {
-        const k: DsuKey = `${sx},${sy},${slot}`;
-        parent.set(k, k);
-      }
-    }
-  }
-  for (let sx = 0; sx < cols - 1; sx++) {
-    for (let sy = 0; sy < rows; sy++) {
-      union(`${sx},${sy},${H_SHARED[0]}`, `${sx + 1},${sy},${H_SHARED[1]}`);
-    }
-  }
-  for (let sx = 0; sx < cols; sx++) {
-    for (let sy = 0; sy < rows - 1; sy++) {
-      union(`${sx},${sy},${V_SHARED[0]}`, `${sx},${sy + 1},${V_SHARED[1]}`);
-    }
-  }
-
-  const canonical = new Map<DsuKey, DsuKey>();
-  for (const k of parent.keys()) {
-    const r = find(k);
-    const prev = canonical.get(r);
-    if (prev === undefined || k < prev) canonical.set(r, k);
-  }
-
-  const keyToWorld = new Map<DsuKey, { worldX: number; worldY: number }>();
-  const pos2owners = new Map<string, { streetX: number; streetY: number; slotIndex: number }[]>();
-  const canonicalPosSet = new Set<string>();
-
-  for (const k of parent.keys()) {
-    const r = find(k);
-    const canonKey = canonical.get(r)!;
-    const [csx, csy, cslot] = canonKey.split(',').map(Number);
-    const w = baseWorld(csx, csy, cslot);
-    keyToWorld.set(k, w);
-    const posKey = `${w.worldX},${w.worldY}`;
-    canonicalPosSet.add(posKey);
-  }
-  for (const k of parent.keys()) {
-    const w = keyToWorld.get(k)!;
-    const posKey = `${w.worldX},${w.worldY}`;
-    const [sx, sy, slot] = k.split(',').map(Number);
-    const arr = pos2owners.get(posKey) ?? [];
-    // Deduplicate: only add if not already present (shared worlds have multiple owners)
-    if (!arr.some(o => o.streetX === sx && o.streetY === sy && o.slotIndex === slot)) {
-      arr.push({ streetX: sx, streetY: sy, slotIndex: slot });
-    }
-    pos2owners.set(posKey, arr);
-  }
-
-  const maps: WorldMaps = { pos2owners, keyToWorld, canonicalPosSet };
-  worldMapsCache.set(cacheKey, maps);
-  return maps;
+/** Height in world rows of a `rows`-tall street lattice. */
+export function worldHeight(rows: number): number {
+  return WORLD_STRIDE_Y * rows + 1;
 }
 
 /**
- * Number of unique world slots for a cols×rows street lattice after
- * shared-corner dedup (one slot per horizontal and vertical adjacency).
+ * Number of unique world slots for a `cols`×`rows` street lattice.
  *
- * Formula: 10*cols*rows − (cols−1)*rows − (rows−1)*cols
- * Yields 10, 19, 19, 36, 53 for 1×1, 2×1, 1×2, 2×2, 3×2.
+ * Because adjacent streets share their whole touching seam, the lattice
+ * collapses to the solid rectangle
+ * `((STREET_COLS−1)·cols + 1) × ((STREET_ROWS−1)·rows + 1)`:
+ * 10, 18, 15, 27, 39, 52 for 1×1, 2×1, 1×2, 2×2, 3×2, 3×3.
  */
 export function worldSlotCount(streetCols: number, streetRows: number): number {
   if (!Number.isInteger(streetCols) || !Number.isInteger(streetRows) || streetCols <= 0 || streetRows <= 0) {
     throw new Error(`worldSlotCount: dimensions must be positive integers, got ${streetCols}×${streetRows}`);
   }
-  return 10 * streetCols * streetRows - (streetCols - 1) * streetRows - (streetRows - 1) * streetCols;
+  return worldWidth(streetCols) * worldHeight(streetRows);
+}
+
+function slotToLocal(slot: number): { lx: number; ly: number } {
+  return { lx: slot % STREET_COLS, ly: Math.floor(slot / STREET_COLS) };
+}
+
+/**
+ * Base world position of street (sx,sy) slot `slotIndex`.
+ *
+ * In the planar model every street/slot pair maps to its base world position;
+ * co-located pairs (the shared seams and intersections) share that position, so
+ * the base is the world coordinate for canonical and non-canonical owners alike.
+ */
+function baseWorld(
+  streetX: number,
+  streetY: number,
+  slotIndex: number,
+): { worldX: number; worldY: number } {
+  const { lx, ly } = slotToLocal(slotIndex);
+  return {
+    worldX: streetX * WORLD_STRIDE_X + lx,
+    worldY: streetY * WORLD_STRIDE_Y + ly,
+  };
+}
+
+/**
+ * Every (streetX, streetY, slotIndex) owner of a world node within a
+ * `cols`×`rows` lattice, sorted lexicographically by (streetX, streetY, slotIndex).
+ * A shared seam node has two owners; a four-way intersection has four.
+ */
+function worldOwners(
+  worldX: number,
+  worldY: number,
+  cols: number,
+  rows: number,
+): { streetX: number; streetY: number; slotIndex: number }[] {
+  const sxMin = Math.max(0, Math.ceil((worldX - (STREET_COLS - 1)) / WORLD_STRIDE_X));
+  const sxMax = Math.min(cols - 1, Math.floor(worldX / WORLD_STRIDE_X));
+  const syMin = Math.max(0, Math.ceil((worldY - (STREET_ROWS - 1)) / WORLD_STRIDE_Y));
+  const syMax = Math.min(rows - 1, Math.floor(worldY / WORLD_STRIDE_Y));
+  const owners: { streetX: number; streetY: number; slotIndex: number }[] = [];
+  for (let sy = syMin; sy <= syMax; sy++) {
+    const ly = worldY - sy * WORLD_STRIDE_Y;
+    if (ly < 0 || ly >= STREET_ROWS) continue;
+    for (let sx = sxMin; sx <= sxMax; sx++) {
+      const lx = worldX - sx * WORLD_STRIDE_X;
+      if (lx < 0 || lx >= STREET_COLS) continue;
+      owners.push({ streetX: sx, streetY: sy, slotIndex: ly * STREET_COLS + lx });
+    }
+  }
+  owners.sort((a, b) => a.streetX - b.streetX || a.streetY - b.streetY || a.slotIndex - b.slotIndex);
+  return owners;
 }
 
 /**
  * Maps (streetX, streetY, slotIndex) to integer world coordinates.
  *
- * The world position is the base (sx*5+lx, sy*2+ly) of the canonical
- * owner of the shared-corner DSU group. For 1×1 grids this is the
- * base itself; for expanded grids shared corners coincide (e.g.
- * (0,0,4) and (1,0,0) both → (4,0)).
+ * The world position is `(streetX·(STREET_COLS−1) + lx, streetY·(STREET_ROWS−1) + ly)`
+ * where `(lx, ly)` is the slot's local (column, row). Shared seams and four-way
+ * intersections therefore return the same world position for each of their
+ * owners (e.g. `(0,0,4)` and `(1,0,0)` both map to world `(4,0)`; for a 2×2
+ * lattice `(0,0,9)`, `(1,0,5)`, `(0,1,4)` and `(1,1,0)` all map to `(4,1)`).
  */
 export function toWorldPosition(
   streetX: number,
@@ -1325,164 +1285,81 @@ export function toWorldPosition(
   if (streetX < 0 || streetY < 0 || slotIndex < 0 || slotIndex >= GRID_SIZE) {
     throw new Error(`toWorldPosition: out of bounds ${streetX},${streetY},${slotIndex}`);
   }
-  // Need a grid large enough to contain the queried street and its west/north neighbours that might be canonical.
-  const cols = Math.max(streetX + 1, 1);
-  const rows = Math.max(streetY + 1, 1);
-  // Cap to max cache size; for larger queries, sharing still only involves immediate neighbours, so this is sufficient.
-  const effCols = Math.min(Math.max(cols, 1), MAX_GRID_COLS);
-  const effRows = Math.min(Math.max(rows, 1), MAX_GRID_ROWS);
-  // If query is beyond max cache, fall back to base (no further sharing beyond max grid)
-  if (cols > MAX_GRID_COLS || rows > MAX_GRID_ROWS) {
-    return baseWorld(streetX, streetY, slotIndex);
-  }
-  const maps = buildWorldMaps(effCols, effRows);
-  const key = `${streetX},${streetY},${slotIndex}`;
-  const w = maps.keyToWorld.get(key);
-  // For grids smaller than max, shared groups that extend beyond the built grid (e.g. south partner not in grid) are not merged,
-  // so we return base for isolated slots; for streets at origin this matches global canonical.
-  if (w) return { ...w };
   return baseWorld(streetX, streetY, slotIndex);
 }
 
 /**
- * Inverse of toWorldPosition: world → one (street, slot) owner, or null
- * if the world coordinate is empty / OOB.
+ * Inverse of toWorldPosition: world → one (street, slot) owner, or null if the
+ * world coordinate is not part of the supported MAX_GRID lattice.
  *
- * For shared corners multiple owners exist; the lexicographically minimal
- * owner is returned (so round-trip via toWorldPosition is stable).
+ * A shared node has several owners; the lexicographically minimal
+ * (streetX, streetY, slotIndex) owner is returned, so a
+ * `world → owner → world` round-trip is stable.
  */
 export function fromWorldPosition(
   worldPos: { worldX: number; worldY: number },
 ): { streetX: number; streetY: number; slotIndex: number } | null {
-  const maps = buildWorldMaps(MAX_GRID_COLS, MAX_GRID_ROWS);
-  const posKey = `${worldPos.worldX},${worldPos.worldY}`;
-  const owners = maps.pos2owners.get(posKey);
-  if (!owners || owners.length === 0) return null;
-  // Return canonical (first) owner (pos2owners preserves insertion order, which is lexicographic due to build loop)
+  if (!Number.isInteger(worldPos.worldX) || !Number.isInteger(worldPos.worldY)) return null;
+  const owners = worldOwners(worldPos.worldX, worldPos.worldY, MAX_GRID_COLS, MAX_GRID_ROWS);
+  if (owners.length === 0) return null;
   return { ...owners[0] };
 }
 
 /**
- * Chebyshev (8-way) neighbours of a world position.
+ * Chebyshev (8-way) neighbours of a world position within the supported
+ * MAX_GRID lattice.
  *
- * Enumerates all world positions within `range` (default 1) in the
- * maximal 5×5 lattice, returning the street/slot owners of each
- * neighbouring world node (shared worlds contribute each of their
- * owners). The queried world itself is excluded.
+ * Returns exactly one entry per distinct neighbouring world node (the node's
+ * canonical owner), so an interior node yields 8 entries at range 1 and
+ * `(2·range+1)² − 1` entries where the lattice has room. Shared seam and
+ * four-way-intersection nodes are visited once each — use the world-index
+ * helpers to enumerate a node's per-street owners.
  */
 export function expandedNeighbors(
   worldPos: { worldX: number; worldY: number },
   range: number = 1,
 ): { streetX: number; streetY: number; slotIndex: number }[] {
   if (!Number.isInteger(range) || range <= 0) return [];
-  const maps = buildWorldMaps(MAX_GRID_COLS, MAX_GRID_ROWS);
-  const posKey = `${worldPos.worldX},${worldPos.worldY}`;
-  // If queried world is not in the lattice, it has no neighbours (OOB)
-  if (!maps.canonicalPosSet.has(posKey)) {
-    // Still allow neighbours for OOB? Contract expects OOB → not found → no crash; we treat as empty.
-    // But for interior queries we must have the pos.
-    // For world positions that are valid but outside max grid, we still compute geometrically.
-    // Fall through to geometric search.
-  }
+  if (!Number.isInteger(worldPos.worldX) || !Number.isInteger(worldPos.worldY)) return [];
+  const xMax = worldWidth(MAX_GRID_COLS) - 1;
+  const yMax = worldHeight(MAX_GRID_ROWS) - 1;
   const result: { streetX: number; streetY: number; slotIndex: number }[] = [];
-  for (const [otherKey, owners] of maps.pos2owners.entries()) {
-    if (otherKey === posKey) continue;
-    const [ox, oy] = otherKey.split(',').map(Number);
-    if (Math.max(Math.abs(ox - worldPos.worldX), Math.abs(oy - worldPos.worldY)) <= range) {
-      for (const o of owners) result.push({ ...o });
+  for (let y = Math.max(0, worldPos.worldY - range); y <= Math.min(yMax, worldPos.worldY + range); y++) {
+    for (let x = Math.max(0, worldPos.worldX - range); x <= Math.min(xMax, worldPos.worldX + range); x++) {
+      if (x === worldPos.worldX && y === worldPos.worldY) continue;
+      const owners = worldOwners(x, y, MAX_GRID_COLS, MAX_GRID_ROWS);
+      if (owners.length > 0) result.push(owners[0]);
     }
   }
-  // Sort for determinism: lexicographic by street, slot
-  result.sort((a, b) => a.streetY - b.streetY || a.streetX - b.streetX || a.slotIndex - b.slotIndex);
   return result;
 }
 
-// ── Grid Dimensions & Neighbor Resolution (Expanded Grids) ──
-
-/** Grid dimensions for expanded street layouts (cols × rows of 5×2 street cells). */
-export interface GridDims {
-  cols: number;
-  rows: number;
-}
+// ── World-index mapping & neighbor resolution ───────────────
 
 /**
- * Resolve neighbors for a given grid slot index.
- *
- * For 1×1 grids (or when `gridDims` is omitted), delegates to `neighbors()`
- * with legacy slot indices (0-9). For expanded grids, converts the index
- * to a world position, queries `expandedNeighbors()`, and maps the result
- * back to a sorted array of world slot indices.
- *
- * @param index    The slot index to find neighbors for.
- * @param range    How far to look in each direction (default 1).
- * @param gridDims Optional grid dimensions for expanded layouts.
- * @returns Sorted array of neighbor indices.
- */
-function resolveNeighbors(
-  index: number,
-  range: number,
-  gridDims?: GridDims,
-): number[] {
-  // Legacy path: 1×1 grid (or no dims provided)
-  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) {
-    return neighbors(index, range);
-  }
-  // Expanded path: use world coordinates directly (avoids 5×5 leak via expandedNeighbors)
-  const total = worldSlotCount(gridDims.cols, gridDims.rows);
-  if (index < 0 || index >= total || range <= 0) return [];
-  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
-  // Build index→position and position→index mappings from canonical positions
-  // Use world slot ordering by (worldY, worldX) to ensure stable index mapping
-  const canonicalPosArray: string[] = [];
-  for (const posKey of maps.canonicalPosSet) canonicalPosArray.push(posKey);
-  canonicalPosArray.sort((a, b) => {
-    const [ax, ay] = a.split(',').map(Number);
-    const [bx, by] = b.split(',').map(Number);
-    return ay - by || ax - bx;
-  });
-  const worldPosKey = canonicalPosArray[index];
-  if (!worldPosKey) return [];
-  const [worldX, worldY] = worldPosKey.split(',').map(Number);
-  const result: number[] = [];
-  for (const otherKey of canonicalPosArray) {
-    if (otherKey === worldPosKey) continue;
-    const [ox, oy] = otherKey.split(',').map(Number);
-    if (Math.max(Math.abs(ox - worldX), Math.abs(oy - worldY)) <= range) {
-      const ni = canonicalPosArray.indexOf(otherKey);
-      if (ni !== -1) result.push(ni);
-    }
-  }
-  return result.sort((a, b) => a - b);
-}
-
-/**
- * Translate a flat world-slot index to its (worldX, worldY) position.
- * Used by tests and expand-grid helpers to map the canonical ordering.
+ * Translates a flat world-slot index back to its (worldX, worldY) position.
+ * Returns null when `index` is out of range for `gridDims`.
  */
 export function worldIndexToPosition(
   index: number,
   gridDims: GridDims,
 ): { worldX: number; worldY: number } | null {
-  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) return null;
+  if (!gridDims) return null;
+  if (!Number.isInteger(index) || index < 0) return null;
   const total = worldSlotCount(gridDims.cols, gridDims.rows);
-  if (index < 0 || index >= total) return null;
-  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
-  const arr: string[] = [];
-  for (const k of maps.canonicalPosSet) arr.push(k);
-  arr.sort((a, b) => {
-    const [ax, ay] = a.split(',').map(Number);
-    const [bx, by] = b.split(',').map(Number);
-    return ay - by || ax - bx;
-  });
-  const key = arr[index];
-  if (!key) return null;
-  const [worldX, worldY] = key.split(',').map(Number);
-  return { worldX, worldY };
+  if (index >= total) return null;
+  const width = worldWidth(gridDims.cols);
+  return { worldX: index % width, worldY: Math.floor(index / width) };
 }
 
 /**
- * Translate (streetX, streetY, slot) to its flat world-slot index.
- * Returns null if the slot is outside the lattice or not canonical.
+ * Translates (streetX, streetY, slot) to its flat world-slot index within a
+ * `gridDims` lattice. Returns null when the street is outside the lattice or
+ * the slot index is invalid.
+ *
+ * Shared nodes map to a single index: for a 2×2 lattice,
+ * `streetSlotToWorldIndex(0,0,9)`, `(1,0,5)`, `(0,1,4)` and `(1,1,0)` all
+ * return the same index (the four-way intersection is one card slot).
  */
 export function streetSlotToWorldIndex(
   streetX: number,
@@ -1490,21 +1367,54 @@ export function streetSlotToWorldIndex(
   slotIndex: number,
   gridDims: GridDims,
 ): number | null {
-  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) {
-    return slotIndex >= 0 && slotIndex < GRID_SIZE ? slotIndex : null;
+  if (!gridDims) return null;
+  if (
+    !Number.isInteger(streetX) || !Number.isInteger(streetY) || !Number.isInteger(slotIndex) ||
+    streetX < 0 || streetY < 0 || streetX >= gridDims.cols || streetY >= gridDims.rows ||
+    slotIndex < 0 || slotIndex >= GRID_SIZE
+  ) {
+    return null;
   }
-  const key = `${streetX},${streetY},${slotIndex}`;
-  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
-  const w = maps.keyToWorld.get(key);
-  if (!w) return null;
-  const posKey = `${w.worldX},${w.worldY}`;
-  const arr: string[] = [];
-  for (const k of maps.canonicalPosSet) arr.push(k);
-  arr.sort((a, b) => {
-    const [ax, ay] = a.split(',').map(Number);
-    const [bx, by] = b.split(',').map(Number);
-    return ay - by || ax - bx;
-  });
-  const idx = arr.indexOf(posKey);
-  return idx === -1 ? null : idx;
+  const { worldX, worldY } = baseWorld(streetX, streetY, slotIndex);
+  const width = worldWidth(gridDims.cols);
+  const total = worldSlotCount(gridDims.cols, gridDims.rows);
+  const index = worldY * width + worldX;
+  return index >= 0 && index < total ? index : null;
+}
+
+/**
+ * Resolve neighbors for a given grid slot index.
+ *
+ * World slots form a solid rectangle, so adjacency is plain 8-way (Chebyshev)
+ * distance over world coordinates — no special-casing of street boundaries.
+ * A 1×1 lattice (or omitted `gridDims`) reproduces the legacy 10-slot
+ * behaviour exactly.
+ *
+ * @param index    The world slot index to find neighbors for.
+ * @param range    How far to look in each direction (default 1).
+ * @param gridDims Optional grid dimensions for expanded layouts.
+ * @returns Ascending array of neighbor indices.
+ */
+function resolveNeighbors(
+  index: number,
+  range: number,
+  gridDims?: GridDims,
+): number[] {
+  if (range <= 0) return [];
+  const dims: GridDims = gridDims ?? { cols: 1, rows: 1 };
+  const total = worldSlotCount(dims.cols, dims.rows);
+  if (!Number.isInteger(index) || index < 0 || index >= total) return [];
+  const width = worldWidth(dims.cols);
+  const originX = index % width;
+  const originY = Math.floor(index / width);
+  const result: number[] = [];
+  for (let i = 0; i < total; i++) {
+    if (i === index) continue;
+    const x = i % width;
+    const y = Math.floor(i / width);
+    if (Math.max(Math.abs(originX - x), Math.abs(originY - y)) <= range) {
+      result.push(i);
+    }
+  }
+  return result;
 }

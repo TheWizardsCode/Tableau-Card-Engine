@@ -161,6 +161,8 @@ interface GameState {
 
 Main Street stores the street as a 10-slot row-major array rendered as a 2x5 `Grid` and calls `neighbors()` from `@core-engine/SpatialRules` with **Chebyshev distance (8-way adjacency)** — diagonally adjacent slots count at every range (CG-0MSP1HCAS00785MP). Default range 1 checks all 8 surrounding slots; `synergyRangeBonus` upgrades expand the radius as larger 8-way squares.
 
+**Expanded lattice (CG-0MTYMD2Q5008UXB9).** The 10-slot board is the `1×1` case of a general lattice of `5×2` street cells. Street cells are tiled with a stride of `(STREET_COLS−1, STREET_ROWS−1) = (4, 1)`, so adjacent streets overlap on their whole touching column/row and a four-way intersection collapses to **one shared plot** (one card, adjacent to neighbours in all four streets). The lattice is consequently a solid, hole-free rectangle of world positions — `worldSlotCount(cols, rows) = ((STREET_COLS−1)·cols+1) × ((STREET_ROWS−1)·rows+1)` (10 / 18 / 15 / 27 / 39 / 52 for 1×1, 2×1, 1×2, 2×2, 3×2, 3×3) — with world indices ordered row-major (worldY, then worldX). Because the world set is planar, 8-way Chebyshev adjacency over world coordinates is exactly the visual adjacency; `MainStreetAdjacency` and the map renderer (`MainStreetMapView`) share this single model.
+
 ---
 
 ## 5. Turn / Round Structure

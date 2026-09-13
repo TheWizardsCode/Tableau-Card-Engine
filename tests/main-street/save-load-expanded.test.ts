@@ -59,13 +59,13 @@ function createLocalStorageMock(): Storage {
 }
 
 /**
- * Build a 2×1 (19 unique world slot) expanded state from a normal 1×1 game,
- * carrying any business card from the market onto the expanded grid so the
- * world-sized array is non-trivial.
+ * Build a 2×1 (18 unique world slot, planar seam-sharing model) expanded state
+ * from a normal 1×1 game, carrying any business card from the market onto the
+ * expanded grid so the world-sized array is non-trivial.
  */
 function makeExpandedState(seed = 'expanded-save-load'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  const size = worldSlotCount(2, 1); // 19
+  const size = worldSlotCount(2, 1); // 18
   state.streetGridCols = 2;
   state.streetGridRows = 1;
   state.streetGrid = new Array<BusinessCard | null>(size).fill(null);
@@ -107,17 +107,17 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
 
     expect(saved.streetGridCols).toBe(2);
     expect(saved.streetGridRows).toBe(1);
-    expect(saved.streetGrid).toHaveLength(19);
+    expect(saved.streetGrid).toHaveLength(18);
     expect(saved.streetCamera).toEqual({ zoomLevel: 2, focusX: 123, focusY: -45 });
-    expect(saved.soldSlots).toHaveLength(19);
+    expect(saved.soldSlots).toHaveLength(18);
 
     const restored = deserializeMainStreetState(saved);
 
     expect(restored.streetGridCols).toBe(2);
     expect(restored.streetGridRows).toBe(1);
-    expect(restored.streetGrid).toHaveLength(19);
+    expect(restored.streetGrid).toHaveLength(18);
     expect(restored.streetCamera).toEqual({ zoomLevel: 2, focusX: 123, focusY: -45 });
-    expect(restored.soldSlots).toHaveLength(19);
+    expect(restored.soldSlots).toHaveLength(18);
 
     // The world-10 card survives verbatim and the sold flag is preserved.
     expect(restored.streetGrid[10]?.id).toBe(`${state.streetGrid[10]!.id}`);
@@ -164,9 +164,9 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
 
     const restored = deserializeMainStreetState(saved as MainStreetSerializedState);
 
-    expect(restored.soldSlots).toHaveLength(19);
+    expect(restored.soldSlots).toHaveLength(18);
     expect(restored.soldSlots[9]).toBe(true);
-    expect(restored.soldSlots[18]).toBe(false);
+    expect(restored.soldSlots[17]).toBe(false);
   });
 
   it('serialises soldSlots at the world grid size even when the runtime array is stale (AC1)', () => {
@@ -177,10 +177,10 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
 
     const saved = serializeMainStreetState(state);
 
-    expect(saved.streetGrid).toHaveLength(19);
-    expect(saved.soldSlots).toHaveLength(19);
+    expect(saved.streetGrid).toHaveLength(18);
+    expect(saved.soldSlots).toHaveLength(18);
     expect(saved.soldSlots[3]).toBe(true);
-    expect(saved.soldSlots[18]).toBe(false);
+    expect(saved.soldSlots[17]).toBe(false);
   });
 
   // ── AC3: undo captures/restores the expanded grid ────────
@@ -207,15 +207,15 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
     undoManager.execute(buyBusinessCommand(state, card.id, slotIndex));
 
     expect(state.streetGrid[slotIndex]).not.toBeNull();
-    expect(state.streetGrid).toHaveLength(19);
+    expect(state.streetGrid).toHaveLength(18);
     expect(state.resourceBank.coins).toBeLessThan(coinsBefore);
     expect(state.actionsRemaining).toBe(actionsBefore - 1);
 
     undoManager.undo();
 
-    expect(state.streetGrid).toHaveLength(19);
+    expect(state.streetGrid).toHaveLength(18);
     expect(state.streetGrid.map((c) => c?.id ?? null)).toEqual(gridBefore);
-    expect(state.soldSlots).toHaveLength(19);
+    expect(state.soldSlots).toHaveLength(18);
     expect(state.soldSlots).toEqual(soldBefore);
     expect(state.resourceBank.coins).toBe(coinsBefore);
     expect(state.actionsRemaining).toBe(actionsBefore);

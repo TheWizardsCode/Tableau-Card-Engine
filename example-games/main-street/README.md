@@ -79,6 +79,20 @@ until the expanded-grid slices (viewport rendering / save-load) make them
 playable; the playable board always stays anchored at the legacy layout origin.
 Adjacent streets share their touching slot column/row, so a `3×3` lattice
 collapses to 52 unique plots.
+- **Node model (CG-0MTYMD2Q5008UXB9).** The map and the adjacency resolver share
+one **planar seam-sharing** topology. Street cells are tiled with a stride of
+`(STREET_COLS−1, STREET_ROWS−1) = (4, 1)`, so adjacent streets overlap on their
+whole touching column/row and a four-way intersection is a single shared plot.
+A `cols×rows` lattice therefore occupies a solid, hole-free rectangle of world
+positions — `worldSlotCount(cols, rows) = ((STREET_COLS−1)·cols+1) ×
+((STREET_ROWS−1)·rows+1)`, i.e. 10 / 18 / 15 / 27 / 39 / 52 for 1×1, 2×1, 1×2,
+2×2, 3×2, 3×3 — and world indices are row-major over that rectangle (worldY
+ascending, then worldX ascending). Because the world set is planar, 8-way
+Chebyshev adjacency over world coordinates is exactly the visual adjacency the
+player sees. `MainStreetMapView.mapSlotCount()` and
+`MainStreetAdjacency.worldSlotCount()` are asserted equal in the contract
+tests, so the rendered geometry and the gameplay adjacency can never drift
+apart.
 - **Reduced motion.** Zoom transitions are skipped
 (`settingsPanel.reducedMotion`), applying the new framing instantly.
 - **Input.** Phaser applies container transforms to input hit testing, so slot
