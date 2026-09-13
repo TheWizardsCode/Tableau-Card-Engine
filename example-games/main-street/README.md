@@ -84,6 +84,15 @@ collapses to 52 unique plots.
 - **Input.** Phaser applies container transforms to input hit testing, so slot
 clicks and drag-drop keep working at any zoom/pan; `scene.getStreetSlotCenter()`
 returns camera-transformed coordinates for animations.
+- **Persistence (CG-0MTH9OWF2002YQQ3).** The camera (`streetCamera:
+{ zoomLevel, focusX, focusY }`) and the grid dimensions
+(`streetGridCols`/`streetGridRows`) are part of the serialized state, so a
+checkpoint resume restores the same framing. The scene captures the live camera
+into state before saving (`syncStreetCameraToState()`) and reapplies it after
+resume (`syncStreetCameraFromState()`). Legacy saves without these fields load
+as `1×1` with the default camera — the save schema version stays `1` because
+`SaveLoadStore` rejects version mismatches; migration defaults provide backward
+compatibility.
 
 ## Layout files and adapter
 

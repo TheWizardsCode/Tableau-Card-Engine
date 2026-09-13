@@ -267,6 +267,9 @@ export class MainStreetLifecycleManager {
     // Wire checkpoint callbacks to the turn controller
     s.msTurnController.onSaveCheckpoint = () => {
       if (s.state) {
+        // Capture the live camera (zoom/pan) into the state before serialising
+        // (CG-0MTH9OWF2002YQQ3).
+        s.syncStreetCameraToState?.();
         s.checkpointManager.save(s.state).catch((_err: unknown) => {
           console.warn('[MainStreet] Failed to save checkpoint:', _err);
         });
@@ -1126,6 +1129,10 @@ export class MainStreetLifecycleManager {
         // (the saved state already has the correct market from save time;
         // calling refillMarket would replace it with fresh deck draws).
         try { s.refreshAll(); } catch (_) { /* ignore */ }
+        // Restore the saved camera (zoom/pan) onto the scene after rehydrating
+        // (CG-0MTH9OWF2002YQQ3). Runs after refreshAll so the street layout
+        // exists; setStreetCameraState then re-renders the visible streets.
+        try { s.syncStreetCameraFromState?.(); } catch (_) { /* ignore */ }
         // Clear the deferred flag — the player has committed by resuming,
         // but the banner must NOT fire (same day continues, AC3).
         s.deferredDayBanner = false;

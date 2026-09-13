@@ -347,4 +347,34 @@ describe('Main Street street-map camera (browser)', () => {
     );
     expect(scene.state.streetGrid[targetSlot]?.id).toBe(business.id);
   });
+
+  it('syncs the camera into serialised state and restores it on load', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+
+    // Default state camera matches the default scene camera.
+    expect(scene.state.streetCamera).toEqual({ zoomLevel: 1, focusX: 0, focusY: 0 });
+
+    // Zoom out and pan, then capture the live camera into state (what the
+    // checkpoint save does). The scene clamps the pan to the map bounds, so
+    // the assertion is against the live scene camera, not the requested value.
+    scene.zoomStreetOut();
+    scene.panStreetBy(60, 40);
+    const live = scene.getStreetCameraState();
+    scene.syncStreetCameraToState();
+    expect(scene.state.streetCamera).toEqual(live);
+    expect(scene.state.streetCamera.zoomLevel).toBeGreaterThan(1);
+
+    // Mutate the live camera away, then restore from the saved state (what a
+    // checkpoint resume does): the scene camera returns to the saved values.
+    scene.setStreetCameraState({ zoomLevel: 1, focusX: 0, focusY: 0 });
+    expect(scene.getStreetCameraState().zoomLevel).toBe(1);
+
+    scene.syncStreetCameraFromState();
+    const restored = scene.getStreetCameraState();
+    expect(restored.zoomLevel).toBe(live.zoomLevel);
+    expect(restored.focusX).toBe(live.focusX);
+    expect(restored.focusY).toBe(live.focusY);
+  });
 });

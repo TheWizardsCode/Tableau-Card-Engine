@@ -341,6 +341,7 @@ export function createTutorialScenario(
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     streetGridCols: 1,
     streetGridRows: 1,
+    streetCamera: { zoomLevel: 1, focusX: 0, focusY: 0 },
     market: {
       cards: marketCards,
     },

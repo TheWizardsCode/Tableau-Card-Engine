@@ -8,6 +8,7 @@
  * @module
  */
 
+import type { StreetCameraState } from './MainStreetMapView';
 import { shuffleArray } from '../../src/card-system';
 import { type ActiveEffect, createSeededRng } from '../../src/core-engine';
 import { createEconomyLedger, type EconomyLedger } from '../../src/rule-engine/EconomyLedger';
@@ -305,6 +306,8 @@ export interface MainStreetState {
   /** World grid dimensions (cols × rows of 5×2 street cells). Null/omitted → 1×1 legacy (10 slots). Max 5×5. */
   streetGridCols: number;
   streetGridRows: number;
+  /** Street-map camera state (zoom + pan). Serialised for checkpoint/save. */
+  streetCamera: StreetCameraState;
   /** Face-up cards available for purchase. */
   market: MarketState;
   /** Player resources. */
@@ -519,6 +522,8 @@ export interface MainStreetSerializedState {
   /** World grid dimensions for save/load (see MainStreetState). */
   streetGridCols: number;
   streetGridRows: number;
+  /** Street-map camera state (zoom + pan). Defaults to {zoomLevel:1, focusX:0, focusY:0} for legacy. */
+  streetCamera: StreetCameraState;
   market: MarketState;
   resourceBank: ResourceBank;
   /** Day-start coin snapshot for the per-turn net summary row (see MainStreetState). */
@@ -1018,6 +1023,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     streetGridCols: 1,
     streetGridRows: 1,
+    streetCamera: { zoomLevel: 1, focusX: 0, focusY: 0 },
     market,
     resourceBank: {
       coins: initCoins,
@@ -1202,6 +1208,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     streetGrid: structuredClone(state.streetGrid),
     streetGridCols: state.streetGridCols,
     streetGridRows: state.streetGridRows,
+    streetCamera: { ...state.streetCamera },
     market: structuredClone(state.market),
     resourceBank: structuredClone(state.resourceBank),
     dayStartCoins: state.dayStartCoins,
@@ -1227,7 +1234,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     maxHandSize: state.maxHandSize,
     discardPile: structuredClone(state.discardPile),
     staffCards: structuredClone(state.staffCards),
-    soldSlots: [...state.soldSlots],
+    soldSlots: resizeSoldSlots(state.soldSlots, state.streetGrid.length),
     csvChecksum: CSV_CHECKSUM,
     csvData: CARD_DATA_RAW,
     actionsRemaining: state.actionsRemaining,
@@ -1420,7 +1427,8 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
 
   // ── soldSlots: add missing field (defaults to all false for legacy saves) ─
   if (!('soldSlots' in saved)) {
-    (saved as Record<string, unknown>).soldSlots = new Array<boolean>(GRID_SIZE).fill(false);
+    const grid = (saved as Record<string, unknown>).streetGrid as unknown[] | undefined;
+    (saved as Record<string, unknown>).soldSlots = new Array<boolean>(grid?.length ?? GRID_SIZE).fill(false);
   }
 
   // ── actionsRemaining: backfill default for legacy saves ──
@@ -1520,6 +1528,11 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).streetGridRows = 1;
   }
 
+  // ── streetCamera: backfill default for pre-camera saves ──
+  if (!('streetCamera' in saved)) {
+    (saved as Record<string, unknown>).streetCamera = { zoomLevel: 1, focusX: 0, focusY: 0 };
+  }
+
   // ── pendingApplicant (CG-0MSTOATDU006UGAX): backfill default ─
   if (!('pendingApplicant' in saved)) {
     (saved as Record<string, unknown>).pendingApplicant = null;
@@ -1589,6 +1602,19 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
       }
     }
   }
+}
+
+/**
+ * Resizes a `soldSlots` boolean array to match the (world-sized) street grid,
+ * preserving existing sold flags and padding with `false` (CG-0MTH9OWF2002YQQ3).
+ */
+function resizeSoldSlots(sold: boolean[] | undefined, gridLength: number): boolean[] {
+  const target = Math.max(gridLength, 0);
+  const out = new Array<boolean>(target).fill(false);
+  if (sold) {
+    for (let i = 0; i < Math.min(sold.length, target); i++) out[i] = sold[i] === true;
+  }
+  return out;
 }
 
 /**
@@ -1680,9 +1706,15 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     maxHandSize: saved.maxHandSize,
     discardPile: structuredClone(saved.discardPile),
     staffCards: structuredClone(saved.staffCards),
-    soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
+    soldSlots: resizeSoldSlots(saved.soldSlots, saved.streetGrid.length),
     streetGridCols: (saved as unknown as { streetGridCols?: number }).streetGridCols ?? 1,
     streetGridRows: (saved as unknown as { streetGridRows?: number }).streetGridRows ?? 1,
+    streetCamera: (saved as unknown as { streetCamera?: Partial<StreetCameraState> }).streetCamera
+      ? { zoomLevel: (saved as unknown as { streetCamera?: { zoomLevel?: number } }).streetCamera?.zoomLevel ?? 1,
+          focusX: (saved as unknown as { streetCamera?: { focusX?: number } }).streetCamera?.focusX ?? 0,
+          focusY: (saved as unknown as { streetCamera?: { focusY?: number } }).streetCamera?.focusY ?? 0,
+        }
+      : { zoomLevel: 1, focusX: 0, focusY: 0 },
     actionsRemaining: saved.actionsRemaining ?? 1,
     bankedActions: saved.bankedActions ?? 0,
     peekUsedThisTurn: saved.peekUsedThisTurn ?? false,

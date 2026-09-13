@@ -119,7 +119,9 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     hand: safeClone(state.hand ?? []),
     incidentDeck: safeClone(state.incidentDeck),
     activityLog: safeClone(state.activityLog),
-    soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
+    soldSlots: safeClone(
+      state.soldSlots ?? new Array<boolean>(state.streetGrid?.length ?? 10).fill(false),
+    ) as boolean[],
     // Unified discard pile — captured so undoing a Close restores the removed
     // card (the card is pushed to `discardPile` by `closeBusiness`).
     discardPile: safeClone(state.discardPile ?? []),
@@ -149,7 +151,7 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.hand = snap.hand as any;
   state.incidentDeck = snap.incidentDeck as any;
   state.activityLog = snap.activityLog as any;
-  state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
+  state.soldSlots = snap.soldSlots ?? new Array<boolean>(state.streetGrid?.length ?? 10).fill(false);
   state.discardPile = (snap.discardPile ?? []) as any;
   if (snap.businessPlacedThisTurn !== null && snap.businessPlacedThisTurn !== undefined) {
     (state as any).businessPlacedThisTurn = snap.businessPlacedThisTurn;

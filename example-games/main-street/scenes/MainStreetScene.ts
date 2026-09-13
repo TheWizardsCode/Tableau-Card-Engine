@@ -528,6 +528,28 @@ export class MainStreetScene extends CardGameScene {
   }
 
   /**
+   * Copies the live scene camera into `state.streetCamera` so the next
+   * checkpoint/save captures the current zoom + pan (CG-0MTH9OWF2002YQQ3).
+   * No-op when there is no state (e.g. before setup).
+   */
+  public syncStreetCameraToState(): void {
+    if (!this.state) return;
+    this.state.streetCamera = this.getStreetCameraState();
+  }
+
+  /**
+   * Restores the scene camera from `state.streetCamera` after a save is
+   * rehydrated (CG-0MTH9OWF2002YQQ3). Missing/degenerate values fall back to
+   * the default camera, and the value is clamped to the current lattice.
+   * No-op when there is no state or layout.
+   */
+  public syncStreetCameraFromState(): void {
+    if (!this.state || !this.layout) return;
+    const saved = this.state.streetCamera;
+    this.setStreetCameraState(saved ?? undefined);
+  }
+
+  /**
    * Re-renders the street layer only when the set of visible slots changed.
    * Called after every camera change; the transform itself is applied
    * separately so panning stays cheap.
