@@ -46,7 +46,7 @@ import {
   FONT_FAMILY,
   HandView,
   HintBar,
-  attachSelection,
+  createSelectionState,
   markHudTransient,
   clearTransientHud,
   DEFAULT_DRAG_DISTANCE_THRESHOLD,
@@ -1617,7 +1617,7 @@ export class MainStreetRenderer {
       isBusinessLike || card.family === 'staff' || card.family === 'upgrade' || card.family === 'event';
     const interactiveEnabled =
       s.uiPhase === 'market' && !isIncidentEvent && !(consumesAction && noActions);
-    const selection = attachSelection(container, {
+    const selection = createSelectionState({
       onStateChange: ({ selected, hovered }) => {
         if (selected) {
           s.selectedMarketCardId = card.id;
