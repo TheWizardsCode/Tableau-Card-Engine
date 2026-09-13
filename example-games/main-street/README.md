@@ -74,9 +74,12 @@ is clipped to the street band by a `GeometryMask`, so HUD chrome (market, hand,
 log, challenges) stays fixed and revealed neighbouring streets can never
 overdraw it.
 - **Lattice.** `scene.setStreetViewLattice(cols, rows)` sets how many street
-cells the map displays (default `1×1`). Neighbouring cells are **view-only**
-until the expanded-grid slices (viewport rendering / save-load) make them
-playable; the playable board always stays anchored at the legacy layout origin.
+cells the map displays (default `1×1`). Cells outside the playable board are
+**view-only**; `scene.setStreetPlayableLattice(cols, rows)` grows the playable
+board itself (re-indexing `state.streetGrid` by world position), so expanded
+streets, shared seams and four-way intersections become placeable
+(CG-0MTH9OW0H0005VKE). The board defaults to `1×1`, anchored at the legacy
+layout origin, so the shipping game is unchanged unless a caller expands it.
 Adjacent streets share their touching slot column/row, so a `3×3` lattice
 collapses to 52 unique plots.
 - **Node model (CG-0MTYMD2Q5008UXB9).** The map and the adjacency resolver share

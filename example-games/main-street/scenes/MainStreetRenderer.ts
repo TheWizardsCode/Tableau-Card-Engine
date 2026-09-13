@@ -14,7 +14,6 @@ import type { SpecializationSkill } from '../MainStreetStaffSkills';
 import type { PendingApplicant } from '../MainStreetState';
 import { getSkill, hasPeekCapableStaff, STAFF_SKILL_CHIP_COLORS } from '../MainStreetStaffSkills';
 import {
-  GRID_SIZE,
   MARKET_TOTAL_SLOTS,
   synergyColor,
 } from '../MainStreetCards';
@@ -539,8 +538,9 @@ export class MainStreetRenderer {
     // the plots shared between neighbouring streets. At zoom level 1 on the
     // default 1×1 lattice this yields exactly the legacy 10 slots in legacy
     // positions, so the pre-camera framing is preserved bit-for-bit.
-    const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
-    const nodes = visibleMapSlots(s.streetCamera, s.layout, lattice);
+    // Slots of the playable lattice carry a world gameplay index
+    // (CG-0MTH9OW0H0005VKE), so expanded streets and shared seams are placeable.
+    const nodes = this.mapNodes();
 
     // Section label
     const label = s.add.text(gameW / 2, streetTop - 16, '', {
@@ -837,10 +837,27 @@ export class MainStreetRenderer {
    */
   private drawSynergyLines(): void {
     const s = this.scene;
-    const pairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+    const playable = s.streetPlayableLattice ?? { cols: 1, rows: 1 };
+    const gridDims = playable.cols === 1 && playable.rows === 1 ? undefined : playable;
+    const pairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? [], gridDims);
+
+    // Only draw links whose endpoints are inside the viewport (culling,
+    // AC4), using the rendered world-slot centres so lines cross street seams
+    // and shared corners correctly (AC2).
+    const centreByIndex = new Map<number, { x: number; y: number }>();
+    for (const node of this.mapNodes()) {
+      if (node.gameplayIndex === null) continue;
+      centreByIndex.set(node.gameplayIndex, {
+        x: node.localX + s.layout.slotW / 2,
+        y: node.localY + s.layout.slotH / 2,
+      });
+    }
 
     for (const pair of pairs) {
-      const { p1, p2 } = synergyLineEndpoints(pair, s.layout);
+      const from = centreByIndex.get(pair.fromIndex);
+      const to = centreByIndex.get(pair.toIndex);
+      if (!from || !to) continue;
+      const { p1, p2 } = synergyLineEndpoints(pair, s.layout, { from, to });
       const color = synergyColor(pair.sharedSynergy);
 
       const line = s.add.graphics();
@@ -888,12 +905,12 @@ export class MainStreetRenderer {
     if (!s.dragDropManager || s.replayMode) return;
     s.dragDropManager.clearDropZones();
 
-    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const col = i % streetCols;
-      const row = Math.floor(i / streetCols);
-      const cx = streetX + col * (slotW + slotGap) + slotW / 2;
-      const cy = streetTop + row * (slotH + streetRowGap) + slotH / 2;
+    const { slotW, slotH } = s.layout;
+    for (const node of this.mapNodes()) {
+      if (node.gameplayIndex === null) continue;
+      const i = node.gameplayIndex;
+      const cx = node.localX + slotW / 2;
+      const cy = node.localY + slotH / 2;
       const zone = s.add.zone(cx, cy, slotW, slotH).setOrigin(0.5);
       zone.setRectangleDropZone(slotW, slotH);
       s.dragDropManager.registerDropZone({
@@ -915,6 +932,23 @@ export class MainStreetRenderer {
   }
 
   /**
+   * The visible, de-duplicated street-map slots for the current camera and
+   * playable lattice. Shared seam and four-way-intersection plots appear once
+   * (one hit-zone), and unrevealed/out-of-viewport streets are absent (culling).
+   */
+  private mapNodes(): MapSlotNode[] {
+    const s = this.scene;
+    const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
+    const playable = s.streetPlayableLattice ?? { cols: 1, rows: 1 };
+    return visibleMapSlots(s.streetCamera, s.layout, lattice, playable);
+  }
+
+  /** Visible, de-duplicated street-map slots (test/introspection hook). */
+  public getVisibleStreetNodes(): MapSlotNode[] {
+    return this.mapNodes();
+  }
+
+  /**
    * Outline the legal drop targets while a drag is active (valid-drop hint).
    *
    * Business drags highlight empty slots green. Upgrade drags highlight
@@ -932,8 +966,10 @@ export class MainStreetRenderer {
       : undefined;
     const isUpgrade = card?.family === 'upgrade';
 
-    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
-    for (let i = 0; i < GRID_SIZE; i++) {
+    const { slotW, slotH } = s.layout;
+    for (const node of this.mapNodes()) {
+      if (node.gameplayIndex === null) continue;
+      const i = node.gameplayIndex;
       const occupied = !!s.state.streetGrid[i];
       let validity: 'valid' | 'invalid';
       if (isUpgrade) {
@@ -944,10 +980,8 @@ export class MainStreetRenderer {
         validity = 'valid';
       }
 
-      const col = i % streetCols;
-      const row = Math.floor(i / streetCols);
-      const x = streetX + col * (slotW + slotGap) + slotW / 2;
-      const y = streetTop + row * (slotH + streetRowGap) + slotH / 2;
+      const x = node.localX + slotW / 2;
+      const y = node.localY + slotH / 2;
       const hl = s.add.rectangle(x, y, slotW, slotH);
       hl.setStrokeStyle(2, validity === 'valid' ? 0x44ff66 : 0xff4444, 0.8);
       hl.setFillStyle(0x000000, 0);

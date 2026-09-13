@@ -52,7 +52,7 @@ import {
 } from './MainStreetState';
 import type { BusinessCard, EventCard, StaffCard, SynergyType, SpecializationSkill } from './MainStreetCards';
 import {
-  SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
+  SELL_VALUE_RATIO, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
   getEventTemplates, getBaseTypeId,
   type DurationEventCard,
 } from './MainStreetCards';
@@ -2920,8 +2920,8 @@ export function buyAndPlaceBusiness(
   if (card.family !== 'business' && card.family !== 'community-space') {
     throw new Error('Buy-and-place only applies to business and community-space cards.');
   }
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.`);
   }
   if (state.streetGrid[slotIndex] !== null) {
     throw new Error(`Slot ${slotIndex} is already occupied.`);

@@ -18,7 +18,6 @@ import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, classifyEffect } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard, StaffCard } from './MainStreetCards';
 import {
-  GRID_SIZE,
   REFRESH_MARKET_COST,
 } from './MainStreetCards';
 import { updateNeighborsOnPlacement, updateNeighborsOnSale, updateNeighborsOnClose, hasAdjacentSameType, tagSlotOwnerIfCompetitive } from './MainStreetAdjacency';
@@ -86,8 +85,8 @@ export function canPurchaseBusiness(
   }
 
   // Validate slot index
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.` };
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.` };
   }
 
   // Check slot is empty
@@ -577,8 +576,8 @@ export function playBusinessFromHand(
   if (state.resourceBank.coins < price) {
     throw new Error(`Not enough coins to play ${card.name} from hand. Need ${price}, have ${state.resourceBank.coins}.`);
   }
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.`);
   }
   if (state.streetGrid[slotIndex] !== null) {
     throw new Error(`Slot ${slotIndex} is already occupied.`);
@@ -839,7 +838,7 @@ export function canBuyAndPlaceUpgrade(
     return { legal: false, reason: 'Card not found in the upgrade market.' };
   }
 
-  if (targetSlot < 0 || targetSlot >= GRID_SIZE) {
+  if (targetSlot < 0 || targetSlot >= state.streetGrid.length) {
     return { legal: false, reason: `Invalid slot index: ${targetSlot}.` };
   }
 
@@ -1035,7 +1034,7 @@ export function getAffordableUpgradeCards(state: MainStreetState): UpgradeCard[]
  */
 export function getEmptySlots(state: MainStreetState): number[] {
   const slots: number[] = [];
-  for (let i = 0; i < GRID_SIZE; i++) {
+  for (let i = 0; i < state.streetGrid.length; i++) {
     if (state.streetGrid[i] === null) slots.push(i);
   }
   return slots;
@@ -1261,8 +1260,8 @@ export function sellBusiness(
   slotIndex: number,
 ): SellResult {
   // Validate slot index
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.`);
   }
 
   const card = state.streetGrid[slotIndex];
@@ -1373,7 +1372,7 @@ export function canSellBusiness(
   }
 
   // Validate slot index
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
     return { legal: false, reason: `Invalid slot index: ${slotIndex}.` };
   }
 
@@ -1434,7 +1433,7 @@ export function canCloseBusiness(
     return { legal: false, reason: 'Cannot close a card while in card-placement mode.' };
   }
 
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
     return { legal: false, reason: `Invalid slot index: ${slotIndex}.` };
   }
 
@@ -1477,8 +1476,8 @@ export function closeBusiness(
   state: MainStreetState,
   slotIndex: number,
 ): CloseResult {
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.`);
   }
 
   const card = state.streetGrid[slotIndex];

@@ -11,6 +11,7 @@ import { SaveLoadStore, CheckpointManager } from '../../../src/core-engine';
 import { UndoRedoManager } from '../../../src/core-engine';
 import type { DragDropManager } from '../../../src/ui';
 import type { MainStreetSerializedState, PendingApplicant } from '../MainStreetState';
+import { setStreetGridLattice } from '../MainStreetState';
 import { hireStaffApplicant, declineStaffApplicant } from '../MainStreetEngine';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
@@ -214,6 +215,14 @@ export class MainStreetScene extends CardGameScene {
    * playable is the viewport-rendering slice of the same epic.
    */
   public streetViewLattice: StreetLatticeDims = { cols: 1, rows: 1 };
+  /**
+   * Playable street lattice, in street cells. Defaults to 1×1 (the shipping
+   * board). `setStreetPlayableLattice()` grows the playable grid (re-indexing
+   * the state by world position, `setStreetGridLattice`) so revealed
+   * neighbouring streets, shared seams and four-way intersections become
+   * placeable (CG-0MTH9OW0H0005VKE).
+   */
+  public streetPlayableLattice: StreetLatticeDims = { cols: 1, rows: 1 };
   /** Mask graphics clipping the street map to its viewport band. */
   public streetMapMaskGraphics: Phaser.GameObjects.Graphics | null = null;
   /** Zoom control objects (owned by `hudContainer`, rebuilt on refresh). */
@@ -556,8 +565,13 @@ export class MainStreetScene extends CardGameScene {
    */
   private syncStreetRender(): void {
     if (!this.layout) return;
-    const key = visibleMapSlots(this.streetCamera, this.layout, this.streetViewLattice)
-      .map((node) => `${node.cellX},${node.cellY},${node.slotIndex}`)
+    const key = visibleMapSlots(
+      this.streetCamera,
+      this.layout,
+      this.streetViewLattice,
+      this.streetPlayableLattice,
+    )
+      .map((node) => `${node.cellX},${node.cellY},${node.slotIndex},${node.gameplayIndex}`)
       .join('|');
     if (key === this.streetRenderedKey) return;
     this.streetRenderedKey = key;
@@ -637,6 +651,48 @@ export class MainStreetScene extends CardGameScene {
     return { ...this.streetViewLattice };
   }
 
+  /** Current playable street lattice (street cells the player can build on). */
+  public getStreetPlayableLattice(): StreetLatticeDims {
+    return { ...this.streetPlayableLattice };
+  }
+
+  /** Visible, de-duplicated street-map slots (test/introspection hook). */
+  public getVisibleStreetNodes(): any[] {
+    return this.msRenderer?.getVisibleStreetNodes?.() ?? [];
+  }
+
+  /**
+   * Grows (or shrinks) the playable street board to a `cols`×`rows` lattice of
+   * street cells (CG-0MTH9OW0H0005VKE).
+   *
+   * The state grid is re-indexed by world position (see
+   * `MainStreetState.setStreetGridLattice`), so placed cards, sold flags and
+   * ownership tags survive the change; plots outside a shrunken board are
+   * dropped. The displayed view lattice is grown to at least the playable size
+   * so every playable street is visible, then the street layer is rebuilt.
+   *
+   * Defaults to 1×1, so the shipping game is unchanged unless a caller expands
+   * the board.
+   */
+  public setStreetPlayableLattice(cols: number, rows: number): void {
+    const next: StreetLatticeDims = {
+      cols: Math.max(1, Math.floor(cols)),
+      rows: Math.max(1, Math.floor(rows)),
+    };
+    if (this.state) setStreetGridLattice(this.state, next.cols, next.rows);
+    this.streetPlayableLattice = next;
+
+    // Ensure the revealed lattice covers the playable board.
+    const view = this.streetViewLattice;
+    if (view.cols < next.cols || view.rows < next.rows) {
+      this.setStreetViewLattice(Math.max(view.cols, next.cols), Math.max(view.rows, next.rows));
+    }
+    this.ensureStreetCamera();
+    this.streetRenderedKey = '';
+    this.applyStreetCamera(false);
+    this.syncStreetRender();
+  }
+
   /**
    * Applies the camera to the street layer (container scale/position plus the
    * viewport mask). Delegates to the renderer, which owns the Phaser objects.
@@ -695,8 +751,13 @@ export class MainStreetScene extends CardGameScene {
     (this.msRenderer as any)?.installStreetMapMask?.();
     (this.msInputManager as any)?.initStreetCameraControls?.();
     this.streetRenderedKey = this.layout
-      ? visibleMapSlots(this.streetCamera, this.layout, this.streetViewLattice)
-          .map((node) => `${node.cellX},${node.cellY},${node.slotIndex}`)
+      ? visibleMapSlots(
+          this.streetCamera,
+          this.layout,
+          this.streetViewLattice,
+          this.streetPlayableLattice,
+        )
+          .map((node) => `${node.cellX},${node.cellY},${node.slotIndex},${node.gameplayIndex}`)
           .join('|')
       : '';
     this.applyStreetCamera(false);

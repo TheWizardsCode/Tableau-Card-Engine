@@ -191,7 +191,9 @@ export function mapCellOrigin(
   };
 }
 
-/** Map-local centre of a slot within a street cell. */
+/**
+ * Map-local centre of a slot within a street cell.
+ */
 export function mapSlotCenter(
   cellX: number,
   cellY: number,
@@ -206,6 +208,81 @@ export function mapSlotCenter(
     x: origin.x + col * (layout.slotW + layout.slotGap) + layout.slotW / 2,
     y: origin.y + row * (layout.slotH + layout.streetRowGap) + layout.slotH / 2,
   };
+}
+
+/** Width in world columns of a `cols`-wide street lattice (planar model). */
+export function latticeWorldWidth(cols: number): number {
+  return (STREET_COLS - 1) * cols + 1;
+}
+
+/** Height in world rows of a `rows`-tall street lattice (planar model). */
+export function latticeWorldHeight(rows: number): number {
+  return (STREET_ROWS - 1) * rows + 1;
+}
+
+/**
+ * Map-local centre of a world position within a street lattice.
+ *
+ * The world lattice uses the same planar seam-sharing model as
+ * `MainStreetAdjacency` (stride `STREET_COLS−1` / `STREET_ROWS−1`), so shared
+ * seam plots resolve to the same pixel centre no matter which street claims
+ * them — a shared corner is drawn exactly once.
+ */
+export function worldPositionToMapCenter(
+  worldX: number,
+  worldY: number,
+  layout: SceneLayout,
+  lattice: StreetLatticeDims = DEFAULT_LATTICE,
+): { x: number; y: number } {
+  const origin = latticeOriginCell(lattice);
+  const originWorldX = origin.x * (STREET_COLS - 1);
+  const originWorldY = origin.y * (STREET_ROWS - 1);
+  return {
+    x: layout.streetX + (worldX - originWorldX) * (layout.slotW + layout.slotGap) + layout.slotW / 2,
+    y: layout.streetTop + (worldY - originWorldY) * (layout.slotH + layout.streetRowGap) + layout.slotH / 2,
+  };
+}
+
+/**
+ * Map-local centre of a flat world-slot index within `lattice`.
+ *
+ * World indices are row-major over the planar world rectangle
+ * (`worldY * latticeWorldWidth(cols) + worldX`). At the default `1×1` lattice
+ * this reproduces the legacy 2×5 slot-centre maths exactly.
+ */
+export function worldIndexToMapCenter(
+  index: number,
+  layout: SceneLayout,
+  lattice: StreetLatticeDims = DEFAULT_LATTICE,
+): { x: number; y: number } {
+  const width = latticeWorldWidth(lattice.cols);
+  const worldX = index % width;
+  const worldY = Math.floor(index / width);
+  return worldPositionToMapCenter(worldX, worldY, layout, lattice);
+}
+
+/**
+ * Map-local centre of a playable-grid slot index, positioned inside the
+ * displayed `lattice` at the playable sub-lattice's origin cell.
+ *
+ * The playable board is a `gameplay.cols × gameplay.rows` sub-lattice of the
+ * displayed map (by default the single centre cell). This maps an index into
+ * the playable world grid onto the corresponding display cell, so the legacy
+ * `1×1` case places the board at the centre of the view exactly as before.
+ */
+export function playableIndexToMapCenter(
+  index: number,
+  layout: SceneLayout,
+  lattice: StreetLatticeDims = DEFAULT_LATTICE,
+  gameplay: StreetGameplayDims = DEFAULT_GAMEPLAY,
+): { x: number; y: number } {
+  const width = latticeWorldWidth(gameplay.cols);
+  const gwX = index % width;
+  const gwY = Math.floor(index / width);
+  const origin = gameplayOriginCell(lattice, gameplay);
+  const worldX = origin.x * (STREET_COLS - 1) + gwX;
+  const worldY = origin.y * (STREET_ROWS - 1) + gwY;
+  return worldPositionToMapCenter(worldX, worldY, layout, lattice);
 }
 
 /**
@@ -408,8 +485,7 @@ export function visibleMapSlots(
           localX,
           localY,
           gameplayIndex: inGameplay
-            ? ((cellY - gameplayOrigin.y) * gameplay.cols + (cellX - gameplayOrigin.x)) *
-                SLOTS_PER_STREET + slotIndex
+            ? playableWorldIndex(cellX, cellY, col, row, gameplayOrigin, gameplay)
             : null,
         };
 
@@ -431,4 +507,26 @@ export function visibleMapSlots(
 function clampTo(min: number, max: number, value: number): number {
   if (max < min) return (min + max) / 2;
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Flat world index of a slot within the playable sub-lattice.
+ *
+ * The playable grid is world-indexed (planar seam-sharing, like
+ * `MainStreetAdjacency`), so a seam plot shared by two visible street cells
+ * resolves to the SAME index — the corner is one card slot, not two.
+ */
+function playableWorldIndex(
+  cellX: number,
+  cellY: number,
+  col: number,
+  row: number,
+  gameplayOrigin: { x: number; y: number },
+  gameplay: StreetGameplayDims,
+): number {
+  const worldX = cellX * (STREET_COLS - 1) + col;
+  const worldY = cellY * (STREET_ROWS - 1) + row;
+  const gwX = worldX - gameplayOrigin.x * (STREET_COLS - 1);
+  const gwY = worldY - gameplayOrigin.y * (STREET_ROWS - 1);
+  return gwY * latticeWorldWidth(gameplay.cols) + gwX;
 }

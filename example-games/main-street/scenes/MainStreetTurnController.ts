@@ -1028,7 +1028,7 @@ export class MainStreetTurnController {
       const afterTransfer = (): void => {
         // Capture synergy pairs before the placement mutates the grid so only
         // NEWLY formed pairs animate (pre-existing pairs never re-trigger).
-        const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+        const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? [], this.streetPairDims());
         try {
           const cmd = buyAndPlaceBusinessCommand(s.state, cardId, slotIndex, priceOverride, extraActions);
           s.undoManager.execute(cmd);
@@ -1271,6 +1271,12 @@ export class MainStreetTurnController {
     return true;
   }
 
+  /** Grid dimensions for expanded-lattice synergy-pair computation (undefined at 1×1). */
+  private streetPairDims(): { cols: number; rows: number } | undefined {
+    const p = (this.scene as any).streetPlayableLattice as { cols: number; rows: number } | undefined;
+    return p && (p.cols > 1 || p.rows > 1) ? { cols: p.cols, rows: p.rows } : undefined;
+  }
+
   public onSlotClick(slotIndex: number): void {
     const s = this.scene;
     if (s.uiPhase !== 'placing-from-hand' && s.uiPhase !== 'placing-business') return;
@@ -1354,7 +1360,7 @@ export class MainStreetTurnController {
       const afterTransfer = (): void => {
         // Capture synergy pairs before the placement mutates the grid so only
         // NEWLY formed pairs animate.
-        const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+        const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? [], this.streetPairDims());
 
         // Composite pricing (CG-0MT24X0SX007RLHN): a same-day card (just
         // moved from the market this turn) is part of the move+place purchase
@@ -1482,7 +1488,7 @@ export class MainStreetTurnController {
     const afterTransfer = (): void => {
       // Capture synergy pairs before the placement mutates the grid so only
       // NEWLY formed pairs animate.
-      const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+      const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? [], this.streetPairDims());
       try {
         const cmd = buyBusinessCommand(s.state, pendingCardId, slotIndex);
         s.undoManager.execute(cmd);
@@ -1888,7 +1894,7 @@ export class MainStreetTurnController {
   private animateNewSynergyPairs(beforePairs: SynergyPair[]): void {
     const s = this.scene;
     try {
-      const afterPairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+      const afterPairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? [], this.streetPairDims());
       for (const pair of diffNewSynergyPairs(beforePairs, afterPairs)) {
         s.msAnimator.animateSynergyFormation(pair);
       }

@@ -13,7 +13,7 @@ import { SFX_KEYS, CARD_BACK_TEMPLATE } from './MainStreetConstants';
 import { synergyLineEndpoints } from './synergyLineEndpoints';
 import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
 import { createCoinGrid, iconsForAmount, roundHalf, type CoinGridHandle } from '../coin-grid';
-import { gameplayOriginCell, mapSlotCenter } from '../MainStreetMapView';
+import { playableIndexToMapCenter } from '../MainStreetMapView';
 
 // ── Income phase animation timing (CG-0MT23O6W8003AXWJ) ────────────────
 // Tune these constants to adjust the phased income choreography pacing.
@@ -607,9 +607,15 @@ export class MainStreetAnimator {
     const s = this.scene;
     const sources = new Map<number | 'fallback', { x: number; y: number }>();
     try {
-      const pairs = computeSynergyPairs(s.state.streetGrid ?? [], s.state.soldSlots ?? []);
+      const pairs = computeSynergyPairs(s.state.streetGrid ?? [], s.state.soldSlots ?? [],
+        s.streetPlayableLattice && (s.streetPlayableLattice.cols > 1 || s.streetPlayableLattice.rows > 1)
+          ? s.streetPlayableLattice
+          : undefined);
       for (const pair of pairs) {
-        const { mid } = synergyLineEndpoints(pair, s.layout);
+        const { mid } = synergyLineEndpoints(pair, s.layout, {
+          from: this.localSlotCentre(pair.fromIndex),
+          to: this.localSlotCentre(pair.toIndex),
+        });
         if (!sources.has(pair.fromIndex)) sources.set(pair.fromIndex, mid);
         if (!sources.has(pair.toIndex)) sources.set(pair.toIndex, mid);
       }
@@ -1233,7 +1239,10 @@ export class MainStreetAnimator {
     const reducedMotion = s.settingsPanel?.reducedMotion === true;
     // Shared clipped geometry: same endpoints as the static renderer uses
     // (edge-to-edge / corner-to-corner, CG-0MSVM3WCD007BRQP).
-    const { p1: a, p2: b, mid } = synergyLineEndpoints(pair, s.layout);
+    const { p1: a, p2: b, mid } = synergyLineEndpoints(pair, s.layout, {
+      from: this.localSlotCentre(pair.fromIndex),
+      to: this.localSlotCentre(pair.toIndex),
+    });
     const color = synergyColor(pair.sharedSynergy);
 
     // Chime SFX — plays in both modes (minimal feedback retained).
@@ -1538,14 +1547,13 @@ export class MainStreetAnimator {
 
   public getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
     const s = this.scene;
-    // Camera-aware (CG-0MTH9OVMC001V44E): the playable board is the centred
-    // cell of the displayed street lattice, and its screen position follows
-    // the map camera transform. At the default 1× framing this is identical to
-    // the legacy layout maths, so animation targets are unchanged there.
+    // Camera-aware (CG-0MTH9OVMC001V44E) and world-index aware
+    // (CG-0MTH9OW0H0005VKE): the playable board occupies the playable
+    // sub-lattice of the displayed map, so a world slot index resolves to the
+    // right cell even after the board is expanded. At 1× on a 1×1 board this
+    // is identical to the legacy layout maths.
     if (typeof s.streetLocalToScreen === 'function' && s.layout) {
-      const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
-      const origin = gameplayOriginCell(lattice);
-      const local = mapSlotCenter(origin.x, origin.y, slotIndex, s.layout, lattice);
+      const local = this.localSlotCentre(slotIndex);
       return s.streetLocalToScreen(local);
     }
     const col = slotIndex % s.layout.streetCols;
@@ -1553,6 +1561,14 @@ export class MainStreetAnimator {
     const x = s.layout.streetX + col * (s.layout.slotW + s.layout.slotGap) + s.layout.slotW / 2;
     const y = s.layout.streetTop + row * (s.layout.slotH + s.layout.streetRowGap) + s.layout.slotH / 2;
     return { x, y };
+  }
+
+  /** Map-local centre of a playable world slot index (street-layer coordinates). */
+  private localSlotCentre(slotIndex: number): { x: number; y: number } {
+    const s = this.scene;
+    const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
+    const playable = s.streetPlayableLattice ?? { cols: 1, rows: 1 };
+    return playableIndexToMapCenter(slotIndex, s.layout, lattice, playable);
   }
 
   /**

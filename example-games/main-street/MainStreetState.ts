@@ -26,6 +26,8 @@ import {
   CSV_CHECKSUM,
   CARD_DATA_RAW,
   GRID_SIZE,
+  STREET_COLS,
+  STREET_ROWS,
   MARKET_TOTAL_SLOTS,
   MARKET_BUSINESS_MIN,
   MARKET_BUSINESS_MAX,
@@ -1147,7 +1149,7 @@ export function createCompetitiveState(
   } as PlayerRecord));
 
   state.ownerTaggedGrid = Array.from(
-    { length: GRID_SIZE },
+    { length: state.streetGrid.length },
     (): OwnerTaggedSlot => ({ card: null, ownerId: null }),
   );
 
@@ -1615,6 +1617,83 @@ function resizeSoldSlots(sold: boolean[] | undefined, gridLength: number): boole
     for (let i = 0; i < Math.min(sold.length, target); i++) out[i] = sold[i] === true;
   }
   return out;
+}
+
+/**
+ * Re-sizes the playable street grid to a new planar world lattice
+ * (`cols`×`rows` street cells), migrating every placed card, sold flag and
+ * ownership tag by WORLD POSITION (CG-0MTH9OW0H0005VKE).
+ *
+ * The world grid is row-major over the planar seam-sharing rectangle, so its
+ * row width changes with `cols` — a legacy 1×1 board (world width 5) becomes
+ * the origin cell of a larger lattice (world width `4·cols+1`), and its bottom
+ * row shifts from indices 5..9 to `worldY·newWidth + worldX`. This function
+ * therefore *reindexes* rather than merely re-sizing.
+ *
+ * Cards/tags outside the new (smaller) lattice are dropped, matching the
+ * shrinkage semantics of `resizeSoldSlots`.
+ *
+ * @returns True when the lattice changed (arrays re-allocated), false for a no-op.
+ */
+export function setStreetGridLattice(
+  state: MainStreetState,
+  cols: number,
+  rows: number,
+): boolean {
+  const nextCols = Math.max(1, Math.floor(cols));
+  const nextRows = Math.max(1, Math.floor(rows));
+  const prevCols = Math.max(1, Math.floor(state.streetGridCols || 1));
+  const prevRows = Math.max(1, Math.floor(state.streetGridRows || 1));
+  if (nextCols === prevCols && nextRows === prevRows) return false;
+
+  const strideX = STREET_COLS - 1;
+  const strideY = STREET_ROWS - 1;
+  const prevWidth = strideX * prevCols + 1;
+  const nextWidth = strideX * nextCols + 1;
+  const nextHeight = strideY * nextRows + 1;
+  const nextSize = nextWidth * nextHeight;
+
+  /** Translate an index in the previous world frame to the next frame. */
+  const reindex = (index: number): number => {
+    const worldX = index % prevWidth;
+    const worldY = Math.floor(index / prevWidth);
+    if (worldX >= nextWidth || worldY >= nextHeight) return -1;
+    return worldY * nextWidth + worldX;
+  };
+
+  const nextGrid: (BusinessCard | CommunitySpaceCard | null)[] =
+    new Array<BusinessCard | CommunitySpaceCard | null>(nextSize).fill(null);
+  const nextSold = new Array<boolean>(nextSize).fill(false);
+  const prevSold = state.soldSlots ?? [];
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const target = reindex(i);
+    if (target < 0) continue;
+    nextGrid[target] = state.streetGrid[i] ?? null;
+    if (prevSold[i]) nextSold[target] = true;
+  }
+
+  let nextOwners: OwnerTaggedSlot[] | undefined;
+  if (state.ownerTaggedGrid) {
+    nextOwners = new Array<OwnerTaggedSlot>(nextSize).fill(undefined as unknown as OwnerTaggedSlot);
+    for (let i = 0; i < state.ownerTaggedGrid.length; i++) {
+      const target = reindex(i);
+      if (target < 0) continue;
+      nextOwners[target] = state.ownerTaggedGrid[i];
+    }
+  }
+
+  state.streetGrid = nextGrid;
+  state.soldSlots = nextSold;
+  if (nextOwners) state.ownerTaggedGrid = nextOwners;
+  state.streetGridCols = nextCols;
+  state.streetGridRows = nextRows;
+
+  addLog(
+    state,
+    `Street grid expanded to ${nextCols}×${nextRows} streets (${nextSize} plots)`,
+    'neutral',
+  );
+  return true;
 }
 
 /**

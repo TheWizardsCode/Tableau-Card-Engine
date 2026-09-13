@@ -995,6 +995,7 @@ export function computeSynergyPairs(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   // soldSlots retained for API compat — sold cards now participate fully as pair endpoints (CG-0MT5XUE2200047IJ)
   _soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
   const seen = new Set<string>();
@@ -1009,7 +1010,7 @@ export function computeSynergyPairs(
     }
 
     const range = 1 + card.synergyRangeBonus;
-    const neighborIndices = neighbors(i, range);
+    const neighborIndices = resolveNeighbors(i, range, gridDims);
 
     for (const ni of neighborIndices) {
       if (ni <= i) continue; // avoid duplicates and self-pairs

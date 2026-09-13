@@ -45,7 +45,6 @@ import {
   getEmptySlots,
 } from './MainStreetMarket';
 import type { BusinessCard, UpgradeCard, EventCard, StaffCard } from './MainStreetCards';
-import { GRID_SIZE } from './MainStreetCards';
 import { computeSynergyBonus } from './MainStreetAdjacency';
 import { computeScore } from './MainStreetEngine';
 
@@ -145,7 +144,7 @@ export function scoreBankOption(state: MainStreetState): number {
     if (card.cost <= coins) continue; // already affordable — not a banking target
     // Simulate placement at best slot (max synergy) to estimate value
     let maxSynergy = 0;
-    for (let slot = 0; slot < GRID_SIZE; slot++) {
+    for (let slot = 0; slot < state.streetGrid.length; slot++) {
       if (state.streetGrid[slot] !== null) continue;
       const sim = [...state.streetGrid];
       sim[slot] = card as unknown as BusinessCard;
@@ -191,7 +190,7 @@ export function scoreBankOption(state: MainStreetState): number {
     const emptyCount = state.streetGrid.filter(s => s === null).length;
     if (emptyCount === 0) continue;
     let maxSynergy = 0;
-    for (let slot = 0; slot < GRID_SIZE; slot++) {
+    for (let slot = 0; slot < state.streetGrid.length; slot++) {
       if (state.streetGrid[slot] !== null) continue;
       const sim = [...state.streetGrid];
       sim[slot] = card as unknown as BusinessCard;
@@ -350,7 +349,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     // Generate one action per valid target slot so the AI can choose
     // which slot to upgrade (important for branching upgrade paths).
     const requiredLevel = card.requiredLevel ?? 0;
-    for (let i = 0; i < GRID_SIZE; i++) {
+    for (let i = 0; i < state.streetGrid.length; i++) {
       const biz = state.streetGrid[i];
       if (
         biz !== null &&
@@ -418,7 +417,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     } else if (card.family === 'upgrade') {
       if (state.resourceBank.coins < card.cost) return;
       const requiredLevel = card.requiredLevel ?? 0;
-      for (let i = 0; i < GRID_SIZE; i++) {
+      for (let i = 0; i < state.streetGrid.length; i++) {
         const biz = state.streetGrid[i];
         if (
           biz !== null &&
@@ -523,7 +522,7 @@ function sameDayCompositeUpgradeActions(state: MainStreetState): PlayerAction[] 
     const upgrade = card as UpgradeCard;
     if (state.resourceBank.coins < upgrade.cost) return;
     const requiredLevel = upgrade.requiredLevel ?? 0;
-    for (let i = 0; i < GRID_SIZE; i++) {
+    for (let i = 0; i < state.streetGrid.length; i++) {
       const biz = state.streetGrid[i];
       if (
         biz !== null &&
