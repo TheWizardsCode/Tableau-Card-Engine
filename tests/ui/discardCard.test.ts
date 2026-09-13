@@ -4,22 +4,12 @@ import {
   DEFAULT_DISCARD_DURATION,
   type DiscardCardOptions,
 } from '../../src/ui/discardCard';
+import { createMockTween } from '../helpers/MockFactory';
 
-// ── Mock scene factory ─────────────────────────────────────
-
-interface MockTweenConfig {
-  targets: unknown;
-  duration: number;
-  ease?: string;
-  onComplete?: () => void;
-  onStart?: () => void;
-  onUpdate?: () => void;
-  x?: number;
-  y?: number;
-  alpha?: number;
-  scaleX?: number;
-  scaleY?: number;
-  rotation?: number;
+/** Extended scene type with tween tracking. */
+interface MockSceneWithTweensList extends Omit<Phaser.Scene, 'tweens'> {
+  tweens: { add: ReturnType<typeof vi.fn> };
+  tweensList: Phaser.Types.Tweens.TweenBuilderConfig[];
 }
 
 /**
@@ -29,13 +19,13 @@ interface MockTweenConfig {
  * synchronously, so chained tweens (move → flip → complete) resolve during
  * the discardCard call itself.
  */
-const createMockScene = () => {
-  const tweens: MockTweenConfig[] = [];
+function createMockScene(): MockSceneWithTweensList {
+  const tweensList: Phaser.Types.Tweens.TweenBuilderConfig[] = [];
 
   return {
     tweens: {
-      add: (config: MockTweenConfig) => {
-        tweens.push(config);
+      add: vi.fn((config: Phaser.Types.Tweens.TweenBuilderConfig) => {
+        tweensList.push(config);
         // Apply tween target values to the target (simulate a complete tween)
         if (config.x !== undefined) {
           (config.targets as any).x = config.x;
@@ -53,16 +43,17 @@ const createMockScene = () => {
           (config.targets as any).scaleY = config.scaleY;
         }
         // Fire onComplete synchronously so chained tweens resolve immediately
-        config.onComplete?.();
-        return { stop: vi.fn() };
-      },
+        const onComplete = (config as any).onComplete as (() => void) | undefined;
+        if (onComplete) onComplete();
+        return createMockTween();
+      }),
     },
-    tweensList: tweens,
-  };
-};
+    tweensList,
+  } as MockSceneWithTweensList;
+}
 
 // Mock target object
-const createMockTarget = (initialX = 100, initialY = 100) => {
+function createMockTarget(initialX = 100, initialY = 100) {
   let _textureKey = 'card_face';
   let _depth = 0;
   return {
@@ -78,19 +69,19 @@ const createMockTarget = (initialX = 100, initialY = 100) => {
     setTexture: vi.fn((key: string) => { _textureKey = key; }),
     setDepth: vi.fn((d: number) => { _depth = d; }),
     setPosition: function(x: number, y: number) {
-      this.x = x;
-      this.y = y;
+      (this as any).x = x;
+      (this as any).y = y;
     },
     setAlpha: function(a: number) {
-      this.alpha = a;
+      (this as any).alpha = a;
     },
     setScale: function(s: number) {
-      this.scaleX = s;
-      this.scaleY = s;
+      (this as any).scaleX = s;
+      (this as any).scaleY = s;
     },
     destroy: vi.fn(),
-  };
-};
+  } as unknown as Phaser.GameObjects.Image;
+}
 
 let target: ReturnType<typeof createMockTarget>;
 let mockScene: ReturnType<typeof createMockScene>;

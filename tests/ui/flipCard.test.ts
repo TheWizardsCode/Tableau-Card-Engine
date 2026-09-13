@@ -13,21 +13,17 @@ import { flipCard } from '../../src/ui/flipCard';
 /** Captured tween configs in call order. */
 let tweenConfigs: Phaser.Types.Tweens.TweenBuilderConfig[];
 
-/** Mock Phaser tween object returned by tweens.add. */
-function createMockTween(): Phaser.Tweens.Tween {
-  return { destroy: vi.fn() } as unknown as Phaser.Tweens.Tween;
-}
+import { createMockTween } from '../helpers/MockFactory';
 
-/** Create a mock Phaser scene with a tweens.add spy. */
+/** Create a mock Phaser scene that records tween configs. */
 function createMockScene(): Phaser.Scene {
   tweenConfigs = [];
+  const baseAdd = vi.fn((config: Phaser.Types.Tweens.TweenBuilderConfig) => {
+    tweenConfigs.push(config);
+    return createMockTween();
+  });
   return {
-    tweens: {
-      add: vi.fn((config: Phaser.Types.Tweens.TweenBuilderConfig) => {
-        tweenConfigs.push(config);
-        return createMockTween();
-      }),
-    },
+    tweens: { add: baseAdd },
   } as unknown as Phaser.Scene;
 }
 

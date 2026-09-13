@@ -1,37 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { popTextOrIcon } from '../../src/ui/popTextOrIcon';
+import { createMockSceneWithTweens } from '../helpers/MockFactory';
 
 function createMockScene() {
-  const tweenConfigs: Array<Record<string, unknown>> = [];
-
-  const scene = {
-    add: {
-      text: vi.fn((x: number, y: number, label: string) => {
-        const target = {
-          x,
-          y,
-          alpha: 1,
-          scaleX: 1,
-          scaleY: 1,
-          setOrigin: vi.fn().mockReturnThis(),
-          setDepth: vi.fn().mockReturnThis(),
-          destroy: vi.fn(),
-        };
-        (target as any).label = label;
-        return target;
-      }),
-    },
-    tweens: {
-      add: vi.fn((config: Record<string, unknown>) => {
-        tweenConfigs.push(config);
-        const onComplete = config.onComplete as (() => void) | undefined;
-        setTimeout(() => onComplete?.(), 0);
-        return {};
-      }),
-    },
-  };
-
-  return { scene, tweenConfigs };
+  const scene = createMockSceneWithTweens({}, { autoTweenComplete: true });
+  return { scene, tweenConfigs: scene.tweensList };
 }
 
 describe('popTextOrIcon', () => {

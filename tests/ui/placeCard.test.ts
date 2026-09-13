@@ -4,61 +4,15 @@ import {
   DEFAULT_PLACE_DURATION,
   type PlaceCardOptions,
 } from '../../src/ui/placeCard';
+import { createMockScene, createMockImage } from '../helpers/MockFactory';
 
-// Mock Phaser scene with tweens
-const createMockScene = () => {
-  const tweens: Array<{
-    targets: unknown;
-    duration: number;
-    ease?: string;
-    onComplete?: () => void;
-    x?: number;
-    y?: number;
-    scaleX?: number;
-    scaleY?: number;
-  }> = [];
-
-  return {
-    tweens: {
-      add: (config: {
-        targets: unknown;
-        duration: number;
-        ease?: string;
-        onComplete?: () => void;
-        x?: number;
-        y?: number;
-        scaleX?: number;
-        scaleY?: number;
-      }) => {
-        tweens.push(config);
-        // Simulate immediate completion for testing
-        setTimeout(() => config.onComplete?.(), 0);
-        return {};
-      },
-    },
-    tweensList: tweens,
-  };
-};
-
-// Mock target object
-const createMockTarget = (initialX = 100, initialY = 100) => ({
-  x: initialX,
-  y: initialY,
-  scaleX: 1,
-  scaleY: 1,
-  setPosition: (x: number, y: number) => {
-    (target as any).x = x;
-    (target as any).y = y;
-  },
-  setScale: (s: number) => {
-    (target as any).scaleX = s;
-    (target as any).scaleY = s;
-  },
-});
-
-let target: ReturnType<typeof createMockTarget>;
+let target: Phaser.GameObjects.Image;
 let mockScene: ReturnType<typeof createMockScene>;
 let mockGameEvents: { emit: ReturnType<typeof vi.fn> };
+
+function createMockTarget(initialX = 100, initialY = 100) {
+  return { ...createMockImage(initialX, initialY) } as unknown as Phaser.GameObjects.Image;
+}
 
 describe('placeCard', () => {
   beforeEach(() => {
@@ -128,7 +82,7 @@ describe('placeCard', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Both phases should use the custom duration
-    const totalDuration = mockScene.tweensList[0].duration + mockScene.tweensList[1].duration;
+    const totalDuration = (mockScene.tweensList![0] as any).duration + (mockScene.tweensList![1] as any).duration;
     expect(totalDuration).toBe(500);
   });
 

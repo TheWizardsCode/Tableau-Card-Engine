@@ -5,57 +5,15 @@ import {
   DEFAULT_DEAL_ARC_HEIGHT,
   type DealCardOptions,
 } from '../../src/ui/dealCard';
+import { createMockScene, createMockImage } from '../helpers/MockFactory';
 
-// Mock Phaser scene with tweens
-const createMockScene = () => {
-  const tweens: Array<{
-    targets: unknown;
-    duration: number;
-    ease?: string;
-    onComplete?: () => void;
-    x?: number;
-    y?: number;
-    rotation?: number;
-  }> = [];
-
-  return {
-    tweens: {
-      add: (config: {
-        targets: unknown;
-        duration: number;
-        ease?: string;
-        onComplete?: () => void;
-        x?: number;
-        y?: number;
-        rotation?: number;
-      }) => {
-        tweens.push(config);
-        // Simulate immediate completion for testing
-        setTimeout(() => config.onComplete?.(), 0);
-        return {};
-      },
-    },
-    tweensList: tweens,
-  };
-};
-
-// Mock target object
-const createMockTarget = (initialX = 100, initialY = 100) => ({
-  x: initialX,
-  y: initialY,
-  rotation: 0,
-  setPosition: (x: number, y: number) => {
-    (target as any).x = x;
-    (target as any).y = y;
-  },
-  setRotation: (r: number) => {
-    (target as any).rotation = r;
-  },
-});
-
-let target: ReturnType<typeof createMockTarget>;
+let target: Phaser.GameObjects.Image;
 let mockScene: ReturnType<typeof createMockScene>;
 let mockGameEvents: { emit: ReturnType<typeof vi.fn> };
+
+function createMockTarget(initialX = 100, initialY = 100) {
+  return { ...createMockImage(initialX, initialY) } as unknown as Phaser.GameObjects.Image;
+}
 
 describe('dealCard', () => {
   beforeEach(() => {
