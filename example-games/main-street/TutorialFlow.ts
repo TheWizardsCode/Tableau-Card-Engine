@@ -195,7 +195,7 @@ export interface UnifiedTutorialStepDef {
   synergyCardId?: string;
 }
 
-// ── Unified Tutorial Script (T1-T23) ────────────────────────
+// ── Unified Tutorial Script (T1-T26) ────────────────────────
 
 /**
  * The unified set of 26 tutorial steps, in sequential order.

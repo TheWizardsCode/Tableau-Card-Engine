@@ -2133,7 +2133,7 @@ reusing base layout zones through composition.
 | `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
 | `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
 | `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T24 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
+| `example-games/main-street/TutorialFlow.ts` | T1-T26 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
 
 #### How composition works
 
