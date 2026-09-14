@@ -68,13 +68,23 @@ function destroyGame(g: Phaser.Game | null): void {
   if (container) container.remove();
 }
 
-function dispatchMouse(type: string, worldX: number, worldY: number): void {
+/**
+ * Dispatch a native DOM MouseEvent at **screen** coordinates.
+ *
+ * `getStreetSlotCenter` returns container-local coordinates (already
+ * transformed through the street camera), which must be converted to canvas
+ * coordinates (accounting for the camera's scale/offset) and then to client
+ * coordinates (accounting for CSS scaling of the canvas).  The formula
+ * normalises screen coordinates by the game dimensions and scales to the
+ * canvas rect.
+ */
+function dispatchScreenMouse(type: string, screenX: number, screenY: number): void {
   const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement;
   expect(canvas).toBeTruthy();
   const rect = canvas.getBoundingClientRect();
   canvas.dispatchEvent(new MouseEvent(type, {
-    clientX: rect.x + (worldX / GAME_W) * rect.width,
-    clientY: rect.y + (worldY / GAME_H) * rect.height,
+    clientX: rect.x + (screenX / GAME_W) * rect.width,
+    clientY: rect.y + (screenY / GAME_H) * rect.height,
     bubbles: true,
     cancelable: true,
     view: window,
@@ -199,9 +209,9 @@ describe('expanded street viewport (browser)', () => {
       'shared corner rendered with a gameplay index',
     );
 
-    dispatchMouse('mousedown', centre.x, centre.y);
+    dispatchScreenMouse('mousedown', centre.x, centre.y);
     await wait(60);
-    dispatchMouse('mouseup', centre.x, centre.y);
+    dispatchScreenMouse('mouseup', centre.x, centre.y);
 
     await waitForCondition(
       () => scene.state.streetGrid[CORNER]?.id === business.id,
