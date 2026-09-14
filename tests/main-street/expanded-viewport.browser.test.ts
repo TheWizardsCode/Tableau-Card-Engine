@@ -157,10 +157,11 @@ describe('expanded street viewport (browser)', () => {
     // The shared four-way intersection is world (4,1) → index 13.
     const CORNER = 13;
     scene.state.resourceBank.coins = 2000;
+    // Any purchasable street card works for the *interaction* assertion — the
+    // synergy assertion below uses controlled fixtures so it never depends on
+    // the random market deal.
     const business = scene.state.market.cards.find((c: any) =>
-      c && c.family === 'business' &&
-      Array.isArray(c.synergyTypes) && c.synergyTypes.length > 0 &&
-      (c.synergyCoinBonus ?? 0.5) !== 0 &&
+      c && (c.family === 'business' || c.family === 'community-space') &&
       canPurchaseBusiness(scene.state, c.id, CORNER).legal,
     );
     expect(business).toBeTruthy();
@@ -182,7 +183,9 @@ describe('expanded street viewport (browser)', () => {
     scene.onSlotClick = (i: number) => { clicks.push(i); return origOnSlotClick(i); };
 
     // The selectable slot rects are (re)drawn by the refresh that follows the
-    // selection; re-render explicitly so the click cannot race that refresh.
+    // selection; re-render explicitly and wait until the shared corner's
+    // hit-zone is actually interactive before clicking (avoids racing the
+    // refresh under parallel-suite load).
     scene.refreshStreetGrid();
     await wait(50);
 
@@ -190,32 +193,38 @@ describe('expanded street viewport (browser)', () => {
     expect(Number.isFinite(centre.x)).toBe(true);
     expect(Number.isFinite(centre.y)).toBe(true);
 
+    await waitForCondition(
+      () => (scene.getVisibleStreetNodes() as Array<{ gameplayIndex: number | null }>)
+        .some((n) => n.gameplayIndex === CORNER),
+      'shared corner rendered with a gameplay index',
+    );
+
     dispatchMouse('mousedown', centre.x, centre.y);
-    await wait(30);
+    await wait(60);
     dispatchMouse('mouseup', centre.x, centre.y);
 
     await waitForCondition(
       () => scene.state.streetGrid[CORNER]?.id === business.id,
       `card placed on the shared corner (slot clicks: ${JSON.stringify(clicks)}, uiPhase: ${scene.uiPhase})`,
+      20_000,
     );
     expect(scene.state.streetGrid[CORNER]?.id).toBe(business.id);
 
     // AC2: a synergistic card in a NEIGHBOURING STREET (world 3,0 → index 3, a
-    // different street cell) forms synergy with the shared-corner card. The
-    // neighbour shares the placed card's synergy type but has a different base
-    // type, and the two plots are Chebyshev-1 adjacent across the seam.
-    const placed = scene.state.streetGrid[CORNER]!;
-    const before = placed.currentIncome ?? 0;
-    expect(before).toBeGreaterThan(0);
-    const shared = ((placed as any).synergyTypes ?? ['Food'])[0];
-    const neighbour = businessFixture('biz-neighbour-street', 10, [shared]);
-    scene.state.streetGrid[3] = neighbour;
+    // different street cell) forms synergy with a shared-corner card. Both
+    // cards are controlled fixtures (distinct base types, shared synergy type)
+    // placed one Chebyshev step apart across the seam.
+    const cafe = businessFixture('cafe-browser-corner', 10, ['retail']);
+    const bakery = businessFixture('bakery-browser-neighbour', 10, ['retail']);
+    scene.state.streetGrid[CORNER] = cafe;
+    scene.state.streetGrid[3] = bakery;
     updateNeighborsOnPlacement(scene.state, 3);
     scene.refreshStreetGrid();
     await wait(80);
 
     const after = scene.state.streetGrid[CORNER]!.currentIncome ?? 0;
-    expect(after).toBeGreaterThan(before);
+    // Base 10 plus cross-street synergy from the neighbouring street.
+    expect(after).toBeGreaterThan(10);
 
     // The cross-street pair is discovered with the expanded grid dimensions…
     const pairs = computeSynergyPairs(

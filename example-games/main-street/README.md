@@ -96,6 +96,14 @@ player sees. `MainStreetMapView.mapSlotCount()` and
 `MainStreetAdjacency.worldSlotCount()` are asserted equal in the contract
 tests, so the rendered geometry and the gameplay adjacency can never drift
 apart.
+- **Shared street corners (player view).** Where four streets meet, the corner
+plot is a **single plot holding one card** that belongs to all four streets at
+once. A business on a shared corner earns synergy from matching neighbours in
+every adjacent street (8-way / Chebyshev adjacency), and — because it is one
+plot — it is selected, tooltipped, sold or closed **once**, from whichever
+street you click it in. Shared seam plots (the row/column where two streets
+overlap) behave the same way for the two streets they join, so a card there is
+adjacent to neighbours on both sides of the seam.
 - **Reduced motion.** Zoom transitions are skipped
 (`settingsPanel.reducedMotion`), applying the new framing instantly.
 - **Input.** Phaser applies container transforms to input hit testing, so slot
