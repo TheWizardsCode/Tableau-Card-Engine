@@ -474,7 +474,7 @@ Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedbac
 - `tests/lost-cities/LostCitiesRoundEnd.browser.test.ts` (Lost Cities flow)
 - `tests/core-engine/SvgHelpers.browser.test.ts` (Core SVG pipeline)
 - `tests/ui/HelpPanel.browser.test.ts` (UI chrome)
-- `tests/gym/GymSceneSmoke.browser.test.ts` (All 19 gym scenes boot)
+- `tests/gym/GymSceneSmoke.browser.test.ts` (All gym scenes boot)
 
 ### Dev Tests
 

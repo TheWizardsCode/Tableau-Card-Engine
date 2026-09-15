@@ -85,6 +85,9 @@ export const GYM_TOKEN_PILE_VIEW_KEY = 'GymTokenPileViewScene';
 /** Rule Engine demo scene key. */
 export const GYM_RULE_ENGINE_KEY = 'GymRuleEngineScene';
 
+/** Card Type Index (grouped by family / synergy) demo scene key. */
+export const GYM_CARD_INDEX_KEY = 'GymCardIndexScene';
+
 /** Blackjack game scene key for Gym demonstration access. */
 export const GYM_BLACKJACK_KEY = 'BlackjackScene';
 
@@ -222,6 +225,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Rule Engine: LegalityResult + EconomyLedger',
     description:
       'Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions) and EconomyLedger resource tracking with constraint enforcement.',
+  },
+  {
+    sceneKey: GYM_CARD_INDEX_KEY,
+    title: 'Card Type Index & Synergy Groups',
+    description:
+      'Browse every Main Street card, grouped by type (family) or by synergy. Filter by name/id, hover for the player-facing tooltip, click for the full raw-data detail dialog.',
   },
   {
     sceneKey: GYM_BLACKJACK_KEY,
