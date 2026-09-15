@@ -52,6 +52,9 @@ function createMockScene(): any {
     },
     refreshStreetGrid: vi.fn(),
     refreshActionButtons: vi.fn(),
+    // Undo/redo HUD button sync (CG-0MT5Y4DL8000AKKZ) — called by the turn
+    // controller after every undo-stack mutation.
+    refreshUndoRedoButtons: vi.fn(),
     refreshAllAction: vi.fn(),
     hintBar: null,
     msLifecycleManager: {

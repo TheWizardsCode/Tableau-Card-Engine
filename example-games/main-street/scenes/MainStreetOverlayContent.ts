@@ -391,6 +391,9 @@ export class MainStreetOverlayContent {
       dismissOverlay(s.overlayObjects);
       s.overlayObjects = [];
       s.refreshAll();
+      // The sale (when it succeeded) added a command to the undo stack —
+      // refresh the HUD buttons so Undo becomes clickable (CG-0MT5Y4DL8000AKKZ).
+      s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
       // Sell demolition + refund coin fly when the sale succeeded
       // (presentation-only; the dimmed SOLD state renders synchronously
       // above and the animator's snapshot reveals it after the demolition).
@@ -449,6 +452,9 @@ export class MainStreetOverlayContent {
       dismissOverlay(s.overlayObjects);
       s.overlayObjects = [];
       s.refreshAll();
+      // A successful close added a command to the undo stack — refresh the
+      // HUD buttons (CG-0MT5Y4DL8000AKKZ).
+      s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
 
       if (closed) {
         // Demolition (card to discard) — no refund coin fly for a close.
@@ -524,6 +530,9 @@ export class MainStreetOverlayContent {
         dismissOverlay(s.overlayObjects);
         s.overlayObjects = [];
         s.refreshAll();
+        // A successful lay-off added a command to the undo stack — refresh
+        // the HUD buttons (CG-0MT5Y4DL8000AKKZ).
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
 
         // The member leaves the business: discard SFX, illegal-move feedback
         // on failure. Presentation-only — state is already committed above.

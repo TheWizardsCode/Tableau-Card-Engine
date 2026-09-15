@@ -308,6 +308,10 @@ export class MainStreetTurnController {
 
     // Clear undo stack on end-of-turn (per acceptance criteria)
     try { s.undoManager.clear(); } catch (e) { /* ignore */ }
+    // Undo/redo are per-turn only; after the clear neither action is
+    // available, so both HUD buttons must show their disabled state
+    // (CG-0MT5Y4DL8000AKKZ).
+    s.refreshUndoRedoButtons(false, false);
 
     // ── Challenge Celebration VFX & Sound ────────────────────────
     // If any challenges were newly completed this turn, trigger celebration
@@ -587,6 +591,9 @@ export class MainStreetTurnController {
       // normal end-of-turn clear) so a choice cannot be undone after the day
       // advanced (undo would resurrect the pending choice mid-market).
       try { s.undoManager?.clear(); } catch (_) { /* ignore */ }
+      // Stacks are empty again — disable both HUD buttons
+      // (CG-0MT5Y4DL8000AKKZ).
+      s.refreshUndoRedoButtons(false, false);
       this.finishTurnPresentation(finalResult, false);
     } catch (e) {
       // Resolution failed (should not happen in normal flow): recover by
@@ -634,6 +641,7 @@ export class MainStreetTurnController {
     try {
       const cmd = playEventCommand(s.state, index);
       s.undoManager.execute(cmd);
+      s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
       played = true;
       // Record action event
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'play-event' }, description: cmd.description }); } catch (_) {}
@@ -671,6 +679,7 @@ export class MainStreetTurnController {
 
     try {
       const cmd = s.undoManager.undo();
+      s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
       addLog(s.state, 'Undo', 'neutral');
       try { if (cmd) recordMainStreetEvent({ type: 'undo', turn: s.state.turn, reversedAction: { description: cmd.description } }); } catch (_) {}
       // Undoing a move-to-hand removes the card from hand, so any tracked
@@ -695,6 +704,7 @@ export class MainStreetTurnController {
 
     try {
       const cmd = s.undoManager.redo();
+      s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
       addLog(s.state, 'Redo', 'neutral');
       try { if (cmd) recordMainStreetEvent({ type: 'redo', turn: s.state.turn, reappliedAction: { description: cmd.description } }); } catch (_) {}
       s.refreshAll();
@@ -798,6 +808,7 @@ export class MainStreetTurnController {
       try {
         const cmd = moveToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'move-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
         s.instructionText.setText(`"${cardName}" moved to hand (1 action)!`);
@@ -1032,6 +1043,7 @@ export class MainStreetTurnController {
         try {
           const cmd = buyAndPlaceBusinessCommand(s.state, cardId, slotIndex, priceOverride, extraActions);
           s.undoManager.execute(cmd);
+          s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
           try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
           try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
           s.instructionText.setText(premiumApplies
@@ -1191,6 +1203,7 @@ export class MainStreetTurnController {
       try {
         const cmd = buyAndPlaceUpgradeCommand(s.state, cardId, slotIndex);
         s.undoManager.execute(cmd);
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-and-place-upgrade', cardId, slotIndex }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId, slotIndex }); } catch (_) {}
         s.instructionText.setText(`Applied "${cardName}" to slot ${slotIndex} (50% premium)`);
@@ -1398,6 +1411,7 @@ export class MainStreetTurnController {
             // manager so the coin deduction is fully undoable/redoable.
             const cmd = playBusinessFromHandCommand(s.state, handIndex, slotIndex, premiumCost);
             s.undoManager.execute(cmd);
+            s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
             // The just-moved card has now been placed; clear the tracker so a
             // later selection of any other hand card costs an action again.
             // (Cleared only on success — on failure the card stays in hand and
@@ -1492,6 +1506,7 @@ export class MainStreetTurnController {
       try {
         const cmd = buyBusinessCommand(s.state, pendingCardId, slotIndex);
         s.undoManager.execute(cmd);
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-business', cardId: pendingCardId, slotIndex }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: pendingCardId, slotIndex }); } catch (_) {}
         s.instructionText.setText(`Placed "${pendingCardName}" on slot ${slotIndex}`);
@@ -1591,6 +1606,7 @@ export class MainStreetTurnController {
       try {
         const cmd = moveEventToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'buy-event', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
         s.instructionText.setText(`Moved event to hand (1 action): "${card.name}"`);
@@ -1648,6 +1664,7 @@ export class MainStreetTurnController {
     try {
       const cmd = refreshMarketCommand(s.state);
       s.undoManager.execute(cmd);
+      s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
       try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'refresh-market' }, description: cmd.description }); } catch (_) {}
       s.instructionText.setText('Market re-rolled');
       addLog(s.state, 'Re-rolled market (via UI)', 'neutral');
@@ -1702,6 +1719,7 @@ export class MainStreetTurnController {
     try {
       const cmd = peekIncidentDeckCommand(s.state);
       s.undoManager.execute(cmd);
+      s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
       try {
         recordMainStreetEvent({
           type: 'action',
@@ -1959,6 +1977,7 @@ export class MainStreetTurnController {
       try {
         const cmd = moveToHandCommand(s.state, card.id);
         s.undoManager.execute(cmd);
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'move-to-hand', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
 
@@ -2110,6 +2129,7 @@ export class MainStreetTurnController {
       try {
         const cmd = playUpgradeFromHandCommand(s.state, handIndex, slotIndex);
         s.undoManager.execute(cmd);
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
         // Clear the same-day composite tracker once the upgrade has landed.
         if (s.state.justMovedUpgradeCardId === cardId) {
           s.state.justMovedUpgradeCardId = null;
@@ -2210,6 +2230,7 @@ export class MainStreetTurnController {
       try {
         const cmd = hireStaffCardCommand(s.state, card.id);
         s.undoManager.execute(cmd);
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
         try { recordMainStreetEvent({ type: 'action', turn: s.state.turn, action: { type: 'hire-staff', cardId: card.id }, description: cmd.description }); } catch (_) {}
         try { s.gameEvents?.emit('card:placed', { cardId: card.id }); } catch (_) {}
         s.instructionText.setText(`Hired "${card.name}" (+${card.handSlotsAdded} hand slots)`);

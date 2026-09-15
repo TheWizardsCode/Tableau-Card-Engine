@@ -490,6 +490,9 @@ export class MainStreetLifecycleManager {
       () => s.performUndo(),
       () => s.performRedo(),
     );
+    // Both stacks are empty at boot, so start the buttons in their disabled
+    // visual state instead of the enabled-by-default look (CG-0MT5Y4DL8000AKKZ).
+    s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
     if (!s.replayMode) {
       s.tooltipManager = new TooltipManager(s, s.settingsPanel);
     }
