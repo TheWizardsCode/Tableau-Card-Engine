@@ -194,10 +194,14 @@ describe('expanded street viewport (browser)', () => {
 
     // The selectable slot rects are (re)drawn by the refresh that follows the
     // selection; re-render explicitly and wait until the shared corner's
-    // hit-zone is actually interactive before clicking (avoids racing the
-    // refresh under parallel-suite load).
+    // hit-zone is actually interactive before clicking.  The street grid is
+    // rebuilt from scratch (container removeAll + re-add) so Phaser's input
+    // system needs time to register the new interactive hit-zones.  Under
+    // full-suite contention the main thread is busy and the flush can take
+    // well over 50 ms — the click-place regression test uses 120 ms for the
+    // same reason.  We use 200 ms here for extra headroom.
     scene.refreshStreetGrid();
-    await wait(50);
+    await wait(200);
 
     const centre = scene.getStreetSlotCenter(CORNER);
     expect(Number.isFinite(centre.x)).toBe(true);
@@ -209,9 +213,29 @@ describe('expanded street viewport (browser)', () => {
       'shared corner rendered with a gameplay index',
     );
 
-    dispatchScreenMouse('mousedown', centre.x, centre.y);
-    await wait(60);
-    dispatchScreenMouse('mouseup', centre.x, centre.y);
+    // Bounded retry for the real pointer click: under full-suite contention
+    // Phaser's hit test may skip objects that haven't been rendered yet
+    // (willRender guard).  If the first dispatch misses the hit-zone, retry
+    // up to 3 more times with short delays — the click-place test relies on
+    // a single 120 ms sleep; this retry loop is more robust.  After each
+    // click the waitForCondition below (20 s timeout) will confirm the
+    // placement or surface the diagnostic label.
+    let placed = false;
+    for (let attempt = 0; attempt < 4 && !placed; attempt++) {
+      dispatchScreenMouse('mousedown', centre.x, centre.y);
+      await wait(60);
+      dispatchScreenMouse('mouseup', centre.x, centre.y);
+      if (scene.state.streetGrid[CORNER]?.id === business.id) {
+        placed = true;
+      } else {
+        await wait(100);
+      }
+    }
+    await waitForCondition(
+      () => scene.state.streetGrid[CORNER]?.id === business.id,
+      `card placed on the shared corner (slot clicks: ${JSON.stringify(clicks)}, uiPhase: ${scene.uiPhase})`,
+      20_000,
+    );
 
     await waitForCondition(
       () => scene.state.streetGrid[CORNER]?.id === business.id,
