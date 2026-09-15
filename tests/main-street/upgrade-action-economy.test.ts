@@ -227,15 +227,15 @@ describe('buy-and-place-upgrade (drag-drop)', () => {
     state.market.cards = [upgrade];
     state.resourceBank.coins = 1000;
 
-    // +50% premium on cost 5 = Math.ceil(5 * 1.5 * 2) / 2 = Math.ceil(15) / 2 = 8
-    // Wait: Math.ceil(5 * 1.5 * 2) = Math.ceil(15) = 15, 15 / 2 = 7.5
+    // +50% premium on cost 5 = Math.ceil(5 * 1.5 * 2) / 2 = Math.ceil(15) / 2 = 7.5
+    // (identical to the business buy-and-place formula).
     executeAction(state, {
       type: 'buy-and-place-upgrade',
       cardId: marketUpgradeId,
       targetSlot: 0,
     });
 
-    expect(state.resourceBank.coins).toBe(1000 - 8);
+    expect(state.resourceBank.coins).toBe(1000 - 7.5);
   });
 
   it('rejects when actionsRemaining is 0', () => {

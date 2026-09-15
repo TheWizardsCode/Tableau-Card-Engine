@@ -8,6 +8,7 @@
  */
 import Phaser from 'phaser';
 import { HelpButton } from './HelpButton';
+import { ListenerRegistry } from '../core-engine/ListenerRegistry';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -133,6 +134,8 @@ export class HelpPanel {
   private destroyed = false;
   private enabled = true;
 
+  // Event listener registry for automatic cleanup
+  private readonly registry = new ListenerRegistry();
   // Keyboard
   private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
   private _helpButton: HelpButton | null = null;
@@ -389,8 +392,8 @@ export class HelpPanel {
       this.keyboardListener = null;
     }
 
-    // Remove wheel listener
-    this.scene.input.off('wheel', this.handleWheel, this);
+    // Clear all tracked listeners (wheel, etc.)
+    this.registry.clear();
 
     // Stop any running tween
     if (this.currentTween) {
@@ -493,8 +496,8 @@ export class HelpPanel {
     this.trackBar.setOrigin(0.5, 0);
     this.container.add(this.trackBar);
 
-    // Scroll listeners
-    this.scene.input.on('wheel', this.handleWheel, this);
+    // Scroll listeners (tracked for automatic cleanup)
+    this.registry.on(this.scene.input, 'wheel', this.handleWheel, this);
 
     // Store visible height for scroll calculations
     (this as unknown as Record<string, number>)._visibleHeight = visibleHeight;

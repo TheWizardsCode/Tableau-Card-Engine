@@ -39,7 +39,7 @@
  * | Step | Action                          | Coins In | Coins Out | Balance |
  * |------|---------------------------------|----------|-----------|---------|
  * | T1   | Start (Easy, 12 coins)          | 12       | 0         | 12      |
- * | T3   | Move Laundromat to hand (free)  | 0        | 0         | 12      |
+ * | T3   | Move Laundromat to hand (1 action) | 0     | 0         | 12      |
  * | T6   | End Turn (held-card cost -1)    | 0        | 1         | 11      |
  * | T7   | Place Laundromat (listed $4)    | 0        | 4         | 7       |
  * | T8   | End Turn (day 2 → 3)            | 0        | 0         | 7       |
@@ -297,7 +297,21 @@ export function createTutorialScenario(
   // why the deck is scripted rather than drawn from the event pool.
   const incidentDeck: EventCard[] = [];
   for (const templateId of scenario.incidentDeck) {
-    incidentDeck.push(findCardByTemplate(eventDeck, templateId));
+    const card = findCardByTemplate(eventDeck, templateId);
+    // Choice-event exclusion (CG-0MTT7FO7I009295E AC1, per producer decision
+    // 2026-09-08 Q2 — no choice events in the tutorial; no teaching step). The
+    // tutorial's scripted deck must never surface a hasChoices event: the
+    // flow has no dialog handling and a pending choice would stall the step
+    // pacing. Fail fast at scenario build so a choice card can never slip in
+    // silently when content is later retrofitted.
+    if (card.hasChoices) {
+      throw new Error(
+        `TutorialScenario: incident template "${templateId}" has hasChoices — ` +
+        'choice events are excluded from the tutorial deck (AC1 CG-0MTT7FO7I009295E). ' +
+        'Remove hasChoices from this template or pick a non-choice incident.',
+      );
+    }
+    incidentDeck.push(card);
   }
 
   // ── Setup deterministic RNG ───────────────────────────────
@@ -321,10 +335,13 @@ export function createTutorialScenario(
   state = {
     config,
     turn: 1,
+    week: 1,
+    year: 1,
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     streetGridCols: 1,
     streetGridRows: 1,
+    streetCamera: { zoomLevel: 1, focusX: 0, focusY: 0 },
     market: {
       cards: marketCards,
     },
@@ -375,7 +392,6 @@ export function createTutorialScenario(
     maxHandSize: 3,
     discardPile: [],
     staffCards: [],
-    skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
     bankedActions: 0,
@@ -385,6 +401,7 @@ export function createTutorialScenario(
     justMovedEventCardId: null,
     justMovedUpgradeCardId: null,
     pendingApplicant: null,
+    pendingEventChoice: null,
   };
 
   // Select challenges for this run using seeded RNG

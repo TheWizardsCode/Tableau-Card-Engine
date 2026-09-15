@@ -18,10 +18,9 @@ import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, classifyEffect } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard, StaffCard } from './MainStreetCards';
 import {
-  GRID_SIZE,
   REFRESH_MARKET_COST,
 } from './MainStreetCards';
-import { updateNeighborsOnPlacement, updateNeighborsOnSale, hasAdjacentSameType } from './MainStreetAdjacency';
+import { updateNeighborsOnPlacement, updateNeighborsOnSale, updateNeighborsOnClose, hasAdjacentSameType, tagSlotOwnerIfCompetitive } from './MainStreetAdjacency';
 import { roundInt } from './MainStreetDifficulty';
 import {
   computeRefreshCostDiscount,
@@ -86,8 +85,8 @@ export function canPurchaseBusiness(
   }
 
   // Validate slot index
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.` };
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.` };
   }
 
   // Check slot is empty
@@ -146,21 +145,13 @@ export function canPurchaseUpgrade(
 }
 
 /**
- * Checks whether the player can take an Event card from the market into their
- * hand.
- *
- * Taking an Investment event is FREE (CG-0MT5W1V4D007NN8Q) — it is held in
- * the player's hand (any mix of business and event cards, up to `maxHandSize`
- * total) and its listed cost is paid only when the event is played from hand
- * during the MarketPhase. This is the same free acquisition model as
- * `moveToHand`, so there is NO coin requirement here.
- * Incident events are drawn automatically (not taken by hand).
- *
- * @param state   Current game state.
- * @param cardId  ID of the Event card in the market.
- * @returns LegalityResult indicating whether the action is permitted.
+ * Budget-independent event acquisition legality: card exists, is an
+ * Investment-trigger event, and the hand has room. Shared by
+ * `canPurchaseEvent` (player-facing eligibility, action-aware) and
+ * `purchaseEvent` (engine helper, invoked *after* `consumeAction` has
+ * already charged the action — so it must not re-check the budget).
  */
-export function canPurchaseEvent(
+function canTakeEventToHand(
   state: MainStreetState,
   cardId: string,
 ): LegalityResult {
@@ -177,14 +168,46 @@ export function canPurchaseEvent(
     return { legal: false, reason: 'Incident events cannot be purchased; they are drawn automatically.' };
   }
 
-  // Hand capacity is the only limit — no separate "max 1 held Investment" rule
-  const handCheck = canAddToHand(state);
-  if (!handCheck.legal) {
-    return handCheck;
+  // Hand capacity is the only card-level limit — no separate "max 1 held
+  // Investment" rule.
+  return canAddToHand(state);
+}
+
+/**
+ * Checks whether the player can take an Event card from the market into their
+ * hand.
+ *
+ * Taking an Investment event costs one daily action (CG-0MTFWBNL30043ZBM),
+ * matching the business-card move-to-hand economy: it is held in the
+ * player's hand (any mix of business and event cards, up to `maxHandSize`
+ * total) and its listed cost is paid only when the event is played from
+ * hand during the MarketPhase — the move itself costs no coins. Incident
+ * events are drawn automatically (not taken by hand).
+ *
+ * This is the player-facing (controller/AI) predicate and therefore includes
+ * the action-budget gate. The engine execution path charges the action via
+ * `consumeAction` and then calls `purchaseEvent`, which uses the
+ * budget-independent `canTakeEventToHand` instead.
+ *
+ * @param state   Current game state.
+ * @param cardId  ID of the Event card in the market.
+ * @returns LegalityResult indicating whether the action is permitted.
+ */
+export function canPurchaseEvent(
+  state: MainStreetState,
+  cardId: string,
+): LegalityResult {
+  const base = canTakeEventToHand(state, cardId);
+  if (!base.legal) {
+    return base;
   }
 
-  // No coin check: taking the event to hand is free; the cost is paid when
-  // the event is executed from hand (CG-0MT5W1V4D007NN8Q).
+  // One daily action, exactly like a business move-to-hand
+  // (CG-0MTFWBNL30043ZBM). No coin check: the cost is paid when the event is
+  // executed from hand (CG-0MT5W1V4D007NN8Q).
+  if ((state.actionsRemaining ?? 0) <= 0) {
+    return { legal: false, reason: 'No actions remaining today. End your turn to start a new day.' };
+  }
 
   return { legal: true };
 }
@@ -358,14 +381,7 @@ export function cycleMarketCards(state: MainStreetState): void {
     }
   }
 
-  // Log the cycle
-  if (visibleCards.length > 0) {
-    addLog(state, `Market cycled: ${visibleCards.length} unpurchased cards moved to discard`, 'neutral');
-  }
-
   // ── Refill the single row from decks ─────────────────────
-  // (refillMarket would also cycle the already-emptied row; call the raw
-  //  refill so the log line above is the canonical cycle record.)
   refillSingleRowMarket(state);
 }
 
@@ -443,6 +459,8 @@ export function purchaseBusiness(
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
+  // Record ownership on the owner-tagged grid (competitive; no-op single-player).
+  tagSlotOwnerIfCompetitive(state, slotIndex);
 
   // Arm Grand Opening placement gate (CG-0MTIOCBH400970OB).
   (state as any).businessPlacedThisTurn = true;
@@ -475,11 +493,13 @@ export function canAddToHand(state: MainStreetState): LegalityResult {
 }
 
 /**
- * Moves a card from the single-row market into the player's hand for free
- * (CG-0MSTOATDT009BRX2). Bounded only by hand capacity (`maxHandSize`); the
- * market is NOT refilled mid-turn after moves (day-start refill unchanged).
- * Payment is deferred — the card's listed cost is paid when it is played
- * from hand (business on placement; upgrade/event when played/triggered).
+ * Moves a card from the single-row market into the player's hand
+ * (CG-0MSTOATDT009BRX2). The move itself costs **one daily action**
+ * (CG-0MSTOF1N5005PK2R business, CG-0MTFWBNL30043ZBM event) but no coins.
+ * Bounded by hand capacity (`maxHandSize`); the market is NOT refilled
+ * mid-turn after moves (day-start refill unchanged). Payment is deferred —
+ * the card's listed cost is paid when it is played from hand (business on
+ * placement; upgrade/event when played/triggered).
  */
 export function moveToHand(state: MainStreetState, cardId: string): PurchaseResult {
   const marketIndex = state.market.cards.findIndex(c => c.id === cardId);
@@ -510,7 +530,7 @@ export function moveToHand(state: MainStreetState, cardId: string): PurchaseResu
     state.justMovedUpgradeCardId = card.id;
   }
 
-  addLog(state, `Moved ${card.name} to hand (free, pay on play)`, 'neutral');
+  addLog(state, `Moved ${card.name} to hand (1 action, pay on play)`, 'neutral');
 
   return { card, cost: 0, refilled: false };
 }
@@ -556,8 +576,8 @@ export function playBusinessFromHand(
   if (state.resourceBank.coins < price) {
     throw new Error(`Not enough coins to play ${card.name} from hand. Need ${price}, have ${state.resourceBank.coins}.`);
   }
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.`);
   }
   if (state.streetGrid[slotIndex] !== null) {
     throw new Error(`Slot ${slotIndex} is already occupied.`);
@@ -567,6 +587,8 @@ export function playBusinessFromHand(
   state.hand.splice(handIndex, 1);
   state.streetGrid[slotIndex] = card as BusinessCard;
   updateNeighborsOnPlacement(state, slotIndex);
+  // Record ownership on the owner-tagged grid (competitive; no-op single-player).
+  tagSlotOwnerIfCompetitive(state, slotIndex);
   (state as any).businessPlacedThisTurn = true;
 
   addLog(
@@ -786,6 +808,67 @@ export function purchaseUpgrade(
 }
 
 /**
+ * Whether the upgrade at `cardId` can be bought and applied to the business
+ * occupying `targetSlot` in one drag-drop gesture (CG-0MT3IYSRL001VVUP).
+ *
+ * This is the slot-specific legality gate for the drag-drop path: unlike
+ * {@link canPurchaseUpgrade} (which only requires *some* eligible business
+ * on the street), the drop must land on a business that matches the
+ * upgrade's `targetBusiness` at exactly its `requiredLevel` and is still
+ * below `maxLevel`. Affordability is checked against the +50% premium — the
+ * price the drag-drop actually charges, not the listed cost.
+ *
+ * @param state      Current game state (read-only).
+ * @param cardId     ID of the Upgrade card in the market.
+ * @param targetSlot Street grid slot the card was dropped on.
+ * @param priceOverride Optional price replacing the +50% premium (GC parity
+ *                      paths charge the listed cost instead).
+ * @returns LegalityResult indicating whether the drop may be applied.
+ */
+export function canBuyAndPlaceUpgrade(
+  state: MainStreetState,
+  cardId: string,
+  targetSlot: number,
+  priceOverride?: number,
+): LegalityResult {
+  const card = state.market.cards.find(
+    c => c.id === cardId && c.family === 'upgrade',
+  ) as UpgradeCard | undefined;
+  if (!card) {
+    return { legal: false, reason: 'Card not found in the upgrade market.' };
+  }
+
+  if (targetSlot < 0 || targetSlot >= state.streetGrid.length) {
+    return { legal: false, reason: `Invalid slot index: ${targetSlot}.` };
+  }
+
+  const biz = state.streetGrid[targetSlot];
+  const requiredLevel = card.requiredLevel ?? 0;
+  if (
+    !biz ||
+    biz.name !== card.targetBusiness ||
+    biz.level !== requiredLevel ||
+    biz.level >= biz.maxLevel
+  ) {
+    return {
+      legal: false,
+      reason: `Business at slot ${targetSlot} is not a valid target for this upgrade.`,
+    };
+  }
+
+  const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+  const price = priceOverride ?? premiumCost;
+  if (state.resourceBank.coins < price) {
+    return {
+      legal: false,
+      reason: `Not enough coins to buy-and-place ${card.name}${priceOverride !== undefined ? '' : ' at premium'}. Need ${price}, have ${state.resourceBank.coins}.`,
+    };
+  }
+
+  return { legal: true };
+}
+
+/**
  * Buys an upgrade from the market and applies it in one step (drag-drop
  * path, CG-0MT3IYSRL001VVUP). Charges a +50% premium on the upgrade's
  * cost.
@@ -800,6 +883,7 @@ export function buyAndPlaceUpgrade(
   state: MainStreetState,
   cardId: string,
   targetSlot?: number,
+  priceOverride?: number,
 ): PurchaseResult {
   const legality = canPurchaseUpgrade(state, cardId);
   if (!legality.legal) {
@@ -812,17 +896,14 @@ export function buyAndPlaceUpgrade(
   const card = state.market.cards[marketIndex] as UpgradeCard;
 
   // Find the target business
-  const requiredLevel = card.requiredLevel ?? 0;
   let businessIndex: number;
   if (targetSlot !== undefined) {
-    const biz = state.streetGrid[targetSlot];
-    if (
-      !biz ||
-      biz.name !== card.targetBusiness ||
-      biz.level !== requiredLevel ||
-      biz.level >= biz.maxLevel
-    ) {
-      throw new Error(`Business at slot ${targetSlot} is not a valid target for this upgrade.`);
+    // Slot-specific legality goes through the shared helper so the drag-drop
+    // gate and the execution path can never diverge (target match, level,
+    // max-level and premium affordability in one place).
+    const targetLegality = canBuyAndPlaceUpgrade(state, cardId, targetSlot, priceOverride);
+    if (!targetLegality.legal) {
+      throw new Error(targetLegality.reason);
     }
     businessIndex = targetSlot;
   } else {
@@ -831,14 +912,16 @@ export function buyAndPlaceUpgrade(
 
   const business = state.streetGrid[businessIndex]!;
 
-  // Calculate +50% premium (CG-0MT3IYSRL001VVUP) — integer-rounded (AC3)
-  const premiumCost = Math.ceil(card.cost * 1.5);
-  if (state.resourceBank.coins < premiumCost) {
-    throw new Error(`Not enough coins to buy-and-place ${card.name} at premium. Need ${premiumCost}, have ${state.resourceBank.coins}.`);
+  // +50% premium — identical formula to business buy-and-place
+  // (`Math.ceil(cost * 1.5 * 2) / 2`, see buyAndPlaceBusiness), so an upgrade
+  // drag-drop is never priced differently from a business drag-drop.
+  const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
+  const price = priceOverride ?? premiumCost;
+  if (state.resourceBank.coins < price) {
+    throw new Error(`Not enough coins to buy-and-place ${card.name}${priceOverride !== undefined ? '' : ' at premium'}. Need ${price}, have ${state.resourceBank.coins}.`);
   }
 
-  // Deduct premium cost
-  state.resourceBank.coins -= premiumCost;
+  state.resourceBank.coins -= price;
 
   // Remove from market
   state.market.cards.splice(marketIndex, 1);
@@ -863,16 +946,22 @@ export function buyAndPlaceUpgrade(
 
   const refilled = false;
 
-  addLog(state, `Bought and placed upgrade ${card.name} on ${business.name} (-€${premiumCost}, +50% premium, ${describeEventEffects(-premiumCost, 0)})`, classifyEffect(-premiumCost, 0));
+  addLog(
+    state,
+    `Bought and placed upgrade ${card.name} on ${business.name} (-€${price}, ${price === premiumCost ? '50% premium' : 'listed'}, ${describeEventEffects(-price, 0)})`,
+    classifyEffect(-price, 0),
+  );
 
-  return { card, cost: premiumCost, refilled };
+  return { card, cost: price, refilled };
 }
 
 /**
  * Takes an Investment-trigger Event card from the market into the player's
- * hand for FREE (cost is paid at play time). The player may execute it later
+ * hand (cost is paid at play time). The move itself costs one daily action
+ * (CG-0MTFWBNL30043ZBM) and no coins. The player may execute it later
  * during the MarketPhase via `playEventFromHand` (which charges the event's
- * listed cost when it is played).
+ * listed cost when it is played); a same-day move+play composite costs a
+ * single action in total (`justMovedEventCardId`).
  *
  * @param state   Current game state (mutated in-place).
  * @param cardId  ID of the Event card in the market.
@@ -883,7 +972,10 @@ export function purchaseEvent(
   state: MainStreetState,
   cardId: string,
 ): PurchaseResult {
-  const legality = canPurchaseEvent(state, cardId);
+  // The caller (`executeAction` 'buy-event' / `moveEventToHandCommand`) has
+  // already charged the daily action via `consumeAction`, so validate only
+  // the budget-independent preconditions here (CG-0MTFWBNL30043ZBM).
+  const legality = canTakeEventToHand(state, cardId);
   if (!legality.legal) {
     throw new Error(legality.reason);
   }
@@ -893,9 +985,10 @@ export function purchaseEvent(
   );
   const card = state.market.cards[marketIndex] as EventCard;
 
-  // Free acquisition: NO coins are deducted here (CG-0MT5W1V4D007NN8Q).
-  // The event's listed cost is paid only when it is executed from hand via
-  // `playEventFromHand`.
+  // Action-only acquisition: the daily action is charged by the caller
+  // (executeAction 'buy-event' / moveEventToHandCommand), and NO coins are
+  // deducted here (CG-0MT5W1V4D007NN8Q). The event's listed cost is paid
+  // only when it is executed from hand via `playEventFromHand`.
 
   // Remove from market
   state.market.cards.splice(marketIndex, 1);
@@ -908,7 +1001,7 @@ export function purchaseEvent(
 
   (state as any).justMovedEventCardId = card.id;
 
-  addLog(state, `Moved event ${card.name} to hand (free, pay on play)`, 'neutral');
+  addLog(state, `Moved event ${card.name} to hand (1 action, pay on play)`, 'neutral');
 
   return { card, cost: 0, refilled };
 }
@@ -941,7 +1034,7 @@ export function getAffordableUpgradeCards(state: MainStreetState): UpgradeCard[]
  */
 export function getEmptySlots(state: MainStreetState): number[] {
   const slots: number[] = [];
-  for (let i = 0; i < GRID_SIZE; i++) {
+  for (let i = 0; i < state.streetGrid.length; i++) {
     if (state.streetGrid[i] === null) slots.push(i);
   }
   return slots;
@@ -1167,8 +1260,8 @@ export function sellBusiness(
   slotIndex: number,
 ): SellResult {
   // Validate slot index
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.`);
   }
 
   const card = state.streetGrid[slotIndex];
@@ -1279,7 +1372,7 @@ export function canSellBusiness(
   }
 
   // Validate slot index
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
     return { legal: false, reason: `Invalid slot index: ${slotIndex}.` };
   }
 
@@ -1297,4 +1390,123 @@ export function canSellBusiness(
   }
 
   return { legal: true };
+}
+
+// ── Close Business (Street Grid) ─────────────────────────────
+
+/** Result returned after closing a business on the street grid. */
+export interface CloseResult {
+  /** The card that was closed (removed from the grid). */
+  card: BusinessCard | CommunitySpaceCard;
+  /** The slot index the closed card occupied. */
+  slotIndex: number;
+}
+
+/**
+ * Checks whether a business or community-space card at the given slot can be
+ * closed.
+ *
+ * Closing is the counterpart to selling: it costs one daily action (charged
+ * by `closeBusinessCommand` via the shared `consumeAction` helper) and grants
+ * no coins, but removes the card from the street entirely so the slot becomes
+ * immediately placeable again. Sold cards are inert and must not be closeable.
+ *
+ * Gates on MarketPhase, not-placing-mode, slot bounds, slot occupied, card
+ * non-sold, and >=1 daily action available — the same `LegalityResult`
+ * pattern as `canSellBusiness`, plus the action-budget check.
+ *
+ * @param state         Current game state.
+ * @param slotIndex     Street grid slot index to check.
+ * @param isPlacingMode Whether the player is currently in card-placement mode (closing not allowed).
+ * @returns LegalityResult indicating whether the action is permitted.
+ */
+export function canCloseBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+  isPlacingMode: boolean = false,
+): LegalityResult {
+  if (state.phase !== 'MarketPhase') {
+    return { legal: false, reason: 'Closing is only allowed during the MarketPhase.' };
+  }
+
+  if (isPlacingMode) {
+    return { legal: false, reason: 'Cannot close a card while in card-placement mode.' };
+  }
+
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}.` };
+  }
+
+  const card = state.streetGrid[slotIndex];
+  if (card === null) {
+    return { legal: false, reason: `Slot ${slotIndex} is empty. Nothing to close.` };
+  }
+
+  const soldSlots: boolean[] = state.soldSlots ?? [];
+  if (soldSlots[slotIndex]) {
+    return { legal: false, reason: `Slot ${slotIndex} has already been sold and cannot be closed.` };
+  }
+
+  if ((state.actionsRemaining ?? 0) <= 0) {
+    return { legal: false, reason: 'No actions remaining today. Closing costs 1 action.' };
+  }
+
+  return { legal: true };
+}
+
+/**
+ * Closes (demolishes without refund) a business or community-space card on the
+ * street grid.
+ *
+ * The card is fully removed: the slot becomes `null` (immediately placeable
+ * again), the card is pushed to the unified `discardPile` (it is not removed
+ * from the game), affected neighbours' cached income/reputation are
+ * recalculated with the closed card no longer present, and an activity-log
+ * entry is written. No coins are credited and no action is consumed at this
+ * layer — the daily action is charged by `closeBusinessCommand` so that the
+ * engine and command paths share the single `consumeAction` enforcement point
+ * (CG-0MTCP7F9S009HARC).
+ *
+ * @param state     Current game state (mutated in-place).
+ * @param slotIndex Street grid slot index of the card to close.
+ * @returns CloseResult on success.
+ * @throws Error if the slot is out of bounds, empty, or already sold.
+ */
+export function closeBusiness(
+  state: MainStreetState,
+  slotIndex: number,
+): CloseResult {
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.`);
+  }
+
+  const card = state.streetGrid[slotIndex];
+  if (card === null) {
+    throw new Error(`Slot ${slotIndex} is empty. Nothing to close.`);
+  }
+
+  const soldSlots: boolean[] = state.soldSlots ?? [];
+  if (soldSlots[slotIndex]) {
+    throw new Error(`Slot ${slotIndex} has already been sold and cannot be closed.`);
+  }
+
+  // Send the card to the unified discard pile (community-space cards share the
+  // business card shape; the pile is typed as BusinessCard[]).
+  state.discardPile.push(card as unknown as BusinessCard);
+
+  // Remove from the grid; the slot becomes immediately placeable.
+  state.streetGrid[slotIndex] = null;
+  state.soldSlots[slotIndex] = false;
+
+  // Recalculate neighbours with the closed card fully removed (unlike a sale,
+  // where the card stays on the grid as an inert synergy anchor).
+  updateNeighborsOnClose(state, slotIndex);
+
+  addLog(
+    state,
+    `Closed ${card.name} from slot ${slotIndex} (no refund, 1 action) (${describeEventEffects(0, 0)})`,
+    classifyEffect(0, 0),
+  );
+
+  return { card, slotIndex };
 }

@@ -711,8 +711,11 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
     const step = getCurrentStep(s.tutorialController);
     if (step?.requiredAction === 'select-business' || step?.requiredAction === 'place-business') {
       // Execute the pick-up synchronously so the card is in hand for placement.
-      // Cost-at-play (CG-0MSTOATDT009BRX2): taking a card to hand is FREE; the
-      // listed cost is paid by placeFromHand when the card is placed.
+      // Cost-at-play (CG-0MSTOATDT009BRX2): taking a card to hand is FREE of
+      // coins; the listed cost is paid by placeFromHand when the card is
+      // placed. (The real move path also charges the daily action — this
+      // synthetic helper short-circuits the engine, so the per-day budget is
+      // guarded by tests/main-street/tutorial-action-economy.test.ts.)
       // Post-CG-0MSXIQIPJ000NDTL: after buying, the card is in hand but NOT
       // auto-selected; we must also call onHandBusinessCardClick.
       const marketCards = s.state?.market?.cards;
@@ -739,10 +742,10 @@ export async function clickStreetSlot(scene: Phaser.Scene, slotIdx: number): Pro
         }
         const cardIdx = marketCards.findIndex((c: any) => c.id === cardToBuy.id);
         if (cardIdx >= 0) {
-          // Move to hand (free, mirrors moveToHand()); placement pays the cost.
-          // Post-CG-0MSXIQIPJ000NDTL: record the just-moved card so a later
-          // selection (clickStreetSlot below) places it free, without
-          // auto-selecting it here.
+          // Move to hand (free of coins, mirrors moveToHand()); placement
+          // pays the cost. Post-CG-0MSXIQIPJ000NDTL: record the just-moved
+          // card so a later selection (clickStreetSlot below) places it free,
+          // without auto-selecting it here.
           s.state.hand.push({ ...marketCards[cardIdx] });
           marketCards.splice(cardIdx, 1);
           s.justMovedHandCardId = cardToBuy.id;

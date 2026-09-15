@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KUL80008VMR
+// smell: unused_eslint_disable
+// severity: low
+// description: Stale disable batch: Applicant 44, community-space-types 226, LegalityResult 43,50 — remove or convert to valid handling; part of CG-0MTP6KUL80008VMR.
+// -->
 /**
  * Community-Space Type System Tests
  *
@@ -223,7 +229,6 @@ describe('AnyCard union includes CommunitySpaceCard (AC3)', () => {
     // This test validates the structural compatibility at runtime.
     const communitySpace = createCommunitySpaceFixture();
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const anyCardPosition: AnyCard = businessDeck[0]; // BusinessCard is valid
     expect(anyCardPosition).toBeDefined();
 

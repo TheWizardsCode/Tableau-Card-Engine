@@ -13,36 +13,34 @@ import { shakeIllegalMove } from '../../src/ui/shakeIllegalMove';
 /** Captured tween configs in call order. */
 let tweenConfigs: Phaser.Types.Tweens.TweenBuilderConfig[];
 
-/** Mock Phaser tween object returned by tweens.add. */
-function createMockTween(): Phaser.Tweens.Tween {
-  return { destroy: vi.fn() } as unknown as Phaser.Tweens.Tween;
-}
+import { createMockTween } from '../helpers/MockFactory';
 
 /** Create a mock Phaser scene with a tweens.add spy and sound.play mock. */
 function createMockScene(): Phaser.Scene {
   tweenConfigs = [];
   const destroyed: any[] = [];
   const rectangles: any[] = [];
+  const add = {
+    rectangle: vi.fn().mockImplementation((x: number, y: number, w: number, h: number, color: number) => {
+      const rect = {
+        x, y, width: w, height: h, color,
+        active: true,
+        setPosition: vi.fn().mockReturnThis(),
+        setOrigin: vi.fn().mockReturnThis(),
+        setDepth: vi.fn().mockReturnThis(),
+        setAlpha: vi.fn().mockReturnThis(),
+        setRotation: vi.fn().mockReturnThis(),
+        destroy: vi.fn().mockImplementation(() => {
+          rect.active = false;
+          destroyed.push(rect);
+        }),
+      };
+      rectangles.push(rect);
+      return rect;
+    }),
+  };
   return {
-    add: {
-      rectangle: vi.fn().mockImplementation((x: number, y: number, w: number, h: number, color: number) => {
-        const rect = {
-          x, y, width: w, height: h, color,
-          active: true,
-          setPosition: vi.fn().mockReturnThis(),
-          setOrigin: vi.fn().mockReturnThis(),
-          setDepth: vi.fn().mockReturnThis(),
-          setAlpha: vi.fn().mockReturnThis(),
-          setRotation: vi.fn().mockReturnThis(),
-          destroy: vi.fn().mockImplementation(() => {
-            rect.active = false;
-            destroyed.push(rect);
-          }),
-        };
-        rectangles.push(rect);
-        return rect;
-      }),
-    },
+    add,
     tweens: {
       add: vi.fn((config: Phaser.Types.Tweens.TweenBuilderConfig) => {
         tweenConfigs.push(config);
@@ -56,8 +54,6 @@ function createMockScene(): Phaser.Scene {
     _destroyed: destroyed,
   } as unknown as Phaser.Scene;
 }
-
-/** Create a mock Phaser Image with position, tint, and x-reset methods. */
 function createMockTarget(x = 100): Phaser.GameObjects.Image {
   return {
     x,

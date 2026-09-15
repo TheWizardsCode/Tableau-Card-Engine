@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KLQD001TBMH
+// smell: god_class
+// severity: medium
+// description: MainStreet god modules: Engine 2452, Animator 1942, Renderer 1902, TurnController 1834, State 1599, Cards 1469, Adjacency 1354, Market 1307, LifecycleManager 1111 lines — decompose per-concern helpers; threshold 800; prior CG-0MM1OP07Q16TUTHI covered different scene files, not these modules.
+// -->
 import Phaser from 'phaser';
 import { CARD_TEMPLATE_NAMES, synergyColor } from '../MainStreetCards';
 import { FONT_FAMILY, popTextOrIcon, moveGameObject } from '../../../src/ui';
@@ -7,6 +13,7 @@ import { SFX_KEYS, CARD_BACK_TEMPLATE } from './MainStreetConstants';
 import { synergyLineEndpoints } from './synergyLineEndpoints';
 import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
 import { createCoinGrid, iconsForAmount, roundHalf, type CoinGridHandle } from '../coin-grid';
+import { playableIndexToMapCenter } from '../MainStreetMapView';
 
 // ── Income phase animation timing (CG-0MT23O6W8003AXWJ) ────────────────
 // Tune these constants to adjust the phased income choreography pacing.
@@ -359,8 +366,10 @@ export class MainStreetAnimator {
    *
    * 1. **Base** — each producing slot's base coins "count out" of the card
    *    into its on-card grid, one coin at a time (`COIN_POP` SFX per coin).
-   * 2. **Synergy** — hand-card synergy coins fly from the synergy line
-   *    midpoints (`synergyLineEndpoints`) into the affected grids.
+   * 2. **Synergy** — board adjacency synergy (currently 0 — hand-card
+   *    synergy was removed; see CG-0MTRDX0DN004EECN). When wired, coins
+   *    would fly from the synergy line midpoints (`synergyLineEndpoints`) into
+   *    the affected grids. Short-circuited when all `synergyBonus` values are 0.
    * 3. **Reputation** — reputation bonus coins fly from the reputation HUD
    *    counter into the affected grids.
    * 4. **Events** — duration-effect (income-multiplier) events show animated
@@ -590,16 +599,23 @@ export class MainStreetAnimator {
 
   /**
    * Synergy flight sources: midpoint of each synergy pair whose cards have
-   * a synergy contribution; fallback is above the street (no pairs → no
-   * street-adjacent anchor for hand synergy).
+   * a synergy contribution; fallback is above the street. Hand cards never
+   * produce synergy (CG-0MTRDX0DN004EECN), so a run only fires when placed
+   * businesses share a synergy type.
    */
   private synergyPhaseSources(): Map<number | 'fallback', { x: number; y: number }> {
     const s = this.scene;
     const sources = new Map<number | 'fallback', { x: number; y: number }>();
     try {
-      const pairs = computeSynergyPairs(s.state.streetGrid ?? [], s.state.soldSlots ?? []);
+      const pairs = computeSynergyPairs(s.state.streetGrid ?? [], s.state.soldSlots ?? [],
+        s.streetPlayableLattice && (s.streetPlayableLattice.cols > 1 || s.streetPlayableLattice.rows > 1)
+          ? s.streetPlayableLattice
+          : undefined);
       for (const pair of pairs) {
-        const { mid } = synergyLineEndpoints(pair, s.layout);
+        const { mid } = synergyLineEndpoints(pair, s.layout, {
+          from: this.localSlotCentre(pair.fromIndex),
+          to: this.localSlotCentre(pair.toIndex),
+        });
         if (!sources.has(pair.fromIndex)) sources.set(pair.fromIndex, mid);
         if (!sources.has(pair.toIndex)) sources.set(pair.toIndex, mid);
       }
@@ -1223,7 +1239,10 @@ export class MainStreetAnimator {
     const reducedMotion = s.settingsPanel?.reducedMotion === true;
     // Shared clipped geometry: same endpoints as the static renderer uses
     // (edge-to-edge / corner-to-corner, CG-0MSVM3WCD007BRQP).
-    const { p1: a, p2: b, mid } = synergyLineEndpoints(pair, s.layout);
+    const { p1: a, p2: b, mid } = synergyLineEndpoints(pair, s.layout, {
+      from: this.localSlotCentre(pair.fromIndex),
+      to: this.localSlotCentre(pair.toIndex),
+    });
     const color = synergyColor(pair.sharedSynergy);
 
     // Chime SFX — plays in both modes (minimal feedback retained).
@@ -1528,11 +1547,28 @@ export class MainStreetAnimator {
 
   public getStreetSlotCenter(slotIndex: number): { x: number; y: number } {
     const s = this.scene;
+    // Camera-aware (CG-0MTH9OVMC001V44E) and world-index aware
+    // (CG-0MTH9OW0H0005VKE): the playable board occupies the playable
+    // sub-lattice of the displayed map, so a world slot index resolves to the
+    // right cell even after the board is expanded. At 1× on a 1×1 board this
+    // is identical to the legacy layout maths.
+    if (typeof s.streetLocalToScreen === 'function' && s.layout) {
+      const local = this.localSlotCentre(slotIndex);
+      return s.streetLocalToScreen(local);
+    }
     const col = slotIndex % s.layout.streetCols;
     const row = Math.floor(slotIndex / s.layout.streetCols);
     const x = s.layout.streetX + col * (s.layout.slotW + s.layout.slotGap) + s.layout.slotW / 2;
     const y = s.layout.streetTop + row * (s.layout.slotH + s.layout.streetRowGap) + s.layout.slotH / 2;
     return { x, y };
+  }
+
+  /** Map-local centre of a playable world slot index (street-layer coordinates). */
+  private localSlotCentre(slotIndex: number): { x: number; y: number } {
+    const s = this.scene;
+    const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
+    const playable = s.streetPlayableLattice ?? { cols: 1, rows: 1 };
+    return playableIndexToMapCenter(slotIndex, s.layout, lattice, playable);
   }
 
   /**
@@ -1713,6 +1749,86 @@ export class MainStreetAnimator {
           },
         });
       });
+    });
+  }
+
+  /**
+   * Animates a Close (coins-free demolition): the pre-close card snapshot
+   * shrinks and fades away and the discard SFX plays, then a brief "Closed"
+   * pop marks the freed slot. Unlike `animateSell` there is no refund coin
+   * fly and no "+€" pop — closing grants no coins.
+   *
+   * Accessibility (reduced motion): the demolition tween is skipped; a brief
+   * "Closed" pop + discard SFX remain (sound is not motion).
+   *
+   * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
+   * resolves immediately in replay/headless mode (`scene.replayMode`) — no
+   * rendering, no audio. Never mutates game state or the transcript.
+   *
+   * Non-blocking: fire-and-forget; the removal is already committed to state
+   * by `closeBusinessCommand` when this runs.
+   *
+   * @param params  Closed street slot and the closed card's identity (for the
+   *                demolition snapshot's family colour).
+   * @returns Promise resolving when the presentation completes.
+   */
+  public animateClose(params: {
+    slotIndex: number;
+    cardId: string;
+    family: 'business' | 'community-space';
+  }): Promise<void> {
+    const s = this.scene;
+
+    // Headless/replay exemption: no rendering or audio in those modes.
+    if (s.replayMode) return Promise.resolve();
+
+    const reducedMotion = s.settingsPanel?.reducedMotion === true;
+    const { x, y } = this.getStreetSlotCenter(params.slotIndex);
+
+    const playCloseFeedback = (): void => {
+      const text = s.add.text(x, y - 10, 'Closed', {
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: '#ffcc88',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5).setDepth(500);
+      void popTextOrIcon({
+        scene: s,
+        target: text,
+        duration: 900,
+        riseY: 16,
+        scale: 1.1,
+        reducedMotion,
+      });
+      // The closed card goes to the discard pile — reuse the discard SFX.
+      try { s.soundManager?.play(SFX_KEYS.DISCARD); } catch (_) { /* ignore */ }
+    };
+
+    if (reducedMotion) {
+      playCloseFeedback();
+      return Promise.resolve();
+    }
+
+    // Demolition: pre-close card snapshot shrinks and fades (~380ms), then the
+    // discard SFX + "Closed" pop replay the outcome. No refund coin fly.
+    return new Promise<void>((resolveDemolition) => {
+      const demo = this.createTransferCardVisual(params.cardId, params.family, x, y) as unknown as {
+        destroy: () => void;
+      };
+      s.tweens.add({
+        targets: demo,
+        scaleX: 0.25,
+        scaleY: 0.25,
+        alpha: 0,
+        duration: 380,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          demo.destroy();
+          resolveDemolition();
+        },
+      });
+    }).then(() => {
+      playCloseFeedback();
     });
   }
 
@@ -1937,6 +2053,122 @@ export class MainStreetAnimator {
       });
 
       s.activeTransferTweens.add(tween);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Applicant presentation animations (CG-0MSTOATDU006UGAX)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Animate the applicant card walking in from the left edge of the screen.
+   * Starts off-screen left and tweens to the target position. Respects
+   * reduced-motion (instant appearance).
+   */
+  public animateApplicantWalkOn(
+    container: Phaser.GameObjects.Container,
+    cardW: number,
+    _cardH: number,
+    reducedMotion?: boolean,
+  ): void {
+    const s = this.scene;
+    if (reducedMotion) {
+      container.setVisible(true);
+      try { s.soundManager?.play(SFX_KEYS.DEAL); } catch { /* ignore */ }
+      return;
+    }
+    const startX = -(cardW + 40);
+    const targetX = container.x;
+    const duration = 1000;
+    container.setPosition(startX, container.y);
+    moveGameObject({
+      scene: s,
+      target: container,
+      destX: targetX,
+      destY: container.y,
+      duration,
+      ease: 'Cubic.easeOut',
+      soundManager: s.soundManager,
+      sfx: { start: SFX_KEYS.DEAL },
+      reducedMotion,
+    });
+  }
+
+  /**
+   * Animate the applicant card walking off to the right on decline.
+   */
+  public animateApplicantWalkOff(
+    container: Phaser.GameObjects.Container,
+    cardW: number,
+    _cardH: number,
+    reducedMotion?: boolean,
+    onComplete?: () => void,
+  ): void {
+    const s = this.scene;
+    const endX = s.layout.gameW + cardW + 40;
+    if (reducedMotion) {
+      container.setVisible(false);
+      try { s.soundManager?.play(SFX_KEYS.DISCARD); } catch { /* ignore */ }
+      onComplete?.();
+      return;
+    }
+    moveGameObject({
+      scene: s,
+      target: container,
+      destX: endX,
+      destY: container.y,
+      duration: 800,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        container.setVisible(false);
+        try { s.soundManager?.play(SFX_KEYS.DISCARD); } catch { /* ignore */ }
+        onComplete?.();
+      },
+      soundManager: s.soundManager,
+      sfx: { end: SFX_KEYS.DISCARD },
+      reducedMotion,
+    });
+  }
+
+  /**
+   * Animate the applicant card into its target business slot on hire.
+   */
+  public animateApplicantWalkIn(
+    container: Phaser.GameObjects.Container,
+    targetSlotIndex: number,
+    _cardW: number,
+    _cardH: number,
+    reducedMotion?: boolean,
+    onComplete?: () => void,
+  ): void {
+    const s = this.scene;
+    // Target the centre of the business slot (matches the street renderer's
+    // slot geometry — streetX/streetTop/streetCols with slotW + slotGap).
+    const col = targetSlotIndex % (s.layout.streetCols || 1);
+    const row = Math.floor(targetSlotIndex / (s.layout.streetCols || 1));
+    const targetX = s.layout.streetX + col * (s.layout.slotW + s.layout.slotGap) + s.layout.slotW / 2;
+    const targetY = s.layout.streetTop + row * (s.layout.slotH + s.layout.streetRowGap) + s.layout.slotH / 2;
+    if (reducedMotion) {
+      container.setVisible(false);
+      try { s.soundManager?.play(SFX_KEYS.PLACE); } catch { /* ignore */ }
+      onComplete?.();
+      return;
+    }
+    moveGameObject({
+      scene: s,
+      target: container,
+      destX: targetX,
+      destY: targetY,
+      duration: 600,
+      ease: 'Cubic.easeInOut',
+      onComplete: () => {
+        container.setVisible(false);
+        try { s.soundManager?.play(SFX_KEYS.PLACE); } catch { /* ignore */ }
+        onComplete?.();
+      },
+      soundManager: s.soundManager,
+      sfx: { end: SFX_KEYS.PLACE },
+      reducedMotion,
     });
   }
 }

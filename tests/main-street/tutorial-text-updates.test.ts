@@ -343,4 +343,43 @@ describe('Data-driven tutorial text (card facts from card data)', () => {
     const body = resolveTutorialStepText(t14).body;
     expect(body).not.toMatch(/\{[A-Za-z_]+\}/);
   });
+
+  // ── Event action economy (CG-0MTH3Z8ZB000MB8N) ─────────────
+
+  describe('event steps teach the 1-action economy (CG-0MTFWBNL30043ZBM)', () => {
+    it('T10 does not claim taking an event to hand is free, and names the action cost', () => {
+      const t10 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T10')!;
+      const body = resolveTutorialStepText(t10).body;
+      // Taking an Investment event to hand consumes the daily action
+      // (CG-0MTFWBNL30043ZBM) — the copy must not contradict the engine.
+      expect(body.toLowerCase()).not.toMatch(/free/);
+      expect(body.toLowerCase()).toMatch(/action/);
+    });
+
+    it('T23 play-event copy names the action cost', () => {
+      const t23 = UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T23')!;
+      const body = resolveTutorialStepText(t23).body;
+      expect(body.toLowerCase()).toMatch(/action/);
+    });
+
+    it('no tutorial step claims event moves or plays are free operations', () => {
+      for (const step of UNIFIED_TUTORIAL_STEPS) {
+        const body = resolveTutorialStepText(step).body.toLowerCase();
+        expect(body, `${step.id} must not claim free event moves/plays`)
+          .not.toMatch(/event[s]?[^.]{0,40}free|free[^.]{0,40}event[s]?/);
+      }
+    });
+
+    it('event steps keep each action day within the 1-action budget', () => {
+      // T10 (buy-event) and T23 (play-event) each consume the day's single
+      // action, so each must be preceded by its own end-turn day boundary.
+      // The partitioning guard lives in tutorial-action-economy.test.ts;
+      // this asserts the two event steps are still classified as consumers.
+      const consuming = new Set(['buy-event', 'play-event']);
+      for (const stepId of ['T10', 'T23']) {
+        const step = UNIFIED_TUTORIAL_STEPS.find(s => s.id === stepId)!;
+        expect(consuming.has(step.requiredAction!), `${stepId} should be action-gated`).toBe(true);
+      }
+    });
+  });
 });

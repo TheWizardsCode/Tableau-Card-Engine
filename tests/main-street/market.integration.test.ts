@@ -20,7 +20,7 @@ import {
 } from '../../example-games/main-street/MainStreetMarket';
 import {
   executeDayStart,
-  processEndOfTurn,
+  endTurnHeadless,
   executeAction,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
@@ -59,7 +59,7 @@ function playGreedyTurn(state: MainStreetState): void {
     const slot = empty[0];
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: slot });
   }
-  processEndOfTurn(state);
+  endTurnHeadless(state);
 }
 
 // ── Market Integrity ────────────────────────────────────────

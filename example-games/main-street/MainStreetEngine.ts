@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KLQD001TBMH
+// smell: god_class
+// severity: medium
+// description: MainStreet god modules: Engine 2452, Animator 1942, Renderer 1902, TurnController 1834, State 1599, Cards 1469, Adjacency 1354, Market 1307, LifecycleManager 1111 lines — decompose per-concern helpers; threshold 800; prior CG-0MM1OP07Q16TUTHI covered different scene files, not these modules.
+// -->
 /**
  * Main Street: Game Engine
  *
@@ -40,18 +46,20 @@ import {
   PHASE_ORDER,
   addLog,
   syncResourceBankToLedger,
+  advanceWeek,
   describeEventEffects,
   classifyEffect,
 } from './MainStreetState';
-import type { BusinessCard, EventCard, StaffCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, EventCard, StaffCard, SynergyType, SpecializationSkill } from './MainStreetCards';
 import {
-  SELL_VALUE_RATIO, GRID_SIZE, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
+  SELL_VALUE_RATIO, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
+  getEventTemplates, getBaseTypeId,
   type DurationEventCard,
 } from './MainStreetCards';
 
 import { createActiveEffect, decayActiveEffects } from '../../src/core-engine/ActiveEffect';
 import { recordMainStreetEvent } from './MainStreetTranscript';
-import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale } from './MainStreetAdjacency';
+import { applyIncome, type IncomeResult, updateNeighborsOnPlacement, updateNeighborsOnSale, applyCompetitiveIncome, tagSlotOwnerIfCompetitive, getSlotOwnerId } from './MainStreetAdjacency';
 import {
   computeIncidentSkillBuffs,
   computeReputationGainMultiplier,
@@ -79,7 +87,12 @@ import {
   type PurchaseResult,
 } from './MainStreetMarket';
 import { evaluateChallenges } from './MainStreetChallenges';
-import { applyReputationMultiplier, reputationCoinMultiplier, roundInt } from './MainStreetDifficulty';
+import {
+  applyReputationMultiplier,
+  reputationCoinMultiplier,
+  roundInt,
+  type DifficultyName,
+} from './MainStreetDifficulty';
 
 // Re-export for convenience (tests import from the engine module).
 export { reputationCoinMultiplier, applyReputationMultiplier, cycleMarketCards };
@@ -93,7 +106,14 @@ export interface BuyBusinessAction {
   slotIndex: number;
 }
 
-/** Buy an upgrade card and apply it to a business. */
+/**
+ * Buy an upgrade card and apply it to a business.
+ *
+ * Headless equivalent of the same-day click composite
+ * (CG-0MT3IYSRL001VVUP): the market click moves the upgrade to hand (one
+ * daily action) and applying it the same day is free, so buying and applying
+ * in one step costs exactly **one daily action** at the listed cost.
+ */
 export interface BuyUpgradeAction {
   type: 'buy-upgrade';
   cardId: string;
@@ -160,6 +180,10 @@ export interface BuyAndPlaceUpgradeAction {
   type: 'buy-and-place-upgrade';
   cardId: string;
   targetSlot?: number;
+  /** Optional listed-price override for GM 2-action parity (see buyAndPlaceUpgrade). */
+  priceOverride?: number;
+  /** Additional daily actions to consume alongside the drag's action (GM parity). */
+  extraActions?: number;
 }
 
 /** Hire a staff card from the general market row. */
@@ -225,6 +249,13 @@ export interface TurnResult {
   finalScore: number;
   /** Challenge IDs that were newly completed during this turn's evaluation. */
   newlyCompletedChallenges: string[];
+  /**
+   * True when the closing sequence paused because a dual-choice incident was
+   * drawn (CG-0MTSHG8RP008E128). When set, `state.pendingEventChoice` holds
+   * the drawn event and the UI must present the Accept/Reject dialog before
+   * the deferred closing (EndCheck / next day) can run.
+   */
+  choicePending: boolean;
 }
 
 // ── Score Calculation ───────────────────────────────────────
@@ -346,6 +377,11 @@ export function executeAction(
       consumeAction(state);
       return hireStaffCard(state, action.cardId);
     case 'buy-upgrade':
+      // One daily action, exactly like the click composite it stands in for
+      // (move-to-hand 1 action + free same-day apply, listed cost). Without
+      // this the AI and Monte Carlo scored upgrades as free actions
+      // (CG-0MT40HTYN008TJ6Q).
+      consumeAction(state);
       return purchaseUpgrade(state, action.cardId, action.targetSlot);
     case 'buy-event': {
       consumeAction(state);
@@ -367,15 +403,23 @@ export function executeAction(
       return playUpgradeFromHand(state, action.handIndex, action.targetSlot);
     }
     case 'buy-and-place-upgrade': {
+      for (let i = 0; i < (action.extraActions ?? 0); i += 1) consumeAction(state);
       consumeAction(state);
-      return buyAndPlaceUpgrade(state, action.cardId, action.targetSlot);
+      return buyAndPlaceUpgrade(state, action.cardId, action.targetSlot, action.priceOverride);
     }
     case 'play-event-from-hand': {
       const hand = state.hand ?? [];
       const card = hand[action.handIndex] as any;
       const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
       if (!isSameDay) consumeAction(state);
-      return playEventFromHand(state, action.handIndex);
+      const result = playEventFromHand(state, action.handIndex);
+      // Investment played by the active player: route the benefit to their
+      // own wallet in competitive mode (CG-0MTIIL6J200291ZQ). SpecificSynergy
+      // coin deltas are routed per-business to slot owners inside the helper.
+      if ((state.players?.length ?? 0) > 1) {
+        applyCompetitiveEventEffects(state, card as EventCard, state.activePlayerId ?? 0);
+      }
+      return result;
     }
     case 'discard-from-hand':
       discardFromHand(state, action.handIndex);
@@ -388,7 +432,12 @@ export function executeAction(
       const card = (state.hand ?? [])[handIndex] as any;
       const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
       if (!isSameDay) consumeAction(state);
-      return playEventFromHand(state, handIndex);
+      const result = playEventFromHand(state, handIndex);
+      // Investment played by the active player: per-owner routing (see above).
+      if ((state.players?.length ?? 0) > 1) {
+        applyCompetitiveEventEffects(state, card as EventCard, state.activePlayerId ?? 0);
+      }
+      return result;
     }
     case 'peek-incident-deck':
       // Consumes one action and enforces the once-per-turn gate inside
@@ -632,6 +681,11 @@ export function playHeldEvent(state: MainStreetState, handIndex?: number): void 
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   resolveEvent(state, event);
+  // Investment played by the active player: per-owner routing in competitive
+  // mode (CG-0MTIIL6J200291ZQ) — benefit lands in the acting player's wallet.
+  if ((state.players?.length ?? 0) > 1) {
+    applyCompetitiveEventEffects(state, event, state.activePlayerId ?? 0);
+  }
   const coinChange = state.resourceBank.coins - coinsBefore;
   const repChange = state.resourceBank.reputation - repBefore;
   addLog(
@@ -715,6 +769,18 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
   // Track the draw so the balance history mirrors the resolved sequence.
   recordIncidentDraw(state.incidentBalance, event);
 
+  // Dual-choice event interception (CG-0MTSHG8RP008E128 AC5): when the drawn
+  // incident has `hasChoices`, its effect is DEFERRED — stash the drawn event
+  // as `pendingEventChoice` (unresolved) and return null (no effect applied,
+  // no escalation yet). The caller (processEndOfTurn) pauses with
+  // TurnResult.choicePending so the UI can present the Accept/Reject dialog;
+  // resolveEventChoice applies the chosen path later.
+  if (event.hasChoices) {
+    state.pendingEventChoice = { event, chosenOption: null, resolved: false };
+    addLog(state, `Incident: ${event.name} — a decision is required.`, 'neutral');
+    return null;
+  }
+
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   resolveEvent(state, event);
@@ -727,6 +793,127 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
   );
 
   return event;
+}
+
+/**
+ * Routes a shared Investment/Incident event's effects per-owner for
+ * competitive states (N >= 2, CG-0MTIIL6J200291ZQ).
+ *
+ * Retains the shared resolution semantics of {@link resolveEvent} but applies
+ * the deltas to each owning player's wallet rather than the shared host
+ * wallet (which is left unchanged — the host path already resolved the event
+ * on the resourceBank before this helper runs):
+ *
+ *  - Duration events are board-wide ActiveEffects (the shared activeEffects
+ *    list) and are NOT re-routed here — they are applied once by the host
+ *    path and influence every owner's income phase via
+ *    {@link applyCompetitiveIncome}.
+ *  - `All` / `RandomBusiness`:
+ *      - Investment events (actingPlayerId provided): the acting player's own
+ *        wallet receives the delta (playing the event benefits the acting
+ *        player).
+ *      - Incidents (shared deck, no acting player): every owner's wallet
+ *        receives the delta, each scaled by its OWN reputation multiplier and
+ *        staff mitigation (street-wide semantics). RandomBusiness resolves
+ *        deterministically to the owner of the lowest-index placed business
+ *        without consuming RNG (no such cards ship in the CSV today —
+ *        verified — so this path is a documented fallback).
+ *  - `SpecificSynergy` (both triggers): coinDelta is multiplied by the count
+ *    of matching businesses OWNED by that player (per-match rule retained)
+ *    and credited to each slot owner; the reputation delta applies once per
+ *    owner that owns at least one matching business (mirrors the shared
+ *    resolution where rep is applied once regardless of match count).
+ *
+ * Consumes no RNG (deterministic replay, AC3).
+ *
+ * @param state           Competitive game state (players[] mutated in-place).
+ * @param event           The already-resolved shared event card to route.
+ * @param actingPlayerId  Owner index of the player who played the event
+ *                        (Investment trigger). Omit for shared incidents.
+ */
+export function applyCompetitiveEventEffects(
+  state: MainStreetState,
+  event: EventCard,
+  actingPlayerId?: number,
+): void {
+  if (!state.players || state.players.length < 2) return;
+  if (isDurationEventCard(event)) return; // board-wide effect, host-applied only
+
+  const cfg = state.config;
+  const target = event.target;
+  const actingId = event.trigger === 'Investment' ? actingPlayerId ?? 0 : undefined;
+
+  // Pre-compute per-owner staff mitigation (mirrors resolveEvent).
+  const owners = state.players.map((player) => {
+    const ownerId = player.playerId;
+    const skills = (player.staffCards ?? []).flatMap((card) =>
+      Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [],
+    );
+    const incidentBuffs =
+      event.trigger === 'Incident' ? computeIncidentSkillBuffs(skills) : null;
+    const theftNeutralized =
+      incidentBuffs !== null && incidentBuffs.immuneToTheftLoss && isTheftLossIncident(event);
+    return { ownerId, player, skills, incidentBuffs, theftNeutralized };
+  });
+
+  const coinDeltaFor = (owner: { incidentBuffs: ReturnType<typeof computeIncidentSkillBuffs> | null; theftNeutralized: boolean }, effect: number): number => {
+    if (owner.theftNeutralized && effect < 0) return 0; // theft immunity
+    if (owner.incidentBuffs === null || effect >= 0) return roundInt(effect);
+    return roundInt(effect + Math.abs(effect) * owner.incidentBuffs.coinDamageReductionPct);
+  };
+  const repDeltaFor = (owner: { skills: readonly SpecializationSkill[]; incidentBuffs: ReturnType<typeof computeIncidentSkillBuffs> | null }, effect: number): number => {
+    if (effect > 0) return roundInt(effect * computeReputationGainMultiplier(owner.skills));
+    if (owner.incidentBuffs === null) return roundInt(effect);
+    return roundInt(Math.min(0, effect + owner.incidentBuffs.reputationDamageReductionFlat));
+  };
+
+  const changed: { ownerId: number; coins: number; rep: number }[] = [];
+  for (const owner of owners) {
+    let coinsGained = 0;
+    let repGained = 0;
+
+    switch (target) {
+      case 'SpecificSynergy': {
+        let matchCount = 0;
+        for (let i = 0; i < state.streetGrid.length; i++) {
+          const b = state.streetGrid[i];
+          if (!b || !b.synergyTypes) continue;
+          if (getSlotOwnerId(state, i) !== owner.ownerId) continue;
+          if (b.synergyTypes.includes(event.targetSynergy as SynergyType)) matchCount += 1;
+        }
+        if (matchCount > 0) {
+          const rawDelta = event.coinDelta * matchCount;
+          coinsGained += applyReputationMultiplier(coinDeltaFor(owner, rawDelta), owner.player.reputation, cfg);
+          repGained += repDeltaFor(owner, event.reputationDelta);
+        }
+        break;
+      }
+      case 'All':
+      case 'RandomBusiness': {
+        // Investment → acting player only; incident → every owner once.
+        if (actingId !== undefined && owner.ownerId !== actingId) break;
+        coinsGained += applyReputationMultiplier(coinDeltaFor(owner, event.coinDelta), owner.player.reputation, cfg);
+        repGained += repDeltaFor(owner, event.reputationDelta);
+        break;
+      }
+      default:
+        break;
+    }
+
+    if (coinsGained !== 0 || repGained !== 0) {
+      owner.player.coins += coinsGained;
+      owner.player.reputation += repGained;
+      changed.push({ ownerId: owner.ownerId, coins: coinsGained, rep: repGained });
+    }
+  }
+
+  for (const c of changed) {
+    addLog(
+      state,
+      `P${c.ownerId} ${event.trigger}: ${event.name} (${describeEventEffects(c.coins, c.rep)})`,
+      classifyEffect(c.coins, c.rep),
+    );
+  }
 }
 
 // ── Community Favour (CG-0MSTOATDQ005XDET) ─────────────────
@@ -1202,6 +1389,20 @@ export function endCompetitiveMarketTurn(state: MainStreetState): void {
  * and competitiveWinnerId records the first-to-threshold winner.
  */
 export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnResult {
+  // AC7 guard (CG-0MTSHG8RP008E128): a pending unresolved choice blocks the
+  // shared closing sequence regardless of mode.
+  if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    return {
+      income: null,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: true,
+    };
+  }
   if (state.phase !== 'InvestmentResolution') {
     throw new Error(`resolveCompetitiveClosingPhases requires InvestmentResolution, got ${state.phase}`);
   }
@@ -1209,7 +1410,6 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
     throw new Error('resolveCompetitiveClosingPhases requires competitive state (players)');
   }
   const turnEnded = state.turn;
-  if (!state.skipMarketCycleOnEndTurn) cycleMarketCards(state);
   if (checkImmediateLoss(state)) {
     appendTurnNetRow(state, turnEnded);
     return {
@@ -1220,6 +1420,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
   }
   state.phase = 'IncomePhase';
@@ -1227,12 +1428,42 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
   applyStaffOngoingCosts(state);
   applyCommunitySpaceOngoingCosts(state);
   applyBusinessOngoingCosts(state);
+  // Per-owner economy layer (competitive N>=2, CG-0MTIIL6J200291ZQ): in
+  // parallel with the shared host wallet above, route income and ongoing
+  // costs to each owner's own wallet (ownerTaggedGrid) so per-player
+  // economics stay authoritative for scoring / AI / deterministic replay.
+  // N=1 never reaches this function via the convenience flow
+  // (executeCompetitiveDay collapses to the legacy single-player path); the
+  // guard keeps direct N=1 calls legacy-identical (AC4). Consumes no RNG.
+  if ((state.players?.length ?? 0) > 1) {
+    applyCompetitiveIncome(state);
+    applyCompetitiveOngoingCosts(state);
+  }
   state.phase = 'IncidentPhase';
   const coinsBefore = state.resourceBank.coins;
   const repBefore = state.resourceBank.reputation;
   const incident = resolveIncident(state);
   const incidentCoinChange = state.resourceBank.coins - coinsBefore;
   const incidentRepChange = state.resourceBank.reputation - repBefore;
+  // Route the resolved shared incident to each owner's wallet per-owner
+  // (street-wide resolution semantics retained; CG-0MTIIL6J200291ZQ).
+  if ((state.players?.length ?? 0) > 1 && incident) {
+    applyCompetitiveEventEffects(state, incident);
+  }
+  // Dual-choice pause (CG-0MTSHG8RP008E128): resolveIncident deferred the
+  // drawn incident; stop before EndCheck and surface choicePending.
+  if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    return {
+      income,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: true,
+    };
+  }
   if (checkImmediateLoss(state)) {
     appendTurnNetRow(state, turnEnded);
     return {
@@ -1243,6 +1474,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
   }
   state.phase = 'EndCheck';
@@ -1256,6 +1488,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
   checkCompetitiveEndConditions(state);
   if (state.gameResult === 'playing') {
     state.turn += 1;
+    advanceWeek(state);
     const bankable = Math.min(state.actionsRemaining, 1);
     state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
     // Mirror shared banked value into each player's budget for next day's costing.
@@ -1274,6 +1507,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
     gameResult: state.gameResult,
     finalScore: state.finalScore,
     newlyCompletedChallenges,
+    choicePending: false,
   };
 }
 
@@ -1327,11 +1561,15 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
 
   // Turn 1 is already set by setup; subsequent turns increment here
   if (state.turn > 1 || state.phase === 'DayStart') {
-    // Refill market at start of each day (skip on checkpoint resume).
-    // Top-up semantics: visible cards are preserved (e.g. tutorial scenario
-    // cards kept via skipMarketCycleOnEndTurn); an already-full row stays.
+    // Cycle market at start of each new day (after the first turn — turn 1's
+    // row is already filled by setupMainStreetGame; cycling there would discard
+    // fresh cards the player hasn't seen yet).
     if (!skipMarketRefill) {
-      refillMarket(state);
+      if (state.turn > 1) {
+        cycleMarketCards(state);
+      } else {
+        refillMarket(state);
+      }
     }
   }
 
@@ -1409,6 +1647,22 @@ export function appendTurnNetRow(state: MainStreetState, turnEnded: number): voi
  * @returns TurnResult with income, incident, and game result.
  */
 export function processEndOfTurn(state: MainStreetState): TurnResult {
+  // AC7 (CG-0MTSHG8RP008E128): while a dual-choice incident is pending and
+  // unresolved, the closing sequence must NOT proceed to IncomePhase — the
+  // player's decision comes first. Returns a choicePending result instead of
+  // throwing so stray/re-entrant end-turn calls stay deterministic.
+  if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    return {
+      income: null,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: true,
+    };
+  }
   if (state.phase !== 'MarketPhase') {
     throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
   }
@@ -1424,28 +1678,19 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // a continuing game, so capture it before that happens).
   const turnEnded = state.turn;
 
-  // Cycle unpurchased market cards to discard piles before advancing phases.
-  // During the tutorial (before T7 completes), market cycling is skipped to
-  // preserve scenario-placed cards (e.g. Local Festival for T7). The
-  // `skipMarketCycleOnEndTurn` flag is set by the turn controller when the
-  // tutorial is active and the current step requires the scenario cards.
-  if (!state.skipMarketCycleOnEndTurn) {
-    cycleMarketCards(state);
-  }
-
   // Phase: InvestmentResolution
   // Held Investment events are NO LONGER auto-resolved. The player must
   // actively play them by clicking during the MarketPhase. Unplayed events
   // persist across turns.
   state.phase = 'InvestmentResolution';
 
-  // Check for immediate loss after events. When the game is about to end
-  // prematurely, emit the per-turn net row BEFORE the game-over banner so
-  // the summary precedes the loss entry (CG-0MT5W7UJJ0065MEZ AC3).
-  if (state.resourceBank.coins < 0 || (state.turn > 1 && state.resourceBank.reputation <= 0)) {
-    appendTurnNetRow(state, turnEnded);
-  }
+  // Check for immediate loss before income (e.g. coins already < 0 from
+  // purchases, or rep already <= 0 at turn > 1). The game-over banner is
+  // emitted first, then the per-turn net row as the final entry so the
+  // summary remains the authoritative closing record even on premature
+  // exits (CG-0MTJP6XU5009KN5L fixes inverted ordering).
   if (checkImmediateLoss(state)) {
+    appendTurnNetRow(state, turnEnded);
     return {
       income: null,
       incident: null,
@@ -1454,6 +1699,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
   }
 
@@ -1480,12 +1726,73 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   const incidentCoinChange = state.resourceBank.coins - coinsBeforeIncident;
   const incidentRepChange = state.resourceBank.reputation - repBeforeIncident;
 
-  // Check for immediate loss after incident. Mirror the premature-exit
-  // ordering above: net row precedes the game-over banner (AC3).
-  if (state.resourceBank.coins < 0 || (state.turn > 1 && state.resourceBank.reputation <= 0)) {
-    appendTurnNetRow(state, turnEnded);
+  // Dual-choice pause (CG-0MTSHG8RP008E128 AC7): when the drawn incident set a
+  // `pendingEventChoice` (resolveIncident deferred the effect), stop the closing
+  // sequence BEFORE EndCheck and return choicePending so the UI presents the
+  // Accept/Reject dialog. The deferred closing then runs via resolveEventChoice
+  // (apply the path) + finishDeferredEndOfTurn (EndCheck → next day).
+  if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    return {
+      income,
+      incident: null,
+      incidentCoinChange: 0,
+      incidentRepChange: 0,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: true,
+    };
   }
+
+  // EndCheck + decay + challenges + advance (shared with the deferred path).
+  return runSinglePlayerTurnClosing(state, {
+    income,
+    incident,
+    incidentCoinChange,
+    incidentRepChange,
+    turnEnded,
+  });
+}
+
+/**
+ * Context carried into the single-player closing tail (EndCheck → next day).
+ * Shared by the normal path (processEndOfTurn) and the deferred path
+ * (finishDeferredEndOfTurn after a dual-choice incident).
+ */
+interface SinglePlayerTurnClosingContext {
+  /** Income result of the turn being closed (null when no income ran). */
+  income: IncomeResult | null;
+  /** The resolved incident (null when deferred / no incident). */
+  incident: EventCard | null;
+  /** Net coin delta from the resolved incident. */
+  incidentCoinChange: number;
+  /** Net reputation delta from the resolved incident. */
+  incidentRepChange: number;
+  /** The turn being summarised by the net row. */
+  turnEnded: number;
+}
+
+/**
+ * Runs the closing tail of a single-player turn from the post-incident point:
+ * immediate-loss check, EndCheck, active-effect decay, challenge evaluation,
+ * end conditions, next-day advance, and the per-turn net summary row.
+ *
+ * @param state Current game state (mutated in-place).
+ * @param ctx   Closing context (income/incident/deltas/turnEnded).
+ * @returns The turn result for the UI.
+ */
+function runSinglePlayerTurnClosing(
+  state: MainStreetState,
+  ctx: SinglePlayerTurnClosingContext,
+): TurnResult {
+  const { income, incident, incidentCoinChange, incidentRepChange, turnEnded } = ctx;
+
+  // Check for immediate loss after incident. Banner is emitted first,
+  // then the per-turn net row as the final entry (mirrors the pre-income
+  // ordering fix above and keeps the net row as the canonical closing
+  // record; CG-0MTJP6XU5009KN5L).
   if (checkImmediateLoss(state)) {
+    appendTurnNetRow(state, turnEnded);
     return {
       income,
       incident,
@@ -1494,6 +1801,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       gameResult: state.gameResult,
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
+      choicePending: false,
     };
   }
 
@@ -1520,6 +1828,7 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // If game continues, advance to next turn
   if (state.gameResult === 'playing') {
     state.turn += 1;
+    advanceWeek(state);
 
     // ── Action Banking (CG-0MT3IOPZB005LNAR) ─────────────
     // Bank unused base actions (at most 1 per day) up to the cap of 2.
@@ -1543,7 +1852,369 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
     gameResult: state.gameResult,
     finalScore: state.finalScore,
     newlyCompletedChallenges,
+    choicePending: false,
   };
+}
+
+/**
+ * Result of applying an Accept / Reject decision for a pending dual-choice
+ * incident (CG-0MTSHG8RP008E128).
+ */
+export interface EventChoiceResolution {
+  /** The event the decision was made about. */
+  event: EventCard;
+  /** Which option the player chose. */
+  option: 'accept' | 'reject';
+  /** Net coin delta applied by the chosen path (0 for reject / durations). */
+  coinChange: number;
+  /** Net reputation delta applied by the chosen path. */
+  repChange: number;
+  /**
+   * The escalation card instance pushed onto the incident deck by the chosen
+   * path (null when the chain ends — no next card).
+   */
+  pushedCard: EventCard | null;
+}
+
+/**
+ * Builds a fresh instance of an escalation card (by template ID) and pushes it
+ * onto the TOP of the incident deck (next to be drawn). Deterministic: the
+ * serial suffix is derived from existing instances of the same base template,
+ * so no RNG / clock is consumed (replay-safe).
+ *
+ * @param state      Current game state (mutated — incidentDeck may grow).
+ * @param templateId The card template ID to add (acceptNextCardId / rejectNextCardId).
+ * @returns The pushed card instance, or null when no chain card was requested
+ *          or the template does not exist.
+ */
+function pushChainCard(state: MainStreetState, templateId: string | null | undefined): EventCard | null {
+  if (!templateId) return null; // chain ends — nothing added (AC4/AC9)
+  const template = getEventTemplates().find((t) => t.id === templateId);
+  if (!template) {
+    addLog(state, `Chain card ${templateId} not found in card data.`, 'neutral');
+    return null;
+  }
+  const base = getBaseTypeId(template.id);
+  // Deterministic serial: highest existing suffix for the base template across
+  // every event-card location, +1. Replay-safe (no RNG / wall clock).
+  let maxSerial = -1;
+  const scan = (cards: readonly EventCard[]): void => {
+    for (const c of cards) {
+      if (getBaseTypeId(c.id) !== base) continue;
+      const m = c.id.match(/-(\d+)$/);
+      const n = m ? Number(m[1]) : -1;
+      if (n > maxSerial) maxSerial = n;
+    }
+  };
+  scan(state.incidentDeck);
+  scan(state.decks.event);
+  scan(state.discards.event);
+  const card: EventCard = { ...template, id: `${base}-${maxSerial + 1}` };
+  state.incidentDeck.push(card);
+  return card;
+}
+
+/**
+ * Resolves a pending dual-choice incident (CG-0MTSHG8RP008E128 AC8/AC9).
+ *
+ * Accept applies the event's effect (via resolveEvent) then pushes the
+ * `acceptNextCardId` escalation onto the incident deck. Reject skips the
+ * effect entirely and pushes the `rejectNextCardId` escalation instead.
+ * Records the decision in the transcript and marks the pending choice
+ * resolved — the deferred closing (EndCheck → next day) is completed by
+ * {@link finishDeferredEndOfTurn}.
+ *
+ * @param state  Current game state (mutated). Must have a pending unresolved choice.
+ * @param option The player's decision.
+ * @throws Error when no unresolved choice is pending.
+ */
+export function resolveEventChoice(
+  state: MainStreetState,
+  option: 'accept' | 'reject',
+): EventChoiceResolution {
+  const pending = state.pendingEventChoice;
+  if (!pending) {
+    throw new Error('No pending event choice to resolve.');
+  }
+  if (pending.resolved) {
+    throw new Error(`Event choice for ${pending.event.name} is already resolved.`);
+  }
+  const event = pending.event;
+  const coinsBefore = state.resourceBank.coins;
+  const repBefore = state.resourceBank.reputation;
+
+  let pushedCard: EventCard | null;
+  if (option === 'accept') {
+    // Accept path (AC8): apply the event's stated effect, then chain on.
+    resolveEvent(state, event);
+    pushedCard = pushChainCard(state, event.acceptNextCardId);
+    addLog(state, `Chose to accept: ${event.name} consequences apply.`, 'neutral');
+  } else {
+    // Reject path (AC9): refuse the event's effect (nothing applied); the
+    // escalation (worse/better card) is added to the deck instead.
+    pushedCard = pushChainCard(state, event.rejectNextCardId);
+    addLog(state, `Chose to reject: ${event.name} consequences refused.`, 'neutral');
+  }
+
+  const coinChange = state.resourceBank.coins - coinsBefore;
+  const repChange = state.resourceBank.reputation - repBefore;
+  syncResourceBankToLedger(state);
+
+  // Transcript (AC12): the choice is recorded identically for player and AI.
+  recordMainStreetEvent({
+    type: 'event-choice',
+    turn: state.turn,
+    eventId: event.id,
+    cardName: event.name,
+    option,
+    acceptNextCardId: event.acceptNextCardId ?? null,
+    rejectNextCardId: event.rejectNextCardId ?? null,
+  });
+
+  pending.chosenOption = option;
+  pending.resolved = true;
+  return { event, option, coinChange, repChange, pushedCard };
+}
+
+/**
+ * Completes the deferred closing of a single-player turn after a dual-choice
+ * incident was resolved (CG-0MTSHG8RP008E128).
+ *
+ * Precondition: `state.pendingEventChoice` is set with `resolved === true`
+ * (resolveEventChoice was called). Consumes the pending choice (clears it) and
+ * runs the post-incident closing tail (immediate-loss check, EndCheck, decay,
+ * challenges, end conditions, next-day advance, net row).
+ *
+ * @param state Current game state (mutated).
+ * @returns The final turn result for the UI.
+ */
+export function finishDeferredEndOfTurn(state: MainStreetState): TurnResult {
+  const pending = state.pendingEventChoice;
+  if (!pending || !pending.resolved) {
+    throw new Error('finishDeferredEndOfTurn requires a resolved pending event choice.');
+  }
+  const turnEnded = state.turn;
+  // Consume the pending choice: the incident event is out of the deck (drawn),
+  // its effect applied (accept) or refused (reject), and the escalation (if
+  // any) is already on the deck top — nothing remains deferred.
+  state.pendingEventChoice = null;
+  return runSinglePlayerTurnClosing(state, {
+    income: null, // income for this turn was already applied & presented
+    incident: null, // the incident consequence was presented by resolveEventChoice
+    incidentCoinChange: 0,
+    incidentRepChange: 0,
+    turnEnded,
+  });
+}
+
+// ── Headless Choice Policy (CG-0MTT7FC7A000AA58 Q1 / CG-0MTSHG8RP008E128) ──
+// The Accept/Reject decision for a pending dual-choice incident lives HERE (in
+// the engine) rather than in the AI strategy module so headless convenience
+// turns (executeFullTurn, MainStreetAiPlayer.playGame, the Monte Carlo
+// harness) can resolve a pending choice without importing the AI module (which
+// would be circular). MainStreetAiStrategy re-exports these symbols so its
+// public API (and tests importing it) is unchanged.
+
+/**
+ * Severity factor applied to a chain card's reputation delta when comparing
+ * event severities: reputation points are worth more than raw coins to the
+ * score (1 rep ≈ +1 score; 1 coin ≈ +1 score), but incident coin deltas are
+ * per-business multiples while reputation deltas are flat. The scale keeps
+ * both axes comparable for severity ranking. Internal heuristic constant.
+ */
+const REPUTATION_SEVERITY_SCALE = 100;
+
+/**
+ * "Significantly worse" guard (Hard policy): when the reject path's full
+ * chain cost exceeds the accept path's full chain cost by at least this
+ * ratio, the policy swallows the current manageable effect rather than risk
+ * the escalation (AC22 — "reject if the escalation card is significantly
+ * worse" maps onto rejecting being costlier). Exported for tests.
+ */
+export const AI_EVENT_CHOICE_SIGNIFICANTLY_WORSE_RATIO = 1.5;
+
+/**
+ * Non-mutating projection of the effective coin delta an event would apply
+ * RIGHT NOW, mirroring the engine's resolveEvent math WITHOUT staff
+ * mitigation (static effect-size comparison per producer decision
+ * 2026-09-08 Q1 — no turn simulation). Used for affordability checks.
+ *
+ * @param state Current game state (read-only).
+ * @param event The event whose coin effect is projected.
+ * @returns Projected coin delta (negative = loss).
+ */
+export function projectEventCoinDelta(state: MainStreetState, event: EventCard): number {
+  const cfg = state.config;
+  const rep = state.resourceBank.reputation;
+  let raw: number;
+  switch (event.target) {
+    case 'SpecificSynergy': {
+      const matchCount = state.streetGrid.filter(
+        (b) => b !== null && b.synergyTypes.includes(event.targetSynergy as never),
+      ).length;
+      raw = event.coinDelta * matchCount;
+      break;
+    }
+    case 'RandomBusiness': {
+      const placed = state.streetGrid.filter((b) => b !== null).length;
+      raw = placed > 0 ? event.coinDelta : 0;
+      break;
+    }
+    case 'All':
+    default:
+      raw = event.coinDelta;
+      break;
+  }
+  return applyReputationMultiplier(raw, rep, cfg);
+}
+
+/**
+ * Static severity of an event's net effect: magnitude of (coinDelta +
+ * reputationDelta) with reputation scaled up. Larger = worse for negative
+ * events / more impactful for positive ones.
+ */
+export function eventSeverity(event: EventCard): number {
+  return Math.abs(
+    event.coinDelta + event.reputationDelta * REPUTATION_SEVERITY_SCALE,
+  );
+}
+
+/**
+ * Looks up the next chain card template (registry lookup only — static, no
+ * simulation) and returns its severity; null/absent/missing template → 0.
+ */
+function chainCardSeverity(nextId: string | null | undefined): number {
+  if (!nextId) return 0;
+  const template = getEventTemplates().find((t) => t.id === nextId);
+  return template ? eventSeverity(template) : 0;
+}
+
+/**
+ * Difficulty-based Accept/Reject decision for a pending dual-choice incident
+ * (CG-0MTSHG8RP008E128 AC22). Deterministic and side-effect free.
+ *
+ * Strategy mapping:
+ * - Easy: always accept — avoid escalation risk, short-term thinking.
+ * - Medium: accept when the event's effect is affordable (coins stay > 0
+ *   after the projected delta); reject when it would be unaffordable.
+ * - Hard (static full-chain evaluation):
+ *   - Positive/neutral events (net >= 0): accept — a guaranteed benefit is
+ *     never refused (rejecting only defers value to a speculative draw).
+ *   - Negative events:
+ *       * accepting ends the chain (acceptNextCardId null) AND the current
+ *         effect is manageable → accept (the safe terminal).
+ *       * otherwise compare the full chain costs — accept pays the current
+ *         effect plus the accept-next card (if the chain continues); reject
+ *         skips the current effect and pays only the reject-next card.
+ *         Choose the cheaper path; when rejecting is
+ *         AI_EVENT_CHOICE_SIGNIFICANTLY_WORSE_RATIO× costlier, accept the
+ *         manageable hit instead (the escalation is "significantly worse").
+ *       * if the current effect is NOT manageable (would bankrupt), reject
+ *         (avoid the imminent loss) unless rejecting is also strictly worse
+ *         than accepting — both paths bad → accept (deterministic default).
+ *
+ * @param state      Current game state (read-only).
+ * @param event      The drawn choice event (effect deferred).
+ * @param difficulty Difficulty preset ('Easy' | 'Medium' | 'Hard').
+ * @returns 'accept' or 'reject'.
+ */
+export function decideEventChoice(
+  state: MainStreetState,
+  event: EventCard,
+  difficulty: DifficultyName,
+): 'accept' | 'reject' {
+  // Positive/neutral events: the benefit is guaranteed; no difficulty
+  // refuses a free gain (reject only delays value to an unknown later draw).
+  if (event.coinDelta + event.reputationDelta >= 0) return 'accept';
+
+  if (difficulty === 'Easy') return 'accept';
+
+  const projected = projectEventCoinDelta(state, event);
+  const manageable = state.resourceBank.coins + projected > 0;
+
+  if (difficulty === 'Medium') {
+    return manageable ? 'accept' : 'reject';
+  }
+
+  // ── Hard: static full-chain evaluation ──
+  const currentCost = eventSeverity(event);
+  const acceptChainCost = currentCost + chainCardSeverity(event.acceptNextCardId);
+  const rejectChainCost = chainCardSeverity(event.rejectNextCardId);
+
+  // Accepting ends the chain (no accept-next card): the known effect is the
+  // whole story — prefer the safe terminal when we can afford it (AC22).
+  if (event.acceptNextCardId === null || event.acceptNextCardId === undefined) {
+    if (manageable) return 'accept';
+    // Unaffordable terminal: refusing skips the loss entirely (nothing is
+    // added on reject either, since rejectChainCost == 0) → reject.
+    return rejectChainCost === 0 ? 'reject' : 'accept';
+  }
+
+  // Rejecting adds nothing — refusing the current effect is free.
+  if (rejectChainCost === 0) return 'reject';
+
+  if (!manageable) {
+    // Accepting bankrupts now. Reject delays the (potentially worse) card;
+    // prefer reject unless rejecting is also the strictly worse path.
+    return rejectChainCost < acceptChainCost ? 'reject' : 'accept';
+  }
+
+  if (rejectChainCost > acceptChainCost * AI_EVENT_CHOICE_SIGNIFICANTLY_WORSE_RATIO) {
+    // The escalation is significantly worse than accepting — swallow the
+    // manageable current effect (AC22 "reject if escalation significantly
+    // worse" ⇒ prefer accept here).
+    return 'accept';
+  }
+  if (rejectChainCost < acceptChainCost) return 'reject';
+  return 'accept';
+}
+
+/**
+ * Resolves a pending dual-choice incident using the difficulty-based policy
+ * (from `state.config.difficultyName`, or an explicit override) and completes
+ * the deferred closing (EndCheck → next day). Headless/AI turns never stall:
+ * executeFullTurn, MainStreetAiPlayer.playGame and the Monte Carlo harness
+ * call this automatically. Records the decision via resolveEventChoice
+ * (identical transcript shape to a player choice).
+ *
+ * @param state      Current game state (mutated). No-op when nothing pending.
+ * @param difficulty Optional override; defaults to state.config.difficultyName.
+ * @returns The completed closing TurnResult, or null when nothing was pending.
+ */
+export function resolvePendingEventChoice(
+  state: MainStreetState,
+  difficulty?: DifficultyName,
+): TurnResult | null {
+  const pending = state.pendingEventChoice;
+  if (!pending || pending.resolved) return null;
+  const option = decideEventChoice(state, pending.event, difficulty ?? state.config.difficultyName);
+  resolveEventChoice(state, option);
+  return finishDeferredEndOfTurn(state);
+}
+
+/**
+ * Ends the current MarketPhase for a HEADLESS / AI / test turn and returns
+ * the completed result (CG-0MTT7FC7A000AA58 Q1).
+ *
+ * Wraps processEndOfTurn and, when the drawn incident was a dual-choice event
+ * (result.choicePending), automatically resolves the choice via the
+ * difficulty-based policy (config.difficultyName) and completes the deferred
+ * closing — so headless sims never stall waiting for dialog input.
+ * Interactive callers (the scene's TurnController) use processEndOfTurn
+ * directly: they present the Accept/Reject dialog and resolve via
+ * resolveEventChoice + finishDeferredEndOfTurn.
+ *
+ * @param state Current game state (mutated). Must be in MarketPhase.
+ * @returns The completed turn result (choicePending is always false).
+ */
+export function endTurnHeadless(state: MainStreetState): TurnResult {
+  const result = processEndOfTurn(state);
+  if (!result.choicePending) return result;
+  const finished = resolvePendingEventChoice(state);
+  if (!finished) return result;
+  // Surface the income that was already applied in the paused turn; the
+  // deferred closing (finish) reports income null.
+  return { ...finished, income: result.income };
 }
 
 /**
@@ -1571,8 +2242,8 @@ export function executeFullTurn(
     executeAction(state, action);
   }
 
-  // Process end of turn
-  return processEndOfTurn(state);
+  // Process end of turn (headless: auto-resolves any dual-choice incident)
+  return endTurnHeadless(state);
 }
 
 // ── Card Placement & Sell Operations (Multi-Use Card Economy) ─
@@ -1636,6 +2307,8 @@ export function placeFromHand(
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
+  // Record ownership on the owner-tagged grid (competitive; no-op single-player).
+  tagSlotOwnerIfCompetitive(state, slotIndex);
 
   addLog(
     state,
@@ -2042,6 +2715,116 @@ export function applyBusinessOngoingCosts(state: MainStreetState): void {
 }
 
 /**
+ * Applies ongoing costs per-owner for competitive states (N >= 2,
+ * CG-0MTIIL6J200291ZQ).
+ *
+ * Mirrors the three shared families above (staff salary, community-space
+ * running costs, business running costs) but deducts from the OWNING player's
+ * wallet instead of the shared host wallet:
+ *  - Staff salary is charged to the player who owns the staff member
+ *    (`players[i].staffCards`), with the Operations Manager per-member salary
+ *    discount and the Cost Cutter street-wide reduction derived from that
+ *    owner's own employed skills.
+ *  - Community-space and business running costs are charged to the slot's
+ *    owner (`ownerTaggedGrid` via getSlotOwnerId).
+ *
+ * The shared host-wallet functions above are left untouched (single-player /
+ * N=1 path); this function is additive parallel bookkeeping so per-player
+ * wallets stay authoritative for scoring / AI. Deduction clamping and log
+ * conventions mirror {@link applyStaffOngoingCosts} / {@link
+ * applyCommunitySpaceOngoingCosts} / {@link applyBusinessOngoingCosts}.
+ * Consumes no RNG (deterministic replay, AC3).
+ *
+ * @param state  Competitive game state (players[] wallets mutated in-place).
+ */
+export function applyCompetitiveOngoingCosts(state: MainStreetState): void {
+  if (!state.players || state.players.length < 2) return;
+  const hostReduction = computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state));
+
+  // Staff salary: charge each owner their own staff's salaries.
+  for (const player of state.players) {
+    const staffCards = player.staffCards ?? [];
+    if (staffCards.length === 0) continue;
+    const ownerSkills = staffCards.flatMap((card) =>
+      Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [],
+    );
+    let totalCost = 0;
+    for (const card of staffCards) {
+      const memberSkills = Array.isArray(card.specializationSkillIds) ? deserializeSkillIds(card.specializationSkillIds) : [];
+      totalCost += computeStaffSalaryCost(memberSkills, card.ongoingCost);
+    }
+    totalCost = roundInt(totalCost * (1 - computeStreetOngoingCostReductionPct(ownerSkills)));
+    if (totalCost <= 0) continue;
+    const actualDeduction = Math.min(totalCost, player.coins);
+    player.coins -= actualDeduction;
+    if (actualDeduction > 0) {
+      addLog(
+        state,
+        `P${player.playerId} Staff costs: -${actualDeduction} coins (${staffCards.length} staff) (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
+    }
+    if (actualDeduction < totalCost) {
+      addLog(
+        state,
+        `P${player.playerId} Insufficient coins for staff costs: owed ${totalCost}, paid ${actualDeduction} (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
+    }
+  }
+
+  // Community-space + business running costs: charge each slot's owner.
+  const grid = state.streetGrid;
+  const ownerCosts = new Map<number, number>();
+  const ownerCounts = new Map<number, { businesses: number; spaces: number }>();
+  for (let i = 0; i < grid.length; i++) {
+    const slot = grid[i];
+    if (!slot) continue;
+    if (slot.family !== 'business' && slot.family !== 'community-space') continue;
+    const cost = (slot as BusinessCard).ongoingCost ?? 0;
+    if (cost <= 0) continue;
+    const ownerId = getSlotOwnerId(state, i);
+    ownerCosts.set(ownerId, (ownerCosts.get(ownerId) ?? 0) + cost);
+    const counts = ownerCounts.get(ownerId) ?? { businesses: 0, spaces: 0 };
+    if (slot.family === 'community-space') counts.spaces += 1;
+    else counts.businesses += 1;
+    ownerCounts.set(ownerId, counts);
+  }
+  for (const [ownerId, rawCost] of ownerCosts) {
+    const player = state.players[ownerId];
+    if (!player) continue;
+    // Street-wide Cost Cutter reduction from the shared (host) staff set:
+    // staff hiring is single-wallet today (outside this leaf's scope), so the
+    // per-slot reduction stays consistent with the shared income/cost paths.
+    const totalCost = roundInt(rawCost * (1 - hostReduction));
+    if (totalCost <= 0) continue;
+    const actualDeduction = Math.min(totalCost, player.coins);
+    player.coins -= actualDeduction;
+    const counts = ownerCounts.get(ownerId)!;
+    const label =
+      counts.businesses > 0 && counts.spaces > 0
+        ? `${counts.businesses} businesses, ${counts.spaces} spaces`
+        : counts.businesses > 0
+          ? `${counts.businesses} businesses`
+          : `${counts.spaces} spaces`;
+    if (actualDeduction > 0) {
+      addLog(
+        state,
+        `P${ownerId} Ongoing costs: -${actualDeduction} coins (${label}) (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
+    }
+    if (actualDeduction < totalCost) {
+      addLog(
+        state,
+        `P${ownerId} Insufficient coins for ongoing costs: owed ${totalCost}, paid ${actualDeduction} (${describeEventEffects(-actualDeduction, 0)})`,
+        classifyEffect(-actualDeduction, 0),
+      );
+    }
+  }
+}
+
+/**
  * Lays off (removes) a staff card, decreasing maxHandSize and randomly
  * removing hand cards equal to the staff card's handSlotsAdded.
  *
@@ -2137,8 +2920,8 @@ export function buyAndPlaceBusiness(
   if (card.family !== 'business' && card.family !== 'community-space') {
     throw new Error('Buy-and-place only applies to business and community-space cards.');
   }
-  if (slotIndex < 0 || slotIndex >= GRID_SIZE) {
-    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${GRID_SIZE - 1}.`);
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    throw new Error(`Invalid slot index: ${slotIndex}. Must be 0-${state.streetGrid.length - 1}.`);
   }
   if (state.streetGrid[slotIndex] !== null) {
     throw new Error(`Slot ${slotIndex} is already occupied.`);
@@ -2156,6 +2939,8 @@ export function buyAndPlaceBusiness(
 
   // Incrementally update the new card's and all affected neighbors' cached values
   updateNeighborsOnPlacement(state, slotIndex);
+  // Record ownership on the owner-tagged grid (competitive; no-op single-player).
+  tagSlotOwnerIfCompetitive(state, slotIndex);
   (state as any).businessPlacedThisTurn = true;
 
   addLog(
@@ -2238,14 +3023,15 @@ export function hasFreeEmploymentSlot(state: MainStreetState, slotIndex: number)
 const APPLICANT_CHANCE_CAP = 15;
 
 /**
- * Returns the effective per-turn income+reputation for the applicant
- * trigger chance calculation. Sum of baseIncome from all placed businesses
+ * Computes the staff-applicant trigger chance: min(income + reputation, 15).
+ *
+ * Sum of baseIncome from all placed businesses
  * plus all reputationPerTurn (business + staff) on the street.
  *
  * @param state     Current game state.
  * @returns Effective income+reputation sum (before the 15% cap).
  */
-function computeApplicantChance(state: MainStreetState): number {
+export function computeApplicantChance(state: MainStreetState): number {
   // Sum business baseIncome
   let totalIncome = 0;
   for (let i = 0; i < state.streetGrid.length; i++) {
@@ -2322,9 +3108,13 @@ export function resolveStaffApplicant(state: MainStreetState): void {
   const chance = computeApplicantChance(state);
   if (chance <= 0) return;
 
-  // Deterministic roll: roll in [0, 100), trigger if < chance
-  const roll = state.rng() * 100;
-  if (roll >= chance) return;
+  // Deterministic roll: roll in [0, 100), trigger if < chance.
+  // Dev-only forced applicant (CG-0MTY9PB51008OG5A) bypasses the roll
+  // while still respecting the eligible-slot and chance>0 guards above.
+  if (!state.forcedStaffApplicant) {
+    const roll = state.rng() * 100;
+    if (roll >= chance) return;
+  }
 
   // Pick a target slot
   const targetSlot = pickTargetSlot(state);

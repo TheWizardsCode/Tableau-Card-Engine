@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KN180075VTV
+// smell: god_class
+// severity: low
+// description: ColorettoScene 1802 lines god class — single scene mixes rendering/input/AI/overlay/sound; extract Renderer/InputHandler/AI scheduler helpers.
+// -->
 /**
  * ColorettoScene -- the main Phaser scene for Coloretto.
  *

@@ -4,7 +4,7 @@
  * Verifies that the click-path purchase rejections caused by insufficient
  * coins play the illegal-move feedback (sfx-illegal-move sound + shake
  * animation on the offending card), while non-affordability rejections
- * (hand full, occupied slot, tutorial gating, incident events, no eligible
+ * (hand full, occupied slot, incident events, no eligible
  * target) keep their existing instruction-text-only behaviour. Investment
  * events are an exception: taking an event to hand is FREE
  * (CG-0MT5W1V4D007NN8Q), so the event click has no insufficient-coins path
@@ -13,8 +13,11 @@
  * Scope of paths under test (see CG-0MSXIA61S00686G5):
  *  - onPlayHeldEvent    — playEventCommand throws "Not enough coins…"
  *  - onSlotClick        — placeFromHand throws "Not enough coins…"
- *  - onUpgradeCardClick — canPurchaseUpgrade fails with "Not enough coins…"
- *  - onEventCardClick   — free take-to-hand; no coins gate (cost at play)
+ *  - onUpgradeCardClick — moves the upgrade to hand (free of coins; the
+ *                         listed cost is charged when it is played onto a
+ *                         business, mirroring the business deferral model)
+ *  - onEventCardClick   — take-to-hand costs 1 action but no coins
+ *                         (listed cost is charged at play)
  *
  * @module tests/main-street/illegal-afford-feedback
  */
@@ -146,6 +149,9 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
     // Event-click take-to-hand animates to the merged handView-predicted
     // position; provide a deterministic insertion point for those tests.
     getEventHandInsertionPosition: vi.fn((handIndex: number) => ({ x: 300 + handIndex * 110, y: 240 })),
+    // Market→hand transfers for upgrades animate to the same merged
+    // HandView insertion point (CG-0MT3IYSRL001VVUP).
+    getBusinessHandInsertionPosition: vi.fn((handIndex: number) => ({ x: 300 + handIndex * 110, y: 240 })),
     msRenderer: {
       getMarketRowCards: vi.fn(() => marketContainers),
       getMarketSlotCenter: vi.fn(() => ({ x: 300, y: 150 })),
@@ -235,7 +241,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
       expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Not enough coins'));
     });
 
-    it('does NOT play feedback when the play failure is non-affordability (e.g. no eligible slot logic)', () => {
+    it('does play feedback when the play failure is non-affordability (incident event)', () => {
       // Incident events cannot be played from hand — a non-coins reason.
       const incident = { ...scene.state.market.cards[0], family: 'event', trigger: 'Incident', id: 'evt-test-incident-0', cost: 1 };
       scene.state.hand = [incident];
@@ -243,8 +249,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
       scene.state.phase = 'MarketPhase';
 
       controller.onPlayHeldEvent(0);
-      expect(scene.sound.play).not.toHaveBeenCalled();
-      expect(scene.tweens.add).not.toHaveBeenCalled();
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
     });
   });
 
@@ -276,7 +281,7 @@ describe('Main Street click-path illegal-afford feedback', () => {
       expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Not enough coins'));
     });
 
-    it('does NOT play feedback when the slot is occupied (non-affordability)', async () => {
+    it('does play feedback when the slot is occupied (non-affordability)', async () => {
       const biz = scene.state.market.cards.find(
         (c: any) => c.family === 'business' || c.family === 'community-space',
       );
@@ -291,35 +296,36 @@ describe('Main Street click-path illegal-afford feedback', () => {
       controller.onSlotClick(0);
       await flushMicrotasks();
 
-      expect(scene.sound.play).not.toHaveBeenCalled();
-      expect(scene.tweens.add).not.toHaveBeenCalled();
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
       expect(scene.state.hand).toHaveLength(1);
       expect(scene.state.resourceBank.coins).toBe(100);
     });
   });
 
-  describe('onEventCardClick (free take-to-hand; cost charged at play)', () => {
-    it('moves the event to hand for free even with zero coins (no illegal-move feedback)', async () => {
+  describe('onEventCardClick (1-action take-to-hand; no coins gate, cost charged at play)', () => {
+    it('moves the event to hand at zero coins with no illegal-move feedback (action charged, coins not)', async () => {
       const event = takeInvestmentEvent(scene.state);
       event.cost = 5;
       scene.state.resourceBank.coins = 0;
       scene.state.phase = 'MarketPhase';
+      expect(scene.state.actionsRemaining).toBe(1);
 
       controller.onEventCardClick(event);
       await flushMicrotasks();
 
-      // Free acquisition (CG-0MT5W1V4D007NN8Q): no feedback, event moved to
-      // hand, coins untouched — the cost is paid only when played from hand.
+      // One daily action is charged (CG-0MTFWBNL30043ZBM), but coins stay
+      // untouched (CG-0MT5W1V4D007NN8Q cost-at-play): no illegal feedback.
       expect(scene.sound.play).not.toHaveBeenCalled();
       expect(scene.tweens.add).not.toHaveBeenCalled();
       expect(scene.state.market.cards.find((c: any) => c.id === event.id)).toBeUndefined();
       expect(scene.state.hand.some((c: any) => c.id === event.id)).toBe(true);
       expect(scene.state.resourceBank.coins).toBe(0);
-      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Moved event to hand (free)'));
+      expect(scene.state.actionsRemaining).toBe(0);
+      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Moved event to hand (1 action)'));
     });
   });
 
-  describe('onUpgradeCardClick (insufficient coins to buy upgrade)', () => {
+  describe('onUpgradeCardClick (upgrade cost is charged at play, not on take)', () => {
     // A market row may not contain an upgrade (staff takes a slot, CG-0MT3KZNQB0053K55),
     // so push one in from the deck when needed. Rebuild the market card
     // container mocks so the shake targets the pushed card's row index.
@@ -337,37 +343,68 @@ describe('Main Street click-path illegal-afford feedback', () => {
       return card;
     }
 
-    it('plays sfx-illegal-move and shakes the market card container', () => {
+    it('moves the upgrade to hand for free at zero coins (no illegal feedback)', async () => {
       const upgrade = ensureUpgradeInMarket(scene);
       expect(upgrade).toBeTruthy();
       upgrade.cost = 5;
-      // No eligible target business on the street for the upgrade.
       scene.state.streetGrid = scene.state.streetGrid.map(() => null);
+      scene.state.hand = [];
       scene.state.resourceBank.coins = 0;
+      scene.state.actionsRemaining = 1;
       scene.state.phase = 'MarketPhase';
 
       controller.onUpgradeCardClick(upgrade);
+      await flushMicrotasks();
 
-      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
-      expect(scene.tweens.add).toHaveBeenCalled();
-      expect(scene.state.market.cards.find((c: any) => c.id === upgrade.id)).toBeTruthy();
+      // Free acquisition (business deferral model): the market click only
+      // moves the card to hand, so an empty coin purse is not an error.
+      expect(scene.sound.play).not.toHaveBeenCalled();
+      expect(scene.state.market.cards.find((c: any) => c.id === upgrade.id)).toBeUndefined();
+      expect(scene.state.hand.some((c: any) => c.id === upgrade.id)).toBe(true);
       expect(scene.state.resourceBank.coins).toBe(0);
-      expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Cannot buy upgrade'));
     });
 
-    it('does NOT play feedback when the upgrade has no eligible target (non-affordability)', () => {
+    it('plays illegal feedback when a held upgrade is applied with insufficient coins', async () => {
       const upgrade = ensureUpgradeInMarket(scene);
       expect(upgrade).toBeTruthy();
-      upgrade.cost = 1;
-      scene.state.streetGrid = scene.state.streetGrid.map(() => null);
-      scene.state.resourceBank.coins = 100;
+      upgrade.cost = 5;
+
+      // An eligible target business so the failure is affordability, not
+      // target eligibility.
+      const requiredLevel = (upgrade as any).requiredLevel ?? 0;
+      scene.state.streetGrid[0] = {
+        family: 'business',
+        id: 'afford-target-biz',
+        name: (upgrade as any).targetBusiness,
+        cost: 10,
+        baseIncome: 1,
+        synergyTypes: [],
+        maxLevel: requiredLevel + 2,
+        description: 'test target',
+        level: requiredLevel,
+        incomeBonus: 0,
+        synergyRangeBonus: 0,
+        reputationBonus: 0,
+        ongoingCost: 0,
+        appliedUpgrades: [],
+      };
+      scene.state.market.cards = scene.state.market.cards.filter(
+        (c: any) => c.id !== upgrade.id,
+      );
+      scene.state.hand = [upgrade];
+      scene.state.justMovedUpgradeCardId = null;
+      scene.state.resourceBank.coins = 0;
+      scene.state.actionsRemaining = 1;
       scene.state.phase = 'MarketPhase';
 
-      controller.onUpgradeCardClick(upgrade);
+      controller.onHandUpgradeCardClick(0);
+      controller.onSlotClick(0);
+      await flushMicrotasks();
 
-      expect(scene.sound.play).not.toHaveBeenCalled();
-      expect(scene.tweens.add).not.toHaveBeenCalled();
-      expect(scene.state.resourceBank.coins).toBe(100);
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
+      expect(scene.state.resourceBank.coins).toBe(0);
+      // The affordable-at-play failure keeps the upgrade in hand for a retry.
+      expect(scene.state.hand.some((c: any) => c.id === upgrade.id)).toBe(true);
     });
   });
 
@@ -421,15 +458,14 @@ describe('Main Street click-path illegal-afford feedback', () => {
       expect(bare.tweens.add).not.toHaveBeenCalled();
     });
 
-    it('does not play feedback on tutorial-gated rejections (text only)', () => {
+    it('does play feedback on tutorial-gated rejections', () => {
       scene.msLifecycleManager.isTutorialActionAllowed = vi.fn()
         .mockReturnValue({ allowed: false, reason: 'Complete the highlighted step first.' });
       const event = takeInvestmentEvent(scene.state);
 
       controller.onEventCardClick(event);
 
-      expect(scene.sound.play).not.toHaveBeenCalled();
-      expect(scene.tweens.add).not.toHaveBeenCalled();
+      expect(scene.sound.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ILLEGAL_MOVE);
       expect(scene.instructionText.setText).toHaveBeenCalledWith(expect.stringContaining('Complete the highlighted step'));
     });
   });

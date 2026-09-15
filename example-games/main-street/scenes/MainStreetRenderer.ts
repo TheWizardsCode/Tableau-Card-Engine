@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KLQD001TBMH
+// smell: god_class
+// severity: medium
+// description: MainStreet god modules: Engine 2452, Animator 1942, Renderer 1902, TurnController 1834, State 1599, Cards 1469, Adjacency 1354, Market 1307, LifecycleManager 1111 lines — decompose per-concern helpers; threshold 800; prior CG-0MM1OP07Q16TUTHI covered different scene files, not these modules.
+// -->
 /**
  * MainStreetRenderer -- extracted UI/layout rendering helper for Main Street.
  */
@@ -5,9 +11,9 @@
 import Phaser from 'phaser';
 import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import type { SpecializationSkill } from '../MainStreetStaffSkills';
+import type { PendingApplicant } from '../MainStreetState';
 import { getSkill, hasPeekCapableStaff, STAFF_SKILL_CHIP_COLORS } from '../MainStreetStaffSkills';
 import {
-  GRID_SIZE,
   MARKET_TOTAL_SLOTS,
   synergyColor,
 } from '../MainStreetCards';
@@ -39,7 +45,7 @@ import {
   FONT_FAMILY,
   HandView,
   HintBar,
-  attachSelection,
+  createSelectionState,
   markHudTransient,
   clearTransientHud,
   DEFAULT_DRAG_DISTANCE_THRESHOLD,
@@ -79,6 +85,16 @@ import {
 export { buildUpgradeOverlaySpec, type UpgradeOverlaySpec };
 
 import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
+import {
+  type MapSlotNode,
+  MAX_ZOOM_LEVEL,
+  MIN_ZOOM_LEVEL,
+  containerTransform,
+  streetViewportRect,
+  visibleMapSlots,
+  zoomScale,
+} from '../MainStreetMapView';
+import { ZOOM_ANIMATION_MS } from './MainStreetConstants';
 
 // markHudTransient and clearTransientHud are now imported from src/ui/Renderer
 
@@ -187,6 +203,23 @@ export class MainStreetRenderer {
             }
             container.add(hover);
           }
+        } else if (card.family === 'upgrade') {
+          // ── Upgrade card path (CG-0MT3IYSRL001VVUP): hand-first targeting.
+          // Clicking the upgrade in hand starts 'placing-from-hand' — the
+          // player then clicks the business to upgrade.
+          if (!s.replayMode) {
+            const hover = s.add.rectangle(0, 0, handCardW, handCardH, 0x000000, 0.001);
+            hover.setInteractive({ useHandCursor: true });
+            hover.on('pointerover', () => {
+              const info = buildCardTooltipInfo(card, s.state.config);
+              s.tooltipManager?.show(info, container.x, container.y);
+            });
+            hover.on('pointerout', () => s.tooltipManager?.hide());
+            hover.on('pointerdown', () => {
+              s.onHandUpgradeCardClick(cardIndex);
+            });
+            container.add(hover);
+          }
         } else {
           // ── Business card path: upgrade overlays, tooltip, + placement click ──
           this.applyUpgradeOverlays(container, card, renderW, renderH);
@@ -214,9 +247,10 @@ export class MainStreetRenderer {
       },
       customClickFn: (cardIndex: number) => {
         const card = s.state.hand?.[cardIndex];
-        // Event cards are played (via onPlayHeldEvent), never placed — ignore
-        // HandView-level clicks on them here.
-        if (card && card.family === 'event') return;
+        // Event cards are played (via onPlayHeldEvent) and upgrade cards are
+        // applied to a business (onHandUpgradeCardClick) — neither is placed
+        // on the street, so ignore HandView-level clicks on them here.
+        if (card && (card.family === 'event' || card.family === 'upgrade')) return;
         // Allow selecting a different business card in the hand during placement
         if (s.uiPhase === 'placing-from-hand') {
           s.pendingHandIndex = cardIndex;
@@ -318,6 +352,7 @@ export class MainStreetRenderer {
     this.refreshActionButtons();
     this.refreshChallengeTracker();
     this.refreshLog();
+    this.refreshApplicant();
     s.updateSvgDebugOverlay();
   }
 
@@ -493,15 +528,30 @@ export class MainStreetRenderer {
 
   public refreshStreetGrid(): void {
     const s = this.scene;
+    s.ensureStreetCamera?.();
     s.streetContainer.removeAll(true);
 
-    const { gameW, streetTop, streetX, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
+    const { gameW, streetTop } = s.layout;
+
+    // ── Street-map camera (CG-0MTH9OVMC001V44E) ──
+    // Render every slot of every street cell inside the viewport, de-duplicating
+    // the plots shared between neighbouring streets. At zoom level 1 on the
+    // default 1×1 lattice this yields exactly the legacy 10 slots in legacy
+    // positions, so the pre-camera framing is preserved bit-for-bit.
+    // Slots of the playable lattice carry a world gameplay index
+    // (CG-0MTH9OW0H0005VKE), so expanded streets and shared seams are placeable.
+    const nodes = this.mapNodes();
 
     // Section label
     const label = s.add.text(gameW / 2, streetTop - 16, '', {
       fontSize: '14px', fontStyle: 'bold', color: '#aa9966', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     s.streetContainer.add(label);
+
+    // Idle backdrop: an interactive zone covering the street viewport. It is
+    // added first (and is only interactive while zoomed out), so Phaser's
+    // topOnly input delivers slot clicks to the slots themselves.
+    this.createStreetPanZone();
 
     // Register drag-drop drop zones BEFORE drawing slot rectangles. Phaser's
     // input system uses topOnly by default, meaning pointer events are delivered
@@ -513,22 +563,261 @@ export class MainStreetRenderer {
     // render order.
     this.refreshDragDropZones();
 
-    for (let i = 0; i < GRID_SIZE; i++) {
-      const col = i % streetCols;
-      const row = Math.floor(i / streetCols);
-      const x = streetX + col * (slotW + slotGap);
-      const y = streetTop + row * (slotH + streetRowGap);
-      const biz = s.state.streetGrid[i];
-
-      if (biz) {
-        this.drawBusinessSlot(x, y, i, biz);
-      } else {
-        this.drawEmptySlot(x, y, i);
-      }
+    for (const node of nodes) {
+      this.drawMapSlot(node);
     }
 
     // Draw synergy lines between adjacent synergistic businesses
     this.drawSynergyLines();
+
+    // Re-clip the layer to the (possibly re-computed) street band, re-apply the
+    // camera transform, and keep the always-available zoom controls in sync.
+    this.updateStreetMapMask();
+    this.applyStreetCamera(false);
+    this.updateStreetZoomControls();
+  }
+
+  /**
+   * Draws one slot of the (possibly expanded) street map.
+   *
+   * Slots of the playable board render the placed card / drop target as
+   * before. Slots belonging to a revealed neighbouring street render as inert,
+   * dimmed plots (view-only until the expanded-grid slices make them playable).
+   */
+  private drawMapSlot(node: MapSlotNode): void {
+    const s = this.scene;
+    const { localX, localY, gameplayIndex } = node;
+
+    if (gameplayIndex === null) {
+      this.drawRevealedStreetSlot(localX, localY);
+      return;
+    }
+
+    const biz = s.state.streetGrid[gameplayIndex];
+    if (biz) {
+      this.drawBusinessSlot(localX, localY, gameplayIndex, biz);
+    } else {
+      this.drawEmptySlot(localX, localY, gameplayIndex);
+    }
+  }
+
+  /**
+   * Draws a revealed-but-unplayable neighbouring street plot: an inert,
+   * low-contrast slot outline so the player can see the street exists without
+   * implying it is interactive yet.
+   */
+  private drawRevealedStreetSlot(x: number, y: number): void {
+    const s = this.scene;
+    const { slotW, slotH } = s.layout;
+    const bg = s.add.rectangle(
+      x + slotW / 2, y + slotH / 2,
+      slotW, slotH, 0x2a2a1c, 0.12,
+    );
+    bg.setStrokeStyle(1, 0x444438, 0.5);
+    s.streetContainer.add(bg);
+  }
+
+  /**
+   * Creates (or refreshes) the drag-to-pan backdrop for the street map.
+   *
+   * The backdrop is only interactive while the map is zoomed out (scale < 1),
+   * where panning is meaningful; at the default 1× framing the street fills its
+   * viewport and a "drag-pan" gesture would be a no-op, so the backdrop stays
+   * inert and cannot swallow clicks.
+   */
+  private createStreetPanZone(): void {
+    const s = this.scene;
+    if (s.replayMode) return;
+    const viewport = streetViewportRect(s.layout);
+    const zone = s.add.zone(
+      viewport.x + viewport.w / 2,
+      viewport.y + viewport.h / 2,
+      Math.max(1, viewport.w - 8),
+      Math.max(1, viewport.h - 4),
+    ).setOrigin(0.5);
+    zone.setName('ms-street-pan-zone');
+    s.streetContainer.add(zone);
+    (s.msInputManager as any)?.attachStreetPanZone?.(zone);
+  }
+
+  /**
+   * Creates the street-map viewport mask (once) and applies the camera
+   * transform to the street layer.
+   *
+   * Only `streetContainer` is transformed, so the HUD chrome (market, hand,
+   * log, challenges) stays fixed while the map zooms/pans. The mask clips the
+   * map to the street band so zoomed-out neighbouring streets can never
+   * overdraw the HUD. Zoom animation is skipped under reduced motion
+   * (`settingsPanel.reducedMotion`), which applies the new framing instantly.
+   */
+  public applyStreetCamera(animate = false): void {
+    const s = this.scene;
+    if (!s.streetContainer || !s.layout) return;
+
+    this.installStreetMapMask();
+    const target = containerTransform(s.streetCamera, s.layout);
+    const reducedMotion = !!(s.settingsPanel?.reducedMotion);
+    const container = s.streetContainer;
+
+    try {
+      const tweening = s.tweens?.isTweening?.(container) ?? false;
+      if (animate && !reducedMotion) {
+        // Restart the transition from the current framing toward the target.
+        s.tweens?.killTweensOf(container);
+        s.tweens.add({
+          targets: container,
+          scaleX: target.scale,
+          scaleY: target.scale,
+          x: target.x,
+          y: target.y,
+          duration: ZOOM_ANIMATION_MS,
+          ease: 'Cubic.easeOut',
+        });
+      } else if (!tweening) {
+        // Never interrupt an in-flight zoom tween: a re-render triggered by the
+        // camera change must not snap the layer to the target mid-transition.
+        container.setScale(target.scale);
+        container.setPosition(target.x, target.y);
+      }
+    } catch (_) {
+      // Presentation-only: a failed transform must never break the game loop.
+    }
+
+    this.updateStreetMapMask();
+  }
+
+  /**
+   * Creates the street-map viewport mask on first use. Kept visible with a
+   * transparent fill (the same pattern as the activity-log mask) so the
+   * geometry is drawn to the canvas clip path without rendering anything.
+   */
+  public installStreetMapMask(): void {
+    const s = this.scene;
+    if (s.streetMapMaskGraphics || !s.streetContainer) return;
+    try {
+      s.streetMapMaskGraphics = s.add.graphics();
+      const mask = new Phaser.Display.Masks.GeometryMask(s, s.streetMapMaskGraphics);
+      s.streetContainer.setMask(mask);
+      this.updateStreetMapMask();
+    } catch (_) {
+      s.streetMapMaskGraphics = null;
+    }
+  }
+
+  /** Updates the street-map mask rectangle to the current layout's viewport. */
+  public updateStreetMapMask(): void {
+    const s = this.scene;
+    if (!s.streetMapMaskGraphics || !s.layout) return;
+    const viewport = streetViewportRect(s.layout);
+    try {
+      s.streetMapMaskGraphics.clear();
+      s.streetMapMaskGraphics.fillStyle(0xffffff, 0);
+      s.streetMapMaskGraphics.fillRect(viewport.x, viewport.y, viewport.w, viewport.h);
+    } catch (_) {
+      // ignore in constrained test environments
+    }
+  }
+
+  /**
+   * Creates the always-available zoom control cluster on first use.
+   *
+   * The controls live in `hudContainer` (not `streetContainer`) so they stay
+   * put while the map transforms, and sit at the top-right of the street band.
+   * Zoom is never gated: the buttons stay usable in every phase.
+   */
+  private installStreetZoomControls(): void {
+    const s = this.scene;
+    if (!s.hudContainer || s.replayMode) return;
+    const viewport = streetViewportRect(s.layout);
+    const size = 26;
+    const gap = 4;
+    const x = viewport.x + viewport.w - size;
+    const y = viewport.y - 2;
+
+    const zoomOut = this.createZoomButton(x, y, size, '−', 'ms-zoom-out', () => s.zoomStreetOut());
+    const zoomIn = this.createZoomButton(x, y + size + gap, size, '+', 'ms-zoom-in', () => s.zoomStreetIn());
+    const zoomLabel = s.add.text(
+      x + size / 2,
+      y + 2 * size + gap + 4,
+      '',
+      { fontSize: '10px', color: '#998866', fontFamily: FONT_FAMILY },
+    ).setOrigin(0.5, 0).setName('ms-zoom-label');
+
+    try {
+      s.hudContainer.add(zoomOut);
+      s.hudContainer.add(zoomIn);
+      s.hudContainer.add(zoomLabel);
+      s.streetZoomControls = [zoomOut, zoomIn, zoomLabel];
+    } catch (_) {
+      // ignore UI errors in constrained test environments
+    }
+  }
+
+  /** Creates one square zoom button and registers its click handler. */
+  private createZoomButton(
+    x: number,
+    y: number,
+    size: number,
+    text: string,
+    name: string,
+    onClick: () => void,
+  ): Phaser.GameObjects.Container {
+    const s = this.scene;
+    const container = s.add.container(x + size / 2, y + size / 2).setName(name);
+    const bg = s.add.rectangle(0, 0, size, size, 0x554422, 0.85);
+    bg.setStrokeStyle(1, 0xaa8855);
+    const label = s.add.text(0, 0, text, {
+      fontSize: '16px', fontStyle: 'bold', color: '#ffcc88', fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5);
+    container.add(bg);
+    container.add(label);
+    bg.setInteractive({ useHandCursor: true });
+    bg.on('pointerdown', onClick);
+    bg.on('pointerover', () => bg.setStrokeStyle(2, 0xffdd44));
+    bg.on('pointerout', () => bg.setStrokeStyle(1, 0xaa8855));
+    return container;
+  }
+
+  /**
+   * Creates the zoom controls if needed and refreshes their enabled/disabled
+   * visuals plus the zoom percentage readout. Called on every street refresh
+   * so the controls always reflect the live camera without being rebuilt
+   * mid-click.
+   */
+  public updateStreetZoomControls(): void {
+    const s = this.scene;
+    if (!s.hudContainer || s.replayMode) return;
+    if (!s.hudContainer.getByName?.('ms-zoom-out')) this.installStreetZoomControls();
+
+    const zoomOut = s.hudContainer.getByName?.('ms-zoom-out') as Phaser.GameObjects.Container | null;
+    const zoomIn = s.hudContainer.getByName?.('ms-zoom-in') as Phaser.GameObjects.Container | null;
+    const zoomLabel = s.hudContainer.getByName?.('ms-zoom-label') as Phaser.GameObjects.Text | null;
+    const level = s.streetCamera.zoomLevel;
+
+    try {
+      this.setZoomButtonEnabled(zoomOut, level < MAX_ZOOM_LEVEL);
+      this.setZoomButtonEnabled(zoomIn, level > MIN_ZOOM_LEVEL);
+      zoomLabel?.setText(`${Math.round(zoomScale(level) * 100)}%`);
+    } catch (_) {
+      // ignore UI errors in constrained test environments
+    }
+  }
+
+  /** Applies the enabled/disabled look to a zoom button's background + label. */
+  private setZoomButtonEnabled(button: Phaser.GameObjects.Container | null, enabled: boolean): void {
+    if (!button) return;
+    const bg = button.list?.[0] as Phaser.GameObjects.Rectangle | undefined;
+    const label = button.list?.[1] as Phaser.GameObjects.Text | undefined;
+    bg?.setFillStyle(0x554422, enabled ? 0.85 : 0.4);
+    label?.setColor(enabled ? '#ffcc88' : '#776655');
+  }
+
+  /**
+   * Backwards-compatible alias used by the scene API: refresh the zoom control
+   * visuals (creating them when absent).
+   */
+  public refreshStreetZoomControls(): void {
+    this.updateStreetZoomControls();
   }
 
   /**
@@ -548,10 +837,27 @@ export class MainStreetRenderer {
    */
   private drawSynergyLines(): void {
     const s = this.scene;
-    const pairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? []);
+    const playable = s.streetPlayableLattice ?? { cols: 1, rows: 1 };
+    const gridDims = playable.cols === 1 && playable.rows === 1 ? undefined : playable;
+    const pairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? [], gridDims);
+
+    // Only draw links whose endpoints are inside the viewport (culling,
+    // AC4), using the rendered world-slot centres so lines cross street seams
+    // and shared corners correctly (AC2).
+    const centreByIndex = new Map<number, { x: number; y: number }>();
+    for (const node of this.mapNodes()) {
+      if (node.gameplayIndex === null) continue;
+      centreByIndex.set(node.gameplayIndex, {
+        x: node.localX + s.layout.slotW / 2,
+        y: node.localY + s.layout.slotH / 2,
+      });
+    }
 
     for (const pair of pairs) {
-      const { p1, p2 } = synergyLineEndpoints(pair, s.layout);
+      const from = centreByIndex.get(pair.fromIndex);
+      const to = centreByIndex.get(pair.toIndex);
+      if (!from || !to) continue;
+      const { p1, p2 } = synergyLineEndpoints(pair, s.layout, { from, to });
       const color = synergyColor(pair.sharedSynergy);
 
       const line = s.add.graphics();
@@ -584,48 +890,123 @@ export class MainStreetRenderer {
     this.dragDropRegistered.clear();
   }
 
-  /** Register empty street slots as drag-drop zones for the market phase. */
+  /**
+   * Register street slots as drag-drop zones for the market phase.
+   *
+   * A single registration pass covers both drag models, dispatching on the
+   * dragged card's family inside `canAccept`:
+   *
+   * - business / community-space cards drop onto an EMPTY slot;
+   * - upgrade cards drop onto an OCCUPIED slot whose business is a legal
+   *   target for that upgrade (CG-0MT3IYSRL001VVUP).
+   */
   private refreshDragDropZones(): void {
     const s = this.scene;
     if (!s.dragDropManager || s.replayMode) return;
     s.dragDropManager.clearDropZones();
 
-    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
-    for (let i = 0; i < GRID_SIZE; i++) {
-      if (s.state.streetGrid[i]) continue; // occupied slots are invalid drop targets
-      const col = i % streetCols;
-      const row = Math.floor(i / streetCols);
-      const cx = streetX + col * (slotW + slotGap) + slotW / 2;
-      const cy = streetTop + row * (slotH + streetRowGap) + slotH / 2;
+    const { slotW, slotH } = s.layout;
+    for (const node of this.mapNodes()) {
+      if (node.gameplayIndex === null) continue;
+      const i = node.gameplayIndex;
+      const cx = node.localX + slotW / 2;
+      const cy = node.localY + slotH / 2;
       const zone = s.add.zone(cx, cy, slotW, slotH).setOrigin(0.5);
       zone.setRectangleDropZone(slotW, slotH);
       s.dragDropManager.registerDropZone({
         zone,
         data: i,
-        canAccept: (payload: any) =>
-          s.msTurnController.canDropBusinessCard(payload.data as string, i),
+        canAccept: (payload: any) => {
+          const cardId = payload.data as string;
+          const card = s.state.market.cards.find((c: any) => c.id === cardId);
+          if (card?.family === 'upgrade') {
+            return s.msTurnController.canDropUpgradeCard(cardId, i);
+          }
+          // Occupied slots are never valid business drop targets.
+          return s.state.streetGrid[i] === null &&
+            s.msTurnController.canDropBusinessCard(cardId, i);
+        },
       });
       s.streetContainer.add(zone);
     }
   }
 
-  /** Outline empty street slots while a drag is active (valid-drop hint). */
-  public showDragHighlights(): void {
+  /**
+   * The visible, de-duplicated street-map slots for the current camera and
+   * playable lattice. Shared seam and four-way-intersection plots appear once
+   * (one hit-zone), and unrevealed/out-of-viewport streets are absent (culling).
+   */
+  private mapNodes(): MapSlotNode[] {
+    const s = this.scene;
+    const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
+    const playable = s.streetPlayableLattice ?? { cols: 1, rows: 1 };
+    return visibleMapSlots(s.streetCamera, s.layout, lattice, playable);
+  }
+
+  /** Visible, de-duplicated street-map slots (test/introspection hook). */
+  public getVisibleStreetNodes(): MapSlotNode[] {
+    return this.mapNodes();
+  }
+
+  /**
+   * Outline the legal drop targets while a drag is active (valid-drop hint).
+   *
+   * Business drags highlight empty slots green. Upgrade drags highlight
+   * OCCUPIED business slots — green when the business is a legal target for
+   * that upgrade, red when it is not, so the player can see the eligible
+   * targets before releasing (CG-0MT3IYSRL001VVUP).
+   *
+   * @param cardId  The dragged market card's id (drives which model applies).
+   */
+  public showDragHighlights(cardId?: string): void {
     const s = this.scene;
     this.clearDragHighlights();
-    const { streetX, streetTop, slotW, slotGap, slotH, streetCols, streetRowGap } = s.layout;
-    for (let i = 0; i < GRID_SIZE; i++) {
-      if (s.state.streetGrid[i]) continue;
-      const col = i % streetCols;
-      const row = Math.floor(i / streetCols);
-      const x = streetX + col * (slotW + slotGap) + slotW / 2;
-      const y = streetTop + row * (slotH + streetRowGap) + slotH / 2;
+    const card = cardId
+      ? s.state.market.cards.find((c: any) => c.id === cardId)
+      : undefined;
+    const isUpgrade = card?.family === 'upgrade';
+
+    const { slotW, slotH } = s.layout;
+    for (const node of this.mapNodes()) {
+      if (node.gameplayIndex === null) continue;
+      const i = node.gameplayIndex;
+      const occupied = !!s.state.streetGrid[i];
+      let validity: 'valid' | 'invalid';
+      if (isUpgrade) {
+        if (!occupied) continue; // an upgrade can only land on a business
+        validity = s.msTurnController.canDropUpgradeCard(card!.id, i) ? 'valid' : 'invalid';
+      } else {
+        if (occupied) continue; // a business can only land on an empty slot
+        validity = 'valid';
+      }
+
+      const x = node.localX + slotW / 2;
+      const y = node.localY + slotH / 2;
       const hl = s.add.rectangle(x, y, slotW, slotH);
-      hl.setStrokeStyle(2, 0x44ff66, 0.8);
+      hl.setStrokeStyle(2, validity === 'valid' ? 0x44ff66 : 0xff4444, 0.8);
       hl.setFillStyle(0x000000, 0);
+      hl.setData('slotIndex', i);
+      hl.setData('validity', validity);
       s.streetContainer.add(hl);
       this.dragHighlightRects.add(hl);
     }
+  }
+
+  /**
+   * The live drag highlights as `{ slotIndex, validity }` pairs (empty when no
+   * drag is in progress). Exposes the green/red drop-target feedback for
+   * introspection alongside `getMarketRowCards()`.
+   */
+  public getDragHighlights(): Array<{ slotIndex: number; validity: 'valid' | 'invalid' }> {
+    const highlights: Array<{ slotIndex: number; validity: 'valid' | 'invalid' }> = [];
+    for (const rect of this.dragHighlightRects) {
+      if (!rect?.active) continue;
+      highlights.push({
+        slotIndex: rect.getData('slotIndex'),
+        validity: rect.getData('validity'),
+      });
+    }
+    return highlights;
   }
 
   /** Remove drag highlights (called on dragend and defensively on refresh). */
@@ -707,7 +1088,7 @@ export class MainStreetRenderer {
         const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
         const synergyRate = formatSynergyRate(biz, s.state.config);
         const synergyInfo = synergyRate !== null ? `\nSynergy bonus: ${synergyRate} of base income per adjacent matching business` : '';
-        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}`;
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}\nClick to manage: sell (free) or close (1 action)`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {
@@ -1131,6 +1512,10 @@ export class MainStreetRenderer {
     const s = this.scene;
     const { marketCardW, marketCardH } = s.layout;
     const container = s.add.container(Math.round(x + marketCardW / 2), Math.round(y + marketCardH / 2));
+    // Name every market card container up-front so it stays locatable
+    // regardless of the interactive/action-budget gate below (click-only
+    // cards such as upgrades would otherwise be unnamed once dimmed).
+    container.setName(`ms-market-card-${card.id}`);
 
     // Determine if this is a non-purchasable Incident event
     const isIncidentEvent = card.family === 'event' && (card as EventCard).trigger === 'Incident';
@@ -1148,20 +1533,46 @@ export class MainStreetRenderer {
     // (CG-0MT24MHGZ0025O20).
     mainStreetRenderCardSvg(s, container, card.id, renderW, renderH, (card as Partial<BusinessCard>).displayName);
 
-    // For upgrade cards, add a dynamic text overlay showing the target business
+    // For upgrade cards, add dynamic target text in the right column
+    // (left-anchored at SVG TEXT_MIN_X 80 so it never bleeds into the
+    // 64×64 graphic, x < 72 in SVG coords / -w/2+80 in container coords).
     if (card.family === 'upgrade') {
       const u = card as UpgradeCard;
       const targetLabel = `for ${u.targetBusiness}`;
-      const targetText = s.add.text(0, Math.round(-renderH / 2 + 24), targetLabel, {
+      const rightColX = Math.round(-renderW / 2 + 80);
+      const targetText = s.add.text(rightColX, Math.round(-renderH / 2 + 24), targetLabel, {
         fontSize: '9px',
         color: '#ddbb88',
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
-        align: 'center',
+        align: 'left',
       });
-      targetText.setOrigin(0.5, 0);
+      targetText.setOrigin(0, 0);
       targetText.setName('upgradeTargetLabel');
       container.add(targetText);
+
+      // Buy-and-place premium indicator for upgrades (CG-0MT3IYSRL001VVUP):
+      // dragging an upgrade market→business is a same-turn buy-and-play that
+      // costs +50% over the listed price, exactly like business cards. Uses
+      // the same badge name so the two families stay visually/nominally
+      // consistent.
+      const premiumCost = Math.ceil(u.cost * 1.5 * 2) / 2;
+      const premiumLabel = s.add.text(
+        rightColX,
+        Math.round(renderH / 2 - 11),
+        `B&P €${premiumCost} (listed €${u.cost})`,
+        {
+          fontSize: '9px',
+          color: '#ffcc88',
+          fontFamily: FONT_FAMILY,
+          fontStyle: 'bold',
+          align: 'left',
+          backgroundColor: '#000000aa',
+        },
+      );
+      premiumLabel.setOrigin(0, 0.5);
+      premiumLabel.setName('buyAndPlacePremiumLabel');
+      container.add(premiumLabel);
     }
 
     // Apply income/reputation overlays for business and community-space cards
@@ -1172,15 +1583,16 @@ export class MainStreetRenderer {
       // market→street placement costs +50% over the listed cost. Shown as a
       // small badge at the bottom of business/community-space cards.
       const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-      const premiumLabel = s.add.text(0, Math.round(renderH / 2 - 11), `B&P €${premiumCost} (listed €${card.cost})`, {
+      const premiumRightX = Math.round(-renderW / 2 + 80);
+      const premiumLabel = s.add.text(premiumRightX, Math.round(renderH / 2 - 11), `B&P €${premiumCost} (listed €${card.cost})`, {
         fontSize: '9px',
         color: '#ffcc88',
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
-        align: 'center',
+        align: 'left',
         backgroundColor: '#000000aa',
       });
-      premiumLabel.setOrigin(0.5, 0.5);
+      premiumLabel.setOrigin(0, 0.5);
       premiumLabel.setName('buyAndPlacePremiumLabel');
       container.add(premiumLabel);
     }
@@ -1229,15 +1641,17 @@ export class MainStreetRenderer {
 
     // Action economy gating (CG-0MSTOF1N5005PK2R): business/community-space
     // card purchases consume the daily action, so those cards are
-    // non-interactive (dimmed) when the budget is spent. Events/upgrades are
-    // free operations and stay interactive. Staff hires also consume an
-    // action (CG-0MT3KZOUX007GQ44), so they gate on the budget like business.
+    // non-interactive (dimmed) when the budget is spent. Staff hires also
+    // consume an action (CG-0MT3KZOUX007GQ44), upgrades consume one when
+    // moved to hand (CG-0MT3IYSRL001VVUP), and Investment events consume one
+    // when taken to hand (CG-0MTFWBNL30043ZBM) — all gate on the budget.
     const noActions = s.state.actionsRemaining <= 0;
     const isBusinessLike = card.family === 'business' || card.family === 'community-space';
-    const consumesAction = isBusinessLike || card.family === 'staff';
+    const consumesAction =
+      isBusinessLike || card.family === 'staff' || card.family === 'upgrade' || card.family === 'event';
     const interactiveEnabled =
       s.uiPhase === 'market' && !isIncidentEvent && !(consumesAction && noActions);
-    const selection = attachSelection(container, {
+    const selection = createSelectionState({
       onStateChange: ({ selected, hovered }) => {
         if (selected) {
           s.selectedMarketCardId = card.id;
@@ -1268,13 +1682,16 @@ export class MainStreetRenderer {
     if (interactiveEnabled) {
       s.marketSelectionByCardId.set(card.id, selection);
 
-      // Business AND community-space cards in the Development row are
-      // draggable (drag-to-buy/place). Events and upgrades stay click-only:
-      // they live in the market row but are not part of the drag-drop
-      // module's dev-row model (CG-0MSKSAREE007AYSZ + operator decision A
-      // for the T13 Library drag support).
+      // Business, community-space AND upgrade cards in the Development row
+      // are draggable. For business-like cards the gesture is drag-to-buy/
+      // place onto an empty slot; for upgrades it is the same-turn
+      // buy-and-play onto a matching business at the +50% premium
+      // (CG-0MSTOF1N5005PK2R + CG-0MT3IYSRL001VVUP). Events stay click-only:
+      // they are not part of the drag-drop row model (CG-0MSKSAREE007AYSZ +
+      // operator decision A for the T13 Library drag support).
+      const isUpgradeCard = card.family === 'upgrade';
       const isDraggableCard =
-        (card.family === 'business' || card.family === 'community-space') &&
+        (card.family === 'business' || card.family === 'community-space' || isUpgradeCard) &&
         !!s.dragDropManager && !s.replayMode;
 
       if (isDraggableCard) {
@@ -1291,8 +1708,14 @@ export class MainStreetRenderer {
           gameObject: container,
           data: card.id,
           hitArea: hitAreaRect,
-          canPickUp: () => s.msTurnController.canPickUpBusinessCard(card.id),
-          onDrop: (payload: any) => s.msTurnController.onDragDropBusiness(payload),
+          canPickUp: () =>
+            isUpgradeCard
+              ? s.msTurnController.canPickUpUpgradeCard(card.id)
+              : s.msTurnController.canPickUpBusinessCard(card.id),
+          onDrop: (payload: any) =>
+            isUpgradeCard
+              ? s.msTurnController.onDragDropUpgrade(payload)
+              : s.msTurnController.onDragDropBusiness(payload),
         });
         this.dragDropRegistered.add(container);
         container.setName(`ms-market-card-${card.id}`);
@@ -1318,8 +1741,9 @@ export class MainStreetRenderer {
         });
         s.marketSelectionManager.registerTarget(container);
       } else {
-        // ── Click-only card (event, upgrade) ────────────────
-        // Existing pointerdown-based path, unchanged.
+        // ── Click-only card (event) ────────────────
+        // Existing pointerdown-based path, unchanged. Upgrades take the
+        // draggable branch above when the action budget allows.
         const hitArea = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
         hitArea.setInteractive({ useHandCursor: true });
         hitArea.on('pointerdown', () => {
@@ -1343,7 +1767,8 @@ export class MainStreetRenderer {
     }
 
     // Dim visual feedback + tooltip for action-gaited cards (business /
-    // community-space / staff hire — CG-0MSTOF1N5005PK2R + CG-0MT3KZOUX007GQ44).
+    // community-space / staff hire / upgrades — CG-0MSTOF1N5005PK2R +
+    // CG-0MT3KZOUX007GQ44 + CG-0MT3IYSRL001VVUP).
     // The card is dimmed so the player understands it is unavailable, but
     // hovering it still shows the FULL card tooltip (regardless of
     // remaining actions, CG-0MT24RFIV007NQMP) instead of a generic
@@ -1361,7 +1786,13 @@ export class MainStreetRenderer {
         const hover = s.add.rectangle(0, 0, marketCardW, marketCardH, 0x000000, 0.001);
         hover.setInteractive({ useHandCursor: false });
         hover.on('pointerover', () => {
-          const info = buildCardTooltipInfo(card, s.state.config, { includeEventDetail: true });
+          // Upgrades additionally state WHY they are unavailable: the full card
+          // details stay (CG-0MT24RFIV007NQMP) and the blocking reason is added
+          // alongside (CG-0MT3IYSRL001VVUP).
+          const info = buildCardTooltipInfo(card, s.state.config, {
+            includeEventDetail: true,
+            noActionsRemaining: card.family === 'upgrade',
+          });
           s.tooltipManager?.show(info, container.x, container.y);
         });
         hover.on('pointerout', () => s.tooltipManager?.hide());
@@ -1627,7 +2058,10 @@ export class MainStreetRenderer {
     const s = this.scene;
     s.actionContainer.removeAll(true);
 
-    if (s.uiPhase === 'market') {
+    // The applicant phase (CG-0MSTOATDU006UGAX) deliberately shares the
+    // market action bar so End Turn stays reachable — ending the turn
+    // auto-declines an unresolved applicant instead of stranding the player.
+    if (s.uiPhase === 'market' || s.uiPhase === 'applicant') {
       const rightX = s.layout.gameW - 24;
       const by = s.layout.actionY;
 
@@ -1787,6 +2221,18 @@ export class MainStreetRenderer {
       });
       s.actionContainer.add(cancelBtn);
     }
+
+    // Staff applicant phase (CG-0MSTOATDU006UGAX): the market action bar
+    // above stays available (Hire/Decline live on the applicant overlay
+    // itself) so the player can resolve the applicant or End Turn to skip.
+    if (s.uiPhase === 'applicant') {
+      const applicantCard = s.pendingApplicant?.card;
+      const name = applicantCard?.name ?? 'Staff Applicant';
+      const salary = applicantCard?.ongoingCost ?? 0;
+      s.hintBar.setText(
+        `${name} — Hire (free, salary ${salary}/turn) or Decline; End Turn to skip`,
+      );
+    }
   }
 
 
@@ -1898,5 +2344,171 @@ export class MainStreetRenderer {
     }
 
     s.updateLogMask();
+  }
+
+  /**
+   * Render the pending staff-applicant overlay (CG-0MSTOATDU006UGAX).
+   *
+   * When `uiPhase === 'applicant'` and a `pendingApplicant` is set, the
+   * applicant renders face-up (staff SVG + specialization skill chips) at
+   * the SLL `applicantOverlay` zone centre, with Hire / Decline buttons and
+   * the per-turn salary, and walks on from the left screen edge.
+   *
+   * The overlay is built **once per applicant card**, tracked by
+   * `applicantRenderedId`, so the many `refreshAll()` calls that happen
+   * during a turn never rebuild the card face nor replay the walk-on tween.
+   * While a hire/decline exit tween is playing (`applicantAnimating`) any
+   * existing overlay is left untouched so the tween target stays alive.
+   *
+   * All child objects use container-local coordinates — the container itself
+   * is positioned at the SLL anchor, so every element travels with the card
+   * during the walk-on/walk-off tweens.
+   *
+   * @returns True when an applicant overlay is currently presented.
+   */
+  public refreshApplicant(): boolean {
+    const s = this.scene as any;
+    const pending = s.pendingApplicant as PendingApplicant | null;
+    const isApplicantPhase = s.uiPhase === 'applicant';
+
+    // ── Not presenting: tear down any stale overlay ──
+    // Skip the teardown while an exit tween is mid-flight, otherwise the
+    // tween would be animating a destroyed container.
+    if (!isApplicantPhase || !pending) {
+      if (!s.applicantAnimating) {
+        (s as { clearApplicantOverlay?: () => void }).clearApplicantOverlay?.();
+      }
+      return false;
+    }
+
+    const card = pending.card as StaffCard;
+
+    // ── Already rendered this applicant → leave it alone (no re-animate) ──
+    if (s.applicantOverlayContainer && s.applicantRenderedId === card.id) {
+      return true;
+    }
+
+    // New/changed applicant: rebuild from scratch.
+    (s as { clearApplicantOverlay?: () => void }).clearApplicantOverlay?.();
+
+    const container: Phaser.GameObjects.Container = s.add.container(0, 0);
+    container.setName('applicantOverlay');
+    // Above the action bar / hint bar (depth 100 within hudContainer) but
+    // below modal overlays (199-201), so the applicant reads as a prominent
+    // in-play decision without covering dialogs.
+    container.setDepth(120);
+    if (s.hudContainer) s.hudContainer.add(container);
+    s.applicantOverlayContainer = container;
+    s.applicantRenderedId = card.id;
+
+    const cardW = s.layout.handCardW ?? 120;
+    const cardH = s.layout.handCardH ?? 170;
+
+    // ── Card face (local origin 0,0 = card centre) ──
+    const cardImg = mainStreetRenderCardSvg(s, container, card.id, cardW, cardH);
+    cardImg.setOrigin(0.5, 0.5).setDepth(10);
+
+    // ── Skill-chip badges (same pattern as market-rendered staff cards) ──
+    const skillIds = Array.isArray(card.specializationSkillIds)
+      ? card.specializationSkillIds
+      : [];
+    const skills: SpecializationSkill[] = [];
+    for (const id of skillIds) {
+      try { skills.push(getSkill(id)); } catch { /* forward-compat */ }
+    }
+    let chipY = Math.round(cardH / 2 - 8);
+    for (const skill of skills) {
+      const chipBg = STAFF_SKILL_CHIP_COLORS[skill.category] ?? '#444455';
+      const chip = s.add.text(0, chipY, skill.name, {
+        fontSize: '8px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        backgroundColor: chipBg,
+        padding: { x: 3, y: 1 },
+      });
+      chip.setOrigin(0.5, 1);
+      chip.setName(`applicantSkillBadge-${skill.id}`);
+      chip.setDepth(11);
+      container.add(chip);
+      chipY -= 12;
+    }
+
+    // ── Interactive hover overlay (tooltip + pointer feedback) ──
+    if (!s.replayMode) {
+      const hover = s.add.rectangle(0, 0, cardW, cardH, 0x000000, 0.001);
+      hover.setInteractive({ useHandCursor: true, cursor: 'pointer' });
+      hover.on('pointerover', () => {
+        const info = buildCardTooltipInfo(card, s.state.config);
+        s.tooltipManager?.show(info, container.x, container.y);
+      });
+      hover.on('pointerout', () => s.tooltipManager?.hide());
+      hover.setDepth(12);
+      container.add(hover);
+    }
+
+    // ── Hire / Decline buttons, below the card (container-local coords) ──
+    const btnW = Math.round(cardW * 0.62);
+    const btnH = 30;
+    const btnY = cardH / 2 + 12;
+    const hireBtn = createActionButton(
+      s, -cardW / 2, btnY, btnW, 'Hire',
+      () => { s.onHireApplicant(); },
+      {
+        height: btnH,
+        fillColor: 0x224422,
+        fillAlpha: 0.9,
+        strokeColor: 0x44aa44,
+        textColor: '#88ff88',
+        fontSize: '13px',
+      },
+    );
+    hireBtn.setDepth(15);
+    container.add(hireBtn);
+
+    const declineBtn = createActionButton(
+      s, 0, btnY, btnW, 'Decline',
+      () => { s.onDeclineApplicant(); },
+      {
+        height: btnH,
+        fillColor: 0x442222,
+        fillAlpha: 0.9,
+        strokeColor: 0xaa4444,
+        textColor: '#ff8888',
+        fontSize: '13px',
+      },
+    );
+    declineBtn.setDepth(15);
+    container.add(declineBtn);
+
+    // ── Title + salary, above the card (container-local coords) ──
+    const hint = s.add.text(0, -cardH / 2 - 30, `Staff Applicant: ${card.name || 'Unknown'}`, {
+      fontSize: '14px',
+      fontStyle: 'bold',
+      color: '#ffdd88',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5, 0.5).setDepth(13);
+    container.add(hint);
+
+    const salaryText = s.add.text(0, -cardH / 2 - 12, `Salary: ${card.ongoingCost ?? 0}/turn`, {
+      fontSize: '11px',
+      color: '#ccaa66',
+      fontFamily: FONT_FAMILY,
+    }).setOrigin(0.5, 0.5).setDepth(14);
+    container.add(salaryText);
+
+    // ── Position from the SLL applicantOverlay zone, then walk on ──
+    // The container position must be set before the walk-on tween: the
+    // animator reads `container.x` as the destination.
+    const centerX = s.layout.applicantCenterX ?? Math.round(s.layout.gameW / 2);
+    const centerY = s.layout.applicantCenterY ?? Math.round(s.layout.gameH * 0.4);
+    container.setPosition(centerX, centerY);
+
+    if (s.msAnimator && !s.replayMode) {
+      s.msAnimator.animateApplicantWalkOn(container, cardW, cardH, s.settingsPanel?.reducedMotion);
+    }
+
+    return true;
   }
 }

@@ -141,17 +141,21 @@ describe('MainStreet two-tone cash line overlay', () => {
     expect(sepSeg!.style.color).toBe('#dddddd');
 
     // Laid out left-to-right: prefix left of income, income left of separator,
-    // separator left of cost — and the line is centred on the card (x 0).
+    // separator left of cost — right-column left-anchored (originX 0,
+    // x = -w/2+80) so it never overlaps the 64×64 graphic (CG-0MTORJ5FS006B0UN).
     expect(prefixSeg!.x).toBeLessThan(incomeSeg!.x);
     expect(incomeSeg!.x).toBeLessThan(sepSeg!.x);
     expect(sepSeg!.x).toBeLessThan(costSeg!.x);
 
-    // Group centred horizontally: leftmost edge ≈ -rightmost edge around x=0.
+    // Group left-anchored in the right column: left edge sits at spec x
+    // (-width/2+80, ≈12 for the 136-wide street render), not centred at 0.
     const leftEdge = prefixSeg!.x;
     const rightEdge = costSeg!.x + costSeg!.width;
-    expect(leftEdge).toBeLessThanOrEqual(0);
-    expect(rightEdge).toBeGreaterThanOrEqual(0);
-    expect(Math.abs(leftEdge + rightEdge)).toBeLessThan(2);
+    expect(leftEdge).toBeGreaterThan(0);
+    expect(rightEdge).toBeGreaterThan(leftEdge);
+    // Spec puts the line at x = -w/2+80 (≈12); allow tolerance for font metrics.
+    expect(leftEdge).toBeGreaterThanOrEqual(8);
+    expect(leftEdge).toBeLessThan(30);
   }, 30_000);
 
   it('renders a single green income segment when there is no ongoing cost', async () => {

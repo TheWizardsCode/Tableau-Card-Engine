@@ -18,10 +18,12 @@ import {
   purchaseEvent,
   refreshMarket,
   sellBusiness,
+  closeBusiness,
   playBusinessFromHand,
   playUpgradeFromHand,
   playEventFromHand,
   discardFromHand,
+  buyAndPlaceUpgrade,
 } from './MainStreetMarket';
 import {
   buyAndPlaceBusiness,
@@ -31,6 +33,7 @@ import {
   hireApplicantAction,
   declineApplicantAction,
   letGoStaffAction,
+  resolveEventChoice,
 } from './MainStreetEngine';
 
 // ── Action Budget Enforcement ────────────────────────────────
@@ -57,11 +60,15 @@ interface MarketActionSnapshot {
   incidentDeck: any | null;
   activityLog: any | null;
   soldSlots: boolean[] | null;
+  /**
+   * Unified discard pile — captured so undoing a Close restores the removed
+   * card (`closeBusiness` pushes it to `discardPile`).
+   */
+  discardPile: any | null;
   /** Grand Opening placement gate — captured so undo restores the per-turn flag. */
   businessPlacedThisTurn: boolean | null;
   /** Daily action budget — captured so undo restores the spent action. */
-  actionsRemaining: number | null;
-  /** Banked actions — captured so undo restores the banking state. */
+  actionsRemaining: number | null;  /** Banked actions — captured so undo restores the banking state. */
   bankedActions: number | null;
   /** Staff peek gate — captured so undo restores the once-per-turn flag. */
   peekUsedThisTurn: boolean | null;
@@ -71,6 +78,21 @@ interface MarketActionSnapshot {
   pendingApplicant: any | null;
   /** Staff roster — captured so undo restores the staff list. */
   staffCards: any | null;
+  /** Same-day upgrade composite tracker (CG-0MT3IYSRL001VVUP). */
+  justMovedUpgradeCardId: string | null;
+  /** Same-day event composite tracker (CG-0MTFWBNL30043ZBM). */
+  justMovedEventCardId: string | null;
+  /**
+   * Pending dual-choice incident (CG-0MTSHG8RP008E128). Captured so undoing
+   * a choice returns to the unresolved pending state with the event still in
+   * play (AC10 parent / AC1 undo child).
+   */
+  pendingEventChoice: any | null;
+  /**
+   * Active duration effects. Captured so undoing a choice that accepted a
+   * DurationEventCard removes the effect it pushed.
+   */
+  activeEffects: any | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -97,7 +119,12 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     hand: safeClone(state.hand ?? []),
     incidentDeck: safeClone(state.incidentDeck),
     activityLog: safeClone(state.activityLog),
-    soldSlots: safeClone(state.soldSlots ?? new Array(10).fill(false)) as boolean[],
+    soldSlots: safeClone(
+      state.soldSlots ?? new Array<boolean>(state.streetGrid?.length ?? 10).fill(false),
+    ) as boolean[],
+    // Unified discard pile — captured so undoing a Close restores the removed
+    // card (the card is pushed to `discardPile` by `closeBusiness`).
+    discardPile: safeClone(state.discardPile ?? []),
     businessPlacedThisTurn: (state as any).businessPlacedThisTurn ?? false,
     actionsRemaining: state.actionsRemaining,
     bankedActions: state.bankedActions ?? 0,
@@ -105,6 +132,10 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     revealedPeekedCard: state.revealedPeekedCard ?? null,
     pendingApplicant: safeClone((state as any).pendingApplicant ?? null),
     staffCards: safeClone(state.staffCards ?? []),
+    justMovedUpgradeCardId: (state as any).justMovedUpgradeCardId ?? null,
+    justMovedEventCardId: (state as any).justMovedEventCardId ?? null,
+    pendingEventChoice: safeClone((state as any).pendingEventChoice ?? null),
+    activeEffects: safeClone(state.activeEffects ?? []),
   };
 }
 
@@ -120,7 +151,8 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   state.hand = snap.hand as any;
   state.incidentDeck = snap.incidentDeck as any;
   state.activityLog = snap.activityLog as any;
-  state.soldSlots = snap.soldSlots ?? new Array(10).fill(false);
+  state.soldSlots = snap.soldSlots ?? new Array<boolean>(state.streetGrid?.length ?? 10).fill(false);
+  state.discardPile = (snap.discardPile ?? []) as any;
   if (snap.businessPlacedThisTurn !== null && snap.businessPlacedThisTurn !== undefined) {
     (state as any).businessPlacedThisTurn = snap.businessPlacedThisTurn;
   }
@@ -141,6 +173,18 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   }
   if ('staffCards' in snap) {
     state.staffCards = snap.staffCards;
+  }
+  if ('justMovedUpgradeCardId' in snap) {
+    (state as any).justMovedUpgradeCardId = snap.justMovedUpgradeCardId;
+  }
+  if ('justMovedEventCardId' in snap) {
+    (state as any).justMovedEventCardId = snap.justMovedEventCardId;
+  }
+  if ('pendingEventChoice' in snap) {
+    (state as any).pendingEventChoice = snap.pendingEventChoice;
+  }
+  if ('activeEffects' in snap) {
+    state.activeEffects = snap.activeEffects ?? [];
   }
 }
 
@@ -219,9 +263,9 @@ export function moveToHandCommand(
 }
 
 /**
- * Command: Move an event card to hand (FREE — buy-event is a non-action
- * operation per the action economy, CG-0MSTOF1N5005PK2R). Events use the
- * cost-at-play deferral model: the move itself costs no coins.
+ * Command: Move an event card to hand (costs 1 daily action — buy-event is
+ * an action-type operation under the action economy, CG-0MTFWBNL30043ZBM).
+ * Events use the cost-at-play deferral model: the move itself costs no coins.
  */
 export function moveEventToHandCommand(
   state: MainStreetState,
@@ -304,17 +348,47 @@ export function playBusinessFromHandCommand(
   );
 }
 
-/** Command: Play Upgrade from Hand (cost-at-play) */
+/**
+ * Command: Play Upgrade from Hand (cost-at-play).
+ *
+ * Same-day composite (CG-0MT3IYSRL001VVUP): if the upgrade at handIndex is
+ * the same card just moved from market to hand this turn (justMovedUpgradeCardId),
+ * the play is free — the move already consumed the action. Otherwise consumes 1 action.
+ *
+ * Premium-aware: when `premiumCost` is supplied the +50% premium REPLACES
+ * the action (drag buy-and-play at 0 actions remaining) — no action consumed.
+ */
 export function playUpgradeFromHandCommand(
   state: MainStreetState,
   handIndex: number,
   targetSlot?: number,
+  premiumCost?: number,
 ) {
   return toCommand(
     state,
     snapshotAction(
-      (s) => playUpgradeFromHand(s, handIndex, targetSlot),
-      `PlayUpgradeFromHand ${handIndex}`,
+      (s) => {
+        if (premiumCost !== undefined) {
+          // Premium replaces the action — no consumeAction (mirrors playBusinessFromHandCommand).
+        } else {
+          const card = (s.hand ?? [])[handIndex];
+          const isSameDayComposite = card != null && s.justMovedUpgradeCardId != null && s.justMovedUpgradeCardId === (card as any).id;
+          if (!isSameDayComposite) {
+            consumeAction(s);
+          }
+          // Clear composite tracker after play (whether same-day or held).
+          if (s.justMovedUpgradeCardId != null && card != null && s.justMovedUpgradeCardId === (card as any).id) {
+            s.justMovedUpgradeCardId = null;
+          }
+        }
+        // Delegate to engine helper — premiumCost currently not threading into
+        // playUpgradeFromHand (upgrade premium is charged in buyAndPlaceUpgrade only);
+        // kept for API parity with playBusinessFromHandCommand.
+        playUpgradeFromHand(s, handIndex, targetSlot);
+      },
+      premiumCost !== undefined
+        ? `PlayUpgradeFromHand ${handIndex} (premium ${premiumCost})`
+        : `PlayUpgradeFromHand ${handIndex}`,
     ),
   );
 }
@@ -365,6 +439,37 @@ export function buyAndPlaceBusinessCommand(
   );
 }
 
+/**
+ * Command: Buy & Place Upgrade directly onto a business (drag-drop path,
+ * CG-0MT3IYSRL001VVUP). Consumes 1 action and charges the +50% premium
+ * (Math.ceil(cost * 1.5 * 2) / 2, matching business buy-and-place).
+ *
+ * @param priceOverride Optional price to charge instead of the +50% premium
+ *                      (listed cost for GM parity on 2-action days — when
+ *                      supplied, still consumes 1 action).
+ * @param extraActions  Additional daily actions to consume (GM parity — 1 on
+ *                      Golden Mile days where the composite consumes 2 actions).
+ */
+export function buyAndPlaceUpgradeCommand(
+  state: MainStreetState,
+  cardId: string,
+  targetSlot?: number,
+  priceOverride?: number,
+  extraActions: number = 0,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => {
+        for (let i = 0; i < extraActions; i += 1) consumeAction(s);
+        consumeAction(s);
+        buyAndPlaceUpgrade(s, cardId, targetSlot, priceOverride);
+      },
+      `BuyAndPlaceUpgrade ${cardId} -> slot ${targetSlot ?? 'auto'}`,
+    ),
+  );
+}
+
 /** Command: Hire Staff from market (consumes 1 action) */
 export function hireStaffCardCommand(
   state: MainStreetState,
@@ -408,6 +513,40 @@ export function sellBusinessCommand(
 }
 
 /**
+ * Command: Close Business (costs 1 daily action, no coins).
+ *
+ * The card is removed from the street grid entirely (slot -> null) and pushed
+ * to the unified `discardPile`, freeing the slot for later placement. The
+ * action cost goes through the command layer's `consumeAction` — the single
+ * shared enforcement point (CG-0MTCP7F9S009HARC) — so `actionsRemaining` and
+ * `bankedActions` (floor 0) decrement in lock-step with every other
+ * action-consuming operation. `closeBusiness` itself is free of action logic,
+ * so the cost is charged exactly once.
+ *
+ * The pre-snapshot (which now includes `discardPile`) makes the whole close
+ * reversible via the shared undo manager: undo restores the card, slot,
+ * discard pile, action budget, and activity log.
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street grid slot index of the card to close.
+ */
+export function closeBusinessCommand(
+  state: MainStreetState,
+  slotIndex: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => {
+        consumeAction(s);
+        closeBusiness(s, slotIndex);
+      },
+      `CloseBusiness slot ${slotIndex}`,
+    ),
+  );
+}
+
+/**
  * Command: Hire the pending staff applicant (CG-0MSTOATDU006UGAX, 0 cost, no hand slots).
  */
 export function hireApplicantCommand(state: MainStreetState) {
@@ -429,6 +568,35 @@ export function declineApplicantCommand(state: MainStreetState) {
     snapshotAction(
       (s) => { declineApplicantAction(s); },
       'DeclineApplicant',
+    ),
+  );
+}
+
+/**
+ * Command: Resolve the pending dual-choice incident (CG-0MTSHG8RP008E128).
+ *
+ * Accept applies the event's effect + pushes the accept-next card; Reject
+ * refuses the effect + pushes the reject-next card. Because the command is
+ * snapshot-based (pre-capture includes the unresolved `pendingEventChoice`,
+ * the incident deck WITHOUT the escalation, the resource bank BEFORE the
+ * effect, and active effects), undo returns to the unresolved pending state
+ * with the event still in play — escalation removed, resources restored
+ * (AC10 parent / AC1+AC4 undo child).
+ *
+ * @param state  Current game state.
+ * @param option The player's (or AI's) decision.
+ */
+export function resolveEventChoiceCommand(
+  state: MainStreetState,
+  option: 'accept' | 'reject',
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => {
+        resolveEventChoice(s, option);
+      },
+      `ResolveEventChoice ${option}`,
     ),
   );
 }

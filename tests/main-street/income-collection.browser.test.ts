@@ -75,6 +75,26 @@ async function bootGame(options: { width?: number; height?: number } = {}): Prom
   return game;
 }
 
+/**
+ * Replaces the scene's incident deck with non-choice, budget-safe incidents
+ * so controller end-of-turn tests never pause on a dual-choice dialog
+ * (content CG-0MTT7FC7A000AA58 ships choice events in the full deck). These
+ * tests exercise income presentation / turn-advance wiring, not the choice
+ * mechanic (covered by the dedicated event-choice-dialog suites).
+ */
+async function makeIncidentsNonChoice(game: Phaser.Game): Promise<void> {
+  const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+  const state = scene.state as { incidentDeck: Array<{ id: string }> };
+  const templates = (await import('../../example-games/main-street/MainStreetCards')).getEventTemplates();
+  const safeIds = ['evt-award', 'evt-good-press', 'evt-graffiti-art', 'evt-street-cleaning'];
+  const picked = templates.filter((t) => safeIds.includes(t.id));
+  state.incidentDeck.length = 0;
+  state.incidentDeck.push(
+    ...picked.map((t, i) => ({ ...t, id: `${t.id}-${i}` })),
+    ...picked.map((t, i) => ({ ...t, id: `${t.id}-${i + 10}` })),
+  ) as never;
+}
+
 function destroyGame(game: Phaser.Game | null): void {
   if (game) {
     game.destroy(true, false);
@@ -146,6 +166,7 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
 
   it('routes per-slot phase data into animateIncomePhases and defers the day start', async () => {
     game = await bootGame();
+    await makeIncidentsNonChoice(game);
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     // Let the boot-time card-SVG prewarm's deferred refreshAll() settle
@@ -231,6 +252,7 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
 
   it('keeps the compact collection during the tutorial (day start inside the usual window)', async () => {
     game = await bootGame();
+    await makeIncidentsNonChoice(game);
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     // Simulate an active tutorial: the controller must keep the compact,
@@ -281,6 +303,7 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
 
   it('never blocks the turn advance when the animator throws', async () => {
     game = await bootGame();
+    await makeIncidentsNonChoice(game);
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     const state = scene.state as {

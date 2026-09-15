@@ -25,6 +25,7 @@ import {
   MARKET_BUSINESS_MAX,
   MARKET_UPGRADE_MAX,
   MARKET_EVENT_MAX,
+  MARKET_STAFF_MAX,
   type BusinessCard,
   type UpgradeCard,
 } from '../../example-games/main-street/MainStreetCards';
@@ -440,13 +441,16 @@ describe('MainStreetMarket', () => {
       );
       const upgrades = state.market.cards.filter(c => c.family === 'upgrade');
       const events = state.market.cards.filter(c => c.family === 'event');
+      const staff = state.market.cards.filter(c => c.family === 'staff');
       expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
       expect(business.length).toBeGreaterThanOrEqual(MARKET_BUSINESS_MIN);
       expect(business.length).toBeLessThanOrEqual(MARKET_BUSINESS_MAX);
       expect(upgrades.length).toBeLessThanOrEqual(MARKET_UPGRADE_MAX);
       expect(events.length).toBeLessThanOrEqual(MARKET_EVENT_MAX);
-      // Exactly 3 cards means only the valid combos can appear.
-      expect(business.length + upgrades.length + events.length).toBe(MARKET_TOTAL_SLOTS);
+      expect(staff.length).toBeLessThanOrEqual(MARKET_STAFF_MAX);
+      // Exactly 3 cards means only the valid combos can appear (a staff card
+      // may occupy the non-business slot, CG-0MT3KZNQB0053K55).
+      expect(business.length + upgrades.length + events.length + staff.length).toBe(MARKET_TOTAL_SLOTS);
     });
 
     it('should decrease investments row size by one after purchasing an upgrade (no immediate refill)', () => {
@@ -646,6 +650,7 @@ describe('MainStreetMarket', () => {
       // making the reshuffle assertion independent of the seeded RNG picks.
       state.market.cards = [];
       state.decks.upgrade = [];
+      state.decks.staff = []; // staff could otherwise fill the third slot
       state.hand = [];
       refillMarket(state);
 
@@ -674,7 +679,7 @@ describe('MainStreetMarket', () => {
   });
 
   describe('unique event templates', () => {
-    it('should have 56 unique event templates across the event deck and incident deck', () => {
+    it('should have 64 unique event templates across the event deck and incident deck', () => {
       const state = createTestState();
       // Count unique event templates by stripping the copy-number suffix.
       // Incidents live in incidentDeck; Investment-trigger events in decks.event.
@@ -682,8 +687,8 @@ describe('MainStreetMarket', () => {
         ...state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
         ...state.incidentDeck.map(e => e.id.replace(/-\d+$/, '')),
       ]);
-      // 56 = 37 + 8 Group C investment events + 10 Group D incidents + 1 Graffiti Art (CG-0MSRC9UR9006FBXC)
-      expect(uniqueTemplateIds.size).toBe(56);
+      // 64 = 56 baseline + 8 chain-event templates (CG-0MTT7FC7A000AA58).
+      expect(uniqueTemplateIds.size).toBe(64);
     });
   });
 });

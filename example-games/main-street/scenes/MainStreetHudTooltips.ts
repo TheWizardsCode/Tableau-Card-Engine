@@ -98,7 +98,7 @@ export const HUD_TOOLTIP_STRINGS = {
   scoreAllTiersUnlocked: 'All tiers unlocked',
   actionTitle: 'Actions This Day',
   actionRemainingLabel: 'Actions remaining',
-  actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff',
+  actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff, close business',
   actionFreeOpsLabel: 'Free: re-roll market, sell, discard, end turn',
   actionBankedLabel: 'Banked actions',
   actionBankingExplain: "1 action per turn, with up to two turns' unused actions banked — every action you take spends 1 from the bank (down to 0), so banked actions are a finite reserve, not a permanent bonus",
@@ -132,10 +132,13 @@ registerLocale('en', enBundle);
 /**
  * Builds the tooltip content string for the Coins HUD element.
  *
- * Shows:
- * - Base income this turn (pre-reputation multiplier)
- * - Multiplied income (post-reputation multiplier)
- * - Brief calculation note
+ * Single source preview of the CG-0MTINZ5GG007BH44 economy (Q1=c — see
+ * MainStreetDifficulty header): sums cached currentIncome, then applies
+ * the same reputationCoinMultiplier / applyReputationMultiplier as
+ * MainStreetAdjacency.applyIncome so the tooltip's ×N and post-multiplier
+ * total agree with the credited income when the multiplier is sampled
+ * after income's own rep accrual. Q2 shows 3 decimals so lifts like
+ * 1.0375 render as ×1.038, not the misleading ×1.0 of toFixed(1).
  */
 export function buildCoinsTooltip(state: MainStreetState): string {
   const soldSlots = state.soldSlots ?? [];
@@ -155,7 +158,9 @@ export function buildCoinsTooltip(state: MainStreetState): string {
     state.config,
   );
   const multiplier = reputationCoinMultiplier(state.resourceBank.reputation, state.config);
-  const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
+  // CG-0MTINZ5GG007BH44 (Q2): show 3 decimals so lifts like 1.0375 render as
+  // ×1.038 instead of the misleading ×1.0 from toFixed(1).
+  const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(3) : '1.000';
 
   const preMultiplierStr = Number.isFinite(baseIncome) ? String(Math.round(baseIncome)) : '0';
   const postMultiplierStr = Number.isFinite(multipliedIncome) ? String(Math.round(multipliedIncome)) : '0';
@@ -172,6 +177,10 @@ export function buildCoinsTooltip(state: MainStreetState): string {
 
 /**
  * Builds the full IncomeResult for external use (e.g. tests).
+ *
+ * Preview-only base totals (no difficulty/buff/multiplier deltas); the
+ * credited path is applyIncome which samples the rep multiplier at Q1=c
+ * per the MainStreetDifficulty header.
  */
 export function getIncomeResult(state: MainStreetState): IncomeResult {
   const soldSlots = state.soldSlots ?? [];
@@ -220,15 +229,14 @@ export function getIncomeResult(state: MainStreetState): IncomeResult {
 /**
  * Builds the tooltip content string for the Reputation HUD element.
  *
- * Shows:
- * - Current reputation value
- * - Active coin multiplier (numeric)
- * - Short explanation of reputation effect on income
+ * Reads the same reputationCoinMultiplier single source (Q1=c) and
+ * Q2 3-decimal display as buildCoinsTooltip.
  */
 export function buildReputationTooltip(state: MainStreetState): string {
   const rep = state.resourceBank.reputation;
   const multiplier = reputationCoinMultiplier(rep, state.config);
-  const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(1) : '1.0';
+  // CG-0MTINZ5GG007BH44 (Q2): 3-decimal display.
+  const multiplierStr = Number.isFinite(multiplier) ? multiplier.toFixed(3) : '1.000';
 
   const lines = [
     t(HUD_TOOLTIP_I18N_KEYS.repTitle),

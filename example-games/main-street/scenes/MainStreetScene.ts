@@ -10,7 +10,9 @@ import type { SelectionController, SingleSelectionManager } from '../../../src/u
 import { SaveLoadStore, CheckpointManager } from '../../../src/core-engine';
 import { UndoRedoManager } from '../../../src/core-engine';
 import type { DragDropManager } from '../../../src/ui';
-import type { MainStreetSerializedState } from '../MainStreetState';
+import type { MainStreetSerializedState, PendingApplicant } from '../MainStreetState';
+import { setStreetGridLattice } from '../MainStreetState';
+import { hireStaffApplicant, declineStaffApplicant } from '../MainStreetEngine';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetAnimator } from './MainStreetAnimator';
 import { MainStreetTurnController } from './MainStreetTurnController';
@@ -23,7 +25,21 @@ import {
   type SceneLayout,
   STREET_ROWS,
 } from './MainStreetConstants';
+import {
+  type StreetCameraState,
+  type StreetLatticeDims,
+  clampStreetCamera,
+  clampZoomLevel,
+  defaultStreetCamera,
+  localToScreen,
+  panStreetCamera,
+  screenToLocal,
+  visibleMapSlots,
+  zoomInLevel,
+  zoomOutLevel,
+} from '../MainStreetMapView';
 import { createMarketCardCheatTool } from '../../../src/ui/debug/MarketCardCheatOverlay';
+import { createStaffApplicantCheatTool } from '../../../src/ui/debug/StaffApplicantCheatOverlay';
 import { createSessionExportTool } from '../../../src/ui/debug/SessionExportTool';
 import { createStateInspectorTool } from '../../../src/ui/debug/StateInspectorOverlay';
 import { createGameEventLogTool } from '../../../src/ui/debug/GameEventLogOverlay';
@@ -35,7 +51,9 @@ type UIPhase =
   | 'placing-business'   // Player selected a business card, picking a slot
   | 'placing-from-hand'  // Player bought a card to hand, click a slot to place it
   | 'animating'          // Brief pause for feedback
-  | 'game-over';         // Final overlay
+  | 'game-over'          // Final overlay
+  | 'applicant'          // Staff applicant overlay: Hire / Decline (CG-0MSTOATDU006UGAX)
+  ;
 
 export class MainStreetScene extends CardGameScene {
   /**
@@ -52,8 +70,11 @@ export class MainStreetScene extends CardGameScene {
     skillRating?: import('../../../src/ui/SettingsPanel').SkillRatingConfig,
     debugTools?: import('../../../src/ui/debug/DebugToolsRegistry').DebugToolsEntry[],
   ): void {
+    // Escape cancels an in-progress hand-card targeting phase before it opens
+    // the settings panel (CG-0MT3IYSRL001VVUP).
+    const vetoToggle = () => this.settingsToggleAllowed();
     if (debugTools !== undefined) {
-      super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools);
+      super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools, vetoToggle);
       return;
     }
     if (import.meta.env.DEV) {
@@ -63,10 +84,23 @@ export class MainStreetScene extends CardGameScene {
         createGameEventLogTool(),
         createAiDecisionViewerTool(),
         createMarketCardCheatTool(),
-      ]);
+        createStaffApplicantCheatTool(),
+      ], vetoToggle);
       return;
     }
-    super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools);
+    super.initSettingsPanel(difficultyNames, defaultDifficulty, hasTooltips, skillRating, debugTools, vetoToggle);
+  }
+
+  /**
+   * Whether the settings-panel toggle key may act.
+   *
+   * While a hand-card targeting phase is active, Escape is reserved for
+   * cancelling that targeting (CG-0MT3IYSRL001VVUP); otherwise Escape toggles
+   * the settings panel as usual. The panel can always be closed with Escape.
+   */
+  private settingsToggleAllowed(): boolean {
+    if (this.settingsPanel?.isOpen) return true;
+    return !(this.msTurnController?.hasPendingTargeting?.() ?? false);
   }
   public tooltipManager?: TooltipManager;
   public msRenderer!: MainStreetRenderer;
@@ -129,8 +163,78 @@ export class MainStreetScene extends CardGameScene {
   // day, or undo.
   public justMovedHandCardId: string | null = null;
 
+  /**
+   * Pending staff applicant for the current day (CG-0MSTOATDU006UGAX).
+   * Mirrored from `state.pendingApplicant` at startup / day-start for the
+   * scene's uiPhase decision. Null when no applicant is present.
+   */
+  public pendingApplicant: PendingApplicant | null = null;
+
+  /**
+   * The applicant overlay container rendered by MainStreetRenderer.refreshApplicant.
+   * Created lazily on first applicant presentation, cleaned up when the phase ends.
+   */
+  public applicantOverlayContainer: Phaser.GameObjects.Container | null = null;
+
+  /**
+   * Id of the applicant card currently rendered in `applicantOverlayContainer`.
+   * `refreshApplicant()` renders each applicant exactly once, so a repeated
+   * `refreshAll()` never rebuilds the card face or replays the walk-on tween
+   * (CG-0MSTOATDU006UGAX).
+   */
+  public applicantRenderedId: string | null = null;
+
+  /**
+   * True while a hire/decline walk tween is playing. `refreshApplicant()`
+   * leaves the overlay untouched during the animation so the tween's target
+   * is never destroyed mid-flight (CG-0MSTOATDU006UGAX).
+   */
+  public applicantAnimating = false;
+
   // Computed responsive layout metrics
   public layout!: SceneLayout;
+
+  // ── Street-map camera (CG-0MTH9OVMC001V44E) ──────────────
+  //
+  // The street board is viewed through a map-style camera: zoom level 1 is the
+  // legacy framing (scale 1, identity transform) and each level up zooms the
+  // map out to reveal neighbouring street cells. Zoom/pan is always available
+  // — never gated by milestones, turns, or resources.
+  //
+  // The camera is scene-owned (not part of `state`) because it is a pure view
+  // concern: gameplay, adjacency, and save/load stay camera-independent. The
+  // serialization slice of this epic can persist it via
+  // `getStreetCameraForTest()` / `setStreetCameraState()`.
+  public streetCamera: StreetCameraState = { zoomLevel: 1, focusX: 0, focusY: 0 };
+  /** True once the camera has been seeded from the computed layout. */
+  private streetCameraReady = false;
+  /**
+   * Displayed street lattice, in street cells. A 1×1 lattice (the default and
+   * the shipping board) renders exactly the pre-camera 10-slot street. Larger
+   * lattices reveal neighbouring streets as view-only cells; making them
+   * playable is the viewport-rendering slice of the same epic.
+   */
+  public streetViewLattice: StreetLatticeDims = { cols: 1, rows: 1 };
+  /**
+   * Playable street lattice, in street cells. Defaults to 1×1 (the shipping
+   * board). `setStreetPlayableLattice()` grows the playable grid (re-indexing
+   * the state by world position, `setStreetGridLattice`) so revealed
+   * neighbouring streets, shared seams and four-way intersections become
+   * placeable (CG-0MTH9OW0H0005VKE).
+   */
+  public streetPlayableLattice: StreetLatticeDims = { cols: 1, rows: 1 };
+  /** Mask graphics clipping the street map to its viewport band. */
+  public streetMapMaskGraphics: Phaser.GameObjects.Graphics | null = null;
+  /** Zoom control objects (owned by `hudContainer`, rebuilt on refresh). */
+  public streetZoomControls: Phaser.GameObjects.GameObject[] = [];
+  /** Active drag-to-pan gesture on the street backdrop (null when idle). */
+  public streetPanDrag: { lastX: number; lastY: number } | null = null;
+  /**
+   * Signature of the street slot set currently rendered. Zooming/panning only
+   * rebuilds the street layer when the visible slot set actually changes, so
+   * smooth panning does not re-create game objects on every pointer move.
+   */
+  private streetRenderedKey = '';
 
   // Display containers
   public hudContainer!: Phaser.GameObjects.Container;
@@ -389,6 +493,275 @@ export class MainStreetScene extends CardGameScene {
   public refreshStreetGrid(...args: any[]): any {
     return (this.msRenderer as any).refreshStreetGrid.apply(this.msRenderer, args);
   }
+
+  // ── Street-map camera (CG-0MTH9OVMC001V44E) ──────────────
+
+  /**
+   * Seeds the camera from the computed layout (once) and re-clamps it against
+   * the current layout/lattice. Safe to call repeatedly — `handleResize()`
+   * recomputes `layout`, and re-clamping keeps the map framed.
+   */
+  public ensureStreetCamera(): void {
+    if (!this.layout) return;
+    if (!this.streetCameraReady) {
+      this.streetCamera = defaultStreetCamera(this.layout);
+      this.streetCameraReady = true;
+    }
+    this.streetCamera = clampStreetCamera(this.streetCamera, this.layout, this.streetViewLattice);
+  }
+
+  /** Public snapshot of the camera state (used by tests and save/load). */
+  public getStreetCameraState(): StreetCameraState {
+    this.ensureStreetCamera();
+    return { ...this.streetCamera };
+  }
+
+  /**
+   * Restores a previously captured camera state (used by tests and, later, by
+   * checkpoint resume). The value is clamped to the current lattice.
+   */
+  public setStreetCameraState(camera: Partial<StreetCameraState> | null | undefined): void {
+    if (!camera || !this.layout) return;
+    this.streetCamera = clampStreetCamera(
+      {
+        zoomLevel: camera.zoomLevel ?? this.streetCamera.zoomLevel,
+        focusX: camera.focusX ?? this.streetCamera.focusX,
+        focusY: camera.focusY ?? this.streetCamera.focusY,
+      },
+      this.layout,
+      this.streetViewLattice,
+    );
+    this.streetCameraReady = true;
+    this.applyStreetCamera(false);
+    this.syncStreetRender();
+  }
+
+  /**
+   * Copies the live scene camera into `state.streetCamera` so the next
+   * checkpoint/save captures the current zoom + pan (CG-0MTH9OWF2002YQQ3).
+   * No-op when there is no state (e.g. before setup).
+   */
+  public syncStreetCameraToState(): void {
+    if (!this.state) return;
+    this.state.streetCamera = this.getStreetCameraState();
+  }
+
+  /**
+   * Restores the scene camera from `state.streetCamera` after a save is
+   * rehydrated (CG-0MTH9OWF2002YQQ3). Missing/degenerate values fall back to
+   * the default camera, and the value is clamped to the current lattice.
+   * No-op when there is no state or layout.
+   */
+  public syncStreetCameraFromState(): void {
+    if (!this.state || !this.layout) return;
+    const saved = this.state.streetCamera;
+    this.setStreetCameraState(saved ?? undefined);
+  }
+
+  /**
+   * Re-renders the street layer only when the set of visible slots changed.
+   * Called after every camera change; the transform itself is applied
+   * separately so panning stays cheap.
+   */
+  private syncStreetRender(): void {
+    if (!this.layout) return;
+    const key = visibleMapSlots(
+      this.streetCamera,
+      this.layout,
+      this.streetViewLattice,
+      this.streetPlayableLattice,
+    )
+      .map((node) => `${node.cellX},${node.cellY},${node.slotIndex},${node.gameplayIndex}`)
+      .join('|');
+    if (key === this.streetRenderedKey) return;
+    this.streetRenderedKey = key;
+    this.refreshStreetGrid();
+  }
+
+  /**
+   * Sets the map zoom level (1 = legacy framing, higher = zoomed out) and
+   * re-applies the street transform. Zoom is always available.
+   */
+  public setStreetZoomLevel(zoomLevel: number, animate = true): void {
+    this.ensureStreetCamera();
+    this.streetCamera = clampStreetCamera(
+      { ...this.streetCamera, zoomLevel: clampZoomLevel(zoomLevel) },
+      this.layout,
+      this.streetViewLattice,
+    );
+    // Apply the transform first so an animated zoom tweens from the old
+    // framing; the visibility sync then re-renders without interrupting it.
+    this.applyStreetCamera(animate);
+    this.syncStreetRender();
+  }
+
+  /** Zooms the street map out by one level (reveals neighbouring streets). */
+  public zoomStreetOut(animate = true): void {
+    this.setStreetZoomLevel(zoomOutLevel(this.streetCamera.zoomLevel), animate);
+  }
+
+  /** Zooms the street map in by one level (back toward the legacy framing). */
+  public zoomStreetIn(animate = true): void {
+    this.setStreetZoomLevel(zoomInLevel(this.streetCamera.zoomLevel), animate);
+  }
+
+  /** Pans the street map by a screen-pixel delta (clamped to the map bounds). */
+  public panStreetBy(dxScreen: number, dyScreen: number): void {
+    this.ensureStreetCamera();
+    this.streetCamera = panStreetCamera(
+      this.streetCamera,
+      dxScreen,
+      dyScreen,
+      this.layout,
+      this.streetViewLattice,
+    );
+    this.applyStreetCamera(false);
+    this.syncStreetRender();
+  }
+
+  /** Returns the map to the default 1× framing. */
+  public resetStreetCamera(animate = true): void {
+    if (!this.layout) return;
+    this.streetCamera = defaultStreetCamera(this.layout);
+    this.streetCameraReady = true;
+    this.applyStreetCamera(animate);
+    this.syncStreetRender();
+  }
+
+  /**
+   * Sets the number of street cells displayed by the map (each cell is a 2×5
+   * street). Neighbouring cells are view-only until the expanded-grid slices
+   * make them playable. Always keeps the playable board's origin cell anchored
+   * so the 1× framing is unchanged.
+   */
+  public setStreetViewLattice(cols: number, rows: number): void {
+    const lattice: StreetLatticeDims = {
+      cols: Math.max(1, Math.floor(cols)),
+      rows: Math.max(1, Math.floor(rows)),
+    };
+    this.streetViewLattice = lattice;
+    this.ensureStreetCamera();
+    this.streetRenderedKey = '';
+    this.applyStreetCamera(true);
+    this.syncStreetRender();
+  }
+
+  /** Current displayed street lattice (view cells). */
+  public getStreetViewLattice(): StreetLatticeDims {
+    return { ...this.streetViewLattice };
+  }
+
+  /** Current playable street lattice (street cells the player can build on). */
+  public getStreetPlayableLattice(): StreetLatticeDims {
+    return { ...this.streetPlayableLattice };
+  }
+
+  /** Visible, de-duplicated street-map slots (test/introspection hook). */
+  public getVisibleStreetNodes(): any[] {
+    return this.msRenderer?.getVisibleStreetNodes?.() ?? [];
+  }
+
+  /**
+   * Grows (or shrinks) the playable street board to a `cols`×`rows` lattice of
+   * street cells (CG-0MTH9OW0H0005VKE).
+   *
+   * The state grid is re-indexed by world position (see
+   * `MainStreetState.setStreetGridLattice`), so placed cards, sold flags and
+   * ownership tags survive the change; plots outside a shrunken board are
+   * dropped. The displayed view lattice is grown to at least the playable size
+   * so every playable street is visible, then the street layer is rebuilt.
+   *
+   * Defaults to 1×1, so the shipping game is unchanged unless a caller expands
+   * the board.
+   */
+  public setStreetPlayableLattice(cols: number, rows: number): void {
+    const next: StreetLatticeDims = {
+      cols: Math.max(1, Math.floor(cols)),
+      rows: Math.max(1, Math.floor(rows)),
+    };
+    if (this.state) setStreetGridLattice(this.state, next.cols, next.rows);
+    this.streetPlayableLattice = next;
+
+    // Ensure the revealed lattice covers the playable board.
+    const view = this.streetViewLattice;
+    if (view.cols < next.cols || view.rows < next.rows) {
+      this.setStreetViewLattice(Math.max(view.cols, next.cols), Math.max(view.rows, next.rows));
+    }
+    this.ensureStreetCamera();
+    this.streetRenderedKey = '';
+    this.applyStreetCamera(false);
+    this.syncStreetRender();
+  }
+
+  /**
+   * Applies the camera to the street layer (container scale/position plus the
+   * viewport mask). Delegates to the renderer, which owns the Phaser objects.
+   * Zoom animations are skipped under reduced motion (`animate` is ignored).
+   */
+  public applyStreetCamera(animate = false): void {
+    this.ensureStreetCamera();
+    (this.msRenderer as any)?.applyStreetCamera?.(animate);
+  }
+
+  /** Rebuilds the zoom control cluster (always-available +/- buttons). */
+  public refreshStreetZoomControls(): void {
+    (this.msRenderer as any)?.refreshStreetZoomControls?.();
+  }
+
+  /** Converts a map-local point of the street layer to canvas coordinates. */
+  public streetLocalToScreen(point: { x: number; y: number }): { x: number; y: number } {
+    this.ensureStreetCamera();
+    return localToScreen(point, this.streetCamera, this.layout);
+  }
+
+  /** Converts canvas coordinates into street map-local space. */
+  public streetScreenToLocal(point: { x: number; y: number }): { x: number; y: number } {
+    this.ensureStreetCamera();
+    return screenToLocal(point, this.streetCamera, this.layout);
+  }
+
+  /**
+   * Test/API hook returning the current camera together with the derived
+   * container transform, so browser tests can assert the framed view.
+   */
+  public getStreetCameraForTest(): {
+    camera: StreetCameraState;
+    lattice: StreetLatticeDims;
+    scale: number;
+    containerX: number;
+    containerY: number;
+  } {
+    const camera = this.getStreetCameraState();
+    const container = this.streetContainer;
+    return {
+      camera,
+      lattice: this.getStreetViewLattice(),
+      scale: container?.scaleX ?? 1,
+      containerX: container?.x ?? 0,
+      containerY: container?.y ?? 0,
+    };
+  }
+
+  /**
+   * Initialises the street-map camera and its always-available controls.
+   * Called once from the lifecycle `create()` after the containers exist.
+   */
+  public initStreetCamera(): void {
+    this.ensureStreetCamera();
+    (this.msRenderer as any)?.installStreetMapMask?.();
+    (this.msInputManager as any)?.initStreetCameraControls?.();
+    this.streetRenderedKey = this.layout
+      ? visibleMapSlots(
+          this.streetCamera,
+          this.layout,
+          this.streetViewLattice,
+          this.streetPlayableLattice,
+        )
+          .map((node) => `${node.cellX},${node.cellY},${node.slotIndex},${node.gameplayIndex}`)
+          .join('|')
+      : '';
+    this.applyStreetCamera(false);
+  }
   public drawBusinessSlot(...args: any[]): any {
     return (this.msRenderer as any).drawBusinessSlot.apply(this.msRenderer, args);
   }
@@ -477,6 +850,9 @@ export class MainStreetScene extends CardGameScene {
   }
   public onHandBusinessCardClick(...args: any[]): any {
     return (this.msTurnController as any).onHandBusinessCardClick.apply(this.msTurnController, args);
+  }
+  public onHandUpgradeCardClick(...args: any[]): any {
+    return (this.msTurnController as any).onHandUpgradeCardClick.apply(this.msTurnController, args);
   }
   public onBusinessCardClick(...args: any[]): any {
     return (this.msTurnController as any).onBusinessCardClick.apply(this.msTurnController, args);
@@ -658,6 +1034,127 @@ export class MainStreetScene extends CardGameScene {
   }
 
   /**
+   * Destroys the staff-applicant overlay and resets its render bookkeeping
+   * (CG-0MSTOATDU006UGAX). Safe to call when no overlay exists.
+   */
+  public clearApplicantOverlay(): void {
+    const overlay = this.applicantOverlayContainer;
+    if (overlay) {
+      overlay.removeAll(true);
+      try { this.hudContainer?.remove(overlay, true); } catch (_) { /* already detached */ }
+    }
+    this.applicantOverlayContainer = null;
+    this.applicantRenderedId = null;
+  }
+
+  /**
+   * Hire the pending staff applicant (CG-0MSTOATDU006UGAX).
+   *
+   * Action-free: consumes no daily action and costs 0 coins. The member is
+   * employed at the applicant's target business slot (so its passive
+   * specialization buff applies from the next income phase) and its salary
+   * becomes an ongoing per-turn cost. Plays the walk-in tween toward that
+   * slot before refreshing the HUD. If the engine rejects the hire (the slot
+   * filled up since the applicant appeared) the applicant stays pending.
+   */
+  public onHireApplicant(): void {
+    const pending = this.pendingApplicant
+      ?? ((this.state as { pendingApplicant?: PendingApplicant | null }).pendingApplicant ?? null);
+    if (!pending) return;
+
+    const targetSlotIndex = pending.targetSlotIndex;
+    const overlay = this.applicantOverlayContainer;
+
+    try {
+      hireStaffApplicant(this.state as any);
+    } catch (e) {
+      console.error('[MainStreet] hire applicant failed:', e);
+      this.refreshAll();
+      return;
+    }
+
+    // The engine clears state.pendingApplicant on success; a still-set value
+    // means the target slot was full and the hire was rejected.
+    const stillPending = (this.state as { pendingApplicant?: PendingApplicant | null }).pendingApplicant ?? null;
+    if (stillPending != null) {
+      this.pendingApplicant = stillPending;
+      this.uiPhase = 'applicant';
+      this.refreshAll();
+      return;
+    }
+
+    this.pendingApplicant = null;
+    this.uiPhase = 'market';
+    this.playApplicantExit('walk-in', overlay, targetSlotIndex);
+  }
+
+  /**
+   * Decline the pending staff applicant (CG-0MSTOATDU006UGAX).
+   * Action-free and side-effect free: the card walks off to the right and
+   * leaves the applicant pool (it is not returned to the staff deck).
+   */
+  public onDeclineApplicant(): void {
+    const pending = this.pendingApplicant
+      ?? ((this.state as { pendingApplicant?: PendingApplicant | null }).pendingApplicant ?? null);
+    if (!pending) return;
+
+    const overlay = this.applicantOverlayContainer;
+
+    try {
+      declineStaffApplicant(this.state as any);
+    } catch (e) {
+      console.error('[MainStreet] decline applicant failed:', e);
+      this.refreshAll();
+      return;
+    }
+
+    this.pendingApplicant = null;
+    this.uiPhase = 'market';
+    this.playApplicantExit('walk-off', overlay, pending.targetSlotIndex);
+  }
+
+  /**
+   * Plays the applicant's exit tween — walk-in toward the target business
+   * slot on hire, walk-off to the right on decline — then destroys the
+   * overlay and refreshes the scene.
+   *
+   * Falls back to immediate cleanup when no overlay is rendered or no
+   * animator is available (replay/headless mode, or reduced motion, which
+   * completes synchronously inside the animator).
+   *
+   * @param direction 'walk-in' (hire) or 'walk-off' (decline).
+   * @param overlay   The rendered applicant overlay, if any.
+   * @param slotIndex Target business slot index (used by 'walk-in').
+   */
+  private playApplicantExit(
+    direction: 'walk-in' | 'walk-off',
+    overlay: Phaser.GameObjects.Container | null,
+    slotIndex: number,
+  ): void {
+    const reducedMotion = (this as any).settingsPanel?.reducedMotion;
+    const cardW = this.layout?.handCardW ?? 120;
+    const cardH = this.layout?.handCardH ?? 170;
+
+    const finish = (): void => {
+      this.applicantAnimating = false;
+      this.clearApplicantOverlay();
+      this.refreshAll();
+    };
+
+    if (!overlay || !this.msAnimator) {
+      finish();
+      return;
+    }
+
+    this.applicantAnimating = true;
+    if (direction === 'walk-in') {
+      this.msAnimator.animateApplicantWalkIn(overlay, slotIndex, cardW, cardH, reducedMotion, finish);
+    } else {
+      this.msAnimator.animateApplicantWalkOff(overlay, cardW, cardH, reducedMotion, finish);
+    }
+  }
+
+  /**
    * Shows the buy-and-play premium explainer dialog.
    *
    * Fires before a same-turn buy-and-play (click composite placement or
@@ -672,6 +1169,26 @@ export class MainStreetScene extends CardGameScene {
   public showBuyAndPlacePremiumDialog(cardName: string, onProceed: () => void, onCancel: () => void): void {
     if (this.msOverlayManager && typeof (this.msOverlayManager as any).showBuyAndPlacePremiumDialog === 'function') {
       (this.msOverlayManager as any).showBuyAndPlacePremiumDialog(cardName, onProceed, onCancel);
+    }
+  }
+
+  /**
+   * Shows the dual-choice incident dialog for a pending `hasChoices` event
+   * (CG-0MTSHG8RP008E128). Accept applies the event's stated consequence;
+   * Reject refuses it and an unknown escalation card replaces it in the deck.
+   * Delegates to the overlay manager's showEventChoiceDialog.
+   *
+   * @param event    The pending choice event (effect deferred).
+   * @param onAccept Callback when the player accepts.
+   * @param onReject Callback when the player rejects.
+   */
+  public showEventChoiceDialog(
+    event: import('../MainStreetCards').EventCard,
+    onAccept: () => void,
+    onReject: () => void,
+  ): void {
+    if (this.msOverlayManager && typeof (this.msOverlayManager as any).showEventChoiceDialog === 'function') {
+      (this.msOverlayManager as any).showEventChoiceDialog(event, onAccept, onReject);
     }
   }
 

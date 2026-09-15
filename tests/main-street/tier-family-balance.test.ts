@@ -9,6 +9,9 @@
  *   into every tier (8 + 9 cards physically cannot cover all 12 tiers).
  * - No single family exceeds 42% of a tier's new cards (events are 39% of
  *   the full catalog, so tiers mirror the catalog mix).
+ *   Content child CG-0MTT7FC7A000AA58 (producer-approved 2026-09-09) added 8
+ *   chain events; the tightest feasible spread keeps every tier ≤ 45.5%
+ *   events, so the ceiling moved 42% → 46%.
  * - Staff cards are tier-gated through `createStaffDeck` like every other
  *   family (`unlockedCardIds` filtering).
  *
@@ -61,7 +64,7 @@ describe('Main Street tier family balance (CG-0MT3C744B009DS84)', () => {
     expect(staffTiers).toBeGreaterThanOrEqual(8);
   });
 
-  it('no single family exceeds 42% of any tier new-card mix', () => {
+  it('no single family exceeds 46% of any tier new-card mix', () => {
     for (const tierDef of Object.values(TIER_DEFINITIONS)) {
       const total = tierDef.newCardIds.length;
       expect(total).toBeGreaterThan(0);
@@ -70,7 +73,7 @@ describe('Main Street tier family balance (CG-0MT3C744B009DS84)', () => {
         expect(
           count / total,
           `${tierDef.id} ${family} share ${count}/${total}`,
-        ).toBeLessThanOrEqual(0.42);
+        ).toBeLessThanOrEqual(0.46);
       }
     }
   });
@@ -79,7 +82,7 @@ describe('Main Street tier family balance (CG-0MT3C744B009DS84)', () => {
     for (const tierId of ['tier-11', 'tier-12']) {
       const cards = TIER_DEFINITIONS[tierId].newCardIds;
       const eventShare = cards.filter((id) => id.startsWith('evt-')).length / cards.length;
-      expect(eventShare, `${tierId} event share`).toBeLessThanOrEqual(0.42);
+      expect(eventShare, `${tierId} event share`).toBeLessThanOrEqual(0.46);
     }
   });
 

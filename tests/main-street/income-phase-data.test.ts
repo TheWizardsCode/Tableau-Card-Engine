@@ -2,7 +2,9 @@
  * Main Street: Per-phase Income Breakdown Data Model Tests
  *
  * Validates the `IncomeResult.phaseBreakdown` field added by CG-0MT23O6W8003AXWJ.
- * Tests per-phase contribution accuracy: base, synergy, reputation, event multipliers.
+ * Tests per-phase contribution accuracy: base, reputation, event multipliers.
+ * Hand-card synergy was removed (CG-0MTRDX0DN004EECN) — `synergyBonus` and
+ * `handSynergyTotal` are always 0.
  */
 import { describe, it, expect } from 'vitest';
 
@@ -58,7 +60,7 @@ function expectPhaseBreakdown(result: IncomeResult): void {
 // ── Tests ─────────────────────────────────────────────────────────
 
 describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
-  it('has phaseBreakdown field with perSlotBreakdown and handSynergyTotal', () => {
+  it('has phaseBreakdown field with perSlotBreakdown and handSynergyTotal (always 0)', () => {
     const state = setupMainStreetGame({ seed: 'income-phase-data' });
     const result = applyIncome(state);
     expectPhaseBreakdown(result);
@@ -90,15 +92,18 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
     });
   });
 
-  describe('synergy bonus (hand card synergy distributed per slot)', () => {
-    it('handSynergyTotal is included in phaseBreakdown', () => {
+  describe('synergy bonus (hand synergy removed — always 0, CG-0MTRDX0DN004EECN)', () => {
+    it('handSynergyTotal stays 0 even with matching hand cards', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
       placeOnGrid(state, makeBiz({ baseIncome: 3, id: 'biz-a' }));
-      // Hand cards with synergy types that match
+      // Hand cards with synergy types that match the placed business
       const handBiz = makeBiz({ baseIncome: 3, id: 'hand-biz', synergyTypes: ['Food'] });
       state.hand.push(handBiz);
       const result = applyIncome(state);
-      expect(result.phaseBreakdown.handSynergyTotal).toBeGreaterThanOrEqual(0);
+      expect(result.phaseBreakdown.handSynergyTotal).toBe(0);
+      for (const pd of result.phaseBreakdown.perSlotBreakdown) {
+        expect(pd.synergyBonus).toBe(0);
+      }
     });
   });
 
@@ -124,7 +129,7 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
       expect(slot.repBonus).toBe(0);
     });
 
-    it('total equals sum of all phases across all slots + handSynergyTotal', () => {
+    it('total equals sum of all phases across all slots', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
       state.resourceBank.reputation = 2000;
       placeOnGrid(state, makeBiz({ baseIncome: 300 }));
@@ -223,9 +228,8 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
         summed += slot.baseIncome + slot.repBonus;
         for (const delta of slot.eventDeltas) summed += delta.delta;
       }
-      // handSynergyTotal is distributed as synergyBonus per slot but is NOT
-      // included in the coins credited (it is folded into total only).
-      // Phase sum should equal coins actually credited.
+      // Hand synergy is 0 (CG-0MTRDX0DN004EECN), so the phase sum equals the
+      // coins actually credited (multiplied amount).
       const coinsCredited = state.resourceBank.coins - coinsBefore;
       // Allow small floating-point drift
       expect(summed).toBeCloseTo(coinsCredited, 2);

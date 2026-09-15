@@ -34,7 +34,7 @@ import { DEFAULT_CHALLENGES_PER_RUN } from '../../example-games/main-street/Main
 // Upgrade:   3 (M1) + 14 (M2) + 4 branching + 4 level-2 + 1 (Community Hub) = 26 templates
 // Community: 2 (Park, Library) = 2 templates
 const BUSINESS_TEMPLATE_COUNT = 30;
-const EVENT_TEMPLATE_COUNT = 56; // +1 Graffiti Art (CG-0MSRC9UR9006FBXC)
+const EVENT_TEMPLATE_COUNT = 64; // 56 + 8 story-chain events (CG-0MTT7FC7A000AA58)
 const UPGRADE_TEMPLATE_COUNT = 39;
 const DEFAULT_BUSINESS_COPIES = 3;
 const DEFAULT_EVENT_COPIES = 3;

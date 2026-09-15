@@ -1,9 +1,39 @@
 import { describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
-import { attachSelection, createSingleSelectionManager } from '../../src/ui/selection';
+import {
+  attachSelection,
+  createSelectionState,
+  createSingleSelectionManager,
+} from '../../src/ui/selection';
 
 describe('selection helpers', () => {
+  it('createSelectionState is testable without Phaser mocks', () => {
+    const onStateChange = vi.fn();
+
+    const controller = createSelectionState({ onStateChange });
+
+    // Initial state fires callback
+    expect(onStateChange).toHaveBeenCalledWith({ selected: false, hovered: false });
+
+    controller.select();
+    expect(onStateChange).toHaveBeenLastCalledWith({ selected: true, hovered: false });
+    expect(controller.isSelected()).toBe(true);
+
+    controller.setHovered(true);
+    expect(onStateChange).toHaveBeenLastCalledWith({ selected: true, hovered: true });
+
+    controller.deselect();
+    expect(onStateChange).toHaveBeenLastCalledWith({ selected: false, hovered: true });
+    expect(controller.isHovered()).toBe(true);
+
+    controller.toggle();
+    expect(onStateChange).toHaveBeenLastCalledWith({ selected: true, hovered: true });
+
+    controller.setHovered(false);
+    expect(controller.isHovered()).toBe(false);
+  });
+
   it('attachSelection tracks selected and hovered state transitions', () => {
     const onStateChange = vi.fn();
     const target = {} as Phaser.GameObjects.GameObject;

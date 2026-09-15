@@ -34,6 +34,10 @@ import {
   moveEventToHandCommand,
   playEventCommand,
 } from '../../example-games/main-street/MainStreetCommands';
+import {
+  canPlayEvent,
+  canPurchaseEvent,
+} from '../../example-games/main-street/MainStreetMarket';
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -555,6 +559,62 @@ describe('budget enforcement', () => {
     expect(() => executeAction(state, { type: 'play-event-from-hand', handIndex: handIdx }))
       .not.toThrow();
     expect(state.actionsRemaining).toBe(0);
+  });
+});
+
+// ── Event legality gates (action budget) ────────────────────
+
+describe('event action-budget legality gates', () => {
+  it('canPurchaseEvent rejects a market event once the daily budget is spent', () => {
+    const state = setupMainStreetGame({ seed: 'evt-gate-move' });
+    executeDayStart(state, true);
+    state.resourceBank.coins = 10000;
+    const evt = makeEvent('evt-gate-move', 'Gate Move', 3) as never;
+    state.market.cards.push(evt);
+
+    expect(state.actionsRemaining).toBe(1);
+    expect(canPurchaseEvent(state, 'evt-gate-move').legal).toBe(true);
+
+    // Spend the budget — the move is now illegal and reports an action reason.
+    state.actionsRemaining = 0;
+    const blocked = canPurchaseEvent(state, 'evt-gate-move');
+    expect(blocked.legal).toBe(false);
+    if (blocked.legal) throw new Error('expected illegal purchase');
+    expect(blocked.reason).toMatch(/action/i);
+  });
+
+  it('canPlayEvent rejects a held event at 0 actions unless it was moved this day', () => {
+    const state = setupMainStreetGame({ seed: 'evt-gate-play' });
+    executeDayStart(state, true);
+    state.resourceBank.coins = 10000;
+    const evt = makeEvent('evt-gate-play', 'Gate Play', 4) as never;
+    state.hand.push(evt);
+
+    expect(canPlayEvent(state, 0).legal).toBe(true);
+
+    state.actionsRemaining = 0;
+    const blocked = canPlayEvent(state, 0);
+    expect(blocked.legal).toBe(false);
+    if (blocked.legal) throw new Error('expected illegal play');
+    expect(blocked.reason).toMatch(/action/i);
+
+    // Same-day composite: the move already paid the action, so the play is
+    // legal even with an exhausted budget.
+    state.justMovedEventCardId = 'evt-gate-play';
+    expect(canPlayEvent(state, 0).legal).toBe(true);
+  });
+
+  it('executeDayStart clears the same-day event composite tracker', () => {
+    const state = setupMainStreetGame({ seed: 'evt-composite-reset' });
+    executeDayStart(state, true);
+    state.resourceBank.coins = 10000;
+    state.market.cards.push(makeEvent('evt-reset', 'Reset Event', 2) as never);
+    executeAction(state, { type: 'buy-event', cardId: 'evt-reset' });
+    expect(state.justMovedEventCardId).toBe('evt-reset');
+
+    processEndOfTurn(state);
+    executeDayStart(state);
+    expect(state.justMovedEventCardId).toBeNull();
   });
 });
 

@@ -66,11 +66,13 @@ function getMarketIDs(state: MainStreetState): string[] {
  * Returns the total discard pile size across all deck types.
  */
 function getTotalDiscardCount(state: MainStreetState): number {
+  const staffDiscards = (state.discards as { staff?: unknown[] }).staff;
   return (
     state.discards.business.length +
     state.discards.communitySpace.length +
     state.discards.event.length +
-    state.discards.upgrade.length
+    state.discards.upgrade.length +
+    (staffDiscards ? staffDiscards.length : 0)
   );
 }
 
@@ -116,6 +118,36 @@ describe('MainStreet Market Cycling', () => {
         // Market cards should now be in discard piles
         const totalDiscards = getTotalDiscardCount(state);
         expect(totalDiscards).toBeGreaterThan(0);
+      },
+    );
+
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should not append a Market cycled entry while still cycling cards to discard',
+      () => {
+        const state = createTestState();
+        executeDayStart(state);
+        const marketCount = state.market.cards.length;
+        expect(marketCount).toBeGreaterThan(0);
+        const logLenBefore = state.activityLog.length;
+        const idsBefore = state.market.cards.map(c => c.id);
+        cycleMarketCards(state);
+        // No log line for the cycle itself.
+        expect(state.activityLog.slice(logLenBefore).some(e => /Market cycled/.test(e.text))).toBe(false);
+        // But the visible cards still moved to discards and the market refilled.
+        expect(getTotalDiscardCount(state)).toBeGreaterThanOrEqual(idsBefore.length);
+        expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
+      },
+    );
+
+    it.runIf(CYCLING_FEATURE_AVAILABLE)(
+      'should not log Market cycled when the market is empty',
+      () => {
+        const state = createTestState();
+        executeDayStart(state);
+        state.market.cards.length = 0;
+        const logLenBefore = state.activityLog.length;
+        cycleMarketCards(state);
+        expect(state.activityLog.slice(logLenBefore).some(e => /Market cycled/.test(e.text))).toBe(false);
       },
     );
 

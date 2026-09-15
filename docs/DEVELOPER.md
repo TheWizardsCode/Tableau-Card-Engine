@@ -17,6 +17,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
 - [Example Games](#example-games)
 - [Transcript Persistence](#transcript-persistence)
+- [Listener Registry](#listener-registry)
 - [Replay Tool](#replay-tool)
 - [Managing Assets](#managing-assets)
 - [SVG Rendering & Migration](#svg-rendering--migration)
@@ -602,6 +603,8 @@ src/
 │   ├── GameState.ts        GameState<T>, createGameState (deprecated for setup — use SetupOptions)
 │   ├── SetupOptions.ts     BaseSetupOptions, MultiplayerSetupOptions, resolveSetupOptions
 │   ├── SeededRng.ts        createSeededRng — deterministic PRNG (LCG) for shuffles and AI
+│   ├── ListenerRegistry.ts   Listener tracking + one-call cleanup (on/off/clear/size)
+│   ├── scene-registry.ts     getSceneRegistry — WeakMap + shutdown hook auto-cleanup for scenes
 │   ├── ActiveEffect.ts     Duration-based modifier system (create, decay, apply, query)
 │   ├── CheckpointManager.ts   Checkpoint save-and-resume abstraction (save, load, clear, checkAndResume)
 │   ├── CheckpointResumeOverlay.ts Built-in default resume overlay component
@@ -1100,6 +1103,11 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
 
+#### Turn Economy (CG-0MTINZ5GG007BH44)
+
+Single-source turn cash formula (Q1=c — see `MainStreetDifficulty.ts` header):
+`dayStart snapshot (dayStartCoins/dayStartRep at DayStart) → placement deductions → applyIncome breakdown (staff buffs → income-multiplier effects → rep multiplier sampled AFTER income's own rep accrual; hand cards contribute no income — CG-0MTRDX0DN004EECN) → ongoing costs (after income, before incident) → incident (or incident-averted log entry via Risk Manager per Q3) → net row (Turn N net: coinsNow-dayStartCoins / repNow-dayStartRep) as the final log entry, including premature bankruptcy/rep-collapse and competitive closing phases`. Invariants: Q1=c rep sampling, Q2 3-decimal tooltip (`toFixed(3)`), Q3 explicit averted entry, banner→net ordering on premature exits. Canonical sites: `reputationCoinMultiplier`/`applyReputationMultiplier` (`MainStreetDifficulty.ts`), `applyIncome` (`MainStreetAdjacency.ts`), `buildCoinsTooltip`/`buildReputationTooltip` (`MainStreetHudTooltips.ts`), `appendTurnNetRow`/`processEndOfTurn`/`resolveCompetitiveClosingPhases` (`MainStreetEngine.ts`).
+
 #### Community Favour (CG-0MSTOATDQ005XDET)
 
 The Community Favour resource exchange is a **free** once-per-turn action
@@ -1128,8 +1136,48 @@ available during the market phase (it does not consume `actionsRemaining`):
   persistence) + `community-favour-ui.browser.test.ts` (buttons, disabled
   states, full exchange round).
 
-## Replay Tool
+## Listener Registry
 
+The `ListenerRegistry` module (`src/core-engine/ListenerRegistry.ts`) centralises
+event listener cleanup: instead of chained `.off()` calls in `destroy()`
+methods, components track every listener through the registry and remove them
+all with a single `.clear()` call.
+
+### API
+
+- **`on(emitter, event, handler, ctx?)`** – register a listener and track it.
+  Compatible with Phaser 4 RC emitters (`scene.events`, `scene.input`,
+  `scene.input.keyboard`) and any object with `.on()`/`.off()`.
+- **`off(emitter, event, handler)`** – remove a single tracked listener
+  (idempotent).
+- **`clear()`** – remove every tracked listener in one call (idempotent; the
+  registry remains usable so it is safe on scene restarts).
+- **`size`** – number of currently tracked listeners.
+
+### Scene scoping
+
+`getSceneRegistry(scene)` (`src/core-engine/scene-registry.ts`) returns a
+`ListenerRegistry` backed by a `WeakMap` and auto-clears it when the scene
+fires its `shutdown` event:
+
+```ts
+import { getSceneRegistry } from '@core-engine';
+
+const registry = getSceneRegistry(this);
+registry.on(this.input, 'pointerdown', this.onPointerDown, this);
+// No explicit cleanup needed — cleared on scene shutdown.
+```
+
+### Migration status
+
+`SettingsPanel` and `HelpPanel` (`src/ui/`) now use `ListenerRegistry` for
+scene-level listener cleanup. Listener-leak behaviour is verified in
+`tests/ui/ListenerLeaks.browser.test.ts` (component create/destroy asserts
+emitter listener counts return to baseline); unit tests live in
+`tests/core-engine/ListenerRegistry.test.ts` and
+`tests/core-engine/scene-registry.test.ts`.
+
+## Replay Tool
 The replay tool (`scripts/replay.ts`) replays a fixture transcript through the game's Phaser scene in a headless browser, capturing per-turn screenshots. It is the foundation for thumbnail generation and visual regression testing.
 
 ### Running a Replay
@@ -2085,7 +2133,7 @@ reusing base layout zones through composition.
 | `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
 | `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
 | `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T24 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
+| `example-games/main-street/TutorialFlow.ts` | T1-T26 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
 
 #### How composition works
 
@@ -2660,6 +2708,42 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
     (`import.meta.env.DEV` branch in `initSettingsPanel`) so the tool is
     absent/tree-shaken from production bundles.
 
+#### Staff Application (Main Street only)
+
+- **Label:** "Staff Application"
+- **Location:** Debug Tools section of the Settings panel — appears only in
+  `MainStreetScene` (injected via a Main-Street-specific override of
+  `CardGameScene.initSettingsPanel`). Visible only when running under
+  `npm run dev` (`import.meta.env.DEV === true`).
+- **Function:** Toggles a dev-only `forcedStaffApplicant` flag that makes the
+  staff-applicant trigger fire deterministically at every day start, bypassing
+  the usual `min(income + reputation, 15)%` RNG roll. The overlay shows the
+  current state (`[ON]` / `[OFF]`) and the live computed chance
+  (e.g. `Staff Application [ON] — 12% chance`), which updates each time the
+  toggle is clicked as the underlying `computeApplicantChance(state)` value
+  changes.
+- **Constraints still respected:** Forced mode still requires at least one
+  eligible business with a free employment slot; if none exists — or the
+  computed chance is 0 — no applicant is spawned. The trigger is also
+  suppressed in tutorial/headless runs where `state.suppressApplicant` is
+  true, because `executeDayStart()` skips `resolveStaffApplicant()` entirely
+  in that case.
+- **Session-only:** The `forcedStaffApplicant` flag is not persisted by
+  save/load — it resets on a new game session.
+- **When to use:** Test the hire / decline / let-go applicant flow without
+  waiting for the random trigger. Open the Settings panel (gear icon) →
+  scroll to Debug Tools → click **Staff Application** → click `[  TOGGLE  ]`
+  to force an applicant on the next day start.
+- **Implementation:**
+  - `src/ui/debug/StaffApplicantCheatOverlay.ts` — Toggle overlay and
+    `createStaffApplicantCheatTool()` factory.
+  - `example-games/main-street/MainStreetState.ts` — `forcedStaffApplicant?:
+    boolean` dev-only field (not serialized).
+  - `example-games/main-street/MainStreetEngine.ts` — `computeApplicantChance()`
+    (exported) and the forced branch in `resolveStaffApplicant()`.
+  - `example-games/main-street/scenes/MainStreetScene.ts` — Dev-gated wiring
+    (`import.meta.env.DEV` branch in `initSettingsPanel`).
+
 ### Adding a New Debug Tool
 
 Adding a new debug tool requires minimal code:
@@ -2732,6 +2816,7 @@ To verify production safety:
 | `src/ui/debug/AiDecisionRecorder.ts` | AI decision recording singleton |
 | `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
 | `src/ui/debug/MarketCardCheatOverlay.ts` | Market Card Cheat overlay (Main Street market-replacement picker) |
+| `src/ui/debug/StaffApplicantCheatOverlay.ts` | Staff Application cheat overlay (Main Street forced-applicant toggle) |
 | `example-games/main-street/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
 | `src/ui/debug/index.ts` | Debug tools barrel file |
 | `src/ui/CardGameScene.ts` | Default debug tool registration |

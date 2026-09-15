@@ -80,11 +80,16 @@ export interface SynergyLineEndpoints {
  * @param pair    Synergy pair (slot indices; `sharedSynergy` is ignored by
  *                the geometry but kept for signature parity).
  * @param layout  Layout values (scene `layout` or a fixture).
+ * @param centres Optional explicit slot centres (map-local). Used for expanded
+ *                street lattices, where a slot index maps to a world position
+ *                rather than a 1×1 row-major cell; callers omit pairs whose
+ *                centres are outside the viewport.
  * @returns The clipped endpoints plus the segment midpoint.
  */
 export function synergyLineEndpoints(
   pair: { fromIndex: number; toIndex: number; sharedSynergy?: string },
   layout: SynergyLineLayout,
+  centres?: { from: SynergyLinePoint; to: SynergyLinePoint },
 ): SynergyLineEndpoints {
   const { streetX, streetTop, slotW, slotH, slotGap, streetRowGap, streetCols } = layout;
 
@@ -93,8 +98,8 @@ export function synergyLineEndpoints(
     y: streetTop + Math.floor(idx / streetCols) * (slotH + streetRowGap) + slotH / 2,
   });
 
-  const a = slotCentre(pair.fromIndex);
-  const b = slotCentre(pair.toIndex);
+  const a = centres ? centres.from : slotCentre(pair.fromIndex);
+  const b = centres ? centres.to : slotCentre(pair.toIndex);
 
   const dx = b.x - a.x;
   const dy = b.y - a.y;

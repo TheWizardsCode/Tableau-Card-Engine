@@ -88,12 +88,12 @@ describe('Graffiti Art: CSV template contract (AC1)', () => {
 describe('Graffiti Art: deck integration (AC2)', () => {
   const deck = createEventDeck(1, undefined, createSeededRng(42), 1);
 
-  it('grows event templates from 55 to exactly 56', () => {
-    expect(deck).toHaveLength(56);
+  it('grows event templates from 55 to exactly 64', () => {
+    expect(deck).toHaveLength(64); // 56 + 8 story-chain events (CG-0MTT7FC7A000AA58)
   });
 
-  it('grows incident templates from 34 to exactly 35', () => {
-    expect(deck.filter(c => c.trigger === 'Incident')).toHaveLength(35);
+  it('grows incident templates from 34 to exactly 43', () => {
+    expect(deck.filter(c => c.trigger === 'Incident')).toHaveLength(43); // 35 + 8
   });
 
   it('appears in the deck with the contracted shape', () => {

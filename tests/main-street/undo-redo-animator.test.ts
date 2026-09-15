@@ -37,15 +37,18 @@ import { SFX_KEYS } from '../../example-games/main-street/scenes/MainStreetConst
 
 // ── Mock scene helpers ──────────────────────────────────────
 
+import { createMockSceneWithTweens } from '../helpers/MockFactory';
+
 function createMockScene(overrides: Record<string, unknown> = {}) {
-  const scene = {
-    layout: { gameW: 960, gameH: 720 },
-    settingsPanel: null,
-    replayMode: false,
-    soundManager: { play: vi.fn() },
-    ...overrides,
+  return {
+    scene: createMockSceneWithTweens({
+      layout: { gameW: 960, gameH: 720 },
+      settingsPanel: null,
+      replayMode: false,
+      soundManager: { play: vi.fn() },
+      ...overrides,
+    }),
   };
-  return { scene };
 }
 
 // ── Tests ───────────────────────────────────────────────────

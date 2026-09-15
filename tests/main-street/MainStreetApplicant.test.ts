@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KUL80008VMR
+// smell: unused_eslint_disable
+// severity: low
+// description: Stale disable batch: Applicant 44, community-space-types 226, LegalityResult 43,50 — remove or convert to valid handling; part of CG-0MTP6KUL80008VMR.
+// -->
 /**
  * Main Street: Staff applicant trigger, hire/decline, and let-go economics
  * (CG-0MTFO4HGQ008VAQR — leaf of CG-0MSTOATDU006UGAX).
@@ -41,7 +47,6 @@ import { deserializeSkillIds } from '../../example-games/main-street/MainStreetS
 /** Lazily resolves an engine export (undefined when not yet implemented). */
 function engineExport<T>(name: string): T | undefined {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const eng: Record<string, unknown> = require('../../example-games/main-street/MainStreetEngine');
     return eng[name] as T | undefined;
   } catch {

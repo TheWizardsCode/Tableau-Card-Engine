@@ -3,9 +3,181 @@ import { generateHint, type HintResult } from '../MainStreetHint';
 import { recordMainStreetEvent } from '../MainStreetTranscript';
 import { FONT_FAMILY } from '../../../src/ui';
 import { LOG_SCROLL_SPEED, LOG_TITLE_H } from './MainStreetConstants';
+import { streetViewportRect } from '../MainStreetMapView';
+
+/** Screen-pixel pan applied per arrow-key press (CG-0MTH9OVMC001V44E). */
+const STREET_KEY_PAN_STEP = 48;
 
 export class MainStreetInputManager {
   constructor(private readonly scene: any) {}
+
+  // ── Street-map camera controls (CG-0MTH9OVMC001V44E) ──────
+
+  /** Bound wheel handler, kept so it can be detached on scene shutdown. */
+  private streetWheelHandler: ((pointer: any, objects: any, dx: number, dy: number) => void) | null = null;
+  /** Bound keydown handler, kept so it can be detached on scene shutdown. */
+  private streetKeyHandler: ((event: KeyboardEvent) => void) | null = null;
+  /** Bound global pointer handlers for drag-to-pan. */
+  private streetPointerMoveHandler: ((pointer: any) => void) | null = null;
+  private streetPointerUpHandler: (() => void) | null = null;
+
+  /**
+   * Registers the always-available street-map camera controls.
+   *
+   * The camera is never gated by milestones, turns, or resources: the wheel
+   * zooms whenever the pointer is over the street band, `+`/`-` zoom, the
+   * arrow keys pan, `0` resets the framing, and dragging the street backdrop
+   * pans while the map is zoomed out. Modal overlays (help/settings/stats)
+   * keep input priority, mirroring the other global key handlers.
+   */
+  public initStreetCameraControls(): void {
+    const s = this.scene;
+    if (!s?.input) return;
+
+    if (!this.streetWheelHandler) {
+      this.streetWheelHandler = (pointer: any, _objects: any, _deltaX: number, deltaY: number) => {
+        this.handleStreetWheel(pointer, deltaY);
+      };
+    }
+    if (!this.streetKeyHandler) {
+      this.streetKeyHandler = (event: KeyboardEvent) => this.handleStreetCameraKey(event);
+    }
+    if (!this.streetPointerMoveHandler) {
+      this.streetPointerMoveHandler = (pointer: any) => this.handleStreetPanMove(pointer);
+    }
+    if (!this.streetPointerUpHandler) {
+      this.streetPointerUpHandler = () => { s.streetPanDrag = null; };
+    }
+
+    try {
+      s.input.off('wheel', this.streetWheelHandler, s);
+      s.input.on('wheel', this.streetWheelHandler, s);
+      s.input.off('pointermove', this.streetPointerMoveHandler, s);
+      s.input.on('pointermove', this.streetPointerMoveHandler, s);
+      s.input.off('pointerup', this.streetPointerUpHandler, s);
+      s.input.on('pointerup', this.streetPointerUpHandler, s);
+    } catch (_) { /* ignore in constrained test environments */ }
+
+    try {
+      if (s.input.keyboard) {
+        s.input.keyboard.off('keydown', this.streetKeyHandler);
+        s.input.keyboard.on('keydown', this.streetKeyHandler);
+      } else if (typeof window !== 'undefined') {
+        window.addEventListener('keydown', this.streetKeyHandler as EventListener);
+      }
+    } catch (_) { /* ignore in constrained test environments */ }
+
+    s.events?.once?.('shutdown', () => {
+      try {
+        if (s.input?.keyboard && this.streetKeyHandler) {
+          s.input.keyboard.off('keydown', this.streetKeyHandler);
+        } else if (typeof window !== 'undefined' && this.streetKeyHandler) {
+          window.removeEventListener('keydown', this.streetKeyHandler as EventListener);
+        }
+      } catch (_) { /* ignore */ }
+    });
+  }
+
+  /**
+   * Mouse-wheel zoom while the pointer is over the street band.
+   * Wheel up zooms in (toward the legacy 1× framing), wheel down zooms out.
+   */
+  public handleStreetWheel(pointer: any, deltaY: number): void {
+    const s = this.scene;
+    if (!pointer || !s?.layout) return;
+    if (!this.pointerOverStreet(pointer)) return;
+    if (!deltaY) return;
+    if (deltaY < 0) s.zoomStreetIn();
+    else s.zoomStreetOut();
+  }
+
+  /**
+   * Keyboard shortcuts for the street camera: `+`/`-` zoom, arrows pan,
+   * `0` resets. Suppressed while a modal overlay owns the input.
+   */
+  public handleStreetCameraKey(event: KeyboardEvent): void {
+    const s = this.scene;
+    if (!s || s.replayMode || !event) return;
+    if (this.modalOverlayOpen()) return;
+
+    switch (event.key) {
+      case '+':
+      case '=':
+        s.zoomStreetIn();
+        break;
+      case '-':
+      case '_':
+        s.zoomStreetOut();
+        break;
+      case '0':
+        s.resetStreetCamera();
+        break;
+      case 'ArrowLeft':
+        s.panStreetBy(STREET_KEY_PAN_STEP, 0);
+        break;
+      case 'ArrowRight':
+        s.panStreetBy(-STREET_KEY_PAN_STEP, 0);
+        break;
+      case 'ArrowUp':
+        s.panStreetBy(0, STREET_KEY_PAN_STEP);
+        break;
+      case 'ArrowDown':
+        s.panStreetBy(0, -STREET_KEY_PAN_STEP);
+        break;
+      default:
+        return;
+    }
+  }
+
+  /**
+   * Makes the street backdrop a drag-to-pan surface. Panning is only engaged
+   * while the map is zoomed out — at 1× the street fills its viewport and
+   * there is nothing to pan to.
+   */
+  public attachStreetPanZone(zone: any): void {
+    const s = this.scene;
+    if (!zone || s.replayMode) return;
+    try {
+      zone.setInteractive({ useHandCursor: false });
+    } catch (_) {
+      return;
+    }
+    zone.on('pointerdown', (pointer: any) => {
+      if (!pointer) return;
+      if (s.streetCamera.zoomLevel <= 1) return;
+      s.streetPanDrag = { lastX: pointer.x, lastY: pointer.y };
+    });
+  }
+
+  /** Applies an in-progress drag-to-pan gesture. */
+  public handleStreetPanMove(pointer: any): void {
+    const s = this.scene;
+    if (!pointer || !s.streetPanDrag) return;
+    const dx = pointer.x - s.streetPanDrag.lastX;
+    const dy = pointer.y - s.streetPanDrag.lastY;
+    s.streetPanDrag = { lastX: pointer.x, lastY: pointer.y };
+    s.panStreetBy(dx, dy);
+  }
+
+  /** True while the pointer is inside the street map viewport band. */
+  private pointerOverStreet(pointer: { x: number; y: number }): boolean {
+    const s = this.scene;
+    const viewport = streetViewportRect(s.layout);
+    return (
+      pointer.x >= viewport.x && pointer.x <= viewport.x + viewport.w &&
+      pointer.y >= viewport.y && pointer.y <= viewport.y + viewport.h
+    );
+  }
+
+  /** True while a modal overlay owns keyboard/mouse input. */
+  private modalOverlayOpen(): boolean {
+    const s = this.scene;
+    if (Array.isArray(s.overlayObjects) && s.overlayObjects.length > 0) return true;
+    if (s.helpPanel?.isOpen) return true;
+    if (s.settingsPanel?.isOpen) return true;
+    if (s.statsOverlay?.isOpen) return true;
+    return false;
+  }
 
   public initSvgDebugOverlay(): void {
     const s = this.scene;

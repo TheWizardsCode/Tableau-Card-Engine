@@ -1,12 +1,14 @@
 /**
- * Main Street Tutorial E2E test — T13: Community Favour → T14: End this turn
- * → T15: Place the Bookshop (listed cost) → T16: End this turn → T17: Move
- * the Library to hand → T18: End this turn → T19: Build a Library next to
+ * Main Street Tutorial E2E test — T15: Community Favour → T16: End this turn
+ * → T17: Place the Bookshop (listed cost) → T18: End this turn → T19: Move
+ * the Library to hand → T20: End this turn → T21: Build a Library next to
  * the Bookshop (synergy, listed cost).
  *
  * Walks the second half of the two-turn plan-ahead flow
  * (CG-0MT53NXGZ004H5AE): the Bookshop is placed at listed cost the day
  * after its move, and the Library gets the same two-turn treatment.
+ * Step IDs follow the 26-step tutorial (CG-0MTNMBX5Z002U0MH inserted the
+ * even-indexed end-turns T8/T14/T16/T18/T20/T22).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
@@ -39,8 +41,8 @@ async function waitForStartButton(scene: Phaser.Scene, timeoutMs = 8_000): Promi
   return null;
 }
 
-/** Walk from T1 to the end of T12 (arrives on T13 Community Favour). */
-async function walkToT13(scene: Phaser.Scene): Promise<void> {
+/** Walk from T1 to the end of T14 (arrives on T15 Community Favour). */
+async function walkToT15(scene: Phaser.Scene): Promise<void> {
   await clickOverlayButtonByText('Next >'); // T1 -> T2
   await clickOverlayButtonByText('Next >'); // T2 -> T3
   await clickRequiredBusinessCard(scene);  // T3 move Laundromat -> T4
@@ -54,19 +56,43 @@ async function walkToT13(scene: Phaser.Scene): Promise<void> {
   await clickStreetSlot(scene, 0);        // T7 place Laundromat -> T8
   await new Promise((r) => setTimeout(r, 500));
   await waitForOverlayVisible(5_000);
-  await clickOverlayButtonByText('Next >'); // T8 -> T9
-  await waitForOverlayVisible(5_000);
-  await clickRequiredEventCard(scene);   // T9 buy Local Festival -> T10
-  await waitForOverlayVisible(5_000);
-  await clickEndTurn(scene);              // T10 end -> T11
+  await clickEndTurn(scene);              // T8 (inserted end-turn) -> T9
   await waitForOverlayVisible(10_000);
-  await clickRequiredBusinessCard(scene); // T11 move Bookshop -> T12
+  await clickOverlayButtonByText('Next >'); // T9 -> T10
   await waitForOverlayVisible(5_000);
-  await clickOverlayButtonByText('Next >'); // T12 -> T13
+  await clickRequiredEventCard(scene);   // T10 buy Local Festival -> T11
   await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);              // T11 end -> T12
+  await waitForOverlayVisible(10_000);
+  await clickRequiredBusinessCard(scene); // T12 move Bookshop -> T13
+  await waitForOverlayVisible(5_000);
+  await clickOverlayButtonByText('Next >'); // T13 Costs -> T14
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);              // T14 (inserted end-turn) -> T15
+  await waitForOverlayVisible(10_000);
 }
 
-describe('Main Street Tutorial E2E — T13-T19', () => {
+/**
+ * Walk from T1 to the end of T20 (arrives on T21 — place the Library next
+ * to the Bookshop). Bookshop sits at slot 1 (placed at T17).
+ */
+async function walkToT21(scene: Phaser.Scene): Promise<void> {
+  await walkToT15(scene);
+  await clickCommunityFavour(scene);       // T15 -> T16
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T16 -> T17
+  await waitForOverlayVisible(10_000);
+  await clickStreetSlot(scene, 1);         // T17 place Bookshop -> T18
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T18 -> T19
+  await waitForOverlayVisible(10_000);
+  await clickRequiredBusinessCard(scene);  // T19 move Library -> T20
+  await waitForOverlayVisible(5_000);
+  await clickEndTurn(scene);               // T20 -> T21
+  await waitForOverlayVisible(10_000);
+}
+
+describe('Main Street Tutorial E2E — T15-T21', () => {
   beforeEach(async () => {
     game = await bootGameWithTutorial();
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
@@ -83,11 +109,11 @@ describe('Main Street Tutorial E2E — T13-T19', () => {
     game = null;
   });
 
-  it('T13: Community Favour rep→coins exchange advances to T14', async () => {
+  it('T15: Community Favour rep→coins exchange advances to T16', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     const s = scene as any;
-    await walkToT13(scene);
-    expect(getStepIndex(scene)).toBe(12); // T13 Community Favour
+    await walkToT15(scene);
+    expect(getStepIndex(scene)).toBe(14); // T15 Community Favour
 
     const coinsBefore = s.state.resourceBank.coins;
     const repBefore = s.state.resourceBank.reputation;
@@ -98,52 +124,38 @@ describe('Main Street Tutorial E2E — T13-T19', () => {
     expect(s.state.favourUsedThisTurn).toBe(true);
     expect(s.state.resourceBank.coins).toBe(coinsBefore + 300);
     expect(s.state.resourceBank.reputation).toBe(repBefore - 200);
-    expect(getStepIndex(scene)).toBe(13); // T14 End this turn
-    await saveScreenshot('t13-favour-t14');
+    expect(getStepIndex(scene)).toBe(15); // T16 End this turn
+    await saveScreenshot('t15-favour-t16');
   }, 30_000);
 
-  it('T14→T18: End turns and placements keep the Budget positive; T15 places the Bookshop at listed cost', async () => {
+  it('T16→T18: End turns and placements keep the Budget positive; T17 places the Bookshop at listed cost', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     const s = scene as any;
-    await walkToT13(scene);
-    expect(getStepIndex(scene)).toBe(12);
-    await clickCommunityFavour(scene); // T13 -> T14
+    await walkToT15(scene);
+    expect(getStepIndex(scene)).toBe(14);
+    await clickCommunityFavour(scene); // T15 -> T16
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(13);
+    expect(getStepIndex(scene)).toBe(15);
 
-    await clickEndTurn(scene);         // T14 end day 3 -> T15
+    await clickEndTurn(scene);         // T16 -> T17
     await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(14); // T15 Place the Bookshop
+    expect(getStepIndex(scene)).toBe(16); // T17 Place the Bookshop
 
-    // T15: place the held Bookshop at LISTED 300 (×100, plan-ahead, not premium).
+    // T17: place the held Bookshop at LISTED 300 (×100, plan-ahead, not premium).
     const coinsBeforeB = s.state.resourceBank.coins;
     await clickStreetSlot(scene, 1);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(15); // T16 End this turn
+    expect(getStepIndex(scene)).toBe(17); // T18 End this turn
     expect(s.state.streetGrid[1]?.id.startsWith('biz-bookshop')).toBe(true);
     expect(s.state.resourceBank.coins).toBe(coinsBeforeB - 300);
-    await saveScreenshot('t15-place-bookshop');
+    await saveScreenshot('t17-place-bookshop');
   }, 30_000);
 
-  it('T19: Build a Library — place next to the Bookshop advances to T20', async () => {
+  it('T21: Build a Library — place next to the Bookshop advances to T22', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     const s = scene as any;
-    await walkToT13(scene);
-    await clickCommunityFavour(scene); // T13 -> T14
-    await waitForOverlayVisible(5_000);
-    await clickEndTurn(scene);         // T14 -> T15
-    await waitForOverlayVisible(10_000);
-    await clickStreetSlot(scene, 1);  // T15 place Bookshop -> T16
-    await waitForOverlayVisible(5_000);
-    await clickEndTurn(scene);         // T16 end day 4 -> T17
-    await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(16); // T17 Move the Library to hand
-    await clickRequiredBusinessCard(scene); // T17 move Library -> T18
-    await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(17); // T18 End this turn
-    await clickEndTurn(scene);         // T18 end day 5 -> T19
-    await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(18); // T19 Build a Library
+    await walkToT21(scene);
+    expect(getStepIndex(scene)).toBe(20); // T21 Build a Library
 
     const library = s.state.market.cards.find((c: any) => c.id.startsWith('cs-library'))
       ?? s.state.hand.find((c: any) => c.id.startsWith('cs-library'));
@@ -154,58 +166,34 @@ describe('Main Street Tutorial E2E — T13-T19', () => {
     const coinsBeforeL = s.state.resourceBank.coins;
     await clickStreetSlot(scene, 2);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(19); // T20 Triggering Events
+    expect(getStepIndex(scene)).toBe(21); // T22 End this turn
     expect(s.state.streetGrid[2]?.id.startsWith('cs-library')).toBe(true);
     expect(s.state.resourceBank.coins).toBe(coinsBeforeL - 700);
-    await saveScreenshot('t19-t20');
+    await saveScreenshot('t21-t22');
   }, 30_000);
 
-  it('T19: diagonal placement next to the Bookshop is accepted (8-way adjacency)', async () => {
+  it('T21: diagonal placement next to the Bookshop is accepted (8-way adjacency)', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
-    await walkToT13(scene);
-    await clickCommunityFavour(scene); // T13 -> T14
-    await waitForOverlayVisible(5_000);
-    await clickEndTurn(scene);         // T14 -> T15
-    await waitForOverlayVisible(10_000);
-    await clickStreetSlot(scene, 1);  // T15 place Bookshop -> T16
-    await waitForOverlayVisible(5_000);
-    await clickEndTurn(scene);         // T16 -> T17
-    await waitForOverlayVisible(10_000);
-    await clickRequiredBusinessCard(scene); // T17 move Library -> T18
-    await waitForOverlayVisible(5_000);
-    await clickEndTurn(scene);         // T18 -> T19
-    await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(18);
+    await walkToT21(scene);
+    expect(getStepIndex(scene)).toBe(20);
 
-    // Bookshop is at slot 1 (from T15). Slot 5 is diagonal (row 1, col 0) —
+    // Bookshop is at slot 1 (from T17). Slot 5 is diagonal (row 1, col 0) —
     // Chebyshev distance 1, so the 8-way "next to" rule accepts it.
     await clickStreetSlot(scene, 5);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(19); // T20 Triggering Events
+    expect(getStepIndex(scene)).toBe(21); // T22 End this turn
     const s = scene as any;
     expect(s.state.streetGrid[5]?.id.startsWith('cs-library')).toBe(true);
-    await saveScreenshot('t19-diagonal-t20');
+    await saveScreenshot('t21-diagonal-t22');
   }, 30_000);
 
-  it('T19: non-adjacent placement is rejected with feedback and does not soft-lock', async () => {
+  it('T21: non-adjacent placement is rejected with feedback and does not soft-lock', async () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
-    await walkToT13(scene);
-    await clickCommunityFavour(scene); // T13 -> T14
-    await waitForOverlayVisible(5_000);
-    await clickEndTurn(scene);         // T14 -> T15
-    await waitForOverlayVisible(10_000);
-    await clickStreetSlot(scene, 1);  // T15 place Bookshop -> T16
-    await waitForOverlayVisible(5_000);
-    await clickEndTurn(scene);         // T16 -> T17
-    await waitForOverlayVisible(10_000);
-    await clickRequiredBusinessCard(scene); // T17 move Library -> T18
-    await waitForOverlayVisible(5_000);
-    await clickEndTurn(scene);         // T18 -> T19
-    await waitForOverlayVisible(10_000);
-    expect(getStepIndex(scene)).toBe(18);
+    await walkToT21(scene);
+    expect(getStepIndex(scene)).toBe(20);
 
     const s = scene as any;
-    // Bookshop is at slot 1 (from T15). Slot 4 is EMPTY but neither
+    // Bookshop is at slot 1 (from T17). Slot 4 is EMPTY but neither
     // orthogonally nor diagonally adjacent (Chebyshev distance 3) — the
     // click must be rejected with the synergy-partner instruction message
     // (blocked-move feedback, CG-0MSP26K6U001PXT8 AC-2).
@@ -223,17 +211,17 @@ describe('Main Street Tutorial E2E — T13-T19', () => {
     expect(String(s.instructionText?.text ?? '')).toContain('next to');
 
     // No soft-lock regression: the slot stays empty, the Library stays in
-    // hand, and the tutorial is still on T19 so the player can retry.
+    // hand, and the tutorial is still on T21 so the player can retry.
     expect(s.state.streetGrid[4]).toBeNull();
     expect(s.state.hand.some((c: any) => c.id.startsWith('cs-library'))).toBe(true);
-    expect(getStepIndex(scene)).toBe(18);
+    expect(getStepIndex(scene)).toBe(20);
 
     // Retry on a valid DIAGONAL slot (7, Chebyshev neighbour of slot 1)
-    // completes T19 — proving the rejection did not break the flow.
+    // completes T21 — proving the rejection did not break the flow.
     await clickStreetSlot(scene, 7);
     await waitForOverlayVisible(5_000);
-    expect(getStepIndex(scene)).toBe(19); // T20 Triggering Events
+    expect(getStepIndex(scene)).toBe(21); // T22 End this turn
     expect(s.state.streetGrid[7]?.id.startsWith('cs-library')).toBe(true);
-    await saveScreenshot('t19-reject-retry');
+    await saveScreenshot('t21-reject-retry');
   }, 30_000);
 });
