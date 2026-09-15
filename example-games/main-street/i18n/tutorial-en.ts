@@ -245,8 +245,10 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // the Library), so the copy teaches the mechanic without a
   // "REQUIRED for the Library" claim (CG-0MT53NXGZ004H5AE).
   // ── T14: End this turn (day 4 → day 5) ─────────────────────
-  // CG-0MTNMBX5Z002U0MH: inserted to split Day 4 so T12 (move Bookshop)
-  // and T15 (community-favour) no longer share a single action.
+  // CG-0MTNMBX5Z002U0MH: splits Day 4 so T12 (move Bookshop) and T15
+  // (community-favour) land on separate days. Community Favour is free
+  // (CG-0MSTOATDQ005XDET), so this boundary is no longer budget-required;
+  // retained as the natural day marker.
   [tutorialKey('T14', 'title')]:
     'End this turn',
   [tutorialKey('T14', 'body')]:

@@ -87,17 +87,20 @@ describe('enumerateLegalActions: Community Favour', () => {
     expect(favourActions(enumerateLegalActions(state))).toHaveLength(0);
   });
 
-  it('is NOT available when the daily action budget is spent (now costs an action)', () => {
+  it('stays available even when the daily action budget is spent (free action)', () => {
     const state = createTestState();
     state.resourceBank.coins = 1000;
     state.resourceBank.reputation = 1000;
     state.favourUsedThisTurn = false;
     state.actionsRemaining = 0;
 
-    // Community Favour now consumes an action, so it should NOT be available
-    // when actionsRemaining === 0 (consumeAction would throw).
+    // Community Favour is a FREE once-per-turn exchange (CG-0MSTOATDQ005XDET),
+    // so it stays available at zero remaining actions — the player's fallback
+    // when they cannot afford a market purchase.
     const favs = favourActions(enumerateLegalActions(state));
-    expect(favs.length).toBe(0);
+    expect(favs.length).toBeGreaterThan(0);
+    expect(favs.some(f => f.direction === 'coins-to-rep')).toBe(true);
+    expect(favs.some(f => f.direction === 'rep-to-coins')).toBe(true);
     // end-turn still present so the AI loop terminates.
     expect(enumerateLegalActions(state).some(a => a.type === 'end-turn')).toBe(true);
   });
@@ -182,41 +185,44 @@ describe('scoreAction: Community Favour', () => {
 // ── AC3/AC4: AI executes the favour fallback without stalling ──
 
 describe('AI Community Favour integration', () => {
-  it('an AI turn without move options makes progress via Community Favour', () => {
+  it('an AI turn in an unaffordable market makes progress via Community Favour', () => {
     const state = createTestState();
-    // Deplete coins so no market purchase is affordable.
+    // Deplete coins so no market purchase is affordable, but keep reputation.
     state.resourceBank.coins = 0;
     state.resourceBank.reputation = 1000;
     state.favourUsedThisTurn = false;
-    // Start with 2 actions: one for Community Favour, one for end-turn.
-    state.actionsRemaining = 2;
-    // Empty the market and hand so the AI is genuinely stalled at
-    // Community Favour priority (no purchases/plays/moves to outrank it).
-    state.market.cards = [];
-    state.hand = [];
+    state.actionsRemaining = 1;
 
     const beforeCoins = state.resourceBank.coins;
     const aiPlayer = new MainStreetAiPlayer(GreedyStrategy, createSeededRng(1234));
 
     let action: PlayerAction = aiPlayer.chooseAction(state);
     let executedFavour = false;
+    // Tracks that executing the favour itself left the daily budget untouched.
+    let favourLeftBudgetUntouched = false;
     let safety = 0;
     while (action.type !== 'end-turn' && state.gameResult === 'playing' && safety < 5) {
+      const actionsBeforeStep = state.actionsRemaining;
       if (action.type === 'community-favour') {
         executedFavour = true;
       }
       executeAction(state, action);
-      if (executedFavour) break; // gate now spent; stop to assert a single exchange
+      if (executedFavour) {
+        favourLeftBudgetUntouched = state.actionsRemaining === actionsBeforeStep;
+        break; // gate now spent; stop to assert a single exchange
+      }
       action = aiPlayer.chooseAction(state);
       safety += 1;
     }
 
-    // The AI should have used Community Favour to gain coins (action-gated
-    // fallback), setting the gate, rather than stalling with nothing to do.
+    // The AI should have used Community Favour to gain coins (free once-per-turn
+    // fallback), setting the gate, rather than stalling with nothing productive.
     expect(state.favourUsedThisTurn).toBe(true);
     expect(state.resourceBank.coins).toBeGreaterThan(beforeCoins);
     expect(state.resourceBank.coins).toBe(
       beforeCoins + state.config.favourRepToCoinsCoinGain,
     );
+    // Free action: the exchange itself does not touch the daily budget.
+    expect(favourLeftBudgetUntouched).toBe(true);
   });
 });

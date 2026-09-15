@@ -1000,8 +1000,9 @@ export function executeCommunityFavour(
   // Sync the ledger so the exchange is visible to other engine systems.
   syncResourceBankToLedger(state);
 
-  // Community Favour is a daily action — consume an action before marking it used.
-  consumeAction(state);
+  // Community Favour is a FREE once-per-turn action (CG-0MSTOATDQ005XDET):
+  // it deliberately does NOT call consumeAction, so it remains available as a
+  // fallback even when the daily action budget is spent.
   state.favourUsedThisTurn = true;
   return null;
 }

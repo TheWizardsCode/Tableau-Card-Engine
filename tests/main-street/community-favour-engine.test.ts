@@ -86,54 +86,48 @@ describe('coins-to-rep exchange', () => {
     expect(state.favourUsedThisTurn).toBe(true);
   });
 
-  it('decrements actionsRemaining by 1', () => {
+  it('does not decrement actionsRemaining (free once-per-turn action)', () => {
     const state = createTestState();
     const actionsBefore = state.actionsRemaining;
 
     executeAction(state, makeCommunityFavourAction('coins-to-rep'));
 
-    expect(state.actionsRemaining).toBe(actionsBefore - 1);
+    expect(state.actionsRemaining).toBe(actionsBefore);
   });
 
-  it('decrements bankedActions (capped at 0)', () => {
+  it('does not decrement bankedActions (free once-per-turn action)', () => {
     const state = createTestState();
-    const bankedBefore = state.bankedActions ?? 0;
+    state.bankedActions = 2;
 
     executeAction(state, makeCommunityFavourAction('coins-to-rep'));
 
-    // consumeAction uses Math.max(0, bankedActions - 1) so it never goes negative.
-    expect(state.bankedActions).toBe(Math.max(0, bankedBefore - 1));
+    expect(state.bankedActions).toBe(2);
   });
 });
 
-// ── AC4: No actions remaining → illegal ──────────────────────
+// ── AC1: free once-per-turn action stays legal with no actions left ──
 
-describe('No actions remaining throws', () => {
-  it('rejects coins-to-rep when actionsRemaining is 0', () => {
+describe('No actions remaining — free action still legal', () => {
+  it('allows coins-to-rep when actionsRemaining is 0', () => {
     const state = createTestState();
     state.actionsRemaining = 0;
+    const beforeCoins = state.resourceBank.coins;
 
-    expect(() =>
-      executeAction(state, makeCommunityFavourAction('coins-to-rep')),
-    ).toThrow('No actions remaining today');
+    expect(executeAction(state, makeCommunityFavourAction('coins-to-rep'))).toBeNull();
+    expect(state.resourceBank.coins).toBe(beforeCoins - state.config.favourCoinsToRepCost);
+    expect(state.favourUsedThisTurn).toBe(true);
+    expect(state.actionsRemaining).toBe(0);
   });
 
-  it('rejects rep-to-coins when actionsRemaining is 0', () => {
+  it('allows rep-to-coins when actionsRemaining is 0', () => {
     const state = createTestState();
     state.actionsRemaining = 0;
+    const beforeCoins = state.resourceBank.coins;
 
-    expect(() =>
-      executeAction(state, makeCommunityFavourAction('rep-to-coins')),
-    ).toThrow('No actions remaining today');
-  });
-
-  it('rejects when actionsRemaining is negative', () => {
-    const state = createTestState();
-    state.actionsRemaining = -1;
-
-    expect(() =>
-      executeAction(state, makeCommunityFavourAction('coins-to-rep')),
-    ).toThrow('No actions remaining today');
+    expect(executeAction(state, makeCommunityFavourAction('rep-to-coins'))).toBeNull();
+    expect(state.resourceBank.coins).toBe(beforeCoins + state.config.favourRepToCoinsCoinGain);
+    expect(state.favourUsedThisTurn).toBe(true);
+    expect(state.actionsRemaining).toBe(0);
   });
 });
 

@@ -113,7 +113,12 @@ describe('event actions respect the daily action budget', () => {
     const actions = enumerateLegalActions(state);
 
     expect(actions.some(a => EVENTS.has(a.type))).toBe(false);
-    expect(actions.map(a => a.type)).toEqual(['end-turn']);
+    // With the budget spent the surviving legal actions are free: end-turn
+    // plus the free once-per-turn Community Favour fallback (CG-0MSTOATDQ005XDET).
+    expect(actions.some(a => a.type === 'end-turn')).toBe(true);
+    expect(
+      actions.every(a => a.type === 'end-turn' || a.type === 'community-favour'),
+    ).toBe(true);
   });
 
   it('includes the free same-day composite play even at zero actions', () => {

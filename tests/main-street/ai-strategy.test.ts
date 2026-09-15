@@ -354,8 +354,10 @@ describe('GreedyStrategy', () => {
 
   it('ends turn when no beneficial actions are available', () => {
     const state = createTestState();
-    // Remove all market cards and events, and drain reputation so
-    // neither Community Favour direction is legal (CG-0MT5UPQGX005GWRP).
+    // Remove all market cards and events, and drain reputation so the
+    // Community Favour fallback is either illegal or neutral (score 1), which
+    // Greedy skips — leaving end-turn. Free once-per-turn action
+    // (CG-0MSTOATDQ005XDET) so its availability does not depend on the budget.
     state.market.cards = [];
     state.market.cards = [];
     state.resourceBank.reputation = 0;
