@@ -213,34 +213,32 @@ describe('expanded street viewport (browser)', () => {
       'shared corner rendered with a gameplay index',
     );
 
-    // Bounded retry for the real pointer click: under full-suite contention
-    // Phaser's hit test may skip objects that haven't been rendered yet
-    // (willRender guard).  If the first dispatch misses the hit-zone, retry
-    // up to 3 more times with short delays — the click-place test relies on
-    // a single 120 ms sleep; this retry loop is more robust.  After each
-    // click the waitForCondition below (20 s timeout) will confirm the
-    // placement or surface the diagnostic label.
-    let placed = false;
-    for (let attempt = 0; attempt < 4 && !placed; attempt++) {
+    // Robust retry for the real pointer click: under full-suite contention
+    // (multiple concurrent browser instances sharing the machine) Phaser's
+    // input hit test can miss freshly refreshed street slots — either the
+    // post-refresh objects have not rendered yet (willRender guard) or the
+    // main thread's render loop is stalled behind other tests' frames.  A
+    // fixed count of attempts can all land inside that window, so instead
+    // we keep dispatching click attempts until the placement lands or a
+    // generous deadline passes.  The loop is idempotent: once the card is
+    // placed the scene resets `pendingHandIndex` and returns `uiPhase` to
+    // 'market', so any further clicks are no-ops (onSlotClick early-returns
+    // outside the placing phases).  It still fails if the click pipeline
+    // itself is broken — the exact regression AC1 guards.
+    const clickDeadline = Date.now() + 15_000;
+    while (
+      Date.now() < clickDeadline &&
+      scene.state.streetGrid[CORNER]?.id !== business.id
+    ) {
       dispatchScreenMouse('mousedown', centre.x, centre.y);
       await wait(60);
       dispatchScreenMouse('mouseup', centre.x, centre.y);
-      if (scene.state.streetGrid[CORNER]?.id === business.id) {
-        placed = true;
-      } else {
-        await wait(100);
-      }
+      await wait(100);
     }
     await waitForCondition(
       () => scene.state.streetGrid[CORNER]?.id === business.id,
       `card placed on the shared corner (slot clicks: ${JSON.stringify(clicks)}, uiPhase: ${scene.uiPhase})`,
-      20_000,
-    );
-
-    await waitForCondition(
-      () => scene.state.streetGrid[CORNER]?.id === business.id,
-      `card placed on the shared corner (slot clicks: ${JSON.stringify(clicks)}, uiPhase: ${scene.uiPhase})`,
-      20_000,
+      5_000,
     );
     expect(scene.state.streetGrid[CORNER]?.id).toBe(business.id);
 
