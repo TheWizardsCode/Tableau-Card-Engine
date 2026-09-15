@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.1.16 (2026-09-15)
+### Features
+- Every card now has a unique art description, so the artwork you see will better match each card's identity. (CG-0MTFWELZA007BKQP)
+- Card costs now show in red and income in green, with no duplicate cost text on cards. (CG-0MTDMOYOL008IQVO)
+- Blocked actions now shake and play a sound so you instantly know why they failed. (CG-0MT5WD8DN002K7EK)
+- Events now offer accept-or-reject choices that can trigger follow-up story events. (CG-0MTSHG8RP008E128)
+- You can now close a business to free its slot for a new card, costing one action. (CG-0MT5XT7K3005IBBV)
+- Event cards now use your daily action, just like businesses. (CG-0MTFWBNL30043ZBM)
+- Upgrade cards now cost an action and go to your hand first, so you can choose when and where to play them. (CG-0MT3IYSRL001VVUP)
+- Fewer bugs and smoother gameplay from improved cleanup of game events. (CG-0MTXDWGY0005SY24)
+- New market cards now appear at the start of each day, so you can review your turn's results first. (CG-0MTIO6E1H00928NK)
+- Watch your income build step by step, seeing exactly where every coin comes from. (CG-0MT23O6W8003AXWJ)
+- Hire staff who walk in each turn to boost a business, but watch your salary costs. (CG-0MSTOATDU006UGAX)
+### Bug Fixes
+- Coin and reputation totals now match what the HUD shows, so you can trust your turn earnings. (CG-0MTINZ5GG007BH44)
+- Cards in hand no longer grant synergy income; only placed businesses count. (CG-0MTR317Q2003YCDN)
+- Release announcements now post reliably to Discord after each update. (CG-0MTOVUUW0006123V)
+- The tutorial now gives you enough actions each day to finish every step without getting stuck. (CG-0MTNMBX5Z002U0MH)
+- Fixed a bug where placing cards on shared corners could fail in the expanded view. (CG-0MU1MXBQL006SHDE)
+### Other
+- Cleaned up the codebase for smoother, more reliable gameplay. (CG-0MTCOQIRQ00541EJ)
+- Internal code cleanup that keeps gameplay stable and makes future updates faster. (CG-0MTXDU8GJ004ZB90)
+- Improved selection and hover responsiveness for smoother interactions. (CG-0MTXDWHTT00274G8)
+- Faster test feedback means quicker bug fixes and updates for you. (CG-0MSZ4TN5Z001JADX)
+- The activity log no longer shows routine market cycling messages, keeping it focused on events that matter. (CG-0MT5VXSSQ003O5ZC)
+
 ## Unreleased
 ### Features
 - Main Street: remove the baked `-X/turn` cost text from business/community-space card faces and render the overlay cash line two-tone (green income / red cost) (CG-0MTDMOYOL008IQVO)
