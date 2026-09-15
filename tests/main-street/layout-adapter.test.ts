@@ -80,6 +80,15 @@ describe('MainStreetLayoutAdapter', () => {
     expect(layout.handCenterX).toBe(410);
   });
 
+  it('resolves the staff-applicant overlay centre from the SLL applicantOverlay zone', () => {
+    const layout = computeMainStreetLayoutWithSll();
+    // applicantOverlay anchor 'center' = { x: 0.5, y: 0.4 } at 1280x720
+    // → 640, 288. Positioned via SLL (no hardcoded pixels) so the overlay
+    // tracks the declared layout rather than a magic constant.
+    expect(layout.applicantCenterX).toBe(640);
+    expect(layout.applicantCenterY).toBe(288);
+  });
+
   it('right column does not overlap with left-area sections horizontally', () => {
     const layout = computeMainStreetLayoutWithSll();
     // Right column starts at logX (960). Street grid ends at streetX + rowWidth (20 + 780 = 800).

@@ -21,6 +21,7 @@ import {
   checkEndConditions,
   executeDayStart,
   processEndOfTurn,
+  endTurnHeadless,
   executeFullTurn,
   type PlayerAction,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -764,7 +765,7 @@ describe('MainStreetEngine', () => {
       ];
       state.phase = 'MarketPhase';
 
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       expect(result.gameResult).toBe('loss');
       expect(state.endReason).toBe('bankruptcy');
@@ -802,7 +803,7 @@ describe('MainStreetEngine', () => {
           executeAction(state, action);
         }
 
-        processEndOfTurn(state);
+        endTurnHeadless(state);
       }
 
       // Should have placed some businesses
@@ -827,7 +828,7 @@ describe('MainStreetEngine', () => {
             executeAction(s, { type: 'buy-business', cardId: card.id, slotIndex: slot });
           }
 
-          processEndOfTurn(s);
+          endTurnHeadless(s);
         }
         return s;
       }
@@ -861,7 +862,7 @@ describe('MainStreetEngine', () => {
 
       // Run a turn
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       // Challenge should have been evaluated and completed (coins should still be >= 25 after a turn)
       expect(state.activeChallenges[0].completed).toBe(true);
@@ -879,7 +880,7 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 5; // Below 3000 threshold (ch-deep-pockets ×100)
 
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       expect(state.activeChallenges[0].completed).toBe(false);
       expect(state.challengesCompleted).not.toContain('ch-deep-pockets');
@@ -897,7 +898,7 @@ describe('MainStreetEngine', () => {
 
       const scoreBefore = computeScore(state);
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       // Score should now include the challenge bonus
       // Note: income/incidents may change coins/rep, but challengesCompleted.length changed by 1
@@ -922,7 +923,7 @@ describe('MainStreetEngine', () => {
 
       // Turn 1: complete the challenge
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       expect(state.activeChallenges[0].completed).toBe(true);
       expect(state.challengesCompleted).toContain('ch-deep-pockets');
 
@@ -930,7 +931,7 @@ describe('MainStreetEngine', () => {
       if (state.gameResult === 'playing') {
         state.resourceBank.coins = 5;
         executeDayStart(state);
-        processEndOfTurn(state);
+        endTurnHeadless(state);
         expect(state.activeChallenges[0].completed).toBe(true);
         expect(state.challengesCompleted.filter(id => id === 'ch-deep-pockets')).toHaveLength(1);
       }
@@ -947,7 +948,7 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 4000;
 
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       const challengeLog = state.activityLog.find(
         entry => entry.text.includes('Challenge completed') && entry.text.includes('Deep Pockets'),
@@ -961,7 +962,7 @@ describe('MainStreetEngine', () => {
       state.activeChallenges = [];
 
       executeDayStart(state);
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       // Should not crash; game continues
       expect(result.gameResult).toBeDefined();

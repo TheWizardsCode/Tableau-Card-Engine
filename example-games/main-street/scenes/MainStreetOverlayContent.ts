@@ -1,8 +1,12 @@
-import { sellBusinessCommand } from '../MainStreetCommands';
+import { sellBusinessCommand, closeBusinessCommand, letGoStaffCommand } from '../MainStreetCommands';
+import { canCloseBusiness } from '../MainStreetMarket';
 import { addLog } from '../MainStreetState';
+import type { EventCard, StaffCard } from '../MainStreetCards';
+import { SFX_KEYS } from './MainStreetConstants';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { TurnResult } from '../MainStreetEngine';
 import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
+import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
 import { TIER_DEFINITIONS, ORDERED_TIER_DEFINITIONS, highestUnlockedTier } from '../MainStreetTiers';
 import {
   isBuyAndPlacePremiumDialogDismissed,
@@ -266,12 +270,25 @@ export class MainStreetOverlayContent {
   }
 
   /**
-   * Shows a sell confirmation overlay for a card on the street grid.
-   * Presents card info, refund amount, and Sell / Cancel buttons.
+   * Shows the Manage Card overlay for a card on the street grid.
    *
-   * @param slotIndex The grid slot index of the card to sell.
+   * Presents card info, the sell refund, and [Sell] [Close] [Cancel] buttons.
+   * Sell keeps its existing free/refund behaviour (the card stays on the grid
+   * as an inert sold marker). Close spends exactly one daily action, grants no
+   * coins, and removes the card from the street entirely so the slot becomes
+   * placeable again — the action cost is charged by `closeBusinessCommand`
+   * through the shared `consumeAction` enforcement point.
+   *
+   * All text/buttons are parented into `hudContainer` and use the overlay
+   * depth convention (backdrop 199, box 200, interactive 201).
+   *
+   * When the card employs staff (job applicants, CG-0MSTOATDU006UGAX) the
+   * dialog also lists them and offers `[ Lay off ]`, which charges 1 turn's
+   * salary (clamped at 0 coins) + 1 reputation through `letGoStaffCommand`.
+   *
+   * @param slotIndex The grid slot index of the card to manage.
    * @param cardName  Display name of the card.
-   * @param refund    Calculated refund amount in coins.
+   * @param refund    Calculated sell refund amount in coins (Sell only).
    * @param info      Detailed card info text for display.
    */
   public showSellConfirmation(
@@ -282,9 +299,19 @@ export class MainStreetOverlayContent {
   ): void {
     const s = this.scene;
 
-    const panelW = 360;
-    const panelH = 300;
+    // Staff employed at this street card (CG-0MSTOATDU006UGAX): surfaced here
+    // so the player can actually let a member go. Their index in
+    // `state.staffCards` is what `letGoStaffCommand` expects.
+    const allStaff: StaffCard[] = (s.state.staffCards ?? []) as StaffCard[];
+    const employedStaff = allStaff
+      .map((member, index) => ({ member, index }))
+      .filter(({ member }) => member.employedAtSlot === slotIndex);
+
+    const panelW = 480;
+    // Extra height for the employed-staff row when it is present.
+    const panelH = employedStaff.length > 0 ? 410 : 360;
     const panelY = s.layout.gameH / 2 - panelH / 2;
+    const centerX = s.layout.gameW / 2;
 
     // Overlay background with semi-transparent backdrop
     const boxConfig = {
@@ -302,14 +329,14 @@ export class MainStreetOverlayContent {
     s.overlayObjects.push(...overlay.objects);
 
     // Title
-    const titleText = s.add.text(s.layout.gameW / 2, panelY + 25, 'Sell Card', {
+    const titleText = s.add.text(centerX, panelY + 24, 'Manage Card', {
       fontSize: '22px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(201);
     if (s.hudContainer) s.hudContainer.add(titleText);
     s.overlayObjects.push(titleText);
 
     // Card info text
-    const infoText = s.add.text(s.layout.gameW / 2, panelY + 65, info, {
+    const infoText = s.add.text(centerX, panelY + 58, info, {
       fontSize: '13px',
       color: '#ddccbb',
       fontFamily: FONT_FAMILY,
@@ -319,16 +346,25 @@ export class MainStreetOverlayContent {
     if (s.hudContainer) s.hudContainer.add(infoText);
     s.overlayObjects.push(infoText);
 
-    // Refund highlight
-    const refundText = s.add.text(s.layout.gameW / 2, panelY + 155, `Refund: +€${refund}`, {
+    // Sell refund highlight (Sell only — Close grants no coins)
+    const refundText = s.add.text(centerX, panelY + 186, `Sell refund: +€${refund}`, {
       fontSize: '20px', fontStyle: 'bold', color: '#44ff44', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5).setDepth(201);
     if (s.hudContainer) s.hudContainer.add(refundText);
     s.overlayObjects.push(refundText);
 
-    // Sell button
+    // Close cost line — makes the 1-action / no-coins cost explicit
+    const closeCostText = s.add.text(
+      centerX, panelY + 214,
+      'Close: costs 1 action, no refund — removes the card and frees the slot.',
+      { fontSize: '12px', color: '#ffcc88', fontFamily: FONT_FAMILY, align: 'center' },
+    ).setOrigin(0.5).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(closeCostText);
+    s.overlayObjects.push(closeCostText);
+
+    // Sell button — existing free/refund behaviour, unchanged
     const sellBtn = createOverlayButton(
-      s, s.layout.gameW / 2 - 100, panelY + 190,
+      s, centerX - 150, panelY + 265,
       '[ Sell ]', 201,
     );
     if (s.hudContainer) s.hudContainer.add(sellBtn);
@@ -374,18 +410,127 @@ export class MainStreetOverlayContent {
     });
     s.overlayObjects.push(sellBtn);
 
+    // Close button — 1 action, no coins, removes the card from the street
+    const closeBtn = createOverlayButton(
+      s, centerX, panelY + 265,
+      '[ Close ]', 201,
+    );
+    if (s.hudContainer) s.hudContainer.add(closeBtn);
+    closeBtn.on('pointerdown', () => {
+      let closed = false;
+      let failureReason = 'unknown';
+      let closedCardId = '';
+      let closedFamily: 'business' | 'community-space' = 'business';
+      try {
+        const legality = canCloseBusiness(s.state, slotIndex, false);
+        if (!legality.legal) {
+          failureReason = legality.reason ?? 'unknown';
+        } else {
+          // Capture identity before the card is removed from the grid.
+          const cardNow = s.state.streetGrid[slotIndex];
+          closedCardId = cardNow?.id ?? '';
+          closedFamily = cardNow?.family === 'community-space' ? 'community-space' : 'business';
+
+          const cmd = closeBusinessCommand(s.state, slotIndex);
+          if (s.undoManager) {
+            s.undoManager.execute(cmd);
+          } else {
+            cmd.execute();
+          }
+          s.instructionText?.setText(`Closed ${cardName} (−1 action)`);
+          closed = true;
+        }
+      } catch (e) {
+        console.error('[Close] Failed:', e);
+        failureReason = (e as Error).message;
+      }
+
+      // Dismiss the overlay
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      s.refreshAll();
+
+      if (closed) {
+        // Demolition (card to discard) — no refund coin fly for a close.
+        try {
+          void s.msAnimator.animateClose({
+            slotIndex,
+            cardId: closedCardId,
+            family: closedFamily,
+          });
+        } catch (_) {
+          // presentation-only — ignore
+        }
+      } else {
+        // Illegal close (no actions, sold, empty, wrong phase): auditable
+        // feedback with no state mutation.
+        safePlaySound(s, COMMON_SFX_KEYS.ILLEGAL_MOVE);
+        s.instructionText?.setText(`Cannot close: ${failureReason}`);
+      }
+    });
+    s.overlayObjects.push(closeBtn);
+
     // Cancel button
     const cancelBtn = createOverlayButton(
-      s, s.layout.gameW / 2 + 30, panelY + 190,
+      s, centerX + 150, panelY + 265,
       '[ Cancel ]', 201,
     );
     if (s.hudContainer) s.hudContainer.add(cancelBtn);
     cancelBtn.on('pointerdown', () => {
       dismissOverlay(s.overlayObjects);
       s.overlayObjects = [];
-      s.instructionText?.setText('Sale cancelled.');
+      s.instructionText?.setText('Cancelled.');
     });
     s.overlayObjects.push(cancelBtn);
+
+    // ── Employed staff / lay-off (CG-0MSTOATDU006UGAX) ──────────────
+    // Only rendered when somebody is actually employed here — no empty row
+    // and no button otherwise. Laying off the most recently hired member
+    // costs 1 turn's salary (clamped at 0 coins) + 1 reputation.
+    if (employedStaff.length > 0) {
+      const names = employedStaff.map(({ member }) => member.name).join(', ');
+      const staffLine = s.add.text(
+        centerX, panelY + 305,
+        `Employed here: ${names}\nLay off: costs 1 turn's salary + 1 reputation.`,
+        { fontSize: '12px', color: '#ffcc88', fontFamily: FONT_FAMILY, align: 'center' },
+      ).setOrigin(0.5).setDepth(201);
+      if (s.hudContainer) s.hudContainer.add(staffLine);
+      s.overlayObjects.push(staffLine);
+
+      const layOffBtn = createOverlayButton(s, centerX, panelY + 352, '[ Lay off ]', 201);
+      if (s.hudContainer) s.hudContainer.add(layOffBtn);
+      layOffBtn.on('pointerdown', () => {
+        const target = employedStaff[employedStaff.length - 1];
+        let laidOff = false;
+        try {
+          const cmd = letGoStaffCommand(s.state, target.index);
+          if (s.undoManager) {
+            s.undoManager.execute(cmd);
+          } else {
+            cmd.execute();
+          }
+          addLog(
+            s.state,
+            `Laid off ${target.member.name} (−1 salary, −1 reputation)`,
+            'loss',
+          );
+          s.instructionText?.setText(`Laid off ${target.member.name} (−1 reputation)`);
+          laidOff = true;
+        } catch (e) {
+          console.error('[LayOff] Failed:', e);
+          s.instructionText?.setText(`Error laying off: ${(e as Error).message}`);
+        }
+
+        dismissOverlay(s.overlayObjects);
+        s.overlayObjects = [];
+        s.refreshAll();
+
+        // The member leaves the business: discard SFX, illegal-move feedback
+        // on failure. Presentation-only — state is already committed above.
+        safePlaySound(s, laidOff ? SFX_KEYS.DISCARD : COMMON_SFX_KEYS.ILLEGAL_MOVE);
+      });
+      s.overlayObjects.push(layOffBtn);
+    }
   }
 
   /**
@@ -497,5 +642,114 @@ export class MainStreetOverlayContent {
       onCancel();
     });
     s.overlayObjects.push(cancelBtn);
+  }
+
+  /**
+   * Shows the dual-choice incident dialog (CG-0MTSHG8RP008E128).
+   *
+   * Presented when `processEndOfTurn` pauses with `choicePending` after a
+   * `hasChoices` incident was drawn (IncidentPhase). The player decides
+   * whether to Accept (the event's stated consequence applies) or Reject
+   * (the consequence is refused; an unknown escalation card is added to the
+   * incident deck). No preview of the escalation is shown — only the two
+   * buttons (AC13). Accepting or rejecting an incident is FREE (no action
+   * cost) — the player is forced to respond, not choosing to engage.
+   *
+   * Overlay pattern compliance (AGENTS.md UI Best Practices):
+   * createOverlayBackground + createOverlayButton from @ui; ALL elements are
+   * parented into `s.hudContainer`; depths 199 (backdrop) / 200 (box) /
+   * 201 (elements). Dialog appears instantly (no fade-in — reduced-motion
+   * safe); button SFX plays through safePlaySound (respects mute/volume).
+   * Cleanup on dismissal resets `s.overlayObjects`.
+   *
+   * @param event    The pending choice event (effect deferred).
+   * @param onAccept Called when the player accepts the consequence.
+   * @param onReject Called when the player refuses the consequence.
+   */
+  public showEventChoiceDialog(
+    event: EventCard,
+    onAccept: () => void,
+    onReject: () => void,
+  ): void {
+    const s = this.scene;
+    if (s.replayMode) return; // headless/replay: never present UI
+
+    const panelW = 500;
+    const panelH = 240;
+    const panelY = s.layout.gameH / 2 - panelH / 2;
+
+    // Overlay background with semi-transparent backdrop (199 / 200 / 201).
+    const boxConfig = {
+      width: panelW,
+      height: panelH,
+      color: 0x000000,
+      alpha: 1.0,
+      depth: 200,
+    };
+    const overlay = createOverlayBackground(
+      s,
+      { depth: 199, alpha: 0.6 },
+      boxConfig,
+    );
+    s.overlayObjects.push(...overlay.objects);
+
+    // Title: the event name (a decision is required).
+    const titleText = s.add.text(s.layout.gameW / 2, panelY + 28, event.name, {
+      fontSize: '21px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
+      align: 'center',
+      wordWrap: { width: panelW - 60 },
+    }).setOrigin(0.5).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(titleText);
+    s.overlayObjects.push(titleText);
+
+    // Body: what Accept does (the card's stated effect). No preview of the
+    // escalation either way — rejecting keeps the consequence unknown.
+    const bodyText = s.add.text(
+      s.layout.gameW / 2, panelY + 92,
+      `An incident has occurred.\nAccept: ${event.effect}\nReject: refuse this consequence — a different event will replace it.`,
+      {
+        fontSize: '13px',
+        color: '#ddccbb',
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        lineSpacing: 4,
+        wordWrap: { width: panelW - 70 },
+      },
+    ).setOrigin(0.5, 0).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(bodyText);
+    s.overlayObjects.push(bodyText);
+
+    // Accept button — label carries the event name per AC14: "Service Workers
+    // Strike (Accept)". Accepting is the safe path (no escalation).
+    const acceptBtn = createOverlayButton(
+      s, s.layout.gameW / 2 - 145, panelY + panelH - 45,
+      `${event.name} (Accept)`, 201,
+      { fontSize: '13px', color: '#88ff88', hoverColor: '#aaffaa' },
+    );
+    if (s.hudContainer) s.hudContainer.add(acceptBtn);
+    acceptBtn.on('pointerdown', () => {
+      // Button SFX always plays (reduced motion keeps sound).
+      safePlaySound(s, COMMON_SFX_KEYS.UI_CLICK);
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      onAccept();
+    });
+    s.overlayObjects.push(acceptBtn);
+
+    // Reject button — bare "Reject": the player accepts an unknown
+    // consequence may follow (AC15).
+    const rejectBtn = createOverlayButton(
+      s, s.layout.gameW / 2 + 145, panelY + panelH - 45,
+      'Reject', 201,
+      { fontSize: '13px', color: '#ffaa88', hoverColor: '#ffccaa' },
+    );
+    if (s.hudContainer) s.hudContainer.add(rejectBtn);
+    rejectBtn.on('pointerdown', () => {
+      safePlaySound(s, COMMON_SFX_KEYS.UI_CLICK);
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      onReject();
+    });
+    s.overlayObjects.push(rejectBtn);
   }
 }

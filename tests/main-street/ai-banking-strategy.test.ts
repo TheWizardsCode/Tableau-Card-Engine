@@ -17,9 +17,9 @@ import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {
+  endTurnHeadless,
   executeAction,
   executeDayStart,
-  processEndOfTurn,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   enumerateLegalActions,
@@ -605,7 +605,7 @@ describe('Greedy Strategy banking integration', () => {
         action = player.chooseAction(state);
       }
 
-      processEndOfTurn(state);
+      endTurnHeadless(state);
     }
 
     // Verify banking occurred (bankedActions should have changed from 0).
@@ -633,7 +633,7 @@ describe('Greedy Strategy banking integration', () => {
         actionsInTurn++;
       }
 
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       turnCount++;
     }
 

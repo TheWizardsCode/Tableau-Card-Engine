@@ -98,6 +98,13 @@ export interface CardTooltipInfoOptions {
    * market-row tooltip). Hand-held event cards omit these lines.
    */
   includeEventDetail?: boolean;
+  /**
+   * Append the reason a card cannot be acted on right now (no daily actions
+   * left) to the full card details. Additive by design: the complete card
+   * tooltip is preserved (CG-0MT24RFIV007NQMP) and the blocking reason is
+   * added alongside it (CG-0MT3IYSRL001VVUP).
+   */
+  noActionsRemaining?: boolean;
 }
 
 /**
@@ -173,7 +180,12 @@ export function buildCardTooltipInfo(
     }
     case 'upgrade': {
       const u = card;
-      return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}`;
+      const noActions = options.noActionsRemaining ? '\nNo actions remaining today — end your turn.' : '';
+      // CG-0MT3IYSRL001VVUP: upgrades follow the business-card economy — the
+      // market click moves the card to hand (1 action; same-day apply is a
+      // free composite, a held apply costs 1 action); dragging it onto a
+      // business buys-and-applies immediately at the +50% premium.
+      return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nClick: move to hand (1 action)\nDrag: buy & apply now (+50%)\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}${noActions}`;
     }
     case 'staff': {
       // Staff cards are hired directly from the general market row

@@ -109,7 +109,7 @@ export class MainStreetSvgTextureManager {
     }
 
     if (count > 0) {
-      console.log('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data');
+      console.info('[MainStreetSvgTextureManager] Regenerated ' + count + ' card SVGs from CSV data');
     }
 
     return count;

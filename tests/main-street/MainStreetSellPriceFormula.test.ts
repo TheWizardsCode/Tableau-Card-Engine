@@ -33,7 +33,13 @@ import {
 } from '../../example-games/main-street/MainStreetAdjacency';
 
 function createTestState(seed: string = 'sell-price-test'): MainStreetState {
-  return setupMainStreetGame({ seed });
+  const state = setupMainStreetGame({ seed });
+  // Sell-price tests reason about refund maths, not affordability: give the
+  // street enough coins that the initial market row's business is always
+  // purchasable regardless of seeded composition (content expansion re-rolls
+  // which business appears in the row).
+  state.resourceBank.coins = 20000;
+  return state;
 }
 
 function placeCardOnGrid(state: MainStreetState, slotIndex: number): BusinessCard | CommunitySpaceCard | null {

@@ -153,6 +153,16 @@ async function waitForPremiumDialog(scene: Scene, label = 'premium dialog to app
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (isDialogOpen(scene)) return;
+    // Fast-fail on a terminal no-dialog state instead of polling the full
+    // budget: when the premium placement was rejected (affordability
+    // pre-gate, CG-0MT24X0SX007RLHN), the controller returns to the market
+    // phase with an Error instruction and never opens the dialog. Detect that
+    // end state (phase market = no transfer in flight) and surface the actual
+    // reason in ~1s rather than a bare 60s timeout.
+    const instruction = (scene as any).instructionText?.text as string | undefined;
+    if (scene.uiPhase === 'market' && typeof instruction === 'string' && instruction.includes('Error:')) {
+      throw new Error(`Premium placement rejected before dialog: ${instruction}`);
+    }
     if (await loopIsFrozen(scene)) {
       await waitForLoopRevival(scene, Math.min(2_000, deadline - Date.now()));
       continue;
@@ -363,7 +373,14 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     const scene = getScene(game);
     await waitForMarketReady(scene);
     await waitForSettled(scene);
-    scene.state.resourceBank.coins = 2000;
+    // Coin budget must cover TWO premium placements even when the seeded
+    // row's first grid-placeable card is an expensive one (e.g. a Library,
+    // cost 700 → premium 1050): otherwise the second, deterministically
+    // injected Library placement trips the affordability pre-gate (no dialog
+    // fires, card stays in hand) and waitForPremiumDialog times out. 5000
+    // comfortably covers two premium placements at the most expensive row
+    // card (premium ≤ 1200 each).
+    scene.state.resourceBank.coins = 5000;
 
     // ── Same-day BUSINESS card: dialog appears, Proceed places at +50%. ──
     const card = firstBuyableCard(scene);

@@ -18,7 +18,7 @@ import type { MainStreetState } from '../example-games/main-street/MainStreetSta
 import {
   executeDayStart,
   executeAction,
-  processEndOfTurn,
+  endTurnHeadless,
   type PlayerAction,
 } from '../example-games/main-street/MainStreetEngine';
 import {
@@ -154,7 +154,7 @@ function runScenario(scenario: ScenarioExpectation): ScenarioResult {
       if (action.type === 'end-turn') break;
       try { executeAction(state, action); } catch { /* skip */ }
     }
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     turnCount++;
     if (state.gameResult !== 'playing') break;
   }

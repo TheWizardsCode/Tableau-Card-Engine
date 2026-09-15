@@ -1,3 +1,9 @@
+
+// <!-- REFACTOR-CG-0MTP6KUL80008VMR
+// smell: ban_ts_comment
+// severity: low
+// description: Stale test disables + ban-ts-comment: SettingsStore 29 @ts-ignore→@ts-expect-error, 4 unused @typescript-eslint disables (Applicant 44, community-space-types 226, LegalityResult 43,50), 8 no-console console.log in tests/screenshots; FeudalismAudioResilience 144 no-direct-sound-play is intentional throw proof not filed.
+// -->
 import { describe, it, expect, vi } from 'vitest';
 import {
   getReducedMotion,
@@ -26,7 +32,6 @@ describe('SettingsStore persistence', () => {
     const storage = createMockStorage();
     setSelectedDifficulty('Hard', storage);
     // ensure setItem was called when persisting
-    // @ts-ignore access underlying mock setItem spy
     expect(storage.setItem).toHaveBeenCalled();
     const restored = getSelectedDifficulty(storage);
     expect(restored).toBe('Hard');

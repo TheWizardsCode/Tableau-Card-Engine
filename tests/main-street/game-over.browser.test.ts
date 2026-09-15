@@ -72,6 +72,7 @@ function gameOverResult(isWin: boolean): TurnResult {
     finalScore: isWin ? 100 : 0,
     gameResult: isWin ? 'win' : 'loss',
     newlyCompletedChallenges: [],
+    choicePending: false,
   };
 }
 

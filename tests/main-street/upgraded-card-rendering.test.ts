@@ -99,14 +99,16 @@ describe('buildUpgradeOverlaySpec', () => {
       expect(spec.cashLine!.text).toBe('Cash: +3');
     });
 
-    it('positions the cash line centred on the card', () => {
-      const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
+    it('positions the cash line in the right column (left-anchored, never inside 64×64 graphic)', () => {
+      const width = 200;
       const height = 280;
-      const spec = buildUpgradeOverlaySpec(biz, 200, height);
+      const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
+      const spec = buildUpgradeOverlaySpec(biz, width, height);
       expect(spec.cashLine).not.toBeNull();
-      // Cash line is centred: x=0 horizontally, y slightly above centre
-      expect(spec.cashLine!.x).toBe(0);
-      // y should be negative (above centre) and near zero (centre of card)
+      // Right column: x = -w/2 + 80 (maps to SVG TEXT_MIN_X 80), left-anchored
+      expect(spec.cashLine!.x).toBe(Math.round(-width / 2 + 80));
+      expect(spec.cashLine!.originX).toBe(0);
+      // y slightly above centre, near zero
       expect(spec.cashLine!.y).toBeLessThan(0);
       expect(spec.cashLine!.y).toBeGreaterThan(-height * 0.2);
     });

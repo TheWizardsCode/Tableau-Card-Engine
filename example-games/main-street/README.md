@@ -4,6 +4,18 @@ Main Street now uses the shared **Screen Layout Language (SLL)** as its canonica
 
 The street is a 10-slot grid rendered as **2 rows × 5 columns**; synergy adjacency is **8-way (Chebyshev)** — orthogonally *and* diagonally adjacent slots count as neighbors (CG-0MSP1HCAS00785MP).
 
+## Upgrade cards: hand-first economy (CG-0MT3IYSRL001VVUP)
+
+Upgrade cards follow the business-card action economy — they are never a free second daily action:
+
+- **Click** a market upgrade → the card **moves to hand** for **1 daily action** and rests unselected.
+- **Play from hand** → click the upgrade, then a matching business. A **same-day** apply is a **free composite** (the move already spent the action); an upgrade **held from a previous day** costs **1 action** when applied.
+- **Drag** the upgrade from the market straight onto a matching business → **buy & apply now** for **1 action at the +50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`), identical to business buy-and-place. Illegal drops snap back with feedback and spend nothing.
+- When the action budget is spent the upgrade is dimmed and buying/playing it is rejected (unless a same-day composite is still pending).
+- **Escape** cancels an in-progress upgrade (or business) targeting phase — the card stays in hand and the same-day composite stays free. Escape only opens Settings when nothing is being targeted.
+
+Event cards moved the same way (each of move-to-hand / play-from-hand costs 1 action, CG-0MTFWBNL30043ZBM); refresh, sell, hint, discard, community favour and end-turn remain non-action operations.
+
 ## End-of-turn income: phased presentation (CG-0MT23O6W8003AXWJ)
 
 Ending a turn with producing businesses on the street plays a **phased
@@ -45,6 +57,68 @@ Rules:
 - **Tutorial:** T13 teaches the rep→coins exchange, which speeds up the $7 Library purchase under the 12-coin scenario budget; the tutorial starts with 12 coins so the exchange is available from the first day (the tutorial's two-turn plan-ahead flow budgets it, but it is not strictly required — the budget table comments in `TutorialScenario.ts` show the Library remains affordable without it).
 - **Persistence:** `favourUsedThisTurn` is serialized with legacy-save backfill to `false`.
 
+## Street map camera: zoom and pan (CG-0MTH9OVMC001V44E)
+
+The street board is viewed through a **map-style camera** (`MainStreetMapView.ts`,
+pure geometry/camera maths, plus the Phaser wiring in `MainStreetRenderer`).
+
+- **Zoom levels.** Level 1 is the legacy framing (container scale `1`, identity
+transform), so the pre-camera 10-slot layout is reproduced exactly. Each level
+up zooms the map *out* by `scale = 1 / level` (max level 4 → 50 %/33 %/25 %).
+- **Controls (always available).** Never gated by milestones, turns, or
+resources: mouse wheel over the street band, the on-screen `−`/`+` controls at
+the top-right of the street band, `+`/`-` keys, arrow keys to pan, and `0` to
+reset the framing. Dragging the street backdrop pans while zoomed out.
+- **Viewport clipping.** Only `streetContainer` is transformed; the street layer
+is clipped to the street band by a `GeometryMask`, so HUD chrome (market, hand,
+log, challenges) stays fixed and revealed neighbouring streets can never
+overdraw it.
+- **Lattice.** `scene.setStreetViewLattice(cols, rows)` sets how many street
+cells the map displays (default `1×1`). Cells outside the playable board are
+**view-only**; `scene.setStreetPlayableLattice(cols, rows)` grows the playable
+board itself (re-indexing `state.streetGrid` by world position), so expanded
+streets, shared seams and four-way intersections become placeable
+(CG-0MTH9OW0H0005VKE). The board defaults to `1×1`, anchored at the legacy
+layout origin, so the shipping game is unchanged unless a caller expands it.
+Adjacent streets share their touching slot column/row, so a `3×3` lattice
+collapses to 52 unique plots.
+- **Node model (CG-0MTYMD2Q5008UXB9).** The map and the adjacency resolver share
+one **planar seam-sharing** topology. Street cells are tiled with a stride of
+`(STREET_COLS−1, STREET_ROWS−1) = (4, 1)`, so adjacent streets overlap on their
+whole touching column/row and a four-way intersection is a single shared plot.
+A `cols×rows` lattice therefore occupies a solid, hole-free rectangle of world
+positions — `worldSlotCount(cols, rows) = ((STREET_COLS−1)·cols+1) ×
+((STREET_ROWS−1)·rows+1)`, i.e. 10 / 18 / 15 / 27 / 39 / 52 for 1×1, 2×1, 1×2,
+2×2, 3×2, 3×3 — and world indices are row-major over that rectangle (worldY
+ascending, then worldX ascending). Because the world set is planar, 8-way
+Chebyshev adjacency over world coordinates is exactly the visual adjacency the
+player sees. `MainStreetMapView.mapSlotCount()` and
+`MainStreetAdjacency.worldSlotCount()` are asserted equal in the contract
+tests, so the rendered geometry and the gameplay adjacency can never drift
+apart.
+- **Shared street corners (player view).** Where four streets meet, the corner
+plot is a **single plot holding one card** that belongs to all four streets at
+once. A business on a shared corner earns synergy from matching neighbours in
+every adjacent street (8-way / Chebyshev adjacency), and — because it is one
+plot — it is selected, tooltipped, sold or closed **once**, from whichever
+street you click it in. Shared seam plots (the row/column where two streets
+overlap) behave the same way for the two streets they join, so a card there is
+adjacent to neighbours on both sides of the seam.
+- **Reduced motion.** Zoom transitions are skipped
+(`settingsPanel.reducedMotion`), applying the new framing instantly.
+- **Input.** Phaser applies container transforms to input hit testing, so slot
+clicks and drag-drop keep working at any zoom/pan; `scene.getStreetSlotCenter()`
+returns camera-transformed coordinates for animations.
+- **Persistence (CG-0MTH9OWF2002YQQ3).** The camera (`streetCamera:
+{ zoomLevel, focusX, focusY }`) and the grid dimensions
+(`streetGridCols`/`streetGridRows`) are part of the serialized state, so a
+checkpoint resume restores the same framing. The scene captures the live camera
+into state before saving (`syncStreetCameraToState()`) and reapplies it after
+resume (`syncStreetCameraFromState()`). Legacy saves without these fields load
+as `1×1` with the default camera — the save schema version stays `1` because
+`SaveLoadStore` rejects version mismatches; migration defaults provide backward
+compatibility.
+
 ## Layout files and adapter
 
 - Canonical layout JSON: `example-games/main-street/layouts/main-street.layout.json`
@@ -75,6 +149,10 @@ npx vitest run tests/ui/screen-layout-schema.test.ts tests/ui/screen-layout-mapp
 # Main Street browser/layout coverage
 npx vitest run tests/main-street/MainStreetLayoutAnchors.browser.test.ts --project browser
 npx vitest run tests/main-street/MainStreetScene.browser.test.ts --project browser
+
+# Street map camera (zoom/pan, culling, camera-mapped input)
+npx vitest run tests/main-street/map-view.test.ts --project unit
+npx vitest run tests/main-street/camera-zoom.browser.test.ts --project browser
 
 # Replay-based canonical resolution assertion
 npx vitest run tests/e2e/replay-main-street.e2e.test.ts --project unit
@@ -201,6 +279,47 @@ Duration events (e.g. Flu Outbreak) also use:
 | `ongoingCost` | number | Per-turn coin cost after hiring |
 | `handSlotsAdded` | number | Additional hand slots provided |
 
+### Job-applicant mechanic (CG-0MSTOATDU006UGAX)
+
+A second staff mechanic runs alongside the hand-slot staff above: **job
+applicants** who are employed at a specific deployed business and grant that
+business a passive specialization buff (per-business employment).
+
+- **Trigger:** at DayStart each turn there is a chance `(reputation + income
+  per turn)%` (capped at 15%) that a staff member applies for work. An
+  applicant only targets a deployed business with a free employment slot.
+- **Presentation:** the applicant card walks on from the **left** of the
+  screen with Hire / Decline buttons (SLL-positioned, animated with SFX and
+  reduced-motion fallbacks — AGENTS.md rule 8).
+- **Hire:** free (no coins, no action), but adds an ongoing per-turn salary
+  deducted during the income phase alongside other staff/community-space
+  ongoing costs (clamped at 0 coins).
+- **Decline / end-turn:** the card walks off to the right; an applicant left
+  unresolved at end-of-turn auto-declines without blocking the turn.
+- **Employment slots:** a business can employ one staff member per level
+  (`level + 1` slots, minimum 1).
+- **Let-go:** open the **Manage Card** dialog on a street card (click it to
+  sell/manage) and press **[ Lay off ]** — shown only when somebody is
+  employed there. It lists who is employed and costs **1 turn's salary + 1
+  reputation**; the member's buff stops applying from the next income phase.
+  The lay-off is undoable via the scene's undo stack.
+
+Engine functions: `resolveStaffApplicant`, `hireStaffApplicant`,
+`declineStaffApplicant`, `letGoStaffMember`, `getEmploymentCapacity`,
+`getEmployedStaffCountAt`, `canHireStaffApplicant` (all in
+`MainStreetEngine.ts`). Scene wiring: `MainStreetScene.onHireApplicant` /
+`onDeclineApplicant`, `MainStreetRenderer.refreshApplicant`,
+`MainStreetAnimator.animateApplicantWalkOn/WalkOff/WalkIn`.
+
+**Dev-only cheat (CG-0MTY9PB51008OG5A):** the Settings panel's Debug Tools
+section (dev builds only) includes a **Staff Application** toggle. Turning it
+on sets `state.forcedStaffApplicant = true`, which forces the applicant
+trigger at every day start (bypassing the `min(income+rep, 15)%` RNG roll)
+while still requiring an eligible business with a free employment slot. The
+overlay shows the live computed chance. The flag is session-only (not
+serialized) and is suppressed in tutorial/headless runs where
+`state.suppressApplicant` is true.
+
 ### Editing the CSV
 
 To add, remove, or modify cards, edit `card-data.csv` directly. The CSV is
@@ -253,7 +372,7 @@ Main Street Milestone 5 (CG-0MOY5TOJK008JFJM) adds a first-time player onboardin
 
 ### Action-Gated Tutorial Flow
 
-- **Module:** `TutorialFlow.ts` — T1-T24 step definitions with pure progression controller (CG-0MTNMBX5Z002U0MH).
+- **Module:** `TutorialFlow.ts` — T1-T26 step definitions with pure progression controller (CG-0MTNMBX5Z002U0MH).
 - Each step gates on a specific player action (confirm, select-business, place-business, end-turn, etc.)
 - Invalid actions show: "Complete the highlighted step first."
 

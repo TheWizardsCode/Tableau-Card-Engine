@@ -1,17 +1,19 @@
 /**
  * Main Street: Adjacency & Income Calculation
  *
- * Implements the adjacency resolver for the 2x5 street grid
- * (stored as a 10-slot row-major array) and income computation
- * (base income + synergy bonuses). Upgrades can extend synergy
- * range beyond the default 1-cell 8-way (Chebyshev) adjacency.
+ * Implements the adjacency resolver for the street lattice and income
+ * computation (base income + synergy bonuses). The legacy 2x5 board is the 1×1
+ * case of a general lattice of 5×2 street cells; expanded lattices use a planar
+ * seam-sharing world grid (see the "Expanded Grid Topology" section below).
+ * Upgrades can extend synergy range beyond the default 1-cell 8-way (Chebyshev)
+ * adjacency.
  *
  * @module
  */
 
-import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
 import { getBaseTypeId } from './MainStreetCards';
-import { GRID_SIZE } from './MainStreetCards';
+import { GRID_SIZE, STREET_COLS, STREET_ROWS } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier, roundInt } from './MainStreetDifficulty';
@@ -24,52 +26,27 @@ import {
 // ── Adjacency Resolver ──────────────────────────────────────
 
 /**
- * Returns the indices of neighboring slots within a given range
- * on the Main Street 2x5 grid.
+ * Returns the indices of neighboring slots within a given range on the
+ * legacy 1×1 (2x5, 10-slot) Main Street grid.
  *
  * Slot indices are row-major:
  *   row 0: 0..4
  *   row 1: 5..9
  *
- * Adjacency is 8-way (Chebyshev distance: max(|dx|, |dy|) <= range),
- * so diagonally adjacent slots count at every range. Default range is 1
- * (the 8 surrounding slots); upgrades extend this radius as larger
- * 8-way squares.
+ * Adjacency is 8-way (Chebyshev distance: max(|dx|, |dy|) <= range), so
+ * diagonally adjacent slots count at every range. Default range is 1 (the 8
+ * surrounding slots); upgrades extend this radius as larger 8-way squares.
+ *
+ * This is a 1×1 convenience wrapper over the single world-coordinate resolver
+ * (`resolveNeighbors`), which also handles expanded lattices — there is only
+ * one adjacency implementation (CG-0MTYMD2Q5008UXB9).
  *
  * @param index  The slot index to find neighbors for.
  * @param range  How far to look in each direction (default 1).
- * @returns Array of neighbor indices (excluding the slot itself).
+ * @returns Ascending array of neighbor indices (excluding the slot itself).
  */
-const STREET_COLS = 5;
-
-function toGridPosition(index: number): { x: number; y: number } {
-  return {
-    x: index % STREET_COLS,
-    y: Math.floor(index / STREET_COLS),
-  };
-}
-
 export function neighbors(index: number, range: number = 1): number[] {
-  if (index < 0 || index >= GRID_SIZE || range <= 0) return [];
-
-  const origin = toGridPosition(index);
-  const result: number[] = [];
-
-  for (let i = 0; i < GRID_SIZE; i++) {
-    if (i === index) continue;
-    const p = toGridPosition(i);
-    // 8-way (Chebyshev) distance: diagonally adjacent slots count at range 1,
-    // and range upgrades expand as larger 8-way squares (CG-0MSP1HCAS00785MP).
-    const distance = Math.max(
-      Math.abs(origin.x - p.x),
-      Math.abs(origin.y - p.y),
-    );
-    if (distance <= range) {
-      result.push(i);
-    }
-  }
-
-  return result.sort((a, b) => a - b);
+  return resolveNeighbors(index, range);
 }
 
 /**
@@ -455,73 +432,50 @@ export function updateNeighborsOnSale(
   }
 }
 
-
 /**
- * Computes the total synergy bonus contributed by hand cards to tableau businesses.
+ * Updates all cards whose cached income/reputation could be affected by the
+ * close (full removal) of the card at `index`.
  *
- * Each hand card contributes Math.floor(card.baseIncome / 3) to each tableau
- * business that shares at least one synergy type.
+ * The closed slot is already `null` when this runs. Unlike a sale — where the
+ * card remains on the grid as an inert synergy anchor — a closed card is gone
+ * entirely, so neighbours lose any synergy it previously contributed. Every
+ * remaining occupied, non-sold slot is recalculated.
  *
- * @param grid  The street grid (tableau businesses).
- * @param hand  Cards held in the player's hand.
- * @returns The total hand card synergy bonus added to all tableau businesses.
+ * @param state Current game state.
+ * @param index The slot index the closed card occupied (now empty).
  */
-export function computeHandCardSynergyBonus(
-  grid: (BusinessCard | CommunitySpaceCard | null)[],
-  hand: (BusinessCard | CommunitySpaceCard | EventCard | UpgradeCard)[],
-  soldSlots: boolean[] = [],
-): number {
-  if (!hand || hand.length === 0) return 0;
-
-  let total = 0;
-
-  for (const handCard of hand) {
-    // Event and upgrade cards have no synergy types — only business cards contribute.
-    if (handCard.family === 'event' || handCard.family === 'upgrade') continue;
-    if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
-
-    // Each hand card provides floor(baseIncome/3) to each matching synergy business
-    const bonusPerMatch = Math.floor(handCard.baseIncome / 3);
-    if (bonusPerMatch <= 0) continue;
-
-    for (let i = 0; i < grid.length; i++) {
-      // Skip sold slots (sold cards don't benefit from synergy)
-      if (soldSlots[i]) continue;
-      const business = grid[i];
-      if (!business) continue;
-
-      // A card with zero synergy values does not participate in synergy
-      if (effectiveSynergyCoinBonus(business) === 0 && effectiveSynergyRepBonus(business) === 0) {
-        continue;
-      }
-      // Check if any of the hand card's synergy types match the business's types
-      const hasMatch = handCard.synergyTypes.some(
-        (st: SynergyType) => business.synergyTypes.includes(st),
-      );
-      if (hasMatch) {
-        total += bonusPerMatch;
-      }
+export function updateNeighborsOnClose(
+  state: MainStreetState,
+  index: number,
+): void {
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    if (i === index) continue;
+    if (state.soldSlots[i]) continue;
+    if (state.streetGrid[i] !== null) {
+      recalculateCard(state, i);
     }
   }
-
-  return total;
 }
 
+
 /**
- * Computes the total income across all businesses on the street grid,
- * optionally including synergy bonuses from hand cards.
+ * Computes the total income across all businesses on the street grid.
  *
- * Returns both the total and a per-slot breakdown for UI display.
+ * Returns both the total and a per-slot breakdown for UI display. Board
+ * adjacency synergy (computeSynergyBonus) is folded into each slot's total;
+ * hand cards never contribute (producer rule CG-0MTRDX0DN004EECN).
  *
  * @param grid               The street grid.
  * @param bonusPerNeighbor   Global multiplier on per-card coin synergy (defaults to 1).
- * @param hand               Optional: hand cards to include for synergy bonuses.
+ * @param hand               Retained for API compatibility; hand cards have no effect.
  * @returns Object with `total` income and `breakdown` per slot.
  */
 export function computeIncome(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   bonusPerNeighbor: number = 1,
-  hand?: BusinessCard[],
+  // Hand cards are not in play and never contribute synergy (CG-0MTRDX0DN004EECN);
+  // the parameter is retained for positional-argument compatibility.
+  _hand?: BusinessCard[],
   soldSlots: boolean[] = [],
   gridDims?: GridDims,
 ): IncomeResult {
@@ -553,41 +507,6 @@ export function computeIncome(
     total += slotTotal;
   }
 
-  // Add hand card synergy bonuses to the total
-  let handSynergyTotal = 0;
-  if (hand && hand.length > 0) {
-    handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
-    total += handSynergyTotal;
-
-    // Add hand synergy to each slot's total in the breakdown
-    // Distribute proportionally for accurate per-slot display
-    if (handSynergyTotal > 0) {
-      for (let i = 0; i < grid.length; i++) {
-        const business = grid[i];
-        if (!business) continue;
-
-        // Calculate hand synergy contribution per business
-        let perSlotHandSynergy = 0;
-        for (const handCard of hand) {
-          if (!handCard.synergyTypes || handCard.synergyTypes.length === 0) continue;
-              const hasMatch = handCard.synergyTypes.some(
-            (st: SynergyType) => business.synergyTypes.includes(st),
-          );
-          if (hasMatch) {
-            perSlotHandSynergy += Math.floor(handCard.baseIncome / 3);
-          }
-        }
-
-        if (perSlotHandSynergy > 0) {
-          const slot = breakdown.find(s => s.slotIndex === i);
-          if (slot) {
-            slot.total += perSlotHandSynergy;
-          }
-        }
-      }
-    }
-  }
-
   // ── Per-phase breakdown (CG-0MT23O6W8003AXWJ) ──────────────
   // computeIncome is a preview/read-only path (no multipliers / active
   // effects), so phase data is base + synergy only; rep/event/upcoming
@@ -601,12 +520,11 @@ export function computeIncome(
     eventDeltas: [],
     upcomingDeltas: [],
   }));
-  const sumBase = perSlotBreakdown.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
-  if (handSynergyTotal > 0) {
-    for (const pd of perSlotBreakdown) {
-      if (sumBase > 0) pd.synergyBonus = handSynergyTotal * (pd.baseIncome / sumBase);
-    }
-  }
+
+  // Hand cards are NOT in play and contribute no synergy (producer rule,
+  // 2026-09-07 — CG-0MTRDX0DN004EECN). The `hand` parameter is retained for
+  // API compatibility but is intentionally ignored.
+  const handSynergyTotal = 0;
 
   return {
     total,
@@ -648,20 +566,24 @@ export function computeReputationPerTurn(
 
 /**
  * Applies income to the player's resource bank.
+ *
+ * Canonical turn-economy segment (CG-0MTINZ5GG007BH44, Q1=c — see
+ * MainStreetDifficulty header): dayStart snapshot → placement deductions →
+ * this breakdown (staff buffs → income-multiplier effects → rep multiplier)
+ * → ongoing costs → incident → net row. Hand cards contribute no income
+ * (CG-0MTRDX0DN004EECN). The reputation multiplier is sampled here AFTER
+ * rep-per-turn has already been credited (Q1=c), so buildCoinsTooltip's
+ * preview and this credited path agree when both read the post-income rep.
+ *
  * Mutates state in-place. Uses config.synergyBonusPerNeighbor from the
- * active difficulty preset.
- *
- * Income is scaled by the reputation coin multiplier (CG-0MMLR38NJ1N11DOS)
- * so that higher reputation yields proportionally more income.
- *
- * Reputation-per-turn from cards (e.g. Clinic) is applied during this phase.
+ * active difficulty preset. Reputation-per-turn from cards (e.g. Clinic)
+ * is applied during this phase.
  *
  * @param state  Current game state (mutated).
  * @returns The IncomeResult for UI display (pre-multiplier breakdown,
  *          but total reflects the multiplied amount actually credited).
  */
 export function applyIncome(state: MainStreetState): IncomeResult {
-  const hand = state.hand ?? [];
   const soldSlots = state.soldSlots ?? [];
   const grid = state.streetGrid;
 
@@ -779,22 +701,17 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     state.resourceBank.reputation += modifiedRepPerTurn;
   }
 
-  // Hand card synergy is still computed fresh each turn (it is not adjacency-based
-  // and operates on hand cards whose state changes independently).
-  let handSynergyTotal = 0;
-  if (hand && hand.length > 0) {
-    handSynergyTotal = computeHandCardSynergyBonus(grid, hand, soldSlots);
-    total += handSynergyTotal;
-  }
+  // Hand cards are NOT in play — they contribute no street income. Only
+  // businesses placed on the street produce synergy (baked into currentIncome
+  // / baseIncome). handSynergyTotal is kept as a constant 0 for API compat.
+  const handSynergyTotal = 0;
 
-  // ── Distribute rep bonus + hand synergy across producing slots ──
+  // ── Distribute rep bonus across producing slots ──
   // `multiplied` is the actual credited amount; `modifiedTotal` is the total
   // after income-multiplier effects. The reputation phase contributes
   // `multiplied - modifiedTotal`, distributed proportionally to each slot's
-  // post-effect income. Hand synergy is distributed proportionally to base
-  // income. Exact integer values throughout.
+  // post-effect income. Exact integer values throughout.
   const repBonus = multiplied - modifiedTotal;
-  const sumPhaseTotal = phaseSlotData.reduce((acc, s) => acc + s.baseIncome, 0) || 0;
   const modifiedSlotTotals = phaseSlotData.map(
     (d) => d.baseIncome + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
   );
@@ -803,9 +720,6 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     const pd = phaseSlotData[i];
     if (sumModifiedSlotTotals > 0) {
       pd.repBonus = repBonus * (modifiedSlotTotals[i] / sumModifiedSlotTotals);
-    }
-    if (sumPhaseTotal > 0 && handSynergyTotal > 0) {
-      pd.synergyBonus = handSynergyTotal * (pd.baseIncome / sumPhaseTotal);
     }
   }
 
@@ -820,9 +734,6 @@ export function applyIncome(state: MainStreetState): IncomeResult {
   if (repPerTurn > 0) {
     addLog(state, `Reputation from cards: +${repPerTurn} (${describeEventEffects(0, repPerTurn)})`, 'gain');
   }
-  if (handSynergyTotal > 0) {
-    addLog(state, `Hand card synergy: +${handSynergyTotal} coins (${describeEventEffects(handSynergyTotal, 0)})`, 'gain');
-  }
   return {
     total,
     breakdown,
@@ -832,6 +743,219 @@ export function applyIncome(state: MainStreetState): IncomeResult {
       handSynergyTotal,
     },
   };
+}
+
+// ── Per-Owner Income Routing (competitive, CG-0MTIIL6J200291ZQ) ──
+
+/**
+ * Resolves the owner of a street slot in competitive mode.
+ *
+ * Reads the owner-tagged grid (state-model sibling) and falls back to the
+ * active player (0 in single-player) when a slot is not yet tagged — this
+ * keeps headless flows that place cards through the shared single-wallet
+ * path deterministic even before ownership tagging lands at every site.
+ *
+ * @param state      Current game state.
+ * @param slotIndex  Street grid slot index.
+ * @returns The owning player index (always an integer).
+ */
+export function getSlotOwnerId(state: MainStreetState, slotIndex: number): number {
+  const tag = state.ownerTaggedGrid?.[slotIndex];
+  if (tag && tag.ownerId !== null) return tag.ownerId;
+  return state.activePlayerId ?? 0;
+}
+
+/**
+ * Tags a street slot with its owner when the state is competitive
+ * (`ownerTaggedGrid` present). No-op in single-player state. The card
+ * reference is kept in sync with `streetGrid` so the tag never drifts.
+ *
+ * @param state      Current game state (mutated in-place when competitive).
+ * @param slotIndex  Street grid slot index just occupied.
+ * @param ownerId    Owner index (defaults to the active player / 0).
+ * @returns True when the tag was written (competitive state).
+ */
+export function tagSlotOwnerIfCompetitive(
+  state: MainStreetState,
+  slotIndex: number,
+  ownerId: number = state.activePlayerId ?? 0,
+): boolean {
+  if (!state.ownerTaggedGrid) return false;
+  state.ownerTaggedGrid[slotIndex] = {
+    card: state.streetGrid[slotIndex] ?? null,
+    ownerId,
+  };
+  return true;
+}
+
+/** Per-owner income result: owner index + that owner's IncomeResult. */
+export interface OwnerIncomeResult {
+  /** The player index this income belongs to (index into state.players). */
+  ownerId: number;
+  /** Standard IncomeResult computed over the owner's own slots/wallet. */
+  income: IncomeResult;
+}
+
+/**
+ * Applies income per-owner for competitive states (N >= 2).
+ *
+ * Each placed business's income (base + adjacency synergy + upgrades — all
+ * folded into the `currentIncome` cache by the adjacency system — plus
+ * per-business staff buffs) accrues ONLY to the slot's owning player
+ * (`ownerTaggedGrid`, falling back to the active player for untagged slots).
+ * Hand cards contribute no income (CG-0MTRDX0DN004EECN). Per-owner
+ * reputation drives the reputation coin multiplier independently; shared
+ * `activeEffects` income/rep multipliers apply to every owner's income phase
+ * (board-wide duration effects, unchanged semantics).
+ *
+ * `applyIncome(state)` above is left byte-identical for single-player / N=1
+ * (AC4 regression: the N=1 flow delegates to the legacy path and never
+ * reaches this function).
+ *
+ * Determinism: consumes no RNG — pure function of the current grid/state,
+ * so seeded replay reproduces identical per-owner sequences (AC3).
+ *
+ * @param state  Competitive game state (players[] wallets mutated in-place).
+ * @returns Per-owner income results (empty when not competitive).
+ */
+export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResult[] {
+  // Single-player / N=1 fallback: keep the shared income path unchanged.
+  if (!state.players || state.players.length < 2) {
+    applyIncome(state);
+    return [];
+  }
+
+  const soldSlots = state.soldSlots ?? [];
+  const grid = state.streetGrid;
+  const results: OwnerIncomeResult[] = [];
+
+  for (const player of state.players) {
+    const ownerId = player.playerId;
+    const breakdown: SlotIncome[] = [];
+    let total = 0;
+    let repPerTurn = 0;
+
+    // Income / reputation from slots THIS owner owns (skip sold).
+    for (let i = 0; i < grid.length; i++) {
+      if (soldSlots[i]) continue;
+      const card = grid[i];
+      if (!card) continue;
+      if (getSlotOwnerId(state, i) !== ownerId) continue;
+
+      const slotIncome = card.currentIncome ?? 0;
+      const profile = {
+        synergyTypes: (card as BusinessCard).synergyTypes ?? [],
+        baseIncome: (card as BusinessCard).baseIncome ?? 0,
+        ongoingCost: (card as BusinessCard).ongoingCost ?? 0,
+      };
+      const buffs = computePerBusinessSkillBuffs(
+        getEmployedSpecializationSkillsForBusiness(state, i),
+        profile,
+      );
+      const buffedIncome = slotIncome * (1 + buffs.income.percent) + buffs.income.flat;
+      breakdown.push({
+        slotIndex: i,
+        businessName: card.name,
+        baseIncome: slotIncome,
+        synergyBonus: 0,
+        total: buffedIncome,
+      });
+      total += buffedIncome;
+
+      const baseRep = card.currentReputationPerTurn ?? 0;
+      const repBuffs = computePerBusinessSkillBuffs(
+        getEmployedSpecializationSkillsForBusiness(state, i),
+        profile,
+      );
+      repPerTurn += baseRep + repBuffs.reputation.flat;
+    }
+
+    // Staff reputation abilities owned by THIS player (per-player staff).
+    for (const staff of player.staffCards ?? []) {
+      repPerTurn += staff.reputationPerTurn ?? 0;
+    }
+
+    // ── Phase breakdown + active-effect income multipliers (mirrors applyIncome) ──
+    const phaseSlotData: SlotPhaseBreakdown[] = breakdown.map(b => ({
+      slotIndex: b.slotIndex,
+      businessName: b.businessName,
+      baseIncome: b.total,
+      synergyBonus: 0,
+      repBonus: 0,
+      eventDeltas: [],
+      upcomingDeltas: [],
+    }));
+    let modifiedTotal = 0;
+    for (let bi = 0; bi < breakdown.length; bi++) {
+      const slot = breakdown[bi];
+      const phaseSlot = phaseSlotData[bi];
+      let runningValue = slot.total;
+      for (const effect of state.activeEffects) {
+        if (effect.effectType !== 'income-multiplier') continue;
+        const newVal = roundInt(runningValue * effect.multiplier);
+        const delta = newVal - runningValue;
+        phaseSlot.eventDeltas.push({
+          cardId: effect.sourceEventId,
+          name: effect.description,
+          delta,
+        });
+        runningValue = newVal;
+      }
+      modifiedTotal += runningValue;
+    }
+
+    const multiplied = applyReputationMultiplier(modifiedTotal, player.reputation, state.config);
+    player.coins += multiplied;
+
+    const modifiedRepPerTurn = roundInt(applyActiveEffectMultiplier(
+      state.activeEffects,
+      'rep-multiplier',
+      repPerTurn,
+    ));
+    if (modifiedRepPerTurn !== 0) {
+      player.reputation += modifiedRepPerTurn;
+    }
+
+    // Hand cards are not in play — no hand synergy from any owner's hand
+    // (producer rule CG-0MTRDX0DN004EECN). Constant 0 for API compatibility.
+    const handSynergyTotal = 0;
+
+    const repBonus = multiplied - modifiedTotal;
+    const modifiedSlotTotals = phaseSlotData.map(
+      (d) => d.baseIncome + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
+    );
+    const sumModifiedSlotTotals = modifiedSlotTotals.reduce((acc, v) => acc + v, 0) || 0;
+    for (let i = 0; i < phaseSlotData.length; i++) {
+      const pd = phaseSlotData[i];
+      if (sumModifiedSlotTotals > 0) {
+        pd.repBonus = repBonus * (modifiedSlotTotals[i] / sumModifiedSlotTotals);
+      }
+    }
+
+    if (multiplied > 0) {
+      addLog(state, `P${ownerId} Income: +${multiplied} coins (${describeEventEffects(multiplied, 0)})`, 'gain');
+    } else {
+      addLog(state, `P${ownerId} Income: +0 coins (${describeEventEffects(0, 0)})`, 'neutral');
+    }
+    if (modifiedRepPerTurn > 0) {
+      addLog(state, `P${ownerId} Reputation from cards: +${modifiedRepPerTurn} (${describeEventEffects(0, modifiedRepPerTurn)})`, 'gain');
+    }
+
+    results.push({
+      ownerId,
+      income: {
+        total,
+        breakdown,
+        handSynergyTotal,
+        phaseBreakdown: {
+          perSlotBreakdown: phaseSlotData,
+          handSynergyTotal,
+        },
+      },
+    });
+  }
+
+  return results;
 }
 
 // ── Synergy Pairs for Visual Lines ──────────────────────────
@@ -871,6 +995,7 @@ export function computeSynergyPairs(
   grid: (BusinessCard | CommunitySpaceCard | null)[],
   // soldSlots retained for API compat — sold cards now participate fully as pair endpoints (CG-0MT5XUE2200047IJ)
   _soldSlots: boolean[] = [],
+  gridDims?: GridDims,
 ): SynergyPair[] {
   const pairs: SynergyPair[] = [];
   const seen = new Set<string>();
@@ -885,7 +1010,7 @@ export function computeSynergyPairs(
     }
 
     const range = 1 + card.synergyRangeBonus;
-    const neighborIndices = neighbors(i, range);
+    const neighborIndices = resolveNeighbors(i, range, gridDims);
 
     for (const ni of neighborIndices) {
       if (ni <= i) continue; // avoid duplicates and self-pairs
@@ -948,7 +1073,7 @@ export interface SlotIncome {
   businessName: string;
   baseIncome: number;
   synergyBonus: number;
-  /** Total income from this slot including hand synergy contributions. */
+  /** Total income from this slot (base + board adjacency synergy). */
   total: number;
 }
 
@@ -972,7 +1097,12 @@ export interface SlotPhaseBreakdown {
   businessName: string;
   /** Base income for this slot (after staff buffs, before event/rep multipliers). */
   baseIncome: number;
-  /** Hand-card synergy bonus distributed to this slot. */
+  /**
+   * Reserved for a dedicated synergy income phase. Always 0 today — board
+   * adjacency synergy is folded into `baseIncome` (currentIncome), and
+   * hand-card synergy was removed (CG-0MTRDX0DN004EECN: cards in the hand
+   * are not in play).
+   */
   synergyBonus: number;
   /** Additional coins from the reputation multiplier. */
   repBonus: number;
@@ -991,17 +1121,21 @@ export interface SlotPhaseBreakdown {
 export interface PhaseBreakdown {
   /** Per-slot phase data for all producing slots. */
   perSlotBreakdown: SlotPhaseBreakdown[];
-  /** Total synergy contributed by hand cards (distributed proportionally across slots). */
+  /**
+   * Total hand-card synergy. Always 0 — cards in the hand are not in play
+   * and contribute no street income (CG-0MTRDX0DN004EECN). Field retained
+   * for API compatibility.
+   */
   handSynergyTotal: number;
 }
 
 /** Full income computation result. */
 export interface IncomeResult {
-  /** Total coins earned from all businesses (includes hand synergy if provided). */
+  /** Total coins earned from all placed businesses (base + board synergy). */
   total: number;
   /** Per-slot breakdown. */
   breakdown: SlotIncome[];
-  /** Total synergy contributed by hand cards. */
+  /** Always 0 — hand cards are not in play (CG-0MTRDX0DN004EECN). */
   handSynergyTotal: number;
   /**
    * Per-phase contribution breakdown for animated income presentation.
@@ -1012,151 +1146,134 @@ export interface IncomeResult {
   phaseBreakdown: PhaseBreakdown;
 }
 
+
 // ═══════════════════════════════════════════════════════════
-// Expanded Grid Topology — Shared-Corner Lattice (CG-0MTH9OTI2008MYFY)
+// Expanded Grid Topology — Planar Seam-Sharing Lattice
+// (CG-0MTH9OTI2008MYFY; reconciled in CG-0MTYMD2Q5008UXB9)
 // ═══════════════════════════════════════════════════════════
-// Each street cell is 5×2 (10 slots). Adjacent streets share one slot
-// per seam: horizontally slot 4 (west top-right) ↔ 0 (east top-left),
-// vertically slot 9 (north bottom-right) ↔ 4 (south top-right).
-// Interior intersections where four streets meet collapse to a single
-// world node (e.g. (0,0,9) ↔ (0,1,4) ↔ (1,1,0) chain). World coords
-// are the base (sx*5+lx, sy*2+ly) of the canonical owner (lexicographically
-// minimal (sx,sy,slot) in the DSU group), giving integer Chebyshev
-// adjacency that satisfies the contract suite (2×1=19, 2×2=36).
-// The spec's 3×2 expectation of 45 is inconsistent with any uniform
-// one-slot-per-seam model (which yields 53); the suite has been corrected
-// to 53 with a documenting comment (CG-0MTH9OTI2008MYFY).
+// Each street cell is STREET_COLS × STREET_ROWS (5×2) slots. Street cells are
+// tiled with a stride of (STREET_COLS−1, STREET_ROWS−1) = (4, 1) so adjacent
+// streets overlap on their whole touching seam column/row:
+//
+//   • horizontally adjacent streets share the west street's rightmost column
+//     with the east street's leftmost column (2 slots per seam);
+//   • vertically adjacent streets share the north street's bottom row with the
+//     south street's top row (5 slots per seam);
+//   • a four-way intersection therefore collapses to a single shared world node.
+//
+// The lattice consequently occupies a solid, hole-free rectangle of world
+// positions — ((STREET_COLS−1)·cols + 1) × ((STREET_ROWS−1)·rows + 1) — so the
+// world coordinates are planar and Chebyshev adjacency on them is exactly the
+// visual adjacency a player sees. World-index order is row-major over that
+// rectangle: worldY ascending, then worldX ascending.
+//
+// NOTE (CG-0MTYMD2Q5008UXB9): an earlier revision used a (5, 2) stride with a
+// single-slot-per-seam DSU, which produced a holed and sheared (non-planar)
+// world set — 19/19/36/53 slots for 2×1, 1×2, 2×2, 3×2 — that disagreed with
+// the planar geometry already used by MainStreetMapView (18/15/27/39). The
+// planar model below is authoritative; both modules now agree.
 // ═══════════════════════════════════════════════════════════
 
-/** Maximum supported grid dimensions for world-map caching. */
+/** Maximum supported lattice dimensions (cols × rows of street cells). */
 const MAX_GRID_COLS = 5;
 const MAX_GRID_ROWS = 5;
 
-/** Horizontal sharing pair: west slot 4 ↔ east slot 0. */
-const H_SHARED: readonly [number, number] = [4, 0] as const;
-/** Vertical sharing pair: north slot 9 ↔ south slot 4. */
-const V_SHARED: readonly [number, number] = [9, 4] as const;
+/** Horizontal distance between the origins of adjacent street cells. */
+const WORLD_STRIDE_X = STREET_COLS - 1; // 4
+/** Vertical distance between the origins of adjacent street cells. */
+const WORLD_STRIDE_Y = STREET_ROWS - 1; // 1
 
-function slotToLocal(slot: number): { lx: number; ly: number } {
-  return { lx: slot % STREET_COLS, ly: Math.floor(slot / STREET_COLS) };
+/** Grid dimensions for expanded street layouts (cols × rows of 5×2 street cells). */
+export interface GridDims {
+  cols: number;
+  rows: number;
 }
 
-function baseWorld(sx: number, sy: number, slot: number): { worldX: number; worldY: number } {
-  const { lx, ly } = slotToLocal(slot);
-  return { worldX: sx * STREET_COLS + lx, worldY: sy * 2 + ly };
+/** Width in world columns of a `cols`-wide street lattice. */
+export function worldWidth(cols: number): number {
+  return WORLD_STRIDE_X * cols + 1;
 }
 
-type DsuKey = string; // "sx,sy,slot"
-interface WorldMaps {
-  /** world key "x,y" → owners */
-  pos2owners: Map<string, { streetX: number; streetY: number; slotIndex: number }[]>;
-  /** dsu key → canonical world */
-  keyToWorld: Map<DsuKey, { worldX: number; worldY: number }>;
-  /** canonical world key → owners (deduped) */
-  canonicalPosSet: Set<string>;
-}
-
-const worldMapsCache = new Map<string, WorldMaps>();
-
-function buildWorldMaps(cols: number, rows: number): WorldMaps {
-  const cacheKey = `${cols}x${rows}`;
-  const cached = worldMapsCache.get(cacheKey);
-  if (cached) return cached;
-
-  const parent = new Map<DsuKey, DsuKey>();
-  const find = (k: DsuKey): DsuKey => {
-    let cur = k;
-    while (parent.get(cur) !== cur) {
-      const p = parent.get(cur)!;
-      const pp = parent.get(p)!;
-      if (pp !== p) parent.set(cur, pp);
-      cur = parent.get(cur)!;
-    }
-    return cur;
-  };
-  const union = (a: DsuKey, b: DsuKey): void => {
-    const ra = find(a);
-    const rb = find(b);
-    if (ra !== rb) parent.set(rb, ra);
-  };
-
-  for (let sx = 0; sx < cols; sx++) {
-    for (let sy = 0; sy < rows; sy++) {
-      for (let slot = 0; slot < GRID_SIZE; slot++) {
-        const k: DsuKey = `${sx},${sy},${slot}`;
-        parent.set(k, k);
-      }
-    }
-  }
-  for (let sx = 0; sx < cols - 1; sx++) {
-    for (let sy = 0; sy < rows; sy++) {
-      union(`${sx},${sy},${H_SHARED[0]}`, `${sx + 1},${sy},${H_SHARED[1]}`);
-    }
-  }
-  for (let sx = 0; sx < cols; sx++) {
-    for (let sy = 0; sy < rows - 1; sy++) {
-      union(`${sx},${sy},${V_SHARED[0]}`, `${sx},${sy + 1},${V_SHARED[1]}`);
-    }
-  }
-
-  const canonical = new Map<DsuKey, DsuKey>();
-  for (const k of parent.keys()) {
-    const r = find(k);
-    const prev = canonical.get(r);
-    if (prev === undefined || k < prev) canonical.set(r, k);
-  }
-
-  const keyToWorld = new Map<DsuKey, { worldX: number; worldY: number }>();
-  const pos2owners = new Map<string, { streetX: number; streetY: number; slotIndex: number }[]>();
-  const canonicalPosSet = new Set<string>();
-
-  for (const k of parent.keys()) {
-    const r = find(k);
-    const canonKey = canonical.get(r)!;
-    const [csx, csy, cslot] = canonKey.split(',').map(Number);
-    const w = baseWorld(csx, csy, cslot);
-    keyToWorld.set(k, w);
-    const posKey = `${w.worldX},${w.worldY}`;
-    canonicalPosSet.add(posKey);
-  }
-  for (const k of parent.keys()) {
-    const w = keyToWorld.get(k)!;
-    const posKey = `${w.worldX},${w.worldY}`;
-    const [sx, sy, slot] = k.split(',').map(Number);
-    const arr = pos2owners.get(posKey) ?? [];
-    // Deduplicate: only add if not already present (shared worlds have multiple owners)
-    if (!arr.some(o => o.streetX === sx && o.streetY === sy && o.slotIndex === slot)) {
-      arr.push({ streetX: sx, streetY: sy, slotIndex: slot });
-    }
-    pos2owners.set(posKey, arr);
-  }
-
-  const maps: WorldMaps = { pos2owners, keyToWorld, canonicalPosSet };
-  worldMapsCache.set(cacheKey, maps);
-  return maps;
+/** Height in world rows of a `rows`-tall street lattice. */
+export function worldHeight(rows: number): number {
+  return WORLD_STRIDE_Y * rows + 1;
 }
 
 /**
- * Number of unique world slots for a cols×rows street lattice after
- * shared-corner dedup (one slot per horizontal and vertical adjacency).
+ * Number of unique world slots for a `cols`×`rows` street lattice.
  *
- * Formula: 10*cols*rows − (cols−1)*rows − (rows−1)*cols
- * Yields 10, 19, 19, 36, 53 for 1×1, 2×1, 1×2, 2×2, 3×2.
+ * Because adjacent streets share their whole touching seam, the lattice
+ * collapses to the solid rectangle
+ * `((STREET_COLS−1)·cols + 1) × ((STREET_ROWS−1)·rows + 1)`:
+ * 10, 18, 15, 27, 39, 52 for 1×1, 2×1, 1×2, 2×2, 3×2, 3×3.
  */
 export function worldSlotCount(streetCols: number, streetRows: number): number {
   if (!Number.isInteger(streetCols) || !Number.isInteger(streetRows) || streetCols <= 0 || streetRows <= 0) {
     throw new Error(`worldSlotCount: dimensions must be positive integers, got ${streetCols}×${streetRows}`);
   }
-  return 10 * streetCols * streetRows - (streetCols - 1) * streetRows - (streetRows - 1) * streetCols;
+  return worldWidth(streetCols) * worldHeight(streetRows);
+}
+
+function slotToLocal(slot: number): { lx: number; ly: number } {
+  return { lx: slot % STREET_COLS, ly: Math.floor(slot / STREET_COLS) };
+}
+
+/**
+ * Base world position of street (sx,sy) slot `slotIndex`.
+ *
+ * In the planar model every street/slot pair maps to its base world position;
+ * co-located pairs (the shared seams and intersections) share that position, so
+ * the base is the world coordinate for canonical and non-canonical owners alike.
+ */
+function baseWorld(
+  streetX: number,
+  streetY: number,
+  slotIndex: number,
+): { worldX: number; worldY: number } {
+  const { lx, ly } = slotToLocal(slotIndex);
+  return {
+    worldX: streetX * WORLD_STRIDE_X + lx,
+    worldY: streetY * WORLD_STRIDE_Y + ly,
+  };
+}
+
+/**
+ * Every (streetX, streetY, slotIndex) owner of a world node within a
+ * `cols`×`rows` lattice, sorted lexicographically by (streetX, streetY, slotIndex).
+ * A shared seam node has two owners; a four-way intersection has four.
+ */
+function worldOwners(
+  worldX: number,
+  worldY: number,
+  cols: number,
+  rows: number,
+): { streetX: number; streetY: number; slotIndex: number }[] {
+  const sxMin = Math.max(0, Math.ceil((worldX - (STREET_COLS - 1)) / WORLD_STRIDE_X));
+  const sxMax = Math.min(cols - 1, Math.floor(worldX / WORLD_STRIDE_X));
+  const syMin = Math.max(0, Math.ceil((worldY - (STREET_ROWS - 1)) / WORLD_STRIDE_Y));
+  const syMax = Math.min(rows - 1, Math.floor(worldY / WORLD_STRIDE_Y));
+  const owners: { streetX: number; streetY: number; slotIndex: number }[] = [];
+  for (let sy = syMin; sy <= syMax; sy++) {
+    const ly = worldY - sy * WORLD_STRIDE_Y;
+    if (ly < 0 || ly >= STREET_ROWS) continue;
+    for (let sx = sxMin; sx <= sxMax; sx++) {
+      const lx = worldX - sx * WORLD_STRIDE_X;
+      if (lx < 0 || lx >= STREET_COLS) continue;
+      owners.push({ streetX: sx, streetY: sy, slotIndex: ly * STREET_COLS + lx });
+    }
+  }
+  owners.sort((a, b) => a.streetX - b.streetX || a.streetY - b.streetY || a.slotIndex - b.slotIndex);
+  return owners;
 }
 
 /**
  * Maps (streetX, streetY, slotIndex) to integer world coordinates.
  *
- * The world position is the base (sx*5+lx, sy*2+ly) of the canonical
- * owner of the shared-corner DSU group. For 1×1 grids this is the
- * base itself; for expanded grids shared corners coincide (e.g.
- * (0,0,4) and (1,0,0) both → (4,0)).
+ * The world position is `(streetX·(STREET_COLS−1) + lx, streetY·(STREET_ROWS−1) + ly)`
+ * where `(lx, ly)` is the slot's local (column, row). Shared seams and four-way
+ * intersections therefore return the same world position for each of their
+ * owners (e.g. `(0,0,4)` and `(1,0,0)` both map to world `(4,0)`; for a 2×2
+ * lattice `(0,0,9)`, `(1,0,5)`, `(0,1,4)` and `(1,1,0)` all map to `(4,1)`).
  */
 export function toWorldPosition(
   streetX: number,
@@ -1169,164 +1286,81 @@ export function toWorldPosition(
   if (streetX < 0 || streetY < 0 || slotIndex < 0 || slotIndex >= GRID_SIZE) {
     throw new Error(`toWorldPosition: out of bounds ${streetX},${streetY},${slotIndex}`);
   }
-  // Need a grid large enough to contain the queried street and its west/north neighbours that might be canonical.
-  const cols = Math.max(streetX + 1, 1);
-  const rows = Math.max(streetY + 1, 1);
-  // Cap to max cache size; for larger queries, sharing still only involves immediate neighbours, so this is sufficient.
-  const effCols = Math.min(Math.max(cols, 1), MAX_GRID_COLS);
-  const effRows = Math.min(Math.max(rows, 1), MAX_GRID_ROWS);
-  // If query is beyond max cache, fall back to base (no further sharing beyond max grid)
-  if (cols > MAX_GRID_COLS || rows > MAX_GRID_ROWS) {
-    return baseWorld(streetX, streetY, slotIndex);
-  }
-  const maps = buildWorldMaps(effCols, effRows);
-  const key = `${streetX},${streetY},${slotIndex}`;
-  const w = maps.keyToWorld.get(key);
-  // For grids smaller than max, shared groups that extend beyond the built grid (e.g. south partner not in grid) are not merged,
-  // so we return base for isolated slots; for streets at origin this matches global canonical.
-  if (w) return { ...w };
   return baseWorld(streetX, streetY, slotIndex);
 }
 
 /**
- * Inverse of toWorldPosition: world → one (street, slot) owner, or null
- * if the world coordinate is empty / OOB.
+ * Inverse of toWorldPosition: world → one (street, slot) owner, or null if the
+ * world coordinate is not part of the supported MAX_GRID lattice.
  *
- * For shared corners multiple owners exist; the lexicographically minimal
- * owner is returned (so round-trip via toWorldPosition is stable).
+ * A shared node has several owners; the lexicographically minimal
+ * (streetX, streetY, slotIndex) owner is returned, so a
+ * `world → owner → world` round-trip is stable.
  */
 export function fromWorldPosition(
   worldPos: { worldX: number; worldY: number },
 ): { streetX: number; streetY: number; slotIndex: number } | null {
-  const maps = buildWorldMaps(MAX_GRID_COLS, MAX_GRID_ROWS);
-  const posKey = `${worldPos.worldX},${worldPos.worldY}`;
-  const owners = maps.pos2owners.get(posKey);
-  if (!owners || owners.length === 0) return null;
-  // Return canonical (first) owner (pos2owners preserves insertion order, which is lexicographic due to build loop)
+  if (!Number.isInteger(worldPos.worldX) || !Number.isInteger(worldPos.worldY)) return null;
+  const owners = worldOwners(worldPos.worldX, worldPos.worldY, MAX_GRID_COLS, MAX_GRID_ROWS);
+  if (owners.length === 0) return null;
   return { ...owners[0] };
 }
 
 /**
- * Chebyshev (8-way) neighbours of a world position.
+ * Chebyshev (8-way) neighbours of a world position within the supported
+ * MAX_GRID lattice.
  *
- * Enumerates all world positions within `range` (default 1) in the
- * maximal 5×5 lattice, returning the street/slot owners of each
- * neighbouring world node (shared worlds contribute each of their
- * owners). The queried world itself is excluded.
+ * Returns exactly one entry per distinct neighbouring world node (the node's
+ * canonical owner), so an interior node yields 8 entries at range 1 and
+ * `(2·range+1)² − 1` entries where the lattice has room. Shared seam and
+ * four-way-intersection nodes are visited once each — use the world-index
+ * helpers to enumerate a node's per-street owners.
  */
 export function expandedNeighbors(
   worldPos: { worldX: number; worldY: number },
   range: number = 1,
 ): { streetX: number; streetY: number; slotIndex: number }[] {
   if (!Number.isInteger(range) || range <= 0) return [];
-  const maps = buildWorldMaps(MAX_GRID_COLS, MAX_GRID_ROWS);
-  const posKey = `${worldPos.worldX},${worldPos.worldY}`;
-  // If queried world is not in the lattice, it has no neighbours (OOB)
-  if (!maps.canonicalPosSet.has(posKey)) {
-    // Still allow neighbours for OOB? Contract expects OOB → not found → no crash; we treat as empty.
-    // But for interior queries we must have the pos.
-    // For world positions that are valid but outside max grid, we still compute geometrically.
-    // Fall through to geometric search.
-  }
+  if (!Number.isInteger(worldPos.worldX) || !Number.isInteger(worldPos.worldY)) return [];
+  const xMax = worldWidth(MAX_GRID_COLS) - 1;
+  const yMax = worldHeight(MAX_GRID_ROWS) - 1;
   const result: { streetX: number; streetY: number; slotIndex: number }[] = [];
-  for (const [otherKey, owners] of maps.pos2owners.entries()) {
-    if (otherKey === posKey) continue;
-    const [ox, oy] = otherKey.split(',').map(Number);
-    if (Math.max(Math.abs(ox - worldPos.worldX), Math.abs(oy - worldPos.worldY)) <= range) {
-      for (const o of owners) result.push({ ...o });
+  for (let y = Math.max(0, worldPos.worldY - range); y <= Math.min(yMax, worldPos.worldY + range); y++) {
+    for (let x = Math.max(0, worldPos.worldX - range); x <= Math.min(xMax, worldPos.worldX + range); x++) {
+      if (x === worldPos.worldX && y === worldPos.worldY) continue;
+      const owners = worldOwners(x, y, MAX_GRID_COLS, MAX_GRID_ROWS);
+      if (owners.length > 0) result.push(owners[0]);
     }
   }
-  // Sort for determinism: lexicographic by street, slot
-  result.sort((a, b) => a.streetY - b.streetY || a.streetX - b.streetX || a.slotIndex - b.slotIndex);
   return result;
 }
 
-// ── Grid Dimensions & Neighbor Resolution (Expanded Grids) ──
-
-/** Grid dimensions for expanded street layouts (cols × rows of 5×2 street cells). */
-export interface GridDims {
-  cols: number;
-  rows: number;
-}
+// ── World-index mapping & neighbor resolution ───────────────
 
 /**
- * Resolve neighbors for a given grid slot index.
- *
- * For 1×1 grids (or when `gridDims` is omitted), delegates to `neighbors()`
- * with legacy slot indices (0-9). For expanded grids, converts the index
- * to a world position, queries `expandedNeighbors()`, and maps the result
- * back to a sorted array of world slot indices.
- *
- * @param index    The slot index to find neighbors for.
- * @param range    How far to look in each direction (default 1).
- * @param gridDims Optional grid dimensions for expanded layouts.
- * @returns Sorted array of neighbor indices.
- */
-function resolveNeighbors(
-  index: number,
-  range: number,
-  gridDims?: GridDims,
-): number[] {
-  // Legacy path: 1×1 grid (or no dims provided)
-  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) {
-    return neighbors(index, range);
-  }
-  // Expanded path: use world coordinates directly (avoids 5×5 leak via expandedNeighbors)
-  const total = worldSlotCount(gridDims.cols, gridDims.rows);
-  if (index < 0 || index >= total || range <= 0) return [];
-  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
-  // Build index→position and position→index mappings from canonical positions
-  // Use world slot ordering by (worldY, worldX) to ensure stable index mapping
-  const canonicalPosArray: string[] = [];
-  for (const posKey of maps.canonicalPosSet) canonicalPosArray.push(posKey);
-  canonicalPosArray.sort((a, b) => {
-    const [ax, ay] = a.split(',').map(Number);
-    const [bx, by] = b.split(',').map(Number);
-    return ay - by || ax - bx;
-  });
-  const worldPosKey = canonicalPosArray[index];
-  if (!worldPosKey) return [];
-  const [worldX, worldY] = worldPosKey.split(',').map(Number);
-  const result: number[] = [];
-  for (const otherKey of canonicalPosArray) {
-    if (otherKey === worldPosKey) continue;
-    const [ox, oy] = otherKey.split(',').map(Number);
-    if (Math.max(Math.abs(ox - worldX), Math.abs(oy - worldY)) <= range) {
-      const ni = canonicalPosArray.indexOf(otherKey);
-      if (ni !== -1) result.push(ni);
-    }
-  }
-  return result.sort((a, b) => a - b);
-}
-
-/**
- * Translate a flat world-slot index to its (worldX, worldY) position.
- * Used by tests and expand-grid helpers to map the canonical ordering.
+ * Translates a flat world-slot index back to its (worldX, worldY) position.
+ * Returns null when `index` is out of range for `gridDims`.
  */
 export function worldIndexToPosition(
   index: number,
   gridDims: GridDims,
 ): { worldX: number; worldY: number } | null {
-  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) return null;
+  if (!gridDims) return null;
+  if (!Number.isInteger(index) || index < 0) return null;
   const total = worldSlotCount(gridDims.cols, gridDims.rows);
-  if (index < 0 || index >= total) return null;
-  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
-  const arr: string[] = [];
-  for (const k of maps.canonicalPosSet) arr.push(k);
-  arr.sort((a, b) => {
-    const [ax, ay] = a.split(',').map(Number);
-    const [bx, by] = b.split(',').map(Number);
-    return ay - by || ax - bx;
-  });
-  const key = arr[index];
-  if (!key) return null;
-  const [worldX, worldY] = key.split(',').map(Number);
-  return { worldX, worldY };
+  if (index >= total) return null;
+  const width = worldWidth(gridDims.cols);
+  return { worldX: index % width, worldY: Math.floor(index / width) };
 }
 
 /**
- * Translate (streetX, streetY, slot) to its flat world-slot index.
- * Returns null if the slot is outside the lattice or not canonical.
+ * Translates (streetX, streetY, slot) to its flat world-slot index within a
+ * `gridDims` lattice. Returns null when the street is outside the lattice or
+ * the slot index is invalid.
+ *
+ * Shared nodes map to a single index: for a 2×2 lattice,
+ * `streetSlotToWorldIndex(0,0,9)`, `(1,0,5)`, `(0,1,4)` and `(1,1,0)` all
+ * return the same index (the four-way intersection is one card slot).
  */
 export function streetSlotToWorldIndex(
   streetX: number,
@@ -1334,21 +1368,54 @@ export function streetSlotToWorldIndex(
   slotIndex: number,
   gridDims: GridDims,
 ): number | null {
-  if (!gridDims || (gridDims.cols === 1 && gridDims.rows === 1)) {
-    return slotIndex >= 0 && slotIndex < GRID_SIZE ? slotIndex : null;
+  if (!gridDims) return null;
+  if (
+    !Number.isInteger(streetX) || !Number.isInteger(streetY) || !Number.isInteger(slotIndex) ||
+    streetX < 0 || streetY < 0 || streetX >= gridDims.cols || streetY >= gridDims.rows ||
+    slotIndex < 0 || slotIndex >= GRID_SIZE
+  ) {
+    return null;
   }
-  const key = `${streetX},${streetY},${slotIndex}`;
-  const maps = buildWorldMaps(gridDims.cols, gridDims.rows);
-  const w = maps.keyToWorld.get(key);
-  if (!w) return null;
-  const posKey = `${w.worldX},${w.worldY}`;
-  const arr: string[] = [];
-  for (const k of maps.canonicalPosSet) arr.push(k);
-  arr.sort((a, b) => {
-    const [ax, ay] = a.split(',').map(Number);
-    const [bx, by] = b.split(',').map(Number);
-    return ay - by || ax - bx;
-  });
-  const idx = arr.indexOf(posKey);
-  return idx === -1 ? null : idx;
+  const { worldX, worldY } = baseWorld(streetX, streetY, slotIndex);
+  const width = worldWidth(gridDims.cols);
+  const total = worldSlotCount(gridDims.cols, gridDims.rows);
+  const index = worldY * width + worldX;
+  return index >= 0 && index < total ? index : null;
+}
+
+/**
+ * Resolve neighbors for a given grid slot index.
+ *
+ * World slots form a solid rectangle, so adjacency is plain 8-way (Chebyshev)
+ * distance over world coordinates — no special-casing of street boundaries.
+ * A 1×1 lattice (or omitted `gridDims`) reproduces the legacy 10-slot
+ * behaviour exactly.
+ *
+ * @param index    The world slot index to find neighbors for.
+ * @param range    How far to look in each direction (default 1).
+ * @param gridDims Optional grid dimensions for expanded layouts.
+ * @returns Ascending array of neighbor indices.
+ */
+function resolveNeighbors(
+  index: number,
+  range: number,
+  gridDims?: GridDims,
+): number[] {
+  if (range <= 0) return [];
+  const dims: GridDims = gridDims ?? { cols: 1, rows: 1 };
+  const total = worldSlotCount(dims.cols, dims.rows);
+  if (!Number.isInteger(index) || index < 0 || index >= total) return [];
+  const width = worldWidth(dims.cols);
+  const originX = index % width;
+  const originY = Math.floor(index / width);
+  const result: number[] = [];
+  for (let i = 0; i < total; i++) {
+    if (i === index) continue;
+    const x = i % width;
+    const y = Math.floor(i / width);
+    if (Math.max(Math.abs(originX - x), Math.abs(originY - y)) <= range) {
+      result.push(i);
+    }
+  }
+  return result;
 }

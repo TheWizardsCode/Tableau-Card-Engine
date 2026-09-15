@@ -15,7 +15,7 @@ import type { MainStreetState } from '../../example-games/main-street/MainStreet
 import {
   executeDayStart,
   executeAction,
-  processEndOfTurn,
+  endTurnHeadless,
   executeFullTurn,
   computeScore,
   resolveIncident,
@@ -57,7 +57,7 @@ function playGreedyTurn(state: MainStreetState): { actions: PlayerAction[]; resu
   }
 
   actions.push({ type: 'end-turn' });
-  const result = processEndOfTurn(state);
+  const result = endTurnHeadless(state);
   return { actions, result };
 }
 
@@ -100,6 +100,11 @@ describe('Integration: Full Turn Cycle', () => {
     expect(state.phase).toBe('MarketPhase');
     expect(state.market.cards.length).toBeGreaterThan(0);
 
+    // Generous budget so the first business in the (seed-dependent, content-
+    // era) market row is always affordable — the test exercises the turn
+    // cycle, not market affordability.
+    state.resourceBank.coins = 9999;
+
     // Buy the first affordable business
     const affordable = getAffordableBusinessCards(state);
     expect(affordable.length).toBeGreaterThan(0);
@@ -118,7 +123,7 @@ describe('Integration: Full Turn Cycle', () => {
     expect(state.resourceBank.coins).toBe(coinsBefore - card.cost);
 
     // Process end of turn (events, income, night, end check)
-    const result = processEndOfTurn(state);
+    const result = endTurnHeadless(state);
 
     // Should have received some income (at least base income of the placed business)
     if (result.income) {
@@ -143,7 +148,7 @@ describe('Integration: Full Turn Cycle', () => {
     expect(affordable.length).toBe(0);
 
     // Just end turn
-    const result = processEndOfTurn(state);
+    const result = endTurnHeadless(state);
     expect(result).toBeDefined();
     expect(result.income).not.toBeNull();
     // With no businesses, income total should be 0
@@ -162,7 +167,7 @@ describe('Integration: Full Turn Cycle', () => {
     phasesSeen.push(state.phase); // MarketPhase
 
     // End turn triggers remaining phases automatically
-    processEndOfTurn(state);
+    endTurnHeadless(state);
 
     // After processEndOfTurn, state is either in DayStart (next turn) or game over
     if (state.gameResult === 'playing') {
@@ -234,7 +239,7 @@ describe('Integration: Full Game', () => {
     executeDayStart(state);
     // Player actively plays the held event during MarketPhase
     executeAction(state, { type: 'play-event' });
-    processEndOfTurn(state);
+    endTurnHeadless(state);
 
     expect(state.gameResult).toBe('loss');
     expect(state.endReason).toBe('bankruptcy');
@@ -262,7 +267,7 @@ describe('Integration: Full Game', () => {
     executeDayStart(state);
     // Player actively plays the held event during MarketPhase
     executeAction(state, { type: 'play-event' });
-    processEndOfTurn(state);
+    endTurnHeadless(state);
 
     expect(state.gameResult).toBe('loss');
     expect(state.endReason).toBe('reputation_collapse');
@@ -343,7 +348,7 @@ describe('Integration: Seeded Determinism', () => {
       executeAction(state1, action);
       actions.push(action);
     }
-    const result1 = processEndOfTurn(state1);
+    const result1 = endTurnHeadless(state1);
 
     // Convenience: setup + executeFullTurn with same actions
     const state2 = setupMainStreetGame({ seed });
@@ -362,8 +367,8 @@ describe('Integration: Seeded Determinism', () => {
 describe('Integration: Income & Synergy', () => {
   it('placing adjacent Food businesses increases income via synergy', () => {
     const s = setupMainStreetGame({ seed: 'synergy-income-2' });
-    s.resourceBank.coins = 50;
-    s.resourceBank.reputation = 5;
+    s.resourceBank.coins = 5000;
+    s.resourceBank.reputation = 5000;
 
     // Deterministically place two different-template Food cards in adjacent
     // slots (0 and 1 on the 2x5 grid). The same-type rule excludes
@@ -375,13 +380,13 @@ describe('Integration: Income & Synergy', () => {
     updateNeighborsOnPlacement(s, 0);
 
     executeDayStart(s);
-    const result1 = processEndOfTurn(s);
+    const result1 = endTurnHeadless(s);
     const income1 = result1.income?.total ?? 0; // Bakery alone: 0.5
 
     s.streetGrid[1] = { ...cafe, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
     updateNeighborsOnPlacement(s, 1);
     executeDayStart(s);
-    const result2 = processEndOfTurn(s);
+    const result2 = endTurnHeadless(s);
     const income2 = result2.income?.total ?? 0; // + Cafe and both synergy bonuses
 
     // Income should increase due to synergy bonus between adjacent Food businesses
@@ -403,7 +408,7 @@ describe('Integration: Incident Deck', () => {
 
     // Turn 1: resolve front incident; the deck shrinks by one (no refill)
     executeDayStart(state);
-    const result1 = processEndOfTurn(state);
+    const result1 = endTurnHeadless(state);
     expect(result1.incident).not.toBeNull();
     expect(result1.incident!.id).toBe(initialDeckIds[0]);
     expect(state.incidentDeck.length).toBe(initialDeckIds.length - 1);
@@ -412,7 +417,7 @@ describe('Integration: Incident Deck', () => {
 
     // Turn 2: next front resolved
     executeDayStart(state);
-    const result2 = processEndOfTurn(state);
+    const result2 = endTurnHeadless(state);
     expect(result2.incident).not.toBeNull();
     // The second resolved should be the card that was at position [1] initially
     expect(result2.incident!.id).toBe(initialDeckIds[1]);
@@ -515,7 +520,7 @@ describe('Integration: Held Investment Event', () => {
 
     executeDayStart(state);
     // Don't play the event during MarketPhase — just end turn
-    const result = processEndOfTurn(state);
+    const result = endTurnHeadless(state);
 
     // The event should NOT have been auto-resolved — it persists in hand
     expect((state.hand ?? []).some(c => c.family === 'event' && c.id === 'evt-held-auto')).toBe(true);
@@ -557,7 +562,7 @@ describe('Integration: Held Investment Event', () => {
     expect(coinsAfterPlay).toBe(52); // 50 -3 + 5 (rounded)
 
     // End turn — InvestmentResolution should have nothing to auto-resolve
-    const result = processEndOfTurn(state);
+    const result = endTurnHeadless(state);
 
     // The +5 should only have been applied once (during play-event, not again during auto-resolve)
     // Income phase adds income, incident phase subtracts — but the event shouldn't double-apply
@@ -570,6 +575,12 @@ describe('Integration: Held Investment Event', () => {
     const state = setupMainStreetGame({ seed: 'held-next-turn' });
     state.resourceBank.coins = 50;
     state.resourceBank.reputation = 5;
+    // Benign no-effect incident used to pin both turn ends (content-era
+    // determinism — the shipped deck contains choice incidents).
+    const benign: EventCard = {
+      family: 'event', id: 'evt-benign', name: 'Nothing Happens', trigger: 'Incident',
+      cost: 0, effect: 'No effect.', target: 'All', coinDelta: 0, reputationDelta: 0,
+    };
 
     // Inject an Investment event into the market
     const investmentEvt: EventCard = {
@@ -590,14 +601,20 @@ describe('Integration: Held Investment Event', () => {
     executeAction(state, { type: 'buy-event', cardId: 'evt-buy-then-play' });
     expect((state.hand ?? []).some(c => c.family === 'event' && c.id === 'evt-buy-then-play')).toBe(true);
 
+    // Pin day 1's incident to the same benign no-effect card (see Turn 2).
+    state.incidentDeck = [{ ...benign, id: 'evt-benign-1' }];
+
     // End turn 1 — held event persists (no longer auto-resolved)
-    const result1 = processEndOfTurn(state);
+    const result1 = endTurnHeadless(state);
     expect((state.hand ?? []).some(c => c.family === 'event' && c.id === 'evt-buy-then-play')).toBe(true); // Persists across turns
     expect(result1).toBeDefined();
 
     if (state.gameResult !== 'playing') return; // Game ended
 
-    // Turn 2: play the held event manually
+    // Turn 2: play the held event manually. Pin the incident deck to a single
+    // benign no-effect card (see setup) so the exact cost-at-play delta stays
+    // deterministic in the content era.
+    state.incidentDeck = [{ ...benign, id: 'evt-benign-2' }];
     executeDayStart(state);
     const coinsBeforePlay = state.resourceBank.coins;
     // Reputation multiplier: 1 + rep/80 (divisor quartered 20→80 by
@@ -609,9 +626,10 @@ describe('Integration: Held Investment Event', () => {
     expect((state.hand ?? []).some(c => c.family === 'event')).toBe(false); // Now resolved
     // CG-0MSTOATDT009BRX2: cost-at-play — the $3 cost is charged when the
     // held event is played.
-    expect(state.resourceBank.coins).toBeCloseTo(coinsBeforePlay - 3 + 4 * repMultiplier); // -cost + +4 base scaled by rep
+    // Engine applies roundInt on the reputation-scaled delta (integer economy).
+    expect(state.resourceBank.coins).toBeCloseTo(coinsBeforePlay - 3 + Math.round(4 * repMultiplier)); // -cost + +4 base scaled by rep
 
-    const result2 = processEndOfTurn(state);
+    const result2 = endTurnHeadless(state);
     expect(result2).toBeDefined();
   });
 });
@@ -715,7 +733,7 @@ describe('Integration: Challenge System', () => {
 
     // With 10000 coins, Deep Pockets (>= 3000 coins) should complete on next EndCheck
     executeDayStart(state);
-    const result = processEndOfTurn(state);
+    const result = endTurnHeadless(state);
 
     expect(state.gameResult).toBe('win');
     expect(state.endReason).toBe('all_challenges');
@@ -733,7 +751,7 @@ describe('Integration: Challenge System', () => {
 
     // Turn 1: coins >= 3000, should complete
     executeDayStart(state);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
 
     if (state.gameResult !== 'playing') return;
 
@@ -745,7 +763,7 @@ describe('Integration: Challenge System', () => {
 
     // Turn 2: challenge should remain completed despite coins < 3000
     executeDayStart(state);
-    processEndOfTurn(state);
+    endTurnHeadless(state);
 
     expect(state.activeChallenges[0].completed).toBe(true);
     expect(state.challengesCompleted.filter(id => id === 'ch-deep-pockets')).toHaveLength(1);
@@ -758,7 +776,7 @@ describe('Integration: Challenge System', () => {
     state.activeChallenges = [];
 
     executeDayStart(state);
-    const result = processEndOfTurn(state);
+    const result = endTurnHeadless(state);
 
     // Game should not end with all_challenges when there are 0 challenges
     if (state.endReason === 'all_challenges') {

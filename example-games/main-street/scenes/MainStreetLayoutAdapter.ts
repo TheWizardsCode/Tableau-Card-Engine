@@ -87,6 +87,18 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const favourCoinsToRepCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'favourCoinsToRepButton', 'center', viewport, 1);
   const favourRepToCoinsCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'favourRepToCoinsButton', 'center', viewport, 1);
 
+  // ── Staff applicant overlay (CG-0MSTOATDU006UGAX) ──────────────
+  // The applicant card + buttons render from the applicantOverlay SLL zone
+  // center anchor. Falls back to screen centre when the zone is absent
+  // (legacy layouts / defensive resolution).
+  let applicantCenterX = Math.round(gameW / 2);
+  let applicantCenterY = Math.round(gameH * 0.4);
+  try {
+    const ac = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'applicantOverlay', 'center', viewport, 1);
+    applicantCenterX = Math.round(ac.x);
+    applicantCenterY = Math.round(ac.y);
+  } catch { /* fallback to defaults */ }
+
   return {
     gameW,
     gameH,
@@ -126,6 +138,8 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
     favourButtonW,
     favourCoinsToRepX: Math.round(favourCoinsToRepCenter.x - favourButtonW / 2),
     favourRepToCoinsX: Math.round(favourRepToCoinsCenter.x - favourButtonW / 2),
+    applicantCenterX,
+    applicantCenterY,
     challengeX: Math.round(challengeTopLeft.x),
     challengeY: Math.round(challengeTopLeft.y),
     challengeW,

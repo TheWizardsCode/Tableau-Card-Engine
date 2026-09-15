@@ -68,7 +68,13 @@ function setUpTableauAndHand(
   state.streetGrid[0] = makeBiz({ id: 'biz-bakery', name: 'Bakery', baseIncome: 3, synergyTypes: ['Food'] });
   state.streetGrid[1] = makeBiz({ id: 'biz-cafe', name: 'Cafe', baseIncome: 0, synergyTypes: ['Food', 'Culture'] });
 
-  // Add a Food hand card for synergy
+  // Sync cached incomes exactly as a real placement does, so the Bakery
+  // contributes its base income even though the Cafe produces none.
+  recalculateCard(state, 0);
+  recalculateCard(state, 1);
+
+  // A Food hand card is held, but hand cards never contribute income
+  // (CG-0MTRDX0DN004EECN) — assertions below verify the street alone pays.
   state.hand.push(makeBiz({ id: 'hand-food', name: 'Hand Food', baseIncome: 3, synergyTypes: ['Food'] }));
 }
 
@@ -96,16 +102,17 @@ describe('Multi-Use Card Economy Integration', () => {
       expect(['playing', 'win', 'loss']).toContain(result.gameResult);
     });
 
-    it('should accumulate synergy bonuses over multiple turns with hand cards', () => {
+    it('should earn income from placed businesses while hand cards are held', () => {
       const state = createTestState();
       setUpTableauAndHand(state);
 
-      // Apply income with hand synergy
+      // Income comes from the placed Bakery (base + board synergy) — the
+      // held Food card contributes nothing (CG-0MTRDX0DN004EECN).
       const result = applyIncome(state);
       expect(result.total).toBeGreaterThan(0);
 
-      // Hand synergy should be reported
-      expect(result.handSynergyTotal).toBeGreaterThanOrEqual(0);
+      // Hand synergy is always 0: cards in hand are not in play.
+      expect(result.handSynergyTotal).toBe(0);
     });
 
     it('should include diagonal-only synergy in income (8-way adjacency)', () => {
@@ -176,7 +183,7 @@ describe('Multi-Use Card Economy Integration', () => {
         expect(state.staffCards.length).toBe(1);
       }
 
-      // Apply income (includes hand synergy)
+      // Apply income (hand cards never contribute — CG-0MTRDX0DN004EECN)
       const incomeResult = applyIncome(state);
 
       // Record coins after income
@@ -401,7 +408,13 @@ describe('Multi-Use Card Economy Integration', () => {
       // Turn 2: tableau purchase
       if (state.gameResult === 'playing') {
         executeDayStart(state);
-        const card2 = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
+        // Only business/community-space cards can be bought onto the street —
+        // prefer the first purchasable one in the seeded row (content
+        // expansion re-rolls which families the market shows).
+        const card2 = state.market.cards.find(
+          c => (c.family === 'business' || c.family === 'community-space')
+            && c.cost <= state.resourceBank.coins,
+        );
         if (card2) {
           const slot = state.streetGrid.findIndex(s => s === null);
           if (slot >= 0) {

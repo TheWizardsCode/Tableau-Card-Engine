@@ -104,6 +104,34 @@ Triggered by `MainStreetOverlayContent.showSellConfirmation()`'s Sell button
 - Reduced motion: single "+€refund" pop + coin SFX retained; demolition and
   coin flight skipped.
 
+## Manage Card dialog: Sell / Close / Cancel
+
+Clicking a non-sold street card during MarketPhase opens the **Manage Card**
+dialog (`MainStreetOverlayContent.showSellConfirmation`, panel 480×360):
+
+- **[Sell]** — free; refunds coins (`sellBusinessCommand`) and leaves the card
+  on the grid as an inert *sold* marker (existing behaviour).
+- **[Close]** — costs **1 action, no coins** (`closeBusinessCommand` via the
+  shared `consumeAction` enforcement point); removes the card from `streetGrid`
+  into `discardPile`, recalculates neighbours, and frees the slot. Illegal
+  closes (no actions, sold slot, empty slot) produce illegal-move feedback and
+  no state change.
+- **[Cancel]** — dismisses with no state change.
+
+All text/buttons are parented into `hudContainer` at depth 201 (backdrop 199,
+box 200) per the project overlay convention. Sold cards never open the dialog.
+
+## Close demolition (no refund)
+
+`MainStreetAnimator.animateClose({ slotIndex, cardId, family })` plays when a
+close is confirmed: a pre-close card snapshot shrinks/fades over ~380ms, then a
+brief "Closed" pop marks the freed slot and `sfx-discard` plays. There is **no**
+refund coin fly and no "+€" pop (closing grants no coins). Triggered by the
+Manage dialog's Close button (only when the close command succeeded).
+
+- Reduced motion: demolition skipped; "Closed" pop + discard SFX retained.
+- Replay/headless: resolves immediately (presentation-only).
+
 ## Day transition banner
 
 `MainStreetAnimator.animateDayBanner({ day })` plays at each day start: a

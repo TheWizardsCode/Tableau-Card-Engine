@@ -131,7 +131,11 @@ export { createCardGame } from './createCardGame';
 export type { CardGameOptions } from './createCardGame';
 
 // Card selection helpers
-export { attachSelection, createSingleSelectionManager } from './selection';
+export {
+  createSelectionState,
+  attachSelection,
+  createSingleSelectionManager,
+} from './selection';
 export type {
   SelectionController,
   SelectionState,

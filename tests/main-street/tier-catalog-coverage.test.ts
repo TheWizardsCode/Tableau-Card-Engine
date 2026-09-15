@@ -25,12 +25,13 @@ describe('Main Street tier catalog coverage', () => {
     }
   });
 
-  it('tier-1 is the starter set (15 cards) and includes every tutorial-pinned card', () => {
+  it('tier-1 is the starter set (16 cards) and includes every tutorial-pinned card', () => {
     const tier1 = TIER_DEFINITIONS['tier-1'].newCardIds;
     // 12-tier starter set (CG-0MT3C744B009DS84): 4 biz + 2 cs + 4 events
-    // + 1 staff + 4 upgrades. The tutorial builds decks from the tier-1 pool,
-    // so the 7 scenario cards are all present.
-    expect(tier1).toHaveLength(15);
+    // + 1 staff + 4 upgrades, + Error in Tax Return (CG-0MTT7FC7A000AA58).
+    // The tutorial builds decks from the tier-1 pool, so the scenario cards
+    // are all present.
+    expect(tier1).toHaveLength(16);
     const set = new Set(tier1);
     for (const pinned of ['biz-bakery', 'biz-laundromat', 'biz-bookshop',
       'cs-library', 'evt-festival', 'evt-award', 'evt-rainy']) {
@@ -47,14 +48,14 @@ describe('Main Street tier catalog coverage', () => {
     }
   });
 
-  it('cumulative pools grow monotonically to 154', () => {
+  it('cumulative pools grow monotonically to 162', () => {
     let prevSize = 0;
     for (let i = 1; i <= 12; i++) {
       const size = TIER_DEFINITIONS[`tier-${i}`].cumulativeCardIds.length;
       expect(size).toBeGreaterThan(prevSize);
       prevSize = size;
     }
-    // 142 + 12 specialization staff applicants (CG-0MT4WXNR80090FXZ).
-    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(154);
+    // 154 baseline + 8 chain-event templates (CG-0MTT7FC7A000AA58).
+    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(162);
   });
 });

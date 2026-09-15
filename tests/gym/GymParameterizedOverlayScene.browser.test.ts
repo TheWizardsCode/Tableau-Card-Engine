@@ -306,6 +306,6 @@ describe('GymParameterizedOverlayScene browser integration', () => {
     const screenshotPath = `__screenshots__/GymParameterizedOverlayScene.browser.test.ts/overlay-game-over.png`;
     await page.screenshot({ path: screenshotPath });
 
-    console.log(`[screenshot:game-over-overlay] path=${screenshotPath} canvas=${canvas!.width}x${canvas!.height}`);
+    console.info(`[screenshot:game-over-overlay] path=${screenshotPath} canvas=${canvas!.width}x${canvas!.height}`);
   });
 });

@@ -202,17 +202,13 @@ describe('AC2: Cash line does not overlap other overlays', () => {
     expect(spec.cashLine!.y).toBeLessThan(spec.reputationText!.y);
   });
 
-  it('cashLine is horizontally centred (originX 0.5)', () => {
+  it('cashLine is right-column left-anchored (originX 0, x = -w/2+80)', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
-    expect(spec.cashLine!.originX).toBe(0.5);
+    // Right column so nothing bleeds into the 64×64 graphic (SVG x < 72)
+    expect(spec.cashLine!.originX).toBe(0);
     expect(spec.cashLine!.originY).toBe(0.5);
-  });
-
-  it('cashLine x is centred at 0', () => {
-    const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0 });
-    const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
-    expect(spec.cashLine!.x).toBe(0);
+    expect(spec.cashLine!.x).toBe(Math.round(-WIDTH / 2 + 80));
   });
 });
 

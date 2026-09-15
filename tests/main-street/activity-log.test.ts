@@ -233,7 +233,7 @@ describe('Activity Log', () => {
   });
 
   describe('event purchase', () => {
-    it('should log a neutral entry when an Investment event is moved to hand (free)', () => {
+    it('should log a neutral entry when an Investment event is moved to hand', () => {
       const state = createTestState();
       executeDayStart(state);
 
@@ -244,8 +244,9 @@ describe('Activity Log', () => {
 
       const entry = lastLog(state);
       expect(entry.type).toBe('neutral');
-      // Taking the event to hand is free (CG-0MT5W1V4D007NN8Q) — the log
-      // reflects the move, not a coin deduction.
+      // Taking the event to hand costs 1 action but no coins
+      // (CG-0MTFWBNL30043ZBM, CG-0MT5W1V4D007NN8Q) — the log reflects the
+      // move, not a coin deduction.
       expect(entry.text).toContain('Moved event');
       expect(entry.text).toContain('Test Fest');
     });
@@ -837,9 +838,10 @@ describe('Activity Log', () => {
       processEndOfTurn(state);
       const netIdx = state.activityLog.findIndex(e => /Turn \d+ net:/.test(e.text));
       const overIdx = state.activityLog.findIndex(e => /Game Over|Bankruptcy/.test(e.text));
-      // Net row is emitted; if game-over follows, net precedes it.
+      // Net row is the final entry; if a game-over log appears (e.g. bankruptcy
+      // triggered by checkImmediateLoss before income), net row comes AFTER it.
       if (netIdx !== -1 && overIdx !== -1) {
-        expect(netIdx).toBeLessThan(overIdx);
+        expect(netIdx).toBeGreaterThan(overIdx);
       } else {
         expect(netIdx).not.toBe(-1);
       }

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
-import { executeDayStart, processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
+import { executeDayStart, endTurnHeadless } from '../../example-games/main-street/MainStreetEngine';
+import { getEventTemplates } from '../../example-games/main-street/MainStreetCards';
 import { canPurchaseBusiness, canPurchaseEvent, getEmptySlots } from '../../example-games/main-street/MainStreetMarket';
 import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
 
@@ -103,9 +104,11 @@ describe('MainStreetScene browser tests', () => {
     await waitForScene(game, 'MainStreetScene');
 
     const restarted = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
-    const state = restarted.state as Parameters<typeof processEndOfTurn>[0];
+    const state = restarted.state as Parameters<typeof endTurnHeadless>[0];
 
-    processEndOfTurn(state);
+    // Headless turn: auto-resolves a dual-choice incident if the restarted
+    // run draws one (content CG-0MTT7FC7A000AA58 ships choice events).
+    endTurnHeadless(state);
     executeDayStart(state);
     (restarted.refreshAll as () => void)();
 
@@ -540,6 +543,18 @@ describe('MainStreetScene browser tests', () => {
   it('allows pressing Enter to end the turn when legal', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, any>;
+
+    // Non-choice incidents only: a dual-choice event would pause end-of-turn
+    // for the dialog and this test only checks the Enter-to-end binding
+    // (content CG-0MTT7FC7A000AA58 ships choice events in the full deck).
+    const safeTemplates = getEventTemplates().filter((t) =>
+      ['evt-award', 'evt-good-press', 'evt-graffiti-art', 'evt-street-cleaning'].includes(t.id),
+    );
+    scene.state.incidentDeck.length = 0;
+    scene.state.incidentDeck.push(
+      ...safeTemplates.map((t, i) => ({ ...t, id: `${t.id}-${i}` })),
+      ...safeTemplates.map((t, i) => ({ ...t, id: `${t.id}-${i + 10}` })),
+    );
 
     // Ensure we are in market phase
     expect(scene.uiPhase).toBe('market');

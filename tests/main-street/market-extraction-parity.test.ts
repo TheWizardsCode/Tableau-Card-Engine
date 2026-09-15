@@ -31,7 +31,7 @@ import {
   getAffordableBusinessCards,
   type RefreshResult,
 } from '../../example-games/main-street/MainStreetMarket';
-import { executeDayStart, processEndOfTurn, executeAction } from '../../example-games/main-street/MainStreetEngine';
+import { executeDayStart, endTurnHeadless, executeAction } from '../../example-games/main-street/MainStreetEngine';
 import {
   GRID_SIZE,
   MARKET_TOTAL_SLOTS,
@@ -899,7 +899,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
       const slot = empty[0];
       executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: slot });
     }
-    processEndOfTurn(state);
+    endTurnHeadless(state);
   }
 
   describe('purchase → end-turn → refill cycle', () => {
@@ -916,7 +916,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
       expect(state.market.cards).toHaveLength(MARKET_TOTAL_SLOTS - 1);
 
       // End turn → Day 2: market should be refilled
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       executeDayStart(state);
       // Market should be refilled to capacity (or deck limit)
       expect(state.market.cards.length).toBeGreaterThanOrEqual(1);
@@ -944,7 +944,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
       expect(state.market.cards.length).toBe(invBefore - 1);
 
       // End turn → Day 2: investments should be refilled
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       executeDayStart(state);
       const upgCount = state.market.cards.filter(c => c.family === 'upgrade').length;
       const evtCount = state.market.cards.filter(c => c.family === 'event').length;

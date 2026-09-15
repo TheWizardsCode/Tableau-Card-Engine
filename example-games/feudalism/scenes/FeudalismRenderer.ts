@@ -15,7 +15,7 @@ import { getInfluence, getBonuses } from '../FeudalismGame';
 import { addCropIcon, cssColorToNumber } from './CropIconRenderer';
 import { FONT_FAMILY, GAME_W, GAME_H, createOverlayBackground } from '../../../src/ui';
 import type { SingleSelectionManager, SelectionController } from '../../../src/ui';
-import { attachSelection, createSingleSelectionManager } from '../../../src/ui';
+import { createSelectionState, createSingleSelectionManager } from '../../../src/ui';
 import { createGameZone } from '../../../src/ui/Renderer';
 import {
   PATRON_W, PATRON_H, PATRON_X,
@@ -345,7 +345,7 @@ export class FeudalismRenderer {
     }
 
     if (this.turnPhase === 'player-turn') {
-      const selection = attachSelection(container, {
+      const selection = createSelectionState({
         onStateChange: ({ selected, hovered }) => {
           if (selected) this.selectedMarketCardId = card.id;
           else if (this.selectedMarketCardId === card.id) this.selectedMarketCardId = null;

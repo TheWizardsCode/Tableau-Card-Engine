@@ -160,6 +160,11 @@ export class MainStreetLifecycleManager {
     // Reset
     s.uiPhase = 'idle';
     s.pendingBusinessCard = null;
+    // Staff applicant render state (CG-0MSTOATDU006UGAX): destroy the
+    // overlay rather than just dropping the reference, so a game restart
+    // does not leak orphaned game objects.
+    (s as any).applicantAnimating = false;
+    (s as any).clearApplicantOverlay?.();
     s.overlayObjects = [];
     s.previousCoins = null;
     s.previousReputation = null;
@@ -262,6 +267,9 @@ export class MainStreetLifecycleManager {
     // Wire checkpoint callbacks to the turn controller
     s.msTurnController.onSaveCheckpoint = () => {
       if (s.state) {
+        // Capture the live camera (zoom/pan) into the state before serialising
+        // (CG-0MTH9OWF2002YQQ3).
+        s.syncStreetCameraToState?.();
         s.checkpointManager.save(s.state).catch((_err: unknown) => {
           console.warn('[MainStreet] Failed to save checkpoint:', _err);
         });
@@ -304,6 +312,10 @@ export class MainStreetLifecycleManager {
     s.createHeader();
     s.createContainers();
     s.createInstructions();
+    // Street-map camera (CG-0MTH9OVMC001V44E): install the viewport mask and
+    // register the always-available zoom/pan controls once the street
+    // container exists.
+    s.initStreetCamera();
     s.initSvgDebugOverlay();
 
     s.scale.off(Phaser.Scale.Events.RESIZE, s.handleResize, s);
@@ -411,11 +423,13 @@ export class MainStreetLifecycleManager {
         heading: 'Turn Flow',
         body:
           'Day Start: market refreshes and income is calculated.\n' +
-          'Market Actions: buy businesses, upgrades, or events from the market.\n' +
-          'Place businesses on the street grid to earn future income.\n' +
-          'End Turn: resolves income, incidents, and advances to the next day.\n' +
-          'Repeat until you win (score threshold / all challenges) or lose\n' +
-          '(bankruptcy / reputation collapse).',
+          'Market Actions: buy businesses, upgrades, or events; place businesses\n' +
+          'on the street grid to earn future income.\n' +
+          'You get 1 action per day (2 with a General Manager). Taking a card to\n' +
+          'hand costs 1 action, as does playing or placing it from hand — but a\n' +
+          'same-day move + play/place pair costs 1 action total.\n' +
+          'Card costs are paid when a card is placed or played, not when taken to hand.\n' +
+          'End Turn: resolves income, incidents, and advances to the next day.',
       },
       {
         heading: 'Win / Loss Conditions',
@@ -584,6 +598,31 @@ export class MainStreetLifecycleManager {
       window.addEventListener('keydown', endTurnKeyHandler as EventListener);
     }
 
+    // Global keyboard handler: Escape cancels an in-progress hand-card
+    // targeting phase (placing-from-hand / placing-business), returning to the
+    // market phase (CG-0MT3IYSRL001VVUP). Same overlay guards as End Turn so an
+    // open dialog keeps priority.
+    const escapeKeyHandler = (ev: KeyboardEvent) => {
+      try {
+        if (s.replayMode) return;
+        if (ev.key !== 'Escape') return;
+        const overlayOpen = Array.isArray(s.overlayObjects) && s.overlayObjects.length > 0;
+        if (overlayOpen) return;
+        if ((s as any).helpPanel?.isOpen) return;
+        if ((s as any).settingsPanel?.isOpen) return;
+        if ((s as any).statsOverlay?.isOpen) return;
+        s.msTurnController?.cancelPendingPlacement?.();
+      } catch (_) {
+        // ignore runtime errors in key handler
+      }
+    };
+
+    if (s.input && s.input.keyboard) {
+      s.input.keyboard.on('keydown', escapeKeyHandler);
+    } else if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', escapeKeyHandler as EventListener);
+    }
+
     s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       markSceneInvalid(s);
       s.cleanupTransferAnimations();
@@ -592,8 +631,10 @@ export class MainStreetLifecycleManager {
       try {
         if (s.input && s.input.keyboard) {
           s.input.keyboard.off('keydown', endTurnKeyHandler);
+          s.input.keyboard.off('keydown', escapeKeyHandler);
         } else if (typeof window !== 'undefined') {
           window.removeEventListener('keydown', endTurnKeyHandler as EventListener);
+          window.removeEventListener('keydown', escapeKeyHandler as EventListener);
         }
       } catch (_) { /* ignore */ }
     });
@@ -1053,7 +1094,7 @@ export class MainStreetLifecycleManager {
     }
 
     if (mismatch) {
-      console.log(`[MainStreetLifecycleManager] CSV mismatch detected (${source}), regenerating SVGs in-memory`);
+      console.info(`[MainStreetLifecycleManager] CSV mismatch detected (${source}), regenerating SVGs in-memory`);
       // Only update SVG sources — no texture clearing. Texture invalidation
       // is handled atomically by prewarmVisibleCardTextures() per-key.
       s.msSvgTextureManager.regenerateSvgSourcesFromCsv();
@@ -1088,6 +1129,10 @@ export class MainStreetLifecycleManager {
         // (the saved state already has the correct market from save time;
         // calling refillMarket would replace it with fresh deck draws).
         try { s.refreshAll(); } catch (_) { /* ignore */ }
+        // Restore the saved camera (zoom/pan) onto the scene after rehydrating
+        // (CG-0MTH9OWF2002YQQ3). Runs after refreshAll so the street layout
+        // exists; setStreetCameraState then re-renders the visible streets.
+        try { s.syncStreetCameraFromState?.(); } catch (_) { /* ignore */ }
         // Clear the deferred flag — the player has committed by resuming,
         // but the banner must NOT fire (same day continues, AC3).
         s.deferredDayBanner = false;

@@ -22,6 +22,7 @@ import {
   checkEndConditions,
   computeScore,
   processEndOfTurn,
+  resolvePendingEventChoice,
 } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -180,6 +181,11 @@ describe('AC1 — Endless-mode opt-in flag', () => {
     s.phase = 'MarketPhase';
 
     const result = processEndOfTurn(s);
+    // Headless turn: if the drawn incident is a dual-choice event, resolve it
+    // per the difficulty policy so the closing (EndCheck) still runs.
+    if (s.pendingEventChoice && !s.pendingEventChoice.resolved) {
+      resolvePendingEventChoice(s);
+    }
 
     // Endless: the turn still completes, phase returns to DayStart, game still playing
     expect(result.gameResult).toBe('playing');

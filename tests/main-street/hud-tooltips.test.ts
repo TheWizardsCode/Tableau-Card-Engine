@@ -257,8 +257,8 @@ describe('buildCoinsTooltip', () => {
     expect(mult).toBeCloseTo(1.25);
 
     const tooltip = buildCoinsTooltip(state);
-    // Tooltip renders the multiplier with toFixed(1): 1.25 → '×1.3'
-    expect(tooltip).toContain('×1.3');
+    // Tooltip renders the multiplier with toFixed(3): 1.25 → '×1.250'
+    expect(tooltip).toContain('×1.250');
   });
 
   it('excludes sold cards from income display', () => {
@@ -324,7 +324,7 @@ describe('buildReputationTooltip', () => {
     state.resourceBank.reputation = 0;
 
     const tooltip = buildReputationTooltip(state);
-    expect(tooltip).toContain('×1.0');
+    expect(tooltip).toContain('×1.000');
   });
 
   it('shows capped multiplier for high reputation', () => {
@@ -333,7 +333,7 @@ describe('buildReputationTooltip', () => {
 
     const tooltip = buildReputationTooltip(state);
     // With default config, max multiplier is 1.5 (quartered cap, CG-0MT3J80HV0084IF1)
-    expect(tooltip).toContain('×1.5');
+    expect(tooltip).toContain('×1.500');
   });
 });
 

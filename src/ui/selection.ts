@@ -26,11 +26,11 @@ export interface SingleSelectionManager {
 }
 
 /**
- * Attaches lightweight selected/hovered state management to a game object.
- * Visuals are delegated to the caller via `onStateChange`.
+ * Creates a selection controller with lightweight selected/hovered state.
+ * Visual updates are delegated to the caller via `onStateChange`.
+ * The returned controller is game-object-agnostic and testable without Phaser mocks.
  */
-export function attachSelection(
-  _target: Phaser.GameObjects.GameObject,
+export function createSelectionState(
   options: AttachSelectionOptions = {},
 ): SelectionController {
   let selected = false;
@@ -74,6 +74,17 @@ export function attachSelection(
 
   emitState();
   return controller;
+}
+
+/**
+ * @deprecated Use {@link createSelectionState} instead.
+ * Kept for backward compatibility; ignores the first `_target` argument.
+ */
+export function attachSelection(
+  _target: Phaser.GameObjects.GameObject,
+  options?: AttachSelectionOptions,
+): SelectionController {
+  return createSelectionState(options ?? {});
 }
 
 /**

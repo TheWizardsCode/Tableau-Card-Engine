@@ -20,7 +20,7 @@ import {
 } from '../../example-games/main-street/MainStreetState';
 import {
   executeDayStart,
-  processEndOfTurn,
+  endTurnHeadless,
   executeAction,
   peekIncidentDeck,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -36,6 +36,11 @@ import { peekIncidentDeckCommand } from '../../example-games/main-street/MainStr
 function createPeekState(seed: string = 'peek-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });
   executeDayStart(state);
+  // Generous but sub-threshold coin buffer: peek gate/reveal tests exercise
+  // peek mechanics, not survival or score. The buffer must survive the worst
+  // seeded incident (~-600) while staying below the win threshold so the
+  // turn completes to DayStart (content expansion re-rolls seeded draws).
+  state.resourceBank.coins = 1400;
   const peekStaff = createStaffDeck(1).find(c => c.peekOncePerTurn);
   expect(peekStaff, 'a peek staff template must exist for this helper').toBeDefined();
   state.staffCards.push({ ...peekStaff! });
@@ -163,7 +168,7 @@ describe('AC3: once-per-turn gate', () => {
 
     // Finish the day (IncidentPhase → EndCheck wraps to DayStart) and start
     // the next turn; the gate must be cleared.
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.phase).toBe('DayStart');
     executeDayStart(state);
 
@@ -272,7 +277,7 @@ describe('AC2: revealedPeekedCard scene contract', () => {
     peekIncidentDeck(state);
     expect(state.revealedPeekedCard).not.toBeNull();
 
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     executeDayStart(state);
     expect(state.revealedPeekedCard).toBeNull();
     expect(state.peekUsedThisTurn).toBe(false);

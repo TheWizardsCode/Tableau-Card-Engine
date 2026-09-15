@@ -27,6 +27,8 @@ const MAX_TURNS = 60;
 
 /** Tuned target win-rate bands per difficulty (design intent). */
 const WIN_RATE_BANDS: Record<'Easy' | 'Medium' | 'Hard', { min: number; max: number }> = {
+  // CG-0MTH5CC4H003Q4B3 re-baseline: Investment events cost one daily action
+  // and the AI scores the take by net play value — measured 85.5%.
   Easy: { min: 0.55, max: 1.0 },
   // CG-0MSRKN325004ELH2 revision: 30–60% → 45–75% (measured 62% on the
   // canonical 200-seed profile; see docs/main-street/balance-guardrail-
@@ -38,10 +40,14 @@ const WIN_RATE_BANDS: Record<'Easy' | 'Medium' | 'Hard', { min: number; max: num
   // in market cards) keeps its liquidity and wins far more often — measured
   // 89.5% on the canonical 200-seed set. Max widened to 0.95; the win-rate
   // ladder (Easy ≥ Medium ≥ Hard) remains the primary balance gate.
+  // CG-0MTH5CC4H003Q4B3 re-baseline: Investment events now cost one daily
+  // action and the AI scores the take by net play value — measured 83.0%.
   Medium: { min: 0.45, max: 0.95 },
   // CG-0MTC31LN3000UHDY re-baseline: same driver as Medium — removing the
   // hand-held ongoing cost roughly quintuples the greedy AI's Hard win rate
   // (measured 65%). Max widened to 0.75 (Hard still the toughest preset).
+  // CG-0MTH5CC4H003Q4B3 re-baseline: Investment events now cost one daily
+  // action and the AI scores the take by net play value — measured 56.5%.
   Hard: { min: 0.1, max: 0.75 },
 };
 

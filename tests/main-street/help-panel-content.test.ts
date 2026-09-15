@@ -71,11 +71,13 @@ const HELP_SECTIONS = [
     heading: 'Turn Flow',
     body:
       'Day Start: market refreshes and income is calculated.\n' +
-      'Market Actions: buy businesses, upgrades, or events from the market.\n' +
-      'Place businesses on the street grid to earn future income.\n' +
-      'End Turn: resolves income, incidents, and advances to the next day.\n' +
-      'Repeat until you win (score threshold / all challenges) or lose\n' +
-      '(bankruptcy / reputation collapse).',
+      'Market Actions: buy businesses, upgrades, or events; place businesses\n' +
+      'on the street grid to earn future income.\n' +
+      'You get 1 action per day (2 with a General Manager). Taking a card to\n' +
+      'hand costs 1 action, as does playing or placing it from hand — but a\n' +
+      'same-day move + play/place pair costs 1 action total.\n' +
+      'Card costs are paid when a card is placed or played, not when taken to hand.\n' +
+      'End Turn: resolves income, incidents, and advances to the next day.',
   },
   {
     heading: 'Win / Loss Conditions',
@@ -163,6 +165,18 @@ describe('Help/Rules panel content (PRD milestone 5)', () => {
   it('"Turn Flow" mentions end turn', () => {
     const body = HELP_SECTIONS.find((s) => s.heading === 'Turn Flow')!.body.toLowerCase();
     expect(body).toContain('end turn');
+  });
+
+  it('"Turn Flow" documents the daily action economy (business and event moves/plays)', () => {
+    const body = HELP_SECTIONS.find((s) => s.heading === 'Turn Flow')!.body.toLowerCase();
+    // One action per day (two with a General Manager); take-to-hand and
+    // play/place each cost 1 action, with a 1-action same-day composite.
+    expect(body).toContain('general manager');
+    expect(body).toContain('taking a card to');
+    expect(body).toContain('hand costs 1 action');
+    expect(body).toContain('same-day move + play/place pair costs 1 action total');
+    // Cost-at-play is preserved: coins are not charged on take-to-hand.
+    expect(body).toContain('not when taken to hand');
   });
 
   it('"Win / Loss Conditions" mentions bankruptcy and reputation', () => {

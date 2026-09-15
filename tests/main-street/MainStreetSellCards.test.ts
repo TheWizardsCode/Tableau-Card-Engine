@@ -287,7 +287,7 @@ describe('MainStreet Sell Cards', () => {
         } else {
           // If sellBusiness requires pre-calculated upgrade cost, skip
           // This test will be updated when the implementation is clearer
-          console.log('Upgrade cost lookup not yet available, skipping test');
+          console.info('Upgrade cost lookup not yet available, skipping test');
         }
       },
     );

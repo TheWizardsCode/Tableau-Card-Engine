@@ -62,8 +62,8 @@ describe('Expanded Card Pool: Template Completeness', () => {
     expect(businessDeck).toHaveLength(30);
   });
 
-  it('should have exactly 56 event templates', () => {
-    expect(eventDeck).toHaveLength(56); // +1 Graffiti Art (CG-0MSRC9UR9006FBXC)
+  it('should have exactly 64 event templates', () => {
+    expect(eventDeck).toHaveLength(64); // 56 + 8 story-chain events (CG-0MTT7FC7A000AA58)
   });
 
   it('should have exactly 39 upgrade templates', () => {
@@ -508,8 +508,8 @@ describe('Expanded Card Pool: Deck Building', () => {
     expect(createBusinessDeck(3)).toHaveLength(90);
   });
 
-    it('event deck with 3 copies should have 168 cards', () => {
-    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(168); // 56 x 3 (+1 Graffiti Art)
+    it('event deck with 3 copies should have 192 cards', () => {
+    expect(createEventDeck(3, undefined, _rng, 1)).toHaveLength(192); // 64 x 3 (+8 story-chain)
   });
 
   it('upgrade deck with 2 copies should have 78 cards', () => {

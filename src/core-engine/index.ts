@@ -194,6 +194,10 @@ export {
   computeAdjacencyBonus,
 } from './SpatialRules';
 
+// Listener registry — automatic event listener tracking and cleanup
+export { ListenerRegistry } from './ListenerRegistry';
+export { getSceneRegistry, removeSceneRegistry } from './scene-registry';
+
 // CSV data loader (CG-0MR6ZR23J006ZDNZ)
 export { parseCsv } from './CsvLoader';
 

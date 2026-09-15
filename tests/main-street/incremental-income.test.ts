@@ -355,7 +355,7 @@ describe('Per-card incremental income/reputation tracking', () => {
       expect(cached0).toBe(computeBusinessIncome(state.streetGrid, 0, state.config.synergyBonusPerNeighbor, state.soldSlots));
       expect(cached1).toBe(computeBusinessIncome(state.streetGrid, 1, state.config.synergyBonusPerNeighbor, state.soldSlots));
 
-      // Run income and verify total matches sum of cached values (+ hand synergy)
+      // Run income and verify total matches sum of cached values
       const result = applyIncome(state);
       const gridTotal = (cached0 ?? 0) + (cached1 ?? 0);
       expect(result.total).toBe(gridTotal);

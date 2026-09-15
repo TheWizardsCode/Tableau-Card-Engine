@@ -8,6 +8,7 @@
  * @module
  */
 
+import type { StreetCameraState } from './MainStreetMapView';
 import { shuffleArray } from '../../src/card-system';
 import { type ActiveEffect, createSeededRng } from '../../src/core-engine';
 import { createEconomyLedger, type EconomyLedger } from '../../src/rule-engine/EconomyLedger';
@@ -25,6 +26,8 @@ import {
   CSV_CHECKSUM,
   CARD_DATA_RAW,
   GRID_SIZE,
+  STREET_COLS,
+  STREET_ROWS,
   MARKET_TOTAL_SLOTS,
   MARKET_BUSINESS_MIN,
   MARKET_BUSINESS_MAX,
@@ -288,6 +291,10 @@ export interface MainStreetState {
    * CG-0MSLXJCHH001DLIO).
    */
   turn: number;
+  /** Current calendar week (1–52). Chosen at setup from the allowed set (CG-0MTT0K9RX0004QTE). */
+  week: number;
+  /** Current calendar year (>=1). Increments when week wraps 52→1. */
+  year: number;
   /** Current phase within the turn. */
   phase: DayPhase;
   /**
@@ -301,6 +308,8 @@ export interface MainStreetState {
   /** World grid dimensions (cols × rows of 5×2 street cells). Null/omitted → 1×1 legacy (10 slots). Max 5×5. */
   streetGridCols: number;
   streetGridRows: number;
+  /** Street-map camera state (zoom + pan). Serialised for checkpoint/save. */
+  streetCamera: StreetCameraState;
   /** Face-up cards available for purchase. */
   market: MarketState;
   /** Player resources. */
@@ -373,12 +382,6 @@ export interface MainStreetState {
   discardPile: BusinessCard[];
   /** Active staff cards providing hand capacity bonuses. */
   staffCards: StaffCard[];
-  /**
-   * If true, `processEndOfTurn()` will skip `cycleMarketCards()`.
-   * Used during the tutorial to preserve scenario-placed market cards
-   * until the T7 purchase step completes.
-   */
-  skipMarketCycleOnEndTurn: boolean;
   /**
    * Tracks which street grid slots have been sold. Length = GRID_SIZE.
    * true = card in this slot has been sold (no income/reputation for itself,
@@ -464,6 +467,26 @@ export interface MainStreetState {
   pendingApplicant: PendingApplicant | null;
   /** Suppresses the staff-applicant trigger at DayStart (CG-0MSTOATDU006UGAX: tutorial/headless). */
   suppressApplicant?: boolean;
+  /**
+   * Dev-only: forces a staff applicant to appear every day start, bypassing
+   * the RNG roll (CG-0MTY9PB51008OG5A). Must still satisfy the eligible-
+   * business constraint. Not serialized in save/load.
+   */
+  forcedStaffApplicant?: boolean;
+  /**
+   * Pending dual-choice incident event (CG-0MTSHG8RP008E128).
+   *
+   * Populated when `resolveIncident()` draws an incident whose card has
+   * `hasChoices: true`. The event's effect is DEFERRED — `resolveIncident`
+   * returns null and `processEndOfTurn` pauses before EndCheck with
+   * `TurnResult.choicePending === true`. The scene presents the Accept/Reject
+   * dialog and resolves via {@link resolveEventChoice} (typed field per
+   * producer decision 2026-09-08 Q3 — NOT the `(state as any)` precedent).
+   *
+   * Cleared when the choice is resolved and the deferred closing phases run.
+   * Serialized/restored by save/load so an unresolved choice survives a save.
+   */
+  pendingEventChoice: PendingEventChoice | null;
 }
 
 /**
@@ -477,14 +500,32 @@ export interface PendingApplicant {
   targetSlotIndex: number;
 }
 
+/**
+ * A dual-choice incident event awaiting the player's Accept / Reject decision
+ * (CG-0MTSHG8RP008E128). Stored as a typed field on `MainStreetState`
+ * (`pendingEventChoice`) so it survives save/load and undo of the choice.
+ */
+export interface PendingEventChoice {
+  /** The choice event drawn from the incident deck (effect deferred). */
+  event: EventCard;
+  /** The player's decision, once made; null while the dialog is showing. */
+  chosenOption: null | 'accept' | 'reject';
+  /** False while the dialog is pending; true after the choice is applied. */
+  resolved: boolean;
+}
+
 export interface MainStreetSerializedState {
   config: GameConfig;
   turn: number;
+  week: number;
+  year: number;
   phase: DayPhase;
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
   /** World grid dimensions for save/load (see MainStreetState). */
   streetGridCols: number;
   streetGridRows: number;
+  /** Street-map camera state (zoom + pan). Defaults to {zoomLevel:1, focusX:0, focusY:0} for legacy. */
+  streetCamera: StreetCameraState;
   market: MarketState;
   resourceBank: ResourceBank;
   /** Day-start coin snapshot for the per-turn net summary row (see MainStreetState). */
@@ -531,8 +572,6 @@ export interface MainStreetSerializedState {
   discardPile: BusinessCard[];
   /** Serialized active staff cards. */
   staffCards: StaffCard[];
-  /** Whether market cycling should be skipped on next end-of-turn. */
-  skipMarketCycleOnEndTurn: boolean;
   /**
    * Checksum of the card-data.csv at the time this save was created.
    * Used to detect CSV changes between saves, triggering SVG regeneration.
@@ -585,6 +624,8 @@ export interface MainStreetSerializedState {
   competitiveWinnerId?: number | null;
   /** Pending staff applicant for the current day (CG-0MSTOATDU006UGAX). */
   pendingApplicant: PendingApplicant | null;
+  /** Pending dual-choice incident event awaiting Accept/Reject (CG-0MTSHG8RP008E128). */
+  pendingEventChoice: PendingEventChoice | null;
 }
 
 /** Record of a single milestone (tier unlock) achievement. */
@@ -675,6 +716,35 @@ export function seedToNumber(seed: string): number {
 }
 
 /**
+ * Allowed starting weeks for a new game (CG-0MTT0K9RX0004QTE).
+ * Drawn uniformly at setup via the game's seeded RNG.
+ */
+export const ALLOWED_START_WEEKS: readonly number[] = [
+  1, 2, 3, 4, 5, 6, 7, 8, 16, 17, 18, 19, 20, 21, 22, 23, 24, 40, 41, 42, 43, 44, 45, 46,
+] as const;
+
+/**
+ * Rolls a start week from the allowed set using the game's seeded RNG.
+ * Consumes exactly one RNG call.
+ */
+export function rollStartWeek(rng: () => number): number {
+  const idx = Math.floor(rng() * ALLOWED_START_WEEKS.length);
+  return ALLOWED_START_WEEKS[idx];
+}
+
+/**
+ * Advances the calendar by one week (wraps 52→1, increments year on wrap).
+ */
+export function advanceWeek(state: MainStreetState): void {
+  if (state.week >= 52) {
+    state.week = 1;
+    state.year += 1;
+  } else {
+    state.week += 1;
+  }
+}
+
+/**
  * Generates a random seed string (6-character alphanumeric).
  */
 export function generateSeedString(): string {
@@ -733,11 +803,9 @@ function forceReshuffleFromDiscards<T>(state: MainStreetState, deck: T[], discar
  *     (empty decks reshuffle matching discards — staff included; Investment-trigger events
  *     are sought in the event deck like the legacy investments row).
  *
- * Visible cards are PRESERVED (top-up semantics), which mirrors the legacy
- * day-start refill behaviour relied on by the tutorial's
- * `skipMarketCycleOnEndTurn` flow (scenario-placed market cards survive into
- * the next day). Callers that want a full re-draw must clear the row first
- * (refreshMarket discards + clears; cycleMarketCards empties the row).
+ * Visible cards are PRESERVED (top-up semantics), so scenario-placed market
+ * cards survive into the next day. Callers that want a full re-draw must clear
+ * the row first (refreshMarket discards + clears; cycleMarketCards empties the row).
  *
  * @param state Current game state (mutated in-place).
  */
@@ -934,16 +1002,30 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
   shuffleArray(incidentPool, rng);
   const incidentDeck = incidentPool;
 
+  // Roll the start week from the allowed set BEFORE any RNG calls from deck
+  // shuffling/market refill/challenge selection, so same seed ⇒ same start week
+  // regardless of how the pool sizes evolve (CG-0MTT0K9RX0004QTE / F2).
+  // To preserve that invariant even after existing setup code adds further RNG
+  // consumption before this point (e.g. future shuffles), derive the start
+  // week from a dedicated seeded stream that shares the numeric seed — the
+  // main replay stream's rngCalls continue to count only main-stream draws.
+  const startWeekSeed = (numericSeed ^ 0x9e3779b9) >>> 0;
+  const startWeekRng = createSeededRng(startWeekSeed);
+  const startWeek = rollStartWeek(() => startWeekRng());
+
   // Build initial state -- use config values instead of hard-coded constants
   const initCoins = config.startingCoins;
   const initRep = config.startingReputation;
   const baseState: MainStreetState = {
     config,
     turn: 1,
+    week: startWeek,
+    year: 1,
     phase: 'DayStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     streetGridCols: 1,
     streetGridRows: 1,
+    streetCamera: { zoomLevel: 1, focusX: 0, focusY: 0 },
     market,
     resourceBank: {
       coins: initCoins,
@@ -990,7 +1072,6 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     maxHandSize: 3,
     discardPile: [],
     staffCards: [],
-    skipMarketCycleOnEndTurn: false,
     soldSlots: new Array<boolean>(GRID_SIZE).fill(false),
     actionsRemaining: 1,
     bankedActions: 0,
@@ -1006,6 +1087,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     activePlayerId: undefined,
     competitiveWinnerId: undefined,
     pendingApplicant: null,
+    pendingEventChoice: null,
   };
   // Endless-mode opt-in (CG-0MTIILU5V006GCN4): overrides the preset's
   // win-threshold semantics. Default is false (existing behaviour).
@@ -1067,7 +1149,7 @@ export function createCompetitiveState(
   } as PlayerRecord));
 
   state.ownerTaggedGrid = Array.from(
-    { length: GRID_SIZE },
+    { length: state.streetGrid.length },
     (): OwnerTaggedSlot => ({ card: null, ownerId: null }),
   );
 
@@ -1122,10 +1204,13 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
   return {
     config: structuredClone(state.config),
     turn: state.turn,
+    week: state.week,
+    year: state.year,
     phase: state.phase,
     streetGrid: structuredClone(state.streetGrid),
     streetGridCols: state.streetGridCols,
     streetGridRows: state.streetGridRows,
+    streetCamera: { ...state.streetCamera },
     market: structuredClone(state.market),
     resourceBank: structuredClone(state.resourceBank),
     dayStartCoins: state.dayStartCoins,
@@ -1151,8 +1236,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     maxHandSize: state.maxHandSize,
     discardPile: structuredClone(state.discardPile),
     staffCards: structuredClone(state.staffCards),
-    skipMarketCycleOnEndTurn: state.skipMarketCycleOnEndTurn,
-    soldSlots: [...state.soldSlots],
+    soldSlots: resizeSoldSlots(state.soldSlots, state.streetGrid.length),
     csvChecksum: CSV_CHECKSUM,
     csvData: CARD_DATA_RAW,
     actionsRemaining: state.actionsRemaining,
@@ -1170,6 +1254,13 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     competitiveWinnerId: state.competitiveWinnerId ?? null,
     pendingApplicant: state.pendingApplicant
       ? { card: structuredClone(state.pendingApplicant.card), targetSlotIndex: state.pendingApplicant.targetSlotIndex }
+      : null,
+    pendingEventChoice: state.pendingEventChoice
+      ? {
+          event: structuredClone(state.pendingEventChoice.event),
+          chosenOption: state.pendingEventChoice.chosenOption,
+          resolved: state.pendingEventChoice.resolved,
+        }
       : null,
   };
 }
@@ -1325,10 +1416,6 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (discards as Record<string, unknown>).staff = [];
   }
 
-  // ── skipMarketCycleOnEndTurn: add missing flag (defaults to false) ─
-  if (!('skipMarketCycleOnEndTurn' in saved)) {
-    (saved as Record<string, unknown>).skipMarketCycleOnEndTurn = false;
-  }
 
   // ── csvChecksum: add missing field (defaults to '' for legacy saves) ─
   if (!('csvChecksum' in saved)) {
@@ -1342,7 +1429,8 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
 
   // ── soldSlots: add missing field (defaults to all false for legacy saves) ─
   if (!('soldSlots' in saved)) {
-    (saved as Record<string, unknown>).soldSlots = new Array<boolean>(GRID_SIZE).fill(false);
+    const grid = (saved as Record<string, unknown>).streetGrid as unknown[] | undefined;
+    (saved as Record<string, unknown>).soldSlots = new Array<boolean>(grid?.length ?? GRID_SIZE).fill(false);
   }
 
   // ── actionsRemaining: backfill default for legacy saves ──
@@ -1442,9 +1530,47 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).streetGridRows = 1;
   }
 
+  // ── streetCamera: backfill default for pre-camera saves ──
+  if (!('streetCamera' in saved)) {
+    (saved as Record<string, unknown>).streetCamera = { zoomLevel: 1, focusX: 0, focusY: 0 };
+  }
+
   // ── pendingApplicant (CG-0MSTOATDU006UGAX): backfill default ─
   if (!('pendingApplicant' in saved)) {
     (saved as Record<string, unknown>).pendingApplicant = null;
+  }
+
+  // ── pendingEventChoice (CG-0MTSHG8RP008E128): backfill default ─
+  // Legacy saves predate the dual-choice incident mechanic; default to null
+  // (no pending choice).
+  if (!('pendingEventChoice' in saved)) {
+    (saved as Record<string, unknown>).pendingEventChoice = null;
+  }
+
+  // ── week/year (CG-0MTT0K9RX0004QTE): backfill for pre-calendar saves ─
+  if (!('week' in saved)) {
+    // Pre-calendar saves had no calendar; reconstruct a valid start week
+    // from the legacy seed's dedicated start-week stream so the calendar is
+    // valid and deterministic after a reload. Mirrors createSeededRng's 5
+    // warm-up iterations + first draw, otherwise legacyWeek would not
+    // match setupMainStreetGame's rollStartWeek for the same seed.
+    const legacyWeek = (() => {
+      const numSeed = (saved as Record<string, unknown>).numericSeed as number | undefined;
+      if (typeof numSeed === 'number') {
+        const dedicated = (numSeed ^ 0x9e3779b9) | 0;
+        let s = dedicated;
+        for (let i = 0; i < 5; i++) s = (Math.imul(1664525, s) + 1013904223) | 0;
+        s = (Math.imul(1664525, s) + 1013904223) | 0;
+        const r = (s >>> 0) / 4294967296;
+        const w = ALLOWED_START_WEEKS[Math.floor(r * ALLOWED_START_WEEKS.length)];
+        return w ?? 1;
+      }
+      return 1;
+    })();
+    (saved as Record<string, unknown>).week = legacyWeek;
+  }
+  if (!('year' in saved)) {
+    (saved as Record<string, unknown>).year = 1;
   }
 
   // ── ongoingCost: default to 0 for legacy community-space cards ─
@@ -1478,6 +1604,96 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
       }
     }
   }
+}
+
+/**
+ * Resizes a `soldSlots` boolean array to match the (world-sized) street grid,
+ * preserving existing sold flags and padding with `false` (CG-0MTH9OWF2002YQQ3).
+ */
+function resizeSoldSlots(sold: boolean[] | undefined, gridLength: number): boolean[] {
+  const target = Math.max(gridLength, 0);
+  const out = new Array<boolean>(target).fill(false);
+  if (sold) {
+    for (let i = 0; i < Math.min(sold.length, target); i++) out[i] = sold[i] === true;
+  }
+  return out;
+}
+
+/**
+ * Re-sizes the playable street grid to a new planar world lattice
+ * (`cols`×`rows` street cells), migrating every placed card, sold flag and
+ * ownership tag by WORLD POSITION (CG-0MTH9OW0H0005VKE).
+ *
+ * The world grid is row-major over the planar seam-sharing rectangle, so its
+ * row width changes with `cols` — a legacy 1×1 board (world width 5) becomes
+ * the origin cell of a larger lattice (world width `4·cols+1`), and its bottom
+ * row shifts from indices 5..9 to `worldY·newWidth + worldX`. This function
+ * therefore *reindexes* rather than merely re-sizing.
+ *
+ * Cards/tags outside the new (smaller) lattice are dropped, matching the
+ * shrinkage semantics of `resizeSoldSlots`.
+ *
+ * @returns True when the lattice changed (arrays re-allocated), false for a no-op.
+ */
+export function setStreetGridLattice(
+  state: MainStreetState,
+  cols: number,
+  rows: number,
+): boolean {
+  const nextCols = Math.max(1, Math.floor(cols));
+  const nextRows = Math.max(1, Math.floor(rows));
+  const prevCols = Math.max(1, Math.floor(state.streetGridCols || 1));
+  const prevRows = Math.max(1, Math.floor(state.streetGridRows || 1));
+  if (nextCols === prevCols && nextRows === prevRows) return false;
+
+  const strideX = STREET_COLS - 1;
+  const strideY = STREET_ROWS - 1;
+  const prevWidth = strideX * prevCols + 1;
+  const nextWidth = strideX * nextCols + 1;
+  const nextHeight = strideY * nextRows + 1;
+  const nextSize = nextWidth * nextHeight;
+
+  /** Translate an index in the previous world frame to the next frame. */
+  const reindex = (index: number): number => {
+    const worldX = index % prevWidth;
+    const worldY = Math.floor(index / prevWidth);
+    if (worldX >= nextWidth || worldY >= nextHeight) return -1;
+    return worldY * nextWidth + worldX;
+  };
+
+  const nextGrid: (BusinessCard | CommunitySpaceCard | null)[] =
+    new Array<BusinessCard | CommunitySpaceCard | null>(nextSize).fill(null);
+  const nextSold = new Array<boolean>(nextSize).fill(false);
+  const prevSold = state.soldSlots ?? [];
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const target = reindex(i);
+    if (target < 0) continue;
+    nextGrid[target] = state.streetGrid[i] ?? null;
+    if (prevSold[i]) nextSold[target] = true;
+  }
+
+  let nextOwners: OwnerTaggedSlot[] | undefined;
+  if (state.ownerTaggedGrid) {
+    nextOwners = new Array<OwnerTaggedSlot>(nextSize).fill(undefined as unknown as OwnerTaggedSlot);
+    for (let i = 0; i < state.ownerTaggedGrid.length; i++) {
+      const target = reindex(i);
+      if (target < 0) continue;
+      nextOwners[target] = state.ownerTaggedGrid[i];
+    }
+  }
+
+  state.streetGrid = nextGrid;
+  state.soldSlots = nextSold;
+  if (nextOwners) state.ownerTaggedGrid = nextOwners;
+  state.streetGridCols = nextCols;
+  state.streetGridRows = nextRows;
+
+  addLog(
+    state,
+    `Street grid expanded to ${nextCols}×${nextRows} streets (${nextSize} plots)`,
+    'neutral',
+  );
+  return true;
 }
 
 /**
@@ -1520,6 +1736,8 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
   state = {
     config: structuredClone(saved.config),
     turn: saved.turn,
+    week: (saved as unknown as { week?: number }).week ?? 1,
+    year: (saved as unknown as { year?: number }).year ?? 1,
     phase: saved.phase,
     streetGrid: structuredClone(saved.streetGrid),
     market: structuredClone(saved.market),
@@ -1567,10 +1785,15 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     maxHandSize: saved.maxHandSize,
     discardPile: structuredClone(saved.discardPile),
     staffCards: structuredClone(saved.staffCards),
-    skipMarketCycleOnEndTurn: saved.skipMarketCycleOnEndTurn ?? false,
-    soldSlots: saved.soldSlots ?? new Array<boolean>(GRID_SIZE).fill(false),
+    soldSlots: resizeSoldSlots(saved.soldSlots, saved.streetGrid.length),
     streetGridCols: (saved as unknown as { streetGridCols?: number }).streetGridCols ?? 1,
     streetGridRows: (saved as unknown as { streetGridRows?: number }).streetGridRows ?? 1,
+    streetCamera: (saved as unknown as { streetCamera?: Partial<StreetCameraState> }).streetCamera
+      ? { zoomLevel: (saved as unknown as { streetCamera?: { zoomLevel?: number } }).streetCamera?.zoomLevel ?? 1,
+          focusX: (saved as unknown as { streetCamera?: { focusX?: number } }).streetCamera?.focusX ?? 0,
+          focusY: (saved as unknown as { streetCamera?: { focusY?: number } }).streetCamera?.focusY ?? 0,
+        }
+      : { zoomLevel: 1, focusX: 0, focusY: 0 },
     actionsRemaining: saved.actionsRemaining ?? 1,
     bankedActions: saved.bankedActions ?? 0,
     peekUsedThisTurn: saved.peekUsedThisTurn ?? false,
@@ -1591,6 +1814,13 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     pendingApplicant: (saved as unknown as { pendingApplicant?: { card: StaffCard; targetSlotIndex: number } | null })?.pendingApplicant
       ? { card: structuredClone((saved as unknown as { pendingApplicant: { card: StaffCard; targetSlotIndex: number } }).pendingApplicant!.card),
           targetSlotIndex: (saved as unknown as { pendingApplicant: { card: StaffCard; targetSlotIndex: number } }).pendingApplicant!.targetSlotIndex,
+        }
+      : null,
+    pendingEventChoice: (saved as unknown as { pendingEventChoice?: { event: EventCard; chosenOption: null | 'accept' | 'reject'; resolved: boolean } | null })?.pendingEventChoice
+      ? {
+          event: structuredClone((saved as unknown as { pendingEventChoice: { event: EventCard; chosenOption: null | 'accept' | 'reject'; resolved: boolean } }).pendingEventChoice!.event),
+          chosenOption: (saved as unknown as { pendingEventChoice: { chosenOption: null | 'accept' | 'reject' } }).pendingEventChoice!.chosenOption,
+          resolved: (saved as unknown as { pendingEventChoice: { resolved: boolean } }).pendingEventChoice!.resolved,
         }
       : null,
   };

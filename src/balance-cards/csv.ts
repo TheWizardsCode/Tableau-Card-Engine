@@ -76,8 +76,14 @@ export function parseCsv(content: string): CsvRow[] {
   const lines = content.split('\n').filter(l => l.trim() !== '');
   if (lines.length < 2) throw new Error('CSV file must have a header row and at least one data row');
   const headers = parseCsvLine(lines[0]).map(h => h.trim());
-  if (headers.length !== CSV_COLUMNS.length) {
-    throw new Error(`CSV has ${headers.length} columns but expected ${CSV_COLUMNS.length}. Columns: ${headers.join(', ')}`);
+  if (headers.length < CSV_COLUMNS.length) {
+    throw new Error(`CSV has ${headers.length} columns but expected at least ${CSV_COLUMNS.length}. Columns: ${headers.join(', ')}`);
+  }
+  // Allow trailing extra columns (e.g. art_notes) — validate header prefix only.
+  for (let i = 0; i < CSV_COLUMNS.length; i++) {
+    if (headers[i] !== CSV_COLUMNS[i]) {
+      throw new Error(`CSV column ${i + 1} mismatch: expected '${CSV_COLUMNS[i]}' but got '${headers[i]}'`);
+    }
   }
   const rows: CsvRow[] = [];
   for (let i = 1; i < lines.length; i++) {
