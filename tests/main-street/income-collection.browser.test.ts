@@ -83,6 +83,17 @@ async function bootGame(options: { width?: number; height?: number } = {}): Prom
  * mechanic (covered by the dedicated event-choice-dialog suites).
  */
 async function makeIncidentsNonChoice(game: Phaser.Game): Promise<void> {
+  await makeIncidentsNonChoiceImpl(game);
+}
+
+/** Blank the incident deck so no incident resolves this turn. */
+async function makeIncidentsNone(game: Phaser.Game): Promise<void> {
+  await makeIncidentsNonChoiceImpl(game);
+  const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+  (scene.state as { incidentDeck: unknown[] }).incidentDeck.length = 0;
+}
+
+async function makeIncidentsNonChoiceImpl(game: Phaser.Game): Promise<void> {
   const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
   const state = scene.state as { incidentDeck: Array<{ id: string }> };
   const templates = (await import('../../example-games/main-street/MainStreetCards')).getEventTemplates();
@@ -252,7 +263,10 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
 
   it('keeps the compact collection during the tutorial (day start inside the usual window)', async () => {
     game = await bootGame();
-    await makeIncidentsNonChoice(game);
+    // No incident this turn: isolate the tutorial income-presentation from
+    // the incident reveal's deliberate 4s hold (CG-0MTW18KFK000MM3I) so the
+    // day still starts inside the compact-collection window.
+    await makeIncidentsNone(game);
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     // Simulate an active tutorial: the controller must keep the compact,
@@ -303,7 +317,9 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
 
   it('never blocks the turn advance when the animator throws', async () => {
     game = await bootGame();
-    await makeIncidentsNonChoice(game);
+    // No incident this turn: isolate the income-animator-failure concern
+    // from the incident reveal gate (CG-0MTW18KFK000MM3I).
+    await makeIncidentsNone(game);
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     const state = scene.state as {

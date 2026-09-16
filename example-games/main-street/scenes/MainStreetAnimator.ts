@@ -1099,32 +1099,32 @@ export class MainStreetAnimator {
   }
 
   /**
-   * Animates the end-of-turn incident reveal: a dramatic sting with damage
-   * feedback so the most negative event in the game reads clearly.
+   * Animates the end-of-turn incident reveal (new choreography, CG-0MTW18KFK000MM3I).
+   *
+   * The face-down card from the Upcoming panel flies to centre screen, flips
+   * face-up with a hinge animation, stays visible for 4 seconds (player reads
+   * the incident), then returns to the queue.
    *
    * Full effect (reduced-motion OFF):
-   * 1. A snapshot card visual flies from the front incident-queue slot to
-   *    the centre of the board (`createTransferCardVisual`, event family).
-   * 2. A brief, subtle red vignette flash pulses over the scene.
-   * 3. The warning sting SFX (`SFX_KEYS.INCOME_NEGATIVE`) plays.
-   * 4. The incident's coin/reputation loss pops on the HUD with
-   *    negative-colour `popTextOrIcon` (explicit, so the deltas are visible
-   *    even while the income-collection animation suppresses the generic
-   *    HUD delta pop).
-   * 5. The active-effects warning indicator (⚠ lines in the Upcoming panel)
-   *    pulses once.
+   * 1. A container at the queue origin holds the incident card face under a
+   *    card-back overlay (reusing `mainStreetRenderCardSvg` + `CARD_BACK_TEMPLATE`).
+   * 2. The container flies to board centre (~550ms).
+   * 3. The back hinges open (`scaleX → 0`) to reveal the face.
+   * 4. The face stays visible for 4 seconds; delta bubbles animate during hold.
+   * 5. Container returns to queue origin and is destroyed.
+   * 6. `onComplete` callback fires after cleanup.
    *
-   * Accessibility (reduced motion): the flight, flash, and indicator pulse
-   * are skipped, but the warning SFX and the HUD loss pops are retained
-   * (AC3 — "keep the pop text + sound").
+   * Accessibility (reduced motion): flight, hinge flip and bubble travel are
+   * skipped — the card appears instantly face-up — but the 4-second hold and
+   * `onComplete` are preserved so the player still has time to read (parent AC3).
    *
    * Headless/replay exemption (AGENTS.md rule 8): presentation-only effect;
    * returns immediately in replay/headless mode (`scene.replayMode`) — no
-   * rendering, no audio. Never mutates game state or the transcript, and
-   * never blocks the turn flow (fire-and-forget tweens).
+   * rendering, no audio. Never mutates game state or the transcript.
    *
    * @param params  Resolved incident (card id/name), its resource deltas
-   *                (negative = loss) and the queue origin for the flight.
+   *                (negative = loss), the queue origin and an optional
+   *                completion callback.
    */
   public animateIncidentReveal(params: {
     cardId: string;
@@ -1133,78 +1133,184 @@ export class MainStreetAnimator {
     coinChange: number;
     /** Net reputation delta from the incident (negative = loss). */
     repChange: number;
-    /** Origin of the flight: the front incident-queue card centre. */
+    /** Origin of the reveal: the front incident-queue card centre. */
     from: { x: number; y: number };
+    /** Fired after the container is returned and destroyed. */
+    onComplete?: () => void;
   }): void {
     const s = this.scene;
 
-    // Headless/replay exemption: no rendering or audio in those modes.
-    if (s.replayMode) return;
+    // Headless/replay exemption: no rendering or audio in those modes. The
+    // completion callback still fires so the caller's turn-advance chain is
+    // never left hanging (presentation is skipped; control flow is not).
+    if (s.replayMode) {
+      params.onComplete?.();
+      return;
+    }
+    // No incident resolved: no-op — no rendering, audio, or scheduling. Fire
+    // the completion callback so a defensive empty-id call never hangs the turn.
+    if (!params.cardId) {
+      params.onComplete?.();
+      return;
+    }
     const reducedMotion = s.settingsPanel?.reducedMotion === true;
 
-    // 3. Warning sting — retained under reduced motion (AC3).
+    // Warning sting SFX — retained in both modes.
     try { s.soundManager?.play(SFX_KEYS.INCOME_NEGATIVE); } catch (_) { /* ignore */ }
 
-    if (!reducedMotion) {
-      // 1. Flight from the queue to the board centre.
-      const to = { x: s.layout.gameW / 2, y: s.layout.gameH / 2 };
-      const visual = this.createTransferCardVisual(params.cardId, 'event', params.from.x, params.from.y);
-      s.tweens.add({
-        targets: visual,
-        x: to.x,
-        y: to.y,
-        scaleX: 1.12,
-        scaleY: 1.12,
-        duration: 550,
-        ease: 'Quad.easeOut',
-        onComplete: () => {
-          visual.destroy();
-        },
-      });
+    const w = s.layout.queueCardW ?? s.layout.marketCardW;
+    const h = s.layout.queueCardH ?? s.layout.marketCardH;
 
-      // 2. Red vignette flash pulse (subtle, brief). Sits above the
-      // gameplay containers (depth 95) and below the HUD (1000+).
-      const flash = s.add.rectangle(to.x, to.y, s.layout.gameW, s.layout.gameH, 0xff2222, 1)
-        .setDepth(95)
-        .setAlpha(0);
-      s.tweens.add({
-        targets: flash,
-        alpha: 0.22,
-        duration: 130,
-        yoyo: true,
-        hold: 80,
-        onComplete: () => {
-          flash.destroy();
-        },
-      });
+    // Build the card-back-over-face container at the queue origin.
+    const container = s.add.container(params.from.x, params.from.y);
+    container.setDepth(10000);
 
-      // 5. Active-effects warning indicator pulses once.
-      this.pulseActiveEffectsIndicator();
+    // Face first (bottom), then back overlay (top).
+    mainStreetRenderCardSvg(s, container, params.cardId, w, h);
+    const back = mainStreetRenderCardSvg(s, container, CARD_BACK_TEMPLATE, w, h);
+
+    const cleanup = (): void => {
+      container.destroy();
+      params.onComplete?.();
+    };
+
+    if (reducedMotion) {
+      // Reduced motion: the card appears instantly face-up at board centre —
+      // no flight, no hinge flip, no bubble travel — but the 4-second hold
+      // is preserved so the player still has time to read the incident.
+      back.setVisible(false);
+      container.setPosition(s.layout.gameW / 2, s.layout.gameH / 2);
+      s.time.delayedCall(4000, () => {
+        cleanup();
+      });
+      return;
     }
 
-    // 4. Explicit HUD loss pops for the incident's resource deltas.
-    const hudY = s.layout.hudY;
-    const coinX = s.layout.gameW * 0.25 + 70;  // mirrors refreshHud strip geometry
-    const repX = s.layout.gameW * 0.5;
-    const popLoss = (x: number, delta: number): void => {
-      if (delta === 0) return;
-      const text = s.add.text(x, hudY - 6, `${delta > 0 ? '+' : ''}${delta}`, {
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: delta < 0 ? '#ff7777' : '#ffdd66',
-        fontFamily: FONT_FAMILY,
-      }).setOrigin(0.5).setDepth(500);
-      void popTextOrIcon({
-        scene: s,
-        target: text,
-        duration: 1500,
-        riseY: 22,
-        scale: 1.2,
-        reducedMotion,
-      });
-    };
-    popLoss(coinX, params.coinChange);
-    popLoss(repX, params.repChange);
+    // ── Full motion choreography ──
+
+    // 2. Flight to board centre (~550ms).
+    const boardCentre = { x: s.layout.gameW / 2, y: s.layout.gameH / 2 };
+    s.tweens.add({
+      targets: container,
+      x: boardCentre.x,
+      y: boardCentre.y,
+      scaleX: 1.1,
+      scaleY: 1.1,
+      duration: 550,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        // 3. Hinge-flip: scaleX → 0 reveals the face.
+        s.tweens.add({
+          targets: back,
+          scaleX: 0,
+          duration: 260,
+          ease: 'Cubic.easeIn',
+          onComplete: () => {
+            back.setVisible(false);
+            // 4. Delta bubbles during the 4-second hold.
+            this.animateIncidentDeltaBubbles({
+              coinChange: params.coinChange,
+              repChange: params.repChange,
+              cardCenter: boardCentre,
+              hudCoinX: s.layout.gameW * 0.25 + 70,
+              hudRepX: s.layout.gameW * 0.5,
+              hudY: s.layout.hudY,
+            });
+            // 4s hold, then return to queue.
+            s.time.delayedCall(4000, () => {
+              // Return animation: scale down slightly, move back.
+              s.tweens.add({
+                targets: container,
+                x: params.from.x,
+                y: params.from.y,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 400,
+                ease: 'Quad.easeIn',
+                onComplete: cleanup,
+              });
+            });
+          },
+        });
+      },
+    });
+  }
+
+  /**
+   * Animates resource-delta bubbles between the HUD score bar and the
+   * revealed incident card during the 4-second hold (CG-0MTW18KFK000MM3I).
+   *
+   * Coin loss: gold bubbles travel HUD coin counter → card.
+   * Coin gain: card → HUD.
+   * Reputation loss: blue bubbles travel HUD rep counter → card.
+   * Reputation gain: card → HUD.
+   * No bubbles when the corresponding delta is zero.
+   *
+   * Reduced motion: no bubble travel at all (parent AC3).
+   *
+   * @param params  Deltas, card centre position, and HUD geometry.
+   */
+  private animateIncidentDeltaBubbles(params: {
+    coinChange: number;
+    repChange: number;
+    cardCenter: { x: number; y: number };
+    hudCoinX: number;
+    hudRepX: number;
+    hudY: number;
+  }): void {
+    const s = this.scene;
+    if (s.settingsPanel?.reducedMotion === true) return;
+
+    const { coinChange, repChange, cardCenter, hudCoinX, hudRepX, hudY } = params;
+    const flightMs = 600;
+
+    // Coin bubbles.
+    if (coinChange !== 0) {
+      const iconCount = Math.min(Math.abs(coinChange), 5); // cap at 5 bubbles
+      for (let i = 0; i < iconCount; i++) {
+        s.time.delayedCall(i * 80, () => {
+          const fromX = coinChange < 0 ? hudCoinX : cardCenter.x;
+          const toX = coinChange < 0 ? cardCenter.x : hudCoinX;
+          const bubble = s.add.circle(fromX, hudY, 5, 0xffcc44, 1).setDepth(3000);
+          moveGameObject({
+            scene: s,
+            target: bubble,
+            destX: toX,
+            destY: cardCenter.y,
+            duration: flightMs,
+            ease: 'Quad.easeIn',
+            soundManager: s.soundManager,
+            sfx: { start: SFX_KEYS.COIN_POP },
+            onComplete: () => {
+              try { bubble.destroy(); } catch (_) { /* ignore */ }
+            },
+          });
+        });
+      }
+    }
+
+    // Reputation bubbles.
+    if (repChange !== 0) {
+      const iconCount = Math.min(Math.abs(repChange), 5); // cap at 5 bubbles
+      for (let i = 0; i < iconCount; i++) {
+        s.time.delayedCall(i * 80, () => {
+          const fromX = repChange < 0 ? hudRepX : cardCenter.x;
+          const toX = repChange < 0 ? cardCenter.x : hudRepX;
+          const bubble = s.add.circle(fromX, hudY, 4, 0x88bbff, 1).setDepth(3000);
+          moveGameObject({
+            scene: s,
+            target: bubble,
+            destX: toX,
+            destY: cardCenter.y,
+            duration: flightMs,
+            ease: 'Quad.easeIn',
+            onComplete: () => {
+              try { bubble.destroy(); } catch (_) { /* ignore */ }
+            },
+          });
+        });
+      }
+    }
   }
 
   /**
@@ -1299,33 +1405,6 @@ export class MainStreetAnimator {
   }
 
   /**
-   * Pulses the ⚠ active-effects warning indicator texts in the Upcoming
-   * panel once (quick scale yoyo) to draw the eye to ongoing modifiers.
-   * No-op when no active effects are rendered. Presentation-only.
-   */
-  private pulseActiveEffectsIndicator(): void {
-    const s = this.scene;
-    const warnChar = String.fromCodePoint(0x26A0);
-    const list = s.incidentQueueContainer?.list ?? [];
-    for (const obj of list) {
-      const textObj = obj as { type?: string; text?: string; scaleX?: number; scaleY?: number; setScale?: (x: number, y?: number) => void };
-      if (textObj.type === 'Text' && typeof textObj.text === 'string' && textObj.text.startsWith(warnChar)) {
-        const baseScaleX = textObj.scaleX ?? 1;
-        const baseScaleY = textObj.scaleY ?? 1;
-        s.tweens.add({
-          targets: textObj,
-          scaleX: 1.5,
-          scaleY: 1.5,
-          duration: 120,
-          yoyo: true,
-          hold: 60,
-          onComplete: () => {
-            textObj.setScale?.(baseScaleX, baseScaleY);
-          },
-        });
-      }
-    }
-  }
 
   /**
    * Animates a newly-formed synergy link: the line draws in, the two paired

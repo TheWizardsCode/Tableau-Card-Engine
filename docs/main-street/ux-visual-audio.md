@@ -125,33 +125,52 @@ void popTextOrIcon({
 - Headless/replay exemption: returns immediately in replay/headless mode
   (`replayMode`) — presentation-only, never mutates game state or the
   transcript, and never blocks the turn flow.
-### Incident reveal (dramatic sting + damage feedback)
+### Incident reveal (flip + 4-second hold + delta bubbles)
 
 - Helper: `MainStreetAnimator.animateIncidentReveal()`.
 - Trigger: `MainStreetTurnController.endTurn()` when `TurnResult.incident` is
-  non-null (after the final render, inside the existing turn-advance window).
-- Resource deltas: `processEndOfTurn` now surfaces the incident's own coin /
+  non-null (after the final render).
+- Resource deltas: `processEndOfTurn` surfaces the incident's own coin /
   reputation deltas on `TurnResult` (`incidentCoinChange` /
   `incidentRepChange`), captured around `resolveIncident()`.
 - Behavior (reduced-motion OFF):
-  1. A snapshot card visual (`createTransferCardVisual`, event family) flies
-     from the front incident-queue card centre
-     (`MainStreetRenderer.getFrontIncidentCardCenter()`) to the board centre.
-  2. A brief, subtle red vignette flash pulses over the scene (depth 95,
-     alpha 0.22 yoyo).
-  3. The warning sting SFX plays — reused `SFX_KEYS.INCOME_NEGATIVE`
-     (`sfx-income-negative`); no new SFX key (ToneForge pipeline untouched).
-  4. The incident's coin/reputation losses pop explicitly on the HUD with
-     negative-colour `popTextOrIcon` (visible even while the income-collection
-     animation suppresses the generic HUD delta pop).
-  5. The ⚠ active-effects warning indicator in the Upcoming panel pulses once.
-- Accessibility (reduced motion): flight, flash, and indicator pulse are
-  skipped; the warning sting SFX and the HUD loss pops are retained.
+  1. A card-back-over-face container (`mainStreetRenderCardSvg` +
+     `CARD_BACK_TEMPLATE`) is built at the face-down Upcoming card centre
+     (`MainStreetRenderer.getFrontIncidentCardCenter()`).
+  2. The container flies to the board centre (~550ms).
+  3. The card back hinges open (`scaleX → 0`) to reveal the incident face.
+  4. The face stays visible for **4 seconds** so the player can read the
+     incident. During the hold, resource-delta bubbles animate between the
+     HUD score bar and the card: coin loss travels HUD → card, coin gain
+     card → HUD (gold, `SFX_KEYS.COIN_POP`); reputation loss/gain does the
+     same for the blue reputation pips (silent). No bubbles when a delta
+     is zero.
+  5. The container returns to the Upcoming card centre and is destroyed;
+     the reveal's `onComplete` then chains the day start.
+- **Blocking timing (CG-0MTW18KFK000MM3I):** the reveal now **gates** the turn
+  advance — `finishTurnPresentation` defers `startDayPhase()` until the
+  reveal's `onComplete` fires (flight + 550ms flip + 4000ms hold + 400ms
+  return, then the existing income-show deferral or the ~800ms schedule).
+  With no incident the reveal is skipped entirely and the ~800ms advance is
+  unchanged (no delay, no animation).
+- Accessibility (reduced motion): the flight, hinge flip and bubble travel
+  are skipped — the card appears instantly face-up at board centre — but the
+  4-second hold, cleanup and `onComplete` are **preserved** so the player
+  still has time to read the incident (producer-confirmed silent hold).
+- Tutorial exemption: the reveal (and its 4-second hold) is skipped while the
+  tutorial is active, preserving the tutorial's window-safe step pacing —
+  the same precedent as the phased income show and the day banner being
+  skipped during the tutorial.
+- Legacy feedback removed: the red vignette flash, the `popTextOrIcon` HUD
+  loss pops and the ⚠ indicator pulse are no longer part of the reveal. The
+  warning sting SFX (`SFX_KEYS.INCOME_NEGATIVE`, `sfx-income-negative`) is
+  retained as the reveal's sound effect per AGENTS.md rule 8 (optional
+  secondary feedback per the parent AC); no new SFX key.
 - Headless/replay exemption (AGENTS.md rule 8): presentation-only — returns
   immediately in replay/headless mode (`scene.replayMode`), never mutates
-  state or transcript, never blocks the turn flow.
-- Reuse: `createTransferCardVisual` + `SoundManager` + `popTextOrIcon`;
-  no new engine infrastructure.
+  state or transcript.
+- Reuse: `mainStreetRenderCardSvg` + `animatePeekReveal` hinge pattern +
+  `moveGameObject` + `SoundManager`; no new engine infrastructure.
 
 ### Synergy link formation
 

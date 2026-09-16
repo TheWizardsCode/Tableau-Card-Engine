@@ -417,15 +417,64 @@ export class MainStreetTurnController {
         } else {
           s.refreshAll();
         }
-        // Incident reveal presentation (AGENTS.md rule 8): non-blocking VFX —
-        // the resolved incident card flies from the face-down incident-deck
-        // panel (CG-0MSTOATDP000JNHH) to the
-        // board centre with a red flash pulse, warning sting SFX, explicit
-        // HUD loss pops and a warning-indicator pulse. Runs after the final
-        // render; reduced-motion keeps the pops + sound, replay/headless
-        // skips everything (handled inside the animator). Never blocks the
-        // turn advance.
-        if (result.incident) {
+
+        // Tutorial: mark end-turn step complete if active. Unchanged — the
+        // step completes when the turn action resolves, not when the
+        // closing presentation finishes.
+        (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
+
+        // ── Closing presentation → day start ─────────────────────────
+        // Advance the day once the closing presentation is done: present
+        // the banking hint (if any), then defer to the phased income show
+        // (bounded) or the normal ~800ms schedule.
+        const advanceDay = (): void => {
+          // ── Banking hint presentation (CG-0MT3JK16W006A66P) ─────
+          // Non-blocking HUD-highlighting overlay, once per save. Fires
+          // after the turn's gated step has advanced so it does not
+          // compete with the step's own overlay. Never blocks the day
+          // start.
+          if (pendingBankingHint) {
+            try { (s as any).tutorialOverlay?.showBankingHint?.(); } catch { /* presentation-only */ }
+          }
+          // The income show is the turn's closing moment (~11s): defer the
+          // day start until the choreography completes so it isn't cut
+          // short by the market/street refresh.
+          if (s.incomeCollectionActive) {
+            // Bounded deferral: start the next day once the choreography
+            // completes (AC7 collect clears the flag); a safety cap forces
+            // the day start even if the flag is somehow never cleared, so
+            // end-of-turn can never hang the game (AC5).
+            const startAt = s.time.now + 16_000;
+            const startAfterIncomeShow = (): void => {
+              if (s.incomeCollectionActive && s.time.now < startAt) {
+                s.time.delayedCall(250, startAfterIncomeShow);
+              } else {
+                s.incomeCollectionActive = false;
+                this.startDayPhase();
+              }
+            };
+            startAfterIncomeShow();
+          } else {
+            s.time.delayedCall(800, () => this.startDayPhase());
+          }
+        };
+
+        // Incident reveal presentation (CG-0MTW18KFK000MM3I): the resolved
+        // incident card flies from the Upcoming panel to board centre, flips
+        // face-up and stays visible for 4 seconds so the player can read the
+        // incident before the turn advances. The reveal **blocks** the day
+        // start until the hold completes (then the normal advance applies).
+        //
+        // Tutorial exemption: the tutorial keeps its window-safe step pacing,
+        // so the reveal (and its 4-second hold) is skipped — the same
+        // precedent as the phased income show and the day banner being
+        // skipped during the tutorial.
+        //
+        // If there is no incident, the entire animation is skipped — no
+        // delay, no state mutation — and the day advances as before.
+        const inTutorial =
+          (s as { tutorialController?: { isActive?: boolean } }).tutorialController?.isActive === true;
+        if (result.incident && !inTutorial) {
           try {
             s.msAnimator.animateIncidentReveal({
               cardId: result.incident.id,
@@ -433,40 +482,14 @@ export class MainStreetTurnController {
               coinChange: result.incidentCoinChange,
               repChange: result.incidentRepChange,
               from: s.msRenderer.getFrontIncidentCardCenter(),
+              onComplete: advanceDay,
             });
           } catch (_) {
-            // presentation-only — ignore
+            // presentation-only — never let the reveal hang the turn.
+            advanceDay();
           }
-        }
-        // Tutorial: mark end-turn step complete if active
-        (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
-        // ── Banking hint presentation (CG-0MT3JK16W006A66P) ─────
-        // Non-blocking HUD-highlighting overlay, once per save. Fires after
-        // the turn's gated step has advanced so it does not compete with
-        // the step's own overlay. Never blocks the day start.
-        if (pendingBankingHint) {
-          try { (s as any).tutorialOverlay?.showBankingHint?.(); } catch { /* presentation-only */ }
-        }
-        // The income show is the turn's closing moment (~11s): defer the
-        // day start until the choreography completes so it isn't cut short
-        // by the market/street refresh.
-        if (s.incomeCollectionActive) {
-          // Bounded deferral: start the next day once the choreography
-          // completes (AC7 collect clears the flag); a safety cap forces
-          // the day start even if the flag is somehow never cleared, so
-          // end-of-turn can never hang the game (AC5).
-          const startAt = s.time.now + 16_000;
-          const startAfterIncomeShow = (): void => {
-            if (s.incomeCollectionActive && s.time.now < startAt) {
-              s.time.delayedCall(250, startAfterIncomeShow);
-            } else {
-              s.incomeCollectionActive = false;
-              this.startDayPhase();
-            }
-          };
-          startAfterIncomeShow();
         } else {
-          s.time.delayedCall(800, () => this.startDayPhase());
+          advanceDay();
         }
       }
   }
@@ -569,22 +592,6 @@ export class MainStreetTurnController {
       s.instructionText.setText(
         `${event.name}: consequence ${option === 'accept' ? 'accepted' : 'refused'}.`,
       );
-      // Visual consequence for resource deltas (accepted effect), mirroring
-      // the standard incident reveal. Reject applies nothing (deltas 0) — the
-      // instruction text above is the only feedback.
-      if (coinChange !== 0 || repChange !== 0) {
-        try {
-          s.msAnimator.animateIncidentReveal({
-            cardId: event.id,
-            incidentName: event.name,
-            coinChange,
-            repChange,
-            from: s.msRenderer.getFrontIncidentCardCenter(),
-          });
-        } catch (_) {
-          // presentation-only — ignore
-        }
-      }
       // Complete the deferred closing (EndCheck → next day) and present it.
       const finalResult = finishDeferredEndOfTurn(s.state);
       // The turn is now closed — the undo stack is cleared (mirrors the
@@ -594,7 +601,28 @@ export class MainStreetTurnController {
       // Stacks are empty again — disable both HUD buttons
       // (CG-0MT5Y4DL8000AKKZ).
       s.refreshUndoRedoButtons(false, false);
-      this.finishTurnPresentation(finalResult, false);
+      // Visual consequence for resource deltas (accepted effect), mirroring
+      // the standard incident reveal. Reject applies nothing (deltas 0) — the
+      // instruction text above is the only feedback. The reveal blocks the
+      // day start until its 4-second hold completes (CG-0MTW18KFK000MM3I).
+      const present = (): void => this.finishTurnPresentation(finalResult, false);
+      if (coinChange !== 0 || repChange !== 0) {
+        try {
+          s.msAnimator.animateIncidentReveal({
+            cardId: event.id,
+            incidentName: event.name,
+            coinChange,
+            repChange,
+            from: s.msRenderer.getFrontIncidentCardCenter(),
+            onComplete: present,
+          });
+        } catch (_) {
+          // presentation-only — never let the reveal hang the turn.
+          present();
+        }
+      } else {
+        present();
+      }
     } catch (e) {
       // Resolution failed (should not happen in normal flow): recover by
       // returning to the market instead of hanging on a dead dialog.
