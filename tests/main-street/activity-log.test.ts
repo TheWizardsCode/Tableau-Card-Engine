@@ -794,6 +794,11 @@ describe('Activity Log', () => {
       const last = lastLog(state);
       expect(last.text).toMatch(/Turn \d+ net:/);
       expect(last.text).toContain(describeEventEffects(state.resourceBank.coins - startCoins, state.resourceBank.reputation - startRep));
+      // AC1/AC2: score delta appended as (score: +/-Z)
+      const deltaCoins = state.resourceBank.coins - startCoins;
+      const deltaRep = state.resourceBank.reputation - startRep;
+      const expectedScoreDelta = state.finalScore - state.dayStartScore;
+      expect(last.text).toContain(`(score: ${expectedScoreDelta > 0 ? '+' : ''}${expectedScoreDelta})`);
     });
 
     it('should emit the net row even when the net is zero', () => {
@@ -817,6 +822,8 @@ describe('Activity Log', () => {
       expect(last.text).toContain(describeEventEffects(0, 0));
       expect(state.resourceBank.coins - beforeCoins).toBe(0);
       expect(state.resourceBank.reputation - beforeRep).toBe(0);
+      // Score unchanged => (score: 0)
+      expect(last.text).toContain('(score: 0)');
     });
 
     it('should use the day-start snapshot survived by save/load (clone/restore)', () => {
@@ -828,6 +835,7 @@ describe('Activity Log', () => {
       if ((state as any).dayStartCoins !== undefined) {
         expect((cloned as any).dayStartCoins).toBe((state as any).dayStartCoins);
         expect((cloned as any).dayStartRep).toBe((state as any).dayStartRep);
+        expect((cloned as any).dayStartScore).toBe((state as any).dayStartScore);
       }
     });
 

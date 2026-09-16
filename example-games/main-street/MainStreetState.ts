@@ -325,6 +325,8 @@ export interface MainStreetState {
   dayStartCoins: number;
   /** Reputation at the start of the current turn (day-start snapshot). */
   dayStartRep: number;
+  /** Score at the start of the current turn (day-start snapshot). */
+  dayStartScore: number;
   /** Remaining cards in each deck (draw from end = top). */
   decks: {
     business: BusinessCard[];
@@ -532,6 +534,8 @@ export interface MainStreetSerializedState {
   dayStartCoins: number;
   /** Day-start reputation snapshot for the per-turn net summary row. */
   dayStartRep: number;
+  /** Day-start score snapshot for the per-turn net summary row. */
+  dayStartScore: number;
   decks: {
     business: BusinessCard[];
     communitySpace: CommunitySpaceCard[];
@@ -1035,6 +1039,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     // executeDayStart each turn (CG-0MT5W7UJJ0065MEZ AC3).
     dayStartCoins: initCoins,
     dayStartRep: initRep,
+    dayStartScore: 0,
     ledger: createEconomyLedger({
       coins: initCoins,
       reputation: initRep,
@@ -1215,6 +1220,7 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     resourceBank: structuredClone(state.resourceBank),
     dayStartCoins: state.dayStartCoins,
     dayStartRep: state.dayStartRep,
+    dayStartScore: state.dayStartScore,
     decks: structuredClone(state.decks),
     discards: structuredClone(state.discards),
     challengesCompleted: [...state.challengesCompleted],
@@ -1747,6 +1753,8 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     // (CG-0MT5W7UJJ0065MEZ AC3).
     dayStartCoins: saved.dayStartCoins ?? saved.resourceBank.coins,
     dayStartRep: saved.dayStartRep ?? saved.resourceBank.reputation,
+    dayStartScore:
+      saved.dayStartScore ?? saved.finalScore ?? 0,
     ledger: createEconomyLedger({
       coins: saved.resourceBank.coins,
       reputation: saved.resourceBank.reputation,

@@ -1606,6 +1606,7 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   // save so a resumed turn's net row measures against the original snapshot.
   state.dayStartCoins = state.resourceBank.coins;
   state.dayStartRep = state.resourceBank.reputation;
+  state.dayStartScore = state.finalScore;
 
   // Staff applicant trigger (CG-0MSTOATDU006UGAX): resolved after market
   // refill so the player sees the applicant during MarketPhase. Suppressed
@@ -1631,11 +1632,13 @@ export function appendTurnNetRow(state: MainStreetState, turnEnded: number): voi
   // day start, so the snapshot is normally always present).
   const startCoins = state.dayStartCoins ?? state.resourceBank.coins;
   const startRep = state.dayStartRep ?? state.resourceBank.reputation;
+  const startScore = state.dayStartScore ?? state.finalScore;
   const deltaCoins = state.resourceBank.coins - startCoins;
   const deltaRep = state.resourceBank.reputation - startRep;
+  const deltaScore = state.finalScore - startScore;
   addLog(
     state,
-    `Turn ${turnEnded} net: ${describeEventEffects(deltaCoins, deltaRep)}`,
+    `Turn ${turnEnded} net: ${describeEventEffects(deltaCoins, deltaRep)} (score: ${deltaScore > 0 ? '+' : ''}${deltaScore})`,
     classifyEffect(deltaCoins, deltaRep),
   );
 }
