@@ -201,7 +201,17 @@ describe('expanded street viewport (browser)', () => {
     // well over 50 ms — the click-place regression test uses 120 ms for the
     // same reason.  We use 200 ms here for extra headroom.
     scene.refreshStreetGrid();
-    await wait(200);
+    // Wait for the render to flush so Phaser's input system processes the new
+    // hit-zones.  Under full-suite contention the rAF queue may be delayed
+    // so a fixed timeout is unreliable — instead we wait for the actual rAF
+    // callbacks (which fire only when the browser is ready to render), giving
+    // Phaser time to clear the willRender flag and register interactive
+    // hit-zones for the input system.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
 
     const centre = scene.getStreetSlotCenter(CORNER);
     expect(Number.isFinite(centre.x)).toBe(true);
