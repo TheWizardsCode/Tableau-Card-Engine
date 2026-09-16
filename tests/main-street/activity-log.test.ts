@@ -795,8 +795,6 @@ describe('Activity Log', () => {
       expect(last.text).toMatch(/Turn \d+ net:/);
       expect(last.text).toContain(describeEventEffects(state.resourceBank.coins - startCoins, state.resourceBank.reputation - startRep));
       // AC1/AC2: score delta appended as (score: +/-Z)
-      const deltaCoins = state.resourceBank.coins - startCoins;
-      const deltaRep = state.resourceBank.reputation - startRep;
       const expectedScoreDelta = state.finalScore - state.dayStartScore;
       expect(last.text).toContain(`(score: ${expectedScoreDelta > 0 ? '+' : ''}${expectedScoreDelta})`);
     });

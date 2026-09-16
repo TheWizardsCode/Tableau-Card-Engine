@@ -353,6 +353,7 @@ export function createTutorialScenario(
     // the first executeDayStart (CG-0MT5W7UJJ0065MEZ AC3).
     dayStartCoins: initCoins,
     dayStartRep: initRep,
+    dayStartScore: 0,
     ledger: createEconomyLedger({
       coins: initCoins,
       reputation: initRep,
