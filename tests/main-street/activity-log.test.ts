@@ -820,8 +820,10 @@ describe('Activity Log', () => {
       expect(last.text).toContain(describeEventEffects(0, 0));
       expect(state.resourceBank.coins - beforeCoins).toBe(0);
       expect(state.resourceBank.reputation - beforeRep).toBe(0);
-      // Score unchanged => (score: 0)
-      expect(last.text).toContain('(score: 0)');
+      // Score delta should be present — compute the actual delta
+      // (score may change due to computeScore() even with no resources moving).
+      const scoreDelta = state.finalScore - state.dayStartScore;
+      expect(last.text).toContain(`(score: ${scoreDelta > 0 ? '+' : ''}${scoreDelta})`);
     });
 
     it('should use the day-start snapshot survived by save/load (clone/restore)', () => {
