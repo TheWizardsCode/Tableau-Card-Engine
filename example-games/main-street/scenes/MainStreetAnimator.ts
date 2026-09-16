@@ -22,14 +22,32 @@ import { playableIndexToMapCenter } from '../MainStreetMapView';
 const INCOME_PHASE_GAP_MS = 2200;
 /** How long each phase's on-screen label stays visible. */
 const INCOME_PHASE_LABEL_MS = 1400;
-/** Stagger between coins as they count out of a card (base phase). */
-const INCOME_BASE_COUNT_STAGGER_MS = 90;
-/** Duration of a coin flight tween (synergy/rep/event/collection). */
+/** Duration of a coin flight tween (fallback when no per-card duration is passed). */
 const INCOME_FLIGHT_MS = 600;
-/** Stagger between coins in a multi-coin flight. */
-const INCOME_FLIGHT_STAGGER_MS = 60;
-/** Stagger between grid-to-HUD collection flights. */
+/** Stagger between grid-to-HUD collection flights within one card. */
 const INCOME_COLLECT_STAGGER_MS = 80;
+
+// ── Sequential card-processing timing (CG-0MTR766U6003RZ88) ────────────
+// These constants govern the one-card-at-a-time animation model: each slot
+// completes fully before the next begins, with decreasing delay and
+// increasing speed between successive cards.
+
+/** Starting delay before each card's animation (base/synergy/rep phases). */
+const INCOME_BASE_CARD_DELAY_MS = 500;
+/** How much the inter-card delay decreases per successive card. */
+const INCOME_CARD_DELAY_DECREMENT_MS = 80;
+/** Minimum inter-card delay (floor). */
+const INCOME_MIN_CARD_DELAY_MS = 120;
+/** Base flight duration for a coin icon. */
+const INCOME_FLIGHT_BASE_MS = 550;
+/** How much flight duration decreases per successive card. */
+const INCOME_FLIGHT_DECREMENT_MS = 50;
+/** Minimum flight duration (floor). */
+const INCOME_FLIGHT_MIN_MS = 350;
+/** Stagger between individual coin icons within one card's animation. */
+const INCOME_CARD_COIN_STAGGER_MS = 100;
+/** Minimum stagger within a card's icon sequence. */
+const INCOME_CARD_COIN_MIN_STAGGER_MS = 50;
 
 /** Phase keys for the phased income animation (base → … → collect). */
 export type IncomePhaseKey = 'base' | 'synergy' | 'reputation' | 'events' | 'upcoming' | 'collect';
@@ -59,6 +77,38 @@ interface IncomePhaseSlot {
 /** MainStreetAnimator -- animation and HUD-delta helper for Main Street scene. */
 export class MainStreetAnimator {
   constructor(private readonly scene: any) {}
+
+  // ── Sequential timing helpers (CG-0MTR766U6003RZ88) ────────────────
+
+  /**
+   * Computes the inter-card delay for card index `si` out of `numSlots`,
+   * decreasing from BASE to MIN (floor).
+   */
+  private getCardDelay(numSlots: number, si: number): number {
+    if (numSlots <= 1) return INCOME_BASE_CARD_DELAY_MS;
+    const raw = INCOME_BASE_CARD_DELAY_MS - si * INCOME_CARD_DELAY_DECREMENT_MS;
+    return Math.max(INCOME_MIN_CARD_DELAY_MS, raw);
+  }
+
+  /**
+   * Computes the flight duration for card index `si` out of `numSlots`,
+   * decreasing from BASE to MIN (floor).
+   */
+  private getFlightDuration(numSlots: number, si: number): number {
+    if (numSlots <= 1) return INCOME_FLIGHT_BASE_MS;
+    const raw = INCOME_FLIGHT_BASE_MS - si * INCOME_FLIGHT_DECREMENT_MS;
+    return Math.max(INCOME_FLIGHT_MIN_MS, raw);
+  }
+
+  /**
+   * Computes the per-icon stagger for icon index `i` within a card's
+   * animation sequence, decreasing from BASE to MIN (floor).
+   */
+  private getIconStagger(numIcons: number, i: number): number {
+    if (numIcons <= 1) return INCOME_CARD_COIN_STAGGER_MS;
+    const raw = INCOME_CARD_COIN_STAGGER_MS - i * 10;
+    return Math.max(INCOME_CARD_COIN_MIN_STAGGER_MS, raw);
+  }
 
   public animateHudValueChanges(params: {
     coins: number;
@@ -361,6 +411,14 @@ export class MainStreetAnimator {
    * Orchestrates the full phased income choreography: base → synergy →
    * reputation → events → upcoming, then grid-to-HUD collection.
    *
+   * **Sequential card processing (CG-0MTR766U6003RZ88):** within every
+   * phase that touches card grids, cards are processed one at a time — card
+   * 0's count-out or coin flight completes before card 1 begins, creating a
+   * satisfying "coins rack up" moment per card. The delay between successive
+   * cards decreases progressively and later cards animate faster (shorter
+   * flight durations / icon staggers), so the sequence feels like it speeds
+   * up (AC2–AC4). `collectIncomeGrids` uses the same per-card ordering.
+   *
    * Phase semantics (each phase's coins land on the affected cards' on-card
    * coin grids from child 2):
    *
@@ -469,53 +527,75 @@ export class MainStreetAnimator {
   /**
    * Executes one income phase's visual work. Reduced motion runs the phases
    * on the same schedule with text progression only (AC8) — no flights.
+   *
+   * Sequential model (CG-0MTR766U6003RZ88): slots are processed one at a
+   * time — each slot's animation is scheduled at an accumulated delay
+   * offset, so slot 0 finishes before slot 1 starts. The inter-card delay
+   * (`getCardDelay`) and per-card animation speed (`getFlightDuration` /
+   * `getIconStagger`) both decrease for later cards (AC2–AC4). Unknown or
+   * zero-contribution slots are skipped gracefully (non-blocking, AC7).
    */
   private runIncomePhase(phase: IncomePhaseKey, slots: IncomePhaseSlot[], ctx: {
     reducedMotion: boolean;
   }): void {
     const s = this.scene;
+    const numSlots = slots.length;
 
     switch (phase) {
       case 'base': {
         if (ctx.reducedMotion) return;
-        slots.forEach((slot, si) => {
+        let delayOffset = 0;
+        for (let si = 0; si < numSlots; si++) {
+          const slot = slots[si];
           const amount = Math.max(0, roundHalf(slot.pd.baseIncome));
-          if (iconsForAmount(amount) === 0) return;
-          this.countOutCoins(slot, amount, si * INCOME_BASE_COUNT_STAGGER_MS);
-        });
+          if (iconsForAmount(amount) === 0) {
+            delayOffset += this.getCardDelay(numSlots, si);
+            continue;
+          }
+          this.countOutCoins(slot, amount, delayOffset);
+          delayOffset += this.getCardDelay(numSlots, si);
+        }
         break;
       }
       case 'synergy': {
         if (ctx.reducedMotion) return;
         if (!slots.some((sl) => iconsForAmount(roundHalf(sl.pd.synergyBonus)) > 0)) return;
         const sources = this.synergyPhaseSources();
-        slots.forEach((slot, si) => {
+        let delayOffset = 0;
+        for (let si = 0; si < numSlots; si++) {
+          const slot = slots[si];
           const amount = Math.max(0, roundHalf(slot.pd.synergyBonus));
-          if (iconsForAmount(amount) === 0) return;
+          if (iconsForAmount(amount) === 0) {
+            delayOffset += this.getCardDelay(numSlots, si);
+            continue;
+          }
           const from = sources.get(slot.pd.slotIndex) ?? sources.get('fallback')!;
-          this.flyCoinsIn(slot, amount, from, si * INCOME_FLIGHT_STAGGER_MS);
-        });
+          const flightMs = this.getFlightDuration(numSlots, si);
+          this.flyCoinsIn(slot, amount, from, delayOffset, flightMs);
+          delayOffset += this.getCardDelay(numSlots, si);
+        }
         break;
       }
       case 'reputation': {
         if (ctx.reducedMotion) return;
         if (!slots.some((sl) => iconsForAmount(roundHalf(sl.pd.repBonus)) > 0)) return;
         const from = { x: s.layout.gameW * 0.5, y: s.layout.hudY };
-        slots.forEach((slot, si) => {
+        let delayOffset = 0;
+        for (let si = 0; si < numSlots; si++) {
+          const slot = slots[si];
           const amount = Math.max(0, roundHalf(slot.pd.repBonus));
-          if (iconsForAmount(amount) === 0) return;
-          this.flyCoinsIn(slot, amount, from, si * INCOME_FLIGHT_STAGGER_MS);
-        });
+          if (iconsForAmount(amount) === 0) {
+            delayOffset += this.getCardDelay(numSlots, si);
+            continue;
+          }
+          const flightMs = this.getFlightDuration(numSlots, si);
+          this.flyCoinsIn(slot, amount, from, delayOffset, flightMs);
+          delayOffset += this.getCardDelay(numSlots, si);
+        }
         break;
       }
       case 'events': {
         if (ctx.reducedMotion) return;
-        // Duration-effect (income-multiplier) events that contributed a
-        // delta this turn: animated line reveals in the Upcoming panel +
-        // coins fly in (positive) or out (negative) of affected grids.
-        // Driven by the phase data's `eventDeltas` (authoritative for the
-        // credits shown) — active-effect descriptions are preferred for the
-        // line text when still present (effects may have decayed by now).
         const deltaEffects = this.eventDeltaEffects(slots);
         if (deltaEffects.length === 0) return;
         const lineStartRow = (s.state.activeEffects ?? []).length;
@@ -524,42 +604,52 @@ export class MainStreetAnimator {
             s.msRenderer?.animateUpcomingEffectLine?.(effect, lineStartRow + ei);
           } catch { /* ignore */ }
           // Coins in/out per affected slot for this effect.
-          slots.forEach((slot, si) => {
+          let effectDelayOffset = 0;
+          for (let si = 0; si < numSlots; si++) {
+            const slot = slots[si];
             const delta = slot.pd.eventDeltas.reduce(
               (acc, d) => (d.cardId === effect.sourceEventId ? acc + d.delta : acc),
               0,
             );
-            if (delta === 0) return;
-            if (iconsForAmount(Math.abs(roundHalf(delta))) === 0) return;
-            const amount = Math.abs(roundHalf(delta));
-            const at = (ei * deltaEffects.length + si) * INCOME_FLIGHT_STAGGER_MS;
-            if (delta > 0) {
-              this.flyCoinsIn(slot, amount, this.eventSourcePoint(), at);
-            } else {
-              this.flyCoinsOut(slot, amount, this.eventSourcePoint(), at);
+            if (delta === 0) {
+              effectDelayOffset += this.getCardDelay(numSlots, si);
+              continue;
             }
-          });
+            if (iconsForAmount(Math.abs(roundHalf(delta))) === 0) {
+              effectDelayOffset += this.getCardDelay(numSlots, si);
+              continue;
+            }
+            const amount = Math.abs(roundHalf(delta));
+            const flightMs = this.getFlightDuration(numSlots, si);
+            const at = effectDelayOffset;
+            if (delta > 0) {
+              this.flyCoinsIn(slot, amount, this.eventSourcePoint(), at, flightMs);
+            } else {
+              this.flyCoinsOut(slot, amount, this.eventSourcePoint(), at, flightMs);
+            }
+            effectDelayOffset += this.getCardDelay(numSlots, si);
+          }
         });
         break;
       }
       case 'upcoming': {
         if (ctx.reducedMotion) return;
-        // Upcoming-card deltas are placeholder data today (not yet wired
-        // upstream); implement the general in/out mechanism so the phase
-        // flies coins whenever a future data source fills `upcomingDeltas`.
         const from = { x: s.layout.gameW * 0.5, y: s.layout.queueTop };
-        slots.forEach((slot, si) => {
+        let delayOffset = 0;
+        for (let si = 0; si < numSlots; si++) {
+          const slot = slots[si];
           for (const d of slot.pd.upcomingDeltas ?? []) {
             if (iconsForAmount(Math.abs(roundHalf(d.delta))) === 0) continue;
             const amount = Math.abs(roundHalf(d.delta));
-            const at = si * INCOME_FLIGHT_STAGGER_MS;
+            const flightMs = this.getFlightDuration(numSlots, si);
             if (d.delta > 0) {
-              this.flyCoinsIn(slot, amount, from, at);
+              this.flyCoinsIn(slot, amount, from, delayOffset, flightMs);
             } else {
-              this.flyCoinsOut(slot, amount, from, at);
+              this.flyCoinsOut(slot, amount, from, delayOffset, flightMs);
             }
           }
-        });
+          delayOffset += this.getCardDelay(numSlots, si);
+        }
         break;
       }
       default:
@@ -628,13 +718,17 @@ export class MainStreetAnimator {
    * Base phase: count a slot's coins out of its card one at a time. Each
    * step re-packs the grid with the cumulative amount; the final fractional
    * amount renders the half coin last. Newly added coin pops in.
+   *
+   * Uses per-icon stagger (decreasing) for the count-out sequence so later
+   * cards feel faster — the outer sequential delay is applied by the caller
+   * via the `at` offset (CG-0MTR766U6003RZ88).
    */
   private countOutCoins(slot: IncomePhaseSlot, amount: number, at: number): void {
     const s = this.scene;
     const iconCount = iconsForAmount(amount);
     if (iconCount === 0) return;
     for (let n = 1; n <= iconCount; n++) {
-      s.time.delayedCall(at + (n - 1) * INCOME_BASE_COUNT_STAGGER_MS, () => {
+      s.time.delayedCall(at + this.getIconStagger(iconCount, n - 1), () => {
         try {
           // Incrementally add one coin at a time (half coin last) so the
           // grid accumulates across phases (AC: stay visible until collect).
@@ -669,15 +763,25 @@ export class MainStreetAnimator {
   /**
    * Flies `amount` coins from a source point into a slot's grid, landing on
    * the grid transform origin (bottom-right quadrant).
+   *
+   * @param flightMs  Duration of each coin's flight tween (ms). Allows
+   *                  per-card speed-up (CG-0MTR766U6003RZ88).
    */
-  private flyCoinsIn(slot: IncomePhaseSlot, amount: number, from: { x: number; y: number }, at: number): void {
+  private flyCoinsIn(
+    slot: IncomePhaseSlot,
+    amount: number,
+    from: { x: number; y: number },
+    at: number,
+    flightMs?: number,
+  ): void {
     const s = this.scene;
     const iconCount = iconsForAmount(amount);
     if (iconCount === 0) return;
+    const duration = flightMs ?? INCOME_FLIGHT_MS;
     const m = slot.handle.container.getWorldTransformMatrix();
     const to = { x: m.getX(0, 0), y: m.getY(0, 0) };
     for (let i = 0; i < iconCount; i++) {
-      s.time.delayedCall(at + i * INCOME_FLIGHT_STAGGER_MS, () => {
+      s.time.delayedCall(at + this.getIconStagger(iconCount, i), () => {
         try {
           const visual = s.add.circle(from.x, from.y, 6, 0xffcc44, 1).setDepth(3000);
           moveGameObject({
@@ -685,7 +789,7 @@ export class MainStreetAnimator {
             target: visual,
             destX: to.x,
             destY: to.y,
-            duration: INCOME_FLIGHT_MS,
+            duration,
             ease: 'Quad.easeIn',
             soundManager: s.soundManager,
             sfx: { start: SFX_KEYS.COIN_POP, moveIntervalMs: 200 },
@@ -709,17 +813,27 @@ export class MainStreetAnimator {
    * target point where it fades. Used by negative event/upcoming deltas.
    * Clamps to the coins actually present in the grid. The half coin (when
    * present) is the last icon in the layout so it is removed first.
+   *
+   * @param flightMs  Duration of each coin's flight tween (ms). Allows
+   *                  per-card speed-up (CG-0MTR766U6003RZ88).
    */
-  private flyCoinsOut(slot: IncomePhaseSlot, amount: number, to: { x: number; y: number }, at: number): void {
+  private flyCoinsOut(
+    slot: IncomePhaseSlot,
+    amount: number,
+    to: { x: number; y: number },
+    at: number,
+    flightMs?: number,
+  ): void {
     const s = this.scene;
     const grid = slot.handle.container;
     const iconCount = iconsForAmount(amount);
     if (iconCount === 0) return;
+    const duration = flightMs ?? INCOME_FLIGHT_MS;
     // Decrement sequence: 1 icon per 100 coins (x100 economy presentation scaling).
     const decrements: number[] = [];
     for (let k = 0; k < iconCount; k++) decrements.push(1);
     for (let i = 0; i < iconCount; i++) {
-      s.time.delayedCall(at + i * INCOME_FLIGHT_STAGGER_MS, () => {
+      s.time.delayedCall(at + this.getIconStagger(iconCount, i), () => {
         try {
           const icon = grid.list[grid.list.length - 1] as Phaser.GameObjects.Image | undefined;
           if (!icon) return; // no coins left in the grid to remove
@@ -736,13 +850,13 @@ export class MainStreetAnimator {
             target: icon,
             destX: to.x,
             destY: to.y,
-            duration: INCOME_FLIGHT_MS,
+            duration,
             ease: 'Quad.easeIn',
             onComplete: () => {
               try { icon.destroy(); } catch { /* ignore */ }
             },
           });
-          s.tweens.add({ targets: icon, alpha: 0, duration: INCOME_FLIGHT_MS, delay: INCOME_FLIGHT_MS * 0.4 });
+          s.tweens.add({ targets: icon, alpha: 0, duration, delay: duration * 0.4 });
         } catch { /* ignore */ }
       });
     }
@@ -750,8 +864,10 @@ export class MainStreetAnimator {
 
   /**
    * Grid-to-HUD collection (AC7): every remaining grid coin flies to the
-   * HUD coins counter (staggered, `COIN_POP` SFX); when the last coin lands
-   * the final `+<total>` pop plays and `incomeCollectionActive` clears.
+   * HUD coins counter, one card at a time — card 0's icons are collected
+   * before card 1 begins, etc. Inter-card delay decreases progressively
+   * (CG-0MTR766U6003RZ88). When the last coin lands the final
+   * `+<total>` pop plays and `incomeCollectionActive` clears.
    * Reduced motion: no flights — the final `+<total>` text pop only.
    */
   private collectIncomeGrids(slots: IncomePhaseSlot[], ctx: {
@@ -761,6 +877,7 @@ export class MainStreetAnimator {
     const s = this.scene;
     const { gameW, hudY } = s.layout;
     const coinX = gameW * 0.25 + 70;
+    const numSlots = slots.length;
 
     let pending = 0;
     const finalize = (): void => {
@@ -794,14 +911,17 @@ export class MainStreetAnimator {
       return;
     }
 
-    // Fly each grid icon to the HUD counter; the last landing finalizes.
-    for (const slot of slots) {
+    // Collect one card's grid at a time (sequential per-slot).
+    let delayOffset = 0;
+    for (let si = 0; si < numSlots; si++) {
+      const slot = slots[si];
       const grid = slot.handle.container;
       const icons = [...grid.list];
+      const flightMs = this.getFlightDuration(numSlots, si);
       for (let i = 0; i < icons.length; i++) {
         const icon = icons[i] as Phaser.GameObjects.Image;
         pending += 1;
-        s.time.delayedCall(i * INCOME_COLLECT_STAGGER_MS, () => {
+        s.time.delayedCall(delayOffset + i * INCOME_COLLECT_STAGGER_MS, () => {
           try {
             const m = icon.getWorldTransformMatrix();
             const from = { x: m.getX(0, 0), y: m.getY(0, 0) };
@@ -813,7 +933,7 @@ export class MainStreetAnimator {
               target: icon,
               destX: coinX,
               destY: hudY,
-              duration: INCOME_FLIGHT_MS,
+              duration: flightMs,
               ease: 'Quad.easeIn',
               soundManager: s.soundManager,
               sfx: { start: SFX_KEYS.COIN_POP, moveIntervalMs: 200 },
@@ -829,6 +949,7 @@ export class MainStreetAnimator {
           }
         });
       }
+      delayOffset += this.getCardDelay(numSlots, si);
     }
     if (pending === 0) finalize();
   }
