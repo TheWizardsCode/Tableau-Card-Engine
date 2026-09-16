@@ -256,7 +256,7 @@ describe('staff cards in the market cycle pipeline (CG-0MT3KZNQB0053K55)', () =>
     const state = setupMainStreetGame({ seed: 'refresh-staff' });
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 1000;
     const staff = state.decks.staff.pop()!;
     state.market.cards.push(staff);
 

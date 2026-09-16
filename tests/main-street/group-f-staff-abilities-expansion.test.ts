@@ -26,6 +26,7 @@ import {
   createEventDeck,
   createUpgradeDeck,
   CARD_TIER_MAP,
+  REFRESH_MARKET_COST,
   type StaffCard,
 } from '../../example-games/main-street/MainStreetCards';
 import { validateCsvRows } from '../../src/balance-cards';
@@ -188,24 +189,24 @@ describe('Group F: Accountant refresh discount (AC2)', () => {
     const state = setupMainStreetGame({ seed: 'group-f-accountant' });
     state.phase = 'MarketPhase';
 
-    // Baseline: REFRESH_MARKET_COST (5) per refresh (CG-0MSTOATDT009BRX2).
-    expect(refreshMarketCost(state)).toBe(5);
+    // Baseline: REFRESH_MARKET_COST (500) per refresh (CG-0MSTOATDT009BRX2).
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST);
 
     const accountant = findStaff(createStaffDeck(1), 'staff-accountant')!;
     state.staffCards.push({ ...accountant });
 
-    expect(refreshMarketCost(state)).toBe(4);
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST - 1);
   });
 
   it('allows a refresh and deducts only the discounted cost', () => {
     const state = setupMainStreetGame({ seed: 'group-f-accountant-deduct' });
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 4;
+    state.resourceBank.coins = REFRESH_MARKET_COST - 1;
 
     const accountant = findStaff(createStaffDeck(1), 'staff-accountant')!;
     state.staffCards.push({ ...accountant });
 
-    // 4 coins is exactly enough with the discount (base 5 - 1).
+    // 499 coins is exactly enough with the discount (base 500 - 1).
     expect(canRefreshMarket(state).legal).toBe(true);
 
     refreshMarket(state);
@@ -218,7 +219,7 @@ describe('Group F: Accountant refresh discount (AC2)', () => {
     state.resourceBank.coins = 1;
 
     expect(canRefreshMarket(state).legal).toBe(false);
-    expect(refreshMarketCost(state)).toBe(5);
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST);
   });
 });
 

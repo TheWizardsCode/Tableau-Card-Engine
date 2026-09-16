@@ -1022,7 +1022,7 @@ export const INCIDENT_QUEUE_SIZE = 2;
  * replacing the legacy per-row refresh costs (€2 each).
  * The Accountant's `refreshCostDiscount` (Group F) applies to this cost.
  */
-export const REFRESH_MARKET_COST = 5;
+export const REFRESH_MARKET_COST = 500;
 
 /**
  * @deprecated Synergy is now percentage-based. Each BusinessCard and
