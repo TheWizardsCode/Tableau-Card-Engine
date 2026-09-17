@@ -19,7 +19,7 @@ import type { AiStrategyBase } from '../../src/ai';
 import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { hasPeekCapableStaff } from './MainStreetStaffSkills';
-import type { MainStreetState } from './MainStreetState';
+import { syncResourceBankToLedger, type MainStreetState, type PlayerRecord } from './MainStreetState';
 import {
   executeDayStart,
   processEndOfTurn,
@@ -44,8 +44,9 @@ import {
   canAddToHand,
   getEmptySlots,
 } from './MainStreetMarket';
-import type { BusinessCard, UpgradeCard, EventCard, StaffCard } from './MainStreetCards';
-import { computeSynergyBonus } from './MainStreetAdjacency';
+import type { BusinessCard, UpgradeCard, EventCard, StaffCard, SynergyType } from './MainStreetCards';
+import { isDurationEventCard } from './MainStreetCards';
+import { computeSynergyBonus, getSlotOwnerId } from './MainStreetAdjacency';
 import { computeScore } from './MainStreetEngine';
 
 // ── Scoring constants ───────────────────────────────────────
@@ -1105,5 +1106,678 @@ export function enumerateAndScoreActions(
   return enumerateLegalActions(state).map(action => ({
     action,
     score: scoreAction(state, action),
+  }));
+}
+
+// ── Competitive mode: ownership-aware, staff-free AI (CG-0MT5X3N79002S038) ──
+//
+// The single-player helpers above assume the AI owns the whole street and
+// controls the shared wallet / hand / staff. In competitive mode (N >= 2)
+// each player has an independent PlayerRecord and every street slot is
+// owner-tagged. This section adds a parallel decision layer used by the
+// opponent:
+//
+//   - enumerateCompetitiveLegalActions(state, playerId): legal actions for
+//     the ACTING player, with staff actions (hire-staff, peek-incident-deck)
+//     EXCLUDED — staff are player-only in competitive mode.
+//   - scoreCompetitiveAction(state, action, playerId): value scored against
+//     the acting player's OWN resources and owned businesses, with the
+//     planning horizon derived from the acting player's own score vs. the
+//     win threshold.
+//   - CompetitiveGreedyStrategy: the Greedy priority chain wired to the two
+//     helpers above.
+//
+// Single-player paths (enumerateLegalActions / scoreAction / GreedyStrategy)
+// are untouched — N=1 keeps using them byte-for-byte (AC4).
+
+/**
+ * True when the state carries a competitive roster (N >= 2 players).
+ *
+ * N=1 is the single-player case and deliberately returns `false` so the
+ * legacy helpers keep being used unchanged.
+ */
+export function isCompetitiveMode(state: MainStreetState): boolean {
+  return (state.players?.length ?? 0) > 1;
+}
+
+/**
+ * Resolves the acting player's record in competitive mode.
+ *
+ * @param state    Current game state.
+ * @param playerId Owner index; defaults to the active player (0 if unset).
+ * @returns The `PlayerRecord`, or `undefined` in single-player states.
+ */
+export function getCompetitivePlayer(
+  state: MainStreetState,
+  playerId?: number,
+): PlayerRecord | undefined {
+  if (!state.players || state.players.length === 0) return undefined;
+  const id = playerId ?? state.activePlayerId ?? 0;
+  return state.players[id];
+}
+
+/**
+ * Competitive planning horizon: the number of future turns a purchase is
+ * expected to yield, derived from the ACTING PLAYER'S OWN score versus the
+ * win threshold (not the shared `computeScore`).
+ *
+ *   horizon = clamp(ceil((winThreshold - player.score) / scorePace), floor, cap)
+ *
+ * A player far from the threshold values future income more (larger
+ * horizon) than a player about to win — the ownership-aware counterpart of
+ * `aiPlanningHorizon` (CG-0MSLXJCHH001DLIO).
+ *
+ * @param state    Current game state (read-only by convention).
+ * @param playerId Owner index; defaults to the active player.
+ * @returns Horizon in turns, always within [AI_HORIZON_FLOOR, AI_HORIZON_CAP].
+ */
+export function aiCompetitivePlanningHorizon(
+  state: MainStreetState,
+  playerId?: number,
+): number {
+  // N=1 keeps the legacy shared-wallet horizon (per-player records are not
+  // maintained in single-player flow).
+  if (!isCompetitiveMode(state)) return aiPlanningHorizon(state);
+  const player = getCompetitivePlayer(state, playerId);
+  if (!player) return aiPlanningHorizon(state);
+  const distance = state.config.winThreshold - (player.score ?? 0);
+  const raw = Math.ceil(distance / AI_SCORE_PACE);
+  return Math.min(AI_HORIZON_CAP, Math.max(AI_HORIZON_FLOOR, raw));
+}
+
+/** Empty street slots for the competitive board (owner tag wins). */
+function competitiveEmptySlots(state: MainStreetState): number[] {
+  const slots: number[] = [];
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const tag = state.ownerTaggedGrid?.[i];
+    const empty = tag ? tag.ownerId === null : state.streetGrid[i] === null;
+    if (empty) slots.push(i);
+  }
+  return slots;
+}
+
+/**
+ * Street slots owned by `playerId` that are valid targets for `card`
+ * (name match, required level, below max level). Only the acting player's
+ * own businesses are upgradeable in competitive mode.
+ */
+function competitiveUpgradeTargets(
+  state: MainStreetState,
+  card: UpgradeCard,
+  playerId: number,
+): number[] {
+  const requiredLevel = card.requiredLevel ?? 0;
+  const targets: number[] = [];
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const biz = state.streetGrid[i];
+    if (!biz) continue;
+    if (getSlotOwnerId(state, i) !== playerId) continue;
+    if (biz.name !== card.targetBusiness) continue;
+    if (biz.level !== requiredLevel) continue;
+    if (biz.level >= biz.maxLevel) continue;
+    targets.push(i);
+  }
+  return targets;
+}
+
+/** Number of the acting player's placed businesses matching `synergy`. */
+function countOwnSynergyMatches(
+  state: MainStreetState,
+  synergy: SynergyType | undefined,
+  playerId: number,
+): number {
+  if (!synergy) return 0;
+  let count = 0;
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const biz = state.streetGrid[i];
+    if (!biz || !biz.synergyTypes) continue;
+    if (getSlotOwnerId(state, i) !== playerId) continue;
+    if (biz.synergyTypes.includes(synergy)) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Estimated value of an event to the acting player in competitive mode.
+ *
+ * Mirrors `applyCompetitiveEventEffects` routing without mutating state:
+ *   - `All` / `RandomBusiness` → the full `coinDelta + reputationDelta`
+ *     (Investment credits only the acting player; incidents credit every
+ *     owner, but the AI only values what it receives).
+ *   - `SpecificSynergy` → `coinDelta × (own matching businesses)` plus
+ *     `reputationDelta` once when at least one own business matches.
+ *   - Duration cards → 0 (board-wide, host-applied only).
+ *
+ * @param state     Current game state (read-only by convention).
+ * @param event     The event card being valued.
+ * @param playerId  Owner index; defaults to the active player.
+ * @returns Net value in coin-equivalent units (0 when the player gains nothing).
+ */
+export function computeCompetitiveEventValue(
+  state: MainStreetState,
+  event: EventCard,
+  playerId?: number,
+): number {
+  const player = getCompetitivePlayer(state, playerId);
+  const pid = player?.playerId ?? playerId ?? 0;
+  if (isDurationEventCard(event)) return 0;
+  switch (event.target) {
+    case 'All':
+    case 'RandomBusiness':
+      return event.coinDelta + event.reputationDelta;
+    case 'SpecificSynergy': {
+      const matches = countOwnSynergyMatches(state, event.targetSynergy as SynergyType, pid);
+      if (matches === 0) return 0;
+      return event.coinDelta * matches + event.reputationDelta;
+    }
+    default:
+      return 0;
+  }
+}
+
+// ── Competitive legal-action enumeration ────────────────────
+
+/**
+ * Produces all valid PlayerAction options for the ACTING player in
+ * competitive mode, using only that player's own resources (coins,
+ * reputation, hand, action budget) and their owner-tagged businesses.
+ *
+ * Differences from the single-player {@link enumerateLegalActions}:
+ *   - staff actions are **excluded** (`hire-staff` and the staff-skill
+ *     `peek-incident-deck`) — an opponent never manages staff (AC2);
+ *   - affordability / hand capacity / action budget read the acting
+ *     player's `PlayerRecord`, not the shared single-player fields;
+ *   - upgrade targets are restricted to the acting player's own slots
+ *     (`ownerTaggedGrid`); empty slots come from the owner-tagged grid.
+ *
+ * Single-player enumeration is left untouched (AC4).
+ *
+ * @param state    Current game state.
+ * @param playerId Owner index; defaults to the active player.
+ * @returns Array of legal PlayerActions for the acting player.
+ */
+export function enumerateCompetitiveLegalActions(
+  state: MainStreetState,
+  playerId?: number,
+): PlayerAction[] {
+  // N=1 (or a state without a roster) is single-player: fall back to the
+  // unchanged legacy enumeration.
+  if (!isCompetitiveMode(state)) return enumerateLegalActions(state);
+  const player = getCompetitivePlayer(state, playerId);
+  if (!player) return enumerateLegalActions(state);
+
+  const pid = player.playerId;
+  const coins = player.coins ?? 0;
+  const reputation = player.reputation ?? 0;
+  const hand = player.hand ?? [];
+  const budget = player.actionBudget ?? 0;
+  const maxHandSize = state.maxHandSize ?? 3;
+  const emptySlots = competitiveEmptySlots(state);
+  const actions: PlayerAction[] = [];
+
+  // ── Community Favour (FREE once-per-turn fallback) ────────
+  if (state.phase === 'MarketPhase' && !state.favourUsedThisTurn) {
+    if (coins >= state.config.favourCoinsToRepCost) {
+      actions.push({ type: 'community-favour', direction: 'coins-to-rep' });
+    }
+    if (reputation >= state.config.favourRepToCoinsRepCost) {
+      actions.push({ type: 'community-favour', direction: 'rep-to-coins' });
+    }
+  }
+
+  // Action budget spent: only free same-day composites and end-turn remain.
+  if (budget <= 0) {
+    return [
+      ...actions,
+      ...competitiveSameDayUpgradeActions(state, player),
+      ...competitiveSameDayEventActions(state, player),
+      { type: 'end-turn' },
+    ];
+  }
+
+  // ── buy-business (direct buy-and-place) ───────────────────
+  for (const card of state.market.cards) {
+    if (card.family !== 'business' && card.family !== 'community-space') continue;
+    if (coins < card.cost) continue;
+    for (const slotIndex of emptySlots) {
+      actions.push({ type: 'buy-business', cardId: card.id, slotIndex });
+    }
+  }
+
+  // ── buy-upgrade (own businesses only) ─────────────────────
+  const marketUpgrades = state.market.cards.filter(
+    c => c.family === 'upgrade',
+  ) as UpgradeCard[];
+  for (const card of marketUpgrades) {
+    if (coins < card.cost) continue;
+    for (const targetSlot of competitiveUpgradeTargets(state, card, pid)) {
+      actions.push({ type: 'buy-upgrade', cardId: card.id, targetSlot });
+    }
+  }
+
+  // ── buy-event (1 action; cost paid at play) ───────────────
+  if (hand.length < maxHandSize) {
+    const marketEvents = state.market.cards.filter(
+      c => c.family === 'event' && (c as EventCard).trigger === 'Investment',
+    ) as EventCard[];
+    for (const card of marketEvents) {
+      actions.push({ type: 'buy-event', cardId: card.id });
+    }
+  }
+
+  // Staff actions (hire-staff / peek-incident-deck) are deliberately NOT
+  // enumerated — staff are player-only in competitive mode (AC2).
+
+  // ── move-to-hand (staff and events handled by their own actions) ──
+  if (hand.length < maxHandSize) {
+    for (const card of state.market.cards) {
+      if (card.family === 'staff' || card.family === 'event') continue;
+      actions.push({ type: 'move-to-hand', cardId: card.id });
+    }
+  }
+
+  // ── play-*-from-hand (cost-at-play) ───────────────────────
+  hand.forEach((card, handIndex) => {
+    if (card.family === 'business' || card.family === 'community-space') {
+      if (coins < card.cost) return;
+      for (const slotIndex of emptySlots) {
+        actions.push({ type: 'play-business-from-hand', handIndex, slotIndex });
+      }
+    } else if (card.family === 'upgrade') {
+      if (coins < card.cost) return;
+      for (const targetSlot of competitiveUpgradeTargets(state, card as UpgradeCard, pid)) {
+        actions.push({ type: 'play-upgrade-from-hand', handIndex, targetSlot });
+      }
+    } else if (card.family === 'event' && (card as EventCard).trigger === 'Investment') {
+      if (
+        String(card.id).startsWith('evt-grand-opening') &&
+        !state.businessPlacedThisTurn
+      ) {
+        return;
+      }
+      if (coins >= card.cost) {
+        actions.push({ type: 'play-event-from-hand', handIndex });
+      }
+    }
+  });
+
+  // ── discard-from-hand (free; only when the hand is full) ──
+  if (hand.length >= maxHandSize) {
+    hand.forEach((_, handIndex) => {
+      actions.push({ type: 'discard-from-hand', handIndex });
+    });
+  }
+
+  actions.push({ type: 'end-turn' });
+  return actions;
+}
+
+/** Free same-day composite upgrade plays for the acting competitive player. */
+function competitiveSameDayUpgradeActions(
+  state: MainStreetState,
+  player: PlayerRecord,
+): PlayerAction[] {
+  const actions: PlayerAction[] = [];
+  const hand = player.hand ?? [];
+  hand.forEach((card, handIndex) => {
+    if (card.family !== 'upgrade') return;
+    if (state.justMovedUpgradeCardId == null || state.justMovedUpgradeCardId !== card.id) return;
+    const upgrade = card as UpgradeCard;
+    if ((player.coins ?? 0) < upgrade.cost) return;
+    for (const targetSlot of competitiveUpgradeTargets(state, upgrade, player.playerId)) {
+      actions.push({ type: 'play-upgrade-from-hand', handIndex, targetSlot });
+    }
+  });
+  return actions;
+}
+
+/** Free same-day composite Investment plays for the acting competitive player. */
+function competitiveSameDayEventActions(
+  state: MainStreetState,
+  player: PlayerRecord,
+): PlayerAction[] {
+  const actions: PlayerAction[] = [];
+  const hand = player.hand ?? [];
+  hand.forEach((card, handIndex) => {
+    if (card.family !== 'event' || (card as EventCard).trigger !== 'Investment') return;
+    if (state.justMovedEventCardId == null || state.justMovedEventCardId !== card.id) return;
+    const event = card as EventCard;
+    if ((player.coins ?? 0) < event.cost) return;
+    if (String(event.id).startsWith('evt-grand-opening') && !state.businessPlacedThisTurn) return;
+    actions.push({ type: 'play-event-from-hand', handIndex });
+  });
+  return actions;
+}
+
+// ── Competitive scoring ─────────────────────────────────────
+
+/**
+ * Scores a single action against the ACTING player's own resources and
+ * owned businesses (AC1). The planning horizon is
+ * {@link aiCompetitivePlanningHorizon} (the player's own score vs. the win
+ * threshold), and owned-business checks use the owner-tagged grid.
+ *
+ * Falls back to the single-player {@link scoreAction} when the state is not
+ * competitive, so callers can use one entry point.
+ *
+ * @param state    Current game state (read-only by convention).
+ * @param action   The action to score.
+ * @param playerId Owner index; defaults to the active player.
+ * @returns Numeric score (higher is better).
+ */
+export function scoreCompetitiveAction(
+  state: MainStreetState,
+  action: PlayerAction,
+  playerId?: number,
+): number {
+  if (!isCompetitiveMode(state)) return scoreAction(state, action);
+  const player = getCompetitivePlayer(state, playerId);
+  if (!player) return scoreAction(state, action);
+  const pid = player.playerId;
+  const horizon = aiCompetitivePlanningHorizon(state, pid);
+
+  switch (action.type) {
+    case 'buy-upgrade':
+    case 'buy-and-place-upgrade':
+      return competitiveUpgradeScore(state, action.cardId, horizon);
+    case 'buy-business':
+    case 'buy-and-place':
+      return competitiveBusinessScore(state, action.cardId, action.slotIndex, horizon);
+    case 'buy-event':
+      return competitiveMarketEventScore(state, action.cardId, pid);
+    case 'play-business-from-hand':
+      return competitiveHandBusinessScore(state, player, action.handIndex, action.slotIndex, horizon);
+    case 'play-upgrade-from-hand':
+      return competitiveHandUpgradeScore(player, action.handIndex, horizon);
+    case 'play-event-from-hand':
+    case 'play-event':
+      return competitiveHandEventScore(state, player, action.handIndex, pid);
+    case 'move-to-hand': {
+      // Lock-in value: the card's listed cost (mirrors the single-player
+      // market-acquisition tier).
+      const card = state.market.cards.find(c => c.id === action.cardId);
+      return card ? card.cost : 0;
+    }
+    case 'community-favour':
+      return competitiveFavourScore(state, player, action.direction);
+    case 'hire-staff':
+    case 'peek-incident-deck':
+      // Not enumerated for competitive play; score 0 so a stray call can
+      // never outrank a real economic play.
+      return 0;
+    case 'end-turn':
+    case 'discard-from-hand':
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+function competitiveUpgradeScore(
+  state: MainStreetState,
+  cardId: string,
+  horizon: number,
+): number {
+  const card = state.market.cards.find(
+    c => c.id === cardId && c.family === 'upgrade',
+  ) as UpgradeCard | undefined;
+  if (!card) return 0;
+  return card.incomeBonus * horizon - card.cost;
+}
+
+function competitiveBusinessScore(
+  state: MainStreetState,
+  cardId: string,
+  slotIndex: number,
+  horizon: number,
+): number {
+  const card = state.market.cards.find(c => c.id === cardId) as BusinessCard | undefined;
+  if (!card) return 0;
+  const simulatedGrid = [...state.streetGrid];
+  simulatedGrid[slotIndex] = card;
+  const projectedSynergy = computeSynergyBonus(
+    simulatedGrid,
+    slotIndex,
+    state.config.synergyBonusPerNeighbor,
+  );
+  return (card.baseIncome + projectedSynergy) * horizon - card.cost;
+}
+
+function competitiveMarketEventScore(
+  state: MainStreetState,
+  cardId: string,
+  playerId: number,
+): number {
+  const card = state.market.cards.find(
+    c => c.id === cardId && c.family === 'event',
+  ) as EventCard | undefined;
+  if (!card) return 0;
+  return computeCompetitiveEventValue(state, card, playerId) - card.cost;
+}
+
+function competitiveHandBusinessScore(
+  state: MainStreetState,
+  player: PlayerRecord,
+  handIndex: number,
+  slotIndex: number,
+  horizon: number,
+): number {
+  const card = (player.hand ?? [])[handIndex] as BusinessCard | undefined;
+  if (!card) return 0;
+  const simulatedGrid = [...state.streetGrid];
+  simulatedGrid[slotIndex] = card;
+  const projectedSynergy = computeSynergyBonus(
+    simulatedGrid,
+    slotIndex,
+    state.config.synergyBonusPerNeighbor,
+  );
+  return (card.baseIncome + projectedSynergy) * horizon - card.cost;
+}
+
+function competitiveHandUpgradeScore(
+  player: PlayerRecord,
+  handIndex: number,
+  horizon: number,
+): number {
+  const card = (player.hand ?? [])[handIndex] as UpgradeCard | undefined;
+  if (!card) return 0;
+  return card.incomeBonus * horizon - card.cost;
+}
+
+function competitiveHandEventScore(
+  state: MainStreetState,
+  player: PlayerRecord,
+  handIndex: number | undefined,
+  playerId: number,
+): number {
+  const hand = player.hand ?? [];
+  const resolvedIndex = handIndex ?? hand.findIndex(c => c.family === 'event');
+  const card = hand[resolvedIndex] as EventCard | undefined;
+  if (!card || card.family !== 'event') return 0;
+  return computeCompetitiveEventValue(state, card, playerId) - card.cost;
+}
+
+function competitiveFavourScore(
+  state: MainStreetState,
+  player: PlayerRecord,
+  direction: 'coins-to-rep' | 'rep-to-coins',
+): number {
+  if (direction === 'coins-to-rep') return 1;
+  const cheapest = getCheapestMarketCost(state);
+  if (
+    Number.isFinite(cheapest) &&
+    (player.coins ?? 0) < cheapest &&
+    (player.reputation ?? 0) >= state.config.favourRepToCoinsRepCost + 1
+  ) {
+    return 3;
+  }
+  return 1;
+}
+
+// ── Competitive seat binding (headless / harness driving) ─────
+
+/**
+ * Binds the acting competitive player's record onto the shared single-player
+ * fields so the existing engine actions ({@link executeAction}) operate on
+ * the right wallet / hand / staff / action budget.
+ *
+ * In competitive mode the engine's action primitives (`purchaseBusiness`,
+ * `moveToHand`, `playBusinessFromHand`, ...) read the shared
+ * `state.resourceBank` / `state.hand` / `state.actionsRemaining` fields.
+ * `bindCompetitiveSeat` copies the acting player's `PlayerRecord` into those
+ * fields before the MarketPhase so the AI's per-player actions execute
+ * against the correct owner; `restoreCompetitiveSeat` writes the shared
+ * wallet back into the record afterwards. No-op in single-player states.
+ *
+ * @param state    Current game state (mutated in-place).
+ * @param playerId Owner index; defaults to the active player.
+ */
+export function bindCompetitiveSeat(state: MainStreetState, playerId?: number): void {
+  const player = getCompetitivePlayer(state, playerId);
+  if (!player) return;
+  state.resourceBank.coins = player.coins;
+  state.resourceBank.reputation = player.reputation;
+  state.hand = player.hand;
+  state.staffCards = player.staffCards;
+  state.actionsRemaining = player.actionBudget;
+  syncResourceBankToLedger(state);
+}
+
+/**
+ * Writes the shared wallet / hand / staff / budget back into the acting
+ * competitive player's record (the inverse of {@link bindCompetitiveSeat}).
+ * No-op in single-player states.
+ *
+ * @param state    Current game state (mutated in-place).
+ * @param playerId Owner index; defaults to the active player.
+ */
+export function restoreCompetitiveSeat(state: MainStreetState, playerId?: number): void {
+  const player = getCompetitivePlayer(state, playerId);
+  if (!player) return;
+  player.coins = state.resourceBank.coins;
+  player.reputation = state.resourceBank.reputation;
+  player.hand = state.hand;
+  player.staffCards = state.staffCards;
+  player.actionBudget = state.actionsRemaining;
+}
+
+// ── CompetitiveGreedyStrategy ───────────────────────────────
+
+/**
+ * Ownership-aware, staff-free greedy strategy for competitive play.
+ *
+ * Mirrors the single-player {@link GreedyStrategy} priority chain but
+ * enumerates and scores through the competitive helpers: the acting
+ * player's own resources decide affordability, only their own businesses
+ * are upgrade targets, staff actions are never offered, and the planning
+ * horizon comes from their own score.
+ */
+export const CompetitiveGreedyStrategy: MainStreetAiStrategy = {
+  name: 'CompetitiveGreedy',
+
+  chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
+    const playerId = state.activePlayerId ?? 0;
+    const legalActions = enumerateCompetitiveLegalActions(state, playerId);
+    const score = (a: PlayerAction): number => scoreCompetitiveAction(state, a, playerId);
+
+    const handBusinessActions = legalActions.filter(
+      a => a.type === 'play-business-from-hand',
+    ) as PlayBusinessFromHandAction[];
+    const handUpgradeActions = legalActions.filter(
+      a => a.type === 'play-upgrade-from-hand',
+    ) as PlayUpgradeFromHandAction[];
+    const handEventActions = legalActions.filter(
+      a => a.type === 'play-event-from-hand',
+    ) as PlayEventFromHandAction[];
+
+    // Priority 0: free same-day composite plays cost no action.
+    const player = getCompetitivePlayer(state, playerId);
+    const freeCompositePlays: PlayerAction[] = [
+      ...handUpgradeActions.filter(
+        a => player != null &&
+          state.justMovedUpgradeCardId != null &&
+          state.justMovedUpgradeCardId === (player.hand ?? [])[a.handIndex]?.id,
+      ),
+      ...handEventActions.filter(
+        a => player != null &&
+          state.justMovedEventCardId != null &&
+          state.justMovedEventCardId === (player.hand ?? [])[a.handIndex]?.id,
+      ),
+    ];
+    if (freeCompositePlays.length > 0) {
+      return pickBest(freeCompositePlays, score, rng);
+    }
+
+    // Priority 1: play an affordable business from hand (best synergy slot).
+    if (handBusinessActions.length > 0) {
+      return pickBest(handBusinessActions, score, rng);
+    }
+
+    // Priority 2: play an affordable upgrade from hand.
+    if (handUpgradeActions.length > 0) {
+      return pickBest(handUpgradeActions, score, rng);
+    }
+
+    // Priority 3: buy upgrades (own businesses only).
+    const upgradeActions = legalActions.filter(a => a.type === 'buy-upgrade') as BuyUpgradeAction[];
+    if (upgradeActions.length > 0) {
+      return pickBest(upgradeActions, score, rng);
+    }
+
+    // Priority 4: buy business for best synergy placement.
+    const businessActions = legalActions.filter(a => a.type === 'buy-business') as BuyBusinessAction[];
+    if (businessActions.length > 0) {
+      return pickBest(businessActions, score, rng);
+    }
+
+    // Priority 5: spend the day's action on the best market acquisition
+    // (event take vs. non-event move-to-hand), ranked by value.
+    const acquisitionActions = legalActions.filter(
+      a => a.type === 'move-to-hand' || a.type === 'buy-event',
+    ) as (MoveToHandAction | BuyEventAction)[];
+    if (acquisitionActions.length > 0) {
+      const best = pickBest(acquisitionActions, score, rng);
+      if (score(best) > 0) return best;
+    }
+
+    // Priority 6: play a held Investment event with positive value.
+    if (handEventActions.length > 0) {
+      const bestEvent = pickBest(handEventActions, score, rng);
+      if (score(bestEvent) > 0) return bestEvent;
+    }
+
+    // Priority 7: discard from a full hand.
+    const discardActions = legalActions.filter(a => a.type === 'discard-from-hand');
+    if (discardActions.length > 0) {
+      return pickRandom(discardActions, rng);
+    }
+
+    // Priority 8: Community Favour fallback when genuinely value-creating.
+    const favourActions = legalActions.filter(
+      a => a.type === 'community-favour',
+    ) as CommunityFavourAction[];
+    if (favourActions.length > 0) {
+      const best = pickBest(favourActions, score, rng);
+      if (score(best) > 1) return best;
+    }
+
+    // No staff priority: staff actions are excluded in competitive mode.
+    // Priority 9: end turn.
+    return { type: 'end-turn' };
+  },
+};
+
+/**
+ * Enumerate and score every legal competitive action for the acting player.
+ * The competitive counterpart of {@link enumerateAndScoreActions}.
+ */
+export function enumerateAndScoreCompetitiveActions(
+  state: MainStreetState,
+  playerId?: number,
+): Array<{ action: PlayerAction; score: number }> {
+  const pid = playerId ?? state.activePlayerId ?? 0;
+  return enumerateCompetitiveLegalActions(state, pid).map(action => ({
+    action,
+    score: scoreCompetitiveAction(state, action, pid),
   }));
 }
