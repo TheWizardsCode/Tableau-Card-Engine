@@ -225,6 +225,29 @@ export function buildCardTooltipInfo(
 }
 
 /**
+ * Renders the employed-staff enumeration for a business/community-space slot
+ * tooltip (CG-0MU3BTTCH001E7ZD AC2/AC3): each staff member's name, the
+ * business types they serve (or "Generalist"), and their effect/ability
+ * description. Returns null when no staff are employed (empty state — AC5:
+ * the tooltip keeps showing only the business's own info).
+ *
+ * @param staff The staff members employed at the slot.
+ * @returns A \n-prefixed bulleted section, or null when empty.
+ */
+export function formatEmployedStaffSummary(staff: readonly StaffCard[]): string | null {
+  if (!Array.isArray(staff) || staff.length === 0) return null;
+  const lines = staff.map((member) => {
+    const types =
+      Array.isArray(member.allowedBusinessTypes) && member.allowedBusinessTypes.length > 0
+        ? member.allowedBusinessTypes.join('/')
+        : 'Generalist';
+    const effect = member.description ? ` — ${member.description}` : '';
+    return `• ${member.name} (${types})${effect}`;
+  });
+  return `\nEmployed staff (${staff.length}):\n${lines.join('\n')}`;
+}
+
+/**
  * Resolves a card description template by substituting the `{SYNERGY_RATE}`
  * token with the card's effective percentage for the active difficulty.
  *

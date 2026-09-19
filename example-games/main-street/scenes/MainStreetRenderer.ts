@@ -24,6 +24,7 @@ import { synergyLineEndpoints } from './synergyLineEndpoints';
 import {
   formatSynergyRate,
   buildCardTooltipInfo,
+  formatEmployedStaffSummary,
   turnLabel,
 } from '../MainStreetFormatting';
 import { computeScore } from '../MainStreetEngine';
@@ -1061,6 +1062,34 @@ export class MainStreetRenderer {
     // Apply upgrade overlays (level badge, income, name, border)
     this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 
+    // ── Employed-staff count badge (CG-0MU3BTTCH001E7ZD AC1) ────
+    // A small corner badge on slots with employed staff; skipped on sold
+    // slots so it never clashes with the SOLD overlay (AC4).
+    const staff = Array.isArray((biz as { employedStaff?: unknown }).employedStaff)
+      ? (biz as { employedStaff: StaffCard[] }).employedStaff
+      : [];
+    if (staff.length > 0 && (s.state.soldSlots ?? [])[_index] !== true) {
+      const badge = s.add.rectangle(
+        renderW / 2 - 12,
+        renderH / 2 - 12,
+        24,
+        24,
+        0x1a2f55,
+        0.95,
+      );
+      badge.setStrokeStyle(1, 0xffffff, 0.8);
+      cardContainer.add(badge);
+      const countText = s.add.text(renderW / 2 - 12, renderH / 2 - 12, `${staff.length}`, {
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        fontFamily: FONT_FAMILY,
+      }).setOrigin(0.5);
+      // Tag for tests/visual QA: find the count badge by data key.
+      countText.setData('staffCountBadge', true);
+      cardContainer.add(countText);
+    }
+
     s.streetContainer.add(cardContainer);
 
     if (isHinted) {
@@ -1110,7 +1139,12 @@ export class MainStreetRenderer {
         const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
         const synergyRate = formatSynergyRate(biz, s.state.config);
         const synergyInfo = synergyRate !== null ? `\nSynergy bonus: ${synergyRate} of base income per adjacent matching business` : '';
-        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}\nClick to manage: sell (free) or close (1 action)`;
+        // Employed-staff enumeration appended to the business's own info
+        // (CG-0MU3BTTCH001E7ZD AC2/AC3); null when none employed (AC5).
+        const staffSummary = formatEmployedStaffSummary(
+          (biz as { employedStaff?: StaffCard[] }).employedStaff ?? [],
+        ) ?? '';
+        const info = `${label}: ${biz.name}\nIncome: +${biz.baseIncome + biz.incomeBonus}/turn${repInfo}\nSynergy: ${biz.synergyTypes.join('/')}${synergyInfo}\nLevel: ${biz.level}\nClick to manage: sell (free) or close (1 action)${staffSummary}`;
         s.tooltipManager?.show(info, tooltipZone.x, tooltipZone.y);
       });
       tooltipZone.on('pointerout', () => {
