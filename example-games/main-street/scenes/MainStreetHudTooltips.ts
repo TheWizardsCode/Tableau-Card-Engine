@@ -43,6 +43,8 @@ export const HUD_TOOLTIP_I18N_KEYS = {
   scoreBreakdownCoins: 'hud.tooltip.score.breakdownCoins',
   scoreBreakdownReputation: 'hud.tooltip.score.breakdownReputation',
   scoreBreakdownChallenges: 'hud.tooltip.score.breakdownChallenges',
+  scoreBreakdownTurnCost: 'hud.tooltip.score.breakdownTurnCost',
+  scoreTurnCostLabel: 'hud.tooltip.score.turnCost',
   scoreRemainingToWin: 'hud.tooltip.score.remainingToWin',
   scoreThresholdMet: 'hud.tooltip.score.thresholdMet',
   scoreNextTierLabel: 'hud.tooltip.score.nextTier',
@@ -92,6 +94,8 @@ export const HUD_TOOLTIP_STRINGS = {
   scoreBreakdownCoins: 'Coins',
   scoreBreakdownReputation: 'Reputation ×',
   scoreBreakdownChallenges: 'Challenges',
+  scoreBreakdownTurnCost: 'Turn cost',
+  scoreTurnCostLabel: 'Total turn cost',
   scoreRemainingToWin: 'more needed to win',
   scoreThresholdMet: 'Win threshold met!',
   scoreNextTierLabel: 'Next tier',
@@ -271,6 +275,22 @@ export function buildScoreTooltip(
   const challengeContribution = state.challengesCompleted.length * state.config.challengeBonusPoints;
   const remaining = threshold - score;
 
+  // Compute total ongoing turn cost from all placed cards.
+  // Street grid holds BusinessCard | CommunitySpaceCard, both of which have
+  // ongoingCost. Staff ongoing costs are tracked separately in state.staffCards.
+  const soldSlots = state.soldSlots ?? [];
+  let totalTurnCost = 0;
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    if (soldSlots[i]) continue;
+    const card = state.streetGrid[i];
+    if (!card) continue;
+    totalTurnCost += card.ongoingCost ?? 0;
+  }
+  // Add ongoing costs from hired staff cards (not on the street grid).
+  for (const staff of state.staffCards ?? []) {
+    totalTurnCost += staff.ongoingCost ?? 0;
+  }
+
   // Determine next locked tier
   const unlockedTiers = campaign?.unlockedTiers ?? ['tier-1'];
   const nextTier = findNextLockedTier(unlockedTiers);
@@ -282,6 +302,8 @@ export function buildScoreTooltip(
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownCoins)}: ${Math.round(coins)}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownReputation)}: ${repContribution}`,
     `${t(HUD_TOOLTIP_I18N_KEYS.scoreBreakdownChallenges)}: ${challengeContribution}`,
+    '',
+    `${t(HUD_TOOLTIP_I18N_KEYS.scoreTurnCostLabel)}: -${totalTurnCost}/turn`,
   ];
 
   if (remaining > 0) {
