@@ -758,9 +758,11 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
   // face-down pool using `findConstrainedIncidentIndex`. This replaces the
   // legacy pre-ordering (`orderIncidentDeck`) — the deck is shuffled once at
   // setup/reshuffle, then each draw picks the best constrained card by index
-  // without consuming any RNG (deterministic from deck order).
-  const idx = findConstrainedIncidentIndex(state.incidentDeck, state.incidentBalance);
-  if (idx < 0) return null; // No Incident-trigger cards in deck.
+  // without consuming any RNG (deterministic from deck order). The current
+  // week gates seasonal Incidents (CG-0MTT0K9RX0004QTE / F4): an out-of-season
+  // windowed card is skipped, and -1 means no incident is eligible this turn.
+  const idx = findConstrainedIncidentIndex(state.incidentDeck, state.incidentBalance, state.week);
+  if (idx < 0) return null; // No Incident-trigger card eligible this week.
 
   // Remove the chosen card by index (deck remains face-down, player sees only
   // the resolved sequence).

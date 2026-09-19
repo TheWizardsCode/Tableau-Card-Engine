@@ -721,7 +721,13 @@ export function createIncidentBalanceFromQueue(queue: EventCard[]): IncidentBala
  * repeat-spacing and streak constraints encoded in `balance`.
  *
  * Returns the array index of the chosen card, or -1 when the deck holds no
- * Incident-trigger cards at all.
+ * Incident-trigger cards at all (or none eligible for the supplied week).
+ *
+ * @param deck    Incident-trigger cards to choose from (not mutated).
+ * @param balance Balance state whose limits and recent history seed the choice.
+ * @param week    Current game week (1–52). When supplied, windowed Incidents
+ *                outside their window are skipped (year-round cards are always
+ *                eligible). Omit to disable week gating.
  *
  * Selection is deterministic: candidates are scanned in deck order (which is
  * itself deterministic under the game's seeded RNG shuffle) and the first
@@ -738,8 +744,9 @@ export function createIncidentBalanceFromQueue(queue: EventCard[]): IncidentBala
  *    neutral is allowed here — it breaks the streak).
  * 4. Relax both to the invariant only.
  * 5. Final fallback: prefer an Incident card outside the repeat window (least
- *    violation), else the first Incident card in deck order. Guaranteed to
- *    exist, so a constrained draw can never hang or crash.
+ *    violation), else the first eligible Incident card in deck order. When a
+ *    week is supplied, every tier is restricted to week-eligible cards, so
+ *    the fallback still respects the declared windows.
  */
 export function findConstrainedIncidentIndex(
   deck: EventCard[],
@@ -747,11 +754,20 @@ export function findConstrainedIncidentIndex(
     IncidentBalanceState,
     'repeatSpacing' | 'maxStreak' | 'recentNames' | 'polarityRun'
   >,
+  week?: number,
 ): number {
   const incidentIndices: number[] = [];
   for (let i = 0; i < deck.length; i++) {
-    if (deck[i].trigger === 'Incident') incidentIndices.push(i);
+    if (deck[i].trigger !== 'Incident') continue;
+    // Week gating (CG-0MTT0K9RX0004QTE / F4): when a week is supplied, a
+    // windowed Incident outside its window is not eligible. Cards with no
+    // window are year-round. This is an additional filter layered on top of
+    // the repeat-spacing / streak constraints below — never a replacement.
+    if (week !== undefined && !isCardAvailableInWeek(deck[i], week)) continue;
+    incidentIndices.push(i);
   }
+  // No Incident-trigger card (or none eligible this week) → draw no incident
+  // for this turn (documented behaviour, AC3).
   if (incidentIndices.length === 0) return -1;
 
   const windowSize = Math.max(0, balance.repeatSpacing - 1);
