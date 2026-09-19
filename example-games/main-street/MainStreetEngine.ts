@@ -2972,6 +2972,10 @@ export function layoffStaffCard(
   // Remove the staff card
   state.staffCards.splice(staffIndex, 1);
 
+  // Deregister the member from its business's employedStaff list
+  // (CG-0MTIOLY2A0092OT1 AC2 — per-business employment source of truth).
+  removeStaffFromBusinessEmployedStaff(state, card);
+
   // Decrease maxHandSize (minimum 2)
   state.maxHandSize = Math.max(2, state.maxHandSize - slotsToRemove);
 
@@ -3113,6 +3117,24 @@ export function getEmploymentCapacity(state: MainStreetState, slotIndex: number)
 }
 
 /**
+ * Returns the staff members currently employed at the given street-grid
+ * slot. Reads the per-business `employedStaff` array (CG-0MTIOLY2A0092OT1,
+ * the source of truth); falls back to `employedAtSlot` links for in-memory
+ * states that predate the field (legacy saves / hand-built fixtures).
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street-grid slot index.
+ * @returns The employed staff at that slot (empty when none).
+ */
+export function getEmployedStaffForBusiness(state: MainStreetState, slotIndex: number): StaffCard[] {
+  const business = state.streetGrid[slotIndex];
+  if (business && Array.isArray(business.employedStaff)) {
+    return business.employedStaff as StaffCard[];
+  }
+  return (state.staffCards ?? []).filter(m => m.employedAtSlot === slotIndex);
+}
+
+/**
  * Counts how many staff members are currently employed at the given
  * street-grid slot (employedAtSlot === slotIndex).
  *
@@ -3121,7 +3143,7 @@ export function getEmploymentCapacity(state: MainStreetState, slotIndex: number)
  * @returns Number of employed staff at that slot.
  */
 export function getEmployedStaffCountAt(state: MainStreetState, slotIndex: number): number {
-  return (state.staffCards ?? []).filter(m => m.employedAtSlot === slotIndex).length;
+  return getEmployedStaffForBusiness(state, slotIndex).length;
 }
 
 /**
@@ -3298,6 +3320,14 @@ export function hireStaffApplicant(state: MainStreetState): void {
   // Add to staffCards with employedAtSlot
   state.staffCards.push(card);
 
+  // Register the member on the business's employedStaff list
+  // (CG-0MTIOLY2A0092OT1 AC2 — per-business employment source of truth).
+  const business = state.streetGrid[pending.targetSlotIndex as number];
+  if (business) {
+    if (!Array.isArray(business.employedStaff)) business.employedStaff = [];
+    business.employedStaff.push(card);
+  }
+
   // Clear pending applicant
   (state as any).pendingApplicant = null;
 }
@@ -3339,6 +3369,26 @@ export function letGoStaffMember(state: MainStreetState, idx: number): void {
 
   // Remove from staffCards
   state.staffCards.splice(idx, 1);
+
+  // Deregister the member from its business's employedStaff list
+  // (CG-0MTIOLY2A0092OT1 AC2 — per-business employment source of truth).
+  removeStaffFromBusinessEmployedStaff(state, member);
+}
+
+/**
+ * Removes a now-fired staff member from its business's `employedStaff` list
+ * (per-business employment source of truth, CG-0MTIOLY2A0092OT1). No-op for
+ * hand-slot members (no `employedAtSlot`) or when the slot is already empty.
+ *
+ * @param state  Current game state (mutated in-place).
+ * @param member The staff member being removed from active staff.
+ */
+function removeStaffFromBusinessEmployedStaff(state: MainStreetState, member: StaffCard): void {
+  const slotIndex = member.employedAtSlot;
+  if (slotIndex == null) return;
+  const business = state.streetGrid[slotIndex];
+  if (!business || !Array.isArray(business.employedStaff)) return;
+  business.employedStaff = business.employedStaff.filter(m => m.id !== member.id);
 }
 
 /** Mutates: consumes a pending applicant into staffCards with employedAtSlot (no hand slots). */

@@ -187,7 +187,10 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
 
   it('undo of a placement on an expanded grid removes the card and reverts resources (AC3)', () => {
     const state = makeExpandedState('undo-expanded-placement');
-    state.resourceBank.coins = 1000;
+    // Generous coins so the fixture's own market card (the one already
+    // placed at the shared-corner slot 10 with a -world10 id) is affordable
+    // here too — its identity drives the integrity assertion below.
+    state.resourceBank.coins = 10000;
     state.actionsRemaining = 2;
 
     const card = state.market.cards.find(

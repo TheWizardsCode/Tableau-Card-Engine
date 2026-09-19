@@ -34,7 +34,7 @@ import {
 } from '../../example-games/main-street/MainStreetCards';
 import { validateCsvRows } from '../../src/balance-cards';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { resolveIncident, processEndOfTurn, executeDayStart, resolveEvent } from '../../example-games/main-street/MainStreetEngine';
+import { resolveIncident, endTurnHeadless, executeDayStart, resolveEvent } from '../../example-games/main-street/MainStreetEngine';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
 import { createSeededRng } from '../../src/core-engine';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
@@ -235,10 +235,15 @@ describe('Group D: Labor Shortage duration incident (AC3)', () => {
     const reducedIncome = state.resourceBank.coins - coinsBeforeReduced;
     expect(reducedIncome).toBeCloseTo(normalIncome * 0.9, 5);
 
+    // Isolate the injected duration effect: clear the incident deck so the
+    // seeded flow cannot draw additional duration incidents over the loop
+    // (deck composition shifts which incident the seeded game draws).
+    state.incidentDeck = [];
+
     // Run 3 full turns: the effect decays and expires at end of turn 3.
     for (let t = 0; t < 3; t++) {
       executeDayStart(state);
-      processEndOfTurn(state);
+      endTurnHeadless(state);
     }
     expect(state.activeEffects).toHaveLength(0);
   });

@@ -1840,5 +1840,19 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
       : null,
   };
 
+  // ── Per-business employedStaff backfill (CG-0MU3BNO590066H75) ──────
+  // Legacy saves and pre-feature in-memory states linked employed staff via
+  // `staff.employedAtSlot` only. Backfill the per-business source of truth
+  // (CG-0MTIOLY2A0092OT1 AC2) from those links when a business lacks the
+  // array; new-format saves carry the array and keep it as serialized
+  // (entries share the same data as the matching staffCards records).
+  for (let i = 0; i < state.streetGrid.length; i++) {
+    const card = state.streetGrid[i];
+    if (!card) continue;
+    if (!Array.isArray(card.employedStaff)) {
+      card.employedStaff = (state.staffCards ?? []).filter(m => m.employedAtSlot === i);
+    }
+  }
+
   return state;
 }

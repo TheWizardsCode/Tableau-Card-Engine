@@ -27,6 +27,7 @@ import {
 import {
   executeDayStart,
   processEndOfTurn,
+  endTurnHeadless,
   executeAction,
   cycleMarketCards,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -313,6 +314,11 @@ describe('MainStreet Market Cycling', () => {
       'should survive multiple rounds of discard reshuffle',
       () => {
         const state = createTestState();
+        // Generous coins: this test guards the discard/reshuffle conservation
+        // pipeline, not budget survival — a comfortable buffer keeps the
+        // seeded run from losing to an unrelated mid-run incident (which
+        // shifts when the staff deck changes).
+        state.resourceBank.coins = 10000;
 
         for (let i = 0; i < 3 && state.gameResult === 'playing'; i++) {
           executeDayStart(state);
@@ -331,7 +337,7 @@ describe('MainStreet Market Cycling', () => {
 
           // Cycle after MarketPhase
           cycleMarketCards(state);
-          processEndOfTurn(state);
+          endTurnHeadless(state);
         }
 
         // Should still be playing after 3+ turns

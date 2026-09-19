@@ -32,6 +32,7 @@ import {
   deserializeSkillIds,
 } from '../../example-games/main-street/MainStreetStaffSkills';
 import { getEmployedSpecializationSkills } from '../../example-games/main-street/MainStreetStaffBuffs';
+import { createStaffDeck } from '../../example-games/main-street/MainStreetCards';
 import type { StaffCard } from '../../example-games/main-street/MainStreetCards';
 
 describe('D1: staff specialization end-to-end integration', () => {
@@ -181,11 +182,11 @@ describe('D1: staff specialization end-to-end integration', () => {
       synergyTypes: ['Culture'], maxLevel: 0, level: 0, incomeBonus: 0,
       synergyRangeBonus: 0, reputationBonus: 0, description: 'D1 fixture.', ongoingCost: 100,
     };
-    state.staffCards.push({
-      ...state.decks.staff[0],
-      id: 'staff-d1-cutter',
-      specializationSkillIds: ['skill-cost-cutter'],
-    });
+    // Pin the hired member to a known salary (assistant, 100) instead of the
+    // seed-shifted deck draw — the staff-deck composition change reorders
+    // which card the seeded shuffle places at index 0.
+    const cutterMember = { ...createStaffDeck(1)[0], id: 'staff-d1-cutter', specializationSkillIds: ['skill-cost-cutter'] };
+    state.staffCards.push(cutterMember);
     state.resourceBank.coins = 10000;
     processEndOfTurn(state);
 
@@ -196,12 +197,13 @@ describe('D1: staff specialization end-to-end integration', () => {
       synergyTypes: ['Culture'], maxLevel: 0, level: 0, incomeBonus: 0,
       synergyRangeBonus: 0, reputationBonus: 0, description: 'D1 fixture.', ongoingCost: 100,
     };
-    control.staffCards.push({ ...control.decks.staff[0], id: 'staff-d1-cutter', specializationSkillIds: [] });
+    control.staffCards.push({ ...createStaffDeck(1)[0], id: 'staff-d1-cutter', specializationSkillIds: [] });
     control.resourceBank.coins = 10000;
     processEndOfTurn(control);
 
     // Identical flow; the cutter member saves 15% on the community-space cost
-    // AND on its own salary (100) → the buffed run keeps ~15 coins more (integer-rounded).
+    // (100) AND on its own salary (100) → the buffed run keeps 15% × 200 = 30
+    // coins more (integer-rounded).
     expect(state.resourceBank.coins).toBeCloseTo(control.resourceBank.coins + 30, 1);
   });
 });

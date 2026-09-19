@@ -223,6 +223,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       ongoingCost: Number(r.ongoingCost) || 0,
       handSlotsAdded: Number(r.handSlotsAdded) || 0,
       description: r.description,
+      allowedBusinessTypes: (r.allowedBusinessTypes || '').split('|').filter(Boolean),
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
       refreshCostDiscount: r.refreshCostDiscount ? Number(r.refreshCostDiscount) : undefined,
       actionsPerTurn: r.actionsPerTurn ? Number(r.actionsPerTurn) : undefined,
@@ -235,6 +236,75 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
 
 /** Synergy types used by Business cards for adjacency bonuses. */
 export type SynergyType = 'Food' | 'Culture' | 'Commerce' | 'Service' | 'Entertainment' | 'Health';
+
+/**
+ * All synergy type names, in a stable order. Useful for building
+ * generalist staff `allowedBusinessTypes` lists and for CSV validation.
+ */
+export const SYNERGY_TYPE_NAMES: readonly SynergyType[] = [
+  'Food',
+  'Culture',
+  'Commerce',
+  'Service',
+  'Entertainment',
+  'Health',
+] as const;
+
+/**
+ * The structural shape `staffMatchesBusiness` matches against: a placed
+ * business or community-space card (both expose `name` and `synergyTypes`).
+ */
+export interface StaffBusinessTarget {
+  readonly name: string;
+  readonly synergyTypes?: readonly SynergyType[];
+}
+
+/**
+ * Business names and/or synergy type names a staff card may serve.
+ *
+ * Both specific business names (e.g. `Cafe`) and synergy type names
+ * (e.g. `Food`) may appear in one list (CG-0MTIOLY2A0092OT1 AC1). An
+ * absent/empty list marks a **generalist** — the staff member matches any
+ * business (legacy hand-slot behaviour preserved; additive constraint).
+ *
+ * @param staff The staff card (template or instance).
+ * @returns The parsed allowed-business list (empty = generalist).
+ */
+export function getAllowedBusinessTypesForStaff(staff: Pick<StaffCard, 'allowedBusinessTypes'>): readonly string[] {
+  return Array.isArray(staff.allowedBusinessTypes) ? staff.allowedBusinessTypes : [];
+}
+
+/**
+ * Returns true when the staff member may be employed at the given business
+ * — its name (exact, case-insensitive) or any of its synergy types appears
+ * in the staff's `allowedBusinessTypes` list. Staff without the field
+ * (legacy saves / hand-built fixtures) are generalists and match any
+ * business (additive constraint, CG-0MTIOLY2A0092OT1).
+ *
+ * @param staff    The staff card to check.
+ * @param business The placed business/community-space card, or null.
+ * @param _state   Reserved for future template resolution; unused today.
+ * @returns True when the staff may be employed at the business.
+ */
+export function staffMatchesBusiness(
+  staff: Pick<StaffCard, 'allowedBusinessTypes'>,
+  business: StaffBusinessTarget | null | undefined,
+  _state?: unknown,
+): boolean {
+  const allowed = getAllowedBusinessTypesForStaff(staff);
+  // Generalist: no restriction recorded → matches any business.
+  if (allowed.length === 0) return business != null;
+  if (!business) return false;
+
+  const name = business.name;
+  if (name && allowed.some(t => t.toLowerCase() === name.toLowerCase())) return true;
+
+  for (const synergy of business.synergyTypes ?? []) {
+    const lower = synergy.toLowerCase();
+    if (allowed.some(t => t.toLowerCase() === lower)) return true;
+  }
+  return false;
+}
 
 // ── Staff specialization skills (CG-0MT1CIWSD003VBPK) ────────
 
@@ -376,6 +446,16 @@ export interface BusinessCard {
    * Defaults to 0 for legacy cards with no CSV value.
    */
   readonly ongoingCost: number;
+
+  /**
+   * Staff members currently employed at this business slot
+   * (CG-0MTIOLY2A0092OT1 AC2). The per-business employment source of truth;
+   * `getEmployedStaffCountAt` reads this array (falling back to legacy
+   * `staff.employedAtSlot` links for in-memory states that predate the
+   * field). Kept in sync with each member's `employedAtSlot` by the hire /
+   * lay-off paths and backfilled on deserialize.
+   */
+  employedStaff?: StaffCard[];
 }
 
 /**
@@ -546,6 +626,14 @@ export interface StaffCard {
    * incidents, brand ambassador, negotiator, ops-manager salary).
    */
   employedAtSlot?: number;
+  /**
+   * Business names and/or synergy type names this staff member may serve
+   * (CG-0MTIOLY2A0092OT1). Absent/empty = generalist (matches any business;
+   * legacy hand-slot behaviour). Parsed from the `allowedBusinessTypes` CSV
+   * column; both specific business names (e.g. `Cafe`) and synergy type
+   * names (e.g. `Food`) are valid tokens.
+   */
+  readonly allowedBusinessTypes?: readonly string[];
   /**
    * Optional reputation granted per turn during the income phase
    * (e.g. the Socialite's +0.1 rep/turn ability — Group F,
@@ -1077,6 +1165,7 @@ function makeBusiness(template: Omit<BusinessCard, 'family' | 'level' | 'incomeB
     reputationBonus: 0,
     ongoingCost: 0,
     appliedUpgrades: [],
+    employedStaff: [],
     ...template,
   };
   // Cached values (currentIncome, currentReputationPerTurn) are intentionally
@@ -1100,6 +1189,7 @@ function makeCommunitySpace(template: Omit<CommunitySpaceCard, 'family' | 'level
     reputationBonus: 0,
     ongoingCost: 0,
     appliedUpgrades: [],
+    employedStaff: [],
     ...template,
   };
   // Cached values left undefined until the card is placed on the grid.
@@ -1200,6 +1290,13 @@ export interface CommunitySpaceCard {
    * space is at level 0 (un-upgraded).
    */
   displayName?: string;
+  /**
+   * Staff members currently employed at this community-space slot — mirrors
+   * `BusinessCard.employedStaff` (CG-0MTIOLY2A0092OT1). Community spaces are
+   * valid employment targets for the applicant mechanic, so they carry the
+   * same per-business employed list.
+   */
+  employedStaff?: StaffCard[];
 }
 
 // ── CSV → typed template arrays ─────────────────────────────

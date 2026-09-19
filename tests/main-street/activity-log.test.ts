@@ -21,6 +21,7 @@ import {
 } from '../../example-games/main-street/MainStreetState';
 import {
   executeDayStart,
+  endTurnHeadless,
   processEndOfTurn,
   executeFullTurn,
   resolveHeldInvestment,
@@ -790,7 +791,7 @@ describe('Activity Log', () => {
       executeDayStart(state);
       const startCoins = state.resourceBank.coins;
       const startRep = state.resourceBank.reputation;
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       const last = lastLog(state);
       expect(last.text).toMatch(/Turn \d+ net:/);
       expect(last.text).toContain(describeEventEffects(state.resourceBank.coins - startCoins, state.resourceBank.reputation - startRep));
@@ -814,7 +815,7 @@ describe('Activity Log', () => {
       // Prevent income from charging trivial rounding effects.
       // With no businesses, income is 0.
       state.phase = 'MarketPhase';
-      processEndOfTurn(state);
+      endTurnHeadless(state);
       const last = lastLog(state);
       expect(last.text).toMatch(/Turn \d+ net:/);
       expect(last.text).toContain(describeEventEffects(0, 0));

@@ -55,7 +55,7 @@ describe('Main Street tier catalog coverage', () => {
       expect(size).toBeGreaterThan(prevSize);
       prevSize = size;
     }
-    // 154 baseline + 8 chain-event templates (CG-0MTT7FC7A000AA58).
-    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(162);
+    // 154 baseline + 8 chain-event templates (CG-0MTT7FC7A000AA58) + 4 specialists (CG-0MTIOLY2A0092OT1).
+    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(166);
   });
 });

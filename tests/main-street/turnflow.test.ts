@@ -184,8 +184,12 @@ describe('MainStreetEngine', () => {
     it('should execute a buy-business action in MarketPhase', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      const card = state.market.cards[0];
-      state.resourceBank.coins = 1000;
+      // Generous coins so any seeded business-family card is affordable
+      // (staff-deck changes compose a different market for this seed).
+      state.resourceBank.coins = 10000;
+      const card = state.market.cards.find(
+        c => c.family === 'business' || c.family === 'community-space',
+      )!;
 
       const result = executeAction(state, {
         type: 'buy-business',
@@ -696,9 +700,13 @@ describe('MainStreetEngine', () => {
   describe('executeFullTurn', () => {
     it('should execute a complete turn with purchases', () => {
       const state = createTestState();
-      state.resourceBank.coins = 1000;
+      // Generous coins so any seeded business-family card is affordable
+      // (staff-deck changes compose a different market for this seed).
+      state.resourceBank.coins = 10000;
 
-      const card = state.market.cards[0];
+      const card = state.market.cards.find(
+        c => c.family === 'business' || c.family === 'community-space',
+      )!;
       const actions: PlayerAction[] = [
         { type: 'buy-business', cardId: card.id, slotIndex: 0 },
         { type: 'end-turn' },
@@ -897,6 +905,10 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 4000;
 
       const scoreBefore = computeScore(state);
+      // Isolate the challenge-bonus accounting: clear the incident deck so a
+      // seeded incident cannot shave coins/rep during the closing (deck
+      // composition shifts which incident the seeded game draws).
+      state.incidentDeck = [];
       executeDayStart(state);
       endTurnHeadless(state);
 

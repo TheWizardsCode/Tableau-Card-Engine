@@ -1006,8 +1006,10 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
     it('should produce deterministic market states with the same seed', () => {
       const state1 = createTestState('flow-deterministic');
       const state2 = createTestState('flow-deterministic');
-      state1.resourceBank.coins = 100;
-      state2.resourceBank.coins = 100;
+      // Generous coins: the parity assertions only care that both identical
+      // seeded flows stay in lockstep, not that they survive on a tight budget.
+      state1.resourceBank.coins = 10000;
+      state2.resourceBank.coins = 10000;
 
       for (let turn = 0; turn < 3; turn++) {
         playGreedyTurn(state1);

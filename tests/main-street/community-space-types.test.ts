@@ -84,6 +84,7 @@ function createCommunitySpaceFixture(overrides?: Record<string, unknown>): Recor
     currentIncome: undefined,
     currentReputationPerTurn: undefined,
     appliedUpgrades: [] as string[],
+    employedStaff: [] as unknown[],
     ...overrides,
   };
 }

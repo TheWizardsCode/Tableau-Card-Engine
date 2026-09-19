@@ -595,7 +595,7 @@ describe('Greedy Strategy banking integration', () => {
     const state = setupMainStreetGame({ seed: 'multi-day-banking' });
     const player = new MainStreetAiPlayer(GreedyStrategy, makeRng());
 
-    for (let day = 0; day < 5; day++) {
+    for (let day = 0; day < 5 && state.gameResult === 'playing'; day++) {
       executeDayStart(state);
 
       // Run AI actions until end-turn
