@@ -39,6 +39,7 @@ import {
   type IncidentBalanceState,
   createIncidentBalanceState,
   createIncidentBalanceFromQueue,
+  isCardAvailableInWeek,
 } from './MainStreetCards';
 import {
   type ActiveChallenge,
@@ -841,11 +842,17 @@ export function refillSingleRowMarket(state: MainStreetState): void {
     market.cards.push(card);
     return true;
   };
+  // Week-gated Investment offers (CG-0MTT0K9RX0004QTE / F3): a seasonal
+  // Investment event is only offerable when the current `state.week` falls
+  // within its declared window. Cards without a window stay year-round.
+  const isOfferableInvestment = (e: EventCard): boolean =>
+    e.trigger === 'Investment' && isCardAvailableInWeek(e, state.week);
+
   const drawEvent = (): boolean => {
-    let idx = decks.event.findIndex(e => e.trigger === 'Investment');
+    let idx = decks.event.findIndex(isOfferableInvestment);
     if (idx === -1) {
       forceReshuffleFromDiscards(state, decks.event, state.discards.event, 'event');
-      idx = decks.event.findIndex(e => e.trigger === 'Investment');
+      idx = decks.event.findIndex(isOfferableInvestment);
     }
     if (idx === -1) return false;
     market.cards.push(decks.event.splice(idx, 1)[0]);
