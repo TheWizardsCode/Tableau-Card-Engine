@@ -727,17 +727,22 @@ export class MainStreetRenderer {
    * Creates the always-available zoom control cluster on first use.
    *
    * The controls live in `hudContainer` (not `streetContainer`) so they stay
-   * put while the map transforms, and sit at the top-right of the street band.
+   * put while the map transforms, and sit at the top-right of the map zone
+   * (below the market, left of the activity log) — CG-0MTZO0YIM000VAIQ.
    * Zoom is never gated: the buttons stay usable in every phase.
    */
   private installStreetZoomControls(): void {
     const s = this.scene;
     if (!s.hudContainer || s.replayMode) return;
     const viewport = streetViewportRect(s.layout);
+    const { marketTop, marketRowH, logX } = s.layout;
     const size = 26;
     const gap = 4;
-    const x = viewport.x + viewport.w - size;
-    const y = viewport.y - 2;
+    // Position in the top-right of the map zone: right of street area,
+    // left of the activity log, below the market row.
+    const clusterW = size;
+    const x = Math.min(viewport.x + viewport.w, logX) - 20 - clusterW;
+    const y = marketTop + marketRowH + 4; // just below the market row
 
     const zoomOut = this.createZoomButton(x, y, size, '−', 'ms-zoom-out', () => s.zoomStreetOut());
     const zoomIn = this.createZoomButton(x, y + size + gap, size, '+', 'ms-zoom-in', () => s.zoomStreetIn());
