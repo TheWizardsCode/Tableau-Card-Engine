@@ -335,7 +335,7 @@ describe('Tooltip — ongoing cost in card tooltip info', () => {
     expect(tooltip).toContain('Ongoing cost: -50/turn');
   });
 
-  it('should omit ongoing cost from tooltip when ongoingCost is 0', () => {
+  it('should show the ongoing cost line even when ongoingCost is 0 (AC1, CG-0MTQZ7VWU008Q259)', () => {
     const biz: BusinessCard = {
       family: 'business',
       ...getBusinessTemplates()[0],
@@ -345,7 +345,9 @@ describe('Tooltip — ongoing cost in card tooltip info', () => {
     };
 
     const tooltip = buildCardTooltipInfo(biz, { synergyBonusPerNeighbor: 1 });
-    expect(tooltip).not.toContain('Ongoing cost');
+    // The turn-cost tooltip feature (447cbdbd) always includes the line;
+    // zero-cost cards render "Ongoing cost: -0/turn".
+    expect(tooltip).toContain('Ongoing cost: -0/turn');
   });
 });
 
