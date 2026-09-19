@@ -50,7 +50,7 @@ import {
   describeEventEffects,
   classifyEffect,
 } from './MainStreetState';
-import type { BusinessCard, EventCard, StaffCard, SynergyType, SpecializationSkill } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, StaffCard, SynergyType, SpecializationSkill } from './MainStreetCards';
 import {
   SELL_VALUE_RATIO, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
   getEventTemplates, getBaseTypeId, staffMatchesBusiness,
@@ -3754,8 +3754,11 @@ function pickTargetSlot(state: MainStreetState): number {
  *
  * When triggered:
  * - Picks a random business with a free employment slot as the target.
- * - Draws a random StaffCard from the staff deck (no removal — the pool
- *   persists for future days).
+ * - Draws a random StaffCard **with a business-type match** from the staff
+ *   deck (CG-0MU3BTRGY0086CM9): only staff whose `allowedBusinessTypes`
+ *   match at least one deployed business may walk on; generalist staff
+ *   remain eligible (fallback). With no matching business at all, no
+ *   applicant appears (the roll is consumed).
  * - Sets `pendingApplicant = { card, targetSlotIndex }`.
  *
  * When no eligible business exists or the RNG roll fails, nothing happens.
@@ -3786,9 +3789,27 @@ export function resolveStaffApplicant(state: MainStreetState): void {
   const staffDeck = state.decks?.staff;
   if (!staffDeck || staffDeck.length === 0) return;
 
-  // Pick a random card from the deck
-  const deckIdx = Math.floor(state.rng() * staffDeck.length);
-  const card = { ...staffDeck[deckIdx] } as StaffCard;
+  // ── Business-type gating (CG-0MU3BTRGY0086CM9 AC1-AC3) ──────
+  // Only staff whose `allowedBusinessTypes` match at least one deployed
+  // business may walk on. Generalist staff (broad type coverage — or
+  // legacy cards without the field) always match any deployed business, so
+  // they naturally remain available when no specialist match exists
+  // (AC3 fallback). When nothing matches (no deployed businesses, or only
+  // mismatched types), no applicant appears — the trigger roll is consumed
+  // (AC2). The dev-only forced applicant (CG-0MTY9PB51008OG5A) BYPASSES
+  // the type gate so the cheat/debug tool can spawn any staff.
+  let pool: readonly StaffCard[] = staffDeck;
+  if (!state.forcedStaffApplicant) {
+    const deployed = state.streetGrid.filter(
+      (c): c is BusinessCard | CommunitySpaceCard => c != null,
+    );
+    pool = staffDeck.filter((c) => deployed.some((b) => staffMatchesBusiness(c, b)));
+    if (pool.length === 0) return;
+  }
+
+  // Pick a random card from the eligible pool
+  const deckIdx = Math.floor(state.rng() * pool.length);
+  const card = { ...pool[deckIdx] } as StaffCard;
 
   // Assign specialization skills if not already present
   if (!Array.isArray(card.specializationSkillIds)) {

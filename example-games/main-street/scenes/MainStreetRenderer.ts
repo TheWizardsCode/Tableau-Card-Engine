@@ -2495,6 +2495,25 @@ export class MainStreetRenderer {
       chipY -= 12;
     }
 
+    // ── Business-type hint (CG-0MU3BTRGY0086CM9): the walk-on gate only
+    // offers staff whose allowedBusinessTypes match a deployed business.
+    // Surface the served types so the player sees why this applicant arrived.
+    const types = Array.isArray(card.allowedBusinessTypes) && card.allowedBusinessTypes.length > 0
+      ? card.allowedBusinessTypes.join('/')
+      : 'Generalist';
+    const typeHint = s.add.text(0, chipY, `Works: ${types}`, {
+      fontSize: '8px',
+      fontStyle: 'bold',
+      color: '#ddeeff',
+      fontFamily: FONT_FAMILY,
+      align: 'center',
+      backgroundColor: '#1a2f55',
+      padding: { x: 3, y: 1 },
+    });
+    typeHint.setOrigin(0.5, 1);
+    typeHint.setDepth(11);
+    container.add(typeHint);
+
     // ── Interactive hover overlay (tooltip + pointer feedback) ──
     if (!s.replayMode) {
       const hover = s.add.rectangle(0, 0, cardW, cardH, 0x000000, 0.001);
