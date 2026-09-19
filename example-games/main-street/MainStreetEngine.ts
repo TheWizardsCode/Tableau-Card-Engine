@@ -53,7 +53,7 @@ import {
 import type { BusinessCard, EventCard, StaffCard, SynergyType, SpecializationSkill } from './MainStreetCards';
 import {
   SELL_VALUE_RATIO, isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex,
-  getEventTemplates, getBaseTypeId,
+  getEventTemplates, getBaseTypeId, staffMatchesBusiness,
   type DurationEventCard,
 } from './MainStreetCards';
 
@@ -3134,6 +3134,132 @@ export function getEmployedStaffForBusiness(state: MainStreetState, slotIndex: n
   return (state.staffCards ?? []).filter(m => m.employedAtSlot === slotIndex);
 }
 
+// ── Staff placement & removal (CG-0MTIOLY2A0092OT1) ────────
+
+/**
+ * Validates whether the hired staff member may be placed at the given
+ * street-grid slot (CG-0MU3BTSQ8006ZRCU AC3/AC4):
+ * - the member must be a hired staff card (present in `state.staffCards`);
+ * - the slot must hold a business/community-space card;
+ * - the business name or one of its synergy types must match the staff's
+ *   `allowedBusinessTypes` (`staffMatchesBusiness`; absent field = generalist);
+ * - the slot must have a free employment slot (`getEmploymentCapacity`).
+ *
+ * @param state     Current game state.
+ * @param staffId   ID of the hired staff card to place.
+ * @param slotIndex Street-grid slot index.
+ * @returns LegalityResult — legal when the placement may proceed.
+ */
+export function canPlaceStaffOnBusiness(
+  state: MainStreetState,
+  staffId: string,
+  slotIndex: number,
+): import('../../src/rule-engine').LegalityResult {
+  const staffIndex = (state.staffCards ?? []).findIndex(c => c.id === staffId);
+  if (staffIndex === -1) {
+    return { legal: false, reason: `Staff card ${staffId} is not hired.` };
+  }
+  if (slotIndex < 0 || slotIndex >= state.streetGrid.length) {
+    return { legal: false, reason: `Invalid slot index: ${slotIndex}.` };
+  }
+  const business = state.streetGrid[slotIndex];
+  if (!business) {
+    return { legal: false, reason: 'Cannot place staff on an empty slot.' };
+  }
+  if (!staffMatchesBusiness(state.staffCards[staffIndex]!, business)) {
+    return {
+      legal: false,
+      reason: `${state.staffCards[staffIndex]!.name} cannot work at ${business.name} — business type does not match.`,
+    };
+  }
+  if (!hasFreeEmploymentSlot(state, slotIndex)) {
+    return { legal: false, reason: `${business.name} has no free employment slots.` };
+  }
+  return { legal: true };
+}
+
+/**
+ * Places a hired staff member at the given street-grid slot
+ * (CG-0MU3BTSQ8006ZRCU AC1-AC3). Sets the member's `employedAtSlot` and
+ * registers it on the business's `employedStaff` list (the per-business
+ * source of truth, CG-0MTIOLY2A0092OT1 AC2). Per-business buffs then apply
+ * only to that business.
+ *
+ * Free: adjusts employment only — no action or coins are consumed (the
+ * staff member was already hired). Undo/redo is provided by the command
+ * wrapper (`placeStaffOnBusinessCommand`).
+ *
+ * @param state     Current game state (mutated in-place).
+ * @param staffId   ID of the hired staff card to place.
+ * @param slotIndex Street-grid slot index.
+ * @throws Error when the placement is illegal (type mismatch, full slot,
+ *         un-hired member, empty slot).
+ */
+export function placeStaffOnBusiness(
+  state: MainStreetState,
+  staffId: string,
+  slotIndex: number,
+): void {
+  const legality = canPlaceStaffOnBusiness(state, staffId, slotIndex);
+  if (!legality.legal) {
+    throw new Error(legality.reason);
+  }
+  const staff = (state.staffCards ?? []).find(c => c.id === staffId)!;
+  // A staff member can only serve one business at a time: deregister from
+  // any previous employment before placing at the new slot.
+  if (staff.employedAtSlot != null && staff.employedAtSlot !== slotIndex) {
+    deregisterStaffFromSlot(state, staff.employedAtSlot, staff.id);
+  }
+  staff.employedAtSlot = slotIndex;
+  const business = state.streetGrid[slotIndex]!;
+  if (!Array.isArray(business.employedStaff)) business.employedStaff = [];
+  if (!business.employedStaff.some(m => m.id === staff.id)) {
+    business.employedStaff.push(staff);
+  }
+}
+
+/**
+ * Removes a staff member's employment from a specific street-grid slot:
+ * clears its `employedAtSlot` and pulls it off the business's
+ * `employedStaff` list. The member remains a hired staff card (salary still
+ * applies); to sell/lay off entirely use `layoffStaffCard`.
+ *
+ * @param state     Current game state (mutated in-place).
+ * @param slotIndex Slot whose employed list holds the member.
+ * @param staffId   ID of the staff member to remove.
+ */
+export function removeStaffFromBusiness(
+  state: MainStreetState,
+  staffId: string,
+): void {
+  const staff = (state.staffCards ?? []).find(c => c.id === staffId);
+  if (!staff) {
+    throw new Error(`Staff card ${staffId} is not hired.`);
+  }
+  const slotIndex = staff.employedAtSlot;
+  if (slotIndex == null) return; // hand-slot member — nothing employed to remove
+  deregisterStaffFromSlot(state, slotIndex, staffId);
+  staff.employedAtSlot = undefined;
+}
+
+/**
+ * Shared deregistration: removes `staffId` from the employed staff list of
+ * the business at `slotIndex` (no-op when absent). Keeps
+ * `business.employedStaff` and `staff.employedAtSlot` consistent.
+ */
+function deregisterStaffFromSlot(
+  state: MainStreetState,
+  slotIndex: number,
+  staffId: string,
+): void {
+  const business = state.streetGrid[slotIndex];
+  if (!business) return;
+  if (business.family !== 'business' && business.family !== 'community-space') return;
+  if (Array.isArray(business.employedStaff)) {
+    business.employedStaff = business.employedStaff.filter(m => m.id !== staffId);
+  }
+}
+
 /**
  * Counts how many staff members are currently employed at the given
  * street-grid slot (employedAtSlot === slotIndex).
@@ -3386,9 +3512,7 @@ export function letGoStaffMember(state: MainStreetState, idx: number): void {
 function removeStaffFromBusinessEmployedStaff(state: MainStreetState, member: StaffCard): void {
   const slotIndex = member.employedAtSlot;
   if (slotIndex == null) return;
-  const business = state.streetGrid[slotIndex];
-  if (!business || !Array.isArray(business.employedStaff)) return;
-  business.employedStaff = business.employedStaff.filter(m => m.id !== member.id);
+  deregisterStaffFromSlot(state, slotIndex, member.id);
 }
 
 /** Mutates: consumes a pending applicant into staffCards with employedAtSlot (no hand slots). */
