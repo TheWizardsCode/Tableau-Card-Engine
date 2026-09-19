@@ -235,15 +235,20 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
     // (the street refresh + DayStart are deferred until collection ends).
     await new Promise((r) => setTimeout(r, 4000));
     expect(scene.incomeCollectionActive).toBe(true);
-    expect(state.phase).toBe('DayStart');
+    // CG-0MTR72P14000VO6Q: the deferred-mutation flow defers the closing
+    // (EndCheck → next day) until the income collection completes — the
+    // phase stays in the closing sequence mid-show instead of having
+    // already advanced to DayStart.
+    expect(state.phase).toBe('IncidentPhase');
 
     // Mid-show: the count-out has already staged coin icons, so the
     // per-coin pop SFX must have fired. (The final positive credit plays
     // only at collection, which is asserted after the show completes.)
     expect(sfxSpy.mock.calls.some(([key]) => key === SFX_KEYS.COIN_POP)).toBe(true);
 
-    // VFX only — the post-income bank value must not change while the show
-    // runs, and the day must advance only after the flag clears.
+    // VFX only — the bank value must NOT change while the show runs
+    // (deferred mutation: the income deltas land only when the collection
+    // completes), and the day must advance only after the flag clears.
     const coinsAfterIncome = (state.resourceBank.coins as number);
 
     // Wait for the full show AND the deferred day start (the controller polls
@@ -253,7 +258,8 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
       label: 'phased income show to complete and the day to start',
     });
 
-    expect(state.resourceBank.coins).toBe(coinsAfterIncome);
+    // The deferred deltas landed with the completed collection (income > 0).
+    expect(state.resourceBank.coins).toBeGreaterThan(coinsAfterIncome);
     expect(state.turn).toBe(turnBefore + 1);
     expect(state.phase).toBe('MarketPhase');
 

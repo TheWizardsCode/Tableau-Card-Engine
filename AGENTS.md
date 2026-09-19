@@ -466,6 +466,36 @@ Use isolated spike scenes for evaluating new graphics pipelines (shaders, lighti
 - **Key APIs:** Phaser sprite tinting, blend modes (ADD, MULTIPLY, SCREEN, NORMAL), LightPlugin, point lights
 - **When to use:** When evaluating whether a new graphics feature (custom shaders, lighting pipeline) can be used safely in the engine. Spikes should: attempt the feature, document findings in help text, fall back gracefully when unavailable, and be peer-reviewed before shared code is refactored.
 
+### 19. Deferred End-of-Turn Mutation (Main Street)
+
+Interactive Main Street play defers end-of-turn resource changes until the
+closing animations land: the engine COMPUTES the deltas without applying
+them, the scene applies them exactly once when the income collection and/or
+incident reveal completes, and the HUD switches from the pre-animation values
+only then — so the coins fly before the numbers change, and the game-over
+banner never appears mid-animation (CG-0MTR72P14000VO6Q).
+
+- **Gym scene / reference:** no Gym scene — canonical reference is
+  `example-games/main-street` (`MainStreetEngine.ts`, `scenes/MainStreetTurnController.ts`)
+- **Dual-mode engine functions:** `applyIncome` (`MainStreetAdjacency.ts`),
+  the three ongoing-cost helpers, and `resolveIncident` accept
+  `{ apply?: boolean }` — the default (omitted) keeps the legacy
+  immediate-apply contract (headless/AI path and direct calls unchanged);
+  `apply: false` returns deltas without mutating `state.resourceBank`.
+- **Deferred closing:** `processEndOfTurn(state, { deferResourceApplication: true })`
+  returns the summed deltas in `TurnResult.pendingCoinDelta` /
+  `pendingRepDelta` / `pendingScoreDelta` (plus `requiresDeferredClosing`)
+  without mutating resources or running EndCheck; the scene applies them via
+  `applyEndOfTurnDeltas` (guarded once by `scene.endOfTurnDeltasApplied`)
+  after the animations, then runs `finishDeferredTurnClosing` (challenges
+  against post-delta state → EndCheck → next day).
+- **HUD window:** `refreshHud()` shows `previousCoins` / `previousReputation`
+  (captured at `endTurn()` start) while `incomeCollectionActive` or
+  `incidentRevealActive` is set.
+- **When to use:** any end-of-turn (or similar resource-payout) presentation
+  where the HUD must not jump before the visual feedback lands. Keep reduced
+  motion and the tutorial on the immediate path (they defer nothing).
+
 ### Scene Base Class Pattern
 
 All Gym demo scenes extend `GymSceneBase` (`example-games/gym/scenes/GymSceneBase.ts`), which provides shared utilities:

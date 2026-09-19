@@ -583,7 +583,10 @@ export function computeReputationPerTurn(
  * @returns The IncomeResult for UI display (pre-multiplier breakdown,
  *          but total reflects the multiplied amount actually credited).
  */
-export function applyIncome(state: MainStreetState): IncomeResult {
+export function applyIncome(
+  state: MainStreetState,
+  opts?: { apply?: boolean },
+): IncomeResult {
   const soldSlots = state.soldSlots ?? [];
   const grid = state.streetGrid;
 
@@ -665,7 +668,14 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     state.resourceBank.reputation,
     state.config,
   );
-  state.resourceBank.coins += multiplied;
+  // Deferred-mutation path (CG-0MTR72P14000VO6Q): when `apply === false` the
+  // coin delta is computed but NOT applied — the caller (the interactive
+  // scene) applies it after the end-of-turn animations complete. The
+  // headless/AI path keeps the legacy immediate-apply behaviour.
+  const coinDelta = multiplied;
+  if (opts?.apply !== false) {
+    state.resourceBank.coins += multiplied;
+  }
 
   // Sum reputation per turn from cached values (skip sold slots)
   let repPerTurn = 0;
@@ -697,7 +707,10 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     'rep-multiplier',
     repPerTurn,
   ));
-  if (modifiedRepPerTurn !== 0) {
+  // Deferred-mutation path (CG-0MTR72P14000VO6Q): same treatment as the coin
+  // delta above.
+  const repDelta = modifiedRepPerTurn !== 0 ? modifiedRepPerTurn : 0;
+  if (opts?.apply !== false) {
     state.resourceBank.reputation += modifiedRepPerTurn;
   }
 
@@ -723,7 +736,9 @@ export function applyIncome(state: MainStreetState): IncomeResult {
     }
   }
 
-  syncResourceBankToLedger(state);
+  if (opts?.apply !== false) {
+    syncResourceBankToLedger(state);
+  }
   if (multiplied > 0) {
     // Integer economy: no decimal formatting (CG-0MTIO1M15001E9Y6).
     // Enriched with the effective coin delta (CG-0MT5W7UJJ0065MEZ).
@@ -742,6 +757,8 @@ export function applyIncome(state: MainStreetState): IncomeResult {
       perSlotBreakdown: phaseSlotData,
       handSynergyTotal,
     },
+    coinDelta,
+    repDelta,
   };
 }
 
@@ -1144,6 +1161,18 @@ export interface IncomeResult {
    * is done at the animation layer.
    */
   phaseBreakdown: PhaseBreakdown;
+  /**
+   * Computed coin delta for this income calculation. When `apply === false`
+   * (deferred-mutation path, CG-0MTR72P14000VO6Q) this is NOT applied to
+   * `state.resourceBank` — the caller applies it after the end-of-turn
+   * animation window closes. Optional: legacy callers/constructions may omit it.
+   */
+  coinDelta?: number;
+  /**
+   * Computed reputation delta for this income calculation. Deferred-mutation
+   * semantics mirror `coinDelta` (CG-0MTR72P14000VO6Q).
+   */
+  repDelta?: number;
 }
 
 

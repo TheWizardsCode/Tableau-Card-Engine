@@ -286,6 +286,22 @@ export class MainStreetScene extends CardGameScene {
    * false under reduced motion and in replay/headless modes.
    */
   public incomeCollectionActive = false;
+
+  /**
+   * True once the deferred end-of-turn deltas have been applied to state
+   * (CG-0MTR72P14000VO6Q). Guarded so income and incident animations apply
+   * the deltas at most once between them. Reset to false at endTurn() start.
+   */
+  public endOfTurnDeltasApplied = false;
+
+  /**
+   * True while the end-of-turn incident reveal animation is in flight
+   * (incident card flight + hold, CG-0MTR72P14000VO6Q). Together with
+   * `incomeCollectionActive` it defines the "deferred window" during which
+   * `refreshHud()` renders `previousCoins` / `previousReputation` instead of
+   * the post-delta state. Cleared in the reveal's completion cleanup.
+   */
+  public incidentRevealActive = false;
   public transferAnimationCount = 0;
   public activeTransferTweens = new Set<Phaser.Tweens.Tween>();
   public activeTransferVisuals = new Set<Phaser.GameObjects.GameObject>();

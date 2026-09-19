@@ -234,7 +234,22 @@ export type PlayerAction =
 // ── Turn Result ─────────────────────────────────────────────
 
 /** Result returned after processing a full turn cycle. */
-export interface TurnResult {
+/**
+ * Pending resource deltas computed during end-of-turn.
+ * Used by the deferred-mutation pattern (CG-0MTR72P14000VO6Q):
+ * the engine computes deltas without mutating state for the
+ * interactive path; the scene layer applies them after animations complete.
+ */
+export interface PendingEndOfTurnDeltas {
+  /** Net coin delta from income + ongoing costs (may be negative). */
+  pendingCoinDelta?: number;
+  /** Net reputation delta from income (may be negative). */
+  pendingRepDelta?: number;
+  /** Score delta from challenges completed this turn (positive only). */
+  pendingScoreDelta?: number;
+}
+
+export interface TurnResult extends PendingEndOfTurnDeltas {
   /** Income earned during the income phase. */
   income: IncomeResult | null;
   /** Incident event drawn and resolved (if any). */
@@ -256,6 +271,16 @@ export interface TurnResult {
    * the deferred closing (EndCheck / next day) can run.
    */
   choicePending: boolean;
+  /**
+   * True when this result came from the deferred-mutation path
+   * (processEndOfTurn with `deferResourceApplication`, CG-0MTR72P14000VO6Q):
+   * the resource deltas are un-applied and the closing tail (EndCheck → next
+   * day) has NOT run. The scene applies the deltas after the end-of-turn
+   * animations complete and calls {@link finishDeferredTurnClosing} before
+   * acting on `gameResult` / `finalScore` (which are pre-turn values here).
+   * Absent/false for the legacy path and headless/AI results.
+   */
+  requiresDeferredClosing?: boolean;
 }
 
 // ── Score Calculation ───────────────────────────────────────
@@ -281,6 +306,30 @@ export function computeScore(state: MainStreetState): number {
  */
 export function updateScore(state: MainStreetState): void {
   state.finalScore = computeScore(state);
+}
+
+/**
+ * Applies pending end-of-turn deltas to `state.resourceBank` and
+ * `state.finalScore` (CG-0MTR72P14000VO6Q).
+ *
+ * This is the single point of application for deferred mutations —
+ * called by the headless path immediately after `processEndOfTurn()`,
+ * and by the scene layer after end-of-turn animations complete.
+ *
+ * @param state  Current game state (mutated in-place).
+ * @param deltas  The pending deltas to apply (from `TurnResult`).
+ */
+export function applyEndOfTurnDeltas(
+  state: MainStreetState,
+  deltas: PendingEndOfTurnDeltas,
+): void {
+  // Apply coin and reputation deltas to the resource bank.
+  state.resourceBank.coins += deltas.pendingCoinDelta ?? 0;
+  state.resourceBank.reputation += deltas.pendingRepDelta ?? 0;
+  // Sync the ledger to keep it consistent with resourceBank.
+  syncResourceBankToLedger(state);
+  // Update the score to reflect the new resource values.
+  updateScore(state);
 }
 
 // ── Phase Transitions ───────────────────────────────────────
@@ -843,14 +892,109 @@ export function resolveHeldInvestment(state: MainStreetState): EventCard | null 
 }
 
 /**
+ * Non-mutating projection of the coin/reputation deltas {@link resolveEvent}
+ * would apply for a regular (non-duration, non-choice) event right now
+ * (CG-0MTR72P14000VO6Q).
+ *
+ * Mirrors the resource math inside resolveEvent — staff mitigation,
+ * reputation gain multiplier, reputation multiplier scaling — WITHOUT
+ * mutating `state.resourceBank`. Used by the deferred-mutation path
+ * (processEndOfTurn with `deferResourceApplication`) so the incident deltas
+ * are known before the end-of-turn animations complete.
+ *
+ * RandomBusiness consumes one RNG draw exactly as resolveEvent does (the
+ * pull is unused for selection either way) so the deterministic RNG stream
+ * is identical across the legacy and deferred paths. Duration events have
+ * zero coin/rep deltas (they mutate activeEffects, not resourceBank).
+ *
+ * @param state      Current game state (read-only).
+ * @param event      The already-drawn incident event.
+ * @param repOverride Optional reputation value to use for the multiplier
+ *                    scaling when the caller knows reputation will change
+ *                    before this event applies (e.g. income rep added first).
+ * @returns The coin and reputation deltas the event would apply.
+ */
+export function computeEventDeltas(
+  state: MainStreetState,
+  event: EventCard,
+  repOverride?: number,
+): { coinDelta: number; repDelta: number } {
+  if (isDurationEventCard(event)) {
+    // Duration events mutate activeEffects, not resourceBank — no deltas.
+    return { coinDelta: 0, repDelta: 0 };
+  }
+  const employedSkills = getEmployedSpecializationSkills(state);
+  const repGainMultiplier = computeReputationGainMultiplier(employedSkills);
+  const incidentBuffs = event.trigger === 'Incident' ? computeIncidentSkillBuffs(employedSkills) : null;
+  const theftNeutralized =
+    incidentBuffs !== null && incidentBuffs.immuneToTheftLoss && isTheftLossIncident(event);
+  const cDelta = (effect: number): number => {
+    if (theftNeutralized && effect < 0) return 0;
+    if (incidentBuffs === null || effect >= 0) return roundInt(effect);
+    return roundInt(effect + Math.abs(effect) * incidentBuffs.coinDamageReductionPct);
+  };
+  const rDelta = (effect: number): number => {
+    if (effect > 0) return roundInt(effect * repGainMultiplier);
+    if (incidentBuffs === null) return roundInt(effect);
+    return roundInt(Math.min(0, effect + incidentBuffs.reputationDamageReductionFlat));
+  };
+  const rep = repOverride ?? state.resourceBank.reputation;
+  const cfg = state.config;
+
+  switch (event.target) {
+    case 'SpecificSynergy': {
+      const matchCount = state.streetGrid.filter(
+        b => b !== null && b.synergyTypes.includes(event.targetSynergy as SynergyType),
+      ).length;
+      const rawDelta = event.coinDelta * matchCount;
+      return {
+        coinDelta: applyReputationMultiplier(cDelta(rawDelta), rep, cfg),
+        repDelta: rDelta(event.reputationDelta),
+      };
+    }
+    case 'All':
+      return {
+        coinDelta: applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg),
+        repDelta: rDelta(event.reputationDelta),
+      };
+    case 'RandomBusiness': {
+      const placed = state.streetGrid.filter(b => b !== null);
+      if (placed.length > 0) {
+        // Consume RNG exactly as resolveEvent does (deterministic selection).
+        void Math.floor(state.rng() * placed.length);
+        return {
+          coinDelta: applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg),
+          repDelta: rDelta(event.reputationDelta),
+        };
+      }
+      return {
+        coinDelta: 0,
+        repDelta: rDelta(event.reputationDelta),
+      };
+    }
+    default:
+      return { coinDelta: 0, repDelta: 0 };
+  }
+}
+
+/**
  * Resolves the front Incident event from the face-down incident deck
  * (front = next to resolve). Records the draw in the incident-draw balance
  * history so subsequent constrained draws (deck rebuilds) see the resolved
  * sequence. When the deck is exhausted, Incident cards from the event deck
  * / discards reshuffle back in. Returns the resolved event or null if no
  * incident is available.
+ *
+ * Deferred-mutation support (CG-0MTR72P14000VO6Q): when `opts.apply === false`
+ * the resource deltas are computed but NOT applied to `state.resourceBank` —
+ * they are reported via `opts.deltasOut` (filled in-place) for the caller to
+ * apply after the end-of-turn animations complete. The headless/AI path keeps
+ * the legacy immediate-apply behaviour.
  */
-export function resolveIncident(state: MainStreetState): EventCard | null {
+export function resolveIncident(
+  state: MainStreetState,
+  opts?: { apply?: boolean; deltasOut?: { coinChange: number; repChange: number } },
+): EventCard | null {
   // Risk Manager: -15% incident probability (I4, CG-0MT4WXV2J000M35M). When
   // employed, each turn's incident draw is averted with probability
   // probabilityReductionPct; the deck is untouched so the averted card
@@ -897,6 +1041,31 @@ export function resolveIncident(state: MainStreetState): EventCard | null {
     state.pendingEventChoice = { event, chosenOption: null, resolved: false };
     addLog(state, `Incident: ${event.name} — a decision is required.`, 'neutral');
     return null;
+  }
+
+  // Deferred-mutation path (CG-0MTR72P14000VO6Q): compute the resource
+  // deltas without mutating state. The reputation multiplier uses the
+  // caller-supplied post-income reputation when provided (income normally
+  // lands before the incident phase), so the deferred path reproduces the
+  // legacy per-turn results exactly.
+  if (opts?.apply === false) {
+    // Duration events mutate activeEffects (not resourceBank): resolve now so
+    // the active effect applies from this turn onward (deferred mutation
+    // covers resourceBank/finalScore only).
+    if (isDurationEventCard(event)) {
+      resolveEvent(state, event);
+    }
+    const deltas = computeEventDeltas(state, event);
+    if (opts.deltasOut) {
+      opts.deltasOut.coinChange = deltas.coinDelta;
+      opts.deltasOut.repChange = deltas.repDelta;
+    }
+    addLog(
+      state,
+      `Incident: ${event.name} (${describeEventEffects(deltas.coinDelta, deltas.repDelta)})`,
+      classifyEffect(deltas.coinDelta, deltas.repDelta),
+    );
+    return event;
   }
 
   const coinsBefore = state.resourceBank.coins;
@@ -1762,13 +1931,47 @@ export function appendTurnNetRow(state: MainStreetState, turnEnded: number): voi
 }
 
 /**
+ * Options for {@link processEndOfTurn}.
+ */
+export interface EndOfTurnOptions {
+  /**
+   * Deferred-mutation flag (CG-0MTR72P14000VO6Q). When `true` (interactive
+   * scene path), resource deltas (income, ongoing costs, incident) are
+   * computed and returned in `TurnResult.pending*Delta` but NOT applied to
+   * `state.resourceBank` / `state.finalScore`, and the closing tail
+   * (EndCheck → next day) is deferred to {@link finishDeferredTurnClosing}
+   * which the caller runs after the end-of-turn animations complete.
+   *
+   * When unset/false (headless/AI path and reduced-motion mode), the legacy
+   * behaviour is preserved: deltas are applied immediately and the turn
+   * closes deterministically within this call.
+   */
+  deferResourceApplication?: boolean;
+}
+
+/**
  * Processes the end of the MarketPhase (after player clicks End Turn).
  * Runs through all remaining phases automatically:
  *   InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
  *
- * @returns TurnResult with income, incident, and game result.
+ * @param state Current game state.
+ * @param opts  Optional deferred-mutation option (see {@link EndOfTurnOptions}).
+ * @returns TurnResult with income, incident, game result, and pending deltas.
  */
-export function processEndOfTurn(state: MainStreetState): TurnResult {
+export function processEndOfTurn(state: MainStreetState, opts?: EndOfTurnOptions): TurnResult {
+  // Deferred-mutation mode: `apply:false` is passed down to the income /
+  // cost / incident helpers so they compute deltas without mutating
+  // resourceBank; the closing tail is deferred to finishDeferredTurnClosing.
+  const deferred = opts?.deferResourceApplication === true;
+  const applyOpts = deferred ? { apply: false as const } : undefined;
+  // Net end-of-turn resource deltas accumulated for TurnResult (legacy mode
+  // derives them from pre/post state diffs instead).
+  let pendingCoinDelta = 0;
+  let pendingRepDelta = 0;
+  const coinsAtTurnStart = state.resourceBank.coins;
+  const repAtTurnStart = state.resourceBank.reputation;
+  const scoreAtTurnStart = state.finalScore;
+
   // AC7 (CG-0MTSHG8RP008E128): while a dual-choice incident is pending and
   // unresolved, the closing sequence must NOT proceed to IncomePhase — the
   // player's decision comes first. Returns a choicePending result instead of
@@ -1783,6 +1986,9 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
       choicePending: true,
+      pendingCoinDelta: 0,
+      pendingRepDelta: 0,
+      pendingScoreDelta: 0,
     };
   }
   if (state.phase !== 'MarketPhase') {
@@ -1822,31 +2028,51 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
       choicePending: false,
+      pendingCoinDelta: 0,
+      pendingRepDelta: 0,
+      pendingScoreDelta: 0,
     };
   }
 
   // Phase: IncomePhase
   state.phase = 'IncomePhase';
-  const income = applyIncome(state);
+  const income = applyIncome(state, applyOpts);
 
   // Apply staff card ongoing costs (Multi-Use Card Economy)
-  applyStaffOngoingCosts(state);
+  const staffDelta = applyStaffOngoingCosts(state, applyOpts);
 
   // Apply community space ongoing costs (reputation-asset cards, e.g. Library)
-  applyCommunitySpaceOngoingCosts(state);
+  const communityDelta = applyCommunitySpaceOngoingCosts(state, applyOpts);
 
   // Apply business card ongoing costs (street-placed cards only)
-  applyBusinessOngoingCosts(state);
+  const businessDelta = applyBusinessOngoingCosts(state, applyOpts);
 
   // Phase: IncidentPhase
   state.phase = 'IncidentPhase';
   // Capture the incident's own resource deltas (negative = loss) for the
-  // incident-reveal presentation (dramatic sting + damage feedback).
+  // incident-reveal presentation (dramatic sting + damage feedback). In
+  // deferred mode the deltas are computed without mutation via
+  // resolveIncident's `deltasOut`; in legacy mode they are derived from the
+  // pre/post state diff.
+  const incidentDeltasOut = deferred ? { coinChange: 0, repChange: 0 } : null;
   const coinsBeforeIncident = state.resourceBank.coins;
   const repBeforeIncident = state.resourceBank.reputation;
-  const incident = resolveIncident(state);
-  const incidentCoinChange = state.resourceBank.coins - coinsBeforeIncident;
-  const incidentRepChange = state.resourceBank.reputation - repBeforeIncident;
+  const incident = resolveIncident(
+    state,
+    deferred ? { apply: false, deltasOut: incidentDeltasOut ?? undefined } : undefined,
+  );
+  const incidentCoinChange = deferred
+    ? incidentDeltasOut!.coinChange
+    : state.resourceBank.coins - coinsBeforeIncident;
+  const incidentRepChange = deferred
+    ? incidentDeltasOut!.repChange
+    : state.resourceBank.reputation - repBeforeIncident;
+
+  if (deferred) {
+    pendingCoinDelta =
+      (income?.coinDelta ?? 0) + staffDelta + communityDelta + businessDelta + incidentCoinChange;
+    pendingRepDelta = (income?.repDelta ?? 0) + incidentRepChange;
+  }
 
   // Dual-choice pause (CG-0MTSHG8RP008E128 AC7): when the drawn incident set a
   // `pendingEventChoice` (resolveIncident deferred the effect), stop the closing
@@ -1854,6 +2080,9 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
   // Accept/Reject dialog. The deferred closing then runs via resolveEventChoice
   // (apply the path) + finishDeferredEndOfTurn (EndCheck → next day).
   if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+    // Deferred mode: the income deltas are NOT yet in state — the scene
+    // applies them (applyEndOfTurnDeltas) when presenting the dialog so the
+    // paused turn's income matches the legacy UX (income lands at pause).
     return {
       income,
       incident: null,
@@ -1863,17 +2092,51 @@ export function processEndOfTurn(state: MainStreetState): TurnResult {
       finalScore: state.finalScore,
       newlyCompletedChallenges: [],
       choicePending: true,
+      pendingCoinDelta,
+      pendingRepDelta,
+      pendingScoreDelta: 0,
+      // The paused turn's income deltas are un-applied in deferred mode — the
+      // scene applies them (idempotently) so the income lands when the turn
+      // pauses, exactly as in the legacy UX.
+      requiresDeferredClosing: true,
+    };
+  }
+
+  // Deferred mode (CG-0MTR72P14000VO6Q): the turn's resource deltas are
+  // returned un-applied; the scene runs the closing tail via
+  // finishDeferredTurnClosing after the income / incident animations land.
+  // gameResult / finalScore stay at their pre-turn values (the closing
+  // recomputes them post-application).
+  if (deferred) {
+    return {
+      income,
+      incident,
+      incidentCoinChange,
+      incidentRepChange,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: false,
+      pendingCoinDelta,
+      pendingRepDelta,
+      pendingScoreDelta: 0, // challenges evaluated at closing (post-application)
+      requiresDeferredClosing: true,
     };
   }
 
   // EndCheck + decay + challenges + advance (shared with the deferred path).
-  return runSinglePlayerTurnClosing(state, {
+  const closed = runSinglePlayerTurnClosing(state, {
     income,
     incident,
     incidentCoinChange,
     incidentRepChange,
     turnEnded,
   });
+  // Legacy mode: derive the end-of-turn deltas from the applied state.
+  closed.pendingCoinDelta = state.resourceBank.coins - coinsAtTurnStart;
+  closed.pendingRepDelta = state.resourceBank.reputation - repAtTurnStart;
+  closed.pendingScoreDelta = state.finalScore - scoreAtTurnStart;
+  return closed;
 }
 
 /**
@@ -2127,6 +2390,107 @@ export function finishDeferredEndOfTurn(state: MainStreetState): TurnResult {
     incidentRepChange: 0,
     turnEnded,
   });
+}
+
+/**
+ * Runs the closing tail of a deferred-mutation turn (CG-0MTR72P14000VO6Q).
+ *
+ * `processEndOfTurn(state, { deferResourceApplication: true })` computes the
+ * turn's resource deltas WITHOUT applying them and defers the closing.
+ * After the end-of-turn animations complete (income collection + incident
+ * reveal), the scene applies the deltas exactly once (income/incident
+ * animation completion, or immediately when none run) and then calls this
+ * to, in a single step:
+ *
+ *  1. evaluate challenges against the post-delta state (a challenge such as
+ *     "accumulate 3000 coins" must see the income land first),
+ *  2. run the immediate-loss check and EndCheck (game-over evaluation — AC4),
+ *  3. advance to the next day when the game continues,
+ *  4. append the per-turn net summary row.
+ *
+ * PRECONDITION: the pending deltas have ALREADY been applied to
+ * `state.resourceBank` (via `applyEndOfTurnDeltas`) by the caller before
+ * invoking this — otherwise EndCheck / challenge evaluation would read
+ * pre-turn values. Returns the FINAL TurnResult (gameResult / finalScore /
+ * newlyCompleted / pendingScoreDelta all computed). Callers pass the result
+ * returned by `processEndOfTurn` so income/incident data flows through.
+ *
+ * @param state  Current game state (mutated: phases, turn, challenges).
+ * @param result The deferred result from `processEndOfTurn(state, { deferResourceApplication: true })`.
+ * @returns The completed closing TurnResult for the UI.
+ */
+export function finishDeferredTurnClosing(
+  state: MainStreetState,
+  result: TurnResult,
+): TurnResult {
+  const turnEnded = state.turn;
+
+  // Phase: EndCheck
+  state.phase = 'EndCheck';
+
+  // 2. Decay active effects (decrement turnsRemaining, remove expired).
+  const decayResult = decayActiveEffects(state.activeEffects);
+  state.activeEffects = decayResult.active;
+  for (const expired of decayResult.expired) {
+    addLog(state, `${expired.description} has expired.`, 'neutral');
+    recordMainStreetEvent({
+      type: 'info',
+      turn: state.turn,
+      message: `${expired.description} has expired.`,
+    });
+  }
+
+  // 3. Evaluate challenges against the post-delta state (mirrors the legacy
+  //    closing where income lands before challenge evaluation).
+  const newlyCompletedChallenges = evaluateChallenges(state.activeChallenges, state);
+  const pendingScoreDelta =
+    newlyCompletedChallenges.length * state.config.challengeBonusPoints;
+
+  // Immediate-loss check after the deltas are applied (mirrors the legacy
+  // post-incident check). Banner emitted first, then the net row.
+  if (checkImmediateLoss(state)) {
+    appendTurnNetRow(state, turnEnded);
+    return {
+      ...result,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges,
+      choicePending: false,
+      pendingScoreDelta,
+    };
+  }
+
+  // 4. EndCheck (game-over evaluation — AC4: runs after the animations and
+  //    post-application, never while animations are in flight).
+  checkEndConditions(state);
+
+  // 5. If the game continues, advance to the next turn.
+  if (state.gameResult === 'playing') {
+    state.turn += 1;
+    advanceWeek(state);
+
+    // ── Action Banking (CG-0MT3IOPZB005LNAR) ─────────────
+    // Bank unused base actions (at most 1 per day) up to the cap of 2.
+    // Staff-derived actions (e.g. General Manager +1) never bank;
+    // only the base-action portion remains bankable.
+    const bankable = Math.min(state.actionsRemaining, 1);
+    state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
+
+    state.phase = 'DayStart';
+  }
+
+  // 6. Per-turn net summary row — the final log entry of a completed turn
+  //    (CG-0MT5W7UJJ0065MEZ AC3). Reads the post-delta resources.
+  appendTurnNetRow(state, turnEnded);
+
+  return {
+    ...result,
+    gameResult: state.gameResult,
+    finalScore: state.finalScore,
+    newlyCompletedChallenges,
+    choicePending: false,
+    pendingScoreDelta,
+  };
 }
 
 // ── Headless Choice Policy (CG-0MTT7FC7A000AA58 Q1 / CG-0MTSHG8RP008E128) ──
@@ -2692,11 +3056,18 @@ export function canSellBusiness(
  * Deducts each active staff card's ongoingCost from coins.
  * If coins are insufficient, deducts what's available (down to 0).
  *
- * @param state  Current game state (mutated in-place).
+ * Deferred-mutation support (CG-0MTR72P14000VO6Q): when `opts.apply === false`
+ * the deduction is computed but NOT applied — the caller applies it after the
+ * end-of-turn animations complete. Returns the computed coin delta (negative
+ * deduction). The headless/AI path keeps the legacy immediate-apply behaviour.
+ *
+ * @param state  Current game state (mutated in-place unless deferred).
+ * @param opts   Optional deferred-mutation flag.
+ * @returns The coin delta applied (or to be applied): 0 or negative.
  */
-export function applyStaffOngoingCosts(state: MainStreetState): void {
+export function applyStaffOngoingCosts(state: MainStreetState, opts?: { apply?: boolean }): number {
   const staffCards = state.staffCards ?? [];
-  if (staffCards.length === 0) return;
+  if (staffCards.length === 0) return 0;
 
   const employed = getEmployedSpecializationSkills(state);
   // Cost Cutter: -15% street-wide ongoing costs (AC7 flagged for extra
@@ -2713,7 +3084,9 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
 
   if (totalCost > 0) {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
-    state.resourceBank.coins -= actualDeduction;
+    if (opts?.apply !== false) {
+      state.resourceBank.coins -= actualDeduction;
+    }
     if (actualDeduction > 0) {
       // Enriched with the effective deduction delta (CG-0MT5W7UJJ0065MEZ).
       addLog(
@@ -2729,7 +3102,9 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
         classifyEffect(-actualDeduction, 0),
       );
     }
+    return -actualDeduction;
   }
+  return 0;
 }
 
 /**
@@ -2740,9 +3115,14 @@ export function applyStaffOngoingCosts(state: MainStreetState): void {
  *
  * Mirrors {@link applyStaffOngoingCosts} clamping/log conventions.
  *
- * @param state  Current game state (mutated in-place).
+ * Deferred-mutation support (CG-0MTR72P14000VO6Q) mirrors
+ * {@link applyStaffOngoingCosts}.
+ *
+ * @param state  Current game state (mutated in-place unless deferred).
+ * @param opts   Optional deferred-mutation flag.
+ * @returns The coin delta applied (or to be applied): 0 or negative.
  */
-export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
+export function applyCommunitySpaceOngoingCosts(state: MainStreetState, opts?: { apply?: boolean }): number {
   const grid = state.streetGrid;
 
   const streetReduction = computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state));
@@ -2758,11 +3138,13 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
     }
   }
   totalCost = roundInt(totalCost * (1 - streetReduction));
-  if (spaceCount === 0) return;
+  if (spaceCount === 0) return 0;
 
   if (totalCost > 0) {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
-    state.resourceBank.coins -= actualDeduction;
+    if (opts?.apply !== false) {
+      state.resourceBank.coins -= actualDeduction;
+    }
     if (actualDeduction > 0) {
       // Enriched with the effective deduction delta (CG-0MT5W7UJJ0065MEZ).
       addLog(
@@ -2778,7 +3160,9 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
         classifyEffect(-actualDeduction, 0),
       );
     }
+    return -actualDeduction;
   }
+  return 0;
 }
 
 /**
@@ -2790,9 +3174,13 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState): void {
  * Mirrors {@link applyStaffOngoingCosts} and {@link applyCommunitySpaceOngoingCosts}
  * clamping/log conventions.
  *
- * @param state  Current game state (mutated in-place).
+ * Deferred-mutation support (CG-0MTR72P14000VO6Q) mirrors the other two.
+ *
+ * @param state  Current game state (mutated in-place unless deferred).
+ * @param opts   Optional deferred-mutation flag.
+ * @returns The coin delta applied (or to be applied): 0 or negative.
  */
-export function applyBusinessOngoingCosts(state: MainStreetState): void {
+export function applyBusinessOngoingCosts(state: MainStreetState, opts?: { apply?: boolean }): number {
   let totalCost = 0;
   let bizCount = 0;
 
@@ -2810,14 +3198,16 @@ export function applyBusinessOngoingCosts(state: MainStreetState): void {
     }
   }
 
-  if (bizCount === 0) return;
+  if (bizCount === 0) return 0;
 
   // Cost Cutter: -15% street-wide ongoing costs (I4) — integer-rounded (AC3).
   totalCost = roundInt(totalCost * (1 - computeStreetOngoingCostReductionPct(getEmployedSpecializationSkills(state))));
 
   if (totalCost > 0) {
     const actualDeduction = Math.min(totalCost, state.resourceBank.coins);
-    state.resourceBank.coins -= actualDeduction;
+    if (opts?.apply !== false) {
+      state.resourceBank.coins -= actualDeduction;
+    }
     if (actualDeduction > 0) {
       // Enriched with the effective deduction delta (CG-0MT5W7UJJ0065MEZ).
       addLog(
@@ -2833,7 +3223,9 @@ export function applyBusinessOngoingCosts(state: MainStreetState): void {
         classifyEffect(-actualDeduction, 0),
       );
     }
+    return -actualDeduction;
   }
+  return 0;
 }
 
 /**

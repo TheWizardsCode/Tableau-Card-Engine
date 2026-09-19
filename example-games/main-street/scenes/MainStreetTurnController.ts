@@ -5,7 +5,7 @@
 // description: MainStreet god modules: Engine 2452, Animator 1942, Renderer 1902, TurnController 1834, State 1599, Cards 1469, Adjacency 1354, Market 1307, LifecycleManager 1111 lines — decompose per-concern helpers; threshold 800; prior CG-0MM1OP07Q16TUTHI covered different scene files, not these modules.
 // -->
 import { addLog } from '../MainStreetState';
-import { executeDayStart, processEndOfTurn, executeAction, finishDeferredEndOfTurn, type TurnResult } from '../MainStreetEngine';
+import { executeDayStart, processEndOfTurn, executeAction, finishDeferredEndOfTurn, finishDeferredTurnClosing, applyEndOfTurnDeltas, type TurnResult } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
 import { hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import {
@@ -254,8 +254,28 @@ export class MainStreetTurnController {
     } catch { /* applicant cleanup never blocks end-turn */ }
 
     let result: TurnResult;
+    // ── Deferred HUD window (CG-0MTR72P14000VO6Q) ─────────────
+    // Capture the pre-animation resource values so the HUD keeps showing
+    // them while the income/incident animations play; the deltas land only
+    // when the closing presentation completes. Reset the exactly-once
+    // application guard (set by the income/incident animation completions
+    // or the closing finalizer).
+    s.previousCoins = s.state.resourceBank.coins;
+    s.previousReputation = s.state.resourceBank.reputation;
+    s.endOfTurnDeltasApplied = false;
     try {
-      result = processEndOfTurn(s.state);
+      // Deferred-mutation mode: normal interactive play defers the resource
+      // application until the end-of-turn animations complete. Tutorial and
+      // reduced-motion keep the legacy immediate path (no animation-window
+      // pacing regressions); replay never mutates state.
+      const reducedMotion = (s as any).settingsPanel?.reducedMotion === true;
+      const inTutorialBefore =
+        (s as { tutorialController?: { isActive?: boolean } }).tutorialController?.isActive === true;
+      const deferred = !inTutorialBefore && !reducedMotion && !s.replayMode;
+      result = processEndOfTurn(
+        s.state,
+        deferred ? { deferResourceApplication: true } : undefined,
+      );
     } catch (e) {
       // Defensive: if processEndOfTurn throws (e.g. phase mismatch from
       // async state replacement), recover gracefully instead of hanging
@@ -296,15 +316,26 @@ export class MainStreetTurnController {
           });
         }
       } else if (phaseBreakdown.length > 0) {
-        s.msAnimator.animateIncomePhases(phaseBreakdown);
+        // Pass the pending deltas so the collection completion applies them
+        // exactly once (CG-0MTR72P14000VO6Q); legacy mode passes nothing.
+        s.msAnimator.animateIncomePhases(
+          phaseBreakdown,
+          result.requiresDeferredClosing === true ? { pendingDeltas: result } : undefined,
+        );
       }
     } catch (_) {
       // Presentation-only: never block the turn on animation failures.
       s.incomeCollectionActive = false;
     }
 
-    // Save checkpoint after each completed turn (fire-and-forget)
-    try { this.onSaveCheckpoint?.(); } catch (e) { /* ignore */ }
+    // Save checkpoint after each completed turn (fire-and-forget). In the
+    // deferred-mutation path (CG-0MTR72P14000VO6Q) the closing tail (day
+    // advance) runs only after the animations complete — persisting here
+    // would capture a mid-animation state with un-applied deltas, so the
+    // checkpoint is written in finalizeDay instead (after the closing).
+    if (result.requiresDeferredClosing !== true) {
+      try { this.onSaveCheckpoint?.(); } catch (e) { /* ignore */ }
+    }
 
     // Clear undo stack on end-of-turn (per acceptance criteria)
     try { s.undoManager.clear(); } catch (e) { /* ignore */ }
@@ -361,137 +392,211 @@ export class MainStreetTurnController {
   ): void {
     const s = this.scene;
     if (result.choicePending) {
+      // Deferred mode: the income deltas must land when the turn pauses (the
+      // Accept/Reject dialog blocks the closing). Apply now if the income
+      // animation's completion hasn't already (idempotent guard) so the
+      // paused turn's income matches the legacy UX (income lands at pause).
+      if (result.requiresDeferredClosing === true && !s.endOfTurnDeltasApplied) {
+        try {
+          applyEndOfTurnDeltas(s.state, result);
+          s.endOfTurnDeltasApplied = true;
+        } catch { /* presentation-only */ }
+      }
       this.presentEventChoiceDialog();
       return;
     }
-    if (result.gameResult !== 'playing') {
-        // Snapshot tiers before the campaign update mutates them
-        const tiersBefore = s.campaign
-          ? [...s.campaign.unlockedTiers]
-          : [];
 
-        // Update campaign progress (tier evaluation + persistence),
-        // then compute newly unlocked tiers and show the overlay.
-        // Auto-save transcript to browser storage (fire-and-forget)
-        const transcript = finalizeMainStreetTranscript({
-          gameResult: result.gameResult,
-          finalScore: result.finalScore,
-        });
-        if (transcript) {
-          const transcriptStore = new TranscriptStore();
-          autoSaveTranscript(transcriptStore, 'main-street', transcript, '[MainStreet]');
-        }
+    // Deferred-mutation mode (CG-0MTR72P14000VO6Q): when the result requires
+    // the deferred closing, `gameResult` / `finalScore` are pre-turn values —
+    // the game-over evaluation happens in finalizeDay AFTER the animations
+    // complete and the deltas land (AC4: no banner mid-animation). The legacy
+    // immediate branch below is for reduced-motion / tutorial / replay and the
+    // dual-choice resolution path (already-final results).
+    const deferred = result.requiresDeferredClosing === true;
+    if (result.gameResult !== 'playing' && !deferred) {
+      this.handleGameOver(result);
+      return;
+    }
 
-        // Update standalone player statistics (fire-and-forget, independent
-        // of campaign progress update). Guarded against replay mode internally
-        // by the lifecycle manager.
-        s.updateStats(result.gameResult, result.finalScore);
+    // Show income feedback briefly then start next turn
+    if (result.income && result.income.total > 0) {
+      s.instructionText.setText(
+        `Income: +${result.income.total} coins` +
+        (result.incident ? ` | Incident: ${result.incident.name}` : ''),
+      );
+    } else if (result.incident) {
+      s.instructionText.setText(`Incident: ${result.incident.name}`);
+    }
+    // While the phased income show runs, the street cards host the
+    // on-card coin grids (child 2); refresh everything EXCEPT the
+    // street so those grids survive until collection completes, then
+    // refresh fully once the choreography finishes.
+    if (s.incomeCollectionActive) {
+      s.msRenderer.refreshAllExceptStreet();
+    } else {
+      s.refreshAll();
+    }
 
-        // Clear checkpoint on game end
-        try { this.onGameEnd?.(); } catch (e) { /* ignore */ }
-        s.updateCampaignProgress().then(() => {
-          const tiersAfter = s.campaign
-            ? s.campaign.unlockedTiers
-            : [];
-          const newlyUnlockedTiers = tiersAfter.filter(
-            (t: any) => !tiersBefore.includes(t),
-          );
-          s.showGameOverOverlay(result, newlyUnlockedTiers);
-        });
-      } else {
-        // Show income feedback briefly then start next turn
-        if (result.income && result.income.total > 0) {
-          s.instructionText.setText(
-            `Income: +${result.income.total} coins` +
-            (result.incident ? ` | Incident: ${result.incident.name}` : ''),
-          );
-        } else if (result.incident) {
-          s.instructionText.setText(`Incident: ${result.incident.name}`);
-        }
-        // While the phased income show runs, the street cards host the
-        // on-card coin grids (child 2); refresh everything EXCEPT the
-        // street so those grids survive until collection completes, then
-        // refresh fully once the choreography finishes.
-        if (s.incomeCollectionActive) {
-          s.msRenderer.refreshAllExceptStreet();
-        } else {
-          s.refreshAll();
-        }
+    // Tutorial: mark end-turn step complete if active. Unchanged — the
+    // step completes when the turn action resolves, not when the
+    // closing presentation finishes.
+    (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
 
-        // Tutorial: mark end-turn step complete if active. Unchanged — the
-        // step completes when the turn action resolves, not when the
-        // closing presentation finishes.
-        (s.msLifecycleManager as any).onTutorialActionComplete?.('end-turn' as TutorialActionType);
-
-        // ── Closing presentation → day start ─────────────────────────
-        // Advance the day once the closing presentation is done: present
-        // the banking hint (if any), then defer to the phased income show
-        // (bounded) or the normal ~800ms schedule.
-        const advanceDay = (): void => {
-          // ── Banking hint presentation (CG-0MT3JK16W006A66P) ─────
-          // Non-blocking HUD-highlighting overlay, once per save. Fires
-          // after the turn's gated step has advanced so it does not
-          // compete with the step's own overlay. Never blocks the day
-          // start.
-          if (pendingBankingHint) {
-            try { (s as any).tutorialOverlay?.showBankingHint?.(); } catch { /* presentation-only */ }
-          }
-          // The income show is the turn's closing moment (~11s): defer the
-          // day start until the choreography completes so it isn't cut
-          // short by the market/street refresh.
-          if (s.incomeCollectionActive) {
-            // Bounded deferral: start the next day once the choreography
-            // completes (AC7 collect clears the flag); a safety cap forces
-            // the day start even if the flag is somehow never cleared, so
-            // end-of-turn can never hang the game (AC5).
-            const startAt = s.time.now + 16_000;
-            const startAfterIncomeShow = (): void => {
-              if (s.incomeCollectionActive && s.time.now < startAt) {
-                s.time.delayedCall(250, startAfterIncomeShow);
-              } else {
-                s.incomeCollectionActive = false;
-                this.startDayPhase();
-              }
-            };
-            startAfterIncomeShow();
+    // ── Closing presentation → day start ─────────────────────────
+    // Advance the day once the closing presentation is done: present
+    // the banking hint (if any), then defer to the phased income show
+    // (bounded) or the normal ~800ms schedule.
+    const advanceDay = (): void => {
+      // ── Banking hint presentation (CG-0MT3JK16W006A66P) ─────
+      // Non-blocking HUD-highlighting overlay, once per save. Fires
+      // after the turn's gated step has advanced so it does not
+      // compete with the step's own overlay. Never blocks the day
+      // start.
+      if (pendingBankingHint) {
+        try { (s as any).tutorialOverlay?.showBankingHint?.(); } catch { /* presentation-only */ }
+      }
+      if (s.incomeCollectionActive) {
+        // Bounded deferral: start the next day once the choreography
+        // completes (AC7 collect clears the flag); a safety cap forces
+        // the day start even if the flag is somehow never cleared, so
+        // end-of-turn can never hang the game (AC5).
+        const startAt = s.time.now + 16_000;
+        const startAfterIncomeShow = (): void => {
+          if (s.incomeCollectionActive && s.time.now < startAt) {
+            s.time.delayedCall(250, startAfterIncomeShow);
           } else {
-            s.time.delayedCall(800, () => this.startDayPhase());
+            s.incomeCollectionActive = false;
+            finalizeDay();
           }
         };
-
-        // Incident reveal presentation (CG-0MTW18KFK000MM3I): the resolved
-        // incident card flies from the Upcoming panel to board centre, flips
-        // face-up and stays visible for 4 seconds so the player can read the
-        // incident before the turn advances. The reveal **blocks** the day
-        // start until the hold completes (then the normal advance applies).
-        //
-        // Tutorial exemption: the tutorial keeps its window-safe step pacing,
-        // so the reveal (and its 4-second hold) is skipped — the same
-        // precedent as the phased income show and the day banner being
-        // skipped during the tutorial.
-        //
-        // If there is no incident, the entire animation is skipped — no
-        // delay, no state mutation — and the day advances as before.
-        const inTutorial =
-          (s as { tutorialController?: { isActive?: boolean } }).tutorialController?.isActive === true;
-        if (result.incident && !inTutorial) {
-          try {
-            s.msAnimator.animateIncidentReveal({
-              cardId: result.incident.id,
-              incidentName: result.incident.name,
-              coinChange: result.incidentCoinChange,
-              repChange: result.incidentRepChange,
-              from: s.msRenderer.getFrontIncidentCardCenter(),
-              onComplete: advanceDay,
-            });
-          } catch (_) {
-            // presentation-only — never let the reveal hang the turn.
-            advanceDay();
-          }
-        } else {
-          advanceDay();
-        }
+        startAfterIncomeShow();
+      } else {
+        s.time.delayedCall(800, () => finalizeDay());
       }
+    };
+
+    // ── Deferred closing tail (CG-0MTR72P14000VO6Q) ────────────
+    // Runs only after the closing animations complete (income collection
+    // and/or incident reveal): applies any remaining deltas (idempotent
+    // guard), runs the deferred closing (EndCheck → next day / game-over
+    // evaluation), clears the deferred HUD window so refreshHud shows the
+    // post-delta values, and either shows the game-over overlay or starts
+    // the next day. The legacy path (deferred === false) just starts the
+    // day — the closing already ran inside processEndOfTurn.
+    const finalizeDay = (): void => {
+      if (deferred) {
+        if (!s.endOfTurnDeltasApplied) {
+          try {
+            applyEndOfTurnDeltas(s.state, result);
+            s.endOfTurnDeltasApplied = true;
+          } catch { /* presentation-only */ }
+        }
+        let finalResult: TurnResult;
+        try {
+          finalResult = finishDeferredTurnClosing(s.state, result);
+        } catch (e) {
+          // Defensive: never hang the turn on a closing failure.
+          console.error('[MainStreet] deferred closing failed:', e);
+          finalResult = result;
+        }
+        // Close the deferred HUD window so refreshHud renders the final
+        // post-delta values.
+        s.previousCoins = null;
+        s.previousReputation = null;
+        s.incidentRevealActive = false;
+        // Render the final post-delta state under the upcoming overlay
+        // (startDayPhase refreshes internally for the continuing path).
+        try { s.refreshAll(); } catch { /* presentation-only */ }
+        if (finalResult.gameResult !== 'playing') {
+          this.handleGameOver(finalResult);
+          return;
+        }
+        // Persist the checkpoint now that the turn has fully closed (the
+        // deferred end-of-turn path skips the earlier endTurn save so the
+        // checkpoint always reflects a complete, applied turn).
+        try { this.onSaveCheckpoint?.(); } catch (e) { /* ignore */ }
+        this.startDayPhase();
+      } else {
+        this.startDayPhase();
+      }
+    };
+
+    // Incident reveal presentation (CG-0MTW18KFK000MM3I): the resolved
+    // incident card flies from the Upcoming panel to board centre, flips
+    // face-up and stays visible for 4 seconds so the player can read the
+    // incident before the turn advances. The reveal **blocks** the day
+    // start until the hold completes (then the normal advance applies).
+    //
+    // Tutorial exemption: the tutorial keeps its window-safe step pacing,
+    // so the reveal (and its 4-second hold) is skipped — the same
+    // precedent as the phased income show and the day banner being
+    // skipped during the tutorial.
+    //
+    // If there is no incident, the entire animation is skipped — no
+    // delay, no state mutation — and the day advances as before.
+    const inTutorial =
+      (s as { tutorialController?: { isActive?: boolean } }).tutorialController?.isActive === true;
+    if (result.incident && !inTutorial) {
+      try {
+        s.msAnimator.animateIncidentReveal({
+          cardId: result.incident.id,
+          incidentName: result.incident.name,
+          coinChange: result.incidentCoinChange,
+          repChange: result.incidentRepChange,
+          from: s.msRenderer.getFrontIncidentCardCenter(),
+          onComplete: advanceDay,
+          pendingDeltas: deferred ? result : undefined,
+        });
+      } catch (_) {
+        // presentation-only — never let the reveal hang the turn.
+        advanceDay();
+      }
+    } else {
+      advanceDay();
+    }
+  }
+
+  /**
+   * Finalises a completed (win/loss) turn: transcript auto-save, standalone
+   * player statistics, campaign progress, and the game-over overlay.
+   * Shared by the legacy immediate path and the deferred path (after the
+   * closing animations complete, CG-0MTR72P14000VO6Q).
+   */
+  private handleGameOver(result: TurnResult): void {
+    const s = this.scene;
+    // Snapshot tiers before the campaign update mutates them
+    const tiersBefore = s.campaign
+      ? [...s.campaign.unlockedTiers]
+      : [];
+
+    // Update campaign progress (tier evaluation + persistence),
+    // then compute newly unlocked tiers and show the overlay.
+    // Auto-save transcript to browser storage (fire-and-forget)
+    const transcript = finalizeMainStreetTranscript({
+      gameResult: result.gameResult,
+      finalScore: result.finalScore,
+    });
+    if (transcript) {
+      const transcriptStore = new TranscriptStore();
+      autoSaveTranscript(transcriptStore, 'main-street', transcript, '[MainStreet]');
+    }
+
+    // Update standalone player statistics (fire-and-forget, independent
+    // of campaign progress update). Guarded against replay mode internally
+    // by the lifecycle manager.
+    s.updateStats(result.gameResult, result.finalScore);
+
+    // Clear checkpoint on game end
+    try { this.onGameEnd?.(); } catch (e) { /* ignore */ }
+    s.updateCampaignProgress().then(() => {
+      const tiersAfter = s.campaign
+        ? s.campaign.unlockedTiers
+        : [];
+      const newlyUnlockedTiers = tiersAfter.filter(
+        (t: any) => !tiersBefore.includes(t),
+      );
+      s.showGameOverOverlay(result, newlyUnlockedTiers);
+    });
   }
 
   /**

@@ -1119,6 +1119,52 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 Single-source turn cash formula (Q1=c — see `MainStreetDifficulty.ts` header):
 `dayStart snapshot (dayStartCoins/dayStartRep at DayStart) → placement deductions → applyIncome breakdown (staff buffs → income-multiplier effects → rep multiplier sampled AFTER income's own rep accrual; hand cards contribute no income — CG-0MTRDX0DN004EECN) → ongoing costs (after income, before incident) → incident (or incident-averted log entry via Risk Manager per Q3) → net row (Turn N net: coinsNow-dayStartCoins / repNow-dayStartRep) as the final log entry, including premature bankruptcy/rep-collapse and competitive closing phases`. Invariants: Q1=c rep sampling, Q2 3-decimal tooltip (`toFixed(3)`), Q3 explicit averted entry, banner→net ordering on premature exits. Canonical sites: `reputationCoinMultiplier`/`applyReputationMultiplier` (`MainStreetDifficulty.ts`), `applyIncome` (`MainStreetAdjacency.ts`), `buildCoinsTooltip`/`buildReputationTooltip` (`MainStreetHudTooltips.ts`), `appendTurnNetRow`/`processEndOfTurn`/`resolveCompetitiveClosingPhases` (`MainStreetEngine.ts`).
 
+#### Deferred End-of-Turn Mutation (CG-0MTR72P14000VO6Q)
+
+Interactive play defers the application of end-of-turn resource changes until
+the closing animations land, so the HUD coins/reputation/score update only
+when the visual feedback completes (coins fly to the HUD, the incident reveal
+finishes) and the game-over banner never appears mid-animation.
+
+- **Dual-mode engine functions.** `applyIncome` (`MainStreetAdjacency.ts`),
+  `applyStaffOngoingCosts` / `applyCommunitySpaceOngoingCosts` /
+  `applyBusinessOngoingCosts`, and `resolveIncident` (`MainStreetEngine.ts`)
+  accept an optional `{ apply?: boolean }` option. Defaulted (or omitted)
+  calls keep the legacy immediate-apply contract — the headless/AI path
+  (`endTurnHeadless`, the Monte Carlo harness) and all existing direct calls
+  are unchanged and deterministic. With `apply: false` they compute and
+  return the deltas without touching `state.resourceBank`.
+- **Deferred `processEndOfTurn`.** `processEndOfTurn(state, { deferResourceApplication: true })`
+  (interactive scene path) runs the same phases but returns the summed deltas
+  in `TurnResult.pendingCoinDelta` / `pendingRepDelta` / `pendingScoreDelta`
+  and sets `TurnResult.requiresDeferredClosing`; `state.resourceBank` and
+  `state.finalScore` are NOT mutated and the closing tail (EndCheck → next
+  day) is deferred. Tutorial, reduced-motion and replay paths omit the flag
+  (legacy immediate behaviour, no regression — AC5).
+- **Apply at animation end.** The scene (`MainStreetTurnController` +
+  `MainStreetAnimator`) applies the deltas exactly once via
+  `applyEndOfTurnDeltas` when the last animation completes (guarded by the
+  scene's `endOfTurnDeltasApplied` flag so income and incident animations
+  cannot double-apply), then runs `finishDeferredTurnClosing` — immediate
+  loss check, challenge evaluation against the post-delta state, EndCheck,
+  next-day advance, net row — and finally refreshes the HUD.
+- **Deferred HUD window.** `refreshHud()` (`MainStreetRenderer.ts`) renders
+  the pre-animation `previousCoins` / `previousReputation` captured at
+  `endTurn()` start while `incomeCollectionActive` or `incidentRevealActive`
+  is set, switching to the post-delta state once the window closes.
+- **Game-over timing.** EndCheck runs inside `finishDeferredTurnClosing`
+  (after the animations) — the overlay cannot appear before the player has
+  seen the income/incident feedback (AC4).
+
+Canonical sites: `applyIncome` (`MainStreetAdjacency.ts`),
+`computeEventDeltas` / `resolveIncident` / `processEndOfTurn` /
+`applyEndOfTurnDeltas` / `finishDeferredTurnClosing` (`MainStreetEngine.ts`),
+`refreshHud` (`MainStreetRenderer.ts`), `animateIncomePhases` /
+`collectIncomeGrids` / `animateIncidentReveal` (`MainStreetAnimator.ts`),
+`endTurn` / `finishTurnPresentation` (`MainStreetTurnController.ts`),
+`previousCoins` / `previousReputation` / `incomeCollectionActive` /
+`incidentRevealActive` / `endOfTurnDeltasApplied` (`MainStreetScene.ts`).
+
 #### Community Favour (CG-0MSTOATDQ005XDET)
 
 The Community Favour resource exchange is a **free** once-per-turn action

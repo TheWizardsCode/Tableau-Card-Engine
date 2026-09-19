@@ -9,6 +9,10 @@ import { CARD_TEMPLATE_NAMES, synergyColor } from '../MainStreetCards';
 import { FONT_FAMILY, popTextOrIcon, moveGameObject } from '../../../src/ui';
 import type { SlotIncome, SlotPhaseBreakdown, SynergyPair } from '../MainStreetAdjacency';
 import { computeSynergyPairs } from '../MainStreetAdjacency';
+import {
+  applyEndOfTurnDeltas,
+  type PendingEndOfTurnDeltas,
+} from '../MainStreetEngine';
 import { SFX_KEYS, CARD_BACK_TEMPLATE } from './MainStreetConstants';
 import { synergyLineEndpoints } from './synergyLineEndpoints';
 import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
@@ -63,6 +67,15 @@ export interface IncomePhaseOptions {
    * both full and reduced-motion modes. Never throws into the choreography.
    */
   onPhase?: (phase: IncomePhaseKey, index: number) => void;
+  /**
+   * Deferred-mutation deltas (CG-0MTR72P14000VO6Q): when provided, the
+   * collection finalize step applies them to `state.resourceBank` exactly
+   * once (guarded by the scene's `endOfTurnDeltasApplied` flag) so the HUD
+   * numbers update only after the coins land. Absent for the legacy
+   * immediate path (reduced-motion / tutorial / headless) where the engine
+   * already applied them.
+   */
+  pendingDeltas?: PendingEndOfTurnDeltas;
 }
 
 /** A producing slot resolved to its live card container + coin grid handle. */
@@ -516,6 +529,7 @@ export class MainStreetAnimator {
           this.collectIncomeGrids(slots, {
             reducedMotion,
             creditedTotal: this.creditedIncomeTotal(phaseData),
+            pendingDeltas: options.pendingDeltas,
           });
         } catch { /* ignore */ }
       });
@@ -870,9 +884,29 @@ export class MainStreetAnimator {
    * `+<total>` pop plays and `incomeCollectionActive` clears.
    * Reduced motion: no flights — the final `+<total>` text pop only.
    */
+  /**
+   * Applies deferred-mutation deltas at most once (CG-0MTR72P14000VO6Q AC3):
+   * income and incident animations both land at the end of the end-of-turn
+   * cycle; whichever completes first applies the deltas, the other no-ops via
+   * the scene's `endOfTurnDeltasApplied` guard. Never throws into a
+   * choreography.
+   */
+  private applyPendingDeltasOnce(deltas: PendingEndOfTurnDeltas | undefined): void {
+    if (!deltas) return;
+    const s = this.scene;
+    try {
+      if (!s.endOfTurnDeltasApplied) {
+        applyEndOfTurnDeltas(s.state, deltas);
+        s.endOfTurnDeltasApplied = true;
+      }
+    } catch { /* presentation-only — never break the choreography */ }
+  }
+
   private collectIncomeGrids(slots: IncomePhaseSlot[], ctx: {
     reducedMotion: boolean;
     creditedTotal: number;
+    /** Deferred-mutation deltas to apply when the collection finishes (CG-0MTR72P14000VO6Q). */
+    pendingDeltas?: PendingEndOfTurnDeltas;
   }): void {
     const s = this.scene;
     const { gameW, hudY } = s.layout;
@@ -882,6 +916,13 @@ export class MainStreetAnimator {
     let pending = 0;
     const finalize = (): void => {
       try {
+        // Deferred-mutation application (CG-0MTR72P14000VO6Q AC3): apply the
+        // pending deltas in a single step once the coin-grid flight lands,
+        // BEFORE the incomeCollectionActive flag clears — the final
+        // refreshAll (in finishTurnPresentation) then shows the new values.
+        // Idempotent: the scene guard ensures at-most-once across the income
+        // and incident animations.
+        this.applyPendingDeltasOnce(ctx.pendingDeltas);
         if (!ctx.reducedMotion || pending === 0) {
           const totalText = s.add.text(coinX, hudY - 8, `+${ctx.creditedTotal}`, {
             fontSize: '18px',
@@ -1137,6 +1178,13 @@ export class MainStreetAnimator {
     from: { x: number; y: number };
     /** Fired after the container is returned and destroyed. */
     onComplete?: () => void;
+    /**
+     * Deferred-mutation deltas (CG-0MTR72P14000VO6Q): applied in the reveal
+     * cleanup (at most once via the scene guard) so the incident's coin/rep
+     * deltas land only after the reveal completes. Absent for the legacy
+     * immediate path where the engine already applied them.
+     */
+    pendingDeltas?: PendingEndOfTurnDeltas;
   }): void {
     const s = this.scene;
 
@@ -1170,6 +1218,13 @@ export class MainStreetAnimator {
     const back = mainStreetRenderCardSvg(s, container, CARD_BACK_TEMPLATE, w, h);
 
     const cleanup = (): void => {
+      // Deferred-mutation application (CG-0MTR72P14000VO6Q AC3): apply any
+      // pending deltas when the incident reveal completes (this may be the
+      // last animation of the end-of-turn cycle). Idempotent via the scene
+      // guard — the income collection may have applied them already.
+      this.applyPendingDeltasOnce(params.pendingDeltas);
+      // Close the deferred HUD window so refreshHud renders post-delta values.
+      s.incidentRevealActive = false;
       container.destroy();
       params.onComplete?.();
     };
@@ -1180,6 +1235,7 @@ export class MainStreetAnimator {
       // is preserved so the player still has time to read the incident.
       back.setVisible(false);
       container.setPosition(s.layout.gameW / 2, s.layout.gameH / 2);
+      s.incidentRevealActive = true;
       s.time.delayedCall(4000, () => {
         cleanup();
       });
@@ -1187,6 +1243,7 @@ export class MainStreetAnimator {
     }
 
     // ── Full motion choreography ──
+    s.incidentRevealActive = true;
 
     // 2. Flight to board centre (~550ms).
     const boardCentre = { x: s.layout.gameW / 2, y: s.layout.gameH / 2 };

@@ -390,7 +390,19 @@ export class MainStreetRenderer {
     clearTransientHud(s.hudContainer);
 
     const score = computeScore(s.state);
-    const { coins, reputation } = s.state.resourceBank;
+    // Deferred-mutation window (CG-0MTR72P14000VO6Q): while the end-of-turn
+    // animations run (income collection and/or incident reveal), the HUD must
+    // show the PRE-animation values captured at endTurn() start, not the post-
+    // delta state — the numbers change only when the feedback lands. Falls
+    // back to the current state outside the window (or when no pre-values
+    // were captured, e.g. reduced-motion / replay paths).
+    const deferredWindow = s.incomeCollectionActive === true || s.incidentRevealActive === true;
+    const coins = deferredWindow && s.previousCoins !== null
+      ? s.previousCoins
+      : s.state.resourceBank.coins;
+    const reputation = deferredWindow && s.previousReputation !== null
+      ? s.previousReputation
+      : s.state.resourceBank.reputation;
     const { gameW, hudY } = s.layout;
 
     // Background strip - 50% width, centered
