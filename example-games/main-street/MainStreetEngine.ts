@@ -361,31 +361,100 @@ export function executeAction(
   }
 
   switch (action.type) {
-    case 'move-to-hand':
+    case 'move-to-hand': {
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       consumeAction(state);
-      return moveToHand(state, action.cardId);
-    case 'buy-business':
+      try {
+        return moveToHand(state, action.cardId);
+      } catch (e) {
+        state.actionsRemaining += 1;
+        if (hadBanked) {
+          state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+        }
+        throw e;
+      }
+    }
+    case 'buy-business': {
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       consumeAction(state);
-      return purchaseBusiness(state, action.cardId, action.slotIndex);
-    case 'play-business-from-hand':
+      try {
+        return purchaseBusiness(state, action.cardId, action.slotIndex);
+      } catch (e) {
+        state.actionsRemaining += 1;
+        if (hadBanked) {
+          state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+        }
+        throw e;
+      }
+    }
+    case 'play-business-from-hand': {
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       consumeAction(state);
-      return playBusinessFromHand(state, action.handIndex, action.slotIndex);
-    case 'buy-and-place':
+      try {
+        return playBusinessFromHand(state, action.handIndex, action.slotIndex);
+      } catch (e) {
+        state.actionsRemaining += 1;
+        if (hadBanked) {
+          state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+        }
+        throw e;
+      }
+    }
+    case 'buy-and-place': {
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       consumeAction(state);
-      return buyAndPlaceBusiness(state, action.cardId, action.slotIndex);
-    case 'hire-staff':
+      try {
+        return buyAndPlaceBusiness(state, action.cardId, action.slotIndex);
+      } catch (e) {
+        state.actionsRemaining += 1;
+        if (hadBanked) {
+          state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+        }
+        throw e;
+      }
+    }
+    case 'hire-staff': {
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       consumeAction(state);
-      return hireStaffCard(state, action.cardId);
-    case 'buy-upgrade':
+      try {
+        return hireStaffCard(state, action.cardId);
+      } catch (e) {
+        state.actionsRemaining += 1;
+        if (hadBanked) {
+          state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+        }
+        throw e;
+      }
+    }
+    case 'buy-upgrade': {
       // One daily action, exactly like the click composite it stands in for
       // (move-to-hand 1 action + free same-day apply, listed cost). Without
       // this the AI and Monte Carlo scored upgrades as free actions
       // (CG-0MT40HTYN008TJ6Q).
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       consumeAction(state);
-      return purchaseUpgrade(state, action.cardId, action.targetSlot);
+      try {
+        return purchaseUpgrade(state, action.cardId, action.targetSlot);
+      } catch (e) {
+        state.actionsRemaining += 1;
+        if (hadBanked) {
+          state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+        }
+        throw e;
+      }
+    }
     case 'buy-event': {
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       consumeAction(state);
-      return purchaseEvent(state, action.cardId);
+      try {
+        return purchaseEvent(state, action.cardId);
+      } catch (e) {
+        state.actionsRemaining += 1;
+        if (hadBanked) {
+          state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+        }
+        throw e;
+      }
     }
     case 'play-upgrade-from-hand': {
       // Same-day composite detection (CG-0MT3IYSRL001VVUP): if the upgrade
@@ -393,33 +462,69 @@ export function executeAction(
       // — the move already consumed the action.
       const card = (state.hand ?? [])[action.handIndex];
       const isSameDayComposite = card && state.justMovedUpgradeCardId === card.id;
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       if (!isSameDayComposite) {
         consumeAction(state);
       }
-      // Clear the composite tracker after play (whether same-day or not).
-      if (state.justMovedUpgradeCardId === card?.id) {
-        state.justMovedUpgradeCardId = null;
+      try {
+        const result = playUpgradeFromHand(state, action.handIndex, action.targetSlot);
+        // Clear the composite tracker after play (whether same-day or not).
+        if (state.justMovedUpgradeCardId === card?.id) {
+          state.justMovedUpgradeCardId = null;
+        }
+        return result;
+      } catch (e) {
+        if (!isSameDayComposite) {
+          state.actionsRemaining += 1;
+          if (hadBanked) {
+            state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+          }
+        }
+        throw e;
       }
-      return playUpgradeFromHand(state, action.handIndex, action.targetSlot);
     }
     case 'buy-and-place-upgrade': {
-      for (let i = 0; i < (action.extraActions ?? 0); i += 1) consumeAction(state);
-      consumeAction(state);
-      return buyAndPlaceUpgrade(state, action.cardId, action.targetSlot, action.priceOverride);
+      const extra = action.extraActions ?? 0;
+      const hadBanked = (state.bankedActions ?? 0) > 0;
+      try {
+        for (let i = 0; i < extra; i += 1) consumeAction(state);
+        consumeAction(state);
+        return buyAndPlaceUpgrade(state, action.cardId, action.targetSlot, action.priceOverride);
+      } catch (e) {
+        // Restore all consumed actions (extra + 1)
+        for (let i = 0; i <= extra; i += 1) {
+          state.actionsRemaining += 1;
+          if (hadBanked) {
+            state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+          }
+        }
+        throw e;
+      }
     }
     case 'play-event-from-hand': {
       const hand = state.hand ?? [];
       const card = hand[action.handIndex] as any;
       const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       if (!isSameDay) consumeAction(state);
-      const result = playEventFromHand(state, action.handIndex);
-      // Investment played by the active player: route the benefit to their
-      // own wallet in competitive mode (CG-0MTIIL6J200291ZQ). SpecificSynergy
-      // coin deltas are routed per-business to slot owners inside the helper.
-      if ((state.players?.length ?? 0) > 1) {
-        applyCompetitiveEventEffects(state, card as EventCard, state.activePlayerId ?? 0);
+      try {
+        const result = playEventFromHand(state, action.handIndex);
+        // Investment played by the active player: route the benefit to their
+        // own wallet in competitive mode (CG-0MTIIL6J200291ZQ). SpecificSynergy
+        // coin deltas are routed per-business to slot owners inside the helper.
+        if ((state.players?.length ?? 0) > 1) {
+          applyCompetitiveEventEffects(state, card as EventCard, state.activePlayerId ?? 0);
+        }
+        return result;
+      } catch (e) {
+        if (!isSameDay) {
+          state.actionsRemaining += 1;
+          if (hadBanked) {
+            state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+          }
+        }
+        throw e;
       }
-      return result;
     }
     case 'discard-from-hand':
       discardFromHand(state, action.handIndex);
@@ -431,13 +536,24 @@ export function executeAction(
       }
       const card = (state.hand ?? [])[handIndex] as any;
       const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+      const hadBanked = (state.bankedActions ?? 0) > 0;
       if (!isSameDay) consumeAction(state);
-      const result = playEventFromHand(state, handIndex);
-      // Investment played by the active player: per-owner routing (see above).
-      if ((state.players?.length ?? 0) > 1) {
-        applyCompetitiveEventEffects(state, card as EventCard, state.activePlayerId ?? 0);
+      try {
+        const result = playEventFromHand(state, handIndex);
+        // Investment played by the active player: per-owner routing (see above).
+        if ((state.players?.length ?? 0) > 1) {
+          applyCompetitiveEventEffects(state, card as EventCard, state.activePlayerId ?? 0);
+        }
+        return result;
+      } catch (e) {
+        if (!isSameDay) {
+          state.actionsRemaining += 1;
+          if (hadBanked) {
+            state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
+          }
+        }
+        throw e;
       }
-      return result;
     }
     case 'peek-incident-deck':
       // Consumes one action and enforces the once-per-turn gate inside
