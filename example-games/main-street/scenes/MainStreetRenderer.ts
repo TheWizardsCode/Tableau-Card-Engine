@@ -158,7 +158,8 @@ export class MainStreetRenderer {
       baseY: handY,
       centerX: handCenterX,
       spacing: handCardW + 8,
-      cardWidth: handCardW,
+      cardWidth: handCardW - 4,
+      cardHeight: handCardH - 4,
       showLabels: false,
       selectionEnabled: false,
       clickEnabled: true,
@@ -259,6 +260,10 @@ export class MainStreetRenderer {
           s.instructionText.setText(`Click an empty slot to place "${cardName}"`);
         }
       },
+      // Ghost capacity outlines (CG-0MT6ER7YY003G680): show one slot per
+      // maxHandSize so the player always sees remaining hand capacity.
+      showPositionOutlines: true,
+      maxSlots: s.state?.maxHandSize ?? 3,
     });
 
     s.actionContainer = createGameZone(s, 0, 0, s.layout.gameW, s.layout.gameH, 'actionContainer');
@@ -2000,6 +2005,10 @@ export class MainStreetRenderer {
     // Render the merged hand (any mix of business and event cards) via the
     // single HandView — HandView gracefully handles an empty array.
     const hand = s.state.hand ?? [];
+    // Keep ghost capacity outlines in sync with current maxHandSize
+    // (staff cards change it at runtime — outlines must track it).
+    const maxSize = Math.max(0, s.state?.maxHandSize ?? hand.length);
+    this.handView.setMaxSlots(maxSize);
     this.handView.setCards(hand);
 
     // Transfer-animation hiding is handled in the hand renderCard callback

@@ -94,6 +94,9 @@ export interface HandViewOptions {
   /** Card width used for layout calculations. @default CARD_W (48) */
   cardWidth?: number;
 
+  /** Card height used for outline sizing. @default CARD_H (130) */
+  cardHeight?: number;
+
   /** Maximum row width (px). Cards compress if they exceed this. */
   maxWidth?: number;
 
@@ -418,6 +421,7 @@ export class HandView {
   private baseY: number;
   private spacing: number;
   private cardWidth: number;
+  private cardHeight: number;
   private maxWidth: number | undefined;
   private arcRadius: number;
   private showLabels: boolean;
@@ -505,6 +509,7 @@ export class HandView {
     this.baseY = opts.baseY;
     this.spacing = opts.spacing ?? 20;
     this.cardWidth = opts.cardWidth ?? CARD_W;
+    this.cardHeight = opts.cardHeight ?? CARD_H;
     this.maxWidth = opts.maxWidth;
     this.arcRadius = Math.max(0, opts.arcRadius ?? 0);
     this.showLabels = opts.showLabels ?? true;
@@ -1282,45 +1287,137 @@ export class HandView {
     return this.cards.length;
   }
 
-  /** Compute centre positions for outline rectangles. */
-  private _computeOutlinePositions(): Array<{ x: number; y: number }> {
+  /**
+   * Compute the centre position and rotation of every outline slot.
+   *
+   * Occupied slots (one per current card) are placed at the **exact** card
+   * rest positions — same x/y and the same rotation — so an outline always
+   * sits directly behind the card it ghosts, with identical spacing.
+   * Extra capacity slots (`maxSlots - cards.length`) continue the same step
+   * to the right of the occupied run (cards fill the hand left-to-right).
+   * With no cards the whole `maxSlots` row is laid out as empty slots,
+   * giving an instant read of hand capacity.
+   *
+   * Each slot also carries its `depth`: occupied slots use `index - 0.5` so
+   * they sit behind the card at `index`; extra empty slots are pushed below
+   * every card so an overlapping card face is never drawn over.
+   */
+  private _computeOutlineSlots(): Array<{ x: number; y: number; rotation: number; depth: number }> {
     const count = this._outlineCount();
     if (count === 0) return [];
 
+    // ── Vertical cascade: slots are the cascade positions themselves ──
     if (this.layoutDirection === 'vertical') {
       return Array.from({ length: count }, (_, i) => ({
         x: this.baseX,
         y: this.baseY + i * this.spacing,
+        rotation: 0,
+        depth: this._outlineDepth(i, count),
       }));
     }
 
     const gap = this.spacing - this.cardWidth;
     const centerX = this._centerX ?? this.baseX;
-    const { positions } = layoutCardPositions({
-      count,
-      cardWidth: this.cardWidth,
-      gap,
-      centerX,
-      maxWidth: this.maxWidth,
-    });
-    const xs =
-      positions.length > 0
-        ? positions
-        : Array.from({ length: count }, (_, i) => this.baseX + i * this.spacing);
+    const n = this.cards.length;
 
-    if (this.arcRadius <= 0 || xs.length < 3) {
-      return xs.map((x) => ({ x, y: this.baseY }));
+    const slots: Array<{ x: number; y: number; rotation: number; depth: number }> = [];
+
+    if (n === 0) {
+      // Empty hand — lay out the full capacity row, centred on the hand
+      // centre, as straight slots (no cards to match, so no rotation).
+      const { positions } = layoutCardPositions({
+        count,
+        cardWidth: this.cardWidth,
+        gap,
+        centerX,
+        maxWidth: this.maxWidth,
+      });
+      const xs = positions.length > 0 ? positions : [centerX];
+      const arcCenterX = (xs[0] + xs[xs.length - 1]) / 2;
+      const halfSpan = Math.max((xs[xs.length - 1] - xs[0]) / 2, 1);
+      const useArcY = this.arcRadius > 0 && xs.length >= 3;
+      for (let i = 0; i < xs.length; i++) {
+        slots.push({
+          x: xs[i],
+          y: useArcY
+            ? this._outlineArcY(xs[i], arcCenterX, halfSpan)
+            : this.baseY,
+          rotation: 0,
+          depth: this._outlineDepth(i, count),
+        });
+      }
+      return slots;
     }
 
-    const first = xs[0];
-    const last = xs[xs.length - 1];
-    const arcCenterX = (first + last) / 2;
-    const halfSpan = Math.max((last - first) / 2, 1);
-    return xs.map((x) => {
-      const normalized = (x - arcCenterX) / halfSpan;
-      const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
-      return { x, y: this.baseY - offsetY };
-    });
+    // Occupied slots ghost their cards exactly — same centre and the card's
+    // **actual** rotation (custom-rendered cards may not rotate even when
+    // maxRotationDegrees is set, so the observed sprite rotation is the
+    // source of truth). Capped at `count` so capacity outlines never exceed
+    // `maxSlots` even if the hand is (transiently) over capacity.
+    const cardPositions = this.computeCardPositions();
+    const occupiedCount = Math.min(n, count);
+    for (let i = 0; i < occupiedCount; i++) {
+      const sprite = this.sprites[i];
+      slots.push({
+        x: cardPositions[i].x,
+        y: cardPositions[i].y,
+        rotation: sprite ? ((sprite as any).rotation ?? 0) : 0,
+        depth: this._outlineDepth(i, count),
+      });
+    }
+
+    // Extra capacity slots continue the same spacing to the right of the
+    // occupied run (cards fill the hand left-to-right), stay straight, and
+    // are pushed below every card so an overlapping card face is never
+    // drawn over.
+    const extras = count - occupiedCount;
+    if (extras > 0) {
+      const { step } = layoutCardPositions({
+        count: n,
+        cardWidth: this.cardWidth,
+        gap,
+        centerX,
+        maxWidth: this.maxWidth,
+      });
+      const effectiveStep = Number.isFinite(step) && step > 0 ? step : this.spacing;
+      const lastCard = cardPositions[occupiedCount - 1];
+      const arcCenterX = (cardPositions[0].x + lastCard.x) / 2;
+      const halfSpan = Math.max((lastCard.x - cardPositions[0].x) / 2, 1);
+      const useArcY = this.arcRadius > 0 && occupiedCount >= 3;
+      for (let i = 1; i <= extras; i++) {
+        const x = lastCard.x + i * effectiveStep;
+        slots.push({
+          x,
+          y: useArcY ? this._outlineArcY(x, arcCenterX, halfSpan) : lastCard.y,
+          rotation: 0,
+          depth: this._outlineDepth(occupiedCount - 1 + i, count),
+        });
+      }
+    }
+
+    return slots;
+  }
+
+  /**
+   * Arc Y offset for a slot inside the hand's arc parabola, using the same
+   * formula as {@link computeCardPositions} so occupied/extended slots blend.
+   */
+  private _outlineArcY(x: number, arcCenterX: number, halfSpan: number): number {
+    const normalized = (x - arcCenterX) / halfSpan;
+    return this.baseY - ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
+  }
+
+  /**
+   * Depth for the outline at `index`.
+   *
+   * Occupied slots sit at `index - 0.5`, i.e. behind the card sprite at
+   * `index` but above any background elements. Extra empty slots beyond the
+   * current card run are pushed below every card (negative depth) so a slot
+   * that overlaps a card face never draws over it.
+   */
+  private _outlineDepth(index: number, count: number): number {
+    if (this.cards.length === 0) return index - 0.5;
+    return index < this.cards.length ? index - 0.5 : index - 0.5 - count;
   }
 
   /** Destroy old outlines and create new ones at current positions. */
@@ -1333,10 +1430,10 @@ export class HandView {
       }
     }
     this.outlineRects = [];
-    const positions = this._computeOutlinePositions();
-    for (let i = 0; i < positions.length; i++) {
-      const pos = positions[i];
-      const rect = this.scene.add.rectangle(pos.x, pos.y, CARD_W, CARD_H, 0x000000, 0);
+    const slots = this._computeOutlineSlots();
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const rect = this.scene.add.rectangle(slot.x, slot.y, this.cardWidth, this.cardHeight, 0x000000, 0);
       rect.setOrigin(0.5, 0.5);
       // Rounded ghost slot (radius 8) matching the card texture so the outline
       // reads as a placeholder — previous 0x666666 at 0.5 blended to #404840
@@ -1347,7 +1444,8 @@ export class HandView {
       }
       rect.setStrokeStyle(2, 0xffffff, 0.45);
       (rect as any).setFillStyle(0xffffff, 0.06);
-      rect.setDepth(i - 0.5);
+      rect.setDepth(slot.depth);
+      (rect as any).setRotation(slot.rotation);
       this.outlineRects.push(rect as unknown as Phaser.GameObjects.Rectangle);
     }
   }
@@ -1355,16 +1453,17 @@ export class HandView {
   /** Reposition existing outlines; rebuilds if count changed. */
   private _updateOutlinePositions(): void {
     if (!this.showPositionOutlines) return;
-    const positions = this._computeOutlinePositions();
-    if (positions.length !== this.outlineRects.length) {
+    const slots = this._computeOutlineSlots();
+    if (slots.length !== this.outlineRects.length) {
       this._rebuildOutlines();
       return;
     }
-    for (let i = 0; i < positions.length && i < this.outlineRects.length; i++) {
+    for (let i = 0; i < slots.length && i < this.outlineRects.length; i++) {
       const rect = this.outlineRects[i];
       if (!rect || !(rect as any).active) continue;
-      (rect as any).setPosition(positions[i].x, positions[i].y);
-      (rect as any).setDepth(i - 0.5);
+      (rect as any).setPosition(slots[i].x, slots[i].y);
+      rect.setDepth(slots[i].depth);
+      (rect as any).setRotation(slots[i].rotation);
     }
   }
 

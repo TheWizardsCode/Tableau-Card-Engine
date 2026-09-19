@@ -908,6 +908,17 @@ Follow the Golf (original reference) and Sushi Go (most recent) examples as refe
 
 For non-standard card models (tokens, resource icons, expedition cards), use the `CardTextureResolver` / `renderCard` callbacks documented in the [UI Adapter Guide](ui/ADAPTER-GUIDE.md). See the [Gym scene index](gym/GYM_INDEX.md) for the complete HandView/PileView scene-to-API mapping.
 
+### Hand capacity outlines
+
+`HandView` can render ghost slot outlines so the player always sees how many more cards the hand can hold (CG-0MT6ER7YY003G680). Enable them per instance with `showPositionOutlines: true` and declare the capacity with `maxSlots` (one outline per slot); `maxSlots` can be updated at runtime via `setMaxSlots()` when the capacity changes (e.g. staff cards altering `maxHandSize` in Main Street). Options:
+
+- `cardWidth` / `cardHeight` — outline size in px. Set both to match non-default card sizes (`cardHeight` defaults to `CARD_H`; Main Street uses `handCardW - 4` × `handCardH - 4`).
+- Outlines are static (no animation), so reduced-motion is honoured by construction.
+- Occupied slots sit at exactly the card's position and rotation (`depth = index - 0.5`, behind card `index`); rotation mirrors the card sprite's **actual** rotation, so custom-rendered hands that never rotate keep straight outlines. Extra capacity slots continue the same step to the right and render below every card.
+- With an empty hand, `maxSlots` outlines render centred on the hand centre — the player sees the hand's capacity before any card is drawn.
+
+Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max hand size 7, toggle button) and `example-games/main-street/scenes/MainStreetRenderer.ts`. Tests: `tests/ui/handView.outlines.test.ts`, `tests/handView/gym-handpile-outlines.browser.test.ts`, `tests/main-street/hand-outlines.browser.test.ts`.
+
 ## Animation & Sound Feedback for Player and AI Actions
 
 **Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops.)
