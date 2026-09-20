@@ -24,9 +24,10 @@ income choreography** instead of a single fly-to-HUD burst:
 - **Phases:** base → synergy → reputation → events → upcoming → collect,
   driven by `IncomeResult.phaseBreakdown` (`MainStreetAdjacency.ts`).
 - **On-card coin grids** (`createCoinGrid`, `example-games/main-street/coin-grid.ts`)
-  render each producing slot's contribution in the card's bottom-right
-  quadrant, filling progressively; phase contributions fly in/out; the
-  collection finale lands a `+total` pop at the HUD coins counter.
+  render each producing slot's contribution left-aligned on the card
+  (starting at the card's left inset and growing rightwards), filling
+  progressively; phase contributions fly in/out; the collection finale
+  lands a `+total` pop at the HUD coins counter.
 - **Pacing:** `INCOME_PHASE_GAP_MS` (2200ms) between phases — collection at
   ≈11s. The turn controller defers the day start (250ms poll, 16s cap)
   until the show completes, so gameplay timing is unchanged; the street

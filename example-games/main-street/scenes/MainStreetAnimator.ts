@@ -820,7 +820,7 @@ export class MainStreetAnimator {
 
   /**
    * Flies `amount` coins from a source point into a slot's grid, landing on
-   * the grid transform origin (bottom-right quadrant).
+   * the grid transform origin (left-anchored; see `createCoinGrid`).
    *
    * @param flightMs  Duration of each coin's flight tween (ms). Allows
    *                  per-card speed-up (CG-0MTR766U6003RZ88).

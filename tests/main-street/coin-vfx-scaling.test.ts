@@ -128,7 +128,9 @@ describe('x100 VFX/SFX scaling via the animator', () => {
     expect(lay.iconCount).toBe(2);
     expect(lay.shrinkApplied).toBe(false);
     for (const p of lay.placements) {
-      expect(Math.abs(p.x)).toBeLessThanOrEqual(35 + 1e-6);
+      // Left-aligned packing: coins stay within the available width.
+      expect(p.x).toBeGreaterThanOrEqual(lay.coinSize / 2 - 1e-6);
+      expect(p.x + lay.coinSize / 2).toBeLessThanOrEqual(70 + 1e-6);
       expect(Math.abs(p.y)).toBeLessThanOrEqual(20 + 1e-6);
     }
   });

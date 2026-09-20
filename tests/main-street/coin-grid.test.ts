@@ -80,8 +80,8 @@ describe('gridColumns', () => {
 });
 
 describe('packCoins', () => {
-  // A 140×80 card like the base market/hand card, bottom-right quadrant
-  // region (70×40) at default sizing.
+  // A 140×80 card like the base market/hand card, lower-half region
+  // (70×40) at default sizing.
   const AREA = { availableWidth: 70, availableHeight: 40 };
 
   it('returns an empty layout for 0 coins', () => {
@@ -138,7 +138,7 @@ describe('packCoins', () => {
   it('never clips: all placements fit the available area for 1-60+ coins', () => {
     const counts = [1, 2, 3, 5, 6, 10, 11, 15, 16, 20, 30, 31, 45, 46, 60];
     const areas = [
-      { availableWidth: 70, availableHeight: 40 }, // default quadrant
+      { availableWidth: 70, availableHeight: 40 }, // default lower-half region
       { availableWidth: 140, availableHeight: 80 }, // full card
       { availableWidth: 120, availableHeight: 68 }, // small card
       { availableWidth: 40, availableHeight: 24 }, // tiny card
@@ -152,25 +152,53 @@ describe('packCoins', () => {
         expect(layout.iconCount).toBe(fullCoins + (halfCoin ? 1 : 0));
         expect(layout.coinSize).toBeGreaterThan(0);
         for (const p of layout.placements) {
-          expect(Math.abs(p.x)).toBeLessThanOrEqual(area.availableWidth / 2 + 1e-6);
+          // Left-aligned horizontally: no coin crosses the left or right edge
+          // (p.x is the coin's centre, so the edges are at p.x ± coinSize/2).
+          expect(p.x).toBeGreaterThanOrEqual(layout.coinSize / 2 - 1e-6);
+          expect(p.x + layout.coinSize / 2).toBeLessThanOrEqual(area.availableWidth + 1e-6);
+          // Vertically centred within the available height.
           expect(Math.abs(p.y)).toBeLessThanOrEqual(area.availableHeight / 2 + 1e-6);
         }
       }
     }
   });
 
+  it('is left-aligned: coins start at w/2 and grow rightwards (1, 3, 5, 10, 15, 20 icons)', () => {
+    for (const count of [1, 3, 5, 10, 15, 20]) {
+      const layout = packCoins(count, 70, 40);
+      // The first coin sits at the left edge of the grid (w/2 from the anchor).
+      expect(layout.placements[0].x).toBeCloseTo(layout.coinSize / 2, 6);
+      // No placement sits left of the first coin (no centre bias / re-centring).
+      expect(Math.min(...layout.placements.map((p) => p.x))).toBeCloseTo(layout.coinSize / 2, 6);
+      // All placements remain within the available region.
+      expect(
+        Math.max(...layout.placements.map((p) => p.x)) + layout.coinSize / 2,
+      ).toBeLessThanOrEqual(70 + 1e-6);
+    }
+  });
+
+  it('places a single coin at the left edge (w/2), not the centre', () => {
+    const layout = packCoins(1, 70, 40);
+    expect(layout.placements).toHaveLength(1);
+    expect(layout.placements[0].x).toBeCloseTo(layout.coinSize / 2, 6);
+  });
+
   it('shrinks coins to fit a narrow available width', () => {
     const layout = packCoins(5, 30, 80); // 5 coins in 30px
     expect(layout.coinSize).toBeLessThan(10); // shrunken from the default
     expect(layout.shrinkApplied).toBe(true);
-    expect(Math.max(...layout.placements.map((p) => Math.abs(p.x)))).toBeLessThanOrEqual(15 + 1e-6);
+    expect(
+      Math.max(...layout.placements.map((p) => p.x)) + layout.coinSize / 2,
+    ).toBeLessThanOrEqual(30 + 1e-6);
   });
 
   it('applies overlap (negative spacing) when shrinking alone is not enough', () => {
     const layout = packCoins(20, 40, 24);
     expect(layout.overlapApplied).toBe(true);
     expect(layout.spacing).toBeLessThan(0);
-    expect(Math.max(...layout.placements.map((p) => Math.abs(p.x)))).toBeLessThanOrEqual(20 + 1e-6);
+    expect(
+      Math.max(...layout.placements.map((p) => p.x)) + layout.coinSize / 2,
+    ).toBeLessThanOrEqual(40 + 1e-6);
     expect(Math.max(...layout.placements.map((p) => Math.abs(p.y)))).toBeLessThanOrEqual(12 + 1e-6);
   });
 
