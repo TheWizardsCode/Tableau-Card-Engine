@@ -527,6 +527,10 @@ export class MainStreetTurnController {
     // incident before the turn advances. The reveal **blocks** the day
     // start until the hold completes (then the normal advance applies).
     //
+    // Audit (CG-0MTR766U6003RZ88): phases must be distinct and not overlap.
+    // If income collection is still running, wait for it to complete before
+    // starting the incident reveal.
+    //
     // Tutorial exemption: the tutorial keeps its window-safe step pacing,
     // so the reveal (and its 4-second hold) is skipped — the same
     // precedent as the phased income show and the day banner being
@@ -538,15 +542,46 @@ export class MainStreetTurnController {
       (s as { tutorialController?: { isActive?: boolean } }).tutorialController?.isActive === true;
     if (result.incident && !inTutorial) {
       try {
-        s.msAnimator.animateIncidentReveal({
-          cardId: result.incident.id,
-          incidentName: result.incident.name,
-          coinChange: result.incidentCoinChange,
-          repChange: result.incidentRepChange,
-          from: s.msRenderer.getFrontIncidentCardCenter(),
-          onComplete: advanceDay,
-          pendingDeltas: deferred ? result : undefined,
-        });
+        // If income collection is active, wait for it to complete before
+        // starting the incident reveal (ensures distinct, non-overlapping phases).
+        if (s.incomeCollectionActive) {
+          const startAfterIncome = (): void => {
+            if (s.incomeCollectionActive) {
+              s.time.delayedCall(250, startAfterIncome);
+            } else {
+              const incident = result.incident;
+              if (!incident) {
+                advanceDay();
+                return;
+              }
+              s.msAnimator.animateIncidentReveal({
+                cardId: incident.id,
+                incidentName: incident.name,
+                coinChange: result.incidentCoinChange,
+                repChange: result.incidentRepChange,
+                from: s.msRenderer.getFrontIncidentCardCenter(),
+                onComplete: advanceDay,
+                pendingDeltas: deferred ? result : undefined,
+              });
+            }
+          };
+          startAfterIncome();
+        } else {
+          const incident = result.incident;
+          if (!incident) {
+            advanceDay();
+            return;
+          }
+          s.msAnimator.animateIncidentReveal({
+            cardId: incident.id,
+            incidentName: incident.name,
+            coinChange: result.incidentCoinChange,
+            repChange: result.incidentRepChange,
+            from: s.msRenderer.getFrontIncidentCardCenter(),
+            onComplete: advanceDay,
+            pendingDeltas: deferred ? result : undefined,
+          });
+        }
       } catch (_) {
         // presentation-only — never let the reveal hang the turn.
         advanceDay();

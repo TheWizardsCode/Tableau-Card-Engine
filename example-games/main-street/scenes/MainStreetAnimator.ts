@@ -48,10 +48,17 @@ const INCOME_FLIGHT_BASE_MS = 550;
 const INCOME_FLIGHT_DECREMENT_MS = 50;
 /** Minimum flight duration (floor). */
 const INCOME_FLIGHT_MIN_MS = 350;
-/** Stagger between individual coin icons within one card's animation. */
-const INCOME_CARD_COIN_STAGGER_MS = 100;
+/** Stagger between individual coin icons within one card's animation.
+ * Audit (CG-0MTR766U6003RZ88): slowed by 50% from 100→150 for better pacing.
+ * This value is dynamic per turn — it starts here and decreases by 20% after
+ * each card completes, resetting to this base at the start of each turn. */
+const INCOME_CARD_COIN_STAGGER_MS = 150;
 /** Minimum stagger within a card's icon sequence. */
 const INCOME_CARD_COIN_MIN_STAGGER_MS = 50;
+/** Pause multiplier when a card's coin grid is full (5× current stagger). */
+const INCOME_CARD_FULL_PAUSE_MULTIPLIER = 5;
+/** Stagger reduction factor after each card (20% reduction = ×0.8). */
+const INCOME_CARD_STAGGER_REDUCTION = 0.8;
 
 /** Phase keys for the phased income animation (base → … → collect). */
 export type IncomePhaseKey = 'base' | 'synergy' | 'reputation' | 'events' | 'upcoming' | 'collect';
@@ -94,6 +101,30 @@ export class MainStreetAnimator {
   // ── Sequential timing helpers (CG-0MTR766U6003RZ88) ────────────────
 
   /**
+   * Per-turn dynamic coin stagger — starts at `INCOME_CARD_COIN_STAGGER_MS`
+   * and is reduced by 20% after each card completes.
+   * Reset to base at the start of each turn.
+   */
+  private currentCoinStagger = INCOME_CARD_COIN_STAGGER_MS;
+
+  /**
+   * Resets the dynamic coin stagger to its base value (called each turn).
+   */
+  public resetCoinStaggerForTurn(): void {
+    this.currentCoinStagger = INCOME_CARD_COIN_STAGGER_MS;
+  }
+
+  /**
+   * Reduces the dynamic coin stagger by 20% after each card completes.
+   */
+  private reduceCoinStaggerAfterCard(): void {
+    this.currentCoinStagger = Math.max(
+      INCOME_CARD_COIN_MIN_STAGGER_MS,
+      Math.round(this.currentCoinStagger * INCOME_CARD_STAGGER_REDUCTION),
+    );
+  }
+
+  /**
    * Computes the inter-card delay for card index `si` out of `numSlots`,
    * decreasing from BASE to MIN (floor).
    */
@@ -115,11 +146,12 @@ export class MainStreetAnimator {
 
   /**
    * Computes the per-icon stagger for icon index `i` within a card's
-   * animation sequence, decreasing from BASE to MIN (floor).
+   * animation sequence, using the current dynamic stagger value.
+   * The stagger decreases from BASE to MIN (floor).
    */
   private getIconStagger(numIcons: number, i: number): number {
-    if (numIcons <= 1) return INCOME_CARD_COIN_STAGGER_MS;
-    const raw = INCOME_CARD_COIN_STAGGER_MS - i * 10;
+    if (numIcons <= 1) return this.currentCoinStagger;
+    const raw = this.currentCoinStagger - i * 10;
     return Math.max(INCOME_CARD_COIN_MIN_STAGGER_MS, raw);
   }
 
@@ -567,7 +599,11 @@ export class MainStreetAnimator {
             continue;
           }
           this.countOutCoins(slot, amount, delayOffset);
-          delayOffset += this.getCardDelay(numSlots, si);
+          // Audit (CG-0MTR766U6003RZ88): pause for 5× current stagger when
+          // card's coin grid is full, then reduce stagger by 20% for next card.
+          const pauseMs = INCOME_CARD_FULL_PAUSE_MULTIPLIER * this.currentCoinStagger;
+          delayOffset += this.getCardDelay(numSlots, si) + pauseMs;
+          this.reduceCoinStaggerAfterCard();
         }
         break;
       }
@@ -586,7 +622,9 @@ export class MainStreetAnimator {
           const from = sources.get(slot.pd.slotIndex) ?? sources.get('fallback')!;
           const flightMs = this.getFlightDuration(numSlots, si);
           this.flyCoinsIn(slot, amount, from, delayOffset, flightMs);
-          delayOffset += this.getCardDelay(numSlots, si);
+          const pauseMs = INCOME_CARD_FULL_PAUSE_MULTIPLIER * this.currentCoinStagger;
+          delayOffset += this.getCardDelay(numSlots, si) + pauseMs;
+          this.reduceCoinStaggerAfterCard();
         }
         break;
       }
@@ -604,7 +642,9 @@ export class MainStreetAnimator {
           }
           const flightMs = this.getFlightDuration(numSlots, si);
           this.flyCoinsIn(slot, amount, from, delayOffset, flightMs);
-          delayOffset += this.getCardDelay(numSlots, si);
+          const pauseMs = INCOME_CARD_FULL_PAUSE_MULTIPLIER * this.currentCoinStagger;
+          delayOffset += this.getCardDelay(numSlots, si) + pauseMs;
+          this.reduceCoinStaggerAfterCard();
         }
         break;
       }
@@ -641,7 +681,9 @@ export class MainStreetAnimator {
             } else {
               this.flyCoinsOut(slot, amount, this.eventSourcePoint(), at, flightMs);
             }
-            effectDelayOffset += this.getCardDelay(numSlots, si);
+            const pauseMs = INCOME_CARD_FULL_PAUSE_MULTIPLIER * this.currentCoinStagger;
+            effectDelayOffset += this.getCardDelay(numSlots, si) + pauseMs;
+            this.reduceCoinStaggerAfterCard();
           }
         });
         break;
@@ -662,7 +704,9 @@ export class MainStreetAnimator {
               this.flyCoinsOut(slot, amount, from, delayOffset, flightMs);
             }
           }
-          delayOffset += this.getCardDelay(numSlots, si);
+          const pauseMs = INCOME_CARD_FULL_PAUSE_MULTIPLIER * this.currentCoinStagger;
+          delayOffset += this.getCardDelay(numSlots, si) + pauseMs;
+          this.reduceCoinStaggerAfterCard();
         }
         break;
       }
