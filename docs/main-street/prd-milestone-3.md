@@ -15,6 +15,22 @@
 > cap 25 / scorePace 8). See `docs/main-street/core-rules-and-mechanics.md`
 > for the current rules.
 
+> **Status update (CG-0MT5X3GMA007EG30):** This PRD originally declared
+> "AI vs. player (competitive mode)" **out of scope** for M3 (see the
+> OUT-of-Scope table in [§2 Scope](#2-scope)). That declaration is now a
+> **deliberate, superseded scope extension**: an **engine-level competitive
+> mode** has shipped beyond M3 — shared-street per-player state, alternating
+> MarketPhases within a shared day, per-owner income/event routing,
+> ownership-aware and staff-free competitive AI scoring, and a head-to-head
+> Monte Carlo harness.
+>
+> The extension remains **engine-only**: competitive mode has **no
+> game-selector entry, no competitive scene, and no competitive UI chrome**
+> yet. Rendering (owner-coloured street slots, shared-market phase
+> alternation with SFX/animations per AGENTS.md §8) is **deferred** to a
+> planning-created child for the next milestone (CG-0MTIILOLR002ZU9K). The
+> other M3 rows in the OUT-of-Scope table remain accurate.
+
 ---
 
 ## Executive Summary
@@ -92,7 +108,7 @@ Deliver AI auto-play, a player-facing hint system, and undo/redo functionality f
 | Progressive hints (vague to specific) | Single-move highlight is sufficient for M3 | Future |
 | Multi-action hint sequences | Greedy evaluates one action at a time; chained suggestions deferred | Future |
 | Undo across turn boundaries | Undo stack clears at end-of-turn; cross-turn undo adds complexity | Future |
-| AI vs. player (competitive mode) | Main Street is single-player; AI is used for auto-play and hints only | N/A |
+| AI vs. player (competitive mode) | **Superseded** — see the CG-0MT5X3GMA007EG30 status update above. The **engine layer** (shared-street per-player state, shared-day phase alternation, per-owner income/events, competitive AI, head-to-head Monte Carlo) shipped as a deliberate scope extension beyond M3. Competitive **rendering** (owner-coloured street, scene, SFX) remains deferred to the planning-created child CG-0MTIILOLR002ZU9K | Shipped (engine) / Future (rendering) |
 | Visual polish for hint/undo UI | Placeholder styling; polish deferred to M4 | M4 |
 
 ---

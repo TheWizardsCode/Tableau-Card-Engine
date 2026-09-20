@@ -1,3 +1,14 @@
+/**
+ * Main Street: Monte Carlo Balance Harness
+ *
+ * Single-player harness (runMonteCarlo / runAllCombinations) plus the
+ * competitive head-to-head extension (runCompetitiveMonteCarlo /
+ * runCompetitiveSeed / computeCompetitiveMetrics / toCompetitiveCsv) added as
+ * part of the competitive-mode scope extension (CG-0MT5X3GMA007EG30 /
+ * CG-0MTIILDBB001F01S). Single-player functions remain unchanged; the
+ * competitive harness runs every player through alternating MarketPhases
+ * within a shared day and aggregates win/score distributions per owner.
+ */
 import { createSeededRng } from '../../src/core-engine';
 import { setupMainStreetGame, createCompetitiveState, seedToNumber, type MainStreetState } from './MainStreetState';
 import { executeAction, executeDayStart, executeCompetitiveDayStart, endCompetitiveMarketTurn, resolveCompetitiveClosingPhases, resolveCompetitivePendingChoice, processEndOfTurn, type PlayerAction } from './MainStreetEngine';

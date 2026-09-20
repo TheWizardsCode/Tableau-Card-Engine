@@ -5,6 +5,13 @@
  * market, resource bank, decks, and phase tracking. Provides a setup function
  * that creates a deterministic initial state from a seed string.
  *
+ * Since the competitive-mode scope extension (CG-0MT5X3GMA007EG30), this
+ * module also defines the competitive state model: per-player `PlayerRecord[]`
+ * (coins/reputation/hand/staff/actionBudget/score), owner-tagged street slots
+ * (`ownerTaggedGrid`), and the shared-day `activePlayerId`. Single-player
+ * state is unchanged; competitive state is created via `createCompetitiveState`
+ * (N-player-ready, see the "Competitive State" section below).
+ *
  * @module
  */
 
