@@ -3,7 +3,7 @@ import { TranscriptRecorderBase } from '../../src/core-engine/transcript';
 // Minimal transcript event types for Main Street
 export type PlayerActionDescriptor = { type: string; [k: string]: any };
 
-export type MainStreetTranscriptEvent =
+export type MainStreetTranscriptEvent = (
   | { type: 'action'; turn: number; action: PlayerActionDescriptor; description?: string }
   | { type: 'ai-action'; turn: number; strategy: string; action: PlayerActionDescriptor }
   | { type: 'hint'; turn: number; recommendedAction: PlayerActionDescriptor; rationale: string }
@@ -21,7 +21,21 @@ export type MainStreetTranscriptEvent =
       option: 'accept' | 'reject';
       acceptNextCardId: string | null;
       rejectNextCardId: string | null;
-    };
+    }
+) & { week?: number; year?: number };
+
+/**
+ * Calendar stamp attached to every recorded transcript event by
+ * `MainStreetTranscriptRecorder` (CG-0MTT0K9RX0004QTE, Feature 6 AC4).
+ *
+ * `week` is 1–52 and `year` is ≥1; both are derived deterministically from
+ * the event's `turn` and the transcript's initial calendar, so a replay can
+ * reconstruct the in-game week/year for any event without extra bookkeeping.
+ */
+export interface MainStreetCalendarStamp {
+  week: number;
+  year: number;
+}
 
 export interface MainStreetTranscript {
   version: number;
@@ -47,8 +61,31 @@ export class MainStreetTranscriptRecorder extends TranscriptRecorderBase<MainStr
     });
   }
 
+  /**
+   * Derives the in-game calendar (week/year) for an event at `turn`.
+   *
+   * Each turn advances exactly one week (wrapping 52→1 and incrementing the
+   * year), so the value is reconstructed from the transcript's initial
+   * calendar plus the turn offset — no per-call-site bookkeeping required.
+   */
+  private deriveCalendar(turn: number): MainStreetCalendarStamp {
+    const init = (this.transcript.initialState ?? {}) as {
+      week?: number;
+      year?: number;
+      turn?: number;
+    };
+    const startWeek = typeof init.week === 'number' ? init.week : 1;
+    const startYear = typeof init.year === 'number' ? init.year : 1;
+    const startTurn = typeof init.turn === 'number' ? init.turn : 1;
+    const delta = Math.max(0, (turn ?? startTurn) - startTurn);
+    const week = ((startWeek - 1 + delta) % 52) + 1;
+    const year = startYear + Math.floor((startWeek - 1 + delta) / 52);
+    return { week, year };
+  }
+
   recordEvent(e: MainStreetTranscriptEvent): void {
-    this.transcript.events.push(e as MainStreetTranscriptEvent);
+    const { week, year } = this.deriveCalendar(e.turn);
+    this.transcript.events.push({ ...e, week, year });
   }
 
   finalize(result: any): MainStreetTranscript {
