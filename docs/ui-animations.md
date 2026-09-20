@@ -349,7 +349,8 @@ import { runSceneTransition } from '@ui/sceneTransition';
 
 ## Game-Specific Usage: Coloretto
 
-Coloretto (`example-games/coloretto/scenes/ColorettoScene.ts`) uses the shared
+Coloretto (`example-games/coloretto/scenes/ColorettoRenderer.ts` — the scene's
+rendering/animation helper) uses the shared
 animation helpers for every player-facing card action:
 
 | Action | Helper | Notes |
