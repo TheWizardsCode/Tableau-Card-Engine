@@ -110,11 +110,11 @@ describe('Tutorial text updates (26-step two-turn restructure)', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
       expect(body.toLowerCase()).not.toMatch(/cost coins|cost reputation|-1 coin|-1 rep|per food/i);
     });
-    it('teaches the face-down incident deck and the peek skill', () => {
+    it('teaches the face-down incident deck', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T5')!).body;
       expect(body.toLowerCase()).toMatch(/deck/);
       expect(body.toLowerCase()).toMatch(/face-down|face down|hidden/);
-      expect(body.toLowerCase()).toMatch(/peek/);
+      expect(body.toLowerCase()).not.toMatch(/peek/);
       expect(body.toLowerCase()).not.toMatch(/top happens/);
       expect(body.toLowerCase()).not.toMatch(/below next turn/);
       expect(body.toLowerCase()).not.toMatch(/hover/i);

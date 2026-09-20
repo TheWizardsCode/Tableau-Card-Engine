@@ -160,19 +160,14 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T4', 'body')]:
     'Cards you take wait here in your hand. They earn nothing until placed. Place them tomorrow — the listed price costs an action then, and it is far cheaper than rushing today.',
 
-  // ── T5: Upcoming Incidents (moved before the first End Turn) ──
+  // ── T5: Upcoming Incidents ──
   // Face-down incident deck (CG-0MSTOATDP000JNHH): incidents are hidden in
   // a deck — the player sees only the remaining count; the top card is
-  // revealed and resolved at the end of each turn. A peek staff member
-  // (staff-lookout) can look at the top card once per turn as an action.
-  // CG-0MT53NXGZ004H5AE moved this informational step before T6 End Turn.
+  // revealed and resolved at the end of each turn.
   [tutorialKey('T5', 'title')]:
     'Upcoming Incidents',
-  // Staff-first wording softened (CG-0MT3JK16W006A66P): the engine spends
-  // staff-granted actions first, but the player likely owns no staff yet, so
-  // the current bank is from unused base actions.
   [tutorialKey('T5', 'body')]:
-    'Incidents hide in a face-down deck \u2014 you see only how many are left, not what is next. The top card is revealed and resolved at the end of each turn. Some staff grant +1 action (spent first, never banked \u2014 but you likely have none yet), and a peek staffer can look at the top card once per turn.',
+    'Incidents hide in a face-down deck \u2014 you see only how many are left, not what is next. The top card is revealed and resolved at the end of each turn.',
 
   // ── T6: End Turn (day 1 → day 2) ───────────────────────────
   [tutorialKey('T6', 'title')]:
