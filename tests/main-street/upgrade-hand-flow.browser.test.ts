@@ -312,6 +312,8 @@ describe('Main Street upgrade hand-first click flow (browser)', () => {
     // The upgrade advertises the same +50% buy-and-place premium as business
     // cards, and is fully interactive while an action remains.
     expect(premiumBadgeText(container)).toContain(String(premiumOf(upgrade.cost)));
+    // The "B&P" hint was removed by manual review (CG-0MTORJ5FS006B0UN).
+    expect(premiumBadgeText(container)).not.toContain('B&P');
     expect(container!.alpha).toBeCloseTo(1, 5);
 
     // Spend the budget → the upgrade gates and dims like business cards.

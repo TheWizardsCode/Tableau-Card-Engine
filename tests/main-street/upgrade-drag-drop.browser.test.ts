@@ -253,6 +253,8 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
 
     // The premium badge mirrors the business buy-and-place label.
     expect(premiumBadgeText(container)).toContain(String(premiumOf(upgrade.cost)));
+    // The "B&P" hint was removed by manual review (CG-0MTORJ5FS006B0UN).
+    expect(premiumBadgeText(container)).not.toContain('B&P');
 
     const originX = container.x;
     const originY = container.y;

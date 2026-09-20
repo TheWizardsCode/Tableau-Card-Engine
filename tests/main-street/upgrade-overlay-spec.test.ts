@@ -156,7 +156,7 @@ describe('Overlay spec structure', () => {
     expect(spec.levelBadge).toBeNull();
     expect(spec.upgradeBorder).toBeNull();
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +1');
+    expect(spec.cashLine!.text).toBe('+1');
   });
 
   it('upgraded card: cash/reputation/level/border overlays present when income > 0', () => {
@@ -172,7 +172,7 @@ describe('Overlay spec structure', () => {
     expect(spec.levelBadge).not.toBeNull();
     expect(spec.levelBadge!.text).toBe('Lvl 1');
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +1.5');
+    expect(spec.cashLine!.text).toBe('+1.5');
     expect(spec.upgradeBorder).not.toBeNull();
   });
 

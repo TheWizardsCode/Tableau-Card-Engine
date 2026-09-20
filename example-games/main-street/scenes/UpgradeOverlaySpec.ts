@@ -88,7 +88,7 @@ export interface OverlayBorderSpec {
 export interface UpgradeOverlaySpec {
   /** Level badge text (e.g. "Lvl 2"), null for base cards. */
   levelBadge: OverlayTextSpec | null;
-  /** Combined cash line (e.g. "Cash: +2 / -0.75"), null when income and cost are both 0.
+  /** Combined cash line (e.g. "+2 / -0.75"), null when income and cost are both 0.
    *  Replaces the former separate income/cost overlays (CG-0MTCP76MP0088TQW). */
   cashLine: OverlayTextSpec | null;
   /** Per-turn reputation text (e.g. "+0.2/turn"), null when total reputation is 0. */
@@ -143,7 +143,10 @@ export function buildUpgradeOverlaySpec(
       }
     : null;
 
-  // Combined cash line: "Cash: +{income} / -{cost}" (CG-0MTCP76MP0088TQW)
+  // Combined cash line: "+{income} / -{cost}" (CG-0MTCP76MP0088TQW).
+  // The former "Cash: " prefix was removed by manual review
+  // (CG-0MTORJ5FS006B0UN); the two-tone green/red colouring conveys the
+  // meaning without it.
   // Replaces separate income and ongoing-cost overlays that visually overlapped.
   // Shown only when totalIncome > 0 OR ongoingCost > 0.
   // Format: integers without decimals, fractions up to 2 decimal places with
@@ -158,7 +161,7 @@ export function buildUpgradeOverlaySpec(
         const hasIncome = totalIncome > 0;
         const hasCost = biz.ongoingCost > 0;
         const parts: string[] = [];
-        const segments: OverlayTextSegmentSpec[] = [{ text: 'Cash: ', color: CASH_LINE_NEUTRAL }];
+        const segments: OverlayTextSegmentSpec[] = [];
         if (hasIncome) {
           parts.push(`+${fmt(totalIncome)}`);
           segments.push({ text: `+${fmt(totalIncome)}`, color: CASH_LINE_INCOME });
@@ -168,7 +171,7 @@ export function buildUpgradeOverlaySpec(
           if (hasIncome) segments.push({ text: ' / ', color: CASH_LINE_NEUTRAL });
           segments.push({ text: `-${fmt(biz.ongoingCost)}`, color: CASH_LINE_COST });
         }
-        const text = `Cash: ${parts.join(' / ')}`;
+        const text = parts.join(' / ');
         // Right-column, left-anchored at TEXT_MIN_X (never inside the
         // 64×64 graphic at SVG x < 72). In centre-origin coords: -w/2 + 80.
         return {

@@ -449,7 +449,7 @@ export function generateCardSvgFromCsvRow(
   }
 
   // Community space ongoing cost: no longer baked into the card face — the
-  // overlay cash line (`Cash: +X / -Y`, CG-0MTCP76MP0088TQW) shows it in the
+  // overlay cash line (`+X / -Y`, CG-0MTCP76MP0088TQW) shows it in the
   // two-tone line instead (CG-0MTDMOYOL008IQVO). Staff cards keep the baked
   // label above because they have no overlay pipeline.
 

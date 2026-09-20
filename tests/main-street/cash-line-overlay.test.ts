@@ -2,11 +2,13 @@
  * Main Street: Cash Line Overlay Tests (CG-0MTCP76MP0088TQW)
  *
  * Validates that `buildUpgradeOverlaySpec()` produces a combined cash line
- * ("Cash: +{income} / -{cost}") instead of a separate income text overlay.
+ * ("+{income} / -{cost}") instead of a separate income text overlay.
+ * The former "Cash: " prefix was removed by manual review
+ * (CG-0MTORJ5FS006B0UN).
  *
  * Acceptance criteria:
  *   AC1  Income and ongoing cost are displayed on one line as
- *        "Cash: +{income} / -{cost}" with consistent formatting.
+ *        "+{income} / -{cost}" with consistent formatting.
  *   AC2  The combined line does not overlap reputation, level badge, or other
  *        card overlays.
  *   AC3  The cash line is shown only when income > 0 or cost > 0.
@@ -75,46 +77,46 @@ function makeCommunitySpace(overrides: Partial<CommunitySpaceCard> = {}): Commun
 // ── AC1: Single combined cash line ────────────────────────────
 
 describe('AC1: Single combined cash line format', () => {
-  it('shows "Cash: +2" when income is 2 and cost is 0', () => {
+  it('shows "+2" when income is 2 and cost is 0', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +2');
+    expect(spec.cashLine!.text).toBe('+2');
   });
 
-  it('shows "Cash: +2 / -0.75" when income is 2 and cost is 0.75', () => {
+  it('shows "+2 / -0.75" when income is 2 and cost is 0.75', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0.75 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +2 / -0.75');
+    expect(spec.cashLine!.text).toBe('+2 / -0.75');
   });
 
-  it('shows "Cash: +1.5 / -0.5" when income is 1.5 and cost is 0.5', () => {
+  it('shows "+1.5 / -0.5" when income is 1.5 and cost is 0.5', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 1, incomeBonus: 0.5, ongoingCost: 0.5 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +1.5 / -0.5');
+    expect(spec.cashLine!.text).toBe('+1.5 / -0.5');
   });
 
   it('shows only cost portion when income is 0 but cost > 0', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 0, ongoingCost: 0.5 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: -0.5');
+    expect(spec.cashLine!.text).toBe('-0.5');
   });
 
-  it('shows "Cash: +2 / -1" when both income and cost are integers', () => {
+  it('shows "+2 / -1" when both income and cost are integers', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 1 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +2 / -1');
+    expect(spec.cashLine!.text).toBe('+2 / -1');
   });
 
   it('omits cost portion when ongoingCost is 0 (income only)', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 3, ongoingCost: 0 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +3');
+    expect(spec.cashLine!.text).toBe('+3');
     expect(spec.cashLine!.text).not.toContain('/');
   });
 
@@ -122,44 +124,41 @@ describe('AC1: Single combined cash line format', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 0.25, ongoingCost: 0 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +0.25');
+    expect(spec.cashLine!.text).toBe('+0.25');
   });
 
   it('handles both fractional income and cost', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 0.25, ongoingCost: 0.15 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +0.25 / -0.15');
+    expect(spec.cashLine!.text).toBe('+0.25 / -0.15');
   });
 });
 
 // ── Two-tone segments: income green, cost red (CG-0MTDMOYOL008IQVO) ──
 
 describe('Two-tone cash line segments', () => {
-  it('income-only: Cash: prefix neutral, income green', () => {
+  it('income-only: income green, no prefix segment', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine!.segments).toEqual([
-      { text: 'Cash: ', color: '#dddddd' },
       { text: '+2', color: '#44ff44' },
     ]);
     expect(spec.cashLine!.color).toBe('#dddddd');
   });
 
-  it('cost-only: Cash: prefix neutral, cost red', () => {
+  it('cost-only: cost red, no prefix segment', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 0, ongoingCost: 0.5 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine!.segments).toEqual([
-      { text: 'Cash: ', color: '#dddddd' },
       { text: '-0.5', color: '#ff6644' },
     ]);
   });
 
-  it('both present: Cash: neutral, income green, separator neutral, cost red', () => {
+  it('both present: income green, separator neutral, cost red, no prefix', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 2, ongoingCost: 0.75 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine!.segments).toEqual([
-      { text: 'Cash: ', color: '#dddddd' },
       { text: '+2', color: '#44ff44' },
       { text: ' / ', color: '#dddddd' },
       { text: '-0.75', color: '#ff6644' },
@@ -171,14 +170,13 @@ describe('Two-tone cash line segments', () => {
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     const joined = spec.cashLine!.segments!.map((s) => s.text).join('');
     expect(joined).toBe(spec.cashLine!.text);
-    expect(joined).toBe('Cash: +2 / -0.75');
+    expect(joined).toBe('+2 / -0.75');
   });
 
   it('community-space card segments use the same two-tone colours', () => {
     const cs = makeCommunitySpace({ level: 1, baseIncome: 1, ongoingCost: 0.25 });
     const spec = buildUpgradeOverlaySpec(cs, WIDTH, HEIGHT);
     expect(spec.cashLine!.segments).toEqual([
-      { text: 'Cash: ', color: '#dddddd' },
       { text: '+1', color: '#44ff44' },
       { text: ' / ', color: '#dddddd' },
       { text: '-0.25', color: '#ff6644' },
@@ -247,14 +245,14 @@ describe('AC4: Ongoing cost included in overlay pipeline', () => {
     const cs = makeCommunitySpace({ level: 1, baseIncome: 1, ongoingCost: 0.25 });
     const spec = buildUpgradeOverlaySpec(cs, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +1 / -0.25');
+    expect(spec.cashLine!.text).toBe('+1 / -0.25');
   });
 
   it('ongoingCost from CSV data is reflected in cash line', () => {
     const biz = makeBusiness({ level: 1, baseIncome: 0, ongoingCost: 0.75 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: -0.75');
+    expect(spec.cashLine!.text).toBe('-0.75');
   });
 });
 
@@ -290,7 +288,7 @@ describe('Structural: incomeText replaced by cashLine', () => {
     const biz = makeBusiness({ level: 0, baseIncome: 2, ongoingCost: 0 });
     const spec = buildUpgradeOverlaySpec(biz, WIDTH, HEIGHT);
     expect(spec.cashLine).not.toBeNull();
-    expect(spec.cashLine!.text).toBe('Cash: +2');
+    expect(spec.cashLine!.text).toBe('+2');
     expect(spec.levelBadge).toBeNull();
     expect(spec.upgradeBorder).toBeNull();
     expect(spec.reputationText).toBeNull();
