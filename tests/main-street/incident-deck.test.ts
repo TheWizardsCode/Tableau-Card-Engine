@@ -90,6 +90,12 @@ describe('Face-Down Incident Deck', () => {
 
     it('should return null when the deck is empty', () => {
       const state = createTestState('ac2-empty');
+      // Force a week inside the 23–35 summer window so every windowed
+      // incident (heatwave / tourist bus) is eligible; otherwise the drain
+      // loop would spin once only out-of-window cards remain, because the
+      // week-gated resolver returns null without splicing (AC4,
+      // CG-0MTT0K9RX0004QTE).
+      state.week = 28;
       // Drain the incident deck completely.
       while (state.incidentDeck.length > 0) {
         resolveIncident(state);
