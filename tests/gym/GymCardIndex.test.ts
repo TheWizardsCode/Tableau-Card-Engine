@@ -290,13 +290,15 @@ describe('formatCardDetailLines', () => {
   });
 
   it('lists absent optional fields explicitly rather than omitting them', () => {
-    const evt = buildCardIndex().find((e) => e.family === 'event')!;
+    // Pick a known year-round event (no week window) so the "absent" dash
+    // path is exercised — seasonal cards render a week range instead.
+    const evt = buildCardIndex().find((e) => e.id === 'evt-tax')!;
     const lines = formatCardDetailLines(evt);
 
     const find = (label: string) => lines.find((l) => l.startsWith(`${label}:`));
     expect(find('Duration')).toBeDefined();
     expect(find('Multiplier')).toBeDefined();
-    // Event cards have no limited-week window by default → explicit dash.
+    // Year-round event cards have no limited-week window → explicit dash.
     expect(find('Available weeks')).toBeDefined();
     expect(find('Available weeks')).toContain('—');
   });

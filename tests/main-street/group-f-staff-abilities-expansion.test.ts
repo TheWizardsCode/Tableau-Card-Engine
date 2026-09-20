@@ -277,7 +277,7 @@ describe('Group F: balance guardrails (AC5/AC6)', () => {
   it('keeps other families unchanged in count (data-driven scope)', () => {
     expect(createBusinessDeck(1).length).toBe(30);
     expect(createCommunitySpaceDeck(1).length).toBe(8);
-    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(64); // +8 chain events (CG-0MTT7FC7A000AA58)
+    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(71); // +8 chain + 7 Irish-holiday (CG-0MTT0K9RX0004QTE)
     expect(createUpgradeDeck(1).length).toBe(39);
   });
 });

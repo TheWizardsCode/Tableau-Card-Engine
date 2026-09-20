@@ -1653,8 +1653,8 @@ export class MainStreetAnimator {
   }
 
   /**
-   * Day transition banner: a "Day N" banner animates in (scale/fade from
-   * the board centre, ~800ms total) and fades out.
+   * Day transition banner: a "Week W · Year Y" banner animates in (scale/fade
+   * from the board centre, ~800ms total) and fades out.
    *
    * The banner is a NON-interactive visual (no input handling) added to the
    * scene root at depth 600 — above the street/market cards, below the HUD
@@ -1676,9 +1676,9 @@ export class MainStreetAnimator {
    * Non-blocking: tweens are fire-and-forget; the market is interactive the
    * whole time (the banner never blocks input).
    *
-   * @param params  The day being announced (e.g. `state.turn`).
+   * @param params  The turn/week information to display.
    */
-  public animateDayBanner(params: { day: number }): void {
+  public animateDayBanner(params: { day: number; week: number; year: number }): void {
     const s = this.scene;
 
     // Headless/replay exemption: no rendering or audio in those modes.
@@ -1693,13 +1693,13 @@ export class MainStreetAnimator {
     const bg = s.add.rectangle(0, 0, 280, 76, 0x000000, 0.85);
     bg.setStrokeStyle(3, 0xffdd88, 0.9);
     banner.add(bg);
-    const dayText = s.add.text(0, 0, `Day ${params.day}`, {
+    const weekText = s.add.text(0, 0, `Week ${params.week} · Year ${params.year}`, {
       fontSize: '36px',
       fontStyle: 'bold',
       color: '#ffdd88',
       fontFamily: FONT_FAMILY,
     }).setOrigin(0.5);
-    banner.add(dayText);
+    banner.add(weekText);
     banner.setDepth(600);
     banner.setAlpha(0);
     banner.setScale(0.6);

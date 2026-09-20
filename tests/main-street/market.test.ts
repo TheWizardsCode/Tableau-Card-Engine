@@ -679,7 +679,7 @@ describe('MainStreetMarket', () => {
   });
 
   describe('unique event templates', () => {
-    it('should have 64 unique event templates across the event deck and incident deck', () => {
+    it('should have 71 unique event templates across the event deck and incident deck', () => {
       const state = createTestState();
       // Count unique event templates by stripping the copy-number suffix.
       // Incidents live in incidentDeck; Investment-trigger events in decks.event.
@@ -687,8 +687,8 @@ describe('MainStreetMarket', () => {
         ...state.decks.event.map(e => e.id.replace(/-\d+$/, '')),
         ...state.incidentDeck.map(e => e.id.replace(/-\d+$/, '')),
       ]);
-      // 64 = 56 baseline + 8 chain-event templates (CG-0MTT7FC7A000AA58).
-      expect(uniqueTemplateIds.size).toBe(64);
+      // 71 = 56 baseline + 8 chain-event templates (CG-0MTT7FC7A000AA58) + 7 Irish-holiday (CG-0MTT0K9RX0004QTE).
+      expect(uniqueTemplateIds.size).toBe(71);
     });
   });
 });

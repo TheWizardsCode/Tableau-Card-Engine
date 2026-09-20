@@ -19,6 +19,7 @@ import {
   executeCompetitiveDayStart,
   endCompetitiveMarketTurn,
   resolveCompetitiveClosingPhases,
+  resolveCompetitivePendingChoice,
   executeCompetitiveDay,
   checkCompetitiveEndConditions,
   updateCompetitiveScores,
@@ -388,7 +389,12 @@ describe('AC4 — Phase diagram and invariants', () => {
     endCompetitiveMarketTurn(s);
     // Currently InvestmentResolution
     expect(s.phase).toBe('InvestmentResolution');
-    resolveCompetitiveClosingPhases(s);
+    const closing = resolveCompetitiveClosingPhases(s);
+    // A dual-choice incident pauses the closing at IncidentPhase; resolve it
+    // via the competitive AI policy so the day completes (CG-0MTSHG8RP008E128).
+    if (closing.choicePending) {
+      resolveCompetitivePendingChoice(s);
+    }
     // After closing, we are back at DayStart (the diagram's cycle point)
     expect(s.phase).toBe('DayStart');
   });

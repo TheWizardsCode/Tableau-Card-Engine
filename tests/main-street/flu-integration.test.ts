@@ -87,24 +87,26 @@ describe('Flu event: full lifecycle integration', () => {
 
     // Process turns with proper phase transitions and verify decay
     state.phase = 'MarketPhase';
+    const fluEffect = () =>
+      state.activeEffects.find((e) => e.sourceEventId === 'evt-flu-outbreak');
     let decayCount = 0;
     for (let i = 0; i < 10; i++) {
-      const beforeEffect = state.activeEffects[0]?.turnsRemaining;
+      const beforeEffect = fluEffect()?.turnsRemaining;
       endTurnHeadless(state);
-      const afterEffect = state.activeEffects[0]?.turnsRemaining;
+      const afterEffect = fluEffect()?.turnsRemaining;
       if (beforeEffect !== undefined && (afterEffect === undefined || afterEffect < beforeEffect)) {
         decayCount++;
       }
-      
-      if (i <= 3 && state.activeEffects.length > 0) {
+
+      if (i <= 3 && fluEffect()) {
         // After i decays: should be 5-(i+1)
-        expect(state.activeEffects[0].turnsRemaining).toBe(5 - (i + 1));
+        expect(fluEffect()!.turnsRemaining).toBe(5 - (i + 1));
       }
-      if (i >= 4 && state.activeEffects.length === 0) {
+      if (i >= 4 && fluEffect() === undefined) {
         // Effect expired after 5 decays
         break;
       }
-      
+
       // processEndOfTurn sets phase to DayStart if game is still playing
       if (state.gameResult === 'playing') {
         executeDayStart(state);
@@ -113,8 +115,9 @@ describe('Flu event: full lifecycle integration', () => {
       }
     }
 
-    // After enough decays, effect should be expired
-    expect(state.activeEffects).toHaveLength(0);
+    // After enough decays, the flu effect should be expired (other duration
+    // incidents drawn from the changed deck order may still be active).
+    expect(fluEffect()).toBeUndefined();
   });
 
   it('clinic on grid reduces flu duration from 5 to 3 turns', () => {

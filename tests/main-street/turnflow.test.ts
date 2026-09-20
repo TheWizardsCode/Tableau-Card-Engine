@@ -679,7 +679,7 @@ describe('MainStreetEngine', () => {
       state.streetGrid[0] = makeBiz({ id: 'food-1', baseIncome: 3, synergyTypes: ['Food'] });
       recalculateCard(state, 0);
 
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       expect(result.income).not.toBeNull();
       expect(result.income!.total).toBeGreaterThan(0);
@@ -727,10 +727,11 @@ describe('MainStreetEngine', () => {
 
       expect(result.gameResult).toBe('playing');
       // Coins may change due to Incident event resolution (seed-dependent;
-      // card pool changes affect seeded shuffle). Range check allows for
-      // any single event resolution outcome.
+      // card pool changes affect seeded shuffle). The upper bound allows the
+      // largest single positive Incident coin delta (evt-farm-table, +600)
+      // plus the starting bank — a dual-choice incident can apply it on Accept.
       expect(state.resourceBank.coins).toBeGreaterThanOrEqual(0);
-      expect(state.resourceBank.coins).toBeLessThanOrEqual(STARTING_COINS + 20);
+      expect(state.resourceBank.coins).toBeLessThanOrEqual(STARTING_COINS + 600);
       expect(state.turn).toBe(2);
     });
 

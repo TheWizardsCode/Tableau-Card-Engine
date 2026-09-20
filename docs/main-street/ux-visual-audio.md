@@ -292,13 +292,13 @@ void popTextOrIcon({
 
 - Helper: `MainStreetAnimator.animateDayBanner()`.
 - Trigger: `MainStreetTurnController.startDayPhase()` — fires
-  `animateDayBanner({ day: state.turn })` synchronously after the day-start
+  `animateDayBanner({ day: state.turn, week: state.week, year: state.year })` synchronously after the day-start
   refresh (the banner plays over the freshly-rendered board). Skipped on
-  checkpoint resume (`skipMarketRefill` — the same day continues, not a new
-  day) and while the tutorial is active (`tutorialController.isActive` —
-  its step overlays carry the guidance). Includes day 1 (first-turn boot).
+  checkpoint resume (`skipMarketRefill` — the same week continues, not a new
+  week) and while the tutorial is active (`tutorialController.isActive` —
+  its step overlays carry the guidance). Includes week 1 (first-turn boot).
 - Behavior (reduced-motion OFF):
-  1. A "Day N" banner (dark rounded box + gold "Day N" text) fades in at
+  1. A "Week W · Year Y" banner (dark rounded box + gold "Week W · Year Y" text) fades in at
      the board centre (`Back.easeOut`, ~250ms), holds (~300ms), and fades
      out (`Quad.easeIn`, ~250ms) before being destroyed (~800ms total).
   2. A day-chime SFX plays — reused `SFX_KEYS.CLICK` (no new ToneForge

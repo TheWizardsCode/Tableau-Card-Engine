@@ -26,6 +26,7 @@ import {
   buildCardTooltipInfo,
   formatEmployedStaffSummary,
   turnLabel,
+  weekLabel,
 } from '../MainStreetFormatting';
 import { computeScore } from '../MainStreetEngine';
 import {
@@ -447,6 +448,20 @@ export class MainStreetRenderer {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0.5));
     s.hudContainer.add(scoreText);
+
+    // Week/year label — small text at the far right of the HUD strip (CG-0MTT0K9RX0004QTE).
+    const weekText = markHudTransient(s.add.text(
+      stripLeft + stripWidth - 10,
+      hudY + 18,
+      weekLabel(s.state.week, s.state.year),
+      {
+        fontSize: '12px',
+        fontStyle: 'italic',
+        color: '#aaaacc',
+        fontFamily: FONT_FAMILY,
+      }
+    ).setOrigin(1, 0));
+    s.hudContainer.add(weekText);
 
     // HUD tooltip zones (desktop: pointer hover, mobile: tap toggle)
     if (!s.replayMode) {
@@ -2252,7 +2267,7 @@ export class MainStreetRenderer {
         // s.instructionText is the same text object as s.hintBar.textObject,
         // so route the reset through HintBar explicitly for consistency.
         s.hintBar.setText(
-          `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
+          `${turnLabel(s.state.config, s.state.turn)} (${weekLabel(s.state.week, s.state.year)}) -- Buy cards from the market or End Turn`,
         );
       });
       s.actionContainer.add(cancelBtn);
@@ -2276,7 +2291,7 @@ export class MainStreetRenderer {
         // s.instructionText is the same text object as s.hintBar.textObject,
         // so route the reset through HintBar explicitly for consistency.
         s.hintBar.setText(
-          `${turnLabel(s.state.config, s.state.turn)} -- Buy cards from the market or End Turn`,
+          `${turnLabel(s.state.config, s.state.turn)} (${weekLabel(s.state.week, s.state.year)}) -- Buy cards from the market or End Turn`,
         );
       });
       s.actionContainer.add(cancelBtn);
