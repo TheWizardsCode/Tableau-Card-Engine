@@ -292,3 +292,18 @@ export function turnLabel(config: Pick<GameConfig, 'maxTurns'>, turn: number): s
     ? `Turn ${turn} / ${config.maxTurns}`
     : `Turn ${turn}`;
 }
+
+/**
+ * Renders the calendar label: `Week W · Year Y`.
+ *
+ * Used in the HUD strip and tutorial text to surface the current week and
+ * year instead of the opaque turn count. Each turn represents one week
+ * (CG-0MTT0K9RX0004QTE).
+ *
+ * @param week  The current game week (1–52).
+ * @param year  The current game year (≥1).
+ * @returns The formatted label, e.g. `Week 12 · Year 3`.
+ */
+export function weekLabel(week: number, year: number): string {
+  return `Week ${week} · Year ${year}`;
+}

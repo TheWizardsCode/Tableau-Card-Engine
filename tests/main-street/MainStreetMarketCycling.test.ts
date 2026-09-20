@@ -415,7 +415,9 @@ describe('MainStreet Market Cycling', () => {
       for (let i = 0; i < 3 && state.gameResult === 'playing'; i++) {
         const turnBefore = state.turn;
         executeDayStart(state);
-        processEndOfTurn(state);
+        // Headless helper auto-resolves any dual-choice incident so the turn
+        // always completes (CG-0MTSHG8RP008E128).
+        endTurnHeadless(state);
 
         if (state.gameResult === 'playing') {
           expect(state.turn).toBe(turnBefore + 1);

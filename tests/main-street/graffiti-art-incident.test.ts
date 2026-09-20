@@ -89,7 +89,7 @@ describe('Graffiti Art: deck integration (AC2)', () => {
   const deck = createEventDeck(1, undefined, createSeededRng(42), 1);
 
   it('grows event templates from 55 to exactly 64', () => {
-    expect(deck).toHaveLength(64); // 56 + 8 story-chain events (CG-0MTT7FC7A000AA58)
+    expect(deck).toHaveLength(71); // 56 + 8 story-chain + 7 Irish-holiday (CG-0MTT0K9RX0004QTE)
   });
 
   it('grows incident templates from 34 to exactly 43', () => {

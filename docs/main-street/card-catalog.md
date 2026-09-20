@@ -1,7 +1,23 @@
 # Main Street: Card Catalog
 
 > **Source of truth:** `example-games/main-street/card-data.csv` (CSV) — loaded by `MainStreetCards.ts` at build time (work item CG-0MR6ZR23J006ZDNZ)
-> **Last updated:** CSV externalisation (work item CG-0MR6ZR23J006ZDNZ)
+> **Last updated:** Annual calendar — week-gated seasonal/holiday events (CG-0MTT0K9RX0004QTE)
+
+This document lists every card template in the Main Street card pool, organised by family (Business, Event, Upgrade, Community Space, Staff). Each entry includes all gameplay-relevant fields and a short design rationale.
+
+Card templates are stored as rows in `card-data.csv` and parsed at build time by `MainStreetCards.ts`. To add cards, edit the CSV and regenerate metadata (see guidance below).
+
+**Deck sizes (default copies):**
+
+| Family        | Templates | Copies each | Total cards |
+|---------------|-----------|-------------|-------------|
+| Business      | 30        | 3           | 90          |
+| Event         | 71        | 3           | 213         |
+| Upgrade       | 39        | 2           | 78          |
+| Community Space | 8       | 3           | 24          |
+| Staff         | 9         | 3           | 27          |
+
+**Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
 
 This document lists every card template in the Main Street card pool, organised by family (Business, Event, Upgrade, Community Space, Staff). Each entry includes all gameplay-relevant fields and a short design rationale.
 
@@ -24,8 +40,8 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 4 | 4 | 4 | 2 | 1 | 15 |
-| Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 9 | 142 |
-| Net increase | +26 | +52 | +35 | +6 | +8 | +127 |
+| Current catalog (`card-data.csv`) | 30 | 71 | 39 | 8 | 9 | 157 |
+| Net increase | +26 | +67 | +35 | +6 | +8 | +142 |
 
 - 2x target from baseline: `>= 30` templates
 - Current total: `142` templates (`9.5x` baseline)
@@ -304,6 +320,49 @@ The M2 incident pool is more balanced than M1: 5 negative vs. 3 positive inciden
 
 ---
 
+## Week Windows (Seasonal & Holiday Events)
+
+Starting with work item CG-0MTT0K9RX0004QTE, each event card can carry optional week-window fields (`availableWeekStart`, `availableWeekEnd`). Cards without a window are **year-round** (always offerable/drawable). Cards with a window are only offerable/drawable when the current game week falls within `[start, end]` inclusive.
+
+The calendar model advances one week per turn (52-week year, wrapping to year 2 at week 53). A new game starts at a random week chosen from the allowed set `{1–8, 16–24, 40–46}` so that different sessions experience different points in the annual cycle.
+
+### New Irish-Holiday Event Cards
+
+Seven new Investment event cards rooted in the Irish calendar, added at CG-0MTT0K9RX0004QTE:
+
+| ID | Name | Weeks | Tier | Trigger | Effect | Rationale |
+|---|---|---|---|---|---|---|
+| `evt-st-brigids` | St Brigid's Day | 5 | 3 | Investment | +3 rep | Imbolc — renewal at start of spring |
+| `evt-st-patricks` | St Patrick's Day | 11–12 | 4 | Investment | +2 coins Commerce, +2 rep | Island-wide celebration |
+| `evt-easter` | Easter | 13–17 | 5 | Investment | +1 coin all, +2 rep | Spring festival and community gathering |
+| `evt-may-day` | May Day / Bealtaine | 18 | 4 | Investment | +2 coins Entertainment, +1 rep | May Day dances and celebrations |
+| `evt-lughnasadh` | Lughnasadh | 31 | 6 | Investment | +3 coins Food, +1 rep | Ancient harvest games and fair |
+| `evt-samhain` | Samhain / Halloween | 44 | 7 | Investment | +2 coins Entertainment, +2 rep | Spooky autumn festival and bonfire night |
+| `evt-christmas` | Christmas | 51–52 | 8 | Investment | +3 coins all, +3 rep | Christmas festivities and seasonal cheer |
+
+### Existing Event Cards — Week-Gate Audit
+
+All 64 original event cards were audited. Seasonal/festival/tourist-style events received windows; generic economic/administrative incidents remain year-round.
+
+| ID | Name | Window | Rationale |
+|---|---|---|---|
+| `evt-festival` | Local Festival | 18–35 | Festival season |
+| `evt-festival-season` | Festival Season | 23–35 | Extended festival season |
+| `evt-block-party` | Block Party | 22–33 | Summer street festivities |
+| `evt-tourist-season` | Tourist Season | 23–35 | Peak tourist months |
+| `evt-tourist-bus` | Tourist Bus | 23–35 | Tourist season incident |
+| `evt-heatwave` | Heatwave | 23–35 | Summer weather event |
+| `evt-street-performer` | Street Performer | 22–35 | Summer fair circuit |
+| `evt-food-tasting` | Food Tasting Tour | 20–36 | Summer fair circuit |
+| `evt-health-carnival` | Health Carnival | 20–36 | Summer fair circuit |
+| `evt-art-sale` | Art Sale | 20–36 | Summer fair circuit |
+| `evt-harvest-festival` | Harvest Festival | 38–41 | Autumn harvest |
+| `evt-summer-fest` | Summer Fest | 23–35 | Summer festival |
+
+**Year-round** (no window — always offerable/drawable): `evt-rainy`, `evt-tax`, `evt-award`, `evt-inspection`, `evt-grand-opening`, `evt-wellness-fair`, `evt-charity-drive`, `evt-power-outage`, `evt-shoplifting`, `evt-noise-complaint`, `evt-pipe-burst`, `evt-food-critic`, `evt-construction`, `evt-viral-review`, `evt-vandalism`, `evt-flu-outbreak`, `evt-recession`, `evt-health-campaign`, `evt-bulk-purchase`, `evt-book-fair`, `evt-volunteer-day`, `evt-community-garden`, `evt-protest`, `evt-supply-chain`, `evt-power-surge`, `evt-strike`, `evt-pest-infestation`, `evt-slow-season`, `evt-good-press`, `evt-cultural-grant`, `evt-shopping-spree`, `evt-service-week`, `evt-community-renovation`, `evt-graffiti`, `evt-graffiti-art`, `evt-water-main`, `evt-parking-tickets`, `evt-labor-shortage`, `evt-movie-premiere`, `evt-health-screening`, `evt-farmers-market`, `evt-library-reading`, `evt-street-cleaning`, `evt-neighborhood-watch`, `evt-tax-error`, `evt-tax-inquiry`, `evt-strike-service`, `evt-general-strike`, `evt-popular-menu`, `evt-farm-table`, `evt-depression`, `evt-pandemic`
+
+---
+
 ## Upgrade Cards
 
 Each Upgrade targets a specific Business by name. Applying an upgrade increments the business's level, adds an income bonus, and optionally extends synergy range.
@@ -464,7 +523,7 @@ Staff cards are a separate card family (`family: 'staff'`) that expand hand capa
 | `staff-lookout` | Lookout | 10 | 2 | +1 | 7 | Peek once/turn | A sharp-eyed lookout can peek at the top card of the incident deck once per turn. | **NEW** peek ability *(CG-0MSXOW6GN008ZSMN).* |
 | `staff-director` | Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. | Premium capacity. |
 | `staff-executive` | Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
-| `staff-general-manager` | General Manager | 20 | 5 | +4 | 12 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
+| `staff-general-manager` | General Manager | 20 | 5 | +4 | 12 | +1 action/turn | A seasoned leader grants **+1 action per week** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
 | `staff-barista` | Barista | 3 | 0.5 | — | 2 | Food synergy | A skilled barista brings warmth to any business. Adjacent Food businesses gain +0.2 synergy coins. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
 | `staff-bookkeeper` | Bookkeeper | 3 | 0.5 | — | 2 | −20% ongoing | Keeps the books tight. Reduces this business ongoing cost by 20%. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
 | `staff-customer-rep` | Customer Service Rep | 3 | 0.5 | — | 2 | Service synergy | Ensures every visitor leaves satisfied. Adjacent businesses gain +0.1 synergy reputation. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |

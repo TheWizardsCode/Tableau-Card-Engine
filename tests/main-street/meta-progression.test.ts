@@ -175,11 +175,11 @@ describe('Meta-Progression System', () => {
       }
     });
 
-    it('Tier 12 cumulative pool covers full catalog (166 tiered templates)', () => {
-      // 166 = 154 (post-Group-D + 21 staff tiers) + 8 chain-event templates
+    it('Tier 12 cumulative pool covers full catalog (173 tiered templates)', () => {
+      // 173 = 154 (post-Group-D + 21 staff tiers) + 8 chain-event templates
       // added by content child CG-0MTT7FC7A000AA58 (producer-approved 2026-09-09)
-      // + 4 business-specialist staff (CG-0MTIOLY2A0092OT1).
-      expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(166);
+      // + 4 business-specialist staff (CG-0MTIOLY2A0092OT1) + 7 Irish-holiday events (CG-0MTT0K9RX0004QTE).
+      expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(173);
     });
 
     it('cumulative card IDs are actually cumulative', () => {
@@ -839,7 +839,7 @@ describe('Meta-Progression System', () => {
         ...staffDeck.map((c) => c.id.replace(/-\d+$/, '')),
       ]);
 
-      expect(allBaseIds.size).toBe(158); // 146 baseline + 8 chain events (CG-0MTT7FC7A000AA58) + 4 business-specialist staff (CG-0MTIOLY2A0092OT1); staff overlap unchanged
+      expect(allBaseIds.size).toBe(165); // 146 baseline + 8 chain events (CG-0MTT7FC7A000AA58) + 4 business-specialist staff (CG-0MTIOLY2A0092OT1) + 7 Irish-holiday events (CG-0MTT0K9RX0004QTE); staff overlap unchanged
     });
   });
 
@@ -1202,13 +1202,13 @@ describe('Meta-Progression System', () => {
 
     it('returns cumulative cards for ["tier-1", "tier-2"]', () => {
       const ids = deriveUnlockedCardIds(['tier-1', 'tier-2']);
-      expect(ids).toHaveLength(35); // 16 (T1) + 17 (T2 new incl. Inquiry Commission, CG-0MTT7FC7A000AA58) + 2 T2 specialists (Florist, Baker)
+      expect(ids).toHaveLength(37); // 16 (T1) + 17 (T2 new incl. Inquiry Commission, CG-0MTT7FC7A000AA58) + 2 T2 specialists (Florist, Baker) + 2 Irish-holiday events (CG-0MTT0K9RX0004QTE)
     });
 
-    it('returns all 166 cards for all 12 tiers', () => {
+    it('returns all 173 cards for all 12 tiers', () => {
       const allTierIds = Array.from({ length: 12 }, (_, i) => `tier-${i + 1}`);
       const ids = deriveUnlockedCardIds(allTierIds);
-      expect(ids).toHaveLength(166); // full catalog incl. 25 staff + 8 chain events (CG-0MTT7FC7A000AA58)
+      expect(ids).toHaveLength(173); // full catalog incl. 25 staff + 8 chain events (CG-0MTT7FC7A000AA58) + 7 Irish-holiday events (CG-0MTT0K9RX0004QTE)
     });
 
     it('handles empty array', () => {

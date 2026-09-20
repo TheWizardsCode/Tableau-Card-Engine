@@ -140,7 +140,7 @@ export class MainStreetScene extends CardGameScene {
   public playDeferredDayBanner(): void {
     if (!this.deferredDayBanner) return;
     this.deferredDayBanner = false;
-    try { this.msAnimator?.animateDayBanner({ day: this.state?.turn ?? 1 }); } catch (_) { /* presentation-only */ }
+    try { this.msAnimator?.animateDayBanner({ day: this.state?.turn ?? 1, week: this.state?.week ?? 1, year: this.state?.year ?? 1 }); } catch (_) { /* presentation-only */ }
   }
 
   // Pending selection for placing a business

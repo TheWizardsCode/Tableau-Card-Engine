@@ -48,14 +48,14 @@ describe('Main Street tier catalog coverage', () => {
     }
   });
 
-  it('cumulative pools grow monotonically to 162', () => {
+  it('cumulative pools grow monotonically to 173', () => {
     let prevSize = 0;
     for (let i = 1; i <= 12; i++) {
       const size = TIER_DEFINITIONS[`tier-${i}`].cumulativeCardIds.length;
       expect(size).toBeGreaterThan(prevSize);
       prevSize = size;
     }
-    // 154 baseline + 8 chain-event templates (CG-0MTT7FC7A000AA58) + 4 specialists (CG-0MTIOLY2A0092OT1).
-    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(166);
+    // 154 baseline + 8 chain-event templates (CG-0MTT7FC7A000AA58) + 4 specialists (CG-0MTIOLY2A0092OT1) + 7 Irish-holiday events (CG-0MTT0K9RX0004QTE).
+    expect(TIER_DEFINITIONS['tier-12'].cumulativeCardIds).toHaveLength(173);
   });
 });

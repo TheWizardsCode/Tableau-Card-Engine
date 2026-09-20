@@ -71,8 +71,9 @@ describe('AC1: specialist staff are market-visible', () => {
 
   it('a specialist card can be drawn into the market row (deterministic seed)', () => {
     // Seed chosen so a fresh refill places staff-chef in the row (deck
-    // composition shifts which seed does this; spec-market-11 verified).
-    const state = setupMainStreetGame({ seed: 'spec-market-11' });
+    // composition shifts which seed does this; spec-market-29 verified
+    // against the calendar-expanded pool, CG-0MTT0K9RX0004QTE).
+    const state = setupMainStreetGame({ seed: 'spec-market-29' });
     // Discard any visible staff and re-draw the row fresh (mirrors refresh).
     for (const card of state.market.cards) {
       if (card.family === 'staff') state.discards.staff.push(card as never);

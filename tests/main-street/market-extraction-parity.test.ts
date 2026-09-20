@@ -540,12 +540,13 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
       expect(result.cost).toBe(REFRESH_MARKET_COST);
       expect(state.resourceBank.coins).toBe(coinsBefore - REFRESH_MARKET_COST);
       // All previously visible cards should be discarded (single row may hold
-      // any family, so scan every discard pile).
+      // any family, so scan every discard pile including staff).
       const discardedIds = [
         ...state.discards.business.map(c => c.id),
         ...state.discards.communitySpace.map(c => c.id),
         ...state.discards.upgrade.map(c => c.id),
         ...state.discards.event.map(c => c.id),
+        ...state.discards.staff.map(c => c.id),
       ];
       for (const id of result.replaced.map(c => c.id)) {
         expect(discardedIds).toContain(id);

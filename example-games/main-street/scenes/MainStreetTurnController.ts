@@ -159,7 +159,7 @@ export class MainStreetTurnController {
 
     s.refreshAll();
 
-    // Day transition banner: non-interactive "Day N" reveal at the board
+    // Day transition banner: non-interactive "Week W · Year Y" reveal at the board
     // centre (skipped under reduced motion / replay — handled inside the
     // animator). Skipped while the tutorial is active (its step overlays
     // carry the guidance), on checkpoint resume (skipMarketRefill — the
@@ -168,7 +168,7 @@ export class MainStreetTurnController {
     // commits to playing).
     const tutController = (s as any).tutorialController as { isActive?: boolean } | undefined;
     if (!skipMarketRefill && !suppressDayBanner && !tutController?.isActive) {
-      try { s.msAnimator.animateDayBanner({ day: s.state.turn }); } catch (_) { /* presentation-only — ignore */ }
+      try { s.msAnimator.animateDayBanner({ day: s.state.turn, week: s.state.week, year: s.state.year }); } catch (_) { /* presentation-only — ignore */ }
     }
     void s.cardSvgLoadPromise
       .then(() => s.prewarmVisibleCardTextures())

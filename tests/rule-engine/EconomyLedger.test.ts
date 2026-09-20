@@ -501,8 +501,9 @@ describe('EconomyLedger — Main Street integration parity', () => {
       }
       state.streetGrid[0] = { ...matchingBiz, level: upgradeCard.requiredLevel ?? 0 };
       // Coin cushion so the seeded investments row's upgrade is always
-      // affordable regardless of the expanded pool's draw.
-      state.resourceBank.coins = 1000;
+      // affordable regardless of the expanded pool's draw (some upgrades
+      // cost up to 1400+).
+      state.resourceBank.coins = 99999;
 
       const ledger = ledgerFromState(state);
       const coinsBefore = state.resourceBank.coins;

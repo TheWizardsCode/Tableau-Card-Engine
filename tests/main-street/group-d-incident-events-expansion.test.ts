@@ -78,7 +78,7 @@ describe('Group D incident expansion: template count (AC1)', () => {
 
   it('grows incident templates from 24 to exactly 35 (+1 Graffiti Art)', () => {
     const incidents = deck.filter(c => c.trigger === 'Incident');
-    expect(incidents).toHaveLength(43); // +8 chain events (CG-0MTT7FC7A000AA58)
+    expect(incidents).toHaveLength(43); // +8 chain events (CG-0MTT7FC7A000AA58); Irish-holiday cards are Investments
   });
 
   it('adds exactly the 10 contracted card IDs', () => {
@@ -89,7 +89,7 @@ describe('Group D incident expansion: template count (AC1)', () => {
   });
 
   it('grows total event templates from 45 to exactly 55', () => {
-    expect(deck).toHaveLength(64); // +8 chain events (CG-0MTT7FC7A000AA58)
+    expect(deck).toHaveLength(71); // +8 chain events (CG-0MTT7FC7A000AA58) + 7 Irish-holiday (CG-0MTT0K9RX0004QTE)
   });
 });
 
@@ -254,8 +254,8 @@ describe('Group D: Labor Shortage duration incident (AC3)', () => {
 describe('Group D: deck generation & balance guardrails (AC6)', () => {
   const rng = createSeededRng(42);
 
-  it('builds a 192-card event deck at the default 3 copies', () => {
-    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(192); // 64 x 3 (+8 chain events CG-0MTT7FC7A000AA58)
+  it('builds a 213-card event deck at the default 3 copies', () => {
+    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(213); // 71 x 3 (64 + 7 Irish-holiday CG-0MTT0K9RX0004QTE)
   });
 
   it('includes every new card in a 1-copy (template) deck', () => {

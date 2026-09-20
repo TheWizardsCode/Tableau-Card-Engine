@@ -422,14 +422,18 @@ export class MainStreetLifecycleManager {
       {
         heading: 'Turn Flow',
         body:
-          'Day Start: market refreshes and income is calculated.\n' +
+          'Week Start: market refreshes and income is calculated. Each turn\n' +
+          'is one week of the Irish year (weeks 1–52), shown in the HUD as\n' +
+          '"Week W · Year Y". Seasonal and holiday cards only appear during\n' +
+          'their real-world windows (e.g. Harvest Festival in autumn).\n' +
           'Market Actions: buy businesses, upgrades, or events; place businesses\n' +
           'on the street grid to earn future income.\n' +
-          'You get 1 action per day (2 with a General Manager). Taking a card to\n' +
-          'hand costs 1 action, as does playing or placing it from hand — but a\n' +
-          'same-day move + play/place pair costs 1 action total.\n' +
-          'Card costs are paid when a card is placed or played, not when taken to hand.\n' +
-          'End Turn: resolves income, incidents, and advances to the next day.',
+          'You get 1 action per week (2 with a General Manager). Taking a card\n' +
+          'to hand costs 1 action, as does playing or placing it from hand —\n' +
+          'but a same-week move + play/place pair costs 1 action total.\n' +
+          'Card costs are paid when a card is placed or played, not when taken\n' +
+          'to hand.\n' +
+          'End Turn: resolves income, incidents, and advances to the next week.',
       },
       {
         heading: 'Win / Loss Conditions',
