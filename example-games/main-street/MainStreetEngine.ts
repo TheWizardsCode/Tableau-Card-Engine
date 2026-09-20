@@ -1676,6 +1676,70 @@ export function endCompetitiveMarketTurn(state: MainStreetState): void {
  * and activePlayerId resets to 0; on game over, phase remains EndCheck
  * and competitiveWinnerId records the first-to-threshold winner.
  */
+/**
+ * Competitive closing tail (IncidentPhase → EndCheck) shared by the normal
+ * shared-day closing and the deferred dual-choice resume
+ * (CG-0MTIILDBB001F01S). Runs the immediate-loss check, EndCheck (decay,
+ * challenges, first-to-threshold), next-day advance, net row, and per-player
+ * score refresh. Extracted verbatim from `resolveCompetitiveClosingPhases` so
+ * `resolveCompetitivePendingChoice` can complete a paused closing without
+ * re-running the income phase.
+ */
+function finishCompetitiveClosingTail(
+  state: MainStreetState,
+  income: IncomeResult | null,
+  incident: EventCard | null,
+  incidentCoinChange: number,
+  incidentRepChange: number,
+  turnEnded: number,
+): TurnResult {
+  if (checkImmediateLoss(state)) {
+    appendTurnNetRow(state, turnEnded);
+    return {
+      income,
+      incident,
+      incidentCoinChange,
+      incidentRepChange,
+      gameResult: state.gameResult,
+      finalScore: state.finalScore,
+      newlyCompletedChallenges: [],
+      choicePending: false,
+    };
+  }
+  state.phase = 'EndCheck';
+  const decayResult = decayActiveEffects(state.activeEffects);
+  state.activeEffects = decayResult.active;
+  for (const expired of decayResult.expired) {
+    addLog(state, `${expired.description} has expired.`, 'neutral');
+    recordMainStreetEvent({ type: 'info', turn: state.turn, message: `${expired.description} has expired.` });
+  }
+  const newlyCompletedChallenges = evaluateChallenges(state.activeChallenges, state);
+  checkCompetitiveEndConditions(state);
+  if (state.gameResult === 'playing') {
+    state.turn += 1;
+    advanceWeek(state);
+    const bankable = Math.min(state.actionsRemaining, 1);
+    state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
+    // Mirror shared banked value into each player's budget for next day's costing.
+    // (Per-player budgets are re-derived from staff+bank at next day start.)
+    state.phase = 'DayStart';
+    state.activePlayerId = 0;
+  }
+  appendTurnNetRow(state, turnEnded);
+  // Keep per-player scores fresh for callers that read them after resolution.
+  updateCompetitiveScores(state);
+  return {
+    income,
+    incident,
+    incidentCoinChange,
+    incidentRepChange,
+    gameResult: state.gameResult,
+    finalScore: state.finalScore,
+    newlyCompletedChallenges,
+    choicePending: false,
+  };
+}
+
 export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnResult {
   // AC7 guard (CG-0MTSHG8RP008E128): a pending unresolved choice blocks the
   // shared closing sequence regardless of mode.
@@ -1752,51 +1816,44 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
       choicePending: true,
     };
   }
-  if (checkImmediateLoss(state)) {
-    appendTurnNetRow(state, turnEnded);
-    return {
-      income,
-      incident,
-      incidentCoinChange,
-      incidentRepChange,
-      gameResult: state.gameResult,
-      finalScore: state.finalScore,
-      newlyCompletedChallenges: [],
-      choicePending: false,
-    };
+  return finishCompetitiveClosingTail(state, income, incident, incidentCoinChange, incidentRepChange, turnEnded);
+}
+
+/**
+ * Resolves a pending dual-choice incident drawn during a competitive closing
+ * and completes the deferred shared-day closing (CG-0MTIILDBB001F01S).
+ *
+ * `resolveCompetitiveClosingPhases` pauses at IncidentPhase when the drawn
+ * incident requires an Accept/Reject decision. This helper applies the
+ * difficulty-based AI policy, routes the accepted effect per-owner (mirroring
+ * the non-deferred path), and runs the competitive closing tail — so a
+ * head-to-head Monte Carlo / headless day loop never stalls and never falls
+ * back to the single-player closing (which reads the shared host wallet).
+ *
+ * N=1 delegates to `resolvePendingEventChoice` so single-player semantics are
+ * unchanged (AC4). No-op when no choice is pending.
+ *
+ * @param state Current game state (mutated).
+ * @returns The finished turn result, or null when no choice is pending.
+ */
+export function resolveCompetitivePendingChoice(state: MainStreetState): TurnResult | null {
+  const pending = state.pendingEventChoice;
+  if (!pending || pending.resolved) return null;
+  if (!state.players || state.players.length < 2) {
+    return resolvePendingEventChoice(state);
   }
-  state.phase = 'EndCheck';
-  const decayResult = decayActiveEffects(state.activeEffects);
-  state.activeEffects = decayResult.active;
-  for (const expired of decayResult.expired) {
-    addLog(state, `${expired.description} has expired.`, 'neutral');
-    recordMainStreetEvent({ type: 'info', turn: state.turn, message: `${expired.description} has expired.` });
+  const turnEnded = state.turn;
+  const option = decideEventChoice(state, pending.event, state.config.difficultyName);
+  const event = pending.event;
+  resolveEventChoice(state, option);
+  // Route an accepted incident per-owner (street-wide semantics retained) —
+  // mirrors the non-deferred path where resolveIncident + applyCompetitive
+  // EventEffects run back-to-back. Reject applies nothing.
+  if (option === 'accept') {
+    applyCompetitiveEventEffects(state, event, state.activePlayerId ?? 0);
   }
-  const newlyCompletedChallenges = evaluateChallenges(state.activeChallenges, state);
-  checkCompetitiveEndConditions(state);
-  if (state.gameResult === 'playing') {
-    state.turn += 1;
-    advanceWeek(state);
-    const bankable = Math.min(state.actionsRemaining, 1);
-    state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
-    // Mirror shared banked value into each player's budget for next day's costing.
-    // (Per-player budgets are re-derived from staff+bank at next day start.)
-    state.phase = 'DayStart';
-    state.activePlayerId = 0;
-  }
-  appendTurnNetRow(state, turnEnded);
-  // Keep per-player scores fresh for callers that read them after resolution.
-  updateCompetitiveScores(state);
-  return {
-    income,
-    incident,
-    incidentCoinChange,
-    incidentRepChange,
-    gameResult: state.gameResult,
-    finalScore: state.finalScore,
-    newlyCompletedChallenges,
-    choicePending: false,
-  };
+  state.pendingEventChoice = null;
+  return finishCompetitiveClosingTail(state, null, null, 0, 0, turnEnded);
 }
 
 /**
