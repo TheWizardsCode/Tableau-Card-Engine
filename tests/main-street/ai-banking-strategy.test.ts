@@ -1,14 +1,18 @@
 /**
  * Main Street: Banking-Aware AI Strategy Tests (CG-0MT3JMGA60091J8W)
  *
- * Tests for the banking heuristic that lets the Greedy AI deliberately hoard
- * actions for future turns:
- *   - scoreBankOption(): the expected value of banking actions
- *   - GreedyStrategy.chooseAction(): compares banking vs spending
- *   - Hoarding when a high-cost target is nearby
+ * Contracts the additive `BankingGreedyStrategy` — the deliberate-hoarding
+ * variant of the pure `GreedyStrategy` baseline:
+ *   - `scoreBankOption()`: expected value of banking (visible + pipeline)
+ *   - `BankingGreedyStrategy.chooseAction()`: bank vs. spend decision
+ *   - Hoarding when a high-cost target is (nearly) affordable
  *   - Spending when no valuable future exists
- *   - Not over-hoarding at bank cap
- *   - Respecting action budget limits
+ *   - Not over-hoarding at the bank cap
+ *   - Respecting action-budget and legality constraints
+ *   - Difficulty scaling (Easy hoards less than Hard)
+ *   - Pipeline look-ahead (Hard sees deck targets, Easy does not)
+ *
+ * `GreedyStrategy` is asserted to remain the pure, never-banking baseline.
  *
  * @module tests/main-street/ai-banking-strategy
  */
@@ -24,12 +28,18 @@ import {
 import {
   enumerateLegalActions,
   GreedyStrategy,
+  BankingGreedyStrategy,
   RandomStrategy,
   scoreAction,
+  scoreBankOption,
   aiPlanningHorizon,
+  BANKING_DIFFICULTY_PROFILES,
   MainStreetAiPlayer,
 } from '../../example-games/main-street/MainStreetAiStrategy';
-import { runMonteCarlo } from '../../example-games/main-street/MainStreetMonteCarlo';
+import {
+  ALL_STRATEGIES,
+  runMonteCarlo,
+} from '../../example-games/main-street/MainStreetMonteCarlo';
 import type { BusinessCard, UpgradeCard } from '../../example-games/main-street/MainStreetCards';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -48,284 +58,90 @@ function makeRng(seed: number = 42): () => number {
   };
 }
 
-// ── AC1 · Deliberate hoarding behaviour ─────────────────────
+function makeBusiness(overrides: Partial<BusinessCard> & Pick<BusinessCard, 'id' | 'name' | 'cost'>): BusinessCard {
+  return {
+    family: 'business',
+    baseIncome: 1,
+    synergyTypes: [],
+    description: 'Test business.',
+    maxLevel: 1,
+    level: 0,
+    incomeBonus: 0,
+    synergyRangeBonus: 0,
+    reputationBonus: 0,
+    ongoingCost: 0,
+    ...overrides,
+  } as BusinessCard;
+}
 
-describe('AC1 · deliberate hoarding behaviour', () => {
-  it('banks actions when a high-cost unaffordable target exists in the market', () => {
-    const state = createTestState('hoard-high-cost');
-    state.bankedActions = 0;
+function makeUpgrade(
+  overrides: Partial<UpgradeCard> & Pick<UpgradeCard, 'id' | 'name' | 'cost' | 'targetBusiness' | 'incomeBonus'>,
+): UpgradeCard {
+  return {
+    family: 'upgrade',
+    synergyRangeBonus: 0,
+    description: 'Test upgrade.',
+    requiredLevel: 0,
+    ...overrides,
+  } as UpgradeCard;
+}
 
-    // Place a very expensive card in the market (cost = 50) — far above
-    // the starting coin balance (~10). The AI should see this as a future
-    // target worth banking for.
-    const expensiveCard: BusinessCard = {
-      family: 'business',
-      id: 'expensive-biz',
-      name: 'Mega Mall',
-      cost: 5000,
-      baseIncome: 1000,
-      synergyTypes: [],
-      description: 'Very expensive business.',
-      maxLevel: 1,
-      level: 0,
-      incomeBonus: 500,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-    state.market.cards = [expensiveCard];
-    state.hand = [];
+/**
+ * Budgets the state down to a single-action turn with no banked reserve and
+ * a known coin balance, then wipes visible cards so each test controls the
+ * full decision surface.
+ */
+function resetDecisionSurface(state: MainStreetState, coins: number): void {
+  state.bankedActions = 0;
+  state.actionsRemaining = 1;
+  state.resourceBank.coins = coins;
+  state.resourceBank.reputation = 3;
+  state.hand = [];
+  state.market.cards = [];
+  // Clear the pipeline so look-ahead is only what a test deliberately seeds.
+  state.decks.business = [];
+  state.decks.communitySpace = [];
+  state.decks.upgrade = [];
+  state.decks.event = [];
+  state.decks.staff = [];
+}
 
-    // With actions remaining but only an unaffordable card, the AI should
-    // end turn (bank) rather than spend on nothing productive.
-    const action = GreedyStrategy.chooseAction(state, makeRng());
-    // The AI should bank when the best option is to wait for the expensive card.
-    // Since the expensive card is the only card and is unaffordable, the
-    // greedy strategy's normal flow should lead to end-turn.
-    expect(action.type).toBe('end-turn');
-    expect(state.actionsRemaining).toBeGreaterThan(0); // still has actions left → banking
+// ── AC1 · Additive strategy contract ────────────────────────
+
+describe('AC1 · additive BankingGreedyStrategy', () => {
+  it('exposes BankingGreedy as a distinct selectable name', () => {
+    expect(BankingGreedyStrategy.name).toBe('BankingGreedy');
   });
 
-  it('spends when an affordable, high-value action is available', () => {
-    const state = createTestState('spend-affordable');
-    state.bankedActions = 0;
-    state.resourceBank.coins = 20;
-
-    // Add an affordable, high-value upgrade
-    const upgradeCard: UpgradeCard = {
-      family: 'upgrade',
-      id: 'valuable-upgrade',
-      name: 'Valuable Upgrade',
-      targetBusiness: 'Bakery',
-      cost: 3,
-      incomeBonus: 500,
-      synergyRangeBonus: 0,
-      description: 'High-value upgrade.',
-      requiredLevel: 0,
-    };
-    state.market.cards = [upgradeCard];
-    state.hand = [];
-
-    // Place a Bakery so the upgrade can target it
-    const bakery: BusinessCard = {
-      family: 'business',
-      id: 'bakery-for-upgrade',
-      name: 'Bakery',
-      cost: 6,
-      baseIncome: 1,
-      synergyTypes: ['Food'],
-      description: 'Bakery for upgrade targeting.',
-      maxLevel: 2,
-      level: 0,
-      incomeBonus: 0,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-    state.streetGrid[0] = bakery;
-
-    // The AI should spend on the affordable upgrade, not bank.
-    const action = GreedyStrategy.chooseAction(state, makeRng());
-    expect(action.type).not.toBe('end-turn');
-  });
-
-  it('banks when the bank value exceeds the best spend value', () => {
-    const state = createTestState('bank-vs-spend');
-    state.bankedActions = 0;
-    state.resourceBank.coins = 15;
-
-    // Add a cheap, low-value card — spending on it is marginal.
-    // Add an expensive card in hand that we can't afford yet.
-    const cheapCard: BusinessCard = {
-      family: 'business',
-      id: 'cheap-biz',
-      name: 'Small Shop',
-      cost: 3,
-      baseIncome: 1,
-      synergyTypes: [],
-      description: 'Cheap, low-value.',
-      maxLevel: 1,
-      level: 0,
-      incomeBonus: 0,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-    state.market.cards = [cheapCard];
-    state.hand = [];
-
-    // With a cheap marginal action and high bank potential (cap of 2),
-    // the AI may bank. At least verify the action is legal and the AI
-    // makes a reasoned choice (not throwing).
-    const action = GreedyStrategy.chooseAction(state, makeRng());
-    expect(action).toBeDefined();
-    expect(action.type).toBeDefined();
-    const legal = enumerateLegalActions(state);
-    expect(legal.some(a => a.type === action.type)).toBe(true);
-  });
-});
-
-// ── AC2 · Heuristic for banking value ───────────────────────
-
-describe('AC2 · banking heuristic considers key factors', () => {
-  it('considers current bank level (higher bank → less incentive to bank more)', () => {
-    const state = createTestState('bank-level');
-    state.bankedActions = 0;
-
-    // Bank 0: should have strong incentive to bank when no good spend exists.
-    const action0 = GreedyStrategy.chooseAction(state, makeRng(1));
-
-    state.bankedActions = 2; // at cap
-    const action2 = GreedyStrategy.chooseAction(state, makeRng(1));
-
-    // Both are legal actions; the key is that the heuristic considers bank level.
-    // When at cap, banking is meaningless (score 0).
-    expect(action0).toBeDefined();
-    expect(action2).toBeDefined();
-  });
-
-  it('considers the distance to a high-cost target', () => {
-    const state = createTestState('target-distance');
-
-    // Near target: AI has 12 coins, target costs 15 (gap = 3).
-    // Far target: AI has 12 coins, target costs 50 (gap = 38).
-    // The near target should create more incentive to bank.
-
-    const nearTarget: BusinessCard = {
-      family: 'business',
-      id: 'near-target',
-      name: 'Neat Nook',
-      cost: 1500,
-      baseIncome: 500,
-      synergyTypes: [],
-      description: 'Nearby target.',
-      maxLevel: 1,
-      level: 0,
-      incomeBonus: 200,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-
-    const farTarget: BusinessCard = {
-      family: 'business',
-      id: 'far-target',
-      name: 'Distant Dome',
-      cost: 5000,
-      baseIncome: 1000,
-      synergyTypes: [],
-      description: 'Distant target.',
-      maxLevel: 1,
-      level: 0,
-      incomeBonus: 500,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-
-    state.market.cards = [nearTarget];
-    state.hand = [];
-    state.bankedActions = 0;
-
-    // With a near target, banking is more likely than with a far target.
-    const nearAction = GreedyStrategy.chooseAction(state, makeRng(10));
-
-    state.market.cards = [farTarget];
-    const farAction = GreedyStrategy.chooseAction(state, makeRng(10));
-
-    // Both actions should be legal and considered by the strategy.
-    expect(nearAction).toBeDefined();
-    expect(farAction).toBeDefined();
-  });
-
-  it('considers the planning horizon', () => {
-    const state = createTestState('horizon');
-    state.bankedActions = 0;
-
-    // Early game: far from threshold → long horizon → banking more valuable.
-    state.resourceBank.coins = 0;
-    state.resourceBank.reputation = 0;
-    state.challengesCompleted = [];
-    const earlyHorizon = aiPlanningHorizon(state);
-
-    // Late game: near threshold → short horizon → banking less valuable.
-    state.resourceBank.coins = 14000;
-    state.resourceBank.reputation = 0;
-    state.challengesCompleted = [];
-    const lateHorizon = aiPlanningHorizon(state);
-
-    expect(earlyHorizon).toBeGreaterThan(lateHorizon);
-  });
-
-  it('considers the target cost relative to current coins', () => {
-    const state = createTestState('cost-relation');
-    state.bankedActions = 0;
-
-    const midTarget: BusinessCard = {
-      family: 'business',
-      id: 'mid-target',
-      name: 'Mid-range Store',
-      cost: 10,
-      baseIncome: 300,
-      synergyTypes: [],
-      description: 'Mid-range target.',
-      maxLevel: 1,
-      level: 0,
-      incomeBonus: 100,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-
-    const highTarget: BusinessCard = {
-      family: 'business',
-      id: 'high-target',
-      name: 'Premium Plaza',
-      cost: 3000,
-      baseIncome: 700,
-      synergyTypes: [],
-      description: 'High-cost target.',
-      maxLevel: 1,
-      level: 0,
-      incomeBonus: 300,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-
-    state.market.cards = [midTarget];
-    state.hand = [];
-    state.resourceBank.coins = 5;
-
-    // With low coins and a mid-cost target, banking is valuable.
-    const midAction = GreedyStrategy.chooseAction(state, makeRng(20));
-
-    state.market.cards = [highTarget];
-    const highAction = GreedyStrategy.chooseAction(state, makeRng(20));
-
-    expect(midAction).toBeDefined();
-    expect(highAction).toBeDefined();
-  });
-});
-
-// ── AC3 · Strategy interface ────────────────────────────────
-
-describe('AC3 · strategy interface', () => {
-  it('GreedyStrategy has a name property', () => {
+  it('keeps GreedyStrategy as the unchanged pure baseline', () => {
     expect(GreedyStrategy.name).toBe('Greedy');
+    expect(RandomStrategy.name).toBe('Random');
   });
 
-  it('GreedyStrategy returns legal actions', () => {
-    const state = createTestState('interface-legal');
-    const action = GreedyStrategy.chooseAction(state, makeRng());
-    const legal = enumerateLegalActions(state);
-    expect(legal.some(a => a.type === action.type)).toBe(true);
+  it('Greedy spends (never banks) on a hoard-trigger state where BankingGreedy banks', () => {
+    const build = (): MainStreetState => {
+      const state = createTestState('greedy-vs-banking');
+      resetDecisionSurface(state, 1000);
+      state.market.cards = [
+        makeBusiness({ id: 'mega', name: 'Mega Mall', cost: 5000, baseIncome: 1000 }),
+      ];
+      return state;
+    };
+
+    const greedyState = build();
+    const greedyAction = GreedyStrategy.chooseAction(greedyState, makeRng());
+    expect(greedyAction.type).not.toBe('end-turn'); // baseline never hoards
+    expect(greedyAction.type).toBe('move-to-hand'); // it locks the card in instead
+
+    const bankingState = build();
+    const bankingAction = BankingGreedyStrategy.chooseAction(bankingState, makeRng());
+    expect(bankingAction.type).toBe('end-turn'); // deliberate hoard
+    expect(bankingState.actionsRemaining).toBeGreaterThan(0);
   });
 
-  it('RandomStrategy is unchanged (still returns random legal action)', () => {
+  it('RandomStrategy is unchanged (still returns a random legal action)', () => {
     const state = createTestState('random-unchanged');
-    const legal = enumerateLegalActions(state);
-    const legalTypes = new Set(legal.map(a => a.type));
+    const legalTypes = new Set(enumerateLegalActions(state).map(a => a.type));
 
     for (let i = 0; i < 10; i++) {
       const action = RandomStrategy.chooseAction(state, makeRng(i));
@@ -334,310 +150,382 @@ describe('AC3 · strategy interface', () => {
   });
 });
 
-// ── AC4 · Monte Carlo harness integration ───────────────────
+// ── AC2 · Deliberate hoarding behaviour ─────────────────────
 
-describe('AC4 · Monte Carlo harness integration', () => {
-  it('runMonteCarlo works with greedy strategy', () => {
-    const seeds = ['monte-bank-1', 'monte-bank-2', 'monte-bank-3'];
-    const result = runMonteCarlo({ seeds, strategy: 'greedy' });
+describe('AC2 · deliberate hoarding behaviour', () => {
+  it('banks when a high-cost unaffordable target exists in the market', () => {
+    const state = createTestState('hoard-high-cost');
+    resetDecisionSurface(state, 1000);
+    state.market.cards = [
+      makeBusiness({ id: 'expensive-biz', name: 'Mega Mall', cost: 5000, baseIncome: 1000 }),
+    ];
 
-    expect(result.metrics.runs).toBe(3);
-    expect(result.metrics.winRate).toBeGreaterThanOrEqual(0);
-    expect(result.metrics.winRate).toBeLessThanOrEqual(1);
-    expect(result.runs.length).toBe(3);
+    const action = BankingGreedyStrategy.chooseAction(state, makeRng());
+    expect(action.type).toBe('end-turn');
+    expect(state.actionsRemaining).toBeGreaterThan(0); // still has actions → banking
   });
 
-  it('banking-aware greedy completes full runs without error', () => {
-    const seeds = Array.from({ length: 20 }, (_, i) => `banking-seed-${i}`);
-    expect(() => runMonteCarlo({ seeds, strategy: 'greedy' })).not.toThrow();
+  it('spends when an affordable, high-value action is available', () => {
+    const state = createTestState('spend-affordable');
+    resetDecisionSurface(state, 20);
+    state.market.cards = [
+      makeUpgrade({ id: 'valuable-upgrade', name: 'Valuable Upgrade', cost: 3, targetBusiness: 'Bakery', incomeBonus: 50000 }),
+    ];
+    state.streetGrid[0] = makeBusiness({ id: 'bakery', name: 'Bakery', cost: 6, maxLevel: 2 });
+
+    const action = BankingGreedyStrategy.chooseAction(state, makeRng());
+    expect(action.type).toBe('buy-upgrade');
+  });
+
+  it('bank score is positive when the only target is unaffordable, zero when affordable', () => {
+    const unaffordable = createTestState('bank-score');
+    resetDecisionSurface(unaffordable, 10);
+    unaffordable.market.cards = [
+      makeBusiness({ id: 'near', name: 'Near Nook', cost: 20, baseIncome: 1000 }),
+    ];
+    expect(scoreBankOption(unaffordable)).toBeGreaterThan(0);
+
+    const affordable = createTestState('bank-score-affordable');
+    resetDecisionSurface(affordable, 100);
+    affordable.market.cards = [
+      makeBusiness({ id: 'near', name: 'Near Nook', cost: 20, baseIncome: 1000 }),
+    ];
+    expect(scoreBankOption(affordable)).toBe(0);
   });
 });
 
-// ── AC5 · Unit tests for banking heuristic ──────────────────
+// ── AC3 · Bank-cap handling (natural via heuristic) ─────────
 
-describe('AC5 · banking heuristic unit tests', () => {
-  describe('(a) AI hoards when facing high-cost target it cannot afford', () => {
-    it('banks when the only market card costs 50 and the AI has 10 coins', () => {
-      const state = createTestState('hoard-50-cost');
-      state.bankedActions = 0;
-      state.resourceBank.coins = 1000;
+describe('AC3 · bank-cap handling', () => {
+  it('scores zero at the cap and starts spending', () => {
+    const state = createTestState('cap');
+    resetDecisionSurface(state, 20);
+    state.bankedActions = 2; // at cap
+    state.market.cards = [
+      makeBusiness({ id: 'near', name: 'Near Nook', cost: 5000, baseIncome: 1000 }),
+    ];
+    expect(scoreBankOption(state)).toBe(0);
 
-      const highCostCard: BusinessCard = {
-        family: 'business',
-        id: 'mega-biz',
-        name: 'Mega Business',
-        cost: 5000,
-        baseIncome: 800,
-        synergyTypes: [],
-        description: 'High-cost business.',
-        maxLevel: 1,
-        level: 0,
-        incomeBonus: 400,
-        synergyRangeBonus: 0,
-        reputationBonus: 0,
-        ongoingCost: 0,
-      };
-      state.market.cards = [highCostCard];
-      state.hand = [];
+    state.market.cards = [
+      makeUpgrade({ id: 'must-buy', name: 'Must Buy', cost: 5, targetBusiness: 'Bakery', incomeBonus: 100000 }),
+    ];
+    state.streetGrid[0] = makeBusiness({ id: 'bakery', name: 'Bakery', cost: 6, maxLevel: 2 });
+    const action = BankingGreedyStrategy.chooseAction(state, makeRng());
+    expect(action.type).toBe('buy-upgrade');
+  });
 
-      const action = GreedyStrategy.chooseAction(state, makeRng());
-      // With an unaffordable card and no other options, the AI should end turn.
+  it('scores zero once the action budget is spent', () => {
+    const state = createTestState('no-actions');
+    resetDecisionSurface(state, 10);
+    state.actionsRemaining = 0;
+    state.market.cards = [
+      makeBusiness({ id: 'near', name: 'Near Nook', cost: 20, baseIncome: 1000 }),
+    ];
+    expect(scoreBankOption(state)).toBe(0);
+  });
+});
+
+// ── AC4 · Hybrid heuristic (visible + pipeline look-ahead) ──
+
+describe('AC4 · hybrid banking heuristic', () => {
+  it('banks for a visible unaffordable target, weighted by closeness', () => {
+    const near = createTestState('visible-near');
+    resetDecisionSurface(near, 15);
+    near.market.cards = [
+      makeBusiness({ id: 'near', name: 'Near Nook', cost: 18, baseIncome: 1000 }),
+    ];
+
+    const far = createTestState('visible-far');
+    resetDecisionSurface(far, 15);
+    far.market.cards = [
+      makeBusiness({ id: 'far', name: 'Distant Dome', cost: 5000, baseIncome: 1000 }),
+    ];
+
+    const nearScore = scoreBankOption(near);
+    const farScore = scoreBankOption(far);
+    expect(nearScore).toBeGreaterThan(0);
+    // A target almost in reach is worth waiting for; a distant one is not.
+    expect(nearScore).toBeGreaterThan(farScore);
+  });
+
+  it('considers the planning horizon (early-game banking is worth more)', () => {
+    const state = createTestState('horizon');
+    resetDecisionSurface(state, 15);
+    state.market.cards = [
+      makeBusiness({ id: 'near', name: 'Near Nook', cost: 18, baseIncome: 1000 }),
+    ];
+
+    const earlyHorizon = aiPlanningHorizon(state);
+    const earlyScore = scoreBankOption(state);
+
+    // Push the score near the win threshold → short horizon → less banking value.
+    state.resourceBank.coins = state.config.winThreshold;
+    const lateHorizon = aiPlanningHorizon(state);
+    const lateScore = scoreBankOption(state);
+
+    expect(earlyHorizon).toBeGreaterThan(lateHorizon);
+    expect(earlyScore).toBeGreaterThan(lateScore);
+  });
+
+  it('sees an unaffordable target sitting in the market pipeline (deck)', () => {
+    const state = createTestState('pipeline');
+    resetDecisionSurface(state, 15);
+    // Single affordable, low-value visible card; the valuable target is only
+    // in the business deck (end of array = next drawn).
+    state.market.cards = [
+      makeBusiness({ id: 'cheap', name: 'Small Shop', cost: 5, baseIncome: 0 }),
+    ];
+    state.decks.business = [
+      makeBusiness({ id: 'pipeline-target', name: 'Pipeline Plaza', cost: 20, baseIncome: 1000 }),
+    ];
+
+    expect(scoreBankOption(state, 'Easy')).toBe(0); // Easy has no look-ahead
+    expect(scoreBankOption(state, 'Medium')).toBeGreaterThan(0);
+    expect(scoreBankOption(state, 'Hard')).toBeGreaterThan(0);
+  });
+
+  it('Hard lets the pipeline target drive a hoard that Easy spends through', () => {
+    const build = (): MainStreetState => {
+      const state = createTestState('pipeline-strategy');
+      resetDecisionSurface(state, 15);
+      state.market.cards = [
+        makeBusiness({ id: 'cheap', name: 'Small Shop', cost: 5, baseIncome: 0 }),
+      ];
+      state.decks.business = [
+        makeBusiness({ id: 'pipeline-target', name: 'Pipeline Plaza', cost: 20, baseIncome: 1000 }),
+      ];
+      return state;
+    };
+
+    const easyState = build();
+    const hardState = build();
+    // Same state, same decision surface — drive the strategy at each difficulty.
+    const easyAction = BankingGreedyStrategyFor('Easy').chooseAction(easyState, makeRng());
+    const hardAction = BankingGreedyStrategyFor('Hard').chooseAction(hardState, makeRng());
+
+    expect(easyAction.type).not.toBe('end-turn'); // spends on the visible card
+    expect(hardAction.type).toBe('end-turn'); // banks for the pipeline target
+  });
+});
+
+/**
+ * Returns the shared BankingGreedyStrategy with the state's configured
+ * difficulty temporarily overridden — a tiny shim so a test can drive the
+ * same strategy against two difficulty presets without duplicating it.
+ */
+function BankingGreedyStrategyFor(difficulty: 'Easy' | 'Medium' | 'Hard') {
+  return {
+    name: 'BankingGreedy',
+    chooseAction(state: MainStreetState, rng: () => number) {
+      const original = state.config.difficultyName;
+      (state.config as { difficultyName: string }).difficultyName = difficulty;
+      try {
+        return BankingGreedyStrategy.chooseAction(state, rng);
+      } finally {
+        (state.config as { difficultyName: string }).difficultyName = original;
+      }
+    },
+  };
+}
+
+// ── AC5 · Difficulty scaling ────────────────────────────────
+
+describe('AC5 · difficulty scaling', () => {
+  it('profiles gate look-ahead depth and aggressiveness monotonically', () => {
+    expect(BANKING_DIFFICULTY_PROFILES.Easy.lookAheadDepth).toBe(0);
+    expect(BANKING_DIFFICULTY_PROFILES.Medium.lookAheadDepth).toBeGreaterThan(
+      BANKING_DIFFICULTY_PROFILES.Easy.lookAheadDepth,
+    );
+    expect(BANKING_DIFFICULTY_PROFILES.Hard.lookAheadDepth).toBeGreaterThan(
+      BANKING_DIFFICULTY_PROFILES.Medium.lookAheadDepth,
+    );
+    expect(BANKING_DIFFICULTY_PROFILES.Easy.aggressiveness).toBeLessThan(
+      BANKING_DIFFICULTY_PROFILES.Medium.aggressiveness,
+    );
+    expect(BANKING_DIFFICULTY_PROFILES.Hard.aggressiveness).toBeGreaterThan(
+      BANKING_DIFFICULTY_PROFILES.Medium.aggressiveness,
+    );
+  });
+
+  it('Easy hoards less than Hard given the same visible-target state', () => {
+    const state = createTestState('difficulty-visible');
+    resetDecisionSurface(state, 15);
+    state.market.cards = [
+      makeBusiness({ id: 'near', name: 'Near Nook', cost: 18, baseIncome: 1000 }),
+    ];
+
+    const easy = scoreBankOption(state, 'Easy');
+    const medium = scoreBankOption(state, 'Medium');
+    const hard = scoreBankOption(state, 'Hard');
+
+    expect(easy).toBeLessThan(medium);
+    expect(medium).toBeLessThan(hard);
+  });
+
+  it('Easy banks less than Hard across an identical pipeline-only state', () => {
+    const state = createTestState('difficulty-pipeline');
+    resetDecisionSurface(state, 15);
+    state.decks.business = [
+      makeBusiness({ id: 'pipeline-target', name: 'Pipeline Plaza', cost: 20, baseIncome: 1000 }),
+    ];
+
+    expect(scoreBankOption(state, 'Easy')).toBe(0);
+    expect(scoreBankOption(state, 'Hard')).toBeGreaterThan(0);
+  });
+});
+
+// ── AC6 · Deterministic scenario coverage ───────────────────
+
+describe('AC6 · deterministic banking scenarios', () => {
+  describe('(a) hoards when a high-cost target is unaffordable', () => {
+    it('banks rather than wasting the action on an unaffordable-only market', () => {
+      const state = createTestState('scenario-hoard');
+      resetDecisionSurface(state, 1000);
+      state.market.cards = [
+        makeBusiness({ id: 'mega-biz', name: 'Mega Business', cost: 5000, baseIncome: 800, incomeBonus: 400 }),
+      ];
+
+      const action = BankingGreedyStrategy.chooseAction(state, makeRng());
       expect(action.type).toBe('end-turn');
       expect(state.actionsRemaining).toBeGreaterThan(0);
     });
-
-    it('banks when the best affordable action has very low value', () => {
-      const state = createTestState('hoard-low-value');
-      state.bankedActions = 0;
-      state.resourceBank.coins = 1000;
-
-      // A cheap business with low income — marginal value.
-      const lowValueCard: BusinessCard = {
-        family: 'business',
-        id: 'marginal-biz',
-        name: 'Marginal Shop',
-        cost: 5,
-        baseIncome: 0,
-        synergyTypes: [],
-        description: 'Zero income, barely affordable.',
-        maxLevel: 1,
-        level: 0,
-        incomeBonus: 0,
-        synergyRangeBonus: 0,
-        reputationBonus: 0,
-        ongoingCost: 0,
-      };
-      state.market.cards = [lowValueCard];
-      state.hand = [];
-
-      const action = GreedyStrategy.chooseAction(state, makeRng());
-      // The AI may bank rather than waste an action on a zero-income purchase.
-      // At minimum, the action should be legal.
-      const legal = enumerateLegalActions(state);
-      expect(legal.some(a => a.type === action.type)).toBe(true);
-    });
   });
 
-  describe('(b) AI spends when no valuable future target exists', () => {
+  describe('(b) spends when no valuable future target exists', () => {
     it('spends on an affordable upgrade when no future target is visible', () => {
-      const state = createTestState('spend-no-future');
-      state.bankedActions = 0;
-      state.resourceBank.coins = 20;
+      const state = createTestState('scenario-spend');
+      resetDecisionSurface(state, 20);
+      state.market.cards = [
+        makeUpgrade({ id: 'good-upgrade', name: 'Good Upgrade', cost: 5, targetBusiness: 'Bakery', incomeBonus: 50000 }),
+      ];
+      state.streetGrid[0] = makeBusiness({ id: 'bakery-upgrade-target', name: 'Bakery', cost: 6, maxLevel: 2 });
 
-      const upgradeCard: UpgradeCard = {
-        family: 'upgrade',
-        id: 'good-upgrade',
-        name: 'Good Upgrade',
-        targetBusiness: 'Bakery',
-        cost: 5,
-        incomeBonus: 300,
-        synergyRangeBonus: 0,
-        description: 'Solid upgrade.',
-        requiredLevel: 0,
-      };
-      state.market.cards = [upgradeCard];
-      state.hand = [];
-
-      const bakery: BusinessCard = {
-        family: 'business',
-        id: 'bakery-upgrade-target',
-        name: 'Bakery',
-        cost: 6,
-        baseIncome: 1,
-        synergyTypes: ['Food'],
-        description: 'Bakery.',
-        maxLevel: 2,
-        level: 0,
-        incomeBonus: 0,
-        synergyRangeBonus: 0,
-        reputationBonus: 0,
-        ongoingCost: 0,
-      };
-      state.streetGrid[0] = bakery;
-
-      const action = GreedyStrategy.chooseAction(state, makeRng());
-      // With a good affordable upgrade and no expensive future target,
-      // the AI should spend on it.
+      const action = BankingGreedyStrategy.chooseAction(state, makeRng());
       expect(action.type).toBe('buy-upgrade');
     });
   });
 
-  describe('(c) AI does not over-hoard (banks to cap then spends)', () => {
-    it('stops banking at cap (2) and starts spending', () => {
-      const state = createTestState('no-overhoard');
-      // Start with bank at 2 (cap).
+  describe('(c) does not over-hoard (banks toward cap then spends)', () => {
+    it('spends when the bank is already at the cap', () => {
+      const state = createTestState('scenario-cap');
+      resetDecisionSurface(state, 20);
       state.bankedActions = 2;
+      state.market.cards = [
+        makeUpgrade({ id: 'must-buy', name: 'Must Buy Upgrade', cost: 5, targetBusiness: 'Bakery', incomeBonus: 4 }),
+      ];
+      state.streetGrid[0] = makeBusiness({ id: 'bakery-must-buy', name: 'Bakery', cost: 6, maxLevel: 2 });
 
-      // Add a valuable, affordable upgrade.
-      state.resourceBank.coins = 20;
-      const upgradeCard: UpgradeCard = {
-        family: 'upgrade',
-        id: 'must-buy',
-        name: 'Must Buy Upgrade',
-        targetBusiness: 'Bakery',
-        cost: 5,
-        incomeBonus: 4,
-        synergyRangeBonus: 0,
-        description: 'High-value upgrade.',
-        requiredLevel: 0,
-      };
-      state.market.cards = [upgradeCard];
-      state.hand = [];
-
-      const bakery: BusinessCard = {
-        family: 'business',
-        id: 'bakery-must-buy',
-        name: 'Bakery',
-        cost: 6,
-        baseIncome: 1,
-        synergyTypes: ['Food'],
-        description: 'Bakery.',
-        maxLevel: 2,
-        level: 0,
-        incomeBonus: 0,
-        synergyRangeBonus: 0,
-        reputationBonus: 0,
-        ongoingCost: 0,
-      };
-      state.streetGrid[0] = bakery;
-
-      // With bank at cap, the AI should spend on the upgrade, not bank.
-      const action = GreedyStrategy.chooseAction(state, makeRng());
+      const action = BankingGreedyStrategy.chooseAction(state, makeRng());
       expect(action.type).toBe('buy-upgrade');
     });
   });
 
-  describe('(d) AI respects action budget limits', () => {
-    it('never chooses an action that exceeds actionsRemaining', () => {
-      const state = createTestState('budget-limits');
-      state.bankedActions = 0;
+  describe('(d) respects action-budget limits and legality', () => {
+    it('never chooses a non-legal action across many trials', () => {
+      const state = createTestState('scenario-budget');
+      resetDecisionSurface(state, 15);
 
       for (let i = 0; i < 50; i++) {
-        const action = GreedyStrategy.chooseAction(state, makeRng(i));
+        const action = BankingGreedyStrategy.chooseAction(state, makeRng(i));
         expect(action).toBeDefined();
-        // Every action chosen must be legal.
         const legal = enumerateLegalActions(state);
         expect(legal.some(a => a.type === action.type)).toBe(true);
       }
     });
 
-    it('end-turn is always available regardless of actionsRemaining', () => {
-      const state = createTestState('always-end-turn');
-      state.bankedActions = 0;
-
-      // Fill market with cards to create plenty of spend options.
-      state.resourceBank.coins = 50;
-      const cards: BusinessCard[] = [];
-      for (let i = 0; i < 5; i++) {
-        cards.push({
-          family: 'business',
-          id: `test-biz-${i}`,
-          name: `Test Biz ${i}`,
-          cost: i * 5,
-          baseIncome: i,
-          synergyTypes: [],
-          description: `Test business ${i}.`,
-          maxLevel: 1,
-          level: 0,
-          incomeBonus: 0,
-          synergyRangeBonus: 0,
-          reputationBonus: 0,
-          ongoingCost: 0,
-        });
-      }
-      state.market.cards = cards;
-      state.hand = [];
-
-      const action = GreedyStrategy.chooseAction(state, makeRng());
-      expect(action).toBeDefined();
-      // The action is either a spend action or end-turn.
-      expect(['buy-business', 'end-turn']).toContain(action.type);
-    });
-
-    it('AI completes a full game without violating action budget', () => {
-      const state = setupMainStreetGame({ seed: 'budget-game' });
-      const player = new MainStreetAiPlayer(GreedyStrategy, makeRng());
+    it('completes a full game without violating the action budget', () => {
+      const state = setupMainStreetGame({ seed: 'scenario-budget-game' });
+      const player = new MainStreetAiPlayer(BankingGreedyStrategy, makeRng());
       expect(() => player.playGame(state)).not.toThrow();
       expect(['win', 'loss']).toContain(state.gameResult);
+    });
+
+    it('does not loop forever across multi-day cycles', () => {
+      const state = setupMainStreetGame({ seed: 'scenario-no-loop' });
+      const player = new MainStreetAiPlayer(BankingGreedyStrategy, makeRng());
+
+      let turnCount = 0;
+      const maxTurns = 100;
+      while (state.gameResult === 'playing' && turnCount < maxTurns) {
+        executeDayStart(state);
+        let action = player.chooseAction(state);
+        let actionsInTurn = 0;
+        while (action.type !== 'end-turn' && state.gameResult === 'playing' && actionsInTurn < 10) {
+          executeAction(state, action);
+          action = player.chooseAction(state);
+          actionsInTurn++;
+        }
+        endTurnHeadless(state);
+        turnCount++;
+      }
+
+      expect(turnCount).toBeLessThanOrEqual(maxTurns);
+      expect(state.gameResult).not.toBe('playing');
+    });
+  });
+
+  describe('(e) difficulty scaling', () => {
+    it('Easy hoards less than Hard given the same state', () => {
+      const state = createTestState('scenario-difficulty');
+      resetDecisionSurface(state, 15);
+      state.market.cards = [
+        makeBusiness({ id: 'near', name: 'Near Nook', cost: 18, baseIncome: 1000 }),
+      ];
+
+      expect(scoreBankOption(state, 'Easy')).toBeLessThan(scoreBankOption(state, 'Hard'));
     });
   });
 });
 
-// ── Integration: Greedy Strategy with Banking ───────────────
+// ── Monte Carlo harness integration ─────────────────────────
 
-describe('Greedy Strategy banking integration', () => {
-  it('scoreAction returns 0 for end-turn (bank option baseline)', () => {
-    const state = createTestState('score-end-turn');
-    expect(scoreAction(state, { type: 'end-turn' })).toBe(0);
+describe('Monte Carlo harness integration', () => {
+  it('registers banking-greedy as a distinct strategy', () => {
+    expect(ALL_STRATEGIES).toContain('banking-greedy');
+    expect(ALL_STRATEGIES).toContain('greedy');
   });
 
-  it('enumerates end-turn as a legal action even when actions remain', () => {
-    const state = createTestState('end-turn-legal');
-    state.bankedActions = 0;
+  it('runs the banking-greedy variant end-to-end', () => {
+    const seeds = ['monte-bank-1', 'monte-bank-2', 'monte-bank-3'];
+    const result = runMonteCarlo({ seeds, strategy: 'banking-greedy' });
 
-    const legal = enumerateLegalActions(state);
-    expect(legal.some(a => a.type === 'end-turn')).toBe(true);
+    expect(result.metrics.runs).toBe(3);
+    expect(result.runs).toHaveLength(3);
+    expect(result.metrics.winRate).toBeGreaterThanOrEqual(0);
+    expect(result.metrics.winRate).toBeLessThanOrEqual(1);
   });
 
-  it('GreedyStrategy produces deterministic results with same seed', () => {
-    const seed = 'banking-determinism';
+  it('completes many banking-greedy runs without error', () => {
+    const seeds = Array.from({ length: 20 }, (_, i) => `banking-seed-${i}`);
+    expect(() => runMonteCarlo({ seeds, strategy: 'banking-greedy' })).not.toThrow();
+  });
 
-    const state1 = createTestState(seed);
-    const action1 = GreedyStrategy.chooseAction(state1, makeRng(42));
+  it('keeps the greedy baseline runnable alongside banking-greedy', () => {
+    const seeds = ['baseline-1', 'baseline-2'];
+    expect(() => runMonteCarlo({ seeds, strategy: 'greedy' })).not.toThrow();
+  });
+});
 
-    const state2 = createTestState(seed);
-    const action2 = GreedyStrategy.chooseAction(state2, makeRng(42));
+// ── Determinism ─────────────────────────────────────────────
 
+describe('determinism', () => {
+  it('produces the same action for the same seed and state', () => {
+    const makeState = (): MainStreetState => {
+      const state = createTestState('determinism');
+      resetDecisionSurface(state, 15);
+      state.market.cards = [
+        makeBusiness({ id: 'near', name: 'Near Nook', cost: 18, baseIncome: 1000 }),
+      ];
+      return state;
+    };
+
+    const action1 = BankingGreedyStrategy.chooseAction(makeState(), makeRng(42));
+    const action2 = BankingGreedyStrategy.chooseAction(makeState(), makeRng(42));
     expect(action1.type).toBe(action2.type);
   });
 
-  it('banking-aware greedy handles multi-day cycles correctly', () => {
-    const state = setupMainStreetGame({ seed: 'multi-day-banking' });
-    const player = new MainStreetAiPlayer(GreedyStrategy, makeRng());
-
-    for (let day = 0; day < 5 && state.gameResult === 'playing'; day++) {
-      executeDayStart(state);
-
-      // Run AI actions until end-turn
-      let action = player.chooseAction(state);
-      while (action.type !== 'end-turn' && state.gameResult === 'playing') {
-        executeAction(state, action);
-        action = player.chooseAction(state);
-      }
-
-      endTurnHeadless(state);
-    }
-
-    // Verify banking occurred (bankedActions should have changed from 0).
-    expect(state.bankedActions).toBeGreaterThanOrEqual(0);
-    expect(state.bankedActions).toBeLessThanOrEqual(2);
-  });
-
-  it('banking strategy does not cause infinite action loops', () => {
-    const state = setupMainStreetGame({ seed: 'no-infinite-loop' });
-    const player = new MainStreetAiPlayer(GreedyStrategy, makeRng());
-
-    let turnCount = 0;
-    const maxTurns = 100;
-
-    while (state.gameResult === 'playing' && turnCount < maxTurns) {
-      executeDayStart(state);
-
-      let action = player.chooseAction(state);
-      let actionsInTurn = 0;
-      const maxActionsPerTurn = 10;
-
-      while (action.type !== 'end-turn' && state.gameResult === 'playing' && actionsInTurn < maxActionsPerTurn) {
-        executeAction(state, action);
-        action = player.chooseAction(state);
-        actionsInTurn++;
-      }
-
-      endTurnHeadless(state);
-      turnCount++;
-    }
-
-    expect(turnCount).toBeLessThanOrEqual(maxTurns);
-    expect(state.gameResult).not.toBe('playing');
+  it('scoreAction returns 0 for end-turn (banking delegates to the spend chain)', () => {
+    const state = createTestState('score-end-turn');
+    expect(scoreAction(state, { type: 'end-turn' })).toBe(0);
   });
 });

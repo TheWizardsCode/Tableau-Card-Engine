@@ -7,7 +7,8 @@
  *   - scoreAction(state, action): score a single action using heuristics
  *   - enumerateAndScoreActions(state): enumerate and score all legal actions
  *   - RandomStrategy: uniformly random legal action
- *   - GreedyStrategy: heuristic priority chain
+ *   - GreedyStrategy: heuristic priority chain (pure greedy baseline)
+ *   - BankingGreedyStrategy: Greedy + deliberate action hoarding
  *   - MainStreetAiPlayer: wrapper binding a strategy and RNG
  *
  * Uses shared AI module (`@ai`) for base types and utility functions.
@@ -44,8 +45,9 @@ import {
   canAddToHand,
   getEmptySlots,
 } from './MainStreetMarket';
-import type { BusinessCard, UpgradeCard, EventCard, StaffCard, SynergyType } from './MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, StaffCard, SynergyType } from './MainStreetCards';
 import { isDurationEventCard } from './MainStreetCards';
+import type { DifficultyName } from './MainStreetDifficulty';
 import { computeSynergyBonus, getSlotOwnerId } from './MainStreetAdjacency';
 import { computeScore } from './MainStreetEngine';
 
@@ -105,139 +107,273 @@ export function aiPlanningHorizon(state: MainStreetState): number {
 const BANK_CAP = 2;
 
 /**
- * Scores the implicit "bank actions" option — the expected value of ending
- * the turn early with `actionsRemaining > 0` and banking the unused actions
- * for a future high-value play (CG-0MT3JMGA60091J8W).
+ * Difficulty profile for the banking heuristic (CG-0MT3JMGA60091J8W,
+ * producer answers Q1c / Q3 / Q6).
  *
- * Heuristic factors (work item AC2):
- *   - Current bank level — at cap (2) the option has no value (0).
- *   - Unaffordable high-value target — the best unaffordable card (by the
- *     same placement/income heuristic used for spending) in hand or market
- *     drives the score. No unaffordable valuable target → 0.
- *   - Closeness — `1 - gap/cost`; targets almost in reach score higher
- *     than those far away, scaled by the target\'s absolute value.
- *   - Planning horizon — normalised `horizon / cap`; banking is worth more
- *     early in the game when future income has more turns to compound.
- *   - Bank headroom — `(cap - banked)/cap`; the emptier the bank, the more
- *     valuable a new deposit is.
- *
- * @param state Current game state (read-only by convention).
- * @returns Score for the bank option (0 means no reason to bank).
+ * `lookAheadDepth` is how many upcoming cards per deck the strategy inspects
+ * as *anticipated* banking targets (0 = visible targets only). `aggressiveness`
+ * scales the final bank score: below 1 the strategy needs a stronger case
+ * before hoarding, above 1 it hoards more readily.
  */
-export function scoreBankOption(state: MainStreetState): number {
-  const banked = state.bankedActions ?? 0;
-  if (banked >= BANK_CAP) return 0;
-  if ((state.actionsRemaining ?? 1) <= 0) return 0;
+interface BankingDifficultyProfile {
+  /** Upcoming deck cards per family inspected as look-ahead targets. */
+  readonly lookAheadDepth: number;
+  /** Multiplier applied to the combined bank score. */
+  readonly aggressiveness: number;
+}
 
-  const coins = state.resourceBank.coins;
+/**
+ * Difficulty-gated banking aggressiveness (AC3).
+ *
+ * Easy looks only at visible cards and under-banks (it rarely skips a spend);
+ * Medium considers the next card in each deck at face value; Hard peeks two
+ * cards deep and hoards hardest. This is the tuning table referenced by the
+ * documentation (AC7) — changing it changes observable AI behaviour, so keep
+ * the two in sync.
+ */
+export const BANKING_DIFFICULTY_PROFILES: Record<DifficultyName, BankingDifficultyProfile> = {
+  Easy: { lookAheadDepth: 0, aggressiveness: 0.5 },
+  Medium: { lookAheadDepth: 1, aggressiveness: 1.0 },
+  Hard: { lookAheadDepth: 2, aggressiveness: 1.5 },
+};
+
+/**
+ * Weight applied to anticipated (pipeline) targets relative to visible ones.
+ * Look-ahead targets are less certain — another card may be drawn first, the
+ * market may reroll — so a pipeline target counts for half a visible one.
+ */
+const PIPELINE_TARGET_WEIGHT = 0.5;
+
+/** A candidate banking target: a valuable card the AI cannot yet afford. */
+interface BankTarget {
+  /** Net expected value of owning the card (income * horizon - cost). */
+  score: number;
+  /** The card's cost (> current coins by construction). */
+  cost: number;
+  /** Confidence weight (1 for visible cards, decayed for pipeline cards). */
+  weight: number;
+}
+
+/**
+ * Best synergy bonus available to `card` across the empty street slots
+ * (0 when the street is full). Shared by visible and pipeline business
+ * targets so both are valued with the same placement heuristic as the
+ * spending path.
+ */
+function bestPlacementSynergy(
+  state: MainStreetState,
+  card: BusinessCard | CommunitySpaceCard,
+): number {
+  let maxSynergy = 0;
+  for (let slot = 0; slot < state.streetGrid.length; slot++) {
+    if (state.streetGrid[slot] !== null) continue;
+    const sim = [...state.streetGrid];
+    sim[slot] = card as unknown as BusinessCard;
+    const s = computeSynergyBonus(sim, slot, state.config.synergyBonusPerNeighbor);
+    if (s > maxSynergy) maxSynergy = s;
+  }
+  return maxSynergy;
+}
+
+/**
+ * Best *unaffordable* high-value target currently visible to the AI — in hand
+ * or in the market row (AC3(a)). Returns `null` when every visible card is
+ * affordable or has no positive value.
+ */
+function bestVisibleBankTarget(
+  state: MainStreetState,
+  coins: number,
+  horizon: number,
+): BankTarget | null {
   const hand = state.hand ?? [];
-  const horizon = aiPlanningHorizon(state);
-  const horizonFactor = horizon / AI_HORIZON_CAP;
-  const bankHeadroom = (BANK_CAP - banked) / BANK_CAP;
+  const emptyCount = state.streetGrid.filter(s => s === null).length;
+  let best: BankTarget | null = null;
 
-  let bestScore = -Infinity;
-  let bestCost = 0;
+  const consider = (score: number, cost: number): void => {
+    if (score > (best?.score ?? -Infinity)) best = { score, cost, weight: 1 };
+  };
 
-  // Hand: business/community-space cards whose play-from-hand cost exceeds coins
-  for (let i = 0; i < hand.length; i++) {
-    const card = hand[i] as BusinessCard & { cost: number; family: string };
-    if (card.family !== 'business' && card.family !== 'community-space') continue;
-    if (card.cost <= coins) continue; // already affordable — not a banking target
-    // Simulate placement at best slot (max synergy) to estimate value
-    let maxSynergy = 0;
-    for (let slot = 0; slot < state.streetGrid.length; slot++) {
-      if (state.streetGrid[slot] !== null) continue;
-      const sim = [...state.streetGrid];
-      sim[slot] = card as unknown as BusinessCard;
-      const s = computeSynergyBonus(sim, slot, state.config.synergyBonusPerNeighbor);
-      if (s > maxSynergy) maxSynergy = s;
-    }
-    const score = (card.baseIncome + maxSynergy) * horizon - card.cost;
-    if (score > bestScore) {
-      bestScore = score;
-      bestCost = card.cost;
-    }
+  // Hand: business / community-space cards whose play-from-hand cost exceeds coins
+  for (const card of hand) {
+    const c = card as BusinessCard & { cost: number; family: string };
+    if (c.family !== 'business' && c.family !== 'community-space') continue;
+    if (c.cost <= coins) continue; // already affordable — not a banking target
+    const synergy = bestPlacementSynergy(state, c);
+    consider((c.baseIncome + synergy) * horizon - c.cost, c.cost);
   }
 
   // Hand: upgrade cards whose cost exceeds coins
-  for (let i = 0; i < hand.length; i++) {
-    const card = hand[i] as UpgradeCard & { cost: number; family: string };
-    if (card.family !== 'upgrade') continue;
-    if (card.cost <= coins) continue;
-    const score = card.incomeBonus * horizon - card.cost;
-    if (score > bestScore) {
-      bestScore = score;
-      bestCost = card.cost;
-    }
+  for (const card of hand) {
+    const c = card as UpgradeCard & { cost: number; family: string };
+    if (c.family !== 'upgrade') continue;
+    if (c.cost <= coins) continue;
+    consider(c.incomeBonus * horizon - c.cost, c.cost);
   }
 
   // Hand: Investment events whose cost exceeds coins
-  for (let i = 0; i < hand.length; i++) {
-    const card = hand[i] as EventCard & { cost: number; family: string };
-    if (card.family !== 'event') continue;
-    if (card.cost <= coins) continue;
-    const score = card.coinDelta + card.reputationDelta - card.cost;
-    if (score > bestScore) {
-      bestScore = score;
-      bestCost = card.cost;
-    }
+  for (const card of hand) {
+    const c = card as EventCard & { cost: number; family: string };
+    if (c.family !== 'event') continue;
+    if (c.cost <= coins) continue;
+    consider(c.coinDelta + c.reputationDelta - c.cost, c.cost);
   }
 
-  // Market: business/community-space cards that are unaffordable
+  // Market: business / community-space cards that are unaffordable and placeable
   for (const card of state.market.cards) {
     if (card.family !== 'business' && card.family !== 'community-space') continue;
     if (card.cost <= coins) continue;
-    // Need at least one empty slot for placement relevance
-    const emptyCount = state.streetGrid.filter(s => s === null).length;
     if (emptyCount === 0) continue;
-    let maxSynergy = 0;
-    for (let slot = 0; slot < state.streetGrid.length; slot++) {
-      if (state.streetGrid[slot] !== null) continue;
-      const sim = [...state.streetGrid];
-      sim[slot] = card as unknown as BusinessCard;
-      const s = computeSynergyBonus(sim, slot, state.config.synergyBonusPerNeighbor);
-      if (s > maxSynergy) maxSynergy = s;
-    }
     const biz = card as BusinessCard;
-    const score = (biz.baseIncome + maxSynergy) * horizon - biz.cost;
-    if (score > bestScore) {
-      bestScore = score;
-      bestCost = biz.cost;
-    }
+    const synergy = bestPlacementSynergy(state, biz);
+    consider((biz.baseIncome + synergy) * horizon - biz.cost, biz.cost);
   }
 
-  // Market: upgrade cards that are unaffordable and have a valid target slot
+  // Market: upgrade cards that are unaffordable. Even without an immediate
+  // target the upgrade may become valid later, so it is still scored.
   for (const card of state.market.cards) {
     if (card.family !== 'upgrade') continue;
     if (card.cost <= coins) continue;
     const upg = card as UpgradeCard;
-    const hasTarget = state.streetGrid.some(
-      b => b !== null && b.name === upg.targetBusiness && b.level === (upg.requiredLevel ?? 0) && b.level < b.maxLevel,
-    );
-    // Even without an immediate target, the upgrade may become valid later;
-    // still consider it, but do not require hasTarget strictly — score it anyway
-    // if the upgrade itself is high-value. We only skip if no slot and no hand value.
-    void hasTarget;
-    const score = upg.incomeBonus * horizon - upg.cost;
-    if (score > bestScore) {
-      bestScore = score;
-      bestCost = upg.cost;
-    }
+    consider(upg.incomeBonus * horizon - upg.cost, upg.cost);
   }
 
-  if (!Number.isFinite(bestScore) || bestScore <= 0) return 0;
+  // Market: Investment events that are unaffordable
+  for (const card of state.market.cards) {
+    if (card.family !== 'event') continue;
+    if (card.cost <= coins) continue;
+    const evt = card as EventCard;
+    consider(evt.coinDelta + evt.reputationDelta - evt.cost, evt.cost);
+  }
 
-  const gap = bestCost - coins; // > 0 by construction
-  const closeness = Math.max(0, 1 - gap / bestCost);
-  // Far targets (closeness near 0) should not dominate marginal spends.
-  // Clamp very low closeness to 0 to avoid banking for wildly unaffordable cards.
-  if (closeness < 0.05) return 0;
+  return best;
+}
 
-  const raw = bestScore * closeness * horizonFactor * bankHeadroom;
-  // Threshold: banking must exceed a minimal value to be preferred over
-  // zero-income spends. Values < 1 are noise — do not bank.
-  if (raw < 1) return 0;
-  return raw;
+/**
+ * Best *anticipated* near-future target (AC3(b)): the top `depth` cards of
+ * each drawable deck (business, community-space, upgrade, event), valued with
+ * the same heuristic as visible targets but decayed by queue position so the
+ * next card to be drawn counts more than the one behind it.
+ *
+ * Depth is difficulty-gated (`lookAheadDepth`), which is how Easy ends up
+ * looking only at visible cards. Deck arrays draw from the end (`deck[len-1]`
+ * is next), so iteration walks backwards from the end.
+ */
+function bestPipelineBankTarget(
+  state: MainStreetState,
+  coins: number,
+  horizon: number,
+  depth: number,
+): BankTarget | null {
+  if (depth <= 0) return null;
+
+  const emptyCount = state.streetGrid.filter(s => s === null).length;
+  let best: BankTarget | null = null;
+
+  const consider = (score: number, cost: number, weight: number): void => {
+    const weighted = score * weight;
+    if (weighted > (best?.score ?? -Infinity)) best = { score, cost, weight };
+  };
+
+  /** Walk the top `depth` cards of a deck, nearest-first (end of array). */
+  const eachTopCard = <T>(deck: readonly T[] | undefined, fn: (card: T, weight: number) => void): void => {
+    if (!deck || deck.length === 0) return;
+    for (let pos = 0; pos < depth && pos < deck.length; pos++) {
+      const card = deck[deck.length - 1 - pos];
+      const weight = (1 / (1 + pos)) * PIPELINE_TARGET_WEIGHT;
+      fn(card, weight);
+    }
+  };
+
+  eachTopCard(state.decks?.business, (card, weight) => {
+    if (card.cost <= coins) return;
+    if (emptyCount === 0) return;
+    const synergy = bestPlacementSynergy(state, card);
+    consider((card.baseIncome + synergy) * horizon - card.cost, card.cost, weight);
+  });
+
+  eachTopCard(state.decks?.communitySpace, (card, weight) => {
+    if (card.cost <= coins) return;
+    if (emptyCount === 0) return;
+    const synergy = bestPlacementSynergy(state, card);
+    consider((card.baseIncome + synergy) * horizon - card.cost, card.cost, weight);
+  });
+
+  eachTopCard(state.decks?.upgrade, (card, weight) => {
+    if (card.cost <= coins) return;
+    consider(card.incomeBonus * horizon - card.cost, card.cost, weight);
+  });
+
+  eachTopCard(state.decks?.event, (card, weight) => {
+    if (card.cost <= coins) return;
+    if (card.trigger !== 'Investment') return; // only purchase events are bankable targets
+    consider(card.coinDelta + card.reputationDelta - card.cost, card.cost, weight);
+  });
+
+  return best;
+}
+
+/**
+ * Scores the implicit "bank actions" option — the expected value of ending
+ * the turn early with `actionsRemaining > 0` and banking the unused actions
+ * for a future high-value play (CG-0MT3JMGA60091J8W).
+ *
+ * Hybrid heuristic (AC3, producer answer Q1c):
+ *   - **Visible targets (a):** the best unaffordable high-value card in hand
+ *     or measured in the market row, using the same income/synergy horizon
+ *     heuristic as the spending path.
+ *   - **Pipeline look-ahead (b):** the best unaffordable card among the next
+ *     `lookAheadDepth` cards of each drawable deck, decayed by queue position
+ *     and by {@link PIPELINE_TARGET_WEIGHT}.
+ *
+ * The final score weights each target by:
+ *   - **Closeness** — `1 - gap/cost`; targets almost in reach score higher.
+ *   - **Planning horizon** — normalised `horizon / cap` (`aiPlanningHorizon`,
+ *     CG-0MSN1A71G005AF7W / Q3): banking is worth more early in the game.
+ *   - **Bank headroom** — `(cap - banked)/cap`; an emptier bank gains more.
+ *   - **Difficulty aggressiveness** (Q6) — scaled after the threshold so Easy
+ *     genuinely under-banks and Hard over-banks on identical states.
+ *
+ * At bank cap or with `actionsRemaining <= 0` the option scores 0, so the
+ * cap needs no special case (AC4). Targets with `closeness < 0.05` and any
+ * final score below 1 are discarded as noise.
+ *
+ * @param state      Current game state (read-only by convention).
+ * @param difficulty Difficulty whose profile gates depth/aggressiveness.
+ *                   Defaults to the state's configured difficulty.
+ * @returns Score for the bank option (0 means no reason to bank).
+ */
+export function scoreBankOption(
+  state: MainStreetState,
+  difficulty: DifficultyName = state.config.difficultyName,
+): number {
+  const banked = state.bankedActions ?? 0;
+  if (banked >= BANK_CAP) return 0;
+  if ((state.actionsRemaining ?? 1) <= 0) return 0;
+
+  const profile = BANKING_DIFFICULTY_PROFILES[difficulty] ?? BANKING_DIFFICULTY_PROFILES.Medium;
+  const coins = state.resourceBank.coins;
+  const horizon = aiPlanningHorizon(state);
+  const horizonFactor = horizon / AI_HORIZON_CAP;
+  const bankHeadroom = (BANK_CAP - banked) / BANK_CAP;
+
+  const visible = bestVisibleBankTarget(state, coins, horizon);
+  const pipeline = bestPipelineBankTarget(state, coins, horizon, profile.lookAheadDepth);
+  if (!visible && !pipeline) return 0;
+
+  const valueOf = (target: BankTarget): number => {
+    const gap = target.cost - coins; // > 0 by construction
+    const closeness = Math.max(0, 1 - gap / target.cost);
+    // Far targets (closeness near 0) must not dominate marginal spends.
+    if (closeness < 0.05) return 0;
+    return target.score * closeness * horizonFactor * bankHeadroom * target.weight;
+  };
+
+  const raw = (visible ? valueOf(visible) : 0) + (pipeline ? valueOf(pipeline) : 0);
+  // Threshold: banking must exceed a minimal value to be preferred over a
+  // zero-income spend; difficulty then scales how readily the AI hoards.
+  const scaled = raw * profile.aggressiveness;
+  if (scaled < 1) return 0;
+  return scaled;
 }
 
 // ── Strategy Interface ──────────────────────────────────────
@@ -622,25 +758,62 @@ export const RandomStrategy: MainStreetAiStrategy = {
   },
 };
 
-// ── GreedyStrategy ──────────────────────────────────────────
+// ── Greedy spending routine ─────────────────────────────────
 
 /**
- * A heuristic greedy strategy following the PRD M3 priority chain:
+ * Selects the best *free* same-day composite play (upgrade apply or event
+ * play) — these consume no action, so they must be taken before any spending
+ * or banking decision (CG-0MT40HTYN008TJ6Q, CG-0MTH5CC4H003Q4B3).
  *
- *   1. Buy an upgrade (if affordable and available) — best income delta
- *   2. Buy a business (best synergy placement score)
- *   3. Buy an Investment event (positive expected ROI only)
- *   4. Play a held event (if holding one)
- *   5. End turn
+ * @returns The chosen free play, or `null` when none is available.
+ */
+function pickFreeCompositePlay(
+  state: MainStreetState,
+  legalActions: PlayerAction[],
+  rng: () => number,
+): PlayerAction | null {
+  const freeCompositePlays: PlayerAction[] = [
+    ...(legalActions.filter(
+      a => a.type === 'play-upgrade-from-hand',
+    ) as PlayUpgradeFromHandAction[]).filter(a => isFreeSameDayUpgradePlay(state, a.handIndex)),
+    ...(legalActions.filter(
+      a => a.type === 'play-event-from-hand',
+    ) as PlayEventFromHandAction[]).filter(a => isFreeSameDayEventPlay(state, a.handIndex)),
+  ];
+  if (freeCompositePlays.length === 0) return null;
+  return pickBest(freeCompositePlays, a => scoreAction(state, a), rng);
+}
+
+/**
+ * Shared greedy spending routine following the PRD M3 priority chain:
+ *
+ *   0. Free same-day composite play (no action cost)
+ *   1. Play an affordable business from hand (best synergy placement)
+ *   2. Play an affordable upgrade from hand
+ *   3. Buy an upgrade (highest income gain per coin)
+ *   4. Buy a business (best synergy placement)
+ *   5. Spend the action on the best market acquisition
+ *   6. Play a held Investment event with positive ROI
+ *   8. Discard from a full hand
+ *   9. Community Favour fallback
+ *  10. Hire staff
+ *  11. End turn
+ *
+ * This is the pure greedy baseline: it never banks actions with budget still
+ * available. {@link BankingGreedyStrategy} layers the hoarding gate on top
+ * and then delegates here.
  *
  * Ties at each priority level are broken randomly via `pickBest`.
+ *
+ * @param state        Current game state (read-only by convention).
+ * @param rng          Seeded random number generator.
+ * @param legalActions Pre-computed legal actions (recomputed when omitted).
  */
-export const GreedyStrategy: MainStreetAiStrategy = {
-  name: 'Greedy',
-
-  chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
-    const legalActions = enumerateLegalActions(state);
-
+const chooseGreedyAction = (
+  state: MainStreetState,
+  rng: () => number,
+  legalActions: PlayerAction[] = enumerateLegalActions(state),
+): PlayerAction => {
     const handUpgradeActions = legalActions.filter(
       a => a.type === 'play-upgrade-from-hand',
     ) as PlayUpgradeFromHandAction[];
@@ -652,30 +825,9 @@ export const GreedyStrategy: MainStreetAiStrategy = {
     // play) consumes no action, so it is taken before anything that spends
     // the budget — the rest of the day's plays stay available
     // (CG-0MT40HTYN008TJ6Q, CG-0MTH5CC4H003Q4B3).
-    const freeCompositePlays: PlayerAction[] = [
-      ...handUpgradeActions.filter(a => isFreeSameDayUpgradePlay(state, a.handIndex)),
-      ...handEventActions.filter(a => isFreeSameDayEventPlay(state, a.handIndex)),
-    ];
-    if (freeCompositePlays.length > 0) {
-      return pickBest(freeCompositePlays, a => scoreAction(state, a), rng);
-    }
-
-    // ── Banking-aware hoarding (CG-0MT3JMGA60091J8W) ─────────
-    // Evaluate an implicit "bank actions" option alongside spending.
-    // If the expected value of banked actions exceeds the value of the
-    // best immediate spend, deliberately end the turn with actions
-    // remaining so the engine can bank them for a future high-value play.
-    const bankScore = scoreBankOption(state);
-    if (bankScore > 0) {
-      const bestSpend = Math.max(
-        0,
-        ...legalActions
-          .filter(a => a.type !== 'end-turn')
-          .map(a => scoreAction(state, a)),
-      );
-      if (bankScore > bestSpend) {
-        return { type: 'end-turn' };
-      }
+    const freeComposite = pickFreeCompositePlay(state, legalActions, rng);
+    if (freeComposite) {
+      return freeComposite;
     }
 
     // Priority 1: play an affordable business from hand (cost-at-play) with
@@ -769,6 +921,71 @@ export const GreedyStrategy: MainStreetAiStrategy = {
 
     // Priority 11: end turn
     return { type: 'end-turn' };
+};
+
+// ── GreedyStrategy ──────────────────────────────────────────
+
+/**
+ * The pure greedy baseline strategy (PRD M3 priority chain).
+ *
+ * Never banks actions: whenever the daily budget still has actions, it
+ * spends them via {@link chooseGreedyAction}. Kept unchanged so existing
+ * balance baselines remain valid; banking lives in
+ * {@link BankingGreedyStrategy} (CG-0MT3JMGA60091J8W, AC1).
+ */
+export const GreedyStrategy: MainStreetAiStrategy = {
+  name: 'Greedy',
+
+  chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
+    return chooseGreedyAction(state, rng);
+  },
+};
+
+// ── BankingGreedyStrategy ───────────────────────────────────
+
+/**
+ * Banking-aware greedy strategy (CG-0MT3JMGA60091J8W).
+ *
+ * Behaves exactly like {@link GreedyStrategy} except for one extra decision
+ * evaluated before spending: the expected value of *banking* the remaining
+ * action(s) — {@link scoreBankOption}, whose hybrid visible + pipeline
+ * look-ahead depth and aggressiveness scale with difficulty. When that value
+ * exceeds the best immediate spend, the AI deliberately returns `end-turn`
+ * with actions remaining so the engine banks them for a later multi-action
+ * play (AC2). Otherwise it delegates to the shared greedy chain.
+ *
+ * At bank cap (2) or with no actions remaining the bank option scores 0, so
+ * the cap needs no special case (AC4).
+ */
+export const BankingGreedyStrategy: MainStreetAiStrategy = {
+  name: 'BankingGreedy',
+
+  chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
+    const legalActions = enumerateLegalActions(state);
+
+    // Free same-day composite plays consume no action — take them before
+    // considering a hoard so a free play is never traded for a bank.
+    const freeComposite = pickFreeCompositePlay(state, legalActions, rng);
+    if (freeComposite) {
+      return freeComposite;
+    }
+
+    // Deliberate hoarding: bank only when the expected value of the banked
+    // action exceeds the value of the best immediate spend.
+    const bankScore = scoreBankOption(state);
+    if (bankScore > 0) {
+      const bestSpend = Math.max(
+        0,
+        ...legalActions
+          .filter(a => a.type !== 'end-turn')
+          .map(a => scoreAction(state, a)),
+      );
+      if (bankScore > bestSpend) {
+        return { type: 'end-turn' };
+      }
+    }
+
+    return chooseGreedyAction(state, rng, legalActions);
   },
 };
 

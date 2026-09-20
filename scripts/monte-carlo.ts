@@ -58,7 +58,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
     throw new Error('--maxTurns/--max-turns must be a positive integer');
   }
 
-  const validStrategies: MonteCarloStrategy[] = ['market-greedy', 'demo-greedy', 'greedy', 'random'];
+  const validStrategies: MonteCarloStrategy[] = [...ALL_STRATEGIES];
   if (!validStrategies.includes(strategyArg)) {
     throw new Error(`--strategy must be one of: ${validStrategies.join(', ')}`);
   }

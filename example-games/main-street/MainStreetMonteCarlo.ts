@@ -2,7 +2,7 @@ import { createSeededRng } from '../../src/core-engine';
 import { setupMainStreetGame, createCompetitiveState, seedToNumber, type MainStreetState } from './MainStreetState';
 import { executeAction, executeDayStart, executeCompetitiveDayStart, endCompetitiveMarketTurn, resolveCompetitiveClosingPhases, resolveCompetitivePendingChoice, processEndOfTurn, type PlayerAction } from './MainStreetEngine';
 import { canPurchaseEvent, getAffordableBusinessCards, getAffordableUpgradeCards, getEmptySlots } from './MainStreetMarket';
-import { GreedyStrategy, RandomStrategy, MainStreetAiPlayer, resolveAiEventChoice, bindCompetitiveSeat, restoreCompetitiveSeat, CompetitiveGreedyStrategy, type MainStreetAiStrategy } from './MainStreetAiStrategy';
+import { GreedyStrategy, BankingGreedyStrategy, RandomStrategy, MainStreetAiPlayer, resolveAiEventChoice, bindCompetitiveSeat, restoreCompetitiveSeat, CompetitiveGreedyStrategy, type MainStreetAiStrategy } from './MainStreetAiStrategy';
 import { DIFFICULTY_NAMES } from './MainStreetDifficulty';
 import type { DifficultyName } from './MainStreetDifficulty';
 
@@ -55,13 +55,14 @@ export interface RunMonteCarloOptions {
   strategy?: MonteCarloStrategy;
 }
 
-export type MonteCarloStrategy = 'market-greedy' | 'demo-greedy' | 'greedy' | 'random';
+export type MonteCarloStrategy = 'market-greedy' | 'demo-greedy' | 'greedy' | 'banking-greedy' | 'random';
 
 /** All available Monte Carlo strategies. */
 export const ALL_STRATEGIES: readonly MonteCarloStrategy[] = [
   'market-greedy',
   'demo-greedy',
   'greedy',
+  'banking-greedy',
   'random',
 ];
 
@@ -211,13 +212,17 @@ function chooseActionsForStrategy(state: MainStreetState, strategy: MonteCarloSt
 
 /**
  * Creates a `MainStreetAiPlayer` bound to the named strategy and a deterministic
- * RNG derived from the run seed.  Returns a `MainStreetAiPlayer` for `greedy` and
- * `random` strategies, or `null` for legacy harness strategies (`market-greedy`,
- * `demo-greedy`) that use their own action choosers.
+ * RNG derived from the run seed.  Returns a `MainStreetAiPlayer` for the AI
+ * strategies (`greedy`, `banking-greedy`, `random`), or `null` for legacy
+ * harness strategies (`market-greedy`, `demo-greedy`) that use their own
+ * action choosers.
  */
 function createAiPlayerForStrategy(strategy: MonteCarloStrategy, seed: string): MainStreetAiPlayer | null {
   if (strategy === 'greedy') {
     return new MainStreetAiPlayer(GreedyStrategy, createSeededRng(seedToNumber(`${seed}-ai`)));
+  }
+  if (strategy === 'banking-greedy') {
+    return new MainStreetAiPlayer(BankingGreedyStrategy, createSeededRng(seedToNumber(`${seed}-ai`)));
   }
   if (strategy === 'random') {
     return new MainStreetAiPlayer(RandomStrategy, createSeededRng(seedToNumber(`${seed}-ai`)));
