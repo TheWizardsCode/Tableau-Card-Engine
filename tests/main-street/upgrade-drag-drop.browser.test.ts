@@ -391,9 +391,12 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     await releaseDrag(target.x, target.y, 40);
 
     // The transfer continues from where the card was released.
+    // Use a longer timeout (25s) to avoid spurious failures under concurrent
+    // Chromium contention (2 suites × 4 workers starves the scene update loop).
     await waitForCondition(
       () => transferSpy.mock.calls.length > 0,
       'transfer animation to start after the drop',
+      25_000,
     );
     const options = transferSpy.mock.calls[0][0] as any;
     expect(options.family).toBe('upgrade');
