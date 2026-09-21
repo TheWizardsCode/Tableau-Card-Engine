@@ -1631,7 +1631,7 @@ export class MainStreetRenderer {
       const premiumLabel = s.add.text(
         rightColX,
         Math.round(renderH / 2 - 11),
-        `B&P €${premiumCost} (listed €${u.cost})`,
+        `€${premiumCost} (listed €${u.cost})`,
         {
           fontSize: '9px',
           color: '#ffcc88',
@@ -1655,7 +1655,7 @@ export class MainStreetRenderer {
       // small badge at the bottom of business/community-space cards.
       const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
       const premiumRightX = Math.round(-renderW / 2 + 80);
-      const premiumLabel = s.add.text(premiumRightX, Math.round(renderH / 2 - 11), `B&P €${premiumCost} (listed €${card.cost})`, {
+      const premiumLabel = s.add.text(premiumRightX, Math.round(renderH / 2 - 11), `€${premiumCost} (listed €${card.cost})`, {
         fontSize: '9px',
         color: '#ffcc88',
         fontFamily: FONT_FAMILY,

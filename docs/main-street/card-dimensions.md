@@ -69,6 +69,28 @@ img.setOrigin(0.5, 0.5);
 
 Keep this document in sync with `docs/main-street/prd-milestone-*` and `public/assets/CREDITS.md` when canonical dimensions change.
 
+## 64×64 art zone (CG-0MTORJ5FS006B0UN)
+
+Every Main Street card has a square art zone at `(8, 8)` sized `64×64 px`
+(the `GRAPHIC_*` constants in `MainStreetCardSvgGenerator.ts`). The zone is
+filled with the card's sprite PNG — `example-games/main-street/sprites/<Name>_64_x_64.png`
+— embedded as an **inline base64 `data:` URI** (an `<image>` clipped to the
+rounded 64×64 corners). Inline embedding is required because the SVG is
+rasterised from a `data:image/svg+xml` URI, where external image references
+do not resolve.
+
+- **Source art**: `example-games/main-street/sprites/<Name>_64_x_64.png`
+  (project-generated from each card's `art_notes`).
+- **Art map**: `node scripts/generate-main-street-card-art.mjs` re-encodes the
+  64×64 sprites as near-lossless 256-colour indexed PNGs and writes the shared
+  `example-games/main-street/card-art-map.json` (base64), consumed by both
+  `MainStreetCardArt.ts` (runtime) and `scripts/generate-main-street-card-svgs.mjs`
+  (static SVGs). Cards without a dedicated sprite use the `Fallback` art via
+  `resolveCardArtName()`.
+- **Hand overlap / stacking**: the logo is top-heavy inside the zone (top
+  40 %), so it stays recognisable at ~23 px visible height when cards stack
+  and at ≥44 px under ~20 px hand overlap.
+
 ## Synergy icons
 
 Main Street card art may include small SVG "synergy" icons embedded in the canonical SVGs. Icons are 16×16 visual targets and should be placed conservatively near the bottom-left of the card so they do not overlap important text or badges. Icons are embedded inline in `public/assets/games/main-street/svg/cards/*.svg` by the generator script (`scripts/generate-main-street-card-svgs.mjs`).

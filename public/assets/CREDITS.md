@@ -49,6 +49,21 @@ Files (in `audio/`):
 - `score-reveal.wav` — score display (sparkle arpeggio)
 - `ui-click.wav` — generic UI button click
 
+## Card Art Sprites — Main Street
+
+63 card-art sprites (plus a `Fallback`) used inside each Main Street card's
+64×64 art zone:
+
+- **Source**: Project-generated art (per-card `art_notes` descriptions in
+  `example-games/main-street/card-data.csv`). Source files:
+  `example-games/main-street/sprites/<Name>_64_x_64.png`
+- **License**: CC0 / Public Domain (project-owned, permissive)
+- **Derived (CG-0MTORJ5FS006B0UN)**: `scripts/generate-main-street-card-art.mjs`
+  re-encodes each 64×64 sprite as a near-lossless 256-colour indexed PNG and
+  writes `example-games/main-street/card-art-map.json` (base64 data URIs) that
+  both the runtime TS generator and the static SVG generator embed inline in
+  the card art zone. Cards without a dedicated sprite use the `Fallback` art.
+
 ## Audio Sound Effects — Main Street
 
 Minimal set of SFX and a short background loop added for the Main Street game:

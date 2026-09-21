@@ -255,7 +255,7 @@ describe('SVG display — ongoing cost NOT baked on business/community-space art
 
     const svg = generateBusinessCardSvg(biz);
     // The `-X/turn` label is no longer baked into the card face — the overlay
-    // cash line (`Cash: +X / -Y`) now carries the cost (CG-0MTDMOYOL008IQVO).
+    // cash line (`+X / -Y`) now carries the cost (CG-0MTDMOYOL008IQVO).
     expect(svg).not.toContain('-50/turn'); // ×100: -0.5 → -50
     expect(svg).not.toContain('#ff8844'); // orange/red cost colour removed
   });

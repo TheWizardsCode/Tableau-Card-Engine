@@ -12,6 +12,14 @@
  * stacked card underneath remains identifiable from its top ~23 px.
  * See CG-0MTORJ5FS006B0UN for the full hand-overlap and stacking analysis.
  *
+ * Art (CG-0MTORJ5FS006B0UN producer review): the 64×64 zone is filled with
+ * the card's sprite PNG (`example-games/main-street/sprites/<Name>_64_x_64.png`,
+ * mapped by `scripts/generate-main-street-card-art.mjs`) embedded as an inline
+ * base64 `data:` URI — required because the SVG itself is rasterised from a
+ * data: URI, where external image references do not resolve. Cards without
+ * dedicated art use the `Fallback` sprite; see
+ * `example-games/main-street/MainStreetCardArt.ts` for the name→art resolver.
+ *
  * Business and Community Space cards include dynamic state (income,
  * reputation, level). Event, Upgrade, and Staff cards are generated
  * from template data only (no dynamic visual state). The CSV fallback
@@ -30,6 +38,7 @@ import type {
 } from '../MainStreetCards';
 import { synergyColor } from '../MainStreetCards';
 import { formatCurrency } from '@core-engine/I18n';
+import { getCardArtDataUri } from '../MainStreetCardArt';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -80,21 +89,47 @@ function headerFill(synergyType: SynergyType): string {
   return synergyColor(synergyType).toString(16).padStart(6, '0');
 }
 
-/** Build the 64×64 left-art graphic placeholder (CG-0MTORJ5FS006B0UN).
+/** Build the clip-path id for a card's rounded 64×64 art zone. */
+function cardArtClipId(cardId: string): string {
+  return `ms-art-clip-${cardId}`;
+}
+
+/** Build the `<clipPath>` element that rounds a card's 64×64 art corners. */
+function cardArtClipPath(cardId: string): string {
+  return `<clipPath id="${cardArtClipId(cardId)}"><rect x="${GRAPHIC_X}" y="${GRAPHIC_Y}" width="${GRAPHIC_W}" height="${GRAPHIC_H}" rx="4" ry="4" /></clipPath>`;
+}
+
+/** Build the 64×64 left-art graphic (CG-0MTORJ5FS006B0UN).
  *
- * Uses a high-contrast rounded rect filled with the card's primary
- * synergy colour, with a bold single-letter glyph in the upper half
- * so the visual remains readable under hand overlap (≥44 px visible)
- * and street stacking (~23 px visible). Future work can replace the
- * `<g>` body with a real `<image>` or family-specific icon.
+ * When `artDataUri` is provided the zone renders the embedded PNG sprite
+ * (self-contained as a `data:` URI, because the SVG itself is rasterised from
+ * a data URI where external references do not resolve), clipped to the
+ * rounded 64×64 corners. The synergy-coloured rect stays as a backing colour
+ * (visible for sprites with transparency). When no art is available the
+ * bold-glyph placeholder is drawn instead, so the visual remains readable
+ * under hand overlap (≥44 px visible) and street stacking (~23 px visible).
  */
 function graphicZoneSvg(
   accentFill: string,
   glyph: string,
+  artDataUri?: string,
+  clipId?: string,
 ): string {
+  const backing = `<rect x="${GRAPHIC_X}" y="${GRAPHIC_Y}" width="${GRAPHIC_W}" height="${GRAPHIC_H}" rx="4" ry="4" fill="${accentFill}" opacity="0.42" stroke="#ffffff" stroke-width="0.5" stroke-opacity="0.22" />`;
+
+  if (artDataUri && clipId) {
+    const image = `<image x="${GRAPHIC_X}" y="${GRAPHIC_Y}" width="${GRAPHIC_W}" height="${GRAPHIC_H}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})" href="${artDataUri}" />`;
+    return [
+      `<g class="ms-card-graphic" aria-hidden="true">`,
+      `  ${backing}`,
+      `  ${image}`,
+      `</g>`,
+    ].join('\n');
+  }
+
   return [
     `<g class="ms-card-graphic" aria-hidden="true">`,
-    `  <rect x="${GRAPHIC_X}" y="${GRAPHIC_Y}" width="${GRAPHIC_W}" height="${GRAPHIC_H}" rx="4" ry="4" fill="${accentFill}" opacity="0.42" stroke="#ffffff" stroke-width="0.5" stroke-opacity="0.22" />`,
+    `  ${backing}`,
     `  <text x="${GRAPHIC_X + GRAPHIC_W / 2}" y="${GRAPHIC_Y + 34}" font-family="${FONT}" font-size="28" fill="#ffffff" font-weight="800" text-anchor="middle" opacity="0.96">${esc(glyph)}</text>`,
     `</g>`,
   ].join('\n');
@@ -195,7 +230,12 @@ export function generateBusinessCardSvg(
   // 64×64 graphic placeholder — top-left; high-contrast + bold letter so
   // the card stays identifiable under hand overlap and future stacking.
   const accent = '#' + headerFill(primarySynergy);
-  const graphic = graphicZoneSvg(accent, (card.name || '?').trim().charAt(0).toUpperCase());
+  const graphic = graphicZoneSvg(
+    accent,
+    (card.name || '?').trim().charAt(0).toUpperCase(),
+    getCardArtDataUri(card.name),
+    cardArtClipId(card.id),
+  );
 
   // Title: right of the graphic (never inside 64×64); left-anchored II 8 px
   // gap from the graphic, truncated via clip to avoid layout overflow.
@@ -244,6 +284,7 @@ export function generateBusinessCardSvg(
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0.02"/>
     </linearGradient>
+    ${cardArtClipPath(card.id)}
   </defs>
   <rect x="0" y="0" width="${width}" height="${height}" rx="6" ry="6" fill="${bgFill}" />
   <rect x="4" y="4" width="${width - 8}" height="${height - 8}" rx="4" ry="4" fill="url(#g-gen-${card.id})" />
@@ -282,7 +323,7 @@ export function generateEventCardSvg(
   const graphicFill = card.trigger === 'Incident' ? '#3D5A80' : '#A0522D';
   const inner: string[] = [];
 
-  inner.push(graphicZoneSvg(graphicFill, card.name.trim().charAt(0).toUpperCase()));
+  inner.push(graphicZoneSvg(graphicFill, card.name.trim().charAt(0).toUpperCase(), getCardArtDataUri(card.name), cardArtClipId(card.id)));
   inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#cccccc" opacity="0.18" />');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="19" font-family="' + FONT + '" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">' + esc(card.name) + '</text>');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="35" font-family="' + FONT + '" font-size="9" fill="#aaaacc" font-weight="400" text-anchor="start">[' + esc(card.trigger) + ']</text>');
@@ -302,7 +343,7 @@ export function generateUpgradeCardSvg(
   height: number = CARD_H,
 ): string {
   const inner: string[] = [];
-  inner.push(graphicZoneSvg('#8B5CBF', card.name.trim().charAt(0).toUpperCase()));
+  inner.push(graphicZoneSvg('#8B5CBF', card.name.trim().charAt(0).toUpperCase(), getCardArtDataUri(card.name), cardArtClipId(card.id)));
   inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#9B59B6" opacity="0.18" />');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="19" font-family="' + FONT + '" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">' + esc(card.name) + '</text>');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="35" font-family="' + FONT + '" font-size="9" fill="#bb99dd" font-weight="400" text-anchor="start">for ' + esc(card.targetBusiness) + '</text>');
@@ -322,7 +363,7 @@ export function generateStaffCardSvg(
   height: number = CARD_H,
 ): string {
   const inner: string[] = [];
-  inner.push(graphicZoneSvg('#777777', card.name.trim().charAt(0).toUpperCase()));
+  inner.push(graphicZoneSvg('#777777', card.name.trim().charAt(0).toUpperCase(), getCardArtDataUri(card.name), cardArtClipId(card.id)));
   inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="#888888" opacity="0.18" />');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="19" font-family="' + FONT + '" font-size="10" fill="#ffffff" font-weight="600" text-anchor="start">' + esc(card.name) + '</text>');
   inner.push('  <text x="' + TEXT_MIN_X + '" y="35" font-family="' + FONT + '" font-size="9" fill="#ff8844" font-weight="400" text-anchor="start">-' + card.ongoingCost + '/turn</text>');
@@ -379,6 +420,7 @@ function svgShell(
     '      <stop offset="0" stop-color="#ffffff" stop-opacity="0.06"/>',
     '      <stop offset="1" stop-color="#ffffff" stop-opacity="0.02"/>',
     '    </linearGradient>',
+    '    ' + cardArtClipPath(cardId),
     '  </defs>',
     '  <rect x="0" y="0" width="' + width + '" height="' + height + '" rx="6" ry="6" fill="' + bgFill + '" />',
     '  <rect x="4" y="4" width="' + (width - 8) + '" height="' + (height - 8) + '" rx="4" ry="4" fill="url(#g-' + cardId + ')" />',
@@ -421,7 +463,7 @@ export function generateCardSvgFromCsvRow(
   // 64×64 left-art graphic — same stacking/overlap rules as concrete generators
   // CG-0MTORJ5FS006B0UN: accent-coloured placeholder with bold initial glyph.
   const glyph = (name || '?').trim().charAt(0).toUpperCase();
-  inner.push(graphicZoneSvg(scheme.accent, glyph));
+  inner.push(graphicZoneSvg(scheme.accent, glyph, getCardArtDataUri(name), cardArtClipId(id)));
 
   // Header bar (kept for contrast, graphic sits on top of it at y=8)
   inner.push('  <rect x="4" y="4" width="' + (width - 8) + '" height="20" rx="3" ry="3" fill="' + scheme.accent + '" opacity="0.18" />');
@@ -449,7 +491,7 @@ export function generateCardSvgFromCsvRow(
   }
 
   // Community space ongoing cost: no longer baked into the card face — the
-  // overlay cash line (`Cash: +X / -Y`, CG-0MTCP76MP0088TQW) shows it in the
+  // overlay cash line (`+X / -Y`, CG-0MTCP76MP0088TQW) shows it in the
   // two-tone line instead (CG-0MTDMOYOL008IQVO). Staff cards keep the baked
   // label above because they have no overlay pipeline.
 

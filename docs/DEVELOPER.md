@@ -1135,6 +1135,20 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
 
+#### Card art pipeline (CG-0MTORJ5FS006B0UN)
+
+Each card's 64×64 art zone embeds its sprite PNG as an inline base64 `data:`
+URI (required: the SVG is rasterised from a data URI, so external refs do not
+resolve). The committed sprites live in
+`example-games/main-street/sprites/<Name>_64_x_64.png`. Run
+`node scripts/generate-main-street-card-art.mjs` to regenerate
+`example-games/main-street/card-art-map.json` (card name → base64 data URI,
+plus spelling aliases and a `Fallback` entry); the script re-encodes each
+sprite as a near-lossless 256-colour indexed PNG to keep the inline map small.
+Both `MainStreetCardArt.ts` (runtime CSV generator) and
+`scripts/generate-main-street-card-svgs.mjs` (static SVGs) consume the map.
+Cards without dedicated art use the `Fallback` sprite.
+
 #### Turn Economy (CG-0MTINZ5GG007BH44)
 
 Single-source turn cash formula (Q1=c — see `MainStreetDifficulty.ts` header):
@@ -1723,7 +1737,7 @@ BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlayS
 - Base cards (`level === 0`): level badge and border are `null`; the cash line is populated when income or cost > 0.
 - Upgraded cards (`level > 0`): The non-name overlays are populated:
   - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-right corner, 10px bold.
-  - **Cash line** — `"Cash: +X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the `Cash:` prefix and ` / ` separator in neutral grey (`#dddddd`). The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `Cash: +2`, `Cash: -0.75`) (CG-0MTCP76MP0088TQW).
+  - **Cash line** — `"+X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the ` / ` separator in neutral grey (`#dddddd`). The former `Cash:` prefix was removed by manual review (CG-0MTORJ5FS006B0UN) — the colouring carries the meaning. The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `+2`, `-0.75`) (CG-0MTCP76MP0088TQW).
   - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below the cash line.
   - **Upgrade border** — Golden stroke (`0xffaa22`), 3px width, around the card perimeter.
   - **Name** — NOT an overlay: baked into the card's SVG via a display-name variant texture (CG-0MT24MHGZ0025O20).
@@ -1792,7 +1806,7 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ┌─────────────────────┐     ┌─────────────────────────────┐
 │  Base SVG texture   │     │  buildUpgradeOverlaySpec()  │
 │  (cached, reused)   │     │  → levelBadge: "Lvl 2"      │
-│  + display-name     │     │  → cashLine: "Cash: +8"    │
+│  + display-name     │     │  → cashLine: "+8"          │
 │  variant (upgraded) │     │  → upgradeBorder: gold 3px   │
 │                     │     │  (name is baked into the     │
 │                     │     │   variant texture, not here) │
