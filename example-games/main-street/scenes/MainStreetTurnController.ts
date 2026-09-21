@@ -215,7 +215,7 @@ export class MainStreetTurnController {
     let pendingBankingHint = false;
     try {
       const tut = (s as any).tutorialController as any;
-      if (tut?.isActive && s.state.actionsRemaining > 0) {
+      if (!tut?.isActive && s.state.actionsRemaining > 0) {
         const ts = loadTutorialState(new BrowserLocalStorageAdapter());
         if (!hasSeenBankingHint(ts)) {
           pendingBankingHint = true;
