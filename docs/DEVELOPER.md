@@ -293,8 +293,8 @@ Two mitigations are in place in this repository:
    pipeline (dispatched DOM events at layout-derived canvas coordinates, e.g.
    the Main Street slot-click suites) can intermittently have their click
    dropped or delayed when the RAF-driven game loop is starved of frames by
-   parallel full-suite runs. Two conventions keep these suites green under
-   contention without masking real regressions:
+   parallel full-suite runs. The following conventions keep these suites green
+   under contention without masking real regressions:
 
    - **Generous per-wait budgets**: animation- or frame-loop-gated waits (a
      triggered reveal, a dialog created by a transfer-completion callback)
@@ -308,6 +308,27 @@ Two mitigations are in place in this repository:
      retry window (30s) that leaves headroom under the test's total budget.
      Re-dispatch is safe because the interaction handler no-ops once the
      phase has moved.
+   - **Wait for a real animation frame before dispatching a pointer
+     gesture** (CG-0MUA7RRXL007GEHW): interactive game objects rebuilt by a
+     refresh (`refreshAll`/`refreshStreetGrid`) are queued in Phaser's
+     `_pendingInsertion` and only registered with the input system during
+     `InputPlugin.preUpdate`, which runs on the game loop's RAF tick — never
+     from a `setTimeout`. A drag started after the refresh but before that
+     tick lands on a not-yet-registered hit zone, so the gesture is silently
+     dropped and the drop never fires (observed as a `waitForCondition`
+     timeout waiting for the transfer animation in
+     `tests/main-street/upgrade-drag-drop.browser.test.ts`). Gesture helpers
+     therefore await two `requestAnimationFrame` callbacks (`waitForFrames()`)
+     before the first `mousedown`, matching the established pattern in
+     `tests/main-street/expanded-viewport.browser.test.ts`.
+   - **Poll frame-gated waits on `requestAnimationFrame`**: a helper that
+     waits for the game loop to reach a state (e.g. `waitForCondition` in
+     `tests/main-street/upgrade-drag-drop.browser.test.ts`) yields to the
+     browser's animation-frame loop on every poll rather than a bare
+     `setTimeout`, so the RAF-driven `InputPlugin.preUpdate` step that
+     dispatches the queued `drop` handler is guaranteed to run. Bare
+     `setTimeout` polling can starve for seconds under concurrent-suite
+     contention even when the timeout budget is large.
    - **Deterministic boot conditions**: tests that assume a buyable market
      card at boot set generous coins (e.g. `resourceBank.coins = 100`)
      rather than relying on the random seed's initial market draw — the

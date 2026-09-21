@@ -90,9 +90,39 @@ async function waitForCondition(
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     if (predicate()) return;
-    await wait(25);
+    // Yield to the browser's animation-frame loop so Phaser's game loop
+    // step (and its InputPlugin.preUpdate) can process queued events.
+    // Without this the `drop` handler may never fire under contention
+    // (CG-0MUA7RRXL007GEHW).  rAF is used rather than a bare setTimeout
+    // because it guarantees at least one full game-loop step runs per poll.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
   throw new Error(`Timed out waiting for ${label}`);
+}
+
+/**
+ * Wait for real browser animation frames so Phaser's game loop executes.
+ *
+ * Newly created interactive game objects (the drop zones and draggable
+ * market-card containers rebuilt by `refreshAll`/`refreshStreetGrid`) are
+ * queued in Phaser's `_pendingInsertion` and only registered with the input
+ * system during `InputPlugin.preUpdate`, which runs on the scene's
+ * `PRE_UPDATE` tick — i.e. from the game loop's rAF callback, never from a
+ * `setTimeout`.
+ *
+ * Under full-suite Chromium contention the loop can be starved for seconds,
+ * so a fixed `setTimeout` wait is unreliable: the drag begins against a
+ * not-yet-registered hit zone, the drop is missed and the transfer never
+ * starts.  Waiting for two `requestAnimationFrame` callbacks guarantees at
+ * least one full game-loop step has run before the gesture begins (the same
+ * established pattern used in `expanded-viewport.browser.test.ts`).
+ *
+ * @param count - Number of frames to wait (default 2 for a margin).
+ */
+async function waitForFrames(count = 2): Promise<void> {
+  for (let i = 0; i < count; i += 1) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
 }
 
 function getScene(game: Phaser.Game): Scene {
@@ -126,6 +156,12 @@ function dispatchMouse(type: string, worldX: number, worldY: number): void {
  * for the card to visibly follow the cursor (mirrors the business drag suite).
  */
 async function beginDrag(sx: number, sy: number): Promise<void> {
+  // Let the game loop register the freshly rebuilt interactive hit zones
+  // (drop zones + draggable containers) before the gesture starts.  Without
+  // this the drag/drop silently misses under full-suite contention, because
+  // Phaser only flushes `_pendingInsertion` on its own rAF tick
+  // (CG-0MUA7RRXL007GEHW).
+  await waitForFrames();
   dispatchMouse('mousedown', sx, sy);
   await wait(40);
   // Cross the drag-distance threshold → dragstart fires.
@@ -391,12 +427,14 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     await releaseDrag(target.x, target.y, 40);
 
     // The transfer continues from where the card was released.
-    // Use a longer timeout (25s) to avoid spurious failures under concurrent
-    // Chromium contention (2 suites × 4 workers starves the scene update loop).
+    // 30 s timeout: under concurrent-suite Chromium contention the
+    // scene update loop can starve, so the default and the 15-25 s budgets
+    // are sometimes too short.  waitForCondition yields to rAF each poll so
+    // the `drop` handler is guaranteed a game-loop step to fire.
     await waitForCondition(
       () => transferSpy.mock.calls.length > 0,
       'transfer animation to start after the drop',
-      25_000,
+      30_000,
     );
     const options = transferSpy.mock.calls[0][0] as any;
     expect(options.family).toBe('upgrade');
