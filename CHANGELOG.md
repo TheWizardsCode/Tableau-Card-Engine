@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.1.17 (2026-09-22)
+### Features
+- Incident cards now stay on screen longer so you can read them before your turn ends. (CG-0MTW18KFK000MM3I)
+- Card and score tooltips now always show ongoing turn costs, so you can see the true cost of your businesses. (CG-0MTQZ7VWU008Q259)
+- Resource numbers now update only after the end-of-turn animations finish. (CG-0MTR72P14000VO6Q)
+- Hire specialist staff and assign them to matching businesses for targeted bonuses. (CG-0MTIOLY2A0092OT1)
+- Main Street now follows a yearly calendar with seasonal and holiday events appearing only in their proper weeks. (CG-0MTT0K9RX0004QTE)
+- Main Street card art now looks crisp and sharp at every zoom level. (CG-0MUCM36EQ008YP4R)
+- Community Favour is now free once per turn. (CG-0MU0BVMUT000JDYT)
+- Trade coins for reputation or reputation for coins once per turn when you need a boost. (CG-0MSTOATDQ005XDET)
+- Browse every Main Street card by type or synergy, with search and full card details. (CG-0MTDH0R5V0094D4T)
+- Empty hand slots now show outlines so you can see how many more cards you can hold. (CG-0MT6ER7YY003G680)
+- Watch your income build up card by card at the end of each turn, with each card counting faster than the last. (CG-0MTR766U6003RZ88)
+- Main Street cards now feature bold artwork, making them easier to tell apart at a glance. (CG-0MTORJ5FS006B0UN)
+- AI opponents now save up actions for bigger plays, making them smarter and more challenging. (CG-0MT3JMGA60091J8W)
+- Zoom out anytime to reveal new streets and grow your city beyond the original block. (CG-0MT5Y1X5T001M4S6)
+### Bug Fixes
+- Sold cards now correctly show they still boost neighboring businesses. (CG-0MTFS4PP40064GHE)
+- Market rerolls now cost 500 coins, making them a real strategic choice. (CG-0MTKMN7KG006F5EE)
+- Fixed a rare issue where placing cards on the shared corner could fail during heavy play. (CG-0MU3BDWEL0058B08)
+- Rejected moves no longer cost you an action. (CG-0MTW1KAD4003XGLU)
+- Upgrade animations and sounds now play correctly when dragging upgrades onto Main Street. (CG-0MTYMSLK9002WUFY)
+- Long test suites no longer time out and reset your progress when finishing tasks. (CG-0MTXKIIRV009MJWG)
+- Undo and redo buttons now gray out when unavailable, so you can tell when they'll work. (CG-0MT5Y4DL8000AKKZ)
+### Other
+- Tutorial no longer mentions staff before you've hired any, so new players won't get confused. (CG-0MU9YAZ5U00005J4)
+- Main Street runs more smoothly and reliably, with fewer bugs in future updates. (CG-0MTP6KLQD001TBMH)
+
 ## v0.1.16 (2026-09-15)
 ### Features
 - Every card now has a unique art description, so the artwork you see will better match each card's identity. (CG-0MTFWELZA007BKQP)
