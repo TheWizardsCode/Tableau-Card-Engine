@@ -133,10 +133,15 @@ function businessFixture(id: string, baseIncome = 10, synergyTypes: string[] = [
   } as BusinessCard;
 }
 
-/** Graphics objects owned by the street layer (the synergy lines). */
+/**
+ * Synergy-line Graphics owned by the street layer (excludes the road layer,
+ * which is also a Graphics object in the same container).
+ */
 function streetGraphics(scene: Scene): Phaser.GameObjects.GameObject[] {
   const container = scene.streetContainer as Phaser.GameObjects.Container;
-  return container.list.filter((o) => o instanceof Phaser.GameObjects.Graphics);
+  return container.list.filter(
+    (o) => o instanceof Phaser.GameObjects.Graphics && (o as Phaser.GameObjects.Graphics).name !== 'ms-street-roads',
+  );
 }
 
 afterEach(() => {

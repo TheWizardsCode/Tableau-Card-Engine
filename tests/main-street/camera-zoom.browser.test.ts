@@ -24,7 +24,8 @@ import { waitForScene } from '../helpers/waitForScene';
 import { TUTORIAL_STATE_STORAGE_KEY } from '../../example-games/main-street/TutorialState';
 import { canPurchaseBusiness, getEmptySlots } from '../../example-games/main-street/MainStreetMarket';
 import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
-import { streetViewportRect } from '../../example-games/main-street/MainStreetMapView';
+import { streetViewportRect, visibleLocalRect } from '../../example-games/main-street/MainStreetMapView';
+import { ROAD_COLOUR } from '../../example-games/main-street/scenes/MainStreetConstants';
 
 const GAME_W = 1280;
 const GAME_H = 720;
@@ -147,6 +148,60 @@ function visibleStreetSlotRects(scene: Scene): Phaser.GameObjects.Rectangle[] {
       cy + halfH > viewport.y && cy - halfH < viewport.y + viewport.h
     );
   });
+}
+
+/**
+ * Count road-surface and road-marking pixels inside the street viewport band.
+ *
+ * Roads must be grey rectangles with a dashed white centre line, so a real
+ * rendered frame should contain both colours inside the band.
+ */
+
+/**
+ * True when any pixel in a small neighbourhood around a screen point matches a
+ * colour (the road markings are 2px wide, so exact-pixel sampling is brittle).
+ */
+function hasNearColour(screenX: number, screenY: number, hex: number, tol = 14): boolean {
+  const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
+  const dpr = canvas.width / GAME_W;
+  const px = Math.round(screenX * dpr);
+  const py = Math.round(screenY * dpr);
+  const size = 3 * Math.max(1, Math.round(dpr));
+  const data = ctx.getImageData(px, py, size, size).data;
+  const tr = (hex >> 16) & 0xff;
+  const tg = (hex >> 8) & 0xff;
+  const tb = hex & 0xff;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 200) continue;
+    if (Math.abs(data[i] - tr) <= tol && Math.abs(data[i + 1] - tg) <= tol && Math.abs(data[i + 2] - tb) <= tol) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Brightest channel value found along a local-space segment, via screen space. */
+function brightestChannel(
+  x1: number, y1: number, x2: number, y2: number,
+  toScreen: (x: number, y: number) => { x: number; y: number },
+): number {
+  const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
+  const dpr = canvas.width / GAME_W;
+  let best = 0;
+  const steps = 40;
+  for (let i = 0; i <= steps; i++) {
+    const lx = x1 + ((x2 - x1) * i) / steps;
+    const ly = y1 + ((y2 - y1) * i) / steps;
+    const s = toScreen(lx, ly);
+    const d = ctx.getImageData(Math.max(0, Math.round(s.x * dpr) - 1), Math.max(0, Math.round(s.y * dpr) - 1), 3, 3).data;
+    for (let k = 0; k < d.length; k += 4) {
+      if (d[k + 3] < 200) continue;
+      best = Math.max(best, d[k], d[k + 1], d[k + 2]);
+    }
+  }
+  return best;
 }
 
 /** Centre of a zoom control in canvas coordinates. */
@@ -274,11 +329,18 @@ describe('Main Street street-map camera (browser)', () => {
     expect(snapshot.camera.zoomLevel).toBe(2);
     expect(snapshot.scale).toBeCloseTo(0.5, 3);
 
-    // A whole ring of neighbours is now framed (8 cells × up to 10 plots,
-    // minus the shared seam plots rendered once).
+    // A whole ring of neighbours is now framed. Streets are physically larger
+    // in the city-block model (each owns its ten plots plus a road band around
+    // it), so fewer plots fit at 2× than in the old seam-sharing layout — the
+    // meaningful assertion is that more than one street cell is revealed.
     const framedAt2x = visibleStreetSlotRects(scene).length;
     expect(framedAt2x).toBeGreaterThan(framedAt1x);
-    expect(framedAt2x).toBeGreaterThanOrEqual(40);
+    expect(framedAt2x).toBeGreaterThanOrEqual(20);
+    const framedCells = new Set(
+      (scene.getVisibleStreetNodes() as Array<{ cellX: number; cellY: number }>)
+        .map((n) => `${n.cellX},${n.cellY}`),
+    );
+    expect(framedCells.size).toBeGreaterThan(1);
 
     // Only the street layer transforms — the HUD chrome stays put.
     if (hudCoinPos) {
@@ -358,6 +420,78 @@ describe('Main Street street-map camera (browser)', () => {
     expect(scene.getStreetCameraForTest().camera.zoomLevel).toBe(3);
     expect(scene.getStreetViewLattice()).toEqual({ cols: 5, rows: 5 });
     expect(scene.getVisibleStreetNodes().length).toBeGreaterThan(10);
+  });
+
+  it('draws the city-block road layer and grows it with the lattice (CG-0MT5Y1X5T001M4S6)', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
+
+    const roadLayer = () => (scene.streetContainer as Phaser.GameObjects.Container).list.find(
+      (obj) => obj.name === 'ms-street-roads',
+    );
+
+    // 1×1 lattice: a road ring around the single street (2 vertical + 2 horizontal).
+    expect(roadLayer()).toBeTruthy();
+    expect(scene.getStreetRoadBands()).toHaveLength(4);
+    expect(scene.getStreetRoadBands().every((b: any) => b.w > 0 && b.h > 0)).toBe(true);
+
+    // Zooming out grows the lattice, and the road layer follows it.
+    scene.zoomStreetOut();
+    await wait(150);
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 3, rows: 3 });
+    // cols + 1 vertical bands + rows + 1 horizontal bands.
+    expect(scene.getStreetRoadBands()).toHaveLength(3 + 1 + 3 + 1);
+    expect(roadLayer()).toBeTruthy();
+  });
+
+  it('renders the roads as grey surfaces with a dashed white centre line', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
+
+    // Zoom out so neighbouring streets (and the roads between them) are
+    // revealed inside the street band.
+    scene.setStreetZoomLevel(2, false);
+    await wait(250);
+
+    const camera = scene.getStreetCameraState();
+    const { scale, containerX, containerY } = scene.getStreetCameraForTest();
+    const visible = visibleLocalRect(camera, scene.layout);
+    const toScreen = (x: number, y: number) => ({ x: containerX + x * scale, y: containerY + y * scale });
+    const bands = scene.getStreetRoadBands() as Array<{ orientation: string; x: number; y: number; w: number; h: number }>;
+    expect(bands.length).toBeGreaterThan(0);
+
+    let sampledSurface = 0;
+    // Brightest channel value found along any road centre line. The road
+    // surface is mid-grey (0x4a = 74), so a clearly brighter pixel proves the
+    // white centre line is drawn.
+    let brightestMarking = 0;
+    for (const band of bands) {
+      const x0 = Math.max(band.x, visible.left);
+      const x1 = Math.min(band.x + band.w, visible.right);
+      const y0 = Math.max(band.y, visible.top);
+      const y1 = Math.min(band.y + band.h, visible.bottom);
+      if (x1 - x0 < 8 || y1 - y0 < 8) continue; // band not (or barely) on screen
+
+      if (band.orientation === 'vertical') {
+        const midY = (y0 + y1) / 2;
+        const surface = toScreen(band.x + band.w * 0.25, midY);
+        if (hasNearColour(surface.x, surface.y, ROAD_COLOUR)) sampledSurface++;
+        brightestMarking = Math.max(brightestMarking, brightestChannel(band.x + band.w / 2, midY - 30, band.x + band.w / 2, midY + 30, toScreen));
+      } else {
+        const midX = (x0 + x1) / 2;
+        const surface = toScreen(midX, band.y + band.h * 0.25);
+        if (hasNearColour(surface.x, surface.y, ROAD_COLOUR)) sampledSurface++;
+        brightestMarking = Math.max(brightestMarking, brightestChannel(midX - 30, band.y + band.h / 2, midX + 30, band.y + band.h / 2, toScreen));
+      }
+    }
+
+    // The road surface and its dashed white centre line are both really drawn.
+    expect(sampledSurface).toBeGreaterThan(0);
+    expect(brightestMarking).toBeGreaterThan(150);
   });
 
   it('maps pointer hit-testing through the camera transform (place after zooming out)', async () => {

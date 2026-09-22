@@ -26,8 +26,8 @@ import {
   CSV_CHECKSUM,
   CARD_DATA_RAW,
   GRID_SIZE,
-  STREET_COLS,
-  STREET_ROWS,
+  worldWidth,
+  worldHeight,
   MARKET_TOTAL_SLOTS,
   MARKET_BUSINESS_MIN,
   MARKET_BUSINESS_MAX,
@@ -299,11 +299,11 @@ export interface MainStreetState {
   /** Current phase within the turn. */
   phase: DayPhase;
   /**
-   * The street grid — world-indexed flat array of unique world slots after
-   * shared-corner dedup (see MainStreetAdjacency.worldSlotCount). For 1×1
-   * this is the legacy 10-slot linear grid; for expanded grids it is
-   * worldSlotCount(cols,rows) long. Indexed by world order, not per-street
-   * slot index; use toWorldPosition/fromWorldPosition for mapping.
+   * The street grid — world-indexed flat array of world slots. Each street owns
+   * its own ten plots, so the array is `worldSlotCount(cols,rows)` long
+   * (see MainStreetAdjacency.worldSlotCount). For 1×1 this is the legacy
+   * 10-slot linear grid. Indexed by world order, not per-street slot index;
+   * use toWorldPosition/fromWorldPosition for mapping.
    */
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
   /** World grid dimensions (cols × rows of 5×2 street cells). Null/omitted → 1×1 legacy (10 slots). Max 5×5. */
@@ -1633,15 +1633,15 @@ function resizeSoldSlots(sold: boolean[] | undefined, gridLength: number): boole
 }
 
 /**
- * Re-sizes the playable street grid to a new planar world lattice
+ * Re-sizes the playable street grid to a new city-block world lattice
  * (`cols`×`rows` street cells), migrating every placed card, sold flag and
  * ownership tag by WORLD POSITION (CG-0MTH9OW0H0005VKE).
  *
- * The world grid is row-major over the planar seam-sharing rectangle, so its
- * row width changes with `cols` — a legacy 1×1 board (world width 5) becomes
- * the origin cell of a larger lattice (world width `4·cols+1`), and its bottom
- * row shifts from indices 5..9 to `worldY·newWidth + worldX`. This function
- * therefore *reindexes* rather than merely re-sizing.
+ * The world grid is row-major over the `(5·cols) × (2·rows)` plot rectangle, so
+ * its row width changes with `cols` — a legacy 1×1 board (world width 5)
+ * becomes the origin cell of a larger lattice (world width `5·cols`), and its
+ * bottom row shifts from indices 5..9 to `worldY·newWidth + worldX`. This
+ * function therefore *reindexes* rather than merely re-sizing.
  *
  * Cards/tags outside the new (smaller) lattice are dropped, matching the
  * shrinkage semantics of `resizeSoldSlots`.
@@ -1659,11 +1659,9 @@ export function setStreetGridLattice(
   const prevRows = Math.max(1, Math.floor(state.streetGridRows || 1));
   if (nextCols === prevCols && nextRows === prevRows) return false;
 
-  const strideX = STREET_COLS - 1;
-  const strideY = STREET_ROWS - 1;
-  const prevWidth = strideX * prevCols + 1;
-  const nextWidth = strideX * nextCols + 1;
-  const nextHeight = strideY * nextRows + 1;
+  const prevWidth = worldWidth(prevCols);
+  const nextWidth = worldWidth(nextCols);
+  const nextHeight = worldHeight(nextRows);
   const nextSize = nextWidth * nextHeight;
 
   /** Translate an index in the previous world frame to the next frame. */

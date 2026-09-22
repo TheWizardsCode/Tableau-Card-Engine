@@ -89,14 +89,23 @@ export { buildUpgradeOverlaySpec, type UpgradeOverlaySpec };
 import { computeMainStreetLayoutWithSll } from './MainStreetLayoutAdapter';
 import {
   type MapSlotNode,
+  type RoadBand,
   MAX_ZOOM_LEVEL,
   MIN_ZOOM_LEVEL,
   containerTransform,
+  mapRoadBands,
   streetViewportRect,
   visibleMapSlots,
   zoomScale,
 } from '../MainStreetMapView';
-import { ZOOM_ANIMATION_MS } from './MainStreetConstants';
+import {
+  ROAD_COLOUR,
+  ROAD_DASH_LENGTH,
+  ROAD_DASH_PERIOD,
+  ROAD_MARKING_COLOUR,
+  ROAD_MARKING_WIDTH,
+  ZOOM_ANIMATION_MS,
+} from './MainStreetConstants';
 
 // markHudTransient and clearTransientHud are now imported from src/ui/Renderer
 
@@ -568,11 +577,11 @@ export class MainStreetRenderer {
 
     // ── Street-map camera (CG-0MTH9OVMC001V44E) ──
     // Render every slot of every street cell inside the viewport, de-duplicating
-    // the plots shared between neighbouring streets. At zoom level 1 on the
-    // default 1×1 lattice this yields exactly the legacy 10 slots in legacy
-    // positions, so the pre-camera framing is preserved bit-for-bit.
-    // Slots of the playable lattice carry a world gameplay index
-    // (CG-0MTH9OW0H0005VKE), so expanded streets and shared seams are placeable.
+    // the streets (each street owns its own plots; roads are drawn between
+    // them). At zoom level 1 on the default 1×1 lattice this yields exactly the
+    // legacy 10 slots in legacy positions, so the pre-camera framing is
+    // preserved bit-for-bit. Slots of the playable lattice carry a world
+    // gameplay index (CG-0MTH9OW0H0005VKE), so expanded streets are placeable.
     const nodes = this.mapNodes();
 
     // Section label
@@ -580,6 +589,11 @@ export class MainStreetRenderer {
       fontSize: '14px', fontStyle: 'bold', color: '#aa9966', fontFamily: FONT_FAMILY,
     }).setOrigin(0.5, 1);
     s.streetContainer.add(label);
+
+    // Roads first: the city-block grid reads as rows and columns of streets
+    // separated by grey roads with a dashed white centre line
+    // (CG-0MT5Y1X5T001M4S6). Drawn before the plots so slots stay on top.
+    this.drawStreetRoads();
 
     // Idle backdrop: an interactive zone covering the street viewport. It is
     // added first (and is only interactive while zoomed out), so Phaser's
@@ -608,6 +622,49 @@ export class MainStreetRenderer {
     this.updateStreetMapMask();
     this.applyStreetCamera(false);
     this.updateStreetZoomControls();
+  }
+
+  /**
+   * Draws the city-block road layer: one grey rectangle per road band with a
+   * dashed white centre line down its middle (CG-0MT5Y1X5T001M4S6).
+   *
+   * Roads are decoration only — they sit in the gaps between street blocks and
+   * never occupy world slots. They are added to `streetContainer` so they are
+   * camera-transformed and clipped with the rest of the map.
+   */
+  private drawStreetRoads(): void {
+    const s = this.scene;
+    const lattice = s.getStreetViewLattice?.() ?? { cols: 1, rows: 1 };
+    const bands: RoadBand[] = mapRoadBands(s.layout, lattice);
+    this.drawnRoadBands = bands;
+    if (bands.length === 0) return;
+
+    const road = s.add.graphics();
+    road.setName('ms-street-roads');
+
+    // Grey road surface.
+    road.fillStyle(ROAD_COLOUR, 1);
+    for (const band of bands) {
+      road.fillRect(band.x, band.y, band.w, band.h);
+    }
+
+    // Dashed white centre line down each road's middle.
+    road.lineStyle(ROAD_MARKING_WIDTH, ROAD_MARKING_COLOUR, 1);
+    for (const band of bands) {
+      if (band.orientation === 'vertical') {
+        const cx = band.x + band.w / 2;
+        for (let y = band.y; y < band.y + band.h; y += ROAD_DASH_PERIOD) {
+          road.lineBetween(cx, y, cx, Math.min(y + ROAD_DASH_LENGTH, band.y + band.h));
+        }
+      } else {
+        const cy = band.y + band.h / 2;
+        for (let x = band.x; x < band.x + band.w; x += ROAD_DASH_PERIOD) {
+          road.lineBetween(x, cy, Math.min(x + ROAD_DASH_LENGTH, band.x + band.w), cy);
+        }
+      }
+    }
+
+    s.streetContainer.add(road);
   }
 
   /**
@@ -880,8 +937,8 @@ export class MainStreetRenderer {
     const pairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? [], gridDims);
 
     // Only draw links whose endpoints are inside the viewport (culling,
-    // AC4), using the rendered world-slot centres so lines cross street seams
-    // and shared corners correctly (AC2).
+    // AC4), using the rendered world-slot centres so lines cross street
+    // boundaries (and the road between them) correctly (AC2).
     const centreByIndex = new Map<number, { x: number; y: number }>();
     for (const node of this.mapNodes()) {
       if (node.gameplayIndex === null) continue;
@@ -974,6 +1031,13 @@ export class MainStreetRenderer {
    * playable lattice. Shared seam and four-way-intersection plots appear once
    * (one hit-zone), and unrevealed/out-of-viewport streets are absent (culling).
    */
+  /**
+   * Road bands drawn by the most recent `drawStreetRoads()` call, exposed for
+   * introspection/tests so a browser test can assert the road layer tracks the
+   * displayed lattice (CG-0MT5Y1X5T001M4S6).
+   */
+  private drawnRoadBands: RoadBand[] = [];
+
   private mapNodes(): MapSlotNode[] {
     const s = this.scene;
     const lattice = s.streetViewLattice ?? { cols: 1, rows: 1 };
@@ -984,6 +1048,11 @@ export class MainStreetRenderer {
   /** Visible, de-duplicated street-map slots (test/introspection hook). */
   public getVisibleStreetNodes(): MapSlotNode[] {
     return this.mapNodes();
+  }
+
+  /** Road bands drawn in the street layer for the current lattice (test hook). */
+  public getStreetRoadBands(): RoadBand[] {
+    return this.drawnRoadBands;
   }
 
   /**

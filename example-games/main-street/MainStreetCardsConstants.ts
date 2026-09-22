@@ -15,6 +15,48 @@ export const GRID_SIZE = 10;
 export const STREET_COLS = 5;
 export const STREET_ROWS = 2;
 
+// ── Expanded street-lattice world geometry ──────────────────
+//
+// The board is a city-block grid of 5×2 street cells separated by ROADS
+// (CG-0MT5Y1X5T001M4S6). Each street **owns** its own 10 plots — neighbouring
+// streets do NOT share seam plots — so the world grid is the contiguous
+// rectangle `(STREET_COLS·cols) × (STREET_ROWS·rows)` laid out at a stride of
+// exactly (STREET_COLS, STREET_ROWS). Roads are a separate visual layer drawn
+// in the gaps between street blocks (see `MainStreetMapView`); they never
+// consume world slots.
+//
+// These helpers live with the constants (rather than in `MainStreetAdjacency`)
+// so the adjacency resolver, the state lattice resize and the map view all
+// share one definition without an import cycle.
+
+/** Horizontal stride (world columns) between adjacent street-cell origins. */
+export const WORLD_STRIDE_X = STREET_COLS;
+/** Vertical stride (world rows) between adjacent street-cell origins. */
+export const WORLD_STRIDE_Y = STREET_ROWS;
+
+/** Width in world columns of a `cols`-wide street lattice. */
+export function worldWidth(cols: number): number {
+  return WORLD_STRIDE_X * cols;
+}
+
+/** Height in world rows of a `rows`-tall street lattice. */
+export function worldHeight(rows: number): number {
+  return WORLD_STRIDE_Y * rows;
+}
+
+/**
+ * Number of world (placeable) slots for a `cols`×`rows` street lattice:
+ * `STREET_COLS · STREET_ROWS · cols · rows` — 10 plots per street, no sharing.
+ *
+ * 10, 20, 20, 40, 60, 90 for 1×1, 2×1, 1×2, 2×2, 3×2, 3×3.
+ */
+export function worldSlotCount(streetCols: number, streetRows: number): number {
+  if (!Number.isInteger(streetCols) || !Number.isInteger(streetRows) || streetCols <= 0 || streetRows <= 0) {
+    throw new Error(`worldSlotCount: dimensions must be positive integers, got ${streetCols}×${streetRows}`);
+  }
+  return worldWidth(streetCols) * worldHeight(streetRows);
+}
+
 // ── Turn & Scoring ──────────────────────────────────────────
 
 /**

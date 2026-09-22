@@ -3,8 +3,8 @@
  *
  * Implements the adjacency resolver for the street lattice and income
  * computation (base income + synergy bonuses). The legacy 2x5 board is the 1×1
- * case of a general lattice of 5×2 street cells; expanded lattices use a planar
- * seam-sharing world grid (see the "Expanded Grid Topology" section below).
+ * case of a general city-block grid of 5×2 street cells (each street owns its
+ * own ten plots; see the "Expanded Grid Topology" section below).
  * Upgrades can extend synergy range beyond the default 1-cell 8-way (Chebyshev)
  * adjacency.
  *
@@ -13,7 +13,10 @@
 
 import type { BusinessCard, CommunitySpaceCard, SynergyType } from './MainStreetCards';
 import { getBaseTypeId } from './MainStreetCards';
-import { GRID_SIZE, STREET_COLS, STREET_ROWS } from './MainStreetCards';
+import { GRID_SIZE, STREET_COLS, STREET_ROWS, WORLD_STRIDE_X, WORLD_STRIDE_Y, worldWidth, worldHeight, worldSlotCount } from './MainStreetCards';
+
+// Re-exported so existing consumers keep importing world geometry from here.
+export { worldWidth, worldHeight, worldSlotCount };
 import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier, roundInt } from './MainStreetDifficulty';
@@ -1177,40 +1180,36 @@ export interface IncomeResult {
 
 
 // ═══════════════════════════════════════════════════════════
-// Expanded Grid Topology — Planar Seam-Sharing Lattice
-// (CG-0MTH9OTI2008MYFY; reconciled in CG-0MTYMD2Q5008UXB9)
+// Expanded Grid Topology — City-Block Grid (No Shared Plots)
+// (CG-0MTH9OTI2008MYFY; re-modelled for roads in CG-0MT5Y1X5T001M4S6)
 // ═══════════════════════════════════════════════════════════
-// Each street cell is STREET_COLS × STREET_ROWS (5×2) slots. Street cells are
-// tiled with a stride of (STREET_COLS−1, STREET_ROWS−1) = (4, 1) so adjacent
-// streets overlap on their whole touching seam column/row:
+// Each street cell is STREET_COLS × STREET_ROWS (5×2) slots and OWNS all ten of
+// them. Street cells are tiled at a stride of exactly (STREET_COLS, STREET_ROWS)
+// = (5, 2), so the world grid is the solid, hole-free rectangle
+// `(STREET_COLS·cols) × (STREET_ROWS·rows)` and no two streets share a plot.
 //
-//   • horizontally adjacent streets share the west street's rightmost column
-//     with the east street's leftmost column (2 slots per seam);
-//   • vertically adjacent streets share the north street's bottom row with the
-//     south street's top row (5 slots per seam);
-//   • a four-way intersection therefore collapses to a single shared world node.
+// Roads are a separate *visual* layer (see `MainStreetMapView` / the street
+// renderer): one road cell is drawn between every pair of adjacent streets, so
+// the board reads as a city-block grid of streets in rows and columns rather
+// than one continuous block of plots. Roads never consume world slots.
 //
-// The lattice consequently occupies a solid, hole-free rectangle of world
-// positions — ((STREET_COLS−1)·cols + 1) × ((STREET_ROWS−1)·rows + 1) — so the
-// world coordinates are planar and Chebyshev adjacency on them is exactly the
-// visual adjacency a player sees. World-index order is row-major over that
-// rectangle: worldY ascending, then worldX ascending.
+// Because the world set is a contiguous rectangle, 8-way Chebyshev adjacency on
+// world coordinates is exactly the adjacency the player sees — including across
+// a road: the plot on a street's east edge is Chebyshev-adjacent to the plot on
+// the neighbouring street's west edge, so cross-street synergy still works.
+// World-index order is row-major: worldY ascending, then worldX ascending.
 //
-// NOTE (CG-0MTYMD2Q5008UXB9): an earlier revision used a (5, 2) stride with a
-// single-slot-per-seam DSU, which produced a holed and sheared (non-planar)
-// world set — 19/19/36/53 slots for 2×1, 1×2, 2×2, 3×2 — that disagreed with
-// the planar geometry already used by MainStreetMapView (18/15/27/39). The
-// planar model below is authoritative; both modules now agree.
+// NOTE (CG-0MTYMD2Q5008UXB9 / CG-0MT5Y1X5T001M4S6): an earlier revision shared
+// each street's touching seam with its neighbour (a "planar seam-sharing"
+// lattice — 10/18/15/27/39/52 slots — which merged adjacent streets into one
+// solid block of plots). The city-block model below replaces it and the
+// shared-seam node model was deleted. Saves written by the seam-sharing build
+// are explicitly NOT migrated (producer decision: no backward compatibility).
 // ═══════════════════════════════════════════════════════════
 
 /** Maximum supported lattice dimensions (cols × rows of street cells). */
 const MAX_GRID_COLS = 5;
 const MAX_GRID_ROWS = 5;
-
-/** Horizontal distance between the origins of adjacent street cells. */
-const WORLD_STRIDE_X = STREET_COLS - 1; // 4
-/** Vertical distance between the origins of adjacent street cells. */
-const WORLD_STRIDE_Y = STREET_ROWS - 1; // 1
 
 /** Grid dimensions for expanded street layouts (cols × rows of 5×2 street cells). */
 export interface GridDims {
@@ -1218,41 +1217,15 @@ export interface GridDims {
   rows: number;
 }
 
-/** Width in world columns of a `cols`-wide street lattice. */
-export function worldWidth(cols: number): number {
-  return WORLD_STRIDE_X * cols + 1;
-}
-
-/** Height in world rows of a `rows`-tall street lattice. */
-export function worldHeight(rows: number): number {
-  return WORLD_STRIDE_Y * rows + 1;
-}
-
-/**
- * Number of unique world slots for a `cols`×`rows` street lattice.
- *
- * Because adjacent streets share their whole touching seam, the lattice
- * collapses to the solid rectangle
- * `((STREET_COLS−1)·cols + 1) × ((STREET_ROWS−1)·rows + 1)`:
- * 10, 18, 15, 27, 39, 52 for 1×1, 2×1, 1×2, 2×2, 3×2, 3×3.
- */
-export function worldSlotCount(streetCols: number, streetRows: number): number {
-  if (!Number.isInteger(streetCols) || !Number.isInteger(streetRows) || streetCols <= 0 || streetRows <= 0) {
-    throw new Error(`worldSlotCount: dimensions must be positive integers, got ${streetCols}×${streetRows}`);
-  }
-  return worldWidth(streetCols) * worldHeight(streetRows);
-}
-
 function slotToLocal(slot: number): { lx: number; ly: number } {
   return { lx: slot % STREET_COLS, ly: Math.floor(slot / STREET_COLS) };
 }
 
 /**
- * Base world position of street (sx,sy) slot `slotIndex`.
+ * Base world position of street (streetX,streetY) slot `slotIndex`.
  *
- * In the planar model every street/slot pair maps to its base world position;
- * co-located pairs (the shared seams and intersections) share that position, so
- * the base is the world coordinate for canonical and non-canonical owners alike.
+ * Each street owns its own plots, so every (street, slot) pair maps to a
+ * distinct world position: `(streetX·STREET_COLS + lx, streetY·STREET_ROWS + ly)`.
  */
 function baseWorld(
   streetX: number,
@@ -1267,42 +1240,34 @@ function baseWorld(
 }
 
 /**
- * Every (streetX, streetY, slotIndex) owner of a world node within a
- * `cols`×`rows` lattice, sorted lexicographically by (streetX, streetY, slotIndex).
- * A shared seam node has two owners; a four-way intersection has four.
+ * The single (streetX, streetY, slotIndex) owner of a world node, or null when
+ * the position falls outside a `cols`×`rows` lattice.
+ *
+ * In the city-block model every world position has exactly one owner (streets
+ * never share plots), so this is a pure coordinate decode.
  */
-function worldOwners(
+function worldOwner(
   worldX: number,
   worldY: number,
   cols: number,
   rows: number,
-): { streetX: number; streetY: number; slotIndex: number }[] {
-  const sxMin = Math.max(0, Math.ceil((worldX - (STREET_COLS - 1)) / WORLD_STRIDE_X));
-  const sxMax = Math.min(cols - 1, Math.floor(worldX / WORLD_STRIDE_X));
-  const syMin = Math.max(0, Math.ceil((worldY - (STREET_ROWS - 1)) / WORLD_STRIDE_Y));
-  const syMax = Math.min(rows - 1, Math.floor(worldY / WORLD_STRIDE_Y));
-  const owners: { streetX: number; streetY: number; slotIndex: number }[] = [];
-  for (let sy = syMin; sy <= syMax; sy++) {
-    const ly = worldY - sy * WORLD_STRIDE_Y;
-    if (ly < 0 || ly >= STREET_ROWS) continue;
-    for (let sx = sxMin; sx <= sxMax; sx++) {
-      const lx = worldX - sx * WORLD_STRIDE_X;
-      if (lx < 0 || lx >= STREET_COLS) continue;
-      owners.push({ streetX: sx, streetY: sy, slotIndex: ly * STREET_COLS + lx });
-    }
-  }
-  owners.sort((a, b) => a.streetX - b.streetX || a.streetY - b.streetY || a.slotIndex - b.slotIndex);
-  return owners;
+): { streetX: number; streetY: number; slotIndex: number } | null {
+  if (!Number.isInteger(worldX) || !Number.isInteger(worldY)) return null;
+  const sx = Math.floor(worldX / WORLD_STRIDE_X);
+  const sy = Math.floor(worldY / WORLD_STRIDE_Y);
+  if (sx < 0 || sy < 0 || sx >= cols || sy >= rows) return null;
+  const lx = worldX - sx * WORLD_STRIDE_X;
+  const ly = worldY - sy * WORLD_STRIDE_Y;
+  if (lx < 0 || lx >= STREET_COLS || ly < 0 || ly >= STREET_ROWS) return null;
+  return { streetX: sx, streetY: sy, slotIndex: ly * STREET_COLS + lx };
 }
 
 /**
  * Maps (streetX, streetY, slotIndex) to integer world coordinates.
  *
- * The world position is `(streetX·(STREET_COLS−1) + lx, streetY·(STREET_ROWS−1) + ly)`
- * where `(lx, ly)` is the slot's local (column, row). Shared seams and four-way
- * intersections therefore return the same world position for each of their
- * owners (e.g. `(0,0,4)` and `(1,0,0)` both map to world `(4,0)`; for a 2×2
- * lattice `(0,0,9)`, `(1,0,5)`, `(0,1,4)` and `(1,1,0)` all map to `(4,1)`).
+ * The world position is `(streetX·STREET_COLS + lx, streetY·STREET_ROWS + ly)`
+ * where `(lx, ly)` is the slot's local (column, row). Every street/slot pair
+ * maps to a distinct world position — no two streets share a plot.
  */
 export function toWorldPosition(
   streetX: number,
@@ -1319,31 +1284,21 @@ export function toWorldPosition(
 }
 
 /**
- * Inverse of toWorldPosition: world → one (street, slot) owner, or null if the
+ * Inverse of toWorldPosition: world → its (street, slot) owner, or null if the
  * world coordinate is not part of the supported MAX_GRID lattice.
- *
- * A shared node has several owners; the lexicographically minimal
- * (streetX, streetY, slotIndex) owner is returned, so a
- * `world → owner → world` round-trip is stable.
  */
 export function fromWorldPosition(
   worldPos: { worldX: number; worldY: number },
 ): { streetX: number; streetY: number; slotIndex: number } | null {
-  if (!Number.isInteger(worldPos.worldX) || !Number.isInteger(worldPos.worldY)) return null;
-  const owners = worldOwners(worldPos.worldX, worldPos.worldY, MAX_GRID_COLS, MAX_GRID_ROWS);
-  if (owners.length === 0) return null;
-  return { ...owners[0] };
+  return worldOwner(worldPos.worldX, worldPos.worldY, MAX_GRID_COLS, MAX_GRID_ROWS);
 }
 
 /**
  * Chebyshev (8-way) neighbours of a world position within the supported
- * MAX_GRID lattice.
+ * MAX_GRID lattice, each returned as its (street, slot) owner.
  *
- * Returns exactly one entry per distinct neighbouring world node (the node's
- * canonical owner), so an interior node yields 8 entries at range 1 and
- * `(2·range+1)² − 1` entries where the lattice has room. Shared seam and
- * four-way-intersection nodes are visited once each — use the world-index
- * helpers to enumerate a node's per-street owners.
+ * An interior node yields 8 entries at range 1 and `(2·range+1)² − 1` entries
+ * where the lattice has room.
  */
 export function expandedNeighbors(
   worldPos: { worldX: number; worldY: number },
@@ -1357,8 +1312,8 @@ export function expandedNeighbors(
   for (let y = Math.max(0, worldPos.worldY - range); y <= Math.min(yMax, worldPos.worldY + range); y++) {
     for (let x = Math.max(0, worldPos.worldX - range); x <= Math.min(xMax, worldPos.worldX + range); x++) {
       if (x === worldPos.worldX && y === worldPos.worldY) continue;
-      const owners = worldOwners(x, y, MAX_GRID_COLS, MAX_GRID_ROWS);
-      if (owners.length > 0) result.push(owners[0]);
+      const owner = worldOwner(x, y, MAX_GRID_COLS, MAX_GRID_ROWS);
+      if (owner) result.push(owner);
     }
   }
   return result;

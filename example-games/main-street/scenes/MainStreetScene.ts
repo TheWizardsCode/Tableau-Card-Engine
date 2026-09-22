@@ -219,8 +219,7 @@ export class MainStreetScene extends CardGameScene {
    * Playable street lattice, in street cells. Defaults to 1×1 (the shipping
    * board). `setStreetPlayableLattice()` grows the playable grid (re-indexing
    * the state by world position, `setStreetGridLattice`) so revealed
-   * neighbouring streets, shared seams and four-way intersections become
-   * placeable (CG-0MTH9OW0H0005VKE).
+   * neighbouring streets become placeable (CG-0MTH9OW0H0005VKE).
    */
   public streetPlayableLattice: StreetLatticeDims = { cols: 1, rows: 1 };
   /** Mask graphics clipping the street map to its viewport band. */
@@ -711,6 +710,11 @@ export class MainStreetScene extends CardGameScene {
   /** Visible, de-duplicated street-map slots (test/introspection hook). */
   public getVisibleStreetNodes(): any[] {
     return this.msRenderer?.getVisibleStreetNodes?.() ?? [];
+  }
+
+  /** Road bands drawn for the current lattice (test/introspection hook). */
+  public getStreetRoadBands(): any[] {
+    return this.msRenderer?.getStreetRoadBands?.() ?? [];
   }
 
   /**

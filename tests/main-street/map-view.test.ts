@@ -24,16 +24,19 @@ import {
   clampStreetCamera,
   clampZoomLevel,
   defaultStreetCamera,
+  mapBounds,
   mapCellOrigin,
+  mapCellStepX,
   mapSlotCenter,
   mapSlotCount,
+  roadBandX,
   screenToLocal,
   localToScreen,
   containerTransform,
   panStreetCamera,
-  streetPixelHeight,
   streetPixelWidth,
   streetViewportRect,
+  visibleLocalRect,
   visibleMapSlots,
   zoomInLevel,
   zoomOutLevel,
@@ -118,10 +121,10 @@ describe('viewport and 1× framing (AC2)', () => {
 });
 
 describe('multi-street lattice and zoom-out reveal (AC2)', () => {
-  it('reports the unique slot count of a lattice (shared seam de-duplicated)', () => {
+  it('reports the plot count of a lattice (ten plots per street, nothing shared)', () => {
     expect(mapSlotCount(SINGLE)).toBe(10);
-    // 3 streets wide share 2 seam columns; 3 streets tall share 2 seam rows.
-    expect(mapSlotCount({ cols: 3, rows: 3 })).toBe(13 * 4);
+    // 3 streets × 5 columns = 15 world columns; 3 streets × 2 rows = 6 world rows.
+    expect(mapSlotCount({ cols: 3, rows: 3 })).toBe(15 * 6);
   });
 
   it('keeps neighbouring streets hidden at 1× (culling)', () => {
@@ -146,30 +149,29 @@ describe('multi-street lattice and zoom-out reveal (AC2)', () => {
     expect(nodes.some((n) => n.gameplayIndex === null)).toBe(true);
   });
 
-  it('de-duplicates shared seam slots and lets the gameplay street own them', () => {
+  it('renders every street-owned plot once — nothing is shared or de-duplicated', () => {
     const camera = clampStreetCamera({ ...defaultStreetCamera(layout), zoomLevel: 2 }, layout, RING);
     const nodes = visibleMapSlots(camera, layout, RING);
     const keys = nodes.map((n) => `${n.localX},${n.localY}`);
     expect(new Set(keys).size).toBe(keys.length);
 
-    // The centre street's right-hand column is shared with its east
-    // neighbour; the playable owner must win the de-duplication.
-    const sharedColumn = nodes.filter(
-      (n) =>
-        (n.localX === layout.streetX + (layout.streetCols - 1) * (layout.slotW + layout.slotGap)) &&
-        n.gameplayIndex !== null,
-    );
-    expect(sharedColumn).toHaveLength(2);
+    // The centre street's east-edge column and the east neighbour's west-edge
+    // column are now DIFFERENT plots (they used to be one shared seam column).
+    const centreEdge = nodes.filter((n) => n.cellX === 1 && n.cellY === 1 && n.slotIndex === 4);
+    const eastEdge = nodes.filter((n) => n.cellX === 2 && n.cellY === 1 && n.slotIndex === 0);
+    expect(centreEdge).toHaveLength(1);
+    expect(eastEdge).toHaveLength(1);
+    expect(eastEdge[0].localX).not.toBe(centreEdge[0].localX);
   });
 
-  it('anchors neighbouring street cells to the shared seam (no gaps)', () => {
+  it('separates neighbouring street cells by a road band (city-block grid)', () => {
     const east = mapCellOrigin(2, 1, layout, RING);
     const centre = mapCellOrigin(1, 1, layout, RING);
-    // Neighbouring streets share one slot column, so they step by
-    // (STREET_COLS - 1) columns rather than a full street width.
-    expect(east.x - centre.x).toBe((layout.streetCols - 1) * (layout.slotW + layout.slotGap));
-    const south = mapCellOrigin(1, 2, layout, RING);
-    expect(south.y - centre.y).toBe((2 - 1) * (layout.slotH + layout.streetRowGap));
+    // Streets step by a full street width plus the road band — they do not touch.
+    expect(east.x - centre.x).toBeCloseTo(streetPixelWidth(layout) + roadBandX(layout), 5);
+    expect(east.x - centre.x).toBeCloseTo(mapCellStepX(layout), 5);
+    // The step is strictly wider than a street block (there is a visible gap).
+    expect(east.x - centre.x).toBeGreaterThan(streetPixelWidth(layout));
   });
 });
 
@@ -181,35 +183,43 @@ describe('panning and clamping', () => {
     expect(camera.focusY).toBeCloseTo(viewport.y + viewport.h / 2, 5);
   });
 
-  it('cannot pan a fitted map off the viewport', () => {
+  it('clamps panning at 1× so the street stays framed (outer road band included)', () => {
     const camera = panStreetCamera(defaultStreetCamera(layout), 500, 300, layout, SINGLE);
-    const transform = containerTransform(camera, layout);
-    expect(transform.x).toBe(0);
-    expect(transform.y).toBe(0);
+    const bounds = mapBounds(layout, SINGLE);
+    const viewport = streetViewportRect(layout);
+    const halfW = viewport.w / 2; // scale 1 at zoom level 1
+    expect(camera.focusX).toBeLessThanOrEqual(bounds.right - halfW + 0.001);
+    expect(camera.focusX).toBeGreaterThanOrEqual(bounds.left + halfW - 0.001);
+    // The street's plot area is still inside the visible window.
+    const visible = visibleLocalRect(camera, layout);
+    expect(visible.right).toBeGreaterThan(layout.streetX);
+    expect(visible.left).toBeLessThan(layout.streetX + streetPixelWidth(layout));
   });
 
   it('pans a zoomed-out lattice and clamps the focus inside the map bounds', () => {
-    // At zoom level 2 the 3×3 map (≈2060px wide) is larger than the
-    // viewport, so horizontal panning is allowed but clamped to the map.
+    // At zoom level 2 the 3×3 map is larger than the viewport, so horizontal
+    // panning is allowed but clamped to the map (roads included).
     const start = clampStreetCamera({ ...defaultStreetCamera(layout), zoomLevel: 2 }, layout, RING);
     const panned = panStreetCamera(start, 10_000, -10_000, layout, RING);
-    const maxX = mapCellOrigin(2, 2, layout, RING).x + streetPixelWidth(layout);
+    const bounds = mapBounds(layout, RING);
     const halfW = streetViewportRect(layout).w / (2 * zoomScale(2));
-    expect(panned.focusX).toBeLessThanOrEqual(maxX - halfW + 0.001);
+    expect(panned.focusX).toBeLessThanOrEqual(bounds.right - halfW + 0.001);
     // The camera actually moved from its clamped start position.
     expect(panned.focusX).toBeGreaterThan(start.focusX);
-    // Vertically the map fits the viewport, so the focus stays centred.
-    const viewport = streetViewportRect(layout);
-    expect(panned.focusY).toBeCloseTo(viewport.y + viewport.h / 2, 5);
+    // The map is taller than the viewport too (streets plus road bands), so the
+    // vertical focus is clamped inside the map rather than left centred.
+    const halfH = streetViewportRect(layout).h / (2 * zoomScale(2));
+    expect(panned.focusY).toBeGreaterThanOrEqual(bounds.top + halfH - 0.001);
+    expect(panned.focusY).toBeLessThanOrEqual(bounds.bottom - halfH + 0.001);
   });
 
   it('clamps vertical panning for a tall lattice', () => {
     const TALL = { cols: 1, rows: 5 };
     const start = clampStreetCamera({ ...defaultStreetCamera(layout), zoomLevel: 2 }, layout, TALL);
     const panned = panStreetCamera(start, 0, 10_000, layout, TALL);
-    const maxY = mapCellOrigin(0, 4, layout, TALL).y + streetPixelHeight(layout);
+    const bounds = mapBounds(layout, TALL);
     const halfH = streetViewportRect(layout).h / (2 * zoomScale(2));
-    expect(panned.focusY).toBeLessThanOrEqual(maxY - halfH + 0.001);
+    expect(panned.focusY).toBeLessThanOrEqual(bounds.bottom - halfH + 0.001);
     expect(panned.focusY).toBeGreaterThan(start.focusY);
   });
 });
