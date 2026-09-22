@@ -40,7 +40,7 @@ try {
   // Art map missing — fall back to the synergy-coloured glyph placeholder.
 }
 
-/** Resolve a card name to its embedded 64x64 PNG data URI (or null). */
+/** Resolve a card name to its embedded art data URI (256×256 WebP, or null). */
 function resolveCardArtDataUri(cardName) {
   const name = String(cardName == null ? '' : cardName).trim();
   const aliased = (CARD_ART_MAP.aliases && CARD_ART_MAP.aliases[name]) || name;
@@ -219,9 +219,11 @@ function artClipPath(cardId) {
   return `<clipPath id="ms-art-clip-${cardId}"><rect x="${GRAPHIC_X}" y="${GRAPHIC_Y}" width="${GRAPHIC_W}" height="${GRAPHIC_H}" rx="4" ry="4" /></clipPath>`;
 }
 
-/** Accent-coloured 64×64 art zone. Embeds the card's art PNG when available
- *  (self-contained data URI — the SVG is rasterised from a data: URI, where
- *  external refs do not resolve); otherwise a bold initial placeholder.
+/** Accent-coloured 64×64 art zone. Embeds the card's art bitmap when
+ *  available (self-contained data URI — the SVG is rasterised from a data:
+ *  URI, where external refs do not resolve); otherwise a bold initial
+ *  placeholder. The zone is 64×64 SVG user units; the embedded bitmap is
+ *  256×256 (CG-0MUCM36EQ008YP4R) and is downsampled into the zone.
  *  Matches the runtime generator (MainStreetCardSvgGenerator.ts). */
 function graphicZoneSvgStatic(name, accent, cardId) {
   const glyph = escapeXml((String(name || '?').trim().charAt(0) || '?').toUpperCase());

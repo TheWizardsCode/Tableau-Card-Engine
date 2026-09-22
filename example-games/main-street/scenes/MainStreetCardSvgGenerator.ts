@@ -13,12 +13,17 @@
  * See CG-0MTORJ5FS006B0UN for the full hand-overlap and stacking analysis.
  *
  * Art (CG-0MTORJ5FS006B0UN producer review): the 64×64 zone is filled with
- * the card's sprite PNG (`example-games/main-street/sprites/<Name>_64_x_64.png`,
+ * the card's art (`example-games/main-street/sprites/<Name>_1024_x_1024.png`,
  * mapped by `scripts/generate-main-street-card-art.mjs`) embedded as an inline
  * base64 `data:` URI — required because the SVG itself is rasterised from a
  * data: URI, where external image references do not resolve. Cards without
  * dedicated art use the `Fallback` sprite; see
  * `example-games/main-street/MainStreetCardArt.ts` for the name→art resolver.
+ *
+ * CG-0MUCM36EQ008YP4R: the embedded bitmap is 256×256 WebP. The 64×64 zone is
+ * a layout dimension in SVG user units, not the render resolution — Phaser
+ * rasterises the card SVG at up to 4× (`rasteriseSvgToTexture`), so the zone
+ * occupies 256×256 device pixels and a 64×64 bitmap looked pixelated.
  *
  * Business and Community Space cards include dynamic state (income,
  * reputation, level). Event, Upgrade, and Staff cards are generated
@@ -101,11 +106,13 @@ function cardArtClipPath(cardId: string): string {
 
 /** Build the 64×64 left-art graphic (CG-0MTORJ5FS006B0UN).
  *
- * When `artDataUri` is provided the zone renders the embedded PNG sprite
+ * When `artDataUri` is provided the zone renders the embedded bitmap
  * (self-contained as a `data:` URI, because the SVG itself is rasterised from
  * a data URI where external references do not resolve), clipped to the
- * rounded 64×64 corners. The synergy-coloured rect stays as a backing colour
- * (visible for sprites with transparency). When no art is available the
+ * rounded 64×64 corners. The bitmap is 256×256 (CG-0MUCM36EQ008YP4R) and is
+ * downsampled into the zone by the rasteriser. The synergy-coloured rect stays
+ * as a backing colour (visible for art with transparency). When no art is
+ * available the
  * bold-glyph placeholder is drawn instead, so the visual remains readable
  * under hand overlap (≥44 px visible) and street stacking (~23 px visible).
  */

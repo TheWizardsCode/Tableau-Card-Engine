@@ -69,24 +69,35 @@ img.setOrigin(0.5, 0.5);
 
 Keep this document in sync with `docs/main-street/prd-milestone-*` and `public/assets/CREDITS.md` when canonical dimensions change.
 
-## 64×64 art zone (CG-0MTORJ5FS006B0UN)
+## 64×64 art zone (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R)
 
 Every Main Street card has a square art zone at `(8, 8)` sized `64×64 px`
 (the `GRAPHIC_*` constants in `MainStreetCardSvgGenerator.ts`). The zone is
-filled with the card's sprite PNG — `example-games/main-street/sprites/<Name>_64_x_64.png`
+filled with the card's art — `example-games/main-street/sprites/<Name>_1024_x_1024.png`
 — embedded as an **inline base64 `data:` URI** (an `<image>` clipped to the
 rounded 64×64 corners). Inline embedding is required because the SVG is
 rasterised from a `data:image/svg+xml` URI, where external image references
 do not resolve.
 
-- **Source art**: `example-games/main-street/sprites/<Name>_64_x_64.png`
-  (project-generated from each card's `art_notes`).
-- **Art map**: `node scripts/generate-main-street-card-art.mjs` re-encodes the
-  64×64 sprites as near-lossless 256-colour indexed PNGs and writes the shared
-  `example-games/main-street/card-art-map.json` (base64), consumed by both
-  `MainStreetCardArt.ts` (runtime) and `scripts/generate-main-street-card-svgs.mjs`
-  (static SVGs). Cards without a dedicated sprite use the `Fallback` art via
-  `resolveCardArtName()`.
+**The 64×64 is a layout dimension, not the render resolution.** Phaser
+rasterises the card SVG at up to 4× quality scale (`rasteriseSvgToTexture`,
+`qualityScale = Math.max(4, dpr)`), so the zone occupies up to 256×256
+*device* pixels. The embedded bitmap is therefore **256×256 WebP**, filling
+the zone at 1:1; a 64×64 bitmap would be stretched 4× and appeared pixelated.
+
+- **Source art**: `example-games/main-street/sprites/<Name>_1024_x_1024.png`
+  (project-generated from each card's `art_notes`). The 1024×1024 files are
+the source of truth; the `_64_x_64.png` files are superseded legacy thumbnails.
+- **Art map**: `node scripts/generate-main-street-card-art.mjs` downscales each
+  1024×1024 source to 256×256 and re-encodes it as lossy WebP (quality 90),
+  writing the shared `example-games/main-street/card-art-map.json` (base64),
+  consumed by both `MainStreetCardArt.ts` (runtime) and
+  `scripts/generate-main-street-card-svgs.mjs` (static SVGs). Cards without a
+  dedicated sprite use the `Fallback` art via `resolveCardArtName()`.
+- **Why WebP**: a 256-colour indexed PNG at 256×256 costs ~5.3 MB of base64
+  across all 63 sprites (more than the whole app bundle); lossy WebP costs
+  ~0.6 MB — still far less than the pixels it carries — and is decoded by all
+  supported browsers (Chromium/Electron, Firefox, Safari).
 - **Hand overlap / stacking**: the logo is top-heavy inside the zone (top
   40 %), so it stays recognisable at ~23 px visible height when cards stack
   and at ≥44 px under ~20 px hand overlap.

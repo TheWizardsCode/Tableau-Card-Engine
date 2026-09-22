@@ -1149,16 +1149,25 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
 
-#### Card art pipeline (CG-0MTORJ5FS006B0UN)
+#### Card art pipeline (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R)
 
-Each card's 64×64 art zone embeds its sprite PNG as an inline base64 `data:`
-URI (required: the SVG is rasterised from a data URI, so external refs do not
-resolve). The committed sprites live in
-`example-games/main-street/sprites/<Name>_64_x_64.png`. Run
+Each card's 64×64 art zone embeds its art as an inline base64 `data:` URI
+(required: the SVG is rasterised from a data URI, so external refs do not
+resolve). **The 64×64 zone is a layout dimension, not the render resolution** —
+Phaser rasterises the card SVG at up to 4× quality scale
+(`rasteriseSvgToTexture`, `qualityScale = Math.max(4, dpr)`), so the zone
+occupies up to 256×256 device pixels and the embedded bitmap is **256×256
+WebP**, filling it at 1:1.
+
+The committed 1024×1024 source sprites live in
+`example-games/main-street/sprites/<Name>_1024_x_1024.png` (the source of
+truth; the `_64_x_64.png` files are superseded legacy thumbnails). Run
 `node scripts/generate-main-street-card-art.mjs` to regenerate
 `example-games/main-street/card-art-map.json` (card name → base64 data URI,
-plus spelling aliases and a `Fallback` entry); the script re-encodes each
-sprite as a near-lossless 256-colour indexed PNG to keep the inline map small.
+plus spelling aliases and a `Fallback` entry); the script downscales each
+1024×1024 sprite to 256×256 and re-encodes it as lossy WebP (quality 90),
+which keeps the inline map small (~0.6 MB) despite carrying 16× the pixels of
+the old 64×64 PNG map.
 Both `MainStreetCardArt.ts` (runtime CSV generator) and
 `scripts/generate-main-street-card-svgs.mjs` (static SVGs) consume the map.
 Cards without dedicated art use the `Fallback` sprite.
