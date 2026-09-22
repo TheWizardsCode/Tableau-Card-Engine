@@ -1622,50 +1622,19 @@ export class MainStreetRenderer {
       targetText.setName('upgradeTargetLabel');
       container.add(targetText);
 
-      // Buy-and-place premium indicator for upgrades (CG-0MT3IYSRL001VVUP):
-      // dragging an upgrade market→business is a same-turn buy-and-play that
-      // costs +50% over the listed price, exactly like business cards. Uses
-      // the same badge name so the two families stay visually/nominally
-      // consistent.
-      const premiumCost = Math.ceil(u.cost * 1.5 * 2) / 2;
-      const premiumLabel = s.add.text(
-        rightColX,
-        Math.round(renderH / 2 - 11),
-        `€${premiumCost} (listed €${u.cost})`,
-        {
-          fontSize: '9px',
-          color: '#ffcc88',
-          fontFamily: FONT_FAMILY,
-          fontStyle: 'bold',
-          align: 'left',
-          backgroundColor: '#000000aa',
-        },
-      );
-      premiumLabel.setOrigin(0, 0.5);
-      premiumLabel.setName('buyAndPlacePremiumLabel');
-      container.add(premiumLabel);
+      // Note: drag-and-drop premium cost text (e.g. "€600 (listed €400)")
+      // was removed per producer audit — the badge conveyed no actionability
+      // and was confusing to players. The premium pricing logic itself is
+      // unchanged (see CG-0MSTOF1N5005PK2R / CG-0MT3IYSRL001VVUP).
     }
 
     // Apply income/reputation overlays for business and community-space cards
     if (card.family === 'business' || card.family === 'community-space') {
       this.applyUpgradeOverlays(container, card as BusinessCard | CommunitySpaceCard, renderW, renderH);
 
-      // Buy-and-place premium indicator (CG-0MSTOF1N5005PK2R): direct
-      // market→street placement costs +50% over the listed cost. Shown as a
-      // small badge at the bottom of business/community-space cards.
-      const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
-      const premiumRightX = Math.round(-renderW / 2 + 80);
-      const premiumLabel = s.add.text(premiumRightX, Math.round(renderH / 2 - 11), `€${premiumCost} (listed €${card.cost})`, {
-        fontSize: '9px',
-        color: '#ffcc88',
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-        align: 'left',
-        backgroundColor: '#000000aa',
-      });
-      premiumLabel.setOrigin(0, 0.5);
-      premiumLabel.setName('buyAndPlacePremiumLabel');
-      container.add(premiumLabel);
+      // Note: drag-and-drop premium cost text was removed per producer audit
+      // — the badge conveyed no actionability and was confusing to players.
+      // The premium pricing logic itself is unchanged (CG-0MSTOF1N5005PK2R).
     }
 
     // Staff specialization skill badges (I5, CG-0MT4WXX1Q00860VP): each

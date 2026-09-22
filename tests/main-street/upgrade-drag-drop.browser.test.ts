@@ -250,13 +250,6 @@ function findMarketCardContainer(scene: Scene, cardId: string): any | undefined 
   return list.find((child) => child?.name === `ms-market-card-${cardId}`);
 }
 
-/** The text of the buy-and-place premium badge on a card container, if any. */
-function premiumBadgeText(container: any): string | null {
-  const children: any[] = container?.list ?? [];
-  const badge = children.find((child) => child?.name === 'buyAndPlacePremiumLabel');
-  return badge?.text ?? null;
-}
-
 /**
  * Wait until the market containers are stable across consecutive polls so a
  * rebuild cannot invalidate the dragged container mid-gesture.
@@ -286,9 +279,6 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     const scene = getScene(game);
     const { upgrade } = setupUpgradeScene(scene);
     const container = await waitForMarketStable(scene, upgrade.id);
-
-    // The premium badge mirrors the business buy-and-place label.
-    expect(premiumBadgeText(container)).toContain(String(premiumOf(upgrade.cost)));
 
     const originX = container.x;
     const originY = container.y;
