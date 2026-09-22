@@ -1,7 +1,23 @@
 # Main Street: Card Catalog
 
 > **Source of truth:** `example-games/main-street/card-data.csv` (CSV) — loaded by `MainStreetCards.ts` at build time (work item CG-0MR6ZR23J006ZDNZ)
-> **Last updated:** CSV externalisation (work item CG-0MR6ZR23J006ZDNZ)
+> **Last updated:** Annual calendar — week-gated seasonal/holiday events (CG-0MTT0K9RX0004QTE)
+
+This document lists every card template in the Main Street card pool, organised by family (Business, Event, Upgrade, Community Space, Staff). Each entry includes all gameplay-relevant fields and a short design rationale.
+
+Card templates are stored as rows in `card-data.csv` and parsed at build time by `MainStreetCards.ts`. To add cards, edit the CSV and regenerate metadata (see guidance below).
+
+**Deck sizes (default copies):**
+
+| Family        | Templates | Copies each | Total cards |
+|---------------|-----------|-------------|-------------|
+| Business      | 30        | 3           | 90          |
+| Event         | 71        | 3           | 213         |
+| Upgrade       | 39        | 2           | 78          |
+| Community Space | 8       | 3           | 24          |
+| Staff         | 9         | 3           | 27          |
+
+**Synergy types:** Food, Culture, Commerce, Service (M2), Entertainment (M2), Health (M2)
 
 This document lists every card template in the Main Street card pool, organised by family (Business, Event, Upgrade, Community Space, Staff). Each entry includes all gameplay-relevant fields and a short design rationale.
 
@@ -24,8 +40,8 @@ Card templates are stored as rows in `card-data.csv` and parsed at build time by
 | Snapshot | Business | Event | Upgrade | Community Space | Staff | Total templates |
 |---|---:|---:|---:|---:|---:|---:|
 | Tier 1 baseline (`docs/main-street/card-catalog-baseline.json`) | 4 | 4 | 4 | 2 | 1 | 15 |
-| Current catalog (`card-data.csv`) | 30 | 56 | 39 | 8 | 9 | 142 |
-| Net increase | +26 | +52 | +35 | +6 | +8 | +127 |
+| Current catalog (`card-data.csv`) | 30 | 71 | 39 | 8 | 9 | 157 |
+| Net increase | +26 | +67 | +35 | +6 | +8 | +142 |
 
 - 2x target from baseline: `>= 30` templates
 - Current total: `142` templates (`9.5x` baseline)
@@ -304,6 +320,49 @@ The M2 incident pool is more balanced than M1: 5 negative vs. 3 positive inciden
 
 ---
 
+## Week Windows (Seasonal & Holiday Events)
+
+Starting with work item CG-0MTT0K9RX0004QTE, each event card can carry optional week-window fields (`availableWeekStart`, `availableWeekEnd`). Cards without a window are **year-round** (always offerable/drawable). Cards with a window are only offerable/drawable when the current game week falls within `[start, end]` inclusive.
+
+The calendar model advances one week per turn (52-week year, wrapping to year 2 at week 53). A new game starts at a random week chosen from the allowed set `{1–8, 16–24, 40–46}` so that different sessions experience different points in the annual cycle.
+
+### New Irish-Holiday Event Cards
+
+Seven new Investment event cards rooted in the Irish calendar, added at CG-0MTT0K9RX0004QTE:
+
+| ID | Name | Weeks | Tier | Trigger | Effect | Rationale |
+|---|---|---|---|---|---|---|
+| `evt-st-brigids` | St Brigid's Day | 5 | 3 | Investment | +3 rep | Imbolc — renewal at start of spring |
+| `evt-st-patricks` | St Patrick's Day | 11–12 | 4 | Investment | +2 coins Commerce, +2 rep | Island-wide celebration |
+| `evt-easter` | Easter | 13–17 | 5 | Investment | +1 coin all, +2 rep | Spring festival and community gathering |
+| `evt-may-day` | May Day / Bealtaine | 18 | 4 | Investment | +2 coins Entertainment, +1 rep | May Day dances and celebrations |
+| `evt-lughnasadh` | Lughnasadh | 31 | 6 | Investment | +3 coins Food, +1 rep | Ancient harvest games and fair |
+| `evt-samhain` | Samhain / Halloween | 44 | 7 | Investment | +2 coins Entertainment, +2 rep | Spooky autumn festival and bonfire night |
+| `evt-christmas` | Christmas | 51–52 | 8 | Investment | +3 coins all, +3 rep | Christmas festivities and seasonal cheer |
+
+### Existing Event Cards — Week-Gate Audit
+
+All 64 original event cards were audited. Seasonal/festival/tourist-style events received windows; generic economic/administrative incidents remain year-round.
+
+| ID | Name | Window | Rationale |
+|---|---|---|---|
+| `evt-festival` | Local Festival | 18–35 | Festival season |
+| `evt-festival-season` | Festival Season | 23–35 | Extended festival season |
+| `evt-block-party` | Block Party | 22–33 | Summer street festivities |
+| `evt-tourist-season` | Tourist Season | 23–35 | Peak tourist months |
+| `evt-tourist-bus` | Tourist Bus | 23–35 | Tourist season incident |
+| `evt-heatwave` | Heatwave | 23–35 | Summer weather event |
+| `evt-street-performer` | Street Performer | 22–35 | Summer fair circuit |
+| `evt-food-tasting` | Food Tasting Tour | 20–36 | Summer fair circuit |
+| `evt-health-carnival` | Health Carnival | 20–36 | Summer fair circuit |
+| `evt-art-sale` | Art Sale | 20–36 | Summer fair circuit |
+| `evt-harvest-festival` | Harvest Festival | 38–41 | Autumn harvest |
+| `evt-summer-fest` | Summer Fest | 23–35 | Summer festival |
+
+**Year-round** (no window — always offerable/drawable): `evt-rainy`, `evt-tax`, `evt-award`, `evt-inspection`, `evt-grand-opening`, `evt-wellness-fair`, `evt-charity-drive`, `evt-power-outage`, `evt-shoplifting`, `evt-noise-complaint`, `evt-pipe-burst`, `evt-food-critic`, `evt-construction`, `evt-viral-review`, `evt-vandalism`, `evt-flu-outbreak`, `evt-recession`, `evt-health-campaign`, `evt-bulk-purchase`, `evt-book-fair`, `evt-volunteer-day`, `evt-community-garden`, `evt-protest`, `evt-supply-chain`, `evt-power-surge`, `evt-strike`, `evt-pest-infestation`, `evt-slow-season`, `evt-good-press`, `evt-cultural-grant`, `evt-shopping-spree`, `evt-service-week`, `evt-community-renovation`, `evt-graffiti`, `evt-graffiti-art`, `evt-water-main`, `evt-parking-tickets`, `evt-labor-shortage`, `evt-movie-premiere`, `evt-health-screening`, `evt-farmers-market`, `evt-library-reading`, `evt-street-cleaning`, `evt-neighborhood-watch`, `evt-tax-error`, `evt-tax-inquiry`, `evt-strike-service`, `evt-general-strike`, `evt-popular-menu`, `evt-farm-table`, `evt-depression`, `evt-pandemic`
+
+---
+
 ## Upgrade Cards
 
 Each Upgrade targets a specific Business by name. Applying an upgrade increments the business's level, adds an income bonus, and optionally extends synergy range.
@@ -452,7 +511,7 @@ This writes per-run and aggregate metrics to:
 
 ## Staff Cards
 
-Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143; 12-tier spread CG-0MT3C744B009DS84): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice). They are hired directly from the general market row (0–1 staff per row, `MARKET_STAFF_MAX`) — there is no dedicated staff market (CG-0MT2WTN0L004JA53). A second wave of 12 specialization applicant cards (CG-0MT4WXNR80090FXZ) adds role-themed staff across tiers 2–5; none grant hand slots — they are employed-applicant cards whose effects (synergy/incident/cost bonuses) are wired by the staff-specialization epic. **Staff specialization skills** (1–3 locked skills per applicant, Town Gossip baseline, stacking caps) are documented in [specialization-skills.md](specialization-skills.md).
+Staff cards are a separate card family (`family: 'staff'`) that expand hand capacity at an ongoing per-turn coin cost. They do not occupy hand slots and are tier-gated like every other family (rebalance CG-0MT2WU0CX005Z143; 12-tier spread CG-0MT3C744B009DS84): staff unlock as their tier is reached, so a fresh run starts with only the Tier-1 staff (Apprentice). They are hired directly from the general market row (0–1 staff per row, `MARKET_STAFF_MAX`) — there is no dedicated staff market (CG-0MT2WTN0L004JA53). A second wave of 12 specialization applicant cards (CG-0MT4WXNR80090FXZ) adds role-themed staff across tiers 2–5; none grant hand slots — they are employed-applicant cards whose effects (synergy/incident/cost bonuses) are wired by the staff-specialization epic. **Staff specialization skills** (1–3 locked skills per applicant, Town Gossip baseline, stacking caps) are documented in [specialization-skills.md](specialization-skills.md). **Business-specialist staff** (CG-0MTIOLY2A0092OT1) carry an `allowedBusinessTypes` list (specific business names and/or synergy types); they may only be employed at matching businesses and are purchasable from the general market like other staff.
 
 | ID | Name | Cost | Ongoing/turn | Slots+ | Tier | Ability | Description | Rationale |
 |----|------|------|--------------|--------|------|---------|-------------|-----------|
@@ -464,7 +523,7 @@ Staff cards are a separate card family (`family: 'staff'`) that expand hand capa
 | `staff-lookout` | Lookout | 10 | 2 | +1 | 7 | Peek once/turn | A sharp-eyed lookout can peek at the top card of the incident deck once per turn. | **NEW** peek ability *(CG-0MSXOW6GN008ZSMN).* |
 | `staff-director` | Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. | Premium capacity. |
 | `staff-executive` | Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |
-| `staff-general-manager` | General Manager | 20 | 5 | +4 | 12 | +1 action/turn | A seasoned leader grants **+1 action per day** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
+| `staff-general-manager` | General Manager | 20 | 5 | +4 | 12 | +1 action/turn | A seasoned leader grants **+1 action per week** while employed (2 actions instead of 1). | **NEW** action-economy ability *(CG-0MSTOF1N5005PK2R).* |
 | `staff-barista` | Barista | 3 | 0.5 | — | 2 | Food synergy | A skilled barista brings warmth to any business. Adjacent Food businesses gain +0.2 synergy coins. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
 | `staff-bookkeeper` | Bookkeeper | 3 | 0.5 | — | 2 | −20% ongoing | Keeps the books tight. Reduces this business ongoing cost by 20%. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
 | `staff-customer-rep` | Customer Service Rep | 3 | 0.5 | — | 2 | Service synergy | Ensures every visitor leaves satisfied. Adjacent businesses gain +0.1 synergy reputation. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
@@ -477,3 +536,7 @@ Staff cards are a separate card family (`family: 'staff'`) that expand hand capa
 | `staff-health-safety` | Health & Safety Inspector | 8 | 1 | — | 4 | −10% Health incidents | Keeps everything up to code. Reduces incident frequency by 10% for Health businesses. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
 | `staff-pr` | PR Officer | 8 | 1 | — | 4 | +0.15 rep/turn | Manages the street image. +0.15 reputation per turn from all businesses. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
 | `staff-financial` | Financial Advisor | 10 | 1.25 | — | 5 | Upgrade −1 | Smart investments pay off. Reduces this business upgrade cost by 1. | **NEW** specialization applicant *(CG-0MT4WXNR80090FXZ).* |
+| `staff-florist` | Florist | 4 | 0.75 | — | 2 | Commerce/Culture bonus | A specialist florist brings beauty and trade. +0.3 coins per turn from adjacent Commerce and Culture businesses. Serves Florist, Commerce, Culture. | **NEW** business specialist *(CG-0MTIOLY2A0092OT1).* |
+| `staff-baker` | Baker | 4 | 0.8 | — | 2 | Food bonus | A master baker keeps the neighbourhood well-fed. +0.25 coins per turn from adjacent Food businesses. Serves Bakery, Food. | **NEW** business specialist *(CG-0MTIOLY2A0092OT1).* |
+| `staff-chef` | Chef | 6 | 1 | — | 3 | +20% Food income | An experienced chef boosts nearby Food businesses with +20% income. Serves Cafe/Diner/Delicatessen, Food. | **NEW** business specialist *(CG-0MTIOLY2A0092OT1).* |
+| `staff-mechanic` | Mechanic | 5 | 0.9 | — | 3 | +0.3 coins Service | A skilled mechanic keeps Service businesses running smoothly. +0.3 coins per turn from a Service business. Serves Hardware Store, Service. | **NEW** business specialist *(CG-0MTIOLY2A0092OT1).* |

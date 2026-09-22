@@ -1,4 +1,6 @@
 import { SoundManager } from '../core-engine';
+import { emitEventOrCallback } from '../core-engine/event-emission';
+import type { CardDealtPayload } from '../core-engine/CardEventPayloads';
 
 /** Default deal animation duration in milliseconds. */
 export const DEFAULT_DEAL_DURATION = 400;
@@ -62,12 +64,10 @@ export interface DealCardOptions {
   rotation?: number;
 
   /**
-   * Optional GameEventEmitter to emit events on completion.
+   * Optional event emitter to emit events on completion.
    * If not provided, the animation still plays but no event is emitted.
    */
-  gameEvents?: {
-    emit(event: 'card:dealt', payload: CardDealtPayload): void;
-  };
+  gameEvents?: { emit(event: string, payload: unknown): void };
 
   /**
    * Optional card ID to include in the event payload.
@@ -97,14 +97,6 @@ export interface DealCardOptions {
     /** If true, play the `move` SFX as a looping sound during the deal. */
     moveLoop?: boolean;
   };
-}
-
-/** Payload for the 'card:dealt' event. */
-export interface CardDealtPayload {
-  /** Card ID (optional, for tracking). */
-  cardId?: string;
-  /** Player index (optional, for multi-player). */
-  playerIndex?: number;
 }
 
 /**
@@ -163,7 +155,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
   if (shouldReduce) {
     target.setPosition(destX, destY);
     if (gameEvents && cardId) {
-      gameEvents.emit('card:dealt', { cardId, playerIndex });
+      emitEventOrCallback({ gameEvents, event: 'card:dealt', payload: { cardId, playerIndex } as CardDealtPayload });
     }
     return scene.tweens.add({
       targets: target,
@@ -248,7 +240,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
             else { try { scene.sound?.play(sfx.end); } catch { /* ignore */ } }
           }
           if (gameEvents && cardId) {
-            gameEvents.emit('card:dealt', { cardId, playerIndex });
+            emitEventOrCallback({ gameEvents, event: 'card:dealt', payload: { cardId, playerIndex } as CardDealtPayload });
           }
         },
       });

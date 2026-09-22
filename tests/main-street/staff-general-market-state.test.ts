@@ -120,7 +120,9 @@ describe('AC3: refill draws staff within the MARKET_STAFF_MAX bound', () => {
 
   it('conserves un-drawn staff in decks.staff across repeated re-draws', () => {
     const state = setupMainStreetGame({ seed: 'staff-conservation' });
-    const initialStaff = state.decks.staff.length;
+    // Tally the FULL staff pool (deck + row + discards) so the conservation
+    // invariant holds regardless of which staff the seeded initial market drew.
+    const initialStaff = state.decks.staff.length + countStaffInRow(state) + state.discards.staff.length;
     expect(initialStaff).toBeGreaterThan(0);
     for (let i = 0; i < 10; i++) {
       // Discard visible staff before clearing, mirroring the refresh/cycle
@@ -256,7 +258,7 @@ describe('staff cards in the market cycle pipeline (CG-0MT3KZNQB0053K55)', () =>
     const state = setupMainStreetGame({ seed: 'refresh-staff' });
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = 1000;
     const staff = state.decks.staff.pop()!;
     state.market.cards.push(staff);
 

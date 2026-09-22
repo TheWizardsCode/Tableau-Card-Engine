@@ -25,7 +25,7 @@ import {
 import {
   executeDayStart,
   executeAction,
-  processEndOfTurn,
+  endTurnHeadless,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   MainStreetTranscriptRecorder,
@@ -76,7 +76,7 @@ function playTurns(state: ReturnType<typeof setupMainStreetGame>, turns: number)
         });
       } catch (_) { /* skip illegal */ }
     }
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     recordMainStreetEvent({ type: 'turn-end', turn: state.turn });
   }
 }

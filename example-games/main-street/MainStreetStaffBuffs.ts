@@ -30,7 +30,7 @@
  * @module
  */
 
-import type { SynergyType } from './MainStreetCards';
+import type { SynergyType, StaffCard } from './MainStreetCards';
 import type { SpecializationSkill } from './MainStreetStaffSkills';
 import { deserializeSkillIds } from './MainStreetStaffSkills';
 import type { MainStreetState } from './MainStreetState';
@@ -219,12 +219,34 @@ export function getEmployedSpecializationSkills(state: MainStreetState): Special
  * @param slotIndex Street-grid slot index of the target business.
  * @returns The employed specialization skills at that slot (empty when none).
  */
+/**
+ * Flattens the specialization skills of ONLY the staff member(s) employed at
+ * the given street-grid slot. Per-business income/reputation buffs in
+ * `applyIncome` are derived from this per-slot pool, so a Chef employed at
+ * one Food business never buffs another Food business elsewhere on the
+ * street, and hand-slot staff contribute no per-business buffs
+ * (CG-0MSTOATDU006UGAX / CG-0MU3BTTWT0025VPL).
+ *
+ * Reads the per-business employed-staff source of truth
+ * (`business.employedStaff`, CG-0MTIOLY2A0092OT1 AC2) and falls back to
+ * `employedAtSlot` links for in-memory states that predate the field
+ * (legacy saves / hand-built fixtures) — the same semantics as
+ * `getEmployedStaffForBusiness` (backward compatibility, AC5).
+ *
+ * @param state     Current game state.
+ * @param slotIndex Street-grid slot index of the target business.
+ * @returns The employed specialization skills at that slot (empty when none).
+ */
 export function getEmployedSpecializationSkillsForBusiness(
   state: MainStreetState,
   slotIndex: number,
 ): SpecializationSkill[] {
-  return (state.staffCards ?? []).flatMap(card => {
-    if (card.employedAtSlot !== slotIndex) return [];
+  const business = state.streetGrid[slotIndex];
+  const members =
+    business && Array.isArray((business as { employedStaff?: unknown }).employedStaff)
+      ? (business as { employedStaff: StaffCard[] }).employedStaff
+      : (state.staffCards ?? []).filter(card => card.employedAtSlot === slotIndex);
+  return members.flatMap(card => {
     const ids = Array.isArray(card.specializationSkillIds) ? card.specializationSkillIds : [];
     try {
       return deserializeSkillIds(ids);

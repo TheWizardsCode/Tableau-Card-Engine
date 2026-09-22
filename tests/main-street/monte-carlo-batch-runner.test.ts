@@ -6,7 +6,8 @@
  * results.
  *
  * Coverage:
- *  - Batch runner returns correct number of combinations (12)
+ *  - Batch runner returns correct number of combinations
+ *    (`ALL_STRATEGIES.length × ALL_DIFFICULTIES.length`)
  *  - Each result has strategy, difficulty, metrics, and runs fields
  *  - Each combination's metrics are well-formed
  *  - Batch runner accepts optional filter parameters
@@ -27,9 +28,9 @@ describe('runAllCombinations (E-2)', () => {
   // Use small seed sets for fast tests
   const smallSeeds = Array.from({ length: 3 }, (_, i) => `mc-e2-smoke-${i}`);
 
-  it('returns results for all 12 strategy×difficulty combinations', () => {
+  it('returns results for all strategy×difficulty combinations', () => {
     const results = runAllCombinations({ seeds: smallSeeds, maxTurns: 10 });
-    expect(results).toHaveLength(12);
+    expect(results).toHaveLength(ALL_STRATEGIES.length * ALL_DIFFICULTIES.length);
   });
 
   it('each result has the expected fields', () => {
@@ -65,7 +66,7 @@ describe('runAllCombinations (E-2)', () => {
   it('each combination covers all strategies', () => {
     const results = runAllCombinations({ seeds: smallSeeds, maxTurns: 10 });
     const strategies = new Set(results.map(r => r.strategy));
-    expect(strategies.size).toBe(4);
+    expect(strategies.size).toBe(ALL_STRATEGIES.length);
     for (const s of ALL_STRATEGIES) {
       expect(strategies.has(s)).toBe(true);
     }
@@ -118,7 +119,7 @@ describe('runAllCombinations (E-2)', () => {
       maxTurns: 10,
       difficulties: ['Easy', 'Hard'],
     });
-    expect(results).toHaveLength(8); // 4 strategies × 2 difficulties
+    expect(results).toHaveLength(ALL_STRATEGIES.length * 2); // all strategies × 2 difficulties
     for (const combo of results) {
       expect(['Easy', 'Hard']).toContain(combo.difficulty);
     }
@@ -138,7 +139,7 @@ describe('runAllCombinations (E-2)', () => {
 
   it('returns empty array when no seeds provided', () => {
     const results = runAllCombinations({ seeds: [], maxTurns: 5 });
-    expect(results).toHaveLength(12);
+    expect(results).toHaveLength(ALL_STRATEGIES.length * ALL_DIFFICULTIES.length);
     // Each combo should have 0 runs
     for (const combo of results) {
       expect(combo.runs).toHaveLength(0);
@@ -148,11 +149,12 @@ describe('runAllCombinations (E-2)', () => {
 });
 
 describe('Strategy and difficulty constants', () => {
-  it('ALL_STRATEGIES contains all 4 strategies', () => {
+  it('ALL_STRATEGIES contains all 5 strategies', () => {
     expect(ALL_STRATEGIES).toEqual([
       'market-greedy',
       'demo-greedy',
       'greedy',
+      'banking-greedy',
       'random',
     ]);
   });

@@ -1045,3 +1045,77 @@ export const ROUTER_EXIT_TRANSITION_MS = 200;
 
 /** Stroke width for the router scene cards. */
 export const ROUTER_CARD_STROKE_WIDTH = 1.5;
+
+// ── Card Index Scene ───────────────────────────────────────────────────
+
+/** Font size for the filter label and clear button row. */
+export const CARD_INDEX_FILTER_FONT_SIZE = '12px';
+
+/** Font size for the live query text. */
+export const CARD_INDEX_QUERY_FONT_SIZE = '13px';
+
+/** Font size for group header lines (family / synergy names). */
+export const CARD_INDEX_GROUP_HEADER_FONT_SIZE = '13px';
+
+/** Font size for card rows in the index list. */
+export const CARD_INDEX_ROW_FONT_SIZE = '12px';
+
+/** Vertical distance between consecutive card rows (px). */
+export const CARD_INDEX_ROW_LINE_HEIGHT = 18;
+
+/** Extra vertical gap inserted before each group header (px). */
+export const CARD_INDEX_GROUP_GAP = 10;
+
+/** Horizontal left margin inside the scrollable list (px). */
+export const CARD_INDEX_LIST_MARGIN_X = 20;
+
+/** Horizontal right margin for right-aligned row metadata (px). */
+export const CARD_INDEX_LIST_MARGIN_RIGHT = 10;
+
+/** Bottom margin below the scrollable list (px). */
+export const CARD_INDEX_LIST_MARGIN_BOTTOM = 14;
+
+/** Font size for the status/summary line (counts, scroll hint). */
+export const CARD_INDEX_STATUS_FONT_SIZE = '11px';
+
+/** Font size for muted per-row metadata (tier, family, synergies). */
+export const CARD_INDEX_META_FONT_SIZE = '11px';
+
+/** Scroll speed multiplier applied to wheel delta. */
+export const CARD_INDEX_SCROLL_STEP = 1.5;
+
+/** Width of the card detail dialog (px). */
+export const CARD_INDEX_DIALOG_WIDTH = 760;
+
+/** Height of the card detail dialog (px). */
+export const CARD_INDEX_DIALOG_HEIGHT = 540;
+
+/** Vertical distance between detail-sheet lines (px). */
+export const CARD_INDEX_DIALOG_LINE_HEIGHT = 16;
+
+/** Background colour for the card index scene. */
+export const CARD_INDEX_BG_COLOR = '#121a2a';
+
+/** Colour for group header text. */
+export const CARD_INDEX_GROUP_HEADER_COLOR = '#88ccff';
+
+/** Colour for card row text. */
+export const CARD_INDEX_ROW_COLOR = '#dddddd';
+
+/** Colour for card row text under the pointer. */
+export const CARD_INDEX_ROW_HOVER_COLOR = '#f0c040';
+
+/** Colour for muted metadata text. */
+export const CARD_INDEX_META_COLOR = '#7f9fbf';
+
+/** Colour for the empty-result message. */
+export const CARD_INDEX_EMPTY_COLOR = '#8888aa';
+
+/** Colour for the active grouping-mode button. */
+export const CARD_INDEX_MODE_ACTIVE_COLOR = '#f0c040';
+
+/** Colour for the inactive grouping-mode button. */
+export const CARD_INDEX_MODE_INACTIVE_COLOR = '#7f9fbf';
+
+/** Horizontal gap between the two grouping-mode toggle buttons (px). */
+export const CARD_INDEX_MODE_BUTTON_GAP = 120;

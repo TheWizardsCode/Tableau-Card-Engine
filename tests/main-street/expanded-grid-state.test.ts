@@ -57,13 +57,13 @@ describe('setStreetGridLattice (playable expansion)', () => {
 
     expect(state.streetGridCols).toBe(2);
     expect(state.streetGridRows).toBe(1);
-    expect(state.streetGrid).toHaveLength(worldSlotCount(2, 1)); // 18
-    expect(state.soldSlots).toHaveLength(18);
+    expect(state.streetGrid).toHaveLength(worldSlotCount(2, 1)); // 20
+    expect(state.soldSlots).toHaveLength(20);
 
-    // World index = worldY * 9 + worldX for a 2-wide lattice.
-    expect(state.streetGrid[1 * 9 + 2]?.id).toBe('biz-test-7');
+    // World index = worldY * 10 + worldX for a 2-wide lattice.
+    expect(state.streetGrid[1 * 10 + 2]?.id).toBe('biz-test-7');
     expect(state.streetGrid[7]).toBeNull();
-    expect(state.soldSlots[0 * 9 + 3]).toBe(true);
+    expect(state.soldSlots[0 * 10 + 3]).toBe(true);
   });
 
   it('expands 1×1 → 2×2 and keeps all ten legacy plots', () => {
@@ -71,14 +71,14 @@ describe('setStreetGridLattice (playable expansion)', () => {
     for (let i = 0; i < 10; i++) state.streetGrid[i] = businessFixture(`biz-test-${i}`);
 
     setStreetGridLattice(state, 2, 2);
-    expect(state.streetGrid).toHaveLength(worldSlotCount(2, 2)); // 27
+    expect(state.streetGrid).toHaveLength(worldSlotCount(2, 2)); // 40
 
     // Every legacy plot survives, at world (lx, ly).
     let present = 0;
     for (let i = 0; i < 10; i++) {
       const worldX = i % 5;
       const worldY = Math.floor(i / 5);
-      expect(state.streetGrid[worldY * 9 + worldX]?.id).toBe(`biz-test-${i}`);
+      expect(state.streetGrid[worldY * 10 + worldX]?.id).toBe(`biz-test-${i}`);
       present++;
     }
     expect(present).toBe(10);
@@ -87,8 +87,8 @@ describe('setStreetGridLattice (playable expansion)', () => {
   it('drops plots outside a shrunken lattice', () => {
     const state = setupMainStreetGame({ seed: 'shrink' });
     setStreetGridLattice(state, 2, 2);
-    // World (8,2) → index 2*9+8 = 26 — outside a 1×1 lattice (5 wide, 2 tall).
-    state.streetGrid[26] = businessFixture('biz-far');
+    // World (8,2) → index 2*10+8 = 28 — outside a 1×1 lattice (5 wide, 2 tall).
+    state.streetGrid[28] = businessFixture('biz-far');
     state.streetGrid[3] = businessFixture('biz-near');
 
     expect(setStreetGridLattice(state, 1, 1)).toBe(true);
@@ -97,12 +97,12 @@ describe('setStreetGridLattice (playable expansion)', () => {
     expect(state.streetGrid.some((c) => c?.id === 'biz-far')).toBe(false);
   });
 
-  it('re-indexes a shared-corner plot consistently when growing', () => {
+  it('re-indexes a street-edge plot consistently when growing', () => {
     const state = setupMainStreetGame({ seed: 'shared-corner' });
-    // Legacy slot 4 (local 4,0) is the shared seam with the east street.
-    state.streetGrid[4] = businessFixture('biz-seam');
+    // Legacy slot 4 (local 4,0) is the west street's own east-edge plot.
+    state.streetGrid[4] = businessFixture('biz-edge');
     setStreetGridLattice(state, 2, 1);
     // World (4,0) is index 4 in BOTH the 1×1 and 2×1 frames.
-    expect(state.streetGrid[4]?.id).toBe('biz-seam');
+    expect(state.streetGrid[4]?.id).toBe('biz-edge');
   });
 });

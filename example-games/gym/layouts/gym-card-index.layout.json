@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "id": "gym-card-index-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "filter",
+    "mode",
+    "list"
+  ],
+  "zones": {
+    "filter": {
+      "rect": {
+        "x": 0.05,
+        "y": 0.1389
+      },
+      "anchors": {
+        "label": { "x": 0.05, "y": 0.1389 },
+        "query": { "x": 0.17, "y": 0.1389 },
+        "clear": { "x": 0.95, "y": 0.1389 }
+      }
+    },
+    "mode": {
+      "rect": {
+        "x": 0.05,
+        "y": 0.1903
+      },
+      "anchors": {
+        "left": { "x": 0.05, "y": 0.1903 },
+        "center": { "x": 0.5, "y": 0.1903 }
+      }
+    },
+    "list": {
+      "rect": {
+        "x": 0.05,
+        "y": 0.2361
+      },
+      "anchors": {
+        "top": { "x": 0.05, "y": 0.2361 },
+        "center": { "x": 0.5, "y": 0.4722 },
+        "bottom": { "x": 0.5, "y": 0.9444 }
+      }
+    }
+  }
+}

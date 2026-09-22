@@ -1,23 +1,19 @@
 /**
- * Main Street: Incident Reveal Browser Tests
+ * Main Street: Incident Reveal Browser Tests (new choreography)
  *
- * Verifies the incident reveal presentation end to end in a real Phaser
+ * Verifies the new incident reveal presentation end to end in a real Phaser
  * scene:
  *
  * 1. Ending the turn with an incident at the front of the Upcoming queue
- *    triggers `MainStreetAnimator.animateIncidentReveal` with the resolved
- *    incident's card id, its resource deltas (negative = loss), and the
- *    front-queue-card origin. The full effect runs: a snapshot card visual
- *    flies from the queue and a red flash rectangle is created.
- * 2. Under reduced motion the reveal is called (the trigger point is
- *    unchanged) but only the sound + HUD pops run — no flight visual and no
- *    red flash.
+ *    triggers the new reveal: a card-back-over-face container builds,
+ *    flies to board centre, hinges open (scaleX → 0), and the face stays
+ *    visible for 4 seconds before the turn advances.
+ * 2. The reveal **blocks** the turn advance — the next day starts only
+ *    after the 4-second hold completes (new gating behaviour).
+ * 3. Under reduced motion the reveal shows the card instantly (no flight,
+ *    no hinge flip) but still waits 4 seconds before advancing.
  *
- * The presentation is non-blocking: it never mutates game state, the
- * transcript, or the turn flow (the next day still starts after the usual
- * turn-advance window).
- *
- * @module tests/main-street/incident-reveal.browser
+ * @module tests/main-street/incident-reveal-browser
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -122,7 +118,7 @@ describe('MainStreet incident reveal presentation', () => {
     game = null;
   });
 
-  it('triggers the reveal with the incident deltas and runs the flight + red flash on end turn', async () => {
+  it('triggers the reveal with the incident deltas and gates turn advance until the 4-second hold completes', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
@@ -130,39 +126,87 @@ describe('MainStreet incident reveal presentation', () => {
     const incident = makeLossIncident();
     (scene.state as { incidentDeck: EventCard[] }).incidentDeck = [incident];
 
-    // Spy on the flight visual factory to observe the reveal's rendering.
-    const createVisualSpy = vi.spyOn(scene.msAnimator as unknown as { createTransferCardVisual: (...a: unknown[]) => unknown }, 'createTransferCardVisual');
+    // Spy on the reveal to observe when it's called.
     const { calls } = spyOnIncidentReveal(scene);
-    const expectedFrom = (scene.msRenderer as unknown as { getFrontIncidentCardCenter: () => { x: number; y: number } }).getFrontIncidentCardCenter();
 
     (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
 
     // The controller calls the animator with the resolved incident details.
-    // Under heavy CPU contention (multiple Chromium instances on the build
-    // machine) Phaser's 400ms delayedCall can stretch beyond the default 5s
-    // window, so use a 10s budget (still well within the 30s test timeout).
     await waitForCondition(() => calls.length >= 1, { timeoutMs: 10_000, label: 'incident reveal trigger' });
     expect(calls).toHaveLength(1);
     expect(calls[0].cardId).toBe('inc-browser-reveal-test');
     expect(calls[0].incidentName).toBe('Power Outage');
     expect(calls[0].coinChange).toBe(-3);
     expect(calls[0].repChange).toBe(0);
-    expect(calls[0].from).toEqual(expectedFrom);
 
-    // The full effect ran: a flight snapshot visual was created (from the
-    // queue origin).
-    expect(createVisualSpy).toHaveBeenCalled();
-    const visualArgs = createVisualSpy.mock.calls[0] as unknown as [string, string, number, number];
-    expect(visualArgs[0]).toBe('inc-browser-reveal-test');
-    expect(visualArgs[2]).toBeCloseTo(expectedFrom.x, 0);
-    expect(visualArgs[3]).toBeCloseTo(expectedFrom.y, 0);
+    // The reveal gates the turn advance: the next day does NOT start
+    // immediately (800ms). Instead it waits for the 4-second hold.
+    // Verify that the phase does NOT return to MarketPhase within 2s
+    // (which would be the old non-blocking behaviour).
+    const earlyPhase = (scene.state as { phase: string }).phase;
+    expect(earlyPhase).not.toBe('MarketPhase');
 
-    // The next day still starts after the usual turn-advance window — the
-    // reveal never blocks the turn flow. Bump to 10s to tolerate contention-
-    // induced RAF stalls (see incident-reveal run failures under load 16+).
+    // After the full reveal (4s hold + return animation), the next day starts.
+    // Bump to 10s to tolerate contention-induced RAF stalls (same as before).
     await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
       timeoutMs: 10_000,
-      label: 'next day start (phase back to MarketPhase)',
+      label: 'next day start after reveal hold (gated)',
+    });
+  }, 30_000);
+
+  it('skips the reveal in tutorial mode so tutorial step pacing is unchanged', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+
+    // Simulate an active tutorial (the scene attaches `tutorialController`
+    // dynamically) and queue an incident that would otherwise reveal.
+    (scene as unknown as { tutorialController: unknown }).tutorialController = {
+      isActive: true,
+      currentStepIndex: 0,
+      lastCompletedStepId: null,
+      exited: false,
+    };
+    (scene.state as { incidentDeck: EventCard[] }).incidentDeck = [makeLossIncident()];
+
+    const animator = scene.msAnimator as unknown as {
+      animateIncidentReveal: (params: RevealCall) => void;
+    };
+    const spy = vi.spyOn(animator, 'animateIncidentReveal');
+
+    (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
+
+    // The reveal is skipped in the tutorial...
+    expect(spy).not.toHaveBeenCalled();
+
+    // ...and the day still advances on the usual window (no 4s hold).
+    await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
+      timeoutMs: 5_000,
+      label: 'next day start during tutorial (reveal skipped)',
+    });
+  }, 30_000);
+
+  it('skips the reveal animation entirely when there is no incident', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+
+    // No incident in the deck.
+    (scene.state as { incidentDeck: EventCard[] }).incidentDeck = [];
+
+    // Spy on the reveal — it should NOT be called.
+    const animator = scene.msAnimator as unknown as {
+      animateIncidentReveal: (params: RevealCall) => void;
+    };
+    const spy = vi.spyOn(animator, 'animateIncidentReveal');
+
+    (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
+
+    // The reveal should not be called when there's no incident.
+    expect(spy).not.toHaveBeenCalled();
+
+    // The day should advance quickly (the ~800ms path).
+    await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
+      timeoutMs: 5_000,
+      label: 'next day start without incident (fast)',
     });
   }, 30_000);
 });

@@ -83,6 +83,17 @@ async function bootGame(options: { width?: number; height?: number } = {}): Prom
  * mechanic (covered by the dedicated event-choice-dialog suites).
  */
 async function makeIncidentsNonChoice(game: Phaser.Game): Promise<void> {
+  await makeIncidentsNonChoiceImpl(game);
+}
+
+/** Blank the incident deck so no incident resolves this turn. */
+async function makeIncidentsNone(game: Phaser.Game): Promise<void> {
+  await makeIncidentsNonChoiceImpl(game);
+  const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+  (scene.state as { incidentDeck: unknown[] }).incidentDeck.length = 0;
+}
+
+async function makeIncidentsNonChoiceImpl(game: Phaser.Game): Promise<void> {
   const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
   const state = scene.state as { incidentDeck: Array<{ id: string }> };
   const templates = (await import('../../example-games/main-street/MainStreetCards')).getEventTemplates();
@@ -224,15 +235,20 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
     // (the street refresh + DayStart are deferred until collection ends).
     await new Promise((r) => setTimeout(r, 4000));
     expect(scene.incomeCollectionActive).toBe(true);
-    expect(state.phase).toBe('DayStart');
+    // CG-0MTR72P14000VO6Q: the deferred-mutation flow defers the closing
+    // (EndCheck → next day) until the income collection completes — the
+    // phase stays in the closing sequence mid-show instead of having
+    // already advanced to DayStart.
+    expect(state.phase).toBe('IncidentPhase');
 
     // Mid-show: the count-out has already staged coin icons, so the
     // per-coin pop SFX must have fired. (The final positive credit plays
     // only at collection, which is asserted after the show completes.)
     expect(sfxSpy.mock.calls.some(([key]) => key === SFX_KEYS.COIN_POP)).toBe(true);
 
-    // VFX only — the post-income bank value must not change while the show
-    // runs, and the day must advance only after the flag clears.
+    // VFX only — the bank value must NOT change while the show runs
+    // (deferred mutation: the income deltas land only when the collection
+    // completes), and the day must advance only after the flag clears.
     const coinsAfterIncome = (state.resourceBank.coins as number);
 
     // Wait for the full show AND the deferred day start (the controller polls
@@ -242,7 +258,8 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
       label: 'phased income show to complete and the day to start',
     });
 
-    expect(state.resourceBank.coins).toBe(coinsAfterIncome);
+    // The deferred deltas landed with the completed collection (income > 0).
+    expect(state.resourceBank.coins).toBeGreaterThan(coinsAfterIncome);
     expect(state.turn).toBe(turnBefore + 1);
     expect(state.phase).toBe('MarketPhase');
 
@@ -252,7 +269,10 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
 
   it('keeps the compact collection during the tutorial (day start inside the usual window)', async () => {
     game = await bootGame();
-    await makeIncidentsNonChoice(game);
+    // No incident this turn: isolate the tutorial income-presentation from
+    // the incident reveal's deliberate 4s hold (CG-0MTW18KFK000MM3I) so the
+    // day still starts inside the compact-collection window.
+    await makeIncidentsNone(game);
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     // Simulate an active tutorial: the controller must keep the compact,
@@ -303,7 +323,9 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
 
   it('never blocks the turn advance when the animator throws', async () => {
     game = await bootGame();
-    await makeIncidentsNonChoice(game);
+    // No incident this turn: isolate the income-animator-failure concern
+    // from the incident reveal gate (CG-0MTW18KFK000MM3I).
+    await makeIncidentsNone(game);
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     const state = scene.state as {

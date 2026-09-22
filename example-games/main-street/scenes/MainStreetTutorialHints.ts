@@ -64,8 +64,10 @@ import { STANDARD_TUTORIAL_SCENARIO } from '../TutorialScenario';
  *   - investmentsRow — ALIAS of developmentRow: the two-row market was merged
  *                      into one row (CG-0MSTOATDT009BRX2), so upgrade/event
  *                      steps highlight the same single market row.
- *   - streetGrid     (20, 337, 780, 172) — streetTop, 5×140 + 4×20, 2×80 + 12
- *   - hand           (266, 620, 288, 80) — centred on handCenterX (410), max
+ *   - streetGrid     (77, 337, 780, 172) — streetX (shifted right by one road
+ *                      band so the road ring is visible at the default zoom),
+ *                      streetTop, 5×140 + 4×20, 2×80 + 12
+ *   - hand           (323, 620, 288, 80) — centred on handCenterX (467), max
  *                                          3 cards (3×140 + 16 gap)
  *   - endTurnButton  (1116, 652, 140, 34) — gameW-24-140, actionY + 4
  *   - incidentQueue  (960, 408, 300, 125) — queueTop, boot-time panel (one

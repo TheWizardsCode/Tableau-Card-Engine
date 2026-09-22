@@ -34,6 +34,9 @@ import {
   declineApplicantAction,
   letGoStaffAction,
   resolveEventChoice,
+  placeStaffOnBusiness,
+  removeStaffFromBusiness,
+  layoffStaffCard,
 } from './MainStreetEngine';
 
 // ── Action Budget Enforcement ────────────────────────────────
@@ -610,6 +613,62 @@ export function letGoStaffCommand(state: MainStreetState, idx: number) {
     snapshotAction(
       (s) => { letGoStaffAction(s, idx); },
       `LetGoStaff ${idx}`,
+    ),
+  );
+}
+
+/**
+ * Command: Place a hired staff member on a business slot
+ * (CG-0MU3BTSQ8006ZRCU AC1-AC3). Free (no action/coins — the member is
+ * already hired); validated by `canPlaceStaffOnBusiness` (business-type
+ * match + employment capacity). Undo restores the previous employment.
+ */
+export function placeStaffOnBusinessCommand(
+  state: MainStreetState,
+  staffId: string,
+  slotIndex: number,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { placeStaffOnBusiness(s, staffId, slotIndex); },
+      `PlaceStaff ${staffId} -> slot ${slotIndex}`,
+    ),
+  );
+}
+
+/**
+ * Command: Remove a staff member from its business (kept hired;
+ * employment cleared so per-business buffs stop). AC5 (removal flow).
+ */
+export function removeStaffFromBusinessCommand(
+  state: MainStreetState,
+  staffId: string,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { removeStaffFromBusiness(s, staffId); },
+      `RemoveStaff ${staffId}`,
+    ),
+  );
+}
+
+/**
+ * Command: Sell / lay off a staff card entirely (AC5). Uses the existing
+ * `layoffStaffCard` engine flow — removes the member from `staffCards` and
+ * the business's `employedStaff`, drops `maxHandSize`/hand cards per
+ * `handSlotsAdded`, returns the card to `discards.staff`. Undo restores all.
+ */
+export function layoffStaffCommand(
+  state: MainStreetState,
+  staffId: string,
+) {
+  return toCommand(
+    state,
+    snapshotAction(
+      (s) => { layoffStaffCard(s, staffId); },
+      `LayoffStaff ${staffId}`,
     ),
   );
 }

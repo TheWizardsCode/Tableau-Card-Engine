@@ -28,6 +28,7 @@ import {
 import {
   executeDayStart,
   processEndOfTurn,
+  endTurnHeadless,
   applyStaffOngoingCosts,
   layoffStaffCard,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -152,7 +153,7 @@ describe('Multi-Use Card Economy Integration', () => {
           }
         }
 
-        processEndOfTurn(state);
+        endTurnHeadless(state);
       }
 
       // Game should still be valid after 3 turns
@@ -244,7 +245,7 @@ describe('Multi-Use Card Economy Integration', () => {
           }
         }
 
-        processEndOfTurn(state);
+        endTurnHeadless(state);
       }
 
       // Market should be refilled each turn
@@ -403,7 +404,7 @@ describe('Multi-Use Card Economy Integration', () => {
       if (card1 && state.hand.length < state.maxHandSize) {
         moveToHand(state, card1.id);
       }
-      processEndOfTurn(state);
+      endTurnHeadless(state);
 
       // Turn 2: tableau purchase
       if (state.gameResult === 'playing') {
@@ -421,7 +422,7 @@ describe('Multi-Use Card Economy Integration', () => {
             purchaseBusiness(state, card2.id, slot);
           }
         }
-        processEndOfTurn(state);
+        endTurnHeadless(state);
       }
 
       // Turn 3: staff purchase
@@ -440,7 +441,7 @@ describe('Multi-Use Card Economy Integration', () => {
             purchaseStaffCard(state, staffCard.id);
           }
         }
-        processEndOfTurn(state);
+        endTurnHeadless(state);
       }
 
       // Game should be in valid state after 3 turns

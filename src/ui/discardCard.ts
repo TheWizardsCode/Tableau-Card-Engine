@@ -1,4 +1,6 @@
 import { SoundManager } from '../core-engine';
+import { emitEventOrCallback } from '../core-engine/event-emission';
+import type { CardDiscardedPayload } from '../core-engine/CardEventPayloads';
 
 /** Default discard animation duration in milliseconds. */
 export const DEFAULT_DISCARD_DURATION = 400;
@@ -53,12 +55,10 @@ export interface DiscardCardOptions {
   rotation?: number;
 
   /**
-   * Optional GameEventEmitter to emit events on completion.
+   * Optional event emitter to emit events on completion.
    * If not provided, the animation still plays but no event is emitted.
    */
-  gameEvents?: {
-    emit(event: 'card:discarded', payload: CardDiscardedPayload): void;
-  };
+  gameEvents?: { emit(event: string, payload: unknown): void };
 
   /**
    * Optional card ID to include in the event payload.
@@ -129,8 +129,7 @@ export interface DiscardCardOptions {
   };
 }
 
-import type { CardDiscardedPayload } from '../core-engine';
-export type { CardDiscardedPayload };
+
 
 /**
  * Check if reduced motion is preferred (accessibility).
@@ -190,7 +189,7 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
       }
     }
     if (gameEvents && cardId) {
-      gameEvents.emit('card:discarded', { cardId, playerIndex });
+      emitEventOrCallback({ gameEvents, event: 'card:discarded', payload: { cardId, playerIndex } as CardDiscardedPayload });
     }
     if (destroyAfter) {
       target.destroy();
@@ -329,7 +328,7 @@ export function discardCard(opts: DiscardCardOptions): Phaser.Tweens.Tween {
     },
     onComplete: () => {
       if (gameEvents && cardId) {
-        gameEvents.emit('card:discarded', { cardId, playerIndex });
+        emitEventOrCallback({ gameEvents, event: 'card:discarded', payload: { cardId, playerIndex } as CardDiscardedPayload });
       }
       if (loopSound) { try { loopSound.stop(); } catch {} loopSound = null; }
       if (sfx?.end) {

@@ -34,6 +34,7 @@ import {
   applyCompetitiveEventEffects,
   executeCompetitiveDay,
   executeFullTurn,
+  resolveCompetitivePendingChoice,
 } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -330,8 +331,16 @@ describe('AC3 — Deterministic replay of per-owner routing (CG-0MTIIL6J200291ZQ
     place(state, makeBiz({ id: 'biz-c', baseIncome: 200, synergyTypes: ['Culture'] }), 6, 1);
 
     executeCompetitiveDay(state, [[], []]);
+    // A dual-choice incident pauses the closing at IncidentPhase; resolve it
+    // via the deterministic AI policy so the day completes (CG-0MTSHG8RP008E128).
+    if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+      resolveCompetitivePendingChoice(state);
+    }
     const day1 = state.players!.map(p => ({ coins: p.coins, reputation: p.reputation, score: p.score }));
     executeCompetitiveDay(state, [[], []]);
+    if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
+      resolveCompetitivePendingChoice(state);
+    }
     const day2 = state.players!.map(p => ({ coins: p.coins, reputation: p.reputation, score: p.score }));
     return { day1, day2, state };
   }

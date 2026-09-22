@@ -59,13 +59,13 @@ function createLocalStorageMock(): Storage {
 }
 
 /**
- * Build a 2×1 (18 unique world slot, planar seam-sharing model) expanded state
+ * Build a 2×1 (20 unique world slot, city-block grid) expanded state
  * from a normal 1×1 game, carrying any business card from the market onto the
  * expanded grid so the world-sized array is non-trivial.
  */
 function makeExpandedState(seed = 'expanded-save-load'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  const size = worldSlotCount(2, 1); // 18
+  const size = worldSlotCount(2, 1); // 20
   state.streetGridCols = 2;
   state.streetGridRows = 1;
   state.streetGrid = new Array<BusinessCard | null>(size).fill(null);
@@ -107,17 +107,17 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
 
     expect(saved.streetGridCols).toBe(2);
     expect(saved.streetGridRows).toBe(1);
-    expect(saved.streetGrid).toHaveLength(18);
+    expect(saved.streetGrid).toHaveLength(20);
     expect(saved.streetCamera).toEqual({ zoomLevel: 2, focusX: 123, focusY: -45 });
-    expect(saved.soldSlots).toHaveLength(18);
+    expect(saved.soldSlots).toHaveLength(20);
 
     const restored = deserializeMainStreetState(saved);
 
     expect(restored.streetGridCols).toBe(2);
     expect(restored.streetGridRows).toBe(1);
-    expect(restored.streetGrid).toHaveLength(18);
+    expect(restored.streetGrid).toHaveLength(20);
     expect(restored.streetCamera).toEqual({ zoomLevel: 2, focusX: 123, focusY: -45 });
-    expect(restored.soldSlots).toHaveLength(18);
+    expect(restored.soldSlots).toHaveLength(20);
 
     // The world-10 card survives verbatim and the sold flag is preserved.
     expect(restored.streetGrid[10]?.id).toBe(`${state.streetGrid[10]!.id}`);
@@ -164,7 +164,7 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
 
     const restored = deserializeMainStreetState(saved as MainStreetSerializedState);
 
-    expect(restored.soldSlots).toHaveLength(18);
+    expect(restored.soldSlots).toHaveLength(20);
     expect(restored.soldSlots[9]).toBe(true);
     expect(restored.soldSlots[17]).toBe(false);
   });
@@ -177,8 +177,8 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
 
     const saved = serializeMainStreetState(state);
 
-    expect(saved.streetGrid).toHaveLength(18);
-    expect(saved.soldSlots).toHaveLength(18);
+    expect(saved.streetGrid).toHaveLength(20);
+    expect(saved.soldSlots).toHaveLength(20);
     expect(saved.soldSlots[3]).toBe(true);
     expect(saved.soldSlots[17]).toBe(false);
   });
@@ -187,7 +187,10 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
 
   it('undo of a placement on an expanded grid removes the card and reverts resources (AC3)', () => {
     const state = makeExpandedState('undo-expanded-placement');
-    state.resourceBank.coins = 1000;
+    // Generous coins so the fixture's own market card (the one already
+    // placed at the street-edge slot 10 with a -world10 id) is affordable
+    // here too — its identity drives the integrity assertion below.
+    state.resourceBank.coins = 10000;
     state.actionsRemaining = 2;
 
     const card = state.market.cards.find(
@@ -207,19 +210,19 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
     undoManager.execute(buyBusinessCommand(state, card.id, slotIndex));
 
     expect(state.streetGrid[slotIndex]).not.toBeNull();
-    expect(state.streetGrid).toHaveLength(18);
+    expect(state.streetGrid).toHaveLength(20);
     expect(state.resourceBank.coins).toBeLessThan(coinsBefore);
     expect(state.actionsRemaining).toBe(actionsBefore - 1);
 
     undoManager.undo();
 
-    expect(state.streetGrid).toHaveLength(18);
+    expect(state.streetGrid).toHaveLength(20);
     expect(state.streetGrid.map((c) => c?.id ?? null)).toEqual(gridBefore);
-    expect(state.soldSlots).toHaveLength(18);
+    expect(state.soldSlots).toHaveLength(20);
     expect(state.soldSlots).toEqual(soldBefore);
     expect(state.resourceBank.coins).toBe(coinsBefore);
     expect(state.actionsRemaining).toBe(actionsBefore);
-    // The shared-corner card placed by the fixture is untouched by the undo.
+    // The street-edge card placed by the fixture is untouched by the undo.
     expect(state.streetGrid[10]?.id).toBe(`${card.id}-world10`);
   });
 

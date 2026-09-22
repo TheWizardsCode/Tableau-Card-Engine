@@ -48,6 +48,24 @@ interface MonteBaseline {
   };
   /** Per-difficulty greedy baseline (CG-0MSRKN325004ELH2). */
   difficultyMatrix: DifficultyBaseline[];
+  /**
+   * Additive banking-aware regression snapshot
+   * (CG-0MT3JMGA60091J8W AC5).
+   *
+   * Recorded on the same 200-seed / 60-turn canonical profile as the greedy
+   * block above. It is a snapshot for `banking-greedy` only — the greedy
+   * baseline is never replaced by it.
+   */
+  bankingGreedy?: BankingGreedyBaseline;
+}
+
+interface BankingGreedyBaseline {
+  strategy: 'banking-greedy';
+  metrics: {
+    winRate: number;
+    averageCoinsPerTurn: number;
+  };
+  difficultyMatrix: DifficultyBaseline[];
 }
 
 function loadBaseline(): MonteBaseline {
@@ -90,6 +108,54 @@ describe('Main Street Monte Carlo guardrails for expanded pool', () => {
     // design-intent bands are enforced separately in monte-carlo-greedy-guardrail.test.ts.
     for (const entry of baseline.difficultyMatrix) {
       const combo = result.find(r => r.difficulty === entry.difficulty);
+      expect(combo).toBeDefined();
+
+      const wrDelta = Math.abs(combo!.metrics.winRate - entry.winRate);
+      expect(wrDelta).toBeLessThanOrEqual(0.25);
+
+      const coinsDelta = Math.abs(combo!.metrics.averageCoinsPerTurn - entry.averageCoinsPerTurn);
+      expect(coinsDelta).toBeLessThanOrEqual(entry.averageCoinsPerTurn * 0.30);
+    }
+  }, 180_000);
+
+  // Banking-aware variant guardrail (CG-0MT3JMGA60091J8W AC5). The additive
+  // `banking-greedy` strategy gets its own recorded snapshot and the same
+  // tolerances as the greedy regression baseline (winRate ±0.25, coins ±30%).
+  // The greedy block above is never replaced by it, so drifting the banking
+  // strategy can never mask a greedy regression (or vice versa).
+  it('banking-greedy stays within tolerance of its recorded snapshot', () => {
+    const baseline = loadBaseline();
+    // The baseline entry point stays greedy — banking-greedy is additive.
+    expect(baseline.strategy).toBe('greedy');
+
+    const banking = baseline.bankingGreedy;
+    expect(
+      banking,
+      'bankingGreedy snapshot missing from docs/main-street/monte-carlo-baseline.json',
+    ).toBeDefined();
+    expect(banking!.strategy).toBe('banking-greedy');
+
+    const seeds = Array.from({ length: baseline.seeds }, (_, i) => `mc-balance-${i}`);
+    const results = runAllCombinations({
+      seeds,
+      maxTurns: baseline.maxTurns,
+      strategies: ['banking-greedy'],
+    });
+    expect(results).toHaveLength(3);
+
+    const medium = results.find(r => r.difficulty === 'Medium');
+    expect(medium).toBeDefined();
+
+    const mediumWinDelta = Math.abs(medium!.metrics.winRate - banking!.metrics.winRate);
+    expect(mediumWinDelta).toBeLessThanOrEqual(0.25);
+
+    const mediumCoinDelta = Math.abs(
+      medium!.metrics.averageCoinsPerTurn - banking!.metrics.averageCoinsPerTurn,
+    );
+    expect(mediumCoinDelta).toBeLessThanOrEqual(banking!.metrics.averageCoinsPerTurn * 0.30);
+
+    for (const entry of banking!.difficultyMatrix) {
+      const combo = results.find(r => r.difficulty === entry.difficulty);
       expect(combo).toBeDefined();
 
       const wrDelta = Math.abs(combo!.metrics.winRate - entry.winRate);

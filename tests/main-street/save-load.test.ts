@@ -5,7 +5,7 @@ import type { MainStreetState } from '../../example-games/main-street/MainStreet
 import {
   executeDayStart,
   executeAction,
-  processEndOfTurn,
+  endTurnHeadless,
   computeScore,
   type PlayerAction,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -66,7 +66,7 @@ describe('Main Street save/load integration', () => {
         c.cost <= state.resourceBank.coins,
     )!;
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
-    processEndOfTurn(state);
+    endTurnHeadless(state);
 
     await saveTurnStartCheckpoint(store, state);
     const restored = await loadTurnStartCheckpoint(store);
@@ -81,7 +81,7 @@ describe('Main Street save/load integration', () => {
         c.cost <= expected.resourceBank.coins,
     )!;
     executeAction(expected, { type: 'buy-business', cardId: expectedCard.id, slotIndex: 0 });
-    processEndOfTurn(expected);
+    endTurnHeadless(expected);
 
     expect(restored!.turn).toBe(expected.turn);
     expect(restored!.phase).toBe(expected.phase);
@@ -200,7 +200,7 @@ describe('Main Street save/load integration', () => {
           if (a.type === 'end-turn') break;
           try { executeAction(s, a); } catch { /* skip illegal */ }
         }
-        processEndOfTurn(s);
+        endTurnHeadless(s);
         out.push(snap(s));
         if (s.gameResult !== 'playing') break;
       }
@@ -217,7 +217,7 @@ describe('Main Street save/load integration', () => {
         if (a.type === 'end-turn') break;
         try { executeAction(stateA, a); } catch { /* skip */ }
       }
-      processEndOfTurn(stateA);
+      endTurnHeadless(stateA);
     }
     const checkpointTurn = stateA.turn;
     const checkpointCoins = stateA.resourceBank.coins;

@@ -1,4 +1,6 @@
 import { SoundManager } from '../core-engine';
+import { emitEventOrCallback } from '../core-engine/event-emission';
+import type { CardPlacedPayload } from '../core-engine/CardEventPayloads';
 
 /**
  * placeCard -- reusable card placement/moving animation helper.
@@ -57,12 +59,10 @@ export interface PlaceCardOptions {
   scaleDurationRatio?: number;
 
   /**
-   * Optional GameEventEmitter to emit events on completion.
+   * Optional event emitter to emit events on completion.
    * If not provided, the animation still plays but no event is emitted.
    */
-  gameEvents?: {
-    emit(event: 'card:placed', payload: CardPlacedPayload): void;
-  };
+  gameEvents?: { emit(event: string, payload: unknown): void };
 
   /**
    * Optional card ID to include in the event payload.
@@ -98,16 +98,6 @@ export interface PlaceCardOptions {
     /** If true, play the `move` SFX as a looping sound during the animation. */
     moveLoop?: boolean;
   };
-}
-
-/** Payload for the 'card:placed' event. */
-export interface CardPlacedPayload {
-  /** Card ID (optional, for tracking). */
-  cardId?: string;
-  /** Player index (optional, for multi-player). */
-  playerIndex?: number;
-  /** Slot/target index (optional, for locating). */
-  slotIndex?: number;
 }
 
 /**
@@ -155,7 +145,7 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
     target.setPosition(destX, destY);
     // Emit event after reduced motion placement
     if (gameEvents && cardId) {
-      gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
+      emitEventOrCallback({ gameEvents, event: 'card:placed', payload: { cardId, playerIndex, slotIndex } as CardPlacedPayload });
     }
     return scene.tweens.add({
       targets: target,
@@ -230,21 +220,12 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
           }
           // Emit event after animation completes
           if (gameEvents && cardId) {
-            setTimeout(() => {
-              gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
-            }, 0);
+            emitEventOrCallback({ gameEvents, event: 'card:placed', payload: { cardId, playerIndex, slotIndex } as CardPlacedPayload });
           }
         },
       });
     },
   });
-
-  // Ensure event is emitted even if phase2 somehow not called (fallback)
-  if (gameEvents && cardId) {
-    setTimeout(() => {
-      gameEvents.emit('card:placed', { cardId, playerIndex, slotIndex });
-    }, 0);
-  }
 
   return phase1;
 }

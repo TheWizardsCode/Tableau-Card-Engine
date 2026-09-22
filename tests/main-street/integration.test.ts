@@ -398,7 +398,10 @@ describe('Integration: Income & Synergy', () => {
 
 describe('Integration: Incident Deck', () => {
   it('resolves the front incident card from the deck across multiple turns', () => {
-    const state = setupMainStreetGame({ seed: 'queue-drain' });
+    // Seed chosen so the front deck cards are non-choice incidents: a
+    // dual-choice incident defers its result (incident null until resolved),
+    // which the deck-composition shift can reorder onto the front.
+    const state = setupMainStreetGame({ seed: 'incident-flow-4' });
     state.resourceBank.coins = 100;
     state.resourceBank.reputation = 10;
 

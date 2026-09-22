@@ -4,7 +4,8 @@
  * Encapsulates the Phaser drag pattern first implemented bespoke in
  * Beleaguered Castle (see `setupDragAndDrop` in `BeleagueredCastleScene.ts`
  * and `makeDraggable`/`snapBack` in `BeleagueredCastleRenderer.ts`) into a
- * single configurable core-engine module:
+ * single configurable core-engine module. Supports optional event emission
+ * via a GameEventEmitter or onEvent callbacks for the drag lifecycle.
  *
  * - registering draggable game objects (Image or Container) with per-object
  *   pickup validation (an illegal-card veto that keeps the card in place and
@@ -27,6 +28,7 @@
 
 import { safePlaySound, COMMON_SFX_KEYS } from '../core-engine/SoundManager';
 import { shakeIllegalMove } from './shakeIllegalMove';
+import { emitEventOrCallback } from '../core-engine/event-emission';
 
 /**
  * A draggable game object: anything with transform + depth components
@@ -58,6 +60,34 @@ export interface DragDropPayload<TData = unknown> {
   zone?: Phaser.GameObjects.Zone;
   /** Caller-attached zone data (e.g. slot index) for the drop target. */
   zoneData?: unknown;
+}
+
+/** Payload for the 'card:drag-started' event. */
+export interface CardDragStartedPayload {
+  /** Card ID extracted from data (optional). */
+  readonly cardId?: string;
+  /** Player index extracted from data (optional). */
+  readonly playerIndex?: number;
+}
+
+/** Payload for the 'card:drag-ended' event. */
+export interface CardDragEndedPayload {
+  /** Card ID extracted from data (optional). */
+  readonly cardId?: string;
+  /** Player index extracted from data (optional). */
+  readonly playerIndex?: number;
+  /** Whether the drag ended with a valid drop. */
+  readonly dropped: boolean;
+}
+
+/** Payload for the 'card:dropped' event. */
+export interface CardDroppedPayload {
+  /** Card ID extracted from data (optional). */
+  readonly cardId?: string;
+  /** Player index extracted from data (optional). */
+  readonly playerIndex?: number;
+  /** Slot index of the drop target (optional). */
+  readonly slotIndex?: number;
 }
 
 /** Config for a single draggable game object. */
@@ -111,6 +141,11 @@ export interface DragDropManagerConfig {
    * click-vs-drag coexistence for consumers.
    */
   dragDistanceThreshold?: number;
+  /**
+   * Optional event emitter for drag lifecycle events. When provided, emits
+   * `card:drag-started`, `card:dropped`, and `card:drag-ended` events.
+   */
+  gameEvents?: { emit(event: string, payload: unknown): void };
   /**
    * Fired after a drag passes pickup validation (i.e. on a valid
    * dragstart) — consumers show valid-drop highlights here.
@@ -258,6 +293,16 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
     gameObject: DraggableGameObject,
   ): DragDropPayload => ({ pointer, gameObject });
 
+  /** Emit a drag-lifecycle event when an emitter is configured. */
+  const emitDragEvent = <T>(
+    event: string,
+    payload: T,
+  ): void => {
+    if (config.gameEvents) {
+      emitEventOrCallback({ gameEvents: config.gameEvents, event, payload });
+    }
+  };
+
   const restoreOrigin = (entry: DraggableEntry, gameObject: DraggableGameObject): void => {
     gameObject.x = entry.originX;
     gameObject.y = entry.originY;
@@ -317,6 +362,14 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
 
     gameObject.setDepth(dragDepth);
     config.onDragStart?.(payload);
+    // Emit card:drag-started event
+    if (config.gameEvents && entry.config.data) {
+      const data = entry.config.data as Record<string, unknown>;
+      emitDragEvent('card:drag-started', {
+        cardId: data.cardId as string | undefined,
+        playerIndex: data.playerIndex as number | undefined,
+      } as CardDragStartedPayload);
+    }
   };
 
   const handleDrag = (
@@ -355,6 +408,15 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
       entry.vetoed = false;
       gameObject.setDepth(entry.originDepth);
       config.onDragEnd?.(payload);
+      // Emit card:dropped event
+      if (config.gameEvents && entry.config.data) {
+        const data = entry.config.data as Record<string, unknown>;
+        emitDragEvent('card:dropped', {
+          cardId: data.cardId as string | undefined,
+          playerIndex: data.playerIndex as number | undefined,
+          slotIndex: zoneEntry?.data as number | undefined,
+        } as CardDroppedPayload);
+      }
       entry.config.onDrop(payload);
       return;
     }
@@ -362,6 +424,15 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
     // Invalid drop (unregistered zone, rejected by canAccept, or no drop
     // handler): snap-back + illegal feedback (illegal-move case).
     entry.dragging = false;
+    // Emit card:drag-ended for invalid drop
+    if (config.gameEvents && entry.config.data) {
+      const data = entry.config.data as Record<string, unknown>;
+      emitDragEvent('card:drag-ended', {
+        cardId: data.cardId as string | undefined,
+        playerIndex: data.playerIndex as number | undefined,
+        dropped: false,
+      } as CardDragEndedPayload);
+    }
     config.onDragEnd?.(payload);
     snapBack(entry, gameObject, payload);
   };
@@ -391,6 +462,15 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
     config.onDragEnd?.(payload);
 
     if (!dropped) {
+      // Emit card:drag-ended for release outside zones
+      if (config.gameEvents && entry.config.data) {
+        const data = entry.config.data as Record<string, unknown>;
+        emitDragEvent('card:drag-ended', {
+          cardId: data.cardId as string | undefined,
+          playerIndex: data.playerIndex as number | undefined,
+          dropped: false,
+        } as CardDragEndedPayload);
+      }
       // Released outside any drop zone: snap back + illegal feedback.
       snapBack(entry, gameObject, payload);
       return;
@@ -398,6 +478,7 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
 
     // Released over a registered Phaser drop zone: the `drop` handler has
     // already accepted it or initiated snap-back. Restore depth only.
+    // Emit card:drag-ended (drop was handled by handleDrop).
     gameObject.setDepth(entry.originDepth);
   };
 

@@ -24,7 +24,7 @@ import {
 import {
   executeDayStart,
   executeAction,
-  processEndOfTurn,
+  endTurnHeadless,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   getStaffCardTemplates,
@@ -125,7 +125,7 @@ describe('actionsRemaining budget', () => {
     expect(state.actionsRemaining).toBe(2);
   });
 
-  it('is refreshed each new day after processEndOfTurn', () => {
+  it('is refreshed each new day after the turn closing', () => {
     const state = setupMainStreetGame({ seed: 'day-cycle' });
     state.resourceBank.coins = 10000;
     executeDayStart(state, true);
@@ -136,7 +136,7 @@ describe('actionsRemaining budget', () => {
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(0);
 
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     expect(state.phase).toBe('DayStart');
 
     executeDayStart(state, true);
@@ -340,6 +340,10 @@ describe('event action economy', () => {
   // prior-day held play costs 1
   it('playing a held event from a prior day costs 1 action', () => {
     const state = setupMainStreetGame({ seed: 'evt-held-prior' });
+    // This test guards action economy, not win conditions — a large seeded
+    // incident can cross the default score threshold mid-flow (deck shifts
+    // change which incident is drawn), so neutralise the win gate.
+    state.config = { ...state.config, winThreshold: Number.MAX_SAFE_INTEGER };
     executeDayStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-held', 'Held Event', 8) as never;
@@ -350,7 +354,7 @@ describe('event action economy', () => {
     expect(state.actionsRemaining).toBe(0);
 
     // End day 1, start day 2
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     executeDayStart(state, true);
     expect(state.actionsRemaining).toBe(1);
     expect(state.hand.some(c => c.id === 'evt-held')).toBe(true);
@@ -376,7 +380,7 @@ describe('event action economy', () => {
     expect(state.resourceBank.coins).toBe(coinsBefore); // move free
 
     // Need fresh action for play — simulate next day
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     executeDayStart(state, true);
     state.resourceBank.coins = coinsBefore; // restore for clear assertion
     // hand still has event from prior day
@@ -612,7 +616,7 @@ describe('event action-budget legality gates', () => {
     executeAction(state, { type: 'buy-event', cardId: 'evt-reset' });
     expect(state.justMovedEventCardId).toBe('evt-reset');
 
-    processEndOfTurn(state);
+    endTurnHeadless(state);
     executeDayStart(state);
     expect(state.justMovedEventCardId).toBeNull();
   });

@@ -110,6 +110,9 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
     refreshAll: vi.fn(),
     refreshStreetGrid: vi.fn(),
     refreshActionButtons: vi.fn(),
+    // Undo/redo HUD button sync (CG-0MT5Y4DL8000AKKZ) — called by the turn
+    // controller after every undo-stack mutation.
+    refreshUndoRedoButtons: vi.fn(),
     gameEvents: { emit: vi.fn(), on: vi.fn(), off: vi.fn() },
     undoManager: new UndoRedoManager(),
     dragDropManager: undefined,
@@ -387,6 +390,9 @@ describe('MainStreet drag-to-buy wiring', () => {
 
       // Single undo step reverses the whole buy+place.
       expect(scene.undoManager.canUndo()).toBe(true);
+      // AC 3 (CG-0MT5Y4DL8000AKKZ): the action synced the HUD buttons — Undo
+      // is now available (stack non-empty) while Redo stays unavailable.
+      expect(scene.refreshUndoRedoButtons).toHaveBeenCalledWith(true, false);
       scene.undoManager.undo();
       expect(scene.state.market.cards.find((c: any) => c.id === card.id)).toBeTruthy();
       expect(scene.state.streetGrid[slot]).toBeNull();

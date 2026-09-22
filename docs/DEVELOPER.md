@@ -293,8 +293,8 @@ Two mitigations are in place in this repository:
    pipeline (dispatched DOM events at layout-derived canvas coordinates, e.g.
    the Main Street slot-click suites) can intermittently have their click
    dropped or delayed when the RAF-driven game loop is starved of frames by
-   parallel full-suite runs. Two conventions keep these suites green under
-   contention without masking real regressions:
+   parallel full-suite runs. The following conventions keep these suites green
+   under contention without masking real regressions:
 
    - **Generous per-wait budgets**: animation- or frame-loop-gated waits (a
      triggered reveal, a dialog created by a transfer-completion callback)
@@ -308,6 +308,27 @@ Two mitigations are in place in this repository:
      retry window (30s) that leaves headroom under the test's total budget.
      Re-dispatch is safe because the interaction handler no-ops once the
      phase has moved.
+   - **Wait for a real animation frame before dispatching a pointer
+     gesture** (CG-0MUA7RRXL007GEHW): interactive game objects rebuilt by a
+     refresh (`refreshAll`/`refreshStreetGrid`) are queued in Phaser's
+     `_pendingInsertion` and only registered with the input system during
+     `InputPlugin.preUpdate`, which runs on the game loop's RAF tick — never
+     from a `setTimeout`. A drag started after the refresh but before that
+     tick lands on a not-yet-registered hit zone, so the gesture is silently
+     dropped and the drop never fires (observed as a `waitForCondition`
+     timeout waiting for the transfer animation in
+     `tests/main-street/upgrade-drag-drop.browser.test.ts`). Gesture helpers
+     therefore await two `requestAnimationFrame` callbacks (`waitForFrames()`)
+     before the first `mousedown`, matching the established pattern in
+     `tests/main-street/expanded-viewport.browser.test.ts`.
+   - **Poll frame-gated waits on `requestAnimationFrame`**: a helper that
+     waits for the game loop to reach a state (e.g. `waitForCondition` in
+     `tests/main-street/upgrade-drag-drop.browser.test.ts`) yields to the
+     browser's animation-frame loop on every poll rather than a bare
+     `setTimeout`, so the RAF-driven `InputPlugin.preUpdate` step that
+     dispatches the queued `drop` handler is guaranteed to run. Bare
+     `setTimeout` polling can starve for seconds under concurrent-suite
+     contention even when the timeout budget is large.
    - **Deterministic boot conditions**: tests that assume a buyable market
      card at boot set generous coins (e.g. `resourceBank.coins = 100`)
      rather than relying on the random seed's initial market draw — the
@@ -432,7 +453,13 @@ re-run the suspected file(s) in isolation via
 `npx vitest run --project browser tests/<file>` to see whether the hang
 reproduces without suite-wide contention. If it does, look for an unresolved
 `Phaser.Game` (the `afterEach` must destroy it) or a frame-wait helper without
-a timeout fallback. Exit codes from the runner: 0/1 from vitest, 124 on hang
+a timeout fallback. A hang in the **unit** stage is instead a synchronous
+infinite loop in test/engine code (e.g. an unbounded drain over a deck that
+self-replenishes or can stall — see [Writing unit tests](#writing-unit-tests));
+vitest's `testTimeout` cannot preempt synchronous JS, so attaching the V8
+inspector to the stuck process and pausing it is the fastest way to get the
+stack (`kill -USR1 <pid>`, then connect to `http://127.0.0.1:9229/json`).
+Exit codes from the runner: 0/1 from vitest, 124 on hang
 abort, 2 on an invalid `--timeout-ms` value.
 
 If you see the worker-timeout error repeatedly under sustained load, run the
@@ -459,6 +486,14 @@ The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameTy
 - Place test files in `tests/` following the `*.test.ts` pattern
 - Import from `vitest` directly: `import { describe, it, expect } from 'vitest'`
 - Vitest globals are enabled -- `describe`, `it`, `expect` are available without imports in test files
+- **Never write an unbounded `while (…) { … }` drain whose stop condition depends
+  on engine state that can stall or self-replenish** — e.g.
+  `while (state.incidentDeck.length > 0) resolveIncident(state)` hangs forever once
+  week gating leaves only out-of-season cards (or `replenishIncidentDeck()` refills the
+  deck). A synchronous infinite loop stalls the whole unit stage, vitest's
+  `testTimeout` cannot preempt it, and only the runner's wall-clock bound catches it
+  (exit 124). Bound the loop with a counter/`for`, stop on no-progress, or arrange the
+  state directly so the assertion is reachable without iteration.
 
 ### Smoke Tests
 
@@ -474,7 +509,7 @@ Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedbac
 - `tests/lost-cities/LostCitiesRoundEnd.browser.test.ts` (Lost Cities flow)
 - `tests/core-engine/SvgHelpers.browser.test.ts` (Core SVG pipeline)
 - `tests/ui/HelpPanel.browser.test.ts` (UI chrome)
-- `tests/gym/GymSceneSmoke.browser.test.ts` (All 19 gym scenes boot)
+- `tests/gym/GymSceneSmoke.browser.test.ts` (All gym scenes boot)
 
 ### Dev Tests
 
@@ -908,11 +943,22 @@ Follow the Golf (original reference) and Sushi Go (most recent) examples as refe
 
 For non-standard card models (tokens, resource icons, expedition cards), use the `CardTextureResolver` / `renderCard` callbacks documented in the [UI Adapter Guide](ui/ADAPTER-GUIDE.md). See the [Gym scene index](gym/GYM_INDEX.md) for the complete HandView/PileView scene-to-API mapping.
 
+### Hand capacity outlines
+
+`HandView` can render ghost slot outlines so the player always sees how many more cards the hand can hold (CG-0MT6ER7YY003G680). Enable them per instance with `showPositionOutlines: true` and declare the capacity with `maxSlots` (one outline per slot); `maxSlots` can be updated at runtime via `setMaxSlots()` when the capacity changes (e.g. staff cards altering `maxHandSize` in Main Street). Options:
+
+- `cardWidth` / `cardHeight` — outline size in px. Set both to match non-default card sizes (`cardHeight` defaults to `CARD_H`; Main Street uses `handCardW - 4` × `handCardH - 4`).
+- Outlines are static (no animation), so reduced-motion is honoured by construction.
+- Occupied slots sit at exactly the card's position and rotation (`depth = index - 0.5`, behind card `index`); rotation mirrors the card sprite's **actual** rotation, so custom-rendered hands that never rotate keep straight outlines. Extra capacity slots continue the same step to the right and render below every card.
+- With an empty hand, `maxSlots` outlines render centred on the hand centre — the player sees the hand's capacity before any card is drawn.
+
+Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max hand size 7, toggle button) and `example-games/main-street/scenes/MainStreetRenderer.ts`. Tests: `tests/ui/handView.outlines.test.ts`, `tests/handView/gym-handpile-outlines.browser.test.ts`, `tests/main-street/hand-outlines.browser.test.ts`.
+
 ## Animation & Sound Feedback for Player and AI Actions
 
 **Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops.)
 
-**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoScene.ts` runs AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then executes the AI's action through the same animated/sounded path as a human turn.
+**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoAiScheduler.ts` schedules AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then dispatches the AI's action through the same animated/sounded path as a human turn (rendered by `ColorettoRenderer`, orchestrated by `ColorettoScene`).
 
 **Accessibility:** Reduced-motion preferences (explicit flag → SettingsStore toggle → `prefers-reduced-motion`; see the [Accessibility](ui-animations.md#accessibility) section of the animation helpers reference) and the settings-panel mute/volume controls must be respected — pass the helper's `reducedMotion` flag and play SFX through `SoundManager` (or `safePlaySound()` for overlay helpers) so mute and volume apply uniformly. This requirement reinforces, never weakens, accessibility behaviour.
 
@@ -942,7 +988,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
 | Main Street | `example-games/main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
-| Coloretto | `example-games/coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording | `tests/coloretto/` (7 files) |
+| Coloretto | `example-games/coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording. Scene decomposed into helpers: `ColorettoRenderer` (board + animations), `ColorettoInputHandler`, `ColorettoAiScheduler`, `ColorettoOverlays` | `tests/coloretto/` (7 files) |
 
 ### Lost Cities card assets
 
@@ -1103,10 +1149,79 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
 
+#### Card art pipeline (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R)
+
+Each card's 64×64 art zone embeds its art as an inline base64 `data:` URI
+(required: the SVG is rasterised from a data URI, so external refs do not
+resolve). **The 64×64 zone is a layout dimension, not the render resolution** —
+Phaser rasterises the card SVG at up to 4× quality scale
+(`rasteriseSvgToTexture`, `qualityScale = Math.max(4, dpr)`), so the zone
+occupies up to 256×256 device pixels and the embedded bitmap is **256×256
+WebP**, filling it at 1:1.
+
+The committed 1024×1024 source sprites live in
+`example-games/main-street/sprites/<Name>_1024_x_1024.png` (the source of
+truth; the `_64_x_64.png` files are superseded legacy thumbnails). Run
+`node scripts/generate-main-street-card-art.mjs` to regenerate
+`example-games/main-street/card-art-map.json` (card name → base64 data URI,
+plus spelling aliases and a `Fallback` entry); the script downscales each
+1024×1024 sprite to 256×256 and re-encodes it as lossy WebP (quality 90),
+which keeps the inline map small (~0.6 MB) despite carrying 16× the pixels of
+the old 64×64 PNG map.
+Both `MainStreetCardArt.ts` (runtime CSV generator) and
+`scripts/generate-main-street-card-svgs.mjs` (static SVGs) consume the map.
+Cards without dedicated art use the `Fallback` sprite.
+
 #### Turn Economy (CG-0MTINZ5GG007BH44)
 
 Single-source turn cash formula (Q1=c — see `MainStreetDifficulty.ts` header):
 `dayStart snapshot (dayStartCoins/dayStartRep at DayStart) → placement deductions → applyIncome breakdown (staff buffs → income-multiplier effects → rep multiplier sampled AFTER income's own rep accrual; hand cards contribute no income — CG-0MTRDX0DN004EECN) → ongoing costs (after income, before incident) → incident (or incident-averted log entry via Risk Manager per Q3) → net row (Turn N net: coinsNow-dayStartCoins / repNow-dayStartRep) as the final log entry, including premature bankruptcy/rep-collapse and competitive closing phases`. Invariants: Q1=c rep sampling, Q2 3-decimal tooltip (`toFixed(3)`), Q3 explicit averted entry, banner→net ordering on premature exits. Canonical sites: `reputationCoinMultiplier`/`applyReputationMultiplier` (`MainStreetDifficulty.ts`), `applyIncome` (`MainStreetAdjacency.ts`), `buildCoinsTooltip`/`buildReputationTooltip` (`MainStreetHudTooltips.ts`), `appendTurnNetRow`/`processEndOfTurn`/`resolveCompetitiveClosingPhases` (`MainStreetEngine.ts`).
+
+#### Deferred End-of-Turn Mutation (CG-0MTR72P14000VO6Q)
+
+Interactive play defers the application of end-of-turn resource changes until
+the closing animations land, so the HUD coins/reputation/score update only
+when the visual feedback completes (coins fly to the HUD, the incident reveal
+finishes) and the game-over banner never appears mid-animation.
+
+- **Dual-mode engine functions.** `applyIncome` (`MainStreetAdjacency.ts`),
+  `applyStaffOngoingCosts` / `applyCommunitySpaceOngoingCosts` /
+  `applyBusinessOngoingCosts`, and `resolveIncident` (`MainStreetEngine.ts`)
+  accept an optional `{ apply?: boolean }` option. Defaulted (or omitted)
+  calls keep the legacy immediate-apply contract — the headless/AI path
+  (`endTurnHeadless`, the Monte Carlo harness) and all existing direct calls
+  are unchanged and deterministic. With `apply: false` they compute and
+  return the deltas without touching `state.resourceBank`.
+- **Deferred `processEndOfTurn`.** `processEndOfTurn(state, { deferResourceApplication: true })`
+  (interactive scene path) runs the same phases but returns the summed deltas
+  in `TurnResult.pendingCoinDelta` / `pendingRepDelta` / `pendingScoreDelta`
+  and sets `TurnResult.requiresDeferredClosing`; `state.resourceBank` and
+  `state.finalScore` are NOT mutated and the closing tail (EndCheck → next
+  day) is deferred. Tutorial, reduced-motion and replay paths omit the flag
+  (legacy immediate behaviour, no regression — AC5).
+- **Apply at animation end.** The scene (`MainStreetTurnController` +
+  `MainStreetAnimator`) applies the deltas exactly once via
+  `applyEndOfTurnDeltas` when the last animation completes (guarded by the
+  scene's `endOfTurnDeltasApplied` flag so income and incident animations
+  cannot double-apply), then runs `finishDeferredTurnClosing` — immediate
+  loss check, challenge evaluation against the post-delta state, EndCheck,
+  next-day advance, net row — and finally refreshes the HUD.
+- **Deferred HUD window.** `refreshHud()` (`MainStreetRenderer.ts`) renders
+  the pre-animation `previousCoins` / `previousReputation` captured at
+  `endTurn()` start while `incomeCollectionActive` or `incidentRevealActive`
+  is set, switching to the post-delta state once the window closes.
+- **Game-over timing.** EndCheck runs inside `finishDeferredTurnClosing`
+  (after the animations) — the overlay cannot appear before the player has
+  seen the income/incident feedback (AC4).
+
+Canonical sites: `applyIncome` (`MainStreetAdjacency.ts`),
+`computeEventDeltas` / `resolveIncident` / `processEndOfTurn` /
+`applyEndOfTurnDeltas` / `finishDeferredTurnClosing` (`MainStreetEngine.ts`),
+`refreshHud` (`MainStreetRenderer.ts`), `animateIncomePhases` /
+`collectIncomeGrids` / `animateIncidentReveal` (`MainStreetAnimator.ts`),
+`endTurn` / `finishTurnPresentation` (`MainStreetTurnController.ts`),
+`previousCoins` / `previousReputation` / `incomeCollectionActive` /
+`incidentRevealActive` / `endOfTurnDeltasApplied` (`MainStreetScene.ts`).
 
 #### Community Favour (CG-0MSTOATDQ005XDET)
 
@@ -1645,7 +1760,7 @@ BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlayS
 - Base cards (`level === 0`): level badge and border are `null`; the cash line is populated when income or cost > 0.
 - Upgraded cards (`level > 0`): The non-name overlays are populated:
   - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-right corner, 10px bold.
-  - **Cash line** — `"Cash: +X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the `Cash:` prefix and ` / ` separator in neutral grey (`#dddddd`). The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `Cash: +2`, `Cash: -0.75`) (CG-0MTCP76MP0088TQW).
+  - **Cash line** — `"+X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the ` / ` separator in neutral grey (`#dddddd`). The former `Cash:` prefix was removed by manual review (CG-0MTORJ5FS006B0UN) — the colouring carries the meaning. The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `+2`, `-0.75`) (CG-0MTCP76MP0088TQW).
   - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below the cash line.
   - **Upgrade border** — Golden stroke (`0xffaa22`), 3px width, around the card perimeter.
   - **Name** — NOT an overlay: baked into the card's SVG via a display-name variant texture (CG-0MT24MHGZ0025O20).
@@ -1714,7 +1829,7 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ┌─────────────────────┐     ┌─────────────────────────────┐
 │  Base SVG texture   │     │  buildUpgradeOverlaySpec()  │
 │  (cached, reused)   │     │  → levelBadge: "Lvl 2"      │
-│  + display-name     │     │  → cashLine: "Cash: +8"    │
+│  + display-name     │     │  → cashLine: "+8"          │
 │  variant (upgraded) │     │  → upgradeBorder: gold 3px   │
 │                     │     │  (name is baked into the     │
 │                     │     │   variant texture, not here) │

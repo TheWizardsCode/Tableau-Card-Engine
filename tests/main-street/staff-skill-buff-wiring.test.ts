@@ -35,7 +35,14 @@ import {
   syncCardCurrentIncome,
 } from '../../example-games/main-street/MainStreetAdjacency';
 import { refreshMarket, refreshMarketCost } from '../../example-games/main-street/MainStreetMarket';
-import { createStaffDeck, type StaffCard, type BusinessCard, type EventCard } from '../../example-games/main-street/MainStreetCards';
+import {
+  createStaffDeck,
+  type StaffCard,
+  type BusinessCard,
+  type EventCard,
+  REFRESH_MARKET_COST,
+} from '../../example-games/main-street/MainStreetCards';
+import { NEGOTIATOR_REFRESH_DISCOUNT } from '../../example-games/main-street/MainStreetStaffBuffs';
 import { getSkill } from '../../example-games/main-street/MainStreetStaffSkills';
 import {
   computeStaffSalaryCost,
@@ -241,13 +248,13 @@ describe('I4: cost-reduction skills apply to ongoing/refresh costs', () => {
   it('Negotiator discounts market refresh cost by 100 (clamped at 0)', () => {
     const state = setupMainStreetGame({ seed: 'i4-neg' });
     executeDayStart(state);
-    expect(refreshMarketCost(state)).toBe(5);
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST);
     hireSynthetic(state, 'neg', ['skill-negotiator']);
-    expect(refreshMarketCost(state)).toBe(0);
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST - NEGOTIATOR_REFRESH_DISCOUNT);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = REFRESH_MARKET_COST;
     refreshMarket(state);
-    expect(state.resourceBank.coins).toBe(100);
+    expect(state.resourceBank.coins).toBe(NEGOTIATOR_REFRESH_DISCOUNT);
   });
 });
 

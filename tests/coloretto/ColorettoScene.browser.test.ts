@@ -730,6 +730,37 @@ describe('ColorettoScene (browser)', () => {
     expect(flyerContainers(scene)).toHaveLength(0);
   });
 
+  it('AI scheduler takes a valuable row through the real runTurn path (CG-0MTP6KN180075VTV)', async () => {
+    game = await bootGame();
+    const scene = await startTwoPlayerGame(game);
+
+    // Clear every row so the AI's take target is unambiguous, then give the
+    // AI a red-heavy collection so a red single row clears the take
+    // threshold (my gain +5 vs the human's +1 -> net 4).
+    for (const row of scene.session.rows) row.cards = [];
+    scene.session.players[1].collection = [
+      { id: 920, type: 'chameleon', color: 'red', count: 2 },
+      { id: 921, type: 'chameleon', color: 'red', count: 2 },
+    ];
+    scene.session.rows[0].cards = [
+      { id: 922, type: 'chameleon', color: 'red', count: 1 },
+    ];
+    // Put the AI in turn and drive the scene's own turn loop (not
+    // executeTurn directly): this is the path the manual review flagged.
+    scene.session.currentTurnIndex = 1;
+    scene.session.players[0].roundState = 'active';
+    scene.session.players[1].roundState = 'active';
+    scene.refreshAll();
+
+    scene.runTurn();
+
+    // The AI chooses Take and the row lands in the AI's collection.
+    await waitForCondition(() => scene.session.rows[0].cards.length === 0);
+    expect(
+      (scene.session.players[1].collection as { id: number }[]).map((c) => c.id),
+    ).toContain(922);
+  });
+
 
   it('animates a human placement: card flies from the deck, moves to the row slot, then flips', async () => {
     game = await bootGame();

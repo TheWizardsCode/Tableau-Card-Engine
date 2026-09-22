@@ -47,6 +47,9 @@ export type {
   DragDropObjectConfig,
   DragDropZoneConfig,
   DragDropPayload,
+  CardDragStartedPayload,
+  CardDragEndedPayload,
+  CardDroppedPayload,
 } from './dragDrop';
 
 // Positional movement animation
@@ -55,15 +58,24 @@ export type { MoveGameObjectOptions } from './moveGameObject';
 
 // Card deal animation
 export { dealCard, DEFAULT_DEAL_DURATION, DEFAULT_DEAL_ARC_HEIGHT } from './dealCard';
-export type { DealCardOptions, CardDealtPayload } from './dealCard';
+export type { DealCardOptions } from './dealCard';
 
 // Card place animation
 export { placeCard, DEFAULT_PLACE_DURATION } from './placeCard';
-export type { PlaceCardOptions, CardPlacedPayload } from './placeCard';
+export type { PlaceCardOptions } from './placeCard';
 
 // Card discard animation
 export { discardCard, DEFAULT_DISCARD_DURATION } from './discardCard';
-export type { DiscardCardOptions, CardDiscardedPayload } from './discardCard';
+export type { DiscardCardOptions } from './discardCard';
+
+// Re-export shared card-event payloads from core-engine
+export type {
+  BaseCardEventPayload,
+  CardDealtPayload,
+  CardPlacedPayload,
+  CardDiscardedPayload,
+  CardFlippedPayload,
+} from '../core-engine';
 
 // Event / transition animation helpers
 export { popTextOrIcon } from './popTextOrIcon';

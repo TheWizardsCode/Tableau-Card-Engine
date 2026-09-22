@@ -540,12 +540,13 @@ describe('MarketOfferEngine — positive-path purchase results', () => {
       expect(result.cost).toBe(REFRESH_MARKET_COST);
       expect(state.resourceBank.coins).toBe(coinsBefore - REFRESH_MARKET_COST);
       // All previously visible cards should be discarded (single row may hold
-      // any family, so scan every discard pile).
+      // any family, so scan every discard pile including staff).
       const discardedIds = [
         ...state.discards.business.map(c => c.id),
         ...state.discards.communitySpace.map(c => c.id),
         ...state.discards.upgrade.map(c => c.id),
         ...state.discards.event.map(c => c.id),
+        ...state.discards.staff.map(c => c.id),
       ];
       for (const id of result.replaced.map(c => c.id)) {
         expect(discardedIds).toContain(id);
@@ -1006,8 +1007,10 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
     it('should produce deterministic market states with the same seed', () => {
       const state1 = createTestState('flow-deterministic');
       const state2 = createTestState('flow-deterministic');
-      state1.resourceBank.coins = 100;
-      state2.resourceBank.coins = 100;
+      // Generous coins: the parity assertions only care that both identical
+      // seeded flows stay in lockstep, not that they survive on a tight budget.
+      state1.resourceBank.coins = 10000;
+      state2.resourceBank.coins = 10000;
 
       for (let turn = 0; turn < 3; turn++) {
         playGreedyTurn(state1);

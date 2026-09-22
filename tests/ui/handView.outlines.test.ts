@@ -262,7 +262,7 @@ describe('HandView position outlines', () => {
     const outlines = getOutlineRects(scene);
     expect(outlines).toHaveLength(1);
 
-    // Card dimensions (CARD_W=96, CARD_H=130)
+    // Default card dimensions (CARD_W=96, CARD_H=130)
     const outline = outlines[0];
     expect(outline.width).toBe(96);
     expect(outline.height).toBe(130);
@@ -273,6 +273,26 @@ describe('HandView position outlines', () => {
     expect((outline as any).radius).toBe(8);
     expect((outline as any).isRounded).toBe(true);
     expect(outline.fillAlpha).toBeCloseTo(0.06, 3);
+
+    hv.destroy();
+  });
+
+  it('outlines honour a custom cardHeight (e.g. Main Street 140x80 cards)', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 148,
+      cardWidth: 136,
+      cardHeight: 76,
+      showPositionOutlines: true,
+    });
+
+    hv.setCards([card('A', 'spades')]);
+
+    const outlines = getOutlineRects(scene);
+    expect(outlines).toHaveLength(1);
+    expect(outlines[0].width).toBe(136);
+    expect(outlines[0].height).toBe(76);
 
     hv.destroy();
   });
@@ -310,6 +330,111 @@ describe('HandView position outlines', () => {
   });
 
   // ── maxSlots ──────────────────────────────────────────────
+
+  it('occupied outlines align exactly with card centres when maxSlots exceeds card count', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 5,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+    const outlines = getOutlineRects(scene);
+    expect(outlines).toHaveLength(5);
+
+    // The occupied slot outlines must sit exactly where the cards rest
+    // (producer feedback: outlines should be "positioned the same as the
+    // cards themselves, with the same rotation and spacing").
+    for (let i = 0; i < 3; i++) {
+      expect(outlines[i].x).toBe(scene._images[i].x);
+      expect(outlines[i].y).toBe(scene._images[i].y);
+    }
+
+    hv.destroy();
+  });
+
+  it('extra capacity outlines render behind every card', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 5,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+
+    const outlines = getOutlineRects(scene);
+    expect(outlines).toHaveLength(5);
+
+    const depth = (r: any) => {
+      const calls = r.setDepth.mock.calls;
+      return calls[calls.length - 1][0];
+    };
+
+    // Occupied slots sit behind their own card (index - 0.5)
+    expect(depth(outlines[0])).toBe(-0.5);
+    expect(depth(outlines[1])).toBe(0.5);
+    expect(depth(outlines[2])).toBe(1.5);
+
+    // Extra empty slots are pushed below every card so an overlapping
+    // card face is never drawn over by a ghost slot.
+    expect(depth(outlines[3])).toBeLessThan(-0.5);
+    expect(depth(outlines[4])).toBeLessThan(-0.5);
+    expect(depth(outlines[3])).toBeLessThan(depth(outlines[4]));
+
+    hv.destroy();
+  });
+
+  it('empty-hand outlines use index - 0.5 depth (no cards to sit behind)', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 3,
+    });
+
+    hv.setCards([]);
+
+    const outlines = getOutlineRects(scene);
+    expect(outlines).toHaveLength(3);
+    for (let i = 0; i < outlines.length; i++) {
+      const calls = outlines[i].setDepth.mock.calls;
+      expect(calls[calls.length - 1][0]).toBe(i - 0.5);
+    }
+
+    hv.destroy();
+  });
+
+  it('never renders more outlines than maxSlots when the hand is over capacity', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 2,
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+    ]);
+
+    const outlines = getOutlineRects(scene);
+    expect(outlines).toHaveLength(2);
+    // The two slots still ghost their cards
+    for (let i = 0; i < 2; i++) {
+      expect(outlines[i].x).toBe(scene._images[i].x);
+      expect(outlines[i].y).toBe(scene._images[i].y);
+    }
+
+    hv.destroy();
+  });
 
   it('maxSlots shows outlines for all slots even with fewer cards', () => {
     const hv = new HandView(scene, {
@@ -515,6 +640,97 @@ describe('HandView position outlines', () => {
     expect(outlines[1].x).toBeGreaterThan(outlines[0].x);
 
     hv.destroy();
+  });
+
+  it('outlines match card rotation in arc layout', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      arcRadius: 120,
+      maxRotationDegrees: 25,
+      showPositionOutlines: true,
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ]);
+
+    const outlines = getOutlineRects(scene);
+    expect(outlines).toHaveLength(5);
+
+    // Every outline must carry the same rotation as the card it ghosts
+    // (producer feedback: outlines need "the same rotation" as the cards).
+    for (let i = 0; i < outlines.length; i++) {
+      expect(outlines[i].rotation).toBeCloseTo(scene._images[i].rotation, 6);
+    }
+  });
+
+  it('occupied outlines keep card rotation when maxSlots adds extra slots', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      arcRadius: 120,
+      maxRotationDegrees: 25,
+      showPositionOutlines: true,
+      maxSlots: 7,
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ]);
+
+    const outlines = getOutlineRects(scene);
+    expect(outlines).toHaveLength(7);
+
+    for (let i = 0; i < 5; i++) {
+      expect(outlines[i].x).toBe(scene._images[i].x);
+      expect(outlines[i].rotation).toBeCloseTo(scene._images[i].rotation, 6);
+    }
+  });
+
+  it('outline rotation updates on setMaxRotationDegrees', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      arcRadius: 120,
+      maxRotationDegrees: 0,
+      showPositionOutlines: true,
+    });
+
+    hv.setCards([
+      card('A', 'spades'),
+      card('2', 'hearts'),
+      card('3', 'clubs'),
+      card('4', 'diamonds'),
+      card('5', 'spades'),
+    ]);
+
+    const outlines = getOutlineRects(scene);
+    // No rotation initially
+    for (const o of outlines) {
+      expect(o.rotation).toBe(0);
+    }
+
+    hv.setMaxRotationDegrees(25);
+    const after = getOutlineRects(scene);
+    // Edge cards rotate, centre card stays flat
+    expect(after[0].rotation).toBeLessThan(0);
+    expect(after[2].rotation).toBeCloseTo(0, 6);
+    expect(after[4].rotation).toBeGreaterThan(0);
+    for (let i = 0; i < after.length; i++) {
+      expect(after[i].rotation).toBeCloseTo(scene._images[i].rotation, 6);
+    }
   });
 
   it('setArcRadius repositions outlines', () => {

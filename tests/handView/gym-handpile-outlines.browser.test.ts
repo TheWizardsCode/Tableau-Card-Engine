@@ -93,9 +93,24 @@ describe('GymHandPileScene outlines', () => {
       expect(typeof rect.setPosition).toBe('function');
     }
 
-    // Verify outlines are behind card sprites (depth index - 0.5)
-    for (let i = 0; i < outlineRects.length; i++) {
+    // Verify outlines are behind card sprites: occupied slots at depth
+    // index - 0.5; extra empty slots pushed below every card.
+    for (let i = 0; i < cardCount; i++) {
       expect(outlineRects[i].depth).toBe(i - 0.5);
+    }
+    for (let i = cardCount; i < outlineRects.length; i++) {
+      expect(outlineRects[i].depth).toBeLessThan(-0.5);
+    }
+
+    // Verify occupied outlines align with the cards they ghost — same
+    // position and rotation (producer feedback: "positioned the same as
+    // the cards themselves, that is with the same rotation and spacing").
+    const sprites = handView.getSprites();
+    expect(sprites.length).toBe(cardCount);
+    for (let i = 0; i < cardCount; i++) {
+      expect(outlineRects[i].x).toBeCloseTo(sprites[i].x, 5);
+      expect(outlineRects[i].y).toBeCloseTo(sprites[i].y, 5);
+      expect(outlineRects[i].rotation).toBeCloseTo(sprites[i].rotation, 5);
     }
 
     // Verify outline dimensions match CARD_W x CARD_H

@@ -8,7 +8,7 @@ import {
   setupMainStreetGame,
 } from '../../example-games/main-street/MainStreetState';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
-import { processEndOfTurn, executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { processEndOfTurn, executeDayStart, resolveEventChoice, finishDeferredEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
 
 describe('CalendarState (CG-0MTT0K9RX0004QTE / F2)', () => {
   describe('ALLOWED_START_WEEKS', () => {
@@ -118,7 +118,13 @@ describe('CalendarState (CG-0MTT0K9RX0004QTE / F2)', () => {
       const s = setupMainStreetGame({ seed: 'cal-engine-1' });
       const startWeek = s.week;
       s.phase = 'MarketPhase' as any;
-      processEndOfTurn(s);
+      const r = processEndOfTurn(s);
+      // A dual-choice incident pauses the closing until the player decides;
+      // resolve it so the turn completes (CG-0MTSHG8RP008E128).
+      if (r.choicePending) {
+        resolveEventChoice(s, 'accept');
+        finishDeferredEndOfTurn(s);
+      }
       // Turn advanced only when the game is still playing; week should
       // always have advanced by one (including on the wrap).
       if (s.gameResult === 'playing') {
@@ -143,8 +149,14 @@ describe('CalendarState (CG-0MTT0K9RX0004QTE / F2)', () => {
       const startWeek = s.week;
       const startYear = s.year;
       const r = processEndOfTurn(s);
+      // A dual-choice incident pauses the closing at IncidentPhase until the
+      // player decides; resolve it so the turn completes (CG-0MTSHG8RP008E128).
+      if (r.choicePending) {
+        resolveEventChoice(s, 'accept');
+        finishDeferredEndOfTurn(s);
+      }
       // Full turn should end in DayStart (next day) when still playing.
-      if (r.gameResult === 'playing') {
+      if (s.gameResult === 'playing') {
         expect(s.phase).toBe('DayStart');
         executeDayStart(s);
         expect(s.phase).toBe('MarketPhase');

@@ -26,6 +26,7 @@ import {
   createEventDeck,
   createUpgradeDeck,
   CARD_TIER_MAP,
+  REFRESH_MARKET_COST,
   type StaffCard,
 } from '../../example-games/main-street/MainStreetCards';
 import { validateCsvRows } from '../../src/balance-cards';
@@ -61,8 +62,8 @@ function findStaff(deck: readonly StaffCard[], id: string): StaffCard | undefine
 // ── AC1: Template count ───────────────────────────────────────────────
 
 describe('Group F staff expansion: template count (AC1)', () => {
-  it('grows staff templates to exactly 21 (incl. General Manager + Lookout + 12 specialization applicants)', () => {
-    expect(createStaffDeck(1)).toHaveLength(21);
+  it('grows staff templates to exactly 25 (incl. General Manager + Lookout + 12 specialization applicants + 4 business specialists)', () => {
+    expect(createStaffDeck(1)).toHaveLength(25);
   });
 
   it('adds exactly the 4 contracted card IDs', () => {
@@ -93,7 +94,7 @@ describe('Group F staff expansion: uniqueness & tier convention (AC4)', () => {
     // lookout T7, director T9, executive T10, general-manager T12, plus the 12
     // specialization applicants across T2-T5, CG-0MT4WXNR80090FXZ).
     const staffIds = getCsvRows().filter(r => r.family === 'staff').map(r => r.id);
-    expect(staffIds).toHaveLength(21);
+    expect(staffIds).toHaveLength(25);
     const staffTiers = staffIds.map(id => CARD_TIER_MAP.get(id));
     const validTiers = Array.from({ length: 12 }, (_, i) => String(i + 1));
     for (const t of staffTiers) {
@@ -188,24 +189,24 @@ describe('Group F: Accountant refresh discount (AC2)', () => {
     const state = setupMainStreetGame({ seed: 'group-f-accountant' });
     state.phase = 'MarketPhase';
 
-    // Baseline: REFRESH_MARKET_COST (5) per refresh (CG-0MSTOATDT009BRX2).
-    expect(refreshMarketCost(state)).toBe(5);
+    // Baseline: REFRESH_MARKET_COST (500) per refresh (CG-0MSTOATDT009BRX2).
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST);
 
     const accountant = findStaff(createStaffDeck(1), 'staff-accountant')!;
     state.staffCards.push({ ...accountant });
 
-    expect(refreshMarketCost(state)).toBe(4);
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST - 1);
   });
 
   it('allows a refresh and deducts only the discounted cost', () => {
     const state = setupMainStreetGame({ seed: 'group-f-accountant-deduct' });
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 4;
+    state.resourceBank.coins = REFRESH_MARKET_COST - 1;
 
     const accountant = findStaff(createStaffDeck(1), 'staff-accountant')!;
     state.staffCards.push({ ...accountant });
 
-    // 4 coins is exactly enough with the discount (base 5 - 1).
+    // 499 coins is exactly enough with the discount (base 500 - 1).
     expect(canRefreshMarket(state).legal).toBe(true);
 
     refreshMarket(state);
@@ -218,7 +219,7 @@ describe('Group F: Accountant refresh discount (AC2)', () => {
     state.resourceBank.coins = 1;
 
     expect(canRefreshMarket(state).legal).toBe(false);
-    expect(refreshMarketCost(state)).toBe(5);
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST);
   });
 });
 
@@ -276,7 +277,7 @@ describe('Group F: balance guardrails (AC5/AC6)', () => {
   it('keeps other families unchanged in count (data-driven scope)', () => {
     expect(createBusinessDeck(1).length).toBe(30);
     expect(createCommunitySpaceDeck(1).length).toBe(8);
-    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(64); // +8 chain events (CG-0MTT7FC7A000AA58)
+    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(71); // +8 chain + 7 Irish-holiday (CG-0MTT0K9RX0004QTE)
     expect(createUpgradeDeck(1).length).toBe(39);
   });
 });

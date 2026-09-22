@@ -127,7 +127,6 @@ function plannedActionSpend(actions: readonly PlayerAction[]): number {
     'play-upgrade-from-hand',
     'play-event',
     'play-event-from-hand',
-    'community-favour',
     'peek-incident-deck',
   ]);
   return actions.filter((a) => consuming.has(a.type)).length;
@@ -172,8 +171,12 @@ describe('AI enumeration is budget-aware for upgrades', () => {
         a.type === 'buy-and-place-upgrade',
     );
     expect(upgradeActions).toHaveLength(0);
-    // With the budget spent only ending the day remains.
-    expect(actions.map((a) => a.type)).toEqual(['end-turn']);
+    // With the budget spent only end-turn and free operations (such as the free
+    // once-per-turn Community Favour fallback, CG-0MSTOATDQ005XDET) remain.
+    expect(actions.some((a) => a.type === 'end-turn')).toBe(true);
+    expect(
+      actions.every((a) => a.type === 'end-turn' || a.type === 'community-favour'),
+    ).toBe(true);
   });
 
   it('offers upgrade actions while an action remains', () => {
