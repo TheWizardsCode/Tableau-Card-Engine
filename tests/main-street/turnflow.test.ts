@@ -184,8 +184,12 @@ describe('MainStreetEngine', () => {
     it('should execute a buy-business action in MarketPhase', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
-      const card = state.market.cards[0];
-      state.resourceBank.coins = 1000;
+      // Generous coins so any seeded business-family card is affordable
+      // (staff-deck changes compose a different market for this seed).
+      state.resourceBank.coins = 10000;
+      const card = state.market.cards.find(
+        c => c.family === 'business' || c.family === 'community-space',
+      )!;
 
       const result = executeAction(state, {
         type: 'buy-business',
@@ -675,7 +679,7 @@ describe('MainStreetEngine', () => {
       state.streetGrid[0] = makeBiz({ id: 'food-1', baseIncome: 3, synergyTypes: ['Food'] });
       recalculateCard(state, 0);
 
-      const result = processEndOfTurn(state);
+      const result = endTurnHeadless(state);
 
       expect(result.income).not.toBeNull();
       expect(result.income!.total).toBeGreaterThan(0);
@@ -696,9 +700,13 @@ describe('MainStreetEngine', () => {
   describe('executeFullTurn', () => {
     it('should execute a complete turn with purchases', () => {
       const state = createTestState();
-      state.resourceBank.coins = 1000;
+      // Generous coins so any seeded business-family card is affordable
+      // (staff-deck changes compose a different market for this seed).
+      state.resourceBank.coins = 10000;
 
-      const card = state.market.cards[0];
+      const card = state.market.cards.find(
+        c => c.family === 'business' || c.family === 'community-space',
+      )!;
       const actions: PlayerAction[] = [
         { type: 'buy-business', cardId: card.id, slotIndex: 0 },
         { type: 'end-turn' },
@@ -719,10 +727,11 @@ describe('MainStreetEngine', () => {
 
       expect(result.gameResult).toBe('playing');
       // Coins may change due to Incident event resolution (seed-dependent;
-      // card pool changes affect seeded shuffle). Range check allows for
-      // any single event resolution outcome.
+      // card pool changes affect seeded shuffle). The upper bound allows the
+      // largest single positive Incident coin delta (evt-farm-table, +600)
+      // plus the starting bank — a dual-choice incident can apply it on Accept.
       expect(state.resourceBank.coins).toBeGreaterThanOrEqual(0);
-      expect(state.resourceBank.coins).toBeLessThanOrEqual(STARTING_COINS + 20);
+      expect(state.resourceBank.coins).toBeLessThanOrEqual(STARTING_COINS + 600);
       expect(state.turn).toBe(2);
     });
 
@@ -897,6 +906,10 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 4000;
 
       const scoreBefore = computeScore(state);
+      // Isolate the challenge-bonus accounting: clear the incident deck so a
+      // seeded incident cannot shave coins/rep during the closing (deck
+      // composition shifts which incident the seeded game draws).
+      state.incidentDeck = [];
       executeDayStart(state);
       endTurnHeadless(state);
 

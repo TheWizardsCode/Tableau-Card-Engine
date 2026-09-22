@@ -159,18 +159,6 @@ function findMarketCardContainer(scene: Scene, cardId: string): any | undefined 
   return list.find((child) => child?.name === `ms-market-card-${cardId}`);
 }
 
-/** The text of the buy-and-place premium badge on a card container, if any. */
-function premiumBadgeText(container: any): string | null {
-  const children: any[] = container?.list ?? [];
-  const badge = children.find((child) => child?.name === 'buyAndPlacePremiumLabel');
-  return badge?.text ?? null;
-}
-
-/** `Math.ceil(cost * 1.5 * 2) / 2` — the business buy-and-place premium. */
-function premiumOf(cost: number): number {
-  return Math.ceil(cost * 1.5 * 2) / 2;
-}
-
 describe('Main Street upgrade hand-first click flow (browser)', () => {
   let game: Phaser.Game | null = null;
 
@@ -302,16 +290,14 @@ describe('Main Street upgrade hand-first click flow (browser)', () => {
     expect(scene.state.actionsRemaining).toBe(1);
   }, 60_000);
 
-  it('shows the premium badge on market upgrades and dims them when the budget is spent', async () => {
+  it('shows market upgrades and dims them when the budget is spent', async () => {
     game = await bootGame();
     const scene = getScene(game);
     const { upgrade } = setupUpgradeScene(scene, { actions: 1 });
 
     const container = findMarketCardContainer(scene, upgrade.id);
     expect(container).toBeTruthy();
-    // The upgrade advertises the same +50% buy-and-place premium as business
-    // cards, and is fully interactive while an action remains.
-    expect(premiumBadgeText(container)).toContain(String(premiumOf(upgrade.cost)));
+    // The upgrade is fully interactive while an action remains.
     expect(container!.alpha).toBeCloseTo(1, 5);
 
     // Spend the budget → the upgrade gates and dims like business cards.

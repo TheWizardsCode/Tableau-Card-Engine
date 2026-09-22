@@ -5,7 +5,7 @@
  *   AC1: exactly 3 visible cards, always ≥1 business card, drawn randomly
  *        within "1–2 business, 0–1 upgrade, 0–1 event" (2B+1U / 2B+1E /
  *        1B+1U+1E). Community-space cards count as business.
- *   AC2: one re-roll: `refreshMarket` costs `REFRESH_MARKET_COST` (5),
+ *   AC2: one re-roll: `refreshMarket` costs `REFRESH_MARKET_COST` (500),
  *        Accountant `refreshCostDiscount` applies; discards all
  *        currently-visible cards and refills the whole line; unlimited per
  *        turn while affordable.
@@ -105,16 +105,16 @@ describe('AC1: single-row market composition', () => {
 
 describe('AC2: refreshMarket re-roll', () => {
   it('costs REFRESH_MARKET_COST (5) with no staff discounts', () => {
-    expect(REFRESH_MARKET_COST).toBe(5);
+    expect(REFRESH_MARKET_COST).toBe(500);
     const state = createTestState('refresh-cost');
     state.phase = 'MarketPhase';
-    expect(refreshMarketCost(state)).toBe(5);
+    expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST);
   });
 
   it('is legal during MarketPhase with sufficient coins, illegal otherwise', () => {
     const state = createTestState('refresh-legal');
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 10;
+    state.resourceBank.coins = REFRESH_MARKET_COST;
     expect(canRefreshMarket(state).legal).toBe(true);
 
     state.phase = 'DayStart';
@@ -129,7 +129,7 @@ describe('AC2: refreshMarket re-roll', () => {
     const state = createTestState('refresh-exec');
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = REFRESH_MARKET_COST * 2;
 
     const visibleBefore = state.market.cards.map(c => c.id);
     expect(visibleBefore.length).toBeGreaterThan(0);
@@ -160,7 +160,7 @@ describe('AC2: refreshMarket re-roll', () => {
   it('applies the Accountant refreshCostDiscount to the re-roll cost', () => {
     const state = createTestState('refresh-accountant');
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 10;
+    state.resourceBank.coins = REFRESH_MARKET_COST * 10;
     expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST);
 
     const accountant = createStaffDeck(1).find(c => c.id.startsWith('staff-accountant'));
@@ -171,8 +171,8 @@ describe('AC2: refreshMarket re-roll', () => {
     purchaseStaffCard(state, accountant!.id);
 
     expect(refreshMarketCost(state)).toBe(REFRESH_MARKET_COST - 1);
-    // 4 coins is enough with the discount (5 - 1), but not without.
-    state.resourceBank.coins = 4;
+    // 499 coins is enough with the discount (500 - 1), but not without.
+    state.resourceBank.coins = REFRESH_MARKET_COST - 1;
     expect(canRefreshMarket(state).legal).toBe(true);
     const coinsBefore = state.resourceBank.coins;
     refreshMarket(state);
@@ -183,7 +183,7 @@ describe('AC2: refreshMarket re-roll', () => {
     const state = createTestState('refresh-unlimited');
     executeDayStart(state);
     state.phase = 'MarketPhase';
-    state.resourceBank.coins = 100;
+    state.resourceBank.coins = REFRESH_MARKET_COST * 3;
 
     const coinsBefore = state.resourceBank.coins;
     refreshMarket(state);

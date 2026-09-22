@@ -205,12 +205,12 @@ describe('AC3 · day-start composition', () => {
 
     // Spend 2 actions — each consumes 1 from banked (floor 0)
     state.resourceBank.coins = 10000;
-    const card1 = state.market.cards[0];
+    const card1 = firstMovableMarketCard(state);
     executeAction(state, { type: 'move-to-hand', cardId: card1.id });
     expect(state.actionsRemaining).toBe(3);
     expect(state.bankedActions).toBe(1); // consumed 1
 
-    const card2 = state.market.cards[0];
+    const card2 = firstMovableMarketCard(state);
     executeAction(state, { type: 'move-to-hand', cardId: card2.id });
     expect(state.actionsRemaining).toBe(2);
     expect(state.bankedActions).toBe(0); // consumed 1 more, now 0

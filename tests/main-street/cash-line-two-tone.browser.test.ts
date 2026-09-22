@@ -101,7 +101,7 @@ describe('MainStreet two-tone cash line overlay', () => {
     game = null;
   });
 
-  it('renders income green and cost red as separate segments on one line', async () => {
+  it('renders income green and cost red as separate segments on one line (no Cash: prefix)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
     const state = scene.state as { streetGrid: Array<BusinessCard | null> };
@@ -126,30 +126,28 @@ describe('MainStreet two-tone cash line overlay', () => {
 
     const incomeSeg = segmentTexts.find((t) => t.text === '+2');
     const costSeg = segmentTexts.find((t) => t.text === '-0.75');
-    const prefixSeg = segmentTexts.find((t) => t.text === 'Cash: ');
     const sepSeg = segmentTexts.find((t) => t.text === ' / ');
 
     expect(incomeSeg).toBeDefined();
     expect(costSeg).toBeDefined();
-    expect(prefixSeg).toBeDefined();
     expect(sepSeg).toBeDefined();
+    // The former "Cash: " prefix was removed by manual review (CG-0MTORJ5FS006B0UN).
+    expect(segmentTexts.find((t) => t.text === 'Cash: ')).toBeUndefined();
 
-    // Income green / cost red / separators neutral.
+    // Income green / cost red / separator neutral.
     expect(incomeSeg!.style.color).toBe('#44ff44');
     expect(costSeg!.style.color).toBe('#ff6644');
-    expect(prefixSeg!.style.color).toBe('#dddddd');
     expect(sepSeg!.style.color).toBe('#dddddd');
 
-    // Laid out left-to-right: prefix left of income, income left of separator,
-    // separator left of cost — right-column left-anchored (originX 0,
-    // x = -w/2+80) so it never overlaps the 64×64 graphic (CG-0MTORJ5FS006B0UN).
-    expect(prefixSeg!.x).toBeLessThan(incomeSeg!.x);
+    // Laid out left-to-right: income left of separator, separator left of
+    // cost — right-column left-anchored (originX 0, x = -w/2+80) so it never
+    // overlaps the 64×64 graphic (CG-0MTORJ5FS006B0UN).
     expect(incomeSeg!.x).toBeLessThan(sepSeg!.x);
     expect(sepSeg!.x).toBeLessThan(costSeg!.x);
 
     // Group left-anchored in the right column: left edge sits at spec x
     // (-width/2+80, ≈12 for the 136-wide street render), not centred at 0.
-    const leftEdge = prefixSeg!.x;
+    const leftEdge = incomeSeg!.x;
     const rightEdge = costSeg!.x + costSeg!.width;
     expect(leftEdge).toBeGreaterThan(0);
     expect(rightEdge).toBeGreaterThan(leftEdge);

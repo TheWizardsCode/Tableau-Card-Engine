@@ -564,8 +564,14 @@ describe('MainStreetScene browser tests', () => {
     const ev = new KeyboardEvent('keydown', { key: 'Enter' });
     if (typeof window !== 'undefined') window.dispatchEvent(ev);
 
-    // Allow engine to process
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Allow the engine to process and the (deferred, CG-0MTR72P14000VO6Q)
+    // closing presentation to complete — the day advances only after the
+    // end-of-turn animations land, so poll instead of assuming synchronous
+    // advancement.
+    await waitForCondition(
+      () => scene.state.turn > beforeTurn,
+      { timeoutMs: 15_000, intervalMs: 100, label: 'turn to advance after end-of-turn presentation' },
+    );
 
     expect(scene.state.turn).toBeGreaterThan(beforeTurn);
 

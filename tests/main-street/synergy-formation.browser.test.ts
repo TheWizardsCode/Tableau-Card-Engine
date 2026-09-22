@@ -279,11 +279,13 @@ describe('MainStreet synergy formation animation', () => {
     // Expected clipped endpoints for the (0,1) pair (shared helper geometry).
     const expected = synergyLineEndpoints({ fromIndex: 0, toIndex: 1, sharedSynergy: shared }, typed.layout);
 
-    // The street container holds exactly one Graphics per synergy line; decode
-    // its strokes (main 3px + glow 6px) and assert both are the clipped
-    // endpoints — edge-to-edge, not slot centres, and identical to each other.
+    // The street container holds exactly one Graphics per synergy line (plus
+    // the city-block road layer, which is not a synergy line); decode its
+    // strokes (main 3px + glow 6px) and assert both are the clipped endpoints —
+    // edge-to-edge, not slot centres, and identical to each other.
     const streetGraphics = typed.streetContainer.list.filter(
-      (obj) => (obj as { type?: string }).type === 'Graphics',
+      (obj) => (obj as { type?: string; name?: string }).type === 'Graphics' &&
+        (obj as { name?: string }).name !== 'ms-street-roads',
     );
     expect(streetGraphics.length).toBe(1);
 

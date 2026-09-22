@@ -3,11 +3,12 @@
  *
  * Covers the boundary conditions that the earlier expanded-grid slices do not:
  *
- *  - AC3a: 3×3 and 5×5 world sizes — planar coverage and the `worldSlotCount`
- *           formula at the maximum supported lattice.
- *  - AC3b: selling a shared-corner card preserves the sold-anchor behaviour
+ *  - AC3a: 3×3 and 5×5 world sizes — coverage and the `worldSlotCount`
+ *           formula at the maximum supported lattice (city-block grid:
+ *           10 plots per street, no sharing).
+ *  - AC3b: selling a corner card preserves the sold-anchor behaviour
  *           (the sold card earns nothing, its neighbours keep its synergy).
- *  - AC3c: a card placed **from hand** onto a shared corner earns the correct
+ *  - AC3c: a card placed **from hand** onto a corner plot earns the correct
  *           cross-street synergy bonus.
  *  - AC3d: layout / SLL bounds at minimum and maximum zoom.
  *
@@ -32,6 +33,8 @@ import {
   defaultStreetCamera,
   mapBounds,
   panStreetCamera,
+  streetPixelHeight,
+  streetPixelWidth,
   streetViewportRect,
   visibleLocalRect,
   zoomScale,
@@ -77,14 +80,17 @@ function mkCard(
   } as BusinessCard;
 }
 
-/** Four-street neighbour set of the 2×2 shared corner (world 4,1 → index 13). */
-const CORNER = 13;
-const CORNER_NEIGHBOURS = [3, 5, 21, 23]; // streets (0,0), (1,0), (0,1), (1,1)
+/**
+ * Corner plot of the 2×2 grid (street (0,0) bottom-right, world (4,1) → index 14)
+ * and one matching neighbour in each of the three other streets that meet there.
+ */
+const CORNER = 14;
+const CORNER_NEIGHBOURS = [5, 23, 25]; // streets (1,0), (0,1), (1,1)
 
 describe('3×3 and 5×5 world sizes (AC3a)', () => {
   it('uses the documented worldSlotCount formula at both sizes', () => {
-    expect(worldSlotCount(3, 3)).toBe(13 * 4); // 52
-    expect(worldSlotCount(5, 5)).toBe(21 * 6); // 126 — the maximum supported lattice
+    expect(worldSlotCount(3, 3)).toBe(15 * 6); // 90
+    expect(worldSlotCount(5, 5)).toBe(25 * 10); // 250 — the maximum supported lattice
   });
 
   it('covers a solid rectangle for 3×3 (no holes, no duplicates)', () => {
@@ -98,9 +104,9 @@ describe('3×3 and 5×5 world sizes (AC3a)', () => {
       }
     }
     expect(seen.size).toBe(worldSlotCount(3, 3));
-    expect(seen.size).toBe(13 * 4);
-    for (let worldY = 0; worldY < 4; worldY++) {
-      for (let worldX = 0; worldX < 13; worldX++) {
+    expect(seen.size).toBe(15 * 6);
+    for (let worldY = 0; worldY < 6; worldY++) {
+      for (let worldX = 0; worldX < 15; worldX++) {
         expect(seen.has(`${worldX},${worldY}`)).toBe(true);
       }
     }
@@ -123,7 +129,7 @@ describe('3×3 and 5×5 world sizes (AC3a)', () => {
   });
 });
 
-describe('selling a shared-corner card (AC3b)', () => {
+describe('selling a corner card (AC3b)', () => {
   function cornerScenario(): {
     grid: AnyCard[];
     sold: boolean[];
@@ -137,13 +143,13 @@ describe('selling a shared-corner card (AC3b)', () => {
     return { grid, sold };
   }
 
-  it('gives the sold shared-corner card zero income but keeps it a synergy anchor', () => {
+  it('gives the sold corner card zero income but keeps it a synergy anchor', () => {
     const { grid, sold } = cornerScenario();
     const dims = { cols: 2, rows: 2 };
 
     const neighbourBefore = computeBusinessIncome(grid as never, CORNER_NEIGHBOURS[0], 1, sold, dims);
     const cornerBefore = computeBusinessIncome(grid as never, CORNER, 1, sold, dims);
-    expect(cornerBefore).toBe(30); // 10 base + roundInt(10 × 0.5 × 4 neighbours) = 30
+    expect(cornerBefore).toBe(25); // 10 base + roundInt(10 × 0.5 × 3 cross-street neighbours) = 25
 
     sold[CORNER] = true;
 
@@ -153,21 +159,21 @@ describe('selling a shared-corner card (AC3b)', () => {
     expect(computeBusinessIncome(grid as never, CORNER_NEIGHBOURS[0], 1, sold, dims)).toBe(neighbourBefore);
     expect(computeSynergyBonus(grid as never, CORNER_NEIGHBOURS[0], 1, sold, dims)).toBeGreaterThan(0);
 
-    // Every neighbour across all four streets keeps the anchor's synergy.
+    // Every neighbour in the three adjacent streets keeps the anchor's synergy.
     for (const idx of CORNER_NEIGHBOURS) {
       expect(computeSynergyBonus(grid as never, idx, 1, sold, dims)).toBeGreaterThan(0);
     }
   });
 });
 
-describe('hand placement on a shared corner (AC3c)', () => {
+describe('hand placement on a corner plot (AC3c)', () => {
   function expandedStateWithCornerNeighbour(): MainStreetState {
     const state = setupMainStreetGame({ seed: 'shared-corner-hand-place' });
     setStreetGridLattice(state, 2, 2);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 1000;
-    // A matching neighbour in the (0,0) street (world 3,0 → index 3).
-    state.streetGrid[3] = mkCard('bakery-1', ['retail'], 10, 0.5);
+    // A matching neighbour in the adjacent east street (world 5,0 → index 5).
+    state.streetGrid[5] = mkCard('bakery-1', ['retail'], 10, 0.5);
     // A hand card sharing the synergy type but a different base type.
     state.hand = [mkCard('cafe-1', ['retail'], 10, 0.5)];
     return state;
@@ -176,12 +182,12 @@ describe('hand placement on a shared corner (AC3c)', () => {
   it('applies the cross-street synergy bonus to the card placed from hand', () => {
     // Control: the same card placed with no neighbour earns base income only.
     const alone = expandedStateWithCornerNeighbour();
-    alone.streetGrid[3] = null;
+    alone.streetGrid[5] = null;
     playBusinessFromHand(alone, 0, CORNER);
     const plain = alone.streetGrid[CORNER]!.currentIncome!;
     expect(plain).toBe(10); // base income, no synergy
 
-    // With a matching neighbour across the seam the placed card gains synergy.
+    // With a matching neighbour across the street boundary the placed card gains synergy.
     const state = expandedStateWithCornerNeighbour();
     const card = playBusinessFromHand(state, 0, CORNER);
 
@@ -190,7 +196,7 @@ describe('hand placement on a shared corner (AC3c)', () => {
     const boosted = state.streetGrid[CORNER]!.currentIncome!;
     expect(boosted).toBeGreaterThan(plain);
     // The neighbour is adjacent to the new corner card, so it gains synergy too.
-    expect(state.streetGrid[3]!.currentIncome!).toBeGreaterThan(10);
+    expect(state.streetGrid[5]!.currentIncome!).toBeGreaterThan(10);
   });
 });
 
@@ -203,13 +209,19 @@ describe('layout / SLL bounds at minimum and maximum zoom (AC3d)', () => {
     expect(zoomScale(MIN_ZOOM_LEVEL)).toBe(1);
     expect(transform).toEqual({ scale: 1, x: 0, y: 0 });
 
-    // The street band fully contains the 1×1 map (framing shows the whole street).
+    // The street band fully contains the legacy 10-slot plot area (the outer
+    // road band may be clipped at 1×, which is fine).
     const visible = visibleLocalRect(camera, layout);
-    const bounds = mapBounds(layout, { cols: 1, rows: 1 });
-    expect(visible.left).toBeLessThanOrEqual(bounds.left + 0.001);
-    expect(visible.right).toBeGreaterThanOrEqual(bounds.right - 0.001);
-    expect(visible.top).toBeLessThanOrEqual(bounds.top + 0.001);
-    expect(visible.bottom).toBeGreaterThanOrEqual(bounds.bottom - 0.001);
+    const plots = {
+      left: layout.streetX,
+      top: layout.streetTop,
+      right: layout.streetX + streetPixelWidth(layout),
+      bottom: layout.streetTop + streetPixelHeight(layout),
+    };
+    expect(visible.left).toBeLessThanOrEqual(plots.left + 0.001);
+    expect(visible.right).toBeGreaterThanOrEqual(plots.right - 0.001);
+    expect(visible.top).toBeLessThanOrEqual(plots.top + 0.001);
+    expect(visible.bottom).toBeGreaterThanOrEqual(plots.bottom - 0.001);
   });
 
   it('contains a small map at maximum zoom and keeps the transform finite', () => {

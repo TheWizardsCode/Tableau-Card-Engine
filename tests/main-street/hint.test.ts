@@ -111,8 +111,8 @@ describe('generateHint', () => {
 
   it('hint score matches the best enumerateAndScoreActions entry', () => {
     // Seed chosen so the greedy priority-chain action is also the global
-    // max-score action (the expanded business pool shifted the seeded market).
-    const state = makeMarketState('hint-seed');
+    // max-score action (staff-deck changes re-shuffled the seeded market).
+    const state = makeMarketState('hint-1');
     const hint = generateHint(state);
     expect(hint).not.toBeNull();
 
@@ -157,19 +157,16 @@ describe('generateHint', () => {
     expect(result!.rationale).toBe('No good buys available -- end your turn');
   });
 
-  it('recommends rep-to-coins Community Favour when stalled with actions remaining and reputation available', () => {
+  it('recommends rep-to-coins Community Favour when stalled even with the action budget spent', () => {
     const state = makeMarketState('cf-hint');
-    // Stalled and nothing affordable, but an action remains: the action-gated
-    // Community Favour exchange is the only meaningful non-end-turn action left.
-    // Hand-block move-to-hand so the stalled fallback is reachable (Greedy picks
-    // move-to-hand at Priority 5 before Community Favour at Priority 9).
-    state.actionsRemaining = 1;
+    // Stalled (every market card unaffordable) with the daily action budget
+    // already spent: the free once-per-turn Community Favour exchange
+    // (CG-0MSTOATDQ005XDET) is the only meaningful non-end-turn action left.
+    state.actionsRemaining = 0;
     state.resourceBank.coins = 0;
     state.resourceBank.reputation = 500;
     state.favourUsedThisTurn = false;
-    // Empty the market so move-to-hand/discard are not enumerated and the
-    // stalled rep-to-coins fallback is reachable (Greedy priority 9).
-    state.market.cards = [];
+    state.market.cards.forEach(c => { (c as { cost: number }).cost = 10; });
     state.hand = [];
     const result = generateHint(state);
     expect(result).not.toBeNull();

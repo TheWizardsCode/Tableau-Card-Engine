@@ -45,6 +45,46 @@ export const STREET_GRID_ROWS = 1;
 export const MAX_GRID_COLS = 5;
 export const MAX_GRID_ROWS = 5;
 export const STREET_ROW_GAP = 12;
+
+// ── City-block roads (CG-0MT5Y1X5T001M4S6) ──────────────────
+// Roads separate the street blocks so the board reads as a grid of streets in
+// rows and columns rather than one solid block of plots.
+
+/**
+ * Road band thickness as a fraction of the smaller plot pitch. Both the
+ * vertical and the horizontal roads use this same fraction so a road is the
+ * same width whichever way it runs.
+ */
+export const ROAD_BAND_RATIO = 0.62;
+
+/**
+ * Road band thickness in pixels for the given plot pitches.
+ *
+ * @param pitchX Horizontal plot pitch (slot width + horizontal gap).
+ * @param pitchY Vertical plot pitch (slot height + row gap).
+ */
+export function roadBandThickness(pitchX: number, pitchY: number): number {
+  return Math.min(pitchX, pitchY) * ROAD_BAND_RATIO;
+}
+
+/**
+ * Road band thickness for the base (scale-1) layout, in pixels. Used by the
+ * SLL layout adapter to reserve room for the road ring around the street.
+ */
+export function baseRoadBandThickness(): number {
+  return roadBandThickness(BASE_SLOT_W + BASE_SLOT_GAP, BASE_SLOT_H + STREET_ROW_GAP);
+}
+
+/** Grey road surface colour. */
+export const ROAD_COLOUR = 0x4a4a4a;
+/** Dashed centre-line colour painted down the middle of each road. */
+export const ROAD_MARKING_COLOUR = 0xf5f5f5;
+/** Width of the dashed centre line, in map-local pixels. */
+export const ROAD_MARKING_WIDTH = 3;
+/** Distance between the start of one dash and the next, in pixels. */
+export const ROAD_DASH_PERIOD = 14;
+/** Length of each dash, in pixels. */
+export const ROAD_DASH_LENGTH = 8;
 // Make hand slot match placeholder size as requested
 export const BASE_HAND_CARD_W = 140;
 export const BASE_HAND_CARD_H = 80;

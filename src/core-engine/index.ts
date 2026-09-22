@@ -80,7 +80,7 @@ export {
   createDefaultResumeOverlay,
 } from './CheckpointResumeOverlay';
 
-// Game event system
+// Game event system (payloads re-exported from CardEventPayloads where applicable)
 export type {
   TurnStartedPayload,
   TurnCompletedPayload,
@@ -88,9 +88,7 @@ export type {
   StateSettledPayload,
   GameEndedPayload,
   CardDrawnPayload,
-  CardFlippedPayload,
   CardSwappedPayload,
-  CardDiscardedPayload,
   UIInteractionPayload,
   CardToFoundationPayload,
   CardToTableauPayload,
@@ -108,6 +106,19 @@ export type {
   GameEventListener,
 } from './GameEventEmitter';
 export { GameEventEmitter } from './GameEventEmitter';
+
+// Shared card-event payloads (single source of truth)
+export type {
+  BaseCardEventPayload,
+  CardDealtPayload,
+  CardPlacedPayload,
+  CardDiscardedPayload,
+  CardFlippedPayload,
+} from './CardEventPayloads';
+
+// Event-emission helper
+export type { EventEmissionConfig } from './event-emission';
+export { emitEventOrCallback } from './event-emission';
 
 // Phaser event bridge
 export type { PhaserLikeEventEmitter } from './PhaserEventBridge';

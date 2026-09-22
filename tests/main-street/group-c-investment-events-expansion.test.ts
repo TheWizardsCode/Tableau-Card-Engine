@@ -78,12 +78,12 @@ describe('Group C investment-event expansion: template count (AC1)', () => {
   const deck = createEventDeck(1, undefined, rng, 1);
 
   it('grows total event templates (56 after Group D + Graffiti Art)', () => {
-    expect(deck).toHaveLength(64); // +8 chain events (CG-0MTT7FC7A000AA58)
+    expect(deck).toHaveLength(71); // +8 chain events (CG-0MTT7FC7A000AA58) + 7 Irish-holiday (CG-0MTT0K9RX0004QTE)
   });
 
   it('grows investment-event templates from 13 to exactly 21', () => {
     const investments = deck.filter(c => c.trigger === 'Investment');
-    expect(investments).toHaveLength(21);
+    expect(investments).toHaveLength(28); // 21 + 7 Irish-holiday Investment cards (CG-0MTT0K9RX0004QTE)
   });
 
   it('adds exactly the 8 contracted card IDs', () => {
@@ -334,8 +334,8 @@ describe('Group C: existing negative income-multiplier (regression)', () => {
 describe('Group C: deck generation & balance guardrails (AC6)', () => {
   const rng = createSeededRng(42);
 
-  it('builds a 192-card event deck at the default 3 copies', () => {
-    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(192); // 64 x 3 (+8 chain events CG-0MTT7FC7A000AA58)
+  it('builds a 213-card event deck at the default 3 copies', () => {
+    expect(createEventDeck(3, undefined, createSeededRng(1), 1)).toHaveLength(213); // 71 x 3 (64 + 7 Irish-holiday CG-0MTT0K9RX0004QTE)
   });
 
   it('includes every new card in a 1-copy (template) deck', () => {

@@ -49,6 +49,25 @@ Files (in `audio/`):
 - `score-reveal.wav` — score display (sparkle arpeggio)
 - `ui-click.wav` — generic UI button click
 
+## Card Art Sprites — Main Street
+
+63 card-art sprites (plus a `Fallback`) used inside each Main Street card's
+64×64 art zone (a layout dimension — the embedded bitmap is 256×256):
+
+- **Source**: Project-generated art (per-card `art_notes` descriptions in
+  `example-games/main-street/card-data.csv`). Source files:
+  `example-games/main-street/sprites/<Name>_1024_x_1024.png`
+- **License**: CC0 / Public Domain (project-owned, permissive)
+- **Derived (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R)**:
+  `scripts/generate-main-street-card-art.mjs` downscales each 1024×1024 source
+  to 256×256 and re-encodes it as lossy WebP (quality 90), then writes
+  `example-games/main-street/card-art-map.json` (base64 data URIs) that both
+  the runtime TS generator and the static SVG generator embed inline in the
+  card art zone. WebP keeps the map small (~0.6 MB) while filling the 4×
+  rasterised art zone at 1:1; the old 64×64 PNG map (~0.34 MB) was stretched 4×
+  and looked pixelated. Cards without a dedicated sprite use the `Fallback` art.
+  The `_64_x_64.png` files are superseded legacy thumbnails.
+
 ## Audio Sound Effects — Main Street
 
 Minimal set of SFX and a short background loop added for the Main Street game:

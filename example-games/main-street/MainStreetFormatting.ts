@@ -148,14 +148,14 @@ export function buildCardTooltipInfo(
       const b = card;
       const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
       const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
-      const bOngoingInfo = (b.ongoingCost ?? 0) > 0 ? `\nOngoing cost: -${b.ongoingCost}/turn` : '';
+      const bOngoingInfo = `\nOngoing cost: -${b.ongoingCost ?? 0}/turn`;
       return `Business: ${b.name}\nCost: ${formatCurrency(b.cost)}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bOngoingInfo}${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${resolveDescription(b.description ?? '', b, config)}`;
     }
     case 'community-space': {
       const cs = card;
       const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
       const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
-      const csOngoingInfo = (cs.ongoingCost ?? 0) > 0 ? `\nOngoing cost: -${cs.ongoingCost}/turn` : '';
+      const csOngoingInfo = `\nOngoing cost: -${cs.ongoingCost ?? 0}/turn`;
       return `Community Space: ${cs.name}\nCost: ${formatCurrency(cs.cost)}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csOngoingInfo}${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${resolveDescription(cs.description ?? '', cs, config)}`;
     }
     case 'event': {
@@ -197,7 +197,7 @@ export function buildCardTooltipInfo(
         `Cost: ${formatCurrency(st.cost)}`,
         `Hand slots: +${st.handSlotsAdded}`,
       ];
-      if ((st.ongoingCost ?? 0) > 0) lines.push(`Ongoing cost: -${st.ongoingCost}/turn`);
+      lines.push(`Ongoing cost: -${st.ongoingCost ?? 0}/turn`);
       if ((st.reputationPerTurn ?? 0) > 0) lines.push(`Reputation: +${st.reputationPerTurn}/turn`);
       if ((st.refreshCostDiscount ?? 0) > 0) lines.push(`Refresh discount: -${st.refreshCostDiscount} per refresh`);
       if ((st.actionsPerTurn ?? 0) > 0) lines.push(`Actions: +${st.actionsPerTurn}/day`);
@@ -222,6 +222,29 @@ export function buildCardTooltipInfo(
       // Staff cards (and any future unknown families) show no tooltip text.
       return '';
   }
+}
+
+/**
+ * Renders the employed-staff enumeration for a business/community-space slot
+ * tooltip (CG-0MU3BTTCH001E7ZD AC2/AC3): each staff member's name, the
+ * business types they serve (or "Generalist"), and their effect/ability
+ * description. Returns null when no staff are employed (empty state — AC5:
+ * the tooltip keeps showing only the business's own info).
+ *
+ * @param staff The staff members employed at the slot.
+ * @returns A \n-prefixed bulleted section, or null when empty.
+ */
+export function formatEmployedStaffSummary(staff: readonly StaffCard[]): string | null {
+  if (!Array.isArray(staff) || staff.length === 0) return null;
+  const lines = staff.map((member) => {
+    const types =
+      Array.isArray(member.allowedBusinessTypes) && member.allowedBusinessTypes.length > 0
+        ? member.allowedBusinessTypes.join('/')
+        : 'Generalist';
+    const effect = member.description ? ` — ${member.description}` : '';
+    return `• ${member.name} (${types})${effect}`;
+  });
+  return `\nEmployed staff (${staff.length}):\n${lines.join('\n')}`;
 }
 
 /**
@@ -268,4 +291,19 @@ export function turnLabel(config: Pick<GameConfig, 'maxTurns'>, turn: number): s
   return config.maxTurns !== undefined
     ? `Turn ${turn} / ${config.maxTurns}`
     : `Turn ${turn}`;
+}
+
+/**
+ * Renders the calendar label: `Week W · Year Y`.
+ *
+ * Used in the HUD strip and tutorial text to surface the current week and
+ * year instead of the opaque turn count. Each turn represents one week
+ * (CG-0MTT0K9RX0004QTE).
+ *
+ * @param week  The current game week (1–52).
+ * @param year  The current game year (≥1).
+ * @returns The formatted label, e.g. `Week 12 · Year 3`.
+ */
+export function weekLabel(week: number, year: number): string {
+  return `Week ${week} · Year ${year}`;
 }

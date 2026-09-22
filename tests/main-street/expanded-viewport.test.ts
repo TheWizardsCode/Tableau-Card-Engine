@@ -1,16 +1,16 @@
 /**
- * Expanded-viewport rendering & shared-corner interaction
- * (CG-0MTH9OW0H0005VKE).
+ * Expanded-viewport rendering & cross-street interaction
+ * (CG-0MTH9OW0H0005VKE; re-modelled as a city-block grid in CG-0MT5Y1X5T001M4S6).
  *
  * Headless tests for the geometry that makes expanded street lattices
  * *playable* (not just view-only):
  *
  *  - AC1: every visible slot of the playable lattice carries a gameplay index,
- *    shared seam/corner plots render exactly ONCE (one node, one hit-zone) and
- *    resolve to a single world index reachable from every owning street.
- *  - AC2: a shared corner's neighbours span all four streets, and the
- *    synergy-line geometry can be resolved from explicit world-index centres
- *    so lines cross street boundaries.
+ *    each street owns its own plots (nothing is shared or de-duplicated), and
+ *    every rendered plot resolves to a unique world index.
+ *  - AC2: a corner plot's neighbours span the adjacent streets across the road,
+ *    and synergy-line geometry can be resolved from explicit world-index
+ *    centres so lines cross street boundaries (and the road).
  *  - AC4: slots outside the camera viewport are not instantiated.
  *
  * @module tests/main-street/expanded-viewport
@@ -24,9 +24,10 @@ import {
   latticeWorldHeight,
   latticeWorldWidth,
   playableIndexToMapCenter,
+  roadBandX,
+  roadBandY,
   visibleMapSlots,
   worldIndexToMapCenter,
-  worldPositionToMapCenter,
 } from '../../example-games/main-street/MainStreetMapView';
 import { worldSlotCount } from '../../example-games/main-street/MainStreetAdjacency';
 import type { SceneLayout } from '../../example-games/main-street/scenes/MainStreetConstants';
@@ -43,7 +44,7 @@ function framingTheWholeLattice(cols: number, rows: number) {
   );
 }
 
-describe('planar lattice dimensions (map view agrees with the adjacency model)', () => {
+describe('city-block lattice dimensions (map view agrees with the adjacency model)', () => {
   it('derives the same world dimensions as worldSlotCount', () => {
     for (const [cols, rows] of [[1, 1], [2, 1], [1, 2], [2, 2], [3, 3]]) {
       expect(latticeWorldWidth(cols) * latticeWorldHeight(rows)).toBe(
@@ -79,49 +80,59 @@ describe('playable lattice rendering (AC1)', () => {
     );
   });
 
-  it('renders a shared seam plot once, with the world index both streets agree on', () => {
+  it('renders every street-owned plot exactly once — no plot is shared or de-duplicated', () => {
     const dims = { cols: 2, rows: 1 };
     const nodes = visibleMapSlots(framingTheWholeLattice(2, 1), layout, dims, dims);
 
-    // Cell (0,0) slot 4 and cell (1,0) slot 0 are the same plot (world 4,0).
+    // Cell (0,0) slot 4 and cell (1,0) slot 0 are DIFFERENT plots now: world
+    // (4,0) and world (5,0). Both must be rendered.
     const fromWest = nodes.filter((n) => n.cellX === 0 && n.slotIndex === 4);
     const fromEast = nodes.filter((n) => n.cellX === 1 && n.slotIndex === 0);
-    expect(fromWest.length + fromEast.length).toBe(1);
-    const seam = (fromWest[0] ?? fromEast[0])!;
-    expect(seam.gameplayIndex).toBe(4); // world (4,0) → 0*9 + 4
-    expect(seam.localX).toBe(worldPositionToMapCenter(4, 0, layout, dims).x - layout.slotW / 2);
+    expect(fromWest).toHaveLength(1);
+    expect(fromEast).toHaveLength(1);
+    expect(fromWest[0].gameplayIndex).toBe(4); // world (4,0) → 0*10 + 4
+    expect(fromEast[0].gameplayIndex).toBe(5); // world (5,0) → 0*10 + 5
+    // The east street starts one plot width plus the road band to the right.
+    expect(fromEast[0].localX - fromWest[0].localX).toBeCloseTo(layout.slotW + roadBandX(layout), 5);
   });
 
-  it('collapses the four-way intersection to one plot with one index (2×2)', () => {
+  it('keeps the four meeting-point corners as four distinct plots (2×2)', () => {
     const dims = { cols: 2, rows: 2 };
     const nodes = visibleMapSlots(framingTheWholeLattice(2, 2), layout, dims, dims);
     expect(nodes.length).toBe(worldSlotCount(2, 2));
 
-    // The four owners of world (4,1) — (0,0,9), (1,0,5), (0,1,4), (1,1,0) —
-    // must collapse to exactly one rendered node with gameplayIndex 13.
-    const cornerOwners: Array<[number, number, number]> = [
-      [0, 0, 9], [1, 0, 5], [0, 1, 4], [1, 1, 0],
+    // The four street corners nearest the meeting point are separate plots with
+    // separate world indices (14, 15, 24, 25) — nothing collapses.
+    const cornerOwners: Array<[number, number, number, number]> = [
+      [0, 0, 9, 14],
+      [1, 0, 5, 15],
+      [0, 1, 4, 24],
+      [1, 1, 0, 25],
     ];
     const cornerNodes = nodes.filter((n) =>
       cornerOwners.some(([cx, cy, slot]) => n.cellX === cx && n.cellY === cy && n.slotIndex === slot),
     );
-    expect(cornerNodes).toHaveLength(1);
-    expect(cornerNodes[0].gameplayIndex).toBe(13);
-
-    const centre = worldIndexToMapCenter(13, layout, dims);
-    expect(cornerNodes[0].localX).toBe(centre.x - layout.slotW / 2);
-    expect(cornerNodes[0].localY).toBe(centre.y - layout.slotH / 2);
+    expect(cornerNodes).toHaveLength(4);
+    expect(new Set(cornerNodes.map((n) => n.gameplayIndex)).size).toBe(4);
+    expect(cornerNodes.map((n) => n.gameplayIndex).sort((a, b) => (a as number) - (b as number)))
+      .toEqual([14, 15, 24, 25]);
   });
 
-  it('uses explicit world-index centres so synergy lines can cross street seams (AC2)', () => {
+  it('resolves explicit world-index centres across a road so synergy lines can cross streets (AC2)', () => {
     const dims = { cols: 2, rows: 2 };
-    const corner = worldIndexToMapCenter(13, layout, dims);
-    // A neighbour in the far street (world 3,2 → index 2*9+3 = 21).
-    const far = worldIndexToMapCenter(21, layout, dims);
+    // Corner of street (0,0): world (4,1) → index 1*10 + 4 = 14.
+    const corner = worldIndexToMapCenter(14, layout, dims);
+    // A neighbour in the street below: world (3,2) → index 2*10 + 3 = 23.
+    const far = worldIndexToMapCenter(23, layout, dims);
     expect(far.x).toBeLessThan(corner.x);
     expect(far.y).toBeGreaterThan(corner.y);
-    // The two centres are one slot-pitch apart on each axis (8-way adjacency).
-    expect(Math.abs(corner.y - far.y)).toBeCloseTo(layout.slotH + layout.streetRowGap, 5);
+    // Vertical separation spans the road band, so it is LARGER than the
+    // within-street row pitch — the synergy line crosses the road.
+    const rowPitch = layout.slotH + layout.streetRowGap;
+    expect(far.y - corner.y).toBeCloseTo(layout.slotH + roadBandY(layout), 5);
+    expect(far.y - corner.y).toBeGreaterThan(rowPitch);
+    // The horizontal separation is one plain plot pitch (same street column).
+    expect(Math.abs(corner.x - far.x)).toBeCloseTo(layout.slotW + layout.slotGap, 5);
   });
 });
 

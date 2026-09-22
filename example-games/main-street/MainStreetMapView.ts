@@ -2,10 +2,12 @@
  * MainStreetMapView — street-map camera geometry for Main Street
  * (CG-0MTH9OVMC001V44E, "Camera zoom controls (map-like)").
  *
- * The street board is a lattice of 2×5 street cells. Adjacent streets share
- * their touching slot column / row (the shared corner plots), so a lattice of
- * `cols × rows` streets collapses to
- * `(cols·(STREET_COLS−1)+1) × (rows·(STREET_ROWS−1)+1)` unique slot positions.
+ * The street board is a city-block lattice of 2×5 street cells. Each street
+ * **owns** its own ten plots (no seam sharing), so a lattice of `cols × rows`
+ * streets holds `cols·STREET_COLS × rows·STREET_ROWS` unique slot positions.
+ * A ROAD band is drawn between every pair of adjacent streets (and around the
+ * outside), so the board reads as rows and columns of streets rather than one
+ * continuous block of plots (CG-0MT5Y1X5T001M4S6).
  *
  * This module is deliberately Phaser-free so the geometry and camera maths are
  * unit-testable headless. It provides:
@@ -18,19 +20,22 @@
  *    camera transform (Phaser applies container transforms to input hit
  *    testing automatically, so this is the shared reference the renderer and
  *    the animation helpers use);
- *  - `visibleMapSlots()`, the culled + de-duplicated list of slots that should
- *    be rendered for the current zoom/pan.
+ *  - `visibleMapSlots()`, the culled list of slots that should be rendered for
+ *    the current zoom/pan;
+ *  - `mapRoadBands()`, the city-block road bands drawn between (and around)
+ *    the street blocks.
  *
  * Scope note: a 1×1 lattice (the shipping board) reproduces the pre-camera
- * layout exactly. Larger lattices reveal neighbouring streets as view-only
- * cells; making those cells playable (cards, adjacency, save/load) is the
- * viewport-rendering / save-load slices of the same epic.
+ * layout exactly. Larger lattices reveal neighbouring streets; those cells are
+ * view-only until the playable board is expanded with
+ * `setStreetPlayableLattice()` (see the viewport-rendering / save-load slices
+ * of the same epic).
  *
  * @module example-games/main-street/MainStreetMapView
  */
 
 import type { SceneLayout } from './scenes/MainStreetConstants';
-import { STREET_COLS, STREET_ROWS } from './scenes/MainStreetConstants';
+import { STREET_COLS, STREET_ROWS, roadBandThickness } from './scenes/MainStreetConstants';
 
 /** Dimensions (in street cells) of the street lattice to display. */
 export interface StreetLatticeDims {
@@ -120,14 +125,37 @@ export function zoomInLevel(zoomLevel: number): number {
   return clampZoomLevel(clampZoomLevel(zoomLevel) - 1);
 }
 
+/** Road band width between street columns (same thickness as a horizontal road). */
+export function roadBandX(layout: SceneLayout): number {
+  return roadBandThickness(layout.slotW + layout.slotGap, layout.slotH + layout.streetRowGap);
+}
+
+/** Road band height between street rows (same thickness as a vertical road). */
+export function roadBandY(layout: SceneLayout): number {
+  return roadBandThickness(layout.slotW + layout.slotGap, layout.slotH + layout.streetRowGap);
+}
+
 /** Horizontal distance between the origins of adjacent street cells. */
 export function mapCellStepX(layout: SceneLayout): number {
-  return (STREET_COLS - 1) * (layout.slotW + layout.slotGap);
+  return streetPixelWidth(layout) + roadBandX(layout);
 }
 
 /** Vertical distance between the origins of adjacent street cells. */
 export function mapCellStepY(layout: SceneLayout): number {
-  return (STREET_ROWS - 1) * (layout.slotH + layout.streetRowGap);
+  return streetPixelHeight(layout) + roadBandY(layout);
+}
+
+/** Orientation of a road band in the map layer. */
+export type RoadOrientation = 'horizontal' | 'vertical';
+
+/** One road band of the map layer (grey rectangle + dashed centre line). */
+export interface RoadBand {
+  orientation: RoadOrientation;
+  /** Map-local top-left corner. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 /** Width of one street cell in map-local pixels. */
@@ -141,16 +169,24 @@ export function streetPixelHeight(layout: SceneLayout): number {
 }
 
 /**
- * Canvas-space rectangle the street map is drawn in. Sized to the street
- * panel (plus the section-label strip) so the map never overlaps the HUD.
+ * Canvas-space rectangle the street map is drawn in: the street's plot area
+ * **plus the road ring around it**, so at the default 1× framing the whole road
+ * is visible on all four edges (CG-0MT5Y1X5T001M4S6). The expansion is
+ * symmetric, so the band centre — and therefore the identity 1× transform and
+ * the legacy plot positions — are unchanged.
+ *
+ * Symmetry matters for culling: the band edge lands exactly on the neighbouring
+ * street's plot edge, so no sliver of a neighbouring street is instantiated at
+ * 1×.
  */
 export function streetViewportRect(layout: SceneLayout): StreetViewportRect {
-  const labelStrip = 12;
+  const roadX = roadBandX(layout);
+  const roadY = roadBandY(layout);
   return {
-    x: layout.streetX,
-    y: layout.streetTop - labelStrip,
-    w: streetPixelWidth(layout),
-    h: streetPixelHeight(layout) + labelStrip,
+    x: layout.streetX - roadX,
+    y: layout.streetTop - roadY,
+    w: streetPixelWidth(layout) + 2 * roadX,
+    h: streetPixelHeight(layout) + 2 * roadY,
   };
 }
 
@@ -210,23 +246,23 @@ export function mapSlotCenter(
   };
 }
 
-/** Width in world columns of a `cols`-wide street lattice (planar model). */
+/** Width in world columns of a `cols`-wide street lattice (each street owns 5). */
 export function latticeWorldWidth(cols: number): number {
-  return (STREET_COLS - 1) * cols + 1;
+  return STREET_COLS * cols;
 }
 
-/** Height in world rows of a `rows`-tall street lattice (planar model). */
+/** Height in world rows of a `rows`-tall street lattice (each street owns 2). */
 export function latticeWorldHeight(rows: number): number {
-  return (STREET_ROWS - 1) * rows + 1;
+  return STREET_ROWS * rows;
 }
 
 /**
  * Map-local centre of a world position within a street lattice.
  *
- * The world lattice uses the same planar seam-sharing model as
- * `MainStreetAdjacency` (stride `STREET_COLS−1` / `STREET_ROWS−1`), so shared
- * seam plots resolve to the same pixel centre no matter which street claims
- * them — a shared corner is drawn exactly once.
+ * The world lattice is a contiguous plot grid at a stride of exactly
+ * (STREET_COLS, STREET_ROWS), but the *rendered* map inserts a road band
+ * between street blocks, so a world column is translated to pixels per-street:
+ * `streetIndex·stepX + localColumn·plotPitchX`.
  */
 export function worldPositionToMapCenter(
   worldX: number,
@@ -235,11 +271,15 @@ export function worldPositionToMapCenter(
   lattice: StreetLatticeDims = DEFAULT_LATTICE,
 ): { x: number; y: number } {
   const origin = latticeOriginCell(lattice);
-  const originWorldX = origin.x * (STREET_COLS - 1);
-  const originWorldY = origin.y * (STREET_ROWS - 1);
+  const relX = worldX - origin.x * STREET_COLS;
+  const relY = worldY - origin.y * STREET_ROWS;
+  const streetX = Math.floor(relX / STREET_COLS);
+  const streetY = Math.floor(relY / STREET_ROWS);
+  const lx = relX - streetX * STREET_COLS;
+  const ly = relY - streetY * STREET_ROWS;
   return {
-    x: layout.streetX + (worldX - originWorldX) * (layout.slotW + layout.slotGap) + layout.slotW / 2,
-    y: layout.streetTop + (worldY - originWorldY) * (layout.slotH + layout.streetRowGap) + layout.slotH / 2,
+    x: layout.streetX + streetX * mapCellStepX(layout) + lx * (layout.slotW + layout.slotGap) + layout.slotW / 2,
+    y: layout.streetTop + streetY * mapCellStepY(layout) + ly * (layout.slotH + layout.streetRowGap) + layout.slotH / 2,
   };
 }
 
@@ -280,8 +320,8 @@ export function playableIndexToMapCenter(
   const gwX = index % width;
   const gwY = Math.floor(index / width);
   const origin = gameplayOriginCell(lattice, gameplay);
-  const worldX = origin.x * (STREET_COLS - 1) + gwX;
-  const worldY = origin.y * (STREET_ROWS - 1) + gwY;
+  const worldX = origin.x * STREET_COLS + gwX;
+  const worldY = origin.y * STREET_ROWS + gwY;
   return worldPositionToMapCenter(worldX, worldY, layout, lattice);
 }
 
@@ -290,9 +330,46 @@ export function playableIndexToMapCenter(
  * touching column/row, so the lattice collapses by one seam per adjacency.
  */
 export function mapSlotCount(lattice: StreetLatticeDims): number {
-  return (
-    (lattice.cols * (STREET_COLS - 1) + 1) * (lattice.rows * (STREET_ROWS - 1) + 1)
-  );
+  return latticeWorldWidth(lattice.cols) * latticeWorldHeight(lattice.rows);
+}
+
+/**
+ * Road bands of the displayed lattice: one between every pair of adjacent
+ * streets, plus a band along each outer edge — so the board reads as a
+ * city-block grid. Bands are pure decoration (no world slots).
+ */
+export function mapRoadBands(
+  layout: SceneLayout,
+  lattice: StreetLatticeDims = DEFAULT_LATTICE,
+): RoadBand[] {
+  const origin = mapCellOrigin(0, 0, layout, lattice);
+  const roadX = roadBandX(layout);
+  const roadY = roadBandY(layout);
+  const gridW = streetPixelWidth(layout) + (lattice.cols - 1) * mapCellStepX(layout);
+  const gridH = streetPixelHeight(layout) + (lattice.rows - 1) * mapCellStepY(layout);
+  const bands: RoadBand[] = [];
+
+  // Vertical roads: left of street 0, between streets, right of the last.
+  for (let i = 0; i <= lattice.cols; i++) {
+    bands.push({
+      orientation: 'vertical',
+      x: origin.x - roadX + i * mapCellStepX(layout),
+      y: origin.y - roadY,
+      w: roadX,
+      h: gridH + 2 * roadY,
+    });
+  }
+  // Horizontal roads: above street 0, between streets, below the last.
+  for (let j = 0; j <= lattice.rows; j++) {
+    bands.push({
+      orientation: 'horizontal',
+      x: origin.x - roadX,
+      y: origin.y - roadY + j * mapCellStepY(layout),
+      w: gridW + 2 * roadX,
+      h: roadY,
+    });
+  }
+  return bands;
 }
 
 /** Map-local bounds of the whole displayed lattice. */
@@ -303,10 +380,10 @@ export function mapBounds(
   const topLeft = mapCellOrigin(0, 0, layout, lattice);
   const bottomRight = mapCellOrigin(lattice.cols - 1, lattice.rows - 1, layout, lattice);
   return {
-    left: topLeft.x,
-    top: topLeft.y,
-    right: bottomRight.x + streetPixelWidth(layout),
-    bottom: bottomRight.y + streetPixelHeight(layout),
+    left: topLeft.x - roadBandX(layout),
+    top: topLeft.y - roadBandY(layout),
+    right: bottomRight.x + streetPixelWidth(layout) + roadBandX(layout),
+    bottom: bottomRight.y + streetPixelHeight(layout) + roadBandY(layout),
   };
 }
 
@@ -439,11 +516,19 @@ export function visibleLocalRect(
 }
 
 /**
+ * Sub-pixel tolerance for viewport culling. The road ring around a street is
+ * exactly the gap to its neighbours, so a neighbouring street's nearest plot
+ * lands precisely on the viewport edge: it has zero visible area and must be
+ * culled, but floating-point error in the band arithmetic can otherwise let it
+ * slip through.
+ */
+const VIEWPORT_EDGE_EPSILON = 0.01;
+
+/**
  * Slots to render for the current camera: only slots intersecting the visible
- * map rect (unrevealed streets are never instantiated) and only one entry per
- * unique slot position (shared seam plots render exactly once). When a shared
- * plot is owned by both a playable and a view-only street, the playable slot
- * wins so its card stays interactive.
+ * map rect (unrevealed streets are never instantiated). Every slot position is
+ * unique in the city-block model (streets do not share plots); the positional
+ * dedup below is a cheap guard against duplicate iteration.
  */
 export function visibleMapSlots(
   camera: StreetCameraState,
@@ -470,10 +555,10 @@ export function visibleMapSlots(
         const localY = origin.y + row * (layout.slotH + layout.streetRowGap);
 
         if (
-          localX + layout.slotW <= visible.left ||
-          localX >= visible.right ||
-          localY + layout.slotH <= visible.top ||
-          localY >= visible.bottom
+          localX + layout.slotW <= visible.left + VIEWPORT_EDGE_EPSILON ||
+          localX >= visible.right - VIEWPORT_EDGE_EPSILON ||
+          localY + layout.slotH <= visible.top + VIEWPORT_EDGE_EPSILON ||
+          localY >= visible.bottom - VIEWPORT_EDGE_EPSILON
         ) {
           continue;
         }
@@ -512,9 +597,9 @@ function clampTo(min: number, max: number, value: number): number {
 /**
  * Flat world index of a slot within the playable sub-lattice.
  *
- * The playable grid is world-indexed (planar seam-sharing, like
- * `MainStreetAdjacency`), so a seam plot shared by two visible street cells
- * resolves to the SAME index — the corner is one card slot, not two.
+ * The playable grid is world-indexed like the display lattice (each street owns
+ * STREET_COLS × STREET_ROWS plots), so a plot's world index is the same no
+ * matter which visible street cell renders it.
  */
 function playableWorldIndex(
   cellX: number,
@@ -524,9 +609,9 @@ function playableWorldIndex(
   gameplayOrigin: { x: number; y: number },
   gameplay: StreetGameplayDims,
 ): number {
-  const worldX = cellX * (STREET_COLS - 1) + col;
-  const worldY = cellY * (STREET_ROWS - 1) + row;
-  const gwX = worldX - gameplayOrigin.x * (STREET_COLS - 1);
-  const gwY = worldY - gameplayOrigin.y * (STREET_ROWS - 1);
+  const worldX = cellX * STREET_COLS + col;
+  const worldY = cellY * STREET_ROWS + row;
+  const gwX = worldX - gameplayOrigin.x * STREET_COLS;
+  const gwY = worldY - gameplayOrigin.y * STREET_ROWS;
   return gwY * latticeWorldWidth(gameplay.cols) + gwX;
 }

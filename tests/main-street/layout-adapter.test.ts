@@ -12,9 +12,11 @@ describe('MainStreetLayoutAdapter', () => {
     expect(layout.queueTop).toBe(408);
     // street zone: y = 0.444444 * 720 ≈ 320, shifted down by 17px for vertical spacing
     expect(layout.streetTop).toBe(337);
-    // streetX from SLL anchor: topCenter.x = 0.3203125 * 1280 = 410, minus half row width (780/2=390)
+    // streetX from SLL anchor: topCenter.x = 0.3203125 * 1280 = 410, minus half
+    // row width (780/2=390), plus one road band (57) so the whole road ring is
+    // on-canvas at the default zoom (CG-0MT5Y1X5T001M4S6).
     // rowWidth = 5*140 + 4*20 = 780
-    expect(layout.streetX).toBe(20);
+    expect(layout.streetX).toBe(77);
     // hand zone: x = 0.03125 * 1280 = 40
     expect(layout.handX).toBe(40);
     // activityLog zone: x = 0.75 * 1280 = 960
@@ -74,10 +76,12 @@ describe('MainStreetLayoutAdapter', () => {
     expect(layout.logW).toBe(layout.challengeW);
   });
 
-  it('computes handCenterX from the street zone topCenter anchor', () => {
+  it('centres handCenterX on the street block', () => {
     const layout = computeMainStreetLayoutWithSll();
-    // street topCenter.x = 0.3203125 * 1280 = 410, representing the midpoint of the left column
-    expect(layout.handCenterX).toBe(410);
+    // The street block spans streetX .. streetX + 780, so its centre is 467
+    // (the SLL anchor 410 shifted right by one road band so the road ring fits).
+    expect(layout.handCenterX).toBe(layout.streetX + 390);
+    expect(layout.handCenterX).toBe(467);
   });
 
   it('resolves the staff-applicant overlay centre from the SLL applicantOverlay zone', () => {

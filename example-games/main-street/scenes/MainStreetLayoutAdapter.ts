@@ -29,6 +29,7 @@ import {
   BASE_HAND_CARD_H,
   STREET_COLS,
   STREET_ROW_GAP,
+  baseRoadBandThickness,
 } from './MainStreetConstants';
 import mainStreetLayoutJson from '../layouts/main-street.layout.json';
 
@@ -60,8 +61,18 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   // left-area column (x≈20 to x≈800). With 5×140px slots and 4×20px gaps:
   //   rowWidth = 5*140 + 4*20 = 780px
   // Centered at streetTopCenter.x = 0.3203125 (410px): streetX = 410 - 390 = 20
+  //
+  // The whole street block is then shifted RIGHT by one road band so that the
+  // entire road ring around the street is on-canvas at the default zoom
+  // (CG-0MT5Y1X5T001M4S6): at x=20 the left-hand road (≈57px wide) would be
+  // clipped. The left column has room for this, and the right-hand road still
+  // stops short of the right-hand panel (x≈960).
   const rowWidth = STREET_COLS * BASE_SLOT_W + (STREET_COLS - 1) * BASE_SLOT_GAP;
-  const streetX = Math.round(streetTopCenter.x - rowWidth / 2);
+  const roadBand = baseRoadBandThickness();
+  const streetX = Math.round(streetTopCenter.x - rowWidth / 2 + roadBand);
+  // The hand row stays centred on the street block so the left column remains
+  // visually aligned after the shift.
+  const columnCenterX = streetX + rowWidth / 2;
   const handTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'hand', 'topLeft', viewport, 1);
   const challengeTopLeft = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'challengePanel', 'topLeft', viewport, 1);
   const challengeBottomRight = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'challengePanel', 'bottomRight', viewport, 1);
@@ -126,7 +137,7 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
     streetCols: STREET_COLS,
     handY: Math.round(handTopLeft.y),
     handX: Math.round(handTopLeft.x),
-    handCenterX: Math.round(streetTopCenter.x),
+    handCenterX: Math.round(columnCenterX),
     handCardW: BASE_HAND_CARD_W,
     handCardH: BASE_HAND_CARD_H,
     instructionY: Math.round(handTopLeft.y - 20),

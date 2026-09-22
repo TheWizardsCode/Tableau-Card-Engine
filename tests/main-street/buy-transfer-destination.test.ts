@@ -169,6 +169,9 @@ function createMockScene(): any {
     refreshAll: vi.fn(),
     refreshStreetGrid: vi.fn(),
     refreshActionButtons: vi.fn(),
+    // Undo/redo HUD button sync (CG-0MT5Y4DL8000AKKZ) — called by the turn
+    // controller after every undo-stack mutation.
+    refreshUndoRedoButtons: vi.fn(),
     refreshAllAction: vi.fn(),
     gameEvents: { emit: vi.fn(), on: vi.fn(), off: vi.fn() },
     time: { delayedCall: vi.fn().mockReturnValue({ remove: vi.fn() }) },

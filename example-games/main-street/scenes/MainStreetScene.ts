@@ -140,7 +140,7 @@ export class MainStreetScene extends CardGameScene {
   public playDeferredDayBanner(): void {
     if (!this.deferredDayBanner) return;
     this.deferredDayBanner = false;
-    try { this.msAnimator?.animateDayBanner({ day: this.state?.turn ?? 1 }); } catch (_) { /* presentation-only */ }
+    try { this.msAnimator?.animateDayBanner({ day: this.state?.turn ?? 1, week: this.state?.week ?? 1, year: this.state?.year ?? 1 }); } catch (_) { /* presentation-only */ }
   }
 
   // Pending selection for placing a business
@@ -219,8 +219,7 @@ export class MainStreetScene extends CardGameScene {
    * Playable street lattice, in street cells. Defaults to 1×1 (the shipping
    * board). `setStreetPlayableLattice()` grows the playable grid (re-indexing
    * the state by world position, `setStreetGridLattice`) so revealed
-   * neighbouring streets, shared seams and four-way intersections become
-   * placeable (CG-0MTH9OW0H0005VKE).
+   * neighbouring streets become placeable (CG-0MTH9OW0H0005VKE).
    */
   public streetPlayableLattice: StreetLatticeDims = { cols: 1, rows: 1 };
   /** Mask graphics clipping the street map to its viewport band. */
@@ -286,6 +285,22 @@ export class MainStreetScene extends CardGameScene {
    * false under reduced motion and in replay/headless modes.
    */
   public incomeCollectionActive = false;
+
+  /**
+   * True once the deferred end-of-turn deltas have been applied to state
+   * (CG-0MTR72P14000VO6Q). Guarded so income and incident animations apply
+   * the deltas at most once between them. Reset to false at endTurn() start.
+   */
+  public endOfTurnDeltasApplied = false;
+
+  /**
+   * True while the end-of-turn incident reveal animation is in flight
+   * (incident card flight + hold, CG-0MTR72P14000VO6Q). Together with
+   * `incomeCollectionActive` it defines the "deferred window" during which
+   * `refreshHud()` renders `previousCoins` / `previousReputation` instead of
+   * the post-delta state. Cleared in the reveal's completion cleanup.
+   */
+  public incidentRevealActive = false;
   public transferAnimationCount = 0;
   public activeTransferTweens = new Set<Phaser.Tweens.Tween>();
   public activeTransferVisuals = new Set<Phaser.GameObjects.GameObject>();
@@ -522,9 +537,14 @@ export class MainStreetScene extends CardGameScene {
    */
   public setStreetCameraState(camera: Partial<StreetCameraState> | null | undefined): void {
     if (!camera || !this.layout) return;
+    const zoomLevel = camera.zoomLevel ?? this.streetCamera.zoomLevel;
+    // Grow the view lattice to cover the restored zoom level first, so a save
+    // taken while zoomed out rehydrates with its neighbouring streets visible
+    // (CG-0MT5Y1X5T001M4S6).
+    this.growViewLatticeForZoom(zoomLevel);
     this.streetCamera = clampStreetCamera(
       {
-        zoomLevel: camera.zoomLevel ?? this.streetCamera.zoomLevel,
+        zoomLevel,
         focusX: camera.focusX ?? this.streetCamera.focusX,
         focusY: camera.focusY ?? this.streetCamera.focusY,
       },
@@ -581,18 +601,49 @@ export class MainStreetScene extends CardGameScene {
   /**
    * Sets the map zoom level (1 = legacy framing, higher = zoomed out) and
    * re-applies the street transform. Zoom is always available.
+   *
+   * The view lattice auto-grows with the zoom level so that zooming out
+   * actually reveals neighbouring streets: level N → lattice (2N−1)×(2N−1).
+   * It only ever grows (never shrinks), so zooming back in does not discard
+   * revealed streets; `visibleMapSlots()` culls whatever is off-screen.
    */
   public setStreetZoomLevel(zoomLevel: number, animate = true): void {
     this.ensureStreetCamera();
+    const clamped = clampZoomLevel(zoomLevel);
     this.streetCamera = clampStreetCamera(
-      { ...this.streetCamera, zoomLevel: clampZoomLevel(zoomLevel) },
+      { ...this.streetCamera, zoomLevel: clamped },
       this.layout,
       this.streetViewLattice,
     );
+
+    // Auto-grow the view lattice to match the zoom level, so zooming out
+    // actually reveals neighbouring streets.
+    this.growViewLatticeForZoom(clamped);
+
     // Apply the transform first so an animated zoom tweens from the old
     // framing; the visibility sync then re-renders without interrupting it.
     this.applyStreetCamera(animate);
     this.syncStreetRender();
+  }
+
+  /**
+   * Grows the displayed view lattice so a zoom level can reveal its ring of
+   * neighbouring streets: level N needs a (2N−1)×(2N−1) lattice. The lattice
+   * only ever grows (never shrinks) — `visibleMapSlots()` culls slots outside
+   * the viewport rect, so a larger-than-needed lattice never renders extra
+   * streets. Returns true when the lattice changed.
+   */
+  private growViewLatticeForZoom(zoomLevel: number): boolean {
+    const needed = Math.max(1, 2 * clampZoomLevel(zoomLevel) - 1);
+    if (needed <= this.streetViewLattice.cols && needed <= this.streetViewLattice.rows) {
+      return false;
+    }
+    this.streetViewLattice = {
+      cols: Math.max(this.streetViewLattice.cols, needed),
+      rows: Math.max(this.streetViewLattice.rows, needed),
+    };
+    this.streetRenderedKey = '';
+    return true;
   }
 
   /** Zooms the street map out by one level (reveals neighbouring streets). */
@@ -659,6 +710,11 @@ export class MainStreetScene extends CardGameScene {
   /** Visible, de-duplicated street-map slots (test/introspection hook). */
   public getVisibleStreetNodes(): any[] {
     return this.msRenderer?.getVisibleStreetNodes?.() ?? [];
+  }
+
+  /** Road bands drawn for the current lattice (test/introspection hook). */
+  public getStreetRoadBands(): any[] {
+    return this.msRenderer?.getStreetRoadBands?.() ?? [];
   }
 
   /**

@@ -24,7 +24,8 @@ import { waitForScene } from '../helpers/waitForScene';
 import { TUTORIAL_STATE_STORAGE_KEY } from '../../example-games/main-street/TutorialState';
 import { canPurchaseBusiness, getEmptySlots } from '../../example-games/main-street/MainStreetMarket';
 import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
-import { streetViewportRect } from '../../example-games/main-street/MainStreetMapView';
+import { streetViewportRect, visibleLocalRect } from '../../example-games/main-street/MainStreetMapView';
+import { ROAD_COLOUR } from '../../example-games/main-street/scenes/MainStreetConstants';
 
 const GAME_W = 1280;
 const GAME_H = 720;
@@ -147,6 +148,60 @@ function visibleStreetSlotRects(scene: Scene): Phaser.GameObjects.Rectangle[] {
       cy + halfH > viewport.y && cy - halfH < viewport.y + viewport.h
     );
   });
+}
+
+/**
+ * Count road-surface and road-marking pixels inside the street viewport band.
+ *
+ * Roads must be grey rectangles with a dashed white centre line, so a real
+ * rendered frame should contain both colours inside the band.
+ */
+
+/**
+ * True when any pixel in a small neighbourhood around a screen point matches a
+ * colour (the road markings are 2px wide, so exact-pixel sampling is brittle).
+ */
+function hasNearColour(screenX: number, screenY: number, hex: number, tol = 14): boolean {
+  const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
+  const dpr = canvas.width / GAME_W;
+  const px = Math.round(screenX * dpr);
+  const py = Math.round(screenY * dpr);
+  const size = 3 * Math.max(1, Math.round(dpr));
+  const data = ctx.getImageData(px, py, size, size).data;
+  const tr = (hex >> 16) & 0xff;
+  const tg = (hex >> 8) & 0xff;
+  const tb = hex & 0xff;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 200) continue;
+    if (Math.abs(data[i] - tr) <= tol && Math.abs(data[i + 1] - tg) <= tol && Math.abs(data[i + 2] - tb) <= tol) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Brightest channel value found along a local-space segment, via screen space. */
+function brightestChannel(
+  x1: number, y1: number, x2: number, y2: number,
+  toScreen: (x: number, y: number) => { x: number; y: number },
+): number {
+  const canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
+  const dpr = canvas.width / GAME_W;
+  let best = 0;
+  const steps = 40;
+  for (let i = 0; i <= steps; i++) {
+    const lx = x1 + ((x2 - x1) * i) / steps;
+    const ly = y1 + ((y2 - y1) * i) / steps;
+    const s = toScreen(lx, ly);
+    const d = ctx.getImageData(Math.max(0, Math.round(s.x * dpr) - 1), Math.max(0, Math.round(s.y * dpr) - 1), 3, 3).data;
+    for (let k = 0; k < d.length; k += 4) {
+      if (d[k + 3] < 200) continue;
+      best = Math.max(best, d[k], d[k + 1], d[k + 2]);
+    }
+  }
+  return best;
 }
 
 /** Centre of a zoom control in canvas coordinates. */
@@ -274,11 +329,18 @@ describe('Main Street street-map camera (browser)', () => {
     expect(snapshot.camera.zoomLevel).toBe(2);
     expect(snapshot.scale).toBeCloseTo(0.5, 3);
 
-    // A whole ring of neighbours is now framed (8 cells × up to 10 plots,
-    // minus the shared seam plots rendered once).
+    // A whole ring of neighbours is now framed. Streets are physically larger
+    // in the city-block model (each owns its ten plots plus a road band around
+    // it), so fewer plots fit at 2× than in the old seam-sharing layout — the
+    // meaningful assertion is that more than one street cell is revealed.
     const framedAt2x = visibleStreetSlotRects(scene).length;
     expect(framedAt2x).toBeGreaterThan(framedAt1x);
-    expect(framedAt2x).toBeGreaterThanOrEqual(40);
+    expect(framedAt2x).toBeGreaterThanOrEqual(20);
+    const framedCells = new Set(
+      (scene.getVisibleStreetNodes() as Array<{ cellX: number; cellY: number }>)
+        .map((n) => `${n.cellX},${n.cellY}`),
+    );
+    expect(framedCells.size).toBeGreaterThan(1);
 
     // Only the street layer transforms — the HUD chrome stays put.
     if (hudCoinPos) {
@@ -292,6 +354,150 @@ describe('Main Street street-map camera (browser)', () => {
     // Back to the default 1× framing on reset.
     scene.setStreetZoomLevel(1, false);
     expect(visibleStreetSlotRects(scene).length).toBe(10);
+  });
+
+  it('reveals new street cells when zooming out from the default 1×1 board (CG-0MT5Y1X5T001M4S6)', async () => {
+    // Regression guard for the manual-audit rejection: "the zoom camera works
+    // but when zooming out no new cells are displayed".  The view lattice must
+    // auto-grow with the zoom level so zooming out actually reveals
+    // neighbouring streets — with NO manual setStreetViewLattice() call.
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
+
+    // The shipping default is the legacy 1×1 board.
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 1, rows: 1 });
+    const nodesAt1x = scene.getVisibleStreetNodes().length;
+    expect(nodesAt1x).toBe(10);
+    const framedAt1x = visibleStreetSlotRects(scene).length;
+    expect(framedAt1x).toBe(10);
+
+    // Zoom out one level: the lattice grows to 3×3 and new street cells are
+    // rendered (strictly more than the legacy 10 slots).
+    scene.zoomStreetOut();
+    await wait(150);
+    expect(scene.getStreetCameraForTest().camera.zoomLevel).toBe(2);
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 3, rows: 3 });
+
+    const nodesAt2x = scene.getVisibleStreetNodes().length;
+    expect(nodesAt2x).toBeGreaterThan(nodesAt1x);
+    // …and the newly revealed cells are actually framed on screen (not just
+    // instantiated off-viewport).
+    expect(visibleStreetSlotRects(scene).length).toBeGreaterThan(framedAt1x);
+
+    // And zooming out again reveals a still larger lattice.
+    scene.zoomStreetOut();
+    await wait(150);
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 5, rows: 5 });
+    expect(scene.getVisibleStreetNodes().length).toBeGreaterThan(nodesAt2x);
+
+    // Zooming back in keeps the revealed streets (the lattice only grows;
+    // the camera rect culls what is off-screen).
+    scene.zoomStreetIn();
+    scene.zoomStreetIn();
+    await wait(150);
+    expect(scene.getStreetCameraForTest().camera.zoomLevel).toBe(1);
+    expect(scene.getVisibleStreetNodes().length).toBe(10);
+  });
+
+  it('grows the view lattice when a zoomed-out camera state is restored (save/load)', async () => {
+    // A checkpoint saved while zoomed out must rehydrate with its
+    // neighbouring streets visible, not just a scaled-down 1×1 board
+    // (CG-0MT5Y1X5T001M4S6).
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
+
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 1, rows: 1 });
+    expect(scene.getVisibleStreetNodes().length).toBe(10);
+
+    // Restoring a saved camera at zoom level 3 grows the lattice to 5×5 and
+    // renders the neighbouring streets.
+    scene.setStreetCameraState({ zoomLevel: 3, focusX: 0, focusY: 0 });
+    await wait(150);
+    expect(scene.getStreetCameraForTest().camera.zoomLevel).toBe(3);
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 5, rows: 5 });
+    expect(scene.getVisibleStreetNodes().length).toBeGreaterThan(10);
+  });
+
+  it('draws the city-block road layer and grows it with the lattice (CG-0MT5Y1X5T001M4S6)', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
+
+    const roadLayer = () => (scene.streetContainer as Phaser.GameObjects.Container).list.find(
+      (obj) => obj.name === 'ms-street-roads',
+    );
+
+    // 1×1 lattice: a road ring around the single street (2 vertical + 2 horizontal).
+    expect(roadLayer()).toBeTruthy();
+    expect(scene.getStreetRoadBands()).toHaveLength(4);
+    expect(scene.getStreetRoadBands().every((b: any) => b.w > 0 && b.h > 0)).toBe(true);
+
+    // Zooming out grows the lattice, and the road layer follows it.
+    scene.zoomStreetOut();
+    await wait(150);
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 3, rows: 3 });
+    // cols + 1 vertical bands + rows + 1 horizontal bands.
+    expect(scene.getStreetRoadBands()).toHaveLength(3 + 1 + 3 + 1);
+    expect(roadLayer()).toBeTruthy();
+  });
+
+  it('renders the whole road ring at the default zoom, with a dashed white centre line', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
+
+    // Sample the real canvas for road surfaces and centre-line markings.
+    const sampleRoads = () => {
+      const camera = scene.getStreetCameraState();
+      const { scale, containerX, containerY } = scene.getStreetCameraForTest();
+      const visible = visibleLocalRect(camera, scene.layout);
+      const toScreen = (x: number, y: number) => ({ x: containerX + x * scale, y: containerY + y * scale });
+      const bands = scene.getStreetRoadBands() as Array<{ orientation: string; x: number; y: number; w: number; h: number }>;
+      let surface = 0;
+      let brightest = 0;
+      for (const band of bands) {
+        const x0 = Math.max(band.x, visible.left);
+        const x1 = Math.min(band.x + band.w, visible.right);
+        const y0 = Math.max(band.y, visible.top);
+        const y1 = Math.min(band.y + band.h, visible.bottom);
+        if (x1 - x0 < 8 || y1 - y0 < 8) continue; // band not (or barely) on screen
+        if (band.orientation === 'vertical') {
+          const midY = (y0 + y1) / 2;
+          const s = toScreen(band.x + band.w * 0.25, midY);
+          if (hasNearColour(s.x, s.y, ROAD_COLOUR)) surface++;
+          brightest = Math.max(brightest, brightestChannel(band.x + band.w / 2, midY - 30, band.x + band.w / 2, midY + 30, toScreen));
+        } else {
+          const midX = (x0 + x1) / 2;
+          const s = toScreen(midX, band.y + band.h * 0.25);
+          if (hasNearColour(s.x, s.y, ROAD_COLOUR)) surface++;
+          brightest = Math.max(brightest, brightestChannel(midX - 30, band.y + band.h / 2, midX + 30, band.y + band.h / 2, toScreen));
+        }
+      }
+      return { surface, brightest, bands: bands.length };
+    };
+
+    // At the DEFAULT zoom the whole road ring is on screen: all four bands
+    // (left/right/top/bottom) are inside the clipped street band, each showing a
+    // grey surface and a bright dashed centre line (CG-0MT5Y1X5T001M4S6).
+    await wait(250);
+    const at1x = sampleRoads();
+    expect(at1x.bands).toBe(4);
+    expect(at1x.surface).toBe(4);
+    expect(at1x.brightest).toBeGreaterThan(150);
+
+    // Zooming out reveals more roads, which are still drawn correctly.
+    scene.setStreetZoomLevel(2, false);
+    await wait(250);
+    const at2x = sampleRoads();
+    expect(at2x.bands).toBeGreaterThan(at1x.bands);
+    expect(at2x.surface).toBeGreaterThanOrEqual(at1x.surface);
+    expect(at2x.brightest).toBeGreaterThan(150);
   });
 
   it('maps pointer hit-testing through the camera transform (place after zooming out)', async () => {

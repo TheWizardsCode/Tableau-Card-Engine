@@ -243,8 +243,8 @@ describe('Group A business expansion: balance guardrails (AC4)', () => {
 
   it('keeps other families unchanged in count (data-driven scope)', () => {
     expect(createCommunitySpaceDeck(1).length).toBe(8); // +6 Group B community-space cards
-    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(64); // +8 chain events (CG-0MTT7FC7A000AA58)
+    expect(createEventDeck(1, undefined, createSeededRng(42), 1).length).toBe(71); // +8 chain + 7 Irish-holiday (CG-0MTT0K9RX0004QTE)
     expect(createUpgradeDeck(1).length).toBe(39); // +12 Group E upgrades
-    expect(createStaffDeck(1).length).toBe(21); // +4 Group F staff, +1 General Manager (CG-0MSTOF1N5005PK2R), +1 Lookout (CG-0MSXOW6GN008ZSMN), +12 specialization applicants (CG-0MT4WXNR80090FXZ)
+    expect(createStaffDeck(1).length).toBe(25); // +4 Group F staff, +1 General Manager (CG-0MSTOF1N5005PK2R), +1 Lookout (CG-0MSXOW6GN008ZSMN), +12 specialization applicants (CG-0MT4WXNR80090FXZ), +4 business specialists (CG-0MTIOLY2A0092OT1)
   });
 });

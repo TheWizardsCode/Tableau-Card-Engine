@@ -30,10 +30,11 @@
  *
  * CG-0MTNMBX5Z002U0MH: inserted T8 (end-turn) before More than Businesses so
  * T7 place-business and T10 buy-event no longer share a single daily action
- * (1 base on Easy), plus T14 and T22 so T12/community-favour and
- * T21/T23 no longer share a day. Each action day now has at most one
- * costed action. Per-day budget audit lives in
- * `tests/main-street/tutorial-action-economy.test.ts`.
+ * (1 base on Easy), plus T14 and T22 to keep each action day at most one
+ * costed action. (Community Favour at T15 is a FREE action —
+ * CG-0MSTOATDQ005XDET — so it does not consume a day's action; the T14/T22
+ * boundaries are retained as natural day markers.) Per-day budget audit lives
+ * in `tests/main-street/tutorial-action-economy.test.ts`.
  *
  * ## Coin Budget Analysis (TutorialScenario, Easy difficulty)
  *
@@ -350,9 +351,10 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   },
   {
     id: 'T14',
-    // CG-0MTNMBX5Z002U0MH: inserted end-turn to split Day 4 so T12
-    // (select-business) on day 4 and community-favour on day 5 never share a
-    // single daily action. T14 ends day 4; day 5 starts with a fresh action.
+    // CG-0MTNMBX5Z002U0MH: end-turn inserted to split Day 4 (T12 select-business)
+    // from Day 5 (T15 Community Favour). Community Favour is free
+    // (CG-0MSTOATDQ005XDET), so this boundary is no longer required for the
+    // budget — retained as the natural day marker.
     titleKey: tutorialKey('T14', 'title'),
     bodyKey: tutorialKey('T14', 'body'),
     highlightZone: 'endTurnButton',

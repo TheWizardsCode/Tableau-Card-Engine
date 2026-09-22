@@ -11,6 +11,24 @@
 
 import type { GamePhase } from './GameState';
 
+// Import shared card-event payloads from CardEventPayloads module
+import type {
+  BaseCardEventPayload,
+  CardDealtPayload,
+  CardPlacedPayload,
+  CardDiscardedPayload,
+  CardFlippedPayload,
+} from './CardEventPayloads';
+
+// Re-export for backward compatibility
+export type {
+  BaseCardEventPayload,
+  CardDealtPayload,
+  CardPlacedPayload,
+  CardDiscardedPayload,
+  CardFlippedPayload,
+};
+
 // ── Event Payloads ──────────────────────────────────────────
 
 /**
@@ -87,15 +105,7 @@ export interface CardDrawnPayload {
   readonly playerIndex: number;
 }
 
-/**
- * Emitted when a card is flipped face-up in a player's grid.
- */
-export interface CardFlippedPayload {
-  /** Grid position (row * cols + col) of the flipped card. */
-  readonly position: number;
-  /** Index of the player whose card was flipped. */
-  readonly playerIndex: number;
-}
+
 
 /**
  * Emitted when a drawn card is swapped with a grid card.
@@ -109,15 +119,7 @@ export interface CardSwappedPayload {
   readonly playerIndex: number;
 }
 
-/**
- * Emitted when a drawn card is discarded (not swapped into the grid).
- */
-export interface CardDiscardedPayload {
-  /** Card ID (optional, for tracking). */
-  cardId?: string;
-  /** Index of the player who discarded. */
-  playerIndex?: number;
-}
+
 
 /**
  * Emitted when a UI element is interacted with.
@@ -243,33 +245,9 @@ export interface DealCardPayload {
   readonly totalCards: number;
 }
 
-/**
- * Emitted when a card is dealt to a player's hand (deal animation complete).
- */
-export interface CardDealtPayload {
-  /** Card ID (optional, for tracking). */
-  readonly cardId?: string;
-  /** Player index (optional, for multi-player). */
-  readonly playerIndex?: number;
-}
 
-/**
- * Emitted when a card is placed on a grid/street (placement animation complete).
- */
-export interface CardPlacedPayload {
-  /** Card ID (optional, for tracking). */
-  readonly cardId?: string;
-  /** Player index (optional, for multi-player). */
-  readonly playerIndex?: number;
-  /** Slot/target index (optional, for locating). */
-  readonly slotIndex?: number;
-  /** Optional action string for contextual events (e.g., 'play-event'). */
-  readonly action?: string;
-  /** Optional target slot for upgrades, placements etc. */
-  readonly targetSlot?: number;
-  /** Optional held event id for play-event actions. */
-  readonly heldEventId?: string;
-}
+
+
 
 /**
  * Emitted when the player gains coins/income.

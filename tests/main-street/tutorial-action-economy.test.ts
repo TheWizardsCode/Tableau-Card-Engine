@@ -4,10 +4,11 @@
  * Root cause for the gap: the previous 23-step flow put two action-consuming
  * steps on Day 2 (T7 place-business and T9 buy-event) under a single daily
  * action budget (base 1 on Easy, no prior bank). Both `executeAction` paths
- * call `consumeAction` — `buy-event` and `community-favour` are NOT free —
- * so the second gated step would throw `No actions remaining today` when run
- * outside the scripted overlay. The fix inserts T8 end-turn before More than
- * Businesses so each day has at most one consumer.
+ * call `consumeAction` — `buy-event` is NOT free — so the second gated step
+ * would throw `No actions remaining today` when run outside the scripted
+ * overlay. (Community Favour is a FREE once-per-turn action and never
+ * consumes a daily action — CG-0MSTOATDQ005XDET.) The fix inserts T8
+ * end-turn before More than Businesses so each day has at most one consumer.
  *
  * Why the gap wasn't caught:
  * - `tutorial-flow.test.ts` and `tutorial-setup-path.test.ts` assert shape
@@ -47,7 +48,7 @@ import { UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/Tutorial
  *  - buy-event        → purchaseEvent (consume, CG-0MTH5C7FK002PDP5)
  *  - play-event       → playEventFromHand (consume unless same-day; the
  *                       T21 festival was bought on T10 / day 3, so not same-day)
- *  - community-favour → executeCommunityFavour (consume)
+ *  - community-favour → executeCommunityFavour (free — no consumeAction)
  *  - peek-incident-deck → peekIncidentDeck (consume)
  */
 const CONSUMING_ACTIONS = new Set([
@@ -63,7 +64,6 @@ const CONSUMING_ACTIONS = new Set([
   'play-upgrade-from-hand',
   'buy-and-place-upgrade',
   'move-to-hand',
-  'community-favour',
   'peek-incident-deck',
 ]);
 
@@ -144,13 +144,16 @@ describe('Tutorial action economy (CG-0MTNMBX5Z002U0MH)', () => {
     }
   });
 
-  it('all buy-event and community-favour action steps are counted as consuming (root cause check)', () => {
+  it('counts buy-event as consuming and Community Favour as free (root cause check)', () => {
     const buyEventSteps = UNIFIED_TUTORIAL_STEPS.filter((s) => s.requiredAction === 'buy-event');
     const favourSteps = UNIFIED_TUTORIAL_STEPS.filter((s) => s.requiredAction === 'community-favour');
     expect(buyEventSteps.length).toBeGreaterThan(0);
     expect(favourSteps.length).toBeGreaterThan(0);
-    for (const s of [...buyEventSteps, ...favourSteps]) {
+    for (const s of buyEventSteps) {
       expect(consumesAction(s.requiredAction), `${s.id} ${s.requiredAction} should consume an action`).toBe(true);
+    }
+    for (const s of favourSteps) {
+      expect(consumesAction(s.requiredAction), `${s.id} community-favour is a free action`).toBe(false);
     }
   });
 

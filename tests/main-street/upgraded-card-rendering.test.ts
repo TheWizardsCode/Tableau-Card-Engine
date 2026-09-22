@@ -89,14 +89,14 @@ describe('buildUpgradeOverlaySpec', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 5, level: 1 });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
       expect(spec.cashLine).not.toBeNull();
-      expect(spec.cashLine!.text).toBe('Cash: +8'); // 3 + 5 = 8
+      expect(spec.cashLine!.text).toBe('+8'); // 3 + 5 = 8
     });
 
     it('shows cash line overlay for an un-upgraded card when income > 0', () => {
       const biz = makeBiz({ baseIncome: 3, incomeBonus: 0, level: 0 });
       const spec = buildUpgradeOverlaySpec(biz, 200, 280);
       expect(spec.cashLine).not.toBeNull();
-      expect(spec.cashLine!.text).toBe('Cash: +3');
+      expect(spec.cashLine!.text).toBe('+3');
     });
 
     it('positions the cash line in the right column (left-anchored, never inside 64×64 graphic)', () => {

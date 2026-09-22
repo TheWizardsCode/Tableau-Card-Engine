@@ -296,7 +296,7 @@ New example games must not introduce bespoke hand rendering; `example-games/blac
 - **Gym scene:** `GymHandPileScene` — `example-games/gym/scenes/GymHandPileScene.ts`
 - **Key APIs:** `HandView`, `PileView`, `flipCard()`, `discardCard()`, `moveGameObject()`, `shakeIllegalMove()`
 - **When to use:** "In a real game like Golf or Lost Cities, HandView renders the player hand and PileView shows draw/discard piles with click-to-interact support." (GymHandPileScene Features help text)
-- **Key features:** Arc layout with live sliders (arc, spacing, rotation, selection raise), vertical cascade toggle, drag-and-drop, card animations (deal from deck, flip in-place, discard to pile, illegal-move shake), reduced-motion fallbacks. Selected cards raise out of the hand (`HandView.setSelectionLift()`) perpendicular to their rotation in horizontal layout, and shift right in vertical cascade. Card sprites use per-index depth (`sprite.setDepth(index)`) so the Canvas-compatible selection highlight (depth `index + 0.01`) can never render over the card to the right / below; labels sit at `index + 0.005`.
+- **Key features:** Arc layout with live sliders (arc, spacing, rotation, selection raise), vertical cascade toggle, drag-and-drop, card animations (deal from deck, flip in-place, discard to pile, illegal-move shake), reduced-motion fallbacks. Selected cards raise out of the hand (`HandView.setSelectionLift()`) perpendicular to their rotation in horizontal layout, and shift right in vertical cascade. Card sprites use per-index depth (`sprite.setDepth(index)`) so the Canvas-compatible selection highlight (depth `index + 0.01`) can never render over the card to the right / below; labels sit at `index + 0.005`. Ghost hand-capacity outlines are available via `showPositionOutlines: true` + `maxSlots` (`setMaxSlots()` at runtime): each occupied slot sits at exactly the card's position and rotation (depth `index - 0.5`), extra capacity slots continue the same spacing to the right and render below every card, and an empty hand shows every slot centred on the hand centre. Set `cardWidth`/`cardHeight` to match non-default card sizes.
 
 ### 3. Command Pattern for Reversible Actions (Undo/Redo)
 
@@ -465,6 +465,36 @@ Use isolated spike scenes for evaluating new graphics pipelines (shaders, lighti
 - **Gym scenes:** `GymGraphicsShaderSpikeScene` — `example-games/gym/scenes/GymGraphicsShaderSpikeScene.ts`, `GymGraphicsLightingSpikeScene` — `example-games/gym/scenes/GymGraphicsLightingSpikeScene.ts`
 - **Key APIs:** Phaser sprite tinting, blend modes (ADD, MULTIPLY, SCREEN, NORMAL), LightPlugin, point lights
 - **When to use:** When evaluating whether a new graphics feature (custom shaders, lighting pipeline) can be used safely in the engine. Spikes should: attempt the feature, document findings in help text, fall back gracefully when unavailable, and be peer-reviewed before shared code is refactored.
+
+### 19. Deferred End-of-Turn Mutation (Main Street)
+
+Interactive Main Street play defers end-of-turn resource changes until the
+closing animations land: the engine COMPUTES the deltas without applying
+them, the scene applies them exactly once when the income collection and/or
+incident reveal completes, and the HUD switches from the pre-animation values
+only then — so the coins fly before the numbers change, and the game-over
+banner never appears mid-animation (CG-0MTR72P14000VO6Q).
+
+- **Gym scene / reference:** no Gym scene — canonical reference is
+  `example-games/main-street` (`MainStreetEngine.ts`, `scenes/MainStreetTurnController.ts`)
+- **Dual-mode engine functions:** `applyIncome` (`MainStreetAdjacency.ts`),
+  the three ongoing-cost helpers, and `resolveIncident` accept
+  `{ apply?: boolean }` — the default (omitted) keeps the legacy
+  immediate-apply contract (headless/AI path and direct calls unchanged);
+  `apply: false` returns deltas without mutating `state.resourceBank`.
+- **Deferred closing:** `processEndOfTurn(state, { deferResourceApplication: true })`
+  returns the summed deltas in `TurnResult.pendingCoinDelta` /
+  `pendingRepDelta` / `pendingScoreDelta` (plus `requiresDeferredClosing`)
+  without mutating resources or running EndCheck; the scene applies them via
+  `applyEndOfTurnDeltas` (guarded once by `scene.endOfTurnDeltasApplied`)
+  after the animations, then runs `finishDeferredTurnClosing` (challenges
+  against post-delta state → EndCheck → next day).
+- **HUD window:** `refreshHud()` shows `previousCoins` / `previousReputation`
+  (captured at `endTurn()` start) while `incomeCollectionActive` or
+  `incidentRevealActive` is set.
+- **When to use:** any end-of-turn (or similar resource-payout) presentation
+  where the HUD must not jump before the visual feedback lands. Keep reduced
+  motion and the tutorial on the immediate path (they defer nothing).
 
 ### Scene Base Class Pattern
 

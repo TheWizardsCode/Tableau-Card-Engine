@@ -4,7 +4,12 @@
  *
  * Usage:
  *   npx vite-node scripts/balance/drift-report.ts [--json] [--difficulties easy,medium,hard]
+ *   npx vite-node scripts/balance/drift-report.ts --strategy=banking-greedy       # banking-aware snapshot
  *   npm run balance:drift-report -- --json
+ *
+ * `--strategy` selects which recorded snapshot to compare against: the
+ * top-level block (the default greedy baseline) or the additive
+ * `bankingGreedy` block (CG-0MT3JMGA60091J8W AC5).
  *
  * Reuses `runAllCombinations` from `MainStreetMonteCarlo` to ensure
  * consistency with the guardrail test harness (CG-0MTD0F66A0005BEX).
@@ -17,30 +22,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runAllCombinations } from '../../example-games/main-street/MainStreetMonteCarlo';
 import type { DifficultyName } from '../../example-games/main-street/MainStreetDifficulty';
+import { selectBaselineBlock } from './baseline-blocks';
+import type { BaselineBlock, MonteBaseline } from './baseline-blocks';
 
 // ---------------------------------------------------------------------------
 // Types (mirrors the baseline schema)
 // ---------------------------------------------------------------------------
-
-interface DifficultyBaseline {
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  winRate: number;
-  averageCoinsPerTurn: number;
-  medianScore: number;
-}
-
-interface MonteBaseline {
-  source?: string;
-  generatedAt?: string;
-  seeds: number;
-  maxTurns: number;
-  strategy: 'greedy' | 'random' | 'market-greedy' | 'demo-greedy';
-  metrics: {
-    winRate: number;
-    averageCoinsPerTurn: number;
-  };
-  difficultyMatrix: DifficultyBaseline[];
-}
 
 interface DriftEntry {
   difficulty: string;
@@ -187,6 +174,8 @@ function main(): void {
   const difficulties = difficultiesArg
     ? difficultiesArg.split('=')[1].split(',').map(d => d.trim() as DifficultyName)
     : undefined;
+  const strategyArg = args.find(a => a.startsWith('--strategy='));
+  const requestedStrategy = strategyArg ? strategyArg.split('=')[1].trim() : undefined;
 
   // Load baseline
   let baseline: MonteBaseline;
@@ -198,7 +187,16 @@ function main(): void {
     process.exit(1);
   }
 
-  console.error(`Running Monte Carlo simulation: ${baseline.seeds} seeds, ${baseline.strategy} strategy, ${baseline.maxTurns} max turns...`);
+  // Resolve which recorded snapshot to compare against.
+  let block: BaselineBlock;
+  try {
+    block = selectBaselineBlock(baseline, requestedStrategy);
+  } catch (err) {
+    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+
+  console.error(`Running Monte Carlo simulation: ${baseline.seeds} seeds, ${block.strategy} strategy, ${baseline.maxTurns} max turns...`);
   if (difficulties) {
     console.error(`  Filtering to difficulties: ${difficulties.join(', ')}`);
   }
@@ -208,14 +206,14 @@ function main(): void {
   const allResults = runAllCombinations({
     seeds,
     maxTurns: baseline.maxTurns,
-    strategies: [baseline.strategy as 'greedy' | 'random' | 'market-greedy' | 'demo-greedy'],
+    strategies: [block.strategy],
     difficulties,
   });
 
   const perDifficulty: DriftEntry[] = [];
 
   for (const combo of allResults) {
-    const baselineEntry = baseline.difficultyMatrix.find(
+    const baselineEntry = block.difficultyMatrix.find(
       d => d.difficulty === combo.difficulty,
     );
     if (!baselineEntry) {
@@ -260,18 +258,18 @@ function main(): void {
   }
 
   const mediumCurrent = allResults.find(r => r.difficulty === 'Medium')!;
-  const mediumBaseline = baseline.difficultyMatrix.find(d => d.difficulty === 'Medium')!;
+  const mediumBaseline = block.difficultyMatrix.find(d => d.difficulty === 'Medium')!;
 
   const report: DriftReport = {
     timestamp: new Date().toISOString(),
     baseline: {
-      winRate: baseline.metrics.winRate,
-      averageCoinsPerTurn: baseline.metrics.averageCoinsPerTurn,
+      winRate: block.metrics.winRate,
+      averageCoinsPerTurn: block.metrics.averageCoinsPerTurn,
       medianScore: mediumBaseline.medianScore,
-      generatedAt: baseline.generatedAt,
+      generatedAt: block.generatedAt,
       seeds: baseline.seeds,
       maxTurns: baseline.maxTurns,
-      strategy: baseline.strategy,
+      strategy: block.strategy,
     },
     current: {
       winRate: mediumCurrent.metrics.winRate,
@@ -281,7 +279,7 @@ function main(): void {
     currentMeta: {
       seeds: baseline.seeds,
       maxTurns: baseline.maxTurns,
-      strategy: baseline.strategy,
+      strategy: block.strategy,
     },
     perDifficulty,
     summary: {
