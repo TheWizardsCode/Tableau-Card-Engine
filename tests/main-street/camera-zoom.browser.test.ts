@@ -446,52 +446,58 @@ describe('Main Street street-map camera (browser)', () => {
     expect(roadLayer()).toBeTruthy();
   });
 
-  it('renders the roads as grey surfaces with a dashed white centre line', async () => {
+  it('renders the whole road ring at the default zoom, with a dashed white centre line', async () => {
     game = await bootGame();
     const scene = getScene(game);
     await waitForMarketReady(scene);
     if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
 
-    // Zoom out so neighbouring streets (and the roads between them) are
-    // revealed inside the street band.
+    // Sample the real canvas for road surfaces and centre-line markings.
+    const sampleRoads = () => {
+      const camera = scene.getStreetCameraState();
+      const { scale, containerX, containerY } = scene.getStreetCameraForTest();
+      const visible = visibleLocalRect(camera, scene.layout);
+      const toScreen = (x: number, y: number) => ({ x: containerX + x * scale, y: containerY + y * scale });
+      const bands = scene.getStreetRoadBands() as Array<{ orientation: string; x: number; y: number; w: number; h: number }>;
+      let surface = 0;
+      let brightest = 0;
+      for (const band of bands) {
+        const x0 = Math.max(band.x, visible.left);
+        const x1 = Math.min(band.x + band.w, visible.right);
+        const y0 = Math.max(band.y, visible.top);
+        const y1 = Math.min(band.y + band.h, visible.bottom);
+        if (x1 - x0 < 8 || y1 - y0 < 8) continue; // band not (or barely) on screen
+        if (band.orientation === 'vertical') {
+          const midY = (y0 + y1) / 2;
+          const s = toScreen(band.x + band.w * 0.25, midY);
+          if (hasNearColour(s.x, s.y, ROAD_COLOUR)) surface++;
+          brightest = Math.max(brightest, brightestChannel(band.x + band.w / 2, midY - 30, band.x + band.w / 2, midY + 30, toScreen));
+        } else {
+          const midX = (x0 + x1) / 2;
+          const s = toScreen(midX, band.y + band.h * 0.25);
+          if (hasNearColour(s.x, s.y, ROAD_COLOUR)) surface++;
+          brightest = Math.max(brightest, brightestChannel(midX - 30, band.y + band.h / 2, midX + 30, band.y + band.h / 2, toScreen));
+        }
+      }
+      return { surface, brightest, bands: bands.length };
+    };
+
+    // At the DEFAULT zoom the whole road ring is on screen: all four bands
+    // (left/right/top/bottom) are inside the clipped street band, each showing a
+    // grey surface and a bright dashed centre line (CG-0MT5Y1X5T001M4S6).
+    await wait(250);
+    const at1x = sampleRoads();
+    expect(at1x.bands).toBe(4);
+    expect(at1x.surface).toBe(4);
+    expect(at1x.brightest).toBeGreaterThan(150);
+
+    // Zooming out reveals more roads, which are still drawn correctly.
     scene.setStreetZoomLevel(2, false);
     await wait(250);
-
-    const camera = scene.getStreetCameraState();
-    const { scale, containerX, containerY } = scene.getStreetCameraForTest();
-    const visible = visibleLocalRect(camera, scene.layout);
-    const toScreen = (x: number, y: number) => ({ x: containerX + x * scale, y: containerY + y * scale });
-    const bands = scene.getStreetRoadBands() as Array<{ orientation: string; x: number; y: number; w: number; h: number }>;
-    expect(bands.length).toBeGreaterThan(0);
-
-    let sampledSurface = 0;
-    // Brightest channel value found along any road centre line. The road
-    // surface is mid-grey (0x4a = 74), so a clearly brighter pixel proves the
-    // white centre line is drawn.
-    let brightestMarking = 0;
-    for (const band of bands) {
-      const x0 = Math.max(band.x, visible.left);
-      const x1 = Math.min(band.x + band.w, visible.right);
-      const y0 = Math.max(band.y, visible.top);
-      const y1 = Math.min(band.y + band.h, visible.bottom);
-      if (x1 - x0 < 8 || y1 - y0 < 8) continue; // band not (or barely) on screen
-
-      if (band.orientation === 'vertical') {
-        const midY = (y0 + y1) / 2;
-        const surface = toScreen(band.x + band.w * 0.25, midY);
-        if (hasNearColour(surface.x, surface.y, ROAD_COLOUR)) sampledSurface++;
-        brightestMarking = Math.max(brightestMarking, brightestChannel(band.x + band.w / 2, midY - 30, band.x + band.w / 2, midY + 30, toScreen));
-      } else {
-        const midX = (x0 + x1) / 2;
-        const surface = toScreen(midX, band.y + band.h * 0.25);
-        if (hasNearColour(surface.x, surface.y, ROAD_COLOUR)) sampledSurface++;
-        brightestMarking = Math.max(brightestMarking, brightestChannel(midX - 30, band.y + band.h / 2, midX + 30, band.y + band.h / 2, toScreen));
-      }
-    }
-
-    // The road surface and its dashed white centre line are both really drawn.
-    expect(sampledSurface).toBeGreaterThan(0);
-    expect(brightestMarking).toBeGreaterThan(150);
+    const at2x = sampleRoads();
+    expect(at2x.bands).toBeGreaterThan(at1x.bands);
+    expect(at2x.surface).toBeGreaterThanOrEqual(at1x.surface);
+    expect(at2x.brightest).toBeGreaterThan(150);
   });
 
   it('maps pointer hit-testing through the camera transform (place after zooming out)', async () => {

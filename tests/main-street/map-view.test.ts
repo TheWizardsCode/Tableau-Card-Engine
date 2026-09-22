@@ -29,6 +29,7 @@ import {
   mapCellStepX,
   mapSlotCenter,
   mapSlotCount,
+  mapRoadBands,
   roadBandX,
   screenToLocal,
   localToScreen,
@@ -89,14 +90,47 @@ describe('zoom levels', () => {
 });
 
 describe('viewport and 1× framing (AC2)', () => {
-  it('clips the map to the street band without covering the HUD', () => {
+  it('clips the map to the street band (street + road ring) without covering the HUD', () => {
     const viewport = streetViewportRect(layout);
-    expect(viewport.w).toBe(layout.streetCols * layout.slotW + (layout.streetCols - 1) * layout.slotGap);
-    expect(viewport.x).toBe(layout.streetX);
-    // The viewport bottom must sit above the player hand row.
+    // The band is the street's plot area plus one road band on every side, so
+    // the whole road ring is visible at the default zoom (CG-0MT5Y1X5T001M4S6).
+    expect(viewport.w).toBe(
+      layout.streetCols * layout.slotW + (layout.streetCols - 1) * layout.slotGap + 2 * roadBandX(layout),
+    );
+    expect(viewport.x).toBe(layout.streetX - roadBandX(layout));
+    // The whole band is on-canvas...
+    expect(viewport.x).toBeGreaterThanOrEqual(0);
+    expect(viewport.y).toBeGreaterThanOrEqual(0);
+    expect(viewport.x + viewport.w).toBeLessThanOrEqual(layout.gameW);
+    expect(viewport.y + viewport.h).toBeLessThanOrEqual(layout.gameH);
+    // ...and never reaches the HUD: above the hand row, below the market, and
+    // clear of the right-hand column.
     expect(viewport.y + viewport.h).toBeLessThanOrEqual(layout.handY);
-    // ...and must not reach into the market row above.
     expect(viewport.y).toBeGreaterThan(layout.marketTop);
+    expect(viewport.x + viewport.w).toBeLessThanOrEqual(layout.logX);
+  });
+
+  it('shows the whole road ring around the street at the default 1× framing', () => {
+    const camera = defaultStreetCamera(layout);
+    const viewport = streetViewportRect(layout);
+    const bands = mapRoadBands(layout, SINGLE);
+    expect(bands).toHaveLength(4); // left/right + top/bottom for a 1×1 lattice
+
+    // With the identity 1× transform, every road band lies fully inside the
+    // clipped street band — so a whole road (grey + dashed centre line) is
+    // visible on each of the four edges.
+    const transform = containerTransform(camera, layout);
+    expect(transform).toEqual({ scale: 1, x: 0, y: 0 });
+    for (const band of bands) {
+      expect(band.x).toBeGreaterThanOrEqual(viewport.x - 0.001);
+      expect(band.y).toBeGreaterThanOrEqual(viewport.y - 0.001);
+      expect(band.x + band.w).toBeLessThanOrEqual(viewport.x + viewport.w + 0.001);
+      expect(band.y + band.h).toBeLessThanOrEqual(viewport.y + viewport.h + 0.001);
+    }
+
+    // The street's own plot area is still framed exactly as before.
+    const nodes = visibleMapSlots(camera, layout, SINGLE);
+    expect(nodes).toHaveLength(10);
   });
 
   it('produces an identity container transform at 1× for a single street', () => {

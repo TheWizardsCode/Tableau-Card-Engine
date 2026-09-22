@@ -35,7 +35,7 @@
  */
 
 import type { SceneLayout } from './scenes/MainStreetConstants';
-import { STREET_COLS, STREET_ROWS } from './scenes/MainStreetConstants';
+import { STREET_COLS, STREET_ROWS, roadBandThickness } from './scenes/MainStreetConstants';
 
 /** Dimensions (in street cells) of the street lattice to display. */
 export interface StreetLatticeDims {
@@ -125,22 +125,14 @@ export function zoomInLevel(zoomLevel: number): number {
   return clampZoomLevel(clampZoomLevel(zoomLevel) - 1);
 }
 
-/**
- * Road band width between street columns, as a fraction of the plot pitch.
- * Roads are pure decoration — they never occupy world slots.
- */
-export const ROAD_BAND_X_RATIO = 0.62;
-/** Road band height between street rows, as a fraction of the plot pitch. */
-export const ROAD_BAND_Y_RATIO = 0.62;
-
-/** Pixel width of the road band between two street columns. */
+/** Road band width between street columns (same thickness as a horizontal road). */
 export function roadBandX(layout: SceneLayout): number {
-  return (layout.slotW + layout.slotGap) * ROAD_BAND_X_RATIO;
+  return roadBandThickness(layout.slotW + layout.slotGap, layout.slotH + layout.streetRowGap);
 }
 
-/** Pixel height of the road band between two street rows. */
+/** Road band height between street rows (same thickness as a vertical road). */
 export function roadBandY(layout: SceneLayout): number {
-  return (layout.slotH + layout.streetRowGap) * ROAD_BAND_Y_RATIO;
+  return roadBandThickness(layout.slotW + layout.slotGap, layout.slotH + layout.streetRowGap);
 }
 
 /** Horizontal distance between the origins of adjacent street cells. */
@@ -177,16 +169,24 @@ export function streetPixelHeight(layout: SceneLayout): number {
 }
 
 /**
- * Canvas-space rectangle the street map is drawn in. Sized to the street
- * panel (plus the section-label strip) so the map never overlaps the HUD.
+ * Canvas-space rectangle the street map is drawn in: the street's plot area
+ * **plus the road ring around it**, so at the default 1× framing the whole road
+ * is visible on all four edges (CG-0MT5Y1X5T001M4S6). The expansion is
+ * symmetric, so the band centre — and therefore the identity 1× transform and
+ * the legacy plot positions — are unchanged.
+ *
+ * Symmetry matters for culling: the band edge lands exactly on the neighbouring
+ * street's plot edge, so no sliver of a neighbouring street is instantiated at
+ * 1×.
  */
 export function streetViewportRect(layout: SceneLayout): StreetViewportRect {
-  const labelStrip = 12;
+  const roadX = roadBandX(layout);
+  const roadY = roadBandY(layout);
   return {
-    x: layout.streetX,
-    y: layout.streetTop - labelStrip,
-    w: streetPixelWidth(layout),
-    h: streetPixelHeight(layout) + labelStrip,
+    x: layout.streetX - roadX,
+    y: layout.streetTop - roadY,
+    w: streetPixelWidth(layout) + 2 * roadX,
+    h: streetPixelHeight(layout) + 2 * roadY,
   };
 }
 
@@ -516,6 +516,15 @@ export function visibleLocalRect(
 }
 
 /**
+ * Sub-pixel tolerance for viewport culling. The road ring around a street is
+ * exactly the gap to its neighbours, so a neighbouring street's nearest plot
+ * lands precisely on the viewport edge: it has zero visible area and must be
+ * culled, but floating-point error in the band arithmetic can otherwise let it
+ * slip through.
+ */
+const VIEWPORT_EDGE_EPSILON = 0.01;
+
+/**
  * Slots to render for the current camera: only slots intersecting the visible
  * map rect (unrevealed streets are never instantiated). Every slot position is
  * unique in the city-block model (streets do not share plots); the positional
@@ -546,10 +555,10 @@ export function visibleMapSlots(
         const localY = origin.y + row * (layout.slotH + layout.streetRowGap);
 
         if (
-          localX + layout.slotW <= visible.left ||
-          localX >= visible.right ||
-          localY + layout.slotH <= visible.top ||
-          localY >= visible.bottom
+          localX + layout.slotW <= visible.left + VIEWPORT_EDGE_EPSILON ||
+          localX >= visible.right - VIEWPORT_EDGE_EPSILON ||
+          localY + layout.slotH <= visible.top + VIEWPORT_EDGE_EPSILON ||
+          localY >= visible.bottom - VIEWPORT_EDGE_EPSILON
         ) {
           continue;
         }
