@@ -50,6 +50,37 @@ async function waitForCondition(check: () => boolean, timeoutMs = 5000): Promise
   }
 }
 
+/**
+ * Wait until the rendered card container for a street slot is non-null and has
+ * not been replaced for `stableMs`.
+ *
+ * The scene recreates street card containers on the deferred post-prewarm
+ * `refreshAll()` (a few hundred ms after boot), so capturing a container before
+ * that render settles yields a stale reference — or attaches an animation grid
+ * to a container that is about to be destroyed.
+ */
+async function waitForStableSlotCard(
+  scene: Phaser.Scene & { streetContainer?: Phaser.GameObjects.Container },
+  slotIndex: number,
+  stableMs = 300,
+  timeoutMs = 5000,
+): Promise<Phaser.GameObjects.Container> {
+  const start = performance.now();
+  let last = slotCard(scene, slotIndex);
+  let lastChangedAt = performance.now();
+  while (performance.now() - start < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const current = slotCard(scene, slotIndex);
+    if (current !== last) {
+      last = current;
+      lastChangedAt = performance.now();
+    }
+    if (current && performance.now() - lastChangedAt >= stableMs) return current;
+  }
+  if (last) return last;
+  throw new Error(`Timed out waiting for slot ${slotIndex} card to stabilise.`);
+}
+
 function makeBiz(id: string, name: string, baseIncome: number): BusinessCard {
   const tpl = getBusinessTemplates()[0];
   return {
@@ -169,7 +200,7 @@ describe('Main Street phased income animation', () => {
     state.streetGrid[0] = makeBiz('cafe-biz', 'Cafe', 3);
     (scene as unknown as { refreshAll: () => void }).refreshAll();
 
-    const card = await waitForCondition(() => slotCard(scene as never, 0) !== null).then(() => slotCard(scene as never, 0)!);
+    const card = await waitForStableSlotCard(scene as never, 0);
 
     const seen: { phase: IncomePhaseKey; recordedAt: number }[] = [];
     const data = makePhaseData();

@@ -144,7 +144,13 @@ describe('MainStreet market deal-in animation', () => {
     // We therefore verify tween *scheduling* (isTweening) as a secondary
     // signal and accept a relaxed scale threshold so the test remains
     // green when tweens are simply slow rather than broken.
-    const marketCall = calls.find((c) => c.row === 'market');
+    // Day start can render the row more than once: a deferred boot render
+    // still in flight and the explicit `startDayPhase()` both deal the market
+    // in, and each render recreates the card containers. The LAST call owns
+    // the containers the player actually sees (its tween advances); an
+    // earlier call's containers were replaced and stay frozen at the dealt
+    // 0.6 scale, so asserting on the first call reads a stale object.
+    const marketCall = [...calls].reverse().find((c) => c.row === 'market');
     expect(marketCall).toBeDefined();
 
     // Helper: wait a few RAF frames (with fallback) to give tweens time to advance.

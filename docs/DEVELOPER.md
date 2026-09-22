@@ -453,7 +453,13 @@ re-run the suspected file(s) in isolation via
 `npx vitest run --project browser tests/<file>` to see whether the hang
 reproduces without suite-wide contention. If it does, look for an unresolved
 `Phaser.Game` (the `afterEach` must destroy it) or a frame-wait helper without
-a timeout fallback. Exit codes from the runner: 0/1 from vitest, 124 on hang
+a timeout fallback. A hang in the **unit** stage is instead a synchronous
+infinite loop in test/engine code (e.g. an unbounded drain over a deck that
+self-replenishes or can stall — see [Writing unit tests](#writing-unit-tests));
+vitest's `testTimeout` cannot preempt synchronous JS, so attaching the V8
+inspector to the stuck process and pausing it is the fastest way to get the
+stack (`kill -USR1 <pid>`, then connect to `http://127.0.0.1:9229/json`).
+Exit codes from the runner: 0/1 from vitest, 124 on hang
 abort, 2 on an invalid `--timeout-ms` value.
 
 If you see the worker-timeout error repeatedly under sustained load, run the
@@ -480,6 +486,14 @@ The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameTy
 - Place test files in `tests/` following the `*.test.ts` pattern
 - Import from `vitest` directly: `import { describe, it, expect } from 'vitest'`
 - Vitest globals are enabled -- `describe`, `it`, `expect` are available without imports in test files
+- **Never write an unbounded `while (…) { … }` drain whose stop condition depends
+  on engine state that can stall or self-replenish** — e.g.
+  `while (state.incidentDeck.length > 0) resolveIncident(state)` hangs forever once
+  week gating leaves only out-of-season cards (or `replenishIncidentDeck()` refills the
+  deck). A synchronous infinite loop stalls the whole unit stage, vitest's
+  `testTimeout` cannot preempt it, and only the runner's wall-clock bound catches it
+  (exit 124). Bound the loop with a counter/`for`, stop on no-progress, or arrange the
+  state directly so the assertion is reachable without iteration.
 
 ### Smoke Tests
 

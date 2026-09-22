@@ -88,12 +88,23 @@ describe('Face-Down Incident Deck', () => {
       expect(state.incidentDeck.length).toBe(deckSizeBefore - 1);
     });
 
-    it('should return null when the deck is empty', () => {
+    it('should return null when the incident deck is empty', () => {
       const state = createTestState('ac2-empty');
-      // Drain the incident deck completely.
-      while (state.incidentDeck.length > 0) {
-        resolveIncident(state);
-      }
+      // Empty every incident source so the deck cannot be replenished, then
+      // assert the empty-deck contract directly.
+      //
+      // NB: never drain with
+      //   while (state.incidentDeck.length > 0) resolveIncident(state);
+      // That loops forever: after week gating (CG-0MTT0K9RX0004QTE)
+      // `resolveIncident()` returns null WITHOUT consuming a card when every
+      // remaining card is out-of-season for `state.week`, and
+      // `replenishIncidentDeck()` refills an emptied deck from event cards /
+      // discards. The loop is synchronous, so vitest's `testTimeout` cannot
+      // preempt it — only the runner's wall-clock bound catches it (exit 124).
+      state.incidentDeck = [];
+      state.decks.event = state.decks.event.filter(e => e.trigger !== 'Incident');
+      state.discards.event = state.discards.event.filter(e => e.trigger !== 'Incident');
+
       expect(state.incidentDeck.length).toBe(0);
       expect(resolveIncident(state)).toBeNull();
     });
