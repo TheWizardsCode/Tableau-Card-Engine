@@ -329,7 +329,12 @@ describe('expanded street viewport (browser)', () => {
     scene.setStreetZoomLevel(4, false);
     await wait(80);
     const visibleAt4x = scene.getVisibleStreetNodes().length;
+    // Zoom level 4 auto-grows the view lattice to 7×7, revealing neighbours
+    // beyond the playable board.  The upper bound is the lattice size,
+    // not the playable board size (CG-0MT5Y1X5T001M4S6).
+    const lattice = scene.getStreetViewLattice();
+    const maxVisible = worldSlotCount(lattice.cols, lattice.rows);
     expect(visibleAt4x).toBeGreaterThan(visibleAt1x);
-    expect(visibleAt4x).toBeLessThanOrEqual(total);
+    expect(visibleAt4x).toBeLessThanOrEqual(maxVisible);
   });
 });

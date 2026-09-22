@@ -538,9 +538,14 @@ export class MainStreetScene extends CardGameScene {
    */
   public setStreetCameraState(camera: Partial<StreetCameraState> | null | undefined): void {
     if (!camera || !this.layout) return;
+    const zoomLevel = camera.zoomLevel ?? this.streetCamera.zoomLevel;
+    // Grow the view lattice to cover the restored zoom level first, so a save
+    // taken while zoomed out rehydrates with its neighbouring streets visible
+    // (CG-0MT5Y1X5T001M4S6).
+    this.growViewLatticeForZoom(zoomLevel);
     this.streetCamera = clampStreetCamera(
       {
-        zoomLevel: camera.zoomLevel ?? this.streetCamera.zoomLevel,
+        zoomLevel,
         focusX: camera.focusX ?? this.streetCamera.focusX,
         focusY: camera.focusY ?? this.streetCamera.focusY,
       },
@@ -597,18 +602,49 @@ export class MainStreetScene extends CardGameScene {
   /**
    * Sets the map zoom level (1 = legacy framing, higher = zoomed out) and
    * re-applies the street transform. Zoom is always available.
+   *
+   * The view lattice auto-grows with the zoom level so that zooming out
+   * actually reveals neighbouring streets: level N → lattice (2N−1)×(2N−1).
+   * It only ever grows (never shrinks), so zooming back in does not discard
+   * revealed streets; `visibleMapSlots()` culls whatever is off-screen.
    */
   public setStreetZoomLevel(zoomLevel: number, animate = true): void {
     this.ensureStreetCamera();
+    const clamped = clampZoomLevel(zoomLevel);
     this.streetCamera = clampStreetCamera(
-      { ...this.streetCamera, zoomLevel: clampZoomLevel(zoomLevel) },
+      { ...this.streetCamera, zoomLevel: clamped },
       this.layout,
       this.streetViewLattice,
     );
+
+    // Auto-grow the view lattice to match the zoom level, so zooming out
+    // actually reveals neighbouring streets.
+    this.growViewLatticeForZoom(clamped);
+
     // Apply the transform first so an animated zoom tweens from the old
     // framing; the visibility sync then re-renders without interrupting it.
     this.applyStreetCamera(animate);
     this.syncStreetRender();
+  }
+
+  /**
+   * Grows the displayed view lattice so a zoom level can reveal its ring of
+   * neighbouring streets: level N needs a (2N−1)×(2N−1) lattice. The lattice
+   * only ever grows (never shrinks) — `visibleMapSlots()` culls slots outside
+   * the viewport rect, so a larger-than-needed lattice never renders extra
+   * streets. Returns true when the lattice changed.
+   */
+  private growViewLatticeForZoom(zoomLevel: number): boolean {
+    const needed = Math.max(1, 2 * clampZoomLevel(zoomLevel) - 1);
+    if (needed <= this.streetViewLattice.cols && needed <= this.streetViewLattice.rows) {
+      return false;
+    }
+    this.streetViewLattice = {
+      cols: Math.max(this.streetViewLattice.cols, needed),
+      rows: Math.max(this.streetViewLattice.rows, needed),
+    };
+    this.streetRenderedKey = '';
+    return true;
   }
 
   /** Zooms the street map out by one level (reveals neighbouring streets). */

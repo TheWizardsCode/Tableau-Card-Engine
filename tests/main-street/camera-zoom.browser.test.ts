@@ -294,6 +294,72 @@ describe('Main Street street-map camera (browser)', () => {
     expect(visibleStreetSlotRects(scene).length).toBe(10);
   });
 
+  it('reveals new street cells when zooming out from the default 1×1 board (CG-0MT5Y1X5T001M4S6)', async () => {
+    // Regression guard for the manual-audit rejection: "the zoom camera works
+    // but when zooming out no new cells are displayed".  The view lattice must
+    // auto-grow with the zoom level so zooming out actually reveals
+    // neighbouring streets — with NO manual setStreetViewLattice() call.
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
+
+    // The shipping default is the legacy 1×1 board.
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 1, rows: 1 });
+    const nodesAt1x = scene.getVisibleStreetNodes().length;
+    expect(nodesAt1x).toBe(10);
+    const framedAt1x = visibleStreetSlotRects(scene).length;
+    expect(framedAt1x).toBe(10);
+
+    // Zoom out one level: the lattice grows to 3×3 and new street cells are
+    // rendered (strictly more than the legacy 10 slots).
+    scene.zoomStreetOut();
+    await wait(150);
+    expect(scene.getStreetCameraForTest().camera.zoomLevel).toBe(2);
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 3, rows: 3 });
+
+    const nodesAt2x = scene.getVisibleStreetNodes().length;
+    expect(nodesAt2x).toBeGreaterThan(nodesAt1x);
+    // …and the newly revealed cells are actually framed on screen (not just
+    // instantiated off-viewport).
+    expect(visibleStreetSlotRects(scene).length).toBeGreaterThan(framedAt1x);
+
+    // And zooming out again reveals a still larger lattice.
+    scene.zoomStreetOut();
+    await wait(150);
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 5, rows: 5 });
+    expect(scene.getVisibleStreetNodes().length).toBeGreaterThan(nodesAt2x);
+
+    // Zooming back in keeps the revealed streets (the lattice only grows;
+    // the camera rect culls what is off-screen).
+    scene.zoomStreetIn();
+    scene.zoomStreetIn();
+    await wait(150);
+    expect(scene.getStreetCameraForTest().camera.zoomLevel).toBe(1);
+    expect(scene.getVisibleStreetNodes().length).toBe(10);
+  });
+
+  it('grows the view lattice when a zoomed-out camera state is restored (save/load)', async () => {
+    // A checkpoint saved while zoomed out must rehydrate with its
+    // neighbouring streets visible, not just a scaled-down 1×1 board
+    // (CG-0MT5Y1X5T001M4S6).
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForMarketReady(scene);
+    if (scene.settingsPanel) scene.settingsPanel._reducedMotion = true;
+
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 1, rows: 1 });
+    expect(scene.getVisibleStreetNodes().length).toBe(10);
+
+    // Restoring a saved camera at zoom level 3 grows the lattice to 5×5 and
+    // renders the neighbouring streets.
+    scene.setStreetCameraState({ zoomLevel: 3, focusX: 0, focusY: 0 });
+    await wait(150);
+    expect(scene.getStreetCameraForTest().camera.zoomLevel).toBe(3);
+    expect(scene.getStreetViewLattice()).toEqual({ cols: 5, rows: 5 });
+    expect(scene.getVisibleStreetNodes().length).toBeGreaterThan(10);
+  });
+
   it('maps pointer hit-testing through the camera transform (place after zooming out)', async () => {
     game = await bootGame();
     const scene = getScene(game);
