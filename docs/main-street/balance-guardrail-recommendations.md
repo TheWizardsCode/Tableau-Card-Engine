@@ -93,7 +93,7 @@ The recommended values above are the **tuned target bands** (design intent): the
 
 | Test | What it guards | Band / tolerance |
 |------|----------------|------------------|
-| `monte-carlo-guardrails.test.ts` | Drift vs the committed baseline (`docs/main-street/monte-carlo-baseline.json`) for Medium **and** the per-difficulty matrix | winRate ±0.25; coins ±30% |
+| `monte-carlo-guardrails.test.ts` | Drift vs the committed baseline (`docs/main-street/monte-carlo-baseline.json`) for Medium **and** the per-difficulty matrix — for `greedy` (top-level block) and additively for `banking-greedy` (the `bankingGreedy` block, CG-0MT3JMGA60091J8W AC5) | winRate ±0.25; coins ±30% |
 | `monte-carlo-balance.test.ts` | Whole-game smoke (market-greedy) at 20-seed PR CI | 0.20–0.96 win rate (raised from 0.80 by CG-0MSVYPEZ90085SHE: hand costs + raised incomes, then the staff-specialisation economy (CG-0MT4WXNR80090FXZ) — measured 0.95 on the mc-balance seed set) |
 
 The old 20–80% greedy test band (`monte-carlo-greedy-guardrail.test.ts`) was redundant with these two tiers and conflated "tuned target" with "regression guardrail"; it has been replaced by the per-difficulty design-intent test.

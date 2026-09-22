@@ -73,6 +73,15 @@ At the top of `BankingGreedyStrategy.chooseAction` (after free same-day composit
 - Respects the action budget (the existing `enumerateLegalActions` budget gate is unchanged).
 - Deterministic: same seed + same state → same decision (validated in `ai-banking-strategy.test.ts`).
 - Difficulty scaling: Easy hoards less than Hard on identical states (validated).
+- Balanced: within win-rate ±0.25 and coins ±30% of the banking-greedy regression snapshot (validated in `monte-carlo-guardrails.test.ts`).
+
+### Guardrails (AC5)
+
+The banking-aware variant is guarded like any other strategy, **additively** — the greedy baseline is never replaced:
+
+- **Snapshot.** `docs/main-street/monte-carlo-baseline.json` carries an additive `bankingGreedy` block, recorded on the same canonical 200-seed / 60-turn profile as the greedy block (`mc-balance-` seed prefix). The top-level `strategy` stays `greedy`; the banking snapshot lives beside it.
+- **Regression guardrail.** `tests/main-street/monte-carlo-guardrails.test.ts` runs `banking-greedy` across Easy/Medium/Hard and asserts its Medium metrics and per-difficulty matrix stay within **winRate ±0.25** and **coins ±30%** of that snapshot — the same tolerances the greedy guardrail uses. A drift in `banking-greedy` can therefore never mask (or be masked by) a greedy/random regression.
+- **Drift is reported, never silently accepted** (policy CG-0MT4ZHRP5002QMS2). When the banking-greedy guardrail trips: run `npx vite-node scripts/balance/drift-report.ts --strategy=banking-greedy` (or `npm run balance:drift-report -- --strategy=banking-greedy`) to get the structured per-difficulty delta report, present it to the producer, and only regenerate the snapshot via `scripts/generate-main-street-monte-baseline.ts` when the shift is an intended balance change (the generator emits both the greedy and banking-greedy blocks). Without `--strategy` the drift report compares against the top-level greedy baseline, as before.
 
 - **Bank consumption fix (CG-0MTCP7F9S009HARC):** This behaviour depends on the bank consumption fix that decrements `bankedActions` on every `consumeAction` call, so the hoarded reserve actually depletes as the AI spends.
 

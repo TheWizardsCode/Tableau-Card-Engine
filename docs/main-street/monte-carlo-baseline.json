@@ -27,5 +27,35 @@
       "averageCoinsPerTurn": 423.4599651791195,
       "medianScore": 15370
     }
-  ]
+  ],
+  "bankingGreedy": {
+    "source": "Generated from MainStreetMonteCarlo.runAllCombinations",
+    "generatedAt": "2026-09-22T00:13:59.000Z",
+    "strategy": "banking-greedy",
+    "note": "Additive regression snapshot for BankingGreedyStrategy (CG-0MT3JMGA60091J8W AC5). Recorded on the same 200-seed / 60-turn canonical profile as the greedy block above; the greedy block is unchanged and is never replaced by this variant. Drift is reported, never silently accepted — see the drift-report workflow in tests/main-street/monte-carlo-guardrails.test.ts and docs/main-street/balance-guardrail-recommendations.md.",
+    "metrics": {
+      "winRate": 0.845,
+      "averageCoinsPerTurn": 721.5768957260202
+    },
+    "difficultyMatrix": [
+      {
+        "difficulty": "Easy",
+        "winRate": 0.895,
+        "averageCoinsPerTurn": 880.8775288175876,
+        "medianScore": 11050.5
+      },
+      {
+        "difficulty": "Medium",
+        "winRate": 0.845,
+        "averageCoinsPerTurn": 721.5768957260202,
+        "medianScore": 13141.5
+      },
+      {
+        "difficulty": "Hard",
+        "winRate": 0.58,
+        "averageCoinsPerTurn": 450.1193969902652,
+        "medianScore": 15349
+      }
+    ]
+  }
 }
