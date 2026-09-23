@@ -104,4 +104,8 @@ Worklog Specific Ignores
 !.pi/skills/
 !.pi/skills/**
 !.pi/test-config.json
+# Track the local skill-extension contract (project-level agent tooling that
+# must be committed and testable, e.g. the test-skill `--type` profile map).
+!.pi/skills_extensions/
+!.pi/skills_extensions/**
 .implement_state.json
