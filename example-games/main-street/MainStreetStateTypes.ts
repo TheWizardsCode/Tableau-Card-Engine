@@ -252,7 +252,11 @@ export interface MainStreetState {
   };
   /** IDs of completed challenges. */
   challengesCompleted: string[];
-  /** Active challenges for this run (selected at setup, evaluated each EndCheck). */
+  /**
+   * Active challenges for this run. Evaluated after **every** action
+   * (CG-0MU37CKRR008252I), with the end-of-turn EndCheck retained as a safety
+   * net for completions caused by the closing phases (Income / Incident).
+   */
   activeChallenges: ActiveChallenge[];
   /** Face-down incident deck: cards are popped from the top (end of array) at end-of-turn. */
   incidentDeck: EventCard[];

@@ -48,7 +48,7 @@ Meta-progression gives players a reason to play multiple runs by introducing per
 **Dual Trigger Paths.** Each tier (2-5) can be unlocked via either of two independent paths:
 
 1. **Reputation Threshold:** Achieve a minimum reputation score at end-of-run (EndCheck phase). The reputation value is the per-run `resourceBank.reputation`, not the final score.
-2. **Challenge Completion:** Complete a specified set of challenges within a single run. The challenges are drawn from the existing challenge pool and evaluated at EndCheck.
+2. **Challenge Completion:** Complete a specified set of challenges within a single run. The challenges are drawn from the existing challenge pool and evaluated after every action (with the end-of-turn EndCheck as a safety net — see US-15).
 
 Either path alone is sufficient to latch the tier. Both paths are evaluated at end-of-run, after challenge evaluation but before score calculation.
 
@@ -60,7 +60,7 @@ Either path alone is sufficient to latch the tier. Both paths are evaluated at e
 Run N completes
     |
     v
-EndCheck phase evaluates challenges
+Challenges complete per-action; EndCheck re-checks (safety net)
     |
     v
 Tier evaluation: check reputation threshold AND challenge milestones
@@ -631,7 +631,7 @@ createUpgradeDeck(2, campaign.unlockedCardIds)
 Normal game play (until win/loss — no default turn limit; see status update above)
     |
     v
-EndCheck phase: evaluateChallenges() -> computeScore() -> determine gameResult
+EndCheck phase: evaluateChallenges() (safety net) -> computeScore() -> determine gameResult
     |
     v
 updateCampaignAfterRun(campaign, state, store)
@@ -671,7 +671,7 @@ Next run starts with updated campaign
 **Acceptance Criteria:**
 
 1. Each tier (2-5) defines a challenge-based unlock condition independent of the reputation threshold.
-2. The challenge condition is evaluated against the run's `challengesCompleted` array and `activeChallenges` at EndCheck.
+2. The challenge condition is evaluated against the run's `challengesCompleted` array and `activeChallenges` after every action (the end-of-turn EndCheck remains a safety net for closing-phase completions).
 3. Either the reputation path or the challenge path is sufficient to unlock a tier; both are not required.
 4. Challenge conditions reference challenge IDs from the existing `CHALLENGE_TEMPLATES` pool.
 
@@ -1046,13 +1046,15 @@ Challenge-based unlock paths are designed to be achievable by skilled players wh
 - `selectChallenges(CHALLENGE_TEMPLATES, 0, rng).length === 0`.
 - `selectChallenges(CHALLENGE_TEMPLATES, 999, rng).length === CHALLENGE_TEMPLATES.length`.
 
-### US-15: Challenge Evaluation at EndCheck
+### US-15: Challenge Evaluation (per-action, EndCheck safety net)
 
-**As a player**, I want challenges to be evaluated at the end of each turn's EndCheck phase **so that** completed challenges contribute bonus points to my score before win/loss is determined.
+**As a player**, I want challenges to be evaluated after every action — not only at the end of each turn's EndCheck phase — **so that** completed challenges contribute their bonus points, tracker update and celebration immediately, while the EndCheck pass still catches closing-phase (Income / Incident) completions before win/loss is determined.
+
+> **Note (CG-0MU37CKRR008252I):** this amendment supersedes the original "evaluated only at EndCheck" design. Per producer decision Q2=A, per-action evaluation runs on all paths (interactive command layer and the engine `executeAction` path used by AI / Monte Carlo / headless).
 
 **Acceptance Criteria:**
 
-1. `evaluateChallenges(activeChallenges, state)` is called during the EndCheck phase, before `checkEndConditions`.
+1. `evaluateChallenges(activeChallenges, state)` (via `evaluateChallengesAfterAction`) is called after every successful action, and again during the end-of-turn EndCheck phase before `checkEndConditions` as a safety net.
 2. When a challenge evaluator returns `true` for the current state and the challenge is not yet completed, it is marked `completed: true` and its ID is added to `state.challengesCompleted`.
 3. The score formula includes `challengesCompleted.length * config.challengeBonusPoints`.
 4. Completing all active challenges triggers an `'all_challenges'` win condition.

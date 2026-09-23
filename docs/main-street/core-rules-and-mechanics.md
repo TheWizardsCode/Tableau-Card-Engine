@@ -294,6 +294,17 @@ The game is considered **won** when **any** of the following conditions are sati
 
 All win conditions are **deterministic** given the same seed, ensuring testability.
 
+> **Challenge evaluation timing (CG-0MU37CKRR008252I).** Challenges are
+> evaluated after **every** action — business placement, purchase, upgrade,
+> event play, staff hire, favour exchange, and so on — not only at the end of
+> the turn. A satisfied challenge is marked complete immediately (tracker,
+> activity log, score bonus, and celebration VFX/SFX), and a completed
+> challenge is never re-completed. The end-of-turn **EndCheck** still evaluates
+> challenges as a **safety net**, so completions caused by the closing phases
+> (Income / Incident) are caught before win/loss is determined. Undoing the
+> action that completed a challenge prompts a warning and, if confirmed,
+> revokes the completion (tracker, log, and score bonus all revert together).
+
 ---
 
 ## 8. Loss Conditions

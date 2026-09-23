@@ -386,7 +386,7 @@ export function processEndOfTurn(state: MainStreetState, opts?: EndOfTurnOptions
       choicePending: false,
       pendingCoinDelta,
       pendingRepDelta,
-      pendingScoreDelta: 0, // challenges evaluated at closing (post-application)
+      pendingScoreDelta: 0, // challenges evaluated at closing (safety net; normally completed per-action)
       requiresDeferredClosing: true,
     };
   }
@@ -802,7 +802,11 @@ export function finishDeferredEndOfTurn(state: MainStreetState): TurnResult {
  * to, in a single step:
  *
  *  1. evaluate challenges against the post-delta state (a challenge such as
- *     "accumulate 3000 coins" must see the income land first),
+ *     "accumulate 3000 coins" must see the income land first) — this is the
+ *     end-of-turn **safety net**; challenges are normally completed
+ *     immediately after the action that satisfies them
+ *     (CG-0MU37CKRR008252I), so this pass reports only closing-phase
+ *     (Income / Incident) completions,
  *  2. run the immediate-loss check and EndCheck (game-over evaluation — AC4),
  *  3. advance to the next day when the game continues,
  *  4. append the per-turn net summary row.
@@ -839,8 +843,10 @@ export function finishDeferredTurnClosing(
     });
   }
 
-  // 3. Evaluate challenges against the post-delta state (mirrors the legacy
-  //    closing where income lands before challenge evaluation).
+  // 3. Evaluate challenges against the post-delta state (end-of-turn safety
+  //    net; the per-action pass has already completed anything the player's
+  //    actions satisfied, so this reports only closing-phase completions —
+  //    mirrors the legacy closing where income lands before evaluation).
   const newlyCompletedChallenges = evaluateChallenges(state.activeChallenges, state);
   const pendingScoreDelta =
     newlyCompletedChallenges.length * state.config.challengeBonusPoints;
@@ -948,7 +954,9 @@ function runSinglePlayerTurnClosing(
     });
   }
 
-  // Evaluate challenges before checking end conditions (so score includes any new bonus points)
+  // Evaluate challenges before checking end conditions (so score includes any
+  // new bonus points). This is the end-of-turn safety net: challenges are
+  // normally completed per-action (CG-0MU37CKRR008252I).
   const newlyCompletedChallenges = evaluateChallenges(state.activeChallenges, state);
 
   checkEndConditions(state);

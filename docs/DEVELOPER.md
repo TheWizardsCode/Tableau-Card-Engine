@@ -1204,7 +1204,9 @@ finishes) and the game-over banner never appears mid-animation.
   `applyEndOfTurnDeltas` when the last animation completes (guarded by the
   scene's `endOfTurnDeltasApplied` flag so income and incident animations
   cannot double-apply), then runs `finishDeferredTurnClosing` — immediate
-  loss check, challenge evaluation against the post-delta state, EndCheck,
+  loss check, challenge evaluation against the post-delta state (the
+  end-of-turn **safety net**: challenges are normally completed immediately
+  after the action that satisfies them, per CG-0MU37CKRR008252I), EndCheck,
   next-day advance, net row — and finally refreshes the HUD.
 - **Deferred HUD window.** `refreshHud()` (`MainStreetRenderer.ts`) renders
   the pre-animation `previousCoins` / `previousReputation` captured at
