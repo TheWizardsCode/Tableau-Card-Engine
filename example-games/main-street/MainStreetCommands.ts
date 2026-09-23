@@ -10,6 +10,7 @@
  */
 
 import { toCommand, type ReversibleAction } from '../../src/core-engine/ActionCommands';
+import { evaluateChallengesAfterAction } from './MainStreetChallenges';
 import type { MainStreetState } from './MainStreetState';
 import {
   purchaseBusiness,
@@ -96,6 +97,14 @@ interface MarketActionSnapshot {
    * DurationEventCard removes the effect it pushed.
    */
   activeEffects: any | null;
+  /**
+   * Challenge completion state (CG-0MU37CKRR008252I). `state.activeChallenges`
+   * holds evaluator *functions* and must NOT be deep-cloned (structuredClone /
+   * JSON clone silently drop them); capture the cloneable form instead: the
+   * completed-ID list plus each challenge's `completed` flag by index.
+   */
+  challengesCompleted: string[] | null;
+  completedFlags: boolean[] | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -139,6 +148,10 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     justMovedEventCardId: (state as any).justMovedEventCardId ?? null,
     pendingEventChoice: safeClone((state as any).pendingEventChoice ?? null),
     activeEffects: safeClone(state.activeEffects ?? []),
+    // Challenge completion state — cloneable form only (never activeChallenges,
+    // whose evaluator functions would be dropped by safeClone).
+    challengesCompleted: safeClone(state.challengesCompleted ?? []),
+    completedFlags: (state.activeChallenges ?? []).map(ac => ac.completed),
   };
 }
 
@@ -189,6 +202,16 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
   if ('activeEffects' in snap) {
     state.activeEffects = snap.activeEffects ?? [];
   }
+  // Restore challenge completion state atomically with the activityLog so
+  // tracker, score and log stay consistent after undo (CG-0MU37CKRR008252I).
+  if (snap.challengesCompleted !== null && snap.challengesCompleted !== undefined) {
+    state.challengesCompleted = snap.challengesCompleted;
+  }
+  if (snap.completedFlags !== null && snap.completedFlags !== undefined) {
+    for (let i = 0; i < state.activeChallenges.length && i < snap.completedFlags.length; i++) {
+      state.activeChallenges[i].completed = snap.completedFlags[i];
+    }
+  }
 }
 
 /**
@@ -200,15 +223,28 @@ function snapshotAction(
   description: string,
 ): ReversibleAction<MainStreetState> {
   let pre: MarketActionSnapshot | null = null;
+  // Same array reference is exposed on the ReversibleAction and propagated by
+  // toCommand() onto the Command, so callers can read it after execute().
+  const completedChallengeIds: string[] = [];
   return {
+    completedChallengeIds,
     description,
     do(state: MainStreetState): void {
       if (pre === null) pre = captureSnapshot(state);
       doFn(state);
+      // Per-action challenge evaluation (CG-0MU37CKRR008252I): complete any
+      // challenge satisfied by the command's forward mutation and record the
+      // IDs so undo can warn before reverting a completion. Reset first so a
+      // redo (do after undo) does not accumulate duplicates.
+      completedChallengeIds.length = 0;
+      completedChallengeIds.push(...evaluateChallengesAfterAction(state));
     },
     undo(state: MainStreetState): void {
       if (pre === null) return;
       restoreSnapshot(state, pre);
+      // Clear the transient per-action buffer so the scene does not read a
+      // stale completion after undo.
+      state._newlyCompletedThisAction = [];
     },
   };
 }

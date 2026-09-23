@@ -54,6 +54,14 @@ export interface ReversibleAction<TState> {
   undo(state: TState): void;
   /** Optional human-readable description for debugging/transcripts. */
   readonly description?: string;
+  /**
+   * Optional transient list of challenge IDs completed by the most recent
+   * `do()` call (CG-0MU37CKRR008252I). `toCommand` propagates this array by
+   * reference onto the returned `Command.completedChallengeIds` so callers
+   * can inspect it after execute(). Actions that do not track completions
+   * leave it undefined.
+   */
+  completedChallengeIds?: string[];
 }
 
 // ── Factory ─────────────────────────────────────────────────
@@ -80,7 +88,7 @@ export function toCommand<TState>(
   state: TState,
   action: ReversibleAction<TState>,
 ): Command {
-  return {
+  const command: Command = {
     execute(): void {
       action.do(state);
     },
@@ -89,6 +97,14 @@ export function toCommand<TState>(
     },
     description: action.description,
   };
+  // Propagate the per-action challenge-completion marker by reference so
+  // callers can inspect `command.completedChallengeIds` after execute()
+  // (CG-0MU37CKRR008252I). Backward-compatible: omitted when the action does
+  // not track completions.
+  if (action.completedChallengeIds) {
+    command.completedChallengeIds = action.completedChallengeIds;
+  }
+  return command;
 }
 
 /**
