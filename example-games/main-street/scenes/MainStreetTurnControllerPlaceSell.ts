@@ -12,6 +12,7 @@ import { computeSynergyPairs } from '../MainStreetAdjacency';
 import type { UpgradeCard } from '../MainStreetCards';
 import { buyBusinessCommand, playBusinessFromHandCommand, playUpgradeFromHandCommand } from '../MainStreetCommands';
 import { canSellBusiness, computeSellRefund } from '../MainStreetMarket';
+import { isEligibleUpgradeTarget } from '../MainStreetMarketUtils';
 import { recordMainStreetEvent } from '../MainStreetTranscript';
 import { getCurrentStep, isSynergyAdjacentPlacement, resolveTutorialCardParams } from '../TutorialFlow';
 import type { TutorialActionType } from '../TutorialFlow';
@@ -319,11 +320,7 @@ export function applyHandUpgradeToSlot(tcCtx: MainStreetTurnControllerContext, h
 
     const biz = s.state.streetGrid[slotIndex];
     const requiredLevel = handCard.requiredLevel ?? 0;
-    const isEligible =
-      !!biz &&
-      biz.name === handCard.targetBusiness &&
-      biz.level === requiredLevel &&
-      biz.level < biz.maxLevel;
+    const isEligible = isEligibleUpgradeTarget(biz, handCard);
 
     const handSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex) as any;
 
@@ -428,6 +425,12 @@ export function cancelPendingPlacement(tcCtx: MainStreetTurnControllerContext): 
     // Drop the hand selection highlight (null clears every border).
     if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
       s.msRenderer.updateBusinessHandSelection(null);
+    }
+    // Defensive explicit clear of upgrade click-target highlights
+    // (CG-0MUDA70FK003J8YL); the refreshAll below already rebuilds the street
+    // container, but this keeps the state clean for any future exit path.
+    if (s.msRenderer && typeof s.msRenderer.clearTargetHighlights === 'function') {
+      s.msRenderer.clearTargetHighlights();
     }
     s.refreshAll();
     return true;

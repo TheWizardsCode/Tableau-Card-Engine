@@ -11,6 +11,7 @@
 import type { MainStreetRendererContext } from './MainStreetRendererContext';
 import { buildUpgradeOverlaySpec } from './UpgradeOverlaySpec';
 import type { UpgradeOverlaySpec } from './UpgradeOverlaySpec';
+import { isEligibleUpgradeTarget } from '../MainStreetMarketUtils';
 
 // Re-export for test imports
 export { buildUpgradeOverlaySpec, type UpgradeOverlaySpec };
@@ -118,5 +119,62 @@ export function clearDragHighlights(renderer: MainStreetRendererContext): void {
       if (rect?.active) rect.destroy();
     }
     renderer.dragHighlightRects.clear();
+  
+}
+
+/**
+ * Click-targeting highlights for a hand-held upgrade (CG-0MUDA70FK003J8YL).
+ *
+ * Mirrors {@link showDragHighlights} for the click-to-place flow: it draws a
+ * transparent border rectangle on every occupied street slot — green for a
+ * business the pending upgrade can legally target, red for one it cannot —
+ * and skips empty slots entirely (an upgrade can only land on a business).
+ *
+ * The eligibility check is business-level only (name + required level + below
+ * max level), deliberately excluding affordability and the action budget:
+ * those errors are surfaced in the instruction text after a click. It reuses
+ * the drag-drop `dragHighlightRects` infrastructure so both targeting flows
+ * render identically and are cleared together.
+ *
+ * @param renderer The renderer context.
+ * @param cardId   Id of the pending hand card (must be an upgrade family).
+ */
+export function showTargetHighlights(renderer: MainStreetRendererContext, cardId: string): void {
+
+    const s = renderer.scene;
+    clearDragHighlights(renderer);
+    const card = (s.state.hand ?? []).find((c: any) => c.id === cardId);
+    if (!card || card.family !== 'upgrade') return;
+
+    const { slotW, slotH } = s.layout;
+    for (const node of renderer.mapNodes()) {
+      if (node.gameplayIndex === null) continue;
+      const i = node.gameplayIndex;
+      const biz = s.state.streetGrid[i];
+      if (!biz) continue; // an upgrade can only land on a business
+
+      const validity: 'valid' | 'invalid' =
+        isEligibleUpgradeTarget(biz, card) ? 'valid' : 'invalid';
+      const x = node.localX + slotW / 2;
+      const y = node.localY + slotH / 2;
+      const hl = s.add.rectangle(x, y, slotW, slotH);
+      hl.setStrokeStyle(2, validity === 'valid' ? 0x44ff66 : 0xff4444, 0.8);
+      hl.setFillStyle(0x000000, 0);
+      hl.setData('slotIndex', i);
+      hl.setData('validity', validity);
+      s.streetContainer.add(hl);
+      renderer.dragHighlightRects.add(hl);
+    }
+  
+}
+
+/**
+ * Clears the click-targeting highlight overlays (CG-0MUDA70FK003J8YL). A thin
+ * alias of {@link clearDragHighlights} so callers express intent — both flows
+ * share the `dragHighlightRects` pool.
+ */
+export function clearTargetHighlights(renderer: MainStreetRendererContext): void {
+
+    clearDragHighlights(renderer);
   
 }

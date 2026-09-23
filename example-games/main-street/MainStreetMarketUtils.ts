@@ -45,6 +45,32 @@ export function getEmptySlots(state: MainStreetState): number[] {
 }
 
 /**
+ * Whether a placed business is a valid target for `card` at the business
+ * level (name matches, level equals `requiredLevel`, still below `maxLevel`).
+ *
+ * This is the **business-level** eligibility rule only — no affordability or
+ * action-budget check. It is the single source of truth shared by the
+ * apply-from-hand command (`applyHandUpgradeToSlot`) and the click-targeting
+ * highlight overlays (CG-0MUDA70FK003J8YL).
+ *
+ * @param business The street-grid business occupying a slot (or null/undefined).
+ * @param card     The UpgradeCard to match.
+ * @returns True when the business can receive the upgrade.
+ */
+export function isEligibleUpgradeTarget(
+  business: BusinessCard | CommunitySpaceCard | null | undefined,
+  card: UpgradeCard,
+): boolean {
+  if (!business) return false;
+  const requiredLevel = card.requiredLevel ?? 0;
+  return (
+    business.name === card.targetBusiness &&
+    business.level === requiredLevel &&
+    business.level < business.maxLevel
+  );
+}
+
+/**
  * Finds the first street grid slot containing a business that is a valid
  * target for `card` — i.e. the business name matches, the business level
  * equals the card's `requiredLevel` (defaulting to 0), and the business is
@@ -61,14 +87,7 @@ export function findTargetBusinessSlot(
   state: MainStreetState,
   card: UpgradeCard,
 ): number {
-  const requiredLevel = card.requiredLevel ?? 0;
-  return state.streetGrid.findIndex(
-    b =>
-      b !== null &&
-      b.name === card.targetBusiness &&
-      b.level === requiredLevel &&
-      b.level < b.maxLevel,
-  );
+  return state.streetGrid.findIndex(b => isEligibleUpgradeTarget(b, card));
 }
 
 /**

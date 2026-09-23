@@ -10,6 +10,7 @@ Upgrade cards follow the business-card action economy — they are never a free 
 
 - **Click** a market upgrade → the card **moves to hand** for **1 daily action** and rests unselected.
 - **Play from hand** → click the upgrade, then a matching business. A **same-day** apply is a **free composite** (the move already spent the action); an upgrade **held from a previous day** costs **1 action** when applied.
+- **Targeting highlights** (CG-0MUDA70FK003J8YL): while an upgrade is selected from hand, every occupied street slot is outlined — **green** for a business the upgrade can legally target (matching `targetBusiness` at `requiredLevel`, below `maxLevel`), **red** for one it cannot. Empty slots stay unhighlighted and are not clickable, and clicking an ineligible business shakes it back with feedback while the upgrade stays selected for a retry.
 - **Drag** the upgrade from the market straight onto a matching business → **buy & apply now** for **1 action at the +50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`), identical to business buy-and-place. Illegal drops snap back with feedback and spend nothing.
 - When the action budget is spent the upgrade is dimmed and buying/playing it is rejected (unless a same-day composite is still pending).
 - **Escape** cancels an in-progress upgrade (or business) targeting phase — the card stays in hand and the same-day composite stays free. Escape only opens Settings when nothing is being targeted.

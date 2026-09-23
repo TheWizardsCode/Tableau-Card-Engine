@@ -297,6 +297,17 @@ export function refreshStreetGrid(renderer: MainStreetRendererContext): void {
     renderer.updateStreetMapMask();
     renderer.applyStreetCamera(false);
     renderer.updateStreetZoomControls();
+
+    // Upgrade click-targeting highlights (CG-0MUDA70FK003J8YL): the street
+    // container was just rebuilt, destroying any prior overlays, so re-create
+    // the eligible/ineligible business highlights whenever an upgrade is
+    // pending from the hand. Hooking the rebuild (rather than the selection
+    // handler) covers both the initial selection and every refreshAll().
+    const pendingIdx = s.pendingHandIndex;
+    const pendingCard = pendingIdx !== null ? s.state.hand?.[pendingIdx] : undefined;
+    if (s.uiPhase === 'placing-from-hand' && pendingCard?.family === 'upgrade') {
+      renderer.showTargetHighlights(pendingCard.id);
+    }
   
 }
 
@@ -705,6 +716,8 @@ export function drawBusinessSlot(renderer: MainStreetRendererContext, x: number,
       );
       tooltipZone.setOrigin(0.5);
       tooltipZone.setInteractive({ useHandCursor: true });
+      // Named so tests (and QA) can address the slot's interactive zone.
+      tooltipZone.setName(`ms-business-slot-zone-${_index}`);
       tooltipZone.on('pointerover', () => {
         if (isSold) {
           const info = `Sold: ${biz.name}\nThis card no longer produces income, but still provides synergy to adjacent businesses.`;
@@ -734,6 +747,17 @@ export function drawBusinessSlot(renderer: MainStreetRendererContext, x: number,
         tooltipZone.on('pointerdown', () => {
           s.onSellCard(_index);
         });
+      }
+
+      // Upgrade hand-targeting (CG-0MUDA70FK003J8YL): while an upgrade is
+      // pending, clicking a business targets it — an eligible business is
+      // upgraded, an ineligible one shows illegal-move feedback and keeps the
+      // upgrade selected for a retry. Mirrors the empty-slot click-to-place
+      // path; the routing/eligibility logic lives in onSlotClick.
+      const pendingIdx = s.pendingHandIndex;
+      const pendingHandCard = pendingIdx !== null ? s.state.hand?.[pendingIdx] : undefined;
+      if (s.uiPhase === 'placing-from-hand' && pendingHandCard?.family === 'upgrade') {
+        tooltipZone.on('pointerdown', () => s.onSlotClick(_index));
       }
 
       s.streetContainer.add(tooltipZone);
@@ -875,7 +899,16 @@ export function drawEmptySlot(renderer: MainStreetRendererContext, x: number, y:
 
     const s = renderer.scene;
     const { slotW, slotH } = s.layout;
-    const isSelectable = s.uiPhase === 'placing-business' || s.uiPhase === 'placing-from-hand';
+    // Upgrade targeting from hand (CG-0MUDA70FK003J8YL): empty slots are NOT
+    // placement targets for an upgrade (only existing businesses are), so they
+    // must not render in the 'selectable' colour nor become interactive.
+    const pendingIdx = s.pendingHandIndex;
+    const pendingHandCard = pendingIdx !== null ? s.state.hand?.[pendingIdx] : undefined;
+    const isUpgradeTargeting =
+      s.uiPhase === 'placing-from-hand' && pendingHandCard?.family === 'upgrade';
+    const isSelectable =
+      !isUpgradeTargeting &&
+      (s.uiPhase === 'placing-business' || s.uiPhase === 'placing-from-hand');
     const isHinted = s.hintedSlotIndex === index && !isSelectable;
     const fillAlpha = isSelectable ? 0.4 : isHinted ? 0.35 : 0.2;
     const strokeColor = isSelectable ? 0xffdd44 : isHinted ? 0x44ffff : 0x555544;
@@ -886,6 +919,7 @@ export function drawEmptySlot(renderer: MainStreetRendererContext, x: number, y:
       slotW, slotH, 0x333322, fillAlpha,
     );
     bg.setStrokeStyle(strokeWidth, strokeColor);
+    bg.setName(`ms-empty-slot-${index}`);
     s.streetContainer.add(bg);
 
     // Slot number (1-indexed for readability: 1-10)

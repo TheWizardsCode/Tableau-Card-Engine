@@ -159,6 +159,22 @@ function findMarketCardContainer(scene: Scene, cardId: string): any | undefined 
   return list.find((child) => child?.name === `ms-market-card-${cardId}`);
 }
 
+/**
+ * Locates the empty-slot rectangle drawn for a gameplay slot (CG-0MUDA70FK003J8YL).
+ * The renderer names every empty-slot background `ms-empty-slot-<index>` so the
+ * test can assert its selectable (interactive) state directly.
+ */
+function findEmptySlotRect(scene: Scene, slotIndex: number): any | undefined {
+  const list: any[] = scene.streetContainer?.list ?? [];
+  return list.find((child) => child?.name === `ms-empty-slot-${slotIndex}`);
+}
+
+/** Locates a business slot's interactive tooltip/click zone by slot index. */
+function findBusinessZone(scene: Scene, slotIndex: number): any | undefined {
+  const list: any[] = scene.streetContainer?.list ?? [];
+  return list.find((child) => child?.name === `ms-business-slot-zone-${slotIndex}`);
+}
+
 describe('Main Street upgrade hand-first click flow (browser)', () => {
   let game: Phaser.Game | null = null;
 
@@ -438,5 +454,159 @@ describe('Main Street upgrade hand-first click flow (browser)', () => {
     expect(scene.pendingHandIndex).toBeNull();
     expect(scene.state.actionsRemaining).toBe(1);
     expect(scene.state.market.cards.some((c: any) => c.id === upgrade.id)).toBe(true);
+  }, 60_000);
+
+  // ── Visual targeting highlights (CG-0MUDA70FK003J8YL) ──────────────
+
+  it('highlights only eligible/ineligible businesses and survives refreshAll', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    setupUpgradeScene(scene, { actions: 1, upgradeInHand: true });
+
+    // Slot 0 holds a level-0 business (eligible); slot 1 holds a level-1 one
+    // (ineligible for this level-0 upgrade). Slots 2+ stay empty.
+    scene.state.streetGrid[1] = {
+      ...scene.state.streetGrid[0]!,
+      id: 'target-ineligible-lvl1',
+      level: 1,
+    };
+    scene.refreshAll();
+
+    // Nothing is highlighted before targeting starts.
+    expect(scene.msRenderer.getDragHighlights()).toHaveLength(0);
+
+    scene.onHandUpgradeCardClick(0);
+    expect(scene.uiPhase).toBe('placing-from-hand');
+
+    const bySlot = new Map<number, string>(
+      (scene.msRenderer.getDragHighlights() as Array<{ slotIndex: number; validity: string }>)
+        .map((h) => [h.slotIndex, h.validity]),
+    );
+    expect(bySlot.get(0)).toBe('valid');
+    expect(bySlot.get(1)).toBe('invalid');
+    // Every highlight is an occupied business slot — no empty slot is highlighted.
+    for (const slotIndex of bySlot.keys()) {
+      expect(scene.state.streetGrid[slotIndex]).not.toBeNull();
+    }
+
+    // The overlays must survive the refreshAll()/refreshStreetGrid() rebuild.
+    scene.refreshAll();
+    const afterRefresh = new Map<number, string>(
+      (scene.msRenderer.getDragHighlights() as Array<{ slotIndex: number; validity: string }>)
+        .map((h) => [h.slotIndex, h.validity]),
+    );
+    expect(afterRefresh.get(0)).toBe('valid');
+    expect(afterRefresh.get(1)).toBe('invalid');
+  }, 60_000);
+
+  it('does not mark empty slots selectable while upgrading, but does while placing a business', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    setupUpgradeScene(scene, { actions: 1, upgradeInHand: true });
+
+    // Slot 5 is empty and would normally be a placement target.
+    scene.onHandUpgradeCardClick(0);
+    expect(scene.uiPhase).toBe('placing-from-hand');
+    const emptyDuringUpgrade = findEmptySlotRect(scene, 5);
+    expect(emptyDuringUpgrade).toBeTruthy();
+    expect(emptyDuringUpgrade.input).toBeFalsy();
+
+    // Cancel, then target a business card from hand: empty slots become selectable.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(150);
+
+    const tpl = getBusinessTemplates()[0];
+    const handBiz: BusinessCard = {
+      ...tpl,
+      id: 'highlight-hand-biz',
+      family: 'business',
+      level: 0,
+      incomeBonus: 0,
+      synergyRangeBonus: 0,
+      reputationBonus: 0,
+      appliedUpgrades: [],
+    };
+    scene.state.hand = [handBiz];
+    scene.justMovedHandCardId = null;
+    scene.refreshAll();
+    scene.onHandBusinessCardClick(0);
+    expect(scene.uiPhase).toBe('placing-from-hand');
+
+    const emptyDuringBusiness = findEmptySlotRect(scene, 5);
+    expect(emptyDuringBusiness).toBeTruthy();
+    expect(emptyDuringBusiness.input).toBeTruthy();
+  }, 60_000);
+
+  it('routes a business-slot click to upgrade targeting (feedback or apply)', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    setupUpgradeScene(scene, { actions: 1, upgradeInHand: true });
+
+    // Slot 0 is the eligible level-0 business; slot 1 is ineligible at level 1.
+    scene.state.streetGrid[1] = {
+      ...scene.state.streetGrid[0]!,
+      id: 'click-ineligible-lvl1',
+      level: 1,
+    };
+    scene.refreshAll();
+    scene.onHandUpgradeCardClick(0);
+    expect(scene.uiPhase).toBe('placing-from-hand');
+
+    // Clicking the ineligible business keeps the upgrade selected and does not
+    // apply it (illegal-move feedback path).
+    const ineligibleZone = findBusinessZone(scene, 1);
+    expect(ineligibleZone).toBeTruthy();
+    ineligibleZone.emit('pointerdown');
+    expect(scene.state.streetGrid[1]?.level).toBe(1);
+    expect(scene.pendingHandIndex).toBe(0);
+    expect(scene.uiPhase).toBe('placing-from-hand');
+    expect(scene.instructionText?.text).toContain('can only upgrade');
+
+    // Clicking the eligible business applies the upgrade.
+    const eligibleZone = findBusinessZone(scene, 0);
+    expect(eligibleZone).toBeTruthy();
+    eligibleZone.emit('pointerdown');
+    await waitForCondition(
+      () => scene.state.streetGrid[0]?.level === 1,
+      'upgrade applied from a business-slot click',
+    );
+    expect(scene.uiPhase).toBe('market');
+    expect(scene.pendingHandIndex).toBeNull();
+  }, 60_000);
+
+  it('clears upgrade target highlights when targeting ends (Escape, switch, or apply)', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    const { upgrade } = setupUpgradeScene(scene, { actions: 2, upgradeInHand: true });
+    scene.state.hand = [upgrade];
+    scene.refreshAll();
+
+    scene.onHandUpgradeCardClick(0);
+    expect(scene.msRenderer.getDragHighlights().length).toBeGreaterThan(0);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await wait(150);
+    expect(scene.uiPhase).toBe('market');
+    expect(scene.msRenderer.getDragHighlights()).toHaveLength(0);
+
+    // Switching the pending hand card from the upgrade to a business clears them.
+    scene.onHandUpgradeCardClick(0);
+    expect(scene.msRenderer.getDragHighlights().length).toBeGreaterThan(0);
+    const tpl = getBusinessTemplates()[0];
+    const handBiz: BusinessCard = {
+      ...tpl,
+      id: 'switch-hand-biz',
+      family: 'business',
+      level: 0,
+      incomeBonus: 0,
+      synergyRangeBonus: 0,
+      reputationBonus: 0,
+      appliedUpgrades: [],
+    };
+    scene.state.hand = [upgrade, handBiz];
+    scene.refreshAll();
+    scene.onHandBusinessCardClick(1);
+    expect(scene.pendingHandIndex).toBe(1);
+    expect(scene.msRenderer.getDragHighlights()).toHaveLength(0);
   }, 60_000);
 });

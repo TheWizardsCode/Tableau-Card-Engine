@@ -58,6 +58,8 @@ export interface MainStreetRendererContext {
   showDragHighlights(cardId?: string): void;
   getDragHighlights(): Array<{ slotIndex: number; validity: 'valid' | 'invalid' }>;
   clearDragHighlights(): void;
+  showTargetHighlights(cardId: string): void;
+  clearTargetHighlights(): void;
   drawBusinessSlot(x: number, y: number, _index: number, biz: BusinessCard | CommunitySpaceCard): void;
   applyUpgradeOverlays(
     container: Phaser.GameObjects.Container,
