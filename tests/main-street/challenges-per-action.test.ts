@@ -12,19 +12,15 @@ import { describe, it, expect } from 'vitest';
 
 import {
   CHALLENGE_TEMPLATES,
-  DEFAULT_CHALLENGES_PER_RUN,
   evaluateChallenges,
   type ActiveChallenge,
-  type Challenge,
-} from '../../../example-games/main-street/MainStreetChallenges';
+} from '../../example-games/main-street/MainStreetChallenges';
 import {
   setupMainStreetGame,
   type MainStreetState,
-} from '../../../example-games/main-street/MainStreetState';
-import { CHALLENGE_BONUS_POINTS, GRID_SIZE } from '../../../example-games/main-street/MainStreetCards';
-import type { SynergyType } from '../../../example-games/main-street/MainStreetCards';
+} from '../../example-games/main-street/MainStreetState';
 
-// ── Helpers ─────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────
 
 /** Creates a test state with challenges pre-selected from the template pool. */
 function createGameState(
@@ -34,38 +30,11 @@ function createGameState(
   return state;
 }
 
-/** Places businesses on the state's street grid at specified positions. */
-function placeBusinesses(
-  state: MainStreetState,
-  placements: { slot: number; synergy: readonly SynergyType[]; level?: number }[],
-): void {
-  for (const p of placements) {
-    state.streetGrid[p.slot] = {
-      family: 'business',
-      id: `test-biz-${p.slot}`,
-      name: `Biz${p.slot}`,
-      cost: 3,
-      baseIncome: 2,
-      synergyTypes: p.synergy,
-      maxLevel: p.level ?? 0,
-      description: 'Test business',
-      level: p.level ?? 0,
-      incomeBonus: 0,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-  }
-}
-
 /**
  * Creates a subset of active challenges from the template pool by ID.
  * Only challenges whose IDs are included are activated.
  */
-function createActiveChallenges(
-  ids: string[],
-  state: MainStreetState,
-): ActiveChallenge[] {
+function createActiveChallenges(ids: string[]): ActiveChallenge[] {
   return ids.map((id) => {
     const template = CHALLENGE_TEMPLATES.find((t) => t.id === id);
     if (!template) {
@@ -105,33 +74,6 @@ function placeFoodRun(
   }
 }
 
-/**
- * Simulates placing N businesses of the given synergy at specific slots.
- */
-function placeSynergyBusinesses(
-  state: MainStreetState,
-  synergy: SynergyType,
-  slots: number[],
-): void {
-  for (const slot of slots) {
-    state.streetGrid[slot] = {
-      family: 'business',
-      id: `${synergy}-${slot}`,
-      name: `${synergy}${slot}`,
-      cost: 3,
-      baseIncome: 2,
-      synergyTypes: [synergy],
-      maxLevel: 0,
-      description: `${synergy} business`,
-      level: 0,
-      incomeBonus: 0,
-      synergyRangeBonus: 0,
-      reputationBonus: 0,
-      ongoingCost: 0,
-    };
-  }
-}
-
 // ── Per-Action Evaluation Tests ─────────────────────────────
 
 describe('Per-Action Challenge Evaluation', () => {
@@ -142,7 +84,7 @@ describe('Per-Action Challenge Evaluation', () => {
 
     it('should return newly completed challenge ID after action that meets the condition', () => {
       const state = createGameState('resource-deep-1');
-      const activeChallenges = createActiveChallenges([challengeId], state);
+      const activeChallenges = createActiveChallenges([challengeId]);
       expect(activeChallenges[0].completed).toBe(false);
       expect(state.challengesCompleted).not.toContain(challengeId);
 
@@ -160,7 +102,7 @@ describe('Per-Action Challenge Evaluation', () => {
 
     it('should return empty array when condition not met', () => {
       const state = createGameState('resource-deep-2');
-      const activeChallenges = createActiveChallenges([challengeId], state);
+      const activeChallenges = createActiveChallenges([challengeId]);
 
       state.resourceBank.coins = 2999; // just below threshold
 
@@ -173,7 +115,7 @@ describe('Per-Action Challenge Evaluation', () => {
 
     it('should not re-add challenge to completed list on subsequent evaluations', () => {
       const state = createGameState('resource-deep-3');
-      const activeChallenges = createActiveChallenges([challengeId], state);
+      const activeChallenges = createActiveChallenges([challengeId]);
 
       state.resourceBank.coins = 3000;
 
@@ -195,7 +137,7 @@ describe('Per-Action Challenge Evaluation', () => {
 
     it('should return newly completed challenge ID after placing the 8th business', () => {
       const state = createGameState('placement-bustling-1');
-      const activeChallenges = createActiveChallenges([challengeId], state);
+      const activeChallenges = createActiveChallenges([challengeId]);
 
       // Place 7 businesses (not enough yet)
       for (let i = 0; i < 7; i++) {
@@ -247,7 +189,7 @@ describe('Per-Action Challenge Evaluation', () => {
 
     it('should return empty array when fewer than 8 businesses placed', () => {
       const state = createGameState('placement-bustling-2');
-      const activeChallenges = createActiveChallenges([challengeId], state);
+      const activeChallenges = createActiveChallenges([challengeId]);
 
       for (let i = 0; i < 7; i++) {
         state.streetGrid[i] = {
@@ -279,7 +221,7 @@ describe('Per-Action Challenge Evaluation', () => {
 
     it('should return newly completed challenge ID after placing 3rd adjacent Food business', () => {
       const state = createGameState('synergy-foodie-1');
-      const activeChallenges = createActiveChallenges([challengeId], state);
+      const activeChallenges = createActiveChallenges([challengeId]);
 
       // Place 2 adjacent Food businesses
       placeFoodRun(state, 2, 2);
@@ -315,7 +257,7 @@ describe('Per-Action Challenge Evaluation', () => {
 
     it('should not complete when businesses are non-adjacent', () => {
       const state = createGameState('synergy-foodie-2');
-      const activeChallenges = createActiveChallenges([challengeId], state);
+      const activeChallenges = createActiveChallenges([challengeId]);
 
       // Place 3 Food businesses but not adjacent
       state.streetGrid[0] = {
@@ -376,7 +318,7 @@ describe('Per-Action Challenge Evaluation', () => {
     it('should not report a challenge already completed mid-turn during end-of-turn evaluation', () => {
       const state = createGameState('safety-net-1');
       state.resourceBank.coins = 3000;
-      const activeChallenges = createActiveChallenges(['ch-deep-pockets'], state);
+      const activeChallenges = createActiveChallenges(['ch-deep-pockets']);
 
       // Per-action evaluation: challenge completed mid-turn
       const midTurnResult = evaluateChallenges(activeChallenges, state);
@@ -397,7 +339,6 @@ describe('Per-Action Challenge Evaluation', () => {
 
       const activeChallenges = createActiveChallenges(
         ['ch-deep-pockets', 'ch-beloved-mayor'],
-        state,
       );
 
       // Per-action evaluation: only Deep Pockets is met
@@ -419,7 +360,7 @@ describe('Per-Action Challenge Evaluation', () => {
       const state = createGameState('safety-net-3');
       state.resourceBank.coins = 3000;
 
-      const activeChallenges = createActiveChallenges(['ch-deep-pockets'], state);
+      const activeChallenges = createActiveChallenges(['ch-deep-pockets']);
 
       // Mid-turn completes all active challenges
       evaluateChallenges(activeChallenges, state);
@@ -440,7 +381,6 @@ describe('Per-Action Challenge Evaluation', () => {
 
       const activeChallenges = createActiveChallenges(
         ['ch-deep-pockets', 'ch-beloved-mayor'],
-        state,
       );
 
       // Both conditions met by the same state
@@ -462,7 +402,6 @@ describe('Per-Action Challenge Evaluation', () => {
 
       const activeChallenges = createActiveChallenges(
         ['ch-deep-pockets', 'ch-beloved-mayor', 'ch-bustling-street'],
-        state,
       );
 
       // Only Deep Pockets is met
