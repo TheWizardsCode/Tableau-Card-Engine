@@ -21,8 +21,12 @@ import type { TutorialActionType } from '../TutorialFlow';
 import { ensureTutorialMarketForUpcomingSteps } from '../TutorialScenario';
 import { BrowserLocalStorageAdapter, hasSeenBankingHint, loadTutorialState, markBankingHintShown, saveTutorialState } from '../TutorialState';
 import type { MainStreetTurnControllerContext } from './MainStreetTurnControllerContext';
+import { celebrateChallengeIds } from './MainStreetChallengeCelebration';
 
 export function startDayPhase(tcCtx: MainStreetTurnControllerContext, skipMarketRefill: boolean = false, suppressDayBanner: boolean = false): void {
+    // A new day begins: reset the per-turn celebrated-challenge set so this
+    // turn can celebrate its own completions (CG-0MU8MZBV4007HF1Q).
+    try { tcCtx.scene.celebratedChallengeIds?.clear(); } catch (_) { /* ignore */ }
 
     const s = tcCtx.scene;
     // Execute DayStart (optionally refills market, transitions to MarketPhase)
@@ -241,27 +245,14 @@ export function endTurn(tcCtx: MainStreetTurnControllerContext): void {
     s.refreshUndoRedoButtons(false, false);
 
     // ── Challenge Celebration VFX & Sound ────────────────────────
-    // If any challenges were newly completed this turn, trigger celebration
-    // animations with staggered timing so they don't overlap.
+    // Celebrate only challenges not already celebrated mid-turn: the
+    // per-action evaluation fires the celebration as soon as the completing
+    // action lands (CG-0MU8MZBV4007HF1Q). celebrateChallengeIds dedupes
+    // against `s.celebratedChallengeIds`, so the end-of-turn pass only fires
+    // for closing-phase (Income / Incident) completions and never for an
+    // already-celebrated mid-turn completion.
     if (result.newlyCompletedChallenges.length > 0) {
-      // Build a lookup from challenge ID to title
-      const challengeTitleById = new Map<string, string>();
-      for (const ac of s.state.activeChallenges) {
-        challengeTitleById.set(ac.challenge.id, ac.challenge.title);
-      }
-
-      result.newlyCompletedChallenges.forEach((challengeId, index) => {
-        const title = challengeTitleById.get(challengeId) ?? 'Challenge Complete!';
-        s.time.delayedCall(index * 600, () => {
-          void s.msAnimator.animateCelebration(title);
-        });
-      });
-
-      // Refresh the challenge tracker after all celebrations
-      s.time.delayedCall(
-        result.newlyCompletedChallenges.length * 600 + 200,
-        () => (s.incomeCollectionActive ? s.msRenderer.refreshAllExceptStreet() : s.refreshAll()),
-      );
+      celebrateChallengeIds(s, result.newlyCompletedChallenges);
     }
 
     // Brief delay then show result / advance

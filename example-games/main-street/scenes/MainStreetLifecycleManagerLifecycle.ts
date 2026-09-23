@@ -9,6 +9,7 @@
  */
 
 import { SaveLoadStore, UndoRedoManager, createTfPlayer, markSceneInvalid, markSceneValid } from '../../../src/core-engine';
+import type { Command } from '../../../src/core-engine';
 import { TooltipManager, createSingleSelectionManager } from '../../../src/ui';
 import type { HelpSection } from '../../../src/ui';
 import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
@@ -27,6 +28,7 @@ import { BG_COLOR, SFX_KEYS } from './MainStreetConstants';
 import { MainStreetInputManager } from './MainStreetInputManager';
 import type { MainStreetLifecycleManagerContext } from './MainStreetLifecycleManagerContext';
 import { MainStreetOverlayContent } from './MainStreetOverlayContent';
+import { celebrateChallengeIds } from './MainStreetChallengeCelebration';
 import { MainStreetRenderer } from './MainStreetRenderer';
 import { MainStreetSvgTextureManager } from './MainStreetSvgTextureManager';
 import { MainStreetTurnController } from './MainStreetTurnController';
@@ -273,6 +275,25 @@ export function create(lmCtx: MainStreetLifecycleManagerContext): void {
 
     // Undo/Redo manager (per-scene)
     s.undoManager = new UndoRedoManager();
+
+    // Wrap execute() so every command dispatch site — which calls
+    // `s.undoManager.execute(cmd)` — fires the immediate challenge
+    // celebration for any challenge the command completed
+    // (CG-0MU8MZBV4007HF1Q). The command layer records completed IDs on
+    // `state._newlyCompletedThisAction`; the wrapper celebrates and clears
+    // them. Deduped against `s.celebratedChallengeIds`.
+    {
+      const undoManager = s.undoManager;
+      const originalExecute = undoManager.execute.bind(undoManager);
+      undoManager.execute = (cmd: Command) => {
+        originalExecute(cmd);
+        const completed: string[] = s.state?._newlyCompletedThisAction ?? [];
+        if (completed.length > 0) {
+          celebrateChallengeIds(s, completed);
+          s.state._newlyCompletedThisAction = [];
+        }
+      };
+    }
 
     // Transcript recorder (optional) — attach global recorder so other modules
     // (AI, Monte Carlo runner) can emit events without direct wiring.

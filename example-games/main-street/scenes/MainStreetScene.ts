@@ -326,6 +326,14 @@ export class MainStreetScene extends CardGameScene {
   // Undo/Redo manager for market actions (per-scene)
   public undoManager!: UndoRedoManager;
 
+  /**
+   * Challenge IDs already celebrated this turn (CG-0MU8MZBV4007HF1Q). The
+   * per-action evaluation celebrates a completion immediately; the end-of-turn
+   * celebration skips any ID in this set so a challenge never fires twice.
+   * Cleared at the start of each day and on undo.
+   */
+  public celebratedChallengeIds: Set<string> = new Set();
+
   // Drag-and-drop buy-to-slot (business cards → street slots)
   public dragDropManager?: DragDropManager;
 
