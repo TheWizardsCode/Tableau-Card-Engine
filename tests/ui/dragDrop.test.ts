@@ -181,6 +181,38 @@ describe('dragDrop module registration', () => {
     expect(mock.input.dragDistanceThreshold).toBe(5);
   });
 
+  it('leaves scene.input.dragDistanceThreshold untouched when unset', () => {
+    const mock = createMockScene();
+    makeManager({}, mock);
+    expect(mock.input.dragDistanceThreshold).toBe(0);
+  });
+
+  it('uses the default snap-back duration when unset', () => {
+    const { mock, manager } = makeManager();
+    const go = createMockGameObject(100, 200, 5);
+    go.input = { draggable: true };
+    manager.registerDraggable({ gameObject: go as unknown as DraggableGameObject });
+
+    mock.events.dragstart(pointer, go);
+    mock.events.drag(pointer, go, 300, 400);
+    mock.events.dragend(pointer, go, false);
+
+    expect(mock.tweenConfigs[0].duration).toBe(200);
+  });
+
+  it('treats an explicitly undefined reducedMotion as absent (animated snap-back)', () => {
+    const { mock, manager } = makeManager({ reducedMotion: undefined });
+    const go = createMockGameObject(100, 200, 5);
+    go.input = { draggable: true };
+    manager.registerDraggable({ gameObject: go as unknown as DraggableGameObject });
+
+    mock.events.dragstart(pointer, go);
+    mock.events.drag(pointer, go, 300, 400);
+    mock.events.dragend(pointer, go, false);
+
+    expect(mock.tweenConfigs.length).toBe(1);
+  });
+
   it('destroy removes all input listeners', () => {
     const { mock, manager } = makeManager();
     manager.destroy();

@@ -35,11 +35,14 @@ is_allowed_line() {
   return 1
 }
 
-# Collect files to scan
+# Collect files to scan (unique temp file so concurrent full-suite runs
+# across worktrees cannot clobber each other's list).
+file_list="$(mktemp "${TMPDIR:-/tmp}/_termguard_files.XXXXXX")"
+trap 'rm -f "$file_list"' EXIT
 {
   find docs -name '*.md' -type f 2>/dev/null
   find example-games/main-street -name '*.ts' -type f 2>/dev/null
-} | sort -u > /tmp/_termguard_files.txt
+} | sort -u > "$file_list"
 
 # Forbidden patterns (POSIX ERE) — day-as-turn tokens
 patterns=(
@@ -70,10 +73,8 @@ while IFS= read -r pat; do
         violations=$((violations + 1))
       fi
     done < <(grep -niE "$pat" "$file" 2>/dev/null || true)
-  done < /tmp/_termguard_files.txt
+  done < "$file_list"
 done <<< "$(printf '%s\n' "${patterns[@]}")"
-
-rm -f /tmp/_termguard_files.txt
 
 echo ""
 if [ "$violations" -gt 0 ]; then

@@ -1,4 +1,4 @@
-import { SoundManager } from '../core-engine';
+import { SoundManager, applyDefaults, DEFAULT_MOVE_SFX_INTERVAL_MS } from '../core-engine';
 import { emitEventOrCallback } from '../core-engine/event-emission';
 import type { CardDealtPayload } from '../core-engine/CardEventPayloads';
 
@@ -128,17 +128,23 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
     destY,
     sourceX,
     sourceY,
-    duration = DEFAULT_DEAL_DURATION,
-    arcHeight = DEFAULT_DEAL_ARC_HEIGHT,
-    ease = 'Quad.easeOut',
-    rotation = 0.05,
+    duration,
+    arcHeight,
+    ease,
+    rotation,
     gameEvents,
     cardId,
     playerIndex,
     reducedMotion,
-    soundManager = null,
+    soundManager,
     sfx,
-  } = opts;
+  } = applyDefaults(opts, {
+    duration: DEFAULT_DEAL_DURATION,
+    arcHeight: DEFAULT_DEAL_ARC_HEIGHT,
+    ease: 'Quad.easeOut',
+    rotation: 0.05,
+    soundManager: null,
+  });
 
   // Determine source position
   const startX = sourceX ?? target.x;
@@ -163,7 +169,7 @@ export function dealCard(opts: DealCardOptions): Phaser.Tweens.Tween {
     });
   }
 
-  const moveInterval = sfx?.moveIntervalMs ?? 120;
+  const moveInterval = sfx?.moveIntervalMs ?? DEFAULT_MOVE_SFX_INTERVAL_MS;
   let lastMovePlay = 0;
   let loopSound: Phaser.Sound.BaseSound | null = null;
 

@@ -27,6 +27,7 @@
  */
 
 import { safePlaySound, COMMON_SFX_KEYS } from '../core-engine/SoundManager';
+import { applyDefaults } from '../core-engine/config-defaults';
 import { shakeIllegalMove } from './shakeIllegalMove';
 import { emitEventOrCallback } from '../core-engine/event-emission';
 
@@ -255,14 +256,21 @@ function rectangleContains(
  */
 export function createDragDropManager(config: DragDropManagerConfig): DragDropManager {
   const scene = config.scene;
-  const dragDepth = config.dragDepth ?? DEFAULT_DRAG_DEPTH;
-  const snapBackDuration = config.snapBackDuration ?? DEFAULT_SNAP_BACK_DURATION;
+  const {
+    dragDepth,
+    snapBackDuration,
+    reducedMotion: initialReducedMotion,
+  } = applyDefaults(config, {
+    dragDepth: DEFAULT_DRAG_DEPTH,
+    snapBackDuration: DEFAULT_SNAP_BACK_DURATION,
+    reducedMotion: false,
+  });
 
   const draggables = new Map<DraggableGameObject, DraggableEntry>();
   const dropZones = new Map<Phaser.GameObjects.Zone, DropZoneEntry>();
 
   let enabled = true;
-  let reducedMotion = config.reducedMotion ?? false;
+  let reducedMotion = initialReducedMotion;
 
   // Apply the click-vs-drag threshold so pointerup-without-drag still
   // reaches the caller's click path (dragDistanceThreshold semantics).
