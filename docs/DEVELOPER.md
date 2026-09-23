@@ -662,6 +662,7 @@ src/
     ├── GameSelectorScene.ts Game selector landing page (GameEntry, REGISTRY_KEY_GAMES)
     ├── HelpPanel.ts         Reusable help panel component
     ├── HelpButton.ts        Help button component
+    ├── UIComponentBase.ts   Shared lifecycle base class for UI components
     └── index.ts             Barrel file / public API
 
 example-games/
@@ -2442,6 +2443,41 @@ The `SettingsButton` class renders a circular gear icon (\u2699) toggle button t
 import { SettingsButton } from '@ui';
 
 const settingsButton = new SettingsButton(this, settingsPanel);
+```
+
+### UI Component Base Class (`UIComponentBase`)
+
+`UIComponentBase` (`src/ui/UIComponentBase.ts`) provides the shared lifecycle contract for reusable UI widgets. `HelpButton`, `SettingsButton`, and `Slider` extend it, and new components should too — it removes the repeated `destroyed` flag, idempotency guard, and manual listener bookkeeping that previously had to be re-implemented (and could leak listeners when a component was destroyed mid-interaction).
+
+It provides:
+
+- `destroyed` / `enabled` read-only state and `setEnabled(boolean)`.
+- `protected canInteract()` — `true` while the component is live **and** enabled; event handlers should gate on it.
+- `protected on(emitter, event, handler, context?)` — registers the listener and tracks it via the shared `ListenerRegistry` (`src/core-engine/ListenerRegistry.ts`). Returns an unsubscribe closure. Every tracked listener is removed automatically by `destroy()`.
+- `protected off(emitter, event, handler)` — removes a single tracked listener early, for listeners whose lifetime is shorter than the component's (e.g. a slider's drag-scoped `pointermove`/`pointerup` handlers detached on `pointerup`).
+- `protected abstract destroyContent()` — subclass-specific game-object teardown.
+- `destroy()` — idempotent; runs `destroyContent()` exactly once, then removes all tracked listeners (cleanup still runs even if `destroyContent()` throws).
+
+The companion `mergeDefaults(defaults, overrides?)` helper merges caller options over defaults: overrides win, absent or explicitly `undefined` keys fall back to the default, and falsy values (`0`, `false`, `''`) and `null` are preserved.
+
+```typescript
+import { UIComponentBase } from '@ui';
+
+class MyWidget extends UIComponentBase {
+  private readonly box: Phaser.GameObjects.Rectangle;
+
+  constructor(scene: Phaser.Scene) {
+    super();
+    this.box = scene.add.rectangle(0, 0, 40, 40);
+    this.on(this.box, 'pointerdown', () => {
+      if (this.canInteract()) this.handleClick();
+    });
+  }
+
+  protected destroyContent(): void {
+    this.box.destroy();
+  }
+}
 ```
 
 ### Overlay Background System

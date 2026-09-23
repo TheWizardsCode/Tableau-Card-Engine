@@ -76,6 +76,7 @@ function createMockScene(): any {
     setInteractive: vi.fn().mockReturnThis(),
     setVisible: vi.fn().mockReturnThis(),
     on: vi.fn().mockReturnThis(),
+    off: vi.fn().mockReturnThis(),
     destroy: vi.fn(),
     input: { enabled: true },
   });
@@ -220,8 +221,8 @@ describe('Slider', () => {
     inputOffMock.mockClear();
 
     // Initially, no pointermove listener should be registered
-    expect(inputOnMock).not.toHaveBeenCalledWith('pointermove', expect.any(Function));
-    expect(inputOnMock).not.toHaveBeenCalledWith('pointerup', expect.any(Function));
+    expect(inputOnMock).not.toHaveBeenCalledWith('pointermove', expect.any(Function), undefined);
+    expect(inputOnMock).not.toHaveBeenCalledWith('pointerup', expect.any(Function), undefined);
 
     // Simulate pointerdown on the hit area
     const onMock = slider.hitArea.on as unknown as ReturnType<typeof vi.fn>;
@@ -232,8 +233,8 @@ describe('Slider', () => {
     }
 
     // After pointerdown, scene.input.on should have registered pointermove and pointerup
-    expect(inputOnMock).toHaveBeenCalledWith('pointermove', expect.any(Function));
-    expect(inputOnMock).toHaveBeenCalledWith('pointerup', expect.any(Function));
+    expect(inputOnMock).toHaveBeenCalledWith('pointermove', expect.any(Function), undefined);
+    expect(inputOnMock).toHaveBeenCalledWith('pointerup', expect.any(Function), undefined);
   });
 
   it('unregisters listeners on pointerup', () => {
@@ -270,8 +271,8 @@ describe('Slider', () => {
     upHandler();
 
     // After pointerup, listeners should be unregistered
-    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler);
-    expect(inputOffMock).toHaveBeenCalledWith('pointerup', upHandler);
+    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler, undefined);
+    expect(inputOffMock).toHaveBeenCalledWith('pointerup', upHandler, undefined);
 
     // After pointerup, pointermove should not change value
     const valueBeforeMove2 = slider.getValue();
@@ -335,7 +336,7 @@ describe('Slider', () => {
     slider.destroy();
 
     // Listeners should be cleaned up
-    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler);
+    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler, undefined);
   });
 
   it('multiple sliders each self-manage their own listeners', () => {
@@ -374,7 +375,7 @@ describe('Slider', () => {
     // Simulate pointerup - listener should be cleaned up
     const upHandler = inputOnMock.mock.calls.find((c: any[]) => c[0] === 'pointerup')?.[1];
     upHandler();
-    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler);
+    expect(inputOffMock).toHaveBeenCalledWith('pointermove', moveHandler, undefined);
   });
 
   it('supports all SliderOptions fields', () => {
@@ -410,5 +411,31 @@ describe('Slider', () => {
     expect(slider.onValueChange).not.toBeNull();
     slider.onValueChange = null;
     expect(slider.onValueChange).toBeNull();
+  });
+
+  // ── UIComponentBase migration regression tests ─────────────
+
+  it('destroy detaches the hit-area listener (listener auto-cleanup)', () => {
+    const scene = createMockScene();
+    const slider = new Slider(scene, 100, 200);
+
+    const handler = (slider.hitArea.on as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .find((c: any[]) => c[0] === 'pointerdown')?.[1];
+    expect(handler).toBeDefined();
+
+    slider.destroy();
+
+    expect(slider.hitArea.off).toHaveBeenCalledWith('pointerdown', handler, undefined);
+  });
+
+  it('destroy is idempotent — objects are destroyed exactly once', () => {
+    const scene = createMockScene();
+    const slider = new Slider(scene, 100, 200);
+    const trackDestroy = slider.track.destroy as unknown as ReturnType<typeof vi.fn>;
+
+    slider.destroy();
+    slider.destroy();
+
+    expect(trackDestroy).toHaveBeenCalledTimes(1);
   });
 });

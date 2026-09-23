@@ -10,6 +10,7 @@
 import Phaser from 'phaser';
 import type { SettingsPanel } from './SettingsPanel';
 import { DEPTH_SETTINGS_BUTTON } from './SettingsPanel';
+import { UIComponentBase } from './UIComponentBase';
 
 // ── Style constants ─────────────────────────────────────────
 
@@ -36,12 +37,11 @@ export interface SettingsButtonConfig {
   y?: number;
 }
 
-export class SettingsButton {
+export class SettingsButton extends UIComponentBase {
   private readonly settingsPanel: SettingsPanel;
   private circle: Phaser.GameObjects.Graphics;
   private label: Phaser.GameObjects.Text;
   private hitArea: Phaser.GameObjects.Zone;
-  private destroyed = false;
   private readonly posX: number;
   private readonly posY: number;
 
@@ -50,6 +50,7 @@ export class SettingsButton {
     settingsPanel: SettingsPanel,
     config?: SettingsButtonConfig,
   ) {
+    super();
     this.settingsPanel = settingsPanel;
 
     // Position to the left of where HelpButton typically sits
@@ -86,21 +87,21 @@ export class SettingsButton {
       }
     } catch (_) { /* ignore */ }
 
-    this.hitArea.on('pointerdown', () => {
-      if (!this.destroyed) {
+    this.on(this.hitArea, 'pointerdown', () => {
+      if (this.canInteract()) {
         this.settingsPanel.toggle();
       }
     });
 
-    this.hitArea.on('pointerover', () => {
-      if (!this.destroyed) {
+    this.on(this.hitArea, 'pointerover', () => {
+      if (this.canInteract()) {
         this.drawCircle(BUTTON_HOVER_BG_COLOR, 1);
         this.label.setColor(BUTTON_HOVER_TEXT_COLOR);
       }
     });
 
-    this.hitArea.on('pointerout', () => {
-      if (!this.destroyed) {
+    this.on(this.hitArea, 'pointerout', () => {
+      if (this.canInteract()) {
         this.drawCircle(BUTTON_BG_COLOR, BUTTON_BG_ALPHA);
         this.label.setColor(BUTTON_TEXT_COLOR);
       }
@@ -108,9 +109,7 @@ export class SettingsButton {
   }
 
   /** Clean up all game objects. */
-  destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
+  protected destroyContent(): void {
     this.circle.destroy();
     this.label.destroy();
     this.hitArea.destroy();

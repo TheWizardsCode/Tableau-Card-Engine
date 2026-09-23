@@ -9,6 +9,7 @@
 import Phaser from 'phaser';
 import type { HelpPanel } from './HelpPanel';
 import { DEPTH_HELP_BUTTON } from './HelpPanel';
+import { UIComponentBase } from './UIComponentBase';
 
 // ── Style constants ─────────────────────────────────────────
 
@@ -35,17 +36,16 @@ export interface HelpButtonConfig {
   y?: number;
 }
 
-export class HelpButton {
+export class HelpButton extends UIComponentBase {
   private readonly helpPanel: HelpPanel;
   private circle: Phaser.GameObjects.Graphics;
   private label: Phaser.GameObjects.Text;
   private hitArea: Phaser.GameObjects.Zone;
-  private destroyed = false;
-  private enabled = true;
   private posX: number;
   private posY: number;
 
   constructor(scene: Phaser.Scene, helpPanel: HelpPanel, config?: HelpButtonConfig) {
+    super();
     this.helpPanel = helpPanel;
 
     this.posX = config?.x ?? scene.scale.width - MARGIN - BUTTON_RADIUS;
@@ -82,21 +82,21 @@ export class HelpButton {
       }
     } catch (_) { /* ignore */ }
 
-    this.hitArea.on('pointerdown', () => {
-      if (!this.destroyed && this.enabled) {
+    this.on(this.hitArea, 'pointerdown', () => {
+      if (this.canInteract()) {
         this.helpPanel.toggle();
       }
     });
 
-    this.hitArea.on('pointerover', () => {
-      if (!this.destroyed && this.enabled) {
+    this.on(this.hitArea, 'pointerover', () => {
+      if (this.canInteract()) {
         this.drawCircle(BUTTON_HOVER_BG_COLOR, 1);
         this.label.setColor(BUTTON_HOVER_TEXT_COLOR);
       }
     });
 
-    this.hitArea.on('pointerout', () => {
-      if (!this.destroyed && this.enabled) {
+    this.on(this.hitArea, 'pointerout', () => {
+      if (this.canInteract()) {
         this.drawCircle(BUTTON_BG_COLOR, BUTTON_BG_ALPHA);
         this.label.setColor(BUTTON_TEXT_COLOR);
       }
@@ -114,7 +114,7 @@ export class HelpButton {
 
   /** Show or hide the help button and its hit target. */
   setVisible(visible: boolean): void {
-    this.enabled = visible;
+    this.setEnabled(visible);
     this.circle.setVisible(visible);
     this.label.setVisible(visible);
     this.hitArea.setVisible(visible);
@@ -144,9 +144,7 @@ export class HelpButton {
   }
 
   /** Clean up all game objects. */
-  destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
+  protected destroyContent(): void {
     this.circle.destroy();
     this.label.destroy();
     this.hitArea.destroy();

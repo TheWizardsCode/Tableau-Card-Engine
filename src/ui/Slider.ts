@@ -27,6 +27,7 @@
 
 import Phaser from 'phaser';
 import { createHudText } from './Renderer';
+import { UIComponentBase, mergeDefaults } from './UIComponentBase';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +59,21 @@ export interface SliderOptions {
   textColor?: string;
 }
 
+/** The complete set of Slider defaults, after `mergeDefaults`. */
+const SLIDER_DEFAULTS: Required<SliderOptions> = {
+  initialValue: 0.5,
+  minValue: 0,
+  maxValue: 1,
+  label: '',
+  width: 150,
+  trackHeight: 6,
+  trackColor: 0x334433,
+  fillColor: 0x88ff88,
+  handleColor: 0xffffff,
+  fontSize: '11px',
+  textColor: '#88ff88',
+};
+
 // ---------------------------------------------------------------------------
 // Slider class
 // ---------------------------------------------------------------------------
@@ -69,7 +85,7 @@ export interface SliderOptions {
  * The slider self-manages its input listeners (only active during drag)
  * and cleans up all Phaser objects and listener registrations on destroy().
  */
-export class Slider {
+export class Slider extends UIComponentBase {
   // Visual components (public for direct inspection/mutation)
   /** The track background rectangle. */
   readonly track: Phaser.GameObjects.Rectangle;
@@ -120,22 +136,23 @@ export class Slider {
     y: number,
     options?: SliderOptions,
   ) {
+    super();
     this._scene = scene;
     this._trackX = x;
 
     const {
-      initialValue = 0.5,
-      minValue = 0,
-      maxValue = 1,
-      label = '',
-      width = 150,
-      trackHeight = 6,
-      trackColor = 0x334433,
-      fillColor = 0x88ff88,
-      handleColor = 0xffffff,
-      fontSize = '11px',
-      textColor = '#88ff88',
-    } = options ?? {};
+      initialValue,
+      minValue,
+      maxValue,
+      label,
+      width,
+      trackHeight,
+      trackColor,
+      fillColor,
+      handleColor,
+      fontSize,
+      textColor,
+    } = mergeDefaults(SLIDER_DEFAULTS, options);
 
     this._value = initialValue;
     this._minValue = minValue;
@@ -165,13 +182,13 @@ export class Slider {
     this.hitArea = scene.add.zone(x + width / 2, y, width + 24, 28)
       .setInteractive({ useHandCursor: true });
 
-    this.hitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    this.on(this.hitArea, 'pointerdown', (pointer: Phaser.Input.Pointer) => {
       this._isDragging = true;
       // Register self-contained listeners — only active during drag
       this._moveHandler = (p: Phaser.Input.Pointer) => { this._handlePointerMove(p.x); };
       this._upHandler = () => { this._handlePointerUp(); };
-      scene.input.on('pointermove', this._moveHandler);
-      scene.input.on('pointerup', this._upHandler);
+      this.on(scene.input, 'pointermove', this._moveHandler);
+      this.on(scene.input, 'pointerup', this._upHandler);
       this._setValueFromPointer(pointer.x);
     });
 
@@ -198,20 +215,8 @@ export class Slider {
     return this._value;
   }
 
-  /**
-   * Destroy all slider objects and clean up input handlers.
-   * Safe to call multiple times.
-   */
-  destroy(): void {
-    // Clean up any active self-contained listeners
-    if (this._moveHandler) {
-      try { this._scene.input.off('pointermove', this._moveHandler); } catch (_) { /* ignore */ }
-      this._moveHandler = null;
-    }
-    if (this._upHandler) {
-      try { this._scene.input.off('pointerup', this._upHandler); } catch (_) { /* ignore */ }
-      this._upHandler = null;
-    }
+  /** Destroy all slider objects. Tracked listeners are removed by the base. */
+  protected destroyContent(): void {
     try { this.track.destroy(); } catch (_) { /* ignore */ }
     try { this.fill.destroy(); } catch (_) { /* ignore */ }
     try { this.handle.destroy(); } catch (_) { /* ignore */ }
@@ -267,11 +272,11 @@ export class Slider {
     this._isDragging = false;
     // Unregister self-contained listeners
     if (this._moveHandler) {
-      this._scene.input.off('pointermove', this._moveHandler);
+      this.off(this._scene.input, 'pointermove', this._moveHandler);
       this._moveHandler = null;
     }
     if (this._upHandler) {
-      this._scene.input.off('pointerup', this._upHandler);
+      this.off(this._scene.input, 'pointerup', this._upHandler);
       this._upHandler = null;
     }
   }

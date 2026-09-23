@@ -319,6 +319,9 @@ export type { DebugToolsEntry } from './debug/DebugToolsRegistry';
 export { Slider } from './Slider';
 export type { SliderOptions } from './Slider';
 
+// UIComponentBase – shared lifecycle for reusable UI components
+export { UIComponentBase, mergeDefaults } from './UIComponentBase';
+
 // Shared Gym scene utilities – event log, deck grid
 // These helpers extract common rendering patterns from Gym demo scenes.
 export {
