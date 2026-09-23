@@ -249,7 +249,7 @@ Events fall into two categories:
 |----|------|---------|------|--------|---------|-------|-----|--------|-----------|
 | `evt-festival` | Local Festival | Investment | 3 | SpecificSynergy | Culture | +2 | +1 | +2 coins to Culture biz, +1 rep. | Core positive Investment for Culture players. |
 | `evt-rainy` | Rainy Day | Incident | 0 | SpecificSynergy | Food | -1 | 0 | -1 coin to Food biz. | Mild Food disruption. |
-| `evt-tax` | Tax Audit | Incident | 0 | All | -- | -3 | 0 | Lose 3 coins. | Universal economic pressure. |
+| `evt-tax` | Tax Audit | Incident | 0 | All | -- | -45% | 0 | Lose 45% of banked coins (25% with the Accountant). | Universal economic pressure that scales with wealth; clamped so it cannot bankrupt a player. |
 | `evt-award` | Community Award | Incident | 0 | All | -- | 0 | +2 | Gain 2 reputation. | Positive incident; balances negative events. |
 | `evt-inspection` | Health Inspection | Incident | 0 | SpecificSynergy | Food | -2 | -1 | -2 coins/Food biz, -1 rep. | Harsh Food-specific punishment. |
 
@@ -519,7 +519,7 @@ Staff cards are a separate card family (`family: 'staff'`) that expand hand capa
 | `staff-assistant` | Assistant | 3 | 1 | +1 | 2 | — | Hire an assistant to help manage your hand. | Original M2 staff. |
 | `staff-manager` | Manager | 7 | 2.5 | +2 | 3 | — | A skilled manager keeps things organised. | Mid-tier capacity. |
 | `staff-socialite` | Socialite | 8 | 1.5 | +1 | 4 | +0.1 rep/turn | A charming socialite adds +1 hand slot and +0.1 reputation per turn. | **NEW** reputation ability *(Group F).* |
-| `staff-accountant` | Accountant | 8 | 1.5 | +1 | 6 | Refresh −1 | A meticulous accountant makes market refreshes cost 1 less. | **NEW** economy ability *(Group F).* |
+| `staff-accountant` | Accountant | 8 | 1.5 | +1 | 6 | Refresh −1; Tax 25% | A meticulous accountant makes market refreshes cost 1 less and reduces Tax Audit losses to 25%. | **NEW** economy ability *(Group F); Tax Audit mitigation (CG-0MTQ7W0ZX0059R3J).* |
 | `staff-lookout` | Lookout | 10 | 2 | +1 | 7 | Peek once/turn | A sharp-eyed lookout can peek at the top card of the incident deck once per turn. | **NEW** peek ability *(CG-0MSXOW6GN008ZSMN).* |
 | `staff-director` | Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. | Premium capacity. |
 | `staff-executive` | Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity at a high ongoing cost. | Premium slot capacity *(Group F).* |

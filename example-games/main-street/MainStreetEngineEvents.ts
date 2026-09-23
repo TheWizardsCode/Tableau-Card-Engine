@@ -12,7 +12,7 @@ import { applyCompetitiveIncome, getSlotOwnerId } from './MainStreetAdjacency';
 import type { EventCard, SynergyType, SpecializationSkill, DurationEventCard } from './MainStreetCards';
 import { isDurationEventCard } from './MainStreetCards';
 import { applyReputationMultiplier, roundInt } from './MainStreetDifficulty';
-import { computeIncidentSkillBuffs, computeReputationGainMultiplier, getEmployedSpecializationSkills } from './MainStreetStaffBuffs';
+import { computeIncidentSkillBuffs, computeReputationGainMultiplier, getEmployedSpecializationSkills, computeTaxAuditRate, computeProportionalCoinLoss } from './MainStreetStaffBuffs';
 import { deserializeSkillIds } from './MainStreetStaffSkills';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, syncResourceBankToLedger, describeEventEffects, classifyEffect } from './MainStreetState';
@@ -91,21 +91,29 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
   };
   const rep = state.resourceBank.reputation;
   const cfg = state.config;
+  // Event's own coin delta before staff mitigation / reputation scaling:
+  // flat events use `coinDelta`; proportional events (CG-0MTQ7W0ZX0059R3J)
+  // collect a percentage of the current banked balance at the effective rate.
+  const baseCoinDelta = eventCoinDeltaFor(state, event);
 
   switch (event.target) {
     case 'SpecificSynergy': {
-      // Count matching businesses and apply coinDelta per match
+      // Count matching businesses and apply coinDelta per match. A
+      // proportional event is a whole-balance effect, so its loss is applied
+      // once rather than per match.
       const matchCount = state.streetGrid.filter(
         b => b !== null && b.synergyTypes.includes(event.targetSynergy as SynergyType),
       ).length;
-      const rawDelta = event.coinDelta * matchCount;
+      const rawDelta = event.coinPercentDelta !== undefined
+        ? baseCoinDelta
+        : baseCoinDelta * matchCount;
       state.resourceBank.coins += applyReputationMultiplier(cDelta(rawDelta), rep, cfg);
       state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
     }
     case 'All': {
       // Apply to all -- direct delta on resource bank
-      state.resourceBank.coins += applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg);
+      state.resourceBank.coins += applyReputationMultiplier(cDelta(baseCoinDelta), rep, cfg);
       state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
     }
@@ -117,7 +125,7 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
         // Consume RNG for deterministic selection (used in future milestones)
         const _targetIdx = Math.floor(state.rng() * placed.length);
         void _targetIdx;
-        state.resourceBank.coins += applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg);
+        state.resourceBank.coins += applyReputationMultiplier(cDelta(baseCoinDelta), rep, cfg);
       }
       state.resourceBank.reputation += rDelta(event.reputationDelta);
       break;
@@ -126,6 +134,33 @@ export function resolveEvent(state: MainStreetState, event: EventCard): void {
 
   // Sync shared EconomyLedger after resourceBank mutations
   syncResourceBankToLedger(state);
+}
+
+/**
+ * The event's own coin delta before staff mitigation and reputation scaling
+ * (CG-0MTQ7W0ZX0059R3J).
+ *
+ * Flat-delta events return `event.coinDelta` unchanged. Proportional events
+ * (`coinPercentDelta` defined) collect a percentage of the player's banked
+ * coins RIGHT NOW: the base rate comes from the card (45% for the Tax Audit),
+ * an employed staff member's `taxAuditRate` may lower it (the Accountant's
+ * 25%), and the loss is rounded to the nearest integer and clamped so the
+ * balance never drops below 0.
+ *
+ * Reads `state.resourceBank.coins` only and consumes no RNG — safe for
+ * deterministic replay and CPU-side AI projection. This is the single source
+ * of truth shared by {@link resolveEvent}, {@link computeEventDeltas} and
+ * `projectEventCoinDelta` so the live, deferred and AI paths never diverge.
+ *
+ * @param state Current game state (read-only).
+ * @param event The event being resolved / projected.
+ * @returns The signed coin delta (negative = loss).
+ */
+export function eventCoinDeltaFor(state: MainStreetState, event: EventCard): number {
+  if (event.coinPercentDelta === undefined) return event.coinDelta;
+  const baseRate = Math.abs(event.coinPercentDelta);
+  const rate = computeTaxAuditRate(state.staffCards ?? [], baseRate);
+  return -computeProportionalCoinLoss(state.resourceBank.coins, rate);
 }
 
 /**
@@ -251,13 +286,20 @@ export function computeEventDeltas(
   };
   const rep = repOverride ?? state.resourceBank.reputation;
   const cfg = state.config;
+  // Proportional events collect from the current banked balance (same helper
+  // as resolveEvent — CG-0MTQ7W0ZX0059R3J). In the deferred path income is
+  // not yet applied; no non-choice proportional event ships, but routing
+  // through the shared helper keeps the two paths identical for flat events.
+  const baseCoinDelta = eventCoinDeltaFor(state, event);
 
   switch (event.target) {
     case 'SpecificSynergy': {
       const matchCount = state.streetGrid.filter(
         b => b !== null && b.synergyTypes.includes(event.targetSynergy as SynergyType),
       ).length;
-      const rawDelta = event.coinDelta * matchCount;
+      const rawDelta = event.coinPercentDelta !== undefined
+        ? baseCoinDelta
+        : baseCoinDelta * matchCount;
       return {
         coinDelta: applyReputationMultiplier(cDelta(rawDelta), rep, cfg),
         repDelta: rDelta(event.reputationDelta),
@@ -265,7 +307,7 @@ export function computeEventDeltas(
     }
     case 'All':
       return {
-        coinDelta: applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg),
+        coinDelta: applyReputationMultiplier(cDelta(baseCoinDelta), rep, cfg),
         repDelta: rDelta(event.reputationDelta),
       };
     case 'RandomBusiness': {
@@ -274,7 +316,7 @@ export function computeEventDeltas(
         // Consume RNG exactly as resolveEvent does (deterministic selection).
         void Math.floor(state.rng() * placed.length);
         return {
-          coinDelta: applyReputationMultiplier(cDelta(event.coinDelta), rep, cfg),
+          coinDelta: applyReputationMultiplier(cDelta(baseCoinDelta), rep, cfg),
           repDelta: rDelta(event.reputationDelta),
         };
       }
@@ -364,6 +406,16 @@ export function applyCompetitiveEventEffects(
   for (const owner of owners) {
     let coinsGained = 0;
     let repGained = 0;
+    // Proportional events (CG-0MTQ7W0ZX0059R3J): each owner is taxed on its
+    // OWN banked balance at its own effective rate (an Accountant employed by
+    // one player only mitigates that player's audit). Flat events keep the
+    // nominal per-owner `coinDelta`.
+    const baseCoinDelta = event.coinPercentDelta === undefined
+      ? event.coinDelta
+      : -computeProportionalCoinLoss(
+          owner.player.coins,
+          computeTaxAuditRate(owner.player.staffCards ?? [], Math.abs(event.coinPercentDelta)),
+        );
 
     switch (target) {
       case 'SpecificSynergy': {
@@ -375,7 +427,9 @@ export function applyCompetitiveEventEffects(
           if (b.synergyTypes.includes(event.targetSynergy as SynergyType)) matchCount += 1;
         }
         if (matchCount > 0) {
-          const rawDelta = event.coinDelta * matchCount;
+          const rawDelta = event.coinPercentDelta !== undefined
+            ? baseCoinDelta
+            : baseCoinDelta * matchCount;
           coinsGained += applyReputationMultiplier(coinDeltaFor(owner, rawDelta), owner.player.reputation, cfg);
           repGained += repDeltaFor(owner, event.reputationDelta);
         }
@@ -385,7 +439,7 @@ export function applyCompetitiveEventEffects(
       case 'RandomBusiness': {
         // Investment → acting player only; incident → every owner once.
         if (actingId !== undefined && owner.ownerId !== actingId) break;
-        coinsGained += applyReputationMultiplier(coinDeltaFor(owner, event.coinDelta), owner.player.reputation, cfg);
+        coinsGained += applyReputationMultiplier(coinDeltaFor(owner, baseCoinDelta), owner.player.reputation, cfg);
         repGained += repDeltaFor(owner, event.reputationDelta);
         break;
       }

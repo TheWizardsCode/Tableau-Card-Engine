@@ -282,7 +282,7 @@ Event cards are split into two trigger types:
 | Name | Trigger | Effect |
 |------|---------|--------|
 | Local Festival | Investment | +2 coins per Culture business and +1 reputation. |
-| Tax Audit | Incident | Lose 3 coins. |
+| Tax Audit | Incident | Lose 45% of banked coins (25% with the Accountant). |
 | Rainy Day | Incident | -1 coin per Food business this turn. |
 | Community Award | Incident | +2 reputation from community recognition. |
 | Health Inspection | Incident | -2 coins per Food business and -1 reputation. |

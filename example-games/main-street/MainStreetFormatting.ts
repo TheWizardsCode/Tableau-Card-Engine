@@ -200,6 +200,7 @@ export function buildCardTooltipInfo(
       lines.push(`Ongoing cost: -${st.ongoingCost ?? 0}/turn`);
       if ((st.reputationPerTurn ?? 0) > 0) lines.push(`Reputation: +${st.reputationPerTurn}/turn`);
       if ((st.refreshCostDiscount ?? 0) > 0) lines.push(`Refresh discount: -${st.refreshCostDiscount} per refresh`);
+      if ((st.taxAuditRate ?? 0) > 0) lines.push(`Tax Audit: losses reduced to ${Math.round((st.taxAuditRate ?? 0) * 100)}%`);
       if ((st.actionsPerTurn ?? 0) > 0) lines.push(`Actions: +${st.actionsPerTurn}/day`);
       if (st.peekOncePerTurn) lines.push('Ability: peek the incident deck once per turn');
       // Specialization skills (CG-0MT1CIWSD003VBPK): the applicant card's

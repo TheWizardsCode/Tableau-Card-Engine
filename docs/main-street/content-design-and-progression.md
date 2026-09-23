@@ -56,7 +56,7 @@ Event cards are split into two trigger types:
 | Children's Story Hour | Incident | +1 reputation. *(Group D.)* |
 | Street Cleaning | Incident | No effect (streak breaker). *(Group D.)* |
 | Neighborhood Watch | Incident | -1 coin but +1 reputation (net-0, streak breaker). *(Group D.)* |
-| Tax Audit | Incident | Lose 3 coins. |
+| Tax Audit | Incident | Lose 45% of banked coins (25% with the Accountant). |
 | Rainy Day | Incident | -1 coin per Food business this turn. |
 | Community Award | Incident | +2 reputation from community recognition. |
 | Health Inspection | Incident | -2 coins per Food business and -1 reputation. |
@@ -113,7 +113,7 @@ Staff cards expand hand capacity at an ongoing per-turn coin cost. *(Group F, CG
 | Assistant | 3 | 1 | +1 | 2 | — | Hire an assistant to help manage your hand. |
 | Manager | 7 | 2.5 | +2 | 3 | — | A skilled manager keeps things organised. |
 | Socialite | 8 | 1.5 | +1 | 4 | +0.1 rep/turn | A charming socialite adds hand capacity and reputation. *(Group F.)* |
-| Accountant | 8 | 1.5 | +1 | 6 | refresh −1 | Makes market refreshes cost 1 less. *(Group F.)* |
+| Accountant | 8 | 1.5 | +1 | 6 | refresh −1; tax 25% | Makes market refreshes cost 1 less and reduces Tax Audit losses to 25%. *(Group F; CG-0MTQ7W0ZX0059R3J.)* |
 | Lookout | 10 | 2 | +1 | 7 | peek once/turn | Peek at the top incident-deck card once per turn. *(CG-0MSXOW6GN008ZSMN.)* |
 | Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. |
 | Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity. *(Group F.)* |

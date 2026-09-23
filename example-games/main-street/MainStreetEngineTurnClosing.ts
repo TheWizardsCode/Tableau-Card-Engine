@@ -165,7 +165,6 @@ export function resolveEventChoice(
     // Accept path (AC8): apply the event's stated effect, then chain on.
     resolveEvent(state, event);
     pushedCard = pushChainCard(state, event.acceptNextCardId);
-    addLog(state, `Chose to accept: ${event.name} consequences apply.`, 'neutral');
   } else {
     // Reject path (AC9): refuse the event's effect (nothing applied); the
     // escalation (worse/better card) is added to the deck instead.
@@ -175,6 +174,17 @@ export function resolveEventChoice(
 
   const coinChange = state.resourceBank.coins - coinsBefore;
   const repChange = state.resourceBank.reputation - repBefore;
+  if (option === 'accept') {
+    // Show the ACTUAL applied delta (CG-0MTQ7W0ZX0059R3J AC6): for the
+    // proportional Tax Audit this is the real percentage amount, e.g.
+    // "Chose to accept: Tax Audit (-450 coins).", using the same
+    // describeEventEffects formatting as the Incident: log lines.
+    addLog(
+      state,
+      `Chose to accept: ${event.name} (${describeEventEffects(coinChange, repChange)}).`,
+      classifyEffect(coinChange, repChange),
+    );
+  }
   syncResourceBankToLedger(state);
 
   // Transcript (AC12): the choice is recorded identically for player and AI.

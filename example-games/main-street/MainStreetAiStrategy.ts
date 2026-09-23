@@ -47,6 +47,7 @@ import {
 } from './MainStreetMarket';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, StaffCard, SynergyType } from './MainStreetCards';
 import { isDurationEventCard } from './MainStreetCards';
+import { computeProportionalCoinLoss, computeTaxAuditRate } from './MainStreetStaffBuffs';
 import type { DifficultyName } from './MainStreetDifficulty';
 import { computeSynergyBonus, getSlotOwnerId } from './MainStreetAdjacency';
 import { computeScore } from './MainStreetEngine';
@@ -1478,14 +1479,23 @@ export function computeCompetitiveEventValue(
   const player = getCompetitivePlayer(state, playerId);
   const pid = player?.playerId ?? playerId ?? 0;
   if (isDurationEventCard(event)) return 0;
+  // Proportional events (CG-0MTQ7W0ZX0059R3J) are valued against the
+  // acting player's own banked balance and effective rate, mirroring
+  // applyCompetitiveEventEffects. Flat events keep the nominal `coinDelta`.
+  const baseCoinDelta = event.coinPercentDelta === undefined
+    ? event.coinDelta
+    : -computeProportionalCoinLoss(
+        player?.coins ?? state.resourceBank.coins,
+        computeTaxAuditRate(player?.staffCards ?? [], Math.abs(event.coinPercentDelta)),
+      );
   switch (event.target) {
     case 'All':
     case 'RandomBusiness':
-      return event.coinDelta + event.reputationDelta;
+      return baseCoinDelta + event.reputationDelta;
     case 'SpecificSynergy': {
       const matches = countOwnSynergyMatches(state, event.targetSynergy as SynergyType, pid);
       if (matches === 0) return 0;
-      return event.coinDelta * matches + event.reputationDelta;
+      return (event.coinPercentDelta !== undefined ? baseCoinDelta : baseCoinDelta * matches) + event.reputationDelta;
     }
     default:
       return 0;

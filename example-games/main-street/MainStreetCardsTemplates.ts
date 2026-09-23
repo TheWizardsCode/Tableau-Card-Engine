@@ -157,6 +157,12 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       const hasChoices = r.hasChoices ? r.hasChoices.trim().toLowerCase() === 'true' : undefined;
       const acceptNextCardId = r.acceptNextCardId ? r.acceptNextCardId.trim() || null : undefined;
       const rejectNextCardId = r.rejectNextCardId ? r.rejectNextCardId.trim() || null : undefined;
+      // Optional proportional coin effect (CG-0MTQ7W0ZX0059R3J): signed
+      // fraction of banked coins (e.g. -0.45 for the Tax Audit). Absent on
+      // flat-delta events.
+      const coinPercentDelta = r.coinPercentDelta !== undefined && r.coinPercentDelta !== ''
+        ? Number(r.coinPercentDelta)
+        : undefined;
       const base: EventCard = {
         family: 'event',
         id: r.id,
@@ -174,6 +180,9 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
         ...(hasChoices === true ? { hasChoices: true } : {}),
         ...(acceptNextCardId !== undefined ? { acceptNextCardId } : {}),
         ...(rejectNextCardId !== undefined ? { rejectNextCardId } : {}),
+        ...(coinPercentDelta !== undefined && Number.isFinite(coinPercentDelta)
+          ? { coinPercentDelta }
+          : {}),
       };
       if (r.duration) {
         return {
@@ -248,6 +257,7 @@ function rebuildTemplateArrays(rows: Record<string, string>[]): void {
       allowedBusinessTypes: (r.allowedBusinessTypes || '').split('|').filter(Boolean),
       reputationPerTurn: r.reputationPerTurn ? Number(r.reputationPerTurn) : undefined,
       refreshCostDiscount: r.refreshCostDiscount ? Number(r.refreshCostDiscount) : undefined,
+      taxAuditRate: r.taxAuditRate !== undefined && r.taxAuditRate !== '' ? Number(r.taxAuditRate) : undefined,
       actionsPerTurn: r.actionsPerTurn ? Number(r.actionsPerTurn) : undefined,
       peekOncePerTurn: r.peekOncePerTurn ? Number(r.peekOncePerTurn) > 0 : undefined,
     });

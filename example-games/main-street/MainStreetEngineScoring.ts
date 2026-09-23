@@ -11,6 +11,7 @@ import type { EventCard } from './MainStreetCards';
 import { getEventTemplates } from './MainStreetCards';
 import { applyReputationMultiplier } from './MainStreetDifficulty';
 import type { DifficultyName } from './MainStreetDifficulty';
+import { eventCoinDeltaFor } from './MainStreetEngineEvents';
 import type { MainStreetState } from './MainStreetState';
 import { syncResourceBankToLedger } from './MainStreetState';
 
@@ -67,23 +68,29 @@ export function updateCompetitiveScores(state: MainStreetState): void {
 export function projectEventCoinDelta(state: MainStreetState, event: EventCard): number {
   const cfg = state.config;
   const rep = state.resourceBank.reputation;
+  // Proportional events (CG-0MTQ7W0ZX0059R3J) project the same
+  // percentage-of-balance magnitude the engine applies; flat events keep
+  // their per-target `coinDelta` semantics. Routing through the shared helper
+  // keeps the AI affordability / accept-reject path in lock-step with
+  // resolveEvent (AC5).
+  const base = eventCoinDeltaFor(state, event);
   let raw: number;
   switch (event.target) {
     case 'SpecificSynergy': {
       const matchCount = state.streetGrid.filter(
         (b) => b !== null && b.synergyTypes.includes(event.targetSynergy as never),
       ).length;
-      raw = event.coinDelta * matchCount;
+      raw = event.coinPercentDelta !== undefined ? base : base * matchCount;
       break;
     }
     case 'RandomBusiness': {
       const placed = state.streetGrid.filter((b) => b !== null).length;
-      raw = placed > 0 ? event.coinDelta : 0;
+      raw = placed > 0 ? base : 0;
       break;
     }
     case 'All':
     default:
-      raw = event.coinDelta;
+      raw = base;
       break;
   }
   return applyReputationMultiplier(raw, rep, cfg);

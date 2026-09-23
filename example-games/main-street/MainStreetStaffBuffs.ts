@@ -33,6 +33,7 @@
 import type { SynergyType, StaffCard } from './MainStreetCards';
 import type { SpecializationSkill } from './MainStreetStaffSkills';
 import { deserializeSkillIds } from './MainStreetStaffSkills';
+import { roundInt } from './MainStreetDifficulty';
 import type { MainStreetState } from './MainStreetState';
 
 // ── Buff Profiles ───────────────────────────────────────────
@@ -105,6 +106,20 @@ export const QUALITY_INSPECTOR_COIN_PCT = 0.3;
 export const COMPLIANCE_REP_FLAT = 50;
 export const RISK_MANAGER_PROBABILITY_PCT = 0.15;
 export const BRAND_AMBASSADOR_REP_MULTIPLIER = 1.5;
+
+/**
+ * Base Tax Audit collection rate: 45% of banked coins. Mirrors the
+ * `coinPercentDelta: -0.45` value on `evt-tax` in `card-data.csv`; the engine
+ * reads the rate from the card, and this named constant is the single
+ * reference site for the design value (tests assert the two agree).
+ */
+export const TAX_AUDIT_BASE_RATE = 0.45;
+
+/**
+ * Accountant-mitigated Tax Audit rate: 25% of banked coins. Mirrors the
+ * `taxAuditRate: 0.25` value on `staff-accountant` in `card-data.csv`.
+ */
+export const TAX_AUDIT_ACCOUNTANT_RATE = 0.25;
 
 // ── Per-business buff computation ───────────────────────────
 
@@ -304,6 +319,46 @@ export function computeStreetOngoingCostReductionPct(
 /** Flat discount on each business-card refresh (Negotiator, -100). */
 export function computeRefreshCostDiscount(skills: readonly SpecializationSkill[]): number {
   return skills.filter(s => s.id === 'skill-negotiator').length * NEGOTIATOR_REFRESH_DISCOUNT;
+}
+
+/**
+ * Effective proportional-tax rate after employed-staff overrides
+ * (CG-0MTQ7W0ZX0059R3J). The event supplies the base rate (e.g. the Tax
+ * Audit's 45%); any employed staff member with a `taxAuditRate` (e.g. the
+ * Accountant's 25%) overrides it, and the lowest (most player-favourable)
+ * override wins. The result is clamped to [0, 1].
+ *
+ * @param staffCards Currently employed staff (`state.staffCards`).
+ * @param baseRate   The event's own rate (a positive fraction).
+ */
+export function computeTaxAuditRate(
+  staffCards: readonly StaffCard[],
+  baseRate: number,
+): number {
+  let rate = Number.isFinite(baseRate) ? baseRate : 0;
+  for (const card of staffCards ?? []) {
+    const override = card.taxAuditRate;
+    if (typeof override === 'number' && Number.isFinite(override)) {
+      rate = Math.min(rate, override);
+    }
+  }
+  return Math.max(0, Math.min(1, rate));
+}
+
+/**
+ * Positive coin loss a proportional-tax effect collects from `coins` at
+ * `rate`: rounded to the nearest integer (shared integer-economy primitive)
+ * and clamped to the balance so the result can never drive coins below 0
+ * (AC3 of CG-0MTQ7W0ZX0059R3J). Pure; consumes no RNG.
+ *
+ * @param coins Current banked coin balance.
+ * @param rate  Positive fraction of the balance to collect (clamped to [0,1]).
+ * @returns Non-negative integer magnitude of the loss.
+ */
+export function computeProportionalCoinLoss(coins: number, rate: number): number {
+  if (!Number.isFinite(coins) || coins <= 0) return 0;
+  const effectiveRate = Math.max(0, Math.min(1, Number.isFinite(rate) ? rate : 0));
+  return Math.min(coins, roundInt(coins * effectiveRate));
 }
 
 /** Flat salary discount for THIS employed staff member (Operations Manager, -50). */

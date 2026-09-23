@@ -206,6 +206,19 @@ export interface EventCard {
   readonly coinDelta: number;
   readonly reputationDelta: number;
   /**
+   * Optional proportional coin effect, expressed as a signed fraction of the
+   * player's banked coins at resolution time (e.g. `-0.45` = lose 45% of
+   * `state.resourceBank.coins`). When present it takes precedence over
+   * `coinDelta` for resolution and AI projection; `coinDelta` remains the
+   * nominal value used for static severity ranking and as a fallback. The
+   * loss is rounded to the nearest integer and clamped so the balance never
+   * drops below 0. Absent on flat-delta events (backward compatible).
+   *
+   * Employed staff may lower the rate via {@link StaffCard.taxAuditRate}
+   * (e.g. the Accountant: 45% -> 25%).
+   */
+  readonly coinPercentDelta?: number;
+  /**
    * Optional week window for seasonal/holiday events.
    * When present, the card is only offerable/drawable when the current
    * game week falls within [availableWeekStart, availableWeekEnd] inclusive.
@@ -340,6 +353,15 @@ export interface StaffCard {
    * CG-0MSQJ7VL9009JHF4).
    */
   readonly refreshCostDiscount?: number;
+  /**
+   * Optional Tax Audit rate override, as a fraction of banked coins
+   * (e.g. `0.25` for the Accountant's "tax losses reduced to 25%" ability).
+   * When one or more employed staff define this, the lowest (most
+   * player-favourable) value is used for proportional tax events instead of
+   * the event's own `coinPercentDelta`. Absent for staff without the ability
+   * (backward compatible).
+   */
+  readonly taxAuditRate?: number;
   /**
    * Optional additional actions granted per turn.
    * (e.g. the General Manager's +1 action per day — CG-0MSTOF1N5005PK2R).
