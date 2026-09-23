@@ -178,6 +178,13 @@ interface BeginDragOptions {
   expectEngage?: boolean;
   /** Max wall-clock time to keep retrying (default 30 s). */
   deadlineMs?: number;
+  /**
+   * Optional live-container resolver, called at the start of every attempt.
+   * The async SVG prewarm chain calls `refreshAll()` after the SVGs load,
+   * which rebuilds the market containers; re-resolving picks up the replacement
+   * instead of dragging a detached object (CG-0MUE2U21C0007BKL).
+   */
+  resolve?: () => any;
 }
 
 /**
@@ -206,16 +213,20 @@ interface BeginDragOptions {
  *    drag/drop pipeline still exhausts the deadline and throws.
  *
  * @param container - The rendered market-card container to drag.
- * @param opts - Engagement expectation and retry deadline.
+ * @param scene - The scene (passed explicitly so a rebuild that destroys the
+ *   original container cannot invalidate the loop driver).
+ * @param container - The rendered market-card container to drag.
+ * @param opts - Engagement expectation, retry deadline and live resolver.
+ * @returns The container that was actually dragged (a rebuild may have
+ *   replaced the one passed in).
  */
 async function beginDrag(
+  scene: Scene,
   container: any,
   opts: BeginDragOptions = {},
-): Promise<void> {
-  const { expectEngage = true, deadlineMs = 30_000 } = opts;
-  const scene = container.scene as Scene;
-  const originX = container.x;
-  const originY = container.y;
+): Promise<any> {
+  const { expectEngage = true, deadlineMs = 30_000, resolve } = opts;
+  let target = container;
 
   // Deterministically flush the freshly rebuilt interactive hit zones
   // (drop zones + draggable containers created by `refreshAll`) out of
@@ -227,6 +238,15 @@ async function beginDrag(
 
   const start = Date.now();
   for (;;) {
+    // Pick up a replacement container if an async rebuild landed since the
+    // last attempt (or since the test captured the container).
+    if (resolve) {
+      const fresh = resolve();
+      if (fresh) target = fresh;
+    }
+    const originX = target.x;
+    const originY = target.y;
+
     // Flush any pending input insertion so the hit zone is hittable for this
     // attempt.  Phaser processes the pointer events synchronously in its DOM
     // handlers, so no further frame waits are needed for the gesture itself.
@@ -239,7 +259,7 @@ async function beginDrag(
     // Cross the drag-distance threshold → dragstart fires.
     dispatchMouse('mousemove', originX + 6, originY);
     // Second move: the container should now track the pointer.  The drag
-    // handler updates `container.x` synchronously on this dispatch.
+    // handler updates `target.x` synchronously on this dispatch.
     dispatchMouse('mousemove', originX + 60, originY + 20);
     stepGame(scene);
     await wait(0);
@@ -247,20 +267,20 @@ async function beginDrag(
     // Poll: has the container moved?  If so, the drag is live — leave it
     // active for releaseDrag().
     if (
-      Math.abs(container.x - originX) > 5 ||
-      Math.abs(container.y - originY) > 5
+      Math.abs(target.x - originX) > 5 ||
+      Math.abs(target.y - originY) > 5
     ) {
-      return;
+      return target;
     }
 
     // A deliberate veto (no actions / no eligible target) leaves the card at
     // its origin by design — return so the test can assert that state.
-    if (!expectEngage) return;
+    if (!expectEngage) return target;
 
     if (Date.now() - start >= deadlineMs) {
       throw new Error(
         `Timed out waiting for the drag to engage after ${deadlineMs}ms ` +
-          `(container.x=${container.x}, container.y=${container.y})`,
+          `(container.x=${target.x}, container.y=${target.y})`,
       );
     }
 
@@ -382,13 +402,31 @@ function findMarketCardContainer(scene: Scene, cardId: string): any | undefined 
 /**
  * Wait until the market containers are stable across consecutive polls so a
  * rebuild cannot invalidate the dragged container mid-gesture.
+ *
+ * The async SVG prewarm chain (`cardSvgLoadPromise.then(prewarm).then(refreshAll)`)
+ * rebuilds the market containers after the SVGs load.  Give it a chance to run
+ * before capturing a container; `beginDrag` also re-resolves per attempt (see
+ * its `resolve` option), so a rebuild that lands later is still handled
+ * (CG-0MUE2U21C0007BKL).
  */
 async function waitForMarketStable(scene: Scene, cardId: string): Promise<any> {
+  try {
+    await Promise.race([scene.cardSvgLoadPromise, wait(5000)]);
+  } catch { /* ignore */ }
+  await wait(250);
+
   let previous: any;
-  for (let i = 0; i < 40; i += 1) {
-    await wait(100);
+  let stablePolls = 0;
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    await wait(250);
     const now = findMarketCardContainer(scene, cardId);
-    if (now && now === previous) return now;
+    if (now && now === previous) {
+      stablePolls += 1;
+      if (stablePolls >= 3) return now;
+    } else {
+      stablePolls = 0;
+    }
     previous = now;
   }
   throw new Error('Timed out waiting for the market containers to stabilise');
@@ -407,11 +445,13 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     game = await bootGame();
     const scene = getScene(game);
     const { upgrade } = setupUpgradeScene(scene);
-    const container = await waitForMarketStable(scene, upgrade.id);
+    let container = await waitForMarketStable(scene, upgrade.id);
 
     const originX = container.x;
     const originDepth = container.depth;
-    await beginDrag(container);
+    container = await beginDrag(scene, container, {
+      resolve: () => findMarketCardContainer(scene, upgrade.id),
+    });
 
     // The container tracks the pointer and is raised above the board.
     expect(container.x).toBeGreaterThan(originX + 20);
@@ -452,7 +492,9 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     const container = await waitForMarketStable(scene, upgrade.id);
     const target = scene.getStreetSlotCenter(0);
 
-    await beginDrag(container);
+    await beginDrag(scene, container, {
+      resolve: () => findMarketCardContainer(scene, upgrade.id),
+    });
     await releaseDrag(scene, target.x, target.y);
 
     await waitForCondition(
@@ -477,12 +519,15 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     const scene = getScene(game);
     // Business sits at level 1 while the upgrade requires level 0.
     const { upgrade } = setupUpgradeScene(scene, { actions: 1, businessLevel: 1 });
-    const container = await waitForMarketStable(scene, upgrade.id);
+    let container = await waitForMarketStable(scene, upgrade.id);
     const originX = container.x;
     const originY = container.y;
     const target = scene.getStreetSlotCenter(0);
 
-    await beginDrag(container, { expectEngage: false });
+    container = await beginDrag(scene, container, {
+      expectEngage: false,
+      resolve: () => findMarketCardContainer(scene, upgrade.id),
+    });
     await releaseDrag(scene, target.x, target.y, 500);
 
     // The card snapped back to the Development row, nothing was spent, and
@@ -500,7 +545,7 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     game = await bootGame();
     const scene = getScene(game);
     const { upgrade } = setupUpgradeScene(scene, { actions: 0 });
-    const container = await waitForMarketStable(scene, upgrade.id);
+    let container = await waitForMarketStable(scene, upgrade.id);
 
     // Disabled presentation + the drag pick-up is refused.
     expect(container.alpha).toBeCloseTo(0.45, 5);
@@ -522,7 +567,10 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     // vetoed (no actions), so the drag is not expected to engage.
     const originX = container.x;
     const originY = container.y;
-    await beginDrag(container, { expectEngage: false });
+    container = await beginDrag(scene, container, {
+      expectEngage: false,
+      resolve: () => findMarketCardContainer(scene, upgrade.id),
+    });
     await releaseDrag(scene, scene.getStreetSlotCenter(0).x, scene.getStreetSlotCenter(0).y, 400);
 
     expect(container.x).toBeCloseTo(originX, 0);
@@ -535,7 +583,7 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     game = await bootGame();
     const scene = getScene(game);
     const { upgrade } = setupUpgradeScene(scene, { actions: 1 });
-    const container = await waitForMarketStable(scene, upgrade.id);
+    let container = await waitForMarketStable(scene, upgrade.id);
     const originX = container.x;
     // Real motion + audio so the transfer animation and its SFX actually run.
     scene.settingsPanel._reducedMotion = false;
@@ -544,7 +592,9 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     const soundSpy = vi.spyOn(scene.soundManager, 'play').mockClear();
 
     const target = scene.getStreetSlotCenter(0);
-    await beginDrag(container);
+    container = await beginDrag(scene, container, {
+      resolve: () => findMarketCardContainer(scene, upgrade.id),
+    });
     await releaseDrag(scene, target.x, target.y, 40);
 
     // The transfer continues from where the card was released.

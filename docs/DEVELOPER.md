@@ -440,13 +440,15 @@ process. When the bound elapses the runner exits with code **124**
 itself only ever exits 0 or 1) after printing a `[hang-timeout]` diagnostic
 with re-run guidance. Hangs are **never retried** — a genuine hang must
 surface, not be masked. `scripts/run-ci-tests.sh` sets the bounds
-explicitly: 5 minutes for the unit stage, 15 minutes for the browser stage
+explicitly: 5 minutes for the unit stage, 20 minutes for the browser stage
 (`--timeout-ms <n>`, default 10 minutes in the runner itself). The browser
-bound is deliberately generous — ~40 files at 8-10s each runs 6-8 minutes
+bound is deliberately generous — 115 files at ~7-8s each runs ~13-15 minutes
 nominal, and concurrent full-suite runs from parallel worktrees can stretch
-it past 12 — while a true hang never completes and is still bounded. Under
-`set -euo pipefail` the 124 exit aborts the gate instead of stalling it
-indefinitely.
+it further — while a true hang never completes and is still bounded. (The
+bound was raised from 15 to 20 minutes once the browser suite grew to 115
+files and normal run-to-run variance straddled the old 15-minute limit,
+risking an abort of an otherwise green stage.) Under `set -euo pipefail` the
+124 exit aborts the gate instead of stalling it indefinitely.
 
 Diagnosing a hang: `[hang-timeout]` in the output identifies the stage;
 re-run the suspected file(s) in isolation via
