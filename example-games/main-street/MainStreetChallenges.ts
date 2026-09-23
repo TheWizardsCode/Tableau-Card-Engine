@@ -81,7 +81,7 @@ export interface ActiveChallenge extends ActiveChallengeRecord<MainStreetState> 
  */
 function countBusinessesBySynergy(state: MainStreetState, synergy: SynergyType): number {
   return state.streetGrid.filter(
-    b => b !== null && b.synergyTypes.includes(synergy),
+    b => b !== null && (b.synergyTypes ?? []).includes(synergy),
   ).length;
 }
 
@@ -101,7 +101,9 @@ function countAdjacentSynergyPairs(state: MainStreetState): number {
     const a = state.streetGrid[i];
     const b = state.streetGrid[i + 1];
     if (a && b) {
-      const shared = a.synergyTypes.some(st => b.synergyTypes.includes(st));
+      const aSyn = a.synergyTypes ?? [];
+      const bSyn = b.synergyTypes ?? [];
+      const shared = aSyn.some(st => bSyn.includes(st));
       if (shared) pairs++;
     }
   }
@@ -115,7 +117,7 @@ function countDistinctSynergyTypes(state: MainStreetState): number {
   const types = new Set<SynergyType>();
   for (const biz of state.streetGrid) {
     if (biz) {
-      for (const st of biz.synergyTypes) {
+      for (const st of biz.synergyTypes ?? []) {
         types.add(st);
       }
     }
@@ -166,7 +168,7 @@ export const CHALLENGE_TEMPLATES: readonly Challenge[] = [
       // Check for 3+ contiguous Food businesses
       let run = 0;
       for (const slot of state.streetGrid) {
-        if (slot && slot.synergyTypes.includes('Food')) {
+        if (slot && (slot.synergyTypes ?? []).includes('Food')) {
           run++;
           if (run >= 3) return true;
         } else {
