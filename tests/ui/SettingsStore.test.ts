@@ -87,3 +87,65 @@ describe('SettingsStore persistence', () => {
     expect(getTooltips(storage)).toBe(false);
   });
 });
+
+// ── Configuration validation edge cases ──────────────────────
+
+describe('SettingsStore configuration validation', () => {
+  it('corrupt storage values return safe defaults', () => {
+    const storage = createMockStorage();
+
+    // reduced-motion: "yes", "1", "" should all default to false
+    (storage as any).setItem('tce-ui-reduced-motion', 'yes');
+    expect(getReducedMotion(storage)).toBe(false);
+
+    (storage as any).setItem('tce-ui-reduced-motion', '1');
+    expect(getReducedMotion(storage)).toBe(false);
+
+    (storage as any).setItem('tce-ui-reduced-motion', '');
+    expect(getReducedMotion(storage)).toBe(false);
+
+    // tooltips: "yes", "1" should default to false (only "true" is truthy)
+    (storage as any).setItem('tce-show-tooltips', 'yes');
+    expect(getTooltips(storage)).toBe(false);
+
+    (storage as any).setItem('tce-show-tooltips', '1');
+    expect(getTooltips(storage)).toBe(false);
+  });
+
+  it('reduced-motion boolean strings "true"/"false" work correctly', () => {
+    const storage = createMockStorage();
+
+    setReducedMotion(true, storage);
+    expect(getReducedMotion(storage)).toBe(true);
+
+    setReducedMotion(false, storage);
+    expect(getReducedMotion(storage)).toBe(false);
+  });
+
+  it('a throwing storage backend falls back to safe defaults on read', () => {
+    const throwingStorage: StorageLike = {
+      getItem: vi.fn(() => {
+        throw new Error('storage unavailable');
+      }),
+      setItem: vi.fn(),
+    };
+
+    // Safe defaults: reduced-motion false, tooltips true, difficulty null
+    expect(getReducedMotion(throwingStorage)).toBe(false);
+    expect(getTooltips(throwingStorage)).toBe(true);
+    expect(getSelectedDifficulty(throwingStorage)).toBeNull();
+  });
+
+  it('a throwing storage backend does not crash writes', () => {
+    const throwingStorage: StorageLike = {
+      getItem: vi.fn(),
+      setItem: vi.fn(() => {
+        throw new Error('quota exceeded');
+      }),
+    };
+
+    expect(() => setReducedMotion(true, throwingStorage)).not.toThrow();
+    expect(() => setTooltips(false, throwingStorage)).not.toThrow();
+    expect(() => setSelectedDifficulty('Hard', throwingStorage)).not.toThrow();
+  });
+});

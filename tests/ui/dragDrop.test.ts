@@ -544,3 +544,123 @@ describe('dragDrop container draggables', () => {
     expect(onIllegal).toHaveBeenCalled();
   });
 });
+
+// ── Error-path tests ─────────────────────────────────────────
+
+describe('dragDrop error paths', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('destroy() mid-drag: subsequent drag events do not throw', () => {
+    const { mock, manager } = makeManager();
+    const go = createMockGameObject(100, 200, 5);
+    go.input = { draggable: true };
+    manager.registerDraggable({ gameObject: go as unknown as DraggableGameObject });
+
+    // Start a drag
+    mock.events.dragstart(pointer, go);
+    expect(go.depth).toBe(1000);
+
+    // Destroy the manager mid-drag
+    manager.destroy();
+
+    // Subsequent events should not throw
+    expect(() => {
+      mock.events.drag(pointer, go, 300, 400);
+      mock.events.dragend(pointer, go, false);
+    }).not.toThrow();
+
+    // Depth should remain at the last set value (no crash)
+    expect(go.depth).toBe(1000);
+  });
+
+  it('re-registering an already-draggable object does not duplicate listeners', () => {
+    const onDragStart = vi.fn();
+    const { mock, manager } = makeManager({ onDragStart });
+    const go = createMockGameObject();
+    go.input = { draggable: true };
+
+    // Register, drag, unregister, re-register, drag again
+    manager.registerDraggable({ gameObject: go as unknown as DraggableGameObject });
+    mock.events.dragstart(pointer, go);
+    expect(onDragStart).toHaveBeenCalledTimes(1);
+
+    manager.unregisterDraggable(go as unknown as DraggableGameObject);
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+    });
+
+    mock.events.dragstart(pointer, go);
+    // Should fire exactly once — no duplicate handlers
+    expect(onDragStart).toHaveBeenCalledTimes(2);
+  });
+
+  it('container shake fallback: when setTint is missing, shakeContainer runs and restores position', () => {
+    const { mock, manager } = makeManager();
+    // A Container-style draggable has no setTint, so defaultIllegal takes the
+    // container-safe path: safePlaySound + shakeContainer. (safePlaySound is
+    // internally exception-safe, so the sound never throws; the fallback
+    // guarantees the container shake still runs regardless.)
+    const container = {
+      x: 100,
+      y: 200,
+      depth: 5,
+      input: { draggable: true },
+      setInteractive: vi.fn(),
+      setDepth: vi.fn((d: number) => { container.depth = d; }),
+    } as unknown as DraggableGameObject;
+
+    manager.registerDraggable({
+      gameObject: container,
+      canPickUp: () => false,
+    });
+    expect(typeof (container as { setTint?: unknown }).setTint).not.toBe('function');
+
+    mock.events.dragstart(pointer, container);
+
+    // shakeContainer registers a shake tween (position restored on completion)
+    expect(mock.tweenConfigs.length).toBe(1);
+    runTweenComplete(mock);
+    expect(container.x).toBe(100); // restored to origin
+  });
+
+  it('illegal feedback never crashes the drag lifecycle when the scene lacks a rectangle factory', () => {
+    // shakeIllegalMove needs scene.add.rectangle (Canvas tint overlay); a
+    // headless/test scene without it must not crash the drag lifecycle — the
+    // default onIllegal hook's try/catch swallows the failure.
+    const { mock, manager } = makeManager();
+    const go = createMockGameObject(100, 200, 5);
+    go.input = { draggable: true };
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      canPickUp: () => false, // forces the illegal-feedback path
+    });
+
+    expect(() => mock.events.dragstart(pointer, go)).not.toThrow();
+
+    // Card is still at origin, no crash occurred
+    expect(go.x).toBe(100);
+    expect(go.y).toBe(200);
+    expect(mock.tweenConfigs.length).toBe(0);
+  });
+
+  it('default illegal feedback plays the shared sfx-illegal-move sound', () => {
+    // The default onIllegal hook (no custom callback) plays the shared SFX
+    // key via safePlaySound (through shakeIllegalMove's default soundKey).
+    const { mock, manager } = makeManager();
+    const go = createMockGameObject();
+    go.input = { draggable: true };
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      canPickUp: () => false,
+    });
+
+    mock.events.dragstart(pointer, go);
+
+    // safePlaySound delegates to scene.sound.play with the shared key
+    expect(mock.scene.sound.play).toHaveBeenCalledWith('sfx-illegal-move');
+  });
+});
