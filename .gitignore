@@ -103,4 +103,5 @@ Worklog Specific Ignores
 .pi/*
 !.pi/skills/
 !.pi/skills/**
+!.pi/test-config.json
 .implement_state.json
