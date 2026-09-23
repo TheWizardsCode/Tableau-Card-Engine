@@ -67,6 +67,35 @@ Each `MonteCarloRunSummary` now includes the following additional fields:
 
 These fields enable per-card micro metrics (pick rate, win-rate delta, survival rate) and economy health analysis (G3, G7) described in the Balance Process & Tooling PRD.
 
+## Per-Action Challenge Evaluation Re-Run (CG-0MU8N8B52003HCJ5)
+
+After challenges began evaluating after every action rather than only at
+end of turn (CG-0MU37CKRR008252I, producer decision Q2=A), the canonical
+greedy profile was re-run and compared against
+`docs/main-street/monte-carlo-baseline.json` (generated 2026-09-12).
+
+```bash
+npx vite-node scripts/monte-carlo.ts --seeds 200 --seed-prefix mc-balance \
+  --maxTurns 60 --strategy greedy --out /tmp/mc-after-greedy.json
+```
+
+| Metric | Baseline (2026-09-12) | Per-action re-run | Delta | Relative |
+|---|---|---|---|---|
+| winRate | 0.830 | 0.635 | -0.195 | -23.5% |
+| averageCoinsPerTurn | 639.60 | 656.36 | +16.76 | +2.6% |
+| medianScore | 13177.5 | 12547 | -630.5 | -4.8% |
+
+Loss reasons in the re-run: `reputation_collapse` 61/73, `bankruptcy` 12/73.
+The coin economy is stable (well within the +/-30% guardrail), but the
+win-rate move exceeds the >5% re-baselining threshold, so a follow-up
+analysis work item was filed (**CG-0MUE03DGQ005KPZ7**) to attribute the
+drift (cumulative balance changes since 2026-09-12 vs. per-action
+completion timing) and either regenerate the baseline or fix a regression.
+The guardrail test (`tests/main-street/monte-carlo-guardrails.test.ts`)
+still passes (win-rate tolerance +/-0.25). The baseline JSON was
+intentionally **not** regenerated — the drift-report-then-ask workflow
+requires operator approval before a baseline change.
+
 ## See Also
 
 - **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the structured balance review process, micro/macro metrics, and baseline management strategy that build on these Monte Carlo results.
