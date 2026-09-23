@@ -715,24 +715,45 @@ export function performUndo(tcCtx: MainStreetTurnControllerContext): void {
     if (s.uiPhase === 'animating' || s.uiPhase === 'game-over') return;
     if (!s.undoManager || !s.undoManager.canUndo()) return;
 
-    try {
-      const cmd = s.undoManager.undo();
-      s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
-      addLog(s.state, 'Undo', 'neutral');
-      try { if (cmd) recordMainStreetEvent({ type: 'undo', turn: s.state.turn, reversedAction: { description: cmd.description } }); } catch (_) {}
-      // Undoing a move-to-hand removes the card from hand, so any tracked
-      // "just moved" card is stale (CG-0MSXIQIPJ000NDTL).
-      s.justMovedHandCardId = null;
-      s.refreshAll();
-      // Undo feedback (AGENTS.md rule 8): "Undid: <action>" pop above the
-      // hint bar + UI click SFX. Reduced motion / replay handled inside the
-      // animator; non-blocking, presentation-only.
-      if (cmd) {
-        try { s.msAnimator?.animateUndoRedo({ action: 'undo', description: cmd.description }); } catch (_) { /* presentation-only — ignore */ }
+    const doUndo = (): void => {
+      try {
+        const cmd = s.undoManager.undo();
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
+        addLog(s.state, 'Undo', 'neutral');
+        try { if (cmd) recordMainStreetEvent({ type: 'undo', turn: s.state.turn, reversedAction: { description: cmd.description } }); } catch (_) {}
+        // Undoing a move-to-hand removes the card from hand, so any tracked
+        // "just moved" card is stale (CG-0MSXIQIPJ000NDTL).
+        s.justMovedHandCardId = null;
+        s.refreshAll();
+        // Undo feedback (AGENTS.md rule 8): "Undid: <action>" pop above the
+        // hint bar + UI click SFX. Reduced motion / replay handled inside the
+        // animator; non-blocking, presentation-only.
+        if (cmd) {
+          try { s.msAnimator?.animateUndoRedo({ action: 'undo', description: cmd.description }); } catch (_) { /* presentation-only — ignore */ }
+        }
+      } catch (e) {
+        console.error('Undo failed:', e);
       }
-    } catch (e) {
-      console.error('Undo failed:', e);
+    };
+
+    // Undo-challenge warning (CG-0MU37CKRR008252I, producer decision Q1=A):
+    // if the command about to be undone completed one or more challenges,
+    // warn the player before the completions are revoked. "Keep Completed"
+    // aborts the undo entirely (no state change); "Undo Anyway" proceeds.
+    const pending = typeof s.undoManager.peekUndo === 'function' ? s.undoManager.peekUndo() : undefined;
+    const completedIds: string[] = pending?.completedChallengeIds ?? [];
+    if (completedIds.length > 0 && typeof s.showUndoChallengeWarningDialog === 'function') {
+      const titles = completedIds.map((id: string) => {
+        const active = (s.state.activeChallenges ?? []).find(
+          (ac: { challenge: { id: string } }) => ac.challenge.id === id,
+        );
+        return active?.challenge.title ?? id;
+      });
+      s.showUndoChallengeWarningDialog(titles, doUndo, () => { /* Keep Completed */ });
+      return;
     }
+
+    doUndo();
   
 }
 
