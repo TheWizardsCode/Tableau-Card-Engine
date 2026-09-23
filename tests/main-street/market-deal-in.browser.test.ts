@@ -21,6 +21,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
+import { destroyPhaserGame } from '../helpers/phaserCanvasPool';
 
 // ── Boot helpers (mirrors MainStreetScene.browser.test.ts) ──
 
@@ -38,12 +39,14 @@ async function bootGame(options: { width?: number; height?: number } = {}): Prom
   return game;
 }
 
+/**
+ * Tear the game down deterministically (see `destroyPhaserGame`): a plain
+ * `game.destroy(true, false)` defers teardown to the next game-loop frame,
+ * which under CPU contention can leave the previous test's loop competing
+ * with the current one and starve its tweens/input (CG-0MUE2U21C0007BKL).
+ */
 function destroyGame(game: Phaser.Game | null): void {
-  if (game) {
-    game.destroy(true, false);
-  }
-  const container = document.getElementById('game-container');
-  if (container) container.remove();
+  destroyPhaserGame(game);
 }
 
 async function waitForCondition(

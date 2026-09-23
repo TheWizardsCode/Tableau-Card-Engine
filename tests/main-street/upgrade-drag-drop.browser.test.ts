@@ -28,6 +28,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
+import { destroyPhaserGame } from '../helpers/phaserCanvasPool';
 import { TUTORIAL_STATE_STORAGE_KEY } from '../../example-games/main-street/TutorialState';
 import {
   getBusinessTemplates,
@@ -72,10 +73,18 @@ async function bootGame(): Promise<Phaser.Game> {
   return game;
 }
 
+/**
+ * Tear the game down deterministically.
+ *
+ * A plain `game.destroy(true, false)` only sets `pendingDestroy` and waits for
+ * the next game-loop frame, which can be delayed for seconds under CPU
+ * contention — leaving the previous test's game loop competing with the
+ * current one and starving the drag gesture (CG-0MUE2U21C0007BKL).
+ * `destroyPhaserGame` runs the deferred destroy synchronously and drains the
+ * Phaser canvas pool.
+ */
 function destroyGame(game: Phaser.Game | null): void {
-  if (game) game.destroy(true, false);
-  const container = document.getElementById('game-container');
-  if (container) container.remove();
+  destroyPhaserGame(game);
 }
 
 function wait(ms: number): Promise<void> {
