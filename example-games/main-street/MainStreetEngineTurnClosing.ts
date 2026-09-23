@@ -448,10 +448,19 @@ export function appendTurnNetRow(state: MainStreetState, turnEnded: number): voi
   const deltaCoins = state.resourceBank.coins - startCoins;
   const deltaRep = state.resourceBank.reputation - startRep;
   const deltaScore = state.finalScore - startScore;
+
+  // Delta summary line: Turn N net: +X coins, +Y rep (score: +Z)
   addLog(
     state,
     `Turn ${turnEnded} net: ${describeEventEffects(deltaCoins, deltaRep)} (score: ${deltaScore > 0 ? '+' : ''}${deltaScore})`,
     classifyEffect(deltaCoins, deltaRep),
+  );
+
+  // Totals line: Turn N: X coins, Y rep, Z score
+  addLog(
+    state,
+    `Turn ${turnEnded} totals: ${Math.round(state.resourceBank.coins)} coins, ${Math.round(state.resourceBank.reputation)} rep, ${state.finalScore} score`,
+    'neutral',
   );
 }
 
