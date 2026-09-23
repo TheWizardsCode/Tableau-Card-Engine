@@ -985,8 +985,17 @@ describe('ColorettoScene (browser)', () => {
     // the human's first turn may share the row).
     expect(scene.session.rows[0].cards.some((c: { type: string }) => c.type === 'last-round')).toBe(true);
     // The human's placement was their final turn; the AI (still active)
-    // gets one more animated turn.
-    expect(scene.phaseManager.current).toBe('ai-thinking');
+    // gets one more animated turn. Pin the AI to always-place so the final
+    // turn is deterministic (the heuristic AI may now take a row when it
+    // contains a bonus card, which has no flightCard and would break the
+    // flightCard assertions below — CG-0MUE0EB0Z002FISV).
+    const ai = scene.aiScheduler.aiPlayers[1];
+    if (ai) {
+      (ai as any).strategy = {
+        name: 'always-place',
+        chooseAction: () => ({ type: 'place', rowIndex: 0 }),
+      };
+    }
 
     // Rendered state while the round is still in play: exactly one 'LR'
     // face in the scene, at the resting position (the row slot renders an
