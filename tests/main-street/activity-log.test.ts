@@ -16,6 +16,8 @@ import { describe, it, expect } from 'vitest';
 
 import {
   setupMainStreetGame,
+  serializeMainStreetState,
+  deserializeMainStreetState,
   type MainStreetState,
   type LogEntry,
 } from '../../example-games/main-street/MainStreetState';
@@ -793,11 +795,18 @@ describe('Activity Log', () => {
       const startRep = state.resourceBank.reputation;
       endTurnHeadless(state);
       const last = lastLog(state);
-      expect(last.text).toMatch(/Turn \d+ net:/);
-      expect(last.text).toContain(describeEventEffects(state.resourceBank.coins - startCoins, state.resourceBank.reputation - startRep));
+      // Totals line should be the last entry
+      expect(last.text).toMatch(/Turn \d+ totals:/);
+      expect(last.text).toContain(`${Math.round(state.resourceBank.coins)} coins`);
+      expect(last.text).toContain(`${Math.round(state.resourceBank.reputation)} rep`);
+      expect(last.text).toContain(`${state.finalScore} score`);
+      // The net row should be the entry before totals
+      const netEntry = state.activityLog.find(e => /Turn \d+ net:/.test(e.text));
+      expect(netEntry).toBeDefined();
+      expect(netEntry!.text).toContain(describeEventEffects(state.resourceBank.coins - startCoins, state.resourceBank.reputation - startRep));
       // AC1/AC2: score delta appended as (score: +/-Z)
       const expectedScoreDelta = state.finalScore - state.dayStartScore;
-      expect(last.text).toContain(`(score: ${expectedScoreDelta > 0 ? '+' : ''}${expectedScoreDelta})`);
+      expect(netEntry!.text).toContain(`(score: ${expectedScoreDelta > 0 ? '+' : ''}${expectedScoreDelta})`);
     });
 
     it('should emit the net row even when the net is zero', () => {
@@ -817,27 +826,50 @@ describe('Activity Log', () => {
       state.phase = 'MarketPhase';
       endTurnHeadless(state);
       const last = lastLog(state);
-      expect(last.text).toMatch(/Turn \d+ net:/);
-      expect(last.text).toContain(describeEventEffects(0, 0));
+      // Totals line should be the last entry
+      expect(last.text).toMatch(/Turn \d+ totals:/);
+      expect(last.text).toContain(`${Math.round(state.resourceBank.coins)} coins`);
+      expect(last.text).toContain(`${Math.round(state.resourceBank.reputation)} rep`);
+      expect(last.text).toContain(`${state.finalScore} score`);
+      // The net row should be the entry before totals
+      const netEntry = state.activityLog.find(e => /Turn \d+ net:/.test(e.text));
+      expect(netEntry).toBeDefined();
+      expect(netEntry!.text).toMatch(/Turn \d+ net:/);
+      expect(netEntry!.text).toContain(describeEventEffects(0, 0));
       expect(state.resourceBank.coins - beforeCoins).toBe(0);
       expect(state.resourceBank.reputation - beforeRep).toBe(0);
       // Score delta should be present — compute the actual delta
       // (score may change due to computeScore() even with no resources moving).
       const scoreDelta = state.finalScore - state.dayStartScore;
-      expect(last.text).toContain(`(score: ${scoreDelta > 0 ? '+' : ''}${scoreDelta})`);
+      expect(netEntry!.text).toContain(`(score: ${scoreDelta > 0 ? '+' : ''}${scoreDelta})`);
     });
 
-    it('should use the day-start snapshot survived by save/load (clone/restore)', () => {
+    it('should use the day-start snapshot survived by save/load (serialize/deserialize)', () => {
       const state = createTestState('net-row-clone');
       executeDayStart(state);
-      // Clone via JSON round-trip (mirrors save/load snapshot requirement)
-      const cloned: MainStreetState = JSON.parse(JSON.stringify(state));
-      // Day-start snapshot fields should be preserved in (de)serialized form.
-      if ((state as any).dayStartCoins !== undefined) {
-        expect((cloned as any).dayStartCoins).toBe((state as any).dayStartCoins);
-        expect((cloned as any).dayStartRep).toBe((state as any).dayStartRep);
-        expect((cloned as any).dayStartScore).toBe((state as any).dayStartScore);
-      }
+      // Give the score a non-zero baseline so the round-trip is meaningful.
+      state.finalScore = 123;
+      state.dayStartScore = 123;
+
+      // Round-trip through the real versioned serialization path (AC4).
+      const restored = deserializeMainStreetState(serializeMainStreetState(state));
+
+      expect(restored.dayStartCoins).toBe(state.dayStartCoins);
+      expect(restored.dayStartRep).toBe(state.dayStartRep);
+      expect(restored.dayStartScore).toBe(state.dayStartScore);
+      expect(restored.dayStartScore).toBe(123);
+    });
+
+    it('legacy saves without dayStartScore fall back to the saved finalScore', () => {
+      const state = createTestState('net-row-legacy');
+      executeDayStart(state);
+      state.finalScore = 77;
+
+      const serialized = serializeMainStreetState(state) as unknown as Record<string, unknown>;
+      delete serialized.dayStartScore; // simulate a pre-CG-0MTR35GBC005RMZH save
+
+      const restored = deserializeMainStreetState(serialized as never);
+      expect(restored.dayStartScore).toBe(77);
     });
 
     it('emits the net row before the game-over entry when the game ends prematurely', () => {
@@ -846,14 +878,32 @@ describe('Activity Log', () => {
       state.resourceBank.coins = -1; // force bankruptcy path
       processEndOfTurn(state);
       const netIdx = state.activityLog.findIndex(e => /Turn \d+ net:/.test(e.text));
+      const totalsIdx = state.activityLog.findIndex(e => /Turn \d+ totals:/.test(e.text));
       const overIdx = state.activityLog.findIndex(e => /Game Over|Bankruptcy/.test(e.text));
-      // Net row is the final entry; if a game-over log appears (e.g. bankruptcy
-      // triggered by checkImmediateLoss before income), net row comes AFTER it.
+      // Net row and totals line should be the final entries; if a game-over log
+      // appears (e.g. bankruptcy triggered by checkImmediateLoss before income),
+      // net and totals come AFTER it.
       if (netIdx !== -1 && overIdx !== -1) {
         expect(netIdx).toBeGreaterThan(overIdx);
       } else {
         expect(netIdx).not.toBe(-1);
       }
+      // Totals line should always be the last log entry
+      if (totalsIdx !== -1) {
+        expect(totalsIdx).toBe(state.activityLog.length - 1);
+      }
+    });
+
+    it('should display totals in the format: coins, rep, score', () => {
+      const state = createTestState('net-row-totals');
+      executeDayStart(state);
+      endTurnHeadless(state);
+      const last = lastLog(state);
+      // Totals line format: "Turn N totals: X coins, Y rep, Z score"
+      expect(last.text).toMatch(/Turn \d+ totals: -?\d+ coins, -?\d+ rep, \d+ score/);
+      expect(last.text).toContain(`${Math.round(state.resourceBank.coins)} coins`);
+      expect(last.text).toContain(`${Math.round(state.resourceBank.reputation)} rep`);
+      expect(last.text).toContain(`${state.finalScore} score`);
     });
   });
 });

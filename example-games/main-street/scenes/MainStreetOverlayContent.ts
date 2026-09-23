@@ -12,6 +12,15 @@ import {
   isBuyAndPlacePremiumDialogDismissed,
   setBuyAndPlacePremiumDialogDismissed,
 } from '../MainStreetPrefs';
+import { t, registerLocale } from '../../../src/core-engine/I18n';
+import {
+  UNDO_CHALLENGE_I18N_KEYS,
+  UNDO_CHALLENGE_EN_BUNDLE,
+} from '../i18n/undo-challenge-en';
+
+// Default English strings are registered at module-load time (merges with the
+// other Main Street 'en' bundles).
+registerLocale('en', UNDO_CHALLENGE_EN_BUNDLE);
 
 export class MainStreetOverlayContent {
   constructor(private readonly scene: any) {}
@@ -651,6 +660,99 @@ export class MainStreetOverlayContent {
       onCancel();
     });
     s.overlayObjects.push(cancelBtn);
+  }
+
+  /**
+   * Shows the undo-challenge warning dialog (CG-0MU37CKRR008252I).
+   *
+   * Presented by `performUndo` when the command about to be undone completed
+   * one or more challenges, whose completions would be revoked. Offers
+   * "Keep Completed" (aborts the undo entirely — no state change) and
+   * "Undo Anyway" (proceeds with the undo, revoking the completions).
+   *
+   * Overlay pattern compliance (AGENTS.md UI Best Practices):
+   * `createOverlayBackground` + `createOverlayButton`; ALL elements are
+   * parented into `s.hudContainer`; depths 199 (backdrop) / 200 (box) /
+   * 201 (interactive). No animations, so reduced motion is inherently
+   * respected.
+   *
+   * @param challengeTitles Titles of the challenges that would be revoked.
+   * @param onConfirm       Called when the player chooses "Undo Anyway".
+   * @param onCancel        Called when the player chooses "Keep Completed".
+   */
+  public showUndoChallengeWarningDialog(
+    challengeTitles: string[],
+    onConfirm: () => void,
+    onCancel: () => void,
+  ): void {
+    const s = this.scene;
+    const panelW = 460;
+    const lineH = 22;
+    const panelH = 210 + challengeTitles.length * lineH;
+    const panelY = s.layout.gameH / 2 - panelH / 2;
+
+    const boxConfig = { width: panelW, height: panelH, color: 0x000000, alpha: 1.0, depth: 200 };
+    const overlay = createOverlayBackground(s, { depth: 199, alpha: 0.6 }, boxConfig);
+    s.overlayObjects.push(...overlay.objects);
+
+    const titleText = s.add.text(
+      s.layout.gameW / 2, panelY + 25,
+      t(UNDO_CHALLENGE_I18N_KEYS.title),
+      { fontSize: '20px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY },
+    ).setOrigin(0.5).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(titleText);
+    s.overlayObjects.push(titleText);
+
+    const bodyText = s.add.text(
+      s.layout.gameW / 2, panelY + 65,
+      t(UNDO_CHALLENGE_I18N_KEYS.body),
+      {
+        fontSize: '14px',
+        color: '#ddccbb',
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        lineSpacing: 4,
+        wordWrap: { width: panelW - 60 },
+      },
+    ).setOrigin(0.5, 0).setDepth(201);
+    if (s.hudContainer) s.hudContainer.add(bodyText);
+    s.overlayObjects.push(bodyText);
+
+    challengeTitles.forEach((title, index) => {
+      const itemText = s.add.text(
+        s.layout.gameW / 2, panelY + 108 + index * lineH,
+        t(UNDO_CHALLENGE_I18N_KEYS.item, { title }),
+        { fontSize: '14px', color: '#ffdd88', fontFamily: FONT_FAMILY },
+      ).setOrigin(0.5).setDepth(201);
+      if (s.hudContainer) s.hudContainer.add(itemText);
+      s.overlayObjects.push(itemText);
+    });
+
+    const buttonY = panelY + panelH - 42;
+
+    const keepBtn = createOverlayButton(
+      s, s.layout.gameW / 2 - 110, buttonY,
+      `[ ${t(UNDO_CHALLENGE_I18N_KEYS.keep)} ]`, 201,
+    );
+    if (s.hudContainer) s.hudContainer.add(keepBtn);
+    keepBtn.on('pointerdown', () => {
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      onCancel();
+    });
+    s.overlayObjects.push(keepBtn);
+
+    const confirmBtn = createOverlayButton(
+      s, s.layout.gameW / 2 + 60, buttonY,
+      `[ ${t(UNDO_CHALLENGE_I18N_KEYS.confirm)} ]`, 201,
+    );
+    if (s.hudContainer) s.hudContainer.add(confirmBtn);
+    confirmBtn.on('pointerdown', () => {
+      dismissOverlay(s.overlayObjects);
+      s.overlayObjects = [];
+      onConfirm();
+    });
+    s.overlayObjects.push(confirmBtn);
   }
 
   /**

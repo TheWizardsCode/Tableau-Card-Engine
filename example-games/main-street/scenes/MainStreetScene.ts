@@ -1229,6 +1229,27 @@ export class MainStreetScene extends CardGameScene {
   }
 
   /**
+   * Shows the undo-challenge warning dialog (CG-0MU37CKRR008252I). Presented
+   * by `performUndo` when undoing would revoke a challenge completion.
+   *
+   * @param challengeTitles Titles of the challenges that would be revoked.
+   * @param onConfirm       Callback when the player chooses "Undo Anyway".
+   * @param onCancel        Callback when the player chooses "Keep Completed".
+   */
+  public showUndoChallengeWarningDialog(
+    challengeTitles: string[],
+    onConfirm: () => void,
+    onCancel: () => void,
+  ): void {
+    if (this.msOverlayManager && typeof (this.msOverlayManager as any).showUndoChallengeWarningDialog === 'function') {
+      (this.msOverlayManager as any).showUndoChallengeWarningDialog(challengeTitles, onConfirm, onCancel);
+    } else {
+      // No overlay manager (headless/tests): proceed rather than strand undo.
+      onConfirm();
+    }
+  }
+
+  /**
    * Shows the dual-choice incident dialog for a pending `hasChoices` event
    * (CG-0MTSHG8RP008E128). Accept applies the event's stated consequence;
    * Reject refuses it and an unknown escalation card replaces it in the deck.

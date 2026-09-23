@@ -5,12 +5,14 @@
  * record at the end of every turn, including premature exits and competitive
  * closing (CG-0MTJP6XU5009KN5L).
  *
- * Core invariants (CG-0MT5W7UJJ0065MEZ + CG-0MTJP6XU5009KN5L):
+ * Core invariants (CG-0MT5W7UJJ0065MEZ + CG-0MTJP6XU5009KN5L +
+ * CG-0MTR35GBC005RMZH):
  *   - Net row uses `dayStartCoins` / `dayStartRep` snapshots.
  *   - Net row = `resourceBank - dayStartSnapshot` for both coins and rep.
- *   - Log ordering: income → costs → incident (or averted) → net row.
- *   - Net row is the final log entry of a completed turn (including premature
- *     exits and competitive closing phases).
+ *   - Log ordering: income → costs → incident (or averted) → net row → totals.
+ *   - The net row is followed by a totals line (coins/rep/score), which is the
+ *     final log entry of a completed turn (including premature exits and
+ *     competitive closing phases).
  */
 import { describe, it, expect } from 'vitest';
 
@@ -55,10 +57,6 @@ function makeBiz(overrides: Partial<BusinessCard> = {}): BusinessCard {
     ongoingCost: overrides.ongoingCost ?? 0,
     reputationPerTurn: overrides.reputationPerTurn,
   };
-}
-
-function lastLog(state: MainStreetState): LogEntry {
-  return state.activityLog[state.activityLog.length - 1];
 }
 
 /**
@@ -123,8 +121,10 @@ describe('Turn net row and activity log ordering', () => {
 
       processEndOfTurn(state);
 
-      // The net row is the last entry
-      const netEntry = lastLog(state);
+      // The net row is second-to-last (totals line is final)
+      const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
+      expect(netIdx.length).toBe(1);
+      const netEntry = state.activityLog[netIdx[0]]!;
       expect(netEntry.text).toMatch(NET_ROW_RE);
 
       // Verify net = coins_now - dayStartCoins, rep_now - dayStartRep
@@ -135,14 +135,13 @@ describe('Turn net row and activity log ordering', () => {
       // Verify ordering: income before costs before net
       const incomeIdx = findLogEntries(state, e => e.text.includes('Income:'));
       const costIdx = findLogEntries(state, e => e.text.includes('Business costs:'));
-      const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
 
       expect(incomeIdx.length).toBeGreaterThan(0);
       if (costIdx.length > 0) {
         expect(incomeIdx[0]).toBeLessThan(costIdx[0]);
       }
-      // Net is always last
-      expect(netIdx[0]).toBe(state.activityLog.length - 1);
+      // Net is second-to-last (totals line is final)
+      expect(netIdx[0]).toBe(state.activityLog.length - 2);
     });
 
     it('net row delta equals sum of all resource changes in the turn', () => {
@@ -161,7 +160,9 @@ describe('Turn net row and activity log ordering', () => {
 
       processEndOfTurn(state);
 
-      const netEntry = lastLog(state);
+      const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
+      expect(netIdx.length).toBe(1);
+      const netEntry = state.activityLog[netIdx[0]]!;
       const deltaCoins = state.resourceBank.coins - dayStartCoins;
       const deltaRep = state.resourceBank.reputation - dayStartRep;
 
@@ -213,7 +214,7 @@ describe('Turn net row and activity log ordering', () => {
       expect(incomeIdx[0]).toBeLessThan(costIdx[0]);
       expect(costIdx[0]).toBeLessThan(incidentIdx[0]);
       expect(incidentIdx[0]).toBeLessThan(netIdx[0]);
-      expect(netIdx[0]).toBe(entries.length - 1); // net is final
+      expect(netIdx[0]).toBe(entries.length - 2); // net is second-to-last (totals line is final)
     });
   });
 
@@ -267,7 +268,7 @@ describe('Turn net row and activity log ordering', () => {
       expect(incomeIdx[0]).toBeLessThan(costIdx[0]);
       expect(costIdx[0]).toBeLessThan(avertedIdx[0]);
       expect(avertedIdx[0]).toBeLessThan(netIdx[0]);
-      expect(netIdx[0]).toBe(entries.length - 1);
+      expect(netIdx[0]).toBe(entries.length - 2); // net is second-to-last (totals line is final)
 
       // Verify no Incident log entry was produced
       const incidentEntries = findLogEntries(state, e => e.text.includes('Incident:'));
@@ -306,7 +307,8 @@ describe('Turn net row and activity log ordering', () => {
 
       processEndOfTurn(state);
 
-      const netEntry = lastLog(state);
+      const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
+      const netEntry = state.activityLog[netIdx[0]]!;
       const deltaCoins = state.resourceBank.coins - dayStartCoins;
       const deltaRep = state.resourceBank.reputation - dayStartRep;
 
@@ -318,7 +320,7 @@ describe('Turn net row and activity log ordering', () => {
   // ── Scenario 4: Premature bankruptcy exit ────────────────────────────────────
 
   describe('processEndOfTurn — premature bankruptcy exit', () => {
-    it('emits net row and game-over banner; net row is final entry', () => {
+    it('emits net row and game-over banner; totals line is final entry', () => {
       const state = createTestState('premature-bankruptcy');
       executeDayStart(state);
 
@@ -365,8 +367,8 @@ describe('Turn net row and activity log ordering', () => {
       );
       expect(bannerIdx.length).toBeGreaterThan(0);
 
-      // Net row must be the final entry (banner comes before it)
-      expect(netIdx[netIdx.length - 1]).toBe(entries.length - 1);
+      // Net row is second-to-last (totals line is final)
+      expect(netIdx[netIdx.length - 1]).toBe(entries.length - 2);
 
       // Game should have ended
       expect(state.gameResult).toBe('loss');
@@ -394,7 +396,8 @@ describe('Turn net row and activity log ordering', () => {
 
       processEndOfTurn(state);
 
-      const netEntry = lastLog(state);
+      const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
+      const netEntry = state.activityLog[netIdx[0]]!;
       const deltaCoins = state.resourceBank.coins - dayStartCoins;
 
       // Even though the turn ends prematurely, the net row should
@@ -407,7 +410,7 @@ describe('Turn net row and activity log ordering', () => {
   // ── Scenario 5: Premature rep-collapse exit ──────────────────────────────────
 
   describe('processEndOfTurn — rep collapse exit', () => {
-    it('emits net row and game-over banner; net row is final entry', () => {
+    it('emits net row and game-over banner; totals line is final entry', () => {
       const state = createTestState('rep-collapse');
       executeDayStart(state);
 
@@ -429,8 +432,8 @@ describe('Turn net row and activity log ordering', () => {
       );
       expect(bannerIdx.length).toBeGreaterThan(0);
 
-      // Net row must be the final entry (banner comes before it)
-      expect(netIdx[netIdx.length - 1]).toBe(entries.length - 1);
+      // Net row is second-to-last (totals line is final)
+      expect(netIdx[netIdx.length - 1]).toBe(entries.length - 2);
 
       expect(state.gameResult).toBe('loss');
     });
@@ -439,7 +442,7 @@ describe('Turn net row and activity log ordering', () => {
   // ── Scenario 6: Competitive resolveCompetitiveClosingPhases ───────────────────
 
   describe('resolveCompetitiveClosingPhases', () => {
-    it('emits per-owner income then net row as final entry', () => {
+    it('emits per-owner income then net row, with totals line last', () => {
       // Use createCompetitiveState so players[] is populated
       const state = createCompetitiveState({
         seed: 'comp-net-ordering',
@@ -476,10 +479,10 @@ describe('Turn net row and activity log ordering', () => {
       );
       expect(incomeEntries.length).toBeGreaterThan(0);
 
-      // Net row should be final
+      // Net row is second-to-last (totals line is final)
       const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
       expect(netIdx.length).toBeGreaterThanOrEqual(1);
-      expect(netIdx[netIdx.length - 1]).toBe(entries.length - 1);
+      expect(netIdx[netIdx.length - 1]).toBe(entries.length - 2);
     });
   });
 
@@ -508,7 +511,8 @@ describe('Turn net row and activity log ordering', () => {
 
       processEndOfTurn(state);
 
-      const netEntry = lastLog(state);
+      const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
+      const netEntry = state.activityLog[netIdx[0]]!;
       // Net should use the corrupted snapshot (0), so delta = coins_now - 0 = coins_now
       const expectedDeltaCoins = state.resourceBank.coins;
       const deltaRep = state.resourceBank.reputation - (state.dayStartRep ?? state.resourceBank.reputation);

@@ -134,6 +134,16 @@ export class UndoRedoManager {
     return this.undoStack.length > 0;
   }
 
+  /**
+   * Inspect the command that {@link undo} would apply, without popping it
+   * (CG-0MU37CKRR008252I). Returns `undefined` when the undo stack is empty.
+   * Used by Main Street's `performUndo` to warn before an undo would revoke a
+   * challenge completion.
+   */
+  peekUndo(): Command | undefined {
+    return this.undoStack[this.undoStack.length - 1];
+  }
+
   /** Whether there are commands that can be redone. */
   canRedo(): boolean {
     return this.redoStack.length > 0;
