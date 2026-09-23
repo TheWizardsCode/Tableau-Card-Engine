@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { setupMainStreetGame, serializeMainStreetState, deserializeMainStreetState, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {
   endTurnHeadless,
-  executeDayStart,
+  executeWeekStart,
   resolveIncident,
 } from '../../example-games/main-street/MainStreetEngine';
 import { runMonteCarlo } from '../../example-games/main-street/MainStreetMonteCarlo';
@@ -107,9 +107,9 @@ describe('Flu event: full lifecycle integration', () => {
         break;
       }
 
-      // processEndOfTurn sets phase to DayStart if game is still playing
+      // processEndOfTurn sets phase to WeekStart if game is still playing
       if (state.gameResult === 'playing') {
-        executeDayStart(state);
+        executeWeekStart(state);
       } else {
         break;
       }
@@ -204,15 +204,15 @@ describe('Flu event: full lifecycle integration', () => {
 
     // Process full turns until effect expires.
     // After resolveIncident, phase is IncidentPhase.
-    // We need to advance through EndCheck to DayStart then process a full turn.
+    // We need to advance through EndCheck to WeekStart then process a full turn.
     // Manually set the phase to MarketPhase so processEndOfTurn works.
     state.phase = 'MarketPhase';
 
     for (let i = 0; i < 6; i++) {
       endTurnHeadless(state);
-      // processEndOfTurn sets phase to DayStart if game is still playing
+      // processEndOfTurn sets phase to WeekStart if game is still playing
       if (state.gameResult === 'playing') {
-        executeDayStart(state);
+        executeWeekStart(state);
       }
     }
 

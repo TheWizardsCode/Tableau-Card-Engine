@@ -382,7 +382,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     // card (premium ≤ 1200 each).
     scene.state.resourceBank.coins = 5000;
 
-    // ── Same-day BUSINESS card: dialog appears, Proceed places at +50%. ──
+    // ── Same-week BUSINESS card: dialog appears, Proceed places at +50%. ──
     const card = firstBuyableCard(scene);
     const coinBefore = scene.state.resourceBank.coins;
     const targetSlot = getEmptySlots(scene.state)[0];
@@ -390,7 +390,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
 
     await clickCompositeToSlot(scene, card, targetSlot);
 
-    // The dialog fires because the same-day placement has 0 actions left.
+    // The dialog fires because the same-week placement has 0 actions left.
     await waitForPremiumDialog(scene);
     const proceedBtn = findButtonText(scene, '[ Proceed ]')!;
     proceedBtn.emit('pointerdown');
@@ -403,7 +403,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     // Premium (not listed cost) deducted from the coin balance.
     expect(scene.state.resourceBank.coins).toBe(coinBefore - premiumOf(card.cost));
 
-    // ── Same-day COMMUNITY-SPACE card: same premium path. ──
+    // ── Same-week COMMUNITY-SPACE card: same premium path. ──
     // Deterministic: inject a Library into the market row.
     const cs = createCommunitySpaceDeck(1).find((c: any) => c.name === 'Library')!;
     expect(cs).toBeTruthy();
@@ -449,7 +449,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     expect(scene.state.resourceBank.coins).toBe(coinBefore);
 
     // ── Same card, now treated as HELD (plan-ahead): listed cost, no
-    // dialog, consumes an action. Clear the same-day tracker so the
+    // dialog, consumes an action. Clear the same-week tracker so the
     // selection is not a composite.
     scene.justMovedHandCardId = null;
     scene.state.actionsRemaining = 1;
@@ -459,7 +459,7 @@ describe('Main Street composite click-to-click buy-and-play (browser)', () => {
     scene.onHandBusinessCardClick(0);
     await waitForCondition(
       () => scene.uiPhase === 'placing-from-hand' && scene.pendingHandJustMoved === false,
-      'held hand card selected (not same-day)',
+      'held hand card selected (not same-week)',
     );
     await wait(120);
     await clickAt(scene.getStreetSlotCenter(heldSlot).x, scene.getStreetSlotCenter(heldSlot).y);

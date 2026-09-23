@@ -22,7 +22,7 @@ import {
   type LogEntry,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   endTurnHeadless,
   processEndOfTurn,
   executeFullTurn,
@@ -173,14 +173,14 @@ describe('Activity Log', () => {
 
     it('should start a new game with a fresh log and then add new entries', () => {
       const firstGame = createTestState('activity-log-first-game');
-      executeDayStart(firstGame);
+      executeWeekStart(firstGame);
       processEndOfTurn(firstGame);
       expect(firstGame.activityLog.length).toBeGreaterThan(0);
 
       const secondGame = createTestState('activity-log-second-game');
       expect(secondGame.activityLog).toEqual([]);
 
-      executeDayStart(secondGame);
+      executeWeekStart(secondGame);
       expect(secondGame.activityLog).toHaveLength(1);
       expect(secondGame.activityLog[0].type).toBe('turn-header');
       expect(secondGame.activityLog[0].text).toBe('Turn 1');
@@ -188,9 +188,9 @@ describe('Activity Log', () => {
   });
 
   describe('turn headers', () => {
-    it('should log a turn-header entry when executeDayStart is called', () => {
+    it('should log a turn-header entry when executeWeekStart is called', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const headers = logsOfType(state, 'turn-header');
       expect(headers).toHaveLength(1);
@@ -201,10 +201,10 @@ describe('Activity Log', () => {
     it('should log turn headers for subsequent turns', () => {
       const state = createTestState();
       // Turn 1
-      executeDayStart(state);
+      executeWeekStart(state);
       processEndOfTurn(state);
-      // Turn 2 starts (processEndOfTurn increments turn and sets DayStart)
-      executeDayStart(state);
+      // Turn 2 starts (processEndOfTurn increments turn and sets WeekStart)
+      executeWeekStart(state);
 
       const headers = logsOfType(state, 'turn-header');
       expect(headers).toHaveLength(2);
@@ -217,7 +217,7 @@ describe('Activity Log', () => {
   describe('business placement', () => {
     it('should log a loss entry when a business is placed', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place a business from the market
       const biz = state.market.cards[0];
@@ -238,7 +238,7 @@ describe('Activity Log', () => {
   describe('event purchase', () => {
     it('should log a neutral entry when an Investment event is moved to hand', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Inject an Investment event into the investments row
       const investmentEvent = makeInvestmentEvent({ id: 'inv-evt-1', name: 'Test Fest' });
@@ -258,7 +258,7 @@ describe('Activity Log', () => {
   describe('upgrade purchase', () => {
     it('should log a loss entry when an upgrade is purchased', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place a business to upgrade
       const biz = makeBiz({ id: 'bakery-1', name: 'Bakery', maxLevel: 3 });
@@ -292,7 +292,7 @@ describe('Activity Log', () => {
   describe('Investment event resolution', () => {
     it('should log entry when held Investment event is auto-resolved', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Set held event in hand
       state.hand = [makeInvestmentEvent({ id: 'de-1', name: 'Tax Audit', coinDelta: -3, reputationDelta: 0 })];
@@ -312,7 +312,7 @@ describe('Activity Log', () => {
 
     it('should log neutral for zero-effect events', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.hand = [makeInvestmentEvent({ id: 'de-n', name: 'Nothing Happens', coinDelta: 0, reputationDelta: 0 })];
 
@@ -326,7 +326,7 @@ describe('Activity Log', () => {
 
     it('should not log when no event is held', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.phase = 'InvestmentResolution';
       const logBefore = state.activityLog.length;
@@ -339,7 +339,7 @@ describe('Activity Log', () => {
   describe('income collection', () => {
     it('should log a gain entry when income is collected', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place a business so there is income
       state.streetGrid[0] = makeBiz({ baseIncome: 5 });
@@ -358,7 +358,7 @@ describe('Activity Log', () => {
 
     it('should log neutral when income is zero', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // No businesses placed, income = 0
       state.phase = 'IncomePhase';
@@ -375,7 +375,7 @@ describe('Activity Log', () => {
   describe('Incident event resolution', () => {
     it('should log an entry when an Incident event is resolved', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Inject an Incident event into the queue
       state.incidentDeck = [
@@ -394,7 +394,7 @@ describe('Activity Log', () => {
 
     it('should not log when the incident queue is empty', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Empty the incident queue
       state.incidentDeck = [];
@@ -410,7 +410,7 @@ describe('Activity Log', () => {
   describe('game end (win)', () => {
     it('should log a gain entry for score threshold victory', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Force score above threshold
       state.resourceBank.coins = WIN_THRESHOLD + 5000;
@@ -428,7 +428,7 @@ describe('Activity Log', () => {
 
     it('should log a gain entry for turn-limit victory', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Turn-based end conditions are opt-in via an explicit config.maxTurns
       // (CG-0MSLXJCHH001DLIO); default presets impose no turn limit.
@@ -452,7 +452,7 @@ describe('Activity Log', () => {
   describe('game end (loss)', () => {
     it('should log a loss entry for bankruptcy', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.resourceBank.coins = -1;
 
@@ -466,7 +466,7 @@ describe('Activity Log', () => {
 
     it('should log a loss entry for reputation collapse', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.turn = 2; // Must be > 1 for rep collapse
       state.resourceBank.reputation = 0;
@@ -481,7 +481,7 @@ describe('Activity Log', () => {
 
     it('should log a loss entry for turn exhaustion', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // turn_exhaustion is only reachable when the turn-limit check runs before
       // the immediate-loss checks: on turn 1 the reputation-collapse guard is
@@ -542,7 +542,7 @@ describe('Activity Log', () => {
 
     it('should log business placement within a full turn', () => {
       const state = createTestState('biz-turn-log');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Find an affordable business and place it
       const biz = state.market.cards[0];
@@ -578,7 +578,7 @@ describe('Activity Log', () => {
   describe('enriched: business purchase', () => {
     it('should log effective deltas for a business purchase alongside cost/slot', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       state.resourceBank.coins = 5000;
       const biz = state.market.cards.find(c => c.family === 'business');
       if (!biz) throw new Error('No business card in market for enriched purchase test');
@@ -598,7 +598,7 @@ describe('Activity Log', () => {
   describe('enriched: upgrade purchase', () => {
     it('should log effective deltas for an upgrade purchase', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       state.streetGrid[0] = makeBiz({ id: 'biz-upg-1', name: 'Bakery', maxLevel: 3 });
       const upgrade: UpgradeCard = {
         family: 'upgrade',
@@ -625,7 +625,7 @@ describe('Activity Log', () => {
   describe('enriched: played event from hand', () => {
     it('should log cost plus effective deltas when playing an event from hand', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       state.resourceBank.coins = 20;
       const ev = makeInvestmentEvent({
         id: 'hand-play-ev-1',
@@ -654,7 +654,7 @@ describe('Activity Log', () => {
   describe('enriched: sells', () => {
     it('should log effective coin delta when selling from hand', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       const biz = makeBiz({ id: 'sell-hand-biz-1', name: 'Sun Cafe', cost: 4 });
       state.hand = [biz];
       const before = state.resourceBank.coins;
@@ -668,7 +668,7 @@ describe('Activity Log', () => {
 
     it('should log effective coin delta when selling from tableau', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       state.streetGrid[0] = makeBiz({ id: 'sell-slot-biz-1', name: 'Sun Cafe', cost: 4 });
       const before = state.resourceBank.coins;
       sellFromTableau(state, 0);
@@ -683,7 +683,7 @@ describe('Activity Log', () => {
   describe('enriched: community favour exchange', () => {
     it('should log effective coin/rep deltas for community favour', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       state.resourceBank.coins = 500;
       state.resourceBank.reputation = 5;
       const beforeCoins = state.resourceBank.coins;
@@ -701,7 +701,7 @@ describe('Activity Log', () => {
   describe('enriched: re-roll market', () => {
     it('should log effective coin delta on re-roll', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       state.resourceBank.coins = 5000;
       const before = state.resourceBank.coins;
       refreshMarket(state);
@@ -716,7 +716,7 @@ describe('Activity Log', () => {
   describe('enriched: staff hire / layoff', () => {
     it('should log effective coin delta on staff hire', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       const staff = makeStaffCard({ id: 'staff-enrich-1', name: 'General Helper', cost: 3 });
       state.market.cards = [staff as any];
       state.resourceBank.coins = 3000;
@@ -730,7 +730,7 @@ describe('Activity Log', () => {
 
     it('should log on staff layoff (coin/rep deltas)', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       const staff = makeStaffCard({ id: 'staff-enrich-lay-1', name: 'General Helper', cost: 3 });
       state.staffCards = [staff];
       layoffStaffCard(state, 'staff-enrich-lay-1');
@@ -745,7 +745,7 @@ describe('Activity Log', () => {
   describe('enriched: staff / community / business ongoing costs', () => {
     it('should log effective coin delta for staff ongoing costs', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       state.staffCards = [makeStaffCard({ id: 'staff-cost-1', name: 'A', cost: 1, ongoingCost: 2 })];
       state.resourceBank.coins = 20;
       const before = state.resourceBank.coins;
@@ -759,7 +759,7 @@ describe('Activity Log', () => {
 
     it('should log effective coin delta for community space ongoing costs', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       const cs = makeCommunitySpace({ id: 'cs-cost-1', name: 'Library', ongoingCost: 1 });
       state.streetGrid[0] = cs as any;
       state.resourceBank.coins = 20;
@@ -774,7 +774,7 @@ describe('Activity Log', () => {
 
     it('should log effective coin delta for business ongoing costs', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       state.streetGrid[0] = makeBiz({ id: 'biz-cost-1', name: 'Clinic', ongoingCost: 1 });
       state.resourceBank.coins = 20;
       const before = state.resourceBank.coins;
@@ -790,7 +790,7 @@ describe('Activity Log', () => {
   describe('per-turn net summary row (AC3)', () => {
     it('should append a net summary row at end of turn processing', () => {
       const state = createTestState('net-row-basic');
-      executeDayStart(state);
+      executeWeekStart(state);
       const startCoins = state.resourceBank.coins;
       const startRep = state.resourceBank.reputation;
       endTurnHeadless(state);
@@ -805,7 +805,7 @@ describe('Activity Log', () => {
       expect(netEntry).toBeDefined();
       expect(netEntry!.text).toContain(describeEventEffects(state.resourceBank.coins - startCoins, state.resourceBank.reputation - startRep));
       // AC1/AC2: score delta appended as (score: +/-Z)
-      const expectedScoreDelta = state.finalScore - state.dayStartScore;
+      const expectedScoreDelta = state.finalScore - state.weekStartScore;
       expect(netEntry!.text).toContain(`(score: ${expectedScoreDelta > 0 ? '+' : ''}${expectedScoreDelta})`);
     });
 
@@ -814,7 +814,7 @@ describe('Activity Log', () => {
       // Establish a stable coin baseline BEFORE the day-start snapshot, then
       // ensure the turn produces no resource delta (empty grid/staff/incidents).
       state.resourceBank.coins = 10;
-      executeDayStart(state);
+      executeWeekStart(state);
       // Ensure income is zero and no ongoing costs are deducted.
       state.streetGrid = state.streetGrid.map(() => null);
       state.staffCards = [];
@@ -840,41 +840,41 @@ describe('Activity Log', () => {
       expect(state.resourceBank.reputation - beforeRep).toBe(0);
       // Score delta should be present — compute the actual delta
       // (score may change due to computeScore() even with no resources moving).
-      const scoreDelta = state.finalScore - state.dayStartScore;
+      const scoreDelta = state.finalScore - state.weekStartScore;
       expect(netEntry!.text).toContain(`(score: ${scoreDelta > 0 ? '+' : ''}${scoreDelta})`);
     });
 
     it('should use the day-start snapshot survived by save/load (serialize/deserialize)', () => {
       const state = createTestState('net-row-clone');
-      executeDayStart(state);
+      executeWeekStart(state);
       // Give the score a non-zero baseline so the round-trip is meaningful.
       state.finalScore = 123;
-      state.dayStartScore = 123;
+      state.weekStartScore = 123;
 
       // Round-trip through the real versioned serialization path (AC4).
       const restored = deserializeMainStreetState(serializeMainStreetState(state));
 
-      expect(restored.dayStartCoins).toBe(state.dayStartCoins);
-      expect(restored.dayStartRep).toBe(state.dayStartRep);
-      expect(restored.dayStartScore).toBe(state.dayStartScore);
-      expect(restored.dayStartScore).toBe(123);
+      expect(restored.weekStartCoins).toBe(state.weekStartCoins);
+      expect(restored.weekStartRep).toBe(state.weekStartRep);
+      expect(restored.weekStartScore).toBe(state.weekStartScore);
+      expect(restored.weekStartScore).toBe(123);
     });
 
-    it('legacy saves without dayStartScore fall back to the saved finalScore', () => {
+    it('legacy saves without weekStartScore fall back to the saved finalScore', () => {
       const state = createTestState('net-row-legacy');
-      executeDayStart(state);
+      executeWeekStart(state);
       state.finalScore = 77;
 
       const serialized = serializeMainStreetState(state) as unknown as Record<string, unknown>;
-      delete serialized.dayStartScore; // simulate a pre-CG-0MTR35GBC005RMZH save
+      delete serialized.weekStartScore; // simulate a pre-CG-0MTR35GBC005RMZH save
 
       const restored = deserializeMainStreetState(serialized as never);
-      expect(restored.dayStartScore).toBe(77);
+      expect(restored.weekStartScore).toBe(77);
     });
 
     it('emits the net row before the game-over entry when the game ends prematurely', () => {
       const state = createTestState('net-row-game-over');
-      executeDayStart(state);
+      executeWeekStart(state);
       state.resourceBank.coins = -1; // force bankruptcy path
       processEndOfTurn(state);
       const netIdx = state.activityLog.findIndex(e => /Turn \d+ net:/.test(e.text));
@@ -896,7 +896,7 @@ describe('Activity Log', () => {
 
     it('should display totals in the format: coins, rep, score', () => {
       const state = createTestState('net-row-totals');
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
       const last = lastLog(state);
       // Totals line format: "Turn N totals: X coins, Y rep, Z score"

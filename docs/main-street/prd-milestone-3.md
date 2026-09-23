@@ -235,7 +235,7 @@ The AI interacts with the game exclusively through the public engine API:
 - `getEmptySlots(state)` -- open grid positions
 - `computeSynergyBonus(grid, slotIndex)` -- evaluate placement quality
 - `executeAction(state, action)` -- execute chosen action
-- `executeDayStart(state)` / `processEndOfTurn(state)` -- turn lifecycle
+- `executeWeekStart(state)` / `processEndOfTurn(state)` -- turn lifecycle
 
 The AI never accesses deck contents or hidden information, ensuring fair evaluation.
 
@@ -266,7 +266,7 @@ The hint system reuses the Greedy strategy to generate recommendations:
    - `rationale: string` -- a human-readable one-line explanation
    - `score: number` -- the heuristic score (for debugging; not shown to player)
 4. The UI highlights the relevant card and target slot.
-5. A `hintUsedThisTurn` flag on the state (or scene) prevents additional hints until the next `DayStart`.
+5. A `hintUsedThisTurn` flag on the state (or scene) prevents additional hints until the next `WeekStart`.
 
 **Rationale generation** maps action types to templates:
 - `buy-business`: "Buy {cardName} at slot {slot} for {synergyRate} synergy bonus" (synergyRate is the effective difficulty-aware percentage, e.g. 50%)
@@ -399,7 +399,7 @@ export class MainStreetAiPlayer extends AiPlayer<MainStreetAiStrategy> {
   /** Run a complete game from the current state until game-end. */
   playGame(state: MainStreetState): void {
     while (state.gameResult === 'playing') {
-      executeDayStart(state);
+      executeWeekStart(state);
       while (state.phase === 'MarketPhase') {
         const action = this.strategy.chooseAction(state, this.rng);
         executeAction(state, action);
@@ -613,7 +613,7 @@ The following tasks represent a suggested implementation order. Each task should
 | # | Task | Description | Dependencies |
 |---|------|-------------|-------------|
 | T-11 | Implement `HintGenerator` | `generateHint()` function, `buildRationale()` templates | T-3, T-4 |
-| T-12 | Add hint state tracking | `hintUsedThisTurn` flag, reset on DayStart | T-11 |
+| T-12 | Add hint state tracking | `hintUsedThisTurn` flag, reset on WeekStart | T-11 |
 | T-13 | Hint UI integration | "Hint" button in `MainStreetScene`, highlight rendering, rationale text | T-11, T-12 |
 | T-14 | Hint unit tests | Correct recommendation, per-turn limit, rationale text | T-11 |
 
@@ -680,7 +680,7 @@ The following tasks represent a suggested implementation order. Each task should
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
 | Greedy heuristic produces poor hints (recommendations that experienced players would disagree with) | Medium | Medium | Include acceptance test where hint matches human-expected move in >=3 of 5 curated scenarios. Heuristic weights can be tuned post-M3 without API changes. |
-| Undo snapshot approach misses state mutations (e.g., market refill side effects) | Medium | High | Market refill happens during `executeDayStart`, not during action execution. Command snapshots only need to capture action-local state. Comprehensive undo/redo tests cover all action types. |
+| Undo snapshot approach misses state mutations (e.g., market refill side effects) | Medium | High | Market refill happens during `executeWeekStart`, not during action execution. Command snapshots only need to capture action-local state. Comprehensive undo/redo tests cover all action types. |
 | Undo/redo of buy-upgrade with branching paths introduces edge cases | Low | Medium | Buy-upgrade commands snapshot the full business card state (level, incomeBonus, synergyRangeBonus, appliedUpgrades). Restoration is a direct property overwrite. Test branching upgrade undo explicitly. |
 | AI strategies slow down Monte Carlo runs significantly | Low | Low | Strategies evaluate <50 candidate actions per turn (market has at most 7 cards x 10 slots). No deep lookahead. Profile if runs exceed 10 seconds for 200 seeds. |
 | Balance targets from M2 PRD may need adjustment after AI testing | High | Low | Balance targets are guidelines, not hard gates. Wide CI guardrail band (20-80%) catches regressions; narrow targets are documented for human review. |

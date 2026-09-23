@@ -425,7 +425,7 @@ export function computeReputationPerTurn(
  * Applies income to the player's resource bank.
  *
  * Canonical turn-economy segment (CG-0MTINZ5GG007BH44, Q1=c — see
- * MainStreetDifficulty header): dayStart snapshot → placement deductions →
+ * MainStreetDifficulty header): weekStart snapshot → placement deductions →
  * this breakdown (staff buffs → income-multiplier effects → rep multiplier)
  * → ongoing costs → incident → net row. Hand cards contribute no income
  * (CG-0MTRDX0DN004EECN). The reputation multiplier is sampled here AFTER
@@ -812,7 +812,7 @@ export interface SlotPhaseBreakdown {
   /** Base income for this slot (after staff buffs, before event/rep multipliers). */
   baseIncome: number;
   /**
-   * Reserved for a dedicated synergy income phase. Always 0 today — board
+   * Reserved for a dedicated synergy income phase. Always 0 currently — board
    * adjacency synergy is folded into `baseIncome` (currentIncome), and
    * hand-card synergy was removed (CG-0MTRDX0DN004EECN: cards in the hand
    * are not in play).

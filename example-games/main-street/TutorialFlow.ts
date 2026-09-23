@@ -331,7 +331,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     bodyKey: tutorialKey('T12', 'body'),
     // Day 3, split 1 of the Bookshop purchase: move it to hand (the day's
     // one action). Same-turn placement would cost +50%; we end the turn and
-    // place at listed cost tomorrow (T15).
+    // place at listed cost next week (T15).
     highlightZone: 'developmentRow',
     gate: 'action',
     requiredAction: 'select-business',
@@ -595,8 +595,8 @@ export function isRequiredAction(
   if (!step || step.gate !== 'action') return false;
   // Two-turn plan-ahead flow (CG-0MT53NXGZ004H5AE): there are no same-turn
   // composite `buy-and-place` steps — a `select-business` step moves the
-  // card to hand today, an `end-turn` advances the day, and a
-  // `place-business` step places it tomorrow at listed cost.
+  // card to hand this week, an `end-turn` advances the day, and a
+  // `place-business` step places it next week at listed cost.
   // Selecting a hand card (select-hand-card) is also allowed during placement
   // steps so the player can pick which card to place (CG-0MSXIQIPJ000NDTL).
   if (step.requiredAction === 'place-business') {

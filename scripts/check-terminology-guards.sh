@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
 # check-terminology-guards.sh — Scan for forbidden day-as-turn tokens in
-# player-facing text (tutorial, HUD tooltips, docs).  Exits non-zero when
-# violations are found.
+# player-facing text (tutorial, HUD tooltips, docs) and in-game messages.
+# Exits non-zero when violations are found.
+#
+# Canonical vocabulary (one turn = one week):
+#   in-world time is "week" / "this week" / "next week"; the activity-log
+#   header remains "Turn N".
 #
 # Allowed (preserved) tokens — NOT flagged:
-#   • Same-day composite terminology: "same-day composite", "same-day placement",
-#     "same-day apply", "same-day move+play", "same-day move + play",
-#     "same-day premium", "same-day click", "same-day or held",
-#     "same-day application", "same-day play", "same-day event",
-#     "same-day upgrade composite", "same-day or not"
-#   • "next day start" or "→ next day" (phase transition in engine code)
-#   • State field names containing justMovedThisDayCardId
-#   • Proper names: Day Spa, Rainy Day, Volunteer Day, Farmers Market Day,
-#     St Brigid's Day / st brydgis day, May Day / Bealtaine
-#   • "Day Phase" (identifier before rename)
+#   • Proper names containing "Day": Day Spa, Rainy Day, Volunteer Day,
+#     Farmers Market Day, St Brigid's Day / st brydgis day, May Day,
+#     Bealtaine.  (These are card/business/event names, not turn synonyms.)
 #
-# Scanned directories:
-#   docs/                        (all .md files)
-#   example-games/main-street/   (tutorial, UI strings — .ts files)
+# Scanned:
+#   docs/                        (all .md files, recursively)
+#   example-games/main-street/   (all .ts files — tutorial + in-game messages)
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -26,20 +23,15 @@ violations=0
 
 is_allowed_line() {
   local line="$1"
-  # Same-day composite / placement / apply / move + play / move+play / premium
-  # / click / application / play / event / upgrade composite / or held / or not
-  if echo "$line" | grep -qE 'same-day (composite|placement|apply|move\+play|move \+ play|premium|click|application|play|event|upgrade composite| or held| or not)'; then return 0; fi
-  # Phase-transition: "next day start" or "→ next day"
-  if echo "$line" | grep -qE 'next day (start|\→| \(EndCheck\)|\.)'; then return 0; fi
-  if echo "$line" | grep -qE '\→ next day\b'; then return 0; fi
-  # State field name
-  if echo "$line" | grep -q 'justMovedThisDayCardId'; then return 0; fi
+  # The canonical terminology rule itself enumerates the forbidden tokens
+  # (docs/main-street/core-rules-and-mechanics.md §1.1). Exempt the rule line.
+  if echo "$line" | grep -q '\*\*Do not\*\* use'; then
+    return 0
+  fi
   # Proper-name business / event cards
-  if echo "$line" | grep -qiE 'Day Spa|Rainy Day|Volunteer Day|Farmers Market Day|St Brigid'\''s Day|st brydgis day|May Day|Bealtaine'; then return 0; fi
-  # "Day Phase" (identifier before rename — acceptable until renamed)
-  if echo "$line" | grep -q 'Day Phase'; then return 0; fi
-  # "this day" as part of "this day is/costs/would/grants/uses/spends/holds/remains/starts/ends"
-  if echo "$line" | grep -qE 'this day (is|costs|would|grants|uses|spends|holds|remains|starts|ends)'; then return 0; fi
+  if echo "$line" | grep -qiE "Day Spa|Rainy Day|Volunteer Day|Farmers Market Day|St Brigid's Day|st brydgis day|May Day|Bealtaine"; then
+    return 0
+  fi
   return 1
 }
 
@@ -49,10 +41,11 @@ is_allowed_line() {
   find example-games/main-street -name '*.ts' -type f 2>/dev/null
 } | sort -u > /tmp/_termguard_files.txt
 
-# Forbidden patterns (POSIX ERE)
+# Forbidden patterns (POSIX ERE) — day-as-turn tokens
 patterns=(
   'day \(or night\) cycle'
   'End the day'
+  'end the day'
   'overnight'
   'this day'
   '\btoday\b'
@@ -67,7 +60,7 @@ while IFS= read -r pat; do
     [ ! -f "$file" ] && continue
     while IFS= read -r match_line; do
       [ -z "$match_line" ] && continue
-      # Extract the actual text (everything after file:linenum:)
+      # Strip "file:linenum:" prefix to get the actual source text
       actual_line="${match_line#*:}"
       actual_line="${actual_line#*:}"
       if ! is_allowed_line "$actual_line"; then
@@ -76,13 +69,12 @@ while IFS= read -r pat; do
         echo "  ${match_line}"
         violations=$((violations + 1))
       fi
-    done < <(grep -nE "$pat" "$file" 2>/dev/null || true)
+    done < <(grep -niE "$pat" "$file" 2>/dev/null || true)
   done < /tmp/_termguard_files.txt
 done <<< "$(printf '%s\n' "${patterns[@]}")"
 
 rm -f /tmp/_termguard_files.txt
 
-# ---------- result ----------------------------------------------------
 echo ""
 if [ "$violations" -gt 0 ]; then
   echo "FAIL: $violations forbidden token violation(s) found."

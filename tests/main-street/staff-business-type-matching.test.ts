@@ -43,7 +43,7 @@ import {
   letGoStaffMember,
   layoffStaffCard,
 } from '../../example-games/main-street/MainStreetEngine';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Fixtures ────────────────────────────────────────────────
 
@@ -259,7 +259,7 @@ describe('AC5: per-business employedStaff state model', () => {
 
   it('a placed business carries an empty employedStaff array (explicit from setup)', () => {
     const state = setupMainStreetGame({ seed: 'staff-model' });
-    executeDayStart(state);
+    executeWeekStart(state);
     placeBusiness(state);
     expect(Array.isArray(state.streetGrid[0]!.employedStaff)).toBe(true);
     expect(state.streetGrid[0]!.employedStaff).toHaveLength(0);
@@ -267,7 +267,7 @@ describe('AC5: per-business employedStaff state model', () => {
 
   it('getEmployedStaffCountAt reads business.employedStaff', () => {
     const state = setupMainStreetGame({ seed: 'staff-count' });
-    executeDayStart(state);
+    executeWeekStart(state);
     const card = placeBusiness(state);
     card.employedStaff = [staffTemplate('staff-chef')];
     expect(getEmployedStaffCountAt(state, 0)).toBe(1);
@@ -276,7 +276,7 @@ describe('AC5: per-business employedStaff state model', () => {
 
   it('getEmployedStaffCountAt falls back to employedAtSlot for legacy in-memory states', () => {
     const state = setupMainStreetGame({ seed: 'staff-fallback' });
-    executeDayStart(state);
+    executeWeekStart(state);
     const card = placeBusiness(state);
     // Legacy shape: no employedStaff field, staff linked via employedAtSlot only.
     card.employedStaff = undefined;
@@ -287,7 +287,7 @@ describe('AC5: per-business employedStaff state model', () => {
 
   it('employedStaff survives serialize → deserialize', () => {
     const state = setupMainStreetGame({ seed: 'staff-save' });
-    executeDayStart(state);
+    executeWeekStart(state);
     const card = placeBusiness(state);
     card.employedStaff = [
       { ...staffTemplate('staff-chef'), employedAtSlot: 0 },
@@ -300,7 +300,7 @@ describe('AC5: per-business employedStaff state model', () => {
 
   it('deserialization backfills employedStaff from legacy employedAtSlot references', () => {
     const state = setupMainStreetGame({ seed: 'staff-migrate' });
-    executeDayStart(state);
+    executeWeekStart(state);
     const card = placeBusiness(state);
     card.employedStaff = undefined; // legacy save shape
     const chef = { ...staffTemplate('staff-chef'), employedAtSlot: 0, specializationSkillIds: ['skill-chef'] };
@@ -317,7 +317,7 @@ describe('AC5: per-business employedStaff state model', () => {
 
   it('hiring the pending applicant registers the staff member on the business', () => {
     const state = setupMainStreetGame({ seed: 'staff-hire' });
-    executeDayStart(state);
+    executeWeekStart(state);
     const card = placeBusiness(state);
     card.employedStaff = [];
     const applicant = { card: { ...staffTemplate('staff-chef') }, targetSlotIndex: 0 };
@@ -329,7 +329,7 @@ describe('AC5: per-business employedStaff state model', () => {
 
   it('laying off or letting go removes the member from the business employedStaff', () => {
     const state = setupMainStreetGame({ seed: 'staff-go' });
-    executeDayStart(state);
+    executeWeekStart(state);
     const card = placeBusiness(state);
     const chef = { ...staffTemplate('staff-chef'), employedAtSlot: 0 };
     const barista = { ...staffTemplate('staff-barista'), employedAtSlot: 0 };

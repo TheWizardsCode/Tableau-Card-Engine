@@ -16,7 +16,7 @@ import { SaveLoadStore, CheckpointManager } from '../../src/core-engine';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   processEndOfTurn,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -139,7 +139,7 @@ describe('Main Street CheckpointManager integration', () => {
     // which card the expanded pool's seeded market draws (×100 integer economy).
     state.resourceBank.coins = 1000;
 
-    executeDayStart(state);
+    executeWeekStart(state);
     const card = state.market.cards[0];
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(state);
@@ -150,7 +150,7 @@ describe('Main Street CheckpointManager integration', () => {
 
     const expected = setupMainStreetGame({ seed: 'existing-api-det-roundtrip' });
     expected.resourceBank.coins = 1000; // match the cushion applied above (×100)
-    executeDayStart(expected);
+    executeWeekStart(expected);
     executeAction(expected, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
     processEndOfTurn(expected);
 

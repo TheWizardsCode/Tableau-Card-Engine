@@ -87,15 +87,15 @@ describe('Main Street Tutorial E2E — Part 2', () => {
     const scene = game!.scene.getScene('MainStreetScene') as Phaser.Scene;
     await walkToT7(scene);
     expect(getStepIndex(scene)).toBe(6);
-    // The Laundromat waited in hand overnight: placing it today costs the
-    // LISTED $4 (plan-ahead, CG-0MT53NXGZ004H5AE) — no same-day premium.
+    // The Laundromat waited in hand until next week: placing it this week costs the
+    // LISTED $4 (plan-ahead, CG-0MT53NXGZ004H5AE) — no same-week premium.
     const s = scene as any;
     const coinsBefore = s.state.resourceBank.coins;
     await clickStreetSlot(scene, 0);
     await new Promise((r) => setTimeout(r, 500));
     await waitForOverlayVisible(5_000);
     expect(getStepIndex(scene)).toBe(7); // T8 Investments
-    // Listed-cost deduction (400, CG-0MTIO1M15001E9Y6 ×100), not 600 same-day premium.
+    // Listed-cost deduction (400, CG-0MTIO1M15001E9Y6 ×100), not 600 same-week premium.
     expect(s.state.resourceBank.coins).toBe(coinsBefore - 400);
     await saveScreenshot('t7-t8');
   }, 30_000);

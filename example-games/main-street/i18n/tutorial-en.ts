@@ -18,8 +18,8 @@
  * - Do NOT describe incident cards as "blue" or list their impacts.
  * - Do NOT mention matching cards in the Place a Business step.
  * - Do NOT promise same-turn placement at listed cost: every purchase is a
- *   two-turn flow (CG-0MT53NXGZ004H5AE) — move to hand today (one action),
- *   End Turn, place tomorrow at LISTED cost. Same-day placement after a move
+ *   two-turn flow (CG-0MT53NXGZ004H5AE) — move to hand this week (one action),
+ *   End Turn, place next week at LISTED cost. Same-week placement after a move
  *   costs the +50% premium (CG-0MT24X0SX007RLHN) and is never scripted.
  *
  * ## Card-data placeholders
@@ -127,7 +127,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [bankingHintKey('title')]:
     'Bank your spare action',
   [bankingHintKey('body')]:
-    'Any unused action banks up to 2 and carries into future days. Check the "(1 banked)" count in the action counter above.',
+    'Any unused action banks up to 2 and carries into future weeks. Check the "(1 banked)" count in the action counter above.',
 
   // ── T1: Welcome ─────────────────────────────────────────────
   [tutorialKey('T1', 'title')]:
@@ -148,17 +148,17 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // resolveTutorialStepText() — do NOT hardcode the card name or price here.
   // Cost-at-play (CG-0MSTOATDT009BRX2): picking the card up is free; the
   // price is paid when the card is placed on the street. Two-turn plan-ahead
-  // (CG-0MT53NXGZ004H5AE): taking the card uses today's ONE action; you'll
-  // end the turn and place it tomorrow at its LISTED cost. Same-turn
+  // (CG-0MT53NXGZ004H5AE): taking the card uses this week's ONE action; you'll
+  // end the turn and place it next week at its LISTED cost. Same-turn
   // placement after the move would cost +50% premium (CG-0MSTOF1N5005PK2R).
   [tutorialKey('T3', 'body')]:
-    "Click the **{cardName}** card to buy it — taking it is free now, but it uses today's **one action**. You'll end the turn and place it tomorrow for its listed **{cost}**.",
+    "Click the **{cardName}** card to buy it — taking it is free now, but it uses this week's **one action**. You'll end the turn and place it next week for its listed **{cost}**.",
 
   // ── T4: Your Hand ──────────────────────────────────────────
   [tutorialKey('T4', 'title')]:
     'Your Hand',
   [tutorialKey('T4', 'body')]:
-    'Cards you take wait here in your hand. They earn nothing until placed. Place them tomorrow — the listed price costs an action then, and it is far cheaper than rushing today.',
+    'Cards you take wait here in your hand. They earn nothing until placed. Place them next week — the listed price costs an action then, and it is far cheaper than rushing this week.',
 
   // ── T5: Upcoming Incidents ──
   // Face-down incident deck (CG-0MSTOATDP000JNHH): incidents are hidden in
@@ -169,27 +169,27 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T5', 'body')]:
     'Incidents hide in a face-down deck \u2014 you see only how many are left, not what is next. The top card is revealed and resolved at the end of each turn.',
 
-  // ── T6: End Turn (day 1 → day 2) ───────────────────────────
+  // ── T6: End Turn (week 1 → week 2) ─────────────────────────
   [tutorialKey('T6', 'title')]:
     'End Turn',
   [tutorialKey('T6', 'body')]:
-    'End the day to collect income and start the next one. The card you took waits in your hand overnight.',
+    'End the week to collect income and start the next week. The card you took waits in your hand until next week.',
 
-  // ── T7: Place a Business (day 2 — listed cost) ─────────────
+  // ── T7: Place a Business (week 2 — listed cost) ────────────
   [tutorialKey('T7', 'title')]:
     'Place a Business',
   [tutorialKey('T7', 'body')]:
-    'The card waited in your hand overnight. Click it in your hand, then click an empty slot on the street to place it and pay its listed **cost**. It starts earning income right away.',
+    'The card waited in your hand until next week. Click it in your hand, then click an empty slot on the street to place it and pay its listed **cost**. It starts earning income right away.',
 
   // ── T8: Investments ────────────────────────────────────────
-  // ── T8: End this turn (day 2 → day 3) ─────────────────────
+  // ── T8: End this turn (week 2 → week 3) ────────────────────
   // CG-0MTNMBX5Z002U0MH: inserted end-turn before More than Businesses so
-  // T7 (place-business) and T10 (buy-event) no longer share Day 2's single
-  // base action. Ends Day 2; Day 3 starts with a fresh action for the Festival.
+  // T7 (place-business) and T10 (buy-event) no longer share Week 2's single
+  // base action. Ends Week 2; Week 3 starts with a fresh action for the Festival.
   [tutorialKey('T8', 'title')]:
     'End this turn',
   [tutorialKey('T8', 'body')]:
-    'End the day to collect income and start the next one. You\'ll have a fresh action tomorrow for the Festival.',
+    'End the week to collect income and start the next week. You\'ll have a fresh action next week for the Festival.',
 
   [tutorialKey('T9', 'title')]:
     'More than Businesses',
@@ -201,11 +201,11 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
     'Buy the Local Festival',
   // {cardName}/{cost}/{bonus} resolved from card-data.csv (evt-festival) at render time.
   // Investment events cost 1 action to take to hand (CG-0MTFWBNL30043ZBM):
-  // T8 ended day 2 so this step spends day 3's fresh action.
+  // T8 ended week 2 so this step spends week 3's fresh action.
   [tutorialKey('T10', 'body')]:
-    'Click the **{cardName}** card to add it to your hand — it uses today\'s action, and you pay **{cost}** when you play it. It waits in your hand for the right moment.',
+    'Click the **{cardName}** card to add it to your hand — it uses this week\'s action, and you pay **{cost}** when you play it. It waits in your hand for the right moment.',
 
-  // ── T10: End this turn (day 2 → day 3) ────────────────────
+  // ── T10: End this turn (week 2 → week 3) ───────────────────
   [tutorialKey('T11', 'title')]:
     'End this turn',
   // {cardName} resolved from card-data.csv (evt-festival) at render time.
@@ -213,16 +213,16 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   [tutorialKey('T11', 'body')]:
     'We could play the **{cardName}** now, but we\'re going to wait for a more opportune moment. End this turn for now.',
 
-  // ── T11: Move the Bookshop to hand (day 3, split 1 of 2) ──
+  // ── T11: Move the Bookshop to hand (week 3, split 1 of 2) ──
   [tutorialKey('T12', 'title')]:
     'Move the Bookshop to hand',
   // {cardName}/{cost} resolved from card-data.csv (biz-bookshop) at render time.
   // Two-turn plan-ahead (CG-0MT53NXGZ004H5AE): taking the Bookshop to hand
-  // uses today's one action; placing it today would cost +50% premium
+  // uses this week's one action; placing it this week would cost +50% premium
   // (CG-0MT24X0SX007RLHN), so we End the turn and place at listed cost
-  // tomorrow (T15). Post-CG-0MSXIQIPJ000NDTL: no auto-select after the move.
+  // next week (T15). Post-CG-0MSXIQIPJ000NDTL: no auto-select after the move.
   [tutorialKey('T12', 'body')]:
-    'The **{cardName}** is a Culture business that makes your festival stronger. Move it to your hand for today\'s **one action** — you\'ll place it tomorrow at its listed **{cost}**, not a same-day premium.',
+    'The **{cardName}** is a Culture business that makes your festival stronger. Move it to your hand for this week\'s **one action** — you\'ll place it next week at its listed **{cost}**, not a same-week premium.',
 
   // ── T12: Costs and Reputation ──────────────────────────────
   [tutorialKey('T13', 'title')]:
@@ -239,60 +239,60 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // budget the conversion is NOT strictly required (income already covers
   // the Library), so the copy teaches the mechanic without a
   // "REQUIRED for the Library" claim (CG-0MT53NXGZ004H5AE).
-  // ── T14: End this turn (day 4 → day 5) ─────────────────────
-  // CG-0MTNMBX5Z002U0MH: splits Day 4 so T12 (move Bookshop) and T15
-  // (community-favour) land on separate days. Community Favour is free
+  // ── T14: End this turn (week 4 → week 5) ───────────────────
+  // CG-0MTNMBX5Z002U0MH: splits Week 4 so T12 (move Bookshop) and T15
+  // (community-favour) land on separate weeks. Community Favour is free
   // (CG-0MSTOATDQ005XDET), so this boundary is no longer budget-required;
-  // retained as the natural day marker.
+  // retained as the natural week marker.
   [tutorialKey('T14', 'title')]:
     'End this turn',
   [tutorialKey('T14', 'body')]:
-    'End the day to collect income and start the next one. The card you took waits in your hand overnight.',
+    'End the week to collect income and start the next week. The card you took waits in your hand until next week.',
 
   [tutorialKey('T15', 'title')]:
     'Community Favour',
   [tutorialKey('T15', 'body')]:
     'You can also turn reputation into coins: click the **2r → 3c** button in the action bar below — a FREE **Community Favour** exchange, once per turn.',
 
-  // ── T14: End this turn (day 3 → day 4) ─────────────────────
+  // ── T14: End this turn (week 3 → week 4) ───────────────────
   [tutorialKey('T16', 'title')]:
     'End this turn',
   // {cardName} resolved from card-data.csv (biz-bookshop) at render time.
   [tutorialKey('T16', 'body')]:
-    'The **{cardName}** waits in your hand. End this turn to continue to tomorrow.',
+    'The **{cardName}** waits in your hand. End this turn to continue to next week.',
 
-  // ── T15: Place the Bookshop (day 4, split 2 of 2) ──────────
+  // ── T15: Place the Bookshop (week 4, split 2 of 2) ─────────
   [tutorialKey('T17', 'title')]:
     'Place the Bookshop',
   // {cardName}/{cost} resolved from card-data.csv (biz-bookshop) at render time.
-  // Listed-cost placement from hand (plan-ahead); no same-day premium.
+  // Listed-cost placement from hand (plan-ahead); no same-week premium.
   [tutorialKey('T17', 'body')]:
     'Click the **{cardName}** in your hand, then click an empty slot on the street to place it at its listed **{cost}**. It starts earning income right away.',
 
-  // ── T16: End this turn (day 4 → day 5) ─────────────────────
+  // ── T16: End this turn (week 4 → week 5) ───────────────────
   [tutorialKey('T18', 'title')]:
     'End this turn',
   [tutorialKey('T18', 'body')]:
-    'End the day to collect income from your street and start the next one.',
+    'End the week to collect income from your street and start the next week.',
 
-  // ── T17: Move the Library to hand (day 5, split 1 of 2) ────
+  // ── T17: Move the Library to hand (week 5, split 1 of 2) ───
   [tutorialKey('T19', 'title')]:
     'Move the Library to hand',
   // {cardName}/{cost} resolved from card-data.csv (cs-library) at render time.
   // Two-turn plan-ahead (CG-0MT53NXGZ004H5AE): moving the Library to hand
-  // uses today's one action; it will be placed next day at listed $7 next to
+  // uses this week's one action; it will be placed next week at listed $7 next to
   // the Bookshop (culture adjacency). Only ONE Culture partner is needed to
-  // trigger the festival at T20, so holding it a day is safe.
+  // trigger the festival at T20, so holding it a week is safe.
   [tutorialKey('T19', 'body')]:
-    'The **{cardName}** brings a Culture bonus when placed next to other Culture cards. Click it to move it to your hand — that\'s today\'s **one action**.',
+    'The **{cardName}** brings a Culture bonus when placed next to other Culture cards. Click it to move it to your hand — that\'s this week\'s **one action**.',
 
-  // ── T18: End this turn (day 5 → day 6) ─────────────────────
+  // ── T18: End this turn (week 5 → week 6) ───────────────────
   [tutorialKey('T20', 'title')]:
     'End this turn',
   [tutorialKey('T20', 'body')]:
-    'End the day to collect income and reach the Library\'s placement day.',
+    'End the week to collect income and reach the Library\'s placement week.',
 
-  // ── T19: Build a Library next to the Bookshop (day 6, split 2 of 2) ──
+  // ── T19: Build a Library next to the Bookshop (week 6, split 2 of 2) ──
   [tutorialKey('T21', 'title')]:
     'Build a Library',
   // {cardName} = cs-library, {synergyCardName} = biz-bookshop — resolved from
@@ -300,26 +300,26 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // to the Bookshop (a Culture business) earns the Culture adjacency bonus.
   // Adjacency is 8-way (Chebyshev): placing the Library diagonally next to the
   // Bookshop counts just as much as orthogonally. Listed-cost placement from
-  // hand (plan-ahead) — no same-day premium for the $7 card.
+  // hand (plan-ahead) — no same-week premium for the $7 card.
   [tutorialKey('T21', 'body')]:
     'Click the **{cardName}** in your hand, then click a slot **next to {synergyCardName}** — orthogonally or diagonally — to place it at its listed cost and gain the Culture bonus.',
 
   // ── T20: Triggering Events ─────────────────────────────────
-  // ── T22: End this turn (day 8 → day 9) ─────────────────────
-  // CG-0MTNMBX5Z002U0MH: inserted to split Day 8 so T21 (place Library)
+  // ── T22: End this turn (week 8 → week 9) ───────────────────
+  // CG-0MTNMBX5Z002U0MH: inserted to split Week 8 so T21 (place Library)
   // and T23 (play festival) no longer share a single action.
   [tutorialKey('T22', 'title')]:
     'End this turn',
   [tutorialKey('T22', 'body')]:
-    'End this turn to collect income and reach the festival day.',
+    'End this turn to collect income and reach the festival week.',
 
   [tutorialKey('T23', 'title')]:
     'Triggering Events',
   // {cardName} resolved from card-data.csv (evt-festival) at render time.
   // Playing a held Investment event costs 1 action (CG-0MTFWBNL30043ZBM);
-  // T22 ended day 8 so this step spends day 9's fresh action.
+  // T22 ended week 8 so this step spends week 9's fresh action.
   [tutorialKey('T23', 'body')]:
-    'Two Culture businesses on your street power the festival. Click the **{cardName}** in your hand to play it — it uses today\'s action.',
+    'Two Culture businesses on your street power the festival. Click the **{cardName}** in your hand to play it — it uses this week\'s action.',
 
   // ── T21: Success and Failure ───────────────────────────────
   [tutorialKey('T24', 'title')]:

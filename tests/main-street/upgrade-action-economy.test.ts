@@ -7,7 +7,7 @@
  * - Buy-upgrade (direct-from-market) now moves to hand AND consumes 1 action
  *   — the old `buy-upgrade` action that applied directly is replaced by
  *   `move-to-hand` for upgrades (same flow as business cards).
- * - Play-upgrade-from-hand same-day composite (just moved this turn) does NOT
+ * - Play-upgrade-from-hand same-week composite (just moved this turn) does NOT
  *   consume a second action.
  * - Play-upgrade-from-hand held from previous day consumes 1 action.
  * - New `buy-and-place-upgrade` action (drag-drop) consumes 1 action with
@@ -25,7 +25,7 @@ import {
   setupMainStreetGame,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
 } from '../../example-games/main-street/MainStreetEngine';
 import type { BusinessCard, UpgradeCard } from '../../example-games/main-street/MainStreetCards';
@@ -89,7 +89,7 @@ function setupUpgradeGame(
   upgradeName: string = 'Neon Sign',
 ): { state: ReturnType<typeof setupMainStreetGame>; businessId: string; upgradeId: string; marketUpgradeId: string } {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state, true);
+  executeWeekStart(state, true);
   state.resourceBank.coins = 1000;
 
   // Place a business on the grid at the desired level.
@@ -135,9 +135,9 @@ describe('move-to-hand for upgrades', () => {
   });
 });
 
-// ── Play-Upgrade-From-Hand: Same-Day Composite ───────────────
+// ── Play-Upgrade-From-Hand: Same-week Composite ───────────────
 
-describe('play-upgrade-from-hand: same-day composite', () => {
+describe('play-upgrade-from-hand: same-week composite', () => {
   it('does NOT consume an action when the upgrade was just moved to hand this turn', () => {
     const { state, marketUpgradeId } = setupUpgradeGame('sdc-free');
 
@@ -145,7 +145,7 @@ describe('play-upgrade-from-hand: same-day composite', () => {
     executeAction(state, { type: 'move-to-hand', cardId: marketUpgradeId });
     expect(state.actionsRemaining).toBe(0);
 
-    // Now play it from hand — same-day composite should be FREE
+    // Now play it from hand — same-week composite should be FREE
     const handIndex = state.hand.findIndex(c => c.id === marketUpgradeId);
     expect(handIndex).toBeGreaterThan(-1);
 
@@ -156,7 +156,7 @@ describe('play-upgrade-from-hand: same-day composite', () => {
       targetSlot: 0,
     });
 
-    // Same-day composite: no additional action consumed
+    // Same-week composite: no additional action consumed
     expect(state.actionsRemaining).toBe(actionsBeforePlay);
 
     // Verify the upgrade was applied (business level increased)
@@ -175,8 +175,8 @@ describe('play-upgrade-from-hand: held-card play', () => {
     expect(state.actionsRemaining).toBe(0);
 
     // Simulate a new day start (actions reset to 1)
-    state.phase = 'DayStart';
-    executeDayStart(state, true);
+    state.phase = 'WeekStart';
+    executeWeekStart(state, true);
     expect(state.actionsRemaining).toBe(1);
 
     // Play the held upgrade — this should consume an action
@@ -296,8 +296,8 @@ describe('upgrade action economy: legality gating', () => {
     const { state, marketUpgradeId } = setupUpgradeGame('gate-pufh');
 
     executeAction(state, { type: 'move-to-hand', cardId: marketUpgradeId });
-    state.phase = 'DayStart';
-    executeDayStart(state, true); // new day, 1 action available
+    state.phase = 'WeekStart';
+    executeWeekStart(state, true); // new day, 1 action available
 
     // Spend the action
     state.market.cards = [makeBiz('biz-x', 'X', 10)];

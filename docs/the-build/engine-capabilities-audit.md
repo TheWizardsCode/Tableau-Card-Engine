@@ -7,7 +7,7 @@
 
 ## Table of Contents
 
-1. [Current Engine Features (Available Today)](#1-current-engine-features-available-today)
+1. [Current Engine Features (Available Now)](#1-current-engine-features-available-now)
 2. [Existing Example Games](#2-existing-example-games)
 3. [Minor Extensions (< 1 day each)](#3-minor-extensions--1-day-each)
 4. [Major Gaps (Multi-day efforts)](#4-major-gaps-multi-day-efforts)
@@ -15,7 +15,7 @@
 
 ---
 
-## 1. Current Engine Features (Available Today)
+## 1. Current Engine Features (Available Now)
 
 ### Core Engine (`src/core-engine/`)
 

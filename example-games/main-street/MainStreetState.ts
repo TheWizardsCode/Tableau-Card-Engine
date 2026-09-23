@@ -20,7 +20,7 @@
 export type {
   LogEntryType,
   LogEntry,
-  DayPhase,
+  TurnPhase,
   MarketState,
   ResourceBank,
   GameResult,

@@ -10,7 +10,7 @@
 
 import { executeAction } from './MainStreetEngineActions';
 import { applyBusinessOngoingCosts, applyCommunitySpaceOngoingCosts, applyStaffOngoingCosts, declineStaffApplicant } from './MainStreetEngineCommands';
-import { executeDayStart } from './MainStreetEngineDayStart';
+import { executeWeekStart } from './MainStreetEngineWeekStart';
 import { computeEventDeltas, resolveEvent } from './MainStreetEngineEvents';
 import { decideEventChoice, updateCompetitiveScores, updateScore } from './MainStreetEngineScoring';
 import { EndOfTurnOptions, EventChoiceResolution, PendingEndOfTurnDeltas, PlayerAction, SinglePlayerTurnClosingContext, TurnResult } from './MainStreetEngineTypes';
@@ -52,7 +52,7 @@ export function resolveIncident(
   const employed = getEmployedSpecializationSkills(state);
   const incidentBuffs = computeIncidentSkillBuffs(employed);
   if (incidentBuffs.probabilityReductionPct > 0 && state.rng() < incidentBuffs.probabilityReductionPct) {
-    addLog(state, 'Risk Manager averted today\'s incident.', 'neutral');
+    addLog(state, 'Risk Manager averted this week\'s incident.', 'neutral');
     return null;
   }
 
@@ -138,7 +138,7 @@ export function resolveIncident(
  * `acceptNextCardId` escalation onto the incident deck. Reject skips the
  * effect entirely and pushes the `rejectNextCardId` escalation instead.
  * Records the decision in the transcript and marks the pending choice
- * resolved — the deferred closing (EndCheck → next day) is completed by
+ * resolved — the deferred closing (EndCheck → next week) is completed by
  * {@link finishDeferredEndOfTurn}.
  *
  * @param state  Current game state (mutated). Must have a pending unresolved choice.
@@ -206,7 +206,7 @@ export function resolveEventChoice(
 /**
  * Resolves a pending dual-choice incident using the difficulty-based policy
  * (from `state.config.difficultyName`, or an explicit override) and completes
- * the deferred closing (EndCheck → next day). Headless/AI turns never stall:
+ * the deferred closing (EndCheck → next week). Headless/AI turns never stall:
  * executeFullTurn, MainStreetAiPlayer.playGame and the Monte Carlo harness
  * call this automatically. Records the decision via resolveEventChoice
  * (identical transcript shape to a player choice).
@@ -355,7 +355,7 @@ export function processEndOfTurn(state: MainStreetState, opts?: EndOfTurnOptions
   // `pendingEventChoice` (resolveIncident deferred the effect), stop the closing
   // sequence BEFORE EndCheck and return choicePending so the UI presents the
   // Accept/Reject dialog. The deferred closing then runs via resolveEventChoice
-  // (apply the path) + finishDeferredEndOfTurn (EndCheck → next day).
+  // (apply the path) + finishDeferredEndOfTurn (EndCheck → next week).
   if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
     // Deferred mode: the income deltas are NOT yet in state — the scene
     // applies them (applyEndOfTurnDeltas) when presenting the dialog so the
@@ -452,9 +452,9 @@ export function appendTurnNetRow(state: MainStreetState, turnEnded: number): voi
   // Fall back to the current resources if no snapshot exists (defensive:
   // processEndOfTurn is only reachable from MarketPhase, i.e. after a
   // day start, so the snapshot is normally always present).
-  const startCoins = state.dayStartCoins ?? state.resourceBank.coins;
-  const startRep = state.dayStartRep ?? state.resourceBank.reputation;
-  const startScore = state.dayStartScore ?? state.finalScore;
+  const startCoins = state.weekStartCoins ?? state.resourceBank.coins;
+  const startRep = state.weekStartRep ?? state.resourceBank.reputation;
+  const startScore = state.weekStartScore ?? state.finalScore;
   const deltaCoins = state.resourceBank.coins - startCoins;
   const deltaRep = state.resourceBank.reputation - startRep;
   const deltaScore = state.finalScore - startScore;
@@ -562,7 +562,7 @@ export function checkEndConditions(state: MainStreetState): boolean {
 // ── Full Turn Execution ─────────────────────────────────────
 
 /**
- * Executes the DayStart phase:
+ * Executes the WeekStart phase:
  * - Increments turn counter (except turn 1).
  * - Refills the market (unless skipMarketRefill is true, e.g., checkpoint resume).
  * - Transitions to MarketPhase.
@@ -726,7 +726,7 @@ export function endTurnHeadless(state: MainStreetState): TurnResult {
 
 /**
  * Runs a complete turn cycle:
- * 1. DayStart (refill market)
+ * 1. WeekStart (refill market)
  * 2. Execute all player actions
  * 3. Process end of turn (events, income, night, end check)
  *
@@ -740,8 +740,8 @@ export function executeFullTurn(
   state: MainStreetState,
   actions: PlayerAction[],
 ): TurnResult {
-  // DayStart
-  executeDayStart(state);
+  // WeekStart
+  executeWeekStart(state);
 
   // Execute player actions, accumulating any challenges completed mid-turn
   // by per-action evaluation (CG-0MU37CKRR008252I).
@@ -818,7 +818,7 @@ export function finishDeferredEndOfTurn(state: MainStreetState): TurnResult {
  *     (CG-0MU37CKRR008252I), so this pass reports only closing-phase
  *     (Income / Incident) completions,
  *  2. run the immediate-loss check and EndCheck (game-over evaluation — AC4),
- *  3. advance to the next day when the game continues,
+ *  3. advance to the next week when the game continues,
  *  4. append the per-turn net summary row.
  *
  * PRECONDITION: the pending deltas have ALREADY been applied to
@@ -891,7 +891,7 @@ export function finishDeferredTurnClosing(
     const bankable = Math.min(state.actionsRemaining, 1);
     state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
 
-    state.phase = 'DayStart';
+    state.phase = 'WeekStart';
   }
 
   // 6. Per-turn net summary row — the final log entry of a completed turn
@@ -983,7 +983,7 @@ function runSinglePlayerTurnClosing(
     const bankable = Math.min(state.actionsRemaining, 1);
     state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
 
-    state.phase = 'DayStart';
+    state.phase = 'WeekStart';
   }
 
   // Per-turn net summary row — the final log entry of a completed turn

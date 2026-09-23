@@ -16,7 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   endTurnHeadless,
   computeScore,
@@ -73,7 +73,7 @@ function runGreedyGame(seed: string, maxTurns = 30): RunSummary {
   const turns: TurnRecord[] = [];
 
   while (state.gameResult === 'playing' && state.turn <= maxTurns) {
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const actions: PlayerAction[] = [];
     const executed: { type: string; detail: string }[] = [];
@@ -225,7 +225,7 @@ describe('Smoke: Main Street Easy difficulty (Tutorial scenario baseline)', () =
     const safetyLimit = 60;
 
     while (state.gameResult === 'playing' && turns < safetyLimit) {
-      executeDayStart(state);
+      executeWeekStart(state);
       const affordable = getAffordableBusinessCards(state);
       const emptySlots = getEmptySlots(state);
       if (affordable.length > 0 && emptySlots.length > 0) {

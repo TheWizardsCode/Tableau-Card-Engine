@@ -7,10 +7,10 @@
  * - taking an event to hand (`buy-event`) costs one daily action and no coins;
  * - playing a held event from a previous day (`play-event-from-hand`) costs
  *   one action and the event's listed cost;
- * - a same-day move + play composite costs a single action in total (the move
- *   already spent it, so the same-day play is free);
+ * - a same-week move + play composite costs a single action in total (the move
+ *   already spent it, so the same-week play is free);
  * - no event action is proposed or chosen once the daily budget is spent,
- *   except the free same-day composite.
+ *   except the free same-week composite.
  *
  * These tests assert observable decision output (`enumerateLegalActions`,
  * `scoreAction`, `GreedyStrategy.chooseAction`, `chooseDemoGreedyActions`)
@@ -27,7 +27,7 @@ import {
 } from '../../example-games/main-street/MainStreetState';
 import {
   executeAction,
-  executeDayStart,
+  executeWeekStart,
 } from '../../example-games/main-street/MainStreetEngine';
 import type { PlayerAction } from '../../example-games/main-street/MainStreetEngine';
 import {
@@ -89,9 +89,9 @@ function makeEvent(
 }
 
 /** Fresh day-1 state with a generous coin bank and an empty market. */
-function freshDay(seed: string): MainStreetState {
+function freshWeek(seed: string): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   state.resourceBank.coins = 10000;
   state.market.cards = [];
   state.hand = [];
@@ -104,7 +104,7 @@ const EVENTS = new Set(['buy-event', 'play-event-from-hand', 'play-event']);
 
 describe('event actions respect the daily action budget', () => {
   it('excludes event actions once the budget is spent (no composite pending)', () => {
-    const state = freshDay('ai-evt-budget-zero');
+    const state = freshWeek('ai-evt-budget-zero');
     state.actionsRemaining = 0;
     state.justMovedEventCardId = null;
     state.market.cards = [makeEvent('evt-market', 'Market Event', 2, 3)];
@@ -121,8 +121,8 @@ describe('event actions respect the daily action budget', () => {
     ).toBe(true);
   });
 
-  it('includes the free same-day composite play even at zero actions', () => {
-    const state = freshDay('ai-evt-composite');
+  it('includes the free same-week composite play even at zero actions', () => {
+    const state = freshWeek('ai-evt-composite');
     state.market.cards = [makeEvent('evt-comp', 'Composite Event', 2, 3)];
 
     // Take the event to hand — this spends the day's single action.
@@ -144,7 +144,7 @@ describe('event actions respect the daily action budget', () => {
   });
 
   it('does not offer a held event from a previous day at zero actions', () => {
-    const state = freshDay('ai-evt-prior-day');
+    const state = freshWeek('ai-evt-prior-day');
     state.hand = [makeEvent('evt-prior', 'Prior Day Event', 2, 3)];
     state.justMovedEventCardId = null;
     state.actionsRemaining = 0;
@@ -158,7 +158,7 @@ describe('event actions respect the daily action budget', () => {
 
 describe('event scoring is action-aware', () => {
   it('scores buy-event as the net value of playing it (cost included)', () => {
-    const state = freshDay('ai-evt-score');
+    const state = freshWeek('ai-evt-score');
     const event = makeEvent('evt-score', 'Scored Event', 5, 2, 1);
     state.market.cards = [event];
 
@@ -169,13 +169,13 @@ describe('event scoring is action-aware', () => {
   });
 
   it('scores a value-positive event positively', () => {
-    const state = freshDay('ai-evt-score-pos');
+    const state = freshWeek('ai-evt-score-pos');
     state.market.cards = [makeEvent('evt-good', 'Good Event', 2, 3, 1)];
     expect(scoreAction(state, { type: 'buy-event', cardId: 'evt-good' })).toBe(2);
   });
 
   it('does not choose a value-negative event over ending the turn', () => {
-    const state = freshDay('ai-evt-negative');
+    const state = freshWeek('ai-evt-negative');
     state.actionsRemaining = 1;
     state.market.cards = [makeEvent('evt-bad', 'Bad Event', 9, 1, 0)];
 
@@ -184,14 +184,14 @@ describe('event scoring is action-aware', () => {
   });
 
   it('chooses a value-positive event when it is the best available action', () => {
-    const state = freshDay('ai-evt-positive');
+    const state = freshWeek('ai-evt-positive');
     state.actionsRemaining = 1;
     state.market.cards = [makeEvent('evt-win', 'Winning Event', 1, 6, 2)];
 
     const action = GreedyStrategy.chooseAction(state, makeRng());
     expect(action.type).toBe('buy-event');
 
-    // Spending the single action leaves only the free same-day composite
+    // Spending the single action leaves only the free same-week composite
     // play — the event is not a free extra action, and once the composite is
     // played the day is over.
     executeAction(state, action);
@@ -206,7 +206,7 @@ describe('event scoring is action-aware', () => {
 
   it('is deterministic for the same seed and state', () => {
     const build = (): MainStreetState => {
-      const state = freshDay('ai-evt-determinism');
+      const state = freshWeek('ai-evt-determinism');
       state.actionsRemaining = 1;
       state.market.cards = [
         makeBusiness('biz-a', 'Biz A', 3),
@@ -225,7 +225,7 @@ describe('event scoring is action-aware', () => {
 
 describe('Monte Carlo planner counts event actions against the cap', () => {
   it('never plans more event/action spend than the budget provides', () => {
-    const state = freshDay('mc-evt-plan');
+    const state = freshWeek('mc-evt-plan');
     state.actionsRemaining = 1;
     state.market.cards = [
       makeBusiness('biz-mc', 'MC Business', 3),
@@ -243,7 +243,7 @@ describe('Monte Carlo planner counts event actions against the cap', () => {
   });
 
   it('plans up to two action-consuming operations on a General Manager day', () => {
-    const state = freshDay('mc-evt-plan-gm');
+    const state = freshWeek('mc-evt-plan-gm');
     state.actionsRemaining = 2;
     state.market.cards = [
       makeBusiness('biz-gm', 'GM Business', 3),

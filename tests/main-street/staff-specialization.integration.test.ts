@@ -19,7 +19,7 @@ import {
   deserializeMainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   processEndOfTurn,
   hireStaffCard,
   peekIncidentDeck,
@@ -39,7 +39,7 @@ describe('D1: staff specialization end-to-end integration', () => {
   it('game-start roster is deterministic AND drives buffed income after a hire', () => {
     const build = (seed: string) => {
       const state = setupMainStreetGame({ seed });
-      executeDayStart(state);
+      executeWeekStart(state);
       return state;
     };
     const a = build('d1-flow');
@@ -103,7 +103,7 @@ describe('D1: staff specialization end-to-end integration', () => {
 
   it('locked skills survive hire → end-of-turn → save → restore (snapshot stable)', () => {
     const state = setupMainStreetGame({ seed: 'd1-persist' });
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 99999;
     const rowStaff = state.market.cards.filter(c => c.family === 'staff') as StaffCard[];
@@ -122,7 +122,7 @@ describe('D1: staff specialization end-to-end integration', () => {
 
   it('Town Gossip peek coexists with assigned skills (baseline on every member)', () => {
     const state = setupMainStreetGame({ seed: 'd1-peek' });
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 99999;
 
@@ -158,7 +158,7 @@ describe('D1: staff specialization end-to-end integration', () => {
 
   it('UI presentation data matches the engine skills (tooltip + badges agree)', () => {
     const state = setupMainStreetGame({ seed: 'd1-ui' });
-    executeDayStart(state);
+    executeWeekStart(state);
     const rowStaff = state.market.cards.filter(c => c.family === 'staff') as StaffCard[];
     for (const card of rowStaff) {
       const tip = buildCardTooltipInfo(card, {} as never);
@@ -176,7 +176,7 @@ describe('D1: staff specialization end-to-end integration', () => {
 
   it('ongoing costs (CG-0MSVYPEZ90085SHE) coexist with the Cost Cutter reduction', () => {
     const state = setupMainStreetGame({ seed: 'd1-costs' });
-    executeDayStart(state);
+    executeWeekStart(state);
     state.streetGrid[0] = {
       family: 'community-space', id: 'cs-d1', name: 'D1 Plaza', cost: 400, baseIncome: 0,
       synergyTypes: ['Culture'], maxLevel: 0, level: 0, incomeBonus: 0,
@@ -191,7 +191,7 @@ describe('D1: staff specialization end-to-end integration', () => {
     processEndOfTurn(state);
 
     const control = setupMainStreetGame({ seed: 'd1-costs' });
-    executeDayStart(control);
+    executeWeekStart(control);
     control.streetGrid[0] = {
       family: 'community-space', id: 'cs-d1', name: 'D1 Plaza', cost: 400, baseIncome: 0,
       synergyTypes: ['Culture'], maxLevel: 0, level: 0, incomeBonus: 0,

@@ -95,7 +95,7 @@ export function animateSynergyFormation(animator: MainStreetAnimatorContext, pai
   
 }
 
-export function animateDayBanner(animator: MainStreetAnimatorContext, params: { day: number; week: number; year: number }): void {
+export function animateWeekBanner(animator: MainStreetAnimatorContext, params: { turn: number; week: number; year: number }): void {
 
     const s = animator.scene;
 

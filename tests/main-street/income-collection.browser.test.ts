@@ -232,13 +232,13 @@ describe('MainStreet end-of-turn income presentation (controller wiring)', () =>
 
     // Mid-show, the controller must keep the choreography alive: the flag
     // still holds and the day has NOT started early at ~4s into the show
-    // (the street refresh + DayStart are deferred until collection ends).
+    // (the street refresh + WeekStart are deferred until collection ends).
     await new Promise((r) => setTimeout(r, 4000));
     expect(scene.incomeCollectionActive).toBe(true);
     // CG-0MTR72P14000VO6Q: the deferred-mutation flow defers the closing
-    // (EndCheck → next day) until the income collection completes — the
+    // (EndCheck → next week) until the income collection completes — the
     // phase stays in the closing sequence mid-show instead of having
-    // already advanced to DayStart.
+    // already advanced to WeekStart.
     expect(state.phase).toBe('IncidentPhase');
 
     // Mid-show: the count-out has already staged coin icons, so the

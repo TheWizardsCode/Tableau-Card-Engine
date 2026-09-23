@@ -45,7 +45,7 @@ import {
   cycleMarketCards,
   moveToHand,
 } from '../../example-games/main-street/MainStreetMarket';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 
 function countStaffInRow(state: MainStreetState): number {
   return state.market.cards.filter(c => c.family === 'staff').length;
@@ -256,7 +256,7 @@ describe('AC6: seeded determinism', () => {
 describe('staff cards in the market cycle pipeline (CG-0MT3KZNQB0053K55)', () => {
   it('refreshMarket routes a staff row card to discards.staff (never dropped)', () => {
     const state = setupMainStreetGame({ seed: 'refresh-staff' });
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 1000;
     const staff = state.decks.staff.pop()!;

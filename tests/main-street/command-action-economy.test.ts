@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
 import {
   buyBusinessCommand,
@@ -32,7 +32,7 @@ import { refreshMarketCost } from '../../example-games/main-street/MainStreetMar
 /** Fresh MarketPhase state with a full action budget. */
 function setupMarketState(seed = 'command-action-economy-test'): ReturnType<typeof setupMainStreetGame> {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   expect(state.actionsRemaining).toBe(1);
   return state;
 }
@@ -94,7 +94,7 @@ describe('action-type commands spend the daily action', () => {
     const mgr = new UndoRedoManager();
     mgr.execute(moveToHandCommand(state, cardId));
     expect(state.actionsRemaining).toBe(0);
-    state.actionsRemaining = 1; // next day
+    state.actionsRemaining = 1; // next week
     const handIndex = state.hand!.findIndex((c: any) => c.id === cardId);
     expect(handIndex).toBeGreaterThanOrEqual(0);
     mgr.execute(playBusinessFromHandCommand(state, handIndex, slot));
@@ -220,7 +220,7 @@ describe('free (non-action) commands leave the budget untouched', () => {
     const cardId = firstAffordableBusinessId(state);
     const mgr = new UndoRedoManager();
     mgr.execute(moveToHandCommand(state, cardId));
-    state.actionsRemaining = 1; // next day
+    state.actionsRemaining = 1; // next week
     const handIndex = state.hand!.findIndex((c: any) => c.id === cardId);
 
     mgr.execute(discardFromHandCommand(state, handIndex));

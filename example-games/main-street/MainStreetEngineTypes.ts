@@ -20,7 +20,7 @@ export interface BuyBusinessAction {
 /**
  * Buy an upgrade card and apply it to a business.
  *
- * Headless equivalent of the same-day click composite
+ * Headless equivalent of the same-week click composite
  * (CG-0MT3IYSRL001VVUP): the market click moves the upgrade to hand (one
  * daily action) and applying it the same day is free, so buying and applying
  * in one step costs exactly **one daily action** at the listed cost.
@@ -192,7 +192,7 @@ export interface TurnResult extends PendingEndOfTurnDeltas {
    * True when the closing sequence paused because a dual-choice incident was
    * drawn (CG-0MTSHG8RP008E128). When set, `state.pendingEventChoice` holds
    * the drawn event and the UI must present the Accept/Reject dialog before
-   * the deferred closing (EndCheck / next day) can run.
+   * the deferred closing (EndCheck / next week) can run.
    */
   choicePending: boolean;
   /**
@@ -216,7 +216,7 @@ export interface EndOfTurnOptions {
    * scene path), resource deltas (income, ongoing costs, incident) are
    * computed and returned in `TurnResult.pending*Delta` but NOT applied to
    * `state.resourceBank` / `state.finalScore`, and the closing tail
-   * (EndCheck → next day) is deferred to {@link finishDeferredTurnClosing}
+   * (EndCheck → next week) is deferred to {@link finishDeferredTurnClosing}
    * which the caller runs after the end-of-turn animations complete.
    *
    * When unset/false (headless/AI path and reduced-motion mode), the legacy
@@ -247,7 +247,7 @@ export interface EventChoiceResolution {
 }
 
 /**
- * Context carried into the single-player closing tail (EndCheck → next day).
+ * Context carried into the single-player closing tail (EndCheck → next week).
  * Shared by the normal path (processEndOfTurn) and the deferred path
  * (finishDeferredEndOfTurn after a dual-choice incident).
  */

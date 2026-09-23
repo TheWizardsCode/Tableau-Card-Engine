@@ -31,8 +31,8 @@
  * │     b. Log coin/rep deltas                                       │
  * │  4. EndCheck  (checkEndConditions, decay effects, challenges)    │
  * │  5. appendTurnNetRow()  ← FINAL LOG ENTRY (AC3)                   │
- * │     - coinsDelta = coinsNow - state.dayStartCoins                 │
- * │     - repDelta   = repNow - state.dayStartRep                     │
+ * │     - coinsDelta = coinsNow - state.weekStartCoins                 │
+ * │     - repDelta   = repNow - state.weekStartRep                     │
  * │     - Net row: "Turn N net: +X coins, +Y rep"                    │
  * │     - Must equal: income + incident + costs (decomposition)       │
  * ├──────────────────────────────────────────────────────────────────────┤
@@ -145,9 +145,9 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
       st.resourceBank.coins -= 400; // 600 - 400 = 200 coins remaining
     });
 
-    // Record dayStart snapshot (this would normally happen at DayStart)
-    state.dayStartCoins = state.resourceBank.coins;
-    state.dayStartRep = state.resourceBank.reputation;
+    // Record weekStart snapshot (this would normally happen at WeekStart)
+    state.weekStartCoins = state.resourceBank.coins;
+    state.weekStartRep = state.resourceBank.reputation;
 
     // Capture state before income
     const coinsBeforeIncome = state.resourceBank.coins;
@@ -188,11 +188,11 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
     appendTurnNetRow(state, state.turn);
 
     // ── Net row reconciliation ──
-    // Net row should equal: coinsNow - dayStartCoins = income + incident + costs
+    // Net row should equal: coinsNow - weekStartCoins = income + incident + costs
     const coinsNow = state.resourceBank.coins;
     const repNow = state.resourceBank.reputation;
-    const expectedCoinsDelta = coinsNow - state.dayStartCoins;
-    const expectedRepDelta = repNow - state.dayStartRep;
+    const expectedCoinsDelta = coinsNow - state.weekStartCoins;
+    const expectedRepDelta = repNow - state.weekStartRep;
 
     // The net row is logged — read it from the activity log
     const netLogEntry = state.activityLog.find(
@@ -235,8 +235,8 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
       updateNeighborsOnPlacement(st, 0);
       st.resourceBank.coins -= 400;
     });
-    state.dayStartCoins = state.resourceBank.coins;
-    state.dayStartRep = state.resourceBank.reputation;
+    state.weekStartCoins = state.resourceBank.coins;
+    state.weekStartRep = state.resourceBank.reputation;
 
     // Tooltip baseIncome
     const tooltipBase = Number(buildCoinsTooltip(state).split('\n').find(l => l.includes('Before'))!.replace(/[^0-9.]/g, ''));
@@ -258,8 +258,8 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
       updateNeighborsOnPlacement(st, 0);
       st.resourceBank.coins -= 400;
     });
-    state.dayStartCoins = state.resourceBank.coins;
-    state.dayStartRep = state.resourceBank.reputation;
+    state.weekStartCoins = state.resourceBank.coins;
+    state.weekStartRep = state.resourceBank.reputation;
 
     const repBefore = state.resourceBank.reputation;
     applyIncome(state);
@@ -284,8 +284,8 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
       updateNeighborsOnPlacement(st, 0);
       st.resourceBank.coins -= 400;
     });
-    state.dayStartCoins = state.resourceBank.coins;
-    state.dayStartRep = state.resourceBank.reputation;
+    state.weekStartCoins = state.resourceBank.coins;
+    state.weekStartRep = state.resourceBank.reputation;
 
     // Track deltas
     const coinsBeforeIncome = state.resourceBank.coins;
@@ -312,7 +312,7 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
     appendTurnNetRow(state, state.turn);
 
     // Verify decomposition
-    const expectedCoinsDelta = state.resourceBank.coins - state.dayStartCoins;
+    const expectedCoinsDelta = state.resourceBank.coins - state.weekStartCoins;
     expect(expectedCoinsDelta).toBe(incomeDelta + incidentDelta + costsDelta);
 
     // Verify log ordering: income → costs → incident → net row

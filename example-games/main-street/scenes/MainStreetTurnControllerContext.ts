@@ -17,7 +17,7 @@ export interface MainStreetTurnControllerContext {
   readonly scene: any;
   onSaveCheckpoint: (() => void) | null;
   onGameEnd: (() => void) | null;
-  startDayPhase(skipMarketRefill?: boolean, suppressDayBanner?: boolean): void;
+  startTurnPhase(skipMarketRefill?: boolean, suppressWeekBanner?: boolean): void;
   endTurn(): void;
   finishTurnPresentation(result: TurnResult, pendingBankingHint: boolean, ): void;
   handleGameOver(result: TurnResult): void;

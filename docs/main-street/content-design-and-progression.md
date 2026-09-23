@@ -117,7 +117,7 @@ Staff cards expand hand capacity at an ongoing per-turn coin cost. *(Group F, CG
 | Lookout | 10 | 2 | +1 | 7 | peek once/turn | Peek at the top incident-deck card once per turn. *(CG-0MSXOW6GN008ZSMN.)* |
 | Director | 14 | 4 | +3 | 9 | — | An experienced director oversees your operations. |
 | Executive | 20 | 5 | +4 | 10 | — | An experienced executive adds major hand capacity. *(Group F.)* |
-| General Manager | 20 | 5 | +4 | 12 | +1 action/turn | Grants an extra action per day while employed. *(CG-0MSTOF1N5005PK2R.)* |
+| General Manager | 20 | 5 | +4 | 12 | +1 action/turn | Grants an extra action per week while employed. *(CG-0MSTOF1N5005PK2R.)* |
 
 > 12-tier expansion (CG-0MT3C744B009DS84): staff cards are spread across 9 of the 12 tiers (9 cards cannot cover every tier); the tier tracks the cost ladder 2→20.
 
@@ -135,7 +135,7 @@ The core economic loop consists of two primary resources:
 2. **Reputation** – a plain score count increased by completing challenges or by positive events. Reputation counts 1:1 at final‑score calculation (`finalScore = coins + reputation + challengeBonuses`).
 
 **Flow of Resources**:
-- At the start of each **Day Phase**, the player may spend coins to acquire cards.
+- At the start of each **WeekStart**, the player may spend coins to acquire cards.
 - During the **Income Phase**, each placed Business generates `effectiveBase + synergyBonus` coins. Synergy is computed as a percentage of base income per matching adjacent Business sharing a Synergy Type: `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount`, where `synergyCoinBonus` defaults to 0.5 (50%) and `bonusPerNeighbor` is the difficulty preset multiplier (0.5 Easy / 0.35 Medium / 0.25 Hard, re-tuned by CG-0MSP26Q5N002EH8P).
 - **Event Cards** may grant or remove coins/reputation immediately.
 - **Upgrade Cards** increase future income and may extend synergy range.
@@ -153,7 +153,7 @@ The balancing methodology and targets for Main Street have been consolidated int
 
 ## 5. Scoring System
 
-The final score is calculated at the end of the **Night Phase** using the formula:
+The final score is calculated at the end of the **week end** using the formula:
 
 ```
 finalScore = resourceBank.coins + resourceBank.reputation + challengeBonus

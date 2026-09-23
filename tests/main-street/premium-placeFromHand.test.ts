@@ -1,7 +1,7 @@
 /**
  * Main Street: Premium-aware placeFromHand tests
  *
- * Verifies the engine-level changes for premium pricing on same-day composite
+ * Verifies the engine-level changes for premium pricing on same-week composite
  * buy-and-play (parent CG-0MT24X0SX007RLHN). These tests cover the core
  * `placeFromHand` signature change and the `playBusinessFromHand` path used
  * by commands.
@@ -20,7 +20,7 @@ import {
   type BusinessCard,
 } from '../../example-games/main-street/MainStreetCards';
 import {
-  executeDayStart,
+  executeWeekStart,
   placeFromHand,
   canPlaceFromHand,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -85,7 +85,7 @@ function setupStateWithCommunityCard(): { state: MainStreetState; card: any; slo
 describe('placeFromHand with premiumCost', () => {
   it('charges listed cost when premiumCost is not provided (held-card path)', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const coinsBefore = state.resourceBank.coins;
     placeFromHand(state, handIndex, slot);
@@ -97,7 +97,7 @@ describe('placeFromHand with premiumCost', () => {
 
   it('charges premium when premiumCost is provided', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
     const coinsBefore = state.resourceBank.coins;
@@ -111,7 +111,7 @@ describe('placeFromHand with premiumCost', () => {
 
   it('rejects when player cannot afford premium cost', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
     // Set coins to exactly the listed cost — enough for listed, not premium
@@ -129,7 +129,7 @@ describe('placeFromHand with premiumCost', () => {
 
   it('rejects when player cannot afford listed cost (no premiumCost)', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     // Set coins to one less than listed cost
     state.resourceBank.coins = card.cost - 1;
@@ -144,7 +144,7 @@ describe('placeFromHand with premiumCost', () => {
 
   it('works for community-space cards with premiumCost', () => {
     const { state, card, slot, handIndex } = setupStateWithCommunityCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
     const coinsBefore = state.resourceBank.coins;
@@ -157,7 +157,7 @@ describe('placeFromHand with premiumCost', () => {
 
   it('premium formula: Math.ceil(cost * 1.5 * 2) / 2', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     // Verify the premium formula produces expected values
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
@@ -170,7 +170,7 @@ describe('placeFromHand with premiumCost', () => {
 
   it('log includes premium annotation when premiumCost differs from card.cost', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
     placeFromHand(state, handIndex, slot, premiumCost);
@@ -226,7 +226,7 @@ describe('canPlaceFromHand with premiumCost', () => {
 describe('playBusinessFromHand with premiumCost', () => {
   it('charges listed cost when premiumCost is not provided', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const coinsBefore = state.resourceBank.coins;
     const result = playBusinessFromHand(state, handIndex, slot);
@@ -237,7 +237,7 @@ describe('playBusinessFromHand with premiumCost', () => {
 
   it('charges premium when premiumCost is provided', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
     const coinsBefore = state.resourceBank.coins;
@@ -249,7 +249,7 @@ describe('playBusinessFromHand with premiumCost', () => {
 
   it('rejects when player cannot afford premium cost', () => {
     const { state, card, slot, handIndex } = setupStateWithCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
     state.resourceBank.coins = card.cost; // enough for listed, not premium
@@ -260,7 +260,7 @@ describe('playBusinessFromHand with premiumCost', () => {
 
   it('works for community-space cards with premiumCost', () => {
     const { state, card, slot, handIndex } = setupStateWithCommunityCard();
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const premiumCost = Math.ceil(card.cost * 1.5 * 2) / 2;
     const coinsBefore = state.resourceBank.coins;

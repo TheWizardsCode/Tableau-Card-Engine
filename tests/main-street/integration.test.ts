@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import type { MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   endTurnHeadless,
   executeFullTurn,
@@ -41,7 +41,7 @@ import {
 
 /** Runs a simple greedy strategy for one turn: buy cheapest business, end turn. */
 function playGreedyTurn(state: MainStreetState): { actions: PlayerAction[]; result: TurnResult } {
-  executeDayStart(state);
+  executeWeekStart(state);
 
   const actions: PlayerAction[] = [];
   const affordable = getAffordableBusinessCards(state);
@@ -91,12 +91,12 @@ describe('Integration: Full Turn Cycle', () => {
   it('completes a single turn cycle with buy-business action', () => {
     const state = setupMainStreetGame({ seed: 'integration-turn-1' });
 
-    // Start in DayStart phase
-    expect(state.phase).toBe('DayStart');
+    // Start in WeekStart phase
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(1);
 
-    // Execute DayStart
-    executeDayStart(state);
+    // Execute WeekStart
+    executeWeekStart(state);
     expect(state.phase).toBe('MarketPhase');
     expect(state.market.cards.length).toBeGreaterThan(0);
 
@@ -140,7 +140,7 @@ describe('Integration: Full Turn Cycle', () => {
     // Drain coins to force no-buy
     state.resourceBank.coins = 0;
 
-    executeDayStart(state);
+    executeWeekStart(state);
     expect(state.phase).toBe('MarketPhase');
 
     // No affordable business
@@ -159,22 +159,22 @@ describe('Integration: Full Turn Cycle', () => {
     const state = setupMainStreetGame({ seed: 'integration-phases' });
     const phasesSeen: string[] = [];
 
-    // Capture DayStart
-    expect(state.phase).toBe('DayStart');
+    // Capture WeekStart
+    expect(state.phase).toBe('WeekStart');
     phasesSeen.push(state.phase);
 
-    executeDayStart(state);
+    executeWeekStart(state);
     phasesSeen.push(state.phase); // MarketPhase
 
     // End turn triggers remaining phases automatically
     endTurnHeadless(state);
 
-    // After processEndOfTurn, state is either in DayStart (next turn) or game over
+    // After processEndOfTurn, state is either in WeekStart (next turn) or game over
     if (state.gameResult === 'playing') {
-      expect(state.phase).toBe('DayStart');
+      expect(state.phase).toBe('WeekStart');
     }
 
-    expect(phasesSeen).toContain('DayStart');
+    expect(phasesSeen).toContain('WeekStart');
     expect(phasesSeen).toContain('MarketPhase');
   });
 });
@@ -236,7 +236,7 @@ describe('Integration: Full Game', () => {
       cost: 0,
     }];
 
-    executeDayStart(state);
+    executeWeekStart(state);
     // Player actively plays the held event during MarketPhase
     executeAction(state, { type: 'play-event' });
     endTurnHeadless(state);
@@ -264,7 +264,7 @@ describe('Integration: Full Game', () => {
       cost: 0,
     }];
 
-    executeDayStart(state);
+    executeWeekStart(state);
     // Player actively plays the held event during MarketPhase
     executeAction(state, { type: 'play-event' });
     endTurnHeadless(state);
@@ -336,9 +336,9 @@ describe('Integration: Seeded Determinism', () => {
   it('executeFullTurn convenience function matches manual turn execution', () => {
     const seed = 'fullTurn-equiv';
 
-    // Manual: setup + executeDayStart + executeAction + processEndOfTurn
+    // Manual: setup + executeWeekStart + executeAction + processEndOfTurn
     const state1 = setupMainStreetGame({ seed });
-    executeDayStart(state1);
+    executeWeekStart(state1);
     const affordable = getAffordableBusinessCards(state1);
     const actions: PlayerAction[] = [];
     if (affordable.length > 0) {
@@ -379,13 +379,13 @@ describe('Integration: Income & Synergy', () => {
     s.streetGrid[0] = { ...bakery, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
     updateNeighborsOnPlacement(s, 0);
 
-    executeDayStart(s);
+    executeWeekStart(s);
     const result1 = endTurnHeadless(s);
     const income1 = result1.income?.total ?? 0; // Bakery alone: 0.5
 
     s.streetGrid[1] = { ...cafe, level: 0, incomeBonus: 0, synergyRangeBonus: 0, reputationBonus: 0, appliedUpgrades: [] };
     updateNeighborsOnPlacement(s, 1);
-    executeDayStart(s);
+    executeWeekStart(s);
     const result2 = endTurnHeadless(s);
     const income2 = result2.income?.total ?? 0; // + Cafe and both synergy bonuses
 
@@ -410,7 +410,7 @@ describe('Integration: Incident Deck', () => {
     expect(initialDeckIds.length).toBeGreaterThan(0);
 
     // Turn 1: resolve front incident; the deck shrinks by one (no refill)
-    executeDayStart(state);
+    executeWeekStart(state);
     const result1 = endTurnHeadless(state);
     expect(result1.incident).not.toBeNull();
     expect(result1.incident!.id).toBe(initialDeckIds[0]);
@@ -419,7 +419,7 @@ describe('Integration: Incident Deck', () => {
     if (state.gameResult !== 'playing') return;
 
     // Turn 2: next front resolved
-    executeDayStart(state);
+    executeWeekStart(state);
     const result2 = endTurnHeadless(state);
     expect(result2.incident).not.toBeNull();
     // The second resolved should be the card that was at position [1] initially
@@ -521,7 +521,7 @@ describe('Integration: Held Investment Event', () => {
       cost: 3,
     }];
 
-    executeDayStart(state);
+    executeWeekStart(state);
     // Don't play the event during MarketPhase — just end turn
     const result = endTurnHeadless(state);
 
@@ -550,7 +550,7 @@ describe('Integration: Held Investment Event', () => {
       cost: 3,
     }];
 
-    executeDayStart(state);
+    executeWeekStart(state);
 
     // Play the event during MarketPhase
     executeAction(state, { type: 'play-event' });
@@ -600,7 +600,7 @@ describe('Integration: Held Investment Event', () => {
     state.market.cards.push(investmentEvt);
 
     // Turn 1: buy the event
-    executeDayStart(state);
+    executeWeekStart(state);
     executeAction(state, { type: 'buy-event', cardId: 'evt-buy-then-play' });
     expect((state.hand ?? []).some(c => c.family === 'event' && c.id === 'evt-buy-then-play')).toBe(true);
 
@@ -618,7 +618,7 @@ describe('Integration: Held Investment Event', () => {
     // benign no-effect card (see setup) so the exact cost-at-play delta stays
     // deterministic in the content era.
     state.incidentDeck = [{ ...benign, id: 'evt-benign-2' }];
-    executeDayStart(state);
+    executeWeekStart(state);
     const coinsBeforePlay = state.resourceBank.coins;
     // Reputation multiplier: 1 + rep/80 (divisor quartered 20→80 by
     // CG-0MT3J80HV0084IF1). Turn 1's incident phase can change
@@ -735,7 +735,7 @@ describe('Integration: Challenge System', () => {
     }
 
     // With 10000 coins, Deep Pockets (>= 3000 coins) should complete on next EndCheck
-    executeDayStart(state);
+    executeWeekStart(state);
     const result = endTurnHeadless(state);
 
     expect(state.gameResult).toBe('win');
@@ -753,7 +753,7 @@ describe('Integration: Challenge System', () => {
     state.activeChallenges = [{ challenge: deepPockets, completed: false }];
 
     // Turn 1: coins >= 3000, should complete
-    executeDayStart(state);
+    executeWeekStart(state);
     endTurnHeadless(state);
 
     if (state.gameResult !== 'playing') return;
@@ -765,7 +765,7 @@ describe('Integration: Challenge System', () => {
     state.resourceBank.coins = 5;
 
     // Turn 2: challenge should remain completed despite coins < 3000
-    executeDayStart(state);
+    executeWeekStart(state);
     endTurnHeadless(state);
 
     expect(state.activeChallenges[0].completed).toBe(true);
@@ -778,7 +778,7 @@ describe('Integration: Challenge System', () => {
     state.resourceBank.reputation = 20;
     state.activeChallenges = [];
 
-    executeDayStart(state);
+    executeWeekStart(state);
     const result = endTurnHeadless(state);
 
     // Game should not end with all_challenges when there are 0 challenges

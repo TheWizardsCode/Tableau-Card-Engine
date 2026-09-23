@@ -141,7 +141,7 @@ function dispatchPlayerAction(
     }
     case 'buy-upgrade': {
       // One daily action, exactly like the click composite it stands in for
-      // (move-to-hand 1 action + free same-day apply, listed cost). Without
+      // (move-to-hand 1 action + free same-week apply, listed cost). Without
       // this the AI and Monte Carlo scored upgrades as free actions
       // (CG-0MT40HTYN008TJ6Q).
       const hadBanked = (state.bankedActions ?? 0) > 0;
@@ -170,24 +170,24 @@ function dispatchPlayerAction(
       }
     }
     case 'play-upgrade-from-hand': {
-      // Same-day composite detection (CG-0MT3IYSRL001VVUP): if the upgrade
+      // Same-week composite detection (CG-0MT3IYSRL001VVUP): if the upgrade
       // was just moved to hand this turn (same card id), the play is free
       // — the move already consumed the action.
       const card = (state.hand ?? [])[action.handIndex];
-      const isSameDayComposite = card && state.justMovedUpgradeCardId === card.id;
+      const isSameWeekComposite = card && state.justMovedUpgradeCardId === card.id;
       const hadBanked = (state.bankedActions ?? 0) > 0;
-      if (!isSameDayComposite) {
+      if (!isSameWeekComposite) {
         consumeAction(state);
       }
       try {
         const result = playUpgradeFromHand(state, action.handIndex, action.targetSlot);
-        // Clear the composite tracker after play (whether same-day or not).
+        // Clear the composite tracker after play (whether same-week or not).
         if (state.justMovedUpgradeCardId === card?.id) {
           state.justMovedUpgradeCardId = null;
         }
         return result;
       } catch (e) {
-        if (!isSameDayComposite) {
+        if (!isSameWeekComposite) {
           state.actionsRemaining += 1;
           if (hadBanked) {
             state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
@@ -217,9 +217,9 @@ function dispatchPlayerAction(
     case 'play-event-from-hand': {
       const hand = state.hand ?? [];
       const card = hand[action.handIndex] as any;
-      const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+      const isSameWeek = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
       const hadBanked = (state.bankedActions ?? 0) > 0;
-      if (!isSameDay) consumeAction(state);
+      if (!isSameWeek) consumeAction(state);
       try {
         const result = playEventFromHand(state, action.handIndex);
         // Investment played by the active player: route the benefit to their
@@ -230,7 +230,7 @@ function dispatchPlayerAction(
         }
         return result;
       } catch (e) {
-        if (!isSameDay) {
+        if (!isSameWeek) {
           state.actionsRemaining += 1;
           if (hadBanked) {
             state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
@@ -248,9 +248,9 @@ function dispatchPlayerAction(
         throw new Error('No Investment event is currently held in hand.');
       }
       const card = (state.hand ?? [])[handIndex] as any;
-      const isSameDay = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+      const isSameWeek = card && (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
       const hadBanked = (state.bankedActions ?? 0) > 0;
-      if (!isSameDay) consumeAction(state);
+      if (!isSameWeek) consumeAction(state);
       try {
         const result = playEventFromHand(state, handIndex);
         // Investment played by the active player: per-owner routing (see above).
@@ -259,7 +259,7 @@ function dispatchPlayerAction(
         }
         return result;
       } catch (e) {
-        if (!isSameDay) {
+        if (!isSameWeek) {
           state.actionsRemaining += 1;
           if (hadBanked) {
             state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + 1);
@@ -327,11 +327,11 @@ export { describeEventEffects, classifyEffect } from './MainStreetState';
  * `bankedActions` untouched.
  *
  * @param state Current game state (mutated in-place).
- * @throws Error if no actions remain today.
+ * @throws Error if no actions remain this week.
  */
 export function consumeAction(state: MainStreetState): void {
   if (state.actionsRemaining <= 0) {
-    throw new Error('No actions remaining today. End your turn to start a new day.');
+    throw new Error('No actions remaining this week. End your turn to start next week.');
   }
   state.actionsRemaining -= 1;
   state.bankedActions = Math.max(0, (state.bankedActions ?? 0) - 1);
@@ -464,7 +464,7 @@ export function peekIncidentDeck(state: MainStreetState): EventCard | null {
     throw new Error('You have already peeked at the incident deck this turn.');
   }
   if (state.actionsRemaining <= 0) {
-    throw new Error('No actions remaining today. End your turn to start a new day.');
+    throw new Error('No actions remaining this week. End your turn to start next week.');
   }
   // Nothing to peek: no-op (no action consumed, gate stays closed).
   if (state.incidentDeck.length === 0) return null;

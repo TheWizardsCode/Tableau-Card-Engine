@@ -5,7 +5,7 @@
  * steps on Day 2 (T7 place-business and T9 buy-event) under a single daily
  * action budget (base 1 on Easy, no prior bank). Both `executeAction` paths
  * call `consumeAction` — `buy-event` is NOT free — so the second gated step
- * would throw `No actions remaining today` when run outside the scripted
+ * would throw `No actions remaining this week` when run outside the scripted
  * overlay. (Community Favour is a FREE once-per-turn action and never
  * consumes a daily action — CG-0MSTOATDQ005XDET.) The fix inserts T8
  * end-turn before More than Businesses so each day has at most one consumer.
@@ -42,12 +42,12 @@ import { UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/Tutorial
  *
  * Tutorial maps:
  *  - select-business  → move-to-hand (consume)
- *  - place-business   → play-business-from-hand (consume unless same-day
+ *  - place-business   → play-business-from-hand (consume unless same-week
  *                       composite; the tutorial's two-turn plan-ahead never
  *                       hits the free composite path)
  *  - buy-event        → purchaseEvent (consume, CG-0MTH5C7FK002PDP5)
- *  - play-event       → playEventFromHand (consume unless same-day; the
- *                       T21 festival was bought on T10 / day 3, so not same-day)
+ *  - play-event       → playEventFromHand (consume unless same-week; the
+ *                       T21 festival was bought on T10 / day 3, so not same-week)
  *  - community-favour → executeCommunityFavour (free — no consumeAction)
  *  - peek-incident-deck → peekIncidentDeck (consume)
  */
@@ -74,19 +74,19 @@ function consumesAction(requiredAction: string | undefined): boolean {
 }
 
 /** Partition the flow into days delimited by `end-turn` steps (inclusive). */
-function partitionIntoDays() {
+function partitionIntoWeeks() {
   const days: { index: number; steps: typeof UNIFIED_TUTORIAL_STEPS[number][] }[] = [];
   let current: typeof UNIFIED_TUTORIAL_STEPS[number][] = [];
-  let dayIndex = 1;
+  let weekIndex = 1;
   for (const step of UNIFIED_TUTORIAL_STEPS) {
     current.push(step);
     if (step.requiredAction === 'end-turn') {
-      days.push({ index: dayIndex, steps: current });
+      days.push({ index: weekIndex, steps: current });
       current = [];
-      dayIndex += 1;
+      weekIndex += 1;
     }
   }
-  if (current.length > 0) days.push({ index: dayIndex, steps: current });
+  if (current.length > 0) days.push({ index: weekIndex, steps: current });
   return days;
 }
 
@@ -96,7 +96,7 @@ describe('Tutorial action economy (CG-0MTNMBX5Z002U0MH)', () => {
   });
 
   it('no day requires more than one action-consuming step (Easy base = 1, no prior bank)', () => {
-    const days = partitionIntoDays();
+    const days = partitionIntoWeeks();
     const violations: string[] = [];
     for (const day of days) {
       const consumers = day.steps.filter(
@@ -119,7 +119,7 @@ describe('Tutorial action economy (CG-0MTNMBX5Z002U0MH)', () => {
 
   it('simulated run with banking (cap 2) never exceeds available actions', () => {
     // Mirrors MainStreetEngine.consumeAction + MainStreetTurnController end-turn
-    // banking: bankable = min(actionsRemaining,1), cap 2, and next day starts
+    // banking: bankable = min(actionsRemaining,1), cap 2, and next week starts
     // at 1 + banked (+ GM bonus, which the tutorial never uses).
     let actionsRemaining = 1;
     let bankedActions = 0;
@@ -158,20 +158,20 @@ describe('Tutorial action economy (CG-0MTNMBX5Z002U0MH)', () => {
   });
 
   it('documents the fixed Day 2 gap: T7 and T10 (buy-event) are on different days', () => {
-    const days = partitionIntoDays();
-    const dayOf = (stepId: string) => days.find((d) => d.steps.some((s) => s.id === stepId))!.index;
-    expect(dayOf('T7')).not.toBe(dayOf('T10'));
+    const days = partitionIntoWeeks();
+    const weekOf = (stepId: string) => days.find((d) => d.steps.some((s) => s.id === stepId))!.index;
+    expect(weekOf('T7')).not.toBe(weekOf('T10'));
     // T7 (place) on day 2, T10 (Local Festival buy) on day 3 — the inserted
     // T8 end-turn is between them.
-    expect(dayOf('T7')).toBe(2);
-    expect(dayOf('T8')).toBe(2); // T8 is the end-turn that closes day 2
-    expect(dayOf('T9')).toBe(3);
-    expect(dayOf('T10')).toBe(3);
+    expect(weekOf('T7')).toBe(2);
+    expect(weekOf('T8')).toBe(2); // T8 is the end-turn that closes day 2
+    expect(weekOf('T9')).toBe(3);
+    expect(weekOf('T10')).toBe(3);
   });
 
   it('eight End Turns delimit nine days (T6, T8, T11, T14, T16, T18, T20, T22)', () => {
     const endTurnIds = UNIFIED_TUTORIAL_STEPS.filter((s) => s.requiredAction === 'end-turn').map((s) => s.id);
     expect(endTurnIds).toEqual(['T6', 'T8', 'T11', 'T14', 'T16', 'T18', 'T20', 'T22']);
-    expect(partitionIntoDays()).toHaveLength(9);
+    expect(partitionIntoWeeks()).toHaveLength(9);
   });
 });

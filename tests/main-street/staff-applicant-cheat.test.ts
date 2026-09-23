@@ -21,7 +21,7 @@ import {
 import {
   resolveStaffApplicant,
   computeApplicantChance,
-  executeDayStart,
+  executeWeekStart,
 } from '../../example-games/main-street/MainStreetEngine';
 import { createStaffDeck, type BusinessCard } from '../../example-games/main-street/MainStreetCards';
 
@@ -191,24 +191,24 @@ describe('resolveStaffApplicant constraints with forced flag (AC4)', () => {
     expect(state.pendingApplicant).toBeNull();
   });
 
-  it('executeDayStart suppresses the forced applicant when suppressApplicant is true', () => {
+  it('executeWeekStart suppresses the forced applicant when suppressApplicant is true', () => {
     const state = setupMainStreetGame({ seed: 'suppressed' });
     placeBusiness(state, 0, { baseIncome: 5 });
     state.suppressApplicant = true;
     state.forcedStaffApplicant = true;
 
-    executeDayStart(state);
+    executeWeekStart(state);
 
     expect(state.pendingApplicant).toBeNull();
   });
 
-  it('executeDayStart triggers the forced applicant when not suppressed', () => {
+  it('executeWeekStart triggers the forced applicant when not suppressed', () => {
     const state = setupMainStreetGame({ seed: 'not-suppressed' });
     placeBusiness(state, 0, { baseIncome: 5 });
     state.suppressApplicant = false;
     state.forcedStaffApplicant = true;
 
-    executeDayStart(state);
+    executeWeekStart(state);
 
     expect(state.pendingApplicant).not.toBeNull();
   });

@@ -12,7 +12,7 @@ import { playIllegalFeedback } from './MainStreetTurnControllerUtils';
 import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
 import type { EventCard } from '../MainStreetCards';
 import { playEventCommand, resolveEventChoiceCommand } from '../MainStreetCommands';
-import { applyEndOfTurnDeltas, executeDayStart, finishDeferredEndOfTurn, finishDeferredTurnClosing, processEndOfTurn } from '../MainStreetEngine';
+import { applyEndOfTurnDeltas, executeWeekStart, finishDeferredEndOfTurn, finishDeferredTurnClosing, processEndOfTurn } from '../MainStreetEngine';
 import type { TurnResult } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
 import { addLog } from '../MainStreetState';
@@ -23,16 +23,16 @@ import { BrowserLocalStorageAdapter, hasSeenBankingHint, loadTutorialState, mark
 import type { MainStreetTurnControllerContext } from './MainStreetTurnControllerContext';
 import { celebrateChallengeIds } from './MainStreetChallengeCelebration';
 
-export function startDayPhase(tcCtx: MainStreetTurnControllerContext, skipMarketRefill: boolean = false, suppressDayBanner: boolean = false): void {
+export function startTurnPhase(tcCtx: MainStreetTurnControllerContext, skipMarketRefill: boolean = false, suppressWeekBanner: boolean = false): void {
     // A new day begins: reset the per-turn celebrated-challenge set so this
     // turn can celebrate its own completions (CG-0MU8MZBV4007HF1Q).
     try { tcCtx.scene.celebratedChallengeIds?.clear(); } catch (_) { /* ignore */ }
 
     const s = tcCtx.scene;
-    // Execute DayStart (optionally refills market, transitions to MarketPhase)
-    executeDayStart(s.state, skipMarketRefill);
+    // Execute WeekStart (optionally refills market, transitions to MarketPhase)
+    executeWeekStart(s.state, skipMarketRefill);
     // Staff applicant walk-on (CG-0MSTOATDU006UGAX): if a pending applicant
-    // arrived at DayStart the player must resolve it (hire or decline).
+    // arrived at WeekStart the player must resolve it (hire or decline).
     s.pendingApplicant = (s.state as any).pendingApplicant ?? null;
     s.uiPhase = (s.pendingApplicant != null) ? 'applicant' : 'market';
     // A new day means no card is "just moved" anymore — any hand card
@@ -41,10 +41,10 @@ export function startDayPhase(tcCtx: MainStreetTurnControllerContext, skipMarket
 
     // Tutorial: the single-row market only holds 3 cards, so force the
     // upcoming steps' required purchase targets into the line (days 2+).
-    const dayStartTut = (s as any).tutorialController as any;
-    if (dayStartTut?.isActive) {
+    const weekStartTut = (s as any).tutorialController as any;
+    if (weekStartTut?.isActive) {
       try {
-        ensureTutorialMarketForUpcomingSteps(s.state, dayStartTut);
+        ensureTutorialMarketForUpcomingSteps(s.state, weekStartTut);
       } catch (_) {
         // robustness — never block day start on scenario bookkeeping
       }
@@ -62,11 +62,11 @@ export function startDayPhase(tcCtx: MainStreetTurnControllerContext, skipMarket
     // animator). Skipped while the tutorial is active (its step overlays
     // carry the guidance), on checkpoint resume (skipMarketRefill — the
     // same day continues, so it is not a new-day transition), or when
-    // suppressed at boot (suppressDayBanner — deferred until the player
+    // suppressed at boot (suppressWeekBanner — deferred until the player
     // commits to playing).
     const tutController = (s as any).tutorialController as { isActive?: boolean } | undefined;
-    if (!skipMarketRefill && !suppressDayBanner && !tutController?.isActive) {
-      try { s.msAnimator.animateDayBanner({ day: s.state.turn, week: s.state.week, year: s.state.year }); } catch (_) { /* presentation-only — ignore */ }
+    if (!skipMarketRefill && !suppressWeekBanner && !tutController?.isActive) {
+      try { s.msAnimator.animateWeekBanner({ turn: s.state.turn, week: s.state.week, year: s.state.year }); } catch (_) { /* presentation-only — ignore */ }
     }
     void s.cardSvgLoadPromise
       .then(() => s.prewarmVisibleCardTextures())
@@ -200,7 +200,7 @@ export function endTurn(tcCtx: MainStreetTurnControllerContext): void {
     // Tutorial exemption: the tutorial keeps the compact window-safe
     // collection (`animateIncomeCollection`) so tutorial step pacing is
     // unchanged — precedent: the day banner is also skipped during the
-    // tutorial (startDayPhase); the full phased show runs in normal play.
+    // tutorial (startTurnPhase); the full phased show runs in normal play.
     try {
       const inTutorial = (s as { tutorialController?: { isActive?: boolean } }).tutorialController?.isActive === true;
       const phaseBreakdown = result.income?.phaseBreakdown?.perSlotBreakdown ?? [];
@@ -232,7 +232,7 @@ export function endTurn(tcCtx: MainStreetTurnControllerContext): void {
     // deferred-mutation path (CG-0MTR72P14000VO6Q) the closing tail (day
     // advance) runs only after the animations complete — persisting here
     // would capture a mid-animation state with un-applied deltas, so the
-    // checkpoint is written in finalizeDay instead (after the closing).
+    // checkpoint is written in finalizeTurn instead (after the closing).
     if (result.requiresDeferredClosing !== true) {
       try { tcCtx.onSaveCheckpoint?.(); } catch (e) { /* ignore */ }
     }
@@ -283,7 +283,7 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
 
     // Deferred-mutation mode (CG-0MTR72P14000VO6Q): when the result requires
     // the deferred closing, `gameResult` / `finalScore` are pre-turn values —
-    // the game-over evaluation happens in finalizeDay AFTER the animations
+    // the game-over evaluation happens in finalizeTurn AFTER the animations
     // complete and the deltas land (AC4: no banner mid-animation). The legacy
     // immediate branch below is for reduced-motion / tutorial / replay and the
     // dual-choice resolution path (already-final results).
@@ -321,7 +321,7 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
     // Advance the day once the closing presentation is done: present
     // the banking hint (if any), then defer to the phased income show
     // (bounded) or the normal ~800ms schedule.
-    const advanceDay = (): void => {
+    const advanceTurn = (): void => {
       // ── Banking hint presentation (CG-0MT3JK16W006A66P) ─────
       // Non-blocking HUD-highlighting overlay, once per save. Fires
       // after the turn's gated step has advanced so it does not
@@ -331,7 +331,7 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
         try { (s as any).tutorialOverlay?.showBankingHint?.(); } catch { /* presentation-only */ }
       }
       if (s.incomeCollectionActive) {
-        // Bounded deferral: start the next day once the choreography
+        // Bounded deferral: start the next week once the choreography
         // completes (AC7 collect clears the flag); a safety cap forces
         // the day start even if the flag is somehow never cleared, so
         // end-of-turn can never hang the game (AC5).
@@ -341,24 +341,24 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
             s.time.delayedCall(250, startAfterIncomeShow);
           } else {
             s.incomeCollectionActive = false;
-            finalizeDay();
+            finalizeTurn();
           }
         };
         startAfterIncomeShow();
       } else {
-        s.time.delayedCall(800, () => finalizeDay());
+        s.time.delayedCall(800, () => finalizeTurn());
       }
     };
 
     // ── Deferred closing tail (CG-0MTR72P14000VO6Q) ────────────
     // Runs only after the closing animations complete (income collection
     // and/or incident reveal): applies any remaining deltas (idempotent
-    // guard), runs the deferred closing (EndCheck → next day / game-over
+    // guard), runs the deferred closing (EndCheck → next week / game-over
     // evaluation), clears the deferred HUD window so refreshHud shows the
     // post-delta values, and either shows the game-over overlay or starts
-    // the next day. The legacy path (deferred === false) just starts the
+    // the next week. The legacy path (deferred === false) just starts the
     // day — the closing already ran inside processEndOfTurn.
-    const finalizeDay = (): void => {
+    const finalizeTurn = (): void => {
       if (deferred) {
         if (!s.endOfTurnDeltasApplied) {
           try {
@@ -380,7 +380,7 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
         s.previousReputation = null;
         s.incidentRevealActive = false;
         // Render the final post-delta state under the upcoming overlay
-        // (startDayPhase refreshes internally for the continuing path).
+        // (startTurnPhase refreshes internally for the continuing path).
         try { s.refreshAll(); } catch { /* presentation-only */ }
         if (finalResult.gameResult !== 'playing') {
           tcCtx.handleGameOver(finalResult);
@@ -390,9 +390,9 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
         // deferred end-of-turn path skips the earlier endTurn save so the
         // checkpoint always reflects a complete, applied turn).
         try { tcCtx.onSaveCheckpoint?.(); } catch (e) { /* ignore */ }
-        tcCtx.startDayPhase();
+        tcCtx.startTurnPhase();
       } else {
-        tcCtx.startDayPhase();
+        tcCtx.startTurnPhase();
       }
     };
 
@@ -426,7 +426,7 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
             } else {
               const incident = result.incident;
               if (!incident) {
-                advanceDay();
+                advanceTurn();
                 return;
               }
               s.msAnimator.animateIncidentReveal({
@@ -435,7 +435,7 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
                 coinChange: result.incidentCoinChange,
                 repChange: result.incidentRepChange,
                 from: s.msRenderer.getFrontIncidentCardCenter(),
-                onComplete: advanceDay,
+                onComplete: advanceTurn,
                 pendingDeltas: deferred ? result : undefined,
               });
             }
@@ -444,7 +444,7 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
         } else {
           const incident = result.incident;
           if (!incident) {
-            advanceDay();
+            advanceTurn();
             return;
           }
           s.msAnimator.animateIncidentReveal({
@@ -453,16 +453,16 @@ export function finishTurnPresentation(tcCtx: MainStreetTurnControllerContext,
             coinChange: result.incidentCoinChange,
             repChange: result.incidentRepChange,
             from: s.msRenderer.getFrontIncidentCardCenter(),
-            onComplete: advanceDay,
+            onComplete: advanceTurn,
             pendingDeltas: deferred ? result : undefined,
           });
         }
       } catch (_) {
         // presentation-only — never let the reveal hang the turn.
-        advanceDay();
+        advanceTurn();
       }
     } else {
-      advanceDay();
+      advanceTurn();
     }
   
 }
@@ -589,7 +589,7 @@ export function onEventChoice(tcCtx: MainStreetTurnControllerContext, option: 'a
       s.instructionText.setText(
         `${event.name}: consequence ${option === 'accept' ? 'accepted' : 'refused'}.`,
       );
-      // Complete the deferred closing (EndCheck → next day) and present it.
+      // Complete the deferred closing (EndCheck → next week) and present it.
       const finalResult = finishDeferredEndOfTurn(s.state);
       // The turn is now closed — the undo stack is cleared (mirrors the
       // normal end-of-turn clear) so a choice cannot be undone after the day

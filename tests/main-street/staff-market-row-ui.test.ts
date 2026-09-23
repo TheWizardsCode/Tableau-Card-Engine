@@ -255,7 +255,7 @@ describe('AC3: staff tooltips show hire-relevant info', () => {
     expect(info).toContain('Staff: General Manager');
     expect(info).toContain('Cost:');
     expect(info).toContain('Hand slots: +4');
-    expect(info).toContain('Actions: +1/day');
+    expect(info).toContain('Actions: +1/week');
   });
 
   it('includes the peek ability line for peek-capable staff', () => {

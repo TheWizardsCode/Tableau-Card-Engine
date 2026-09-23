@@ -30,7 +30,7 @@ import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   hireStaffCard,
   layoffStaffCard,
@@ -51,7 +51,7 @@ import { createStaffDeck } from '../../example-games/main-street/MainStreetCards
 /** Seeded state with the day started (MarketPhase). */
 function startState(seed = 'staff-purchase'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 
@@ -190,7 +190,7 @@ describe('AC3: hireStaffCard via the unified action path', () => {
 
     expect(() =>
       executeAction(state, { type: 'hire-staff', cardId: staff.id }),
-    ).toThrow(/No actions remaining today/);
+    ).toThrow(/No actions remaining this week/);
     expect(state.staffCards).toHaveLength(0);
   });
 });

@@ -2,12 +2,12 @@
  * Main Street: Action Economy Tests (CG-0MSTOF1N5005PK2R, CG-0MTFWBNL30043ZBM)
  *
  * Validates the single-daily-action budget:
- * - Initial value and DayStart reset (1 action; 2 with a General Manager employed)
+ * - Initial value and WeekStart reset (1 action; 2 with a General Manager employed)
  * - Action-type operations spend the budget; free operations do not
  * - Budget-spent enforcement (rejects further action-type operations)
  * - Buy-and-place premium pricing (+50%, rounded up to nearest 0.5)
  * - Event action economy: move-to-hand and play-from-hand each cost 1 action,
- *   same-day composite costs 1 total, coins model unchanged, undo/redo
+ *   same-week composite costs 1 total, coins model unchanged, undo/redo
  * - Serialization round-trip / legacy-save migration of actionsRemaining
  * - General Manager card template stats
  *
@@ -22,7 +22,7 @@ import {
   deserializeMainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   endTurnHeadless,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -110,25 +110,25 @@ describe('actionsRemaining budget', () => {
     expect(state.actionsRemaining).toBe(1);
   });
 
-  it('resets to 1 at DayStart when no action-boosting staff are employed', () => {
+  it('resets to 1 at WeekStart when no action-boosting staff are employed', () => {
     const state = setupMainStreetGame({ seed: 'reset-basic' });
-    state.phase = 'DayStart';
-    executeDayStart(state, true);
+    state.phase = 'WeekStart';
+    executeWeekStart(state, true);
     expect(state.actionsRemaining).toBe(1);
   });
 
-  it('resets to 2 at DayStart while a General Manager is employed (+1 action)', () => {
+  it('resets to 2 at WeekStart while a General Manager is employed (+1 action)', () => {
     const state = setupMainStreetGame({ seed: 'reset-gm' });
     state.staffCards.push({ ...gmTemplate() });
-    state.phase = 'DayStart';
-    executeDayStart(state, true);
+    state.phase = 'WeekStart';
+    executeWeekStart(state, true);
     expect(state.actionsRemaining).toBe(2);
   });
 
   it('is refreshed each new day after the turn closing', () => {
     const state = setupMainStreetGame({ seed: 'day-cycle' });
     state.resourceBank.coins = 10000;
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     expect(state.actionsRemaining).toBe(1);
 
     // Spend the single action
@@ -137,9 +137,9 @@ describe('actionsRemaining budget', () => {
     expect(state.actionsRemaining).toBe(0);
 
     endTurnHeadless(state);
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
 
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     expect(state.actionsRemaining).toBe(1);
   });
 });
@@ -149,7 +149,7 @@ describe('actionsRemaining budget', () => {
 describe('action spend', () => {
   it('move-to-hand consumes the single daily action', () => {
     const state = setupMainStreetGame({ seed: 'spend-move' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(0);
@@ -157,7 +157,7 @@ describe('action spend', () => {
 
   it('buy-business consumes the single daily action', () => {
     const state = setupMainStreetGame({ seed: 'spend-buy' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
@@ -167,7 +167,7 @@ describe('action spend', () => {
 
   it('play-business-from-hand consumes the single daily action', () => {
     const state = setupMainStreetGame({ seed: 'spend-play' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     state.hand.push(makeBiz('biz-play', 'Play Me', 3));
     executeAction(state, { type: 'play-business-from-hand', handIndex: 0, slotIndex: 0 });
@@ -177,7 +177,7 @@ describe('action spend', () => {
 
   it('buy-and-place consumes the single daily action', () => {
     const state = setupMainStreetGame({ seed: 'spend-bap' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     state.market.cards = [makeBiz('biz-bap', 'BAP', 3)];
     executeAction(state, { type: 'buy-and-place', cardId: 'biz-bap', slotIndex: 0 });
@@ -186,7 +186,7 @@ describe('action spend', () => {
 
   it('hire-staff consumes the single daily action', () => {
     const state = setupMainStreetGame({ seed: 'spend-hire' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     // Staff are hired from the general market row (CG-0MT3KZOBZ005IRYE);
     // if the seeded row lacks the GM, move one from the staff deck into it.
@@ -210,7 +210,7 @@ describe('action spend', () => {
 describe('free (non-action) operations', () => {
   it('discard-from-hand does not consume an action', () => {
     const state = setupMainStreetGame({ seed: 'free-discard' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.hand.push(makeBiz('biz-discard', 'Discard Me', 3));
     executeAction(state, { type: 'discard-from-hand', handIndex: 0 });
     expect(state.actionsRemaining).toBe(1);
@@ -219,7 +219,7 @@ describe('free (non-action) operations', () => {
 
   it('end-turn is allowed even with the budget spent', () => {
     const state = setupMainStreetGame({ seed: 'free-end' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
@@ -234,7 +234,7 @@ describe('event action economy', () => {
   // move-to-hand consumes 1 action via engine
   it('buy-event (move event to hand) consumes 1 action via executeAction', () => {
     const state = setupMainStreetGame({ seed: 'evt-move-engine' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     state.market.cards.push(makeEvent('evt-test', 'Test Event', 2) as never);
     executeAction(state, { type: 'buy-event', cardId: 'evt-test' });
@@ -244,7 +244,7 @@ describe('event action economy', () => {
 
   it('buy-event via moveEventToHandCommand consumes 1 action', () => {
     const state = setupMainStreetGame({ seed: 'evt-move-cmd' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-cmd', 'Cmd Event', 3) as never;
     state.market.cards.push(evt);
@@ -257,7 +257,7 @@ describe('event action economy', () => {
   // play consumes 1 action + cost via engine
   it('play-event-from-hand consumes 1 action and deducts event.cost via executeAction', () => {
     const state = setupMainStreetGame({ seed: 'evt-play-engine' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-play', 'Play Event', 7) as never;
     state.hand.push(evt);
@@ -270,7 +270,7 @@ describe('event action economy', () => {
 
   it('play-event (implicit hand index) consumes 1 action and deducts cost', () => {
     const state = setupMainStreetGame({ seed: 'evt-play-implicit' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-impl', 'Impl Event', 4) as never;
     state.hand.push(evt);
@@ -282,7 +282,7 @@ describe('event action economy', () => {
 
   it('playEventCommand consumes 1 action and deducts event.cost', () => {
     const state = setupMainStreetGame({ seed: 'evt-play-cmd' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-pcmd', 'PCmd Event', 5) as never;
     state.hand.push(evt);
@@ -294,10 +294,10 @@ describe('event action economy', () => {
     expect(state.resourceBank.coins).toBeLessThan(coinsBefore);
   });
 
-  // same-day composite = 1 total (move charges, same-day play free)
-  it('same-day composite move→play costs exactly 1 action total via engine', () => {
+  // same-week composite = 1 total (move charges, same-week play free)
+  it('same-week composite move→play costs exactly 1 action total via engine', () => {
     const state = setupMainStreetGame({ seed: 'evt-composite-engine' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-comp', 'Composite', 6) as never;
     state.market.cards.push(evt);
@@ -309,7 +309,7 @@ describe('event action economy', () => {
     expect(state.hand.some(c => c.id === 'evt-comp')).toBe(true);
     expect(state.resourceBank.coins).toBe(coinsBefore); // move costs 0 coins
 
-    // Same-day play of the just-moved event is free (composite = 1 total)
+    // Same-week play of the just-moved event is free (composite = 1 total)
     const handIdx = state.hand.findIndex(c => c.id === 'evt-comp');
     executeAction(state, { type: 'play-event-from-hand', handIndex: handIdx });
     expect(state.actionsRemaining).toBe(0); // still 0, not -1
@@ -317,9 +317,9 @@ describe('event action economy', () => {
     expect(state.resourceBank.coins).toBeLessThan(coinsBefore); // cost deducted at play
   });
 
-  it('same-day composite move→play costs exactly 1 action total via commands', () => {
+  it('same-week composite move→play costs exactly 1 action total via commands', () => {
     const state = setupMainStreetGame({ seed: 'evt-composite-cmd' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-cc', 'CC Event', 9) as never;
     state.market.cards.push(evt);
@@ -344,7 +344,7 @@ describe('event action economy', () => {
     // incident can cross the default score threshold mid-flow (deck shifts
     // change which incident is drawn), so neutralise the win gate.
     state.config = { ...state.config, winThreshold: Number.MAX_SAFE_INTEGER };
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-held', 'Held Event', 8) as never;
     state.market.cards.push(evt);
@@ -355,7 +355,7 @@ describe('event action economy', () => {
 
     // End day 1, start day 2
     endTurnHeadless(state);
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     expect(state.actionsRemaining).toBe(1);
     expect(state.hand.some(c => c.id === 'evt-held')).toBe(true);
     const coinsBeforePlay = state.resourceBank.coins;
@@ -370,7 +370,7 @@ describe('event action economy', () => {
   // coins model unchanged
   it('move costs 0 coins, cost deducted at play', () => {
     const state = setupMainStreetGame({ seed: 'evt-coins' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 5000;
     const evt = makeEvent('evt-coin', 'Coin Event', 12) as never;
     state.market.cards.push(evt);
@@ -379,9 +379,9 @@ describe('event action economy', () => {
     executeAction(state, { type: 'buy-event', cardId: 'evt-coin' });
     expect(state.resourceBank.coins).toBe(coinsBefore); // move free
 
-    // Need fresh action for play — simulate next day
+    // Need fresh action for play — simulate next week
     endTurnHeadless(state);
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = coinsBefore; // restore for clear assertion
     // hand still has event from prior day
     const handIdx = state.hand.findIndex(c => c.id === 'evt-coin');
@@ -390,11 +390,11 @@ describe('event action economy', () => {
   });
 
   // GM 2-action day still respects composite (leaves 1 remaining)
-  it('General Manager 2-action day: same-day composite leaves 1 action remaining', () => {
+  it('General Manager 2-action day: same-week composite leaves 1 action remaining', () => {
     const state = setupMainStreetGame({ seed: 'evt-gm-composite' });
     state.staffCards.push({ ...gmTemplate() });
-    state.phase = 'DayStart';
-    executeDayStart(state, true);
+    state.phase = 'WeekStart';
+    executeWeekStart(state, true);
     expect(state.actionsRemaining).toBe(2);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-gm', 'GM Event', 3) as never;
@@ -411,7 +411,7 @@ describe('event action economy', () => {
   // undo/redo
   it('undo restores the action spent for moveEventToHandCommand', () => {
     const state = setupMainStreetGame({ seed: 'evt-undo-move' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-um', 'Undo Move', 5) as never;
     state.market.cards.push(evt);
@@ -428,7 +428,7 @@ describe('event action economy', () => {
 
   it('undo restores the action and coins for playEventCommand', () => {
     const state = setupMainStreetGame({ seed: 'evt-undo-play' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-up', 'Undo Play', 11) as never;
     state.hand.push(evt);
@@ -448,7 +448,7 @@ describe('event action economy', () => {
 
   it('new action after undo invalidates the redo stack', () => {
     const state = setupMainStreetGame({ seed: 'evt-undo-redo-invalidate' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const e1 = makeEvent('evt-r1', 'R1', 2) as never;
     const e2 = makeEvent('evt-r2', 'R2', 3) as never;
@@ -466,7 +466,7 @@ describe('event action economy', () => {
 
   it('composite undo/redo restores the single action correctly', () => {
     const state = setupMainStreetGame({ seed: 'evt-composite-undo' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-cu', 'CU Event', 4) as never;
     state.market.cards.push(evt);
@@ -496,7 +496,7 @@ describe('event action economy', () => {
 describe('budget enforcement', () => {
   it('rejects action-type operations when the budget is spent', () => {
     const state = setupMainStreetGame({ seed: 'enforce' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
@@ -515,7 +515,7 @@ describe('budget enforcement', () => {
 
   it('rejects buy-event when the budget is spent', () => {
     const state = setupMainStreetGame({ seed: 'enforce-evt-move' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     // Spend the action first
     const card = state.market.cards[0];
@@ -531,9 +531,9 @@ describe('budget enforcement', () => {
       .toThrow(/No actions remaining/);
   });
 
-  it('rejects play-event-from-hand when the budget is spent (not same-day)', () => {
+  it('rejects play-event-from-hand when the budget is spent (not same-week)', () => {
     const state = setupMainStreetGame({ seed: 'enforce-evt-play' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const held = makeEvent('evt-held-enforce', 'Held Enforce', 6) as never;
     state.hand.push(held);
@@ -550,16 +550,16 @@ describe('budget enforcement', () => {
       .toThrow(/No actions remaining/);
   });
 
-  it('same-day composite play is allowed even when budget is spent', () => {
+  it('same-week composite play is allowed even when budget is spent', () => {
     const state = setupMainStreetGame({ seed: 'enforce-composite-allowed' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     state.market.cards.push(makeEvent('evt-free-play', 'Free Play', 7) as never);
 
     executeAction(state, { type: 'buy-event', cardId: 'evt-free-play' });
     expect(state.actionsRemaining).toBe(0);
     const handIdx = state.hand.findIndex(c => c.id === 'evt-free-play');
-    // Should NOT throw — same-day composite is free
+    // Should NOT throw — same-week composite is free
     expect(() => executeAction(state, { type: 'play-event-from-hand', handIndex: handIdx }))
       .not.toThrow();
     expect(state.actionsRemaining).toBe(0);
@@ -571,7 +571,7 @@ describe('budget enforcement', () => {
 describe('event action-budget legality gates', () => {
   it('canPurchaseEvent rejects a market event once the daily budget is spent', () => {
     const state = setupMainStreetGame({ seed: 'evt-gate-move' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-gate-move', 'Gate Move', 3) as never;
     state.market.cards.push(evt);
@@ -587,9 +587,9 @@ describe('event action-budget legality gates', () => {
     expect(blocked.reason).toMatch(/action/i);
   });
 
-  it('canPlayEvent rejects a held event at 0 actions unless it was moved this day', () => {
+  it('canPlayEvent rejects a held event at 0 actions unless it was moved this week', () => {
     const state = setupMainStreetGame({ seed: 'evt-gate-play' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const evt = makeEvent('evt-gate-play', 'Gate Play', 4) as never;
     state.hand.push(evt);
@@ -602,22 +602,22 @@ describe('event action-budget legality gates', () => {
     if (blocked.legal) throw new Error('expected illegal play');
     expect(blocked.reason).toMatch(/action/i);
 
-    // Same-day composite: the move already paid the action, so the play is
+    // Same-week composite: the move already paid the action, so the play is
     // legal even with an exhausted budget.
     state.justMovedEventCardId = 'evt-gate-play';
     expect(canPlayEvent(state, 0).legal).toBe(true);
   });
 
-  it('executeDayStart clears the same-day event composite tracker', () => {
+  it('executeWeekStart clears the same-week event composite tracker', () => {
     const state = setupMainStreetGame({ seed: 'evt-composite-reset' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     state.market.cards.push(makeEvent('evt-reset', 'Reset Event', 2) as never);
     executeAction(state, { type: 'buy-event', cardId: 'evt-reset' });
     expect(state.justMovedEventCardId).toBe('evt-reset');
 
     endTurnHeadless(state);
-    executeDayStart(state);
+    executeWeekStart(state);
     expect(state.justMovedEventCardId).toBeNull();
   });
 });
@@ -627,7 +627,7 @@ describe('event action-budget legality gates', () => {
 describe('buy-and-place premium pricing', () => {
   it('charges cost × 1.5 rounded up to nearest 0.5 (3 → 4.5)', () => {
     const state = setupMainStreetGame({ seed: 'premium-3' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     state.market.cards = [makeBiz('biz-prem3', 'Premium 3', 300)];
     executeAction(state, { type: 'buy-and-place', cardId: 'biz-prem3', slotIndex: 0 });
@@ -637,7 +637,7 @@ describe('buy-and-place premium pricing', () => {
 
   it('charges cost × 1.5 rounded up to nearest 0.5 (7 → 10.5)', () => {
     const state = setupMainStreetGame({ seed: 'premium-7' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     state.market.cards = [makeBiz('biz-prem7', 'Premium 7', 700)];
     executeAction(state, { type: 'buy-and-place', cardId: 'biz-prem7', slotIndex: 0 });
@@ -647,7 +647,7 @@ describe('buy-and-place premium pricing', () => {
 
   it('rejects buy-and-place when the player cannot afford the premium', () => {
     const state = setupMainStreetGame({ seed: 'premium-poor' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 500;
     state.market.cards = [makeBiz('biz-prem7', 'Premium 7', 700)];
     expect(() => executeAction(state, { type: 'buy-and-place', cardId: 'biz-prem7', slotIndex: 0 }))
@@ -660,7 +660,7 @@ describe('buy-and-place premium pricing', () => {
 describe('serialization of the action budget', () => {
   it('round-trips actionsRemaining through save/load', () => {
     const state = setupMainStreetGame({ seed: 'save-roundtrip' });
-    executeDayStart(state, true);
+    executeWeekStart(state, true);
     state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });

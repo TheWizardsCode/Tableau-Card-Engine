@@ -23,7 +23,7 @@ import { setupMainStreetGame, type MainStreetState } from '../../example-games/m
 import {
   endTurnHeadless,
   executeAction,
-  executeDayStart,
+  executeWeekStart,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
   enumerateLegalActions,
@@ -46,7 +46,7 @@ import type { BusinessCard, UpgradeCard } from '../../example-games/main-street/
 
 function createTestState(seed: string = 'banking-ai-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 
@@ -447,7 +447,7 @@ describe('AC6 · deterministic banking scenarios', () => {
       let turnCount = 0;
       const maxTurns = 100;
       while (state.gameResult === 'playing' && turnCount < maxTurns) {
-        executeDayStart(state);
+        executeWeekStart(state);
         let action = player.chooseAction(state);
         let actionsInTurn = 0;
         while (action.type !== 'end-turn' && state.gameResult === 'playing' && actionsInTurn < 10) {

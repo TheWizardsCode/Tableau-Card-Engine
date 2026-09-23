@@ -20,7 +20,7 @@ import {
 } from '../../example-games/main-street/MainStreetState';
 import {
   executeAction,
-  executeDayStart,
+  executeWeekStart,
   executeFullTurn,
   endTurnHeadless,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -75,9 +75,9 @@ function fillStreet(state: MainStreetState, count: number): void {
   }
 }
 
-/** Starts the day (setupMainStreetGame leaves the game in DayStart). */
-function startDay(state: MainStreetState): void {
-  executeDayStart(state);
+/** Starts the day (setupMainStreetGame leaves the game in WeekStart). */
+function startTurn(state: MainStreetState): void {
+  executeWeekStart(state);
 }
 
 /** Sets resources and mirrors them into the ledger (used by validators). */
@@ -99,7 +99,7 @@ function challengeLogCount(state: MainStreetState, title: string): number {
 describe('executeAction · per-action challenge evaluation', () => {
   it('completes a resource challenge immediately after a favour action', () => {
     const state = setupMainStreetGame({ seed: 'engine-per-action-resource' });
-    startDay(state);
+    startTurn(state);
     activate(state, 'ch-deep-pockets');
 
     // One rep→coins favour action away from the 3000-coin threshold.
@@ -117,7 +117,7 @@ describe('executeAction · per-action challenge evaluation', () => {
 
   it('completes a placement challenge immediately after a placement action', () => {
     const state = setupMainStreetGame({ seed: 'engine-per-action-placement' });
-    startDay(state);
+    startTurn(state);
     activate(state, 'ch-bustling-street');
 
     setResources(state, 100000, 0);
@@ -140,7 +140,7 @@ describe('executeAction · per-action challenge evaluation', () => {
 
   it('clears the transient buffer for an action that completes nothing', () => {
     const state = setupMainStreetGame({ seed: 'engine-per-action-reset' });
-    startDay(state);
+    startTurn(state);
     activate(state, 'ch-deep-pockets');
 
     setResources(state, 2900, 200);
@@ -161,7 +161,7 @@ describe('executeAction · per-action challenge evaluation', () => {
 describe('end-of-turn safety net · no double-reporting', () => {
   it('does not double-report a challenge completed mid-action at end of turn', () => {
     const state = setupMainStreetGame({ seed: 'engine-safety-net' });
-    startDay(state);
+    startTurn(state);
     activate(state, 'ch-deep-pockets');
 
     setResources(state, 2900, 200);
@@ -178,7 +178,7 @@ describe('end-of-turn safety net · no double-reporting', () => {
 
   it('completes remaining challenges at end of turn without duplicating mid-turn ones', () => {
     const state = setupMainStreetGame({ seed: 'engine-safety-net-mixed' });
-    startDay(state);
+    startTurn(state);
     activate(state, 'ch-deep-pockets', 'ch-beloved-mayor');
 
     // Complete Deep Pockets mid-turn.

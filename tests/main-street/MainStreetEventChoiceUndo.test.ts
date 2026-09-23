@@ -173,7 +173,7 @@ describe('choice command integrates with the deferred closing', () => {
     const result = finishDeferredEndOfTurn(state);
     expect(result.choicePending).toBe(false);
     expect(state.pendingEventChoice).toBeNull();
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(2);
   });
 });

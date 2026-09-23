@@ -18,7 +18,7 @@ These tests serve as the regression oracle during migration.
 | Refill policy — incident queue | `refillIncidentQueue` | 5 |
 | Refill policy — exhaustion | `refillMarket` (single-row refill) | 3 |
 | Refill policy — reshuffle from discard | `reshuffleIfNeeded` (business/upgrade/event decks) | 5 |
-| Multi-turn integration | `executeDayStart`, `processEndOfTurn`, `executeAction` | 7 |
+| Multi-turn integration | `executeWeekStart`, `processEndOfTurn`, `executeAction` | 7 |
 
 **Total: 57 tests**
 

@@ -380,7 +380,7 @@ These augmentations move Main Street from "simple adjacency game" to "lightweigh
 |---|---|
 | **Selected concept** | Main Street |
 | **Working title** | "The Build: Main Street" |
-| **Elevator pitch** | Revitalize a small town's main street by placing shops along a single row where neighboring businesses boost each other, managing customers, money, and reputation across day/night cycles in 10-15 minute roguelike runs. |
+| **Elevator pitch** | Revitalize a small town's main street by placing shops along a single row where neighboring businesses boost each other, managing customers, money, and reputation across weeks in 10-15 minute roguelike runs. |
 | **Core engine components** | Grid<T>, AdjacencyResolver, Market<T>, ResourceBank |
 | **Estimated engine work** | 6-10 days |
 | **Estimated MVP** | 2-3 weeks |

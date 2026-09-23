@@ -93,10 +93,11 @@ describe('expanded grid save/load, camera & undo (CG-0MTH9OWF2002YQQ3)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('keeps the MainStreet save schema at v1 so legacy saves still load (AC2)', () => {
-    // Backward compatibility depends on migrations, not a version bump:
-    // SaveLoadStore rejects any schemaVersion mismatch outright.
-    expect(MAIN_STREET_SAVE_SCHEMA_VERSION).toBe(1);
+  it('bumps the MainStreet save schema and still loads legacy saves via migration (AC2)', () => {
+    // The day→week terminology rename (CG-0MTMYIHKO001QCWL) bumped the schema
+    // to v2 and added a forward-migration hook, so pre-change saves still load
+    // while the wire format carries the new field names.
+    expect(MAIN_STREET_SAVE_SCHEMA_VERSION).toBe(2);
   });
 
   // ── AC1: round-trip ──────────────────────────────────────

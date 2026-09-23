@@ -100,7 +100,7 @@ export const HUD_TOOLTIP_STRINGS = {
   scoreThresholdMet: 'Win threshold met!',
   scoreNextTierLabel: 'Next tier',
   scoreAllTiersUnlocked: 'All tiers unlocked',
-  actionTitle: 'Actions This Day',
+  actionTitle: 'Actions This Week',
   actionRemainingLabel: 'Actions remaining',
   actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff, close business',
   actionFreeOpsLabel: 'Free: re-roll market, sell, discard, end turn',
@@ -114,7 +114,7 @@ export const HUD_ARIA_STRINGS = {
   coins: 'Coins status — hover for expected income breakdown',
   rep: 'Reputation status — hover for multiplier details',
   score: 'Score status — hover for next tier threshold',
-  action: 'Actions remaining this day — buying/placing/hiring spends one',
+  action: 'Actions remaining this week — buying/placing/hiring spends one',
 } as const;
 
 // ── Register the English locale bundle ────────────────────────────────

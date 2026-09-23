@@ -17,7 +17,7 @@ import {
 
 import {
   endTurnHeadless,
-  executeDayStart,
+  executeWeekStart,
 } from '../../example-games/main-street/MainStreetEngine';
 
 import { type BusinessCard, GRID_SIZE } from '../../example-games/main-street/MainStreetCards';
@@ -78,7 +78,7 @@ describe('Challenge Celebration Integration', () => {
         },
       ];
       giveWealth(state);
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const result = endTurnHeadless(state);
 
@@ -100,7 +100,7 @@ describe('Challenge Celebration Integration', () => {
         },
       ];
       state.resourceBank.coins = 5; // Below 3000 threshold
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const result = endTurnHeadless(state);
 
@@ -123,7 +123,7 @@ describe('Challenge Celebration Integration', () => {
       ];
       giveWealth(state);
       fillGrid(state); // Fill all 10 slots for ch-bustling-street (requires >= 8)
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const result = endTurnHeadless(state);
 
@@ -143,7 +143,7 @@ describe('Challenge Celebration Integration', () => {
         },
       ];
       giveWealth(state);
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const result = endTurnHeadless(state);
 
@@ -155,7 +155,7 @@ describe('Challenge Celebration Integration', () => {
     it('should not crash with no active challenges', () => {
       const state = createState('celebrate-5');
       state.activeChallenges = [];
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Should not throw
       const result = endTurnHeadless(state);

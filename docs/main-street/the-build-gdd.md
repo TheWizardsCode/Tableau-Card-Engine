@@ -4,7 +4,7 @@
 
 ## Executive Summary
 
-**Main Street** (working title: *The Build*) is a single-player, turn-based tableau card game where the player revitalises a 10-slot street grid by purchasing and placing business cards from a market. Adjacent (including diagonally adjacent) businesses sharing synergy types generate bonus income. The player manages two resources (Coins and Reputation) across 20 day/night turns, aiming to reach a difficulty-scaled score threshold (100 Easy / 120 Medium / 150 Hard) or complete all challenges. The game is built on the Tableau Card Engine using Phaser 3, TypeScript, and seeded deterministic RNG for reproducible sessions.
+**Main Street** (working title: *The Build*) is a single-player, turn-based tableau card game where the player revitalises a 10-slot street grid by purchasing and placing business cards from a market. Adjacent (including diagonally adjacent) businesses sharing synergy types generate bonus income. The player manages two resources (Coins and Reputation) across 20 weekly turns, aiming to reach a difficulty-scaled score threshold (100 Easy / 120 Medium / 150 Hard) or complete all challenges. The game is built on the Tableau Card Engine using Phaser 3, TypeScript, and seeded deterministic RNG for reproducible sessions.
 
 ## Table of Contents
 1. [Core Rules and Mechanics](#core-rules-and-mechanics)
@@ -24,7 +24,7 @@
 
 ## 1. Game Overview
 
-**Main Street** is a single‑player, turn‑based tableau card game built on the **Tableau Card Engine**. The player takes the role of a town planner revitalising a small main street by purchasing and placing business cards in a 10‑slot street grid. Each turn represents a day (or night) cycle. Adjacent (including diagonally adjacent) businesses generate synergy bonuses, earn coins, and increase the town’s reputation. The game ends after a fixed number of turns or when a win condition is met. The design prioritises a fast‑to‑prototype core loop while delivering reusable engine components (grid, adjacency resolver, market, resource bank).
+**Main Street** is a single‑player, turn‑based tableau card game built on the **Tableau Card Engine**. The player takes the role of a town planner revitalising a small main street by purchasing and placing business cards in a 10‑slot street grid. Each turn represents one week. Adjacent (including diagonally adjacent) businesses generate synergy bonuses, earn coins, and increase the town’s reputation. The game ends after a fixed number of turns or when a win condition is met. The design prioritises a fast‑to‑prototype core loop while delivering reusable engine components (grid, adjacency resolver, market, resource bank).
 
 > **Update (CG-0MSLXJCHH001DLIO):** "Fixed number of turns" describes the original design; there is no default turn limit anymore.
 
@@ -39,7 +39,7 @@
 | **Synergy Type** | A tag (e.g., *Food*, *Culture*, *Commerce*) that determines adjacency bonuses. When two adjacent businesses — orthogonally or **diagonally adjacent** (8‑way / Chebyshev adjacency, default range 1) — share a synergy type, each gains a **Synergy Bonus** equal to a percentage of its own effective base income per matching neighbor. The per-card rate defaults to 50% (`synergyCoinBonus` 0.5) and is scaled by the difficulty preset multiplier `synergyBonusPerNeighbor` (Easy 0.5 / Medium 0.35 / Hard 0.25, re-tuned by CG-0MSP26Q5N002EH8P). Same-type adjacent businesses do not receive synergy from each other.
 | **Market** | The face‑up cards the player may purchase each turn. It has two rows: a **Business** row (4 slots) and a mixed **Investments** row (2 Upgrade cards + 1 Investment event card = 3 slots). Incidents are not purchasable; they populate a visible FIFO **Incident Queue** instead.
 | **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (plain score count). Coins start at 8 and Reputation starts at 3.
-| **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
+| **Turn** | A full week consisting of several phases (see Section 5). Turn number increments after the **week end**.
 | **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are player‑bought from the Investments row and held until played; **Incident** events resolve automatically from the incident queue.
 | **Incident Queue** | A visible FIFO queue of 2 face‑up Incident cards. Each turn the front card is resolved and a replacement is drawn from the event deck. The player can see upcoming incidents and plan accordingly.
 | **Upgrade Card** | A card that modifies a specific Business card (e.g., upgrade a Bakery to a Patisserie, increasing income and synergy range).
@@ -55,7 +55,7 @@
 |-------|------|-------------|
 | **Name** | string | Human‑readable title (e.g., *Bakery*). |
 | **Cost** | number (coins) | Purchase price from the market. |
-| **Base Income** | number (coins per turn) | Income generated each **Day Phase** before synergy. |
+| **Base Income** | number (coins per turn) | Income generated each **WeekStart** before synergy. |
 | **Synergy Types** | string[] | One or more tags that interact with adjacent cards (e.g., `Food`). |
 | **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this business. |
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
@@ -124,7 +124,7 @@ The engine maintains a single **GameState** object with the following fields (il
 ```ts
 interface GameState {
   turn: number; // starts at 1
-  dayPhase: 'Day' | 'Night';
+  turnPhase: 'WeekStart' | 'MarketPhase' | 'EndCheck';
   streetGrid: (BusinessCard | null)[]; // length = GRID_SIZE (default 10)
   market: {
     business: BusinessCard[];                   // 4 face-up slots
@@ -157,26 +157,26 @@ interface GameState {
 
 ## 5. Turn / Round Structure
 
-The turn follows a deterministic state‑machine that repeats each day/night cycle. The diagram below is a Mermaid **state diagram** that doubles as a flowchart for designers and developers.
+The turn follows a deterministic state‑machine that repeats each week. The diagram below is a Mermaid **state diagram** that doubles as a flowchart for designers and developers.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DayStart
-    DayStart --> MarketPhase: Show market (4 Business, 2 Upgrade + 1 Investment event)
+    [*] --> WeekStart
+    WeekStart --> MarketPhase: Show market (4 Business, 2 Upgrade + 1 Investment event)
     MarketPhase --> ActionPhase: Player purchases/places/upgrades (+ play held Investment)
     ActionPhase --> InvestmentResolution: Auto‑resolve held Investment if not played
     InvestmentResolution --> IncomePhase: Collect Base Income + Synergy Bonuses
     IncomePhase --> IncidentPhase: Resolve front of incident queue (FIFO)
     IncidentPhase --> EndCheck: Evaluate win/loss conditions
-    EndCheck --> DayStart: Loop to next turn
+    EndCheck --> WeekStart: Loop to next turn
 ```
 
 **Phase details**
-1. **DayStart** – Increment `turn` counter, reset temporary flags, replenish market.
+1. **WeekStart** – Increment `turn` counter, reset temporary flags, replenish market.
 2. **MarketPhase** – The market shows 4 Business cards and 3 Investments (2 Upgrades + 1 Investment event). The player may purchase any combination as long as they have enough coins.
 3. **ActionPhase** – The player resolves purchases:
    - **Buy Business** → `resourceBank.coins -= cost` → place card into a chosen empty slot (1 action).
-   - **Buy Upgrade** → the market click **moves the card to hand (1 action)**; it is then applied from the hand by clicking the card and a matching business (same-day apply is a **free composite**; an upgrade held from a previous day costs 1 action). Dragging the upgrade from the market straight onto a matching business is a same-turn buy-and-apply at a **+50% premium** (1 action) — the same gesture and pricing as business buy-and-place (CG-0MT3IYSRL001VVUP).
+   - **Buy Upgrade** → the market click **moves the card to hand (1 action)**; it is then applied from the hand by clicking the card and a matching business (same-week apply is a **free composite**; an upgrade held from a previous week costs 1 action). Dragging the upgrade from the market straight onto a matching business is a same-turn buy-and-apply at a **+50% premium** (1 action) — the same gesture and pricing as business buy-and-place (CG-0MT3IYSRL001VVUP).
    - **Buy Event (Investment)** → add the event card to the player's hand (any mix of business/event cards up to `maxHandSize`). The player may play it during MarketPhase via a `play-event` action.
    - **Play Event (from hand)** → resolve an Investment event card from the hand immediately and remove it.
 4. **InvestmentResolution** – Reserved phase; Investment events are **not** auto‑resolved here. Unplayed events persist in the hand until the player plays them during a later MarketPhase.
@@ -186,7 +186,7 @@ stateDiagram-v2
    - **Sold businesses** (CG-0MT5XUE2200047IJ): a sold card produces **0 income and 0 reputation for itself**, but remains a **synergy anchor** — its non‑sold neighbours keep the exact coin synergy, reputation synergy, and same‑type penalty they had before the sale (the sold card still counts as a matching neighbour and as a same‑type neighbour). Selling a business therefore never degrades the rest of the street.
 6. **IncidentPhase** – Resolve the front Incident card from the visible FIFO incident queue. After resolution, draw a replacement Incident from the event deck to the back of the queue (maintaining queue size of 2). If the deck has no more Incidents, the queue shrinks naturally.
 7. **EndCheck** – Evaluate win/loss conditions.
-8. Loop back to **DayStart** for the next turn.
+8. Loop back to **WeekStart** for the next turn.
 
 The turn ends when either:
 - The predefined maximum turn count (`MAX_TURNS = 20`) is reached, **or**
@@ -201,21 +201,21 @@ The turn ends when either:
 
 | Action | Description | Preconditions | Result |
 |--------|-------------|---------------|--------|
-| **Buy Business** | Move a Business card from the market to the hand (`coins >= cost` at placement) and place it on an empty slot (1 action). | Market contains Business card; `actionsRemaining >= 1`; at least one empty slot. | Card moved to hand; action spent; listed cost paid when placed from hand (same-day placement is a free composite). |
-| **Buy Upgrade** | Move an Upgrade card from the market to the hand (1 action); it is then applied from hand by clicking the card and a matching business. | Market contains Upgrade card targeting a placed Business at the required level; hand has room. | Upgrade moves to hand; action spent. Same-day apply is free; a held upgrade costs 1 action when applied. Dragging the upgrade straight onto a matching business buys-and-applies it at a **+50% premium** (1 action). |
+| **Buy Business** | Move a Business card from the market to the hand (`coins >= cost` at placement) and place it on an empty slot (1 action). | Market contains Business card; `actionsRemaining >= 1`; at least one empty slot. | Card moved to hand; action spent; listed cost paid when placed from hand (same-week placement is a free composite). |
+| **Buy Upgrade** | Move an Upgrade card from the market to the hand (1 action); it is then applied from hand by clicking the card and a matching business. | Market contains Upgrade card targeting a placed Business at the required level; hand has room. | Upgrade moves to hand; action spent. Same-week apply is free; a held upgrade costs 1 action when applied. Dragging the upgrade straight onto a matching business buys-and-applies it at a **+50% premium** (1 action). |
 | **Buy Event** | Take an Investment event card from the market into the hand **for free** (cost is paid when the event is executed from hand). | Market contains Investment event card; hand has room (`hand.length < maxHandSize`). | Event appended to hand; **no coins deducted** at take time. Player pays the event's listed cost when it is played during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
 | **Play Event (from hand)** | Play an Investment event card from the hand during MarketPhase. | Player holds an Investment event card in hand; current phase is MarketPhase. | Event resolved and removed from hand. |
 | **Place Business** | Choose an empty slot and put the purchased Business card there. | Business card in hand; slot is empty. | Card is now part of `streetGrid`. |
 | **Sell Business** | Refund a placed Business/community-space card for **no action**; the card stays on the grid as an inert *sold* marker (still a synergy anchor, slot stays occupied). | MarketPhase; slot occupied and not sold. | Coins credited per the sell refund formula; `soldSlots[slot] = true`. |
 | **Close Business** | Remove a placed Business/community-space card from the street for **1 action and no coins**; the card goes to the discard pile and the slot becomes empty again. Sold cards cannot be closed. | MarketPhase; slot occupied and not sold; `actionsRemaining >= 1`. | Card removed from `streetGrid` (slot → `null`); card pushed to `discardPile`; neighbours recalculated; 1 action consumed. |
 | **Resolve Event** | Apply the effect described on an Event card. | Event card active. | Game state mutated per effect (coins, reputation, temporary modifiers). |
-| **End Turn** | Transition to the next phase/state. | All desired actions for the day are complete. | Turn counter increments, flow moves to Night or next Day. |
+| **End Turn** | Transition to the next phase/state. | All desired actions for the week are complete. | Turn counter increments, flow moves to week end or next WeekStart. |
 
 ---
 
 ## 7. Win Conditions
 
-The game is considered **won** when **any** of the following conditions are satisfied **at the end of a Night Phase**:
+The game is considered **won** when **any** of the following conditions are satisfied **at the end of a week end**:
 1. **Score Threshold** – `finalScore >= winThreshold` where winThreshold is difficulty-scaled (100 Easy / 120 Medium / 150 Hard):
 ```ts
 finalScore = resourceBank.coins + resourceBank.reputation + challengeBonus;
@@ -312,7 +312,7 @@ The core economic loop consists of two primary resources:
 2. **Reputation** – a plain score count increased by completing challenges or by positive events. Reputation counts 1:1 at final‑score calculation (`finalScore = coins + reputation + challengeBonuses`).
 
 **Flow of Resources**:
-- At the start of each **Day Phase**, the player may spend coins to acquire cards.
+- At the start of each **WeekStart**, the player may spend coins to acquire cards.
 - During the **Income Phase**, each placed Business generates `effectiveBase + synergyBonus` coins. Synergy is computed as a percentage of base income per matching adjacent Business sharing a Synergy Type: `synergyBonus = effectiveBase * synergyCoinBonus * bonusPerNeighbor * matchingNeighborCount`, where `synergyCoinBonus` defaults to 0.5 (50%) and `bonusPerNeighbor` is the difficulty preset multiplier (0.5 Easy / 0.35 Medium / 0.25 Hard, re-tuned by CG-0MSP26Q5N002EH8P).
 - **Event Cards** may grant or remove coins/reputation immediately.
 - **Upgrade Cards** increase future income and may extend synergy range.
@@ -330,7 +330,7 @@ The balancing methodology and targets for Main Street have been consolidated int
 
 ## 5. Scoring System
 
-The final score is calculated at the end of the **Night Phase** using the formula:
+The final score is calculated at the end of the **week end** using the formula:
 ```
 finalScore = resourceBank.coins + resourceBank.reputation + challengeBonus
 ```

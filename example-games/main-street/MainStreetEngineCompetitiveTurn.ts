@@ -8,7 +8,7 @@
 
 import { executeAction } from './MainStreetEngineActions';
 import { applyBusinessOngoingCosts, applyCommunitySpaceOngoingCosts, applyCompetitiveOngoingCosts, applyStaffOngoingCosts } from './MainStreetEngineCommands';
-import { executeDayStart } from './MainStreetEngineDayStart';
+import { executeWeekStart } from './MainStreetEngineWeekStart';
 import { applyCompetitiveEventEffects } from './MainStreetEngineEvents';
 import { decideEventChoice, updateCompetitiveScores } from './MainStreetEngineScoring';
 import { appendTurnNetRow, checkCompetitiveEndConditions, checkImmediateLoss, processEndOfTurn, resolveEventChoice, resolveIncident, resolvePendingEventChoice } from './MainStreetEngineTurnClosing';
@@ -26,13 +26,13 @@ import { recordMainStreetEvent } from './MainStreetTranscript';
  * Begins the shared day (CG-0MT5X3GMA007EG30): refills the shared market,
  * resets the shared action budgets and peek/favour gates, and arms the
  * first player's MarketPhase. Competitive winner is cleared. In
- * single-player the behaviour is identical to executeDayStart.
+ * single-player the behaviour is identical to executeWeekStart.
  */
-export function executeCompetitiveDayStart(
+export function executeCompetitiveWeekStart(
   state: MainStreetState,
   skipMarketRefill: boolean = false,
 ): void {
-  executeDayStart(state, skipMarketRefill);
+  executeWeekStart(state, skipMarketRefill);
   if (state.players && state.players.length > 0) {
     state.activePlayerId = 0;
     // Per-player action budgets: reset each day from staff actions + bank.
@@ -101,7 +101,7 @@ export function endCompetitiveMarketTurn(state: MainStreetState): void {
  * (per-owner application) — here it runs the existing shared effects
  * plus the competitive first-to-threshold EndCheck.
  *
- * Postcondition: on continue, phase becomes DayStart (next shared day)
+ * Postcondition: on continue, phase becomes WeekStart (next shared day)
  * and activePlayerId resets to 0; on game over, phase remains EndCheck
  * and competitiveWinnerId records the first-to-threshold winner.
  */
@@ -109,20 +109,20 @@ export function endCompetitiveMarketTurn(state: MainStreetState): void {
 /**
  * Convenience: runs a full shared day (CG-0MT5X3GMA007EG30).
  *
- * Sequences DayStart → N alternating MarketPhases (each driven by
+ * Sequences WeekStart → N alternating MarketPhases (each driven by
  * `playerActions[playerId]` then endCompetitiveMarketTurn) → shared
  * closing phases. Shared market/decks/incidentDeck are unchanged.
  *
  * Example (N=2, producer-confirmed Option A):
- *   Turn 1: DayStart → P0-Market → P1-Market → Income → Incident → EndCheck → DayStart(next)
+ *   Turn 1: WeekStart → P0-Market → P1-Market → Income → Incident → EndCheck → WeekStart(next)
  *
- * N=1 collapses to the single-player path (executeDayStart + processEndOfTurn).
+ * N=1 collapses to the single-player path (executeWeekStart + processEndOfTurn).
  */
-export function executeCompetitiveDay(
+export function executeCompetitiveTurn(
   state: MainStreetState,
   playerActions: PlayerAction[][],
 ): TurnResult {
-  executeCompetitiveDayStart(state);
+  executeCompetitiveWeekStart(state);
   const n = state.players?.length ?? 1;
 
   // Accumulate challenges completed mid-action by per-action evaluation
@@ -220,9 +220,9 @@ function finishCompetitiveClosingTail(
     advanceWeek(state);
     const bankable = Math.min(state.actionsRemaining, 1);
     state.bankedActions = Math.min(2, (state.bankedActions ?? 0) + bankable);
-    // Mirror shared banked value into each player's budget for next day's costing.
-    // (Per-player budgets are re-derived from staff+bank at next day start.)
-    state.phase = 'DayStart';
+    // Mirror shared banked value into each player's budget for next week's costing.
+    // (Per-player budgets are re-derived from staff+bank at next week start.)
+    state.phase = 'WeekStart';
     state.activePlayerId = 0;
   }
   appendTurnNetRow(state, turnEnded);
@@ -285,7 +285,7 @@ export function resolveCompetitiveClosingPhases(state: MainStreetState): TurnRes
   // costs to each owner's own wallet (ownerTaggedGrid) so per-player
   // economics stay authoritative for scoring / AI / deterministic replay.
   // N=1 never reaches this function via the convenience flow
-  // (executeCompetitiveDay collapses to the legacy single-player path); the
+  // (executeCompetitiveTurn collapses to the legacy single-player path); the
   // guard keeps direct N=1 calls legacy-identical (AC4). Consumes no RNG.
   if ((state.players?.length ?? 0) > 1) {
     applyCompetitiveIncome(state);

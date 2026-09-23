@@ -247,7 +247,7 @@ describe('AC6 — AI choices are recorded identically to player choices', () => 
     resolveAiEventChoice(state);
 
     expect(state.pendingEventChoice).toBeNull();
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(2);
   });
 });

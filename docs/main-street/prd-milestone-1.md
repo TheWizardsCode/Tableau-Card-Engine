@@ -30,7 +30,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 
 | # | Criterion | Measurement |
 |---|-----------|-------------|
-| SC-1 | A player can complete a full 20-turn session | Manual playthrough from DayStart turn 1 to game-end |
+| SC-1 | A player can complete a full 20-turn session | Manual playthrough from WeekStart turn 1 to game-end |
 | SC-2 | Core loop is identifiable: buy -> place -> earn -> survive | Playtest checklist confirms all four verbs are exercised each turn |
 | SC-3 | Win and loss conditions trigger correctly | Unit tests for score threshold win, bankruptcy loss, reputation collapse, and turn exhaustion |
 | SC-4 | Adjacency synergies produce observable income differences | Unit test comparing income with/without adjacent matching businesses |
@@ -45,9 +45,9 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 
 | Area | Details |
 |------|---------|
-| **Game State Model** | TypeScript types/interfaces for `MainStreetState` including street grid (10 slots), resource bank (coins + reputation), market, deck state, turn counter, day/night phase, and challenges completed. |
+| **Game State Model** | TypeScript types/interfaces for `MainStreetState` including street grid (10 slots), resource bank (coins + reputation), market, deck state, turn counter, week phase, and challenges completed. |
 | **Card Types** | 5 Business cards (Bakery, Diner, Bookshop, Park, Hardware Store), 5 Event cards (Local Festival, Rainy Day, Tax Audit, Community Award, Health Inspection), 3 Upgrade cards (Patisserie, Bistro, Reader's Café). Defined as typed JSON fixtures. |
-| **Turn Structure** | 6-phase day cycle: DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck. Implemented via `PhaseManager`. |
+| **Turn Structure** | 6-phase weekly cycle: WeekStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck. Implemented via `PhaseManager`. |
 | **Core Actions** | Buy Business, Buy Upgrade, Buy Event, Place Business, End Turn. All with legality validation returning `LegalityResult`. |
 | **Win/Loss Detection** | Score threshold (>= winThreshold: 100 Easy / 120 Medium / 150 Hard), all-challenges-complete, turn-limit victory (turn 20 with reputation > 0 and coins >= 0). Loss: bankruptcy (coins < 0), reputation collapse (reputation <= 0), turn exhaustion without victory. |
 | **Adjacency & Income** | `AdjacencyResolver` computing synergy bonuses for the linear 1x10 grid. `computeIncome()` summing base income + synergy bonuses. Upgrades extending adjacency range. |
@@ -84,7 +84,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 **so that** I can begin building my street and optionally replay specific scenarios.
 
 **Acceptance Criteria:**
-- [ ] AC-1.1: Game initialises with turn 1, Day phase, 8 coins, 3 reputation, empty 10-slot street grid, and a 2-card incident queue.
+- [ ] AC-1.1: Game initialises with turn 1, WeekStart phase, 8 coins, 3 reputation, empty 10-slot street grid, and a 2-card incident queue.
 - [ ] AC-1.2: Market displays up to 4 Business cards and 3 Investments (2 Upgrade + 1 Investment event). Incident queue shows 2 face-up Incident cards.
 - [ ] AC-1.3: Seed is displayed on the game screen.
 - [ ] AC-1.4: Providing the same seed produces an identical initial market and deck order.
@@ -149,7 +149,7 @@ Deliver a playable walking skeleton of Main Street that a human player can compl
 **so that** I know when my session is complete and can see my final score.
 
 **Acceptance Criteria:**
-- [ ] AC-6.1: Win triggers when `finalScore >= winThreshold` (100 Easy / 120 Medium / 150 Hard) at end of Night Phase.
+- [ ] AC-6.1: Win triggers when `finalScore >= winThreshold` (100 Easy / 120 Medium / 150 Hard) at end of week end.
 - [ ] AC-6.2: Win triggers when all primary challenges are completed.
 - [ ] AC-6.3: Loss triggers immediately when coins < 0 (bankruptcy).
 - [ ] AC-6.4: Loss triggers immediately when reputation <= 0 (reputation collapse).
@@ -255,8 +255,8 @@ interface UpgradeCard {
 
 type AnyCard = BusinessCard | EventCard | UpgradeCard;
 
-type DayPhase =
-  | 'DayStart'
+type TurnPhase =
+  | 'WeekStart'
   | 'MarketPhase'
   | 'ActionPhase'
   | 'InvestmentResolution'
@@ -279,7 +279,7 @@ interface ResourceBank {
 
 interface MainStreetState {
   turn: number;                            // 1-based, max 20
-  phase: DayPhase;
+  phase: TurnPhase;
   streetGrid: (BusinessCard | null)[];     // Length 10
   market: MarketState;
   resourceBank: ResourceBank;
@@ -350,7 +350,7 @@ function computeSynergyBonus(grid: (BusinessCard | null)[], index: number): numb
 
 The walking skeleton simplifies the 10-phase GDD turn structure to reduce implementation complexity while preserving the core loop:
 
-1. **DayStart** -- Increment turn, replenish market.
+1. **WeekStart** -- Increment turn, replenish market.
 2. **MarketPhase / ActionPhase** (combined) -- Player buys/places/upgrades. Market shows 4 Business + 3 Investments (2 Upgrades + 1 Investment event). Multiple purchases allowed per turn. Player clicks "End Turn" when done.
 3. **InvestmentResolution** -- Reserved phase; Investment events are **not** auto-resolved here. Unplayed events persist in the hand until the player plays them during a later MarketPhase.
 4. **IncomePhase** -- Compute and add income from all placed businesses.

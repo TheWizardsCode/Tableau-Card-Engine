@@ -79,14 +79,14 @@ skips members with stale ids so a future save never breaks the income phase. Leg
 
 > The applicant presentation (walk-on/walk-off UI) is implemented in
 > `MainStreetRenderer.refreshApplicant()` + `MainStreetAnimator` walk tweens;
-> scene wiring lives in `MainStreetTurnController.startDayPhase()` (sets the
+> scene wiring lives in `MainStreetTurnController.startTurnPhase()` (sets the
 > `applicant` UI phase when a pending applicant arrives) and
 > `MainStreetScene.onHireApplicant()` / `onDeclineApplicant()`. Engine rules
 > are in `MainStreetEngine.ts`.
 
 ### Per-turn trigger
 
-At DayStart, after the market refill, `resolveStaffApplicant(state)` rolls a
+At WeekStart, after the market refill, `resolveStaffApplicant(state)` rolls a
 chance of `min(reputationPerTurn + incomePerTurn, 15)%` via the seeded
 `state.rng`. When it fires, it picks a deployed business with a free
 employment slot (`getEmploymentCapacity(state, slot)` = `max(1, level + 1)`

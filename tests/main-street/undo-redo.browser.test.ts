@@ -146,9 +146,9 @@ describe('MainStreet undo/redo feedback', () => {
     // Populate the market (the booted game waits for the player to start the day).
     const state = s.state as MainStreetState;
     if (state.market.cards.length === 0) {
-      state.phase = 'DayStart';
-      const { executeDayStart } = await import('../../example-games/main-street/MainStreetEngine');
-      executeDayStart(state);
+      state.phase = 'WeekStart';
+      const { executeWeekStart } = await import('../../example-games/main-street/MainStreetEngine');
+      executeWeekStart(state);
     }
 
     // Generous coins so an affordable business/community-space card always

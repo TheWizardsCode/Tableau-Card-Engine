@@ -2,7 +2,7 @@
  * Main Street turn-controller composite pricing tests (CG-0MT24X0SX007RLHN).
  *
  * Verifies the controller-level same-turn buy-and-play pricing:
- *  - a just-moved (same-day) card placed with 0 actions remaining charges
+ *  - a just-moved (same-week) card placed with 0 actions remaining charges
  *    the +50% premium (premium replaces the missing action, no action
  *    consumed) and fires the explainer dialog;
  *  - the same placement on a Golden Mile 2-action day consumes the second
@@ -20,7 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { COMMON_SFX_KEYS } from '../../src/core-engine/SoundManager';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
 
@@ -38,7 +38,7 @@ function createMockScene(overrides: Record<string, unknown> = {}): any {
   const state = setupMainStreetGame({ seed: 'controller-pricing-test' });
   // Enter the MarketPhase so Market-layer commands (playBusinessFromHand →
   // validateHandIndex) accept the placement (CG-0MT76QNJX005UR93).
-  executeDayStart(state);
+  executeWeekStart(state);
   const scene: any = {
     state,
     uiPhase: 'placing-from-hand',
@@ -148,10 +148,10 @@ function firstEmptySlot(state: any): number {
   return state.streetGrid.findIndex((slot: any) => slot === null);
 }
 
-/** Sets up a same-day composite: one just-moved card in hand, pending
+/** Sets up a same-week composite: one just-moved card in hand, pending
  *  tracker set, phase = placing-from-hand. */
-function setupSameDayComposite(scene: any, cost = 6): any {
-  const biz = makeBiz('biz-same-day', 'Same Day', cost);
+function setupSameWeekComposite(scene: any, cost = 6): any {
+  const biz = makeBiz('biz-same-week', 'Same Day', cost);
   scene.state.hand = [biz];
   scene.state.market.cards = [makeBiz('biz-market', 'Market', cost)];
   scene.pendingHandIndex = 0;
@@ -183,8 +183,8 @@ describe('Composite buy-and-play pricing (CG-0MT24X0SX007RLHN)', () => {
     controller = new MainStreetTurnController(scene);
   });
 
-  it('charges the +50% premium when no action remains for a same-day card', async () => {
-    setupSameDayComposite(scene, 6);
+  it('charges the +50% premium when no action remains for a same-week card', async () => {
+    setupSameWeekComposite(scene, 6);
     scene.state.actionsRemaining = 0; // move already consumed the day's action
     scene.state.resourceBank.coins = 100;
     const coinsBefore = scene.state.resourceBank.coins;
@@ -198,7 +198,7 @@ describe('Composite buy-and-play pricing (CG-0MT24X0SX007RLHN)', () => {
 
     const premium = Math.ceil(6 * 1.5 * 2) / 2; // 9
     expect(scene.state.resourceBank.coins).toBe(coinsBefore - premium);
-    // The same-day card is now on the street.
+    // The same-week card is now on the street.
     expect(scene.state.streetGrid.filter((slot: any) => slot !== null)).toHaveLength(1);
     expect(scene.state.streetGrid.some((slot: any) => slot?.name === 'Same Day')).toBe(true);
     expect(scene.state.hand).toHaveLength(0);
@@ -210,8 +210,8 @@ describe('Composite buy-and-play pricing (CG-0MT24X0SX007RLHN)', () => {
     expect(scene.uiPhase).toBe('market');
   });
 
-  it('GM day: same-day placement consumes the remaining action at listed cost (no dialog)', async () => {
-    setupSameDayComposite(scene, 6);
+  it('GM day: same-week placement consumes the remaining action at listed cost (no dialog)', async () => {
+    setupSameWeekComposite(scene, 6);
     scene.state.actionsRemaining = 1; // GM second action remains after the move
     scene.state.resourceBank.coins = 100;
     const coinsBefore = scene.state.resourceBank.coins;
@@ -244,7 +244,7 @@ describe('Composite buy-and-play pricing (CG-0MT24X0SX007RLHN)', () => {
   });
 
   it('dialog cancel aborts the premium placement (card stays in hand, no coins)', async () => {
-    const biz = setupSameDayComposite(scene, 6);
+    const biz = setupSameWeekComposite(scene, 6);
     scene.state.actionsRemaining = 0;
     scene.state.resourceBank.coins = 100;
     const coinsBefore = scene.state.resourceBank.coins;
@@ -284,7 +284,7 @@ describe('Composite buy-and-play pricing (CG-0MT24X0SX007RLHN)', () => {
   });
 
   it('rejects the premium placement with illegal feedback and NO dialog when unaffordable', async () => {
-    const biz = setupSameDayComposite(scene, 6);
+    const biz = setupSameWeekComposite(scene, 6);
     scene.state.actionsRemaining = 0; // premium applies
     scene.state.resourceBank.coins = 5; // below the 9 premium
     const coinsBefore = scene.state.resourceBank.coins;
@@ -308,13 +308,13 @@ describe('Composite buy-and-play pricing (CG-0MT24X0SX007RLHN)', () => {
 
   it('parity: composite premium equals buyAndPlaceBusiness drag-drop premium (drag never cheaper)', async () => {
     // Same card, same day, no actions available:
-    //  - click composite (same-day, 0 actions) charges premium
+    //  - click composite (same-week, 0 actions) charges premium
     //  - drag buy-and-place (1-action day) charges the same premium
     const cost = 6;
     const premium = Math.ceil(cost * 1.5 * 2) / 2; // 9
 
     // Composite side.
-    setupSameDayComposite(scene, cost);
+    setupSameWeekComposite(scene, cost);
     scene.state.actionsRemaining = 0;
     scene.state.resourceBank.coins = 100;
     const compositeCoinsBefore = scene.state.resourceBank.coins;
@@ -351,7 +351,7 @@ describe('Composite buy-and-play pricing (CG-0MT24X0SX007RLHN)', () => {
       scene.premiumDialogCardName = cardName;
       onProceed();
     });
-    setupSameDayComposite(scene, 6);
+    setupSameWeekComposite(scene, 6);
     scene.state.actionsRemaining = 0;
     scene.state.resourceBank.coins = 100;
     const coinsBefore = scene.state.resourceBank.coins;

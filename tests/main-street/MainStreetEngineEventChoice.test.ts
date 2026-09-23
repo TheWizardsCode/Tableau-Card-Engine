@@ -304,7 +304,7 @@ describe('Duration choice events', () => {
 // ── finishDeferredEndOfTurn (deferred closing) ──────────────
 
 describe('finishDeferredEndOfTurn completes the paused turn', () => {
-  it('clears the pending choice, runs EndCheck and advances to the next day', () => {
+  it('clears the pending choice, runs EndCheck and advances to the next week', () => {
     const state = createChoiceAwareState();
     forceNextIncident(state, 'evt-choice-test');
     const paused = processEndOfTurn(state);
@@ -314,7 +314,7 @@ describe('finishDeferredEndOfTurn completes the paused turn', () => {
     const result = finishDeferredEndOfTurn(state);
 
     expect(state.pendingEventChoice).toBeNull(); // consumed
-    expect(state.phase).toBe('DayStart'); // next day
+    expect(state.phase).toBe('WeekStart'); // next week
     expect(state.turn).toBe(2);
     expect(result.choicePending).toBe(false);
     expect(result.gameResult).toBe('playing');

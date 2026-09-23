@@ -6,14 +6,14 @@ The street is a 10-slot grid rendered as **2 rows × 5 columns**; synergy adjace
 
 ## Upgrade cards: hand-first economy (CG-0MT3IYSRL001VVUP)
 
-Upgrade cards follow the business-card action economy — they are never a free second daily action:
+Upgrade cards follow the business-card action economy — they are never a free second weekly action:
 
-- **Click** a market upgrade → the card **moves to hand** for **1 daily action** and rests unselected.
-- **Play from hand** → click the upgrade, then a matching business. A **same-day** apply is a **free composite** (the move already spent the action); an upgrade **held from a previous day** costs **1 action** when applied.
+- **Click** a market upgrade → the card **moves to hand** for **1 weekly action** and rests unselected.
+- **Play from hand** → click the upgrade, then a matching business. A **same-week** apply is a **free composite** (the move already spent the action); an upgrade **held from a previous week** costs **1 action** when applied.
 - **Targeting highlights** (CG-0MUDA70FK003J8YL): while an upgrade is selected from hand, every occupied street slot is outlined — **green** for a business the upgrade can legally target (matching `targetBusiness` at `requiredLevel`, below `maxLevel`), **red** for one it cannot. Empty slots stay unhighlighted and are not clickable, and clicking an ineligible business shakes it back with feedback while the upgrade stays selected for a retry.
 - **Drag** the upgrade from the market straight onto a matching business → **buy & apply now** for **1 action at the +50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`), identical to business buy-and-place. Illegal drops snap back with feedback and spend nothing.
-- When the action budget is spent the upgrade is dimmed and buying/playing it is rejected (unless a same-day composite is still pending).
-- **Escape** cancels an in-progress upgrade (or business) targeting phase — the card stays in hand and the same-day composite stays free. Escape only opens Settings when nothing is being targeted.
+- When the action budget is spent the upgrade is dimmed and buying/playing it is rejected (unless a same-week composite is still pending).
+- **Escape** cancels an in-progress upgrade (or business) targeting phase — the card stays in hand and the same-week composite stays free. Escape only opens Settings when nothing is being targeted.
 
 Event cards moved the same way (each of move-to-hand / play-from-hand costs 1 action, CG-0MTFWBNL30043ZBM); refresh, sell, hint, discard, community favour and end-turn remain non-action operations.
 
@@ -29,7 +29,7 @@ income choreography** instead of a single fly-to-HUD burst:
   quadrant, filling progressively; phase contributions fly in/out; the
   collection finale lands a `+total` pop at the HUD coins counter.
 - **Pacing:** `INCOME_PHASE_GAP_MS` (2200ms) between phases — collection at
-  ≈11s. The turn controller defers the day start (250ms poll, 16s cap)
+  ≈11s. The turn controller defers the week start (250ms poll, 16s cap)
   until the show completes, so gameplay timing is unchanged; the street
   render is deferred via `refreshAllExceptStreet` while the show runs.
 - **Tutorial:** the tutorial keeps the compact window-safe
@@ -49,13 +49,13 @@ Main Street has a **Community Favour** resource exchange available once per turn
 - **reputation → coins:** spend `favourRepToCoinsRepCost` (default **2**) reputation for `favourRepToCoinsCoinGain` (default **3**) coins.
 
 Rules:
-- **Once per turn:** `state.favourUsedThisTurn` gates the exchange; reset at each `DayStart`.
+- **Once per turn:** `state.favourUsedThisTurn` gates the exchange; reset at each `WeekStart`.
 - **MarketPhase only:** rejected outside the market phase.
 - **Lossy round-trip:** 2 coins → 1 rep → 1.5 coins (2→3 rate), so the exchange cannot be arbitraged.
 - **Configurable:** the three rates live on `GameConfig` and are tuned per-difficulty in `MainStreetDifficulty.ts` (defaults on all three presets).
 - **UI:** two SLL-positioned buttons in the market-phase action bar (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones; rendered in `MainStreetRenderer.refreshActionButtons`), disabled when the input resource is insufficient or the gate is spent.
 - **AI:** `enumerateLegalActions` includes the action when affordable and unused; `GreedyStrategy` uses it only when genuinely stalled (cannot afford the cheapest market card) with a reputation buffer, so it never dominates normal purchases.
-- **Tutorial:** T13 teaches the rep→coins exchange, which speeds up the $7 Library purchase under the 12-coin scenario budget; the tutorial starts with 12 coins so the exchange is available from the first day (the tutorial's two-turn plan-ahead flow budgets it, but it is not strictly required — the budget table comments in `TutorialScenario.ts` show the Library remains affordable without it).
+- **Tutorial:** T13 teaches the rep→coins exchange, which speeds up the $7 Library purchase under the 12-coin scenario budget; the tutorial starts with 12 coins so the exchange is available from the first week (the tutorial's two-turn plan-ahead flow budgets it, but it is not strictly required — the budget table comments in `TutorialScenario.ts` show the Library remains affordable without it).
 - **Persistence:** `favourUsedThisTurn` is serialized with legacy-save backfill to `false`.
 
 ## Street map camera: zoom and pan (CG-0MTH9OVMC001V44E)
@@ -286,7 +286,7 @@ A second staff mechanic runs alongside the hand-slot staff above: **job
 applicants** who are employed at a specific deployed business and grant that
 business a passive specialization buff (per-business employment).
 
-- **Trigger:** at DayStart each turn there is a chance `(reputation + income
+- **Trigger:** at WeekStart each turn there is a chance `(reputation + income
   per turn)%` (capped at 15%) that a staff member applies for work. An
   applicant only targets a deployed business with a free employment slot.
 - **Presentation:** the applicant card walks on from the **left** of the
@@ -315,7 +315,7 @@ Engine functions: `resolveStaffApplicant`, `hireStaffApplicant`,
 **Dev-only cheat (CG-0MTY9PB51008OG5A):** the Settings panel's Debug Tools
 section (dev builds only) includes a **Staff Application** toggle. Turning it
 on sets `state.forcedStaffApplicant = true`, which forces the applicant
-trigger at every day start (bypassing the `min(income+rep, 15)%` RNG roll)
+trigger at every week start (bypassing the `min(income+rep, 15)%` RNG roll)
 while still requiring an eligible business with a free employment slot. The
 overlay shows the live computed chance. The flag is session-only (not
 serialized) and is suppressed in tutorial/headless runs where

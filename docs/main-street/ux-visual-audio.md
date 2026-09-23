@@ -62,16 +62,16 @@ void popTextOrIcon({
   - Phase pace: `INCOME_PHASE_GAP_MS` (default 2200ms) between phases;
     collection lands at ≈11s — **this pacing is part of the feature's
     acceptance criteria and MUST NOT be shortened** (the turn controller
-    defers the day start until the show completes, so gameplay timing is
+    defers the week start until the show completes, so gameplay timing is
     unaffected).
   - Non-blocking (AC9): VFX only — never mutates game state, the transcript,
     or the turn flow; every step is defensive and failures are swallowed so
-    the turn always advances (a throwing animator cannot stall the day).
+    the turn always advances (a throwing animator cannot stall the week).
 - Tutorial-mode helper (unchanged compact path):
   `MainStreetAnimator.animateIncomeCollection()` — the window-safe
   coin-fly-to-HUD used during the tutorial (the phased choreography is
   gated to non-tutorial play so E2E tutorial pacing is untouched, mirroring
-  the day-banner skip precedent).
+  the week-banner skip precedent).
 - SFX: per-action sounds via the scene `SoundManager` — staggered
   `SFX_KEYS.COIN_POP` (`sfx-coin-pop`) per count-out coin and per flight
   (`moveGameObject`'s `sfx.start`), and a final `SFX_KEYS.INCOME_POSITIVE`
@@ -82,8 +82,8 @@ void popTextOrIcon({
   (`scene.incomeCollectionActive === true`) the immediate HUD delta pop is
   suppressed so the final pop is the single landing feedback — the income
   sound/event routing (`income-gained` → `sfx-income-positive`) still runs.
-- Day-start deferral: the controller polls `incomeCollectionActive` on a
-  250ms cadence (with a 16s safety cap) before starting the next day, so
+- Week-start deferral: the controller polls `incomeCollectionActive` on a
+  250ms cadence (with a 16s safety cap) before starting the next week, so
   the street refresh + HUD update never cut the show short; the street
   render itself is deferred via `refreshAllExceptStreet` while the show runs.
 - Accessibility (reduced motion): the coin grids and flights are skipped;
@@ -98,11 +98,11 @@ void popTextOrIcon({
 - Reuse: `moveGameObject` + `SoundManager` + `popTextOrIcon`, `SFX_KEYS`
   (`COMMON_SFX_KEYS` convention); no new SFX keys or engine infrastructure.
 
-### Market deal-in (day-start refill / Discover / Research swap)
+### Market deal-in (week-start refill / Discover / Research swap)
 
 - Helper: `MainStreetAnimator.animateMarketDealIn()`.
 - Trigger points (`MainStreetTurnController`):
-  - `startDayPhase()` — after the final (post-prewarm) market render, the
+  - `startTurnPhase()` — after the final (post-prewarm) market render, the
     single market row deals in (CG-0MSTOATDT009BRX2 merged the two rows).
     Skipped on checkpoint resume (`skipMarketRefill`), where the saved market
     is preserved.
@@ -146,9 +146,9 @@ void popTextOrIcon({
      same for the blue reputation pips (silent). No bubbles when a delta
      is zero.
   5. The container returns to the Upcoming card centre and is destroyed;
-     the reveal's `onComplete` then chains the day start.
+     the reveal's `onComplete` then chains the week start.
 - **Blocking timing (CG-0MTW18KFK000MM3I):** the reveal now **gates** the turn
-  advance — `finishTurnPresentation` defers `startDayPhase()` until the
+  advance — `finishTurnPresentation` defers `startTurnPhase()` until the
   reveal's `onComplete` fires (flight + 550ms flip + 4000ms hold + 400ms
   return, then the existing income-show deferral or the ~800ms schedule).
   With no incident the reveal is skipped entirely and the ~800ms advance is
@@ -159,7 +159,7 @@ void popTextOrIcon({
   still has time to read the incident (producer-confirmed silent hold).
 - Tutorial exemption: the reveal (and its 4-second hold) is skipped while the
   tutorial is active, preserving the tutorial's window-safe step pacing —
-  the same precedent as the phased income show and the day banner being
+  the same precedent as the phased income show and the week banner being
   skipped during the tutorial.
 - Legacy feedback removed: the red vignette flash, the `popTextOrIcon` HUD
   loss pops and the ⚠ indicator pulse are no longer part of the reveal. The
@@ -288,11 +288,11 @@ void popTextOrIcon({
 - Reuse: `createTransferCardVisual` + `popTextOrIcon` + `SFX_KEYS.DISCARD`; no
   new engine infrastructure.
 
-### Day transition banner
+### Week transition banner
 
-- Helper: `MainStreetAnimator.animateDayBanner()`.
-- Trigger: `MainStreetTurnController.startDayPhase()` — fires
-  `animateDayBanner({ day: state.turn, week: state.week, year: state.year })` synchronously after the day-start
+- Helper: `MainStreetAnimator.animateWeekBanner()`.
+- Trigger: `MainStreetTurnController.startTurnPhase()` — fires
+  `animateWeekBanner({ turn: state.turn, week: state.week, year: state.year })` synchronously after the week-start
   refresh (the banner plays over the freshly-rendered board). Skipped on
   checkpoint resume (`skipMarketRefill` — the same week continues, not a new
   week) and while the tutorial is active (`tutorialController.isActive` —
@@ -301,7 +301,7 @@ void popTextOrIcon({
   1. A "Week W · Year Y" banner (dark rounded box + gold "Week W · Year Y" text) fades in at
      the board centre (`Back.easeOut`, ~250ms), holds (~300ms), and fades
      out (`Quad.easeIn`, ~250ms) before being destroyed (~800ms total).
-  2. A day-chime SFX plays — reused `SFX_KEYS.CLICK` (no new ToneForge
+  2. A week-chime SFX plays — reused `SFX_KEYS.CLICK` (no new ToneForge
      key; the `sfx-` prefix convention is untouched).
   3. The banner is NON-interactive (never calls `setInteractive`) at depth
      600 — above the street/market cards, below the HUD container (1000)

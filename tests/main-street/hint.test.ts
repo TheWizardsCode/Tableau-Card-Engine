@@ -13,7 +13,7 @@ import {
   setupMainStreetGame,
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import type { PlayerAction, BuyBusinessAction } from '../../example-games/main-street/MainStreetEngine';
 import {
   generateHint,
@@ -31,7 +31,7 @@ import { createBusinessDeck } from '../../example-games/main-street/MainStreetCa
 /** Create a state in MarketPhase. */
 function makeMarketState(seed: string = 'hint-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 
@@ -71,10 +71,10 @@ function actionsEqual(a: PlayerAction, b: PlayerAction): boolean {
 // ── generateHint tests ───────────────────────────────────────
 
 describe('generateHint', () => {
-  it('returns null outside MarketPhase (DayStart)', () => {
+  it('returns null outside MarketPhase (WeekStart)', () => {
     const state = setupMainStreetGame({ seed: 'phase-guard' });
-    // Phase is DayStart; do not call executeDayStart
-    expect(state.phase).toBe('DayStart');
+    // Phase is WeekStart; do not call executeWeekStart
+    expect(state.phase).toBe('WeekStart');
     const result = generateHint(state);
     expect(result).toBeNull();
   });

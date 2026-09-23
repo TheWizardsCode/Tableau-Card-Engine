@@ -36,7 +36,7 @@ import {
   GRID_SIZE,
 } from '../../example-games/main-street/MainStreetCards';
 import {
-  executeDayStart,
+  executeWeekStart,
   processEndOfTurn,
 } from '../../example-games/main-street/MainStreetEngine';
 import {
@@ -150,7 +150,7 @@ describe('MainStreet Hand State', () => {
     it('should not break existing state fields', () => {
       const state = createTestState();
       expect(state.turn).toBe(1);
-      expect(state.phase).toBe('DayStart');
+      expect(state.phase).toBe('WeekStart');
       expect(state.resourceBank.coins).toBeGreaterThan(0);
       expect(state.resourceBank.reputation).toBeGreaterThan(0);
       expect(state.streetGrid).toHaveLength(GRID_SIZE);
@@ -165,7 +165,7 @@ describe('MainStreet Hand State', () => {
       'should add card to hand and deduct coins',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = state.market.cards.find(
           c => c.cost <= state.resourceBank.coins,
@@ -190,7 +190,7 @@ describe('MainStreet Hand State', () => {
       'should reject when hand is full',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const market = await import('../../example-games/main-street/MainStreetMarket');
         const purchaseFn = (market as any).purchaseBusinessToHand ?? (market as any).buyBusinessToHand;
@@ -217,7 +217,7 @@ describe('MainStreet Hand State', () => {
 
     it('should still allow tableau placement when hand exists (empty or full)', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const card = state.market.cards.find(
         c => c.cost <= state.resourceBank.coins,
@@ -238,7 +238,7 @@ describe('MainStreet Hand State', () => {
 
     it('should reject tableau purchase when slot is occupied', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const card = state.market.cards.find(
         c => c.cost <= state.resourceBank.coins,
@@ -279,7 +279,7 @@ describe('MainStreet Hand State', () => {
       'should round-trip hand contents',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const market = await import('../../example-games/main-street/MainStreetMarket');
         const fn = (market as any).purchaseBusinessToHand ?? (market as any).buyBusinessToHand;
@@ -304,7 +304,7 @@ describe('MainStreet Hand State', () => {
 
     it('should preserve core state fields through round-trip', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const serialized = serializeMainStreetState(state);
       const restored = deserializeMainStreetState(serialized);
@@ -347,7 +347,7 @@ describe('MainStreet Hand State', () => {
 
     it('should preserve core fields when hand fields are missing', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const serialized = serializeMainStreetState(state) as any;
       delete serialized.hand;
@@ -415,7 +415,7 @@ describe('MainStreet Hand State', () => {
       'should handle hand with mixed synergy type cards',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const market = await import('../../example-games/main-street/MainStreetMarket');
         const fn = (market as any).purchaseBusinessToHand ?? (market as any).buyBusinessToHand;
@@ -443,7 +443,7 @@ describe('MainStreet Hand State', () => {
       'should persist hand cards across turns',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const market = await import('../../example-games/main-street/MainStreetMarket');
         const fn = (market as any).purchaseBusinessToHand ?? (market as any).buyBusinessToHand;

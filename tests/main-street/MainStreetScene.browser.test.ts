@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
-import { executeDayStart, endTurnHeadless } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart, endTurnHeadless } from '../../example-games/main-street/MainStreetEngine';
 import { getEventTemplates } from '../../example-games/main-street/MainStreetCards';
 import { canPurchaseBusiness, canPurchaseEvent, getEmptySlots } from '../../example-games/main-street/MainStreetMarket';
 import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../example-games/main-street/MainStreetPrefs';
@@ -109,7 +109,7 @@ describe('MainStreetScene browser tests', () => {
     // Headless turn: auto-resolves a dual-choice incident if the restarted
     // run draws one (content CG-0MTT7FC7A000AA58 ships choice events).
     endTurnHeadless(state);
-    executeDayStart(state);
+    executeWeekStart(state);
     (restarted.refreshAll as () => void)();
 
     const logContentContainer = restarted.logContentContainer as Phaser.GameObjects.Container;
@@ -331,7 +331,7 @@ describe('MainStreetScene browser tests', () => {
       // Generous coins so an affordable business always exists in the row
       // regardless of the random seed's market draw.
       state.resourceBank.coins = 2000;
-      // Same-day composite placement now incurs the +50% premium with a
+      // Same-week composite placement now incurs the +50% premium with a
       // one-time explainer dialog (CG-0MT24X0SX007RLHN) — dismiss it so
       // this test focuses on the transfer-visual mechanics.
       try { localStorage.setItem(PREMIUM_DIALOG_DISMISSED_KEY, 'true'); } catch { /* ignore */ }

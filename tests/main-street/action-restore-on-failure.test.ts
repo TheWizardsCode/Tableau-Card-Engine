@@ -232,7 +232,7 @@ describe('buy-event', () => {
   });
 });
 
-// ── play-upgrade-from-hand (same-day composite) ────────────────────
+// ── play-upgrade-from-hand (same-week composite) ────────────────────
 
 describe('play-upgrade-from-hand', () => {
   it('restores action when target business not found on street', () => {

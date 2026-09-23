@@ -1,6 +1,6 @@
 import { createSeededRng } from '../../src/core-engine';
 import { setupMainStreetGame, createCompetitiveState, seedToNumber, type MainStreetState } from './MainStreetState';
-import { executeAction, executeDayStart, executeCompetitiveDayStart, endCompetitiveMarketTurn, resolveCompetitiveClosingPhases, resolveCompetitivePendingChoice, processEndOfTurn, type PlayerAction } from './MainStreetEngine';
+import { executeAction, executeWeekStart, executeCompetitiveWeekStart, endCompetitiveMarketTurn, resolveCompetitiveClosingPhases, resolveCompetitivePendingChoice, processEndOfTurn, type PlayerAction } from './MainStreetEngine';
 import { canPurchaseEvent, getAffordableBusinessCards, getAffordableUpgradeCards, getEmptySlots } from './MainStreetMarket';
 import { GreedyStrategy, BankingGreedyStrategy, RandomStrategy, MainStreetAiPlayer, resolveAiEventChoice, bindCompetitiveSeat, restoreCompetitiveSeat, CompetitiveGreedyStrategy, type MainStreetAiStrategy } from './MainStreetAiStrategy';
 import { DIFFICULTY_NAMES } from './MainStreetDifficulty';
@@ -126,7 +126,7 @@ function chooseMarketGreedyActions(state: MainStreetState): PlayerAction[] {
  * Builds the whole turn's action list upfront, so it tracks the daily action
  * budget itself: every action it plans except `end-turn` consumes one action
  * (CG-0MSTOF1N5005PK2R / CG-0MT40HTYN008TJ6Q — `buy-upgrade` included, as the
- * headless equivalent of the same-day click composite). Once the budget is
+ * headless equivalent of the same-week click composite). Once the budget is
  * committed the planner stops, so a plan can never over-commit actions that
  * the engine would then reject.
  *
@@ -244,7 +244,7 @@ function runSeed(seed: string, maxTurns: number, strategy: MonteCarloStrategy): 
   const marketOfferSet = new Set<string>();
 
   while (state.gameResult === 'playing' && turns < maxTurns) {
-    executeDayStart(state);
+    executeWeekStart(state);
 
     // Record all card IDs currently in the market as offers for this turn.
     for (const card of state.market.cards) {
@@ -413,7 +413,7 @@ function runSeedWithDifficulty(
   const marketOfferSet = new Set<string>();
 
   while (state.gameResult === 'playing' && turns < maxTurns) {
-    executeDayStart(state);
+    executeWeekStart(state);
 
     for (const card of state.market.cards) {
       marketOfferSet.add(card.id);
@@ -683,7 +683,7 @@ function playCompetitiveMarketPhases(
   rngs: readonly (() => number)[],
   cardsOwnedByPlayer: string[][],
 ): void {
-  executeCompetitiveDayStart(state);
+  executeCompetitiveWeekStart(state);
   const n = state.players!.length;
   for (let pid = 0; pid < n; pid++) {
     state.activePlayerId = pid;

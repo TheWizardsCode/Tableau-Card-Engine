@@ -21,7 +21,7 @@ import {
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   endTurnHeadless,
   computeScore,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -54,7 +54,7 @@ function activate(state: MainStreetState, ...ids: string[]): void {
 
 function setupMarketState(seed: string): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 

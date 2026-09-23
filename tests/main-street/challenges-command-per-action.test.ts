@@ -16,7 +16,7 @@ import {
   syncResourceBankToLedger,
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { buyAndPlaceBusinessCommand } from '../../example-games/main-street/MainStreetCommands';
 import {
   CHALLENGE_TEMPLATES,
@@ -68,7 +68,7 @@ function fillStreet(state: MainStreetState, count: number): void {
 
 function setupMarketState(seed: string): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 

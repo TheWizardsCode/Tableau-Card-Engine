@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import type { PlayerAction } from '../../example-games/main-street/MainStreetEngine';
 import {
   enumerateLegalActions,
@@ -30,7 +30,7 @@ import {
 
 function createTestState(seed: string = 'ai-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 

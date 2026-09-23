@@ -23,7 +23,7 @@ import {
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   processEndOfTurn,
   executeAction,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -208,7 +208,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should increase maxHandSize when staff card is purchased',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const purchaseAPI = await hasStaffPurchaseAPI();
         if (!purchaseAPI) return;
@@ -232,7 +232,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should deduct coins when purchasing staff card',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const purchaseAPI = await hasStaffPurchaseAPI();
         if (!purchaseAPI) return;
@@ -255,7 +255,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should add staff card to active staffCards array',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const purchaseAPI = await hasStaffPurchaseAPI();
         if (!purchaseAPI) return;
@@ -276,7 +276,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
 
     it('should reject staff purchase with insufficient coins', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.resourceBank.coins = 0;
 
@@ -286,7 +286,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
 
     it('should not occupy hand slot when staff card is purchased', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Staff cards should not be in the hand
       const hand = getHand(state);
@@ -302,7 +302,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should stack hand capacity from multiple staff cards',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const purchaseAPI = await hasStaffPurchaseAPI();
         if (!purchaseAPI) return;
@@ -354,7 +354,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should deduct ongoing cost from coins each IncomePhase',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         // Set up staff cards in state directly
         if (STAFF_FEATURE_AVAILABLE) {
@@ -374,7 +374,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
 
     it('should continue game even with insufficient coins for staff costs', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Set low coins with staff active
       state.resourceBank.coins = 0;
@@ -396,7 +396,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should remove random hand cards when staff is laid off',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const layoffAPI = await hasLayoffAPI();
         if (!layoffAPI) return;
@@ -435,7 +435,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should remove all hand cards when fewer hand cards than slots to remove',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const layoffAPI = await hasLayoffAPI();
         if (!layoffAPI) return;
@@ -466,7 +466,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should remove staff card from active staffCards after layoff',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const layoffAPI = await hasLayoffAPI();
         if (!layoffAPI) return;
@@ -489,7 +489,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should decrease maxHandSize when staff is laid off',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const layoffAPI = await hasLayoffAPI();
         if (!layoffAPI) return;
@@ -514,8 +514,8 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
         const state1 = createTestState('layoff-rng-test');
         const state2 = createTestState('layoff-rng-test');
 
-        executeDayStart(state1);
-        executeDayStart(state2);
+        executeWeekStart(state1);
+        executeWeekStart(state2);
 
         const layoffAPI = await hasLayoffAPI();
         if (!layoffAPI) return;
@@ -616,7 +616,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should handle layoff with no hand cards',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const layoffAPI = await hasLayoffAPI();
         if (!layoffAPI) return;
@@ -638,7 +638,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
       'should handle multiple staff cards with different slot values',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const purchaseAPI = await hasStaffPurchaseAPI();
         if (!purchaseAPI) return;
@@ -669,7 +669,7 @@ describe('MainStreet Staff Cards & Hand Capacity', () => {
 
     it('should work alongside existing tableau placement', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Normal gameplay should still work
       const card = state.market.cards.find(

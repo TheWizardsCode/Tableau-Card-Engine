@@ -414,9 +414,9 @@ describe('Integration — competitive state validity', () => {
     expect(state.endReason).toBeNull();
   });
 
-  it('should start in DayStart phase', () => {
+  it('should start in WeekStart phase', () => {
     const state = createCompetitiveTestState('int-phase', 2);
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(1);
   });
 

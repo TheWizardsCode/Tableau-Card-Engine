@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
-import { executeDayStart, endTurnHeadless } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart, endTurnHeadless } from '../../example-games/main-street/MainStreetEngine';
 import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
 
@@ -143,8 +143,8 @@ describe('Active effect income modifier', () => {
      * Sets the phase to MarketPhase so the engine accepts the end-turn.
      */
     function advanceToEndOfTurn(): void {
-      // executeDayStart sets phase to MarketPhase
-      executeDayStart(state);
+      // executeWeekStart sets phase to MarketPhase
+      executeWeekStart(state);
     }
 
     it('decays active effects at end of turn', () => {

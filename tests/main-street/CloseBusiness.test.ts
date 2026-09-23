@@ -44,7 +44,7 @@ import {
   type CommunitySpaceCard,
 } from '../../example-games/main-street/MainStreetCards';
 import {
-  executeDayStart,
+  executeWeekStart,
   canPlaceFromHand,
 } from '../../example-games/main-street/MainStreetEngine';
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
@@ -160,7 +160,7 @@ describe('MainStreet Close Business', () => {
 
   beforeEach(() => {
     state = createTestState('close-test-' + Math.random().toString(36).slice(2, 8));
-    executeDayStart(state);
+    executeWeekStart(state);
     expect(state.phase).toBe('MarketPhase');
     expect(state.actionsRemaining).toBe(1);
   });
@@ -443,7 +443,7 @@ describe('MainStreet Close Business', () => {
         if (!card) return;
 
         // Bank 2 actions — the daily budget (actionsRemaining) is composed at
-        // DayStart from 1 base + banked; here we assert the command's single
+        // WeekStart from 1 base + banked; here we assert the command's single
         // consumeAction decrements the bankedActions counter in lock-step.
         state.bankedActions = 2;
         state.actionsRemaining = 3;

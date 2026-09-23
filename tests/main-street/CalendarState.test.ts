@@ -8,7 +8,7 @@ import {
   setupMainStreetGame,
 } from '../../example-games/main-street/MainStreetState';
 import { createSeededRng } from '../../src/core-engine/SeededRng';
-import { processEndOfTurn, executeDayStart, resolveEventChoice, finishDeferredEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
+import { processEndOfTurn, executeWeekStart, resolveEventChoice, finishDeferredEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
 
 describe('CalendarState (CG-0MTT0K9RX0004QTE / F2)', () => {
   describe('ALLOWED_START_WEEKS', () => {
@@ -155,10 +155,10 @@ describe('CalendarState (CG-0MTT0K9RX0004QTE / F2)', () => {
         resolveEventChoice(s, 'accept');
         finishDeferredEndOfTurn(s);
       }
-      // Full turn should end in DayStart (next day) when still playing.
+      // Full turn should end in WeekStart (next week) when still playing.
       if (s.gameResult === 'playing') {
-        expect(s.phase).toBe('DayStart');
-        executeDayStart(s);
+        expect(s.phase).toBe('WeekStart');
+        executeWeekStart(s);
         expect(s.phase).toBe('MarketPhase');
         // Week advanced exactly once during processEndOfTurn.
         const expectedWeek = startWeek >= 52 ? 1 : startWeek + 1;

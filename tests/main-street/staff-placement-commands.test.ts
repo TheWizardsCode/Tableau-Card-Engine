@@ -37,7 +37,7 @@ import {
   removeStaffFromBusinessCommand,
   layoffStaffCommand,
 } from '../../example-games/main-street/MainStreetCommands';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Fixtures ────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ function hire(state: MainStreetState, id: string): StaffCard {
 
 function freshState(seed = 'staff-place'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 

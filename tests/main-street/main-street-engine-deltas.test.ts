@@ -289,7 +289,7 @@ describe('processEndOfTurn (deferResourceApplication)', () => {
     expect(state.resourceBank.coins).toBe(coinsBefore + (deferred.pendingCoinDelta ?? 0));
     // Day advanced exactly once.
     expect(state.turn).toBe(turnBefore + 1);
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     expect(final.finalScore).toBeGreaterThanOrEqual(0);
   });
 

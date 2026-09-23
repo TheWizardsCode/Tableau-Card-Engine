@@ -48,8 +48,8 @@ export interface LogEntry {
  * The phases of a Main Street turn (simplified for walking skeleton).
  *
  * Single-player:
- *   DayStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
- *   EndCheck -> DayStart (next turn) | GameOver
+ *   WeekStart -> MarketPhase -> InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck
+ *   EndCheck -> WeekStart (next turn) | GameOver
  *
  * Competitive (CG-0MT5X3GMA007EG30 — Option A, shared day):
  *   MarketPhases ALTERNATE within the same shared day; the closing phases
@@ -57,7 +57,7 @@ export interface LogEntry {
  *   this is modelled as a per-day loop over PlayerRecord[] (N-player-ready;
  *   the current player is state.activePlayerId):
  *
- *            DayStart
+ *            WeekStart
  *               |
  *       +-------+--------+
  *       |   activePlayerId = 0
@@ -76,16 +76,16 @@ export interface LogEntry {
  *                          stored as state.competitiveWinnerId; N=1 uses
  *                          the existing single-player end check)
  *               |
- *           DayStart (next turn) | GameOver
+ *           WeekStart (next turn) | GameOver
  *
  * N=1 is identical to the legacy single-player sequence (one MarketPhase).
  * The shared day’s market/decks/incidentDeck remain single-owner and
  * unchanged (see createCompetitiveState). Diagrams here and in
- * MainStreetEngine.executeCompetitiveDay are the canonical reference for
+ * MainStreetEngine.executeCompetitiveTurn are the canonical reference for
  * transition tests (tests/main-street/competitive-phase.test.ts).
  */
-export type DayPhase =
-  | 'DayStart'
+export type TurnPhase =
+  | 'WeekStart'
   | 'MarketPhase'
   | 'InvestmentResolution'
   | 'IncomePhase'
@@ -93,8 +93,8 @@ export type DayPhase =
   | 'EndCheck';
 
 /** All phases in order for the PhaseManager. */
-export const PHASE_ORDER: readonly DayPhase[] = [
-  'DayStart',
+export const PHASE_ORDER: readonly TurnPhase[] = [
+  'WeekStart',
   'MarketPhase',
   'InvestmentResolution',
   'IncomePhase',
@@ -201,7 +201,7 @@ export interface MainStreetState {
   /** Current calendar year (>=1). Increments when week wraps 52→1. */
   year: number;
   /** Current phase within the turn. */
-  phase: DayPhase;
+  phase: TurnPhase;
   /**
    * The street grid — world-indexed flat array of world slots. Each street owns
    * its own ten plots, so the array is `worldSlotCount(cols,rows)` long
@@ -227,11 +227,11 @@ export interface MainStreetState {
    * save/load so the resumed turn's net is computed against the snapshot
    * taken when the turn began (CG-0MT5W7UJJ0065MEZ AC3).
    */
-  dayStartCoins: number;
+  weekStartCoins: number;
   /** Reputation at the start of the current turn (day-start snapshot). */
-  dayStartRep: number;
+  weekStartRep: number;
   /** Score at the start of the current turn (day-start snapshot). */
-  dayStartScore: number;
+  weekStartScore: number;
   /** Remaining cards in each deck (draw from end = top). */
   decks: {
     business: BusinessCard[];
@@ -303,12 +303,12 @@ export interface MainStreetState {
   soldSlots: boolean[];
   /**
    * Remaining actions the player can take this turn.
-   * Resets at DayStart to 1 + sum(actionsPerTurn for employed staff) + bankedActions.
+   * Resets at WeekStart to 1 + sum(actionsPerTurn for employed staff) + bankedActions.
    */
   actionsRemaining: number;
   /**
    * Unused base actions banked from previous days (capped at 2).
-   * Composed into the daily budget at DayStart. Staff-derived actions
+   * Composed into the daily budget at WeekStart. Staff-derived actions
    * (e.g. General Manager +1) are never banked — only the base action
    * banks each day. (CG-0MT3IOPZB005LNAR)
    */
@@ -316,7 +316,7 @@ export interface MainStreetState {
   /**
    * Staff peek gate (CG-0MSXOW6GN008ZSMN): whether the once-per-turn peek
    * at the top of the incident deck has already been used this turn.
-   * Reset to false at DayStart.
+   * Reset to false at WeekStart.
    */
   peekUsedThisTurn: boolean;
   /**
@@ -329,23 +329,23 @@ export interface MainStreetState {
   /**
    * Community Favour gate (CG-0MSTOATDQ005XDET): whether the once-per-turn
    * resource exchange has already been used this turn.
-   * Reset to false at DayStart.
+   * Reset to false at WeekStart.
    */
   favourUsedThisTurn: boolean;
   /**
-   * Same-day Investment event composite (CG-0MTFWBNL30043ZBM): ID of the
-   * event card just moved from the market to hand this day. Playing that
-   * same card later this day is free (move+play = 1 action total). Cleared
-   * at DayStart / after play / on undo.
+   * Same-week Investment event composite (CG-0MTFWBNL30043ZBM): ID of the
+   * event card just moved from the market to hand this week. Playing that
+   * same card later this week is free (move+play = 1 action total). Cleared
+   * at WeekStart / after play / on undo.
    */
   justMovedEventCardId: string | null;
   /**
-   * Tracks the upgrade card moved to hand this turn for same-day composite
+   * Tracks the upgrade card moved to hand this turn for same-week composite
    * detection (CG-0MT3IYSRL001VVUP). When an upgrade is moved to hand via
    * `move-to-hand`, this is set to its cardId; `play-upgrade-from-hand` then
    * checks if the playing card matches — if so, the action is free (no
    * additional action consumed). Cleared after the composite play or on
-   * DayStart.
+   * WeekStart.
    */
   justMovedUpgradeCardId?: string | null;
   /**
@@ -354,7 +354,7 @@ export interface MainStreetState {
    * (Grand Opening Sale) play: the event can only be played from hand on a
    * turn where a business was placed. Set to true whenever a card is
    * placed on `streetGrid` (via `purchaseBusiness`, `playBusinessFromHand`,
-   * or `buyAndPlaceBusiness`); reset to false at `DayStart`.
+   * or `buyAndPlaceBusiness`); reset to false at `WeekStart`.
    */
   businessPlacedThisTurn?: boolean;
   // ── Competitive mode (CG-0MT5X3GMA007EG30) ─────────────────
@@ -370,13 +370,13 @@ export interface MainStreetState {
   competitiveWinnerId?: number | null;
   /**
    * Pending staff applicant for the current day (CG-0MSTOATDU006UGAX).
-   * Populated during DayStart when the applicant trigger fires and a business
+   * Populated during WeekStart when the applicant trigger fires and a business
    * has a free employment slot. The scene renders the applicant overlay and
    * resolves it via hireStaffApplicant or declineStaffApplicant.
-   * Cleared on hire, decline, or at the next DayStart.
+   * Cleared on hire, decline, or at the next WeekStart.
    */
   pendingApplicant: PendingApplicant | null;
-  /** Suppresses the staff-applicant trigger at DayStart (CG-0MSTOATDU006UGAX: tutorial/headless). */
+  /** Suppresses the staff-applicant trigger at WeekStart (CG-0MSTOATDU006UGAX: tutorial/headless). */
   suppressApplicant?: boolean;
   /**
    * Dev-only: forces a staff applicant to appear every day start, bypassing
@@ -411,7 +411,7 @@ export interface MainStreetState {
 }
 
 /**
- * A staff applicant triggered at DayStart, awaiting the player's hire or
+ * A staff applicant triggered at WeekStart, awaiting the player's hire or
  * decline decision (CG-0MSTOATDU006UGAX).
  */
 export interface PendingApplicant {
@@ -440,7 +440,7 @@ export interface MainStreetSerializedState {
   turn: number;
   week: number;
   year: number;
-  phase: DayPhase;
+  phase: TurnPhase;
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[];
   /** World grid dimensions for save/load (see MainStreetState). */
   streetGridCols: number;
@@ -450,11 +450,11 @@ export interface MainStreetSerializedState {
   market: MarketState;
   resourceBank: ResourceBank;
   /** Day-start coin snapshot for the per-turn net summary row (see MainStreetState). */
-  dayStartCoins: number;
+  weekStartCoins: number;
   /** Day-start reputation snapshot for the per-turn net summary row. */
-  dayStartRep: number;
+  weekStartRep: number;
   /** Day-start score snapshot for the per-turn net summary row. */
-  dayStartScore: number;
+  weekStartScore: number;
   decks: {
     business: BusinessCard[];
     communitySpace: CommunitySpaceCard[];
@@ -524,10 +524,10 @@ export interface MainStreetSerializedState {
   revealedPeekedCard: EventCard | null;
   /** Whether the once-per-turn Community Favour exchange has been used this turn. */
   favourUsedThisTurn: boolean;
-  /** Same-day Investment event composite (CG-0MTFWBNL30043ZBM). */
+  /** Same-week Investment event composite (CG-0MTFWBNL30043ZBM). */
   justMovedEventCardId: string | null;
   /**
-   * Same-day upgrade composite tracking (CG-0MT3IYSRL001VVUP): cardId of
+   * Same-week upgrade composite tracking (CG-0MT3IYSRL001VVUP): cardId of
    * the upgrade just moved to hand this turn. `play-upgrade-from-hand`
    * checks this to decide whether the play is free.
    */

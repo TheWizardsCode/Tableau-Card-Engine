@@ -128,6 +128,11 @@ Tutorial text follows these editorial principles:
 - **Plain language:** Short sentences, common words, active voice, no jargon without explanation
 - **Consistency:** Use consistent terminology across all steps (e.g. "Coins" not "gold", "turns" not "days")
 
+> **Terminology:** One turn = one week. See
+> [Core Rules — Time and Terminology](core-rules-and-mechanics.md#11-time-and-terminology)
+> for the canonical vocabulary rule ("this week"/"next week"; the activity-log
+> header stays `Turn N`). `scripts/check-terminology-guards.sh` enforces it.
+
 ### Content rules for the 23-step two-turn flow
 
 - Do NOT mention time-limited play (the "25 turns" sentence was removed from T1).
@@ -143,19 +148,19 @@ Tutorial text follows these editorial principles:
 | 3 | T3 | Move the Laundromat to hand | action (select-business) | laundromatCard (card-level) |
 | 4 | T4 | Your Hand | confirm | hand |
 | 5 | T5 | Upcoming Incidents | confirm | incidentQueue |
-| 6 | T6 | End Turn (day 1 → 2) | action (end-turn) | endTurnButton |
+| 6 | T6 | End Turn (week 1 → 2) | action (end-turn) | endTurnButton |
 | 7 | T7 | Place the Laundromat (listed $4) | action (place-business) | streetGrid |
 | 8 | T8 | More than Businesses | confirm | investmentsRow (aliases the single market row) |
 | 9 | T9 | Buy the Local Festival | action (buy-event) | festivalCard (card-level) |
-| 10 | T10 | End this turn (day 2 → 3) | action (end-turn) | endTurnButton |
+| 10 | T10 | End this turn (week 2 → 3) | action (end-turn) | endTurnButton |
 | 11 | T11 | Move the Bookshop to hand | action (select-business) | developmentRow |
 | 12 | T12 | Costs and Reputation | confirm (informative) | developmentRow |
 | 13 | T13 | Community Favour | action (community-favour, rep→coins) | actionButtons (action bar) |
-| 14 | T14 | End this turn (day 3 → 4) | action (end-turn) | endTurnButton |
+| 14 | T14 | End this turn (week 3 → 4) | action (end-turn) | endTurnButton |
 | 15 | T15 | Place the Bookshop (listed $3) | action (place-business) | streetGrid |
-| 16 | T16 | End this turn (day 4 → 5) | action (end-turn) | endTurnButton |
+| 16 | T16 | End this turn (week 4 → 5) | action (end-turn) | endTurnButton |
 | 17 | T17 | Move the Library to hand | action (select-business) | developmentRow |
-| 18 | T18 | End this turn (day 5 → 6) | action (end-turn) | endTurnButton |
+| 18 | T18 | End this turn (week 5 → 6) | action (end-turn) | endTurnButton |
 | 19 | T19 | Build a Library next to the Bookshop (listed $7) | action (place-business + synergy) | streetGrid |
 | 20 | T20 | Triggering Events | action (play-event) | hand |
 | 21 | T21 | Success and Failure | confirm | hud (scoring bar) |
@@ -163,8 +168,8 @@ Tutorial text follows these editorial principles:
 | 23 | T23 | Tutorial Complete | confirm | completionModal |
 
 Every purchase is a **two-turn plan-ahead flow** (CG-0MT53NXGZ004H5AE): move a
-card to hand on day N (its one action), End Turn, then place it from hand on day
-N+1 at its **listed cost** (another action). No same-day composite step exists,
+card to hand in week N (its one action), End Turn, then place it from hand in week
+N+1 at its **listed cost** (another action). No same-week composite step exists,
 so no +50% premium is ever scripted. T12 (Costs and Reputation) is an
 informative step that introduces the Library's running cost vs reputation
 trade-off; the Culture synergy rule (place the Library next to the Bookshop) is
@@ -179,8 +184,8 @@ tutorial-scenario market slots, not hardcoded pixel positions.
 ### Scenario budget (Easy / 12 coins)
 
 The tutorial runs the **Easy** preset with a **12-coin starting budget**. The
-two-turn flow places each card the day after its move at **listed cost** (no
-same-day premium), so every balance stays positive (CG-0MT53NXGZ004H5AE):
+two-turn flow places each card the week after its move at **listed cost** (no
+same-week premium), so every balance stays positive (CG-0MT53NXGZ004H5AE):
 
 | Step | Action | Coins In | Coins Out | Balance |
 |------|--------|----------|-----------|---------|

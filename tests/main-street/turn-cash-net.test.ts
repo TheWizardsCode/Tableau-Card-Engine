@@ -7,8 +7,8 @@
  *
  * Core invariants (CG-0MT5W7UJJ0065MEZ + CG-0MTJP6XU5009KN5L +
  * CG-0MTR35GBC005RMZH):
- *   - Net row uses `dayStartCoins` / `dayStartRep` snapshots.
- *   - Net row = `resourceBank - dayStartSnapshot` for both coins and rep.
+ *   - Net row uses `weekStartCoins` / `weekStartRep` snapshots.
+ *   - Net row = `resourceBank - weekStartSnapshot` for both coins and rep.
  *   - Log ordering: income → costs → incident (or averted) → net row → totals.
  *   - The net row is followed by a totals line (coins/rep/score), which is the
  *     final log entry of a completed turn (including premature exits and
@@ -23,7 +23,7 @@ import {
   type LogEntry,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   processEndOfTurn,
   describeEventEffects,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -108,7 +108,7 @@ describe('Turn net row and activity log ordering', () => {
   describe('processEndOfTurn — standard turn (no incident)', () => {
     it('emits log entries in correct order: income → costs → net', () => {
       const state = createTestState('std-no-incident');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place one business (Bakery, baseIncome=2, ongoingCost=0) on the grid
       const bakery = makeBiz({ id: 'bakery-1', name: 'Bakery', baseIncome: 2, ongoingCost: 0 });
@@ -127,9 +127,9 @@ describe('Turn net row and activity log ordering', () => {
       const netEntry = state.activityLog[netIdx[0]]!;
       expect(netEntry.text).toMatch(NET_ROW_RE);
 
-      // Verify net = coins_now - dayStartCoins, rep_now - dayStartRep
-      const deltaCoins = state.resourceBank.coins - state.dayStartCoins!;
-      const deltaRep = state.resourceBank.reputation - state.dayStartRep!;
+      // Verify net = coins_now - weekStartCoins, rep_now - weekStartRep
+      const deltaCoins = state.resourceBank.coins - state.weekStartCoins!;
+      const deltaRep = state.resourceBank.reputation - state.weekStartRep!;
       expect(netEntry.text).toContain(describeEventEffects(deltaCoins, deltaRep));
 
       // Verify ordering: income before costs before net
@@ -146,7 +146,7 @@ describe('Turn net row and activity log ordering', () => {
 
     it('net row delta equals sum of all resource changes in the turn', () => {
       const state = createTestState('std-no-incident-delta');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place one business with known income
       const bakery = makeBiz({ id: 'bakery-1', name: 'Bakery', baseIncome: 3, ongoingCost: 1, reputationPerTurn: 1 });
@@ -155,16 +155,16 @@ describe('Turn net row and activity log ordering', () => {
 
       recalculateCard(state, 0);
 
-      const dayStartCoins = state.dayStartCoins!;
-      const dayStartRep = state.dayStartRep!;
+      const weekStartCoins = state.weekStartCoins!;
+      const weekStartRep = state.weekStartRep!;
 
       processEndOfTurn(state);
 
       const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
       expect(netIdx.length).toBe(1);
       const netEntry = state.activityLog[netIdx[0]]!;
-      const deltaCoins = state.resourceBank.coins - dayStartCoins;
-      const deltaRep = state.resourceBank.reputation - dayStartRep;
+      const deltaCoins = state.resourceBank.coins - weekStartCoins;
+      const deltaRep = state.resourceBank.reputation - weekStartRep;
 
       // The net row must reflect the exact deltas
       expect(netEntry.text).toContain(describeEventEffects(deltaCoins, deltaRep));
@@ -176,7 +176,7 @@ describe('Turn net row and activity log ordering', () => {
   describe('processEndOfTurn — forced incident (Noise Complaint)', () => {
     it('emits log entries in order: income → costs → incident → net', () => {
       const state = createTestState('forced-incident');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place an Arcade (baseIncome=2, ongoingCost=1, reputationPerTurn=5)
       const arcade = makeBiz({
@@ -223,7 +223,7 @@ describe('Turn net row and activity log ordering', () => {
   describe('processEndOfTurn — Risk Manager averted path', () => {
     it('emits log entries in order: income → costs → averted → net', () => {
       const state = createTestState('risk-manager-averted');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place an Arcade with known income and ongoing cost
       const arcade = makeBiz({
@@ -280,7 +280,7 @@ describe('Turn net row and activity log ordering', () => {
 
     it('net row does not include incident delta when averted', () => {
       const state = createTestState('rm-averted-no-incident-delta');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const arcade = makeBiz({
         id: 'arcade-1',
@@ -302,15 +302,15 @@ describe('Turn net row and activity log ordering', () => {
 
       recalculateCard(state, 0);
 
-      const dayStartCoins = state.dayStartCoins!;
-      const dayStartRep = state.dayStartRep!;
+      const weekStartCoins = state.weekStartCoins!;
+      const weekStartRep = state.weekStartRep!;
 
       processEndOfTurn(state);
 
       const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
       const netEntry = state.activityLog[netIdx[0]]!;
-      const deltaCoins = state.resourceBank.coins - dayStartCoins;
-      const deltaRep = state.resourceBank.reputation - dayStartRep;
+      const deltaCoins = state.resourceBank.coins - weekStartCoins;
+      const deltaRep = state.resourceBank.reputation - weekStartRep;
 
       // Net should reflect income + costs only (no incident delta)
       expect(netEntry.text).toContain(describeEventEffects(deltaCoins, deltaRep));
@@ -322,12 +322,12 @@ describe('Turn net row and activity log ordering', () => {
   describe('processEndOfTurn — premature bankruptcy exit', () => {
     it('emits net row and game-over banner; totals line is final entry', () => {
       const state = createTestState('premature-bankruptcy');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place a business that generates low income but has high ongoing cost
       // Bankruptcy requires coins < 0. We set coins to 0 and use a large
       // incident delta to push below zero (the turn header already set
-      // dayStartCoins to ~600, so we reset it to 0 after day start).
+      // weekStartCoins to ~600, so we reset it to 0 after day start).
       const arcade = makeBiz({
         id: 'arcade-1',
         name: 'Arcade',
@@ -376,7 +376,7 @@ describe('Turn net row and activity log ordering', () => {
 
     it('net row delta reflects full turn effects even on premature exit', () => {
       const state = createTestState('premature-bankruptcy-delta');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Low income, high ongoing cost — net is negative
       const arcade = makeBiz({
@@ -392,17 +392,17 @@ describe('Turn net row and activity log ordering', () => {
 
       recalculateCard(state, 0);
 
-      const dayStartCoins = state.dayStartCoins!;
+      const weekStartCoins = state.weekStartCoins!;
 
       processEndOfTurn(state);
 
       const netIdx = findLogEntries(state, e => NET_ROW_RE.test(e.text));
       const netEntry = state.activityLog[netIdx[0]]!;
-      const deltaCoins = state.resourceBank.coins - dayStartCoins;
+      const deltaCoins = state.resourceBank.coins - weekStartCoins;
 
       // Even though the turn ends prematurely, the net row should
       // correctly reflect the actual delta
-      const deltaRep = state.resourceBank.reputation - state.dayStartRep!;
+      const deltaRep = state.resourceBank.reputation - state.weekStartRep!;
       expect(netEntry.text).toContain(describeEventEffects(deltaCoins, deltaRep));
     });
   });
@@ -412,7 +412,7 @@ describe('Turn net row and activity log ordering', () => {
   describe('processEndOfTurn — rep collapse exit', () => {
     it('emits net row and game-over banner; totals line is final entry', () => {
       const state = createTestState('rep-collapse');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.incidentDeck = [];
       state.resourceBank.reputation = 0;
@@ -454,7 +454,7 @@ describe('Turn net row and activity log ordering', () => {
       state.players![1].coins = 200;
       state.resourceBank.coins = 200; // host wallet
 
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Place a business in the shared grid
       const bakery = makeBiz({
@@ -488,10 +488,10 @@ describe('Turn net row and activity log ordering', () => {
 
   // ── Snapshot integrity ───────────────────────────────────────────────────────
 
-  describe('dayStart snapshot integrity', () => {
-    it('net row uses dayStart snapshot, not current values', () => {
+  describe('weekStart snapshot integrity', () => {
+    it('net row uses weekStart snapshot, not current values', () => {
       const state = createTestState('snapshot-integrity');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const arcade = makeBiz({
         id: 'arcade-1',
@@ -505,9 +505,9 @@ describe('Turn net row and activity log ordering', () => {
 
       recalculateCard(state, 0);
 
-      // Mutate dayStartCoins AFTER snapshot to verify net uses the snapshot
-      const originalDayStartCoins = state.dayStartCoins;
-      state.dayStartCoins = 0; // corrupt snapshot
+      // Mutate weekStartCoins AFTER snapshot to verify net uses the snapshot
+      const originalWeekStartCoins = state.weekStartCoins;
+      state.weekStartCoins = 0; // corrupt snapshot
 
       processEndOfTurn(state);
 
@@ -515,11 +515,11 @@ describe('Turn net row and activity log ordering', () => {
       const netEntry = state.activityLog[netIdx[0]]!;
       // Net should use the corrupted snapshot (0), so delta = coins_now - 0 = coins_now
       const expectedDeltaCoins = state.resourceBank.coins;
-      const deltaRep = state.resourceBank.reputation - (state.dayStartRep ?? state.resourceBank.reputation);
+      const deltaRep = state.resourceBank.reputation - (state.weekStartRep ?? state.resourceBank.reputation);
       expect(netEntry.text).toContain(describeEventEffects(expectedDeltaCoins, deltaRep));
 
       // Restore
-      state.dayStartCoins = originalDayStartCoins;
+      state.weekStartCoins = originalWeekStartCoins;
     });
   });
 });

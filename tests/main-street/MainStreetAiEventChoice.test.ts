@@ -230,7 +230,7 @@ describe('resolveAiEventChoice resolves a paused sim turn', () => {
     resolveAiEventChoice(state);
 
     expect(state.pendingEventChoice).toBeNull();
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(turnBefore + 1);
     // Easy accepted → the -100 effect applied during resolution.
     expect(state.resourceBank.coins).toBe(coinsBefore - 100);
@@ -255,7 +255,7 @@ describe('resolveAiEventChoice resolves a paused sim turn', () => {
     resolveAiEventChoice(state);
 
     expect(state.pendingEventChoice).toBeNull();
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     // Reject skipped the -300 effect.
     expect(state.resourceBank.coins).toBe(coinsBefore);
   });

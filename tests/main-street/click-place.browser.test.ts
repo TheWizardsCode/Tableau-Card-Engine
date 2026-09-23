@@ -204,7 +204,7 @@ describe('MainStreet click-to-place via real pointer events (browser)', () => {
     // Plenty of coins so affordability is not a factor.
     scene.state.resourceBank.coins = 2000;
 
-    // Same-day composite buy-and-play now incurs the +50% premium with a
+    // Same-week composite buy-and-play now incurs the +50% premium with a
     // one-time explainer dialog (CG-0MT24X0SX007RLHN). Dismiss it here so
     // the regression test focuses on the pointer-pipeline fix; the dialog
     // flow itself is covered by dedicated dialog tests.

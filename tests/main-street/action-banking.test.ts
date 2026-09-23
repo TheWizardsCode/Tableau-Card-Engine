@@ -21,7 +21,7 @@ import {
 } from '../../example-games/main-street/MainStreetState';
 import {
   endTurnHeadless,
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   buyAndPlaceBusiness,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -49,10 +49,10 @@ function gmTemplate() {
 }
 
 /**
- * Advance a fresh game state through one full day: DayStart → MarketPhase.
+ * Advance a fresh game state through one full day: WeekStart → MarketPhase.
  */
-function startDay(state: ReturnType<typeof setupMainStreetGame>): void {
-  executeDayStart(state);
+function startTurn(state: ReturnType<typeof setupMainStreetGame>): void {
+  executeWeekStart(state);
 }
 
 /** A non-staff market card (staff cards cannot move to hand). */
@@ -78,14 +78,14 @@ function prepareForManyActions(state: ReturnType<typeof setupMainStreetGame>): v
 describe('AC1 · banking on end-of-turn', () => {
   it('banks all unspent actions when the player takes none (0 spent → 1 banked)', () => {
     const state = setupMainStreetGame({ seed: 'ac1-idle' });
-    startDay(state);
+    startTurn(state);
     expect(state.actionsRemaining).toBe(1);
     expect(state.bankedActions).toBe(0);
 
     endTurnHeadless(state);
 
     // Next day starts
-    startDay(state);
+    startTurn(state);
     expect(state.bankedActions).toBe(1);
     expect(state.actionsRemaining).toBe(2); // 1 base + 1 banked
   });
@@ -94,7 +94,7 @@ describe('AC1 · banking on end-of-turn', () => {
     const state = setupMainStreetGame({ seed: 'ac1-partial' });
     // Start with bank at cap
     state.bankedActions = 2;
-    startDay(state);
+    startTurn(state);
     expect(state.actionsRemaining).toBe(3); // 1 base + 2 banked
 
     // Spend 1 action
@@ -104,20 +104,20 @@ describe('AC1 · banking on end-of-turn', () => {
     expect(state.actionsRemaining).toBe(2);
 
     endTurnHeadless(state);
-    startDay(state);
+    startTurn(state);
     expect(state.bankedActions).toBe(2); // capped at 2, had 2 remaining so banked 1 more but stays at 2
   });
 
   it('banks zero when the player spends all actions', () => {
     const state = setupMainStreetGame({ seed: 'ac1-all-spent' });
-    startDay(state);
+    startTurn(state);
     state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
     expect(state.actionsRemaining).toBe(0);
 
     endTurnHeadless(state);
-    startDay(state);
+    startTurn(state);
     expect(state.bankedActions).toBe(0);
     expect(state.actionsRemaining).toBe(1);
   });
@@ -126,17 +126,17 @@ describe('AC1 · banking on end-of-turn', () => {
     const state = setupMainStreetGame({ seed: 'ac1-multi-day' });
 
     // Day 1: idle → banks 1
-    startDay(state);
+    startTurn(state);
     endTurnHeadless(state);
     expect(state.bankedActions).toBe(1);
 
     // Day 2: idle → banks 1 more → total 2
-    startDay(state);
+    startTurn(state);
     endTurnHeadless(state);
     expect(state.bankedActions).toBe(2);
 
     // Day 3: idle → at cap, no change
-    startDay(state);
+    startTurn(state);
     endTurnHeadless(state);
     expect(state.bankedActions).toBe(2);
   });
@@ -149,7 +149,7 @@ describe('AC2 · cap enforced', () => {
     const state = setupMainStreetGame({ seed: 'ac2-cap' });
 
     for (let i = 0; i < 5; i++) {
-      startDay(state);
+      startTurn(state);
       endTurnHeadless(state);
       expect(state.bankedActions).toBeLessThanOrEqual(2);
     }
@@ -159,7 +159,7 @@ describe('AC2 · cap enforced', () => {
     const state = setupMainStreetGame({ seed: 'ac2-overflow' });
     state.bankedActions = 2; // already at cap
 
-    startDay(state);
+    startTurn(state);
     expect(state.actionsRemaining).toBe(3); // 1 + 2 banked
     // Don't spend anything
     endTurnHeadless(state);
@@ -174,12 +174,12 @@ describe('AC3 · day-start composition', () => {
     const state = setupMainStreetGame({ seed: 'ac3-no-staff' });
     // Bank 2 actions first
     for (let i = 0; i < 2; i++) {
-      startDay(state);
+      startTurn(state);
       endTurnHeadless(state);
     }
     expect(state.bankedActions).toBe(2);
 
-    startDay(state);
+    startTurn(state);
     expect(state.actionsRemaining).toBe(3); // 1 base + 2 banked
   });
 
@@ -188,9 +188,9 @@ describe('AC3 · day-start composition', () => {
     state.staffCards.push({ ...gmTemplate() });
     // Manually set banked to 2 (avoiding multi-day idle which can trigger win)
     state.bankedActions = 2;
-    // Force phase to DayStart so executeDayStart works
-    state.phase = 'DayStart';
-    startDay(state);
+    // Force phase to WeekStart so executeWeekStart works
+    state.phase = 'WeekStart';
+    startTurn(state);
     expect(state.actionsRemaining).toBe(4); // 1 base + 1 GM + 2 banked
   });
 
@@ -199,8 +199,8 @@ describe('AC3 · day-start composition', () => {
     state.staffCards.push({ ...gmTemplate() });
     // Manually set banked to 2
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     expect(state.actionsRemaining).toBe(4);
 
     // Spend 2 actions — each consumes 1 from banked (floor 0)
@@ -217,7 +217,7 @@ describe('AC3 · day-start composition', () => {
 
     // bankable = min(2, 1) = 1, so banked = min(2, 0 + 1) = 1
     endTurnHeadless(state);
-    startDay(state);
+    startTurn(state);
     expect(state.bankedActions).toBe(1);
   });
 });
@@ -229,7 +229,7 @@ describe('AC4 · staff actions never bank', () => {
     const state = setupMainStreetGame({ seed: 'ac4-idle-gm' });
     state.staffCards.push({ ...gmTemplate() });
 
-    startDay(state);
+    startTurn(state);
     expect(state.actionsRemaining).toBe(2); // 1 base + 1 GM
 
     endTurnHeadless(state);
@@ -240,7 +240,7 @@ describe('AC4 · staff actions never bank', () => {
     const state = setupMainStreetGame({ seed: 'ac4-1-spent-gm' });
     state.staffCards.push({ ...gmTemplate() });
 
-    startDay(state);
+    startTurn(state);
     state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
     executeAction(state, { type: 'move-to-hand', cardId: card.id });
@@ -253,14 +253,14 @@ describe('AC4 · staff actions never bank', () => {
   it('without GM, idle banks 1; with GM idle, banks 1 (same)', () => {
     // No GM
     const noGm = setupMainStreetGame({ seed: 'ac4-no-gm-idle' });
-    startDay(noGm);
+    startTurn(noGm);
     endTurnHeadless(noGm);
     expect(noGm.bankedActions).toBe(1);
 
     // With GM
     const withGm = setupMainStreetGame({ seed: 'ac4-gm-idle' });
     withGm.staffCards.push({ ...gmTemplate() });
-    startDay(withGm);
+    startTurn(withGm);
     endTurnHeadless(withGm);
     expect(withGm.bankedActions).toBe(1);
   });
@@ -270,12 +270,12 @@ describe('AC4 · staff actions never bank', () => {
     state.staffCards.push({ ...gmTemplate() });
     // Bank 2
     for (let i = 0; i < 2; i++) {
-      startDay(state);
+      startTurn(state);
       endTurnHeadless(state);
     }
 
     // Idle again with GM
-    startDay(state);
+    startTurn(state);
     endTurnHeadless(state);
     expect(state.bankedActions).toBe(2); // stays at cap
   });
@@ -286,7 +286,7 @@ describe('AC4 · staff actions never bank', () => {
 describe('AC6 · state persistence (save/load + undo/redo)', () => {
   it('bankedActions round-trips through save/load', () => {
     const state = setupMainStreetGame({ seed: 'ac6-roundtrip' });
-    startDay(state);
+    startTurn(state);
     endTurnHeadless(state);
     expect(state.bankedActions).toBe(1);
 
@@ -308,7 +308,7 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
     const state = setupMainStreetGame({ seed: 'ac6-multi-saveload' });
 
     // Bank 1
-    startDay(state);
+    startTurn(state);
     endTurnHeadless(state);
     expect(state.bankedActions).toBe(1);
 
@@ -317,7 +317,7 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
     expect(restored1.bankedActions).toBe(1);
 
     // Bank another
-    startDay(restored1);
+    startTurn(restored1);
     endTurnHeadless(restored1);
     expect(restored1.bankedActions).toBe(2);
 
@@ -330,14 +330,14 @@ describe('AC6 · state persistence (save/load + undo/redo)', () => {
     // This tests that undo doesn't corrupt bankedActions.
     // The action command captures a snapshot including bankedActions.
     const state = setupMainStreetGame({ seed: 'ac6-undo' });
-    startDay(state);
+    startTurn(state);
 
     // Bank 1 action from previous day
     endTurnHeadless(state);
     expect(state.bankedActions).toBe(1);
 
     // New day: take and undo an action
-    startDay(state);
+    startTurn(state);
     state.resourceBank.coins = 10000;
     const card = state.market.cards[0];
 
@@ -360,7 +360,7 @@ describe('AC4 edge cases', () => {
     const state = setupMainStreetGame({ seed: 'ac4-base-only' });
 
     for (let day = 1; day <= 3; day++) {
-      startDay(state);
+      startTurn(state);
       endTurnHeadless(state);
       // Each day banks 1 base action
       expect(state.bankedActions).toBeLessThanOrEqual(day);
@@ -383,8 +383,8 @@ describe('banked consumption regressions', () => {
   it('every action-consuming operation decrements banked by 1 (floor 0)', () => {
     const state = setupMainStreetGame({ seed: 'banked-decrement' });
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     prepareForManyActions(state);
 
     expect(state.actionsRemaining).toBe(3); // 1 base + 2 banked
@@ -405,8 +405,8 @@ describe('banked consumption regressions', () => {
   it('floors at 0: taking more actions than banked never goes negative', () => {
     const state = setupMainStreetGame({ seed: 'banked-floor' });
     state.bankedActions = 1;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     prepareForManyActions(state);
 
     expect(state.actionsRemaining).toBe(2); // 1 base + 1 banked
@@ -422,8 +422,8 @@ describe('banked consumption regressions', () => {
   it('full-spend day drains the bank to 0', () => {
     const state = setupMainStreetGame({ seed: 'banked-full-spend' });
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     prepareForManyActions(state);
 
     expect(state.actionsRemaining).toBe(3);
@@ -439,7 +439,7 @@ describe('banked consumption regressions', () => {
 
     // Day-end: nothing banked (0 actions remaining), bank stays at 0
     endTurnHeadless(state);
-    startDay(state);
+    startTurn(state);
     expect(state.bankedActions).toBe(0);
     expect(state.actionsRemaining).toBe(1); // 1 base only
   });
@@ -448,8 +448,8 @@ describe('banked consumption regressions', () => {
     const state = setupMainStreetGame({ seed: 'banked-gm-drain' });
     state.staffCards.push({ ...gmTemplate() });
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     prepareForManyActions(state);
 
     expect(state.actionsRemaining).toBe(4); // 1 base + 1 GM + 2 banked
@@ -472,8 +472,8 @@ describe('banked consumption regressions', () => {
     // action still spends normally.
     const state = setupMainStreetGame({ seed: 'banked-gm-only' });
     state.staffCards.push({ ...gmTemplate() });
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     prepareForManyActions(state);
 
     expect(state.actionsRemaining).toBe(2); // 1 base + 1 GM, no banked
@@ -491,8 +491,8 @@ describe('banked consumption regressions', () => {
     expect(lookout).toBeDefined();
     state.staffCards.push({ ...lookout! });
     state.bankedActions = 1;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
 
     // Ensure incident deck non-empty so the peek is not a no-op
     expect(state.incidentDeck.length).toBeGreaterThan(0);
@@ -505,8 +505,8 @@ describe('banked consumption regressions', () => {
   it('premium buy-and-place path leaves banked untouched', () => {
     const state = setupMainStreetGame({ seed: 'banked-premium-bap' });
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
 
     state.resourceBank.coins = 100000;
     const savedBanked = state.bankedActions;
@@ -525,8 +525,8 @@ describe('banked consumption regressions', () => {
   it('premium play-from-hand path leaves banked untouched', () => {
     const state = setupMainStreetGame({ seed: 'banked-premium-pfh' });
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
 
     // Get a business into hand: move-to-hand consumes 1 action + 1 banked.
     // The premium placement then replaces the SECOND action — banked must
@@ -552,8 +552,8 @@ describe('banked consumption regressions', () => {
   it('command-layer undo/redo restores banked (move-to-hand)', () => {
     const state = setupMainStreetGame({ seed: 'banked-undo-command' });
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     prepareForManyActions(state);
 
     expect(state.actionsRemaining).toBe(3);
@@ -578,8 +578,8 @@ describe('banked consumption regressions', () => {
   it('command-layer undo restores banked for buy-and-place', () => {
     const state = setupMainStreetGame({ seed: 'banked-undo-bap' });
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     prepareForManyActions(state);
 
     const biz = state.market.cards.find(
@@ -603,8 +603,8 @@ describe('banked consumption regressions', () => {
   it('command-layer undo of premium play-from-hand keeps banked stable', () => {
     const state = setupMainStreetGame({ seed: 'banked-undo-premium-pfh' });
     state.bankedActions = 2;
-    state.phase = 'DayStart';
-    startDay(state);
+    state.phase = 'WeekStart';
+    startTurn(state);
     prepareForManyActions(state);
     state.resourceBank.coins = 100000; // fund the premium override
 

@@ -3,7 +3,7 @@
  *
  * Verifies the market deal-in animation end to end in a real Phaser scene:
  *
- * 1. Starting a new day (`startDayPhase`) refills the market and triggers
+ * 1. Starting a new day (`startTurnPhase`) refills the market and triggers
  *    `MainStreetAnimator.animateMarketDealIn` for the single market row. The
  *    rendered cards enter a "dealt" state (scale 0.6, faint) synchronously
  *    and tween back to full scale.
@@ -156,11 +156,11 @@ describe('MainStreet market deal-in animation', () => {
 
     const { calls } = spyOnMarketDealIn(scene);
 
-    // Day 2 start: executeDayStart requires the DayStart phase, then refills
+    // Day 2 start: executeWeekStart requires the WeekStart phase, then refills
     // the market row; the deal-in animation runs after the final
     // (post-prewarm) render.
-    (scene.state as { phase: string }).phase = 'DayStart';
-    (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase();
+    (scene.state as { phase: string }).phase = 'WeekStart';
+    (scene.msTurnController as unknown as { startTurnPhase: (skipMarketRefill?: boolean) => void }).startTurnPhase();
 
     // The single market row deals in, with the rendered cards captured at call time.
     await waitForCondition(() => calls.length >= 1, { label: 'deal-in call for the market row', scene });
@@ -175,7 +175,7 @@ describe('MainStreet market deal-in animation', () => {
     }
 
     // Day start can render the row more than once: a deferred boot render
-    // still in flight and the explicit `startDayPhase()` both deal the market
+    // still in flight and the explicit `startTurnPhase()` both deal the market
     // in, and each render recreates the card containers. The LAST call owns
     // the containers the player actually sees (its tween advances); an
     // earlier call's containers were replaced and stay frozen at the dealt

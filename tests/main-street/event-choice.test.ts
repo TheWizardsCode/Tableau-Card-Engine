@@ -193,8 +193,8 @@ describe('AC3 — non-choice events resolve normally', () => {
     expect(state.pendingEventChoice).toBeNull();
     expect(coins(state)).toBe(coinsBefore - 20);
     expect(result.incident).not.toBeNull();
-    // The closing completed: next day started.
-    expect(state.phase).toBe('DayStart');
+    // The closing completed: next week started.
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(2);
   });
 
@@ -266,8 +266,8 @@ describe('AC5 — a pushed chain card is the next incident drawn', () => {
     resolveEventChoice(state, 'reject'); // pushes evt-chain-worse
     const result = finishDeferredEndOfTurn(state);
     expect(result.choicePending).toBe(false);
-    // Turn advanced; the next day begins.
-    expect(state.phase).toBe('DayStart');
+    // Turn advanced; the next week begins.
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(2);
 
     // End the new market day: the escalation (chain-worse) is drawn next.
@@ -371,7 +371,7 @@ describe('AC7 — pendingEventChoice state tracks event/option/resolved', () => 
     expect(coins(restored)).toBe(restoredCoins - 50);
     finishDeferredEndOfTurn(restored);
     expect(restored.pendingEventChoice).toBeNull();
-    expect(restored.phase).toBe('DayStart');
+    expect(restored.phase).toBe('WeekStart');
   });
 });
 
@@ -388,7 +388,7 @@ describe('AC8 — processEndOfTurn defers while a choice is pending', () => {
     expect(result.choicePending).toBe(true);
     expect(result.incident).toBeNull();
     expect(state.phase).toBe('IncidentPhase'); // paused mid-closing
-    expect(state.turn).toBe(turnBefore); // EndCheck/next day did NOT run
+    expect(state.turn).toBe(turnBefore); // EndCheck/next week did NOT run
     expect(state.pendingEventChoice).not.toBeNull();
   });
 
@@ -415,7 +415,7 @@ describe('AC8 — processEndOfTurn defers while a choice is pending', () => {
     const result = finishDeferredEndOfTurn(state);
 
     expect(state.pendingEventChoice).toBeNull();
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(2);
     expect(result.choicePending).toBe(false);
     expect(result.gameResult).toBe('playing');

@@ -177,7 +177,7 @@ export function canPurchaseEvent(
   // (CG-0MTFWBNL30043ZBM). No coin check: the cost is paid when the event is
   // executed from hand (CG-0MT5W1V4D007NN8Q).
   if ((state.actionsRemaining ?? 0) <= 0) {
-    return { legal: false, reason: 'No actions remaining today. End your turn to start a new day.' };
+    return { legal: false, reason: 'No actions remaining this week. End your turn to start next week.' };
   }
 
   return { legal: true };
@@ -185,8 +185,8 @@ export function canPurchaseEvent(
 
 /**
  * Whether the Investment event at handIndex can be played this turn.
- * Same-day composite (CG-0MTFWBNL30043ZBM): playing the event just moved
- * to hand this day (justMovedEventCardId) is free; otherwise costs 1 action.
+ * Same-week composite (CG-0MTFWBNL30043ZBM): playing the event just moved
+ * to hand this week (justMovedEventCardId) is free; otherwise costs 1 action.
  */
 export function canPlayEvent(
   state: MainStreetState,
@@ -203,9 +203,9 @@ export function canPlayEvent(
   if ((card as any).trigger !== 'Investment') {
     return { legal: false, reason: 'Incident events cannot be played from hand.' };
   }
-  const isSameDay = (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
-  if (!isSameDay && (state.actionsRemaining ?? 0) <= 0) {
-    return { legal: false, reason: 'No actions remaining today. End your turn to start a new day.' };
+  const isSameWeek = (state as any).justMovedEventCardId != null && (state as any).justMovedEventCardId === card.id;
+  if (!isSameWeek && (state.actionsRemaining ?? 0) <= 0) {
+    return { legal: false, reason: 'No actions remaining this week. End your turn to start next week.' };
   }
   if (state.resourceBank.coins < card.cost) {
     return { legal: false, reason: `Not enough coins to play ${card.name} from hand. Need ${card.cost}, have ${state.resourceBank.coins}.` };
@@ -214,7 +214,7 @@ export function canPlayEvent(
   // Grand Opening Sale can only be played from hand during a turn where a
   // business was placed onto the street grid. The gate arms when any
   // placement path succeeds (purchaseBusiness / playBusinessFromHand /
-  // buyAndPlaceBusiness) and resets at DayStart.
+  // buyAndPlaceBusiness) and resets at WeekStart.
   if (String((card as any).id).startsWith('evt-grand-opening') && !(state as any).businessPlacedThisTurn) {
     return { legal: false, reason: `Grand Opening Sale can only be played on a turn where a business was placed on the street grid.` };
   }
@@ -595,7 +595,7 @@ export function buyAndPlaceUpgrade(
   // Recalculate the upgraded card's cached values
   updateNeighborsOnPlacement(state, businessIndex);
 
-  // Clear same-day composite tracker — drag-drop is not a composite path.
+  // Clear same-week composite tracker — drag-drop is not a composite path.
   state.justMovedUpgradeCardId = null;
 
   const refilled = false;
@@ -614,7 +614,7 @@ export function buyAndPlaceUpgrade(
  * hand (cost is paid at play time). The move itself costs one daily action
  * (CG-0MTFWBNL30043ZBM) and no coins. The player may execute it later
  * during the MarketPhase via `playEventFromHand` (which charges the event's
- * listed cost when it is played); a same-day move+play composite costs a
+ * listed cost when it is played); a same-week move+play composite costs a
  * single action in total (`justMovedEventCardId`).
  *
  * @param state   Current game state (mutated in-place).

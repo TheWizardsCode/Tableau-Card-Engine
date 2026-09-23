@@ -8,16 +8,16 @@
 
 import { resolveStaffApplicant } from './MainStreetEngineCommands';
 import { refillMarket, cycleMarketCards } from './MainStreetMarket';
-import type { MainStreetState, DayPhase } from './MainStreetState';
+import type { MainStreetState, TurnPhase } from './MainStreetState';
 import { PHASE_ORDER, addLog } from './MainStreetState';
 
-export function executeDayStart(state: MainStreetState, skipMarketRefill: boolean = false): void {
-  if (state.phase !== 'DayStart') {
-    throw new Error(`Expected DayStart phase, got ${state.phase}`);
+export function executeWeekStart(state: MainStreetState, skipMarketRefill: boolean = false): void {
+  if (state.phase !== 'WeekStart') {
+    throw new Error(`Expected WeekStart phase, got ${state.phase}`);
   }
 
   // Turn 1 is already set by setup; subsequent turns increment here
-  if (state.turn > 1 || state.phase === 'DayStart') {
+  if (state.turn > 1 || state.phase === 'WeekStart') {
     // Cycle market at start of each new day (after the first turn — turn 1's
     // row is already filled by setupMainStreetGame; cycling there would discard
     // fresh cards the player hasn't seen yet).
@@ -50,9 +50,9 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   // Community Favour gate (CG-0MSTOATDQ005XDET): one resource exchange per turn.
   state.favourUsedThisTurn = false;
 
-  // Same-day Investment composite (CG-0MTFWBNL30043ZBM): new day clears the tracker.
+  // Same-week Investment composite (CG-0MTFWBNL30043ZBM): new day clears the tracker.
   (state as any).justMovedEventCardId = null;
-  // Clear same-day upgrade composite tracking (CG-0MT3IYSRL001VVUP).
+  // Clear same-week upgrade composite tracking (CG-0MT3IYSRL001VVUP).
   state.justMovedUpgradeCardId = null;
   // Grand Opening placement gate (CG-0MTIOCBH400970OB): new day resets the flag.
   (state as any).businessPlacedThisTurn = false;
@@ -60,9 +60,9 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
   // Day-start snapshot for the per-turn net summary row (CG-0MT5W7UJJ0065MEZ
   // AC3): resources exactly as the player's turn begins. Persisted with the
   // save so a resumed turn's net row measures against the original snapshot.
-  state.dayStartCoins = state.resourceBank.coins;
-  state.dayStartRep = state.resourceBank.reputation;
-  state.dayStartScore = state.finalScore;
+  state.weekStartCoins = state.resourceBank.coins;
+  state.weekStartRep = state.resourceBank.reputation;
+  state.weekStartScore = state.finalScore;
 
   // Staff applicant trigger (CG-0MSTOATDU006UGAX): resolved after market
   // refill so the player sees the applicant during MarketPhase. Suppressed
@@ -76,7 +76,7 @@ export function executeDayStart(state: MainStreetState, skipMarketRefill: boolea
 
 /**
  * Advances the game to the next phase in the turn cycle.
- * After EndCheck, wraps back to DayStart (next turn).
+ * After EndCheck, wraps back to WeekStart (next turn).
  */
 export function advancePhase(state: MainStreetState): void {
   const currentIndex = PHASE_ORDER.indexOf(state.phase);
@@ -90,7 +90,7 @@ export function advancePhase(state: MainStreetState): void {
 /**
  * Sets the phase to a specific value (for internal use).
  */
-export function setPhase(state: MainStreetState, phase: DayPhase): void {
+export function setPhase(state: MainStreetState, phase: TurnPhase): void {
   state.phase = phase;
 }
 

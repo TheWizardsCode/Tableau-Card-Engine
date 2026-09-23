@@ -131,7 +131,7 @@ This script is the canonical onboarding sequence. Steps are intentionally short 
 | T2 | Resource HUD | Teach Coins, Reputation, Score at top HUD | HUD strip | Click highlighted HUD area | HUD acknowledged |
 | T3 | Market Rows | Explain Business vs Investments rows | Market panel | Click highlighted business card | Business card selected |
 | T4 | Place a Business | Teach grid placement and adjacency potential | Street grid | Place selected business in highlighted valid slot | Purchase succeeds + slot populated |
-| T5 | End Turn | Teach turn lifecycle and end-turn progression | End Turn button | Click `End Turn` | Turn advances to next day |
+| T5 | End Turn | Teach turn lifecycle and end-turn progression | End Turn button | Click `End Turn` | Turn advances to next week |
 | T6 | Incident Queue | Teach upcoming incidents and planning ahead | Incident queue | Click highlighted incident card/queue | Queue acknowledged |
 | T7 | Held Event Card | Teach event purchase + hand slot usage | Investments row + hand slot | Buy an event and keep/play as prompted | Held event exists or played |
 | T8 | Upgrade Concept | Teach upgrade path and value | Investments row + target business | Purchase/apply highlighted upgrade | Upgrade applied |
@@ -144,7 +144,7 @@ This script is the canonical onboarding sequence. Steps are intentionally short 
 - T2: "Track Coins, Reputation, and Score here. Running out of reputation or coins can end your run."
 - T3: "Businesses go on your street. Investments are upgrades and events that shape your strategy."
 - T4: "Place this business in a highlighted slot. Adjacent matching types create synergy bonuses."
-- T5: "End Turn resolves income and incidents, then starts a new market day."
+- T5: "End Turn resolves income and incidents, then starts a new market week."
 - T6: "Incidents are upcoming events. Watch this queue to plan ahead."
 - T7: "You can hold one event card and play it when timing is best."
 - T8: "Upgrades improve an existing business. Strong upgrades compound over remaining turns."
@@ -205,7 +205,7 @@ Help content should be concise, scannable, and aligned with existing panel secti
    - Adjacent matching categories yield bonuses.
    - Upgrades can increase range/value.
 4. **Turn Flow**
-   - Day start -> market actions -> end turn resolution.
+   - Week start -> market actions -> end turn resolution.
 5. **Win / Loss Conditions**
    - Win threshold / challenge completion paths.
    - Bankruptcy / reputation collapse / turn exhaustion loss states.

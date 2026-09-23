@@ -82,7 +82,7 @@ export function computeSellRefund(
  *
  * where effectiveBase = (baseIncome + incomeBonus) × (same-type adjacent ? 0.6 : 1).
  *
- * This is the same +50% premium multiplier used for same-day composite
+ * This is the same +50% premium multiplier used for same-week composite
  * and drag-and-drop placements (CG-0MT5XO7DI0066QCT).
  *
  * @param state     Current game state (mutated in-place).
@@ -234,7 +234,7 @@ export function canCloseBusiness(
   }
 
   if ((state.actionsRemaining ?? 0) <= 0) {
-    return { legal: false, reason: 'No actions remaining today. Closing costs 1 action.' };
+    return { legal: false, reason: 'No actions remaining this week. Closing costs 1 action.' };
   }
 
   return { legal: true };

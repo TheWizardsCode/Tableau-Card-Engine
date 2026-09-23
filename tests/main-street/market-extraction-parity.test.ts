@@ -31,7 +31,7 @@ import {
   getAffordableBusinessCards,
   type RefreshResult,
 } from '../../example-games/main-street/MainStreetMarket';
-import { executeDayStart, endTurnHeadless, executeAction } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart, endTurnHeadless, executeAction } from '../../example-games/main-street/MainStreetEngine';
 import {
   GRID_SIZE,
   MARKET_TOTAL_SLOTS,
@@ -310,7 +310,7 @@ describe('MarketOfferEngine — negative-path buy eligibility', () => {
   describe('canRefreshMarket — negative paths', () => {
     it('should reject refresh outside MarketPhase', () => {
       const state = createTestState();
-      state.phase = 'DayStart';
+      state.phase = 'WeekStart';
       state.resourceBank.coins = REFRESH_MARKET_COST + 10;
 
       const result = canRefreshMarket(state);
@@ -891,7 +891,7 @@ describe('MarketOfferEngine — refill policy: reshuffle from discard', () => {
 
 describe('MarketOfferEngine — multi-turn market flow parity', () => {
   function playGreedyTurn(state: MainStreetState): void {
-    executeDayStart(state);
+    executeWeekStart(state);
     const affordable = getAffordableBusinessCards(state);
     affordable.sort((a, b) => a.cost - b.cost);
     const empty = getEmptySlots(state);
@@ -904,12 +904,12 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
   }
 
   describe('purchase → end-turn → refill cycle', () => {
-    it('should refill the business market at DayStart after a purchase', () => {
+    it('should refill the business market at WeekStart after a purchase', () => {
       const state = createTestState('flow-refill-1');
       state.resourceBank.coins = 5000;
 
       // Day 1: buy a business
-      executeDayStart(state);
+      executeWeekStart(state);
       expect(state.market.cards).toHaveLength(MARKET_TOTAL_SLOTS);
       const card = state.market.cards[0];
       executeAction(state, { type: 'buy-business', cardId: card.id, slotIndex: 0 });
@@ -918,13 +918,13 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
 
       // End turn → Day 2: market should be refilled
       endTurnHeadless(state);
-      executeDayStart(state);
+      executeWeekStart(state);
       // Market should be refilled to capacity (or deck limit)
       expect(state.market.cards.length).toBeGreaterThanOrEqual(1);
       expect(state.market.cards.length).toBeLessThanOrEqual(MARKET_TOTAL_SLOTS);
     });
 
-    it('should refill the investments row at DayStart after purchasing an upgrade', () => {
+    it('should refill the investments row at WeekStart after purchasing an upgrade', () => {
       const state = createTestState('flow-refill-2');
       state.resourceBank.coins = 5000;
 
@@ -938,7 +938,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
       state.streetGrid[0] = { ...biz, level: upgrade.requiredLevel ?? 0 };
 
       // Day 1
-      executeDayStart(state);
+      executeWeekStart(state);
       const invBefore = state.market.cards.length;
       executeAction(state, { type: 'buy-upgrade', cardId: upgrade.id });
       // After purchase, investments row has one fewer card
@@ -946,7 +946,7 @@ describe('MarketOfferEngine — multi-turn market flow parity', () => {
 
       // End turn → Day 2: investments should be refilled
       endTurnHeadless(state);
-      executeDayStart(state);
+      executeWeekStart(state);
       const upgCount = state.market.cards.filter(c => c.family === 'upgrade').length;
       const evtCount = state.market.cards.filter(c => c.family === 'event').length;
       expect(upgCount).toBeGreaterThanOrEqual(0);

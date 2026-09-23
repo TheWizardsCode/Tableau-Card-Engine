@@ -80,7 +80,7 @@ describe('AC1: Tutorial setup uses scenario factory (not seed-based setupWithSee
     // State is properly initialized
     expect(state).toBeDefined();
     expect(state.turn).toBe(1);
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     expect(state.gameResult).toBe('playing');
 
     // Difficulty is Easy (same as tutorial)
@@ -293,7 +293,7 @@ describe('AC3: All 18 tutorial steps complete with scenario-based setup', () => 
 
     // After moving the Laundromat to hand (day 1) and placing it at listed
     // cost (day 2): 8 coins remaining — positive even after holding it
-    // overnight (ongoing-cost overhead).
+    // until next week (ongoing-cost overhead).
     expect(12 - 4).toBe(8);
 
     // End-turn income (~2.154 from the placed Laundromat on day 2) funds the
@@ -523,7 +523,7 @@ describe('Node unit test compatibility (AC6)', () => {
 
   it('all scenario functions are synchronous (no Phaser async dependencies)', () => {
     const state = createTutorialScenario();
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
     expect(state.turn).toBe(1);
 
     // Tutorial controller functions are also synchronous

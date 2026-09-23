@@ -329,7 +329,7 @@ async function attemptBoot(cycleNumber: number, attempt: number): Promise<Phaser
       `(resume='${resumeBtn?.text}', newGame='${newGameBtn?.text}'). ` +
       `checkpointManager exists: ${!!s.checkpointManager}. ` +
       `checkpointManager.load(): ${checkpoint === null || checkpoint === undefined ? 'none' : JSON.stringify(checkpoint)?.slice(0, 200)}. ` +
-      `saveStore exists: ${!!s.saveStore}. deferredDayBanner: ${s.deferredDayBanner}. ` +
+      `saveStore exists: ${!!s.saveStore}. deferredWeekBanner: ${s.deferredWeekBanner}. ` +
       `Display list (factory/sys): ${displayObjects}. ` +
       `This usually means the async checkAndResume → freshStartFn → show() ` +
       `chain stalled or threw silently (errors are swallowed), or the scene ` +
@@ -896,7 +896,7 @@ export async function clickEndTurn(scene: Phaser.Scene): Promise<void> {
   try { s.endTurn(); } catch (_) { /* ignore */ }
   // Wait for the end-turn processing to complete AND the day-start transition
   // to land: the tutorial step overlay advances immediately, but the 800ms
-  // delayed startDayPhase (market refill + tutorial market guarantee hook)
+  // delayed startTurnPhase (market refill + tutorial market guarantee hook)
   // runs afterwards — reading state before then sees the previous day's row.
   await pollUntil(
     () =>

@@ -129,9 +129,9 @@ describe('MainStreetState', () => {
       expect(state.turn).toBe(1);
     });
 
-    it('should start in DayStart phase', () => {
+    it('should start in WeekStart phase', () => {
       const state = createTestState();
-      expect(state.phase).toBe('DayStart');
+      expect(state.phase).toBe('WeekStart');
     });
 
     it('should create an empty street grid of GRID_SIZE slots', () => {

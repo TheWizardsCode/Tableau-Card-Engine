@@ -7,14 +7,14 @@
  * Acceptance Criteria:
  * 1. Turn-gated play — blocked when no business placed this turn; allowed when placed.
  * 2. All placement paths arm the gate — purchaseBusiness, playBusinessFromHand, buyAndPlaceBusiness.
- * 3. Gate lifecycle — resets at DayStart; persists across actions within the same turn.
+ * 3. Gate lifecycle — resets at WeekStart; persists across actions within the same turn.
  * 4. No regression — other Investment events remain un gated.
  * 5. Acquisition (moveToHand / purchaseEvent) stays free — only play is gated.
  */
 import { describe, expect, it } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import {
   canPlayEvent,
   playEventFromHand,
@@ -55,7 +55,7 @@ function setupGame(): {
   findGrandOpeningInHand: () => { handIndex: number; card: EventCard };
 } {
   const state = setupMainStreetGame({ seed: 'seed-52' });
-  executeDayStart(state);
+  executeWeekStart(state);
   // Make sure the player can afford any seeded business (Art Gallery is 1400).
   state.resourceBank.coins = 9999;
 
@@ -237,8 +237,8 @@ describe('AC2: All placement paths arm the Grand Opening gate', () => {
 
 // ── AC3: Gate lifecycle ─────────────────────────────────────────
 
-describe('AC3: Gate lifecycle — reset on DayStart, persists within turn', () => {
-  it('gate resets at DayStart (new day)', () => {
+describe('AC3: Gate lifecycle — reset on WeekStart, persists within turn', () => {
+  it('gate resets at WeekStart (new day)', () => {
     const { state, findGrandOpeningInHand } = setupGame();
 
     // Place a business → gate opens
@@ -254,9 +254,9 @@ describe('AC3: Gate lifecycle — reset on DayStart, persists within turn', () =
 
     expect(canPlayEvent(state, findGrandOpeningInHand().handIndex).legal).toBe(true);
 
-    // Advance to next day
-    state.phase = 'DayStart';
-    executeDayStart(state);
+    // Advance to next week
+    state.phase = 'WeekStart';
+    executeWeekStart(state);
 
     // Gate should now be closed again
     expect(canPlayEvent(state, findGrandOpeningInHand().handIndex).legal).toBe(false);
@@ -285,7 +285,7 @@ describe('AC3: Gate lifecycle — reset on DayStart, persists within turn', () =
 
   it('state field exists and defaults to false', () => {
     const state = setupMainStreetGame({ seed: 'default-test' });
-    executeDayStart(state);
+    executeWeekStart(state);
 
     expect((state as any).businessPlacedThisTurn).toBe(false);
   });
@@ -337,7 +337,7 @@ describe('AC4: Other Investment events remain un gated', () => {
 describe('AC5: Acquiring Grand Opening to hand is not gated', () => {
   it('moveToHand works for Grand Opening regardless of placement gate', () => {
     const state = setupMainStreetGame({ seed: 'go-acquire-test' });
-    executeDayStart(state);
+    executeWeekStart(state);
     state.resourceBank.coins = 9999;
 
     let goCard = state.market.cards.find(
@@ -365,7 +365,7 @@ describe('AC5: Acquiring Grand Opening to hand is not gated', () => {
 describe('State field defaults', () => {
   it('businessPlacedThisTurn defaults to false on fresh game', () => {
     const state = setupMainStreetGame({ seed: 'fresh-game' });
-    executeDayStart(state);
+    executeWeekStart(state);
     state.resourceBank.coins = 9999;
 
     expect((state as any).businessPlacedThisTurn).toBe(false);
@@ -390,7 +390,7 @@ describe('State field defaults', () => {
 // ── executeAction integration test ──────────────────────────────
 
 describe('executeAction integration: play-event respects the gate', () => {
-  it('executeAction returns illegal via canPlayEvent when gate is closed (same-day composite routing)', () => {
+  it('executeAction returns illegal via canPlayEvent when gate is closed (same-week composite routing)', () => {
     const { state, findGrandOpeningInHand } = setupGame();
     const { handIndex } = findGrandOpeningInHand();
 

@@ -10,7 +10,7 @@
  * Respects existing constraints:
  * - Still requires at least one eligible business with a free employment slot.
  * - Suppressed when `state.suppressApplicant` is true (tutorial/headless),
- *   because `executeDayStart()` skips `resolveStaffApplicant()` entirely.
+ *   because `executeWeekStart()` skips `resolveStaffApplicant()` entirely.
  *
  * @module @ui/debug/StaffApplicantCheatOverlay
  */

@@ -3,7 +3,7 @@ import { SaveLoadStore } from '../../src/core-engine';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import type { MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   endTurnHeadless,
   computeScore,
@@ -58,7 +58,7 @@ describe('Main Street save/load integration', () => {
     const store = new SaveLoadStore();
     const state = setupMainStreetGame({ seed: 'save-load-turn-start' });
 
-    executeDayStart(state);
+    executeWeekStart(state);
     state.resourceBank.coins = 1000;
     const card = state.market.cards.find(
       c =>
@@ -73,7 +73,7 @@ describe('Main Street save/load integration', () => {
     expect(restored).not.toBeNull();
 
     const expected = setupMainStreetGame({ seed: 'save-load-turn-start' });
-    executeDayStart(expected);
+    executeWeekStart(expected);
     expected.resourceBank.coins = 1000;
     const expectedCard = expected.market.cards.find(
       c =>
@@ -195,7 +195,7 @@ describe('Main Street save/load integration', () => {
     function playToEnd(s: MainStreetState): Snapshot[] {
       const out: Snapshot[] = [];
       while (s.gameResult === 'playing' && s.turn <= MAX_TURNS) {
-        executeDayStart(s);
+        executeWeekStart(s);
         for (const a of chooseActions(s)) {
           if (a.type === 'end-turn') break;
           try { executeAction(s, a); } catch { /* skip illegal */ }
@@ -212,7 +212,7 @@ describe('Main Street save/load integration', () => {
     // Phase 1: play N turns then save
     const stateA = setupMainStreetGame({ seed: SEED });
     for (let t = 0; t < CHECKPOINT_AFTER && stateA.gameResult === 'playing' && stateA.turn <= MAX_TURNS; t++) {
-      executeDayStart(stateA);
+      executeWeekStart(stateA);
       for (const a of chooseActions(stateA)) {
         if (a.type === 'end-turn') break;
         try { executeAction(stateA, a); } catch { /* skip */ }

@@ -140,14 +140,14 @@ function expectButtons(scene: SceneLike, undoEnabled: boolean, redoEnabled: bool
 
 /**
  * Put the scene into a playable MarketPhase with coins for the actions under
- * test. Mirrors the `executeDayStart` fallback used by
+ * test. Mirrors the `executeWeekStart` fallback used by
  * `tests/main-street/undo-redo.browser.test.ts`.
  */
 async function ensureMarketPhase(scene: SceneLike): Promise<void> {
   const state = scene.state;
-  if (state.phase === 'DayStart') {
-    const { executeDayStart } = await import('../../example-games/main-street/MainStreetEngine');
-    executeDayStart(state);
+  if (state.phase === 'WeekStart') {
+    const { executeWeekStart } = await import('../../example-games/main-street/MainStreetEngine');
+    executeWeekStart(state);
   }
   state.resourceBank.coins = 2000;
   scene.uiPhase = 'market';

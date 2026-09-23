@@ -7,11 +7,11 @@ This folder uses reusable UI helpers from `src/ui`:
 - `attachSelection` + `createSingleSelectionManager` for persistent card selection highlights
 - `runSceneTransition` helper exists in `src/ui`, but scene fades are currently disabled in Main Street
 - `MainStreetAnimator.animateMarketDealIn` for the market deal-in animation
-  (day-start refill and Discover/Research row swaps: incoming cards deal in
+  (week-start refill and Discover/Research row swaps: incoming cards deal in
   with a staggered deal SFX; outgoing row cards fade/shrink out).
   Triggered by `MainStreetTurnController` after the final market render.
 - `MainStreetAnimator.animateMarketDealIn` for the market deal-in animation
-  (day-start refill and Discover/Research row swaps: incoming cards deal in
+  (week-start refill and Discover/Research row swaps: incoming cards deal in
   with a staggered deal SFX; outgoing row cards fade/shrink out).
   Triggered by `MainStreetTurnController` after the final market render.
 
@@ -132,12 +132,12 @@ Manage dialog's Close button (only when the close command succeeded).
 - Reduced motion: demolition skipped; "Closed" pop + discard SFX retained.
 - Replay/headless: resolves immediately (presentation-only).
 
-## Day transition banner
+## Week transition banner
 
-`MainStreetAnimator.animateDayBanner({ day })` plays at each day start: a
-non-interactive "Day N" banner fades in at the board centre (~250ms), holds,
-and fades out (~800ms total) with a day-chime SFX (reused `sfx-click`).
-Triggered by `MainStreetTurnController.startDayPhase()` (including day 1);
+`MainStreetAnimator.animateWeekBanner({ turn })` plays at each week start: a
+non-interactive "Week N" banner fades in at the board centre (~250ms), holds,
+and fades out (~800ms total) with a week-chime SFX (reused `sfx-click`).
+Triggered by `MainStreetTurnController.startTurnPhase()` (including week 1);
 skipped while the tutorial is active and on checkpoint resume. It never
 intercepts pointer events, never shifts layout, and leaves the market fully
 interactive. See `docs/main-street/ux-visual-audio.md` for the design notes.

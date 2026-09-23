@@ -24,7 +24,7 @@ export function showTutorialOfferOrDeferredBanner(lmCtx: MainStreetLifecycleMana
     const shown = modal?.showIfEligible?.(tutorialOpts, legacySeen) ?? false;
     if (!shown) {
       // No modal waiting — play the deferred banner now.
-      s.playDeferredDayBanner();
+      s.playDeferredWeekBanner();
     }
     return shown;
   

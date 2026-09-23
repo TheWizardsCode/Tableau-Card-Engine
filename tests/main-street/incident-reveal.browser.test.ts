@@ -8,7 +8,7 @@
  *    triggers the new reveal: a card-back-over-face container builds,
  *    flies to board centre, hinges open (scaleX → 0), and the face stays
  *    visible for 4 seconds before the turn advances.
- * 2. The reveal **blocks** the turn advance — the next day starts only
+ * 2. The reveal **blocks** the turn advance — the next week starts only
  *    after the 4-second hold completes (new gating behaviour).
  * 3. Under reduced motion the reveal shows the card instantly (no flight,
  *    no hinge flip) but still waits 4 seconds before advancing.
@@ -139,18 +139,18 @@ describe('MainStreet incident reveal presentation', () => {
     expect(calls[0].coinChange).toBe(-3);
     expect(calls[0].repChange).toBe(0);
 
-    // The reveal gates the turn advance: the next day does NOT start
+    // The reveal gates the turn advance: the next week does NOT start
     // immediately (800ms). Instead it waits for the 4-second hold.
     // Verify that the phase does NOT return to MarketPhase within 2s
     // (which would be the old non-blocking behaviour).
     const earlyPhase = (scene.state as { phase: string }).phase;
     expect(earlyPhase).not.toBe('MarketPhase');
 
-    // After the full reveal (4s hold + return animation), the next day starts.
+    // After the full reveal (4s hold + return animation), the next week starts.
     // Bump to 10s to tolerate contention-induced RAF stalls (same as before).
     await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
       timeoutMs: 10_000,
-      label: 'next day start after reveal hold (gated)',
+      label: 'next week start after reveal hold (gated)',
     });
   }, 30_000);
 
@@ -181,7 +181,7 @@ describe('MainStreet incident reveal presentation', () => {
     // ...and the day still advances on the usual window (no 4s hold).
     await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
       timeoutMs: 5_000,
-      label: 'next day start during tutorial (reveal skipped)',
+      label: 'next week start during tutorial (reveal skipped)',
     });
   }, 30_000);
 
@@ -206,7 +206,7 @@ describe('MainStreet incident reveal presentation', () => {
     // The day should advance quickly (the ~800ms path).
     await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
       timeoutMs: 5_000,
-      label: 'next day start without incident (fast)',
+      label: 'next week start without incident (fast)',
     });
   }, 30_000);
 });

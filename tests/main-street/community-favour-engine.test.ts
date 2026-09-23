@@ -4,7 +4,7 @@
  * Covers:
  * - Legal exchange in both directions
  * - Insufficient funds rejection
- * - Once-per-turn enforcement + DayStart reset
+ * - Once-per-turn enforcement + WeekStart reset
  * - MarketPhase gating
  * - Config rates per difficulty
  * - Legacy save backfill (favourUsedThisTurn default)
@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { executeAction, executeDayStart, type PlayerAction } from '../../example-games/main-street/MainStreetEngine';
+import { executeAction, executeWeekStart, type PlayerAction } from '../../example-games/main-street/MainStreetEngine';
 import { getPreset, DIFFICULTY_PRESETS, type DifficultyName } from '../../example-games/main-street/MainStreetDifficulty';
 import { serializeMainStreetState, deserializeMainStreetState } from '../../example-games/main-street/MainStreetState';
 
@@ -23,10 +23,10 @@ function createTestState(
   seed: string = 'cf-engine-test',
 ): MainStreetState {
   const state = setupMainStreetGame({ difficulty, seed });
-  // Setup leaves the phase at DayStart; advance to MarketPhase where the
+  // Setup leaves the phase at WeekStart; advance to MarketPhase where the
   // Community Favour action is legal.
   if (state.phase !== 'MarketPhase') {
-    executeDayStart(state);
+    executeWeekStart(state);
   }
   return state;
 }
@@ -221,18 +221,18 @@ describe('Once-per-turn enforcement', () => {
     ).toThrow('You have already used Community Favour this turn.');
   });
 
-  it('allows exchange on the next day after DayStart reset', () => {
+  it('allows exchange on the next week after WeekStart reset', () => {
     const state = createTestState();
 
     executeAction(state, makeCommunityFavourAction('coins-to-rep'));
     expect(state.favourUsedThisTurn).toBe(true);
 
-    // Simulate DayStart for a new day
-    state.phase = 'DayStart';
+    // Simulate WeekStart for a new day
+    state.phase = 'WeekStart';
     state.turn = 2;
-    executeDayStart(state);
+    executeWeekStart(state);
 
-    // After DayStart, the flag should be reset
+    // After WeekStart, the flag should be reset
     expect(state.favourUsedThisTurn).toBe(false);
     expect(state.phase).toBe('MarketPhase');
 

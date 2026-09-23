@@ -10,7 +10,7 @@
  * |-------------------------------------|----------------|
  * | `MainStreetEngineTypes`             | Action payloads + result interfaces (leaf) |
  * | `MainStreetEngineScoring`           | Scores, event projection, AI choice |
- * | `MainStreetEngineDayStart`          | Day start + phase cursor |
+ * | `MainStreetEngineWeekStart`          | Day start + phase cursor |
  * | `MainStreetEngineCompetitiveTurn`   | Competitive day orchestration |
  * | `MainStreetEngineActions`           | Action dispatch + budget |
  * | `MainStreetEngineEvents`            | Event resolution |
@@ -56,18 +56,18 @@ export {
   updateScore,
 } from './MainStreetEngineScoring';
 
-// ── DayStart ─────────────────────────────────────────────
+// ── WeekStart ─────────────────────────────────────────────
 export {
   advancePhase,
-  executeDayStart,
+  executeWeekStart,
   setPhase,
-} from './MainStreetEngineDayStart';
+} from './MainStreetEngineWeekStart';
 
 // ── CompetitiveTurn ─────────────────────────────────────────────
 export {
   endCompetitiveMarketTurn,
-  executeCompetitiveDay,
-  executeCompetitiveDayStart,
+  executeCompetitiveTurn,
+  executeCompetitiveWeekStart,
   getActivePlayerId,
   resolveCompetitiveClosingPhases,
   resolveCompetitivePendingChoice,

@@ -34,8 +34,8 @@ import {
   CompetitiveGreedyStrategy,
 } from '../../example-games/main-street/MainStreetAiStrategy';
 import {
-  executeDayStart,
-  executeCompetitiveDayStart,
+  executeWeekStart,
+  executeCompetitiveWeekStart,
   endCompetitiveMarketTurn,
   executeAction,
   updateCompetitiveScores,
@@ -259,7 +259,7 @@ describe('AC2 — Competitive enumeration excludes staff actions', () => {
 
   it('single-player enumeration still offers hire-staff (unchanged)', () => {
     const single = setupMainStreetGame({ seed: 'ac2-single-staff' });
-    executeDayStart(single);
+    executeWeekStart(single);
     single.resourceBank.coins = 1000;
     single.market.cards.push(makeStaff({ id: 'staff-market', cost: 20 }));
 
@@ -291,8 +291,8 @@ describe('AC3 — Deterministic competitive replay', () => {
    * action signatures. Stops before the shared closing phases so the
    * comparison isolates the AI decision sequence.
    */
-  function playSharedMarketDay(state: MainStreetState, rng: () => number): string[] {
-    executeCompetitiveDayStart(state);
+  function playSharedMarketWeek(state: MainStreetState, rng: () => number): string[] {
+    executeCompetitiveWeekStart(state);
     const recorded: string[] = [];
     const n = state.players!.length;
 
@@ -316,7 +316,7 @@ describe('AC3 — Deterministic competitive replay', () => {
   function run(seed: string): string[] {
     const state = createCompetitiveState({ seed, playerCount: 2 });
     padWallets(state, 2000);
-    return playSharedMarketDay(state, createSeededRng(987654321));
+    return playSharedMarketWeek(state, createSeededRng(987654321));
   }
 
   it('same seed + same strategy produces identical action sequences', () => {
@@ -342,14 +342,14 @@ describe('AC3 — Deterministic competitive replay', () => {
 describe('AC4 — N=1 falls back to the legacy single-player helpers', () => {
   it('enumerateCompetitiveLegalActions(N=1) equals enumerateLegalActions', () => {
     const state = createCompetitiveState({ seed: 'ac4-enum', playerCount: 1 });
-    executeDayStart(state);
+    executeWeekStart(state);
     expect(isCompetitiveMode(state)).toBe(false);
     expect(enumerateCompetitiveLegalActions(state, 0)).toEqual(enumerateLegalActions(state));
   });
 
   it('scoreCompetitiveAction(N=1) equals scoreAction for every legal action', () => {
     const state = createCompetitiveState({ seed: 'ac4-score', playerCount: 1 });
-    executeDayStart(state);
+    executeWeekStart(state);
     const legal = enumerateLegalActions(state);
     expect(legal.length).toBeGreaterThan(0);
     for (const action of legal) {

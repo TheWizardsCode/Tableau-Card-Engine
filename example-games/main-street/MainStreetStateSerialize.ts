@@ -50,9 +50,9 @@ export function serializeMainStreetState(state: MainStreetState): MainStreetSeri
     streetCamera: { ...state.streetCamera },
     market: structuredClone(state.market),
     resourceBank: structuredClone(state.resourceBank),
-    dayStartCoins: state.dayStartCoins,
-    dayStartRep: state.dayStartRep,
-    dayStartScore: state.dayStartScore,
+    weekStartCoins: state.weekStartCoins,
+    weekStartRep: state.weekStartRep,
+    weekStartScore: state.weekStartScore,
     decks: structuredClone(state.decks),
     discards: structuredClone(state.discards),
     challengesCompleted: [...state.challengesCompleted],
@@ -385,6 +385,27 @@ function migrateSerializedState(saved: Record<string, unknown>): void {
     (saved as Record<string, unknown>).pendingEventChoice = null;
   }
 
+  // ── day → week terminology rename (CG-0MTMYIHKO001QCWL) ──
+  // Pre-rename saves serialized the phase as 'DayStart' and the turn-start
+  // resource snapshot as dayStartCoins/dayStartRep/dayStartScore. Map them to
+  // the current names so old saves keep loading (schema v1 → v2). This runs
+  // for every load and is idempotent, so it also covers callers that invoke
+  // deserializeMainStreetState() directly (tests, harnesses).
+  if ((saved as Record<string, unknown>).phase === 'DayStart') {
+    (saved as Record<string, unknown>).phase = 'WeekStart';
+  }
+  const legacyDayStartFields: ReadonlyArray<[string, string]> = [
+    ['dayStartCoins', 'weekStartCoins'],
+    ['dayStartRep', 'weekStartRep'],
+    ['dayStartScore', 'weekStartScore'],
+  ];
+  for (const [oldKey, newKey] of legacyDayStartFields) {
+    if (!(newKey in saved) && oldKey in saved) {
+      (saved as Record<string, unknown>)[newKey] = (saved as Record<string, unknown>)[oldKey];
+    }
+    delete (saved as Record<string, unknown>)[oldKey];
+  }
+
   // ── week/year (CG-0MTT0K9RX0004QTE): backfill for pre-calendar saves ─
   if (!('week' in saved)) {
     // Pre-calendar saves had no calendar; reconstruct a valid start week
@@ -522,10 +543,10 @@ export function deserializeMainStreetState(saved: MainStreetSerializedState): Ma
     // Legacy saves predate the day-start snapshot; fall back to the current
     // resources so a resumed turn's net row measures from the resume point
     // (CG-0MT5W7UJJ0065MEZ AC3).
-    dayStartCoins: saved.dayStartCoins ?? saved.resourceBank.coins,
-    dayStartRep: saved.dayStartRep ?? saved.resourceBank.reputation,
-    dayStartScore:
-      saved.dayStartScore ?? saved.finalScore ?? 0,
+    weekStartCoins: saved.weekStartCoins ?? saved.resourceBank.coins,
+    weekStartRep: saved.weekStartRep ?? saved.resourceBank.reputation,
+    weekStartScore:
+      saved.weekStartScore ?? saved.finalScore ?? 0,
     ledger: createEconomyLedger({
       coins: saved.resourceBank.coins,
       reputation: saved.resourceBank.reputation,

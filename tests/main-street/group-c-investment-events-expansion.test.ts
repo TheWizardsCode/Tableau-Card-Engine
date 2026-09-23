@@ -33,7 +33,7 @@ import {
 } from '../../example-games/main-street/MainStreetCards';
 import { validateCsvRows } from '../../src/balance-cards';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { resolveEvent, processEndOfTurn, executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { resolveEvent, processEndOfTurn, executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
 import { createSeededRng } from '../../src/core-engine';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
@@ -275,7 +275,7 @@ describe('Group C: duration expiry (AC2)', () => {
 
     // Run 4 full turns: Tourist Season expires at end of turn 3; Renovation at end of turn 4.
     for (let t = 0; t < 4; t++) {
-      executeDayStart(state);
+      executeWeekStart(state);
       processEndOfTurn(state);
     }
     // Both effects expired (removed by decay).

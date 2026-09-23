@@ -268,7 +268,7 @@ describe('Florist income rebalance (CG-0MT6EQSPW002E7RC)', () => {
 describe('Business templates never carry zero base income (CG-0MT6EQSPW002E7RC)', () => {
   it('every business template has baseIncome > 0 unless it is a documented rep-only card', () => {
     // Rep-only exception: cards that earn reputation instead of coins.
-    // Only biz-clinic today (AC3); add to the set deliberately when a new
+    // Only biz-clinic this week (AC3); add to the set deliberately when a new
     // rep-only business is introduced.
     const repOnlyBusinessIds = new Set(['biz-clinic']);
     for (const card of businessDeck) {
@@ -278,7 +278,7 @@ describe('Business templates never carry zero base income (CG-0MT6EQSPW002E7RC)'
     }
   });
 
-  it('the rep-only zero-income exception set is exactly biz-clinic today', () => {
+  it('the rep-only zero-income exception set is exactly biz-clinic this week', () => {
     const zeroIncome = businessDeck
       .filter(c => c.baseIncome <= 0)
       .map(c => c.id.replace(/-\d+$/, ''));

@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {
   endTurnHeadless,
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   type PlayerAction,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -33,7 +33,7 @@ import { hireStaffCard } from '../../example-games/main-street/MainStreetEngine'
 
 // ── Helpers ─────────────────────────────────────────────────
 
-/** Fresh setup in DayStart, ready for a day to begin. Not advanced yet. */
+/** Fresh setup in WeekStart, ready for a day to begin. Not advanced yet. */
 function setupState(seed = 'ai-budget-test'): MainStreetState {
   return setupMainStreetGame({ seed });
 }
@@ -57,17 +57,17 @@ function isActionType(a: PlayerAction): boolean {
 }
 
 /**
- * Run the game for up to `maxDays` days mirroring the Monte Carlo harness:
- * executeDayStart → choose/execute actions until end-turn → processEndOfTurn.
+ * Run the game for up to `maxWeeks` days mirroring the Monte Carlo harness:
+ * executeWeekStart → choose/execute actions until end-turn → processEndOfTurn.
  * Returns the maximum number of action-type actions executed in a single day.
  */
-function runDays(state: MainStreetState, chooseAction: (s: MainStreetState) => PlayerAction, maxDays = 100): number {
-  let maxPerDay = 0;
-  let dayGuard = 0;
+function runWeeks(state: MainStreetState, chooseAction: (s: MainStreetState) => PlayerAction, maxWeeks = 100): number {
+  let maxPerWeek = 0;
+  let weekGuard = 0;
   let actionGuard = 0;
-  while (state.gameResult === 'playing' && dayGuard < maxDays) {
-    dayGuard++;
-    executeDayStart(state);
+  while (state.gameResult === 'playing' && weekGuard < maxWeeks) {
+    weekGuard++;
+    executeWeekStart(state);
     let actionCount = 0;
     let action = chooseAction(state);
     while (action.type !== 'end-turn' && state.gameResult === 'playing') {
@@ -78,10 +78,10 @@ function runDays(state: MainStreetState, chooseAction: (s: MainStreetState) => P
       if (state.gameResult !== 'playing') break;
       action = chooseAction(state);
     }
-    maxPerDay = Math.max(maxPerDay, actionCount);
+    maxPerWeek = Math.max(maxPerWeek, actionCount);
     endTurnHeadless(state);
   }
-  return maxPerDay;
+  return maxPerWeek;
 }
 
 // ── enumerateLegalActions budget filtering ──────────────────
@@ -136,11 +136,11 @@ describe('MainStreetAiPlayer respects the action budget', () => {
   it('each day the AI executes at most 2 action-type actions (banking-aware, no GM: 1 base + up to 1 banked, cap 2 → observed max 2; CG-0MT3JMGA60091J8W)', () => {
     const state = setupState('ai-budget-day');
     const player = new MainStreetAiPlayer(GreedyStrategy, makeRng(11));
-    const maxPerDay = runDays(state, (s) => player.chooseAction(s));
+    const maxPerWeek = runWeeks(state, (s) => player.chooseAction(s));
     // Banking-aware Greedy may deliberately bank on days with no high-value
-    // spend, so the next day composes 1 base + 1 banked = 2 (cap 2 after
+    // spend, so the next week composes 1 base + 1 banked = 2 (cap 2 after
     // multiple idle days). The budget invariant still holds — just wider.
-    expect(maxPerDay).toBeLessThanOrEqual(3);
+    expect(maxPerWeek).toBeLessThanOrEqual(3);
   });
 });
 
@@ -150,13 +150,13 @@ describe('Monte Carlo-style loop respects the action cap', () => {
   it('executes at most actionsRemaining action-type actions per day', () => {
     const state = setupState('mc-budget-cap');
     // First legal action each time (end-turn only when the budget is spent).
-    const maxPerDay = runDays(state, (s) => enumerateLegalActions(s)[0]);
-    expect(maxPerDay).toBeLessThanOrEqual(1);
+    const maxPerWeek = runWeeks(state, (s) => enumerateLegalActions(s)[0]);
+    expect(maxPerWeek).toBeLessThanOrEqual(1);
   });
 
   it('hiring a General Manager allows up to 2 action-type actions per day', () => {
     const state = setupState('mc-budget-gm');
-    executeDayStart(state); // Day 1
+    executeWeekStart(state); // Day 1
     // Staff are hired from the general market row (CG-0MT3KZOBZ005IRYE);
     // if the seeded row lacks the GM, move one from the staff deck into it.
     let gm = state.market.cards.find((c: any) => c.id.startsWith('staff-general-manager'));
@@ -169,11 +169,11 @@ describe('Monte Carlo-style loop respects the action cap', () => {
     state.resourceBank.coins = 3000; // enough for the GM (cost 2000), far below the win threshold
     hireStaffCard(state, gm!.id);
     endTurnHeadless(state); // Day 1 ends
-    expect(state.phase).toBe('DayStart'); // game not ended by the hire
+    expect(state.phase).toBe('WeekStart'); // game not ended by the hire
 
     // Day 2 → GM bonus applies: 1 base + 1 GM + 1 banked (from Day 1 idle remainder)
     // Day 1: 2 actions total, 1 spent hiring GM → 1 banks → Day 2 budget = 3.
-    executeDayStart(state);
+    executeWeekStart(state);
     expect(state.actionsRemaining).toBe(3); // 1 base + 1 GM + 1 banked (CG-0MT3IOPZB005LNAR)
 
     // With the 3-action budget the AI can execute up to 3 action-type

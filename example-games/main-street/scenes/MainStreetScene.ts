@@ -46,7 +46,7 @@ import { createGameEventLogTool } from '../../../src/ui/debug/GameEventLogOverla
 import { createAiDecisionViewerTool } from '../../../src/ui/debug/AiDecisionOverlay';
 
 type UIPhase =
-  | 'idle'               // Waiting for DayStart
+  | 'idle'               // Waiting for WeekStart
   | 'market'             // Player can buy or end turn
   | 'placing-business'   // Player selected a business card, picking a slot
   | 'placing-from-hand'  // Player bought a card to hand, click a slot to place it
@@ -130,17 +130,17 @@ export class MainStreetScene extends CardGameScene {
    * to playing (skips the tutorial offer, starts the tutorial, or resumes
    * from checkpoint). Cleared after it fires exactly once.
    */
-  public deferredDayBanner = false;
+  public deferredWeekBanner = false;
 
   /**
    * Plays the deferred day-banner animation if one is pending.
-   * Clears the `deferredDayBanner` flag so it fires at most once.
+   * Clears the `deferredWeekBanner` flag so it fires at most once.
    * Safe to call when no banner is pending (no-op).
    */
-  public playDeferredDayBanner(): void {
-    if (!this.deferredDayBanner) return;
-    this.deferredDayBanner = false;
-    try { this.msAnimator?.animateDayBanner({ day: this.state?.turn ?? 1, week: this.state?.week ?? 1, year: this.state?.year ?? 1 }); } catch (_) { /* presentation-only */ }
+  public playDeferredWeekBanner(): void {
+    if (!this.deferredWeekBanner) return;
+    this.deferredWeekBanner = false;
+    try { this.msAnimator?.animateWeekBanner({ turn: this.state?.turn ?? 1, week: this.state?.week ?? 1, year: this.state?.year ?? 1 }); } catch (_) { /* presentation-only */ }
   }
 
   // Pending selection for placing a business
@@ -151,14 +151,14 @@ export class MainStreetScene extends CardGameScene {
   public pendingHandIndex: number | null = null;
 
   // True when the pending hand card was just moved from the market this turn
-  // (same-day move+place composite = 1 action). False when the card was
+  // (same-week move+place composite = 1 action). False when the card was
   // already in hand (placing then costs a second action).
   public pendingHandJustMoved: boolean = false;
 
   // ID of the hand card most recently moved from the market this turn
   // (CG-0MSXIQIPJ000NDTL). The card rests unselected in the hand; when the
   // player clicks it, pendingHandJustMoved is derived from this ID so placing
-  // the just-moved card stays free (same-day move+place = 1 action) while any
+  // the just-moved card stays free (same-week move+place = 1 action) while any
   // other held card still costs an action. Cleared on placement, cancel, new
   // day, or undo.
   public justMovedHandCardId: string | null = null;
@@ -441,8 +441,8 @@ export class MainStreetScene extends CardGameScene {
   }
 
   // ── Day flow ────────────────────────────────────────────
-  public startDayPhase(...args: any[]): any {
-    return (this.msTurnController as any).startDayPhase.apply(this.msTurnController, args);
+  public startTurnPhase(...args: any[]): any {
+    return (this.msTurnController as any).startTurnPhase.apply(this.msTurnController, args);
   }
   public endTurn(...args: any[]): any {
     return (this.msTurnController as any).endTurn.apply(this.msTurnController, args);

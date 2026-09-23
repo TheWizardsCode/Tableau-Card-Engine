@@ -34,7 +34,7 @@ import {
 } from '../../example-games/main-street/MainStreetCards';
 import { validateCsvRows } from '../../src/balance-cards';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { resolveIncident, endTurnHeadless, executeDayStart, resolveEvent } from '../../example-games/main-street/MainStreetEngine';
+import { resolveIncident, endTurnHeadless, executeWeekStart, resolveEvent } from '../../example-games/main-street/MainStreetEngine';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
 import { createSeededRng } from '../../src/core-engine';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
@@ -242,7 +242,7 @@ describe('Group D: Labor Shortage duration incident (AC3)', () => {
 
     // Run 3 full turns: the effect decays and expires at end of turn 3.
     for (let t = 0; t < 3; t++) {
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
     }
     expect(state.activeEffects).toHaveLength(0);

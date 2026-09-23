@@ -351,7 +351,7 @@ export function computeEventDeltas(
  *        receives the delta, each scaled by its OWN reputation multiplier and
  *        staff mitigation (street-wide semantics). RandomBusiness resolves
  *        deterministically to the owner of the lowest-index placed business
- *        without consuming RNG (no such cards ship in the CSV today —
+ *        without consuming RNG (no such cards ship in the CSV at present —
  *        verified — so this path is a documented fallback).
  *  - `SpecificSynergy` (both triggers): coinDelta is multiplied by the count
  *    of matching businesses OWNED by that player (per-match rule retained)

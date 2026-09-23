@@ -35,7 +35,7 @@ import {
 } from '../../example-games/main-street/MainStreetMarket';
 
 import {
-  executeDayStart,
+  executeWeekStart,
   endTurnHeadless,
   resolveEvent,
   playHeldEvent,
@@ -667,7 +667,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
   });
 
   describe('Full turn parity', () => {
-    it('executeDayStart + processEndOfTurn: ledger matches full turn economy', () => {
+    it('executeWeekStart + processEndOfTurn: ledger matches full turn economy', () => {
       const state = setupMainStreetGame({ seed: 'ledger-full-turn' });
 
       // Place a business for income
@@ -683,7 +683,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
       const coinsBefore = state.resourceBank.coins;
       const repBefore = state.resourceBank.reputation;
 
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
 
       verifyParity(state, ledger, {
@@ -709,7 +709,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
         const coinsBefore = state.resourceBank.coins;
         const repBefore = state.resourceBank.reputation;
 
-        executeDayStart(state);
+        executeWeekStart(state);
         endTurnHeadless(state);
 
         ledger.apply({
@@ -749,7 +749,7 @@ describe('EconomyLedger — Main Street integration parity', () => {
       state.streetGrid.fill(null);
       state.streetGrid[0] = { ...state.decks.business[0] };
       state.resourceBank.coins = 5000;
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
 
       // Compute score the Main Street way
@@ -773,9 +773,9 @@ describe('EconomyLedger — Main Street integration parity', () => {
       state.streetGrid[0] = { ...state.decks.business[0] };
       state.streetGrid[1] = { ...state.decks.business[1] };
       state.resourceBank.coins = 5000;
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
 
       // Call the actual computeScore function

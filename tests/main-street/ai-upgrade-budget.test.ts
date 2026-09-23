@@ -6,8 +6,8 @@
  *
  * - taking an upgrade to hand costs one daily action (it is applied for
  *   free the same day, or for one action when held from a previous day);
- * - `buy-upgrade` is the headless equivalent of the same-day click
- *   composite (move-to-hand + free same-day apply): one action, listed cost;
+ * - `buy-upgrade` is the headless equivalent of the same-week click
+ *   composite (move-to-hand + free same-week apply): one action, listed cost;
  * - no upgrade action is proposed or chosen once the daily budget is spent.
  *
  * These tests assert the observable decision output (`enumerateLegalActions`,
@@ -23,7 +23,7 @@ import {
   setupMainStreetGame,
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
-import { executeAction, executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeAction, executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import type { PlayerAction } from '../../example-games/main-street/MainStreetEngine';
 import { enumerateLegalActions, GreedyStrategy } from '../../example-games/main-street/MainStreetAiStrategy';
 import type { BusinessCard, UpgradeCard } from '../../example-games/main-street/MainStreetCards';
@@ -92,7 +92,7 @@ function makeUpgradeState(seed = 'ai-upg-budget'): {
   upgrade: UpgradeCard;
 } {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   state.phase = 'MarketPhase';
 
   const biz = makeBusiness('biz-diner', 'Diner', 400);
@@ -217,7 +217,7 @@ describe('AI upgrade choice respects the budget and prefers the free composite',
     expect(action.type).toBe('end-turn');
   });
 
-  it('prefers a free same-day composite upgrade over an action-costing one', () => {
+  it('prefers a free same-week composite upgrade over an action-costing one', () => {
     const { state, upgrade } = makeUpgradeState();
     // The upgrade is in hand and was moved there this turn → applying it is
     // free, so the AI must take the free gain before spending its action.
@@ -248,7 +248,7 @@ describe('AI upgrade choice respects the budget and prefers the free composite',
     expect(state.actionsRemaining).toBe(0);
   });
 
-  it('does not spend a second action on the same-day composite play', () => {
+  it('does not spend a second action on the same-week composite play', () => {
     const { state, upgrade } = makeUpgradeState();
     state.hand = [upgrade];
     state.market.cards = [makeUpgrade('upg-market', 200, 'Diner', 0)];

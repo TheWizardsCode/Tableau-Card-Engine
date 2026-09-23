@@ -291,14 +291,14 @@ export const DIFFICULTY_NAMES: readonly DifficultyName[] = ['Easy', 'Medium', 'H
 // ── Reputation-based Coin Multiplier ────────────────────────
 //
 // Canonical turn-economy formula (single source; CG-0MTINZ5GG007BH44, Q1=c):
-//   dayStart snapshot (dayStartCoins/dayStartRep at DayStart)
+//   weekStart snapshot (weekStartCoins/weekStartRep at WeekStart)
 //     → placement deductions (buy/place costs at market time)
 //     → applyIncome breakdown (staff buffs → income-multiplier effects
 //       → rep multiplier sampled AFTER income's own rep accrual;
 //       hand cards contribute no income — CG-0MTRDX0DN004EECN)
 //     → ongoing costs (applyBusinessOngoingCosts, after income, before incident)
 //     → incident (resolveIncident; Risk-Manager averted emits explicit log per Q3)
-//     → net row (appendTurnNetRow = coinsNow-dayStartCoins / repNow-dayStartRep)
+//     → net row (appendTurnNetRow = coinsNow-weekStartCoins / repNow-weekStartRep)
 // Q1=c: reputation for the multiplier is sampled AFTER applyIncome has credited
 // rep-per-turn (clinic/staff/rep-multiplier), so tooltip and engine agree.
 // See MainStreetAdjacency.applyIncome and MainStreetHudTooltips.buildCoinsTooltip.

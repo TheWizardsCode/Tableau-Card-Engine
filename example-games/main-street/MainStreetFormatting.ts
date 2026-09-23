@@ -180,9 +180,9 @@ export function buildCardTooltipInfo(
     }
     case 'upgrade': {
       const u = card;
-      const noActions = options.noActionsRemaining ? '\nNo actions remaining today — end your turn.' : '';
+      const noActions = options.noActionsRemaining ? '\nNo actions remaining this week — end your turn.' : '';
       // CG-0MT3IYSRL001VVUP: upgrades follow the business-card economy — the
-      // market click moves the card to hand (1 action; same-day apply is a
+      // market click moves the card to hand (1 action; same-week apply is a
       // free composite, a held apply costs 1 action); dragging it onto a
       // business buys-and-applies immediately at the +50% premium.
       return `Upgrade: ${u.name}\nCost: ${formatCurrency(u.cost)}\nClick: move to hand (1 action)\nDrag: buy & apply now (+50%)\nApplies to: ${u.targetBusiness}\nIncome Bonus: +${u.incomeBonus}\nRequires: Lv${u.requiredLevel ?? 0}\n${u.description ?? ''}${noActions}`;
@@ -201,7 +201,7 @@ export function buildCardTooltipInfo(
       if ((st.reputationPerTurn ?? 0) > 0) lines.push(`Reputation: +${st.reputationPerTurn}/turn`);
       if ((st.refreshCostDiscount ?? 0) > 0) lines.push(`Refresh discount: -${st.refreshCostDiscount} per refresh`);
       if ((st.taxAuditRate ?? 0) > 0) lines.push(`Tax Audit: losses reduced to ${Math.round((st.taxAuditRate ?? 0) * 100)}%`);
-      if ((st.actionsPerTurn ?? 0) > 0) lines.push(`Actions: +${st.actionsPerTurn}/day`);
+      if ((st.actionsPerTurn ?? 0) > 0) lines.push(`Actions: +${st.actionsPerTurn}/week`);
       if (st.peekOncePerTurn) lines.push('Ability: peek the incident deck once per turn');
       // Specialization skills (CG-0MT1CIWSD003VBPK): the applicant card's
       // locked skill set (1-3 skills incl. the Town Gossip baseline). Legacy

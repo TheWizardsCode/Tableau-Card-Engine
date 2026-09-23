@@ -22,7 +22,7 @@ As a game designer, I want The Build's AI behaviour and player assistance system
 
 ## Banking-Aware Action Hoarding (CG-0MT3JMGA60091J8W — Action Banking)
 
-Since the action-banking mechanic (see `action-banking.test.ts`, `ai-banking-strategy.test.ts`) lets unused base actions persist across days (capped at 2), the AI should consider **banking** as a strategic option alongside spending. Without banking awareness the AI flushes every action each day, forfeiting its hoarded reserve and leaving banking as a human-only feature.
+Since the action-banking mechanic (see `action-banking.test.ts`, `ai-banking-strategy.test.ts`) lets unused base actions persist across weeks (capped at 2), the AI should consider **banking** as a strategic option alongside spending. Without banking awareness the AI flushes every action each week, forfeiting its hoarded reserve and leaving banking as a human-only feature.
 
 ### Additive strategy split (AC1)
 
@@ -64,7 +64,7 @@ Tuning table must stay in sync with `BANKING_DIFFICULTY_PROFILES` in `MainStreet
 
 ### Decision (AC2)
 
-At the top of `BankingGreedyStrategy.chooseAction` (after free same-day composite plays, which consume no action), `scoreBankOption(state)` is compared against the best `scoreAction` across all non-`end-turn` spends. When the bank value **exceeds** the best spend, the AI deliberately returns `end-turn` with actions remaining — the engine's `processEndOfTurn` then banks the unused portion. Otherwise it delegates to the pure greedy chain.
+At the top of `BankingGreedyStrategy.chooseAction` (after free same-week composite plays, which consume no action), `scoreBankOption(state)` is compared against the best `scoreAction` across all non-`end-turn` spends. When the bank value **exceeds** the best spend, the AI deliberately returns `end-turn` with actions remaining — the engine's `processEndOfTurn` then banks the unused portion. Otherwise it delegates to the pure greedy chain.
 
 ### Guarantees
 

@@ -32,7 +32,7 @@ import {
 import {
   applyCompetitiveOngoingCosts,
   applyCompetitiveEventEffects,
-  executeCompetitiveDay,
+  executeCompetitiveTurn,
   executeFullTurn,
   resolveCompetitivePendingChoice,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -397,7 +397,7 @@ describe('AC2 — Shared event/incident per-owner routing (CG-0MTIIL6J200291ZQ)'
 // ── AC3: Deterministic replay ────────────────────────────────────
 
 describe('AC3 — Deterministic replay of per-owner routing (CG-0MTIIL6J200291ZQ)', () => {
-  function runTwoDays(seed: string) {
+  function runTwoWeeks(seed: string) {
     const state = compState(seed);
     // Give players a modest starting wallet so first-to-threshold never fires
     // within two days (winThreshold 10000; ~200-500/day incomes).
@@ -407,14 +407,14 @@ describe('AC3 — Deterministic replay of per-owner routing (CG-0MTIIL6J200291ZQ
     place(state, makeBiz({ id: 'biz-b', baseIncome: 180, synergyTypes: ['Food'] }), 1, 0);
     place(state, makeBiz({ id: 'biz-c', baseIncome: 200, synergyTypes: ['Culture'] }), 6, 1);
 
-    executeCompetitiveDay(state, [[], []]);
+    executeCompetitiveTurn(state, [[], []]);
     // A dual-choice incident pauses the closing at IncidentPhase; resolve it
     // via the deterministic AI policy so the day completes (CG-0MTSHG8RP008E128).
     if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
       resolveCompetitivePendingChoice(state);
     }
     const day1 = state.players!.map(p => ({ coins: p.coins, reputation: p.reputation, score: p.score }));
-    executeCompetitiveDay(state, [[], []]);
+    executeCompetitiveTurn(state, [[], []]);
     if (state.pendingEventChoice && !state.pendingEventChoice.resolved) {
       resolveCompetitivePendingChoice(state);
     }
@@ -423,8 +423,8 @@ describe('AC3 — Deterministic replay of per-owner routing (CG-0MTIIL6J200291ZQ
   }
 
   it('same seed → identical per-owner sequences across independent runs', () => {
-    const a = runTwoDays('replay42');
-    const b = runTwoDays('replay42');
+    const a = runTwoWeeks('replay42');
+    const b = runTwoWeeks('replay42');
     expect(a.state.gameResult).toBe('playing');
     expect(a.day1).toEqual(b.day1);
     expect(a.day2).toEqual(b.day2);
@@ -434,8 +434,8 @@ describe('AC3 — Deterministic replay of per-owner routing (CG-0MTIIL6J200291ZQ
   });
 
   it('different seeds diverge (seed drives deck/incident order)', () => {
-    const a = runTwoDays('replay-aaaa');
-    const b = runTwoDays('replay-bbbb');
+    const a = runTwoWeeks('replay-aaaa');
+    const b = runTwoWeeks('replay-bbbb');
     // Both runs are valid continuous games.
     expect(a.state.gameResult).toBe('playing');
     expect(b.state.gameResult).toBe('playing');
@@ -466,7 +466,7 @@ describe('AC4 — N=1 regression (CG-0MTIIL6J200291ZQ)', () => {
     updateNeighborsOnPlacement(comp, 0);
 
     const singleResult = executeFullTurn(single, []);
-    const compResult = executeCompetitiveDay(comp, [[]]);
+    const compResult = executeCompetitiveTurn(comp, [[]]);
 
     // Identical host-wallet economics and turn results.
     expect(compResult.income?.total).toBe(singleResult.income?.total);

@@ -7,13 +7,13 @@
  *
  * 1. Ending a turn when the drawn incident has `hasChoices` pauses the
  *    closing (choicePending) and presents the Accept/Reject dialog instead
- *    of starting the next day. The dialog shows the event name, an Accept
+ *    of starting the next week. The dialog shows the event name, an Accept
  *    button labelled "<event name> (Accept)", and a bare "Reject" button —
  *    all parented into the HUD container (overlay pattern compliance).
  * 2. Accept applies the event's effect, clears the pending choice, and the
- *    deferred closing advances to the next day.
+ *    deferred closing advances to the next week.
  * 3. Reject refuses the effect (resources unchanged), clears the pending
- *    choice, and the deferred closing advances to the next day.
+ *    choice, and the deferred closing advances to the next week.
  *
  * @module tests/main-street/event-choice-dialog-slice.browser
  */
@@ -123,7 +123,7 @@ describe('Main Street dual-choice event dialog (UI slice)', () => {
     (scene.msTurnController as unknown as { endTurn: () => void }).endTurn();
 
     // The closing pauses (choicePending): the dialog appears instead of the
-    // next day starting. Wait for the Accept label in the HUD container.
+    // next week starting. Wait for the Accept label in the HUD container.
     await waitForCondition(
       () => Boolean(findText(scene, 'Power Outage (Accept)') && findText(scene, 'Reject')),
       { timeoutMs: 12_000, label: 'event choice dialog buttons' },
@@ -138,7 +138,7 @@ describe('Main Street dual-choice event dialog (UI slice)', () => {
     expect(rejectBtn.input?.enabled).toBe(true);
 
     // Engine pause state: the incident is pending and the turn has not
-    // advanced (deferred closing — EndCheck/next day have not run).
+    // advanced (deferred closing — EndCheck/next week have not run).
     const pending = sceneState(scene).pendingEventChoice;
     expect(pending).not.toBeNull();
     expect(pending.resolved).toBe(false);
@@ -170,7 +170,7 @@ describe('Main Street dual-choice event dialog (UI slice)', () => {
     await waitForCondition(() => {
       const st = sceneState(scene);
       return st.pendingEventChoice === null && st.phase === 'MarketPhase' && st.turn === turnBefore + 1;
-    }, { timeoutMs: 15_000, label: 'accept resolution + next day' });
+    }, { timeoutMs: 15_000, label: 'accept resolution + next week' });
 
     expect(sceneState(scene).resourceBank.coins).toBe(coinsBefore - 50);
   }, 30_000);
@@ -196,7 +196,7 @@ describe('Main Street dual-choice event dialog (UI slice)', () => {
     await waitForCondition(() => {
       const st = sceneState(scene);
       return st.pendingEventChoice === null && st.phase === 'MarketPhase' && st.turn === turnBefore + 1;
-    }, { timeoutMs: 15_000, label: 'reject resolution + next day' });
+    }, { timeoutMs: 15_000, label: 'reject resolution + next week' });
 
     // Reject = refuse the consequence: no coins changed.
     expect(sceneState(scene).resourceBank.coins).toBe(coinsBefore);

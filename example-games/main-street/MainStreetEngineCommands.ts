@@ -26,7 +26,7 @@ import { addLog, describeEventEffects, classifyEffect } from './MainStreetState'
  * @param handIndex   Index of the card in state.hand to place.
  * @param slotIndex   Target street grid slot (0-based, must be empty).
  * @param premiumCost Optional premium price to charge instead of the listed
- *                    `card.cost` (same-day composite buy-and-play when no
+ *                    `card.cost` (same-week composite buy-and-play when no
  *                    action is available — CG-0MT24X0SX007RLHN). When absent,
  *                    the listed cost is charged (held-card / plan-ahead path).
  * @throws Error if the hand index is invalid, slot is occupied, or coins insufficient.
@@ -63,7 +63,7 @@ export function placeFromHand(
 
   // Cost-at-play (CG-0MSTOATDT009BRX2): moving a card to hand is free, but
   // placing it on the street pays its listed cost (or the optional premium
-  // price for same-day composite buy-and-play when no action is available,
+  // price for same-week composite buy-and-play when no action is available,
   // CG-0MSTOF1N5005PK2R / CG-0MT24X0SX007RLHN).
   const price = premiumCost ?? card.cost;
   if (state.resourceBank.coins < price) {
@@ -181,13 +181,13 @@ export function sellFromTableau(
  *
  * Validates hand bounds, slot bounds, slot occupancy, and coin sufficiency
  * (a card can only be placed if the player can afford its purchase price —
- * or the optional premium price for same-day composite buy-and-play).
+ * or the optional premium price for same-week composite buy-and-play).
  *
  * @param state      Current game state (read-only).
  * @param handIndex  Index of the card in state.hand to place.
  * @param slotIndex  Target street grid slot (0-based, must be empty).
  * @param premiumCost Optional premium price to check affordability against
- *                    instead of the listed `card.cost` (same-day composite
+ *                    instead of the listed `card.cost` (same-week composite
  *                    premium path — CG-0MT24X0SX007RLHN).
  * @returns LegalityResult — `{ legal: true }` if valid, otherwise
  *          `{ legal: false, reason }` describing the violation.
@@ -594,7 +594,7 @@ export function applyCompetitiveOngoingCosts(state: MainStreetState): void {
     const player = state.players[ownerId];
     if (!player) continue;
     // Street-wide Cost Cutter reduction from the shared (host) staff set:
-    // staff hiring is single-wallet today (outside this leaf's scope), so the
+    // staff hiring is single-wallet at present (outside this leaf's scope), so the
     // per-slot reduction stays consistent with the shared income/cost paths.
     const totalCost = roundInt(rawCost * (1 - hostReduction));
     if (totalCost <= 0) continue;

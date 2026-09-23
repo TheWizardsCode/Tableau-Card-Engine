@@ -844,14 +844,14 @@ describe('Meta-Progression System', () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  // US-5: CAMPAIGN PERSISTENCE ROUND-TRIP (SCHEMA V2, V1→V2 MIGRATION)
+  // US-5: CAMPAIGN PERSISTENCE ROUND-TRIP (SCHEMA V3, V1→V3 MIGRATION)
   // ────────────────────────────────────────────────────────────
 
   describe('US-5: Campaign persistence round-trip', () => {
-    it('createDefaultCampaignProgress returns schema version 2', () => {
+    it('createDefaultCampaignProgress returns the current schema version', () => {
       const campaign = createDefaultCampaignProgress();
       expect(campaign.schemaVersion).toBe(MAIN_STREET_CAMPAIGN_SCHEMA_VERSION);
-      expect(campaign.schemaVersion).toBe(2);
+      expect(campaign.schemaVersion).toBe(3);
     });
 
     it('default campaign has tier-1 unlocked with all 16 tier-1 card IDs', () => {
@@ -878,7 +878,7 @@ describe('Meta-Progression System', () => {
       const loaded = await loadCampaignProgress(store);
 
       expect(loaded).not.toBeNull();
-      expect(loaded!.schemaVersion).toBe(2);
+      expect(loaded!.schemaVersion).toBe(3);
       expect(loaded!.unlockedTiers).toEqual(['tier-1', 'tier-2']);
       expect(loaded!.unlockedCardIds).toEqual(campaign.unlockedCardIds);
       expect(loaded!.totalRuns).toBe(5);
@@ -887,7 +887,7 @@ describe('Meta-Progression System', () => {
       expect(loaded!.persistentReputation).toBe(700);
     });
 
-    it('v1 campaign data is migrated to v2 on load', () => {
+    it('v1 campaign data is migrated to the current version on load', () => {
       // Simulate v1 data (no schemaVersion, no unlockedCardIds, no milestoneHistory)
       const v1Data = {
         unlockedTiers: ['tier-1', 'tier-2'],
@@ -900,7 +900,7 @@ describe('Meta-Progression System', () => {
 
       const migrated = mainStreetCampaignSerializer.deserialize(v1Data);
 
-      expect(migrated.schemaVersion).toBe(2);
+      expect(migrated.schemaVersion).toBe(3);
       expect(migrated.unlockedCardIds).toEqual(
         deriveUnlockedCardIds(['tier-1', 'tier-2']),
       );
@@ -923,7 +923,7 @@ describe('Meta-Progression System', () => {
 
       const migrated = mainStreetCampaignSerializer.deserialize(v1Data);
 
-      expect(migrated.schemaVersion).toBe(2);
+      expect(migrated.schemaVersion).toBe(3);
       expect(migrated.unlockedCardIds).toEqual(deriveUnlockedCardIds(['tier-1']));
       expect(migrated.milestoneHistory).toEqual([]);
     });
@@ -942,7 +942,7 @@ describe('Meta-Progression System', () => {
 
       const result = mainStreetCampaignSerializer.deserialize(v2Data);
 
-      expect(result.schemaVersion).toBe(2);
+      expect(result.schemaVersion).toBe(3);
       expect(result.milestoneHistory).toHaveLength(1);
     });
 

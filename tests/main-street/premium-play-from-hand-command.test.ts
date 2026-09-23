@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import {
   moveToHandCommand,
   playBusinessFromHandCommand,
@@ -27,7 +27,7 @@ import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
 /** Fresh MarketPhase state with a full action budget. */
 function setupMarketState(): ReturnType<typeof setupMainStreetGame> {
   const state = setupMainStreetGame({ seed: 'premium-play-from-hand-command' });
-  executeDayStart(state);
+  executeWeekStart(state);
   expect(state.actionsRemaining).toBe(1);
   return state;
 }

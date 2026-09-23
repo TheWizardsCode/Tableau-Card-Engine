@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { setupMainStreetGame, serializeMainStreetState, deserializeMainStreetState, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart, executeAction } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart, executeAction } from '../../example-games/main-street/MainStreetEngine';
 import {
   MainStreetTranscriptRecorder,
   setMainStreetRecorder,
@@ -32,7 +32,7 @@ function createLocalStorageMock(): Storage {
 
 function createMarketState(seed = 'cf-persist-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 

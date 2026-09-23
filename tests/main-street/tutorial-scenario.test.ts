@@ -54,7 +54,7 @@ describe('STANDARD_TUTORIAL_SCENARIO definition', () => {
     // Bookshop $300 + Library $700 + Local Festival $300 at LISTED cost (every
     // placement follows an End Turn, so no +50% premium is charged); income
     // across the five end-turn steps keeps every balance positive. 1200 is
-    // higher than Easy's 500 so the tutorial survives holding a card overnight.
+    // higher than Easy's 500 so the tutorial survives holding a card until next week.
     expect(STANDARD_TUTORIAL_SCENARIO.resourceBank.coins).toBe(1200);
     const preset = getPreset('Easy');
     expect(1200).toBeGreaterThan(preset.startingCoins);
@@ -119,7 +119,7 @@ describe('createTutorialScenario', () => {
     const state = createTutorialScenario();
     expect(state).toBeDefined();
     expect(state.turn).toBe(1);
-    expect(state.phase).toBe('DayStart');
+    expect(state.phase).toBe('WeekStart');
   });
 
   it('is deterministic (same seed produces same state)', () => {
@@ -217,7 +217,7 @@ describe('createTutorialScenario', () => {
   it('provides sufficient coin budget for the 26-step two-turn flow (listed-cost placements, positive balances)', () => {
     const state = createTutorialScenario();
     // Scenario starts with 1200 coins (higher than Easy's 500 so holding a card
-    // overnight overhead (−100/−75/−25 ongoing costs) never goes negative).
+    // until next week overhead (−100/−75/−25 ongoing costs) never goes negative).
     expect(state.resourceBank.coins).toBe(1200);
 
     // 26-step flow (CG-0MTNMBX5Z002U0MH): 9 days, 8 End Turns, budget verified

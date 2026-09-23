@@ -11,7 +11,7 @@
  * This file is the tests-first specification for CG-0MSTOATDU006UGAX ACs
  * AC1/AC3/AC4. The functions under test — `resolveStaffApplicant`,
  * `hireStaffApplicant`, `declineStaffApplicant`, and `letGoStaffMember`
- * plus the wiring in `executeDayStart` / `processEndOfTurn` — do not yet
+ * plus the wiring in `executeWeekStart` / `processEndOfTurn` — do not yet
  * exist and are detected dynamically, so the suite stays green until the
  * implementation child (CG-0MTFO4IBI005C3GC) lands. Every assertion that
  * requires an unimplemented function is marked TODO and guarded.
@@ -37,7 +37,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart, processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart, processEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
 import { createStaffDeck, type BusinessCard } from '../../example-games/main-street/MainStreetCards';
 import { computeStaffSalaryCost } from '../../example-games/main-street/MainStreetStaffBuffs';
 import { deserializeSkillIds } from '../../example-games/main-street/MainStreetStaffSkills';
@@ -147,7 +147,7 @@ describe('applicant trigger: deterministic under seeded RNG (CG-0MTFO4HGQ008VAQR
     expect(outcomes.every(v => v === outcomes[0])).toBe(true);
   });
 
-  it('second day start with the same game seed is reproducible (executeDayStart path)', () => {
+  it('second day start with the same game seed is reproducible (executeWeekStart path)', () => {
     const resolve = engineExport<(s: MainStreetState) => void>('resolveStaffApplicant');
     if (!pendingFn(resolve)) {
       expect(true).toBe(true);
@@ -160,12 +160,12 @@ describe('applicant trigger: deterministic under seeded RNG (CG-0MTFO4HGQ008VAQR
       // trigger at the same numbered day for the same seed.
       s.phase = 'MarketPhase';
       processEndOfTurn(s);
-      // Next DayStart — applicant step syncs off state.rng, not wall clock.
-      executeDayStart(s);
+      // Next WeekStart — applicant step syncs off state.rng, not wall clock.
+      executeWeekStart(s);
       return hasPendingApplicant(s);
     }
-    const a = headlessPairResult('daystart-determinism-seed');
-    const b = headlessPairResult('daystart-determinism-seed');
+    const a = headlessPairResult('weekstart-determinism-seed');
+    const b = headlessPairResult('weekstart-determinism-seed');
     expect(a).toBe(b);
   });
 });

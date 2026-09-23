@@ -31,7 +31,7 @@ import {
   type CommunitySpaceCard,
 } from '../../example-games/main-street/MainStreetCards';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   processEndOfTurn,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -488,7 +488,7 @@ describe('Per-card incremental income/reputation tracking', () => {
   describe('Integration: purchaseBusiness triggers recalculations', () => {
     it('sets currentIncome on newly purchased card matching computeBusinessIncome', () => {
       const state = createRichState('purchase-recalc');
-      executeDayStart(state);
+      executeWeekStart(state);
 
       const card = state.market.cards[0];
       if (!card) return;
@@ -508,7 +508,7 @@ describe('Per-card incremental income/reputation tracking', () => {
       const incomeBefore = state.streetGrid[0]!.currentIncome!;
 
       // Now purchase a second card adjacent via the market
-      executeDayStart(state);
+      executeWeekStart(state);
       // Look for a Food synergy card that won't be same-type as biz-cafe-0
       const foodCard = state.market.cards.find(
         (c): c is BusinessCard =>
@@ -588,14 +588,14 @@ describe('Per-card incremental income/reputation tracking', () => {
 
       // Run game 1
       const state1 = createRichState(seed);
-      executeDayStart(state1);
+      executeWeekStart(state1);
       const card1 = state1.market.cards[0];
       if (card1) executeAction(state1, { type: 'buy-business', cardId: card1.id, slotIndex: 0 });
       processEndOfTurn(state1);
 
       // Run game 2 with same seed
       const state2 = createRichState(seed);
-      executeDayStart(state2);
+      executeWeekStart(state2);
       const card2 = state2.market.cards[0];
       if (card2) executeAction(state2, { type: 'buy-business', cardId: card2.id, slotIndex: 0 });
       processEndOfTurn(state2);

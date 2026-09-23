@@ -162,7 +162,7 @@ export interface MainStreetAnimatorContext {
   popSynergyText(at: { x: number; y: number }, _color: number): void;
   findStreetCardContainer(slotIndex: number): Phaser.GameObjects.Container | null;
   getMarketCardCenter(_row: 'market', slotIndex: number): { x: number; y: number } | null;
-  animateDayBanner(params: { day: number; week: number; year: number }): void;
+  animateWeekBanner(params: { turn: number; week: number; year: number }): void;
   animateGameOver(params: { win: boolean; width: number; height: number }): void;
   animateUndoRedo(params: { action: 'undo' | 'redo'; description: string }): void;
   getStreetSlotCenter(slotIndex: number): { x: number; y: number };

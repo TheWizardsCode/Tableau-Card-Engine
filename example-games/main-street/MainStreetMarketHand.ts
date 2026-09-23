@@ -64,9 +64,9 @@ export function moveToHand(state: MainStreetState, cardId: string): PurchaseResu
   state.market.cards.splice(marketIndex, 1);
   state.hand.push({ ...card } as any);
 
-  // Track same-day composite for upgrades (CG-0MT3IYSRL001VVUP): when an
+  // Track same-week composite for upgrades (CG-0MT3IYSRL001VVUP): when an
   // upgrade is moved to hand, record its id so `play-upgrade-from-hand`
-  // can detect a same-day move+play composite and skip the action cost.
+  // can detect a same-week move+play composite and skip the action cost.
   if (card.family === 'upgrade') {
     state.justMovedUpgradeCardId = card.id;
   }
@@ -97,7 +97,7 @@ export function validateHandIndex(state: MainStreetState, handIndex: number): An
  * (CG-0MSTOATDT009BRX2 cost-at-play deferral model).
  *
  * @param premiumCost Optional premium price to charge instead of the listed
- *                    `card.cost` (same-day composite buy-and-play when no
+ *                    `card.cost` (same-week composite buy-and-play when no
  *                    action is available — CG-0MT24X0SX007RLHN). When absent,
  *                    the listed cost is charged (held-card / plan-ahead path).
  */

@@ -23,7 +23,7 @@ import {
   serializeMainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   endTurnHeadless,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -56,7 +56,7 @@ function createLocalStorageMock(): Storage {
 function playTurns(state: ReturnType<typeof setupMainStreetGame>, turns: number): void {
   for (let t = 0; t < turns; t++) {
     if (state.gameResult !== 'playing') break;
-    executeDayStart(state);
+    executeWeekStart(state);
     // Try to buy first affordable business
     const affordable = state.market.cards.filter(
       c =>

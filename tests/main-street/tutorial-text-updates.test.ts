@@ -8,8 +8,8 @@
  * 4. Place a Business has no matching-card mention.
  * 5. Card facts (name, cost, income) are resolved from live card data via
  *    {cardName}/{cost}/{bonus}/{synergyCardName} placeholders — never hardcoded.
- * 6. Every purchase is a two-turn plan-ahead flow: move to hand today (one
- *    action), End Turn, place tomorrow at LISTED cost. No copy promises
+ * 6. Every purchase is a two-turn plan-ahead flow: move to hand this week (one
+ *    action), End Turn, place next week at LISTED cost. No copy promises
  *    same-turn placement at listed cost (that path now costs a +50% premium).
  *
  * Text is resolved through the i18n system from `TUTORIAL_EN_BUNDLE`, with
@@ -81,16 +81,16 @@ describe('Tutorial text updates (26-step two-turn restructure)', () => {
     });
   });
 
-  describe('T3 Buy the Laundromat (AC: explicit click-to-buy, teaching move-today / place-tomorrow)', () => {
+  describe('T3 Buy the Laundromat (AC: explicit click-to-buy, teaching move-this week / place-next week)', () => {
     it('mentions clicking to buy', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
       expect(body.toLowerCase()).toMatch(/click/);
       expect(body.toLowerCase()).toMatch(/buy/);
     });
-    it('teaches move-today / place-tomorrow (one action today, listed cost tomorrow)', () => {
+    it('teaches move-this week / place-next week (one action this week, listed cost next week)', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
       expect(body.toLowerCase()).toMatch(/one action/);
-      expect(body.toLowerCase()).toMatch(/tomorrow/);
+      expect(body.toLowerCase()).toMatch(/next week/);
     });
     it('does not promise same-turn placement at listed cost', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T3')!).body;
@@ -122,10 +122,10 @@ describe('Tutorial text updates (26-step two-turn restructure)', () => {
   });
 
   describe('T6 End Turn (day 1 → day 2) — first two-turn boundary', () => {
-    it('says to end the day and that the taken card waits overnight', () => {
+    it('says to end the week and that the taken card waits until next week', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T6')!).body;
       expect(body.toLowerCase()).toMatch(/end/i);
-      expect(body.toLowerCase()).toMatch(/overnight|tomorrow|next one/i);
+      expect(body.toLowerCase()).toMatch(/until next week|next week|next one/i);
     });
   });
 
@@ -147,9 +147,9 @@ describe('Tutorial text updates (26-step two-turn restructure)', () => {
       expect(body.toLowerCase()).toMatch(/culture/);
       expect(body.toLowerCase()).toMatch(/hand/);
     });
-    it('teaches place-tomorrow at listed cost instead of same-day premium', () => {
+    it('teaches place-next week at listed cost instead of same-week premium', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!).body;
-      expect(body.toLowerCase()).toMatch(/tomorrow/);
+      expect(body.toLowerCase()).toMatch(/next week/);
       expect(body.toLowerCase()).toMatch(/listed/);
     });
   });
@@ -241,17 +241,17 @@ describe('Tutorial text updates (26-step two-turn restructure)', () => {
       expect(body.toLowerCase()).toMatch(/one action/i);
     });
 
-    it('T12 teaches move-today / place-tomorrow at listed cost', () => {
+    it('T12 teaches move-this week / place-next week at listed cost', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T12')!).body;
       expect(body.toLowerCase()).toMatch(/one action/i);
-      expect(body.toLowerCase()).toMatch(/tomorrow.*listed|listed.*tomorrow/i);
+      expect(body.toLowerCase()).toMatch(/next week.*listed|listed.*next week/i);
     });
 
     it('no step copy promises same-turn placement at listed cost', () => {
       for (const step of UNIFIED_TUTORIAL_STEPS) {
         const body = resolveTutorialStepText(step).body.toLowerCase();
         expect(body, `${step.id} must not promise free same-turn placement`).not.toMatch(/placing later this turn is free/i);
-        expect(body, `${step.id} must not teach same-day buy-and-place at listed cost`).not.toMatch(/buy-and-place|buy and place.*free/i);
+        expect(body, `${step.id} must not teach same-week buy-and-place at listed cost`).not.toMatch(/buy-and-place|buy and place.*free/i);
       }
     });
   });

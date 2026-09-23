@@ -25,7 +25,7 @@
  * - `ensureTutorialMarketForUpcomingSteps()` — The single-row market holds
  *   only `MARKET_TOTAL_SLOTS` (3) cards, but the tutorial needs six purchase
  *   targets across nine days (Laundromat T3, Local Festival T10, Bookshop T12,
- *   Library T19 — moved to hand, then placed from hand the next day). At
+ *   Library T19 — moved to hand, then placed from hand the next week). At
  *   each day start the turn controller calls this hook, which forces the
  *   upcoming action steps' required cards into the visible line (from
  *   decks/discards), mirroring the legacy two-row scenario-placing behaviour.
@@ -337,7 +337,7 @@ export function createTutorialScenario(
     turn: 1,
     week: 1,
     year: 1,
-    phase: 'DayStart',
+    phase: 'WeekStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     streetGridCols: 1,
     streetGridRows: 1,
@@ -350,10 +350,10 @@ export function createTutorialScenario(
       reputation: initRep,
     },
     // Day-start snapshot (see setupMainStreetGame): becomes authoritative at
-    // the first executeDayStart (CG-0MT5W7UJJ0065MEZ AC3).
-    dayStartCoins: initCoins,
-    dayStartRep: initRep,
-    dayStartScore: 0,
+    // the first executeWeekStart (CG-0MT5W7UJJ0065MEZ AC3).
+    weekStartCoins: initCoins,
+    weekStartRep: initRep,
+    weekStartScore: 0,
     ledger: createEconomyLedger({
       coins: initCoins,
       reputation: initRep,
@@ -430,7 +430,7 @@ function upcomingStepCardIds(controllerState: TutorialControllerState): string[]
   if (!controllerState.isActive) return result;
   // INCLUSIVE start: after an end-turn step completes, the controller is
   // already ON the next step (e.g. T11 move-Bookshop / T17 move-Library),
-  // and `startDayPhase` runs the guarantee hook for it. The current step's
+  // and `startTurnPhase` runs the guarantee hook for it. The current step's
   // required card must be covered too (CG-0MT53NXGZ004H5AE two-turn flow).
   const startIndex = Math.max(0, controllerState.currentStepIndex);
   for (let i = startIndex; i < UNIFIED_TUTORIAL_STEPS.length; i++) {
@@ -486,7 +486,7 @@ function extractTemplateCard(
  * its family deck). Day-1 cards are scenario-placed by
  * `createTutorialScenario`; this hook covers days 2+.
  *
- * Caller: `MainStreetTurnController.startDayPhase` when the tutorial is
+ * Caller: `MainStreetTurnController.startTurnPhase` when the tutorial is
  * active. Deterministic — no RNG is consumed.
  *
  * @param state           Current game state (mutated in-place).

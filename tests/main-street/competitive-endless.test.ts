@@ -187,11 +187,11 @@ describe('AC1 — Endless-mode opt-in flag', () => {
       resolvePendingEventChoice(s);
     }
 
-    // Endless: the turn still completes, phase returns to DayStart, game still playing
+    // Endless: the turn still completes, phase returns to WeekStart, game still playing
     expect(result.gameResult).toBe('playing');
     expect(s.gameResult).toBe('playing');
     expect(s.endReason).toBe('score_threshold_continue');
-    expect(s.phase).toBe('DayStart');
+    expect(s.phase).toBe('WeekStart');
   });
 
   it('computeScore keeps growing beyond the threshold in endless mode', () => {

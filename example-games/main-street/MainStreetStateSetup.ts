@@ -153,7 +153,7 @@ function forceReshuffleFromDiscards<T>(state: MainStreetState, deck: T[], discar
  *     are sought in the event deck like the legacy investments row).
  *
  * Visible cards are PRESERVED (top-up semantics), so scenario-placed market
- * cards survive into the next day. Callers that want a full re-draw must clear
+ * cards survive into the next week. Callers that want a full re-draw must clear
  * the row first (refreshMarket discards + clears; cycleMarketCards empties the row).
  *
  * @param state Current game state (mutated in-place).
@@ -376,7 +376,7 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
     turn: 1,
     week: startWeek,
     year: 1,
-    phase: 'DayStart',
+    phase: 'WeekStart',
     streetGrid: new Array<BusinessCard | CommunitySpaceCard | null>(GRID_SIZE).fill(null),
     streetGridCols: 1,
     streetGridRows: 1,
@@ -387,10 +387,10 @@ export function setupMainStreetGame(options: MainStreetSetupOptions = {}): MainS
       reputation: initRep,
     },
     // Day-start snapshot initialised to the opening resources; overwritten by
-    // executeDayStart each turn (CG-0MT5W7UJJ0065MEZ AC3).
-    dayStartCoins: initCoins,
-    dayStartRep: initRep,
-    dayStartScore: 0,
+    // executeWeekStart each turn (CG-0MT5W7UJJ0065MEZ AC3).
+    weekStartCoins: initCoins,
+    weekStartRep: initRep,
+    weekStartScore: 0,
     ledger: createEconomyLedger({
       coins: initCoins,
       reputation: initRep,

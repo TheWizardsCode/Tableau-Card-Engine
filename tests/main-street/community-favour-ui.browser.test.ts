@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Boot helpers (mirrors peek.browser.test.ts) ──
 
@@ -218,7 +218,7 @@ describe('Main Street Community Favour UI', () => {
     expect(scene.state.favourUsedThisTurn).toBe(true);
   }, 30_000);
 
-  it('buttons re-enable on a new day (DayStart resets the gate)', async () => {
+  it('buttons re-enable on a new day (WeekStart resets the gate)', async () => {
     const scene = await bootScene();
 
     scene.state.resourceBank.coins = 2000;
@@ -230,10 +230,10 @@ describe('Main Street Community Favour UI', () => {
     scene.msTurnController.onCommunityFavourClick('coins-to-rep');
     expect(scene.state.favourUsedThisTurn).toBe(true);
 
-    // Simulate DayStart: reset phase + gate (no awaits between the phase
+    // Simulate WeekStart: reset phase + gate (no awaits between the phase
     // assignment and the engine call, so the live game loop cannot intervene).
-    scene.state.phase = 'DayStart';
-    executeDayStart(scene.state as never);
+    scene.state.phase = 'WeekStart';
+    executeWeekStart(scene.state as never);
     scene.refreshAll();
 
     expect(scene.state.favourUsedThisTurn).toBe(false);

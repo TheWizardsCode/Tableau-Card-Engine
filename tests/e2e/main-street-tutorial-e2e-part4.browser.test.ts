@@ -4,7 +4,7 @@
  *
  * The two-turn plan-ahead flow (CG-0MT53NXGZ004H5AE): the Bookshop is moved
  * to hand on day 3 (split 1), and will be placed at LISTED cost on day 4
- * (T17, in Part 5). No same-day composite buy-and-place step exists here.
+ * (T17, in Part 5). No same-week composite buy-and-place step exists here.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';

@@ -16,15 +16,15 @@ import {
 import {
   getActivePlayerId,
   setActivePlayerId,
-  executeCompetitiveDayStart,
+  executeCompetitiveWeekStart,
   endCompetitiveMarketTurn,
   resolveCompetitiveClosingPhases,
   resolveCompetitivePendingChoice,
-  executeCompetitiveDay,
+  executeCompetitiveTurn,
   checkCompetitiveEndConditions,
   updateCompetitiveScores,
   processEndOfTurn,
-  executeDayStart,
+  executeWeekStart,
 } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -49,11 +49,11 @@ function setScores(state: MainStreetState, scores: number[]): void {
 // ── AC1: Alternating MarketPhases then shared closing ───────
 
 describe('AC1 — Shared-day alternation and shared closing', () => {
-  it('executeCompetitiveDayStart arms P0 MarketPhase and resets per-player budgets', () => {
+  it('executeCompetitiveWeekStart arms P0 MarketPhase and resets per-player budgets', () => {
     const s = comp('ac1-start', 2);
-    // Initially DayStart
-    expect(s.phase).toBe('DayStart');
-    executeCompetitiveDayStart(s);
+    // Initially WeekStart
+    expect(s.phase).toBe('WeekStart');
+    executeCompetitiveWeekStart(s);
     expect(s.phase).toBe('MarketPhase');
     expect(getActivePlayerId(s)).toBe(0);
     expect(s.activePlayerId).toBe(0);
@@ -64,7 +64,7 @@ describe('AC1 — Shared-day alternation and shared closing', () => {
 
   it('endCompetitiveMarketTurn alternates P0 -> P1 staying in MarketPhase', () => {
     const s = comp('ac1-alt-1', 2);
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     expect(s.phase).toBe('MarketPhase');
     expect(getActivePlayerId(s)).toBe(0);
     endCompetitiveMarketTurn(s);
@@ -74,26 +74,26 @@ describe('AC1 — Shared-day alternation and shared closing', () => {
 
   it('final endCompetitiveMarketTurn transitions to InvestmentResolution', () => {
     const s = comp('ac1-alt-final', 2);
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     endCompetitiveMarketTurn(s); // P0 -> P1
     expect(s.phase).toBe('MarketPhase');
     endCompetitiveMarketTurn(s); // P1 -> closing
     expect(s.phase).toBe('InvestmentResolution');
   });
 
-  it('resolveCompetitiveClosingPhases runs shared closing once and returns to DayStart (next day)', () => {
+  it('resolveCompetitiveClosingPhases runs shared closing once and returns to WeekStart (next week)', () => {
     const s = comp('ac1-closing', 2);
     s.resourceBank.coins = 1000;
     s.resourceBank.reputation = 1000;
     s.ledger.apply({ coins: 1000 - s.ledger.get('coins'), reputation: 1000 - s.ledger.get('reputation') } as any, 'test');
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     endCompetitiveMarketTurn(s); // P0->P1
     endCompetitiveMarketTurn(s); // P1->InvestmentResolution
     expect(s.phase).toBe('InvestmentResolution');
     const beforeTurn = s.turn;
     const result = resolveCompetitiveClosingPhases(s);
-    // Closing ran once; on continue we are back at DayStart next day, activePlayer 0
-    expect(s.phase).toBe('DayStart');
+    // Closing ran once; on continue we are back at WeekStart next week, activePlayer 0
+    expect(s.phase).toBe('WeekStart');
     expect(s.turn).toBe(beforeTurn + 1);
     expect(s.activePlayerId).toBe(0);
     expect(result.gameResult).toBe('playing');
@@ -103,7 +103,7 @@ describe('AC1 — Shared-day alternation and shared closing', () => {
 
   it('shared closing with N=3 alternates P0->P1->P2 then closing', () => {
     const s = comp('ac1-n3', 3);
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     expect(getActivePlayerId(s)).toBe(0);
     endCompetitiveMarketTurn(s);
     expect(getActivePlayerId(s)).toBe(1);
@@ -117,13 +117,13 @@ describe('AC1 — Shared-day alternation and shared closing', () => {
     s.resourceBank.coins = 500;
     s.resourceBank.reputation = 500;
     resolveCompetitiveClosingPhases(s);
-    expect(s.phase).toBe('DayStart');
+    expect(s.phase).toBe('WeekStart');
     expect(s.activePlayerId).toBe(0);
   });
 
   it('shared closing with N=4 alternates through all players', () => {
     const s = comp('ac1-n4', 4);
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     for (let i = 0; i < 3; i++) {
       expect(getActivePlayerId(s)).toBe(i);
       endCompetitiveMarketTurn(s);
@@ -139,33 +139,33 @@ describe('AC1 — Shared-day alternation and shared closing', () => {
     // Give P0 a staff with +1 action to verify per-player derivation
     s.players![0].staffCards = [{ id: 'staff-gm', name: 'GM', family: 'staff', cost: 2, actionsPerTurn: 1, handSlotsAdded: 0, ongoingCost: 0, specializationSkillIds: [] } as any];
     s.bankedActions = 1;
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     expect(s.players![0].actionBudget).toBe(3); // 1 base +1 staff +1 bank
     expect(s.players![1].actionBudget).toBe(2); // 1 base +0 staff +1 bank
   });
 
-  it('executeCompetitiveDay convenience runs DayStart -> N markets -> shared closing', () => {
+  it('executeCompetitiveTurn convenience runs WeekStart -> N markets -> shared closing', () => {
     const s = comp('ac1-conv', 2);
     s.resourceBank.coins = 1000;
     s.resourceBank.reputation = 1000;
     const beforeTurn = s.turn;
-    const result = executeCompetitiveDay(s, [[], []]);
+    const result = executeCompetitiveTurn(s, [[], []]);
     // After one shared day, turn advanced and phase reset
     expect(result.gameResult).toBe('playing');
     expect(s.turn).toBe(beforeTurn + 1);
-    expect(s.phase).toBe('DayStart');
+    expect(s.phase).toBe('WeekStart');
     expect(s.activePlayerId).toBe(0);
   });
 
   it('phase entry/exit invariants: endCompetitiveMarketTurn throws outside MarketPhase', () => {
     const s = comp('ac1-inv-phase', 2);
-    s.phase = 'DayStart';
+    s.phase = 'WeekStart';
     expect(() => endCompetitiveMarketTurn(s)).toThrow(/MarketPhase/);
   });
 
   it('phase entry/exit invariants: resolveCompetitiveClosingPhases throws outside InvestmentResolution', () => {
     const s = comp('ac1-inv-close', 2);
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     // Still in MarketPhase, not InvestmentResolution
     expect(() => resolveCompetitiveClosingPhases(s)).toThrow(/InvestmentResolution/);
   });
@@ -295,17 +295,17 @@ describe('AC3 — N=1 preserves legacy single-player sequence', () => {
     const s = comp('ac3-n1-phase', 1);
     s.resourceBank.coins = 500;
     s.resourceBank.reputation = 500;
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     expect(s.phase).toBe('MarketPhase');
     expect(getActivePlayerId(s)).toBe(0);
     endCompetitiveMarketTurn(s);
     expect(s.phase).toBe('InvestmentResolution');
     const result = resolveCompetitiveClosingPhases(s);
     expect(result.gameResult).toBe('playing');
-    expect(s.phase).toBe('DayStart');
+    expect(s.phase).toBe('WeekStart');
   });
 
-  it('executeCompetitiveDay N=1 collapses to legacy path (processEndOfTurn)', () => {
+  it('executeCompetitiveTurn N=1 collapses to legacy path (processEndOfTurn)', () => {
     const seed = 'ac3-n1-conv';
     const a = comp(seed, 1);
     const b = comp(seed, 1);
@@ -315,9 +315,9 @@ describe('AC3 — N=1 preserves legacy single-player sequence', () => {
       s.resourceBank.reputation = 500;
     }
     // N=1 competitive convenience
-    const rComp = executeCompetitiveDay(a, [[]]);
-    // Legacy single-player path for comparison: DayStart + processEndOfTurn
-    executeDayStart(b);
+    const rComp = executeCompetitiveTurn(a, [[]]);
+    // Legacy single-player path for comparison: WeekStart + processEndOfTurn
+    executeWeekStart(b);
     const rLegacy = processEndOfTurn(b);
     expect(rComp.gameResult).toBe(rLegacy.gameResult);
     expect(a.turn).toBe(b.turn);
@@ -346,7 +346,7 @@ describe('AC3 — N=1 preserves legacy single-player sequence', () => {
 // ── AC4: Phase diagram invariants ───────────────────────────
 
 describe('AC4 — Phase diagram and invariants', () => {
-  it('full shared day via executeCompetitiveDay matches manual alternation', () => {
+  it('full shared day via executeCompetitiveTurn matches manual alternation', () => {
     const seed = 'ac4-manual-vs-conv';
     const a = comp(seed, 2);
     const b = comp(seed, 2);
@@ -355,12 +355,12 @@ describe('AC4 — Phase diagram and invariants', () => {
       s.resourceBank.reputation = 800;
     }
     // Manual
-    executeCompetitiveDayStart(a);
+    executeCompetitiveWeekStart(a);
     endCompetitiveMarketTurn(a);
     endCompetitiveMarketTurn(a);
     const rManual = resolveCompetitiveClosingPhases(a);
     // Convenience
-    const rConv = executeCompetitiveDay(b, [[], []]);
+    const rConv = executeCompetitiveTurn(b, [[], []]);
     expect(rManual.gameResult).toBe(rConv.gameResult);
     expect(a.turn).toBe(b.turn);
     expect(a.phase).toBe(b.phase);
@@ -370,8 +370,8 @@ describe('AC4 — Phase diagram and invariants', () => {
   it('determinism: same seed same shared-day phase transitions', () => {
     const s1 = comp('ac4-det', 2);
     const s2 = comp('ac4-det', 2);
-    executeCompetitiveDayStart(s1);
-    executeCompetitiveDayStart(s2);
+    executeCompetitiveWeekStart(s1);
+    executeCompetitiveWeekStart(s2);
     expect(s1.phase).toBe(s2.phase);
     expect(getActivePlayerId(s1)).toBe(getActivePlayerId(s2));
     endCompetitiveMarketTurn(s1);
@@ -380,11 +380,11 @@ describe('AC4 — Phase diagram and invariants', () => {
     expect(getActivePlayerId(s1)).toBe(getActivePlayerId(s2));
   });
 
-  it('phase diagram: InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck -> DayStart is exercised', () => {
+  it('phase diagram: InvestmentResolution -> IncomePhase -> IncidentPhase -> EndCheck -> WeekStart is exercised', () => {
     const s = comp('ac4-diagram', 2);
     s.resourceBank.coins = 1000;
     s.resourceBank.reputation = 1000;
-    executeCompetitiveDayStart(s);
+    executeCompetitiveWeekStart(s);
     endCompetitiveMarketTurn(s);
     endCompetitiveMarketTurn(s);
     // Currently InvestmentResolution
@@ -395,7 +395,7 @@ describe('AC4 — Phase diagram and invariants', () => {
     if (closing.choicePending) {
       resolveCompetitivePendingChoice(s);
     }
-    // After closing, we are back at DayStart (the diagram's cycle point)
-    expect(s.phase).toBe('DayStart');
+    // After closing, we are back at WeekStart (the diagram's cycle point)
+    expect(s.phase).toBe('WeekStart');
   });
 });

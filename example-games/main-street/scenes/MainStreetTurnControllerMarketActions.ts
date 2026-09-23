@@ -33,7 +33,7 @@ export function onBusinessCardClick(tcCtx: MainStreetTurnControllerContext, card
     // costs the daily action — gate before the transfer animation so the
     // player gets immediate feedback instead of a mid-flight error.
     if (s.state.actionsRemaining <= 0) {
-      s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      s.instructionText.setText('No actions remaining this week. End your turn to start next week.');
       const containers0 = s.msRenderer?.getMarketRowCards?.();
       const cardIndex0 = s.state.market.cards.findIndex((c: any) => c.id === card.id);
       const target0 = containers0?.[cardIndex0] ?? null;
@@ -122,7 +122,7 @@ export function onBusinessCardClick(tcCtx: MainStreetTurnControllerContext, card
         // No auto-selection (CG-0MSXIQIPJ000NDTL): the card rests in hand,
         // unselected. The player must explicitly click the hand card when
         // ready to place it. Record the card ID so that placing it stays
-        // free (same-day move+place = 1 action) when the player selects it.
+        // free (same-week move+place = 1 action) when the player selects it.
         s.pendingHandIndex = null;
         s.pendingHandJustMoved = false;
         s.justMovedHandCardId = card.id;
@@ -319,7 +319,7 @@ export function onPeekClick(tcCtx: MainStreetTurnControllerContext): void {
     if (s.uiPhase !== 'market') return;
 
     if (s.state.actionsRemaining <= 0) {
-      s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      s.instructionText.setText('No actions remaining this week. End your turn to start next week.');
       playIllegalFeedback(s.actionContainer, s);
       return;
     }
@@ -487,7 +487,7 @@ export function onUpgradeCardClick(tcCtx: MainStreetTurnControllerContext, card:
     // explicit step. Gate before the transfer so the player gets immediate
     // feedback instead of a mid-flight error.
     if (s.state.actionsRemaining <= 0) {
-      s.instructionText.setText('No actions remaining today. End your turn to start a new day.');
+      s.instructionText.setText('No actions remaining this week. End your turn to start next week.');
       const containersNoActions = s.msRenderer?.getMarketRowCards?.();
       const cardIndexNoActions = s.state.market.cards.findIndex((c: any) => c.id === card.id);
       playIllegalFeedback(containersNoActions?.[cardIndexNoActions] ?? s.actionContainer ?? null, s);
@@ -539,7 +539,7 @@ export function onUpgradeCardClick(tcCtx: MainStreetTurnControllerContext, card:
 
         // No auto-selection (mirrors CG-0MSXIQIPJ000NDTL for business cards):
         // the upgrade rests in the hand, unselected. `justMovedUpgradeCardId`
-        // (set by moveToHand) makes the later play a free same-day composite.
+        // (set by moveToHand) makes the later play a free same-week composite.
         s.pendingHandIndex = null;
         s.pendingHandJustMoved = false;
         s.uiPhase = 'market';
@@ -589,15 +589,15 @@ export function onHandUpgradeCardClick(tcCtx: MainStreetTurnControllerContext, i
       return;
     }
 
-    // Same-day composite (just moved from the market this turn) applies the
+    // Same-week composite (just moved from the market this turn) applies the
     // upgrade without a second action; an upgrade held from a previous day
     // costs one action.
-    const isSameDay = s.state.justMovedUpgradeCardId === hand[index]?.id;
+    const isSameWeek = s.state.justMovedUpgradeCardId === hand[index]?.id;
 
     // Switching selection while already targeting is allowed.
     if (s.uiPhase === 'placing-from-hand' && s.pendingHandIndex !== null) {
       s.pendingHandIndex = index;
-      s.pendingHandJustMoved = isSameDay;
+      s.pendingHandJustMoved = isSameWeek;
       s.instructionText.setText(`Click a business to apply "${hand[index]?.name ?? 'upgrade'}"`);
       s.refreshAll();
       if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
@@ -611,7 +611,7 @@ export function onHandUpgradeCardClick(tcCtx: MainStreetTurnControllerContext, i
     s.tooltipManager?.hide();
 
     s.pendingHandIndex = index;
-    s.pendingHandJustMoved = isSameDay;
+    s.pendingHandJustMoved = isSameWeek;
     s.uiPhase = 'placing-from-hand';
     s.instructionText.setText(`Click a business to apply "${hand[index]?.name ?? 'upgrade'}"`);
     s.refreshAll();

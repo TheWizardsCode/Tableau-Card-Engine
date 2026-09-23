@@ -48,7 +48,7 @@ import {
   canPurchaseBusiness,
   purchaseStaffCard,
 } from '../../example-games/main-street/MainStreetMarket';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 
 function createTestState(seed = 'single-row-market-test'): MainStreetState {
   return setupMainStreetGame({ seed });
@@ -117,7 +117,7 @@ describe('AC2: refreshMarket re-roll', () => {
     state.resourceBank.coins = REFRESH_MARKET_COST;
     expect(canRefreshMarket(state).legal).toBe(true);
 
-    state.phase = 'DayStart';
+    state.phase = 'WeekStart';
     expect(canRefreshMarket(state).legal).toBe(false);
 
     state.phase = 'MarketPhase';
@@ -127,7 +127,7 @@ describe('AC2: refreshMarket re-roll', () => {
 
   it('deducts coins, discards visible cards, and refills to full composition', () => {
     const state = createTestState('refresh-exec');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = REFRESH_MARKET_COST * 2;
 
@@ -181,7 +181,7 @@ describe('AC2: refreshMarket re-roll', () => {
 
   it('is unlimited per turn while affordable', () => {
     const state = createTestState('refresh-unlimited');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = REFRESH_MARKET_COST * 3;
 
@@ -200,7 +200,7 @@ describe('AC2: refreshMarket re-roll', () => {
 describe('AC3: moveToHand is free; direct buy-and-place pays immediately', () => {
   it('moves a market card to hand without charging coins', () => {
     const state = createTestState('move-free');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0; // no money needed to move
 
@@ -219,7 +219,7 @@ describe('AC3: moveToHand is free; direct buy-and-place pays immediately', () =>
 
   it('is bounded only by maxHandSize', () => {
     const state = createTestState('move-bound');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0;
 
@@ -242,7 +242,7 @@ describe('AC3: moveToHand is free; direct buy-and-place pays immediately', () =>
 
   it('rejects a move when the hand is full', () => {
     const state = createTestState('move-full');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0;
 
@@ -264,7 +264,7 @@ describe('AC3: moveToHand is free; direct buy-and-place pays immediately', () =>
 
   it('direct buy-and-place still pays immediately', () => {
     const state = createTestState('direct-buy');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
 
     const card = state.market.cards.find(
@@ -284,7 +284,7 @@ describe('AC3: moveToHand is free; direct buy-and-place pays immediately', () =>
 
   it('direct buy-and-place is still legality-checked', () => {
     const state = createTestState('direct-buy-legal');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 1; // below most card costs
 
@@ -302,7 +302,7 @@ describe('AC3: moveToHand is free; direct buy-and-place pays immediately', () =>
 describe('AC4: cost-at-play from hand', () => {
   it('charges a business card only when placed from hand', () => {
     const state = createTestState('pay-on-place');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 5000;
 
@@ -323,7 +323,7 @@ describe('AC4: cost-at-play from hand', () => {
 
   it('rejects placing from hand when the player cannot afford the cost', () => {
     const state = createTestState('pay-on-place-broke');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0;
 
@@ -339,7 +339,7 @@ describe('AC4: cost-at-play from hand', () => {
 
   it('charges an upgrade card when played from hand onto a business', () => {
     const state = createTestState('pay-upgrade');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 5000;
 
@@ -364,7 +364,7 @@ describe('AC4: cost-at-play from hand', () => {
 
   it('charges an event card when played from hand (cost-at-play)', () => {
     const state = createTestState('pay-event');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 5000;
 
@@ -396,7 +396,7 @@ describe('AC4: cost-at-play from hand', () => {
 describe('AC5: discardFromHand', () => {
   it('is free and sends the card to its corresponding discard pile', () => {
     const state = createTestState('discard-free');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0;
 
@@ -422,7 +422,7 @@ describe('AC5: discardFromHand', () => {
 
   it('is allowed any time during the player turn', () => {
     const state = createTestState('discard-phase');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0;
 
@@ -458,7 +458,7 @@ describe('AC6: maxHandSize base 3, growable', () => {
 
   it('allows holding more than 3 cards once grown', () => {
     const state = createTestState('hand-grown-hold');
-    executeDayStart(state);
+    executeWeekStart(state);
     state.phase = 'MarketPhase';
     state.resourceBank.coins = 0;
 

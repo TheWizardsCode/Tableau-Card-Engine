@@ -4,7 +4,32 @@
 
 ## 1. Game Overview
 
-**Main Street** is a single‑player, turn‑based tableau card game built on the **Tableau Card Engine**. The player takes the role of a town planner revitalising a small main street by purchasing and placing business cards in a 10‑slot street grid. Each turn represents a day (or night) cycle. Adjacent (including diagonally adjacent) businesses generate synergy bonuses, earn coins, and increase the town’s reputation. The game ends when a win or loss condition is met (default presets impose **no turn limit**; a turn limit is opt-in via an explicit `maxTurns` config — CG-0MSLXJCHH001DLIO). The design prioritises a fast‑to‑prototype core loop while delivering reusable engine components (grid, adjacency resolver, market, resource bank).
+**Main Street** is a single‑player, turn‑based tableau card game built on the **Tableau Card Engine**. The player takes the role of a town planner revitalising a small main street by purchasing and placing business cards in a 10‑slot street grid. Each turn represents one week. Adjacent (including diagonally adjacent) businesses generate synergy bonuses, earn coins, and increase the town’s reputation. The game ends when a win or loss condition is met (default presets impose **no turn limit**; a turn limit is opt-in via an explicit `maxTurns` config — CG-0MSLXJCHH001DLIO). The design prioritises a fast‑to‑prototype core loop while delivering reusable engine components (grid, adjacency resolver, market, resource bank).
+
+---
+
+## 1.1 Time and Terminology
+
+Main Street uses a single time model: **one turn = one week** of in-world time.
+The annual calendar advances one week per turn (`state.week` / `state.year`),
+and the HUD renders `Week W · Year Y`.
+
+Canonical vocabulary — use these terms consistently in code, docs, tutorials,
+and all user-facing text:
+
+| Term | Meaning |
+|------|---------|
+| **Turn** | The atomic unit of play; the activity-log header is `Turn N`. |
+| **Week** | The in-world duration of one turn. Write "this week" / "next week". |
+| **WeekStart** | The phase that opens a turn and composes the action budget. |
+
+**Do not** use "day", "today", "tomorrow", "overnight", or "same-week" as
+synonyms for a turn. Non-turn uses of "day" are fine where they are proper
+names (e.g. *Day Spa*, *Rainy Day*, *Volunteer Day*, *Farmers Market Day*,
+*St Brigid's Day*, *May Day / Bealtaine*).
+
+This rule is enforced by `scripts/check-terminology-guards.sh`; run it before
+committing changes to player-facing text or docs.
 
 ---
 
@@ -17,7 +42,7 @@
 | **Synergy Type** | A tag (e.g., *Food*, *Culture*, *Commerce*) that determines adjacency bonuses. When two adjacent businesses — orthogonally or **diagonally adjacent** (8‑way / Chebyshev adjacency, default range 1) — share a synergy type and are of **different base types** (different template IDs), each gains a **Synergy Bonus** equal to a percentage of its own effective base income per matching neighbor. The per-card synergy rate defaults to 50% (0.5) and is configurable via `synergyCoinBonus`. Same-type adjacent businesses do not receive synergy from each other.
 | **Market** | The face‑up cards the player may purchase each turn. A single row of exactly **3 cards** (CG-0MSTOATDT009BRX2): 1–2 Business/Community‑Space cards, 0–1 Upgrade, 0–1 Investment event (combinations 2B+1U, 2B+1E, or 1B+1U+1E). Incidents are not purchasable; they populate a hidden face‑down **Incident Deck** instead (CG-0MSTOATDP000JNHH).
 | **Resource Bank** | Holds the player's **Coins** (currency) and **Reputation** (plain score count). Coins start at 8 and Reputation starts at 3.
-| **Turn** | A full day/night cycle consisting of several phases (see Section 5). Turn number increments after the **Night Phase**.
+| **Turn** | A full week consisting of several phases (see Section 5). Turn number increments after the **week end**.
 | **Event Card** | A card that triggers a one‑off effect (e.g., Festival, Tax, Storm). **Investment** events are taken from the single market row (**1 action**, no coins at take) and held until played (cost at play); **Incident** events resolve automatically from the face-down incident deck (CG-0MSTOATDP000JNHH).
 | **Incident Deck** | A hidden face‑down deck of Incident cards (card back + remaining count only). Each turn the top card is revealed and resolved at the end of the turn; when the deck is exhausted, resolved events are reshuffled back in with the order rebuilt constraint‑aware (repeat‑spacing / streak limits, CG-0MSTOATDP000JNHH). A peek staff member (staff‑lookout) can look at the top card once per turn as an action.
 | **Upgrade Card** | A card that modifies a specific Business card (e.g., upgrade a Bakery to a Patisserie, increasing income and synergy range).
@@ -33,7 +58,7 @@
 |-------|------|-------------|
 | **Name** | string | Human‑readable title (e.g., *Bakery*). |
 | **Cost** | number (coins) | Purchase price from the market. |
-| **Base Income** | number (coins per turn) | Income generated each **Day Phase** before synergy. |
+| **Base Income** | number (coins per turn) | Income generated each **WeekStart** before synergy. |
 | **Synergy Types** | string[] | One or more tags that interact with adjacent cards (e.g., `Food`). |
 | **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this business. |
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
@@ -127,7 +152,7 @@ The engine maintains a single **GameState** object with the following fields (il
 ```ts
 interface GameState {
   turn: number; // starts at 1
-  phase: DayPhase; // DayStart | MarketPhase | InvestmentResolution | IncomePhase | IncidentPhase | EndCheck
+  phase: TurnPhase; // WeekStart | MarketPhase | InvestmentResolution | IncomePhase | IncidentPhase | EndCheck
   streetGrid: (BusinessCard | CommunitySpaceCard | null)[]; // length = GRID_SIZE (default 10)
   market: {
     cards: (BusinessCard | CommunitySpaceCard | UpgradeCard | EventCard)[]; // single row, exactly 3 slots
@@ -152,7 +177,7 @@ interface GameState {
 **Key components**
 - **Grid<T>** – generic NxM grid (used here as 1x10), now using the reusable `@core-engine` `Grid` type.
 - **AdjacencyResolver** – computes synergy bonuses based on shared `synergyTypes` and proximity (8‑way / Chebyshev adjacency: orthogonal **and diagonal** neighbors at default range 1, extendable by upgrades) via `@core-engine/SpatialRules`.
-- **Market** – a single row of 3 face‑up cards drawn from the Business, Community Space, Upgrade, and Event (Investment‑trigger) decks, always with ≥1 Business/Community‑Space card. The row is refilled at day start; taking a card to hand costs **1 action** (CG-0MSTOF1N5005PK2R businesses, CG-0MTFWBNL30043ZBM events) but no coins, and the listed cost is paid when the card is played or placed.
+- **Market** – a single row of 3 face‑up cards drawn from the Business, Community Space, Upgrade, and Event (Investment‑trigger) decks, always with ≥1 Business/Community‑Space card. The row is refilled at week start; taking a card to hand costs **1 action** (CG-0MSTOF1N5005PK2R businesses, CG-0MTFWBNL30043ZBM events) but no coins, and the listed cost is paid when the card is played or placed.
 - **Incident Deck** – hidden face-down deck of Incident cards, order rebuilt constraint-aware at build/reshuffle (CG-0MSTOATDP000JNHH). The top card reveals and resolves each turn during IncidentPhase; when the deck runs out, resolved events are shuffled back in.
 - **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
 - **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation also counts 1:1 toward the final score (`finalScore = coins + reputation + challengeBonuses`).
@@ -173,22 +198,22 @@ Main Street stores the street as a 10-slot row-major array rendered as a 2x5 `Gr
 
 ## 5. Turn / Round Structure
 
-The turn follows a deterministic state‑machine that repeats each day/night cycle. The diagram below is a Mermaid **state diagram** that doubles as a flowchart for designers and developers.
+The turn follows a deterministic state‑machine that repeats each week. The diagram below is a Mermaid **state diagram** that doubles as a flowchart for designers and developers.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DayStart
-    DayStart --> MarketPhase: Show market (single 3-card row, always ≥1 business)
+    [*] --> WeekStart
+    WeekStart --> MarketPhase: Show market (single 3-card row, always ≥1 business)
     MarketPhase --> ActionPhase: Player purchases/places/upgrades (+ play held Investment)
     ActionPhase --> InvestmentResolution: Auto‑resolve held Investment if not played
     InvestmentResolution --> IncomePhase: Collect Base Income + Synergy Bonuses
     IncomePhase --> IncidentPhase: Reveal and resolve top of incident deck
     IncidentPhase --> EndCheck: Evaluate win/loss conditions
-    EndCheck --> DayStart: Loop to next turn
+    EndCheck --> WeekStart: Loop to next turn
 ```
 
 **Phase details**
-1. **DayStart** – Increment `turn` counter, reset temporary flags, refill the single market row.
+1. **WeekStart** – Increment `turn` counter, reset temporary flags, refill the single market row.
 2. **MarketPhase** – The market shows one 3‑card row (1–2 Business/Community‑Space, 0–1 Upgrade, 0–1 Investment event). Taking a card to hand costs **1 action** (bounded additionally by hand capacity); the card's cost is paid when placed/played (cost‑at‑play).
 3. **ActionPhase** – The player resolves purchases:
    - **Buy Business** → `resourceBank.coins -= cost` → place card into a chosen empty slot.
@@ -204,7 +229,7 @@ stateDiagram-v2
    - **Ongoing costs** (staff cards, community-space cards, and business cards **placed on the street grid** with `ongoingCost > 0` — e.g. the Library's 0.25 coins/turn; business cards held in hand are not charged, CG-0MTC31LN3000UHDY) are deducted from coins after income. Deductions are clamped at 0 coins (the player is never driven below zero) and logged.
 6. **IncidentPhase** – Reveal and resolve the top card of the face‑down incident deck. The player knows only how many incidents remain (card back + count); the revealed card's effect posts to the activity log. When the deck is exhausted, resolved events are reshuffled back in with the order rebuilt constraint‑aware (CG-0MSTOATDP000JNHH).
 7. **EndCheck** – Evaluate win/loss conditions.
-8. Loop back to **DayStart** for the next turn.
+8. Loop back to **WeekStart** for the next turn.
 
 The turn ends when either:
 - The player meets a **Win Condition** (Section 7), **or**
@@ -216,73 +241,73 @@ Default presets impose **no turn limit** (CG-0MSLXJCHH001DLIO): a player who kee
 
 ## 6. Core Actions
 
-### 6.0 Action Economy (daily action budget)
+### 6.0 Action Economy (weekly action budget)
 
-Each day (MarketPhase) the player has **exactly one action** — two while a **General Manager** is employed (CG-0MSTOF1N5005PK2R) — plus any **banked** actions carried over from previous days (CG-0MT3IOPZB005LNAR). The budget resets at **DayStart**; spending it blocks further action-type operations until the next day. The remaining budget is shown in the HUD action counter (banked count shown as `(N banked)` when non-zero).
+Each week (MarketPhase) the player has **exactly one action** — two while a **General Manager** is employed (CG-0MSTOF1N5005PK2R) — plus any **banked** actions carried over from previous weeks (CG-0MT3IOPZB005LNAR). The budget resets at **WeekStart**; spending it blocks further action-type operations until the next week. The remaining budget is shown in the HUD action counter (banked count shown as `(N banked)` when non-zero).
 
-**Day-start composition.** At DayStart the daily budget is:
+**Week-start composition.** At WeekStart the weekly budget is:
 
 ```
 1 base + staff actionsPerTurn bonus + banked actions (capped at 2)
 ```
 
-- The **base action banks**: any unused base action at end of day is banked, up to a **bank cap of 2**.
-- **Staff actions never bank.** Staff-derived actions (e.g. the General Manager's +1 `actionsPerTurn`) are **consumed first** and are not bankable — an idle GM day banks exactly 1 (the base), not 2.
-- Spending during the day draws down the combined budget (base + staff + banked share one counter).
-- **Banked is consumed 1-per-action.** Every action-type operation decrements the banked reserve by 1 (floor 0) alongside the daily counter (CG-0MTCP7F9S009HARC) — banked actions are spent as the player acts, so a banked day grants only its carried-over actions, never an endless reserve. Premium same-day placements (which replace the action with a +50% coin charge) do **not** consume the bank.
-- **No expiry:** banked actions persist indefinitely across days until spent. They reset to 0 only on a new game.
-- At day end, at most **1** action can bank (only the base portion), so reaching the cap takes two idle days; overflow beyond the cap is discarded.
+- The **base action banks**: any unused base action at end of week is banked, up to a **bank cap of 2**.
+- **Staff actions never bank.** Staff-derived actions (e.g. the General Manager's +1 `actionsPerTurn`) are **consumed first** and are not bankable — an idle GM week banks exactly 1 (the base), not 2.
+- Spending during the week draws down the combined budget (base + staff + banked share one counter).
+- **Banked is consumed 1-per-action.** Every action-type operation decrements the banked reserve by 1 (floor 0) alongside the weekly counter (CG-0MTCP7F9S009HARC) — banked actions are spent as the player acts, so a banked week grants only its carried-over actions, never an endless reserve. Premium same-week placements (which replace the action with a +50% coin charge) do **not** consume the bank.
+- **No expiry:** banked actions persist indefinitely across weeks until spent. They reset to 0 only on a new game.
+- At week end, at most **1** action can bank (only the base portion), so reaching the cap takes two idle weeks; overflow beyond the cap is discarded.
 
 > **Follow-ups:** Tutorial coverage of banking is tracked in CG-0MT3JK16W006A66P; a banking-aware AI strategy (deliberate hoarding) in CG-0MT3JMGA60091J8W.
 
-**Action-type operations (spend the daily action):**
+**Action-type operations (spend the weekly action):**
 
 | Operation | Cost | Notes |
 |-----------|------|-------|
 | Move a market card to hand | 1 action | Free of coins; pays the listed cost when placed. |
-| Take an Investment event to hand | 1 action | Free of coins; pays the event's listed cost when played. An event moved and played on the **same day** is the 1-action total composite below. |
-| Play a held Investment event | 1 action | Pays the event's listed cost at play. A **same-day** play of the event just moved to hand that day is a **free composite** (the move already spent the action); an event held from a previous day costs **1 action**. |
+| Take an Investment event to hand | 1 action | Free of coins; pays the event's listed cost when played. An event moved and played on the **same week** is the 1-action total composite below. |
+| Play a held Investment event | 1 action | Pays the event's listed cost at play. A **same-week** play of the event just moved to hand that week is a **free composite** (the move already spent the action); an event held from a previous week costs **1 action**. |
 | Play a card from hand to the street | 1 action | Pays the card's listed cost at placement. |
-| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`) when the move leaves **no action** for the placement (same pricing as the click composite). Triggered by dragging a market card straight onto a street slot. On a Golden Mile 2-action day the placement instead consumes the remaining action at **listed cost** — drag is never cheaper than click. Upgrade cards use the same gesture, dropping onto the business they target (CG-0MT3IYSRL001VVUP). |
+| Direct buy-and-place (market→street) | 1 action | Skips the hand; pays **+50%** over the listed cost (`Math.ceil(cost * 1.5 * 2) / 2`) when the move leaves **no action** for the placement (same pricing as the click composite). Triggered by dragging a market card straight onto a street slot. On a Golden Mile 2-action week the placement instead consumes the remaining action at **listed cost** — drag is never cheaper than click. Upgrade cards use the same gesture, dropping onto the business they target (CG-0MT3IYSRL001VVUP). |
 | Hire a staff card | 1 action | From the general market row. |
-| Close a business/community-space card | 1 action | **No refund.** Removes the card from the street entirely (slot → `null`, card → discard pile) so the slot can be re-filled on a later day. Only non-sold cards can be closed. Selling the *same* card is free but leaves an inert sold card occupying the slot (see below). |
+| Close a business/community-space card | 1 action | **No refund.** Removes the card from the street entirely (slot → `null`, card → discard pile) so the slot can be re-filled in a later week. Only non-sold cards can be closed. Selling the *same* card is free but leaves an inert sold card occupying the slot (see below). |
 
 **Free operations (never consume an action):**
 
 - Market re-roll/refresh
 - Selling a business — **free**, and the card **stays on the grid** as an inert *sold* marker (no income/reputation for itself, **no ongoing/running cost** — sold cards are excluded from the IncomePhase ongoing-cost deduction (CG-0MU3VH7QW006A2XA) — but still a synergy anchor for its neighbours; the slot stays occupied). Refund formula (CG-0MT5XO7DI0066QCT): `Math.ceil((card.cost + totalUpgradeCost) * 1.5) + Math.max(0, currentIncome − effectiveBase) + Math.max(0, currentReputationPerTurn − (repPerTurn + reputationBonus))` where `effectiveBase = (baseIncome + incomeBonus) × (hasAdjacentSameType ? 0.6 : 1)` and the 1.5× is the same +50% buy-and-place premium; applies to business **and** community-space cards; synergy comps are 0 when undefined and never negative.
   The sell dialog and activity log show the breakdown (base, synergy income, synergy rep).
-- Hint (still 1/day)
+- Hint (still 1/week)
 - Discarding from hand
 - Ending the turn
 
 > Upgrade and event actions (CG-0MT3IYSRL001VVUP, CG-0MTFWBNL30043ZBM): taking an **upgrade** or **Investment event** from the market into hand, and playing either from hand, each consume **1 action** — they are action-type operations, not free operations. They are listed in the action-economy table above.
 
-> Cancelling a pending selection (CG-0MT3IYSRL001VVUP): after selecting a hand card the next street click places (business) or applies (upgrade) it. Pressing **Escape** cancels that targeting and returns to the market phase; the card stays in hand and the daily action already spent on the move is unaffected, so re-selecting and playing it later the same day still costs no second action. Escape only toggles the Settings panel when no targeting is in progress.
+> Cancelling a pending selection (CG-0MT3IYSRL001VVUP): after selecting a hand card the next street click places (business) or applies (upgrade) it. Pressing **Escape** cancels that targeting and returns to the market phase; the card stays in hand and the weekly action already spent on the move is unaffected, so re-selecting and playing it later the same week still costs no second action. Escape only toggles the Settings panel when no targeting is in progress.
 
 > Sell price (CG-0MT5XO7DI0066QCT): the sell refund mirrors the buy-and-place premium (1.5× purchase + upgrades) and adds the card's current synergy value, so emergency cash reflects what the card actually earns on the grid. A card with no synergies still recovers more than before (`/2 → ×1.5`); a well-synergised card recovers coins **plus** rep-derived value automatically. The breakdown is visible before the player confirms.
 
 > Close vs Sell (CG-0MT5XT7K3005IBBV): clicking a non-sold street card opens a **Manage Card** dialog with **[Sell] [Close] [Cancel]**. **Sell** is free and keeps the sold card on the grid as an inert synergy anchor (the slot remains occupied permanently). **Close** costs **1 action and no coins**, removes the card to the discard pile, recalculates its neighbours **without** the removed card's synergy, and frees the slot for a future placement. Sold cards cannot be closed — once sold, the only way past that slot is a future "clear sold card" capability (not yet implemented).
 
-> Same-day composite pricing (CG-0MT24X0SX007RLHN): clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase**. If the move consumed the daily action (0 actions left), the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**; an explainer dialog fires first (Proceed commits, Cancel aborts with no cost, "Don't show this again" persists the preference). If an action **remains** (Golden Mile 2-action days), the placement consumes it at **listed cost**. A card left in hand and placed on a **later** day costs that day's action at listed cost, with no dialog. Business and community-space cards are priced identically.
+> Same-week composite pricing (CG-0MT24X0SX007RLHN): clicking a market card (move-to-hand, 1 action) and then placing it on an empty slot the same turn is a **single purchase**. If the move consumed the weekly action (0 actions left), the placement charges the **+50% premium** (`Math.ceil(cost * 1.5 * 2) / 2`) and consumes **no additional action**; an explainer dialog fires first (Proceed commits, Cancel aborts with no cost, "Don't show this again" persists the preference). If an action **remains** (Golden Mile 2-action weeks), the placement consumes it at **listed cost**. A card left in hand and placed in a **later** week costs that week's action at listed cost, with no dialog. Business and community-space cards are priced identically.
 
 ---
 
 | Action | Description | Preconditions | Result |
 |--------|-------------|---------------|--------|
 | **Buy Business** | Spend coins to acquire a Business card from the market and place it on an empty slot. | Market contains Business card; `resourceBank.coins >= cost`; at least one empty slot. | Business placed; coins deducted; slot becomes occupied. |
-| **Buy Upgrade** | Move an Upgrade card from the market to the hand (the upgrade is then **applied from hand** by clicking the card and then the target business). | Market contains Upgrade card targeting a placed Business at the required level; hand has room. | Upgrade appended to hand; the daily action is spent on the move (the same-day application is then a free composite; an upgrade held from a previous day costs 1 action when applied). |
-| **Buy Event** | Take an Investment event card from the market into the hand for **1 action** (no coins at take; cost is paid when the event is executed from hand). | Market contains Investment event card; hand has room (`hand.length < maxHandSize`); at least 1 action remaining. | Event appended to hand; the daily action is spent; **no coins deducted** at take time. Player pays the event's listed cost when it is played during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
+| **Buy Upgrade** | Move an Upgrade card from the market to the hand (the upgrade is then **applied from hand** by clicking the card and then the target business). | Market contains Upgrade card targeting a placed Business at the required level; hand has room. | Upgrade appended to hand; the weekly action is spent on the move (the same-week application is then a free composite; an upgrade held from a previous week costs 1 action when applied). |
+| **Buy Event** | Take an Investment event card from the market into the hand for **1 action** (no coins at take; cost is paid when the event is executed from hand). | Market contains Investment event card; hand has room (`hand.length < maxHandSize`); at least 1 action remaining. | Event appended to hand; the weekly action is spent; **no coins deducted** at take time. Player pays the event's listed cost when it is played during MarketPhase. There is **no limit on the number of event cards** in hand — only hand capacity (`maxHandSize`) applies. |
 | **Play Event (from hand)** | Play an Investment event card from the hand during MarketPhase. | Player holds an Investment event card in hand; current phase is MarketPhase. | Event resolved and removed from hand. |
 | **Place Business** | Choose an empty slot and put the purchased Business card there. | Business card in hand; slot is empty. | Card is now part of `streetGrid`. |
 | **Resolve Event** | Apply the effect described on an Event card. | Event card active. | Game state mutated per effect (coins, reputation, temporary modifiers). |
-| **End Turn** | Transition to the next phase/state. | All desired actions for the day are complete. | Turn counter increments, flow moves to Night or next Day. |
+| **End Turn** | Transition to the next phase/state. | All desired actions for the week are complete. | Turn counter increments, flow moves to week end or next WeekStart. |
 
 ---
 
 ## 7. Win Conditions
 
-The game is considered **won** when **any** of the following conditions are satisfied **at the end of a Night Phase**:
+The game is considered **won** when **any** of the following conditions are satisfied **at the end of a week end**:
 
 1. **Score Threshold** – `finalScore >= winThreshold` where winThreshold is difficulty-scaled (100 Easy / 120 Medium / 150 Hard):
    ```ts
@@ -340,7 +365,7 @@ Every resource-mutating action appends an entry to the activity log showing its 
 - Entry colour classification (`gain` / `loss` / `neutral`) is derived by `classifyEffect` from the same effective net (coins + rep), so a mixed exchange colours consistently with its net effect.
 - Examples: purchases, upgrades, sells, staff hire/layoff, ongoing-cost deductions (including the clamped `Insufficient coins for ...` shortfall), market refreshes, Community Favour exchanges, events played from hand (cost *plus* resolved effects), investments, and incident resolutions.
 
-Each completed turn ends with a **per-turn net summary row** — `Turn <n> net: <effective deltas>` — comparing the resource bank against a **day-start snapshot** taken at the beginning of `executeDayStart`. The snapshot is persisted with saves (legacy saves fall back to the current resources), and the net row is emitted even when the game ends prematurely — in that case it is written **before** the `Game Over` / `Bankruptcy` banner so the summary precedes the loss entry. When both are present, the net row always precedes the game-over entry; on a normal turn it is the final log entry.
+Each completed turn ends with a **per-turn net summary row** — `Turn <n> net: <effective deltas>` — comparing the resource bank against a **week-start snapshot** taken at the beginning of `executeWeekStart`. The snapshot is persisted with saves (legacy saves fall back to the current resources), and the net row is emitted even when the game ends prematurely — in that case it is written **before** the `Game Over` / `Bankruptcy` banner so the summary precedes the loss entry. When both are present, the net row always precedes the game-over entry; on a normal turn it is the final log entry.
 
 ---
 

@@ -26,7 +26,7 @@ import {
   recalculateCard,
 } from '../../example-games/main-street/MainStreetAdjacency';
 import {
-  executeDayStart,
+  executeWeekStart,
   processEndOfTurn,
   endTurnHeadless,
   applyStaffOngoingCosts,
@@ -87,7 +87,7 @@ describe('Multi-Use Card Economy Integration', () => {
   describe('Full game loop with hand management', () => {
     it('should complete a full turn with purchase-to-hand and income', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Buy a card to hand
       const card = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
@@ -139,7 +139,7 @@ describe('Multi-Use Card Economy Integration', () => {
       state.resourceBank.coins = 50;
 
       for (let turn = 0; turn < 3 && state.gameResult === 'playing'; turn++) {
-        executeDayStart(state);
+        executeWeekStart(state);
 
         // Buy to hand if possible
         const card = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
@@ -232,7 +232,7 @@ describe('Multi-Use Card Economy Integration', () => {
       const state = createTestState();
 
       for (let turn = 0; turn < 3 && state.gameResult === 'playing'; turn++) {
-        executeDayStart(state);
+        executeWeekStart(state);
 
         // Buy a card to stimulate cycling
         const card = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
@@ -259,7 +259,7 @@ describe('Multi-Use Card Economy Integration', () => {
   describe('Staff card lifecycle', () => {
     it('should purchase staff, apply ongoing cost, and lay off', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Hire a staff card from the general market row (CG-0MT3KZOBZ005IRYE);
       // if the row lacks one, move a deck staff card into it.
@@ -300,7 +300,7 @@ describe('Multi-Use Card Economy Integration', () => {
 
     it('should handle layoff with fewer hand cards than slots to remove', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Add staff with empty hand
       state.staffCards.push({
@@ -328,7 +328,7 @@ describe('Multi-Use Card Economy Integration', () => {
   describe('Save/load migration with all fields', () => {
     it('should round-trip full multi-use economy state', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Set up hand, staff, discard
       state.hand.push(makeBiz({ id: 'hand-test', baseIncome: 1, synergyTypes: ['Food'] }));
@@ -399,7 +399,7 @@ describe('Multi-Use Card Economy Integration', () => {
       const state = createTestState();
 
       // Turn 1: hand purchase
-      executeDayStart(state);
+      executeWeekStart(state);
       const card1 = state.market.cards.find(c => c.cost <= state.resourceBank.coins);
       if (card1 && state.hand.length < state.maxHandSize) {
         moveToHand(state, card1.id);
@@ -408,7 +408,7 @@ describe('Multi-Use Card Economy Integration', () => {
 
       // Turn 2: tableau purchase
       if (state.gameResult === 'playing') {
-        executeDayStart(state);
+        executeWeekStart(state);
         // Only business/community-space cards can be bought onto the street —
         // prefer the first purchasable one in the seeded row (content
         // expansion re-rolls which families the market shows).
@@ -427,7 +427,7 @@ describe('Multi-Use Card Economy Integration', () => {
 
       // Turn 3: staff purchase
       if (state.gameResult === 'playing') {
-        executeDayStart(state);
+        executeWeekStart(state);
         // Hire a staff card from the general market row (CG-0MT3KZOBZ005IRYE)
         let staffCard3 = state.market.cards.find(c => c.family === 'staff');
         if (!staffCard3) {

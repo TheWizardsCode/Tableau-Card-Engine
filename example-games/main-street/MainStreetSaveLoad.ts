@@ -16,8 +16,8 @@ import {
   deriveUnlockedCardIds,
 } from './MainStreetTiers';
 
-export const MAIN_STREET_SAVE_SCHEMA_VERSION = 1;
-export const MAIN_STREET_CAMPAIGN_SCHEMA_VERSION = 2;
+export const MAIN_STREET_SAVE_SCHEMA_VERSION = 2;
+export const MAIN_STREET_CAMPAIGN_SCHEMA_VERSION = 3;
 export const MAIN_STREET_GAME_TYPE = 'main-street';
 export const MAIN_STREET_RUN_SLOT = 'turn-start';
 export const MAIN_STREET_CAMPAIGN_SLOT = 'campaign-default';
@@ -29,6 +29,13 @@ export const mainStreetStateSerializer: SaveSerializer<
   schemaVersion: MAIN_STREET_SAVE_SCHEMA_VERSION,
   serialize: serializeMainStreetState,
   deserialize: deserializeMainStreetState,
+  // v1 → v2 (CG-0MTMYIHKO001QCWL): the day→week terminology rename maps the
+  // legacy 'DayStart' phase and dayStartCoins/dayStartRep/dayStartScore fields
+  // to their week equivalents inside migrateSerializedState(), which runs as
+  // part of deserializeMainStreetState(). The version-migration hook is
+  // therefore an identity passthrough; it exists so a v1 checkpoint is
+  // accepted rather than rejected by the strict version check.
+  migrate: (data) => data,
 };
 
 export const mainStreetCampaignSerializer: SaveSerializer<
@@ -38,23 +45,32 @@ export const mainStreetCampaignSerializer: SaveSerializer<
   schemaVersion: MAIN_STREET_CAMPAIGN_SCHEMA_VERSION,
   serialize: (state) => structuredClone(state),
   deserialize: (data) => {
-    // v1 -> v2 migration: add schemaVersion, unlockedCardIds, milestoneHistory
-    if (!data.schemaVersion || data.schemaVersion === 1) {
-      return {
-        ...data,
+    // v1 → v2 migration: add schemaVersion, unlockedCardIds, milestoneHistory
+    // v2 → v3 migration: terminology rename (no field shape change)
+    // (CG-0MTMYIHKO001QCWL)
+    let working = data as any;
+    if (!working.schemaVersion || working.schemaVersion < 2) {
+      working = {
+        ...working,
         schemaVersion: 2,
-        unlockedCardIds: deriveUnlockedCardIds(data.unlockedTiers),
+        unlockedCardIds: deriveUnlockedCardIds(working.unlockedTiers),
         milestoneHistory: [],
       };
     }
+    if (working.schemaVersion < MAIN_STREET_CAMPAIGN_SCHEMA_VERSION) {
+      working = { ...working, schemaVersion: MAIN_STREET_CAMPAIGN_SCHEMA_VERSION };
+    }
 
     // Ensure tutorialSeen flag exists on returned object for runtime code.
-    const cloned = structuredClone(data) as any;
+    const cloned = structuredClone(working) as any;
     if (typeof cloned.tutorialSeen === 'undefined') {
       cloned.tutorialSeen = false;
     }
     return cloned as MainStreetCampaignProgress;
   },
+  // v1/v2 → v3 (CG-0MTMYIHKO001QCWL): the campaign shape is unchanged by the
+  // terminology rename; the field upgrades are applied by deserialize above.
+  migrate: (data) => data,
 };
 
 export function createDefaultCampaignProgress(): MainStreetCampaignProgress {

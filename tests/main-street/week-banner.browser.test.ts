@@ -1,20 +1,20 @@
 /**
- * Main Street: Day Transition Banner Browser Tests
+ * Main Street: Week Transition Banner Browser Tests
  *
- * Verifies the day-start banner trigger end to end in a real Phaser scene:
+ * Verifies the week-start banner trigger end to end in a real Phaser scene:
  *
- * 1. `startDayPhase()` triggers `MainStreetAnimator.animateDayBanner` with
- *    the current day — including the first day (day 1).
+ * 1. `startTurnPhase()` triggers `MainStreetAnimator.animateWeekBanner` with
+ *    the current turn — including the first turn (week 1).
  * 2. The banner is skipped while the tutorial is active (its step overlays
  *    carry the guidance) and on checkpoint resume (`skipMarketRefill=true` —
- *    the same day continues).
+ *    the same week continues).
  * 3. Under reduced motion the trigger still fires (the animator degrades
  *    internally — covered by unit tests).
  *
  * The banner is non-interactive and non-blocking; the market remains fully
  * interactive the whole time.
  *
- * @module tests/main-street/day-banner.browser
+ * @module tests/main-street/week-banner.browser
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -76,23 +76,23 @@ async function waitForCondition(
 }
 
 interface BannerCall {
-  day: number;
+  turn: number;
 }
 
-function spyOnDayBanner(scene: Phaser.Scene & Record<string, unknown>): { calls: BannerCall[] } {
+function spyOnWeekBanner(scene: Phaser.Scene & Record<string, unknown>): { calls: BannerCall[] } {
   const animator = scene.msAnimator as unknown as {
-    animateDayBanner: (params: BannerCall) => void;
+    animateWeekBanner: (params: BannerCall) => void;
   };
-  const original = animator.animateDayBanner.bind(animator);
+  const original = animator.animateWeekBanner.bind(animator);
   const calls: BannerCall[] = [];
-  vi.spyOn(animator, 'animateDayBanner').mockImplementation((params) => {
+  vi.spyOn(animator, 'animateWeekBanner').mockImplementation((params) => {
     calls.push(params);
     original(params); // run the real implementation so the visuals run
   });
   return { calls };
 }
 
-describe('MainStreet day banner', () => {
+describe('MainStreet week banner', () => {
   let game: Phaser.Game | null = null;
 
   afterEach(() => {
@@ -113,45 +113,45 @@ describe('MainStreet day banner', () => {
     game = null;
   });
 
-  it('fires the banner with the current day on a new-day start (including day 1)', async () => {
+  it('fires the banner with the current turn on a new-week start (including week 1)', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
     // Ensure the tutorial is not active so the banner is eligible.
     (scene as unknown as { tutorialController?: unknown }).tutorialController = undefined;
 
-    const { calls } = spyOnDayBanner(scene);
+    const { calls } = spyOnWeekBanner(scene);
 
-    (scene.state as { phase: string }).phase = 'DayStart';
-    (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase();
+    (scene.state as { phase: string }).phase = 'WeekStart';
+    (scene.msTurnController as unknown as { startTurnPhase: (skipMarketRefill?: boolean) => void }).startTurnPhase();
 
-    await waitForCondition(() => calls.length >= 1, { timeoutMs: 5000, label: 'day banner trigger' });
+    await waitForCondition(() => calls.length >= 1, { timeoutMs: 5000, label: 'week banner trigger' });
     expect(calls).toHaveLength(1);
-    expect(calls[0].day).toBe((scene.state as { turn: number }).turn);
+    expect(calls[0].turn).toBe((scene.state as { turn: number }).turn);
   }, 30_000);
 
   it('does NOT fire while the tutorial is active or on checkpoint resume', async () => {
     game = await bootGame();
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
-    const { calls } = spyOnDayBanner(scene);
+    const { calls } = spyOnWeekBanner(scene);
 
     // Tutorial active → skipped.
     (scene as unknown as { tutorialController?: unknown }).tutorialController = { isActive: true };
-    (scene.state as { phase: string }).phase = 'DayStart';
-    (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase();
+    (scene.state as { phase: string }).phase = 'WeekStart';
+    (scene.msTurnController as unknown as { startTurnPhase: (skipMarketRefill?: boolean) => void }).startTurnPhase();
     expect(calls).toHaveLength(0);
 
-    // Checkpoint resume (same day continues) → skipped.
+    // Checkpoint resume (same week continues) → skipped.
     (scene as unknown as { tutorialController?: unknown }).tutorialController = undefined;
-    (scene.state as { phase: string }).phase = 'DayStart';
-    (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase(true);
+    (scene.state as { phase: string }).phase = 'WeekStart';
+    (scene.msTurnController as unknown as { startTurnPhase: (skipMarketRefill?: boolean) => void }).startTurnPhase(true);
     expect(calls).toHaveLength(0);
   }, 30_000);
 
 
   // ── Deferral tests (CG-0MSZE2PY7007J6XA) ──────────────────
   //
-  // These verify the day-banner is deferred at boot until the player
+  // These verify the week-banner is deferred at boot until the player
   // commits to playing: (a) no banner while the tutorial offer modal is
   // waiting for a choice; (b) the deferred banner fires exactly once after
   // the player skips the tutorial offer.
@@ -163,7 +163,7 @@ describe('MainStreet day banner', () => {
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     // Spy AFTER boot so we measure only post-boot banner triggers.
-    const { calls } = spyOnDayBanner(scene);
+    const { calls } = spyOnWeekBanner(scene);
 
     // Tutorial offer modal should be waiting for a choice (fresh tutorial state
     // + no checkpoint in a clean browser). Wait for it to become visible.
@@ -178,7 +178,7 @@ describe('MainStreet day banner', () => {
     // The deferred banner must NOT have played while the modal is up.
     expect(calls).toHaveLength(0);
     // And the deferred flag is still pending.
-    expect((scene as unknown as { deferredDayBanner: boolean }).deferredDayBanner).toBe(true);
+    expect((scene as unknown as { deferredWeekBanner: boolean }).deferredWeekBanner).toBe(true);
   }, 30_000);
 
   it('fires the deferred banner only once the player skips the tutorial offer', async () => {
@@ -188,7 +188,7 @@ describe('MainStreet day banner', () => {
     const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
 
     // Spy AFTER boot so we measure only post-boot banner triggers.
-    const { calls } = spyOnDayBanner(scene);
+    const { calls } = spyOnWeekBanner(scene);
 
     await waitForCondition(() => {
       const modal = (scene as unknown as { tutorialOfferModal?: { isVisible: boolean } }).tutorialOfferModal;
@@ -202,7 +202,7 @@ describe('MainStreet day banner', () => {
     // the modal's createOverlayButton; search the scene's display list and
     // children (it may be parented into hudContainer). Emit pointerdown
     // exactly like a real click — this exercises the modal's actual onSkip
-    // wiring (dismiss → onSkip → playDeferredDayBanner).
+    // wiring (dismiss → onSkip → playDeferredWeekBanner).
     const skipLabel = '[ ' + 'Skip' + ' ]';
     const allTexts: Phaser.GameObjects.Text[] = [];
     const displayList = (scene as any).displayList?.getAll?.() ?? [];
@@ -217,10 +217,10 @@ describe('MainStreet day banner', () => {
     if (!skipBtn) return;
     skipBtn.emit('pointerdown');
 
-    await waitForCondition(() => calls.length >= 1, { timeoutMs: 5000, label: 'deferred day banner after skip' });
+    await waitForCondition(() => calls.length >= 1, { timeoutMs: 5000, label: 'deferred week banner after skip' });
     expect(calls).toHaveLength(1);
-    expect(calls[0].day).toBe((scene.state as { turn: number }).turn);
+    expect(calls[0].turn).toBe((scene.state as { turn: number }).turn);
     // The flag is cleared after firing (fires exactly once).
-    expect((scene as unknown as { deferredDayBanner: boolean }).deferredDayBanner).toBe(false);
+    expect((scene as unknown as { deferredWeekBanner: boolean }).deferredWeekBanner).toBe(false);
   }, 30_000);
 });

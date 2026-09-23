@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { setupMainStreetGame, serializeMainStreetState, deserializeMainStreetState } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { mainStreetStateSerializer } from '../../example-games/main-street/MainStreetSaveLoad';
 import { computeCsvChecksum } from '../../example-games/main-street/CsvChecksum';
 import { generateCardSvgFromCsvRow } from '../../example-games/main-street/scenes/MainStreetCardSvgGenerator';
@@ -323,23 +323,23 @@ describe('Market state preservation on save/load', () => {
     expect(reloadedInvIds).toEqual(invIds);
   });
 
-  it('save → load → executeDayStart without skipMarketRefill replaces market cards', () => {
+  it('save → load → executeWeekStart without skipMarketRefill replaces market cards', () => {
     const state = setupMainStreetGame({ seed: 'market-cycle' });
     const serialized = serializeMainStreetState(state);
 
     // Load the saved state
     const deserialized = deserializeMainStreetState(serialized);
 
-    // Set phase to DayStart and call executeDayStart (normal flow — should refill)
-    deserialized.phase = 'DayStart';
-    executeDayStart(deserialized);
+    // Set phase to WeekStart and call executeWeekStart (normal flow — should refill)
+    deserialized.phase = 'WeekStart';
+    executeWeekStart(deserialized);
 
     // Verify market cards exist (refilled from deck)
     const newDevIds = deserialized.market.cards.map(c => c.id);
     expect(newDevIds.length).toBeGreaterThan(0);
   });
 
-  it('save → load → executeDayStart with skipMarketRefill preserves market cards', () => {
+  it('save → load → executeWeekStart with skipMarketRefill preserves market cards', () => {
     const state = setupMainStreetGame({ seed: 'market-preserve' });
     const serialized = serializeMainStreetState(state);
     const savedDevIds = serialized.market.cards.map(c => c.id);
@@ -348,9 +348,9 @@ describe('Market state preservation on save/load', () => {
     // Load the saved state
     const deserialized = deserializeMainStreetState(serialized);
 
-    // Set phase to DayStart and call executeDayStart with skipMarketRefill=true
-    deserialized.phase = 'DayStart';
-    executeDayStart(deserialized, true);
+    // Set phase to WeekStart and call executeWeekStart with skipMarketRefill=true
+    deserialized.phase = 'WeekStart';
+    executeWeekStart(deserialized, true);
 
     // Verify market cards are preserved
     const newDevIds = deserialized.market.cards.map(c => c.id);

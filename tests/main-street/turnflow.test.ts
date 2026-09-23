@@ -19,7 +19,7 @@ import {
   playHeldEvent,
   checkImmediateLoss,
   checkEndConditions,
-  executeDayStart,
+  executeWeekStart,
   processEndOfTurn,
   endTurnHeadless,
   executeFullTurn,
@@ -168,7 +168,7 @@ describe('MainStreetEngine', () => {
         'IncomePhase',
         'IncidentPhase',
         'EndCheck',
-        'DayStart', // wraps around
+        'WeekStart', // wraps around
       ];
 
       for (const expected of expectedPhases) {
@@ -641,14 +641,14 @@ describe('MainStreetEngine', () => {
     });
   });
 
-  // ── DayStart ──────────────────────────────────────────────
+  // ── WeekStart ──────────────────────────────────────────────
 
-  describe('executeDayStart', () => {
-    it('should transition from DayStart to MarketPhase', () => {
+  describe('executeWeekStart', () => {
+    it('should transition from WeekStart to MarketPhase', () => {
       const state = createTestState();
-      expect(state.phase).toBe('DayStart');
+      expect(state.phase).toBe('WeekStart');
 
-      executeDayStart(state);
+      executeWeekStart(state);
 
       expect(state.phase).toBe('MarketPhase');
     });
@@ -657,23 +657,23 @@ describe('MainStreetEngine', () => {
       const state = createTestState();
       state.market.cards = state.market.cards.slice(0, 2);
 
-      executeDayStart(state);
+      executeWeekStart(state);
 
       expect(state.market.cards.length).toBeGreaterThanOrEqual(3);
     });
 
-    it('should throw if not in DayStart phase', () => {
+    it('should throw if not in WeekStart phase', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
 
-      expect(() => executeDayStart(state)).toThrow('Expected DayStart');
+      expect(() => executeWeekStart(state)).toThrow('Expected WeekStart');
     });
   });
 
   // ── Full Turn Integration ─────────────────────────────────
 
   describe('processEndOfTurn', () => {
-    it('should process all phases after MarketPhase and return to DayStart', () => {
+    it('should process all phases after MarketPhase and return to WeekStart', () => {
       const state = createTestState();
       state.phase = 'MarketPhase';
       state.streetGrid[0] = makeBiz({ id: 'food-1', baseIncome: 3, synergyTypes: ['Food'] });
@@ -686,7 +686,7 @@ describe('MainStreetEngine', () => {
       expect(result.gameResult).toBe('playing');
       // Should advance to next turn
       expect(state.turn).toBe(2);
-      expect(state.phase).toBe('DayStart');
+      expect(state.phase).toBe('WeekStart');
     });
 
     it('should throw if not in MarketPhase', () => {
@@ -793,8 +793,8 @@ describe('MainStreetEngine', () => {
 
         // Buy a business if available and place in next empty slot
         const actions: PlayerAction[] = [];
-        if (state.phase === 'DayStart') {
-          executeDayStart(state);
+        if (state.phase === 'WeekStart') {
+          executeWeekStart(state);
         }
 
         const card = state.market.cards[0];
@@ -829,7 +829,7 @@ describe('MainStreetEngine', () => {
 
         for (let t = 0; t < 3; t++) {
           if (s.gameResult !== 'playing') break;
-          executeDayStart(s);
+          executeWeekStart(s);
 
           const card = s.market.cards[0];
           const slot = s.streetGrid.findIndex(sl => sl === null);
@@ -870,7 +870,7 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 4000;
 
       // Run a turn
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
 
       // Challenge should have been evaluated and completed (coins should still be >= 25 after a turn)
@@ -888,7 +888,7 @@ describe('MainStreetEngine', () => {
       ];
       state.resourceBank.coins = 5; // Below 3000 threshold (ch-deep-pockets ×100)
 
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
 
       expect(state.activeChallenges[0].completed).toBe(false);
@@ -910,7 +910,7 @@ describe('MainStreetEngine', () => {
       // seeded incident cannot shave coins/rep during the closing (deck
       // composition shifts which incident the seeded game draws).
       state.incidentDeck = [];
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
 
       // Score should now include the challenge bonus
@@ -935,7 +935,7 @@ describe('MainStreetEngine', () => {
       state.resourceBank.coins = 4000;
 
       // Turn 1: complete the challenge
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
       expect(state.activeChallenges[0].completed).toBe(true);
       expect(state.challengesCompleted).toContain('ch-deep-pockets');
@@ -943,7 +943,7 @@ describe('MainStreetEngine', () => {
       // Turn 2: even if coins drop below threshold, challenge stays completed
       if (state.gameResult === 'playing') {
         state.resourceBank.coins = 5;
-        executeDayStart(state);
+        executeWeekStart(state);
         endTurnHeadless(state);
         expect(state.activeChallenges[0].completed).toBe(true);
         expect(state.challengesCompleted.filter(id => id === 'ch-deep-pockets')).toHaveLength(1);
@@ -960,7 +960,7 @@ describe('MainStreetEngine', () => {
       ];
       state.resourceBank.coins = 4000;
 
-      executeDayStart(state);
+      executeWeekStart(state);
       endTurnHeadless(state);
 
       const challengeLog = state.activityLog.find(
@@ -974,7 +974,7 @@ describe('MainStreetEngine', () => {
       const state = createTestState('no-challenges');
       state.activeChallenges = [];
 
-      executeDayStart(state);
+      executeWeekStart(state);
       const result = endTurnHeadless(state);
 
       // Should not crash; game continues

@@ -10,7 +10,7 @@
  * 2. Click the upgrade in hand → it becomes the pending hand card and the
  *    scene enters `'placing-from-hand'` targeting.
  * 3. Click an eligible business on the street → the upgrade is applied. A
- *    same-day moved upgrade is a free composite (the move already spent the
+ *    same-week moved upgrade is a free composite (the move already spent the
  *    action); an upgrade held from a previous day spends one action.
  * 4. Click an ineligible business → illegal-move feedback and the upgrade
  *    stays selected so the player can pick another target.
@@ -204,11 +204,11 @@ describe('Main Street upgrade hand-first click flow (browser)', () => {
     expect(scene.pendingHandIndex).toBeNull();
     expect(scene.pendingHandJustMoved).toBe(false);
     expect(scene.uiPhase).toBe('market');
-    // The same-day composite tracker records the moved upgrade.
+    // The same-week composite tracker records the moved upgrade.
     expect(scene.state.justMovedUpgradeCardId).toBe(upgrade.id);
   }, 60_000);
 
-  it('clicking the same-day upgrade in hand enters placing-from-hand targeting', async () => {
+  it('clicking the same-week upgrade in hand enters placing-from-hand targeting', async () => {
     game = await bootGame();
     const scene = getScene(game);
     const { upgrade } = setupUpgradeScene(scene, { actions: 1 });
@@ -221,12 +221,12 @@ describe('Main Street upgrade hand-first click flow (browser)', () => {
 
     expect(scene.pendingHandIndex).toBe(0);
     expect(scene.uiPhase).toBe('placing-from-hand');
-    // Same-day: the selected card is the one just moved, so the play will be
+    // Same-week: the selected card is the one just moved, so the play will be
     // a free composite.
     expect(scene.pendingHandJustMoved).toBe(true);
   }, 60_000);
 
-  it('applying the same-day upgrade to an eligible business does not spend a second action', async () => {
+  it('applying the same-week upgrade to an eligible business does not spend a second action', async () => {
     game = await bootGame();
     const scene = getScene(game);
     const { upgrade } = setupUpgradeScene(scene, { actions: 1 });
@@ -341,7 +341,7 @@ describe('Main Street upgrade hand-first click flow (browser)', () => {
     expect(scene.uiPhase).toBe('market');
   }, 60_000);
 
-  it('Escape cancels upgrade targeting and keeps the same-day apply free', async () => {
+  it('Escape cancels upgrade targeting and keeps the same-week apply free', async () => {
     game = await bootGame();
     const scene = getScene(game);
     const { upgrade } = setupUpgradeScene(scene, { actions: 1 });
@@ -367,7 +367,7 @@ describe('Main Street upgrade hand-first click flow (browser)', () => {
     expect(scene.pendingHandJustMoved).toBe(false);
     expect(scene.settingsPanel?.isOpen).toBe(false);
     // The card is still held, the move's action is still spent, and the
-    // same-day composite marker survives the cancel.
+    // same-week composite marker survives the cancel.
     expect(scene.state.hand.some((c: any) => c.id === upgrade.id)).toBe(true);
     expect(scene.state.actionsRemaining).toBe(0);
     expect(scene.state.justMovedUpgradeCardId).toBe(upgrade.id);

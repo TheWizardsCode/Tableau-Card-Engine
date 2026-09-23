@@ -22,7 +22,7 @@ import { recordMainStreetEvent } from './MainStreetTranscript';
 import { hasPeekCapableStaff } from './MainStreetStaffSkills';
 import { syncResourceBankToLedger, type MainStreetState, type PlayerRecord } from './MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   processEndOfTurn,
   executeAction,
   resolvePendingEventChoice,
@@ -451,7 +451,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   // Favour fallback (added above) stays legal too — with end-turn always
   // present so the AI loop still terminates.
   //
-  // Same-day composite plays are the exception (CG-0MT40HTYN008TJ6Q,
+  // Same-week composite plays are the exception (CG-0MT40HTYN008TJ6Q,
   // CG-0MTH5CC4H003Q4B3): applying an upgrade or playing an Investment event
   // that was moved to hand this turn costs no action (the move already spent
   // it), so they stay legal (and valuable) even at zero remaining actions.
@@ -460,8 +460,8 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   if ((state.actionsRemaining ?? 1) <= 0) {
     return [
       ...actions,
-      ...sameDayCompositeUpgradeActions(state),
-      ...sameDayCompositeEventActions(state),
+      ...sameWeekCompositeUpgradeActions(state),
+      ...sameWeekCompositeEventActions(state),
       { type: 'end-turn' },
     ];
   }
@@ -536,7 +536,7 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
   // Staff cards are hired directly from the market row, never moved to the
   // hand (CG-0MT3KZNQB0053K55); skip them here. Investment events are also
   // skipped: they have their own `buy-event` action, which spends the same
-  // single action and records the same-day composite tracker
+  // single action and records the same-week composite tracker
   // (`justMovedEventCardId`) — enumerating them here too would let the AI
   // acquire an event without that tracker and double-offer the same action.
   if (canAddToHand(state).legal) {
@@ -624,10 +624,10 @@ function getCheapestMarketCost(state: MainStreetState): number {
 
 // ── RandomStrategy ──────────────────────────────────────────
 
-// ── Same-day composite helpers (CG-0MT40HTYN008TJ6Q) ────────
+// ── Same-week composite helpers (CG-0MT40HTYN008TJ6Q) ────────
 
 /**
- * Whether applying the hand card at `handIndex` is a free same-day composite
+ * Whether applying the hand card at `handIndex` is a free same-week composite
  * — i.e. it was moved to the hand this turn, so the move already spent the
  * day's action and the apply costs nothing.
  *
@@ -635,14 +635,14 @@ function getCheapestMarketCost(state: MainStreetState): number {
  * @param handIndex  Index into `state.hand`.
  * @returns `true` when the play would consume no action.
  */
-export function isFreeSameDayUpgradePlay(state: MainStreetState, handIndex: number): boolean {
+export function isFreeSameWeekUpgradePlay(state: MainStreetState, handIndex: number): boolean {
   const card = (state.hand ?? [])[handIndex] as UpgradeCard | undefined;
   if (!card || card.family !== 'upgrade') return false;
   return state.justMovedUpgradeCardId != null && state.justMovedUpgradeCardId === card.id;
 }
 
 /**
- * The legal free same-day composite upgrade plays for the current state.
+ * The legal free same-week composite upgrade plays for the current state.
  *
  * These consume no daily action, so they are enumerated even when the budget
  * is spent (unlike every other action-consuming upgrade path). Eligibility
@@ -652,12 +652,12 @@ export function isFreeSameDayUpgradePlay(state: MainStreetState, handIndex: numb
  * @param state Current game state (read-only by convention).
  * @returns Legal `play-upgrade-from-hand` actions that cost no action.
  */
-function sameDayCompositeUpgradeActions(state: MainStreetState): PlayerAction[] {
+function sameWeekCompositeUpgradeActions(state: MainStreetState): PlayerAction[] {
   const actions: PlayerAction[] = [];
   const hand = state.hand ?? [];
   hand.forEach((card, handIndex) => {
     if (card.family !== 'upgrade') return;
-    if (!isFreeSameDayUpgradePlay(state, handIndex)) return;
+    if (!isFreeSameWeekUpgradePlay(state, handIndex)) return;
     const upgrade = card as UpgradeCard;
     if (state.resourceBank.coins < upgrade.cost) return;
     const requiredLevel = upgrade.requiredLevel ?? 0;
@@ -677,7 +677,7 @@ function sameDayCompositeUpgradeActions(state: MainStreetState): PlayerAction[] 
 }
 
 /**
- * Whether playing the hand card at `handIndex` is a free same-day event
+ * Whether playing the hand card at `handIndex` is a free same-week event
  * composite — i.e. the Investment event was taken to hand this turn, so the
  * move already spent the day's action and the play costs nothing
  * (CG-0MTFWBNL30043ZBM).
@@ -686,14 +686,14 @@ function sameDayCompositeUpgradeActions(state: MainStreetState): PlayerAction[] 
  * @param handIndex  Index into `state.hand`.
  * @returns `true` when the play would consume no action.
  */
-export function isFreeSameDayEventPlay(state: MainStreetState, handIndex: number): boolean {
+export function isFreeSameWeekEventPlay(state: MainStreetState, handIndex: number): boolean {
   const card = (state.hand ?? [])[handIndex] as EventCard | undefined;
   if (!card || card.family !== 'event' || card.trigger !== 'Investment') return false;
   return state.justMovedEventCardId != null && state.justMovedEventCardId === card.id;
 }
 
 /**
- * The legal free same-day composite event plays for the current state.
+ * The legal free same-week composite event plays for the current state.
  *
  * These consume no daily action, so they are enumerated even when the budget
  * is spent (unlike the action-consuming `buy-event` / held-event play paths).
@@ -703,11 +703,11 @@ export function isFreeSameDayEventPlay(state: MainStreetState, handIndex: number
  * @param state Current game state (read-only by convention).
  * @returns Legal `play-event-from-hand` actions that cost no action.
  */
-function sameDayCompositeEventActions(state: MainStreetState): PlayerAction[] {
+function sameWeekCompositeEventActions(state: MainStreetState): PlayerAction[] {
   const actions: PlayerAction[] = [];
   const hand = state.hand ?? [];
   hand.forEach((card, handIndex) => {
-    if (!isFreeSameDayEventPlay(state, handIndex)) return;
+    if (!isFreeSameWeekEventPlay(state, handIndex)) return;
     const event = card as EventCard;
     if (state.resourceBank.coins < event.cost) return;
     if (
@@ -762,7 +762,7 @@ export const RandomStrategy: MainStreetAiStrategy = {
 // ── Greedy spending routine ─────────────────────────────────
 
 /**
- * Selects the best *free* same-day composite play (upgrade apply or event
+ * Selects the best *free* same-week composite play (upgrade apply or event
  * play) — these consume no action, so they must be taken before any spending
  * or banking decision (CG-0MT40HTYN008TJ6Q, CG-0MTH5CC4H003Q4B3).
  *
@@ -776,10 +776,10 @@ function pickFreeCompositePlay(
   const freeCompositePlays: PlayerAction[] = [
     ...(legalActions.filter(
       a => a.type === 'play-upgrade-from-hand',
-    ) as PlayUpgradeFromHandAction[]).filter(a => isFreeSameDayUpgradePlay(state, a.handIndex)),
+    ) as PlayUpgradeFromHandAction[]).filter(a => isFreeSameWeekUpgradePlay(state, a.handIndex)),
     ...(legalActions.filter(
       a => a.type === 'play-event-from-hand',
-    ) as PlayEventFromHandAction[]).filter(a => isFreeSameDayEventPlay(state, a.handIndex)),
+    ) as PlayEventFromHandAction[]).filter(a => isFreeSameWeekEventPlay(state, a.handIndex)),
   ];
   if (freeCompositePlays.length === 0) return null;
   return pickBest(freeCompositePlays, a => scoreAction(state, a), rng);
@@ -788,7 +788,7 @@ function pickFreeCompositePlay(
 /**
  * Shared greedy spending routine following the PRD M3 priority chain:
  *
- *   0. Free same-day composite play (no action cost)
+ *   0. Free same-week composite play (no action cost)
  *   1. Play an affordable business from hand (best synergy placement)
  *   2. Play an affordable upgrade from hand
  *   3. Buy an upgrade (highest income gain per coin)
@@ -822,7 +822,7 @@ const chooseGreedyAction = (
       a => a.type === 'play-event-from-hand',
     ) as PlayEventFromHandAction[];
 
-    // Priority 0: a free same-day composite play (upgrade apply or event
+    // Priority 0: a free same-week composite play (upgrade apply or event
     // play) consumes no action, so it is taken before anything that spends
     // the budget — the rest of the day's plays stay available
     // (CG-0MT40HTYN008TJ6Q, CG-0MTH5CC4H003Q4B3).
@@ -841,7 +841,7 @@ const chooseGreedyAction = (
     }
 
     // Priority 2: play an affordable upgrade from hand (cost-at-play). Upgrades
-    // held from a previous day consume the daily action; the free same-day
+    // held from a previous day consume the daily action; the free same-week
     // composite was already handled by Priority 0 above.
     if (handUpgradeActions.length > 0) {
       return pickBest(handUpgradeActions, a => scorePlayUpgradeFromHandAction(state, a), rng);
@@ -859,7 +859,7 @@ const chooseGreedyAction = (
       return pickBest(businessActions, a => scoreBusinessAction(state, a), rng);
     }
 
-    // Priority 5: spend the day's action on the best market acquisition.
+    // Priority 5: spend this week's action on the best market acquisition.
     // Moving a non-event card to hand and taking an Investment event to hand
     // cost the same single action (CG-0MTFWBNL30043ZBM), so they compete in
     // one value-ranked tier — a fixed priority order would starve the event
@@ -964,7 +964,7 @@ export const BankingGreedyStrategy: MainStreetAiStrategy = {
   chooseAction(state: MainStreetState, rng: () => number): PlayerAction {
     const legalActions = enumerateLegalActions(state);
 
-    // Free same-day composite plays consume no action — take them before
+    // Free same-week composite plays consume no action — take them before
     // considering a hoard so a free play is never traded for a bank.
     const freeComposite = pickFreeCompositePlay(state, legalActions, rng);
     if (freeComposite) {
@@ -1026,7 +1026,7 @@ export class MainStreetAiPlayer extends AiPlayerBase<MainStreetAiStrategy> {
    */
   playGame(state: MainStreetState): void {
     while (state.gameResult === 'playing') {
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Execute actions until end-turn is chosen or game ends
       let action = this.chooseAction(state);
@@ -1552,12 +1552,12 @@ export function enumerateCompetitiveLegalActions(
     }
   }
 
-  // Action budget spent: only free same-day composites and end-turn remain.
+  // Action budget spent: only free same-week composites and end-turn remain.
   if (budget <= 0) {
     return [
       ...actions,
-      ...competitiveSameDayUpgradeActions(state, player),
-      ...competitiveSameDayEventActions(state, player),
+      ...competitiveSameWeekUpgradeActions(state, player),
+      ...competitiveSameWeekEventActions(state, player),
       { type: 'end-turn' },
     ];
   }
@@ -1639,8 +1639,8 @@ export function enumerateCompetitiveLegalActions(
   return actions;
 }
 
-/** Free same-day composite upgrade plays for the acting competitive player. */
-function competitiveSameDayUpgradeActions(
+/** Free same-week composite upgrade plays for the acting competitive player. */
+function competitiveSameWeekUpgradeActions(
   state: MainStreetState,
   player: PlayerRecord,
 ): PlayerAction[] {
@@ -1658,8 +1658,8 @@ function competitiveSameDayUpgradeActions(
   return actions;
 }
 
-/** Free same-day composite Investment plays for the acting competitive player. */
-function competitiveSameDayEventActions(
+/** Free same-week composite Investment plays for the acting competitive player. */
+function competitiveSameWeekEventActions(
   state: MainStreetState,
   player: PlayerRecord,
 ): PlayerAction[] {
@@ -1917,7 +1917,7 @@ export const CompetitiveGreedyStrategy: MainStreetAiStrategy = {
       a => a.type === 'play-event-from-hand',
     ) as PlayEventFromHandAction[];
 
-    // Priority 0: free same-day composite plays cost no action.
+    // Priority 0: free same-week composite plays cost no action.
     const player = getCompetitivePlayer(state, playerId);
     const freeCompositePlays: PlayerAction[] = [
       ...handUpgradeActions.filter(
@@ -1957,7 +1957,7 @@ export const CompetitiveGreedyStrategy: MainStreetAiStrategy = {
       return pickBest(businessActions, score, rng);
     }
 
-    // Priority 5: spend the day's action on the best market acquisition
+    // Priority 5: spend this week's action on the best market acquisition
     // (event take vs. non-event move-to-hand), ranked by value.
     const acquisitionActions = legalActions.filter(
       a => a.type === 'move-to-hand' || a.type === 'buy-event',

@@ -472,7 +472,7 @@ export function create(lmCtx: MainStreetLifecycleManagerContext): void {
     s.initSettingsPanel(DIFFICULTY_NAMES, 'Medium');
     // Drag-and-drop buy-to-slot (business cards → street slots): wire the
     // reusable core-engine drag-drop module after the settings panel exists
-    // (reads reducedMotion) and before the first startDayPhase refresh.
+    // (reads reducedMotion) and before the first startTurnPhase refresh.
     try {
       s.msTurnController.initDragDrop();
     } catch (e) {
@@ -494,7 +494,7 @@ export function create(lmCtx: MainStreetLifecycleManagerContext): void {
           difficulty: s.selectedDifficulty,
           unlockedCardIds: s.campaign?.unlockedCardIds,
         });
-        s.startDayPhase();
+        s.startTurnPhase();
         s.refreshAll();
       };
       window.addEventListener('tce:difficulty-changed', difficultyChangeHandler);
@@ -549,8 +549,8 @@ export function create(lmCtx: MainStreetLifecycleManagerContext): void {
               // day-banner because the tutorial overlays carry the guidance
               // (the banner was already deferred at boot). Clear the deferred
               // flag since we are not going to play the deferred banner.
-              s.deferredDayBanner = false;
-              s.startDayPhase(false, true);
+              s.deferredWeekBanner = false;
+              s.startTurnPhase(false, true);
               // Start the action-gated tutorial flow (T1-T17)
               const controller = (s as any).tutorialController as TutorialControllerState | undefined;
               if (controller) {
@@ -563,7 +563,7 @@ export function create(lmCtx: MainStreetLifecycleManagerContext): void {
           onSkip: () => {
             // Normal gameplay begins; play the deferred day-banner now
             // that the player has committed to the game.
-            s.playDeferredDayBanner();
+            s.playDeferredWeekBanner();
           },
         },
       );
@@ -661,8 +661,8 @@ export function create(lmCtx: MainStreetLifecycleManagerContext): void {
     // Start first turn — suppress the day-banner at boot so it does not
     // fire while the tutorial offer modal is visible or before any player
     // choice is made (deferred banner will play on skip/start/tutorial).
-    s.deferredDayBanner = true;
-    s.startDayPhase(false, true);
+    s.deferredWeekBanner = true;
+    s.startTurnPhase(false, true);
   
 }
 

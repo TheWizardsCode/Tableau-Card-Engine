@@ -16,7 +16,7 @@
 import { setupMainStreetGame } from '../example-games/main-street/MainStreetState';
 import type { MainStreetState } from '../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   endTurnHeadless,
   type PlayerAction,
@@ -148,7 +148,7 @@ function runScenario(scenario: ScenarioExpectation): ScenarioResult {
   let turnCount = 0;
 
   while (state.gameResult === 'playing' && state.turn <= 20) {
-    executeDayStart(state);
+    executeWeekStart(state);
     const planned = chooseActions(state);
     for (const action of planned) {
       if (action.type === 'end-turn') break;

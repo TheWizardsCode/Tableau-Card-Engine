@@ -31,7 +31,7 @@ import {
   type CommunitySpaceCard,
 } from '../../example-games/main-street/MainStreetCards';
 import {
-  executeDayStart,
+  executeWeekStart,
 } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Constants ───────────────────────────────────────────────
@@ -129,7 +129,7 @@ describe('MainStreet Sell Cards', () => {
 
   beforeEach(() => {
     state = createTestState('sell-test-' + Math.random().toString(36).slice(2, 8));
-    executeDayStart(state);
+    executeWeekStart(state);
   });
 
   // ── State: soldSlots field (AC3 preamble) ────────────────

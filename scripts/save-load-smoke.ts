@@ -52,7 +52,7 @@ import { SaveLoadStore } from '../src/core-engine';
 import { setupMainStreetGame } from '../example-games/main-street/MainStreetState';
 import type { MainStreetState } from '../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   endTurnHeadless,
   computeScore,
@@ -159,7 +159,7 @@ function playToCompletion(state: MainStreetState): TurnSnapshot[] {
   const snapshots: TurnSnapshot[] = [];
 
   while (state.gameResult === 'playing' && state.turn <= MAX_TURNS) {
-    executeDayStart(state);
+    executeWeekStart(state);
     const planned = chooseActions(state);
     for (const action of planned) {
       if (action.type === 'end-turn') break;
@@ -220,7 +220,7 @@ async function main() {
 
   for (let t = 0; t < checkpointAfterTurn; t++) {
     if (stateA.gameResult !== 'playing' || stateA.turn > MAX_TURNS) break;
-    executeDayStart(stateA);
+    executeWeekStart(stateA);
     const planned = chooseActions(stateA);
     for (const action of planned) {
       if (action.type === 'end-turn') break;

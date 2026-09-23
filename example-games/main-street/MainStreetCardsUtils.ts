@@ -49,7 +49,7 @@ export function getAllowedBusinessTypesForStaff(staff: Pick<StaffCard, 'allowedB
  *
  * @param staff    The staff card to check.
  * @param business The placed business/community-space card, or null.
- * @param _state   Reserved for future template resolution; unused today.
+ * @param _state   Reserved for future template resolution; unused currently.
  * @returns True when the staff may be employed at the business.
  */
 export function staffMatchesBusiness(

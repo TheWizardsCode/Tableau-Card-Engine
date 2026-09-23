@@ -82,9 +82,9 @@ interface MarketActionSnapshot {
   pendingApplicant: any | null;
   /** Staff roster — captured so undo restores the staff list. */
   staffCards: any | null;
-  /** Same-day upgrade composite tracker (CG-0MT3IYSRL001VVUP). */
+  /** Same-week upgrade composite tracker (CG-0MT3IYSRL001VVUP). */
   justMovedUpgradeCardId: string | null;
-  /** Same-day event composite tracker (CG-0MTFWBNL30043ZBM). */
+  /** Same-week event composite tracker (CG-0MTFWBNL30043ZBM). */
   justMovedEventCardId: string | null;
   /**
    * Pending dual-choice incident (CG-0MTSHG8RP008E128). Captured so undoing
@@ -345,8 +345,8 @@ export function playEventCommand(state: MainStreetState, handIndex?: number) {
       (s) => {
         const idx = handIndex ?? (s.hand ?? []).findIndex(c => c.family === 'event');
         const card = (s.hand ?? [])[idx] as any;
-        const isSameDay = card && (s as any).justMovedEventCardId != null && (s as any).justMovedEventCardId === card.id;
-        if (!isSameDay) consumeAction(s);
+        const isSameWeek = card && (s as any).justMovedEventCardId != null && (s as any).justMovedEventCardId === card.id;
+        if (!isSameWeek) consumeAction(s);
         return playEventFromHand(s, idx);
       },
       'PlayEventFromHand',
@@ -358,7 +358,7 @@ export function playEventCommand(state: MainStreetState, handIndex?: number) {
  * Command: Play Business from Hand (consumes 1 action; pays cost-at-play).
  *
  * Premium-aware (CG-0MT24X0SX007RLHN): when `premiumCost` is supplied the
- * +50% premium REPLACES the missing action (same-day composite placement
+ * +50% premium REPLACES the missing action (same-week composite placement
  * with 0 actions remaining) — no action is consumed and the premium price
  * is deducted, recorded in the undo/redo snapshot. When absent, the held-
  * card (plan-ahead) path is unchanged: 1 action consumed + listed cost.
@@ -390,7 +390,7 @@ export function playBusinessFromHandCommand(
 /**
  * Command: Play Upgrade from Hand (cost-at-play).
  *
- * Same-day composite (CG-0MT3IYSRL001VVUP): if the upgrade at handIndex is
+ * Same-week composite (CG-0MT3IYSRL001VVUP): if the upgrade at handIndex is
  * the same card just moved from market to hand this turn (justMovedUpgradeCardId),
  * the play is free — the move already consumed the action. Otherwise consumes 1 action.
  *
@@ -411,11 +411,11 @@ export function playUpgradeFromHandCommand(
           // Premium replaces the action — no consumeAction (mirrors playBusinessFromHandCommand).
         } else {
           const card = (s.hand ?? [])[handIndex];
-          const isSameDayComposite = card != null && s.justMovedUpgradeCardId != null && s.justMovedUpgradeCardId === (card as any).id;
-          if (!isSameDayComposite) {
+          const isSameWeekComposite = card != null && s.justMovedUpgradeCardId != null && s.justMovedUpgradeCardId === (card as any).id;
+          if (!isSameWeekComposite) {
             consumeAction(s);
           }
-          // Clear composite tracker after play (whether same-day or held).
+          // Clear composite tracker after play (whether same-week or held).
           if (s.justMovedUpgradeCardId != null && card != null && s.justMovedUpgradeCardId === (card as any).id) {
             s.justMovedUpgradeCardId = null;
           }

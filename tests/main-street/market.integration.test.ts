@@ -19,7 +19,7 @@ import {
   getEmptySlots,
 } from '../../example-games/main-street/MainStreetMarket';
 import {
-  executeDayStart,
+  executeWeekStart,
   endTurnHeadless,
   executeAction,
 } from '../../example-games/main-street/MainStreetEngine';
@@ -50,7 +50,7 @@ function hasDuplicateIds(items: { id: string }[]): string[] {
 
 /** Play one greedy turn: buy cheapest business if possible, end turn. */
 function playGreedyTurn(state: MainStreetState): void {
-  executeDayStart(state);
+  executeWeekStart(state);
   const affordable = getAffordableBusinessCards(state);
   affordable.sort((a, b) => a.cost - b.cost);
   const empty = getEmptySlots(state);

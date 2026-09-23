@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart, executeAction } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart, executeAction } from '../../example-games/main-street/MainStreetEngine';
 import type { PlayerAction } from '../../example-games/main-street/MainStreetEngine';
 import {
   enumerateLegalActions,
@@ -25,7 +25,7 @@ import { createSeededRng } from '../../src/core-engine/SeededRng';
 
 function createTestState(seed: string = 'cf-ai-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 

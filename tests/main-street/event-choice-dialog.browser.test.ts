@@ -159,7 +159,7 @@ describe('Main Street event-choice dialog overlay (browser)', () => {
     await waitForCondition(() => {
       const st = s.state;
       return st.pendingEventChoice === null && st.phase === 'MarketPhase' && st.turn === turnBefore + 1;
-    }, { timeoutMs: 15_000, label: 'reject resolution + next day' });
+    }, { timeoutMs: 15_000, label: 'reject resolution + next week' });
     expect(s.state.resourceBank.coins).toBe(coinsBefore);
   }, 30_000);
 });

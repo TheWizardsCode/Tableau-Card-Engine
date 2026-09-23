@@ -19,7 +19,7 @@ import {
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   endTurnHeadless,
   executeAction,
   peekIncidentDeck,
@@ -35,11 +35,11 @@ import { peekIncidentDeckCommand } from '../../example-games/main-street/MainStr
  */
 function createPeekState(seed: string = 'peek-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   // Generous but sub-threshold coin buffer: peek gate/reveal tests exercise
   // peek mechanics, not survival or score. The buffer must survive the worst
   // seeded incident (~-600) while staying below the win threshold so the
-  // turn completes to DayStart (content expansion re-rolls seeded draws).
+  // turn completes to WeekStart (content expansion re-rolls seeded draws).
   state.resourceBank.coins = 1400;
   const peekStaff = createStaffDeck(1).find(c => c.peekOncePerTurn);
   expect(peekStaff, 'a peek staff template must exist for this helper').toBeDefined();
@@ -50,7 +50,7 @@ function createPeekState(seed: string = 'peek-test'): MainStreetState {
 /** Builds a MarketPhase state with no staff employed. */
 function createNoStaffState(seed: string = 'peek-no-staff'): MainStreetState {
   const state = setupMainStreetGame({ seed });
-  executeDayStart(state);
+  executeWeekStart(state);
   return state;
 }
 
@@ -166,11 +166,11 @@ describe('AC3: once-per-turn gate', () => {
     peekIncidentDeck(state);
     expect(state.peekUsedThisTurn).toBe(true);
 
-    // Finish the day (IncidentPhase → EndCheck wraps to DayStart) and start
+    // Finish the day (IncidentPhase → EndCheck wraps to WeekStart) and start
     // the next turn; the gate must be cleared.
     endTurnHeadless(state);
-    expect(state.phase).toBe('DayStart');
-    executeDayStart(state);
+    expect(state.phase).toBe('WeekStart');
+    executeWeekStart(state);
 
     expect(state.peekUsedThisTurn).toBe(false);
     expect(() => peekIncidentDeck(state)).not.toThrow();
@@ -272,13 +272,13 @@ describe('AC2: revealedPeekedCard scene contract', () => {
     expect(state.revealedPeekedCard).toBeNull();
   });
 
-  it('clears revealedPeekedCard at DayStart', () => {
-    const state = createPeekState('peek-reveal-daystart');
+  it('clears revealedPeekedCard at WeekStart', () => {
+    const state = createPeekState('peek-reveal-weekstart');
     peekIncidentDeck(state);
     expect(state.revealedPeekedCard).not.toBeNull();
 
     endTurnHeadless(state);
-    executeDayStart(state);
+    executeWeekStart(state);
     expect(state.revealedPeekedCard).toBeNull();
     expect(state.peekUsedThisTurn).toBe(false);
   });

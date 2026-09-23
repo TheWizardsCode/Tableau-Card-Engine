@@ -104,7 +104,7 @@ export function onSlotClick(tcCtx: MainStreetTurnControllerContext, slotIndex: n
         // NEWLY formed pairs animate.
         const beforePairs = computeSynergyPairs(s.state.streetGrid, s.state.soldSlots ?? [], tcCtx.streetPairDims());
 
-        // Composite pricing (CG-0MT24X0SX007RLHN): a same-day card (just
+        // Composite pricing (CG-0MT24X0SX007RLHN): a same-week card (just
         // moved from the market this turn) is part of the move+place purchase
         // — the move already spent the daily action. When no action remains
         // for the placement step, the +50% premium replaces the missing
@@ -353,7 +353,7 @@ export function applyHandUpgradeToSlot(tcCtx: MainStreetTurnControllerContext, h
         const cmd = playUpgradeFromHandCommand(s.state, handIndex, slotIndex);
         s.undoManager.execute(cmd);
         s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
-        // Clear the same-day composite tracker once the upgrade has landed.
+        // Clear the same-week composite tracker once the upgrade has landed.
         if (s.state.justMovedUpgradeCardId === cardId) {
           s.state.justMovedUpgradeCardId = null;
         }

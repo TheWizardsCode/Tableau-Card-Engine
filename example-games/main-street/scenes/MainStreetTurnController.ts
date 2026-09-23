@@ -14,7 +14,7 @@ import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStr
 import type { SynergyPair } from '../MainStreetAdjacency';
 import type { TurnResult } from '../MainStreetEngine';
 import type { DragDropPayload } from '../../../src/ui/dragDrop';
-import { startDayPhase, endTurn, finishTurnPresentation, handleGameOver, presentEventChoiceDialog, onEventChoice, onPlayHeldEvent, performUndo, performRedo } from './MainStreetTurnControllerTurnFlow';
+import { startTurnPhase, endTurn, finishTurnPresentation, handleGameOver, presentEventChoiceDialog, onEventChoice, onPlayHeldEvent, performUndo, performRedo } from './MainStreetTurnControllerTurnFlow';
 import { onBusinessCardClick, onEventCardClick, onRefreshMarketClick, onPeekClick, onCommunityFavourClick, onUpgradeCardClick, onHandUpgradeCardClick, onStaffCardClick, onHandBusinessCardClick } from './MainStreetTurnControllerMarketActions';
 import { onSlotClick, onSellCard, applyHandUpgradeToSlot, hasPendingTargeting, cancelPendingPlacement, streetPairDims } from './MainStreetTurnControllerPlaceSell';
 import { initDragDrop, canPickUpBusinessCard, canDropBusinessCard, onDragDropBusiness, canPickUpUpgradeCard, canDropUpgradeCard, onDragDropUpgrade } from './MainStreetTurnControllerDragDrop';
@@ -28,8 +28,8 @@ export class MainStreetTurnController implements MainStreetTurnControllerContext
 
   constructor(public readonly scene: any) {}
 
-  public startDayPhase(skipMarketRefill: boolean = false, suppressDayBanner: boolean = false): void {
-    startDayPhase(this, skipMarketRefill, suppressDayBanner);
+  public startTurnPhase(skipMarketRefill: boolean = false, suppressWeekBanner: boolean = false): void {
+    startTurnPhase(this, skipMarketRefill, suppressWeekBanner);
   }
 
   public endTurn(): void {

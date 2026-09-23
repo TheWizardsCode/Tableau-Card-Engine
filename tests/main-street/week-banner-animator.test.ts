@@ -1,18 +1,18 @@
 /**
- * Main Street: Day Transition Banner Tests
+ * Main Street: Week Transition Banner Tests
  *
- * Unit tests for `MainStreetAnimator.animateDayBanner` — the non-interactive
- * "Week W · Year Y" banner that plays at each day start (fade in ~250ms,
+ * Unit tests for `MainStreetAnimator.animateWeekBanner` — the non-interactive
+ * "Week W · Year Y" banner that plays at each week start (fade in ~250ms,
  * hold ~300ms, fade out ~250ms, then destroy).
  *
  * These run in the Node unit environment, so the browser-only Phaser and
  * `src/ui` modules are mocked. The tests assert observable behaviour via the
  * public animator API: the banner container + "Week W · Year Y" text + depth,
- * the day-chime SFX (reused `SFX_KEYS.CLICK`), the fade-in tween, the
+ * the week-chime SFX (reused `SFX_KEYS.CLICK`), the fade-in tween, the
  * scheduled fade-out, the reduced-motion / replay-mode exemptions, and that
  * the banner is non-interactive (never calls setInteractive).
  *
- * @module tests/main-street/day-banner-animator
+ * @module tests/main-street/week-banner-animator
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -119,16 +119,16 @@ function createMockScene(overrides: Record<string, unknown> = {}) {
 
 // ── Tests ───────────────────────────────────────────────────
 
-describe('MainStreetAnimator.animateDayBanner', () => {
+describe('MainStreetAnimator.animateWeekBanner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('shows a "Week W \u00b7 Year Y" banner at the board centre with the day-chime SFX and fades in', () => {
+  it('shows a "Week W \u00b7 Year Y" banner at the board centre with the week-chime SFX and fades in', () => {
     const { scene, tweens, scheduled, banners } = createMockScene();
     const animator = new MainStreetAnimator(scene);
 
-    animator.animateDayBanner({ day: 3, week: 12, year: 1 });
+    animator.animateWeekBanner({ turn: 3, week: 12, year: 1 });
 
     // Banner at the board centre, above the board but below the HUD (1000).
     expect(banners).toHaveLength(1);
@@ -138,7 +138,7 @@ describe('MainStreetAnimator.animateDayBanner', () => {
     expect(banners[0].alpha).toBe(0);
     expect(banners[0].scaleX).toBe(0.6);
 
-    // Day-chime SFX (reused CLICK — no new ToneForge key).
+    // Week-chime SFX (reused CLICK — no new ToneForge key).
     expect(scene.soundManager.play).toHaveBeenCalledWith(SFX_KEYS.CLICK);
 
     // Fade-in tween: 250ms Back.easeOut to full size/opacity.
@@ -169,7 +169,7 @@ describe('MainStreetAnimator.animateDayBanner', () => {
     });
     const animator = new MainStreetAnimator(scene);
 
-    animator.animateDayBanner({ day: 1, week: 1, year: 1 });
+    animator.animateWeekBanner({ turn: 1, week: 1, year: 1 });
 
     expect(banners).toHaveLength(0);
     expect(tweens).toHaveLength(0);
@@ -181,7 +181,7 @@ describe('MainStreetAnimator.animateDayBanner', () => {
     const { scene, tweens, scheduled, banners } = createMockScene({ replayMode: true });
     const animator = new MainStreetAnimator(scene);
 
-    animator.animateDayBanner({ day: 2, week: 3, year: 1 });
+    animator.animateWeekBanner({ turn: 2, week: 3, year: 1 });
 
     expect(banners).toHaveLength(0);
     expect(tweens).toHaveLength(0);
@@ -192,7 +192,7 @@ describe('MainStreetAnimator.animateDayBanner', () => {
     const { scene, banners } = createMockScene();
     const animator = new MainStreetAnimator(scene);
 
-    animator.animateDayBanner({ day: 5, week: 20, year: 2 });
+    animator.animateWeekBanner({ turn: 5, week: 20, year: 2 });
 
     expect(banners).toHaveLength(1);
     expect(banners[0].setInteractive).not.toHaveBeenCalled();

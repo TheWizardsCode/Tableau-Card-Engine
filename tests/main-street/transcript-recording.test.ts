@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
 import { buyBusinessCommand } from '../../example-games/main-street/MainStreetCommands';
 import {
@@ -17,7 +17,7 @@ describe('Main Street transcript recording (action, undo, redo)', () => {
     state.resourceBank.coins = 9999; // content-era: any market business affordable
 
     // Move to MarketPhase so market is populated
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const emptySlots = state.streetGrid.map((s, i) => (s === null ? i : -1)).filter(i => i >= 0);
     expect(emptySlots.length).toBeGreaterThan(0);

@@ -18,7 +18,7 @@ import { resetCoinStaggerForTurn, reduceCoinStaggerAfterCard, getCardDelay, getF
 import { animateHudValueChanges, animateCelebration, animateIncomeCollection, animateIncomePhases, runIncomePhase, eventDeltaEffects, countOutCoins, revealInGrid, flyCoinsIn, flyCoinsOut, applyPendingDeltasOnce, collectIncomeGrids, showIncomePhaseLabel } from './MainStreetAnimatorIncome';
 import { animateIncidentReveal, animateIncidentDeltaBubbles, animatePeekReveal } from './MainStreetAnimatorIncident';
 import { animateMarketDealIn, createTransferCardVisual, cleanupTransferAnimations, animateTransferFromMarket, animateApplicantWalkOn, animateApplicantWalkOff, animateApplicantWalkIn } from './MainStreetAnimatorMarket';
-import { animateSynergyFormation, animateDayBanner, animateGameOver, animateUndoRedo, animateLevelUp, animateSell, animateClose, animateEventPlayed } from './MainStreetAnimatorBoard';
+import { animateSynergyFormation, animateWeekBanner, animateGameOver, animateUndoRedo, animateLevelUp, animateSell, animateClose, animateEventPlayed } from './MainStreetAnimatorBoard';
 
 export type { IncomePhaseKey, IncomePhaseOptions } from './MainStreetAnimatorContext';
 export type { MainStreetAnimatorContext } from './MainStreetAnimatorContext';
@@ -228,8 +228,8 @@ export class MainStreetAnimator implements MainStreetAnimatorContext {
     return getMarketCardCenter(this, _row, slotIndex);
   }
 
-  public animateDayBanner(params: { day: number; week: number; year: number }): void {
-    animateDayBanner(this, params);
+  public animateWeekBanner(params: { turn: number; week: number; year: number }): void {
+    animateWeekBanner(this, params);
   }
 
   public animateGameOver(params: { win: boolean; width: number; height: number }): void {

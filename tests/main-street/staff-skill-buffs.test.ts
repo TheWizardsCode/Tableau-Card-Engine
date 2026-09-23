@@ -34,7 +34,7 @@ import {
 } from '../../example-games/main-street/MainStreetStaffBuffs';
 import { getSkill, BASELINE_SKILL_ID } from '../../example-games/main-street/MainStreetStaffSkills';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { applyIncome, syncCardCurrentIncome, computeBusinessIncome } from '../../example-games/main-street/MainStreetAdjacency';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -56,7 +56,7 @@ function skills(...ids: string[]) {
 /** Places a known business on a fresh game grid slot 0 and returns its state. */
 function stateWithBusiness(synergyTypes: readonly string[] = ['Food'], baseIncome = 2) {
   const state = setupMainStreetGame({ seed: 'staff-buffs-integration' });
-  executeDayStart(state);
+  executeWeekStart(state);
   const business: BusinessCard = {
     family: 'business',
     id: 'test-bistro',

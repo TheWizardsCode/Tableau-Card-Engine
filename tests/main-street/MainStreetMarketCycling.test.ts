@@ -25,7 +25,7 @@ import {
   MARKET_TOTAL_SLOTS,
 } from '../../example-games/main-street/MainStreetCards';
 import {
-  executeDayStart,
+  executeWeekStart,
   processEndOfTurn,
   endTurnHeadless,
   executeAction,
@@ -107,7 +107,7 @@ describe('MainStreet Market Cycling', () => {
       'should capture unpurchased market cards in discard after MarketPhase',
       () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         // Get market cards before cycling
         const marketIDsBefore = getMarketIDs(state);
@@ -126,7 +126,7 @@ describe('MainStreet Market Cycling', () => {
       'should not append a Market cycled entry while still cycling cards to discard',
       () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
         const marketCount = state.market.cards.length;
         expect(marketCount).toBeGreaterThan(0);
         const logLenBefore = state.activityLog.length;
@@ -144,7 +144,7 @@ describe('MainStreet Market Cycling', () => {
       'should not log Market cycled when the market is empty',
       () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
         state.market.cards.length = 0;
         const logLenBefore = state.activityLog.length;
         cycleMarketCards(state);
@@ -154,7 +154,7 @@ describe('MainStreet Market Cycling', () => {
 
     it('should not remove player-owned tableau cards during cycling', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Buy a business-family card and place on tableau (buy-business only
       // accepts business/community-space cards — the market row may lead
@@ -180,7 +180,7 @@ describe('MainStreet Market Cycling', () => {
 
     it('should not remove player-owned hand cards during cycling', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // If hand exists, add a card to simulate hand ownership
       if (HAND_FEATURE_AVAILABLE) {
@@ -209,19 +209,19 @@ describe('MainStreet Market Cycling', () => {
   // ── Market Refill After Cycling ────────────────────────────
 
   describe('Market refill after cycling', () => {
-    it('should refill the development market to full slots after DayStart', () => {
+    it('should refill the development market to full slots after WeekStart', () => {
       const state = createTestState();
 
       // Initially full
       expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
 
       // Run a full turn
-      executeDayStart(state);
+      executeWeekStart(state);
       processEndOfTurn(state);
 
       // Next day start refills
-      if (state.phase === 'DayStart') {
-        executeDayStart(state);
+      if (state.phase === 'WeekStart') {
+        executeWeekStart(state);
         expect(state.market.cards.length).toBe(MARKET_TOTAL_SLOTS);
       }
     });
@@ -232,7 +232,7 @@ describe('MainStreet Market Cycling', () => {
         const state = createTestState();
         const firstMarketIds = getMarketIDs(state);
 
-        executeDayStart(state);
+        executeWeekStart(state);
 
         // Apply cycling
         cycleMarketCards(state);
@@ -250,15 +250,15 @@ describe('MainStreet Market Cycling', () => {
 
     it('should not crash when deck is near empty during refill', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Drain the business deck
       state.decks.business.length = 0;
 
       expect(() => processEndOfTurn(state)).not.toThrow();
 
-      if (state.phase === 'DayStart') {
-        expect(() => executeDayStart(state)).not.toThrow();
+      if (state.phase === 'WeekStart') {
+        expect(() => executeWeekStart(state)).not.toThrow();
       }
     });
   });
@@ -270,7 +270,7 @@ describe('MainStreet Market Cycling', () => {
       'should reshuffle discard into deck when deck is empty',
       () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         // Simulate deck depletion: move all deck cards to discard
         const bizCards = state.decks.business.splice(0);
@@ -296,14 +296,14 @@ describe('MainStreet Market Cycling', () => {
       // Same initial state
       expect(getMarketIDs(state1)).toEqual(getMarketIDs(state2));
 
-      executeDayStart(state1);
-      executeDayStart(state2);
+      executeWeekStart(state1);
+      executeWeekStart(state2);
       processEndOfTurn(state1);
       processEndOfTurn(state2);
 
-      if (state1.phase === 'DayStart' && state2.phase === 'DayStart') {
-        executeDayStart(state1);
-        executeDayStart(state2);
+      if (state1.phase === 'WeekStart' && state2.phase === 'WeekStart') {
+        executeWeekStart(state1);
+        executeWeekStart(state2);
 
         // After same operations, markets should be identical
         expect(getMarketIDs(state1)).toEqual(getMarketIDs(state2));
@@ -321,7 +321,7 @@ describe('MainStreet Market Cycling', () => {
         state.resourceBank.coins = 10000;
 
         for (let i = 0; i < 3 && state.gameResult === 'playing'; i++) {
-          executeDayStart(state);
+          executeWeekStart(state);
 
           // Buy a business-family card if possible (buy-business only
           // accepts business/community-space cards).
@@ -378,7 +378,7 @@ describe('MainStreet Market Cycling', () => {
   describe('Edge Cases', () => {
     it('should handle empty market without crashing', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.market.cards.length = 0;
       state.market.cards.length = 0;
@@ -394,17 +394,17 @@ describe('MainStreet Market Cycling', () => {
       state.decks.event.length = 0;
       state.decks.upgrade.length = 0;
 
-      executeDayStart(state);
+      executeWeekStart(state);
       expect(() => processEndOfTurn(state)).not.toThrow();
     });
 
     it('should handle full turn cycle with no player purchases', () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
       expect(() => processEndOfTurn(state)).not.toThrow();
 
-      if (state.phase === 'DayStart') {
-        executeDayStart(state);
+      if (state.phase === 'WeekStart') {
+        executeWeekStart(state);
         expect(state.market.cards.length).toBeGreaterThan(0);
       }
     });
@@ -414,7 +414,7 @@ describe('MainStreet Market Cycling', () => {
 
       for (let i = 0; i < 3 && state.gameResult === 'playing'; i++) {
         const turnBefore = state.turn;
-        executeDayStart(state);
+        executeWeekStart(state);
         // Headless helper auto-resolves any dual-choice incident so the turn
         // always completes (CG-0MTSHG8RP008E128).
         endTurnHeadless(state);
@@ -432,14 +432,14 @@ describe('MainStreet Market Cycling', () => {
       () => {
         const state = createTestState();
 
-        executeDayStart(state);
+        executeWeekStart(state);
         cycleMarketCards(state);
         const discardsAfterTurn1 = getTotalDiscardCount(state);
 
         processEndOfTurn(state);
 
         if (state.gameResult === 'playing') {
-          executeDayStart(state);
+          executeWeekStart(state);
           cycleMarketCards(state);
           const discardsAfterTurn2 = getTotalDiscardCount(state);
           expect(discardsAfterTurn2).toBeGreaterThanOrEqual(discardsAfterTurn1);

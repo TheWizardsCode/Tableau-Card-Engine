@@ -4,7 +4,7 @@ import path from 'node:path';
 import { validateTranscriptFile } from '../../scripts/validate-transcript';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import {
-  executeDayStart,
+  executeWeekStart,
   executeAction,
   endTurnHeadless,
   computeScore,
@@ -52,14 +52,14 @@ function runGreedyGame(seed: string, maxTurns = 30): {
   const turns: TurnRecord[] = [];
 
   while (state.gameResult === 'playing' && state.turn <= maxTurns) {
-    executeDayStart(state);
+    executeWeekStart(state);
 
     const actions: PlayerAction[] = [];
     const executed: { type: string; detail: string }[] = [];
 
     // Daily action budget for this turn (CG-0MT40HTYN008TJ6Q): every planned
     // action below consumes one action — including `buy-upgrade`, which is the
-    // headless equivalent of the same-day click composite. Track the budget
+    // headless equivalent of the same-week click composite. Track the budget
     // while planning so the harness never queues actions the engine would
     // reject.
     let actionBudget = state.actionsRemaining ?? 1;

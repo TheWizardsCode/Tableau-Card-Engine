@@ -42,7 +42,7 @@ import {
   type BusinessCard,
 } from '../../example-games/main-street/MainStreetCards';
 import {
-  executeDayStart,
+  executeWeekStart,
 } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Feature Detection ───────────────────────────────────────
@@ -171,7 +171,7 @@ describe('MainStreet Place/Sell System', () => {
       'should place card from hand to tableau with cost-at-play deduction',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -203,7 +203,7 @@ describe('MainStreet Place/Sell System', () => {
       'placement from hand deducts the card cost',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -232,7 +232,7 @@ describe('MainStreet Place/Sell System', () => {
       'should reject placement when hand is empty',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const slot = findEmptySlot(state);
         if (slot < 0) return;
@@ -250,7 +250,7 @@ describe('MainStreet Place/Sell System', () => {
       'should reject placement when target slot is occupied',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -282,7 +282,7 @@ describe('MainStreet Place/Sell System', () => {
       'should credit 75% of purchase value when selling from hand',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -308,7 +308,7 @@ describe('MainStreet Place/Sell System', () => {
       'should move sold card to discard pile',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -332,7 +332,7 @@ describe('MainStreet Place/Sell System', () => {
       'should reject selling from empty hand',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 
@@ -346,7 +346,7 @@ describe('MainStreet Place/Sell System', () => {
       'should reject with invalid hand index',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         addCardToHand(state, { id: 'test-card', cost: 6 });
         const invalidIndex = getHand(state).length + 5;
@@ -367,7 +367,7 @@ describe('MainStreet Place/Sell System', () => {
       'should credit 75% of purchase value when selling from tableau',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -402,7 +402,7 @@ describe('MainStreet Place/Sell System', () => {
       'should move sold tableau card to discard pile',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -432,7 +432,7 @@ describe('MainStreet Place/Sell System', () => {
       'should reject selling from empty tableau slot',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 
@@ -446,7 +446,7 @@ describe('MainStreet Place/Sell System', () => {
       'should reject with invalid slot index',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 
@@ -464,7 +464,7 @@ describe('MainStreet Place/Sell System', () => {
       'should block placement when player has insufficient coins',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         // Add a high-cost card to hand that exceeds current coins
         addCardToHand(state, { id: 'biz-expensive', cost: 999, name: 'Expensive' });
@@ -491,7 +491,7 @@ describe('MainStreet Place/Sell System', () => {
       'should allow placement when player has sufficient coins',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -512,7 +512,7 @@ describe('MainStreet Place/Sell System', () => {
       'should block placement with 0 coins (cost-at-play)',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         // Drain coins to 0
         state.resourceBank.coins = 0;
@@ -543,7 +543,7 @@ describe('MainStreet Place/Sell System', () => {
       'canSellFromHand should reject invalid hand index',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         addCardToHand(state, { id: 'test-card', cost: 6 });
 
@@ -559,7 +559,7 @@ describe('MainStreet Place/Sell System', () => {
       'canSellFromHand should allow selling a card in hand',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         addCardToHand(state, { id: 'test-card', cost: 6 });
 
@@ -574,7 +574,7 @@ describe('MainStreet Place/Sell System', () => {
       'canSellFromTableau should reject invalid slot index',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 
@@ -588,7 +588,7 @@ describe('MainStreet Place/Sell System', () => {
       'canSellFromTableau should reject empty tableau slot',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const engine = await import('../../example-games/main-street/MainStreetEngine');
 
@@ -602,7 +602,7 @@ describe('MainStreet Place/Sell System', () => {
       'canSellFromTableau should allow selling an occupied slot',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -621,7 +621,7 @@ describe('MainStreet Place/Sell System', () => {
       'legality checks do not mutate state',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -656,7 +656,7 @@ describe('MainStreet Place/Sell System', () => {
       'should place sold cards (from hand) into discard pile',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -677,7 +677,7 @@ describe('MainStreet Place/Sell System', () => {
       'should place sold cards (from tableau) into discard pile',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -703,7 +703,7 @@ describe('MainStreet Place/Sell System', () => {
       'should accumulate multiple sold cards in discard pile',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const bizCards = state.market.cards.filter(
           c => c.family === 'business' || c.family === 'community-space',
@@ -736,7 +736,7 @@ describe('MainStreet Place/Sell System', () => {
       'should record a transcript event for placing from hand',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -780,7 +780,7 @@ describe('MainStreet Place/Sell System', () => {
       'should record a transcript event for selling from hand',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -818,7 +818,7 @@ describe('MainStreet Place/Sell System', () => {
       'should record a transcript event for selling from tableau',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -866,7 +866,7 @@ describe('MainStreet Place/Sell System', () => {
       'should handle placing the last card from hand',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -888,7 +888,7 @@ describe('MainStreet Place/Sell System', () => {
       'should preserve other hand cards when placing or selling one card',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const cards = state.market.cards.filter(
           c => c.cost <= state.resourceBank.coins,
@@ -917,7 +917,7 @@ describe('MainStreet Place/Sell System', () => {
       'should handle selling all cards from hand leaving empty hand',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -935,7 +935,7 @@ describe('MainStreet Place/Sell System', () => {
       'should handle selling the only card from a full tableau slot',
       async () => {
         const state = createTestState();
-        executeDayStart(state);
+        executeWeekStart(state);
 
         const card = getAffordableCard(state);
         if (!card) return;
@@ -960,7 +960,7 @@ describe('MainStreet Place/Sell System', () => {
     it('should not break existing state fields during place/sell operations', () => {
       // Basic sanity: existing state fields are unchanged after operations
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       expect(state.turn).toBe(1);
       expect(state.phase).toBe('MarketPhase');
@@ -972,7 +972,7 @@ describe('MainStreet Place/Sell System', () => {
 
     it('rejects placing an event card from hand onto the street (CG-0MSKU0BE5003I2ZD)', async () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       // Put an event card in the hand
       state.hand = [{
@@ -998,7 +998,7 @@ describe('MainStreet Place/Sell System', () => {
 
     it('rejects selling an event card from hand (CG-0MSKU0BE5003I2ZD)', async () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.hand = [{
         family: 'event',
@@ -1019,7 +1019,7 @@ describe('MainStreet Place/Sell System', () => {
 
     it('reports illegal legality results for placing/selling an event card from hand (CG-0MSKU0BE5003I2ZD)', async () => {
       const state = createTestState();
-      executeDayStart(state);
+      executeWeekStart(state);
 
       state.hand = [{
         family: 'event',

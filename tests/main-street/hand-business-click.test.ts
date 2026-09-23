@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
-import { executeDayStart } from '../../example-games/main-street/MainStreetEngine';
+import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -109,8 +109,8 @@ function createMockScene(): any {
   };
 
   // Helper to run day start
-  mockScene.startDayPhase = () => {
-    executeDayStart(mockScene.state);
+  mockScene.startTurnPhase = () => {
+    executeWeekStart(mockScene.state);
     mockScene.uiPhase = 'market';
     mockScene.pendingHandIndex = null;
   };
@@ -124,7 +124,7 @@ describe('Hand business card click', () => {
   describe('onHandBusinessCardClick (turn controller)', () => {
     it('sets pendingHandIndex and switches to placing-from-hand during market phase', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       // Add cards to hand
       const bizCard = scene.state.market.cards[0];
@@ -146,7 +146,7 @@ describe('Hand business card click', () => {
 
     it('does nothing during non-market phases', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
@@ -166,7 +166,7 @@ describe('Hand business card click', () => {
 
     it('does nothing during animating phase', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
@@ -183,7 +183,7 @@ describe('Hand business card click', () => {
 
     it('does nothing during game-over phase', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
@@ -200,7 +200,7 @@ describe('Hand business card click', () => {
 
     it('allows switching to a different hand card during placing-from-hand', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       // Add two business-family cards to hand (the single row can also hold
       // event/upgrade cards, which are not placeable on the street).
@@ -227,7 +227,7 @@ describe('Hand business card click', () => {
   describe('Scene delegation', () => {
     it('MainStreetScene.onHandBusinessCardClick delegates to turn controller', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
@@ -251,7 +251,7 @@ describe('Hand business card click', () => {
   describe('Edge cases', () => {
     it('handles out-of-bounds index gracefully', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;
@@ -267,7 +267,7 @@ describe('Hand business card click', () => {
 
     it('handles empty hand gracefully', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       scene.state.hand = [];
       scene.pendingHandIndex = null;
@@ -281,7 +281,7 @@ describe('Hand business card click', () => {
 
     it('tutorial gating prevents action when tutorial disallows it', () => {
       const scene = createMockScene();
-      scene.startDayPhase();
+      scene.startTurnPhase();
 
       const bizCard = scene.state.market.cards[0];
       if (!bizCard) return;

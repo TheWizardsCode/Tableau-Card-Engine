@@ -350,7 +350,7 @@ Two mitigations are in place in this repository:
      `tests/main-street/hint-bar-placement.browser.test.ts`,
      `tests/main-street/undo-redo.browser.test.ts`, and
      `tests/ui/MainStreetMigration.browser.test.ts`. This is not just a
-     visual-overlay hazard: a mid-day checkpoint restores a partially-sold
+     visual-overlay hazard: a mid-week checkpoint restores a partially-sold
      market row with no business cards, so tests that assume a buyable
      business card (e.g. undo-redo's affordable-card finder) fail unless the
      checkpoint is cleared first (the ≥1-business guarantee applies at
@@ -1175,7 +1175,7 @@ Cards without dedicated art use the `Fallback` sprite.
 #### Turn Economy (CG-0MTINZ5GG007BH44)
 
 Single-source turn cash formula (Q1=c — see `MainStreetDifficulty.ts` header):
-`dayStart snapshot (dayStartCoins/dayStartRep at DayStart) → placement deductions → applyIncome breakdown (staff buffs → income-multiplier effects → rep multiplier sampled AFTER income's own rep accrual; hand cards contribute no income — CG-0MTRDX0DN004EECN) → ongoing costs (after income, before incident) → incident (or incident-averted log entry via Risk Manager per Q3) → net row (Turn N net: coinsNow-dayStartCoins / repNow-dayStartRep) as the final log entry, including premature bankruptcy/rep-collapse and competitive closing phases`. Invariants: Q1=c rep sampling, Q2 3-decimal tooltip (`toFixed(3)`), Q3 explicit averted entry, banner→net ordering on premature exits. Canonical sites: `reputationCoinMultiplier`/`applyReputationMultiplier` (`MainStreetDifficulty.ts`), `applyIncome` (`MainStreetAdjacency.ts`), `buildCoinsTooltip`/`buildReputationTooltip` (`MainStreetHudTooltips.ts`), `appendTurnNetRow`/`processEndOfTurn`/`resolveCompetitiveClosingPhases` (`MainStreetEngine.ts`).
+`weekStart snapshot (weekStartCoins/weekStartRep at WeekStart) → placement deductions → applyIncome breakdown (staff buffs → income-multiplier effects → rep multiplier sampled AFTER income's own rep accrual; hand cards contribute no income — CG-0MTRDX0DN004EECN) → ongoing costs (after income, before incident) → incident (or incident-averted log entry via Risk Manager per Q3) → net row (Turn N net: coinsNow-weekStartCoins / repNow-weekStartRep) as the final log entry, including premature bankruptcy/rep-collapse and competitive closing phases`. Invariants: Q1=c rep sampling, Q2 3-decimal tooltip (`toFixed(3)`), Q3 explicit averted entry, banner→net ordering on premature exits. Canonical sites: `reputationCoinMultiplier`/`applyReputationMultiplier` (`MainStreetDifficulty.ts`), `applyIncome` (`MainStreetAdjacency.ts`), `buildCoinsTooltip`/`buildReputationTooltip` (`MainStreetHudTooltips.ts`), `appendTurnNetRow`/`processEndOfTurn`/`resolveCompetitiveClosingPhases` (`MainStreetEngine.ts`).
 
 #### Deferred End-of-Turn Mutation (CG-0MTR72P14000VO6Q)
 
@@ -1197,7 +1197,7 @@ finishes) and the game-over banner never appears mid-animation.
   in `TurnResult.pendingCoinDelta` / `pendingRepDelta` / `pendingScoreDelta`
   and sets `TurnResult.requiresDeferredClosing`; `state.resourceBank` and
   `state.finalScore` are NOT mutated and the closing tail (EndCheck → next
-  day) is deferred. Tutorial, reduced-motion and replay paths omit the flag
+  week) is deferred. Tutorial, reduced-motion and replay paths omit the flag
   (legacy immediate behaviour, no regression — AC5).
 - **Apply at animation end.** The scene (`MainStreetTurnController` +
   `MainStreetAnimator`) applies the deltas exactly once via
@@ -1207,7 +1207,7 @@ finishes) and the game-over banner never appears mid-animation.
   loss check, challenge evaluation against the post-delta state (the
   end-of-turn **safety net**: challenges are normally completed immediately
   after the action that satisfies them, per CG-0MU37CKRR008252I), EndCheck,
-  next-day advance, net row — and finally refreshes the HUD.
+  next-week advance, net row — and finally refreshes the HUD.
 - **Deferred HUD window.** `refreshHud()` (`MainStreetRenderer.ts`) renders
   the pre-animation `previousCoins` / `previousReputation` captured at
   `endTurn()` start while `incomeCollectionActive` or `incidentRevealActive`
@@ -1236,7 +1236,7 @@ available during the market phase (it does not consume `actionsRemaining`):
   arbitrage.
 - Rates are per-difficulty `GameConfig` constants in `MainStreetDifficulty.ts`
   (defaults on Easy/Medium/Hard).
-- Gating: `state.favourUsedThisTurn` (market-phase only, reset at `DayStart`),
+- Gating: `state.favourUsedThisTurn` (market-phase only, reset at `WeekStart`),
   serialized with legacy-save backfill to `false`.
 - UI: two SLL-positioned buttons in the market-phase action bar
   (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones), disabled when the
@@ -2833,7 +2833,7 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   `CardGameScene.initSettingsPanel`). Visible only when running under
   `npm run dev` (`import.meta.env.DEV === true`).
 - **Function:** Toggles a dev-only `forcedStaffApplicant` flag that makes the
-  staff-applicant trigger fire deterministically at every day start, bypassing
+  staff-applicant trigger fire deterministically at every week start, bypassing
   the usual `min(income + reputation, 15)%` RNG roll. The overlay shows the
   current state (`[ON]` / `[OFF]`) and the live computed chance
   (e.g. `Staff Application [ON] — 12% chance`), which updates each time the
@@ -2843,14 +2843,14 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   eligible business with a free employment slot; if none exists — or the
   computed chance is 0 — no applicant is spawned. The trigger is also
   suppressed in tutorial/headless runs where `state.suppressApplicant` is
-  true, because `executeDayStart()` skips `resolveStaffApplicant()` entirely
+  true, because `executeWeekStart()` skips `resolveStaffApplicant()` entirely
   in that case.
 - **Session-only:** The `forcedStaffApplicant` flag is not persisted by
   save/load — it resets on a new game session.
 - **When to use:** Test the hire / decline / let-go applicant flow without
   waiting for the random trigger. Open the Settings panel (gear icon) →
   scroll to Debug Tools → click **Staff Application** → click `[  TOGGLE  ]`
-  to force an applicant on the next day start.
+  to force an applicant on the next week start.
 - **Implementation:**
   - `src/ui/debug/StaffApplicantCheatOverlay.ts` — Toggle overlay and
     `createStaffApplicantCheatTool()` factory.
