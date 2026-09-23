@@ -322,7 +322,7 @@ describe('CG-0MTINZ5GG007BH44 — Repro: 6-coin Arcade turn cash', () => {
 
     expect(incomeIdx).toBeGreaterThanOrEqual(0);
     expect(netIdx).toBeGreaterThan(incomeIdx);
-    expect(netIdx).toBe(logMessages.length - 1); // net row is FINAL entry
+    expect(netIdx).toBe(logMessages.length - 2); // net row is second-to-last (totals line is final)
   });
 
   it('uses only reputationCoinMultiplier/applyReputationMultiplier as canonical path', () => {
