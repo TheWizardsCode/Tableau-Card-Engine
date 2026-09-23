@@ -172,7 +172,7 @@ interface BeginDragOptions {
    * the card stayed put.
    */
   expectEngage?: boolean;
-  /** Max wall-clock time to keep retrying (default 15 s). */
+  /** Max wall-clock time to keep retrying (default 30 s). */
   deadlineMs?: number;
 }
 
@@ -204,7 +204,7 @@ async function beginDrag(
   container: any,
   opts: BeginDragOptions = {},
 ): Promise<void> {
-  const { expectEngage = true, deadlineMs = 15_000 } = opts;
+  const { expectEngage = true, deadlineMs = 30_000 } = opts;
   const originX = container.x;
   const originY = container.y;
 
