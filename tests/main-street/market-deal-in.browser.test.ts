@@ -49,9 +49,39 @@ function destroyGame(game: Phaser.Game | null): void {
   destroyPhaserGame(game);
 }
 
+/**
+ * Advance the Phaser game loop by one deterministic frame.
+ *
+ * Headless Chromium may throttle `requestAnimationFrame` under CPU
+ * contention, stalling Phaser's tween manager.  `TimeStep.step(time)` runs a
+ * full game step synchronously (the manual-stepping remedy used by
+ * `BeleagueredCastleLayout.browser.test.ts`), advancing tweens by a real
+ * frame regardless of rAF scheduling (CG-0MUE2U21C0007BKL).
+ */
+function stepGame(scene: Phaser.Scene, deltaMs = 16): void {
+  const loop = (scene.game as any)?.loop;
+  if (!loop || typeof loop.step !== 'function') return;
+  const now = typeof loop.now === 'number' && loop.now > 0
+    ? loop.now
+    : window.performance.now();
+  try {
+    loop.step(now + deltaMs);
+  } catch { /* game loop already torn down */ }
+}
+
+/**
+ * Poll a predicate, stepping the game loop each iteration when a `scene` is
+ * supplied so tween-driven predicates make progress even when rAF is
+ * throttled under CPU contention.
+ */
 async function waitForCondition(
   predicate: () => boolean,
-  options: { timeoutMs?: number; intervalMs?: number; label?: string } = {},
+  options: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    label?: string;
+    scene?: Phaser.Scene;
+  } = {},
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? 5000;
   const intervalMs = options.intervalMs ?? 25;
@@ -60,6 +90,9 @@ async function waitForCondition(
 
   while (Date.now() - start < timeoutMs) {
     if (predicate()) return;
+    // Step the game loop directly so the predicate (which may depend on a
+    // tween) makes progress even when rAF is throttled.
+    if (options.scene) stepGame(options.scene);
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 
@@ -130,7 +163,7 @@ describe('MainStreet market deal-in animation', () => {
     (scene.msTurnController as unknown as { startDayPhase: (skipMarketRefill?: boolean) => void }).startDayPhase();
 
     // The single market row deals in, with the rendered cards captured at call time.
-    await waitForCondition(() => calls.length >= 1, { label: 'deal-in call for the market row' });
+    await waitForCondition(() => calls.length >= 1, { label: 'deal-in call for the market row', scene });
 
     const rows = calls.map((c) => c.row);
     expect(rows).toContain('market');
@@ -141,65 +174,32 @@ describe('MainStreet market deal-in animation', () => {
       expect(call.scaleAtCall).toBeCloseTo(0.6, 1);
     }
 
-    // The staggered deal-in tweens complete: cards return to full scale.
-    // NOTE: headless Chromium (Playwright) may throttle RAF callbacks under
-    // CPU contention, causing Phaser tweens to lag or stall entirely.
-    // We therefore verify tween *scheduling* (isTweening) as a secondary
-    // signal and accept a relaxed scale threshold so the test remains
-    // green when tweens are simply slow rather than broken.
     // Day start can render the row more than once: a deferred boot render
     // still in flight and the explicit `startDayPhase()` both deal the market
     // in, and each render recreates the card containers. The LAST call owns
     // the containers the player actually sees (its tween advances); an
     // earlier call's containers were replaced and stay frozen at the dealt
     // 0.6 scale, so asserting on the first call reads a stale object.
-    const marketCall = [...calls].reverse().find((c) => c.row === 'market');
+    //
+    // Advance the game loop deterministically (headless Chromium may throttle
+    // rAF under CPU contention) and re-resolve the last market call on every
+    // step, so a deferred render that replaces the containers cannot leave the
+    // assertion reading a stale, frozen object.
+    let marketCall = [...calls].reverse().find((c) => c.row === 'market');
     expect(marketCall).toBeDefined();
 
-    // Helper: wait a few RAF frames (with fallback) to give tweens time to advance.
-    const waitForTweensToAdvance = (): Promise<void> =>
-      new Promise<void>((resolve) => {
-        let settled = false;
-        const fallback = setTimeout(() => { settled = true; resolve(); }, 2000);
-        const tick = () => {
-          if (settled) return;
-          requestAnimationFrame(() => {
-            if (settled) return;
-            resolve();
-            settled = true;
-            clearTimeout(fallback);
-          });
-        };
-        requestAnimationFrame(tick);
-      });
-
-    // Wait a couple of frames for the delayedCall callback + tween start.
-    await new Promise((r) => setTimeout(r, 100));
-    await waitForTweensToAdvance();
-    await waitForTweensToAdvance();
-
-    // Primary check: card has visibly grown from the dealt 0.6 toward 1.0.
-    // Accept >= 0.85 as "animated" — full 0.99 is ideal but headless envs
-    // may not complete the 350 ms tween in time.
-    const midProgress = marketCall!.cards[0]?.scaleX ?? 0;
-    expect(midProgress).toBeGreaterThan(0.6);
-
-    // If the tween is still in flight, assert that; otherwise confirm full scale.
-    const sceneRef = game!.scene.getScene('MainStreetScene') as Phaser.Scene & {
-      tweens?: Phaser.Tweens.TweenManager;
-    };
-    const cardRef = marketCall!.cards[0];
-    const stillTweening = sceneRef?.tweens?.isTweening?.(cardRef) ?? false;
-
-    if (stillTweening) {
-      // Tween is still running — the animation engine is working; accept.
-      expect(midProgress).toBeGreaterThan(0.6);
-    } else {
-      // Tween completed (or was skipped in reduced-motion): check scale.
-      await waitForCondition(() => (marketCall!.cards[0]?.scaleX ?? 0) >= 0.85, {
-        timeoutMs: 3000,
-        label: 'first market card to animate toward full scale',
-      });
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      stepGame(scene);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const latest = [...calls].reverse().find((c) => c.row === 'market');
+      if (latest) marketCall = latest;
+      if ((marketCall!.cards[0]?.scaleX ?? 0) >= 0.85) break;
     }
+
+    // The last market call's cards tweened from the dealt 0.6 to (near) full
+    // scale. Accept >= 0.85 — full 0.99 is ideal but headless envs may not
+    // complete the 350 ms tween in the budget.
+    expect(marketCall!.cards[0]?.scaleX ?? 0).toBeGreaterThanOrEqual(0.85);
   }, 30_000);
 });
