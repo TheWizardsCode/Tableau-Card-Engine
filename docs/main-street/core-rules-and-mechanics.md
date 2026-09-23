@@ -38,10 +38,10 @@
 | **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this business. |
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
 | **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g., Clinic provides +0.2 rep/turn). Default 0. |
-| **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase** for business cards placed on the street grid. Cards held in hand are not charged (CG-0MTC31LN3000UHDY). Defaults to 0 for cards without a CSV value. Mirrors the StaffCard/CommunitySpaceCard `ongoingCost` mechanic. |
+| **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase** for business cards placed on the street grid. Cards held in hand are not charged (CG-0MTC31LN3000UHDY); sold cards are not charged either (CG-0MU3VH7QW006A2XA). Defaults to 0 for cards without a CSV value. Mirrors the StaffCard/CommunitySpaceCard `ongoingCost` mechanic. |
 | **Description** | string | Flavor text and any special rules. |
 
-> **Business ongoing costs are deducted in the IncomePhase.** Business cards with `ongoingCost > 0` **placed on the street grid** have their total running cost deducted from coins each turn, alongside staff and community-space costs (CG-0MSVYPEZ90085SHE). Business cards held in the player's hand are not yet active and do **not** incur running costs (CG-0MTC31LN3000UHDY). The deduction is **clamped at 0 coins** — the player is never driven below zero — and both the deduction and any shortfall are logged to the activity log.
+> **Business ongoing costs are deducted in the IncomePhase.** Business cards with `ongoingCost > 0` **placed on the street grid** have their total running cost deducted from coins each turn, alongside staff and community-space costs (CG-0MSVYPEZ90085SHE). Business cards held in the player's hand are not yet active and do **not** incur running costs (CG-0MTC31LN3000UHDY), and **sold** street cards are excluded from the deduction entirely (CG-0MU3VH7QW006A2XA) — a sold card is an inert synergy anchor, so it neither earns nor costs. The deduction is **clamped at 0 coins** — the player is never driven below zero — and both the deduction and any shortfall are logged to the activity log.
 
 **Example Business Card (JSON‑like)**
 ```json
@@ -116,7 +116,7 @@ Community space cards (e.g. Park, Library) are a separate card family (`communit
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
 | **Description** | string | Flavor text and any special rules. |
 
-> **Ongoing costs are deducted in the IncomePhase.** Community spaces with `ongoingCost > 0` have their total running cost deducted from coins each turn (after income is credited, alongside staff card costs). The deduction is **clamped at 0 coins** — the player is never driven below zero — and both the deduction and any shortfall are logged to the activity log.
+> **Ongoing costs are deducted in the IncomePhase.** Community spaces with `ongoingCost > 0` have their total running cost deducted from coins each turn (after income is credited, alongside staff card costs). Sold community-space cards are excluded from the deduction (CG-0MU3VH7QW006A2XA). The deduction is **clamped at 0 coins** — the player is never driven below zero — and both the deduction and any shortfall are logged to the activity log.
 
 ---
 
@@ -250,7 +250,7 @@ Each day (MarketPhase) the player has **exactly one action** — two while a **G
 **Free operations (never consume an action):**
 
 - Market re-roll/refresh
-- Selling a business — **free**, and the card **stays on the grid** as an inert *sold* marker (no income/reputation for itself, but still a synergy anchor for its neighbours; the slot stays occupied). Refund formula (CG-0MT5XO7DI0066QCT): `Math.ceil((card.cost + totalUpgradeCost) * 1.5) + Math.max(0, currentIncome − effectiveBase) + Math.max(0, currentReputationPerTurn − (repPerTurn + reputationBonus))` where `effectiveBase = (baseIncome + incomeBonus) × (hasAdjacentSameType ? 0.6 : 1)` and the 1.5× is the same +50% buy-and-place premium; applies to business **and** community-space cards; synergy comps are 0 when undefined and never negative.
+- Selling a business — **free**, and the card **stays on the grid** as an inert *sold* marker (no income/reputation for itself, **no ongoing/running cost** — sold cards are excluded from the IncomePhase ongoing-cost deduction (CG-0MU3VH7QW006A2XA) — but still a synergy anchor for its neighbours; the slot stays occupied). Refund formula (CG-0MT5XO7DI0066QCT): `Math.ceil((card.cost + totalUpgradeCost) * 1.5) + Math.max(0, currentIncome − effectiveBase) + Math.max(0, currentReputationPerTurn − (repPerTurn + reputationBonus))` where `effectiveBase = (baseIncome + incomeBonus) × (hasAdjacentSameType ? 0.6 : 1)` and the 1.5× is the same +50% buy-and-place premium; applies to business **and** community-space cards; synergy comps are 0 when undefined and never negative.
   The sell dialog and activity log show the breakdown (base, synergy income, synergy rep).
 - Hint (still 1/day)
 - Discarding from hand

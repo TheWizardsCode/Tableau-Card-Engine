@@ -24,7 +24,7 @@ import {
   createCompetitiveState,
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
-import type { BusinessCard, EventCard, DurationEventCard, StaffCard } from '../../example-games/main-street/MainStreetCards';
+import type { BusinessCard, CommunitySpaceCard, EventCard, DurationEventCard, StaffCard } from '../../example-games/main-street/MainStreetCards';
 import {
   applyCompetitiveIncome,
   updateNeighborsOnPlacement,
@@ -90,7 +90,26 @@ function compState(seed: string = 'comp-income'): MainStreetState {
 }
 
 /** Places a card at a slot, refreshes adjacency caches, tags its owner. */
-function place(state: MainStreetState, card: BusinessCard, slot: number, ownerId: number): void {
+/** Creates a community-space card with arbitrary overrides (for tests). */
+function makeCommunitySpace(overrides: Partial<CommunitySpaceCard> = {}): CommunitySpaceCard {
+  return {
+    family: 'community-space' as const,
+    id: overrides.id ?? 'test-cs',
+    name: overrides.name ?? 'Test Community Space',
+    cost: overrides.cost ?? 100,
+    baseIncome: overrides.baseIncome ?? 0,
+    synergyTypes: overrides.synergyTypes ?? [],
+    description: overrides.description ?? 'A test community space',
+    level: overrides.level ?? 0,
+    incomeBonus: overrides.incomeBonus ?? 0,
+    synergyRangeBonus: overrides.synergyRangeBonus ?? 0,
+    reputationBonus: overrides.reputationBonus ?? 0,
+    ongoingCost: overrides.ongoingCost ?? 0,
+    ...overrides,
+  } as CommunitySpaceCard;
+}
+
+function place(state: MainStreetState, card: BusinessCard | CommunitySpaceCard, slot: number, ownerId: number): void {
   state.streetGrid[slot] = card;
   updateNeighborsOnPlacement(state, slot);
   state.ownerTaggedGrid![slot] = { card, ownerId };
@@ -184,6 +203,64 @@ describe('AC1 — Per-owner income routing (CG-0MTIIL6J200291ZQ)', () => {
       expect(r.income.phaseBreakdown.perSlotBreakdown.length).toBe(r.income.breakdown.length);
       expect(r.income.handSynergyTotal).toBe(0);
     }
+  });
+
+  describe('Sold-card exclusion from competitive ongoing costs (CG-0MU3VH7QW006A2XA)', () => {
+    it('should NOT deduct business ongoingCost for a sold slot in competitive mode', () => {
+      const state = compState('comp-sold-no-cost');
+      const biz = makeBiz({ id: 'sold-compet-biz', ongoingCost: 100 });
+      place(state, biz, 0, 0);
+      state.soldSlots[0] = true;
+
+      const coinsBefore = state.players![0].coins;
+      applyCompetitiveOngoingCosts(state);
+
+      // Sold card should NOT incur ongoing cost
+      expect(state.players![0].coins).toBe(coinsBefore);
+    });
+
+    it('should still deduct for an unsold slot in competitive mode (regression)', () => {
+      const state = compState('comp-unsold-cost');
+      const biz = makeBiz({ id: 'unsold-compet-biz', ongoingCost: 100 });
+      place(state, biz, 0, 0);
+      // Not sold
+
+      applyCompetitiveOngoingCosts(state);
+
+      expect(state.players![0].coins).toBe(1000 - 100);
+    });
+
+    it('should NOT deduct community-space ongoingCost for a sold slot in competitive mode', () => {
+      const state = compState('comp-sold-cs-no-cost');
+      const cs = makeCommunitySpace({ id: 'sold-cs', ongoingCost: 50 });
+      place(state, cs, 0, 0);
+      state.soldSlots[0] = true;
+
+      const coinsBefore = state.players![0].coins;
+      applyCompetitiveOngoingCosts(state);
+
+      // Sold card should NOT incur ongoing cost
+      expect(state.players![0].coins).toBe(coinsBefore);
+    });
+
+    it('should only charge unsold slots when mixing sold and unsold in competitive mode', () => {
+      const state = compState('comp-mixed-sold-unsold');
+      // Sold business for P0
+      const soldBiz = makeBiz({ id: 'sold-biz-comp', ongoingCost: 100 });
+      place(state, soldBiz, 0, 0);
+      state.soldSlots[0] = true;
+      // Unsold business for P1
+      const unsoldBiz = makeBiz({ id: 'unsold-biz-comp', ongoingCost: 40 });
+      place(state, unsoldBiz, 1, 1);
+
+      const p0Before = state.players![0].coins;
+      const p1Before = state.players![1].coins;
+      applyCompetitiveOngoingCosts(state);
+
+      // P0 sold → no deduction. P1 unsold → charged 40.
+      expect(state.players![0].coins).toBe(p0Before);
+      expect(state.players![1].coins).toBe(p1Before - 40);
+    });
   });
 
   describe('per-owner ongoing costs (salary/upkeep)', () => {

@@ -407,8 +407,11 @@ export function applyCommunitySpaceOngoingCosts(state: MainStreetState, opts?: {
 
   let totalCost = 0;
   let spaceCount = 0;
-  for (const slot of grid) {
+  // Sold cards do not incur ongoing costs (CG-0MU3VH7QW006A2XA).
+  for (let i = 0; i < grid.length; i++) {
+    const slot = grid[i];
     if (!slot || slot.family !== 'community-space') continue;
+    if (state.soldSlots[i]) continue; // Sold cards do not incur ongoing costs
     const cost = slot.ongoingCost ?? 0;
     if (cost > 0) {
       totalCost += cost;
@@ -466,9 +469,12 @@ export function applyBusinessOngoingCosts(state: MainStreetState, opts?: { apply
   // cards held in hand are not yet active and incur no running cost
   // (CG-0MTC31LN3000UHDY). Mirrors applyStaffOngoingCosts() /
   // applyCommunitySpaceOngoingCosts().
+  // Sold cards do not incur ongoing costs (CG-0MU3VH7QW006A2XA).
   const grid = state.streetGrid;
-  for (const slot of grid) {
+  for (let i = 0; i < grid.length; i++) {
+    const slot = grid[i];
     if (!slot || slot.family !== 'business') continue;
+    if (state.soldSlots[i]) continue; // Sold cards do not incur ongoing costs
     const cost = (slot as BusinessCard).ongoingCost ?? 0;
     if (cost > 0) {
       totalCost += cost;
@@ -566,6 +572,7 @@ export function applyCompetitiveOngoingCosts(state: MainStreetState): void {
   }
 
   // Community-space + business running costs: charge each slot's owner.
+  // Sold cards do not incur ongoing costs (CG-0MU3VH7QW006A2XA).
   const grid = state.streetGrid;
   const ownerCosts = new Map<number, number>();
   const ownerCounts = new Map<number, { businesses: number; spaces: number }>();
@@ -573,6 +580,7 @@ export function applyCompetitiveOngoingCosts(state: MainStreetState): void {
     const slot = grid[i];
     if (!slot) continue;
     if (slot.family !== 'business' && slot.family !== 'community-space') continue;
+    if (state.soldSlots[i]) continue; // Sold cards do not incur ongoing costs
     const cost = (slot as BusinessCard).ongoingCost ?? 0;
     if (cost <= 0) continue;
     const ownerId = getSlotOwnerId(state, i);
