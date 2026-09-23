@@ -724,14 +724,31 @@ export function executeFullTurn(
   // DayStart
   executeDayStart(state);
 
-  // Execute player actions
+  // Execute player actions, accumulating any challenges completed mid-turn
+  // by per-action evaluation (CG-0MU37CKRR008252I).
+  const midTurnCompleted: string[] = [];
   for (const action of actions) {
     if (action.type === 'end-turn') break;
     executeAction(state, action);
+    if (state._newlyCompletedThisAction?.length) {
+      midTurnCompleted.push(...state._newlyCompletedThisAction);
+    }
   }
 
   // Process end of turn (headless: auto-resolves any dual-choice incident)
-  return endTurnHeadless(state);
+  const result = endTurnHeadless(state);
+
+  // Surface mid-turn completions through the TurnResult so headless/AI
+  // callers observe the same completion set as the interactive scene. The
+  // end-of-turn safety net only reports *additional* (closing-phase)
+  // completions, so the union is de-duplicated defensively.
+  if (midTurnCompleted.length > 0) {
+    result.newlyCompletedChallenges = [
+      ...new Set([...midTurnCompleted, ...result.newlyCompletedChallenges]),
+    ];
+  }
+
+  return result;
 }
 
 /**

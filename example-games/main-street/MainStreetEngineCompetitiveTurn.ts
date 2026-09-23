@@ -124,20 +124,30 @@ export function executeCompetitiveDay(
 ): TurnResult {
   executeCompetitiveDayStart(state);
   const n = state.players?.length ?? 1;
-  if (n === 1) {
-    for (const action of playerActions[0] ?? []) {
+
+  // Accumulate challenges completed mid-action by per-action evaluation
+  // (CG-0MU37CKRR008252I) across every player's MarketPhase, then surface
+  // them through the returned TurnResult alongside the closing-phase
+  // completions (de-duplicated defensively).
+  const midTurnCompleted: string[] = [];
+  const runActions = (actions: PlayerAction[] | undefined): void => {
+    for (const action of actions ?? []) {
       if (action.type === 'end-turn') break;
       executeAction(state, action);
+      if (state._newlyCompletedThisAction?.length) {
+        midTurnCompleted.push(...state._newlyCompletedThisAction);
+      }
     }
-    return processEndOfTurn(state);
+  };
+
+  if (n === 1) {
+    runActions(playerActions[0]);
+    return mergeMidTurnChallenges(processEndOfTurn(state), midTurnCompleted);
   }
   for (let playerId = 0; playerId < n; playerId++) {
     state.phase = 'MarketPhase';
     state.activePlayerId = playerId;
-    for (const action of playerActions[playerId] ?? []) {
-      if (action.type === 'end-turn') break;
-      executeAction(state, action);
-    }
+    runActions(playerActions[playerId]);
     if (playerId < n - 1) {
       endCompetitiveMarketTurn(state);
     }
@@ -146,7 +156,24 @@ export function executeCompetitiveDay(
   if (state.phase === 'MarketPhase') {
     endCompetitiveMarketTurn(state);
   }
-  return resolveCompetitiveClosingPhases(state);
+  return mergeMidTurnChallenges(resolveCompetitiveClosingPhases(state), midTurnCompleted);
+}
+
+/**
+ * Merges mid-turn challenge completions into a TurnResult's
+ * `newlyCompletedChallenges` (de-duplicated), returning the same result
+ * object for convenience. No-op when nothing completed mid-turn.
+ */
+function mergeMidTurnChallenges(
+  result: TurnResult,
+  midTurnCompleted: string[],
+): TurnResult {
+  if (midTurnCompleted.length > 0) {
+    result.newlyCompletedChallenges = [
+      ...new Set([...midTurnCompleted, ...result.newlyCompletedChallenges]),
+    ];
+  }
+  return result;
 }
 
 /**

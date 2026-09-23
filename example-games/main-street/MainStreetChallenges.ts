@@ -362,3 +362,25 @@ export function evaluateChallenges(
     },
   );
 }
+
+/**
+ * Evaluates challenges after a single successful player action
+ * (CG-0MU37CKRR008252I, producer decision Q2 = A: all paths).
+ *
+ * Delegates to {@link evaluateChallenges} (same evaluator logic, no
+ * duplication) and records the newly completed IDs on the transient
+ * `state._newlyCompletedThisAction` field so the interactive scene can fire
+ * immediate celebration VFX/SFX. Because completion is flagged on each
+ * `ActiveChallenge`, a later end-of-turn EndCheck returns an empty array
+ * for challenges completed here — no double-reporting, no duplicate log
+ * entries.
+ *
+ * @param state Current game state (mutated in-place: challenge flags,
+ *              `challengesCompleted`, `activityLog`, `_newlyCompletedThisAction`).
+ * @returns The challenge IDs newly completed by this action (usually `[]`).
+ */
+export function evaluateChallengesAfterAction(state: MainStreetState): string[] {
+  const newlyCompleted = evaluateChallenges(state.activeChallenges, state);
+  state._newlyCompletedThisAction = newlyCompleted;
+  return newlyCompleted;
+}

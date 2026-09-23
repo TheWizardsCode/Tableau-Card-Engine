@@ -394,6 +394,16 @@ export interface MainStreetState {
    * Serialized/restored by save/load so an unresolved choice survives a save.
    */
   pendingEventChoice: PendingEventChoice | null;
+  /**
+   * Transient buffer of challenge IDs completed by the most recent
+   * per-action evaluation (CG-0MU37CKRR008252I). Reset to `[]` at the start
+   * of every `executeAction` call and populated by
+   * `evaluateChallengesAfterAction`. The interactive scene reads it to fire
+   * immediate celebration VFX/SFX; the closing EndCheck skips challenges
+   * already flagged completed, so nothing is reported twice. Never
+   * serialized (transient presentation state).
+   */
+  _newlyCompletedThisAction?: string[];
 }
 
 /**

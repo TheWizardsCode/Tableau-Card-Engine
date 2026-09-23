@@ -8,6 +8,7 @@
  */
 
 import { buyAndPlaceBusiness, hireStaffCard } from './MainStreetEngineCommands';
+import { evaluateChallengesAfterAction } from './MainStreetChallenges';
 import { applyCompetitiveEventEffects } from './MainStreetEngineEvents';
 import { PlayerAction } from './MainStreetEngineTypes';
 import type { EventCard } from './MainStreetCards';
@@ -37,6 +38,7 @@ export function executeAction(
     if (state.phase !== 'MarketPhase') {
       throw new Error(`Cannot end turn during ${state.phase}. Must be in MarketPhase.`);
     }
+    state._newlyCompletedThisAction = [];
     return null;
   }
 
@@ -44,6 +46,33 @@ export function executeAction(
     throw new Error(`Cannot perform ${action.type} during ${state.phase}. Must be in MarketPhase.`);
   }
 
+  // Reset the transient per-action challenge buffer, then dispatch. Per-action
+  // challenge evaluation (CG-0MU37CKRR008252I, producer decision Q2 = A: all
+  // paths) runs only AFTER a successful dispatch, so a failed action (which
+  // throws before returning) never reports a spurious completion. The
+  // end-of-turn EndCheck remains as a safety net for completions caused by
+  // the closing phases (Income / Incident) and skips challenges already
+  // flagged complete here.
+  state._newlyCompletedThisAction = [];
+  const result = dispatchPlayerAction(state, action);
+  evaluateChallengesAfterAction(state);
+  return result;
+}
+
+/**
+ * Dispatches an already-validated player action to its handler. Split out of
+ * {@link executeAction} so per-action challenge evaluation can run once, after
+ * a successful dispatch, regardless of which case handled the action.
+ *
+ * @param state   Current game state (mutated in-place).
+ * @param action  The player action to execute (never `end-turn`).
+ * @returns PurchaseResult for buy actions, or null for play-event.
+ * @throws Error if the action is illegal or out of phase.
+ */
+function dispatchPlayerAction(
+  state: MainStreetState,
+  action: PlayerAction,
+): PurchaseResult | null {
   switch (action.type) {
     case 'move-to-hand': {
       const hadBanked = (state.bankedActions ?? 0) > 0;
