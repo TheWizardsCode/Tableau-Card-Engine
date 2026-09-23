@@ -893,6 +893,17 @@ describe('ColorettoScene (browser)', () => {
     game = await bootGame();
     const scene = await startTwoPlayerGame(game);
 
+    // The heuristic now takes a row proactively when one is valuable enough
+    // (round-1 take fix, CG-0MUCIHPES005ZURM), but this test exercises the AI
+    // *placement* animation pipeline: pin the AI to a deterministic place.
+    const ai = scene.aiScheduler.aiPlayers[1];
+    if (ai) {
+      (ai as any).strategy = {
+        name: 'always-place',
+        chooseAction: () => ({ type: 'place', rowIndex: 0 }),
+      };
+    }
+
     // The board may already hold a card from the AI's lead turn when the
     // randomized turn order put the AI first (startTwoPlayerGame awaits the
     // human turn, so the AI's first placement precedes this point).
