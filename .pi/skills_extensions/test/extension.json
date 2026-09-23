@@ -1,0 +1,37 @@
+{
+  "description": "TCE test profiles for `/skill:test --type`. `full` is deliberately omitted so a bare invocation resolves to the genuine full CI suite (`npm --silent test`) and populates the audit-accepted full-suite cache entry. See the sibling SKILL_PREFIX.md for the stage-selection policy. Browser-dependent types chain scripts/check-browser-test-env.ts before Vitest; every typed Vitest command runs through scripts/vitest-run-with-retry.ts (retry-once + wall-clock hang timeout) with the default reporter (human summary + retry detection) plus the flat-TAP reporter (scripts/vitest-tap-reporter.ts) so red runs triage per test.",
+  "types": {
+    "unit": [
+      "npx tsx scripts/vitest-run-with-retry.ts --project unit --timeout-ms 300000 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts"
+    ],
+    "smoke": [
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project smoke --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'"
+    ],
+    "dev": [
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project dev --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'"
+    ],
+    "browser": [
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project browser --timeout-ms 900000 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'"
+    ],
+    "tutorial": [
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part1 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part2 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part4 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part5 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part6 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part3 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'"
+    ],
+    "e2e": [
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part1 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part2 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part4 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part5 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part6 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project tutorial-part3 --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'",
+      "bash -c 'npx tsx scripts/check-browser-test-env.ts && npx tsx scripts/vitest-run-with-retry.ts --project replay-e2e --reporter=default --reporter=./scripts/vitest-tap-reporter.ts'"
+    ],
+    "electron": [
+      "bash scripts/run-electron-smoke.sh"
+    ]
+  }
+}
