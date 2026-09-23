@@ -74,6 +74,20 @@ function makeBusiness(
   };
 }
 
+/** Creates a business card with arbitrary overrides (for tests needing non-default fields). */
+function makeBusinessOverride(overrides: Partial<BusinessCard>): BusinessCard {
+  return {
+    family: 'business',
+    ...getBusinessTemplates()[0],
+    ...overrides,
+    level: overrides.level ?? 0,
+    incomeBonus: overrides.incomeBonus ?? 0,
+    synergyRangeBonus: overrides.synergyRangeBonus ?? 0,
+    reputationBonus: overrides.reputationBonus ?? 0,
+    appliedUpgrades: overrides.appliedUpgrades ?? [],
+  };
+}
+
 // ── AC (a): CSV Parsing ─────────────────────────────────────
 
 describe('CSV parsing — ongoingCost on business cards', () => {
@@ -241,6 +255,36 @@ describe('applyBusinessOngoingCosts — deduction logic', () => {
   });
 });
 
+// ── AC (4): Staff salary costs unchanged by soldSlots (CG-0MU3VH7QW006A2XA) ────────
+
+describe('Staff salary costs unchanged by soldSlots (CG-0MU3VH7QW006A2XA)', () => {
+  it('should NOT deduct ongoingCost for a sold business card (regression guard)', () => {
+    const state = createTestState('staff-unchanged-sold');
+    state.resourceBank.coins = 1000;
+
+    const biz = makeBusiness(100, 'sold-biz');
+    placeBusinessOnGrid(state, biz);
+    state.soldSlots[0] = true;
+
+    // Add a staff member
+    state.staffCards.push({
+      family: 'staff',
+      id: 'staff-tester',
+      name: 'Tester',
+      cost: 3,
+      ongoingCost: 50,
+      handSlotsAdded: 1,
+      description: 'Test staff',
+    });
+
+    const coinsBefore = state.resourceBank.coins;
+    applyBusinessOngoingCosts(state);
+
+    // Sold business: no cost. Staff: unaffected by business soldSlots.
+    expect(state.resourceBank.coins).toBe(coinsBefore);
+  });
+});
+
 // ── AC (d): SVG display ─────────────────────────────────────
 
 describe('SVG display — ongoing cost NOT baked on business/community-space art', () => {
@@ -397,6 +441,90 @@ describe('producer regression — business card in hand costs nothing per turn (
     expect(result.income).toBeDefined();
     expect(state.resourceBank.coins).toBeCloseTo(600 - 175, 5); // ×100: 6 → 600, 1.75 → 175
     expect(state.activityLog.some(l => l.text.includes('Business costs: -175'))).toBe(true);
+  });
+});
+
+// ── Sold-card exclusion (CG-0MU3VH7QW006A2XA) ─────────────────
+
+describe('Sold-card exclusion from business ongoing costs (CG-0MU3VH7QW006A2XA)', () => {
+  it('should NOT deduct ongoingCost for a sold business card', () => {
+    const state = createTestState('sold-biz-no-cost');
+    state.resourceBank.coins = 1000;
+
+    const biz = makeBusiness(100, 'test-sold-biz');
+    placeBusinessOnGrid(state, biz);
+    // Mark the slot as sold
+    state.soldSlots[0] = true;
+
+    const coinsBefore = state.resourceBank.coins;
+    applyBusinessOngoingCosts(state);
+
+    // Sold card should NOT incur ongoing cost
+    expect(state.resourceBank.coins).toBe(coinsBefore);
+  });
+
+  it('should still deduct for an unsold business card (regression)', () => {
+    const state = createTestState('unsold-biz-cost');
+    state.resourceBank.coins = 1000;
+
+    const biz = makeBusiness(100, 'test-unsold-biz');
+    placeBusinessOnGrid(state, biz);
+    // Not sold — soldSlots[0] is false
+
+    const coinsBefore = state.resourceBank.coins;
+    applyBusinessOngoingCosts(state);
+
+    expect(state.resourceBank.coins).toBe(coinsBefore - 100);
+  });
+
+  it('should only deduct for unsold cards when mixing sold and unsold businesses', () => {
+    const state = createTestState('mixed-sold-unsold');
+    state.resourceBank.coins = 1000;
+
+    const soldBiz = makeBusiness(100, 'sold-biz');
+    placeBusinessOnGrid(state, soldBiz);
+    state.soldSlots[0] = true;
+
+    // Place unsold business in slot 1
+    const unsold = makeBusiness(50, 'unsold-biz-2');
+    unsold.currentIncome = unsold.baseIncome + unsold.incomeBonus;
+    unsold.currentReputationPerTurn = (unsold.reputationPerTurn ?? 0) + unsold.reputationBonus;
+    state.streetGrid[1] = unsold;
+
+    const coinsBefore = state.resourceBank.coins;
+    applyBusinessOngoingCosts(state);
+
+    // Only unsold biz charged: 50
+    expect(state.resourceBank.coins).toBe(coinsBefore - 50);
+  });
+
+  it('should still act as a synergy anchor when sold (synergy unchanged)', () => {
+    const state = createTestState('sold-as-synergy-anchor');
+    state.resourceBank.coins = 1000;
+
+    const synergyAnchor = makeBusinessOverride({
+      id: 'sold-synergy-anchor', ongoingCost: 100, baseIncome: 100,
+      synergyTypes: ['Food'],
+    });
+    synergyAnchor.currentIncome = synergyAnchor.baseIncome + synergyAnchor.incomeBonus;
+    synergyAnchor.currentReputationPerTurn = (synergyAnchor.reputationPerTurn ?? 0) + synergyAnchor.reputationBonus;
+    state.streetGrid[0] = synergyAnchor;
+    state.soldSlots[0] = true;
+
+    // Adjacent Food business that earns synergy from the sold anchor
+    const adjacentBiz = makeBusinessOverride({
+      id: 'adjacent-food', ongoingCost: 50, baseIncome: 100,
+      synergyTypes: ['Food'],
+    });
+    adjacentBiz.currentIncome = adjacentBiz.baseIncome + adjacentBiz.incomeBonus;
+    adjacentBiz.currentReputationPerTurn = (adjacentBiz.reputationPerTurn ?? 0) + adjacentBiz.reputationBonus;
+    state.streetGrid[1] = adjacentBiz;
+
+    const coinsBefore = state.resourceBank.coins;
+    applyBusinessOngoingCosts(state);
+
+    // Sold card: no cost. Adjacent unsold card: its cost only.
+    expect(state.resourceBank.coins).toBe(coinsBefore - 50);
   });
 });
 

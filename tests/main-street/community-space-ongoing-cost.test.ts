@@ -229,6 +229,69 @@ describe('Community space ongoing-cost deduction', () => {
   });
 });
 
+// ── Sold-card exclusion (CG-0MU3VH7QW006A2XA) ─────────────────
+
+describe('Sold-card exclusion from community-space ongoing costs (CG-0MU3VH7QW006A2XA)', () => {
+  it('should NOT deduct ongoingCost for a sold community-space card', () => {
+    const state = createTestState('sold-cs-no-cost');
+    state.resourceBank.coins = 1000;
+
+    placeLibrary(state);
+    // Mark the slot as sold
+    state.soldSlots[0] = true;
+
+    const coinsBefore = state.resourceBank.coins;
+    applyCommunitySpaceOngoingCosts(state);
+
+    // Sold card should NOT incur ongoing cost
+    expect(state.resourceBank.coins).toBe(coinsBefore);
+  });
+
+  it('should still deduct for an unsold community-space card (regression)', () => {
+    const state = createTestState('unsold-cs-cost');
+    state.resourceBank.coins = 1000;
+
+    placeLibrary(state);
+    // Not sold — soldSlots[0] is false
+
+    const coinsBefore = state.resourceBank.coins;
+    applyCommunitySpaceOngoingCosts(state);
+
+    expect(state.resourceBank.coins).toBe(coinsBefore - 25);
+  });
+
+  it('should only deduct for unsold spaces when mixing sold and unsold community spaces', () => {
+    const state = createTestState('mixed-sold-unsold-cs');
+    state.resourceBank.coins = 1000;
+
+    // Sold library in slot 0
+    const soldLibrary = createCommunitySpaceDeck(1).find(c => c.name === 'Library')!;
+    soldLibrary.currentIncome = soldLibrary.baseIncome;
+    soldLibrary.currentReputationPerTurn = soldLibrary.reputationPerTurn ?? 0;
+    state.streetGrid[0] = soldLibrary;
+    state.soldSlots[0] = true;
+
+    // Unsold Park in slot 1 (Park has ongoingCost 0 — no cost)
+    const park = createCommunitySpaceDeck(1).find(c => c.name === 'Park')!;
+    park.currentIncome = park.baseIncome;
+    park.currentReputationPerTurn = park.reputationPerTurn ?? 0;
+    state.streetGrid[1] = park;
+
+    // Add another community space with ongoing cost in slot 2
+    const garden = createCommunitySpaceDeck(1).find(c => c.name === 'Community Garden')!;
+    garden.currentIncome = garden.baseIncome;
+    garden.currentReputationPerTurn = garden.reputationPerTurn ?? 0;
+    state.streetGrid[2] = garden;
+
+    const coinsBefore = state.resourceBank.coins;
+    applyCommunitySpaceOngoingCosts(state);
+
+    // Only the unsold Community Garden charged; sold library is free
+    const expectedCost = (garden.ongoingCost ?? 0);
+    expect(state.resourceBank.coins).toBe(coinsBefore - expectedCost);
+  });
+});
+
 // ── AC: Community Hub upgrade repurposed to reputation ──────
 
 describe('Community Hub upgrade (upg-community-hub)', () => {
