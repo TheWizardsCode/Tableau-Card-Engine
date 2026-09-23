@@ -548,10 +548,8 @@ describe('Main Street upgrade drag-drop buy-and-play (browser)', () => {
     await releaseDrag(scene, target.x, target.y, 40);
 
     // The transfer continues from where the card was released.
-    // 30 s timeout: under concurrent-suite Chromium contention the
-    // scene update loop can starve, so the default and the 15-25 s budgets
-    // are sometimes too short.  waitForCondition yields to rAF each poll so
-    // the `drop` handler is guaranteed a game-loop step to fire.
+    // `waitForCondition` steps the game loop on every poll, so the transfer
+    // tween does not depend on the browser granting animation frames.
     await waitForCondition(
       () => transferSpy.mock.calls.length > 0,
       'transfer animation to start after the drop',
