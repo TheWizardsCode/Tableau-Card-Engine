@@ -515,10 +515,14 @@ Two mitigations are in place in this repository:
      `tests/main-street/TutorialOverlayClickThrough.browser.test.ts`);
      composite's premium-dialog wait factors loop liveness (frozen RAF
      detection) into a 60s deadline instead of a blind timer
-     (`tests/main-street/composite-click.browser.test.ts`); and peek's
+     (`tests/main-street/composite-click.browser.test.ts`); peek's
      tween-completion waits use 10s budgets
      (`tests/main-street/peek.browser.test.ts`), matching the 5-10s
-     per-wait convention. A beforeEach hook that boots a game plus waits for
+     per-wait convention; and the incident reveal's post-hold day-start
+     wait uses a 22s budget (nominal ~6s choreography + 16s contention
+     margin) in `tests/main-street/incident-reveal.browser.test.ts`, with
+     the no-incident fast path on a 14s budget. A beforeEach hook that
+     boots a game plus waits for
      UI must raise its own budget beyond Vitest's default 30s (e.g. 90s for
      the tutorial file) or the hook itself times out while the boot is still
      legitimately progressing.

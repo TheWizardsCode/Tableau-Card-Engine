@@ -13,6 +13,13 @@
  * 3. Under reduced motion the reveal shows the card instantly (no flight,
  *    no hinge flip) but still waits 4 seconds before advancing.
  *
+ * Timing notes — the reveal choreography (flight 550ms + hinge 260ms +
+ * hold 4000ms + return 400ms = 5210ms) plus the controller's 800ms delay
+ * after reveal completion makes the nominal wall-clock ~6s. Under CPU
+ * contention Phaser rAF timers lag, so the test uses a generous margin
+ * (+16s) to avoid false failures; see the pattern in
+ * `income-collection.browser.test.ts`.
+ *
  * @module tests/main-street/incident-reveal-browser
  */
 
@@ -21,6 +28,16 @@ import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
 import type { EventCard } from '../../example-games/main-street/MainStreetCards';
+
+// ── Timing constants ───────────────────────────────────────────
+// Nominal reveal choreography: flight 550ms + hinge 260ms + hold 4000ms
+// + return 400ms = 5210ms, plus the controller's 800ms delay after
+// reveal completion → ~6010ms nominal. Under CPU contention Phaser rAF
+// timers lag; use a generous margin (+16s) to avoid false failures.
+const REVEAL_WAIT_MS = 6_000 + 16_000;
+
+/** No-incident fast path: advanceTurn's 800ms delay plus generous margin. */
+const FAST_PATH_WAIT_MS = 2_000 + 12_000;
 
 // ── Boot helpers (mirrors MainStreetScene.browser.test.ts) ──
 
@@ -147,12 +164,12 @@ describe('MainStreet incident reveal presentation', () => {
     expect(earlyPhase).not.toBe('MarketPhase');
 
     // After the full reveal (4s hold + return animation), the next week starts.
-    // Bump to 10s to tolerate contention-induced RAF stalls (same as before).
+    // Use generous timeout: nominal ~6s + 16s margin for contention-induced RAF lag.
     await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
-      timeoutMs: 10_000,
+      timeoutMs: REVEAL_WAIT_MS,
       label: 'next week start after reveal hold (gated)',
     });
-  }, 30_000);
+  }, 45_000);
 
   it('skips the reveal in tutorial mode so tutorial step pacing is unchanged', async () => {
     game = await bootGame();
@@ -180,10 +197,10 @@ describe('MainStreet incident reveal presentation', () => {
 
     // ...and the day still advances on the usual window (no 4s hold).
     await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
-      timeoutMs: 5_000,
+      timeoutMs: FAST_PATH_WAIT_MS,
       label: 'next week start during tutorial (reveal skipped)',
     });
-  }, 30_000);
+  }, 45_000);
 
   it('skips the reveal animation entirely when there is no incident', async () => {
     game = await bootGame();
@@ -205,8 +222,8 @@ describe('MainStreet incident reveal presentation', () => {
 
     // The day should advance quickly (the ~800ms path).
     await waitForCondition(() => (scene.state as { phase: string }).phase === 'MarketPhase', {
-      timeoutMs: 5_000,
+      timeoutMs: FAST_PATH_WAIT_MS,
       label: 'next week start without incident (fast)',
     });
-  }, 30_000);
+  }, 45_000);
 });
