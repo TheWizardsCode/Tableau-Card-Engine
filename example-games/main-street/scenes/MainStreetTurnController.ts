@@ -15,7 +15,7 @@ import type { SynergyPair } from '../MainStreetAdjacency';
 import type { TurnResult } from '../MainStreetEngine';
 import type { DragDropPayload } from '../../../src/ui/dragDrop';
 import { startTurnPhase, endTurn, finishTurnPresentation, handleGameOver, presentEventChoiceDialog, onEventChoice, onPlayHeldEvent, performUndo, performRedo } from './MainStreetTurnControllerTurnFlow';
-import { onBusinessCardClick, onEventCardClick, onRefreshMarketClick, onPeekClick, onCommunityFavourClick, onUpgradeCardClick, onHandUpgradeCardClick, onStaffCardClick, onHandBusinessCardClick } from './MainStreetTurnControllerMarketActions';
+import { onBusinessCardClick, onEventCardClick, onRefreshMarketClick, onPeekClick, onCommunityFavourClick, onUpgradeCardClick, onHandUpgradeCardClick, onStaffCardClick, onHandBusinessCardClick, onDiscardHandCard } from './MainStreetTurnControllerMarketActions';
 import { onSlotClick, onSellCard, applyHandUpgradeToSlot, hasPendingTargeting, cancelPendingPlacement, streetPairDims } from './MainStreetTurnControllerPlaceSell';
 import { initDragDrop, canPickUpBusinessCard, canDropBusinessCard, onDragDropBusiness, canPickUpUpgradeCard, canDropUpgradeCard, onDragDropUpgrade } from './MainStreetTurnControllerDragDrop';
 import { animateMarketDealIn, animateMarketSwap, animateNewSynergyPairs } from './MainStreetTurnControllerAnimation';
@@ -164,6 +164,10 @@ export class MainStreetTurnController implements MainStreetTurnControllerContext
 
   public onHandBusinessCardClick(index: number): void {
     onHandBusinessCardClick(this, index);
+  }
+
+  public onDiscardHandCard(handIndex: number | null): void {
+    onDiscardHandCard(this, handIndex);
   }
 
   public onSellCard(slotIndex: number): void {

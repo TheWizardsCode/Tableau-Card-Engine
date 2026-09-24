@@ -385,11 +385,33 @@ export function refreshActionButtons(renderer: MainStreetRendererContext): void 
 
       const hand = s.state.hand ?? [];
       const handCount = hand.length;
+      const selected = s.pendingHandIndex !== null ? hand[s.pendingHandIndex] : undefined;
       s.hintBar.setText(`Card in hand (${handCount}) — click an empty slot to place`);
 
-      // Cancel button (right-aligned) — returns to market, card stays in hand
       const btnW = s.layout.actionButtonW;
-      const cancelBtn = createActionButton(s, rightX - btnW, by + 4, btnW, 'Cancel', () => {
+
+      // Discard button — occupies the End Turn slot (rightmost action-bar
+      // position), the same slot Cancel used to take alone. Discards the
+      // selected hand card for reputation equal to its coin cost
+      // (CG-0MTQ7KUVF009ELQK); no confirmation dialog.
+      const repCost = selected?.cost ?? 0;
+      const discardBtn = createActionButton(
+        s, rightX - btnW, by + 4, btnW,
+        repCost > 0 ? `Discard (-${repCost} rep)` : 'Discard',
+        () => s.onDiscardHandCard(s.pendingHandIndex),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: 0x442222,
+          fillAlpha: 0.8,
+          strokeColor: 0xaa4444,
+          textColor: '#ff8888',
+          fontSize: '13px',
+        },
+      );
+      s.actionContainer.add(discardBtn);
+
+      // Cancel button (shifted left of Discard) — returns to market, card stays in hand
+      const cancelBtn = createActionButton(s, rightX - 2 * btnW - 12, by + 4, btnW, 'Cancel', () => {
         s.pendingHandIndex = null;
         s.pendingHandJustMoved = false;
         s.justMovedHandCardId = null;

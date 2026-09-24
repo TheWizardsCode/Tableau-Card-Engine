@@ -50,5 +50,6 @@ export interface MainStreetTurnControllerContext {
   applyHandUpgradeToSlot(handIndex: number, slotIndex: number): void;
   onStaffCardClick(card: StaffCard): void;
   onHandBusinessCardClick(index: number): void;
+  onDiscardHandCard(handIndex: number | null): void;
   onSellCard(slotIndex: number): void;
 }

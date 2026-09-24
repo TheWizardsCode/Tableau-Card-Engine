@@ -13,7 +13,11 @@ import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundMa
 import { FONT_FAMILY } from '../../../src/ui/constants';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import type { BusinessCard, EventCard, StaffCard, UpgradeCard } from '../MainStreetCards';
-import { hireStaffCardCommand, moveEventToHandCommand, moveToHandCommand, peekIncidentDeckCommand, refreshMarketCommand } from '../MainStreetCommands';
+import { discardFromHandCommand, hireStaffCardCommand, moveEventToHandCommand, moveToHandCommand, peekIncidentDeckCommand, refreshMarketCommand } from '../MainStreetCommands';
+import { SFX_KEYS } from './MainStreetConstants';
+// Import the concrete module (not the `src/ui` barrel) so Node unit tests that
+// import this controller module do not pull in browser-only UI modules.
+import { discardCard } from '../../../src/ui/discardCard';
 import { executeAction } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
 import { canAddToHand, canPurchaseEvent, canPurchaseStaff, canRefreshMarket } from '../MainStreetMarket';
@@ -777,5 +781,96 @@ export function onHandBusinessCardClick(tcCtx: MainStreetTurnControllerContext, 
     try {
       (s.msLifecycleManager as any).onTutorialActionComplete?.('select-hand-card' as any);
     } catch (_) { /* ignore */ }
+  
+}
+
+/**
+ * Discards the selected hand card for reputation equal to its coin cost
+ * (clamped at 0) — the player-facing [Discard] control in the End Turn slot
+ * (CG-0MTQ7KUVF009ELQK). Action-free, no confirmation dialog.
+ *
+ * The discard is undoable via `discardFromHandCommand`; the card animates out
+ * of the hand with the discard SFX (reduced-motion respected) before the
+ * command executes. A tutorial-disallowed discard shows illegal-move feedback
+ * and mutates nothing.
+ */
+export function onDiscardHandCard(
+  tcCtx: MainStreetTurnControllerContext,
+  handIndex: number | null,
+): void {
+
+    const s = tcCtx.scene;
+    if (handIndex === null || handIndex === undefined) return;
+    if (s.uiPhase !== 'placing-from-hand' && s.uiPhase !== 'market') return;
+    const hand = s.state.hand ?? [];
+    const card = hand[handIndex];
+    if (!card) return;
+
+    // Tutorial gating: a discard must never bypass the required tutorial step.
+    const check = (s.msLifecycleManager as any).isTutorialActionAllowed?.('discard-from-hand' as any);
+    if (check && !check.allowed) {
+      s.instructionText.setText(check.reason ?? 'Complete the highlighted step first.');
+      const blockedSprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex) as any;
+      playIllegalFeedback(blockedSprite ?? s.actionContainer, s);
+      return;
+    }
+
+    const reducedMotion = s.settingsPanel?.reducedMotion ?? false;
+    const sprite = s.msRenderer?.handView?.getSpriteAt?.(handIndex) as any;
+
+    const finishDiscard = () => {
+      try {
+        const cmd = discardFromHandCommand(s.state, handIndex);
+        s.undoManager.execute(cmd);
+        s.refreshUndoRedoButtons(s.undoManager.canUndo(), s.undoManager.canRedo());
+        try {
+          recordMainStreetEvent({
+            type: 'action',
+            turn: s.state.turn,
+            action: { type: 'discard-from-hand', handIndex },
+            description: cmd.description,
+          });
+        } catch (_) { /* transcript disabled */ }
+        const repCost = card.cost ?? 0;
+        s.instructionText.setText(
+          repCost > 0
+            ? `Discarded "${card.name}" (-${repCost} rep).`
+            : `Discarded "${card.name}" (no reputation cost).`,
+        );
+      } catch (e) {
+        playIllegalFeedback(s.actionContainer, s);
+        s.instructionText.setText(`Error: ${(e as Error).message}`);
+      }
+      // Return to the market phase with no selection (AC1).
+      s.pendingHandIndex = null;
+      s.pendingHandJustMoved = false;
+      s.justMovedHandCardId = null;
+      s.clearMarketSelection();
+      s.uiPhase = 'market';
+      s.refreshAll();
+      s.refreshActionButtons();
+    };
+
+    if (sprite) {
+      s.uiPhase = 'animating';
+      s.instructionText.setText(`Discarding "${card.name}"...`);
+      discardCard({
+        scene: s,
+        target: sprite,
+        offsetY: 30,
+        duration: 400,
+        reducedMotion,
+        destroyAfter: false,
+        gameEvents: s.gameEvents,
+        cardId: card.id,
+        soundManager: s.soundManager ?? null,
+        sfx: { start: SFX_KEYS.DISCARD },
+      });
+      s.time.delayedCall(reducedMotion ? 0 : 400, finishDiscard);
+    } else {
+      // No hand sprite available (headless/edge): still audible, apply now.
+      try { s.soundManager?.play(SFX_KEYS.DISCARD); } catch (_) { /* ignore */ }
+      finishDiscard();
+    }
   
 }
