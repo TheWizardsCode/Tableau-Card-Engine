@@ -105,6 +105,12 @@ interface MarketActionSnapshot {
    */
   challengesCompleted: string[] | null;
   completedFlags: boolean[] | null;
+  /**
+   * Per-family discard piles — captured so undoing a discard removes the card
+   * from its family discard pile as well as restoring the hand, and redo
+   * re-adds it exactly once (CG-0MUEQ19VX0009VIW).
+   */
+  discards: any | null;
 }
 
 /** Safe cloning helper that uses structuredClone when available, else falls back to JSON clone. */
@@ -152,6 +158,7 @@ function captureSnapshot(state: MainStreetState): MarketActionSnapshot {
     // whose evaluator functions would be dropped by safeClone).
     challengesCompleted: safeClone(state.challengesCompleted ?? []),
     completedFlags: (state.activeChallenges ?? []).map(ac => ac.completed),
+    discards: safeClone(state.discards ?? {}),
   };
 }
 
@@ -211,6 +218,11 @@ function restoreSnapshot(state: MainStreetState, snap: MarketActionSnapshot): vo
     for (let i = 0; i < state.activeChallenges.length && i < snap.completedFlags.length; i++) {
       state.activeChallenges[i].completed = snap.completedFlags[i];
     }
+  }
+  // Restore the per-family discard piles so undo removes a discarded card from
+  // its pile (and redo re-adds it exactly once) — CG-0MUEQ19VX0009VIW.
+  if (snap.discards !== null && snap.discards !== undefined) {
+    state.discards = snap.discards;
   }
 }
 

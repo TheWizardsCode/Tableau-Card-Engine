@@ -270,6 +270,75 @@ describe('undo/redo via discardFromHandCommand', () => {
     expect(state.resourceBank.reputation).toBe(6);
     expect(state.hand.length).toBe(0);
   });
+
+  it('undo restores the hand, the business discard pile and reputation (no duplicate)', () => {
+    const state = setupMainStreetGame({ seed: 'disc-undo-pile-biz' });
+    executeWeekStart(state, true);
+    state.resourceBank.reputation = 10;
+    const card = makeBiz('disc-pile-biz', 'Pile Business', 3);
+    state.hand.push(card);
+    const mgr = new UndoRedoManager();
+
+    mgr.execute(discardFromHandCommand(state, 0));
+    expect(state.hand.length).toBe(0);
+    expect(state.discards.business.some(c => c.id === 'disc-pile-biz')).toBe(true);
+    expect(state.resourceBank.reputation).toBe(7);
+
+    mgr.undo();
+    expect(state.hand.some(c => c.id === 'disc-pile-biz')).toBe(true);
+    // The card must NOT remain in the discard pile while also in the hand.
+    expect(state.discards.business.some(c => c.id === 'disc-pile-biz')).toBe(false);
+    expect(state.resourceBank.reputation).toBe(10);
+
+    mgr.redo();
+    expect(state.hand.length).toBe(0);
+    expect(state.discards.business.some(c => c.id === 'disc-pile-biz')).toBe(true);
+    expect(state.resourceBank.reputation).toBe(7);
+  });
+
+  it('undo restores the community-space discard pile (non-business family)', () => {
+    const state = setupMainStreetGame({ seed: 'disc-undo-pile-cs' });
+    executeWeekStart(state, true);
+    state.resourceBank.reputation = 10;
+    const card = makeCommunitySpace('disc-pile-cs', 'Pile Community Space', 4);
+    state.hand.push(card);
+    const mgr = new UndoRedoManager();
+
+    mgr.execute(discardFromHandCommand(state, 0));
+    expect(state.discards.communitySpace.some(c => c.id === 'disc-pile-cs')).toBe(true);
+
+    mgr.undo();
+    expect(state.hand.some(c => c.id === 'disc-pile-cs')).toBe(true);
+    expect(state.discards.communitySpace.some(c => c.id === 'disc-pile-cs')).toBe(false);
+
+    mgr.redo();
+    expect(state.discards.communitySpace.some(c => c.id === 'disc-pile-cs')).toBe(true);
+    expect(state.hand.some(c => c.id === 'disc-pile-cs')).toBe(false);
+  });
+
+  it('undo restores the upgrade and event discard piles', () => {
+    const state = setupMainStreetGame({ seed: 'disc-undo-pile-multi' });
+    executeWeekStart(state, true);
+    state.resourceBank.reputation = 10;
+    state.hand.push(makeUpgrade('disc-pile-upg', 'Pile Upgrade', 2));
+    state.hand.push(makeEvent('disc-pile-evt', 'Pile Event', 1));
+    const mgr = new UndoRedoManager();
+
+    // Discard the event first (index 1), then the upgrade (now index 0).
+    mgr.execute(discardFromHandCommand(state, 1));
+    mgr.execute(discardFromHandCommand(state, 0));
+    expect(state.discards.event.some(c => c.id === 'disc-pile-evt')).toBe(true);
+    expect(state.discards.upgrade.some(c => c.id === 'disc-pile-upg')).toBe(true);
+
+    mgr.undo();
+    expect(state.discards.upgrade.some(c => c.id === 'disc-pile-upg')).toBe(false);
+    expect(state.discards.event.some(c => c.id === 'disc-pile-evt')).toBe(true);
+    expect(state.hand.some(c => c.id === 'disc-pile-upg')).toBe(true);
+
+    mgr.undo();
+    expect(state.discards.event.some(c => c.id === 'disc-pile-evt')).toBe(false);
+    expect(state.hand.some(c => c.id === 'disc-pile-evt')).toBe(true);
+  });
 });
 
 // ── executeAction path ────────────────────────────────────────
