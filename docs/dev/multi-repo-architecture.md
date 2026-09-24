@@ -217,7 +217,81 @@ files / 1840 tests) and the Gym smoke profile boots (2 files / 20 tests).
 
 ---
 
-## 5. Follow-on work (not in this feature)
+## 5. Per-game repo scaffold (F4)
+
+`scripts/extract-repos.sh` (F1) splits a game's tree out of the monorepo but
+leaves it unbuildable: a game repo has no `package.json`, `vite.config.ts`,
+`tsconfig.json`, `main.ts` or `index.html`. `scripts/game-repo-scaffold.ts`
+adds them, turning an extracted checkout into a runnable **single-game
+launcher** that composes the sibling core (`../tableau-card-engine-core`).
+
+```bash
+# One game, next to an extracted checkout:
+tsx scripts/game-repo-scaffold.ts \
+  --game golf --game-repo-root ../tce-golf \
+  --core-root ../tableau-card-engine-core
+
+# Every game in scripts/configs/repo-layout.json:
+npm run scaffold:games
+```
+
+What it writes into the game repo:
+
+- **`package.json`** — name `tce-<game>`, the core's dependencies and
+devDependencies, and the core toolchain scripts (`save-load-smoke`,
+`monte-carlo`, `replay`, …) with the repo entry points (`dev`, `build`,
+`build:electron`, `test`) overridden.
+- **`vite.config.ts`** — imports `gameDiscoveryPlugin` and `resolveCoreAliases`
+from the sibling core and reads `configs/game.json` (Gym + this one game) by
+default; `GAMES_CONFIG` can still override for an ad-hoc build.
+- **`tsconfig.json`** — the five core aliases point at the sibling core;
+browser/E2E tests are excluded from the type-check (they belong to the
+launcher distribution).
+- **`main.ts`, `env.d.ts`, `index.html`** — the entry point and its
+virtual-module types.
+- **`configs/game.json`** — a single-game preset.
+
+### Root-relative compatibility symlinks
+
+Most game source and tests import core code with repository-root-relative
+specifiers (`../../src/…`, `../../scripts/…`, `../../example-games/gym/…`) that
+neither TypeScript `paths` nor Vite `resolve.alias` can remap. Rather than
+rewriting hundreds of files, the scaffold creates relative symlinks so those
+imports resolve without touching the game code:
+
+| Link | Target | Needed by |
+|---|---|---|
+| `src` | `<core>/src` | `../../src/…` core imports |
+| `scripts` | `<core>/scripts` | the replay-adapter framework |
+| `example-games/gym` | `<core>/example-games/gym` | Gym-backed demo scenes (e.g. Main Street's card index) |
+| `tests/helpers` | `<core>/tests/helpers` | shared unit-test helpers (`MockFactory`) |
+| `core` | `<core>` | a stable alias for the engine checkout |
+| `public/assets/<shared>` | `<core>/public/assets/<shared>` | shared assets from the F1 asset table (game-owned assets stay real) |
+
+The path aliases (`@core-engine/*`, …) resolve independently, so both import
+styles work.
+
+### Verifying a scaffolded game repo
+
+```bash
+npx tsc --noEmit && npm run build && npm run build:electron
+npm test          # vitest run --project unit
+```
+
+Verified end to end for **golf** and **main-street**: `tsc`, the web and
+Electron renderer builds, and the unit suite (golf 217 passed; main-street 3850
+passed) are all green against a sibling core checkout.
+
+### GitHub remotes are not created in this phase
+
+The scaffold writes local checkouts only. Creating the nine GitHub repositories
+and pushing the extracted history was **not authorised** in this phase (producer
+decision), so the `tce-<game>` remotes recorded in
+`scripts/configs/repo-layout.json` are documented but not yet created. The
+scaffold wires the local composition that F5 (launcher distribution) and F7
+(integration verification) consume.
+
+## 6. Follow-on work (not in this feature)
 
 - **F2** creates the core-engine repository from this script's `core` target.
 - **F3** adds config-driven game discovery: a Vite plugin plus per-game

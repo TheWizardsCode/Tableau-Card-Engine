@@ -110,24 +110,33 @@ describe('rule-engine / LegalityResult', () => {
     }
   });
 
-  it('Golf re-exports the same LegalityResult type', async () => {
-    // Dynamic import so we get the actual re-exported type at runtime.
-    const golfRules = await import(
-      '../../example-games/golf/GolfRules'
-    );
-    // The module should re-export LegalityResult (as a type, not a value).
-    // We verify by constructing values that match the type through the
-    // functions that return LegalityResult.
-    expect(typeof golfRules.checkMoveLegality).toBe('function');
-    expect(typeof golfRules.checkInitialReveal).toBe('function');
+  it('a game validator returns the canonical LegalityResult shape', () => {
+    // Games validate their own moves with the canonical contract; this
+    // inline validator stands in for a game-specific one so the test does
+    // not depend on another game repo (F4 single-game launcher).
+    const validateMove = (rank: number): LegalityResult =>
+      rank > 0 ? { legal: true } : { legal: false, reason: 'rank must be positive' };
+
+    expect(validateMove(5)).toEqual({ legal: true });
+    const illegal = validateMove(0);
+    expect(illegal.legal).toBe(false);
+    if (!illegal.legal) {
+      expect(illegal.reason).toBe('rank must be positive');
+    }
   });
 
-  it('Lost Cities re-exports the same LegalityResult type', async () => {
-    const lcRules = await import(
-      '../../example-games/lost-cities/LostCitiesRules'
+  it('games can build validators on the legalAction/illegalAction helpers', async () => {
+    const { legalAction, illegalAction } = await import(
+      '../../src/rule-engine/index'
     );
-    expect(typeof lcRules.checkPhase1Legality).toBe('function');
-    expect(typeof lcRules.checkPhase2Legality).toBe('function');
+    const validateMove = (rank: number): LegalityResult =>
+      rank > 0 ? legalAction() : illegalAction('rank must be positive');
+
+    expect(validateMove(1)).toEqual({ legal: true });
+    expect(validateMove(-1)).toEqual({
+      legal: false,
+      reason: 'rank must be positive',
+    });
   });
 
   describe('legalAction / illegalAction helpers', () => {

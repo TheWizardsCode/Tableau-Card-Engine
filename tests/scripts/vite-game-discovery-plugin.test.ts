@@ -391,6 +391,19 @@ describe('renderGameRegistryModule', () => {
       );
     }
   });
+
+  it('imports the core-owned Gym from coreRoot in a game-repo context (F4)', () => {
+    // A game repo keeps its Gym in the sibling ./core checkout, not locally,
+    // so the plugin must resolve the barrel against coreRoot.
+    const src = renderGameRegistryModule([], {
+      coreRoot: '/repos/tableau-card-engine-core',
+    });
+    expect(src).toContain(
+      "from \"/repos/tableau-card-engine-core/example-games/gym\"",
+    );
+    expect(src).not.toContain("from './example-games/gym'");
+    expect(src).toContain('GymRouterScene');
+  });
 });
 
 // ── Module id constants ───────────────────────────────────────────────────

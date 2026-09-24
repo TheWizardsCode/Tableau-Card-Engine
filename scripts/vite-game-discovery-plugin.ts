@@ -422,6 +422,19 @@ const GYM_ENTRY = {
 } as const;
 
 /**
+ * Options for {@link renderGameRegistryModule}.
+ */
+export interface RegistryModuleOptions {
+  /**
+   * Absolute core-repo root. When set, the Gym (which is core-owned) is
+   * imported from `<coreRoot>/example-games/gym`, so a game repo whose Gym
+   * lives in the sibling `./core` checkout still gets it. When omitted, the
+   * barrel resolves relative to the project root (monorepo/core layout).
+   */
+  coreRoot?: string;
+}
+
+/**
  * Render the `virtual:game-registry` module source.
  *
  * The generated module exports:
@@ -431,16 +444,24 @@ const GYM_ENTRY = {
  * Gym is core-owned, so it is present in every build including core-only.
  *
  * @param games Resolved games (empty for a core-only build).
+ * @param options Registry options (see {@link RegistryModuleOptions}).
  * @returns JavaScript module source.
  */
-export function renderGameRegistryModule(games: DiscoveredGame[]): string {
+export function renderGameRegistryModule(
+  games: DiscoveredGame[],
+  options: RegistryModuleOptions = {},
+): string {
   const imports: string[] = [];
   const sceneRegistrations: string[] = [];
   const catalogueEntries: string[] = [];
 
+  const gymBarrel = options.coreRoot
+    ? path.resolve(options.coreRoot, 'example-games/gym')
+    : GYM_BARREL;
+
   // Core-owned Gym first.
   imports.push(
-    `import {\n${GYM_SCENE_NAMES.map((n) => `  ${n},`).join('\n')}\n} from '${GYM_BARREL}';`,
+    `import {\n${GYM_SCENE_NAMES.map((n) => `  ${n},`).join('\n')}\n} from ${JSON.stringify(gymBarrel)};`,
   );
   sceneRegistrations.push(...GYM_SCENE_NAMES);
   catalogueEntries.push(JSON.stringify(GYM_ENTRY, null, 2));
@@ -509,6 +530,12 @@ const GYM_SCENE_NAMES = [
 export function gameDiscoveryPlugin(options: {
   projectRoot?: string;
   env?: Record<string, string | undefined>;
+  /**
+   * Absolute core-repo root. A game repo (F4) sets this to its `./core`
+   * submodule (or sibling `../tableau-card-engine-core`) so the core-owned
+   * Gym resolves from the engine checkout rather than the game repo root.
+   */
+  coreRoot?: string;
 } = {}): Plugin {
   let projectRoot = options.projectRoot ?? process.cwd();
   let generated = '';
@@ -518,7 +545,10 @@ export function gameDiscoveryPlugin(options: {
     const configPath = selectConfigPath(projectRoot, env);
     const config = loadGamesConfig(configPath);
     const games = discoverGames(config, projectRoot);
-    return renderGameRegistryModule(games);
+    return renderGameRegistryModule(
+      games,
+      options.coreRoot ? { coreRoot: options.coreRoot } : {},
+    );
   };
 
   return {

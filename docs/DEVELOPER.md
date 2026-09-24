@@ -1134,6 +1134,26 @@ CORE_ROOT=./core npm run build             # production build
 CORE_ROOT=./core npm run build:electron    # desktop build
 ```
 
+### Scaffolding a game repo
+
+An extracted game checkout (F1) has no root project files. Generate them with
+`scripts/game-repo-scaffold.ts`, which turns the checkout into a runnable
+single-game launcher against a sibling core (`../tableau-card-engine-core`):
+
+```bash
+tsx scripts/game-repo-scaffold.ts \
+  --game <game> --game-repo-root ../tce-<game> \
+  --core-root ../tableau-card-engine-core
+# …or every game in scripts/configs/repo-layout.json:
+npm run scaffold:games
+```
+
+It writes `package.json`, `vite.config.ts`, `tsconfig.json`, `main.ts`,
+`env.d.ts` and `configs/game.json`, and creates the compatibility symlinks
+(`src`, `scripts`, `example-games/gym`, `tests/helpers`, `core`, shared
+`public/assets`) that let the game's root-relative core imports resolve. See
+[Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4).
+
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 
 ## Hand & Pile Rendering

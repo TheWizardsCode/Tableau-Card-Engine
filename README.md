@@ -123,11 +123,18 @@ missing game fails the build with a message naming it.
 
 ### Per-game development loop
 
-Each game repo is a minimal TCE distribution with exactly one game:
+Each game repo is a minimal TCE distribution with exactly one game. A freshly
+extracted game checkout has no root project files; generate them with
+`scripts/game-repo-scaffold.ts` (which composes the sibling core checkout and
+the shared assets):
 
 ```bash
+# from the core repo, next to an extracted tce-golf checkout
+tsx scripts/game-repo-scaffold.ts \
+  --game golf --game-repo-root ../tce-golf \
+  --core-root ../tableau-card-engine-core
+
 cd tce-golf
-git submodule update --init --recursive   # fetch/refresh ./core
 npm install
 npm run dev                               # HMR dev server
 npm run build                             # production build
