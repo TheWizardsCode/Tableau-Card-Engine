@@ -412,8 +412,9 @@ export interface MainStreetAiStrategy extends AiStrategyBase {
  *   - `move-to-hand`: take a non-event card to hand (1 action; bounded by hand
  *     capacity)
  *   - `play-*-from-hand`: cost-at-play placement/activation from the hand
- *   - `discard-from-hand`: free discard (only enumerated when the hand is
- *     full, so the AI never gratuitously discards)
+ *   - `discard-from-hand`: costs the card's coin value in reputation
+ *     (CG-0MTQ7KUVF009ELQK); only enumerated when the hand is full, so the AI
+ *     never gratuitously discards
  *   - `end-turn`: always included
  *
  * Every action returned here is guaranteed to be accepted by `executeAction`.
@@ -575,7 +576,8 @@ export function enumerateLegalActions(state: MainStreetState): PlayerAction[] {
     }
   });
 
-  // ── discard-from-hand (free; only enumerated when the hand is full) ──
+  // ── discard-from-hand (costs reputation = card.cost; only enumerated
+  //    when the hand is full — CG-0MTQ7KUVF009ELQK) ──
   if (hand.length >= (state.maxHandSize ?? 3)) {
     hand.forEach((_, handIndex) => {
       actions.push({ type: 'discard-from-hand', handIndex });
@@ -745,6 +747,37 @@ function scoreMarketAcquisition(
 }
 
 /**
+ * Value of the best affordable market acquisition available this turn — the
+ * capacity benefit of freeing a hand slot (CG-0MTQ7KUVF009ELQK).
+ *
+ * Returns 0 when the hand already has a free slot (freeing another has no
+ * value) or when nothing in the market is affordable. Otherwise it mirrors
+ * {@link scoreMarketAcquisition}'s move-to-hand proxy (a card's listed cost;
+ * an event's net play value).
+ *
+ * Discard scoring subtracts the discarded card's coin cost (the reputation
+ * loss) from this benefit, so the AI only discards when freeing a slot is
+ * worth the reputation paid, and prefers lower-cost cards.
+ */
+function bestMarketAcquisitionValue(state: MainStreetState): number {
+  const hand = state.hand ?? [];
+  if (hand.length < (state.maxHandSize ?? 3)) return 0;
+  let best = 0;
+  for (const card of state.market.cards) {
+    if (card.family === 'staff') continue;
+    const cost = (card as { cost?: number }).cost ?? 0;
+    if (state.resourceBank.coins < cost) continue;
+    best = Math.max(
+      best,
+      card.family === 'event'
+        ? scoreEventAction(state, { type: 'buy-event', cardId: card.id })
+        : cost,
+    );
+  }
+  return best;
+}
+
+/**
  * Selects a uniformly random legal action each turn.
  *
  * Baseline strategy used for Monte Carlo balance testing and as a
@@ -884,10 +917,16 @@ const chooseGreedyAction = (
       }
     }
 
-    // Priority 8: discard from a full hand (frees capacity for moves)
+    // Priority 8: discard from a full hand (frees capacity for moves).
+    // Discarding costs the card's coin value in reputation, so only take it
+    // when the capacity benefit outweighs the reputation loss; prefer the
+    // lowest-cost card when several are worth discarding (CG-0MTQ7KUVF009ELQK).
     const discardActions = legalActions.filter(a => a.type === 'discard-from-hand');
     if (discardActions.length > 0) {
-      return pickRandom(discardActions, rng);
+      const best = pickBest(discardActions, a => scoreAction(state, a), rng);
+      if (scoreAction(state, best) > 0) {
+        return best;
+      }
     }
 
     // Priority 9: Community Favour fallback (CG-0MSTOATDQ005XDET).
@@ -1258,8 +1297,15 @@ export function scoreAction(state: MainStreetState, action: PlayerAction): numbe
     }
     case 'move-to-hand':
       return 0;
-    case 'discard-from-hand':
-      return 0;
+    case 'discard-from-hand': {
+      // Discarding costs the card's coin value in reputation; weigh that
+      // against the capacity benefit of freeing a hand slot so the AI only
+      // discards when it is worth it, and prefers lower-cost cards
+      // (CG-0MTQ7KUVF009ELQK).
+      const card = (state.hand ?? [])[action.handIndex];
+      if (!card) return 0;
+      return bestMarketAcquisitionValue(state) - (card.cost ?? 0);
+    }
     case 'end-turn':
       return 0;
     // Action economy actions (CG-0MSTOF1N5005PK2R). Minimal scoring for now;
@@ -1628,7 +1674,8 @@ export function enumerateCompetitiveLegalActions(
     }
   });
 
-  // ── discard-from-hand (free; only when the hand is full) ──
+  // ── discard-from-hand (costs reputation = card.cost; only when the hand
+  //    is full — CG-0MTQ7KUVF009ELQK) ──
   if (hand.length >= maxHandSize) {
     hand.forEach((_, handIndex) => {
       actions.push({ type: 'discard-from-hand', handIndex });
@@ -1733,11 +1780,39 @@ export function scoreCompetitiveAction(
       // never outrank a real economic play.
       return 0;
     case 'end-turn':
-    case 'discard-from-hand':
       return 0;
+    case 'discard-from-hand': {
+      // Discarding costs the card's coin value in reputation; weigh the
+      // capacity benefit of a freed slot against it and prefer lower-cost
+      // cards (CG-0MTQ7KUVF009ELQK).
+      const card = (player.hand ?? [])[action.handIndex];
+      if (!card) return 0;
+      return competitiveBestMarketAcquisitionValue(state, player) - (card.cost ?? 0);
+    }
     default:
       return 0;
   }
+}
+
+/**
+ * Competitive counterpart of {@link bestMarketAcquisitionValue}: the value of
+ * the best affordable market acquisition for the acting player, used as the
+ * capacity benefit of freeing one of their hand slots (CG-0MTQ7KUVF009ELQK).
+ */
+function competitiveBestMarketAcquisitionValue(
+  state: MainStreetState,
+  player: PlayerRecord,
+): number {
+  const hand = player.hand ?? [];
+  if (hand.length < (state.maxHandSize ?? 3)) return 0;
+  let best = 0;
+  for (const card of state.market.cards) {
+    if (card.family === 'staff' || card.family === 'event') continue;
+    const cost = (card as { cost?: number }).cost ?? 0;
+    if ((player.coins ?? 0) < cost) continue;
+    best = Math.max(best, cost);
+  }
+  return best;
 }
 
 function competitiveUpgradeScore(
@@ -1973,10 +2048,13 @@ export const CompetitiveGreedyStrategy: MainStreetAiStrategy = {
       if (score(bestEvent) > 0) return bestEvent;
     }
 
-    // Priority 7: discard from a full hand.
+    // Priority 7: discard from a full hand — only when the capacity benefit
+    // outweighs the reputation cost; prefer the lowest-cost card
+    // (CG-0MTQ7KUVF009ELQK).
     const discardActions = legalActions.filter(a => a.type === 'discard-from-hand');
     if (discardActions.length > 0) {
-      return pickRandom(discardActions, rng);
+      const best = pickBest(discardActions, score, rng);
+      if (score(best) > 0) return best;
     }
 
     // Priority 8: Community Favour fallback when genuinely value-creating.

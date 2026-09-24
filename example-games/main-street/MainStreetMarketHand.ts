@@ -142,13 +142,17 @@ export function playBusinessFromHand(
 }
 
 /**
- * Discards a card from the player's hand for free, any time during the
- * player's turn; the card goes to its corresponding discard pile
- * (CG-0MSTOATDT009BRX2).
+ * Discards a card from the player's hand at any time during the player's
+ * turn, deducting the card's coin cost as reputation (clamped at 0).
+ * The card goes to its corresponding family discard pile
+ * (CG-0MSTOATDT009BRX2, CG-0MTQ7KUVF009ELQK).
  */
 export function discardFromHand(state: MainStreetState, handIndex: number): void {
   const card = validateHandIndex(state, handIndex);
   state.hand.splice(handIndex, 1);
+  // Reputation penalty: deduct the card's coin cost, clamped at 0.
+  const repCost = card.cost ?? 0;
+  state.resourceBank.reputation = Math.max(0, state.resourceBank.reputation - repCost);
   if (card.family === 'business') {
     state.discards.business.push(card as BusinessCard);
   } else if (card.family === 'community-space') {
@@ -158,6 +162,12 @@ export function discardFromHand(state: MainStreetState, handIndex: number): void
   } else if (card.family === 'event') {
     state.discards.event.push(card as EventCard);
   }
-  addLog(state, `Discarded ${card.name} from hand (free)`, 'neutral');
+  addLog(
+    state,
+    repCost > 0
+      ? `Discarded ${card.name} from hand (-${repCost} rep)`
+      : `Discarded ${card.name} from hand (no cost)`,
+    'neutral',
+  );
 }
 

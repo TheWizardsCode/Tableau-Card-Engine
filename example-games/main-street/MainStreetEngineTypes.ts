@@ -75,7 +75,7 @@ export interface PlayEventFromHandAction {
   handIndex: number;
 }
 
-/** Discard a hand card for free during the player's turn. */
+/** Discard a hand card during the player's turn, costing the card's coin value in reputation. */
 
 export interface DiscardFromHandAction {
   type: 'discard-from-hand';
