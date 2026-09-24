@@ -103,8 +103,12 @@ export function createContainers(renderer: MainStreetRendererContext): void {
               s.tooltipManager?.show(info, container.x, container.y);
             });
             hover.on('pointerout', () => s.tooltipManager?.hide());
-            if (s.uiPhase === 'market') {
-              hover.on('pointerdown', () => s.onPlayHeldEvent(cardIndex));
+            if (s.uiPhase === 'market' || s.uiPhase === 'event-selected') {
+              // Select-then-act (CG-0MUEQ1BF000770B3): clicking a held event
+              // selects it and offers [Play] / [Discard] in the action bar,
+              // rather than playing immediately. Preserves the one-click
+              // play path via the [Play] button.
+              hover.on('pointerdown', () => s.onHandEventCardClick(cardIndex));
             }
             container.add(hover);
           }

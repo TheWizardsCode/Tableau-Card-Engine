@@ -634,7 +634,9 @@ export function onEventChoice(tcCtx: MainStreetTurnControllerContext, option: 'a
 export function onPlayHeldEvent(tcCtx: MainStreetTurnControllerContext, handIndex?: number): void {
 
     const s = tcCtx.scene;
-    if (s.uiPhase !== 'market') return;
+    // Allow both the one-click market path and the select-then-act
+    // `event-selected` phase (CG-0MUEQ1BF000770B3).
+    if (s.uiPhase !== 'market' && s.uiPhase !== 'event-selected') return;
 
     // Tutorial gating: only allow play-event if it's the required action or
     // the tutorial is inactive (T14 "Triggering Events" uses this gate).
@@ -680,6 +682,9 @@ export function onPlayHeldEvent(tcCtx: MainStreetTurnControllerContext, handInde
       try {
         (s.msLifecycleManager as any).onTutorialActionComplete?.('play-event' as TutorialActionType);
       } catch (_) { /* ignore */ }
+      // Select-then-act: clear the event selection once the play succeeds.
+      s.pendingHandIndex = null;
+      s.uiPhase = 'market';
     } catch (e) {
       const msg = (e as Error).message;
       console.error('[MS] PlayEvent failed', e);

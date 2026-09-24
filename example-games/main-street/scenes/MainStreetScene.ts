@@ -50,6 +50,7 @@ type UIPhase =
   | 'market'             // Player can buy or end turn
   | 'placing-business'   // Player selected a business card, picking a slot
   | 'placing-from-hand'  // Player bought a card to hand, click a slot to place it
+  | 'event-selected'     // Player selected a held event card: Play / Discard (CG-0MUEQ1BF000770B3)
   | 'animating'          // Brief pause for feedback
   | 'game-over'          // Final overlay
   | 'applicant'          // Staff applicant overlay: Hire / Decline (CG-0MSTOATDU006UGAX)
@@ -914,6 +915,9 @@ export class MainStreetScene extends CardGameScene {
   }
   public onHandBusinessCardClick(...args: any[]): any {
     return (this.msTurnController as any).onHandBusinessCardClick.apply(this.msTurnController, args);
+  }
+  public onHandEventCardClick(...args: any[]): any {
+    return (this.msTurnController as any).onHandEventCardClick.apply(this.msTurnController, args);
   }
   public onDiscardHandCard(...args: any[]): any {
     return (this.msTurnController as any).onDiscardHandCard.apply(this.msTurnController, args);

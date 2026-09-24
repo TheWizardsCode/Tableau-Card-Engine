@@ -794,6 +794,35 @@ export function onHandBusinessCardClick(tcCtx: MainStreetTurnControllerContext, 
  * command executes. A tutorial-disallowed discard shows illegal-move feedback
  * and mutates nothing.
  */
+/**
+ * Selects a held event card (select-then-act flow, CG-0MUEQ1BF000770B3):
+ * clicking an event card highlights it and switches to the `event-selected`
+ * phase, where the action bar offers [Play] (preserving the one-click
+ * `play-event` behaviour) and [Discard].
+ */
+export function onHandEventCardClick(
+  tcCtx: MainStreetTurnControllerContext,
+  index: number,
+): void {
+
+    const s = tcCtx.scene;
+    const hand = s.state.hand ?? [];
+    if (index < 0 || index >= hand.length) return;
+    const card = hand[index];
+    if (!card || card.family !== 'event') return;
+    if (s.uiPhase !== 'market' && s.uiPhase !== 'event-selected') return;
+
+    s.pendingHandIndex = index;
+    s.pendingHandJustMoved = false;
+    s.uiPhase = 'event-selected';
+    s.instructionText.setText(`Selected "${card.name}" — Play or Discard.`);
+    s.refreshAll();
+    if (s.msRenderer && typeof s.msRenderer.updateBusinessHandSelection === 'function') {
+      s.msRenderer.updateBusinessHandSelection(index);
+    }
+  
+}
+
 export function onDiscardHandCard(
   tcCtx: MainStreetTurnControllerContext,
   handIndex: number | null,
@@ -801,7 +830,11 @@ export function onDiscardHandCard(
 
     const s = tcCtx.scene;
     if (handIndex === null || handIndex === undefined) return;
-    if (s.uiPhase !== 'placing-from-hand' && s.uiPhase !== 'market') return;
+    if (
+      s.uiPhase !== 'placing-from-hand' &&
+      s.uiPhase !== 'event-selected' &&
+      s.uiPhase !== 'market'
+    ) return;
     const hand = s.state.hand ?? [];
     const card = hand[handIndex];
     if (!card) return;

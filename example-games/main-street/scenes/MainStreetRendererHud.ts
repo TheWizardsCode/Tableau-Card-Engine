@@ -427,6 +427,59 @@ export function refreshActionButtons(renderer: MainStreetRendererContext): void 
       });
       s.actionContainer.add(cancelBtn);
 
+    } else if (s.uiPhase === 'event-selected') {
+      // Select-then-act for held event cards (CG-0MUEQ1BF000770B3): the
+      // action bar offers [Play] (preserving the one-click play-event
+      // behaviour) and [Discard] (in the End Turn slot, CG-0MTQ7KUVF009ELQK).
+      const rightX = s.layout.gameW - 24;
+      const by = s.layout.actionY;
+      const btnW = s.layout.actionButtonW;
+
+      const hand = s.state.hand ?? [];
+      const selected = s.pendingHandIndex !== null ? hand[s.pendingHandIndex] : undefined;
+      s.hintBar.setText('Event selected — Play it or Discard it');
+
+      // Discard (rightmost — the End Turn slot).
+      const repCost = selected?.cost ?? 0;
+      const discardBtn = createActionButton(
+        s, rightX - btnW, by + 4, btnW,
+        repCost > 0 ? `Discard (-${repCost} rep)` : 'Discard',
+        () => s.onDiscardHandCard(s.pendingHandIndex),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: 0x442222,
+          fillAlpha: 0.8,
+          strokeColor: 0xaa4444,
+          textColor: '#ff8888',
+          fontSize: '13px',
+        },
+      );
+      s.actionContainer.add(discardBtn);
+
+      // Play (left of Discard) — the existing one-click play-event path.
+      const playBtn = createActionButton(
+        s, rightX - 2 * btnW - 12, by + 4, btnW, 'Play',
+        () => s.onPlayHeldEvent(s.pendingHandIndex ?? undefined),
+        {
+          height: s.layout.actionButtonH,
+          fillColor: 0x224422,
+          fillAlpha: 0.8,
+          strokeColor: 0x44aa44,
+          textColor: '#88ff88',
+          fontSize: '13px',
+        },
+      );
+      s.actionContainer.add(playBtn);
+
+      // Cancel (left of Play) — clears the selection and returns to market.
+      const cancelBtn = createActionButton(s, rightX - 3 * btnW - 24, by + 4, btnW, 'Cancel', () => {
+        s.pendingHandIndex = null;
+        s.clearMarketSelection();
+        s.uiPhase = 'market';
+        renderer.refreshAll();
+      });
+      s.actionContainer.add(cancelBtn);
+
     } else if (s.uiPhase === 'placing-business') {
       const rightX = s.layout.gameW - 24;
       const by = s.layout.actionY;
