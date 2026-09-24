@@ -209,6 +209,31 @@ loader — never tsx (see the same rationale in `docs/main-street/card-catalog.m
 
 > **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only. The full test suite is run locally before every push (quality gates in `AGENTS.md`) and is intentionally not re-run in PR CI: the Phaser 4 browser suite outgrew the single-Chromium-instance context budget in the constrained CI environment (reliably hard-killed mid-run). The Monte Carlo env-var table below therefore applies to **local** runs (and any future CI that re-enables tests), not to PR CI.
 
+### Test Configuration (`.pi/test-config.json`)
+
+The repository root includes a `.pi/test-config.json` file that overrides the default
+per-command test timeout for the implement skill and the audit skill's test runner:
+
+```json
+{"timeoutPerCommand": 1500}
+```
+
+- **`timeoutPerCommand`** — maximum seconds per test-suite command (default 600 if absent).
+  TCE's full suite takes 15–19 minutes, so this is set to 1500 s to prevent premature
+timeout kills.
+
+**Why is `.pi/test-config.json` tracked by git?**
+
+Git worktrees (created by `implement.py start` and the worklog's worktree system) inherit
+only tracked files. The `.pi/*` directory is gitignored (`.gitignore:103`), which means a
+worktree would normally have no `.pi/test-config.json`. Without the file, `implement.py
+finish` silently falls back to the 600 s default timeout and the full suite is killed
+mid-run. By committing the file and adding a negation entry (`!.pi/test-config.json`) to
+`.gitignore`, every worktree inherits the correct timeout configuration automatically.
+
+This file is deliberately tracked as the simplest, most robust fix — no cross-repository
+change to the implement skill is needed.
+
 ### Monte Carlo environment variables
 
 The Main Street balance guardrail (`tests/main-street/monte-carlo-balance.test.ts`) and harness
