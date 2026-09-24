@@ -26,6 +26,21 @@ npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
 
 Note: Vitest browser runs use an internal Vite server, but the dev-only transcript persistence middleware is disabled in test mode to avoid file-system side effects and reduce harness flakiness.
 
+### Which games does a build include?
+
+The game catalogue is **config-driven**. A build selects a preset with
+`GAMES_CONFIG`; the default (`core-only`) ships the engine + Gym with no games:
+
+```bash
+npm run build                          # core-only (engine + Gym)
+GAMES_CONFIG=sample npm run build      # configs/sample.json (a small subset)
+GAMES_CONFIG=all npm run build         # configs/all.json (every game)
+GAMES_CONFIG=configs/full.json npm run build   # an explicit preset path
+```
+
+See [Repository Map](#repository-map-multi-repo-layout) below and
+[Config-Driven Game Catalogue](docs/DEVELOPER.md#config-driven-game-catalogue).
+
 ## Desktop Launcher (Electron) & Steam Packaging
 
 TCE ships as a web app (GitHub Pages) **and** as a native desktop launcher built with **Electron** (`electron/`), for Steam distribution. The launcher boots the same built web app in a desktop window:
@@ -42,39 +57,98 @@ See `docs/DEVELOPER.md` (Electron Launcher / Desktop Packaging) and `RELEASE.md`
 
 The Tableau Card Engine (TCE) builds increasingly complex card games as "spikes" to validate gameplay mechanics and engine APIs. Reusable components are extracted from each spike into shared engine modules. The end goal is a fully modular engine that others can use to build their own tableau card games.
 
-The project is organized as a **flat monorepo** -- a single `package.json` at the root, shared engine code under `src/`, and standalone example games under `example-games/`.
+The project is organised as a **multi-repo distribution**. Shared engine code,
+the Gym, and the launcher shell live in the **core-engine repo**; each example
+game is its own repo that composes the engine as a git submodule. The
+`Tableau-Card-Engine` repo is the **launcher / distribution**: it composes the
+engine with any subset of game repos and produces the web and desktop builds.
+
+See [Repository Map (multi-repo layout)](#repository-map-multi-repo-layout).
 
 **How the engine was built:** for a narrative walkthrough of the project's evolution from first commit to present day -- the spike-driven phases, the architectural decisions, and the lessons learned -- see the [video series outline](https://github.com/SorraTheOrc/open_source_llm/blob/dev/docs/video-series-outline.md) (maintained in the open_source_llm project, where the video series is produced).
 
-## Repository Layout
+## Repository Map (multi-repo layout)
+
+TCE is split into one **core-engine** repo plus one repo per game, composed back
+together with **git submodules**. Repos are checked out as siblings:
+
+```
+<parent>/
+├── tableau-card-engine-core/   engine + Gym + launcher shell + shared assets
+├── tce-golf/                   one repo per game (pulls ./core as a submodule)
+├── tce-beleaguered-castle/
+├── tce-blackjack/
+├── tce-sushi-go/
+├── tce-feudalism/
+├── tce-lost-cities/
+├── tce-main-street/
+└── tce-coloretto/
+```
+
+### Cloning
+
+```bash
+# Engine + Gym only
+git clone git@github.com:TheWizardsCode/tableau-card-engine-core.git
+
+# A game repo, with its engine submodule
+git clone --recurse-submodules git@github.com:TheWizardsCode/tce-golf.git
+# ...or, in an existing checkout:
+git submodule update --init --recursive
+
+# The launcher/distribution repo (engine + whichever games are configured)
+git clone --recurse-submodules git@github.com:TheWizardsCode/Tableau-Card-Engine.git
+```
+
+### Building a distribution
+
+Which games a build contains is selected by a preset in `configs/`:
+
+| Preset | Games | Use |
+|---|---|---|
+| `configs/core-only.json` | none (engine + Gym) | core-only build; the default |
+| `configs/sample.json` | a small subset (golf, main-street) | partial-distribution smoke |
+| `configs/all.json` | all eight games | full distribution |
+
+```bash
+GAMES_CONFIG=all npm run build            # web build (dist/)
+GAMES_CONFIG=all npm run build:electron   # desktop build
+GAMES_CONFIG=all npm run package          # packaged desktop binary
+```
+
+A game is resolved **locally first** (`example-games/<id>/`, the flat layout
+still used by the launcher checkout) and then **as a sibling repo**
+(`../tce-<id>/`, the composed layout), so one preset set works in both. A
+missing game fails the build with a message naming it.
+
+### Per-game development loop
+
+Each game repo is a minimal TCE distribution with exactly one game:
+
+```bash
+cd tce-golf
+git submodule update --init --recursive   # fetch/refresh ./core
+npm install
+npm run dev                               # HMR dev server
+npm run build                             # production build
+npm run build:electron                    # desktop build
+```
+
+Engine imports (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`,
+`@ai/*`) resolve into the game's `./core` submodule via `CORE_ROOT`.
+
+### Repository layout (this checkout)
 
 ```
 tableau-card-engine/
-├── src/                   Engine modules
-│   ├── core-engine/       Game loop, state management, turn sequencing
-│   ├── card-system/       Card, Deck, Pile abstractions
-│   ├── rule-engine/       Rule definitions, validation, turn logic
-│   └── ui/                Reusable UI components (HelpPanel, SettingsPanel, Overlay, buttons, HUD utilities)
-├── example-games/         Standalone example games
-│   ├── gym/               Interactive demo scene suite for core-engine features
-│   ├── golf/              9-Card Golf (human vs. AI)
-│   ├── beleaguered-castle/ Beleaguered Castle (open solitaire)
-│   ├── sushi-go/          Sushi Go! (card drafting, human vs. AI)
-│   ├── feudalism/          Feudalism (engine-building, human vs. AI)
-│   ├── lost-cities/       Lost Cities (2-player expedition lanes, human vs. AI)
-│   ├── main-street/       Main Street (single-player tableau builder)
-│   └── coloretto/         Coloretto (set-building rows, human vs. 1-4 AI)
-├── electron/             Desktop launcher (Electron main process, preload, content locator)
-├── public/assets/         Static assets (cards, fonts, images)
-│   └── cards/             52 standard card SVGs + card back + game-specific cards (140x190px)
-├── tests/                 Vitest test files
+├── src/                   Engine modules (core-engine, card-system, rule-engine, ui, ai, balance-cards)
+├── example-games/         Example games; gym stays in core, the rest move to their own repos
+├── configs/               Build presets (core-only, sample, all)
+├── scripts/               Core tooling (build/test runners, extraction, game discovery)
+├── electron/              Desktop launcher (Electron main process, preload, content locator)
+├── public/assets/         Shared assets (canonical deck, default SFX); game assets move with their game
+├── tests/                 Vitest test files (core + Gym suites)
 ├── docs/                  Developer documentation
-│   ├── DEVELOPER.md       Detailed developer guide
-│   ├── core-engine/       Engine API notes (including spatial rules)
-│   └── rule-engine/       Rule engine API docs (including economy ledger)
-├── dist/                  Production build output (gitignored)
-├── dist-electron/         Compiled Electron main process output (gitignored)
-├── release/               Packaged binaries (gitignored; electron-builder output)
 ├── AGENTS.md              Project guidance and Worklog rules
 ├── package.json
 ├── tsconfig.json
@@ -109,17 +183,22 @@ Developer Guide for full documentation and usage examples.
 
 ## Example Games
 
-| Game | Location | Description |
-|------|----------|-------------|
-| Gym (demo suite) | `example-games/gym/` | Interactive demo scenes for every core-engine feature: deck lifecycle, hand/pile interactions, undo/redo, overlays, SLL composition, audio feedback, transcript recording, save/load |
-| 9-Card Golf | `example-games/golf/` | Single-round 9-Card Golf (human vs. AI) with card flip animations, greedy/random AI strategies, and JSON game transcripts |
-| Beleaguered Castle | `example-games/beleaguered-castle/` | Open solitaire with drag-and-drop, click-to-move, undo/redo, auto-move to foundations, auto-complete, win/loss detection, help panel, JSON game transcripts, and checkpoint autosave after each move with startup recovery. **Citadel variant**: a pre-game choice deals all 52 cards to the tableau (no pre-placed aces) for an extra challenge — selection persists across reloads |
-| Sushi Go! | `example-games/sushi-go/` | Card drafting game (human vs. AI). Pick and pass hands over 3 rounds, collect sets of sushi dishes, and score the most points |
-| Feudalism | `example-games/feudalism/` | Engine-building card game (human vs. AI). Collect gem tokens, purchase development cards for bonuses, attract nobles, and reach 15 prestige to win. Checkpoint autosaves after each turn (human + AI) with startup recovery |
-| Lost Cities | `example-games/lost-cities/` | Two-player expedition card game (human vs. AI). Bet on up to 5 colored expeditions across a 3-round match with investment multipliers, ascending-play rules, and cumulative scoring |
-| Main Street | `example-games/main-street/` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score — no turn limit by default (games end via score threshold, all challenges, bankruptcy, or reputation collapse; a turn limit is opt-in via an explicit `maxTurns` config). **Annual calendar**: each turn is one week of the Irish year (weeks 1–52, year wraps); seasonal and holiday event cards only appear during their real-world week windows (e.g. St Patrick's Day in late winter, Harvest Festival in autumn). **Multi-Use Card Economy**: cards can be held in hand for synergy bonuses; staff cards expand hand capacity with ongoing costs. **Action economy**: one action per week (two with a General Manager) — move-to-hand, play-from-hand, direct buy-and-place (+50% premium), and hire-staff spend the action; refresh, sell, hint, discard, upgrades, events, and end-turn are free. Market cycles each turn. Tutorial overlay zones are defined in a separate SLL layout file (`main-street-tutorial.layout.json`) composed with the base layout. Balance analysis tools are specified in the [Balance Process & Tooling PRD](docs/main-street/prd-balance-process-and-tooling.md). |
-| Scenario: Tutorial | `example-games/main-street/scenes/MainStreetTutorialScene.ts` | Guided introduction to Main Street. 17-step tutorial overlays walk through buy → hand → place, invest → optimize → trigger, and scoring. Accessible from the Game Selector. |
-| Coloretto | `example-games/coloretto/` | Set-building card game (human vs. 1-4 AI). On your turn place the top deck card on a shared row (max 3) or take an entire row into your collection. Score 3 colors positively and the rest negatively across 7/5/4/3 rounds (2/3/4/5 players) using the canonical point table (1=1, 2=3, 3=6, 4=10, 5=15, 6+=21). |
+Each game below is its **own repository** (`tce-<game>`) that pulls the engine in
+as a `./core` submodule. In the launcher checkout they are present locally under
+`example-games/<game>/`; in a decomposed checkout they are siblings. The **Gym
+stays in the core repo** — it is the canonical core-engine feature demonstrator.
+
+| Game | Repo | Description |
+|------|------|-------------|
+| Gym (demo suite) | *(core)* `example-games/gym/` | Interactive demo scenes for every core-engine feature: deck lifecycle, hand/pile interactions, undo/redo, overlays, SLL composition, audio feedback, transcript recording, save/load |
+| 9-Card Golf | `tce-golf` | Single-round 9-Card Golf (human vs. AI) with card flip animations, greedy/random AI strategies, and JSON game transcripts |
+| Beleaguered Castle | `tce-beleaguered-castle` | Open solitaire with drag-and-drop, click-to-move, undo/redo, auto-move to foundations, auto-complete, win/loss detection, help panel, JSON game transcripts, and checkpoint autosave after each move with startup recovery. **Citadel variant**: a pre-game choice deals all 52 cards to the tableau (no pre-placed aces) for an extra challenge — selection persists across reloads |
+| Sushi Go! | `tce-sushi-go` | Card drafting game (human vs. AI). Pick and pass hands over 3 rounds, collect sets of sushi dishes, and score the most points |
+| Feudalism | `tce-feudalism` | Engine-building card game (human vs. AI). Collect gem tokens, purchase development cards for bonuses, attract nobles, and reach 15 prestige to win. Checkpoint autosaves after each turn (human + AI) with startup recovery |
+| Lost Cities | `tce-lost-cities` | Two-player expedition card game (human vs. AI). Bet on up to 5 colored expeditions across a 3-round match with investment multipliers, ascending-play rules, and cumulative scoring |
+| Main Street | `tce-main-street` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score — no turn limit by default (games end via score threshold, all challenges, bankruptcy, or reputation collapse; a turn limit is opt-in via an explicit `maxTurns` config). **Annual calendar**: each turn is one week of the Irish year (weeks 1–52, year wraps); seasonal and holiday event cards only appear during their real-world week windows (e.g. St Patrick's Day in late winter, Harvest Festival in autumn). **Multi-Use Card Economy**: cards can be held in hand for synergy bonuses; staff cards expand hand capacity with ongoing costs. **Action economy**: one action per week (two with a General Manager) — move-to-hand, play-from-hand, direct buy-and-place (+50% premium), and hire-staff spend the action; refresh, sell, hint, discard, upgrades, events, and end-turn are free. Market cycles each turn. Tutorial overlay zones are defined in a separate SLL layout file (`main-street-tutorial.layout.json`) composed with the base layout. Balance analysis tools are specified in the [Balance Process & Tooling PRD](docs/main-street/prd-balance-process-and-tooling.md). |
+| Scenario: Tutorial | `tce-main-street` | Guided introduction to Main Street. 17-step tutorial overlays walk through buy → hand → place, invest → optimize → trigger, and scoring. Accessible from the Game Selector. |
+| Coloretto | `tce-coloretto` | Set-building card game (human vs. 1-4 AI). On your turn place the top deck card on a shared row (max 3) or take an entire row into your collection. Score 3 colors positively and the rest negatively across 7/5/4/3 rounds (2/3/4/5 players) using the canonical point table (1=1, 2=3, 3=6, 4=10, 5=15, 6+=21). |
 
 ## Main Street Card Upgrade Visualization
 

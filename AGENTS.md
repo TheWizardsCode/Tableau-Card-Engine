@@ -6,7 +6,7 @@ Read the global agent instructions at `~/.pi/agent/AGENTS.md` — they define th
 
 You are a producer for the Tableau Card Engine (TCE), a game engine designed to support building single-player tableau card games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
 
-This project follows a **spike-driven development** approach: example games are built first to validate gameplay mechanics and engine APIs, then reusable components are extracted and refined into the shared engine modules. The project is organized as a **flat monorepo** with a single `package.json` at the root.
+This project follows a **spike-driven development** approach: example games are built first to validate gameplay mechanics and engine APIs, then reusable components are extracted and refined into the shared engine modules. The project is organised as a **multi-repo distribution**: the engine + Gym + launcher shell live in the core-engine repo, each game is its own repo composed via git submodules, and the `Tableau-Card-Engine` repo is the launcher/distribution. See [Multi-Repo Architecture](docs/dev/multi-repo-architecture.md).
 
 ## Components
 
@@ -15,49 +15,32 @@ This project follows a **spike-driven development** approach: example games are 
 - **Rule Engine** (`src/rule-engine/`): A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics, turn logic, and validation.
 - **AI** (`src/ai/`): Shared AI strategy abstractions and utility functions. Provides `AiStrategyBase` (base interface), `AiPlayer<TStrategy>` (generic player wrapper that binds a strategy to an RNG), `pickRandom<T>()` (uniform random selection), and `pickBest<T>()` (scored selection with random tie-breaking). Game-specific strategies extend the base types.
 - **User Interface** (`src/ui/`): A modular UI system with reusable components (buttons, menus, overlays) that can be customized and extended to fit different card game themes and styles.
-- **Example Games** (`example-games/`): A collection of sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features, including direct and composed Screen Layout Language (SLL) examples.
+- **Example Games** (`example-games/`): A collection of sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests, and is **its own repository** (`tce-<game>`) that composes the engine as a `./core` git submodule. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features (including direct and composed Screen Layout Language (SLL) examples) and **stays in the core repo** — it is the canonical engine feature demonstrator.
 
 ## Directory Structure
 
+The engine + Gym + launcher shell form the **core repo**; each game is its own
+`tce-<game>` repo that pulls the engine in as a `./core` submodule. Repos are
+siblings, composed by the launcher via `configs/*.json` presets (see
+[Multi-Repo Architecture](docs/dev/multi-repo-architecture.md)). This tree is
+the launcher checkout, where games are present locally under `example-games/`.
+
 ```
 tableau-card-engine/
-├── src/
-│   ├── core-engine/       # Game loop, state management, rendering helpers
-│   │   └── index.ts       # Barrel file / public API
-│   ├── card-system/       # Card, Deck, Hand, Pile abstractions
-│   │   └── index.ts
-│   ├── rule-engine/       # Rule definitions, validation, turn logic
-│   │   └── index.ts
-│   ├── ai/                # Shared AI strategy abstractions and utilities
-│   │   └── index.ts       # Barrel file / public API
-│   └── ui/                # Reusable UI components
-│       └── index.ts
+├── src/                   # core-engine, card-system, rule-engine, ai, balance-cards, ui
 ├── example-games/
-│   └── gym/               Gym demo scenes for core-engine features
-│       ├── README.md
-│       ├── GymRegistry.ts
-│       ├── index.ts
-│       └── scenes/
-│           ├── GymRouterScene.ts
-│           ├── GymSceneBase.ts
-│           ├── GymDeckRngScene.ts
-│           ├── GymHandPileScene.ts
-│           ├── GymOverlayUiScene.ts
-│           ├── GymUndoRedoScene.ts
-│           ├── GymTranscriptScene.ts
-│           ├── GymSaveLoadScene.ts
-│           └── GymAudioFeedbackScene.ts
-├── public/                # Static assets (images, fonts, etc.)
-│   └── assets/
-│       ├── cards/         # Card sprite assets (CC0/permissive)
-│       └── CREDITS.md     # Asset attribution
+│   ├── gym/               # Gym demo scenes (stays in core)
+│   └── <game>/            # each game is its own tce-<game> repo
+├── configs/               # build presets: core-only.json, sample.json, all.json
+├── scripts/               # core tooling (runners, extraction, game discovery)
+├── public/assets/         # shared assets (cards/ + CREDITS.md); game assets move with their game
 ├── tests/                 # Vitest test files
-├── dist/                  # Production build output (gitignored)
+├── dist/                  # production build output (gitignored)
 ├── AGENTS.md
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
-├── index.html             # Single entry point for Vite
+├── index.html             # single entry point for Vite
 └── .gitignore
 ```
 

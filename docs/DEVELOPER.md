@@ -766,6 +766,14 @@ Audio assets are organized in `public/assets/audio/<game>/` with a fallback to
 
 ## Project Structure
 
+> **Multi-repo note.** This tree describes the **launcher checkout**, where the
+games are present locally under `example-games/`. In the decomposed layout the
+engine lives in `tableau-card-engine-core` and each game in its own `tce-<game>`
+repo, composed with git submodules. A game repo keeps the same
+`example-games/<game>/` tree plus its `./core` submodule. See
+[Multi-Repo Architecture](dev/multi-repo-architecture.md) for the full split and
+`configs/*.json` for the build presets.
+
 ```
 src/
 ├── core-engine/            Game loop, state management, turn sequencing, utilities
@@ -1049,33 +1057,82 @@ When migrating an existing game to the canonical pattern:
 
 > **Note:** For engine feature demonstrations (not full games), add a demo scene to the **Gym** instead of creating a new example game. See [Gym documentation](../example-games/gym/README.md) and [Gym scene index](gym/GYM_INDEX.md).
 
-1. Create a directory: `example-games/<game-name>/`
+### Repo layout
+
+A new game gets its **own repository** (`tce-<game>`) that composes the engine as
+a git submodule at `./core`. For local development against a launcher checkout,
+the game can also live at `example-games/<game-name>/`; the discovery plugin
+resolves a game **locally first**, then as a sibling `../tce-<game>` repo.
+
+```bash
+# Scaffold a game repo alongside the core checkout
+mkdir tce-my-game && cd tce-my-game
+git submodule add git@github.com:TheWizardsCode/tableau-card-engine-core.git core
+```
+
+### Steps
+
+1. Create the game tree: `example-games/<game-name>/`
 2. Add a standalone entry point: `example-games/<game-name>/main.ts`
 3. Add a factory function: `example-games/<game-name>/createXxxGame.ts` (for browser tests)
 4. Add scenes: `example-games/<game-name>/scenes/<SceneName>.ts` (extend `Phaser.Scene`)
-5. Place assets in `public/assets/<game-name>/` and document attribution in `public/assets/CREDITS.md`
+5. Place game-owned assets under the game tree / `public/assets/<game-name>/` and document attribution in `public/assets/CREDITS.md`
 6. Add game-specific tests under `tests/<game-name>/`
-7. Register the game in the unified entry point (`main.ts` at the project root):
-   - Import the scene class
-   - Add it to the `scene` array in the Phaser config
-   - Add a `GameEntry` to the `GAMES` catalogue array (include `thumbnail` once available)
-8. Add a `[ Menu ]` button to the game scene that calls `this.scene.start('GameSelectorScene')` for navigation back to the selector
-9. Add transcript recording:
-   - Create `example-games/<game-name>/GameTranscript.ts` with transcript types and a `TranscriptRecorder` extending `TranscriptRecorderBase<T>` from `src/core-engine/TranscriptRecorder.ts`
-   - Integrate recording into the scene: create the recorder after game setup, record each turn/action, finalize on game over, and auto-save to `TranscriptStore`
-10. Add replay support:
+7. **Export `GAME_INFO` from the game's scene module** (do *not* edit `main.ts`):
+
+   ```ts
+   export class MyGameScene extends CardGameScene { /* … */ }
+
+   export const GAME_INFO = {
+     sceneKey: 'MyGameScene',
+     title: 'My Game',
+     description: 'One or two sentences shown on the selector card.',
+     thumbnail: 'games/my-game/thumbnail',   // optional; relative to assets/
+   } as const;
+   ```
+
+   The Vite game-discovery plugin reads this at build time. See
+   [Config-Driven Game Catalogue](#config-driven-game-catalogue).
+8. **Add the game to a preset** in `configs/*.json`:
+
+   ```json
+   {
+     "id": "my-game",
+     "path": "../tce-my-game",
+     "scenePath": "example-games/my-game/scenes/MyGameScene.ts",
+     "adapterPath": "example-games/my-game/scripts/adapters/MyGameReplayAdapter.ts"
+   }
+   ```
+
+   `adapterPath` is optional; include it when the game supports replay. Games
+   without an entry simply do not appear in that build.
+9. Add a `[ Menu ]` button to the game scene that calls `this.scene.start('GameSelectorScene')` for navigation back to the selector
+10. Add transcript recording:
+    - Create `example-games/<game-name>/GameTranscript.ts` with transcript types and a `TranscriptRecorder` extending `TranscriptRecorderBase<T>` from `src/core-engine/TranscriptRecorder.ts`
+    - Integrate recording into the scene: create the recorder after game setup, record each turn/action, finalize on game over, and auto-save to `TranscriptStore`
+11. Add replay support:
     - Add `loadBoardState(stateJson: string)` to the scene to reconstruct visual state from a transcript snapshot
     - Emit a `state-settled` event (via `GameEventEmitter`) after `loadBoardState()` completes rendering
     - Handle `?mode=replay` URL parameter in the scene to skip normal game initialization
     - Expose `window.__GAME_EVENTS__` in replay mode for adapter communication
-11. Create a replay adapter:
-    - Create `scripts/adapters/<GameName>ReplayAdapter.ts` implementing the `ReplayAdapter` interface
-    - Register the adapter in `scripts/adapters/index.ts` (before Golf, which uses structural detection)
+12. Create a replay adapter **inside the game repo**:
+    - Create `example-games/<game-name>/scripts/adapters/<GameName>ReplayAdapter.ts` implementing the core `ReplayAdapter` interface
+    - Reference it from the preset's `adapterPath` (step 8). Registration order follows preset order; put structural-match adapters (like Golf) last. Do **not** edit `scripts/adapters/index.ts` — it is core and game-free.
     - Include a `gameType` field in the transcript for explicit adapter matching
-12. Generate fixture and thumbnail:
-    - Create a fixture generator script at `scripts/generate-<game>-fixture-transcript.ts`
-    - Generate and commit the fixture transcript at `tests/fixtures/transcripts/<game-name>/fixture-game.json`
+13. Generate fixture and thumbnail **inside the game repo**:
+    - Create a fixture generator script at `example-games/<game-name>/scripts/generate-<game>-fixture-transcript.ts`
+    - Generate and commit the fixture transcript at `example-games/<game-name>/tests/fixtures/transcripts/fixture-game.json`
     - Generate and commit the thumbnail at `public/assets/games/<game-name>/thumbnail.png` using `./scripts/refresh-thumbnails.sh <game-name>`
+
+### Per-game npm scripts
+
+A game repo runs the same core toolchain against its `./core` submodule:
+
+```bash
+CORE_ROOT=./core npm run dev               # HMR dev server
+CORE_ROOT=./core npm run build             # production build
+CORE_ROOT=./core npm run build:electron    # desktop build
+```
 
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 
