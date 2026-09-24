@@ -163,10 +163,18 @@ describe('smoke/dev test lists follow the selected preset', () => {
       const config = viteConfig({ command: 'build', mode: 'production' }) as unknown;
       for (const name of ['smoke', 'dev']) {
         for (const file of includeFor(config, name)) {
-          expect(
-            fs.existsSync(path.join(REPO_ROOT, file)),
-            `${name} references missing test file: ${file}`,
-          ).toBe(true);
+          if (fs.existsSync(path.join(REPO_ROOT, file))) continue;
+          // A game that is not checked out (core-only or partial checkout) has
+          // no test tree, so its entries are legitimately absent.
+          const group = file.split('/')[1];
+          if (
+            group &&
+            !fs.existsSync(path.join(REPO_ROOT, 'example-games', group)) &&
+            !fs.existsSync(path.join(REPO_ROOT, 'tests', group))
+          ) {
+            continue;
+          }
+          throw new Error(`${name} references missing test file: ${file}`);
         }
       }
     } finally {
