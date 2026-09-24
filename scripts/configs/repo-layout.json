@@ -13,15 +13,39 @@
       "src/ai",
       "src/balance-cards",
       "example-games/gym",
-      "src/ui/GameSelectorScene.ts",
-      "src/ui/createCardGame.ts",
       "electron",
       "index.html",
       "main.ts",
       "package.json",
       "tsconfig.json",
       "vite.config.ts",
-      "scripts",
+      "configs",
+      "docs/gym",
+      "scripts/adapters",
+      "scripts/configs",
+      "scripts/build-electron-main.mjs",
+      "scripts/check-browser-test-env.ts",
+      "scripts/check-terminology-guards.sh",
+      "scripts/dev-server-utils.ts",
+      "scripts/export-transcripts.ts",
+      "scripts/extract-repos.sh",
+      "scripts/generate-all-thumbnails.ts",
+      "scripts/generate-sfx.mjs",
+      "scripts/generate-thumbnail.ts",
+      "scripts/refresh-context-thresholds.sh",
+      "scripts/replay.ts",
+      "scripts/run-ci-tests.sh",
+      "scripts/run-dev-tests.sh",
+      "scripts/run-smoke-tests.sh",
+      "scripts/run-tutorial-tests.sh",
+      "scripts/tf-generate-synths.sh",
+      "scripts/tf-spike-capture.sh",
+      "scripts/validate-transcript.ts",
+      "scripts/verify-file-url-load.ts",
+      "scripts/vite-game-discovery-plugin.ts",
+      "scripts/vite-transcript-plugin.ts",
+      "scripts/vitest-run-with-retry.ts",
+      "scripts/vitest-tap-reporter.ts",
       "tests/core-engine",
       "tests/card-system",
       "tests/rule-engine",
@@ -30,7 +54,20 @@
       "tests/gym",
       "tests/handView",
       "tests/core",
-      "docs/gym"
+      "tests/scripts",
+      "tests/replay",
+      "tests/smoke.phaser4.browser.test.ts",
+      "tests/vite-config.test.ts",
+      "tests/vite-transcript-plugin-regression.test.ts",
+      "tests/test-config-tracking.test.ts",
+      "tests/test-workflow-safety.test.ts",
+      "tests/skills-extensions-tracking.test.ts",
+      "tests/helpers/MockFactory.ts",
+      "tests/helpers/phaserCanvasPool.ts",
+      "tests/helpers/waitForScene.ts",
+      "tests/fixtures/layouts/README.md",
+      "src/vite-env.d.ts",
+      "scripts/contact-sheet.ts"
     ],
     "assets": [
       "CREDITS.md",
@@ -107,7 +144,13 @@
       "paths": [
         "example-games/golf",
         "tests/golf",
-        "docs/golf"
+        "docs/golf",
+        "scripts/generate-fixture-transcript.ts",
+        "scripts/adapters/GolfReplayAdapter.ts",
+        "tests/ui/HelpPanel.test.ts",
+        "tests/ui/HelpPanel.browser.test.ts",
+        "tests/ui/ListenerLeaks.browser.test.ts",
+        "tests/rule-engine/LegalityResult.test.ts"
       ],
       "assets": [
         "audio/golf/",
@@ -121,7 +164,11 @@
       "paths": [
         "example-games/beleaguered-castle",
         "tests/beleaguered-castle",
-        "docs/beleaguered-castle"
+        "docs/beleaguered-castle",
+        "scripts/generate-castle-sfx.mjs",
+        "scripts/adapters/BeleagueredCastleReplayAdapter.ts",
+        "tests/ui/CardGameSceneUndoRedoPositions.browser.test.ts",
+        "tests/ui/hud-layer-contract.browser.test.ts"
       ],
       "assets": [
         "audio/beleaguered-castle/",
@@ -150,7 +197,9 @@
         "tests/sushi-go",
         "tests/sushi-go-icons.test.ts",
         "tests/sushi-go-wasabi.test.ts",
-        "docs/sushi-go"
+        "docs/sushi-go",
+        "scripts/generate-sushi-go-fixture-transcript.ts",
+        "scripts/adapters/SushiGoReplayAdapter.ts"
       ],
       "assets": [
         "sushi-go/",
@@ -165,7 +214,9 @@
       "paths": [
         "example-games/feudalism",
         "tests/feudalism",
-        "docs/feudalism"
+        "docs/feudalism",
+        "scripts/generate-feudalism-fixture-transcript.ts",
+        "scripts/adapters/FeudalismReplayAdapter.ts"
       ],
       "assets": [
         "audio/feudalism/",
@@ -179,7 +230,11 @@
       "paths": [
         "example-games/lost-cities",
         "tests/lost-cities",
-        "docs/lost-cities"
+        "docs/lost-cities",
+        "scripts/generate-lc-fixture-transcript.ts",
+        "scripts/generate-lost-cities-cards.ts",
+        "scripts/generate-lost-cities-sfx.mjs",
+        "scripts/adapters/LostCitiesReplayAdapter.ts"
       ],
       "assets": [
         "cards/lost-cities/",
@@ -200,7 +255,41 @@
         "tests/e2e/main-street-tutorial-e2e-part4.browser.test.ts",
         "tests/e2e/main-street-tutorial-e2e-part5.browser.test.ts",
         "tests/e2e/main-street-tutorial-e2e-part6.browser.test.ts",
-        "docs/main-street"
+        "docs/main-street",
+        "src/ui/debug/MarketCardCheatOverlay.ts",
+        "src/ui/debug/StaffApplicantCheatOverlay.ts",
+        "scripts/balance",
+        "tests/balance",
+        "scripts/generate-card-csv.ts",
+        "scripts/generate-main-street-card-art.mjs",
+        "scripts/generate-main-street-card-svgs.mjs",
+        "scripts/generate-main-street-catalog-baseline.ts",
+        "scripts/generate-main-street-expanded-card-manifest.ts",
+        "scripts/generate-main-street-monte-baseline.ts",
+        "scripts/monte-carlo.ts",
+        "scripts/playtest-scenarios.ts",
+        "scripts/run-balance-cards.ts",
+        "scripts/save-load-smoke.ts",
+        "scripts/create-dummy-main-street-screenshot.ts",
+        "scripts/refresh-thumbnails.sh",
+        "tests/scripts/generate-card-csv.test.ts",
+        "scripts/adapters/MainStreetReplayAdapter.ts",
+        "example-games/gym/GymCardIndex.ts",
+        "example-games/gym/scenes/GymCardIndexScene.ts",
+        "tests/gym/GymCardIndex.test.ts",
+        "tests/e2e/main-street-cheat-smoke.browser.test.ts",
+        "tests/e2e/main-street-headless.e2e.test.ts",
+        "tests/e2e/main-street-no-console-errors.browser.test.ts",
+        "tests/helpers/main-street-tutorial-e2e.ts",
+        "tests/rule-engine/EconomyLedger.test.ts",
+        "tests/ui/MainStreetMigration.browser.test.ts",
+        "tests/ui/screen-layout-schema.test.ts",
+        "tests/fixtures/layouts/main-street.valid.layout.json",
+        "tests/fixtures/layouts/main-street.invalid-anchor.layout.json",
+        "tests/fixtures/layouts/main-street.invalid-coordinate.layout.json",
+        "tests/fixtures/layouts/main-street.invalid-missing-zone.layout.json",
+        "tests/fixtures/layouts/main-street.invalid-overflow.layout.json",
+        "tests/fixtures/layouts/main-street-tutorial-dim.layout.json"
       ],
       "assets": [
         "games/main-street/"
@@ -431,7 +520,8 @@
     "assetIncludeSemantics": "git filter-repo directory includes re-include their children and glob '*' crosses '/', so a shared asset is NEVER declared as a broad parent of a game-owned child. Rather than exclude, the layout enumerates the shared files and the disjoint shared subtrees (cards/alternative/, audio/default/) explicitly; game-owned subdirectories are simply absent.",
     "crossBoundaryFixes": [
       "example-games/gym/scenes/GymTokenPileViewScene.ts loads 'assets/cards/classic-vector/back.png', which does not exist in public/assets. Retarget the Gym demo to the shared card_back.svg ('assets/cards/card_back.svg') so the Gym depends only on core-owned assets.",
-      "example-games/gym/scenes/GymSvgHelpersScene.ts loads 'assets/sushi-go/icon-tempura.svg' (a game-owned asset). Retarget the Gym demo to a core-owned SVG so the Gym does not depend on a game repo."
+      "example-games/gym/scenes/GymSvgHelpersScene.ts loads 'assets/sushi-go/icon-tempura.svg' (a game-owned asset). Retarget the Gym demo to a core-owned SVG so the Gym does not depend on a game repo.",
+      "tests/ui/screen-layout-schema.test.ts imports example-games/main-street/layouts/main-street.layout.json \u2014 a game-owned layout referenced by a core UI test. Replace that case with a core-owned SLL fixture (tests/fixtures/layouts/) so the core suite does not depend on a game repo."
     ],
     "sharedCardsCount": 53,
     "sharedRootAudioCount": 8

@@ -11,8 +11,8 @@
  * See CG-0MLTFUL061DWDGA2.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { GolfReplayAdapter } from '../../scripts/adapters/GolfReplayAdapter';
-import { BeleagueredCastleReplayAdapter } from '../../scripts/adapters/BeleagueredCastleReplayAdapter';
+import { GolfReplayAdapter } from '../../example-games/golf/scripts/adapters/GolfReplayAdapter';
+import { BeleagueredCastleReplayAdapter } from '../../example-games/beleaguered-castle/scripts/adapters/BeleagueredCastleReplayAdapter';
 import { adapterRegistry } from '../../scripts/adapters/AdapterRegistry';
 import type { ReplayAdapter } from '../../scripts/adapters/ReplayAdapter';
 

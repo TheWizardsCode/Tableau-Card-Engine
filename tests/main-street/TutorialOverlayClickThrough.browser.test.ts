@@ -66,7 +66,7 @@ import {
   waitForTutorialOverlay,
   waitForOverlayVisible,
   clickOverlayButtonByText,
-} from '../helpers/main-street-tutorial-e2e';
+} from './helpers/main-street-tutorial-e2e';
 import { resolveMarketCardAnchor } from '../../example-games/main-street/scenes/MainStreetTutorialHints';
 
 /**

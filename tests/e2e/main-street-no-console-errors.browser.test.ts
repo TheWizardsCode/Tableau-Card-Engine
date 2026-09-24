@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Phaser from 'phaser';
 import { page } from '@vitest/browser/context';
 import { waitForScene } from '../helpers/waitForScene';
-import { destroyGame } from '../helpers/main-street-tutorial-e2e';
+import { destroyGame } from '../main-street/helpers/main-street-tutorial-e2e';
 
 const SCENE_LOAD_TIMEOUT = 30_000;
 

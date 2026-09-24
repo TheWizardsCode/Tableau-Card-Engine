@@ -90,3 +90,64 @@ describe('vite config core path aliases', () => {
     }
   });
 });
+
+// ── Preset-aware test profiles (core-only checkout) ───────────────────────
+
+describe('smoke/dev test lists follow the selected preset', () => {
+  interface ProjectLike {
+    test?: { name?: string; include?: string[] };
+  }
+
+  function includeFor(config: unknown, name: string): string[] {
+    const projects = (config as { test?: { projects?: ProjectLike[] } }).test?.projects ?? [];
+    const project = projects.find((p) => p.test?.name === name);
+    return project?.test?.include ?? [];
+  }
+
+  it('keeps game test paths when the games are selected', () => {
+    const original = process.env.GAMES_CONFIG;
+    try {
+      process.env.GAMES_CONFIG = 'all';
+      const smoke = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'smoke');
+      expect(smoke).toContain('tests/golf/GolfScene.browser.test.ts');
+      expect(smoke).toContain('tests/gym/GymSceneSmoke.browser.test.ts');
+    } finally {
+      if (original === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = original;
+    }
+  });
+
+  it('drops game test paths in a core-only checkout, keeping core + Gym', () => {
+    const original = process.env.GAMES_CONFIG;
+    try {
+      process.env.GAMES_CONFIG = 'core-only';
+      const smoke = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'smoke');
+      // Game suites would not resolve in a core-only checkout — referencing
+      // them makes Vitest fail with "no test files found".
+      expect(smoke).not.toContain('tests/golf/GolfScene.browser.test.ts');
+      expect(smoke).not.toContain('tests/main-street/MainStreetScene.browser.test.ts');
+      // Core-owned suites stay.
+      expect(smoke).toContain('tests/core-engine/SvgHelpers.browser.test.ts');
+      expect(smoke).toContain('tests/ui/HelpPanel.browser.test.ts');
+      expect(smoke).toContain('tests/gym/GymSceneSmoke.browser.test.ts');
+    } finally {
+      if (original === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = original;
+    }
+  });
+
+  it('keeps only the sample preset games for a partial checkout', () => {
+    const original = process.env.GAMES_CONFIG;
+    try {
+      process.env.GAMES_CONFIG = 'sample';
+      const dev = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'dev');
+      expect(dev).toContain('tests/golf/GolfScene.browser.test.ts');
+      expect(dev).toContain('tests/main-street/MainStreetScene.browser.test.ts');
+      expect(dev).not.toContain('tests/coloretto/ColorettoScene.browser.test.ts');
+      expect(dev).not.toContain('tests/sushi-go/SushiGoIcons.browser.test.ts');
+    } finally {
+      if (original === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = original;
+    }
+  });
+});

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { selectBaselineBlock } from '../../scripts/balance/baseline-blocks';
-import type { MonteBaseline } from '../../scripts/balance/baseline-blocks';
+import { selectBaselineBlock } from '../../example-games/main-street/scripts/balance/baseline-blocks';
+import type { MonteBaseline } from '../../example-games/main-street/scripts/balance/baseline-blocks';
 
 /**
  * Baseline-block selection for the Monte Carlo drift tooling

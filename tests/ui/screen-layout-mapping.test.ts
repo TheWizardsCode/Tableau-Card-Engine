@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import validMainStreetLayout from '../fixtures/layouts/main-street.valid.layout.json';
+import validMainStreetLayout from '../../example-games/main-street/tests/fixtures/layouts/main-street.valid.layout.json';
 import type {
   ScreenLayoutDocument,
   PixelPoint,

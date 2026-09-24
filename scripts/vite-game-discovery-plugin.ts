@@ -89,6 +89,34 @@ export function resolveCoreAliases(coreRoot: string): Record<string, string> {
   };
 }
 
+/**
+ * Return the selected game ids for the active preset (empty when none).
+ *
+ * Used by `vite.config.ts` to filter the smoke/dev project test lists: a test
+ * file that belongs to a game which is not checked out would otherwise make
+ * Vitest fail with "no test files found". A core-only checkout therefore runs
+ * only the core + Gym subsets.
+ *
+ * Never throws: a broken/missing preset degrades to "no games" so the core
+ * test profiles always remain runnable.
+ *
+ * @param coreRoot Absolute core-repo root (where `configs/` lives).
+ * @param env Environment-like record (defaults to `process.env`).
+ * @returns Selected game ids in preset order.
+ */
+export function selectedGameIds(
+  coreRoot: string,
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  try {
+    const configPath = selectConfigPath(coreRoot, env);
+    if (!fs.existsSync(configPath)) return [];
+    return loadGamesConfig(configPath).games.map((g) => g.id);
+  } catch {
+    return [];
+  }
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 /** One game selection inside a preset. */

@@ -27,7 +27,7 @@ import {
   clickEndTurn,
   clickCommunityFavour,
   saveScreenshot,
-} from '../helpers/main-street-tutorial-e2e';
+} from '../main-street/helpers/main-street-tutorial-e2e';
 
 let game: Phaser.Game | null = null;
 

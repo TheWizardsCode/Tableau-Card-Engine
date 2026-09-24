@@ -3,7 +3,38 @@ import { defineConfig } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from './scripts/vite-transcript-plugin';
-import { gameDiscoveryPlugin, resolveCoreAliases } from './scripts/vite-game-discovery-plugin';
+import { gameDiscoveryPlugin, resolveCoreAliases, selectedGameIds } from './scripts/vite-game-discovery-plugin';
+
+// Which games are checked out for this build/test run. Used to filter the
+// smoke/dev project test lists so a core-only checkout does not reference test
+// files that are not present (which Vitest treats as an error).
+//
+// Resolved lazily so a test that changes GAMES_CONFIG sees the effect (the
+// config factory is re-invoked per test).
+let selectedGamesCache: Set<string> | null = null;
+function selectedGames(): Set<string> {
+  if (process.env.VITEST) {
+    // Tests mutate GAMES_CONFIG between cases; never cache under Vitest.
+    return new Set(selectedGameIds(__dirname));
+  }
+  if (!selectedGamesCache) selectedGamesCache = new Set(selectedGameIds(__dirname));
+  return selectedGamesCache;
+}
+
+/** Keep only test files that belong to a checked-out game (or to core). */
+function coreOrSelected(...files: string[]): string[] {
+  const games = selectedGames();
+  return files.filter((f) => {
+    const m = /^tests\/([^/]+)\//.exec(f);
+    if (!m) return true;
+    const group = m[1];
+    // Always-present (core-owned) suites.
+    if (['core-engine', 'ui', 'gym', 'handView', 'card-system', 'rule-engine', 'ai', 'core'].includes(group)) {
+      return true;
+    }
+    return games.has(group);
+  });
+}
 
 // Read version from package.json (single source of truth)
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
@@ -125,7 +156,7 @@ export default defineConfig(({ mode, command }) => ({
         extends: true,
         test: {
           name: 'smoke',
-          include: [
+          include: coreOrSelected(
             'tests/main-street/MainStreetScene.browser.test.ts',
             'tests/golf/GolfScene.browser.test.ts',
             'tests/feudalism/FeudalismSmokeTest.browser.test.ts',
@@ -136,7 +167,7 @@ export default defineConfig(({ mode, command }) => ({
             'tests/core-engine/SvgHelpers.browser.test.ts',
             'tests/ui/HelpPanel.browser.test.ts',
             'tests/gym/GymSceneSmoke.browser.test.ts',
-          ],
+          ),
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -156,7 +187,7 @@ export default defineConfig(({ mode, command }) => ({
         extends: true,
         test: {
           name: 'dev',
-          include: [
+          include: coreOrSelected(
             // Core + UI
             'tests/core-engine/SvgHelpers.browser.test.ts',
             'tests/core-engine/PhaserEventBridge.browser.test.ts',
@@ -196,7 +227,7 @@ export default defineConfig(({ mode, command }) => ({
             // Gym feature tests
             'tests/gym/GymDeckRngScene.browser.test.ts',
             'tests/gym/GymOverlayUiScene.browser.test.ts',
-          ],
+          ),
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,

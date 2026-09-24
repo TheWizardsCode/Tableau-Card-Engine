@@ -18,7 +18,7 @@ import { resolve } from 'node:path';
 import {
   filterEntries,
   type CardEntry,
-} from '../../src/ui/debug/MarketCardCheatOverlay';
+} from '../../example-games/main-street/debug/MarketCardCheatOverlay';
 import { cheatReplaceMarketCard } from '../../example-games/main-street/MainStreetMarket';
 import {
   setupMainStreetGame,
@@ -33,7 +33,7 @@ import {
   getStaffCardTemplates,
 } from '../../example-games/main-street/MainStreetCards';
 import { isDevMode } from '../../src/ui/debug/DebugToolsRegistry';
-import { createMarketCardCheatTool } from '../../src/ui/debug/MarketCardCheatOverlay';
+import { createMarketCardCheatTool } from '../../example-games/main-street/debug/MarketCardCheatOverlay';
 
 // ── Helpers ─────────────────────────────────────────────────
 

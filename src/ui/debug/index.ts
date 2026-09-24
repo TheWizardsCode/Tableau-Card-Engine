@@ -12,7 +12,7 @@ export { createSessionExportTool } from './SessionExportTool';
 export { createStateInspectorTool } from './StateInspectorOverlay';
 export { createGameEventLogTool } from './GameEventLogOverlay';
 export { createAiDecisionViewerTool } from './AiDecisionOverlay';
-export { createMarketCardCheatTool } from './MarketCardCheatOverlay';
-export { createStaffApplicantCheatTool } from './StaffApplicantCheatOverlay';
+// MarketCardCheatOverlay moved to example-games/main-street/debug (Main Street-owned).
+// StaffApplicantCheatOverlay moved to example-games/main-street/debug (Main Street-owned).
 export { AiDecisionRecorder } from './AiDecisionRecorder';
 export type { AiDecisionRecord } from './AiDecisionRecorder';

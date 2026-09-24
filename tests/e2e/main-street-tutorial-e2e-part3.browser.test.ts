@@ -22,7 +22,7 @@ import {
   clickRequiredEventCard,
   clickStreetSlot,
   clickEndTurn,
-} from '../helpers/main-street-tutorial-e2e';
+} from '../main-street/helpers/main-street-tutorial-e2e';
 
 let game: Phaser.Game | null = null;
 
@@ -107,7 +107,7 @@ describe('Main Street Tutorial E2E — Coin Budget (1200 coins)', () => {
 });
 
 /** Reuse the standard screenshot helper with the part-3 screenshot dir. */
-import { saveScreenshot } from '../helpers/main-street-tutorial-e2e';
+import { saveScreenshot } from '../main-street/helpers/main-street-tutorial-e2e';
 async function saveScreenshotForPart3(_scene: Phaser.Scene, name: string): Promise<void> {
   await saveScreenshot(name);
 }

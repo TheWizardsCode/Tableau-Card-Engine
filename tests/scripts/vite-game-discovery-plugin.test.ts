@@ -29,6 +29,7 @@ import {
   readGameInfo,
   resolveCoreAliases,
   selectConfigPath,
+  selectedGameIds,
   VIRTUAL_MODULE_ID,
   type GameConfigEntry,
 } from '../../scripts/vite-game-discovery-plugin';
@@ -412,6 +413,32 @@ describe('resolveCoreAliases', () => {
     const aliases = resolveCoreAliases('/repo/tce-golf/core');
     expect(aliases['@core-engine']).toBe('/repo/tce-golf/core/src/core-engine');
     expect(aliases['@ui']).toBe('/repo/tce-golf/core/src/ui');
+  });
+});
+
+// ── selectedGameIds (test-profile filtering) ─────────────────────────────
+
+describe('selectedGameIds', () => {
+  it('returns every game for the all preset', () => {
+    const ids = selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'all' });
+    expect(ids.length).toBe(8);
+    expect(ids).toContain('golf');
+    expect(ids).toContain('main-street');
+  });
+
+  it('returns no ids for the core-only preset', () => {
+    expect(selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'core-only' })).toEqual([]);
+  });
+
+  it('returns only the sample preset games', () => {
+    const ids = selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'sample' });
+    expect(ids.sort()).toEqual(['golf', 'main-street']);
+  });
+
+  it('degrades to no games for a broken preset rather than throwing', () => {
+    // The core test profiles must stay runnable even with a bad GAMES_CONFIG.
+    expect(() => selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'does-not-exist' })).not.toThrow();
+    expect(selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'does-not-exist' })).toEqual([]);
   });
 });
 
