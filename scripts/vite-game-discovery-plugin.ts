@@ -489,7 +489,6 @@ const GYM_SCENE_NAMES = [
   'GymSpatialRulesScene',
   'GymTokenPileViewScene',
   'GymRuleEngineScene',
-  'GymCardIndexScene',
 ] as const;
 
 // ── The plugin ────────────────────────────────────────────────────────────

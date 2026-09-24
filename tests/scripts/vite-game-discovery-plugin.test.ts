@@ -371,6 +371,26 @@ describe('renderGameRegistryModule', () => {
     // Gym is core-owned, so it is present even with no games selected.
     expect(src).toContain('GymRouterScene');
   });
+
+  it('only imports Gym scenes the barrel actually exports', () => {
+    // Regression: the plugin used to hardcode a Gym scene that had moved to a
+    // game repo, which broke the core-only build at bundle time.
+    const src = renderGameRegistryModule([]);
+    const barrel = fs.readFileSync(
+      path.join(REPO_ROOT, 'example-games', 'gym', 'index.ts'),
+      'utf-8',
+    );
+    const imported = src
+      .split('\n')
+      .filter((l) => l.startsWith('  Gym') && l.endsWith(','))
+      .map((l) => l.trim().replace(/,$/, ''));
+    expect(imported.length).toBeGreaterThan(0);
+    for (const scene of imported) {
+      expect(barrel, `${scene} not exported by the Gym barrel`).toContain(
+        `export { ${scene} }`,
+      );
+    }
+  });
 });
 
 // ── Module id constants ───────────────────────────────────────────────────
