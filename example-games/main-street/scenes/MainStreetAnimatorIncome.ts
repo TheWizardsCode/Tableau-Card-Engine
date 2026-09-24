@@ -17,7 +17,7 @@ import type { PendingEndOfTurnDeltas } from '../MainStreetEngine';
 import { SFX_KEYS } from './MainStreetConstants';
 import { createCoinGrid, iconsForAmount, roundHalf } from '../coin-grid';
 import type { IncomePhaseKey, IncomePhaseOptions, IncomePhaseSlot, MainStreetAnimatorContext } from './MainStreetAnimatorContext';
-import { INCOME_CARD_FULL_PAUSE_MULTIPLIER, INCOME_COLLECT_STAGGER_MS, INCOME_FLIGHT_MS, INCOME_PHASE_GAP_MS, INCOME_PHASE_LABEL_MS } from './MainStreetAnimatorTiming';
+import { INCOME_CARD_FULL_PAUSE_MULTIPLIER, INCOME_COLLECT_STAGGER_MS, INCOME_FLIGHT_MS, INCOME_FLIGHT_STAGGER_MS, INCOME_PHASE_GAP_MS, INCOME_PHASE_LABEL_MS } from './MainStreetAnimatorTiming';
 
 
 export function animateHudValueChanges(animator: MainStreetAnimatorContext, params: {
@@ -378,22 +378,19 @@ export function runIncomePhase(animator: MainStreetAnimatorContext, phase: Incom
       }
       case 'synergy': {
         if (ctx.reducedMotion) return;
-        if (!slots.some((sl) => iconsForAmount(roundHalf(sl.pd.synergyBonus)) > 0)) return;
-        const sources = animator.synergyPhaseSources();
-        let delayOffset = 0;
-        for (let si = 0; si < numSlots; si++) {
-          const slot = slots[si];
-          const amount = Math.max(0, roundHalf(slot.pd.synergyBonus));
-          if (iconsForAmount(amount) === 0) {
-            delayOffset += animator.getCardDelay(numSlots, si);
-            continue;
-          }
-          const from = sources.get(slot.pd.slotIndex) ?? sources.get('fallback')!;
-          const flightMs = animator.getFlightDuration(numSlots, si);
-          animator.flyCoinsIn(slot, amount, from, delayOffset, flightMs);
-          const pauseMs = INCOME_CARD_FULL_PAUSE_MULTIPLIER * animator.currentCoinStagger;
-          delayOffset += animator.getCardDelay(numSlots, si) + pauseMs;
-          animator.reduceCoinStaggerAfterCard();
+        // Bidirectional line-to-grid flights (CG-0MTV6LZEA003YS3E): for every
+        // synergy pair, one coin stream per direction travels along the shared
+        // clipped line (synergyLineEndpoints) from the giver's edge to the
+        // receiver's edge, then pops into the receiver's on-card coin grid.
+        // The phase no longer short-circuits while any slot has a synergy
+        // bonus; `synergyPhaseFlights` already filters slots without one.
+        const flights = animator.synergyPhaseFlights(slots);
+        if (flights.length === 0) return;
+        let at = 0;
+        for (const flight of flights) {
+          animator.flyCoinsAlongLine(flight.slot, flight.amount, flight.start, flight.end, at);
+          // Per-line stagger (parallel flights never drift further than this).
+          at += INCOME_FLIGHT_STAGGER_MS;
         }
         break;
       }
@@ -580,6 +577,47 @@ export function flyCoinsIn(animator: MainStreetAnimatorContext,
                 // concurrent phases accumulate robustly.
                 const increment = 1;
                 animator.revealInGrid(slot, Math.round(slot.displayed + increment));
+              } catch { /* ignore */ }
+            },
+          });
+        } catch { /* ignore */ }
+      });
+    }
+  
+}
+
+export function flyCoinsAlongLine(animator: MainStreetAnimatorContext, 
+    slot: IncomePhaseSlot,
+    amount: number,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    at: number,
+    flightMs?: number,
+  ): void {
+
+    const s = animator.scene;
+    const iconCount = iconsForAmount(amount);
+    if (iconCount === 0) return;
+    const duration = flightMs ?? INCOME_FLIGHT_MS;
+    for (let i = 0; i < iconCount; i++) {
+      s.time.delayedCall(at + i * INCOME_FLIGHT_STAGGER_MS, () => {
+        try {
+          const visual = s.add.circle(from.x, from.y, 6, 0xffcc44, 1).setDepth(3000);
+          moveGameObject({
+            scene: s,
+            target: visual,
+            destX: to.x,
+            destY: to.y,
+            duration,
+            ease: 'Quad.easeIn',
+            soundManager: s.soundManager,
+            sfx: { start: SFX_KEYS.COIN_POP, moveIntervalMs: 200 },
+            onComplete: () => {
+              try {
+                visual.destroy();
+                // Arrival increments the receiver's on-card grid (same
+                // incremental accumulation as base/reputation phases).
+                animator.revealInGrid(slot, Math.round(slot.displayed + 1));
               } catch { /* ignore */ }
             },
           });

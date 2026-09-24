@@ -375,4 +375,44 @@ describe('Main Street phased income animation', () => {
     expect(order).toEqual([]);
     expect(scene.incomeCollectionActive as boolean).toBe(false);
   });
+
+  it('runs bidirectional synergy-line flights that land coins on both cards (CG-0MTV6LZEA003YS3E)', async () => {
+    game = await bootGame();
+    const scene = game.scene.getScene('MainStreetScene') as Phaser.Scene & Record<string, unknown>;
+    const state = scene.state as { streetGrid: Array<BusinessCard | null> };
+    // Two different-type businesses sharing a synergy type → one synergy pair
+    // (slots 0 and 1 are orthogonally adjacent).
+    state.streetGrid[0] = makeBiz('cafe-biz', 'Cafe', 200);
+    state.streetGrid[1] = makeBiz('bakery-biz', 'Bakery', 200);
+    (scene as unknown as { refreshAll: () => void }).refreshAll();
+
+    const card0 = await waitForStableSlotCard(scene as never, 0);
+    const card1 = await waitForStableSlotCard(scene as never, 1);
+
+    // Base 0 so only the synergy phase contributes coins; each direction
+    // carries 50 (one icon) to the facing card's grid.
+    const data: SlotPhaseBreakdown[] = [
+      { slotIndex: 0, businessName: 'Cafe', baseIncome: 0, synergyBonus: 50, repBonus: 0, eventDeltas: [], upcomingDeltas: [] },
+      { slotIndex: 1, businessName: 'Bakery', baseIncome: 0, synergyBonus: 50, repBonus: 0, eventDeltas: [], upcomingDeltas: [] },
+    ];
+
+    const msAnimator = scene.msAnimator as {
+      animateIncomePhases: (d: SlotPhaseBreakdown[], o: { phaseGapMs: number }) => void;
+    };
+    msAnimator.animateIncomePhases(data, { phaseGapMs: 600 });
+
+    // The synergy phase (600 ms after the start) lands one coin on BOTH cards
+    // via the two directional line flights.
+    await waitForCondition(
+      () => coinIconsUnder(card0).length > 0 && coinIconsUnder(card1).length > 0,
+      8000,
+    );
+    expect(coinIconsUnder(card0).length).toBeGreaterThan(0);
+    expect(coinIconsUnder(card1).length).toBeGreaterThan(0);
+
+    // Collection clears both grids at the end of the choreography.
+    await waitForCondition(() => (scene.incomeCollectionActive as boolean) === false, 15_000);
+    expect(coinIconsUnder(card0).length).toBe(0);
+    expect(coinIconsUnder(card1).length).toBe(0);
+  });
 });

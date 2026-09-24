@@ -13,9 +13,9 @@ import { INCOME_CARD_COIN_STAGGER_MS } from './MainStreetAnimatorTiming';
 import type { MainStreetAnimatorContext } from './MainStreetAnimatorContext';
 import type { SlotIncome, SlotPhaseBreakdown, SynergyPair } from '../MainStreetAdjacency';
 import type { PendingEndOfTurnDeltas } from '../MainStreetEngine';
-import type { IncomePhaseKey, IncomePhaseOptions, IncomePhaseSlot } from './MainStreetAnimatorContext';
-import { resetCoinStaggerForTurn, reduceCoinStaggerAfterCard, getCardDelay, getFlightDuration, getIconStagger, eventSourcePoint, synergyPhaseSources, popSynergyText, findStreetCardContainer, localSlotCentre, getStreetSlotCenter, getMarketCardCenter, getHandCardCenter, creditedIncomeTotal } from './MainStreetAnimatorUtils';
-import { animateHudValueChanges, animateCelebration, animateIncomeCollection, animateIncomePhases, runIncomePhase, eventDeltaEffects, countOutCoins, revealInGrid, flyCoinsIn, flyCoinsOut, applyPendingDeltasOnce, collectIncomeGrids, showIncomePhaseLabel } from './MainStreetAnimatorIncome';
+import type { IncomePhaseKey, IncomePhaseOptions, IncomePhaseSlot, SynergyPhaseFlight } from './MainStreetAnimatorContext';
+import { resetCoinStaggerForTurn, reduceCoinStaggerAfterCard, getCardDelay, getFlightDuration, getIconStagger, eventSourcePoint, synergyPhaseFlights, popSynergyText, findStreetCardContainer, localSlotCentre, getStreetSlotCenter, getMarketCardCenter, getHandCardCenter, creditedIncomeTotal } from './MainStreetAnimatorUtils';
+import { animateHudValueChanges, animateCelebration, animateIncomeCollection, animateIncomePhases, runIncomePhase, eventDeltaEffects, countOutCoins, revealInGrid, flyCoinsIn, flyCoinsAlongLine, flyCoinsOut, applyPendingDeltasOnce, collectIncomeGrids, showIncomePhaseLabel } from './MainStreetAnimatorIncome';
 import { animateIncidentReveal, animateIncidentDeltaBubbles, animatePeekReveal } from './MainStreetAnimatorIncident';
 import { animateMarketDealIn, createTransferCardVisual, cleanupTransferAnimations, animateTransferFromMarket, animateApplicantWalkOn, animateApplicantWalkOff, animateApplicantWalkIn } from './MainStreetAnimatorMarket';
 import { animateSynergyFormation, animateWeekBanner, animateGameOver, animateUndoRedo, animateLevelUp, animateSell, animateClose, animateEventPlayed } from './MainStreetAnimatorBoard';
@@ -97,8 +97,8 @@ export class MainStreetAnimator implements MainStreetAnimatorContext {
     return eventSourcePoint(this);
   }
 
-  public synergyPhaseSources(): Map<number | 'fallback', { x: number; y: number }> {
-    return synergyPhaseSources(this);
+  public synergyPhaseFlights(slots: IncomePhaseSlot[]): SynergyPhaseFlight[] {
+    return synergyPhaseFlights(this, slots);
   }
 
   public countOutCoins(slot: IncomePhaseSlot, amount: number, at: number): void {
@@ -117,6 +117,17 @@ export class MainStreetAnimator implements MainStreetAnimatorContext {
     flightMs?: number,
   ): void {
     flyCoinsIn(this, slot, amount, from, at, flightMs);
+  }
+
+  public flyCoinsAlongLine(
+    slot: IncomePhaseSlot,
+    amount: number,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    at: number,
+    flightMs?: number,
+  ): void {
+    flyCoinsAlongLine(this, slot, amount, from, to, at, flightMs);
   }
 
   public flyCoinsOut(

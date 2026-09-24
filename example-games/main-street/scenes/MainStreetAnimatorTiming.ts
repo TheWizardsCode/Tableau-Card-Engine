@@ -16,6 +16,12 @@ export const INCOME_PHASE_GAP_MS = 2200;
 export const INCOME_PHASE_LABEL_MS = 1400;
 /** Duration of a coin flight tween (fallback when no per-card duration is passed). */
 export const INCOME_FLIGHT_MS = 600;
+/**
+ * Stagger between successive synergy-line coin flights / icons
+ * (CG-0MTV6LZEA003YS3E): each synergy pair animates in both directions, one
+ * stream per line, offset by this amount so the parallel flights stay readable.
+ */
+export const INCOME_FLIGHT_STAGGER_MS = 60;
 /** Stagger between grid-to-HUD collection flights within one card. */
 export const INCOME_COLLECT_STAGGER_MS = 80;
 

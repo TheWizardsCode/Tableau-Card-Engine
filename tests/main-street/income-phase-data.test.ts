@@ -85,7 +85,14 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
 
     it('multiple producing slots each have correct baseIncome', () => {
       const state = setupMainStreetGame({ seed: 'income-phase-data' });
-      placeOnGrid(state, makeBiz({ baseIncome: 3, id: 'biz-a' }), makeBiz({ baseIncome: 5, id: 'biz-b' }));
+      // Different synergy types so neither slot earns board synergy — this
+      // isolates the base-income contribution per slot (the base/synergy
+      // separation is covered separately below).
+      placeOnGrid(
+        state,
+        makeBiz({ baseIncome: 3, id: 'biz-a', synergyTypes: ['Food'] }),
+        makeBiz({ baseIncome: 5, id: 'biz-b', synergyTypes: ['Service'] }),
+      );
       const result = applyIncome(state);
       expect(result.phaseBreakdown.perSlotBreakdown[0].baseIncome).toBe(3);
       expect(result.phaseBreakdown.perSlotBreakdown[1].baseIncome).toBe(5);
@@ -225,7 +232,7 @@ describe('IncomeResult.phaseBreakdown (CG-0MT23O6W8003AXWJ)', () => {
       // the coins actually credited (multiplied amount), not the pre-multiplier total.
       let summed = 0;
       for (const slot of result.phaseBreakdown.perSlotBreakdown) {
-        summed += slot.baseIncome + slot.repBonus;
+        summed += slot.baseIncome + slot.synergyBonus + slot.repBonus;
         for (const delta of slot.eventDeltas) summed += delta.delta;
       }
       // Hand synergy is 0 (CG-0MTRDX0DN004EECN), so the phase sum equals the

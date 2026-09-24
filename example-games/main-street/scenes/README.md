@@ -56,6 +56,10 @@ placement (`diffNewSynergyPairs`) so ONLY new pairs animate. See
   pulse skipped.
 - Replay/headless: returns immediately (documented exemption, AGENTS.md
   rule 8) — presentation-only, never mutates state or transcript.
+- Income conduit (CG-0MTV6LZEA003YS3E): the SAME clipped `p1`/`p2` geometry is
+  reused by the end-of-turn synergy phase's bidirectional coin flights
+  (`synergyPhaseFlights` / `flyCoinsAlongLine`), so the animated income streams
+  ride exactly on the static lines.
 
 ## Resource delta pop
 

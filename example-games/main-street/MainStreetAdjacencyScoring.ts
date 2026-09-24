@@ -319,8 +319,11 @@ export function recalculateCard(
  * Computes the total income across all businesses on the street grid.
  *
  * Returns both the total and a per-slot breakdown for UI display. Board
- * adjacency synergy (computeSynergyBonus) is folded into each slot's total;
- * hand cards never contribute (producer rule CG-0MTRDX0DN004EECN).
+ * adjacency synergy (computeSynergyBonus) is reported separately in each
+ * slot's `synergyBonus` (and excluded from `baseIncome`) so the phased income
+ * animation can route synergy coins along the synergy lines (CG-0MTV6LZEA003YS3E);
+ * `total` still folds base + synergy. Hand cards never contribute (producer
+ * rule CG-0MTRDX0DN004EECN).
  *
  * @param grid               The street grid.
  * @param bonusPerNeighbor   Global multiplier on per-card coin synergy (defaults to 1).
@@ -367,12 +370,14 @@ export function computeIncome(
   // ── Per-phase breakdown (CG-0MT23O6W8003AXWJ) ──────────────
   // computeIncome is a preview/read-only path (no multipliers / active
   // effects), so phase data is base + synergy only; rep/event/upcoming
-  // phases are zero. Slots keep the exact totals used above.
+  // phases are zero. `baseIncome` excludes synergy and `synergyBonus` carries
+  // it, so the per-slot phase sum equals the same total used above
+  // (CG-0MTV6LZEA003YS3E — the synergy coins travel along the synergy lines).
   const perSlotBreakdown: SlotPhaseBreakdown[] = breakdown.map(b => ({
     slotIndex: b.slotIndex,
     businessName: b.businessName,
-    baseIncome: b.total,
-    synergyBonus: 0,
+    baseIncome: b.baseIncome,
+    synergyBonus: b.synergyBonus,
     repBonus: 0,
     eventDeltas: [],
     upcomingDeltas: [],
@@ -446,6 +451,9 @@ export function applyIncome(
 ): IncomeResult {
   const soldSlots = state.soldSlots ?? [];
   const grid = state.streetGrid;
+  const gridDims = state.streetGridCols && state.streetGridRows
+    ? { cols: state.streetGridCols, rows: state.streetGridRows }
+    : undefined;
 
   // Specialization skills of the staff EMPLOYED at each business slot
   // (CG-0MSTOATDU006UGAX). Per-business income buffs are scoped to the
@@ -457,6 +465,12 @@ export function applyIncome(
   // contract). Street-wide skills (cost-cutter, incident mitigation, etc.)
   // still aggregate over ALL staff via getEmployedSpecializationSkills.
   const breakdown: SlotIncome[] = [];
+  // Built in the same pass as `breakdown` so the buffed base/synergy split is
+  // available: the staff income multiplier scales the whole cached income
+  // (base + synergy) while the flat bonus is base-only, so the phase fields
+  // must be derived here rather than re-mapped from `breakdown`
+  // (CG-0MTV6LZEA003YS3E).
+  const phaseSlotData: SlotPhaseBreakdown[] = [];
   let total = 0;
   for (let i = 0; i < grid.length; i++) {
     if (soldSlots[i]) continue;
@@ -464,6 +478,16 @@ export function applyIncome(
     if (!card) continue;
 
     const slotIncome = card.currentIncome ?? 0;
+    // Board adjacency synergy is reported separately from base income so the
+    // phased animation can route it along the synergy lines (CG-0MTV6LZEA003YS3E).
+    // The cached `currentIncome` is base (with same-type penalty) + synergy.
+    const synergy = computeSynergyBonus(
+      grid,
+      i,
+      state.config.synergyBonusPerNeighbor,
+      soldSlots,
+      gridDims,
+    );
     // Per-business income skill buffs: +pct of the business's cached income,
     // plus a flat coin bonus (chef/dj/sales-champion — I4). Fed by the staff
     // employed AT this slot only (CG-0MSTOATDU006UGAX).
@@ -473,29 +497,28 @@ export function applyIncome(
       ongoingCost: (card as BusinessCard).ongoingCost ?? 0,
     });
     const buffedIncome = slotIncome * (1 + buffs.income.percent) + buffs.income.flat;
+    const buffedSynergy = synergy * (1 + buffs.income.percent);
     breakdown.push({
       slotIndex: i,
       businessName: card.name,
-      baseIncome: slotIncome,
-      synergyBonus: 0,
+      baseIncome: slotIncome - synergy,
+      synergyBonus: synergy,
       total: buffedIncome,
+    });
+    phaseSlotData.push({
+      slotIndex: i,
+      businessName: card.name,
+      // Buffed base = buffed total minus the buffed synergy, so the phase sum
+      // (`baseIncome + synergyBonus + repBonus + eventDeltas`) still equals the
+      // credited total exactly.
+      baseIncome: buffedIncome - buffedSynergy,
+      synergyBonus: buffedSynergy,
+      repBonus: 0,
+      eventDeltas: [],
+      upcomingDeltas: [],
     });
     total += buffedIncome;
   }
-
-  // ── Per-phase breakdown for animated income (CG-0MT23O6W8003AXWJ) ──
-  // Build phase data alongside the existing breakdown.
-  // Each field holds exact integer values
-  // is done at the animation layer, not here.
-  const phaseSlotData: SlotPhaseBreakdown[] = breakdown.map(b => ({
-    slotIndex: b.slotIndex,
-    businessName: b.businessName,
-    baseIncome: b.total,  // buffedIncome is the effective base
-    synergyBonus: 0,
-    repBonus: 0,
-    eventDeltas: [],
-    upcomingDeltas: [],
-  }));
 
   // Apply active effect income modifiers per-slot, before reputation multiplier.
   // Each slot's income is individually multiplied (integer-rounded — AC3),
@@ -582,8 +605,11 @@ export function applyIncome(
   // `multiplied - modifiedTotal`, distributed proportionally to each slot's
   // post-effect income. Exact integer values throughout.
   const repBonus = multiplied - modifiedTotal;
+  // Weight the reputation bonus by each slot's full post-effect total
+  // (base + synergy + event deltas) so the split is unchanged by the
+  // base/synergy separation (CG-0MTV6LZEA003YS3E).
   const modifiedSlotTotals = phaseSlotData.map(
-    (d) => d.baseIncome + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
+    (d) => d.baseIncome + d.synergyBonus + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
   );
   const sumModifiedSlotTotals = modifiedSlotTotals.reduce((acc, v) => acc + v, 0) || 0;
   for (let i = 0; i < phaseSlotData.length; i++) {
@@ -650,11 +676,15 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
 
   const soldSlots = state.soldSlots ?? [];
   const grid = state.streetGrid;
+  const gridDims = state.streetGridCols && state.streetGridRows
+    ? { cols: state.streetGridCols, rows: state.streetGridRows }
+    : undefined;
   const results: OwnerIncomeResult[] = [];
 
   for (const player of state.players) {
     const ownerId = player.playerId;
     const breakdown: SlotIncome[] = [];
+    const phaseSlotData: SlotPhaseBreakdown[] = [];
     let total = 0;
     let repPerTurn = 0;
 
@@ -666,6 +696,15 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
       if (getSlotOwnerId(state, i) !== ownerId) continue;
 
       const slotIncome = card.currentIncome ?? 0;
+      // Board adjacency synergy (board-wide, ownership-independent) is
+      // reported separately from base income (CG-0MTV6LZEA003YS3E).
+      const synergy = computeSynergyBonus(
+        grid,
+        i,
+        state.config.synergyBonusPerNeighbor,
+        soldSlots,
+        gridDims,
+      );
       const profile = {
         synergyTypes: (card as BusinessCard).synergyTypes ?? [],
         baseIncome: (card as BusinessCard).baseIncome ?? 0,
@@ -676,12 +715,22 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
         profile,
       );
       const buffedIncome = slotIncome * (1 + buffs.income.percent) + buffs.income.flat;
+      const buffedSynergy = synergy * (1 + buffs.income.percent);
       breakdown.push({
         slotIndex: i,
         businessName: card.name,
-        baseIncome: slotIncome,
-        synergyBonus: 0,
+        baseIncome: slotIncome - synergy,
+        synergyBonus: synergy,
         total: buffedIncome,
+      });
+      phaseSlotData.push({
+        slotIndex: i,
+        businessName: card.name,
+        baseIncome: buffedIncome - buffedSynergy,
+        synergyBonus: buffedSynergy,
+        repBonus: 0,
+        eventDeltas: [],
+        upcomingDeltas: [],
       });
       total += buffedIncome;
 
@@ -698,16 +747,7 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
       repPerTurn += staff.reputationPerTurn ?? 0;
     }
 
-    // ── Phase breakdown + active-effect income multipliers (mirrors applyIncome) ──
-    const phaseSlotData: SlotPhaseBreakdown[] = breakdown.map(b => ({
-      slotIndex: b.slotIndex,
-      businessName: b.businessName,
-      baseIncome: b.total,
-      synergyBonus: 0,
-      repBonus: 0,
-      eventDeltas: [],
-      upcomingDeltas: [],
-    }));
+    // ── Active-effect income multipliers (phase breakdown built above, mirrors applyIncome) ──
     let modifiedTotal = 0;
     for (let bi = 0; bi < breakdown.length; bi++) {
       const slot = breakdown[bi];
@@ -744,8 +784,10 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
     const handSynergyTotal = 0;
 
     const repBonus = multiplied - modifiedTotal;
+    // Weight by the full post-effect total (base + synergy + event deltas),
+    // mirroring applyIncome (CG-0MTV6LZEA003YS3E).
     const modifiedSlotTotals = phaseSlotData.map(
-      (d) => d.baseIncome + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
+      (d) => d.baseIncome + d.synergyBonus + d.eventDeltas.reduce((acc, e) => acc + e.delta, 0),
     );
     const sumModifiedSlotTotals = modifiedSlotTotals.reduce((acc, v) => acc + v, 0) || 0;
     for (let i = 0; i < phaseSlotData.length; i++) {
@@ -784,9 +826,11 @@ export function applyCompetitiveIncome(state: MainStreetState): OwnerIncomeResul
 export interface SlotIncome {
   slotIndex: number;
   businessName: string;
+  /** Base income for this slot (base + income bonus, same-type penalty applied) — excludes board adjacency synergy. */
   baseIncome: number;
+  /** Board adjacency synergy contribution for this slot (integer coins). */
   synergyBonus: number;
-  /** Total income from this slot (base + board adjacency synergy). */
+  /** Total income from this slot (base + board adjacency synergy, plus any staff buffs). */
   total: number;
 }
 
@@ -809,13 +853,18 @@ export interface SlotEventDelta {
 export interface SlotPhaseBreakdown {
   slotIndex: number;
   businessName: string;
-  /** Base income for this slot (after staff buffs, before event/rep multipliers). */
+  /**
+   * Base income for this slot (after staff buffs, before event/rep multipliers)
+   * — excludes board adjacency synergy, which is reported separately below so
+   * the synergy phase can animate it along the synergy lines
+   * (CG-0MTV6LZEA003YS3E).
+   */
   baseIncome: number;
   /**
-   * Reserved for a dedicated synergy income phase. Always 0 currently — board
-   * adjacency synergy is folded into `baseIncome` (currentIncome), and
-   * hand-card synergy was removed (CG-0MTRDX0DN004EECN: cards in the hand
-   * are not in play).
+   * Board adjacency synergy contribution for this slot (after staff buffs).
+   * Non-zero when the slot has matching, different-type synergy neighbours.
+   * Hand-card synergy was removed (CG-0MTRDX0DN004EECN: cards in the hand are
+   * not in play), so this only ever reflects street-grid adjacency.
    */
   synergyBonus: number;
   /** Additional coins from the reputation multiplier. */

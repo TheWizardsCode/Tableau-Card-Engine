@@ -24,6 +24,14 @@ income choreography** instead of a single fly-to-HUD burst:
 
 - **Phases:** base → synergy → reputation → events → upcoming → collect,
   driven by `IncomeResult.phaseBreakdown` (`MainStreetAdjacency.ts`).
+- **Synergy line flights (CG-0MTV6LZEA003YS3E):** `SlotPhaseBreakdown.baseIncome`
+  excludes board-adjacency synergy (it is reported separately in
+  `synergyBonus`); the synergy phase sends a coin stream in **both**
+  directions along each synergy line — giver's clipped edge (`p1`) to
+  receiver's clipped edge (`p2`), reusing the shared `synergyLineEndpoints`
+  geometry — over `INCOME_FLIGHT_MS` (600ms) with a 60ms per-line stagger
+  (`INCOME_FLIGHT_STAGGER_MS`). Each stream carries the receiver's
+  per-neighbour share (split so shares sum exactly) and lands in its coin grid.
 - **On-card coin grids** (`createCoinGrid`, `example-games/main-street/coin-grid.ts`)
   render each producing slot's contribution in the card's bottom-right
   quadrant, filling progressively; phase contributions fly in/out; the

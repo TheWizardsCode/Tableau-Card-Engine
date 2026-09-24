@@ -55,8 +55,23 @@ void popTextOrIcon({
   - Each producing street slot hosts an on-card coin grid
     (`createCoinGrid`, child 2) in its bottom-right quadrant; the grid
     fills progressively as base coins count out (staggered reveal,
-    rounded to nearest 0.5 at the animation layer only).
-  - Synergy / reputation / event contributions fly in/out of the grids;
+    rounded to nearest 0.5 at the animation layer only). Base income
+    EXCLUDES board adjacency synergy: `SlotPhaseBreakdown.baseIncome` is
+    base-only and `synergyBonus` carries the synergy
+    (CG-0MTV6LZEA003YS3E), so the per-slot phase sum still equals the
+    credited total.
+  - Synergy contributions travel as coin flights ALONG the synergy lines
+    (CG-0MTV6LZEA003YS3E): for every pair (`computeSynergyPairs`) BOTH
+    directions animate — one stream from each card's clipped slot edge
+    (`p1`) to the other's (`p2`), reusing the shared
+    `synergyLineEndpoints` geometry so animated lines never drift from the
+    static lines. Each traversal takes `INCOME_FLIGHT_MS` (600ms) with a
+    60ms per-line stagger (`INCOME_FLIGHT_STAGGER_MS`). Each direction
+    carries the receiver's per-neighbour share of its `synergyBonus`
+    (`attributeSynergyShares`, split so the shares sum exactly to the
+    credited bonus) and lands in the receiver's `CoinGrid` via
+    `revealInGrid` with `sfx-coin-pop`.
+  - Reputation / event contributions fly in/out of the grids;
     events also light up their `Upcoming`-panel effect lines
     (`animateUpcomingEffectLine`).
   - Phase pace: `INCOME_PHASE_GAP_MS` (default 2200ms) between phases;
@@ -188,6 +203,10 @@ void popTextOrIcon({
   for diagonally adjacent slots (extended-range pairs are clipped to the card
   boundaries; the straight line still crosses intermediate cells). There is
   no duplicated geometry to drift.
+- Income conduit (CG-0MTV6LZEA003YS3E): the SAME clipped `p1`/`p2` geometry is
+  reused as the path for the end-of-turn synergy coin flights, so the animated
+  income streams ride exactly on top of the static lines (see
+  [End-of-turn income presentation](#end-of-turn-income-presentation-phased-coin-grid-animation-cg-0mt23o6w8003axwj)).
 - Behavior (reduced-motion OFF):
   1. The new synergy line fades in (same clipped edge/corner endpoints and
      colour as `MainStreetRenderer.drawSynergyLines()`, depth 10,

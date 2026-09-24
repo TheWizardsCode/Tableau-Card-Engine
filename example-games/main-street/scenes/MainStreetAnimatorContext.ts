@@ -45,6 +45,32 @@ export interface IncomePhaseSlot {
   displayed: number;
 }
 
+/**
+ * One direction of a synergy coin flight along a synergy line
+ * (CG-0MTV6LZEA003YS3E).
+ *
+ * For each synergy pair the animator emits two flights — one per direction —
+ * so both cards in the pair visibly receive coins from the other.
+ */
+export interface SynergyPhaseFlight {
+  /** Giver slot index (coin origin, clipped slot edge). */
+  fromSlotIndex: number;
+  /** Receiver slot index (coin destination, receiver's coin grid). */
+  toSlotIndex: number;
+  /** Receiver's phase slot + on-card coin grid (the `revealInGrid` target). */
+  slot: IncomePhaseSlot;
+  /** Coin origin on the giver's clipped slot edge (`p1` of the pair geometry). */
+  start: { x: number; y: number };
+  /** Coin destination on the receiver's clipped slot edge (`p2` of the pair geometry). */
+  end: { x: number; y: number };
+  /**
+   * Receiver's synergy coin amount attributable to this giver (integer, ×100
+   * economy). Shares are split across the receiver's matching neighbours so
+   * they sum exactly to the receiver's `SlotPhaseBreakdown.synergyBonus`.
+   */
+  amount: number;
+}
+
 /** MainStreetAnimator -- animation and HUD-delta helper for Main Street scene. */
 
 export interface MainStreetAnimatorContext {
@@ -82,13 +108,32 @@ export interface MainStreetAnimatorContext {
     description: string;
   }>;
   eventSourcePoint(): { x: number; y: number };
-  synergyPhaseSources(): Map<number | 'fallback', { x: number; y: number }>;
+  /**
+   * Builds the bidirectional synergy-line coin flights for the `synergy` income
+   * phase: one flight per direction per synergy pair, each carrying the
+   * receiver's per-neighbour synergy share
+   * (CG-0MTV6LZEA003YS3E).
+   */
+  synergyPhaseFlights(slots: IncomePhaseSlot[]): SynergyPhaseFlight[];
   countOutCoins(slot: IncomePhaseSlot, amount: number, at: number): void;
   revealInGrid(slot: IncomePhaseSlot, cumulativeAmount: number): void;
   flyCoinsIn(
     slot: IncomePhaseSlot,
     amount: number,
     from: { x: number; y: number },
+    at: number,
+    flightMs?: number,
+  ): void;
+  /**
+   * Flies coins from `from` to `to` (along a synergy line) and increments the
+   * receiver's on-card coin grid on each arrival
+   * (CG-0MTV6LZEA003YS3E).
+   */
+  flyCoinsAlongLine(
+    slot: IncomePhaseSlot,
+    amount: number,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
     at: number,
     flightMs?: number,
   ): void;

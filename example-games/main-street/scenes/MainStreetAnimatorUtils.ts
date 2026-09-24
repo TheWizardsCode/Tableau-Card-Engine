@@ -16,7 +16,7 @@ import { computeSynergyPairs } from '../MainStreetAdjacency';
 import { synergyLineEndpoints } from './synergyLineEndpoints';
 import { playableIndexToMapCenter } from '../MainStreetMapView';
 import { INCOME_BASE_CARD_DELAY_MS, INCOME_CARD_COIN_MIN_STAGGER_MS, INCOME_CARD_COIN_STAGGER_MS, INCOME_CARD_DELAY_DECREMENT_MS, INCOME_CARD_STAGGER_REDUCTION, INCOME_FLIGHT_BASE_MS, INCOME_FLIGHT_DECREMENT_MS, INCOME_FLIGHT_MIN_MS, INCOME_MIN_CARD_DELAY_MS } from './MainStreetAnimatorTiming';
-import type { MainStreetAnimatorContext } from './MainStreetAnimatorContext';
+import type { IncomePhaseSlot, MainStreetAnimatorContext, SynergyPhaseFlight } from './MainStreetAnimatorContext';
 
 
 export function resetCoinStaggerForTurn(animator: MainStreetAnimatorContext): void {
@@ -65,26 +65,123 @@ export function eventSourcePoint(animator: MainStreetAnimatorContext): { x: numb
   
 }
 
-export function synergyPhaseSources(animator: MainStreetAnimatorContext): Map<number | 'fallback', { x: number; y: number }> {
+/**
+ * Distributes a receiver slot's synergy coin bonus across its matching
+ * (different-type, shared-synergy) neighbours so the shares sum EXACTLY to the
+ * rounded total (CG-0MTV6LZEA003YS3E).
+ *
+ * `computeSynergyBonus` rounds once over `N` neighbours (`roundInt(unit * N)`),
+ * so splitting the already-rounded slot total evenly and assigning the
+ * remainder to the lowest slot indices keeps the sum preserved — the
+ * attribution risk mitigation from the work item.
+ *
+ * Pure and exported for unit testing.
+ */
+export function attributeSynergyShares(
+  synergyBonus: number,
+  giverIndices: number[],
+): Map<number, number> {
+  const shares = new Map<number, number>();
+  const unique = [...new Set(giverIndices)].sort((a, b) => a - b);
+  const n = unique.length;
+  if (n === 0) return shares;
+  const amount = Math.max(0, Math.round(synergyBonus));
+  if (amount <= 0) {
+    for (const giver of unique) shares.set(giver, 0);
+    return shares;
+  }
+  const base = Math.floor(amount / n);
+  const remainder = amount % n;
+  unique.forEach((giver, i) => shares.set(giver, base + (i < remainder ? 1 : 0)));
+  return shares;
+}
+
+/**
+ * Builds the bidirectional synergy-line coin flights for the `synergy` income
+ * phase (CG-0MTV6LZEA003YS3E).
+ *
+ * For every synergy pair (`computeSynergyPairs`, 8-way Chebyshev incl.
+ * extended range) BOTH directions are emitted — `fromIndex` -> `toIndex` and
+ * `toIndex` -> `fromIndex` — using the SAME clipped `p1`/`p2` geometry as the
+ * static synergy lines (`synergyLineEndpoints`), so animated lines never drift
+ * from the rendered ones.
+ *
+ * Each direction carries the RECEIVER's synergy amount attributable to the
+ * giver: the receiver's `SlotPhaseBreakdown.synergyBonus` is split across its
+ * matching neighbours (`attributeSynergyShares`), so a receiver with two
+ * synergistic neighbours shows one stream per line and the streams sum to the
+ * credited bonus.
+ */
+export function synergyPhaseFlights(animator: MainStreetAnimatorContext, slots: IncomePhaseSlot[]): SynergyPhaseFlight[] {
 
     const s = animator.scene;
-    const sources = new Map<number | 'fallback', { x: number; y: number }>();
+    const flights: SynergyPhaseFlight[] = [];
     try {
-      const pairs = computeSynergyPairs(s.state.streetGrid ?? [], s.state.soldSlots ?? [],
-        s.streetPlayableLattice && (s.streetPlayableLattice.cols > 1 || s.streetPlayableLattice.rows > 1)
-          ? s.streetPlayableLattice
-          : undefined);
+      const playable = s.streetPlayableLattice ?? { cols: 1, rows: 1 };
+      const gridDims = playable.cols === 1 && playable.rows === 1 ? undefined : playable;
+      const pairs = computeSynergyPairs(s.state.streetGrid ?? [], s.state.soldSlots ?? [], gridDims);
+
+      const slotByIndex = new Map<number, IncomePhaseSlot>();
+      for (const slot of slots) slotByIndex.set(slot.pd.slotIndex, slot);
+
+      // Incident matching neighbours per receiver (one pair per neighbour).
+      const giversByReceiver = new Map<number, number[]>();
       for (const pair of pairs) {
-        const { mid } = synergyLineEndpoints(pair, s.layout, {
+        const toGivers = giversByReceiver.get(pair.toIndex) ?? [];
+        toGivers.push(pair.fromIndex);
+        giversByReceiver.set(pair.toIndex, toGivers);
+
+        const fromGivers = giversByReceiver.get(pair.fromIndex) ?? [];
+        fromGivers.push(pair.toIndex);
+        giversByReceiver.set(pair.fromIndex, fromGivers);
+      }
+
+      for (const pair of pairs) {
+        const { p1, p2 } = synergyLineEndpoints(pair, s.layout, {
           from: animator.localSlotCentre(pair.fromIndex),
           to: animator.localSlotCentre(pair.toIndex),
         });
-        if (!sources.has(pair.fromIndex)) sources.set(pair.fromIndex, mid);
-        if (!sources.has(pair.toIndex)) sources.set(pair.toIndex, mid);
+
+        // Direction pair.fromIndex (giver) -> pair.toIndex (receiver).
+        const toSlot = slotByIndex.get(pair.toIndex);
+        if (toSlot) {
+          const share = attributeSynergyShares(
+            toSlot.pd.synergyBonus,
+            giversByReceiver.get(pair.toIndex) ?? [],
+          ).get(pair.fromIndex) ?? 0;
+          if (share > 0) {
+            flights.push({
+              fromSlotIndex: pair.fromIndex,
+              toSlotIndex: pair.toIndex,
+              slot: toSlot,
+              start: p1,
+              end: p2,
+              amount: share,
+            });
+          }
+        }
+
+        // Direction pair.toIndex (giver) -> pair.fromIndex (receiver).
+        const fromSlot = slotByIndex.get(pair.fromIndex);
+        if (fromSlot) {
+          const share = attributeSynergyShares(
+            fromSlot.pd.synergyBonus,
+            giversByReceiver.get(pair.fromIndex) ?? [],
+          ).get(pair.toIndex) ?? 0;
+          if (share > 0) {
+            flights.push({
+              fromSlotIndex: pair.toIndex,
+              toSlotIndex: pair.fromIndex,
+              slot: fromSlot,
+              start: p2,
+              end: p1,
+              amount: share,
+            });
+          }
+        }
       }
-    } catch { /* ignore */ }
-    sources.set('fallback', { x: s.layout.gameW * 0.5, y: Math.max(24, s.layout.streetTop + 6) });
-    return sources;
+    } catch { /* presentation-only — never break the choreography */ }
+    return flights;
   
 }
 
