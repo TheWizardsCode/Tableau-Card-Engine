@@ -70,7 +70,8 @@
       "src/ui/GameSelectorScene.ts",
       "src/ui/createCardGame.ts",
       "AGENTS.md",
-      "docs/dev"
+      "docs/dev",
+      "scripts/refresh-thumbnails.sh"
     ],
     "assets": [
       "CREDITS.md",
@@ -274,7 +275,6 @@
         "scripts/run-balance-cards.ts",
         "scripts/save-load-smoke.ts",
         "scripts/create-dummy-main-street-screenshot.ts",
-        "scripts/refresh-thumbnails.sh",
         "tests/scripts/generate-card-csv.test.ts",
         "scripts/adapters/MainStreetReplayAdapter.ts",
         "example-games/gym/GymCardIndex.ts",

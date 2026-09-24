@@ -42,7 +42,7 @@ import type {
   UpgradeCard,
 } from '../../example-games/main-street/MainStreetCards';
 // @ts-ignore: no declaration file for .mjs script — intentional
-import { generateCardSvg } from '../../scripts/generate-main-street-card-svgs.mjs';
+import { generateCardSvg } from '../../example-games/main-street/scripts/generate-main-street-card-svgs.mjs';
 
 const SPRITES_DIR = path.resolve('example-games/main-street/sprites');
 const ART_DATA_URI = /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/;

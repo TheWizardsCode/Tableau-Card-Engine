@@ -51,7 +51,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..', '..', '..');
 const SPRITES_DIR = path.join(ROOT, 'example-games', 'main-street', 'sprites');
 const MAP_PATH = path.join(ROOT, 'example-games', 'main-street', 'card-art-map.json');
 

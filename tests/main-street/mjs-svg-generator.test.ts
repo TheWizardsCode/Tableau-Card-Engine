@@ -20,7 +20,7 @@ import {
   generateCardSvg as generateCardSvgMjs,
   regenerateCardSvgs,
   // @ts-ignore: no declaration file for .mjs script — intentional
-} from '../../scripts/generate-main-street-card-svgs.mjs';
+} from '../../example-games/main-street/scripts/generate-main-street-card-svgs.mjs';
 
 // ---------------------------------------------------------------------------
 // MJS generator — staff card baked cost text (AC-4: fix for previous regression)

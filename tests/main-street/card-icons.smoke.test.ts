@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 describe('Main Street card generator: synergy icons smoke', () => {
   it('generates card SVGs with inline synergy icon or fallback', () => {
     // run generator
-    execSync('node scripts/generate-main-street-card-svgs.mjs', { stdio: 'inherit' });
+    execSync('node example-games/main-street/scripts/generate-main-street-card-svgs.mjs', { stdio: 'inherit' });
 
     const outDir = path.resolve('public/assets/games/main-street/svg/cards');
     const files = fs.readdirSync(outDir).filter(f => f.endsWith('.svg'));

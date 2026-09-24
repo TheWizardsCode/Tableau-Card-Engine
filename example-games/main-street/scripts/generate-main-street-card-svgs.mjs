@@ -33,7 +33,7 @@ try {
   const artMapPath = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     '..',
-    'example-games/main-street/card-art-map.json',
+    'card-art-map.json',
   );
   CARD_ART_MAP = JSON.parse(fs.readFileSync(artMapPath, 'utf8'));
 } catch {

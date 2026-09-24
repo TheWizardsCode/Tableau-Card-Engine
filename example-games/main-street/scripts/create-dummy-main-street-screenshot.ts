@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const outDir = join(__dirname, '..', 'data', 'screenshots', 'main-street');
+const outDir = join(__dirname, '..', '..', '..', 'data', 'screenshots', 'main-street');
 mkdirSync(outDir, { recursive: true });
 
 async function main() {

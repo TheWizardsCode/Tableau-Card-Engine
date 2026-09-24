@@ -2,7 +2,7 @@
  * CLI harness regression tests for the Main Street npm scripts.
  *
  * Regression guard for CG-0MT4RBHQR006C5GR: the Main Street harness entry
- * points (`scripts/monte-carlo.ts`, `scripts/save-load-smoke.ts`) transitively
+ * points (`example-games/main-street/scripts/monte-carlo.ts`, `example-games/main-street/scripts/save-load-smoke.ts`) transitively
  * import `example-games/main-street/MainStreetCards.ts`, which loads
  * `card-data.csv` via Vite's `?raw` query suffix. tsx cannot resolve that
  * suffix (`ERR_UNKNOWN_FILE_EXTENSION`), so the scripts must run under
@@ -57,7 +57,7 @@ describe('Main Street harness CLI scripts (vite-node)', () => {
     const jsonOut = path.join(tmpDir, 'mc.json');
     const csvOut = path.join(tmpDir, 'mc.csv');
     const res = runCmd(VITE_NODE_BIN, [
-      'scripts/monte-carlo.ts',
+      'example-games/main-street/scripts/monte-carlo.ts',
       '--seeds',
       '4',
       '--seed-prefix',
@@ -84,7 +84,7 @@ describe('Main Street harness CLI scripts (vite-node)', () => {
     const jsonBase = path.join(tmpDir, 'sweep.json');
     const csvBase = path.join(tmpDir, 'sweep.csv');
     const res = runCmd(VITE_NODE_BIN, [
-      'scripts/monte-carlo.ts',
+      'example-games/main-street/scripts/monte-carlo.ts',
       '--sweep',
       '--seeds',
       '2',
