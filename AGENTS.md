@@ -516,17 +516,7 @@ All Gym demo scenes extend `GymSceneBase` (`example-games/gym/scenes/GymSceneBas
 
 ## Worklog Rules
 
-This project follows the standard Worklog (wl) workflow for work-item tracking. The full ruleset is defined in the global AGENTS.md at `~/.pi/agent/AGENTS.md` under these sections:
-
-- **Work-item Tracking with Worklog (wl)** — Core principles for using wl
-- **CRITICAL RULES** — Mandatory rules for commits, tests, and work-item hygiene
-- **Important Rules** — Recommended practices for effective wl usage
-- **Stage vs Status distinction** — Understanding the two lifecycle axes
-- **work-item Types, Descriptions, Priorities, Dependencies** — Template definitions
-- **Workflow management** — Stage progression and team coordination
-- **Work-Item Management** — CLI reference for `wl create`, `wl update`, `wl close`, etc.
-- **Project Status** — CLI reference for `wl list`, `wl show`, `wl next`, etc.
-- **Coding Disciplines** — Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution
+This project follows the standard Worklog (wl) workflow for work-item tracking. The complete ruleset — core principles, critical rules, work-item types/priorities/dependencies, workflow management, CLI reference, and coding disciplines — is defined in the always-loaded global `AGENTS.md` at `~/.pi/agent/AGENTS.md`; follow it. TCE-specific conventions follow below.
 
 ### TCE Project Conventions
 

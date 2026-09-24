@@ -9,6 +9,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Building for Production](#building-for-production)
 - [Electron Launcher / Desktop Packaging](#electron-launcher--desktop-packaging)
 - [Testing](#testing)
+- [Startup Context Budget](#startup-context-budget)
 - [ToneForge Audio Generation](#toneforge-audio-generation)
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
@@ -649,6 +650,17 @@ npx playwright install --list
 This lists the installed browsers and their expected locations (e.g. `chromium-1208`).
 
 **Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. PR CI is build-only (CG-0MT022826006EM0D) and no longer runs browser tests; local devs run `npx playwright install chromium` once (see [Browser test setup](#browser-test-setup)).
+
+## Startup Context Budget
+
+The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:
+
+```bash
+npm run context:refresh   # regenerate the thresholds, print the delta
+npm run context:check     # verify without writing (also runs in the unit profile)
+```
+
+See [docs/dev/context-budget.md](dev/context-budget.md) for what the gate measures, why the refresh is required, the exact workflow, and its fail-open behaviour.
 
 ## ToneForge Audio Generation
 
