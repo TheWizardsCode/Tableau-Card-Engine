@@ -22,6 +22,34 @@ This document captures the current implementation-level guidance for Main Street
     4ms per px), so a card released next to its slot settles into place
     quickly instead of taking the full fixed flight (CG-0MST2LS3E004BTPO).
 
+### Upgrade targeting highlights (click-to-place, CG-0MUDA70FK003J8YL)
+
+- Helpers: `showTargetHighlights()` / `clearTargetHighlights()` in
+  `MainStreetRendererDragDrop.ts` (re-exported through `MainStreetRenderer.ts`).
+- Trigger: selecting a hand-held upgrade for targeting — `uiPhase ===
+  'placing-from-hand'` and `state.hand[pendingHandIndex].family === 'upgrade'`.
+  `refreshStreetGrid()` re-creates the overlays at the tail of its street
+  rebuild, so they survive the `refreshAll()` that follows a selection (and
+  any later refresh) instead of being destroyed with the container.
+- Behavior: every occupied street slot is outlined — **green** (`0x44ff66`)
+  for a business the upgrade can legally target (matching `targetBusiness` at
+  `requiredLevel`, below `maxLevel`) and **red** (`0xff4444`) otherwise. Empty
+  slots are skipped entirely and are no longer rendered as selectable while an
+  upgrade is pending, so only real businesses appear as targets.
+- Eligibility is business-level only, via the shared
+  `isEligibleUpgradeTarget()` predicate in `MainStreetMarketUtils.ts`;
+  affordability and the action budget are surfaced in the instruction text
+  after the click, matching the drag-drop flow. Clicking an ineligible
+  business shakes it back with feedback while the upgrade stays selected for
+  a retry.
+- Clearing: `cancelPendingPlacement()` (Escape / switching card) calls
+  `clearTargetHighlights()`; applying the upgrade rebuilds the street without
+  a pending card, dropping the overlays. Both targeting flows share the
+  `dragHighlightRects` pool, so drag-drop and click-to-place highlights render
+  identically and clear together.
+- Reuse: the existing `dragHighlightRects` infrastructure and
+  `isEligibleUpgradeTarget()` predicate; no new engine primitives.
+
 ### Resource pop feedback (coins / reputation)
 
 - Trigger: whenever HUD coin or reputation value changes.
