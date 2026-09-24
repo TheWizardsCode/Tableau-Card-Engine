@@ -69,7 +69,11 @@
       "src/vite-env.d.ts",
       "scripts/contact-sheet.ts",
       "tests/replay/adapters.test.ts",
-      "tests/helpers/FakeReplayAdapter.ts"
+      "tests/helpers/FakeReplayAdapter.ts",
+      "src/ui/GameSelectorScene.ts",
+      "src/ui/createCardGame.ts",
+      "AGENTS.md",
+      "docs/dev"
     ],
     "assets": [
       "CREDITS.md",

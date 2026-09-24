@@ -127,6 +127,12 @@ export interface GameConfigEntry {
   path: string;
   /** Scene module path inside the game repo, e.g. `example-games/golf/scenes/GolfScene.ts`. */
   scenePath: string;
+  /**
+   * Optional replay-adapter module path inside the game repo. When present,
+   * `scripts/replay.ts` dynamically imports it and registers the adapter, so
+   * the replay tool works without the core importing any game code.
+   */
+  adapterPath?: string;
 }
 
 /** A parsed config preset. */

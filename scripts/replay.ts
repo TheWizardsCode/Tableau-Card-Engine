@@ -27,7 +27,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Browser, Page } from 'playwright';
 import { DEV_SERVER_URL, ensureDevServer, killDevServer } from './dev-server-utils';
-import { adapterRegistry } from './adapters';
+import { adapterRegistry, registerConfiguredAdapters } from './adapters';
 import type { ReplayAdapter } from './adapters';
 
 // NOTE: Playwright (`chromium`) and the contact-sheet module (which imports
@@ -234,6 +234,11 @@ async function captureScreenshot(
 async function main(): Promise<void> {
   const { transcriptPath, outputDir: explicitOutputDir, stopAt, skipTo, gameType } = parseArgs();
   const rawTranscript = loadRawTranscript(transcriptPath);
+
+  // ── Register adapters from the selected game config ──
+  // The replay tool is core-owned and imports no game code statically; the
+  // active preset (configs/*.json via GAMES_CONFIG) names the adapters to load.
+  await registerConfiguredAdapters(process.cwd());
 
   // ── Resolve adapter ──
   let adapter: ReplayAdapter;

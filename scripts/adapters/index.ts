@@ -47,3 +47,72 @@ export function registerAdapters(adapters: readonly ReplayAdapter[]): void {
     adapterRegistry.register(adapter);
   }
 }
+
+/**
+ * Register every adapter listed in the selected game config.
+ *
+ * The replay tool is core-owned and must run with no games checked out, so it
+ * cannot import game adapters statically. Instead it reads the active preset
+ * (`configs/<preset>.json`, selected via `GAMES_CONFIG`) and dynamically
+ * imports each entry's optional `adapterPath`. A core-only preset registers
+ * nothing, which is correct — there are no games to replay.
+ *
+ * Registration follows the preset order, which is also the auto-detection
+ * priority order.
+ *
+ * @param projectRoot Absolute core-repo root (where `configs/` lives).
+ * @param env Environment-like record (defaults to `process.env`).
+ * @returns The number of adapters registered.
+ */
+export async function registerConfiguredAdapters(
+  projectRoot: string,
+  env: Record<string, string | undefined> = process.env,
+): Promise<number> {
+  const { selectConfigPath, loadGamesConfig } = await import(
+    '../vite-game-discovery-plugin'
+  );
+
+  let config;
+  try {
+    config = loadGamesConfig(selectConfigPath(projectRoot, env));
+  } catch {
+    // No config / unknown preset: nothing to register. The caller reports the
+    // "no adapters" error with its own actionable message.
+    return 0;
+  }
+
+  let registered = 0;
+  for (const entry of config.games) {
+    const adapterPath = (entry as { adapterPath?: string }).adapterPath;
+    if (!adapterPath) continue;
+    const modulePath = pathToFileUrl(`${projectRoot}/${adapterPath}`);
+    let mod: Record<string, unknown>;
+    try {
+      mod = (await import(/* @vite-ignore */ modulePath)) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const AdapterClass = findAdapterClass(mod);
+    if (!AdapterClass) continue;
+    adapterRegistry.register(new AdapterClass() as ReplayAdapter);
+    registered += 1;
+  }
+  return registered;
+}
+
+/** Convert an absolute filesystem path to a `file://` URL for dynamic import. */
+function pathToFileUrl(absolutePath: string): string {
+  const normalized = absolutePath.replace(/\\/g, '/');
+  return normalized.startsWith('/') ? `file://${normalized}` : normalized;
+}
+
+/** Find a `*ReplayAdapter` class export in a dynamically imported module. */
+function findAdapterClass(
+  mod: Record<string, unknown>,
+): (new () => unknown) | undefined {
+  const candidates = Object.values(mod).filter(
+    (v): v is new () => unknown =>
+      typeof v === 'function' && (v as { name?: string }).name?.endsWith('ReplayAdapter') === true,
+  );
+  return candidates[0];
+}
