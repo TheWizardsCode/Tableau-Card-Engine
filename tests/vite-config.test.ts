@@ -49,4 +49,44 @@ describe('vite config transcript plugin registration', () => {
       process.env.VITEST = originalVitest;
     }
   });
+
+  it('registers the config-driven game discovery plugin', () => {
+    const config = viteConfig({ command: 'build', mode: 'production' });
+    const pluginNames = extractPluginNames(config.plugins);
+    expect(pluginNames).toContain('tce-game-discovery');
+  });
+});
+
+describe('vite config core path aliases', () => {
+  const ALIAS_KEYS = ['@core-engine', '@card-system', '@rule-engine', '@ui', '@ai'];
+
+  it('points core aliases at this checkout by default', () => {
+    const original = process.env.CORE_ROOT;
+    try {
+      delete process.env.CORE_ROOT;
+      const config = viteConfig({ command: 'build', mode: 'production' });
+      const alias = config.resolve?.alias as Record<string, string>;
+      for (const key of ALIAS_KEYS) {
+        expect(alias[key]).toBeTruthy();
+        expect(alias[key]).toContain('/src/');
+      }
+    } finally {
+      if (original === undefined) delete process.env.CORE_ROOT;
+      else process.env.CORE_ROOT = original;
+    }
+  });
+
+  it('honours CORE_ROOT so a game repo resolves the core submodule (AC5)', () => {
+    const original = process.env.CORE_ROOT;
+    try {
+      process.env.CORE_ROOT = '/repo/tce-golf/core';
+      const config = viteConfig({ command: 'build', mode: 'production' });
+      const alias = config.resolve?.alias as Record<string, string>;
+      expect(alias['@core-engine']).toBe('/repo/tce-golf/core/src/core-engine');
+      expect(alias['@ui']).toBe('/repo/tce-golf/core/src/ui');
+    } finally {
+      if (original === undefined) delete process.env.CORE_ROOT;
+      else process.env.CORE_ROOT = original;
+    }
+  });
 });

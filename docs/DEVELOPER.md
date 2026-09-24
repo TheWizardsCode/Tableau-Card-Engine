@@ -7,6 +7,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Environment Setup](#environment-setup)
 - [Running Locally](#running-locally)
 - [Building for Production](#building-for-production)
+- [Config-Driven Game Catalogue](#config-driven-game-catalogue)
 - [Electron Launcher / Desktop Packaging](#electron-launcher--desktop-packaging)
 - [Testing](#testing)
 - [Startup Context Budget](#startup-context-budget)
@@ -77,6 +78,82 @@ The project uses a unified entry point (`main.ts` at the project root) that regi
 The game catalogue is stored in the Phaser registry (key: `gameSelector.games`) via a `preBoot` callback, so game scenes don't need to know about the catalogue to return to the selector.
 
 Each example game also retains its own standalone `main.ts` entry point and `createXxxGame.ts` factory function for independent testing and browser test use.
+
+#### Config-driven game catalogue
+
+<a id="config-driven-game-catalogue"></a>
+
+The catalogue is **generated at build time** by
+`scripts/vite-game-discovery-plugin.ts` from a config preset — `main.ts`
+imports `virtual:game-registry` and never hardcodes game imports. This is what
+lets a checkout build with no games (the core-engine repo) or with any subset
+of 1..n games (a distribution), without editing source.
+
+Select a preset with the `GAMES_CONFIG` environment variable:
+
+```bash
+npm run build                      # default preset: core-only (Gym only)
+GAMES_CONFIG=sample npm run build  # a small subset (configs/sample.json)
+GAMES_CONFIG=all npm run build     # every game (configs/all.json)
+GAMES_CONFIG=/path/to/my.json npm run build   # an explicit preset
+```
+
+Presets live in `configs/` and list the sibling game repos to include:
+
+```json
+{
+  "games": [
+    { "id": "golf", "path": "../tce-golf",
+      "scenePath": "example-games/golf/scenes/GolfScene.ts" }
+  ]
+}
+```
+
+`GAMES_CONFIG` can also be a bare preset name (`all`) or an explicit path. An
+unknown preset name fails the build rather than silently shipping fewer games.
+
+> **Two config locations, two purposes:** `configs/*.json` (this section) are
+> **build presets** selecting which games a build includes; the repo partition
+> used by the extraction tooling lives separately at
+> `scripts/configs/repo-layout.json` (see
+> [Multi-Repo Architecture](dev/multi-repo-architecture.md)).
+
+A game is resolved **locally first** (`example-games/<id>/…`, the flat
+monorepo layout) and then **as a sibling repo** (`../tce-<id>/…`, the composed
+distribution layout), so one preset set works before and after the split. A
+missing game fails the build with a message naming the game and both paths it
+looked in.
+
+The **Gym is core-owned and always present**, including in a core-only build.
+
+##### The `GAME_INFO` convention
+
+Every game's scene module exports its selector metadata next to its scene
+class:
+
+```ts
+export class GolfScene extends CardGameScene { /* … */ }
+
+export const GAME_INFO = {
+  sceneKey: 'GolfScene',
+  title: '9-Card Golf',
+  description: 'Single-round Golf (human vs. AI). …',
+  thumbnail: 'games/golf/thumbnail',   // optional; relative to assets/
+} as const;
+```
+
+The plugin parses this at build time (it cannot import the module, which
+requires a browser/Phaser context). `sceneKey`, `title` and `description` are
+required; `thumbnail` is optional.
+
+> **Test suites always use the full preset.** The shell runners
+> (`scripts/run-ci-tests.sh`, `run-dev-tests.sh`, `run-smoke-tests.sh`,
+> `run-tutorial-tests.sh`) export `GAMES_CONFIG=all` by default, because tests
+> exercise every game. Override with an explicit `GAMES_CONFIG=…` if needed.
+
+> **`.worklog/worktrees/` layouts:** the local lookup uses `<root>/<scenePath>`,
+> so presets resolve correctly inside a git worktree as well as the main
+> checkout.
 
 ## Building for Production
 
@@ -848,6 +925,20 @@ Usage in code:
 ```typescript
 import { ENGINE_VERSION } from '@core-engine/index';
 ```
+
+The aliases are rooted at a single **core checkout root**, which
+`vite.config.ts` computes via `resolveCoreAliases()` from
+`scripts/vite-game-discovery-plugin.ts`. By default the root is the directory
+containing `vite.config.ts` (correct for the monorepo and the core-engine
+repo). A game repo sets `CORE_ROOT` to point the same aliases at its engine
+checkout — the `./core` submodule or the sibling `../tableau-card-engine-core`:
+
+```bash
+CORE_ROOT=./core npm run build     # game-repo context
+```
+
+This keeps `@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*` and
+`@ai/*` import specifiers identical across the core repo and every game repo.
 
 ## Build-Time Version Injection
 

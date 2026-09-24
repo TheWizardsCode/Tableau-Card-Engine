@@ -500,3 +500,17 @@ export class GolfScene extends CardGameScene {
     );
   }
 }
+
+/**
+ * Catalogue metadata for the Game Selector. The GAME_INFO convention
+ * (see scripts/vite-game-discovery-plugin.ts) lets a distribution
+ * build its game catalogue from config presets instead of hardcoded
+ * imports in main.ts.
+ */
+export const GAME_INFO = {
+  sceneKey: 'GolfScene',
+  title: '9-Card Golf',
+  description:
+    'Single-round Golf (human vs. AI). Flip cards, swap from the draw or discard pile, and try to get the lowest score.',
+  thumbnail: 'games/golf/thumbnail',
+} as const;

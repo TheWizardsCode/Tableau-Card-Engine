@@ -1,0 +1,15 @@
+{
+  "$comment": "Sample preset: a small non-empty subset used to prove the 1..n assembly boundary cases (a distribution with a few games, not all). Part of CG-0MTRO6Y2N009B9CF.",
+  "games": [
+    {
+      "id": "golf",
+      "path": "../tce-golf",
+      "scenePath": "example-games/golf/scenes/GolfScene.ts"
+    },
+    {
+      "id": "main-street",
+      "path": "../tce-main-street",
+      "scenePath": "example-games/main-street/scenes/MainStreetScene.ts"
+    }
+  ]
+}

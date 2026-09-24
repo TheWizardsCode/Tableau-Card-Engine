@@ -40,6 +40,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
+# The test suites exercise every game, so tests always build/test against the
+# full preset regardless of the ambient GAMES_CONFIG (which defaults to
+# `core-only` for production builds). See scripts/vite-game-discovery-plugin.ts.
+export GAMES_CONFIG="${GAMES_CONFIG:-all}"
+
 # Fast-fail pre-check: the browser stages below need Playwright's Chromium.
 # Detect a missing prerequisite up front (launch-free, <2s) and print the
 # exact remediation commands instead of timing out with an opaque Vitest

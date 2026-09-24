@@ -385,3 +385,17 @@ export class LostCitiesScene extends CardGameScene {
     this.shutdownBase();
   }
 }
+
+/**
+ * Catalogue metadata for the Game Selector. The GAME_INFO convention
+ * (see scripts/vite-game-discovery-plugin.ts) lets a distribution
+ * build its game catalogue from config presets instead of hardcoded
+ * imports in main.ts.
+ */
+export const GAME_INFO = {
+  sceneKey: 'LostCitiesScene',
+  title: 'Lost Cities',
+  description:
+    'Two-player expedition card game (human vs. AI). Bet on up to 5 expeditions across a 3-round match, manage risk with investment cards, and outscore the AI.',
+  thumbnail: 'games/lost-cities/thumbnail',
+} as const;

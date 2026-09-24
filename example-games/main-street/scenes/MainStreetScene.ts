@@ -1295,3 +1295,17 @@ export class MainStreetScene extends CardGameScene {
     return (this.msLifecycleManager as any).showTutorialStepOverlay.apply(this.msLifecycleManager, args);
   }
 }
+
+/**
+ * Catalogue metadata for the Game Selector. The GAME_INFO convention
+ * (see scripts/vite-game-discovery-plugin.ts) lets a distribution
+ * build its game catalogue from config presets instead of hardcoded
+ * imports in main.ts.
+ */
+export const GAME_INFO = {
+  sceneKey: 'MainStreetScene',
+  title: 'Main Street',
+  description:
+    'Single-player tableau builder. Purchase businesses, place them along a 10-slot street for synergy bonuses, manage coins and reputation, and build the highest-scoring Main Street — no turn limit (games end via score threshold, all challenges, bankruptcy, or reputation collapse).',
+  thumbnail: 'games/main-street/thumbnail',
+} as const;

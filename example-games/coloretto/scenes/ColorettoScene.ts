@@ -653,3 +653,16 @@ export class ColorettoScene extends CardGameScene {
     this.shutdownBase();
   }
 }
+
+/**
+ * Catalogue metadata for the Game Selector. The GAME_INFO convention
+ * (see scripts/vite-game-discovery-plugin.ts) lets a distribution
+ * build its game catalogue from config presets instead of hardcoded
+ * imports in main.ts.
+ */
+export const GAME_INFO = {
+  sceneKey: 'ColorettoScene',
+  title: 'Coloretto',
+  description:
+    'Set-building card game (human vs. 1-4 AI). Take rows of chameleon cards from the shared tableau, score 3 colors positively across multiple rounds, and outscore the AI.',
+} as const;

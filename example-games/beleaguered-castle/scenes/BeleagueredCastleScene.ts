@@ -1076,3 +1076,17 @@ export class BeleagueredCastleScene extends CardGameScene {
     this.overlayManager.add(restartBtn);
   }
 }
+
+/**
+ * Catalogue metadata for the Game Selector. The GAME_INFO convention
+ * (see scripts/vite-game-discovery-plugin.ts) lets a distribution
+ * build its game catalogue from config presets instead of hardcoded
+ * imports in main.ts.
+ */
+export const GAME_INFO = {
+  sceneKey: 'BeleagueredCastleScene',
+  title: 'Beleaguered Castle',
+  description:
+    'Open solitaire. Move cards between 8 tableau columns and build foundations up by suit from Ace to King.',
+  thumbnail: 'games/beleaguered-castle/thumbnail',
+} as const;

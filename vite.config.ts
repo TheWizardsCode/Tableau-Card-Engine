@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from './scripts/vite-transcript-plugin';
+import { gameDiscoveryPlugin, resolveCoreAliases } from './scripts/vite-game-discovery-plugin';
 
 // Read version from package.json (single source of truth)
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
@@ -18,19 +19,23 @@ export default defineConfig(({ mode, command }) => ({
   // be loaded via Electron's file:// protocol (no server, no absolute paths).
   base: mode === 'electron' ? './' : mode === 'production' ? '/Tableau-Card-Engine/' : '/',
   plugins: [
+    // Config-driven game discovery (F3/CG-0MTRO6Y2N009B9CF): `main.ts`
+    // imports `virtual:game-registry`, which this plugin generates from the
+    // preset selected via GAMES_CONFIG (default `core-only`). This is what
+    // lets the core repo build with no games and a distribution assemble any
+    // subset of 1..n games without editing source.
+    gameDiscoveryPlugin(),
     // Only register the transcript persistence plugin during normal dev-server runs.
     // Vitest browser uses an internal Vite server; avoid plugin middleware there to
     // prevent file-system side effects and extra request handling during tests.
     ...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []),
   ],
   resolve: {
-    alias: {
-      '@core-engine': path.resolve(__dirname, 'src/core-engine'),
-      '@card-system': path.resolve(__dirname, 'src/card-system'),
-      '@rule-engine': path.resolve(__dirname, 'src/rule-engine'),
-      '@ui': path.resolve(__dirname, 'src/ui'),
-      '@ai': path.resolve(__dirname, 'src/ai'),
-    },
+    // Core aliases resolve to whichever core checkout this build belongs to.
+    // `CORE_ROOT` lets a game repo (F4) point them at its `./core` submodule or
+    // the sibling `../tableau-card-engine-core` checkout; it defaults to this
+    // directory, which is correct for the monorepo and the core repo itself.
+    alias: resolveCoreAliases(process.env.CORE_ROOT || __dirname),
   },
   build: {
     outDir: 'dist',

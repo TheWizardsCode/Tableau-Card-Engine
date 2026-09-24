@@ -755,3 +755,15 @@ export class BlackjackScene extends CardGameScene {
 
 }
 
+/**
+ * Catalogue metadata for the Game Selector. The GAME_INFO convention
+ * (see scripts/vite-game-discovery-plugin.ts) lets a distribution
+ * build its game catalogue from config presets instead of hardcoded
+ * imports in main.ts.
+ */
+export const GAME_INFO = {
+  sceneKey: 'BlackjackScene',
+  title: 'Blackjack',
+  description:
+    'Classic single-player Blackjack vs the dealer. Hit or stand to reach 21 without going bust.',
+} as const;

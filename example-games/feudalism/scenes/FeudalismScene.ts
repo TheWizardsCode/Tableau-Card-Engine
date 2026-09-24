@@ -556,3 +556,17 @@ export class FeudalismScene extends CardGameScene {
     this.shutdownBase();
   }
 }
+
+/**
+ * Catalogue metadata for the Game Selector. The GAME_INFO convention
+ * (see scripts/vite-game-discovery-plugin.ts) lets a distribution
+ * build its game catalogue from config presets instead of hardcoded
+ * imports in main.ts.
+ */
+export const GAME_INFO = {
+  sceneKey: 'FeudalismScene',
+  title: 'Feudalism',
+  description:
+    'Engine-building card game (human vs. AI). Collect gem tokens, purchase cards for bonuses, attract nobles, and reach 15 prestige to win.',
+  thumbnail: 'games/feudalism/thumbnail',
+} as const;

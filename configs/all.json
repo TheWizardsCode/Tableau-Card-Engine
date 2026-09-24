@@ -1,0 +1,45 @@
+{
+  "$comment": "Full preset: the engine + Gym + all eight example games. Used by the launcher distribution's complete build and by the full test suite. Part of CG-0MTRO6Y2N009B9CF.",
+  "games": [
+    {
+      "id": "golf",
+      "path": "../tce-golf",
+      "scenePath": "example-games/golf/scenes/GolfScene.ts"
+    },
+    {
+      "id": "beleaguered-castle",
+      "path": "../tce-beleaguered-castle",
+      "scenePath": "example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts"
+    },
+    {
+      "id": "sushi-go",
+      "path": "../tce-sushi-go",
+      "scenePath": "example-games/sushi-go/scenes/SushiGoScene.ts"
+    },
+    {
+      "id": "feudalism",
+      "path": "../tce-feudalism",
+      "scenePath": "example-games/feudalism/scenes/FeudalismScene.ts"
+    },
+    {
+      "id": "lost-cities",
+      "path": "../tce-lost-cities",
+      "scenePath": "example-games/lost-cities/scenes/LostCitiesScene.ts"
+    },
+    {
+      "id": "main-street",
+      "path": "../tce-main-street",
+      "scenePath": "example-games/main-street/scenes/MainStreetScene.ts"
+    },
+    {
+      "id": "blackjack",
+      "path": "../tce-blackjack",
+      "scenePath": "example-games/blackjack/scenes/BlackjackScene.ts"
+    },
+    {
+      "id": "coloretto",
+      "path": "../tce-coloretto",
+      "scenePath": "example-games/coloretto/scenes/ColorettoScene.ts"
+    }
+  ]
+}
