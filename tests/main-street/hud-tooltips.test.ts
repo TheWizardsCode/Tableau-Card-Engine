@@ -441,6 +441,17 @@ describe('buildScoreTooltip', () => {
     expect(tooltip).toContain(`${challengeContribution}`);
   });
 
+  it('renders the reputation breakdown label without a trailing × (CG-0MTR12QY2001VCDC)', () => {
+    const state = setupMainStreetGame({ seed: 'test-score-rep-label' });
+    state.resourceBank.reputation = 8;
+
+    const tooltip = buildScoreTooltip(state, null);
+
+    // Regression: the label must read `Reputation: 8`, not `Reputation ×: 8`.
+    expect(tooltip).toContain(`Reputation: ${state.resourceBank.reputation}`);
+    expect(tooltip).not.toContain('Reputation ×');
+  });
+
   it('shows remaining score needed to reach win threshold when score is below target (rounded)', () => {
     const state = setupMainStreetGame({ seed: 'test-score-remaining' });
     // Starting game: score should be well below threshold

@@ -92,7 +92,7 @@ export const HUD_TOOLTIP_STRINGS = {
   scoreTitle: 'Score Estimate',
   scoreEstimateLabel: 'Estimated score',
   scoreBreakdownCoins: 'Coins',
-  scoreBreakdownReputation: 'Reputation ×',
+  scoreBreakdownReputation: 'Reputation',
   scoreBreakdownChallenges: 'Challenges',
   scoreBreakdownTurnCost: 'Turn cost',
   scoreTurnCostLabel: 'Total turn cost',
