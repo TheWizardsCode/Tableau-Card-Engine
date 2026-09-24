@@ -17,7 +17,13 @@
 # [vitest] Browser connection was closed while running tests for the browser-mode
 # WebSocket drop) — a non-zero exit that happens even when every test passed.
 # The retry is masked against genuine failures (see that script's
-# shouldRetryOnce). See CG-0MS9M5UJP005PWD3 and CG-0MSCI73RH004VPCE.
+# shouldRetryOnce). If the retry is ALSO an all-passed transient failure, the run
+# is accepted as green — every test file passed, so there is no failure to mask
+# (CG-0MUF0LU4X006IXXU). See CG-0MS9M5UJP005PWD3 and CG-0MSCI73RH004VPCE.
+#
+# The runner emits a final `[vitest-runner] attempts=N status=S outcome=...`
+# line after every run, so the attempt count and outcome survive the `tail -20`
+# truncation below (CG-0MUF0LU4X006IXXU).
 #
 # The same runner bounds every attempt with a wall-clock timeout
 # (CG-0MT08R2QR0070F3N): a true hang — e.g. a browser test whose

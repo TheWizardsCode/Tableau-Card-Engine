@@ -31,6 +31,7 @@ import {
   BROWSER_DROP_SIGNATURE,
   shouldRetryOnce,
   runWithRetry,
+  runSummary,
   runVitestSync,
   parseTimeoutArgs,
   hangTimeoutMessage,
@@ -143,13 +144,37 @@ describe('runWithRetry (retry-once orchestration)', () => {
     expect(calls).toBe(2);
   });
 
-  it('retries only once even if the retry itself hits the transient timeout', async () => {
+  it('accepts the run as green when BOTH attempts are all-passed transient failures', async () => {
     let calls = 0;
     const runner: VitestRunner = () => {
       calls += 1;
       return { status: 1, output: TRANSIENT_OUTPUT };
     };
+    expect(await runWithRetry([], runner, warnSpy)).toBe(0);
+    expect(calls).toBe(2);
+  });
+
+  it('still fails when the retry reports genuine test failures (acceptance never masks a failure)', async () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: TRANSIENT_OUTPUT }
+        : { status: 1, output: FAIL_OUTPUT };
+    };
     expect(await runWithRetry([], runner, warnSpy)).toBe(1);
+    expect(calls).toBe(2);
+  });
+
+  it('does not accept a retry that hangs (a hang must surface)', async () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: TRANSIENT_OUTPUT }
+        : { status: HANG_TIMEOUT_EXIT_CODE, output: hangTimeoutMessage(60) };
+    };
+    expect(await runWithRetry([], runner, warnSpy, 60_000)).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(calls).toBe(2);
   });
 
@@ -199,6 +224,31 @@ describe('runWithRetry (retry-once orchestration)', () => {
     };
     expect(await runWithRetry([], runner, warnSpy, 42_000)).toBe(0);
     expect(seenTimeouts).toEqual([42_000, 42_000]);
+  });
+});
+
+// ── Final runner summary (survives `tail -20` truncation) ────
+
+describe('runSummary (final diagnostic line)', () => {
+  it('formats the attempt count, status, outcome and forwarded args', () => {
+    expect(runSummary(['--project', 'unit'], 2, 0, 'accepted-transient')).toBe(
+      '[vitest-runner] attempts=2 status=0 outcome=accepted-transient args="--project unit"',
+    );
+  });
+
+  it('emits a clean summary after a single passing run', async () => {
+    const messages: string[] = [];
+    const runner: VitestRunner = () => ({ status: 0, output: PASS_OUTPUT });
+    await runWithRetry(['--project', 'unit'], runner, (m) => messages.push(m));
+    expect(messages.some((m) => m.includes('attempts=1 status=0 outcome=clean'))).toBe(true);
+  });
+
+  it('emits an accepted-transient summary when both attempts are poisoned but green', async () => {
+    const messages: string[] = [];
+    const runner: VitestRunner = () => ({ status: 1, output: TRANSIENT_OUTPUT });
+    await runWithRetry(['--project', 'unit'], runner, (m) => messages.push(m));
+    expect(messages.some((m) => m.includes('outcome=accepted-transient'))).toBe(true);
+    expect(messages.some((m) => m.includes('[transient-accepted]'))).toBe(true);
   });
 });
 

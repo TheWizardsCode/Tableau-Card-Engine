@@ -31,9 +31,17 @@
  *
  *   - Retry the run exactly once when the output shows ALL files passed
  *     AND the sole error is one of the transient signatures above.
- *   - Never retry on genuine test failures — the masking guard
+ *   - If the retry ALSO reports all files passed with only a transient
+ *     signature, accept the run as green: there is no test failure to
+ *     mask, and the non-zero exit is purely a post-completion teardown
+ *     RPC artefact. This keeps the gate resilient when CPU contention
+ *     persists across both attempts (CG-0MUF0LU4X006IXXU).
+ *   - Never retry or accept on genuine test failures — the masking guard
  *     (shouldRetryOnce) proves "all passed" from the reporter summary
  *     before a retry is allowed.
+ *   - Emit a final `[vitest-runner]` summary line after every run so the
+ *     attempt count and outcome survive `tail -N` truncation in
+ *     `scripts/run-ci-tests.sh` (CG-0MUF0LU4X006IXXU).
  *   - Bound every vitest attempt with a wall-clock timeout (tunable via
  *     `--timeout-ms`, default 10 minutes). When the bound is exceeded the
  *     vitest process tree is SIGTERMed (graceful), then SIGKILLed after a
@@ -150,6 +158,21 @@ export function shouldRetryOnce(output: string): boolean {
  * `DEFAULT_RUN_TIMEOUT_MS`). When an attempt exceeds the bound it reports
  * `HANG_TIMEOUT_EXIT_CODE` (124) and is NEVER retried — a genuine hang must
  * surface, not be masked.
+ *
+ * Transient recovery has two stages (CG-0MUF0LU4X006IXXU):
+ *
+ *   1. Retry once after an all-passed transient failure.
+ *   2. If the retry is ALSO an all-passed transient failure, accept the run
+ *      as green (exit 0). Every test file passed in both attempts, so there
+ *      is no test failure to mask — the non-zero exit was solely the
+ *      post-completion teardown RPC timeout. Without this, sustained CPU
+ *      contention that poisons both attempts would still fail the gate even
+ *      though the suite was green (the original CG-0MUF0LU4X006IXXU
+ *      evidence: two ~117s poisoned attempts, all 396 files passing).
+ *
+ * A final `[vitest-runner] attempts=N status=S outcome=... args="..."` line
+ * is emitted via `warn` after every run, so the attempt count and outcome
+ * survive the `tail -20` truncation in `scripts/run-ci-tests.sh`.
  */
 export async function runWithRetry(
   args: string[],
@@ -161,6 +184,7 @@ export async function runWithRetry(
   if (first.status === HANG_TIMEOUT_EXIT_CODE) {
     // A hang is already reported by the runner; retrying would only
     // double the wall-clock cost. Surface it.
+    warn(runSummary(args, 1, first.status, 'hang'));
     return first.status;
   }
   if (first.status !== 0 && shouldRetryOnce(first.output)) {
@@ -168,9 +192,44 @@ export async function runWithRetry(
       '\n[retry] Vitest transient failure (worker RPC timeout or browser connection drop) ' +
         'detected with all tests passing. Retrying once...\n',
     );
-    return (await run(args, timeoutMs)).status;
+    const second = await run(args, timeoutMs);
+    if (second.status === 0) {
+      warn(runSummary(args, 2, second.status, 'retry-clean'));
+      return second.status;
+    }
+    if (shouldRetryOnce(second.output)) {
+      // Both attempts completed with every test file passing; the only
+      // error is the post-completion teardown RPC timeout (or browser
+      // WebSocket drop). There is no test failure to mask, so accept the
+      // run as green rather than failing the gate on a runner artefact.
+      warn(
+        '\n[transient-accepted] Vitest transient teardown failure on BOTH attempts, ' +
+          'but every test file passed in both — treating the run as green. ' +
+          'No test failure was masked (the masking guard proved all files passed).\n',
+      );
+      warn(runSummary(args, 2, 0, 'accepted-transient'));
+      return 0;
+    }
+    warn(runSummary(args, 2, second.status, 'retry-failed'));
+    return second.status;
   }
+  warn(runSummary(args, 1, first.status, first.status === 0 ? 'clean' : 'failed'));
   return first.status;
+}
+
+/**
+ * Final one-line diagnostic emitted after every run. Kept at the very end of
+ * the runner's output so it survives the `tail -20` truncation applied by
+ * `scripts/run-ci-tests.sh`, letting later triage establish whether a retry
+ * happened and how it resolved (CG-0MUF0LU4X006IXXU).
+ */
+export function runSummary(
+  args: string[],
+  attempts: number,
+  status: number,
+  outcome: string,
+): string {
+  return `[vitest-runner] attempts=${attempts} status=${status} outcome=${outcome} args="${args.join(' ')}"`;
 }
 
 /**

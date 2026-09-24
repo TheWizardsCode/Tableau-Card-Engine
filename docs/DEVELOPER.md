@@ -302,16 +302,30 @@ Two mitigations are in place in this repository:
 
 1. **Worker-pool cap** — the `unit` project in `vite.config.ts` sets
    `maxWorkers: 4` to bound aggregate CPU demand from parallel tinypool workers.
-2. **Retry-once on the transient signatures** — the unit **and** browser steps in
-   `scripts/run-ci-tests.sh` run through `scripts/vitest-run-with-retry.ts`, which
-   retries the run exactly once when (and only when) the reporter summary shows
-   **all** files passed **and** the sole error is one of the transient signatures
+2. **Retry-once on the transient signatures, then accept an all-passed retry** —
+   the unit **and** browser steps in `scripts/run-ci-tests.sh` run through
+   `scripts/vitest-run-with-retry.ts`, which retries the run exactly once when
+   (and only when) the reporter summary shows **all** files passed **and** the
+   sole error is one of the transient signatures
    (`[vitest-worker]: Timeout calling "onTaskUpdate"` or
    `[vitest] Browser connection was closed while running tests`). The masking
    guard (`shouldRetryOnce` in that script, unit-tested in
    `tests/scripts/vitest-run-with-retry.test.ts`) proves "all passed" from the
    summary before a retry is allowed, so a genuine test failure can never be
-   hidden by a retry.
+   hidden by a retry. If the retry is **also** an all-passed transient failure
+   (both attempts poisoned by sustained contention), the run is accepted as
+   green (exit 0): every test file passed in both attempts, so there is no test
+   failure to mask — the non-zero exit was solely the post-completion teardown
+   RPC artefact (CG-0MUF0LU4X006IXXU). This closes the residual gap where two
+   ~117s poisoned attempts (all 396 files passing) still failed the gate.
+
+   The runner emits a final
+   `[vitest-runner] attempts=N status=S outcome=... args="..."` line after every
+   run, so the attempt count and outcome survive the `tail -20` truncation in
+   `scripts/run-ci-tests.sh` — this is what lets later triage establish whether a
+   retry happened and how it resolved (the discriminator flagged in
+   CG-0MUF0LU4X006IXXU). Outcomes are `clean`, `retry-clean`,
+   `accepted-transient`, `retry-failed`, `failed` and `hang`.
 
 3. **Test-side hardening (browser tests)** — beyond the runner-level
    mitigations above, browser tests that drive the real Phaser pointer
