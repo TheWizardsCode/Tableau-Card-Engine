@@ -278,8 +278,9 @@ Each week (MarketPhase) the player has **exactly one action** — two while a **
 - Selling a business — **free**, and the card **stays on the grid** as an inert *sold* marker (no income/reputation for itself, **no ongoing/running cost** — sold cards are excluded from the IncomePhase ongoing-cost deduction (CG-0MU3VH7QW006A2XA) — but still a synergy anchor for its neighbours; the slot stays occupied). Refund formula (CG-0MT5XO7DI0066QCT): `Math.ceil((card.cost + totalUpgradeCost) * 1.5) + Math.max(0, currentIncome − effectiveBase) + Math.max(0, currentReputationPerTurn − (repPerTurn + reputationBonus))` where `effectiveBase = (baseIncome + incomeBonus) × (hasAdjacentSameType ? 0.6 : 1)` and the 1.5× is the same +50% buy-and-place premium; applies to business **and** community-space cards; synergy comps are 0 when undefined and never negative.
   The sell dialog and activity log show the breakdown (base, synergy income, synergy rep).
 - Hint (still 1/week)
-- Discarding from hand
 - Ending the turn
+
+> Discarding from hand (CG-0MTQ7KUVF009ELQK): **action-free, but not free of reputation.** Select a hand card and click **[Discard]** (in the End Turn slot) to discard it to its family discard pile. The discard deducts the card's listed coin `cost` from reputation, **clamped at 0** (reputation never goes negative). It applies to every family — business, community-space, upgrade and event — and a 0-cost card costs nothing. The discard is **not** gated on affordability: a player with less reputation than the card's cost may still discard, down to 0. There is no confirmation dialog. The discard is undoable (hand, discard pile and reputation are all restored).
 
 > Upgrade and event actions (CG-0MT3IYSRL001VVUP, CG-0MTFWBNL30043ZBM): taking an **upgrade** or **Investment event** from the market into hand, and playing either from hand, each consume **1 action** — they are action-type operations, not free operations. They are listed in the action-economy table above.
 

@@ -326,6 +326,13 @@ describe('buildRationale', () => {
     expect(rationale).toContain('immediate benefit');
   });
 
+  it('rationale for discard-from-hand states the reputation cost (not free)', () => {
+    const state = makeMarketState('rationale-discard');
+    const rationale = buildRationale({ type: 'discard-from-hand', handIndex: 0 }, 0, state);
+    expect(rationale).toMatch(/reputation/i);
+    expect(rationale).not.toMatch(/\bfree\b/i);
+  });
+
   it('rationale always returns a non-empty string', () => {
     const state = makeMarketState();
     const types: PlayerAction[] = [

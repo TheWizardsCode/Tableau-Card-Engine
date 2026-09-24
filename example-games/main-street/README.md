@@ -15,7 +15,9 @@ Upgrade cards follow the business-card action economy — they are never a free 
 - When the action budget is spent the upgrade is dimmed and buying/playing it is rejected (unless a same-week composite is still pending).
 - **Escape** cancels an in-progress upgrade (or business) targeting phase — the card stays in hand and the same-week composite stays free. Escape only opens Settings when nothing is being targeted.
 
-Event cards moved the same way (each of move-to-hand / play-from-hand costs 1 action, CG-0MTFWBNL30043ZBM); refresh, sell, hint, discard, community favour and end-turn remain non-action operations.
+Event cards moved the same way (each of move-to-hand / play-from-hand costs 1 action, CG-0MTFWBNL30043ZBM); refresh, sell, hint, community favour and end-turn remain non-action operations.
+
+**Discarding from hand** is **action-free but not free of reputation** (CG-0MTQ7KUVF009ELQK): select a hand card and click **[Discard]** (in the End Turn slot) to send it to its family discard pile. The discard deducts the card's listed coin `cost` from reputation, clamped at 0 (reputation never goes negative), applies to every family, and is not gated on affordability — a player may discard down to 0 reputation. 0-cost cards cost nothing. There is no confirmation dialog, and the discard is undoable.
 
 ## End-of-turn income: phased presentation (CG-0MT23O6W8003AXWJ)
 

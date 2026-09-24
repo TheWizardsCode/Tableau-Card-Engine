@@ -180,7 +180,7 @@ export function buildRationale(
     }
 
     case 'discard-from-hand':
-      return 'Discard a card from hand to free capacity';
+      return 'Discard a hand card for reputation equal to its coin cost, to open a hand slot';
     case 'community-favour': {
       const a = action as { type: 'community-favour'; direction: 'coins-to-rep' | 'rep-to-coins' };
       if (a.direction === 'coins-to-rep') {

@@ -103,7 +103,7 @@ export const HUD_TOOLTIP_STRINGS = {
   actionTitle: 'Actions This Week',
   actionRemainingLabel: 'Actions remaining',
   actionConsumesLabel: 'Costs 1 action: buy/place business, move to hand, hire staff, close business',
-  actionFreeOpsLabel: 'Free: re-roll market, sell, discard, end turn',
+  actionFreeOpsLabel: 'No action: re-roll market, sell, end turn. Discard costs reputation (its coin cost), not an action',
   actionBankedLabel: 'Banked actions',
   actionBankingExplain: "1 action per turn, with up to two turns' unused actions banked — every action you take spends 1 from the bank (down to 0), so banked actions are a finite reserve, not a permanent bonus",
   actionBankingGmNote: '+1 action per turn from General Manager (staff actions are used first, never banked)',

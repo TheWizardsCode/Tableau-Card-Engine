@@ -444,7 +444,7 @@ export function playUpgradeFromHandCommand(
   );
 }
 
-/** Command: Discard card from hand (free) */
+/** Command: Discard a hand card, costing its coin value in reputation (clamped at 0). */
 export function discardFromHandCommand(
   state: MainStreetState,
   handIndex: number,
