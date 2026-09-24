@@ -1,0 +1,439 @@
+{
+  "$comment": "Repo partition contract for the TCE multi-repo decomposition (epic CG-0MTR7DLMY008CK17, feature F1 CG-0MTRO6P18003AZIZ). This is the single source of truth for BOTH the extraction script (scripts/extract-repos.sh) and the distribution builds (configs/*.json presets consumed by the Vite game-discovery plugin, F3). Paths are relative to the monorepo root and use forward slashes.",
+  "version": 1,
+  "core": {
+    "name": "tableau-card-engine-core",
+    "slug": "tableau-card-engine-core",
+    "remote": "git@github.com:TheWizardsCode/tableau-card-engine-core.git",
+    "paths": [
+      "src/core-engine",
+      "src/card-system",
+      "src/rule-engine",
+      "src/ui",
+      "src/ai",
+      "src/balance-cards",
+      "example-games/gym",
+      "src/ui/GameSelectorScene.ts",
+      "src/ui/createCardGame.ts",
+      "electron",
+      "index.html",
+      "main.ts",
+      "package.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "scripts",
+      "tests/core-engine",
+      "tests/card-system",
+      "tests/rule-engine",
+      "tests/ui",
+      "tests/ai",
+      "tests/gym",
+      "tests/handView",
+      "tests/core",
+      "docs/gym"
+    ],
+    "assets": [
+      "CREDITS.md",
+      "cards/alternative/",
+      "audio/default/",
+      "cards/10_of_clubs.svg",
+      "cards/10_of_diamonds.svg",
+      "cards/10_of_hearts.svg",
+      "cards/10_of_spades.svg",
+      "cards/2_of_clubs.svg",
+      "cards/2_of_diamonds.svg",
+      "cards/2_of_hearts.svg",
+      "cards/2_of_spades.svg",
+      "cards/3_of_clubs.svg",
+      "cards/3_of_diamonds.svg",
+      "cards/3_of_hearts.svg",
+      "cards/3_of_spades.svg",
+      "cards/4_of_clubs.svg",
+      "cards/4_of_diamonds.svg",
+      "cards/4_of_hearts.svg",
+      "cards/4_of_spades.svg",
+      "cards/5_of_clubs.svg",
+      "cards/5_of_diamonds.svg",
+      "cards/5_of_hearts.svg",
+      "cards/5_of_spades.svg",
+      "cards/6_of_clubs.svg",
+      "cards/6_of_diamonds.svg",
+      "cards/6_of_hearts.svg",
+      "cards/6_of_spades.svg",
+      "cards/7_of_clubs.svg",
+      "cards/7_of_diamonds.svg",
+      "cards/7_of_hearts.svg",
+      "cards/7_of_spades.svg",
+      "cards/8_of_clubs.svg",
+      "cards/8_of_diamonds.svg",
+      "cards/8_of_hearts.svg",
+      "cards/8_of_spades.svg",
+      "cards/9_of_clubs.svg",
+      "cards/9_of_diamonds.svg",
+      "cards/9_of_hearts.svg",
+      "cards/9_of_spades.svg",
+      "cards/ace_of_clubs.svg",
+      "cards/ace_of_diamonds.svg",
+      "cards/ace_of_hearts.svg",
+      "cards/ace_of_spades.svg",
+      "cards/card_back.svg",
+      "cards/jack_of_clubs.svg",
+      "cards/jack_of_diamonds.svg",
+      "cards/jack_of_hearts.svg",
+      "cards/jack_of_spades.svg",
+      "cards/king_of_clubs.svg",
+      "cards/king_of_diamonds.svg",
+      "cards/king_of_hearts.svg",
+      "cards/king_of_spades.svg",
+      "cards/queen_of_clubs.svg",
+      "cards/queen_of_diamonds.svg",
+      "cards/queen_of_hearts.svg",
+      "cards/queen_of_spades.svg",
+      "audio/card-discard.wav",
+      "audio/card-draw.wav",
+      "audio/card-flip.wav",
+      "audio/card-swap.wav",
+      "audio/round-end.wav",
+      "audio/score-reveal.wav",
+      "audio/turn-change.wav",
+      "audio/ui-click.wav"
+    ]
+  },
+  "games": [
+    {
+      "name": "golf",
+      "slug": "tce-golf",
+      "remote": "git@github.com:TheWizardsCode/tce-golf.git",
+      "paths": [
+        "example-games/golf",
+        "tests/golf",
+        "docs/golf"
+      ],
+      "assets": [
+        "audio/golf/",
+        "games/golf/"
+      ]
+    },
+    {
+      "name": "beleaguered-castle",
+      "slug": "tce-beleaguered-castle",
+      "remote": "git@github.com:TheWizardsCode/tce-beleaguered-castle.git",
+      "paths": [
+        "example-games/beleaguered-castle",
+        "tests/beleaguered-castle",
+        "docs/beleaguered-castle"
+      ],
+      "assets": [
+        "audio/beleaguered-castle/",
+        "games/beleaguered-castle/"
+      ]
+    },
+    {
+      "name": "blackjack",
+      "slug": "tce-blackjack",
+      "remote": "git@github.com:TheWizardsCode/tce-blackjack.git",
+      "paths": [
+        "example-games/blackjack",
+        "tests/blackjack",
+        "tests/blackjack.test.ts"
+      ],
+      "assets": [
+        "audio/blackjack/"
+      ]
+    },
+    {
+      "name": "sushi-go",
+      "slug": "tce-sushi-go",
+      "remote": "git@github.com:TheWizardsCode/tce-sushi-go.git",
+      "paths": [
+        "example-games/sushi-go",
+        "tests/sushi-go",
+        "tests/sushi-go-icons.test.ts",
+        "tests/sushi-go-wasabi.test.ts",
+        "docs/sushi-go"
+      ],
+      "assets": [
+        "sushi-go/",
+        "audio/sushi-go/",
+        "games/sushi-go/"
+      ]
+    },
+    {
+      "name": "feudalism",
+      "slug": "tce-feudalism",
+      "remote": "git@github.com:TheWizardsCode/tce-feudalism.git",
+      "paths": [
+        "example-games/feudalism",
+        "tests/feudalism",
+        "docs/feudalism"
+      ],
+      "assets": [
+        "audio/feudalism/",
+        "games/feudalism/"
+      ]
+    },
+    {
+      "name": "lost-cities",
+      "slug": "tce-lost-cities",
+      "remote": "git@github.com:TheWizardsCode/tce-lost-cities.git",
+      "paths": [
+        "example-games/lost-cities",
+        "tests/lost-cities",
+        "docs/lost-cities"
+      ],
+      "assets": [
+        "cards/lost-cities/",
+        "audio/lost-cities/",
+        "games/lost-cities/"
+      ]
+    },
+    {
+      "name": "main-street",
+      "slug": "tce-main-street",
+      "remote": "git@github.com:TheWizardsCode/tce-main-street.git",
+      "paths": [
+        "example-games/main-street",
+        "tests/main-street",
+        "tests/e2e/main-street-tutorial-e2e-part1.browser.test.ts",
+        "tests/e2e/main-street-tutorial-e2e-part2.browser.test.ts",
+        "tests/e2e/main-street-tutorial-e2e-part3.browser.test.ts",
+        "tests/e2e/main-street-tutorial-e2e-part4.browser.test.ts",
+        "tests/e2e/main-street-tutorial-e2e-part5.browser.test.ts",
+        "tests/e2e/main-street-tutorial-e2e-part6.browser.test.ts",
+        "docs/main-street"
+      ],
+      "assets": [
+        "games/main-street/"
+      ]
+    },
+    {
+      "name": "coloretto",
+      "slug": "tce-coloretto",
+      "remote": "git@github.com:TheWizardsCode/tce-coloretto.git",
+      "paths": [
+        "example-games/coloretto",
+        "tests/coloretto",
+        "docs/coloretto"
+      ],
+      "assets": [
+        "audio/coloretto/"
+      ]
+    }
+  ],
+  "sharedAssets": [
+    "CREDITS.md",
+    "cards/alternative/",
+    "audio/default/",
+    "cards/10_of_clubs.svg",
+    "cards/10_of_diamonds.svg",
+    "cards/10_of_hearts.svg",
+    "cards/10_of_spades.svg",
+    "cards/2_of_clubs.svg",
+    "cards/2_of_diamonds.svg",
+    "cards/2_of_hearts.svg",
+    "cards/2_of_spades.svg",
+    "cards/3_of_clubs.svg",
+    "cards/3_of_diamonds.svg",
+    "cards/3_of_hearts.svg",
+    "cards/3_of_spades.svg",
+    "cards/4_of_clubs.svg",
+    "cards/4_of_diamonds.svg",
+    "cards/4_of_hearts.svg",
+    "cards/4_of_spades.svg",
+    "cards/5_of_clubs.svg",
+    "cards/5_of_diamonds.svg",
+    "cards/5_of_hearts.svg",
+    "cards/5_of_spades.svg",
+    "cards/6_of_clubs.svg",
+    "cards/6_of_diamonds.svg",
+    "cards/6_of_hearts.svg",
+    "cards/6_of_spades.svg",
+    "cards/7_of_clubs.svg",
+    "cards/7_of_diamonds.svg",
+    "cards/7_of_hearts.svg",
+    "cards/7_of_spades.svg",
+    "cards/8_of_clubs.svg",
+    "cards/8_of_diamonds.svg",
+    "cards/8_of_hearts.svg",
+    "cards/8_of_spades.svg",
+    "cards/9_of_clubs.svg",
+    "cards/9_of_diamonds.svg",
+    "cards/9_of_hearts.svg",
+    "cards/9_of_spades.svg",
+    "cards/ace_of_clubs.svg",
+    "cards/ace_of_diamonds.svg",
+    "cards/ace_of_hearts.svg",
+    "cards/ace_of_spades.svg",
+    "cards/card_back.svg",
+    "cards/jack_of_clubs.svg",
+    "cards/jack_of_diamonds.svg",
+    "cards/jack_of_hearts.svg",
+    "cards/jack_of_spades.svg",
+    "cards/king_of_clubs.svg",
+    "cards/king_of_diamonds.svg",
+    "cards/king_of_hearts.svg",
+    "cards/king_of_spades.svg",
+    "cards/queen_of_clubs.svg",
+    "cards/queen_of_diamonds.svg",
+    "cards/queen_of_hearts.svg",
+    "cards/queen_of_spades.svg",
+    "audio/card-discard.wav",
+    "audio/card-draw.wav",
+    "audio/card-flip.wav",
+    "audio/card-swap.wav",
+    "audio/round-end.wav",
+    "audio/score-reveal.wav",
+    "audio/turn-change.wav",
+    "audio/ui-click.wav"
+  ],
+  "gameAssets": [
+    {
+      "game": "golf",
+      "assets": [
+        "audio/golf/",
+        "games/golf/"
+      ]
+    },
+    {
+      "game": "beleaguered-castle",
+      "assets": [
+        "audio/beleaguered-castle/",
+        "games/beleaguered-castle/"
+      ]
+    },
+    {
+      "game": "blackjack",
+      "assets": [
+        "audio/blackjack/"
+      ]
+    },
+    {
+      "game": "sushi-go",
+      "assets": [
+        "sushi-go/",
+        "audio/sushi-go/",
+        "games/sushi-go/"
+      ]
+    },
+    {
+      "game": "feudalism",
+      "assets": [
+        "audio/feudalism/",
+        "games/feudalism/"
+      ]
+    },
+    {
+      "game": "lost-cities",
+      "assets": [
+        "cards/lost-cities/",
+        "audio/lost-cities/",
+        "games/lost-cities/"
+      ]
+    },
+    {
+      "game": "main-street",
+      "assets": [
+        "games/main-street/"
+      ]
+    },
+    {
+      "game": "coloretto",
+      "assets": [
+        "audio/coloretto/"
+      ]
+    }
+  ],
+  "assetDecisionTable": [
+    {
+      "asset": "CREDITS.md",
+      "owner": "core",
+      "rationale": "Asset attribution index for the shared deck, default SFX and every game's assets; stays with the shared asset tree and is extended when a game moves out."
+    },
+    {
+      "asset": "cards/",
+      "owner": "core",
+      "rationale": "Canonical 52-card deck (SVGCards Vertical2, Public Domain) plus card_back.svg; shared by Gym, Golf, Blackjack and the Card System tests. Note: the shared include must NOT be a parent of a game-owned card dir; cards/lost-cities/ is owned by lost-cities and is not covered by this entry."
+    },
+    {
+      "asset": "cards/alternative/",
+      "owner": "core",
+      "rationale": "Webisso MIT 'Modern' deck is a core-provided alternative card design, referenced from Card System docs and Gym; not owned by any single game."
+    },
+    {
+      "asset": "cards/lost-cities/",
+      "owner": "lost-cities",
+      "rationale": "61 expedition-specific SVGs generated by scripts/generate-lost-cities-cards.ts; used only by the Lost Cities game."
+    },
+    {
+      "asset": "audio/default/",
+      "owner": "core",
+      "rationale": "Shared default SFX set (card-draw/flip/swap/discard, round-end, score-reveal, turn-change, ui-click, plus game-win, game-lost, illegal-move), referenced via 'assets/audio/default/*' by Gym, Golf, Beleaguered Castle, Lost Cities, Main Street and Coloretto."
+    },
+    {
+      "asset": "audio/",
+      "owner": "core",
+      "rationale": "The handful of legacy root-level shared SFX (card-discard/card-draw/card-flip/card-swap/round-end/score-reveal/turn-change/ui-click.wav) referenced directly via 'assets/audio/<name>.wav' by earlier games. Represented in the layout as explicit file entries under a shared 'audio/' rule so per-game audio subdirectories are excluded by not being listed; see 'audioRootShared'."
+    },
+    {
+      "asset": "audio/beleaguered-castle/",
+      "owner": "beleaguered-castle",
+      "rationale": "14 castle-themed SFX generated by scripts/generate-castle-sfx.mjs for this game only."
+    },
+    {
+      "asset": "audio/blackjack/",
+      "owner": "blackjack",
+      "rationale": "9 blackjack SFX referenced only by the Blackjack scene."
+    },
+    {
+      "asset": "audio/coloretto/",
+      "owner": "coloretto",
+      "rationale": "5 coloretto SFX referenced only by the Coloretto scene."
+    },
+    {
+      "asset": "audio/feudalism/",
+      "owner": "feudalism",
+      "rationale": "6 feudalism SFX referenced only by the Feudalism scene."
+    },
+    {
+      "asset": "audio/golf/",
+      "owner": "golf",
+      "rationale": "10 golf SFX generated by scripts/generate-sfx.mjs for the Golf game."
+    },
+    {
+      "asset": "audio/lost-cities/",
+      "owner": "lost-cities",
+      "rationale": "12 expedition-themed SFX generated by scripts/generate-lost-cities-sfx.mjs for Lost Cities."
+    },
+    {
+      "asset": "audio/sushi-go/",
+      "owner": "sushi-go",
+      "rationale": "6 sushi-go SFX referenced only by the Sushi Go scene."
+    },
+    {
+      "asset": "games/",
+      "owner": "core",
+      "rationale": "Container for per-game output directories (thumbnails and game-scoped sub-trees). Each per-game child moves with its game; a game repo re-creates its own games/<game>/ directory."
+    },
+    {
+      "asset": "games/main-street/",
+      "owner": "main-street",
+      "rationale": "190 files: main-street card SVGs (svg/cards), icons (svg/icons) and game audio; generated by scripts/generate-main-street-card-*.mjs and used only by Main Street."
+    },
+    {
+      "asset": "sushi-go/",
+      "owner": "sushi-go",
+      "rationale": "14 in-house SVG icons plus STYLE.md and preview.html for the Sushi Go game only."
+    }
+  ],
+  "notes": {
+    "historyPreservation": "git-filter-repo --path <path>; preserves commit history for moved files.",
+    "siblingLayout": "Per-game repos and the core repo are checked out as siblings; a game repo pulls the core as a git submodule at ./core.",
+    "assetIncludeSemantics": "git filter-repo directory includes re-include their children and glob '*' crosses '/', so a shared asset is NEVER declared as a broad parent of a game-owned child. Rather than exclude, the layout enumerates the shared files and the disjoint shared subtrees (cards/alternative/, audio/default/) explicitly; game-owned subdirectories are simply absent.",
+    "crossBoundaryFixes": [
+      "example-games/gym/scenes/GymTokenPileViewScene.ts loads 'assets/cards/classic-vector/back.png', which does not exist in public/assets. Retarget the Gym demo to the shared card_back.svg ('assets/cards/card_back.svg') so the Gym depends only on core-owned assets.",
+      "example-games/gym/scenes/GymSvgHelpersScene.ts loads 'assets/sushi-go/icon-tempura.svg' (a game-owned asset). Retarget the Gym demo to a core-owned SVG so the Gym does not depend on a game repo."
+    ],
+    "sharedCardsCount": 53,
+    "sharedRootAudioCount": 8
+  }
+}
