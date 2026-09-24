@@ -67,7 +67,9 @@
       "tests/helpers/waitForScene.ts",
       "tests/fixtures/layouts/README.md",
       "src/vite-env.d.ts",
-      "scripts/contact-sheet.ts"
+      "scripts/contact-sheet.ts",
+      "tests/replay/adapters.test.ts",
+      "tests/helpers/FakeReplayAdapter.ts"
     ],
     "assets": [
       "CREDITS.md",
