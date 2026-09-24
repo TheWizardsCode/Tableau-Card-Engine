@@ -59,7 +59,7 @@ Files (in `audio/`):
   `example-games/main-street/sprites/<Name>_1024_x_1024.png`
 - **License**: CC0 / Public Domain (project-owned, permissive)
 - **Derived (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R)**:
-  `scripts/generate-main-street-card-art.mjs` downscales each 1024×1024 source
+  `example-games/main-street/scripts/generate-main-street-card-art.mjs` downscales each 1024×1024 source
   to 256×256 and re-encodes it as lossy WebP (quality 90), then writes
   `example-games/main-street/card-art-map.json` (base64 data URIs) that both
   the runtime TS generator and the static SVG generator embed inline in the
@@ -90,10 +90,10 @@ Files (in `games/main-street/audio/`):
 
 14 medieval/castle-themed WAV sound effects generated for the Beleaguered Castle solitaire game:
 
-- **Source**: Procedurally generated using `scripts/generate-castle-sfx.mjs` with Tone.js frequency utilities
+- **Source**: Procedurally generated using `example-games/beleaguered-castle/scripts/generate-castle-sfx.mjs` with Tone.js frequency utilities
 - **License**: CC0 / Public Domain (original procedural synthesis, no external samples used)
 - **Format**: 16-bit PCM WAV, 22050 Hz, mono
-- **Generator**: Run `node scripts/generate-castle-sfx.mjs` to regenerate
+- **Generator**: Run `node example-games/beleaguered-castle/scripts/generate-castle-sfx.mjs` to regenerate
 
 Files (in `audio/beleaguered-castle/`):
 - `card-pickup.wav` — stone scrape / heavy lift when picking up a card
@@ -115,10 +115,10 @@ Files (in `audio/beleaguered-castle/`):
 
 61 SVG card images (60 expedition cards + 1 card back) generated for the Lost Cities game:
 
-- **Source**: Procedurally generated using `scripts/generate-lost-cities-cards.ts`
+- **Source**: Procedurally generated using `example-games/lost-cities/scripts/generate-lost-cities-cards.ts`
 - **License**: MIT (original procedural generation, no external assets used)
 - **Format**: SVG, 140x190px
-- **Generator**: Run `npx tsx scripts/generate-lost-cities-cards.ts` to regenerate
+- **Generator**: Run `npx tsx example-games/lost-cities/scripts/generate-lost-cities-cards.ts` to regenerate
 
 Files (in `cards/lost-cities/`):
 - `lc-{color}-{2-10}.svg` — numbered expedition cards (45 total, 9 per color)
@@ -138,10 +138,10 @@ Notes: Icons are vector SVGs authored for the project. See `public/assets/sushi-
 
 12 expedition-themed WAV sound effects generated for the Lost Cities game:
 
-- **Source**: Procedurally generated using `scripts/generate-lost-cities-sfx.mjs` with Tone.js frequency utilities
+- **Source**: Procedurally generated using `example-games/lost-cities/scripts/generate-lost-cities-sfx.mjs` with Tone.js frequency utilities
 - **License**: CC0 / Public Domain (original procedural synthesis, no external samples used)
 - **Format**: 16-bit PCM WAV, 22050 Hz, mono
-- **Generator**: Run `node scripts/generate-lost-cities-sfx.mjs` to regenerate
+- **Generator**: Run `node example-games/lost-cities/scripts/generate-lost-cities-sfx.mjs` to regenerate
 
 Files (in `audio/lost-cities/`):
 - `card-select.wav` — compass click when selecting a card from hand
@@ -161,7 +161,7 @@ Files (in `audio/lost-cities/`):
 
 Shared game-outcome sounds used by games that play a distinct victory/defeat tone on game completion (e.g. Golf's `sfx-game-win` / `sfx-game-lost`):
 
-- **Source**: Copied from the Lost Cities procedural synth set (see below; originally generated with `scripts/generate-lost-cities-sfx.mjs`)
+- **Source**: Copied from the Lost Cities procedural synth set (see below; originally generated with `example-games/lost-cities/scripts/generate-lost-cities-sfx.mjs`)
 - **License**: CC0 / Public Domain (original procedural synthesis, no external samples used)
 - **Format**: 16-bit PCM WAV, 22050 Hz, mono
 

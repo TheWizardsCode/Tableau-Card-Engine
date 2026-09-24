@@ -165,7 +165,7 @@ export default defineConfig(({ mode, command }) => ({
             'tests/sushi-go/SushiGoIcons.browser.test.ts',
             'tests/lost-cities/LostCitiesRoundEnd.browser.test.ts',
             'tests/core-engine/SvgHelpers.browser.test.ts',
-            'tests/ui/HelpPanel.browser.test.ts',
+            'tests/golf/HelpPanel.browser.test.ts',
             'tests/gym/GymSceneSmoke.browser.test.ts',
           ),
           fileParallelism: false,
@@ -191,7 +191,7 @@ export default defineConfig(({ mode, command }) => ({
             // Core + UI
             'tests/core-engine/SvgHelpers.browser.test.ts',
             'tests/core-engine/PhaserEventBridge.browser.test.ts',
-            'tests/ui/HelpPanel.browser.test.ts',
+            'tests/golf/HelpPanel.browser.test.ts',
             'tests/ui/TooltipManager.browser.test.ts',
             'tests/ui/SettingsPanelTooltips.browser.test.ts',
             // Main Street key E2E

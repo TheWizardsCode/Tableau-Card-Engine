@@ -184,7 +184,40 @@ Both are recorded in `repo-layout.json → notes.crossBoundaryFixes` so the F2
 
 ---
 
-## 4. Follow-on work (not in this feature)
+## 4. Core/game coupling resolution (F2)
+
+Making the core repo build standalone required removing every dependency from
+core code on game code. The couplings found and how each was resolved:
+
+| Coupling | Resolution |
+|---|---|
+| `src/ui/debug/{MarketCardCheat,StaffApplicantCheat}Overlay.ts` imported Main Street | Moved to `example-games/main-street/debug/` |
+| `scripts/balance/**` + `tests/balance/**` imported Main Street | Moved to `example-games/main-street/scripts/balance/` and `tests/main-street/balance/` |
+| Game-specific `scripts/*` (card generators, monte-carlo, playtest, save-load-smoke, transcript generators, SFX generators) | Moved to `example-games/<game>/scripts/` |
+| `scripts/adapters/*ReplayAdapter.ts` (per-game) | Moved to `example-games/<game>/scripts/adapters/`; the framework (`AdapterRegistry`, `ReplayAdapter`) stays in core |
+| `scripts/adapters/index.ts` registered all adapters | Now a pure core module; `registerConfiguredAdapters()` loads adapters named by the active preset's `adapterPath` |
+| `example-games/gym/GymCardIndex{Scene,}.ts` imported Main Street card data | Moved to `example-games/main-street/gym/` (it browses the Main Street card pool, not a core feature) |
+| Core tests importing game fixtures (`I18n`, `LegalityResult`, `EconomyLedger`, `screen-layout-*`, `HelpPanel`, `ListenerLeaks`, undo/redo, hud-layer-contract) | Moved to their owning game's test tree |
+| `tests/replay/adapters.test.ts` used real game adapters | Split: framework tests stay in core with `tests/helpers/FakeReplayAdapter.ts`; per-game adapter tests moved to golf and beleaguered-castle |
+| `tests/replay/replay.test.ts` drove golf replay | Moved to `tests/golf/` |
+| Per-game transcript/layout fixtures under `tests/fixtures/` | Moved to `example-games/<game>/tests/fixtures/` |
+| `vite.config.ts` smoke/dev lists hardcoded game test paths | Filtered through `selectedGameIds()` so a core-only checkout runs only core + Gym |
+| `tests/core-engine/no-runtime-synthesis.test.ts` flagged moved SFX generators | Walk now skips any `scripts/` directory (build-time tooling is not runtime code) |
+| Launcher/agent-infra tests (`.pi/` tracking, Main Street asset-deletion guard) | Kept out of core; they guard the launcher repo |
+
+**Core-owned and unchanged:** `src/balance-cards/**` (the algorithm library itself
+is game-agnostic — only the `scripts/balance/**` consumers were Main Street
+coupled) and the `scripts/adapters/{AdapterRegistry,ReplayAdapter}.ts`
+framework.
+
+**Verified standalone core** (extracted via `scripts/extract-repos.sh
+--target core`): `tsc --noEmit` clean, `npm run build` and `npm run
+build:electron` succeed (283 modules, core-only), the unit suite passes (114
+files / 1840 tests) and the Gym smoke profile boots (2 files / 20 tests).
+
+---
+
+## 5. Follow-on work (not in this feature)
 
 - **F2** creates the core-engine repository from this script's `core` target.
 - **F3** adds config-driven game discovery: a Vite plugin plus per-game

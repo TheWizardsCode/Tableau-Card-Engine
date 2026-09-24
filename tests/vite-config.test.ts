@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import viteConfig from '../vite.config';
+
+const REPO_ROOT = path.resolve(__dirname, '..');
 
 type PluginLike = { name: string };
 
@@ -128,7 +132,6 @@ describe('smoke/dev test lists follow the selected preset', () => {
       expect(smoke).not.toContain('tests/main-street/MainStreetScene.browser.test.ts');
       // Core-owned suites stay.
       expect(smoke).toContain('tests/core-engine/SvgHelpers.browser.test.ts');
-      expect(smoke).toContain('tests/ui/HelpPanel.browser.test.ts');
       expect(smoke).toContain('tests/gym/GymSceneSmoke.browser.test.ts');
     } finally {
       if (original === undefined) delete process.env.GAMES_CONFIG;
@@ -145,6 +148,27 @@ describe('smoke/dev test lists follow the selected preset', () => {
       expect(dev).toContain('tests/main-street/MainStreetScene.browser.test.ts');
       expect(dev).not.toContain('tests/coloretto/ColorettoScene.browser.test.ts');
       expect(dev).not.toContain('tests/sushi-go/SushiGoIcons.browser.test.ts');
+    } finally {
+      if (original === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = original;
+    }
+  });
+
+  it('only references test files that exist (no silent coverage loss)', () => {
+    const original = process.env.GAMES_CONFIG;
+    try {
+      // Select everything so the full explicit lists are produced; a stale
+      // path is silently ignored by Vitest, so guard it here.
+      process.env.GAMES_CONFIG = 'all';
+      const config = viteConfig({ command: 'build', mode: 'production' }) as unknown;
+      for (const name of ['smoke', 'dev']) {
+        for (const file of includeFor(config, name)) {
+          expect(
+            fs.existsSync(path.join(REPO_ROOT, file)),
+            `${name} references missing test file: ${file}`,
+          ).toBe(true);
+        }
+      }
     } finally {
       if (original === undefined) delete process.env.GAMES_CONFIG;
       else process.env.GAMES_CONFIG = original;
