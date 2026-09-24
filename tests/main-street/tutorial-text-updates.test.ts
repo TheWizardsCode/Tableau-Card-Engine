@@ -154,10 +154,14 @@ describe('Tutorial text updates (26-step two-turn restructure)', () => {
     });
   });
 
-  describe('T11 End this turn (AC: wait for a more opportune moment)', () => {
-    it('says we could play the card now but wait for a more opportune moment', () => {
+  describe('T11 End this turn (AC: no action points; cultural focused businesses first)', () => {
+    it('explains the festival cannot start now because no action points remain', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;
-      expect(body).toMatch(/(wait|hold).*(opportune|moment)/i);
+      expect(body.toLowerCase()).toMatch(/action points/);
+    });
+    it('says to maximise impact by opening cultural focused businesses first', () => {
+      const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;
+      expect(body.toLowerCase()).toMatch(/cultural focused businesses/);
     });
     it('resolves {cardName} from card data (no raw placeholder tokens)', () => {
       const body = resolveTutorialStepText(UNIFIED_TUTORIAL_STEPS.find(s => s.id === 'T11')!).body;

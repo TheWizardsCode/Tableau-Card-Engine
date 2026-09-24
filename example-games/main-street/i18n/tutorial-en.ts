@@ -208,10 +208,10 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // ── T10: End this turn (week 2 → week 3) ───────────────────
   [tutorialKey('T11', 'title')]:
     'End this turn',
-  // {cardName} resolved from card-data.csv (evt-festival) at render time.
-  // Emphasizes deliberately holding the festival for a more opportune moment (CG-0MSOKG89N001LDT4).
+  // Explains the festival is held because no action points remain, and that
+  // cultural focused businesses should be opened first to strengthen its impact (CG-0MUA2TPL9001FYYH).
   [tutorialKey('T11', 'body')]:
-    'We could play the **{cardName}** now, but we\'re going to wait for a more opportune moment. End this turn for now.',
+    'We can\'t start the festival now because we have no action points left. Besides, we need to maximize the impact it will have by opening cultural focused businesses first. End this turn for now.',
 
   // ── T11: Move the Bookshop to hand (week 3, split 1 of 2) ──
   [tutorialKey('T12', 'title')]:
