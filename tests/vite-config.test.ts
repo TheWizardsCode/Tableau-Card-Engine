@@ -183,3 +183,22 @@ describe('smoke/dev test lists follow the selected preset', () => {
     }
   });
 });
+
+// ── Build base-path assertions (F7 / CG-0MTRO7ECL006ID7J) ─────────────────
+
+describe('build base path per mode (F7)', () => {
+  it('production base is the GitHub Pages sub-path /Tableau-Card-Engine/', () => {
+    const config = viteConfig({ command: 'build', mode: 'production' });
+    expect(config.base).toBe('/Tableau-Card-Engine/');
+  });
+
+  it('electron base is relative (./) for file:// loading', () => {
+    const config = viteConfig({ command: 'build', mode: 'electron' });
+    expect(config.base).toBe('./');
+  });
+
+  it('dev base is / so localhost:3000 works directly', () => {
+    const config = viteConfig({ command: 'serve', mode: 'development' });
+    expect(config.base).toBe('/');
+  });
+});
