@@ -16,7 +16,7 @@
  */
 
 import { computeMainStreetLayoutWithSll } from '../../../example-games/main-street/scenes/MainStreetLayoutAdapter';
-import { BASE_HUD_Y, BASE_MARKET_CARD_H, BASE_MARKET_ROW_GAP } from '../../../example-games/main-street/scenes/MainStreetConstants';
+import { BASE_MARKET_CARD_H, BASE_MARKET_ROW_GAP, HUD_BAR_HEIGHT_PX } from '../../../example-games/main-street/scenes/MainStreetConstants';
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -50,10 +50,8 @@ export interface MainStreetLayoutGeometry {
 
 // ── Constants (used by the adapter; imported from constants) ──────
 
-/** HUD strip height (legacy constant from renderer; shared with tutorial math). */
-const HUD_STRIP_H = 28;
-/** Favour button width (from the layout adapter). */
-const FAVOUR_BUTTON_W = 110;
+/** HUD strip height (shared with the renderer). */
+const HUD_STRIP_H = HUD_BAR_HEIGHT_PX;
 
 // ── Private helpers ──────────────────────────────────────────────
 
@@ -76,60 +74,44 @@ function deriveMarketBox(layout: ReturnType<typeof computeMainStreetLayoutWithSl
 }
 
 /**
- * Derive the HUD strip geometry.
+ * Derive the HUD strip geometry (market-aligned, CG-0MUFAIS8W0011LGQ).
  *
- * **Current (pre-refactor):** the renderer draws a centred half-width strip
- * (`gameW / 4, hudY, gameW * 0.5, 28`).  This helper expresses the **target**
- * contract — market-aligned edges — so the test harness drives the
- * geometry source-of-truth child to green.
- *
- * Until child 2 lands, this returns the market-aligned target rect
- * (`hudLeft === marketLeft`, `hudRight === marketRight`).
+ * `y` is the strip's TOP edge: the 28px strip is centred on `hudY`, so it
+ * spans `[hudY - 14, hudY + 14]`.
  */
 function deriveHudStrip(layout: ReturnType<typeof computeMainStreetLayoutWithSll>): Rect {
-  // The adapter exposes `hudLeft`/`hudRight`/`hudWidth`, aligned to the market
-  // box edges by contract (CG-0MUFAIS8W0011LGQ).
   return {
     x: layout.hudLeft,
-    y: BASE_HUD_Y,
+    y: layout.hudY - HUD_STRIP_H / 2,
     width: layout.hudWidth,
     height: HUD_STRIP_H,
   };
 }
 
 /**
- * Derive the Community Favour buttons in their **target** HUD-strip position.
+ * Derive the Community Favour buttons in their HUD-strip position
+ * (CG-0MUFAITED0088AGN). Both buttons sit inside the HUD strip between the
+ * Coins and Reputation elements, ordered left-to-right `[rep→coins][coins→rep]`.
  *
- * The target layout (AC3) places both buttons inside the HUD strip between
- * the Coins and Reputation elements, ordered left-to-right
- * `[rep→coins][coins→rep]`.
- *
- * **Pre-refactor note:** the current renderer places these buttons in the
- * bottom action bar (`y = actionY + 4`).  This helper returns the target
- * HUD-strip y-coordinate so the harness tests are green against the future
- * state.
+ * All values come from the adapter (`favourRepToCoinsX` / `favourCoinsToRepX` /
+ * `favourButtonW` / `favourButtonH`) — no duplicated pixel maths.
  */
 function deriveFavourButtons(
   layout: ReturnType<typeof computeMainStreetLayoutWithSll>,
 ): { coinsToRep: Rect; repToCoins: Rect } {
-  const hudStripY = BASE_HUD_Y + 2;
-  const buttonH = 24; // fits within the 28px strip
-  const marketLeft = layout.marketLeft;
-  // Position the pair adjacent, starting near the market-box left edge
-  // (where the Coins element is left-aligned).
-  const coinsToRepX = marketLeft + 120; // to the right of the Coins label
+  const y = layout.hudY - layout.favourButtonH / 2;
   return {
     repToCoins: {
-      x: coinsToRepX,
-      y: hudStripY,
-      width: FAVOUR_BUTTON_W,
-      height: buttonH,
+      x: layout.favourRepToCoinsX,
+      y,
+      width: layout.favourButtonW,
+      height: layout.favourButtonH,
     },
     coinsToRep: {
-      x: coinsToRepX + FAVOUR_BUTTON_W,
-      y: hudStripY,
-      width: FAVOUR_BUTTON_W,
-      height: buttonH,
+      x: layout.favourCoinsToRepX,
+      y,
+      width: layout.favourButtonW,
+      height: layout.favourButtonH,
     },
   };
 }

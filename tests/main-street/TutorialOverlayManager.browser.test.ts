@@ -148,7 +148,12 @@ describe('TutorialOverlayManager highlight zones', () => {
   // ── AC 1: HUD highlight (T24, Success and Failure) ─────────
 
   it('HUD highlight (T24) starts at hudY and covers the HUD strip', async () => {
-    const layout = scene.layout as { hudY: number; gameW: number } | undefined;
+    const layout = scene.layout as {
+      hudY: number;
+      gameW: number;
+      hudLeft: number;
+      hudWidth: number;
+    } | undefined;
     expect(layout).toBeTruthy();
     expect(layout!.hudY).toBeGreaterThan(0);
 
@@ -163,9 +168,10 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.y).toBeLessThanOrEqual(hudY + 2);
     expect(bounds!.y).toBeGreaterThanOrEqual(hudY - 16);
 
-    // HUD strip is now 50% screen width (centered) after the layout refinement
-    expect(bounds!.w).toBeLessThan(layout!.gameW * 0.55);
-    expect(bounds!.w).toBeGreaterThan(layout!.gameW * 0.45);
+    // HUD strip is now market-aligned (CG-0MUFAISSZ002TE1B): the highlight
+    // covers [hudLeft, hudLeft + hudWidth] = 920px wide at 1280×720.
+    expect(bounds!.x).toBe(layout!.hudLeft);
+    expect(bounds!.w).toBe(layout!.hudWidth);
 
     // Height should be reasonable for a single HUD row (28px strip + padding = ~34px)
     expect(bounds!.h).toBeLessThan(60);
@@ -401,10 +407,15 @@ describe('TutorialOverlayManager highlight zones', () => {
     expect(bounds!.y).toBeGreaterThanOrEqual(layout!.marketTop - 10);
   });
 
-  // ── AC 11b: Community Favour action-buttons highlight (T15) ──
+  // ── AC 11b: Community Favour button highlight (T15) ──
 
-  it('actionButtons highlight (T15) covers the action bar (Community Favour)', async () => {
-    const layout = scene.layout as { actionY: number; actionButtonH: number; gameW: number } | undefined;
+  it('actionButtons highlight (T15) covers the relocated Community Favour buttons', async () => {
+    const layout = scene.layout as {
+      hudY: number;
+      favourBandLeft: number;
+      favourBandRight: number;
+      favourButtonH: number;
+    } | undefined;
     expect(layout).toBeTruthy();
 
     const highlight = showStepAndGetHighlight('T15'); // T15 = action, actionButtons zone
@@ -412,10 +423,13 @@ describe('TutorialOverlayManager highlight zones', () => {
 
     const bounds = getHighlightBounds(highlight!);
     expect(bounds).toBeTruthy();
-    // The action bar band sits below the street; the highlight should cover it.
-    const minY = layout!.actionY;
-    expect(bounds!.y).toBeGreaterThanOrEqual(minY - 10);
-    expect(bounds!.h).toBeGreaterThanOrEqual(layout!.actionButtonH);
+    // The favour buttons now sit in the HUD strip (CG-0MUFAITED0088AGN): the
+    // highlight covers the reserved band [favourBandLeft, favourBandRight] at
+    // the HUD band vertical position.
+    expect(bounds!.x).toBe(layout!.favourBandLeft);
+    expect(bounds!.w).toBe(layout!.favourBandRight - layout!.favourBandLeft);
+    expect(bounds!.y).toBeLessThanOrEqual(layout!.hudY);
+    expect(bounds!.h).toBeGreaterThanOrEqual(layout!.favourButtonH);
   });
 
   // ── AC 11c: Move the Library dev row highlight (T19) ───────

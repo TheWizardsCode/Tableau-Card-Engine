@@ -134,9 +134,14 @@ function computeTargetRect(
 
   switch (zone) {
     case 'hud': {
-      // HUD strip: 50% screen width centred at (gameW/2, hudY), 28px tall
-      const stripW = Math.round(gameW * 0.5);
-      return { x: Math.round((gameW - stripW) / 2), y: layout.hudY - 14, w: stripW, h: 28 };
+      // HUD strip: market-aligned [hudLeft, hudRight], 28px tall, centred on hudY
+      // (CG-0MUFAISSZ002TE1B).
+      return {
+        x: layout.hudLeft,
+        y: layout.hudY - 14,
+        w: layout.hudWidth,
+        h: 28,
+      };
     }
     case 'developmentRow': {
       // Dev row: market background strip (bgLeft=20 → logX-20), top at marketTop + 6
@@ -221,17 +226,13 @@ function computeTargetRect(
       };
     }
     case 'actionButtons': {
-      // Community Favour action-bar band (CG-0MSTOATDQ005XDET): the two
-      // favour buttons span the SLL zone in the main-street-tutorial layout
-      // (x 0.365625..0.639063 at y 0.905556..0.952778 → px at 1280×720).
-      // Mirror the tutorial layout JSON used by resolveZoneToAnchor.
-      const x = Math.round(0.365625 * gameW);
-      const w = Math.round(0.273438 * gameW);
+      // Community Favour button band inside the HUD strip (CG-0MUFAITED0088AGN):
+      // the two buttons span [favourBandLeft, favourBandRight] at the HUD band y.
       return {
-        x,
-        y: layout.actionY + 4,
-        w,
-        h: layout.actionButtonH,
+        x: layout.favourBandLeft,
+        y: layout.hudY - layout.favourButtonH / 2,
+        w: layout.favourBandRight - layout.favourBandLeft,
+        h: layout.favourButtonH,
       };
     }
     default:

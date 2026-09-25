@@ -93,9 +93,11 @@ describe('HUD strip alignment to market box (AC2 target contract)', () => {
     expect(g.hudStrip.height).toBe(28);
   });
 
-  it('HUD strip y starts at BASE_HUD_Y', () => {
+  it('HUD strip y is the top edge of the hudY-centred strip', () => {
     const g = geom();
-    expect(g.hudStrip.y).toBe(BASE_HUD_Y);
+    // 28px strip centred on BASE_HUD_Y → top edge BASE_HUD_Y - 14.
+    expect(g.hudStrip.y).toBe(BASE_HUD_Y - 14);
+    expect(g.hudStrip.y + g.hudStrip.height).toBe(BASE_HUD_Y + 14);
   });
 });
 
@@ -140,13 +142,12 @@ describe('Favour button geometry', () => {
     }
   });
 
-  it('favour buttons sit in the HUD strip band (y ≈ 3..10)', () => {
+  it('favour buttons are vertically inside the HUD strip', () => {
     const g = geom();
-    // Both buttons should be near the top of the 28px strip.
-    expect(g.favourRepToCoinsButton.y).toBeGreaterThanOrEqual(BASE_HUD_Y);
-    expect(g.favourRepToCoinsButton.y).toBeLessThanOrEqual(BASE_HUD_Y + 10);
-    expect(g.favourCoinsToRepButton.y).toBeGreaterThanOrEqual(BASE_HUD_Y);
-    expect(g.favourCoinsToRepButton.y).toBeLessThanOrEqual(BASE_HUD_Y + 10);
+    for (const btn of [g.favourRepToCoinsButton, g.favourCoinsToRepButton]) {
+      expect(btn.y).toBeGreaterThanOrEqual(g.hudStrip.y);
+      expect(btn.y + btn.height).toBeLessThanOrEqual(g.hudStrip.y + g.hudStrip.height);
+    }
   });
 
   it('favour buttons share the same width', () => {

@@ -96,7 +96,7 @@ export type TutorialHighlightZone =
   | 'helpButton'
   | 'completionModal'
   | 'hand'             // hand area (Your Hand / Triggering Events)
-  | 'actionButtons'    // market-phase action bar (End Turn / Hint / Community Favour buttons)
+  | 'actionButtons'    // Community Favour button band (relocated into the HUD strip, CG-0MUFAITED0088AGN)
   | 'laundromatCard'   // card-level: Laundromat on the market row (T3)
   | 'festivalCard';    // card-level: Local Festival on the market row (T9)
 

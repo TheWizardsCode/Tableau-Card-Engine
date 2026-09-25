@@ -27,11 +27,11 @@ import {
 import baseLayout from '../../example-games/main-street/layouts/main-street.layout.json';
 import tutorialLayout from '../../example-games/main-street/layouts/main-street-tutorial.layout.json';
 import {
-  BASE_HUD_Y,
   BASE_MARKET_CARD_H,
   BASE_MARKET_ROW_GAP,
 } from '../../example-games/main-street/scenes/MainStreetConstants';
 import { computeMainStreetLayoutWithSll } from '../../example-games/main-street/scenes/MainStreetLayoutAdapter';
+import { computeMainStreetLayoutGeometry } from './helpers/mainStreetLayoutGeometry';
 
 const VIEWPORT: LayoutViewport = { width: 1280, height: 720 };
 
@@ -45,9 +45,8 @@ const VIEWPORT: LayoutViewport = { width: 1280, height: 720 };
  */
 function computeExpectedZoneBounds(
   zone: string,
-  viewport: LayoutViewport = VIEWPORT,
+  _viewport: LayoutViewport = VIEWPORT,
 ): { x: number; y: number; w: number; h: number } | null {
-  const gameW = viewport.width;
   const layout = computeMainStreetLayoutWithSll();
   const marketRowH = BASE_MARKET_CARD_H + 14; // 94
 
@@ -58,9 +57,23 @@ function computeExpectedZoneBounds(
   const bgRight = logX - 20;
 
   switch (zone) {
-    case 'hud':
-      // HUD strip: 50% screen width centered, 28px tall, center at hudY=50
-      return { x: Math.round(gameW * 0.25), y: BASE_HUD_Y - 14, w: Math.round(gameW * 0.5), h: 28 };
+    case 'hud': {
+      // HUD strip: market-aligned [hudLeft, hudRight], 28px tall, centred on hudY.
+      const g = computeMainStreetLayoutGeometry();
+      return { x: g.hudStrip.x, y: g.hudStrip.y, w: g.hudStrip.width, h: g.hudStrip.height };
+    }
+    case 'actionButtons': {
+      // Community Favour button band inside the HUD strip (CG-0MUFAITED0088AGN).
+      const g = computeMainStreetLayoutGeometry();
+      const left = g.favourRepToCoinsButton.x;
+      const right = g.favourCoinsToRepButton.x + g.favourCoinsToRepButton.width;
+      return {
+        x: left,
+        y: g.favourRepToCoinsButton.y,
+        w: right - left,
+        h: g.favourRepToCoinsButton.height,
+      };
+    }
     case 'marketBusinessRow': {
       // Market background box: bgLeft=20, bgRight=logX-20, covers both rows
       const bothRowsH = 2 * marketRowH + BASE_MARKET_ROW_GAP + 20;
@@ -588,10 +601,11 @@ describe('Tutorial layout resolution', () => {
       expect(resolved.viewport.pixelWidth).toBe(2560);
       expect(resolved.viewport.pixelHeight).toBe(1440);
 
-      // HUD is 50% centered; at 2x DPR the x is scaled from 0.25*1280*2=640
-      expect(resolved.zones.hud.rect.x).toBe(640);
+      // HUD is market-aligned; at 2x DPR x is scaled from 0.015625*1280*2=40,
+      // width from 0.71875*1280*2=1840.
+      expect(resolved.zones.hud.rect.x).toBe(40);
       expect(resolved.zones.hud.rect.y).toBe(72);
-      expect(resolved.zones.hud.rect.width).toBe(1280);
+      expect(resolved.zones.hud.rect.width).toBe(1840);
       expect(resolved.zones.hud.rect.height).toBeCloseTo(56, 0);
     });
 
@@ -604,10 +618,10 @@ describe('Tutorial layout resolution', () => {
         1,
       );
 
-      // HUD is 50% centered; at 800px: x=0.25*800=200, w=0.5*800=400
-      expect(resolved.zones.hud.rect.x).toBe(200);
+      // HUD is market-aligned; at 800px: x=0.015625*800=12.5, w=0.71875*800=575
+      expect(resolved.zones.hud.rect.x).toBeCloseTo(12.5, 1);
       expect(resolved.zones.hud.rect.y).toBeCloseTo(30, 0);
-      expect(resolved.zones.hud.rect.width).toBe(400);
+      expect(resolved.zones.hud.rect.width).toBeCloseTo(575, 0);
       expect(resolved.zones.hud.rect.height).toBeCloseTo(23.33, 0);
     });
   });

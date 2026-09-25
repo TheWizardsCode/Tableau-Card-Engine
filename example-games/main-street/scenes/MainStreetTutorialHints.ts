@@ -59,7 +59,10 @@ import { STANDARD_TUTORIAL_SCENARIO } from '../TutorialScenario';
  * each tutorial zone rect resolves to the ACTUAL rendered element rect as
  * computed by MainStreetLayoutAdapter/`computeMainStreetLayoutWithSll()` and
  * MainStreetRenderer (source of truth). At the canonical 1280×720 viewport:
- *   - hud            (320, 36, 640, 28)  — strip centred at (gameW/2, hudY)
+ *   - hud            (20, 36, 920, 28)   — market-aligned strip (hudLeft..hudRight,
+ *                                            CG-0MUFAISSZ002TE1B)
+ *   - actionButtons  (140, 38, 220, 24)  — Community Favour button band inside
+ *                                            the HUD strip (CG-0MUFAITED0088AGN)
  *   - developmentRow (20, 96, 920, 94)   — marketTop + 6 (single market row)
  *   - investmentsRow — ALIAS of developmentRow: the two-row market was merged
  *                      into one row (CG-0MSTOATDT009BRX2), so upgrade/event
