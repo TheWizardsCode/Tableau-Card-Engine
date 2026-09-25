@@ -14,6 +14,8 @@ import {
   buildReputationTooltip,
   buildScoreTooltip,
   buildActionTooltip,
+  buildCoinsToRepTooltip,
+  buildRepToCoinsTooltip,
   findNextLockedTier,
   HUD_TOOLTIP_I18N_KEYS,
   HUD_ARIA_I18N_KEYS,
@@ -76,6 +78,13 @@ describe('HUD tooltip i18n keys', () => {
     expect(HUD_ARIA_LABELS.score).toBe(HUD_ARIA_STRINGS.score);
   });
 
+  it('has non-empty favour ARIA labels (CG-0MUFAITED0088AGN)', () => {
+    expect(HUD_ARIA_LABELS.favourCoinsToRep.length).toBeGreaterThan(0);
+    expect(HUD_ARIA_LABELS.favourRepToCoins.length).toBeGreaterThan(0);
+    expect(HUD_ARIA_LABELS.favourCoinsToRep).toBe(HUD_ARIA_STRINGS.favourCoinsToRep);
+    expect(HUD_ARIA_LABELS.favourRepToCoins).toBe(HUD_ARIA_STRINGS.favourRepToCoins);
+  });
+
   it('tooltip builders use i18n — overriding locale changes content', () => {
     const state = setupMainStreetGame({ seed: 'test-i18n-override' });
 
@@ -93,6 +102,76 @@ describe('HUD tooltip i18n keys', () => {
     // Reset to English for other tests
     resetI18n();
     // Re-register en bundle since resetI18n cleared everything
+    const enBundle: Record<string, string> = {};
+    for (const [k, v] of Object.entries(HUD_TOOLTIP_STRINGS)) {
+      enBundle[HUD_TOOLTIP_I18N_KEYS[k as keyof typeof HUD_TOOLTIP_I18N_KEYS]] = v;
+    }
+    for (const [k, v] of Object.entries(HUD_ARIA_STRINGS)) {
+      enBundle[HUD_ARIA_I18N_KEYS[k as keyof typeof HUD_ARIA_I18N_KEYS]] = v;
+    }
+    registerLocale('en', enBundle);
+    setLocale('en');
+  });
+});
+
+// ── Unit tests: Community Favour tooltips (CG-0MUFAITED0088AGN) ──
+
+describe('Community Favour tooltips', () => {
+  it('coins→rep tooltip states the exact rate and the once-per-turn limit', () => {
+    const state = setupMainStreetGame({ seed: 'favour-coins-to-rep' });
+    state.config = { ...state.config, favourCoinsToRepCost: 2 };
+    state.favourUsedThisTurn = false;
+    state.resourceBank.coins = 9999;
+
+    const tooltip = buildCoinsToRepTooltip(state);
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.favourCoinsToRepTitle);
+    expect(tooltip).toContain('2 coins');
+    expect(tooltip).toContain('1 reputation');
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.favourGate);
+    // Not used, affordable → no status suffix.
+    expect(tooltip).not.toContain(HUD_TOOLTIP_STRINGS.favourUsedThisTurn);
+  });
+
+  it('rep→coins tooltip states the exact rate and the once-per-turn limit', () => {
+    const state = setupMainStreetGame({ seed: 'favour-rep-to-coins' });
+    state.config = { ...state.config, favourRepToCoinsRepCost: 2, favourRepToCoinsCoinGain: 3 };
+    state.favourUsedThisTurn = false;
+    state.resourceBank.reputation = 9999;
+
+    const tooltip = buildRepToCoinsTooltip(state);
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.favourRepToCoinsTitle);
+    expect(tooltip).toContain('2 reputation');
+    expect(tooltip).toContain('3 coins');
+    expect(tooltip).toContain(HUD_TOOLTIP_STRINGS.favourGate);
+  });
+
+  it('appends the used-this-turn status when the gate is spent', () => {
+    const state = setupMainStreetGame({ seed: 'favour-used' });
+    state.favourUsedThisTurn = true;
+    expect(buildCoinsToRepTooltip(state)).toContain(HUD_TOOLTIP_STRINGS.favourUsedThisTurn);
+    expect(buildRepToCoinsTooltip(state)).toContain(HUD_TOOLTIP_STRINGS.favourUsedThisTurn);
+  });
+
+  it('appends the insufficient-resource status when unaffordable', () => {
+    const state = setupMainStreetGame({ seed: 'favour-poor' });
+    state.favourUsedThisTurn = false;
+    state.resourceBank.coins = 0;
+
+    const tooltip = buildCoinsToRepTooltip(state);
+    expect(tooltip).toContain('coins');
+    expect(tooltip).toContain('need');
+  });
+
+  it('i18n override changes the favour tooltip copy', () => {
+    const state = setupMainStreetGame({ seed: 'favour-i18n' });
+    registerLocale('de', {
+      [HUD_TOOLTIP_I18N_KEYS.favourGate]: 'Einmal pro Runde.',
+    });
+    setLocale('de');
+
+    expect(buildCoinsToRepTooltip(state)).toContain('Einmal pro Runde.');
+
+    resetI18n();
     const enBundle: Record<string, string> = {};
     for (const [k, v] of Object.entries(HUD_TOOLTIP_STRINGS)) {
       enBundle[HUD_TOOLTIP_I18N_KEYS[k as keyof typeof HUD_TOOLTIP_I18N_KEYS]] = v;

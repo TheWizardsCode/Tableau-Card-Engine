@@ -19,7 +19,7 @@ import type { SpecializationSkill } from '../MainStreetStaffSkills';
 import { STAFF_SKILL_CHIP_COLORS, getSkill, hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import type { PendingApplicant } from '../MainStreetState';
 import { BOX_STROKE, CHALLENGE_LINE_H, CHALLENGE_PAD, CHALLENGE_TITLE_H, HUD_BAR_HEIGHT_PX, LOG_COLORS, LOG_FONT_SIZE, LOG_LINE_H, LOG_PAD, LOG_TITLE_H } from './MainStreetConstants';
-import { HUD_ARIA_LABELS, buildActionTooltip, buildCoinsTooltip, buildReputationTooltip, buildScoreTooltip } from './MainStreetHudTooltips';
+import { HUD_ARIA_LABELS, buildActionTooltip, buildCoinsToRepTooltip, buildCoinsTooltip, buildRepToCoinsTooltip, buildReputationTooltip, buildScoreTooltip } from './MainStreetHudTooltips';
 import type { MainStreetRendererContext } from './MainStreetRendererContext';
 import { buildUpgradeOverlaySpec } from './UpgradeOverlaySpec';
 import type { UpgradeOverlaySpec } from './UpgradeOverlaySpec';
@@ -79,6 +79,84 @@ export function refreshAllExceptStreet(renderer: MainStreetRendererContext): voi
     renderer.refreshLog();
     s.updateSvgDebugOverlay();
   
+}
+
+/**
+ * Render the two Community Favour buttons inside the widened HUD strip
+ * (CG-0MUFAITED0088AGN).
+ *
+ * The buttons live in `hudContainer` (so they render above the strip), are
+ * `markHudTransient`-tagged (so `clearTransientHud` removes them on refresh),
+ * and carry i18n tooltips + aria labels. They render only in the market /
+ * applicant phases — the exchange is only legal in `MarketPhase`.
+ */
+function renderFavourButtons(s: MainStreetRendererContext['scene']): void {
+  if (s.uiPhase !== 'market' && s.uiPhase !== 'applicant') return;
+
+  const {
+    favourCoinsToRepX, favourRepToCoinsX, favourButtonW, favourButtonH, hudY,
+  } = s.layout;
+  const favourY = hudY - favourButtonH / 2;
+
+  const favourGone = s.state.favourUsedThisTurn;
+  const coinsToRepCost = s.state.config.favourCoinsToRepCost;
+  const repToCoinsRepCost = s.state.config.favourRepToCoinsRepCost;
+  const repToCoinsCoinGain = s.state.config.favourRepToCoinsCoinGain;
+  const coinsToRepDisabled = favourGone || s.state.resourceBank.coins < coinsToRepCost;
+  const repToCoinsDisabled = favourGone || s.state.resourceBank.reputation < repToCoinsRepCost;
+
+  const coinsToRepBtn = markHudTransient(createActionButton(
+    s, favourCoinsToRepX, favourY, favourButtonW,
+    `${coinsToRepCost}c → 1r`,
+    () => s.onCommunityFavourClick('coins-to-rep'),
+    {
+      height: favourButtonH,
+      fillColor: coinsToRepDisabled ? 0x2a2a2a : 0x442244,
+      fillAlpha: 0.8,
+      strokeColor: coinsToRepDisabled ? 0x444444 : 0xaa44aa,
+      textColor: coinsToRepDisabled ? '#666666' : '#ff88ff',
+      fontSize: '13px',
+      disabled: coinsToRepDisabled,
+    },
+  ));
+  s.hudContainer.add(coinsToRepBtn);
+
+  const repToCoinsBtn = markHudTransient(createActionButton(
+    s, favourRepToCoinsX, favourY, favourButtonW,
+    `${repToCoinsRepCost}r → ${repToCoinsCoinGain}c`,
+    () => s.onCommunityFavourClick('rep-to-coins'),
+    {
+      height: favourButtonH,
+      fillColor: repToCoinsDisabled ? 0x2a2a2a : 0x224422,
+      fillAlpha: 0.8,
+      strokeColor: repToCoinsDisabled ? 0x444444 : 0x44aa44,
+      textColor: repToCoinsDisabled ? '#666666' : '#88ff88',
+      fontSize: '13px',
+      disabled: repToCoinsDisabled,
+    },
+  ));
+  s.hudContainer.add(repToCoinsBtn);
+
+  if (!s.replayMode) {
+    // Attach hover tooltips to the already-interactive button backgrounds
+    // (`list[0]` is the background rectangle created by createActionButton).
+    // `tapToggle: false` keeps the button's click action independent of the
+    // tooltip; `alreadyInteractive: true` preserves the existing hit area.
+    attachHudTooltipZone(
+      s,
+      coinsToRepBtn.list[0] as Phaser.GameObjects.Rectangle,
+      HUD_ARIA_LABELS.favourCoinsToRep,
+      () => buildCoinsToRepTooltip(s.state),
+      { tapToggle: false, alreadyInteractive: true },
+    );
+    attachHudTooltipZone(
+      s,
+      repToCoinsBtn.list[0] as Phaser.GameObjects.Rectangle,
+      HUD_ARIA_LABELS.favourRepToCoins,
+      () => buildRepToCoinsTooltip(s.state),
+      { tapToggle: false, alreadyInteractive: true },
+    );
+  }
 }
 
 export function refreshHud(renderer: MainStreetRendererContext): void {
@@ -154,6 +232,10 @@ export function refreshHud(renderer: MainStreetRendererContext): void {
       }
     ).setOrigin(1, 0));
     s.hudContainer.add(weekText);
+
+    // Community Favour buttons — inside the widened strip, between Coins and
+    // Reputation (CG-0MUFAITED0088AGN).
+    renderFavourButtons(s);
 
     // NOTE: the actions-remaining counter is intentionally NOT rendered in the
     // HUD strip. It lives in the action cluster above the End Turn button
@@ -360,51 +442,6 @@ export function refreshActionButtons(renderer: MainStreetRendererContext): void 
         );
         s.actionContainer.add(peekBtn);
       }
-
-      // ── Community Favour buttons (CG-0MSTOATDQ005XDET) ────────────────
-      // Two buttons (one per direction), positioned via SLL zones, to the
-      // left of the action cluster. Disabled when the input resource is
-      // insufficient, when the once-per-turn gate is spent, or outside
-      // MarketPhase (the refresh only renders in the market UI phase).
-      const favourW = s.layout.favourButtonW;
-      const favourGone = s.state.favourUsedThisTurn;
-      const coinsToRepCost = s.state.config.favourCoinsToRepCost;
-      const repToCoinsRepCost = s.state.config.favourRepToCoinsRepCost;
-      const repToCoinsCoinGain = s.state.config.favourRepToCoinsCoinGain;
-      const coinsToRepDisabled = favourGone || s.state.resourceBank.coins < coinsToRepCost;
-      const repToCoinsDisabled = favourGone || s.state.resourceBank.reputation < repToCoinsRepCost;
-
-      const favourCoinsToRepBtn = createActionButton(
-        s, s.layout.favourCoinsToRepX, by + 4, favourW,
-        `${coinsToRepCost}c → 1r`,
-        () => s.onCommunityFavourClick('coins-to-rep'),
-        {
-          height: s.layout.actionButtonH,
-          fillColor: coinsToRepDisabled ? 0x2a2a2a : 0x442244,
-          fillAlpha: 0.8,
-          strokeColor: coinsToRepDisabled ? 0x444444 : 0xaa44aa,
-          textColor: coinsToRepDisabled ? '#666666' : '#ff88ff',
-          fontSize: '13px',
-          disabled: coinsToRepDisabled,
-        },
-      );
-      s.actionContainer.add(favourCoinsToRepBtn);
-
-      const favourRepToCoinsBtn = createActionButton(
-        s, s.layout.favourRepToCoinsX, by + 4, favourW,
-        `${repToCoinsRepCost}r → ${repToCoinsCoinGain}c`,
-        () => s.onCommunityFavourClick('rep-to-coins'),
-        {
-          height: s.layout.actionButtonH,
-          fillColor: repToCoinsDisabled ? 0x2a2a2a : 0x224422,
-          fillAlpha: 0.8,
-          strokeColor: repToCoinsDisabled ? 0x444444 : 0x44aa44,
-          textColor: repToCoinsDisabled ? '#666666' : '#88ff88',
-          fontSize: '13px',
-          disabled: repToCoinsDisabled,
-        },
-      );
-      s.actionContainer.add(favourRepToCoinsBtn);
 
     } else if (s.uiPhase === 'placing-from-hand') {
       const rightX = s.layout.gameW - 24;

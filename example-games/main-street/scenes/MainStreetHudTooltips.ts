@@ -56,6 +56,13 @@ export const HUD_TOOLTIP_I18N_KEYS = {
   actionBankedLabel: 'hud.tooltip.action.banked',
   actionBankingExplain: 'hud.tooltip.action.bankingExplain',
   actionBankingGmNote: 'hud.tooltip.action.bankingGmNote',
+  favourCoinsToRepTitle: 'hud.tooltip.favour.coinsToRep.title',
+  favourCoinsToRepRate: 'hud.tooltip.favour.coinsToRep.rate',
+  favourRepToCoinsTitle: 'hud.tooltip.favour.repToCoins.title',
+  favourRepToCoinsRate: 'hud.tooltip.favour.repToCoins.rate',
+  favourGate: 'hud.tooltip.favour.gate',
+  favourUsedThisTurn: 'hud.tooltip.favour.usedThisTurn',
+  favourInsufficient: 'hud.tooltip.favour.insufficient',
 } as const;
 
 /** ARIA label i18n keys (for screen-reader accessibility). */
@@ -64,6 +71,8 @@ export const HUD_ARIA_I18N_KEYS = {
   rep: 'hud.aria.rep',
   score: 'hud.aria.score',
   action: 'hud.aria.action',
+  favourCoinsToRep: 'hud.aria.favour.coinsToRep',
+  favourRepToCoins: 'hud.aria.favour.repToCoins',
 } as const;
 
 // ── ARIA label lookup via i18n ──────────────────────────────
@@ -74,6 +83,8 @@ export const HUD_ARIA_LABELS = {
   get rep() { return t(HUD_ARIA_I18N_KEYS.rep); },
   get score() { return t(HUD_ARIA_I18N_KEYS.score); },
   get action() { return t(HUD_ARIA_I18N_KEYS.action); },
+  get favourCoinsToRep() { return t(HUD_ARIA_I18N_KEYS.favourCoinsToRep); },
+  get favourRepToCoins() { return t(HUD_ARIA_I18N_KEYS.favourRepToCoins); },
 };
 
 // ── Default English strings (registered as the 'en' locale bundle) ────
@@ -107,6 +118,13 @@ export const HUD_TOOLTIP_STRINGS = {
   actionBankedLabel: 'Banked actions',
   actionBankingExplain: "1 action per turn, with up to two turns' unused actions banked — every action you take spends 1 from the bank (down to 0), so banked actions are a finite reserve, not a permanent bonus",
   actionBankingGmNote: '+1 action per turn from General Manager (staff actions are used first, never banked)',
+  favourCoinsToRepTitle: 'Community Favour — Coins → Reputation',
+  favourCoinsToRepRate: 'Spend {cost} coins to gain {gain} reputation.',
+  favourRepToCoinsTitle: 'Community Favour — Reputation → Coins',
+  favourRepToCoinsRate: 'Spend {cost} reputation to gain {gain} coins.',
+  favourGate: 'Once per turn.',
+  favourUsedThisTurn: 'Already used this turn.',
+  favourInsufficient: 'Not enough {resource} (need {cost}).',
 } as const;
 
 /** ARIA label default English strings. Registered as the `en` locale bundle. */
@@ -115,6 +133,8 @@ export const HUD_ARIA_STRINGS = {
   rep: 'Reputation status — hover for multiplier details',
   score: 'Score status — hover for next tier threshold',
   action: 'Actions remaining this week — buying/placing/hiring spends one',
+  favourCoinsToRep: 'Community Favour: exchange coins for reputation (once per turn)',
+  favourRepToCoins: 'Community Favour: exchange reputation for coins (once per turn)',
 } as const;
 
 // ── Register the English locale bundle ────────────────────────────────
@@ -359,6 +379,52 @@ export function buildActionTooltip(state: MainStreetState): string {
     lines.push(t(HUD_TOOLTIP_I18N_KEYS.actionBankingGmNote));
   }
   return lines.join('\n');
+}
+
+/**
+ * Builds the Community Favour tooltip for a direction (CG-0MUFAITED0088AGN).
+ *
+ * Shows the exact exchange rate (from `state.config`) and the once-per-turn
+ * limit, plus the current gate/affordability status. All copy is i18n-sourced.
+ */
+export function buildFavourTooltip(
+  state: MainStreetState,
+  direction: 'coins-to-rep' | 'rep-to-coins',
+): string {
+  const isCoinsToRep = direction === 'coins-to-rep';
+  const cost = isCoinsToRep
+    ? state.config.favourCoinsToRepCost
+    : state.config.favourRepToCoinsRepCost;
+  const gain = isCoinsToRep ? 1 : state.config.favourRepToCoinsCoinGain;
+  const resourceName = isCoinsToRep ? 'coins' : 'reputation';
+  const resource = isCoinsToRep ? state.resourceBank.coins : state.resourceBank.reputation;
+
+  const lines = [
+    t(isCoinsToRep ? HUD_TOOLTIP_I18N_KEYS.favourCoinsToRepTitle : HUD_TOOLTIP_I18N_KEYS.favourRepToCoinsTitle),
+    t(isCoinsToRep ? HUD_TOOLTIP_I18N_KEYS.favourCoinsToRepRate : HUD_TOOLTIP_I18N_KEYS.favourRepToCoinsRate, {
+      cost,
+      gain,
+    }),
+    t(HUD_TOOLTIP_I18N_KEYS.favourGate),
+  ];
+
+  if (state.favourUsedThisTurn) {
+    lines.push(t(HUD_TOOLTIP_I18N_KEYS.favourUsedThisTurn));
+  } else if (resource < cost) {
+    lines.push(t(HUD_TOOLTIP_I18N_KEYS.favourInsufficient, { resource: resourceName, cost }));
+  }
+
+  return lines.join('\n');
+}
+
+/** Tooltip for the coins→reputation Community Favour button. */
+export function buildCoinsToRepTooltip(state: MainStreetState): string {
+  return buildFavourTooltip(state, 'coins-to-rep');
+}
+
+/** Tooltip for the reputation→coins Community Favour button. */
+export function buildRepToCoinsTooltip(state: MainStreetState): string {
+  return buildFavourTooltip(state, 'rep-to-coins');
 }
 
 // ── Helpers ───────────────────────────────────────────────────

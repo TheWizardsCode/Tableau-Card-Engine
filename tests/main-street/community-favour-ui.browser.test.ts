@@ -13,7 +13,7 @@
  * @module tests/main-street/community-favour-ui.browser
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
 import { waitForScene } from '../helpers/waitForScene';
@@ -70,15 +70,18 @@ interface SceneHandle extends Phaser.Scene {
   };
   uiPhase: string;
   actionContainer: Phaser.GameObjects.Container;
+  hudContainer: Phaser.GameObjects.Container;
+  replayMode: boolean;
+  tooltipManager: { show: (content: string, x: number, y: number) => void; hide: () => void };
   refreshAll: () => void;
+  refreshHud: () => void;
   msTurnController: { onCommunityFavourClick: (direction: 'coins-to-rep' | 'rep-to-coins') => void };
   settingsPanel?: { reducedMotion?: boolean };
   instructionText: { setText: (t: string) => void };
 }
 
-/** Collects the action buttons rendered in the action container. */
-function actionButtonLabels(scene: SceneHandle): string[] {
-  const container = scene.actionContainer;
+/** Walk a container and collect every text label found (including nested). */
+function collectLabels(container: Phaser.GameObjects.Container): string[] {
   const labels: string[] = [];
   const walk = (obj: Phaser.GameObjects.GameObject): void => {
     if (obj.type === 'Text') {
@@ -92,6 +95,27 @@ function actionButtonLabels(scene: SceneHandle): string[] {
   };
   container.list.forEach(walk);
   return labels;
+}
+
+/** Collects the favour button labels rendered in the HUD strip. */
+function hudFavourLabels(scene: SceneHandle): string[] {
+  return collectLabels(scene.hudContainer).filter(l => l.includes('→'));
+}
+
+/** Collects every text label in the action container. */
+function actionButtonLabels(scene: SceneHandle): string[] {
+  return collectLabels(scene.actionContainer);
+}
+
+/** Finds the background rectangle of the favour button whose label matches. */
+function findFavourButtonBg(scene: SceneHandle, labelIncludes: string): Phaser.GameObjects.Rectangle | undefined {
+  const found = scene.hudContainer.list.find((obj) => {
+    const c = obj as Phaser.GameObjects.Container;
+    if (c.type !== 'Container' || !Array.isArray(c.list)) return false;
+    return c.list.some((child: any) => child?.text?.includes(labelIncludes));
+  }) as Phaser.GameObjects.Container | undefined;
+  if (!found) return undefined;
+  return found.list.find((c: any) => c.type === 'Rectangle') as Phaser.GameObjects.Rectangle | undefined;
 }
 
 describe('Main Street Community Favour UI', () => {
@@ -118,20 +142,59 @@ describe('Main Street Community Favour UI', () => {
     return scene;
   }
 
-  it('renders two favour buttons in the market-phase action bar', async () => {
+  it('renders two favour buttons in the HUD strip, not the action bar', async () => {
     const scene = await bootScene();
-    const labels = () => actionButtonLabels(scene);
+    const labels = () => hudFavourLabels(scene);
 
     await waitForCondition(
-      () => labels().some(l => l.includes('→')),
-      { label: 'favour buttons present' },
+      () => labels().length >= 2,
+      { label: 'favour buttons present in HUD' },
     );
 
-    const favourLabels = labels().filter(l => l.includes('→'));
+    const favourLabels = labels();
     // One per direction: e.g. "2c → 1r" and "2r → 3c".
     expect(favourLabels).toHaveLength(2);
     expect(favourLabels.some(l => /^\d+c → \d+r$/.test(l.trim()))).toBe(true);
     expect(favourLabels.some(l => /^\d+r → \d+c$/.test(l.trim()))).toBe(true);
+
+    // They are NOT rendered in the bottom action bar any more.
+    const actionLabels = actionButtonLabels(scene);
+    expect(actionLabels.some(l => l.includes('→'))).toBe(false);
+  }, 30_000);
+
+  it('attaches i18n tooltip zones to both favour buttons (CG-0MUFAITED0088AGN)', async () => {
+    const scene = await bootScene();
+    await waitForCondition(() => hudFavourLabels(scene).length >= 2, { label: 'favour buttons present' });
+
+    const showSpy = vi.spyOn(scene.tooltipManager, 'show');
+    const repToCoinsBg = findFavourButtonBg(scene, 'r → ');
+    const coinsToRepBg = findFavourButtonBg(scene, 'c → ');
+    expect(repToCoinsBg, 'rep→coins button background').toBeTruthy();
+    expect(coinsToRepBg, 'coins→rep button background').toBeTruthy();
+
+    repToCoinsBg!.emit('pointerover');
+    expect(showSpy).toHaveBeenCalled();
+    expect(String(showSpy.mock.calls[0][0])).toContain('Coins');
+    showSpy.mockClear();
+    repToCoinsBg!.emit('pointerout');
+
+    coinsToRepBg!.emit('pointerover');
+    expect(showSpy).toHaveBeenCalled();
+    expect(String(showSpy.mock.calls[0][0])).toContain('Reputation');
+  }, 30_000);
+
+  it('skips favour tooltips in replay mode (CG-0MUFAITED0088AGN)', async () => {
+    const scene = await bootScene();
+    scene.replayMode = true;
+    scene.refreshHud();
+
+    const showSpy = vi.spyOn(scene.tooltipManager, 'show');
+    const repToCoinsBg = findFavourButtonBg(scene, 'r → ');
+    expect(repToCoinsBg).toBeTruthy();
+    repToCoinsBg!.emit('pointerover');
+    expect(showSpy).not.toHaveBeenCalled();
+
+    scene.replayMode = false;
   }, 30_000);
 
   it('active exchange updates resources, sets the gate, and does not consume an action', async () => {
@@ -165,23 +228,33 @@ describe('Main Street Community Favour UI', () => {
     const scene = await bootScene();
 
     // Coins below the coins-to-rep cost → only the coins direction is
-    // disabled (its container has no interactivity), rep direction stays.
+    // disabled (faded 0x2a2a2a fill), rep direction stays enabled.
     scene.state.resourceBank.coins = 0;
-    scene.state.resourceBank.reputation = 5;
+    // Exactly enough reputation to afford the rep→coins exchange (integer economy).
+    scene.state.resourceBank.reputation = scene.state.config.favourRepToCoinsRepCost;
     scene.state.favourUsedThisTurn = false;
     scene.refreshAll();
 
+    const coinsBg = findFavourButtonBg(scene, 'c → ');
+    const repBg = findFavourButtonBg(scene, 'r → ');
+    expect(coinsBg!.fillColor).toBe(0x2a2a2a); // disabled (insufficient coins)
+    expect(repBg!.fillColor).not.toBe(0x2a2a2a); // enabled (enough reputation)
+
     const pressed: string[] = [];
-    // A disabled button's background is non-interactive — clicking it must
-    // not mutate state. Dispatch via the controller would still guard; here
-    // we assert the controller's guard path surfaces feedback for the
-    // insufficient resource rather than mutating.
+    // The controller guard surfaces feedback for the insufficient resource
+    // rather than mutating state.
     scene.msTurnController.onCommunityFavourClick('coins-to-rep');
     expect(scene.state.resourceBank.coins).toBe(0);
     expect(scene.state.favourUsedThisTurn).toBe(false);
 
-    // After using the gate, a second click (rep → coins) is rejected with
-    // feedback and no mutation.
+    // Once the gate is spent, BOTH directions are disabled (faded fill).
+    scene.state.favourUsedThisTurn = true;
+    scene.refreshAll();
+    expect(findFavourButtonBg(scene, 'c → ')!.fillColor).toBe(0x2a2a2a);
+    expect(findFavourButtonBg(scene, 'r → ')!.fillColor).toBe(0x2a2a2a);
+
+    // After resetting the gate and funding, a successful exchange sets the
+    // gate and a second click is rejected with no further mutation.
     scene.state.resourceBank.coins = 2000;
     scene.state.resourceBank.reputation = 500;
     scene.state.favourUsedThisTurn = false;

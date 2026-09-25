@@ -15,6 +15,7 @@ import type { SceneLayout } from './MainStreetConstants';
 import {
   BASE_HUD_Y,
   HUD_FAVOUR_BAND_OFFSET_PX,
+  HUD_FAVOUR_BUTTON_H_PX,
   MARKET_BOX_MARGIN_PX,
   BASE_MARKET_CARD_W,
   BASE_MARKET_CARD_H,
@@ -170,6 +171,7 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
     favourButtonW,
     favourCoinsToRepX: Math.round(favourCoinsToRepCenter.x - favourButtonW / 2),
     favourRepToCoinsX: Math.round(favourRepToCoinsCenter.x - favourButtonW / 2),
+    favourButtonH: HUD_FAVOUR_BUTTON_H_PX,
     marketLeft,
     marketRight,
     hudLeft,

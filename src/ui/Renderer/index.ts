@@ -250,12 +250,52 @@ export function createHudText(
  * @param ariaLabel - Accessibility label for screen readers.
  * @param contentBuilder - Function that returns the tooltip content string.
  */
+/**
+ * Options for {@link attachHudTooltipZone}.
+ */
+export interface HudTooltipZoneOptions {
+  /**
+   * When `false`, skip the mobile tap-toggle `pointerdown` handler. Use for
+   * buttons whose own click already performs an action, so a tap does not
+   * also toggle the tooltip. Desktop hover is unaffected.
+   * @default true
+   */
+  tapToggle?: boolean;
+  /**
+   * When `true`, the target already has a correctly configured hit area
+   * (e.g. a `createActionButton` background). The helper then only attaches
+   * the hover listeners, preserving the existing hit area, cursor, and click
+   * handler. When `false` (default) the helper calls `setInteractive` with a
+   * bounds-derived hit area.
+   * @default false
+   */
+  alreadyInteractive?: boolean;
+}
+
+/**
+ * Attach a hover/tap tooltip zone to a HUD element.
+ *
+ * Supports both plain text readouts (`Phaser.GameObjects.Text`) and
+ * already-interactive primitives such as `Phaser.GameObjects.Rectangle`
+ * (button backgrounds). The aria label is applied to the object's DOM node
+ * when one exists (a no-op for canvas-only objects).
+ *
+ * @param scene - The Phaser scene owning the tooltip manager.
+ * @param textObj - The target object (text or interactive rectangle).
+ * @param ariaLabel - The i18n-resolved aria label.
+ * @param contentBuilder - Builds the tooltip content lazily on hover.
+ * @param options - Optional behaviour flags (see {@link HudTooltipZoneOptions}).
+ */
 export function attachHudTooltipZone(
   scene: Phaser.Scene,
-  textObj: Phaser.GameObjects.Text,
+  textObj: Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle,
   ariaLabel: string,
   contentBuilder: () => string,
+  options: HudTooltipZoneOptions = {},
 ): void {
+  const tapToggle = options.tapToggle ?? true;
+  const alreadyInteractive = options.alreadyInteractive ?? false;
+
   // Set ARIA label for screen-reader accessibility
   try {
     const node = (textObj as any).node;
@@ -268,14 +308,16 @@ export function attachHudTooltipZone(
     // Ignore in non-DOM environments.
   }
 
-  // Compute hit area size from text metrics
-  const w = Math.max(textObj.width, 60);
-  const h = Math.max(textObj.height, 20);
+  if (!alreadyInteractive) {
+    // Compute hit area size from text metrics
+    const w = Math.max(textObj.width, 60);
+    const h = Math.max(textObj.height, 20);
 
-  textObj.setInteractive(
-    new Phaser.Geom.Rectangle(0, 0, w / textObj.scaleX, h / textObj.scaleY),
-    Phaser.Geom.Rectangle.Contains,
-  );
+    textObj.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, w / textObj.scaleX, h / textObj.scaleY),
+      Phaser.Geom.Rectangle.Contains,
+    );
+  }
 
   // Mobile tap-toggle state (per element)
   let tooltipVisible = false;
@@ -292,16 +334,18 @@ export function attachHudTooltipZone(
   });
 
   // Mobile / tap: toggle on pointerdown
-  textObj.on('pointerdown', () => {
-    if (tooltipVisible) {
-      tooltipVisible = false;
-      (scene as any).tooltipManager?.hide();
-    } else {
-      tooltipVisible = true;
-      const content = contentBuilder();
-      (scene as any).tooltipManager?.show(content, textObj.x, textObj.y - 10);
-    }
-  });
+  if (tapToggle) {
+    textObj.on('pointerdown', () => {
+      if (tooltipVisible) {
+        tooltipVisible = false;
+        (scene as any).tooltipManager?.hide();
+      } else {
+        tooltipVisible = true;
+        const content = contentBuilder();
+        (scene as any).tooltipManager?.show(content, textObj.x, textObj.y - 10);
+      }
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

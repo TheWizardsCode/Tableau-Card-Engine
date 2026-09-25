@@ -30,6 +30,9 @@ export const HUD_BAR_HEIGHT_PX = 28;
  * (CG-0MUFAISSZ002TE1B / CG-0MUFAITED0088AGN).
  */
 export const HUD_FAVOUR_BAND_OFFSET_PX = 120;
+
+/** Height (px) of each Community Favour button inside the HUD strip. */
+export const HUD_FAVOUR_BUTTON_H_PX = 24;
 export const BASE_MARKET_CARD_W = 140;
 export const BASE_MARKET_CARD_H = 80;
 export const BASE_MARKET_ROW_GAP = 10;
@@ -230,6 +233,8 @@ export interface SceneLayout {
   favourRepToCoinsX: number;
   /** Width of each Community Favour button. */
   favourButtonW: number;
+  /** Height of each Community Favour button. */
+  favourButtonH: number;
   /** Left edge X of the market background box (SLL-derived). */
   marketLeft: number;
   /** Right edge X of the market background box (SLL-derived). */

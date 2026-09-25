@@ -35,14 +35,15 @@ describe('Main Street layout: Community Favour SLL zones', () => {
     expect(repToCoins!.anchors?.center).toBeDefined();
   });
 
-  it('zone centers sit in the bottom action bar band (y in 0.85..0.98)', () => {
+  it('zone centers sit in the HUD strip band (y ≈ 0.069, CG-0MUFAITED0088AGN)', () => {
     const parsed = parseScreenLayoutDocument(layoutJson);
     expect(parsed.layout).not.toBeNull();
     const zones = parsed.layout!.zones!;
     for (const name of ['favourCoinsToRepButton', 'favourRepToCoinsButton']) {
       const center = (zones[name] as unknown as { anchors: { center: { x: number; y: number } } }).anchors.center;
-      expect(center.y).toBeGreaterThanOrEqual(0.85);
-      expect(center.y).toBeLessThanOrEqual(0.98);
+      // HUD strip is centred at hudY = 50 / 720 ≈ 0.069444.
+      expect(center.y).toBeGreaterThanOrEqual(0.05);
+      expect(center.y).toBeLessThanOrEqual(0.09);
     }
   });
 
@@ -69,16 +70,28 @@ describe('Main Street layout adapter: favour button positions', () => {
     // Left edge = centerX - width/2 (matches the adapter formula).
     expect(layout.favourCoinsToRepX).toBe(Math.round(coinsCenter.x - layout.favourButtonW / 2));
     expect(layout.favourRepToCoinsX).toBe(Math.round(repCenter.x - layout.favourButtonW / 2));
-    // Pixel-perfect vs the current anchor values (documented stability).
-    expect(layout.favourCoinsToRepX).toBe(Math.round(0.408594 * 1280 - layout.favourButtonW / 2));
-    expect(layout.favourRepToCoinsX).toBe(Math.round(0.596094 * 1280 - layout.favourButtonW / 2));
-    // Both sit to the left of the Peek button (left edge ≈ 848) with a gap.
-    expect(layout.favourRepToCoinsX + layout.favourButtonW).toBeLessThan(848);
+    // Pixel-perfect vs the current HUD-band anchor values (documented stability).
+    expect(layout.favourCoinsToRepX).toBe(Math.round(0.238281 * 1280 - layout.favourButtonW / 2));
+    expect(layout.favourRepToCoinsX).toBe(Math.round(0.152344 * 1280 - layout.favourButtonW / 2));
   });
 
-  it('favour buttons share the action button height', () => {
+  it('favour buttons share the action button height constant', () => {
     const layout = computeMainStreetLayoutWithSll();
     expect(layout.actionButtonH).toBe(34);
     expect(layout.favourButtonW).toBeGreaterThan(0);
+    // HUD-band button height fits inside the 28px strip.
+    expect(layout.favourButtonH).toBe(24);
+  });
+
+  it('favour buttons are adjacent and ordered [rep→coins][coins→rep] (AC3)', () => {
+    const layout = computeMainStreetLayoutWithSll();
+    // Adjacency: rep→coins right edge === coins→rep left edge.
+    expect(layout.favourRepToCoinsX + layout.favourButtonW).toBe(layout.favourCoinsToRepX);
+    // The pair sits inside the reserved favour band, which is itself inside
+    // the HUD strip and right of the Coins readout.
+    expect(layout.favourRepToCoinsX).toBe(layout.favourBandLeft);
+    expect(layout.favourCoinsToRepX + layout.favourButtonW).toBe(layout.favourBandRight);
+    expect(layout.favourBandLeft).toBeGreaterThan(layout.hudLeft);
+    expect(layout.favourBandRight).toBeLessThan(layout.hudRight);
   });
 });
