@@ -79,6 +79,30 @@ function makeFixture(games: string[], withConfig: Record<string, unknown> | null
   return root;
 }
 
+/** Add a `src/`-layout scene module to an existing sibling game repo. */
+function writeSrcLayoutScene(root: string, game: string): string {
+  const cls = game
+    .split('-')
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join('');
+  const dir = path.join(root, `tce-${game}`, 'src', 'scenes');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${cls}Scene.ts`);
+  fs.writeFileSync(
+    file,
+    [
+      `export class ${cls}Scene {}`,
+      `export const GAME_INFO = {`,
+      `  sceneKey: '${cls}Scene',`,
+      `  title: '${cls}',`,
+      `  description: 'Fixture game ${game}.',`,
+      `};`,
+      '',
+    ].join('\n'),
+  );
+  return file;
+}
+
 beforeEach(() => {
   tmpRoot = '';
 });
@@ -136,11 +160,28 @@ describe('configs/ presets', () => {
     }
   });
 
-  it('every preset game points at the sibling <game>/example-games layout', () => {
+  it('every preset game points at both the monorepo and src/ layouts', () => {
     const cfg = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'full.json'));
     for (const g of cfg.games) {
       expect(g.path).toContain('tce-');
       expect(g.scenePath).toContain(`example-games/${g.id}`);
+      // Option C (F9/C1): a src/-layout sibling path is also recorded.
+      expect(g.siblingScenePath).toBe(
+        g.scenePath.replace(`example-games/${g.id}/`, 'src/'),
+      );
+    }
+  });
+
+  it('records a sibling adapter path wherever the monorepo preset has one', () => {
+    for (const preset of PRESETS) {
+      const cfg = loadGamesConfig(path.join(REPO_ROOT, 'configs', `${preset}.json`));
+      for (const g of cfg.games) {
+        if (g.adapterPath) {
+          expect(g.siblingAdapterPath, `${preset}/${g.id}`).toBe(
+            g.adapterPath.replace(`example-games/${g.id}/`, 'src/'),
+          );
+        }
+      }
     }
   });
 });
@@ -247,6 +288,45 @@ describe('discoverGames', () => {
     cfg.games[0].scenePath = 'example-games/golf/scenes/LocalGolfScene.ts';
     const [resolved] = discoverGames(cfg, core);
     expect(resolved.absoluteScenePath).toBe(localScene);
+  });
+
+  it('resolves a src/-layout sibling repo via siblingScenePath (Option C)', () => {
+    tmpRoot = makeFixture([], null);
+    const core = path.join(tmpRoot, 'tableau-card-engine-core');
+    // A sibling repo whose source lives at src/ (no example-games/ tree).
+    writeSrcLayoutScene(tmpRoot, 'golf');
+    const config = {
+      games: [
+        {
+          id: 'golf',
+          path: '../tce-golf',
+          scenePath: 'example-games/golf/scenes/GolfScene.ts',
+          siblingScenePath: 'src/scenes/GolfScene.ts',
+        },
+      ],
+    };
+    const [resolved] = discoverGames(config, core);
+    expect(resolved.absoluteScenePath).toBe(
+      path.join(tmpRoot, 'tce-golf', 'src', 'scenes', 'GolfScene.ts'),
+    );
+    expect(resolved.info.description).toContain('golf');
+  });
+
+  it('fails fast with every candidate path when a src/ sibling scene is absent', () => {
+    tmpRoot = makeFixture([], null);
+    const core = path.join(tmpRoot, 'tableau-card-engine-core');
+    const config = {
+      games: [
+        {
+          id: 'golf',
+          path: '../tce-golf',
+          scenePath: 'example-games/golf/scenes/GolfScene.ts',
+          siblingScenePath: 'src/scenes/GolfScene.ts',
+        },
+      ],
+    };
+    expect(() => discoverGames(config, core)).toThrow(/golf/);
+    expect(() => discoverGames(config, core)).toThrow(/src\/scenes\/GolfScene\.ts/);
   });
 
   it('fails fast, naming the missing game, when it exists in neither location', () => {

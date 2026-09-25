@@ -1,17 +1,21 @@
 {
-  "$comment": "Arcade preset: a small non-empty subset used to prove the 1..n assembly boundary cases (a distribution with a few games, not all). Part of epic CG-0MTR7DLMY008CK17; named distribution preset formalised by F5 CG-0MTRO77XA006YZZC. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; in the flat launcher checkout they resolve from example-games/<id>/ instead.",
+  "$comment": "Arcade preset: a small non-empty subset used to prove the 1..n assembly boundary cases (a distribution with a few games, not all). Part of epic CG-0MTR7DLMY008CK17; named distribution preset formalised by F5 CG-0MTRO77XA006YZZC. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; in the flat launcher checkout they resolve from example-games/<id>/ instead. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; `scenePath`/`adapterPath` are the flat-monorepo layout and `siblingScenePath`/`siblingAdapterPath` the `src/` layout of a sibling game repo (Option C, F9).",
   "games": [
     {
       "id": "main-street",
       "path": "../tce-main-street",
       "scenePath": "example-games/main-street/scenes/MainStreetScene.ts",
-      "adapterPath": "example-games/main-street/scripts/adapters/MainStreetReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/MainStreetScene.ts",
+      "adapterPath": "example-games/main-street/scripts/adapters/MainStreetReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/MainStreetReplayAdapter.ts"
     },
     {
       "id": "golf",
       "path": "../tce-golf",
       "scenePath": "example-games/golf/scenes/GolfScene.ts",
-      "adapterPath": "example-games/golf/scripts/adapters/GolfReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/GolfScene.ts",
+      "adapterPath": "example-games/golf/scripts/adapters/GolfReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/GolfReplayAdapter.ts"
     }
   ]
 }

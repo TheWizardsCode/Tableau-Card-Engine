@@ -134,11 +134,19 @@ export interface GameConfigEntry {
   /** Scene module path inside the game repo, e.g. `example-games/golf/scenes/GolfScene.ts`. */
   scenePath: string;
   /**
+   * Scene module path in a `src/`-layout sibling repo (Option C, F9/C1), e.g.
+   * `src/scenes/GolfScene.ts`. Resolved against `path`. Optional: the legacy
+   * `scenePath` is tried as a sibling fallback when it is absent.
+   */
+  siblingScenePath?: string;
+  /**
    * Optional replay-adapter module path inside the game repo. When present,
    * `scripts/replay.ts` dynamically imports it and registers the adapter, so
    * the replay tool works without the core importing any game code.
    */
   adapterPath?: string;
+  /** Replay-adapter path in a `src/`-layout sibling repo (Option C). */
+  siblingAdapterPath?: string;
 }
 
 /** A parsed config preset. */
@@ -306,19 +314,25 @@ export function discoverGames(
   return config.games.map((entry) => {
     const localScenePath = path.resolve(projectRoot, entry.scenePath);
     const siblingRoot = path.resolve(projectRoot, entry.path);
-    const siblingScenePath = path.resolve(siblingRoot, entry.scenePath);
+    // Option C (F9/C1): try, in order, the monorepo `example-games/<game>/…`
+    // path, the explicit `src/`-layout sibling path, then the legacy sibling
+    // path (so a preset keeps working before and after a game repo migrates).
+    const candidates = [
+      localScenePath,
+      ...(entry.siblingScenePath
+        ? [path.resolve(siblingRoot, entry.siblingScenePath)]
+        : []),
+      path.resolve(siblingRoot, entry.scenePath),
+    ];
 
-    let absoluteScenePath: string;
-    if (fs.existsSync(localScenePath)) {
-      absoluteScenePath = localScenePath;
-    } else if (fs.existsSync(siblingScenePath)) {
-      absoluteScenePath = siblingScenePath;
-    } else {
+    const absoluteScenePath = candidates.find((candidate) =>
+      fs.existsSync(candidate),
+    );
+    if (!absoluteScenePath) {
       throw new Error(
         `[game-discovery] Game "${entry.id}" not found. Expected its scene ` +
-          `module either locally at ${localScenePath} or in the sibling repo ` +
-          `${entry.path} at ${siblingScenePath}. Check out the sibling repo, ` +
-          `or remove "${entry.id}" from the preset.`,
+          `module at one of: ${candidates.join(', ')}. Check out the sibling ` +
+          `repo at ${entry.path} (or remove "${entry.id}" from the preset).`,
       );
     }
 

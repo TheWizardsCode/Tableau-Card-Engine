@@ -32,6 +32,8 @@ export { adapterRegistry } from './AdapterRegistry';
 
 import { adapterRegistry } from './AdapterRegistry';
 import type { ReplayAdapter } from './ReplayAdapter';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Register a batch of adapters in the given order.
@@ -83,9 +85,26 @@ export async function registerConfiguredAdapters(
 
   let registered = 0;
   for (const entry of config.games) {
-    const adapterPath = (entry as { adapterPath?: string }).adapterPath;
-    if (!adapterPath) continue;
-    const modulePath = pathToFileUrl(`${projectRoot}/${adapterPath}`);
+    const e = entry as {
+      id?: string;
+      path?: string;
+      adapterPath?: string;
+      siblingAdapterPath?: string;
+    };
+    // Option C (F9/C1): resolve the adapter in the monorepo layout, then the
+    // `src/`-layout sibling repo, then the legacy sibling layout.
+    const candidates = [
+      ...(e.adapterPath ? [path.resolve(projectRoot, e.adapterPath)] : []),
+      ...(e.siblingAdapterPath && e.path
+        ? [path.resolve(projectRoot, e.path, e.siblingAdapterPath)]
+        : []),
+      ...(e.adapterPath && e.path
+        ? [path.resolve(projectRoot, e.path, e.adapterPath)]
+        : []),
+    ];
+    const moduleFile = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!moduleFile) continue;
+    const modulePath = pathToFileUrl(moduleFile);
     let mod: Record<string, unknown>;
     try {
       mod = (await import(/* @vite-ignore */ modulePath)) as Record<string, unknown>;

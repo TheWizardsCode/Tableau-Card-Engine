@@ -1,51 +1,65 @@
 {
-  "$comment": "Full preset: the engine + Gym + all eight example games. Used by the launcher distribution's complete build and by the full test suite (the shell runners default to GAMES_CONFIG=full). Part of epic CG-0MTR7DLMY008CK17; named distribution preset formalised by F5 CG-0MTRO77XA006YZZC. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; in the flat launcher checkout they resolve from example-games/<id>/ instead.",
+  "$comment": "Full preset: the engine + Gym + all eight example games. Used by the launcher distribution's complete build and by the full test suite (the shell runners default to GAMES_CONFIG=full). Part of epic CG-0MTR7DLMY008CK17; named distribution preset formalised by F5 CG-0MTRO77XA006YZZC. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; in the flat launcher checkout they resolve from example-games/<id>/ instead. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; `scenePath`/`adapterPath` are the flat-monorepo layout and `siblingScenePath`/`siblingAdapterPath` the `src/` layout of a sibling game repo (Option C, F9).",
   "games": [
     {
       "id": "beleaguered-castle",
       "path": "../tce-beleaguered-castle",
       "scenePath": "example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts",
-      "adapterPath": "example-games/beleaguered-castle/scripts/adapters/BeleagueredCastleReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/BeleagueredCastleScene.ts",
+      "adapterPath": "example-games/beleaguered-castle/scripts/adapters/BeleagueredCastleReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/BeleagueredCastleReplayAdapter.ts"
     },
     {
       "id": "lost-cities",
       "path": "../tce-lost-cities",
       "scenePath": "example-games/lost-cities/scenes/LostCitiesScene.ts",
-      "adapterPath": "example-games/lost-cities/scripts/adapters/LostCitiesReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/LostCitiesScene.ts",
+      "adapterPath": "example-games/lost-cities/scripts/adapters/LostCitiesReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/LostCitiesReplayAdapter.ts"
     },
     {
       "id": "sushi-go",
       "path": "../tce-sushi-go",
       "scenePath": "example-games/sushi-go/scenes/SushiGoScene.ts",
-      "adapterPath": "example-games/sushi-go/scripts/adapters/SushiGoReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/SushiGoScene.ts",
+      "adapterPath": "example-games/sushi-go/scripts/adapters/SushiGoReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/SushiGoReplayAdapter.ts"
     },
     {
       "id": "feudalism",
       "path": "../tce-feudalism",
       "scenePath": "example-games/feudalism/scenes/FeudalismScene.ts",
-      "adapterPath": "example-games/feudalism/scripts/adapters/FeudalismReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/FeudalismScene.ts",
+      "adapterPath": "example-games/feudalism/scripts/adapters/FeudalismReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/FeudalismReplayAdapter.ts"
     },
     {
       "id": "main-street",
       "path": "../tce-main-street",
       "scenePath": "example-games/main-street/scenes/MainStreetScene.ts",
-      "adapterPath": "example-games/main-street/scripts/adapters/MainStreetReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/MainStreetScene.ts",
+      "adapterPath": "example-games/main-street/scripts/adapters/MainStreetReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/MainStreetReplayAdapter.ts"
     },
     {
       "id": "golf",
       "path": "../tce-golf",
       "scenePath": "example-games/golf/scenes/GolfScene.ts",
-      "adapterPath": "example-games/golf/scripts/adapters/GolfReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/GolfScene.ts",
+      "adapterPath": "example-games/golf/scripts/adapters/GolfReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/GolfReplayAdapter.ts"
     },
     {
       "id": "blackjack",
       "path": "../tce-blackjack",
-      "scenePath": "example-games/blackjack/scenes/BlackjackScene.ts"
+      "scenePath": "example-games/blackjack/scenes/BlackjackScene.ts",
+      "siblingScenePath": "src/scenes/BlackjackScene.ts"
     },
     {
       "id": "coloretto",
       "path": "../tce-coloretto",
-      "scenePath": "example-games/coloretto/scenes/ColorettoScene.ts"
+      "scenePath": "example-games/coloretto/scenes/ColorettoScene.ts",
+      "siblingScenePath": "src/scenes/ColorettoScene.ts"
     }
   ]
 }

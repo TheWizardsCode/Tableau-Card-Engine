@@ -1,17 +1,21 @@
 {
-  "$comment": "Deluxe preset: a second partial distribution (feudalism + lost-cities) distinct from the arcade preset. Used to prove that different named presets produce genuinely different distributions (epic CG-0MTR7DLMY008CK17, F5 CG-0MTRO77XA006YZZC). Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts.",
+  "$comment": "Deluxe preset: a second partial distribution (feudalism + lost-cities) distinct from the arcade preset. Used to prove that different named presets produce genuinely different distributions (epic CG-0MTR7DLMY008CK17, F5 CG-0MTRO77XA006YZZC). Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; `scenePath`/`adapterPath` are the flat-monorepo layout and `siblingScenePath`/`siblingAdapterPath` the `src/` layout of a sibling game repo (Option C, F9).",
   "games": [
     {
       "id": "feudalism",
       "path": "../tce-feudalism",
       "scenePath": "example-games/feudalism/scenes/FeudalismScene.ts",
-      "adapterPath": "example-games/feudalism/scripts/adapters/FeudalismReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/FeudalismScene.ts",
+      "adapterPath": "example-games/feudalism/scripts/adapters/FeudalismReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/FeudalismReplayAdapter.ts"
     },
     {
       "id": "lost-cities",
       "path": "../tce-lost-cities",
       "scenePath": "example-games/lost-cities/scenes/LostCitiesScene.ts",
-      "adapterPath": "example-games/lost-cities/scripts/adapters/LostCitiesReplayAdapter.ts"
+      "siblingScenePath": "src/scenes/LostCitiesScene.ts",
+      "adapterPath": "example-games/lost-cities/scripts/adapters/LostCitiesReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/LostCitiesReplayAdapter.ts"
     }
   ]
 }
