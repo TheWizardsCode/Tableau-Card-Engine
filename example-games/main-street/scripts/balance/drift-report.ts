@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runAllCombinations } from '../../MainStreetMonteCarlo';
 import type { DifficultyName } from '../../MainStreetDifficulty';
-import { selectBaselineBlock } from './baseline-blocks';
+import { selectBaselineBlock, currentCommitShaFull } from './baseline-blocks';
 import type { BaselineBlock, MonteBaseline } from './baseline-blocks';
 
 // ---------------------------------------------------------------------------
@@ -56,11 +56,14 @@ interface DriftEntry {
 
 interface DriftReport {
   timestamp: string;
+  /** Full commit SHA of the checkout under test (AC4, CG-0MUE03DGQ005KPZ7). */
+  currentCommitSha: string | null;
   baseline: {
     winRate: number;
     averageCoinsPerTurn: number;
     medianScore: number | null;
     generatedAt: string | undefined;
+    commitSha: string | undefined;
     seeds: number;
     maxTurns: number;
     strategy: string;
@@ -122,11 +125,15 @@ function formatDriftReport(report: DriftReport, asJson = false): string {
   if (report.baseline.generatedAt) {
     lines.push(`  Baseline generated: ${report.baseline.generatedAt}`);
   }
+  if (report.baseline.commitSha) {
+    lines.push(`  Baseline commit: ${report.baseline.commitSha}`);
+  }
   lines.push(`  Baseline winRate: ${report.baseline.winRate.toFixed(4)}`);
   lines.push(`  Baseline avg coins/turn: ${report.baseline.averageCoinsPerTurn.toFixed(4)}`);
   lines.push('');
 
   lines.push(`Current: ${report.currentMeta.strategy}, ${report.currentMeta.seeds} seeds, ${report.currentMeta.maxTurns} max turns`);
+  lines.push(`  Current commit: ${report.currentCommitSha ?? 'unknown (git unavailable)'}`);
   lines.push(`  Current winRate: ${report.current.winRate.toFixed(4)}`);
   lines.push(`  Current avg coins/turn: ${report.current.averageCoinsPerTurn.toFixed(4)}`);
   lines.push('');
@@ -262,11 +269,13 @@ function main(): void {
 
   const report: DriftReport = {
     timestamp: new Date().toISOString(),
+    currentCommitSha: currentCommitShaFull() ?? null,
     baseline: {
       winRate: block.metrics.winRate,
       averageCoinsPerTurn: block.metrics.averageCoinsPerTurn,
       medianScore: mediumBaseline.medianScore,
       generatedAt: block.generatedAt,
+      commitSha: block.commitSha,
       seeds: baseline.seeds,
       maxTurns: baseline.maxTurns,
       strategy: block.strategy,

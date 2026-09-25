@@ -9,6 +9,7 @@
  */
 
 import type { MonteCarloStrategy } from '../../MainStreetMonteCarlo';
+import { execSync } from 'node:child_process';
 
 export interface DifficultyBaseline {
   difficulty: 'Easy' | 'Medium' | 'Hard';
@@ -24,6 +25,12 @@ export interface DifficultyBaseline {
 export interface BaselineBlock {
   source?: string;
   generatedAt?: string;
+  /**
+   * Commit SHA the snapshot was generated from (AC4, CG-0MUE03DGQ005KPZ7).
+   * Recorded so `baseline → control → current` attribution is reproducible and
+   * a stale figure cannot be mistaken for the current dev state.
+   */
+  commitSha?: string;
   strategy: MonteCarloStrategy;
   metrics: {
     winRate: number;
@@ -57,4 +64,27 @@ export function selectBaselineBlock(baseline: MonteBaseline, strategy?: string):
   throw new Error(
     `No baseline block for strategy "${strategy}" in docs/main-street/monte-carlo-baseline.json`,
   );
+}
+
+/**
+ * Returns the current git commit SHA (short form), or `undefined` when git is
+ * unavailable (e.g. a source export). Used to stamp baselines and drift
+ * reports with the exact commit under test (AC4, CG-0MUE03DGQ005KPZ7).
+ *
+ * The lookup is best-effort: a failure never blocks a drift report.
+ */
+export function currentCommitSha(): string | undefined {
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return undefined;
+  }
+}
+
+export function currentCommitShaFull(): string | undefined {
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return undefined;
+  }
 }

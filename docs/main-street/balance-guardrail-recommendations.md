@@ -34,6 +34,41 @@ and loses the audit trail of what changed.
 3. **Ask the operator** — present the drift report to the producer/balance lead
    and let them decide (see the decision tree below).
 
+### Acceptance criterion (producer decision Q1 = B, 2026-09-23)
+
+A tightened **baseline-relative threshold is authoritative**: a win-rate move
+that exceeds the >5% re-baselining threshold against the committed baseline
+requires investigation/fix **even if the result sits inside the design-intent
+guardrail band**. The guardrail band (e.g. Medium 0.45–0.95) alone is *not*
+sufficient to accept the move. Treat the band as a breakage catch; treat the
+baseline-relative threshold as the primary drift gate.
+
+### Attribution before acceptance (three-point analysis)
+
+When the drift exceeds the threshold but no single change obviously explains
+it, run a **three-point attribution** before deciding regenerate-vs-fix:
+
+1. **Baseline** — the committed snapshot's metrics (with its commit SHA).
+2. **Control** — the state immediately before the suspected change, measured
+   on the same canonical profile. If the pre-change commit predates the
+   harness, use a temporary toggle disabling the suspected code path on a
+   current worktree (revert before completion).
+3. **Current** — the current dev HEAD on the same canonical profile.
+
+The per-change contribution is `current − control`; the cumulative contribution
+is `control − baseline`. Report both as absolute and relative figures. A
+contribution indistinguishable from zero (sub-1 pt) is Monte Carlo noise.
+
+**Worked example (CG-0MUE03DGQ005KPZ7):** a -23.5% win-rate drift reported
+after per-action challenge evaluation was attributed entirely to cumulative
+balance changes (control 0.615 vs current 0.615; baseline 0.830). The suspected
+change contributed 0.000. See
+[monte-carlo-attribution-analysis.md](monte-carlo-attribution-analysis.md).
+
+**Process requirement:** every drift report should record the **exact commit
+SHA** alongside the metrics, so `baseline → control → current` comparisons are
+reproducible and a stale "after" figure cannot be mistaken for the current one.
+
 ### Decision tree: regenerate vs investigate
 
 ```
@@ -56,10 +91,20 @@ Drift detected in guardrail test?
 | `scripts/balance/drift-report.ts` | Compare current results vs. baseline |
 | `scripts/generate-main-street-monte-baseline.ts` | Regenerate the baseline |
 | `tests/main-street/monte-carlo-guardrails.test.ts` | Guardrail test (reads baseline, asserts drift bounds) |
-| `docs/main-street/monte-carlo-baseline.json` | Committed regression snapshot |
+| `docs/main-street/monte-carlo-baseline.json` | Committed regression snapshot (now stamped with `commitSha` on regeneration) |
+
+**Commit tracking (AC4, CG-0MUE03DGQ005KPZ7):** `scripts/balance/drift-report.ts`
+now prints both the **baseline commit SHA** (from the baseline JSON, when
+present) and the **current checkout's HEAD SHA** in its report, and
+`generate-main-street-monte-baseline.ts` stamps the regenerated baseline with
+`commitSha`. This makes every `baseline → control → current` comparison
+reproducible and prevents a stale "after" figure from being mistaken for the
+current dev state.
 
 > **Note:** Tolerance values (winRate ±0.25, coins ±30%) are independent of
 > this process. Updating them is a separate concern documented in §1 below.
+> The **baseline-relative threshold** (Q1 = B) is the authoritative drift gate;
+> the ±0.25 guardrail band only catches outright breakage.
 
 ---
 

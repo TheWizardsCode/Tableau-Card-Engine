@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { execSync } from 'node:child_process';
 
-import { selectBaselineBlock } from '../../example-games/main-street/scripts/balance/baseline-blocks';
+import { selectBaselineBlock, currentCommitSha, currentCommitShaFull } from '../../example-games/main-street/scripts/balance/baseline-blocks';
 import type { MonteBaseline } from '../../example-games/main-street/scripts/balance/baseline-blocks';
 
 /**
@@ -85,5 +86,29 @@ describe('selectBaselineBlock', () => {
     expect(banking.strategy).toBe('banking-greedy');
     expect(banking.metrics).toEqual(baseline.bankingGreedy?.metrics);
     expect(banking.difficultyMatrix.map(entry => entry.difficulty)).toEqual(['Easy', 'Medium', 'Hard']);
+  });
+});
+
+/**
+ * Commit-SHA stamping (AC4, CG-0MUE03DGQ005KPZ7).
+ *
+ * Drift reports and regenerated baselines must record the commit under test so
+ * a `baseline → control → current` attribution is reproducible. These tests pin
+ * the helper contract: the short SHA is the 7+ char abbreviation of the full
+ * SHA, and both match `git rev-parse`.
+ */
+describe('commit SHA stamping', () => {
+  const fullSha = execSync('git rev-parse HEAD', { encoding: 'utf-8' }).trim();
+
+  it('currentCommitShaFull returns the repo HEAD SHA', () => {
+    expect(currentCommitShaFull()).toBe(fullSha);
+  });
+
+  it('currentCommitSha returns the abbreviated form of the same HEAD', () => {
+    const short = currentCommitSha();
+    expect(short).toBeTruthy();
+    expect(fullSha.startsWith(short as string)).toBe(true);
+    expect((short as string).length).toBeGreaterThanOrEqual(7);
+    expect((short as string).length).toBeLessThan(fullSha.length);
   });
 });

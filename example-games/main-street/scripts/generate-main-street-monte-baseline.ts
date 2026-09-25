@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { runAllCombinations } from '../MainStreetMonteCarlo';
+import { currentCommitShaFull } from './balance/baseline-blocks';
 
 /**
  * Regenerates `docs/main-street/monte-carlo-baseline.json` — the regression
@@ -51,6 +52,7 @@ if (!bankingMedium) {
 const baseline = {
   source: 'Generated from MainStreetMonteCarlo.runAllCombinations',
   generatedAt: new Date().toISOString(),
+  commitSha: currentCommitShaFull() ?? null,
   seeds,
   maxTurns,
   strategy,
@@ -70,6 +72,7 @@ const baseline = {
   bankingGreedy: {
     source: 'Generated from MainStreetMonteCarlo.runAllCombinations',
     generatedAt: new Date().toISOString(),
+    commitSha: currentCommitShaFull() ?? null,
     strategy: bankingStrategy,
     note:
       'Additive regression snapshot for BankingGreedyStrategy (CG-0MT3JMGA60091J8W AC5). ' +

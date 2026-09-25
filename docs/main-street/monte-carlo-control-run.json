@@ -1,0 +1,1833 @@
+{
+  "generatedAt": "2026-09-25T04:21:35.137Z",
+  "runsRequested": 200,
+  "runsExecuted": 200,
+  "seedPrefix": "mc-balance",
+  "maxTurns": 60,
+  "strategy": "greedy",
+  "perActionChallengeEvaluation": false,
+  "note": "Control run for CG-0MUE03DGQ005KPZ7 attribution analysis. Per-action challenge evaluation disabled via temporary toggle. Full per-seed data (marketOffers/economyHistory) omitted; regenerate with the harness command in monte-carlo-attribution-analysis.md.",
+  "metrics": {
+    "runs": 200,
+    "wins": 123,
+    "losses": 77,
+    "winRate": 0.615,
+    "medianScore": 12332.5,
+    "averageScore": 8628.885,
+    "averageCoinsPerTurn": 632.9923581211316,
+    "averageTurns": 9.73,
+    "averageNoActionTurns": 0.31,
+    "averageTurnWhenGridHalf": 6.844444444444444,
+    "averageTurnWhenGridFull": 12.413333333333334,
+    "lossReasons": {
+      "bankruptcy": 15,
+      "reputation_collapse": 62
+    },
+    "lossReasonRates": {
+      "bankruptcy": 0.19480519480519481,
+      "reputation_collapse": 0.8051948051948052
+    }
+  },
+  "runs": [
+    {
+      "seed": "mc-balance-0",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12998,
+      "finalCoins": 10988,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-1",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": 130,
+      "finalCoins": -70,
+      "turns": 6,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-2",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 321,
+      "finalCoins": 405,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-3",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14474,
+      "finalCoins": 12481,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-4",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 229,
+      "finalCoins": 309,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-5",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13541,
+      "finalCoins": 11802,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-6",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 308,
+      "finalCoins": 318,
+      "turns": 7,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-7",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 12737,
+      "finalCoins": 8653,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-8",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12245,
+      "finalCoins": 10171,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-9",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13410,
+      "finalCoins": 11729,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-10",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13447,
+      "finalCoins": 11437,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-11",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": 0,
+      "finalCoins": -100,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-12",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 900,
+      "finalCoins": 948,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-13",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12151,
+      "finalCoins": 9324,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-14",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14446,
+      "finalCoins": 13865,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-15",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1063,
+      "finalCoins": 1117,
+      "turns": 6,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-16",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15488,
+      "finalCoins": 13286,
+      "turns": 17,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-17",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 805,
+      "finalCoins": 881,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-18",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12745,
+      "finalCoins": 10722,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-19",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 752,
+      "finalCoins": 812,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-20",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14719,
+      "finalCoins": 13887,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-21",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 539,
+      "finalCoins": 593,
+      "turns": 8,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-22",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1318,
+      "finalCoins": 1349,
+      "turns": 6,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-23",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": -220,
+      "finalCoins": -200,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-24",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 16096,
+      "finalCoins": 12861,
+      "turns": 15,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-25",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13925,
+      "finalCoins": 11204,
+      "turns": 18,
+      "noActionTurns": 6
+    },
+    {
+      "seed": "mc-balance-26",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15687,
+      "finalCoins": 13361,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-27",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12356,
+      "finalCoins": 9973,
+      "turns": 18,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-28",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 903,
+      "finalCoins": 978,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-29",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15762,
+      "finalCoins": 13966,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-30",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12330,
+      "finalCoins": 10684,
+      "turns": 16,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-31",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15133,
+      "finalCoins": 12911,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-32",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 925,
+      "finalCoins": 942,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-33",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 9354,
+      "finalCoins": 5854,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-34",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15384,
+      "finalCoins": 13532,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-35",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 800,
+      "finalCoins": 800,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-36",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 151,
+      "finalCoins": 163,
+      "turns": 8,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-37",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13706,
+      "finalCoins": 11244,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-38",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12065,
+      "finalCoins": 10100,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-39",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": -405,
+      "finalCoins": -425,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-40",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 14473,
+      "finalCoins": 10830,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-41",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 473,
+      "finalCoins": 513,
+      "turns": 10,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-42",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": -95,
+      "finalCoins": -100,
+      "turns": 16,
+      "noActionTurns": 7
+    },
+    {
+      "seed": "mc-balance-43",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14852,
+      "finalCoins": 12928,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-44",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 233,
+      "finalCoins": 293,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-45",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14211,
+      "finalCoins": 10772,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-46",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": -252,
+      "finalCoins": -320,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-47",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 16703,
+      "finalCoins": 14601,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-48",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13437,
+      "finalCoins": 12744,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-49",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12918,
+      "finalCoins": 8897,
+      "turns": 17,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-50",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12964,
+      "finalCoins": 10108,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-51",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13089,
+      "finalCoins": 9797,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-52",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12010,
+      "finalCoins": 9266,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-53",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13692,
+      "finalCoins": 11697,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-54",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": -400,
+      "finalCoins": -330,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-55",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13822,
+      "finalCoins": 11845,
+      "turns": 20,
+      "noActionTurns": 4
+    },
+    {
+      "seed": "mc-balance-56",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 522,
+      "finalCoins": 531,
+      "turns": 8,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-57",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 900,
+      "finalCoins": 900,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-58",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13263,
+      "finalCoins": 10274,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-59",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1226,
+      "finalCoins": 1281,
+      "turns": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-60",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12294,
+      "finalCoins": 9449,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-61",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13982,
+      "finalCoins": 10786,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-62",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15478,
+      "finalCoins": 13643,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-63",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12646,
+      "finalCoins": 11152,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-64",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 397,
+      "finalCoins": 432,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-65",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 810,
+      "finalCoins": 858,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-66",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12086,
+      "finalCoins": 10308,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-67",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12338,
+      "finalCoins": 9602,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-68",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1323,
+      "finalCoins": 1366,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-69",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14875,
+      "finalCoins": 12611,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-70",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13804,
+      "finalCoins": 11726,
+      "turns": 19,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-71",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12566,
+      "finalCoins": 9128,
+      "turns": 17,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-72",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12480,
+      "finalCoins": 11709,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-73",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14003,
+      "finalCoins": 11070,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-74",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 16486,
+      "finalCoins": 14416,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-75",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14859,
+      "finalCoins": 12579,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-76",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15729,
+      "finalCoins": 13452,
+      "turns": 16,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-77",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13872,
+      "finalCoins": 13153,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-78",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 369,
+      "finalCoins": 434,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-79",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15576,
+      "finalCoins": 12262,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-80",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": 0,
+      "finalCoins": -130,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-81",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13530,
+      "finalCoins": 10781,
+      "turns": 15,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-82",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 270,
+      "finalCoins": 355,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-83",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1227,
+      "finalCoins": 1233,
+      "turns": 6,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-84",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13180,
+      "finalCoins": 11608,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-85",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 16102,
+      "finalCoins": 12189,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-86",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 300,
+      "finalCoins": 300,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-87",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13065,
+      "finalCoins": 9628,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-88",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13759,
+      "finalCoins": 10181,
+      "turns": 19,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-89",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12063,
+      "finalCoins": 9474,
+      "turns": 15,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-90",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 641,
+      "finalCoins": 691,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-91",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 11511,
+      "finalCoins": 7767,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-92",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 509,
+      "finalCoins": 536,
+      "turns": 10,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-93",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 483,
+      "finalCoins": 559,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-94",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 117,
+      "finalCoins": 177,
+      "turns": 9,
+      "noActionTurns": 4
+    },
+    {
+      "seed": "mc-balance-95",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14347,
+      "finalCoins": 12637,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-96",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13882,
+      "finalCoins": 11684,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-97",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12338,
+      "finalCoins": 9436,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-98",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 9664,
+      "finalCoins": 8664,
+      "turns": 19,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-99",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 300,
+      "finalCoins": 370,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-100",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12761,
+      "finalCoins": 12076,
+      "turns": 15,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-101",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 800,
+      "finalCoins": 800,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-102",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 283,
+      "finalCoins": 306,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-103",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13308,
+      "finalCoins": 11798,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-104",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": 76,
+      "finalCoins": -34,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-105",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 458,
+      "finalCoins": 513,
+      "turns": 13,
+      "noActionTurns": 6
+    },
+    {
+      "seed": "mc-balance-106",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12348,
+      "finalCoins": 10639,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-107",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15863,
+      "finalCoins": 14989,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-108",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15371,
+      "finalCoins": 12713,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-109",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 129,
+      "finalCoins": 219,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-110",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12323,
+      "finalCoins": 10202,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-111",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12404,
+      "finalCoins": 10774,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-112",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 280,
+      "finalCoins": 356,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-113",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15208,
+      "finalCoins": 13332,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-114",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 927,
+      "finalCoins": 1005,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-115",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12004,
+      "finalCoins": 8954,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-116",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13740,
+      "finalCoins": 11008,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-117",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13978,
+      "finalCoins": 11918,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-118",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13016,
+      "finalCoins": 11210,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-119",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13249,
+      "finalCoins": 11685,
+      "turns": 16,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-120",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12143,
+      "finalCoins": 9623,
+      "turns": 8,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-121",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 478,
+      "finalCoins": 554,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-122",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1416,
+      "finalCoins": 1428,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-123",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12938,
+      "finalCoins": 11348,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-124",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": -22,
+      "finalCoins": -67,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-125",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12000,
+      "finalCoins": 11259,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-126",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1757,
+      "finalCoins": 1765,
+      "turns": 9,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-127",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14015,
+      "finalCoins": 10983,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-128",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 16315,
+      "finalCoins": 14368,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-129",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13920,
+      "finalCoins": 11987,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-130",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12328,
+      "finalCoins": 9283,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-131",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12403,
+      "finalCoins": 11214,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-132",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12428,
+      "finalCoins": 10750,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-133",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 16421,
+      "finalCoins": 13852,
+      "turns": 15,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-134",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1215,
+      "finalCoins": 1253,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-135",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14374,
+      "finalCoins": 12620,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-136",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13993,
+      "finalCoins": 11862,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-137",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": -301,
+      "finalCoins": -306,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-138",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13619,
+      "finalCoins": 11498,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-139",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14049,
+      "finalCoins": 13227,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-140",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13852,
+      "finalCoins": 10970,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-141",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": -100,
+      "finalCoins": -120,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-142",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12035,
+      "finalCoins": 7733,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-143",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12335,
+      "finalCoins": 9726,
+      "turns": 14,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-144",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12908,
+      "finalCoins": 10824,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-145",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15404,
+      "finalCoins": 14709,
+      "turns": 19,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-146",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 10897,
+      "finalCoins": 6884,
+      "turns": 15,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-147",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15536,
+      "finalCoins": 13829,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-148",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 8023,
+      "finalCoins": 4332,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-149",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12560,
+      "finalCoins": 9972,
+      "turns": 13,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-150",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 104,
+      "finalCoins": 104,
+      "turns": 6,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-151",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": -57,
+      "finalCoins": 33,
+      "turns": 8,
+      "noActionTurns": 3
+    },
+    {
+      "seed": "mc-balance-152",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 600,
+      "finalCoins": 600,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-153",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 37,
+      "finalCoins": 57,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-154",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 754,
+      "finalCoins": 781,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-155",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 251,
+      "finalCoins": 326,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-156",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13026,
+      "finalCoins": 10305,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-157",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1014,
+      "finalCoins": 1080,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-158",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 100,
+      "finalCoins": 100,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-159",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1817,
+      "finalCoins": 1860,
+      "turns": 6,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-160",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14697,
+      "finalCoins": 10948,
+      "turns": 18,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-161",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15280,
+      "finalCoins": 14548,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-162",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13291,
+      "finalCoins": 10439,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-163",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 671,
+      "finalCoins": 709,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-164",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15027,
+      "finalCoins": 13193,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-165",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 609,
+      "finalCoins": 694,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-166",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13750,
+      "finalCoins": 11831,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-167",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13950,
+      "finalCoins": 11870,
+      "turns": 9,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-168",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 300,
+      "finalCoins": 300,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-169",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": 210,
+      "finalCoins": -45,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-170",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1022,
+      "finalCoins": 1072,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-171",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 524,
+      "finalCoins": 539,
+      "turns": 6,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-172",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12174,
+      "finalCoins": 10556,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-173",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12244,
+      "finalCoins": 8959,
+      "turns": 17,
+      "noActionTurns": 2
+    },
+    {
+      "seed": "mc-balance-174",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12465,
+      "finalCoins": 8181,
+      "turns": 16,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-175",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14388,
+      "finalCoins": 12406,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-176",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14443,
+      "finalCoins": 12306,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-177",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1301,
+      "finalCoins": 1325,
+      "turns": 6,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-178",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 1254,
+      "finalCoins": 1282,
+      "turns": 5,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-179",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12329,
+      "finalCoins": 10713,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-180",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 341,
+      "finalCoins": 409,
+      "turns": 4,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-181",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 16502,
+      "finalCoins": 12465,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-182",
+      "result": "win",
+      "endReason": "all_challenges",
+      "finalScore": 11500,
+      "finalCoins": 7321,
+      "turns": 8,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-183",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": 96,
+      "finalCoins": -32,
+      "turns": 3,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-184",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12956,
+      "finalCoins": 10360,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-185",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 94,
+      "finalCoins": 184,
+      "turns": 2,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-186",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": -60,
+      "finalCoins": 0,
+      "turns": 7,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-187",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 4083,
+      "finalCoins": 3083,
+      "turns": 16,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-188",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15015,
+      "finalCoins": 13013,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-189",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12881,
+      "finalCoins": 11675,
+      "turns": 24,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-190",
+      "result": "loss",
+      "endReason": "bankruptcy",
+      "finalScore": 47,
+      "finalCoins": -23,
+      "turns": 8,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-191",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12869,
+      "finalCoins": 10224,
+      "turns": 14,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-192",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 14370,
+      "finalCoins": 13402,
+      "turns": 15,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-193",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12990,
+      "finalCoins": 10145,
+      "turns": 15,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-194",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12815,
+      "finalCoins": 10005,
+      "turns": 11,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-195",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 13168,
+      "finalCoins": 10269,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-196",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12638,
+      "finalCoins": 10925,
+      "turns": 10,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-197",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 12303,
+      "finalCoins": 9605,
+      "turns": 12,
+      "noActionTurns": 0
+    },
+    {
+      "seed": "mc-balance-198",
+      "result": "loss",
+      "endReason": "reputation_collapse",
+      "finalScore": 6579,
+      "finalCoins": 5579,
+      "turns": 18,
+      "noActionTurns": 1
+    },
+    {
+      "seed": "mc-balance-199",
+      "result": "win",
+      "endReason": "score_threshold",
+      "finalScore": 15530,
+      "finalCoins": 13422,
+      "turns": 11,
+      "noActionTurns": 0
+    }
+  ]
+}

@@ -96,6 +96,38 @@ still passes (win-rate tolerance +/-0.25). The baseline JSON was
 intentionally **not** regenerated — the drift-report-then-ask workflow
 requires operator approval before a baseline change.
 
+## Attribution Analysis (CG-0MUE03DGQ005KPZ7)
+
+A three-point attribution study was conducted to decompose the win-rate drift
+between the 2026-09-12 baseline and the current dev state.
+
+### Three-Point Data
+
+| Point | State | Per-Action Eval? | Win Rate | Coins/Turn | Median Score |
+|-------|-------|-------------------|----------|------------|--------------|
+| **A** | 2026-09-12 baseline | Not yet merged | **0.830** | 639.6 | 13177.5 |
+| **B** | Control (toggle DISABLED) | **NO** | **0.615** | 633.0 | 12332.5 |
+| **C** | Current dev | **YES** | **0.615** | 633.0 | 12332.5 |
+
+> The original brief cited 0.635 as the "after" figure (captured at an
+> earlier dev commit). The current dev state has drifted to 0.615.
+
+### Attribution Breakdown
+
+| Component | Delta | Contribution |
+|-----------|-------|-------------|
+| Per-action challenge evaluation (B→C) | 0.000 | **0%** (statistically zero) |
+| Cumulative non-challenge changes (A→B) | -0.215 | **100%** |
+
+### Key Finding
+
+**The per-action challenge evaluation has no measurable effect on win rate.**
+The entire drift is attributable to cumulative balance changes that accumulated
+between the 2026-09-12 baseline and the current dev state.
+
+See the full [attribution analysis](monte-carlo-attribution-analysis.md) for
+detailed mechanism explanation and recommendations.
+
 ## See Also
 
 - **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the structured balance review process, micro/macro metrics, and baseline management strategy that build on these Monte Carlo results.
