@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { computeMainStreetLayoutWithSll } from '../../example-games/main-street/scenes/MainStreetLayoutAdapter';
+import { parseScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
+import { getZoneRect } from '../../src/ui/screen-layout';
+import mainStreetLayoutJson from '../../example-games/main-street/layouts/main-street.layout.json';
+import {
+  computeMainStreetLayoutGeometry,
+} from './helpers/mainStreetLayoutGeometry';
 
 describe('MainStreetLayoutAdapter', () => {
   it('derives layout from SLL layout document as single source of truth', () => {
@@ -98,5 +104,44 @@ describe('MainStreetLayoutAdapter', () => {
     // Right column starts at logX (960). Street grid ends at streetX + rowWidth (20 + 780 = 800).
     const streetRightEdge = layout.streetX + (layout.streetCols * layout.slotW + (layout.streetCols - 1) * layout.slotGap);
     expect(streetRightEdge).toBeLessThanOrEqual(layout.logX - 10);
+  });
+});
+
+// ── HUD/market geometry source of truth (CG-0MUFAIS8W0011LGQ) ──────
+
+describe('MainStreetLayoutAdapter: HUD/market geometry source of truth', () => {
+  it('exposes marketLeft/marketRight derived from SLL zones', () => {
+    const layout = computeMainStreetLayoutWithSll();
+    // marketLeft = round(market zone topLeft.x) = 0.015625 * 1280 = 20
+    expect(layout.marketLeft).toBe(20);
+    // marketRight = round(activityLog topLeft.x) - MARKET_BOX_MARGIN_PX
+    //             = 960 - 20 = 940
+    expect(layout.marketRight).toBe(940);
+  });
+
+  it('aligns the HUD strip edges to the market box edges (AC2)', () => {
+    const layout = computeMainStreetLayoutWithSll();
+    expect(layout.hudLeft).toBe(layout.marketLeft);
+    expect(layout.hudRight).toBe(layout.marketRight);
+    expect(layout.hudWidth).toBe(layout.marketRight - layout.marketLeft);
+    expect(layout.hudWidth).toBe(920);
+  });
+
+  it('layout-derived test harness reports the same aligned geometry', () => {
+    const layout = computeMainStreetLayoutWithSll();
+    const geometry = computeMainStreetLayoutGeometry();
+    expect(geometry.marketBox.x).toBe(layout.marketLeft);
+    expect(geometry.marketBox.x + geometry.marketBox.width).toBe(layout.marketRight);
+    expect(geometry.hudStrip.x).toBe(layout.hudLeft);
+    expect(geometry.hudStrip.x + geometry.hudStrip.width).toBe(layout.hudRight);
+  });
+
+  it('defines a hudBar SLL zone whose edges coincide with the market box at 1280x720', () => {
+    const parsed = parseScreenLayoutDocument(mainStreetLayoutJson);
+    expect(parsed.valid).toBe(true);
+    const viewport = { width: 1280, height: 720 };
+    const rect = getZoneRect(parsed.layout as never, 'hudBar', viewport, 1);
+    expect(Math.round(rect.x)).toBe(20);
+    expect(Math.round(rect.x + (rect.width ?? 0))).toBe(940);
   });
 });

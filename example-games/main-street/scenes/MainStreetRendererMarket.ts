@@ -44,11 +44,12 @@ export function refreshMarket(renderer: MainStreetRendererContext): void {
     s.marketSelectionByCardId.clear();
     s.selectedMarketCardId = null;
 
-    const { marketTop, marketRowH, logX } = s.layout;
+    const { marketTop, marketRowH, marketLeft, marketRight } = s.layout;
 
-    // Wider section background — extends from left edge to near the activity log (logX - 20px margin)
-    const bgLeft = 20;
-    const bgRight = logX - 20; // 820 - 20 = 800
+    // Wider section background — edges read from the single layout authority
+    // (marketLeft/marketRight), never recomputed inline (CG-0MUFAIS8W0011LGQ).
+    const bgLeft = marketLeft;
+    const bgRight = marketRight;
     const totalH = marketRowH + 30;
     const bgBox = s.add.graphics();
     bgBox.fillStyle(BOX_FILL, 0.3);
@@ -105,7 +106,7 @@ export function drawMarketRow(renderer: MainStreetRendererContext,
   ): void {
 
     const s = renderer.scene;
-    const { marketCardW, marketCardH, marketCardGap, logX } = s.layout;
+    const { marketCardW, marketCardH, marketCardGap, marketLeft, marketRight } = s.layout;
 
     // Row label - also use for positioning deck count
     const label = s.add.text(40, y, rowLabel, {
@@ -115,8 +116,8 @@ export function drawMarketRow(renderer: MainStreetRendererContext,
 
     // Determine card startX: an explicit alignmentStartX wins; otherwise
     // centre the row independently in the market box.
-    const boxLeft = 20;
-    const boxRight = logX - 20;
+    const boxLeft = marketLeft;
+    const boxRight = marketRight;
     const boxCenter = (boxLeft + boxRight) / 2;
     const totalCardsW = maxSlots * marketCardW + (maxSlots - 1) * marketCardGap;
     const startX = alignmentStartX ?? Math.round(boxCenter - totalCardsW / 2);
@@ -233,8 +234,8 @@ export function getMarketSlotCenter(renderer: MainStreetRendererContext,
   ): { x: number; y: number } {
 
     const s = renderer.scene;
-    const { marketTop, logX, marketCardW, marketCardGap } = s.layout;
-    const boxCenter = (20 + logX - 20) / 2;
+    const { marketTop, marketLeft, marketRight, marketCardW, marketCardGap } = s.layout;
+    const boxCenter = (marketLeft + marketRight) / 2;
     const totalCardsW = MARKET_TOTAL_SLOTS * marketCardW + (MARKET_TOTAL_SLOTS - 1) * marketCardGap;
     const startX = Math.round(boxCenter - totalCardsW / 2);
     const rowTop = marketTop + 6;

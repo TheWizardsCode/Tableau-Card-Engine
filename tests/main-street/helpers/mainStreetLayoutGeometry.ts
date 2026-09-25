@@ -65,8 +65,10 @@ const FAVOUR_BUTTON_W = 110;
  * these edges exactly (`hudLeft === marketLeft`, `hudRight === marketRight`).
  */
 function deriveMarketBox(layout: ReturnType<typeof computeMainStreetLayoutWithSll>): Rect {
-  const marketLeft = 20;
-  const marketRight = layout.logX - 20;
+  // Edges come from the layout contract (`marketLeft`/`marketRight`), which
+  // the adapter derives from the SLL zones — never recomputed here.
+  const marketLeft = layout.marketLeft;
+  const marketRight = layout.marketRight;
   const marketTop = layout.marketTop - 10;
   const marketRowH = BASE_MARKET_CARD_H + 14;
   const bothRowsH = 2 * marketRowH + BASE_MARKET_ROW_GAP + 20;
@@ -85,12 +87,12 @@ function deriveMarketBox(layout: ReturnType<typeof computeMainStreetLayoutWithSl
  * (`hudLeft === marketLeft`, `hudRight === marketRight`).
  */
 function deriveHudStrip(layout: ReturnType<typeof computeMainStreetLayoutWithSll>): Rect {
-  const marketLeft = 20;
-  const marketRight = layout.logX - 20;
+  // The adapter exposes `hudLeft`/`hudRight`/`hudWidth`, aligned to the market
+  // box edges by contract (CG-0MUFAIS8W0011LGQ).
   return {
-    x: marketLeft,
+    x: layout.hudLeft,
     y: BASE_HUD_Y,
-    width: marketRight - marketLeft,
+    width: layout.hudWidth,
     height: HUD_STRIP_H,
   };
 }
@@ -108,11 +110,11 @@ function deriveHudStrip(layout: ReturnType<typeof computeMainStreetLayoutWithSll
  * state.
  */
 function deriveFavourButtons(
-  _layout: ReturnType<typeof computeMainStreetLayoutWithSll>,
+  layout: ReturnType<typeof computeMainStreetLayoutWithSll>,
 ): { coinsToRep: Rect; repToCoins: Rect } {
   const hudStripY = BASE_HUD_Y + 2;
   const buttonH = 24; // fits within the 28px strip
-  const marketLeft = 20; // same constant as the renderer's bgLeft
+  const marketLeft = layout.marketLeft;
   // Position the pair adjacent, starting near the market-box left edge
   // (where the Coins element is left-aligned).
   const coinsToRepX = marketLeft + 120; // to the right of the Coins label

@@ -14,6 +14,7 @@ import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema'
 import type { SceneLayout } from './MainStreetConstants';
 import {
   BASE_HUD_Y,
+  MARKET_BOX_MARGIN_PX,
   BASE_MARKET_CARD_W,
   BASE_MARKET_CARD_H,
   BASE_MARKET_ROW_GAP,
@@ -80,6 +81,18 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const logBottomRight = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'activityLog', 'bottomRight', viewport, 1);
 
   const marketRowH = BASE_MARKET_CARD_H + 14;
+
+  // ── HUD / market geometry source of truth (CG-0MUFAIS8W0011LGQ) ─────
+  // The market background box and the HUD strip share one set of edges:
+  //   left  = market zone topLeft.x (SLL)         → 20 at 1280×720
+  //   right = activityLog topLeft.x - margin      → logX - 20 = 940
+  // Both renderers read these from SceneLayout, so the two bars cannot
+  // silently desynchronise (no duplicated `20` / `logX - 20` literals).
+  const marketLeft = Math.round(marketTopLeft.x);
+  const marketRight = Math.round(logTopLeft.x) - MARKET_BOX_MARGIN_PX;
+  const hudLeft = marketLeft;
+  const hudRight = marketRight;
+  const hudWidth = hudRight - hudLeft;
 
   const actionButtonH = 34;
   const hintButtonW = 104;
@@ -149,6 +162,11 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
     favourButtonW,
     favourCoinsToRepX: Math.round(favourCoinsToRepCenter.x - favourButtonW / 2),
     favourRepToCoinsX: Math.round(favourRepToCoinsCenter.x - favourButtonW / 2),
+    marketLeft,
+    marketRight,
+    hudLeft,
+    hudRight,
+    hudWidth,
     applicantCenterX,
     applicantCenterY,
     challengeX: Math.round(challengeTopLeft.x),

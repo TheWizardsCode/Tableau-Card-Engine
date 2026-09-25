@@ -12,6 +12,16 @@ export const BOX_RADIUS = 6;
 
 // Base metrics are tuned for 1280x720 and scaled at runtime for narrower/taller viewports.
 export const BASE_HUD_Y = 50;
+
+/**
+ * Right-hand inset (px) between the activity-log panel's left edge (`logX`)
+ * and the right edge of the market/HUD bar. Single named authority so the
+ * market box and the HUD strip can never disagree (CG-0MUFAIS8W0011LGQ).
+ */
+export const MARKET_BOX_MARGIN_PX = 20;
+
+/** Height (px) of the HUD strip bar. */
+export const HUD_BAR_HEIGHT_PX = 28;
 export const BASE_MARKET_CARD_W = 140;
 export const BASE_MARKET_CARD_H = 80;
 export const BASE_MARKET_ROW_GAP = 10;
@@ -212,6 +222,16 @@ export interface SceneLayout {
   favourRepToCoinsX: number;
   /** Width of each Community Favour button. */
   favourButtonW: number;
+  /** Left edge X of the market background box (SLL-derived). */
+  marketLeft: number;
+  /** Right edge X of the market background box (SLL-derived). */
+  marketRight: number;
+  /** Left edge X of the HUD strip bar (aligned to `marketLeft`). */
+  hudLeft: number;
+  /** Right edge X of the HUD strip bar (aligned to `marketRight`). */
+  hudRight: number;
+  /** Width of the HUD strip bar (`hudRight - hudLeft`). */
+  hudWidth: number;
   /** X/Y of the staff-applicant overlay centre (SLL applicantOverlay zone). */
   applicantCenterX: number;
   applicantCenterY: number;
