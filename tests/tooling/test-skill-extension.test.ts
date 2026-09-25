@@ -55,6 +55,23 @@ function normaliseCommands(
   return [];
 }
 
+/**
+ * Locate the global test-skill `run_tests.py`. The global skill root is
+ * either `$PI_AGENT_HOME`, `~/.pi/agent`, or a local `skills/` checkout.
+ */
+function findGlobalRunner(): string | null {
+  const candidates = [
+    process.env.PI_AGENT_HOME
+      ? join(process.env.PI_AGENT_HOME, 'skills', 'test', 'scripts', 'run_tests.py')
+      : null,
+    join(homedir(), '.pi', 'agent', 'skills', 'test', 'scripts', 'run_tests.py'),
+    join(REPO_ROOT, 'skills', 'test', 'scripts', 'run_tests.py'),
+  ].filter((c): c is string => c !== null);
+  return candidates.find((c) => existsSync(c)) ?? null;
+}
+
+const GLOBAL_TEST_RUNNER = findGlobalRunner();
+
 // Tutorial parts in the established order (from run-tutorial-tests.sh):
 // part1 → part2 → part4 → part5 → part6 → part3
 const TUTORIAL_PART_ORDER = [
@@ -102,22 +119,9 @@ describe('AC1 — extension.json structure', () => {
 // ---------------------------------------------------------------------------
 
 describe('AC2/AC3 — resolver resolves local types and rejects unknowns', () => {
-  // Locate the global run_tests.py module. The global skill root is either
-  // `$PI_AGENT_HOME`, `~/.pi/agent`, or a local `skills/` checkout. The
-  // resolver is the authoritative consumer of the local extension contract
-  // (SA-0MSQ7MQEJ0064ZB0).
-  function findGlobalRunner(): string | null {
-    const candidates = [
-      process.env.PI_AGENT_HOME
-        ? join(process.env.PI_AGENT_HOME, 'skills', 'test', 'scripts', 'run_tests.py')
-        : null,
-      join(homedir(), '.pi', 'agent', 'skills', 'test', 'scripts', 'run_tests.py'),
-      join(REPO_ROOT, 'skills', 'test', 'scripts', 'run_tests.py'),
-    ].filter((c): c is string => c !== null);
-    return candidates.find((c) => existsSync(c)) ?? null;
-  }
-
-  const GLOBAL_RUNNER = findGlobalRunner();
+  // The global resolver is the authoritative consumer of the local extension
+  // contract (SA-0MSQ7MQEJ0064ZB0).
+  const GLOBAL_RUNNER = GLOBAL_TEST_RUNNER;
 
   /**
    * Resolve a test type to commands by importing the global resolver in a
@@ -276,5 +280,43 @@ describe('AC5 — tutorial/e2e part coverage and ordering', () => {
     // The extension's tutorial commands must match the canonical part order
     // from run-tutorial-tests.sh.
     expect(extensionProjects).toEqual(expectedProjects);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC7: SKILL_PREFIX.md prose hook
+// ---------------------------------------------------------------------------
+
+describe('AC7 — SKILL_PREFIX.md prose hook', () => {
+  /**
+   * Ask the global extension loader to load TCE's `test` extension and report
+   * whether the prose prefix is surfaced. Exercises the real loader rather
+   * than inspecting file text (per the Test Writing Guidelines).
+   */
+  function loadExtensionViaRunner(): {
+    present: boolean;
+    prefix: string | null;
+  } {
+    const scriptsDir = join(GLOBAL_TEST_RUNNER!, '..');
+    const skillsRoot = join(scriptsDir, '..', '..');
+    const script = [
+      'import json, sys',
+      `sys.path.insert(0, ${JSON.stringify(skillsRoot)})`,
+      'from shared.skill_extensions import load_extension',
+      `ext = load_extension('test', ${JSON.stringify(REPO_ROOT)})`,
+      "print(json.dumps({'present': ext.present, 'prefix': ext.prefix}))",
+    ].join('\n');
+    const result = spawnSync('python3', ['-c', script], { encoding: 'utf-8' });
+    if (result.status !== 0) {
+      throw new Error(result.stderr || `loader exited ${result.status}`);
+    }
+    return JSON.parse(result.stdout) as { present: boolean; prefix: string | null };
+  }
+
+  it('is present and surfaced by the extension loader', () => {
+    const ext = loadExtensionViaRunner();
+    expect(ext.present).toBe(true);
+    expect(ext.prefix).not.toBeNull();
+    expect((ext.prefix ?? '').length).toBeGreaterThan(0);
   });
 });
