@@ -171,8 +171,12 @@ function deriveActionCluster(layout: ReturnType<typeof computeMainStreetLayoutWi
       height: layout.actionButtonH,
     },
     actionCounter: {
-      x: rightX - 180, // right-aligned with End Turn button (20px left margin)
-      y: layout.actionY - 20,
+      // Right-aligned with the End Turn button's right edge. The renderer draws
+      // the text at (rightX, actionY - 22) with origin (1, 1), so its bounding
+      // box bottom sits at actionY - 22 and it is stacked above the
+      // "Can buy: ..." summary line and the End Turn button (CG-0MUFAITX70081W41).
+      x: rightX - 180,
+      y: layout.actionY - 38,
       width: 180,
       height: 16,
     },
