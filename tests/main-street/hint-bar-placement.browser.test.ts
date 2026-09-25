@@ -151,10 +151,13 @@ function hintText(scene: Scene): string {
 function hasInlineActionText(scene: Scene): boolean {
   const list = scene.actionContainer?.list ?? [];
   return list.some((entry: any) => {
-    if (entry?.text !== undefined && entry?.type === 'Text') return true;
-    // Nested text (e.g. inside a button container) is fine — the AC is about
-    // standalone hint text directly added to the action container.
-    return false;
+    if (entry?.text === undefined || entry?.type !== 'Text') return false;
+    // The actions-remaining counter is a legitimate standalone readout in the
+    // action cluster (CG-0MUFAITX70081W41) — not an inline placement hint.
+    if (/\d+\s+actions?\s+left/i.test(String(entry.text))) return false;
+    // Any other standalone text directly in the action container is an
+    // inline hint, which the HintBar AC forbids (nested button text is fine).
+    return true;
   });
 }
 
