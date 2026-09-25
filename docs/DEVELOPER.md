@@ -1502,9 +1502,19 @@ available during the market phase (it does not consume `actionsRemaining`):
   (defaults on Easy/Medium/Hard).
 - Gating: `state.favourUsedThisTurn` (market-phase only, reset at `WeekStart`),
   serialized with legacy-save backfill to `false`.
-- UI: two SLL-positioned buttons in the market-phase action bar
-  (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones), disabled when the
-  input resource is insufficient or the gate is spent.
+- UI: two SLL-positioned buttons inside the **market-aligned HUD strip**
+  between the Coins and Reputation readouts (`favourRepToCoinsButton` →
+  `favourCoinsToRepButton`, left-to-right `[rep→coins][coins→rep]`; rendered by
+  `MainStreetRenderer.refreshHud` and parented into `hudContainer` as transient
+  HUD children). Each carries an i18n tooltip
+  (`buildCoinsToRepTooltip` / `buildRepToCoinsTooltip`) describing the exact
+  exchange rate and the once-per-turn limit; tooltips are skipped in replay
+  mode. They are disabled when the input resource is insufficient or the gate
+  is spent.
+- HUD layout (CG-0MT5UO47U0047UKA): the HUD strip is market-aligned
+  (`hudLeft`..`hudRight` = the market box edges) and the actions-remaining
+  counter renders in the action cluster directly above the End Turn / Cancel
+  button, not in the strip.
 - AI: `MainStreetAiStrategy` enumerates the action when affordable/unused and
   scores rep→coins > 1 only when genuinely stalled (cannot afford the cheapest
   market card) with a reputation buffer; `GreedyStrategy` Priority 9 selects it
@@ -2551,13 +2561,14 @@ The tutorial layout defines these zones (all use normalized coordinates with opt
 
 | Zone ID | Description | Uses dimensions |
 |---------|-------------|-----------------|
-| `hud` | HUD strip (top bar with coins, reputation, score) | Yes (full-width bounding box) |
+| `hud` | HUD strip (market-aligned bar with coins, reputation, score, and the Community Favour buttons; width matches the market box, CG-0MUFAISSZ002TE1B) | Yes (full-width bounding box) |
 | `marketBusinessRow` | Legacy full-market-area zone (single row now drawn in the same band) | No (informational) |
 | `streetGrid` | The 2×5 street grid for placing businesses | Yes (stops before right column) |
 | `endTurnButton` | End Turn action button area | Yes |
 | `incidentQueue` | Face-down incident deck panel (card back + remaining count, CG-0MSTOATDP000JNHH) | Yes |
 | `investmentsRow` | ALIAS of `developmentRow` — the market rows were merged into one (CG-0MSTOATDT009BRX2); upgrade/event steps highlight the same single row | Yes |
 | `helpButton` | Help/settings button area | Yes |
+| `actionButtons` | Community Favour button band inside the HUD strip (relocated from the action bar, CG-0MUFAITED0088AGN) | Yes |
 
 Zones that return `null` for highlighting (no bounding box needed):
 - `center-modal` — centered overlay

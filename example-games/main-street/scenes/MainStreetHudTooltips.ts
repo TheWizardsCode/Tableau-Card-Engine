@@ -2,7 +2,8 @@
  * MainStreetHudTooltips -- Tooltip content builders for the HUD status bar.
  *
  * Provides localisable string keys and builder functions for the Coins,
- * Reputation, and Score tooltips shown when hovering/tapping HUD values.
+ * Reputation, Score, Actions and Community Favour tooltips shown when
+ * hovering/tapping HUD values.
  *
  * ## i18n integration
  * Every user-facing string is looked up via the core-engine `t()` function

@@ -155,7 +155,7 @@ Tutorial text follows these editorial principles:
 | 10 | T10 | End this turn (week 2 → 3) | action (end-turn) | endTurnButton |
 | 11 | T11 | Move the Bookshop to hand | action (select-business) | developmentRow |
 | 12 | T12 | Costs and Reputation | confirm (informative) | developmentRow |
-| 13 | T13 | Community Favour | action (community-favour, rep→coins) | actionButtons (action bar) |
+| 13 | T13 | Community Favour | action (community-favour, rep→coins) | actionButtons (HUD strip favour band) |
 | 14 | T14 | End this turn (week 3 → 4) | action (end-turn) | endTurnButton |
 | 15 | T15 | Place the Bookshop (listed $3) | action (place-business) | streetGrid |
 | 16 | T16 | End this turn (week 4 → 5) | action (end-turn) | endTurnButton |
