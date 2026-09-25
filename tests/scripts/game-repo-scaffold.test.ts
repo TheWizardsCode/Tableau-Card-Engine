@@ -50,7 +50,7 @@ const GAMES = [
 const MANIFEST: CoreManifest = {
   version: '9.9.9',
   scripts: {
-    'save-load-smoke': 'vite-node example-games/main-street/scripts/save-load-smoke.ts',
+    'save-load-smoke': 'vite-node example-games/golf/scripts/save-load-smoke.ts',
     build: 'core-build',
   },
   dependencies: { phaser: '4.0.0-rc.7' },
@@ -114,7 +114,12 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
   fs.mkdirSync(testDir, { recursive: true });
   fs.writeFileSync(
     path.join(testDir, `${pascalCase(game)}.test.ts`),
-    `import { ${pascalCase(game)}Scene } from '../../example-games/${game}/scenes/${pascalCase(game)}Scene';\n`,
+    [
+      `import { ${pascalCase(game)}Scene } from '../../example-games/${game}/scenes/${pascalCase(game)}Scene';`,
+      `spawnSync('node', ['--import', 'tsx/esm', 'scripts/replay.ts']);`,
+      `const roots = [{ dir: 'src/ui' }, { dir: 'src/core-engine' }];`,
+      '',
+    ].join('\n'),
   );
   return { core, gameRepo };
 }
@@ -211,7 +216,8 @@ describe('renderPackageJson', () => {
     expect(pkg.version).toBe('9.9.9');
     expect(pkg.type).toBe('module');
     // Game-specific toolchain scripts are inherited from the core manifest…
-    expect(pkg.scripts['save-load-smoke']).toContain('save-load-smoke');
+    expect(pkg.scripts['save-load-smoke']).toContain('src/scripts/save-load-smoke');
+    expect(pkg.scripts['save-load-smoke']).not.toContain('example-games/golf/');
     // …while the repo entry points override the core's.
     expect(pkg.scripts.build).toContain('tsc --noEmit');
     expect(pkg.scripts.dev).toContain('vite');
@@ -337,6 +343,11 @@ describe('scaffoldGameRepo', () => {
     );
     expect(testSrc).toContain("'../../src/scenes/GolfScene'");
     expect(testSrc).not.toContain('example-games/golf/');
+    // A game test invoking a core-owned CLI resolves it through the core link.
+    expect(testSrc).toContain("'core/scripts/replay.ts'");
+    // A game test scanning a core layer resolves it through the core link too.
+    expect(testSrc).toContain("'core/src/ui'");
+    expect(testSrc).toContain("'core/src/core-engine'");
   });
 
   it('produces a preset the discovery plugin resolves to exactly one game', () => {

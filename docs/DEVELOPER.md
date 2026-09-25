@@ -807,8 +807,9 @@ Audio assets are organized in `public/assets/audio/<game>/` with a fallback to
 > **Multi-repo note.** This tree describes the **launcher checkout**, where the
 games are present locally under `example-games/`. In the decomposed layout the
 engine lives in `tableau-card-engine-core` and each game in its own `tce-<game>`
-repo, composed with git submodules. A game repo keeps the same
-`example-games/<game>/` tree plus its `./core` submodule. See
+repo, composed with git submodules. A game repo keeps the game tree at repo-root
+`src/` (the extraction renames `example-games/<game>/` -> `src/`) plus its
+`./core` submodule, and imports the engine through path aliases. See
 [Multi-Repo Architecture](dev/multi-repo-architecture.md) for the full split and
 `configs/*.json` for the build presets.
 
@@ -1100,7 +1101,9 @@ When migrating an existing game to the canonical pattern:
 A new game gets its **own repository** (`tce-<game>`) that composes the engine as
 a git submodule at `./core`. For local development against a launcher checkout,
 the game can also live at `example-games/<game-name>/`; the discovery plugin
-resolves a game **locally first**, then as a sibling `../tce-<game>` repo.
+resolves a game **locally first**, then as a sibling `../tce-<game>` repo at the
+Option C `src/` layout (`src/scenes/<Game>Scene.ts`), then at the legacy
+`example-games/<game>/` sibling layout.
 
 ```bash
 # Scaffold a game repo alongside the core checkout
@@ -1187,10 +1190,18 @@ npm run scaffold:games
 ```
 
 It writes `package.json`, `vite.config.ts`, `tsconfig.json`, `main.ts`,
-`env.d.ts` and `configs/game.json`, and creates the compatibility symlinks
-(`src`, `scripts`, `example-games/gym`, `tests/helpers`, `core`, shared
-`public/assets`) that let the game's root-relative core imports resolve. See
-[Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4).
+`env.d.ts` and `configs/game.json`. Per **Option C** (F9), the game source
+lives at repo-root `src/` (the extraction renames `example-games/<game>/` ->
+`src/`) and the scaffold creates only the `core` link to the sibling engine
+checkout; engine imports resolve through the path aliases
+(`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`,
+`@balance-cards/*`, `@core-scripts/*`, `@core-tests/*`, `@core-gym/*`) rather
+than the removed `src`/`scripts`/`example-games/gym`/`tests/helpers`
+symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
+`src/…`, and core-owned CLI/core-layer references to `core/scripts/…` and
+`core/src/…`. See
+[Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
+and the [layout decision record](dev/per-game-src-layout-decision.md).
 
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 

@@ -319,3 +319,39 @@ Notes:
   verified here against this repo's `tsconfig.json`; C3 must add the aliases to
   the scaffolded `tsconfig.json` and C5 must prove `npm test -- --project unit`
   (which drives the `tsx` replay CLI) green in a scaffolded repo.
+
+---
+
+## How to work with a `src/`-layout game repo
+
+```bash
+# 1. Extract + rename (history-preserving) and scaffold, next to the core:
+scripts/extract-repos.sh --target golf        # -> ../tce-golf (game tree at src/)
+tsx scripts/game-repo-scaffold.ts \
+  --game golf --game-repo-root ../tce-golf \
+  --core-root ../tableau-card-engine-core
+
+# 2. Develop / build / test the single-game repo:
+cd ../tce-golf
+npm install
+npm run dev                                   # HMR on :3000
+npm run build                                 # web build (dist/)
+npm run build:electron                        # desktop renderer build
+npm test -- --project unit                    # unit suite (tsx-driven replay CLI included)
+```
+
+Import rules inside a game repo:
+
+- Engine modules: `@core-engine/*`, `@card-system/*`, `@rule-engine/*`,
+  `@ui/*`, `@ai/*`, `@balance-cards/*`.
+- Core-owned framework/tests/Gym: `@core-scripts/*`,
+  `@core-tests/*`, `@core-gym/*`.
+- The game's own source: relative (`./`, `../`) — the game tree is `src/`.
+- **Never** reach the engine with `(../)+src/**`, and never rely on a `src`,
+  `scripts`, `example-games/gym` or `tests/helpers` symlink — they are gone.
+
+In the launcher, a preset entry carries both contexts:
+`"scenePath": "example-games/golf/scenes/GolfScene.ts"` (flat monorepo) and
+`"siblingScenePath": "src/scenes/GolfScene.ts"` (a sibling `tce-golf` repo).
+The discovery plugin resolves the local path first, then the sibling `src/`
+path, then the legacy sibling path (see §5).

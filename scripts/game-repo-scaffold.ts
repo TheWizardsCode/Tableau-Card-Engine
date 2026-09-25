@@ -200,8 +200,15 @@ export function renderPackageJson(
     scripts: {
       // Inherit the core toolchain scripts (save-load-smoke, monte-carlo,
       // balance, replay, …) so a game's tests can invoke them, then override
-      // the repo-specific entry points below.
-      ...(manifest.scripts ?? {}),
+      // the repo-specific entry points below. Option C (F9/C1) moves the game
+      // tree to `src/`, so any inherited script that references
+      // `example-games/<game>/…` is repointed accordingly.
+      ...Object.fromEntries(
+        Object.entries(manifest.scripts ?? {}).map(([name, cmd]) => [
+          name,
+          cmd.split(`example-games/${game}/`).join('src/'),
+        ]),
+      ),
       dev: 'vite --host',
       build: 'tsc --noEmit && vite build',
       'build:electron': 'tsc --noEmit && vite build --mode electron',
@@ -541,10 +548,27 @@ export function rewriteGameTreePaths(gameRepoRoot: string, game: string): string
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (/\.(ts|tsx)$/.test(entry.name)) {
+      else if (/\.(ts|tsx|mjs|cjs|js)$/.test(entry.name)) {
         const original = fs.readFileSync(full, 'utf-8');
-        if (original.includes(needle)) {
-          fs.writeFileSync(full, original.split(needle).join('src/'), 'utf-8');
+        // 1. `example-games/<game>/…` -> `src/…` (game tree).
+        // 2. A quoted `scripts/…` path -> `core/scripts/…`: game tests invoke
+        //    core-owned CLIs (e.g. `scripts/replay.ts`) that now live in the
+        //    core checkout, not the game repo. `src/scripts/…` is untouched.
+        // 3. A quoted `src/<core-dir>…` path -> `core/src/<core-dir>…`: some
+        //    main-street tests scan the core's UI/engine layers directly.
+        const updated = original
+          .split(needle)
+          .join('src/')
+          .split("'scripts/")
+          .join("'core/scripts/")
+          .split('"scripts/')
+          .join('"core/scripts/')
+          .replace(
+            /(['"])src\/(core-engine|card-system|rule-engine|ui|ai)(?=[/'"])/g,
+            '$1core/src/$2',
+          );
+        if (updated !== original) {
+          fs.writeFileSync(full, updated, 'utf-8');
           rewritten.push(full);
         }
       }

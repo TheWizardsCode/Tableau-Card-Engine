@@ -121,9 +121,11 @@ GAMES_CONFIG=full npm run package          # packaged desktop binary
 ```
 
 A game is resolved **locally first** (`example-games/<id>/`, the flat layout
-still used by the launcher checkout) and then **as a sibling repo**
-(`../tce-<id>/`, the composed layout), so one preset set works in both. A
-missing game fails the build with a message naming it.
+used by the launcher checkout) and then **as a sibling repo** — first at the
+Option C `src/` layout (`../tce-<id>/src/…`) and then at the legacy sibling
+layout (`../tce-<id>/example-games/<id>/…`), so one preset set works in both. A
+missing game fails the build with a message naming it and listing every
+candidate path.
 
 ### Per-game development loop
 
@@ -145,8 +147,13 @@ npm run build                             # production build
 npm run build:electron                    # desktop build
 ```
 
-Engine imports (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`,
-`@ai/*`) resolve into the game's `./core` submodule via `CORE_ROOT`.
+The game source lives at repo-root `src/` (the extraction renames
+`example-games/<game>/` -> `src/`), and engine imports
+(`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`,
+`@balance-cards/*`, `@core-scripts/*`, `@core-tests/*`, `@core-gym/*`) resolve
+into the game's `./core` submodule via `CORE_ROOT`. There is no `src` symlink:
+the aliases replace the F4 compatibility symlinks. See the
+[layout decision record](docs/dev/per-game-src-layout-decision.md).
 
 ### Repository layout (this checkout)
 
