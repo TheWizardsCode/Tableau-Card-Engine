@@ -28,6 +28,7 @@ import {
   renderTsconfig,
   renderViteConfig,
   scaffoldGameRepo,
+  toGameRepoPath,
   type CoreManifest,
 } from '../../scripts/game-repo-scaffold';
 import {
@@ -93,7 +94,7 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
   );
 
   const gameRepo = path.join(root, `tce-${game}`);
-  const sceneDir = path.join(gameRepo, 'example-games', game, 'scenes');
+  const sceneDir = path.join(gameRepo, 'src', 'scenes');
   fs.mkdirSync(sceneDir, { recursive: true });
   fs.writeFileSync(
     path.join(sceneDir, `${pascalCase(game)}Scene.ts`),
@@ -106,6 +107,14 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
       '};',
       '',
     ].join('\n'),
+  );
+  // The game's own tests still reach the game tree via the monorepo
+  // `example-games/<game>/…` prefix; the scaffold rewrites it to `src/`.
+  const testDir = path.join(gameRepo, 'tests', game);
+  fs.mkdirSync(testDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(testDir, `${pascalCase(game)}.test.ts`),
+    `import { ${pascalCase(game)}Scene } from '../../example-games/${game}/scenes/${pascalCase(game)}Scene';\n`,
   );
   return { core, gameRepo };
 }
@@ -147,27 +156,43 @@ describe('linkSharedAssets', () => {
 
 describe('game id helpers', () => {
   it('maps every shipped game id to its scene module path', () => {
-    expect(defaultScenePath('golf')).toBe('example-games/golf/scenes/GolfScene.ts');
+    expect(defaultScenePath('golf')).toBe('src/scenes/GolfScene.ts');
     expect(defaultScenePath('beleaguered-castle')).toBe(
-      'example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts',
+      'src/scenes/BeleagueredCastleScene.ts',
     );
     expect(defaultScenePath('blackjack')).toBe(
-      'example-games/blackjack/scenes/BlackjackScene.ts',
+      'src/scenes/BlackjackScene.ts',
     );
     expect(defaultScenePath('sushi-go')).toBe(
-      'example-games/sushi-go/scenes/SushiGoScene.ts',
+      'src/scenes/SushiGoScene.ts',
     );
     expect(defaultScenePath('feudalism')).toBe(
-      'example-games/feudalism/scenes/FeudalismScene.ts',
+      'src/scenes/FeudalismScene.ts',
     );
     expect(defaultScenePath('lost-cities')).toBe(
-      'example-games/lost-cities/scenes/LostCitiesScene.ts',
+      'src/scenes/LostCitiesScene.ts',
     );
     expect(defaultScenePath('main-street')).toBe(
-      'example-games/main-street/scenes/MainStreetScene.ts',
+      'src/scenes/MainStreetScene.ts',
     );
     expect(defaultScenePath('coloretto')).toBe(
-      'example-games/coloretto/scenes/ColorettoScene.ts',
+      'src/scenes/ColorettoScene.ts',
+    );
+  });
+
+  it('translates a monorepo game-tree path to the src/ layout', () => {
+    expect(toGameRepoPath('example-games/golf/GolfGame.ts', 'golf')).toBe(
+      'src/GolfGame.ts',
+    );
+    expect(
+      toGameRepoPath('example-games/golf/scripts/adapters/GolfReplayAdapter.ts', 'golf'),
+    ).toBe('src/scripts/adapters/GolfReplayAdapter.ts');
+    // Paths that do not reference this game's tree are unchanged.
+    expect(toGameRepoPath('src/scenes/GolfScene.ts', 'golf')).toBe(
+      'src/scenes/GolfScene.ts',
+    );
+    expect(toGameRepoPath('example-games/main-street/MainStreetEngine.ts', 'golf')).toBe(
+      'example-games/main-street/MainStreetEngine.ts',
     );
   });
 
@@ -212,37 +237,48 @@ describe('renderTsconfig', () => {
   it('points every core alias at the sibling core checkout', () => {
     const cfg = JSON.parse(renderTsconfig('golf', DEFAULT_CORE_REL));
     for (const [key, expected] of [
+      ['@core-engine', 'src/core-engine'],
       ['@core-engine/*', 'src/core-engine/*'],
+      ['@card-system', 'src/card-system'],
       ['@card-system/*', 'src/card-system/*'],
+      ['@rule-engine', 'src/rule-engine'],
       ['@rule-engine/*', 'src/rule-engine/*'],
+      ['@ui', 'src/ui'],
       ['@ui/*', 'src/ui/*'],
+      ['@ai', 'src/ai'],
       ['@ai/*', 'src/ai/*'],
+      ['@balance-cards', 'src/balance-cards'],
+      ['@balance-cards/*', 'src/balance-cards/*'],
+      ['@core-scripts/*', 'scripts/*'],
+      ['@core-tests/*', 'tests/*'],
+      ['@core-gym', 'example-games/gym'],
+      ['@core-gym/*', 'example-games/gym/*'],
     ] as const) {
       expect(cfg.compilerOptions.paths[key]).toEqual([
         `${DEFAULT_CORE_REL}/${expected}`,
       ]);
     }
-    expect(cfg.include).toContain('example-games/golf/**/*.ts');
+    // Option C: the game tree is at `src/`; no `example-games/` include.
+    expect(cfg.include).toContain('src/**/*.ts');
     expect(cfg.include).toContain('tests/**/*.ts');
+    expect(cfg.include).not.toContain('example-games/golf/**/*.ts');
   });
 });
 
 describe('renderPreset', () => {
   it('selects exactly one game, resolved locally', () => {
-    const preset = JSON.parse(
-      renderPreset('golf', 'example-games/golf/scenes/GolfScene.ts'),
-    );
+    const preset = JSON.parse(renderPreset('golf', 'src/scenes/GolfScene.ts'));
     expect(preset.games).toHaveLength(1);
     expect(preset.games[0]).toEqual({
       id: 'golf',
       path: '.',
-      scenePath: 'example-games/golf/scenes/GolfScene.ts',
+      scenePath: 'src/scenes/GolfScene.ts',
     });
   });
 
   it('includes an adapter path where the game supports replay', () => {
     const preset = JSON.parse(
-      renderPreset('golf', 'example-games/golf/scenes/GolfScene.ts', 'example-games/golf/scripts/adapters/GolfReplayAdapter.ts'),
+      renderPreset('golf', 'src/scenes/GolfScene.ts', 'src/scripts/adapters/GolfReplayAdapter.ts'),
     );
     expect(preset.games[0].adapterPath).toContain('GolfReplayAdapter');
   });
@@ -252,7 +288,7 @@ describe('findGameInPreset', () => {
   it('reads the scene path for a game from the core full.json preset', () => {
     const { core } = makeLayout('golf');
     expect(findGameInPreset(core, 'golf')?.scenePath).toBe(
-      'example-games/golf/scenes/GolfScene.ts',
+      'src/scenes/GolfScene.ts',
     );
   });
 
@@ -266,7 +302,7 @@ describe('findGameInPreset', () => {
 // ── End-to-end scaffold over a fixture ────────────────────────────────────
 
 describe('scaffoldGameRepo', () => {
-  it('writes the root configs, preset and core symlinks', () => {
+  it('writes the root configs, preset and only the core link', () => {
     const { core, gameRepo } = makeLayout('golf');
     const result = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
 
@@ -283,18 +319,24 @@ describe('scaffoldGameRepo', () => {
     }
     expect(result.presetPath).toBe(path.join(gameRepo, 'configs', `${DEFAULT_GAME_PRESET}.json`));
 
-    // The symlinks make root-relative `../../src`, `../../scripts` and
-    // `../../example-games/gym` imports resolve to the core checkout.
-    expect(fs.lstatSync(path.join(gameRepo, 'src')).isSymbolicLink()).toBe(true);
-    expect(fs.realpathSync(path.join(gameRepo, 'src'))).toBe(fs.realpathSync(path.join(core, 'src')));
-    expect(fs.realpathSync(path.join(gameRepo, 'scripts'))).toBe(fs.realpathSync(path.join(core, 'scripts')));
-    expect(fs.realpathSync(path.join(gameRepo, 'example-games', 'gym'))).toBe(
-      fs.realpathSync(path.join(core, 'example-games', 'gym')),
-    );
+    // Option C: the game tree occupies `src/`; the legacy `src -> core/src`
+    // symlink and the `scripts`/`example-games/gym`/`tests/helpers` symlinks
+    // are gone. `src` is a real directory, not a link.
+    expect(fs.lstatSync(path.join(gameRepo, 'src')).isSymbolicLink()).toBe(false);
+    expect(fs.existsSync(path.join(gameRepo, 'src', 'scenes', 'GolfScene.ts'))).toBe(true);
+    expect(fs.lstatSync(path.join(gameRepo, 'scripts'), { throwIfNoEntry: false }) ?? null).toBeNull();
+    expect(fs.lstatSync(path.join(gameRepo, 'example-games'), { throwIfNoEntry: false }) ?? null).toBeNull();
     expect(fs.realpathSync(path.join(gameRepo, 'core'))).toBe(fs.realpathSync(core));
-    expect(fs.realpathSync(path.join(gameRepo, 'tests', 'helpers'))).toBe(
-      fs.realpathSync(path.join(core, 'tests', 'helpers')),
+    expect(result.symlinks.map((s) => path.basename(s))).toEqual(['core']);
+
+    // The game's own test import is repointed from the monorepo
+    // `example-games/golf/…` tree to the `src/` layout.
+    const testSrc = fs.readFileSync(
+      path.join(gameRepo, 'tests', 'golf', 'Golf.test.ts'),
+      'utf-8',
     );
+    expect(testSrc).toContain("'../../src/scenes/GolfScene'");
+    expect(testSrc).not.toContain('example-games/golf/');
   });
 
   it('produces a preset the discovery plugin resolves to exactly one game', () => {
@@ -309,15 +351,15 @@ describe('scaffoldGameRepo', () => {
     expect(games[0].id).toBe('main-street');
     expect(games[0].info.description).toBe('demo');
     expect(games[0].absoluteScenePath).toBe(
-      path.join(gameRepo, 'example-games', 'main-street', 'scenes', 'MainStreetScene.ts'),
+      path.join(gameRepo, 'src', 'scenes', 'MainStreetScene.ts'),
     );
   });
 
-  it('is idempotent (a re-scaffold does not recreate the symlinks)', () => {
+  it('is idempotent (a re-scaffold does not recreate the core link)', () => {
     const { core, gameRepo } = makeLayout('blackjack');
     const first = scaffoldGameRepo({ game: 'blackjack', gameRepoRoot: gameRepo, coreRoot: core });
     const second = scaffoldGameRepo({ game: 'blackjack', gameRepoRoot: gameRepo, coreRoot: core });
-    expect(first.symlinks.length).toBe(5);
+    expect(first.symlinks.length).toBe(1);
     expect(second.symlinks.length).toBe(0);
     expect(fs.realpathSync(path.join(gameRepo, 'core'))).toBe(fs.realpathSync(core));
   });

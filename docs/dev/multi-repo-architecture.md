@@ -253,32 +253,48 @@ devDependencies, and the core toolchain scripts (`save-load-smoke`,
 - **`vite.config.ts`** — imports `gameDiscoveryPlugin` and `resolveCoreAliases`
 from the sibling core and reads `configs/game.json` (Gym + this one game) by
 default; `GAMES_CONFIG` can still override for an ad-hoc build.
-- **`tsconfig.json`** — the five core aliases point at the sibling core;
-browser/E2E tests are excluded from the type-check (they belong to the
-launcher distribution).
+- **`tsconfig.json`** — the core aliases (`@core-engine`, `@card-system`,
+`@rule-engine`, `@ui`, `@ai`, `@balance-cards`, `@core-scripts`,
+`@core-tests`, `@core-gym`) point at the sibling core; `src/**` and `tests/**`
+are included; browser/E2E tests are excluded from the type-check (they belong
+to the launcher distribution).
 - **`main.ts`, `env.d.ts`, `index.html`** — the entry point and its
 virtual-module types.
-- **`configs/game.json`** — a single-game preset.
+- **`configs/game.json`** — a single-game preset whose `scenePath` is
+`src/scenes/<Game>Scene.ts`.
 
-### Root-relative compatibility symlinks
+### Option C layout — flat `src/`, no compatibility symlinks (F9)
 
-Most game source and tests import core code with repository-root-relative
-specifiers (`../../src/…`, `../../scripts/…`, `../../example-games/gym/…`) that
-neither TypeScript `paths` nor Vite `resolve.alias` can remap. Rather than
-rewriting hundreds of files, the scaffold creates relative symlinks so those
-imports resolve without touching the game code:
+The F4 layout above (game at `example-games/<game>/`, `src -> <core>/src`)
+is reworked by feature **F9** into **Option C**: the game's source lives at
+repo-root `src/` and every engine import goes through a path alias. The
+deciding record is
+[`per-game-src-layout-decision.md`](./per-game-src-layout-decision.md).
 
-| Link | Target | Needed by |
-|---|---|---|
-| `src` | `<core>/src` | `../../src/…` core imports |
-| `scripts` | `<core>/scripts` | the replay-adapter framework |
-| `example-games/gym` | `<core>/example-games/gym` | Gym-backed demo scenes (e.g. Main Street's card index) |
-| `tests/helpers` | `<core>/tests/helpers` | shared unit-test helpers (`MockFactory`) |
-| `core` | `<core>` | a stable alias for the engine checkout |
-| `public/assets/<shared>` | `<core>/public/assets/<shared>` | shared assets from the F1 asset table (game-owned assets stay real) |
+`scripts/extract-repos.sh` now renames each game's tree during extraction,
+history-preservingly:
 
-The path aliases (`@core-engine/*`, …) resolve independently, so both import
-styles work.
+```
+example-games/<game>/  ->  src/        (git filter-repo --path-rename)
+```
+
+The game's own `tests/` and `scripts/` trees travel with it, so they live at
+`src/tests/` and `src/scripts/`. The game's **unit/browser tests** stay at
+`tests/<game>/`; the scaffold rewrites the `example-games/<game>/` segment of
+those tests to `src/` (so a test at `tests/<game>/…` reaches the source with
+`../../src/…`), including runtime fixture paths. Only one directory link
+remains — `core` (the engine checkout, a git submodule once the remotes exist).
+The old `src`, `scripts`, `example-games/gym` and `tests/helpers` symlinks are
+gone, replaced by aliases:
+
+| Old F4 symlink | Option C replacement |
+|---|---|
+| `src -> <core>/src` | game source occupies `src/`; engine imports use `@core-engine/*` etc. |
+| `scripts -> <core>/scripts` | `@core-scripts/*` (replay-adapter framework) |
+| `example-games/gym -> <core>/example-games/gym` | `@core-gym/*` (game-owned Gym-backed scenes) |
+| `tests/helpers -> <core>/tests/helpers` | `@core-tests/*` (shared test helpers) |
+| `core -> <core>` | kept (git submodule) |
+| `public/assets/<shared>` | kept (assets are not code) |
 
 ### Verifying a scaffolded game repo
 
@@ -287,9 +303,10 @@ npx tsc --noEmit && npm run build && npm run build:electron
 npm test          # vitest run --project unit
 ```
 
-Verified end to end for **golf** and **main-street**: `tsc`, the web and
-Electron renderer builds, and the unit suite (golf 217 passed; main-street 3850
-passed) are all green against a sibling core checkout.
+Verified end to end for **golf** and **main-street** against a core checkout:
+`tsc --noEmit` and `vite build` both succeed with the game source at `src/`
+and no `src` symlink (F9/C3). The full build + test gate for the composed
+launcher is F7.
 
 ### GitHub remotes are not created in this phase
 

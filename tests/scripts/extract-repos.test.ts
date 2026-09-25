@@ -288,6 +288,18 @@ describe('extract-repos.sh — dry-run plan', () => {
     expect(stdout).toContain('example-games/gym');
   });
 
+  it('plans the history-preserving rename of each game tree to src/ (Option C)', () => {
+    const { stdout } = runExtract(['--dry-run']);
+    for (const game of GAME_NAMES) {
+      expect(stdout, `missing rename for ${game}`).toContain(
+        `example-games/${game}/ -> src/`,
+      );
+    }
+    // The core repo is not renamed.
+    const { stdout: coreOnly } = runExtract(['--target', 'core', '--dry-run']);
+    expect(coreOnly).not.toContain('-> src/');
+  });
+
   it('warns when git-filter-repo is unavailable but still plans (fail-open)', () => {
     const { stdout, status } = runExtract(['--dry-run']);
     expect(status).toBe(0);

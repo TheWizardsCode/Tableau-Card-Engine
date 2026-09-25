@@ -42,7 +42,7 @@
 
 import Phaser from 'phaser';
 
-import { GymSceneBase } from '../../gym/scenes/GymSceneBase';
+import { GymSceneBase } from '@core-gym/scenes/GymSceneBase';
 import { GAME_W } from '@ui/constants';
 import { createHudText } from '@ui/Renderer';
 import { anchorPoint } from '@ui/screen-layout';
@@ -66,7 +66,7 @@ import {
   type CardGroup,
   type CardIndexEntry,
 } from './GymCardIndex';
-import gymCardIndexLayoutJson from '../../gym/layouts/gym-card-index.layout.json';
+import gymCardIndexLayoutJson from '@core-gym/layouts/gym-card-index.layout.json';
 import {
   CARD_INDEX_BG_COLOR,
   CARD_INDEX_DIALOG_HEIGHT,
@@ -93,7 +93,7 @@ import {
   CARD_INDEX_SCROLL_STEP,
   CARD_INDEX_STATUS_FONT_SIZE,
   DEFAULT_VIEWPORT,
-} from '../../gym/scenes/GymConstants';
+} from '@core-gym/scenes/GymConstants';
 
 // Parse the scene layout once at module load.
 const CARD_INDEX_LAYOUT: ScreenLayoutDocument | null = (() => {

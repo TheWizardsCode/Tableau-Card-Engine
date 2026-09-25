@@ -76,6 +76,9 @@ export const ALIAS_RULES: readonly AliasRule[] = [
   // Game tests import the core helper tree via the `tests/helpers` symlink as
   // `../helpers/…`; no game ships its own `helpers/` reachable that way.
   { match: /^helpers\/(.*)$/, replace: '@core-tests/helpers/$1' },
+  // Game-owned Gym-backed scenes (e.g. main-street's card index) import the
+  // core-owned Gym via `../../gym/…`; the `example-games/gym` symlink is gone.
+  { match: /^gym\/(.*)$/, replace: '@core-gym/$1' },
 ];
 
 /**
@@ -84,7 +87,7 @@ export const ALIAS_RULES: readonly AliasRule[] = [
  * remainder (the part the alias rules match).
  */
 export const RELATIVE_SPECIFIER_RE =
-  /(['"])((?:\.\.\/)+)((?:src|scripts|tests|helpers)\/[^'"]+)\1/g;
+  /(['"])((?:\.\.\/)+)((?:src|scripts|tests|helpers|gym)\/[^'"]+)\1/g;
 
 /** Result of codemodding one file. */
 export interface FileRewrite {

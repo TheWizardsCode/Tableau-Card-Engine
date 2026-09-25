@@ -13,32 +13,35 @@
  * an extracted game tree into a runnable single-game launcher which composes
  * the core engine checkout as a sibling (`../tableau-card-engine-core`).
  *
- * ## Composed layout
+ * ## Composed layout (Option C — F9/C1)
  *
  * ```
  * <parent>/
  * ├── tableau-card-engine-core/   the engine + Gym + launcher shell
  * └── tce-<game>/                 scaffolded by this module
- *     ├── core -> ../tableau-card-engine-core   (symlink, optional)
- *     ├── src  -> ../tableau-card-engine-core/src   (symlink: `../../src` imports)
+ *     ├── core -> ../tableau-card-engine-core   (symlink, optional; git submodule)
+ *     ├── src/                     the game tree (renamed from example-games/<game>/)
+ *     │   ├── scenes/<Game>Scene.ts
+ *     │   ├── scripts/adapters/<Game>ReplayAdapter.ts
+ *     │   └── tests/fixtures/…
  *     ├── configs/<game>.json      single-game preset (Gym + 1 game)
- *     ├── example-games/<game>/    the game tree (from F1 extraction)
  *     ├── main.ts / index.html / env.d.ts
  *     ├── package.json / vite.config.ts / tsconfig.json
- *     └── tests/<game>/            the game's tests (from F1 extraction)
+ *     └── tests/<game>/            the game's unit/browser tests (from F1 extraction)
  * ```
  *
- * The `src` symlink exists because the game source and tests import core code
- * with repository-root-relative specifiers (`../../src/card-system/Card`),
- * which neither TypeScript `paths` nor Vite `resolve.alias` can remap. The
- * symlink keeps those imports working without rewriting hundreds of files; the
- * path aliases (`@core-engine/*`, …) still resolve to the sibling core.
+ * The game source lives at repo-root `src/`; the `src -> core/src` compatibility
+ * symlink is **gone**. Engine imports use the shared path aliases (C2), and the
+ * game's own tests reach the game source through the rewritten `src/` prefix
+ * (`../../src/…`), so no `example-games/` tree or symlink is needed.
  *
  * ## History
  *
  * Scaffolding is deliberately separate from extraction so the F1
- * `git filter-repo` step owns history preservation (AC5). Scaffolding writes a
- * single commit's worth of root files on top of the extracted history.
+ * `git filter-repo` step owns history preservation (AC5). The game-tree
+ * rename to `src/` is a `--path-rename` in `scripts/extract-repos.sh`, so it is
+ * history-preserving; scaffolding writes a single commit's worth of root files
+ * on top of the extracted history and rewrites intra-test game-tree paths.
  *
  * ## CLI
  *
@@ -81,7 +84,11 @@ export interface GameEntryRef {
   id: string;
   path: string;
   scenePath: string;
+  /** Sibling-repo (`src/`-layout) scene path (Option C, C4). */
+  siblingScenePath?: string;
   adapterPath?: string;
+  /** Sibling-repo (`src/`-layout) adapter path (Option C, C4). */
+  siblingAdapterPath?: string;
 }
 
 /** Inputs for {@link scaffoldGameRepo}. */
@@ -114,6 +121,8 @@ export interface ScaffoldResult {
   presetPath: string;
   written: string[];
   symlinks: string[];
+  /** Test/source files whose `example-games/<game>/` paths were rewritten. */
+  rewritten: string[];
   /** Shared core assets linked into `public/assets` (F1 asset table). */
   assetLinks: string[];
 }
@@ -129,9 +138,20 @@ export function pascalCase(id: string): string {
     .join('');
 }
 
-/** Default scene module path for a game id. */
+/** Default scene module path for a game id (Option C: `src/` layout). */
 export function defaultScenePath(game: string): string {
-  return `example-games/${game}/scenes/${pascalCase(game)}Scene.ts`;
+  return `src/scenes/${pascalCase(game)}Scene.ts`;
+}
+
+/**
+ * Translate a monorepo (`example-games/<game>/…`) path to the game-repo
+ * (`src/…`) layout. Paths that do not reference the game tree are unchanged.
+ */
+export function toGameRepoPath(monorepoPath: string, game: string): string {
+  const prefix = `example-games/${game}/`;
+  return monorepoPath.startsWith(prefix)
+    ? `src/${monorepoPath.slice(prefix.length)}`
+    : monorepoPath;
 }
 
 /** Read and parse the core manifest (`package.json`). */
@@ -280,7 +300,7 @@ export default defineConfig(({ mode }) => ({
 }
 
 /** Render the game repo `tsconfig.json`. */
-export function renderTsconfig(game: string, coreRel: string): string {
+export function renderTsconfig(_game: string, coreRel: string): string {
   const cfg = {
     compilerOptions: {
       target: 'ES2020',
@@ -301,17 +321,31 @@ export function renderTsconfig(game: string, coreRel: string): string {
       outDir: './dist',
       baseUrl: '.',
       paths: {
+        '@core-engine': [`${coreRel}/src/core-engine`],
         '@core-engine/*': [`${coreRel}/src/core-engine/*`],
+        '@card-system': [`${coreRel}/src/card-system`],
         '@card-system/*': [`${coreRel}/src/card-system/*`],
+        '@rule-engine': [`${coreRel}/src/rule-engine`],
         '@rule-engine/*': [`${coreRel}/src/rule-engine/*`],
+        '@ui': [`${coreRel}/src/ui`],
         '@ui/*': [`${coreRel}/src/ui/*`],
+        '@ai': [`${coreRel}/src/ai`],
         '@ai/*': [`${coreRel}/src/ai/*`],
+        '@balance-cards': [`${coreRel}/src/balance-cards`],
+        '@balance-cards/*': [`${coreRel}/src/balance-cards/*`],
+        // Core-owned framework trees consumed by the game's own tests and
+        // replay adapter (F9 / C1).
+        '@core-scripts/*': [`${coreRel}/scripts/*`],
+        '@core-tests/*': [`${coreRel}/tests/*`],
+        // Core-owned Gym, imported by a game-owned Gym-backed scene.
+        '@core-gym': [`${coreRel}/example-games/gym`],
+        '@core-gym/*': [`${coreRel}/example-games/gym/*`],
       },
     },
     include: [
       'main.ts',
       'env.d.ts',
-      `example-games/${game}/**/*.ts`,
+      'src/**/*.ts',
       'tests/**/*.ts',
       'vite.config.ts',
     ],
@@ -488,6 +522,40 @@ export function linkSharedAssets(
 }
 
 /**
+ * Rewrite intra-test references to the game tree for the `src/` layout.
+ *
+ * Game tests reach their own source with repository-root-relative specifiers
+ * like `../../example-games/<game>/GolfGame` (C2 rewrote only the *engine*
+ * imports to aliases). In the Option C layout the game tree is at `src/`, and
+ * because a game test lives at the same depth as in the monorepo
+ * (`tests/<game>/…`), replacing the `example-games/<game>/` segment with
+ * `src/` is exact — including runtime paths such as fixture file locations.
+ *
+ * @returns The rewritten file paths.
+ */
+export function rewriteGameTreePaths(gameRepoRoot: string, game: string): string[] {
+  const needle = `example-games/${game}/`;
+  const rewritten: string[] = [];
+  const walk = (dir: string): void => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(ts|tsx)$/.test(entry.name)) {
+        const original = fs.readFileSync(full, 'utf-8');
+        if (original.includes(needle)) {
+          fs.writeFileSync(full, original.split(needle).join('src/'), 'utf-8');
+          rewritten.push(full);
+        }
+      }
+    }
+  };
+  walk(path.join(gameRepoRoot, 'tests'));
+  walk(path.join(gameRepoRoot, 'src'));
+  return rewritten;
+}
+
+/**
  * Scaffold a per-game repo in place.
  *
  * Writes `package.json`, `vite.config.ts`, `tsconfig.json`, `main.ts`,
@@ -521,9 +589,18 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   const preset = options.scenePath
     ? undefined
     : findGameInPreset(coreRoot, options.game);
+  // Option C (C1/C4): prefer an explicit sibling `src/` path from the core's
+  // preset, then translate a monorepo `example-games/<game>/…` path, then fall
+  // back to the canonical `src/scenes/<Game>Scene.ts`.
   const scenePath =
-    options.scenePath ?? preset?.scenePath ?? defaultScenePath(options.game);
-  const adapterPath = options.adapterPath ?? preset?.adapterPath;
+    options.scenePath ??
+    preset?.siblingScenePath ??
+    (preset?.scenePath ? toGameRepoPath(preset.scenePath, options.game) : undefined) ??
+    defaultScenePath(options.game);
+  const adapterPath =
+    options.adapterPath ??
+    preset?.siblingAdapterPath ??
+    (preset?.adapterPath ? toGameRepoPath(preset.adapterPath, options.game) : undefined);
 
   const written: string[] = [];
   const symlinks: string[] = [];
@@ -570,38 +647,20 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     written,
   );
 
-  // Root-relative imports that core-owned code needs: `../../src/...` (game
-  // source + tests), `../../scripts/...` (the replay-adapter framework), and
-  // `../../example-games/gym/...` (a game's Gym-backed demo scenes). The `core`
-  // link is a stable alias for the core checkout itself.
-  if (ensureDirSymlink(path.join(gameRepoRoot, 'src'), path.join(coreRoot, 'src'))) {
-    symlinks.push(path.join(gameRepoRoot, 'src'));
-  }
-  if (ensureDirSymlink(path.join(gameRepoRoot, 'scripts'), path.join(coreRoot, 'scripts'))) {
-    symlinks.push(path.join(gameRepoRoot, 'scripts'));
-  }
-  if (
-    ensureDirSymlink(
-      path.join(gameRepoRoot, 'example-games', 'gym'),
-      path.join(coreRoot, 'example-games', 'gym'),
-    )
-  ) {
-    symlinks.push(path.join(gameRepoRoot, 'example-games', 'gym'));
-  }
+  // Option C (C1): the game source occupies repo-root `src/`, so the
+  // `src -> core/src` compatibility symlink (and the `scripts`,
+  // `example-games/gym` and `tests/helpers` symlinks that propped up
+  // root-relative imported paths) are no longer created. Engine imports go
+  // through the path aliases; intra-test game-tree paths are rewritten to
+  // `src/`. The only remaining link is `core` (the engine checkout / a git
+  // submodule once remotes exist).
   if (ensureDirSymlink(path.join(gameRepoRoot, 'core'), coreRoot)) {
     symlinks.push(path.join(gameRepoRoot, 'core'));
   }
-  // Some unit tests share the core's test helpers (`tests/helpers/MockFactory`).
-  if (
-    ensureDirSymlink(
-      path.join(gameRepoRoot, 'tests', 'helpers'),
-      path.join(coreRoot, 'tests', 'helpers'),
-    )
-  ) {
-    symlinks.push(path.join(gameRepoRoot, 'tests', 'helpers'));
-  }
 
   const assetLinks = linkSharedAssets(gameRepoRoot, coreRoot);
+
+  const rewritten = rewriteGameTreePaths(gameRepoRoot, options.game);
 
   return {
     gameRepoRoot,
@@ -614,6 +673,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     ),
     written,
     symlinks,
+    rewritten,
     assetLinks,
   };
 }
@@ -748,6 +808,9 @@ function main(argv: string[]): number {
       console.log(`  preset:    ${result.presetPath}`);
       for (const f of result.written) console.log(`  wrote ${f}`);
       for (const l of result.symlinks) console.log(`  linked ${l}`);
+      if (result.rewritten.length) {
+        console.log(`  rewrote example-games/${game}/ → src/ in ${result.rewritten.length} file(s)`);
+      }
       if (result.assetLinks.length) {
         console.log(`  linked ${result.assetLinks.length} shared asset(s)`);
       }

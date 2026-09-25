@@ -53,6 +53,15 @@ describe('rewriteSource', () => {
     });
   });
 
+  it('maps a game-owned Gym-backed scene import to the core Gym alias', () => {
+    expect(
+      rewriteSource("import { GymSceneBase } from '../../gym/scenes/GymSceneBase';"),
+    ).toMatchObject({
+      source: "import { GymSceneBase } from '@core-gym/scenes/GymSceneBase';",
+      rewrites: 1,
+    });
+  });
+
   it('rewrites dynamic import() specifiers too', () => {
     expect(
       rewriteSource("const m = await import('../../src/ui/overlays');"),

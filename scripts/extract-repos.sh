@@ -215,6 +215,9 @@ print_plan() {
     echo "[${TARGET_KINDS[$i]}] ${TARGET_SLUGS[$i]}"
     echo "    remote: ${TARGET_REMOTES[$i]}"
     echo "    output: ${OUT_DIR}/${TARGET_SLUGS[$i]}"
+    if [[ "${TARGET_KINDS[$i]}" == "game" ]]; then
+      echo "    rename: example-games/${TARGET_NAMES[$i]}/ -> src/ (Option C)"
+    fi
     echo "    paths:"
     local p
     while IFS= read -r p; do
@@ -252,6 +255,8 @@ mkdir -p "${OUT_DIR}"
 
 extract_one() {
   local index="$1"
+  local kind="${TARGET_KINDS[$index]}"
+  local name="${TARGET_NAMES[$index]}"
   local slug="${TARGET_SLUGS[$index]}"
   local remote="${TARGET_REMOTES[$index]}"
   local dest="${OUT_DIR}/${slug}"
@@ -284,9 +289,19 @@ extract_one() {
     done < <(printf '%s\n' "${assets_csv}" | tr ',' '\n')
   fi
 
+  # Option C (F9 / C1): a game repo keeps its source at repo-root `src/`.
+  # Rename the extracted game tree in place, history-preserving, so the
+  # per-game repo has `src/**` instead of `example-games/<game>/**`. This is
+  # a single directory rename; the game's own `tests/` and `scripts/` trees
+  # stay under `src/` (`src/tests/`, `src/scripts/`).
+  local -a rename_args=()
+  if [[ "${kind}" == "game" ]]; then
+    rename_args+=(--path-rename "example-games/${name}/:src/")
+  fi
+
   # Work on a clone so the source monorepo is never rewritten in place.
   git clone --no-local --quiet "${SOURCE_REPO}" "${dest}"
-  git -C "${dest}" filter-repo --force "${filter_args[@]}" "${asset_args[@]}"
+  git -C "${dest}" filter-repo --force "${rename_args[@]}" "${filter_args[@]}" "${asset_args[@]}"
 
   if [[ -n "${remote}" ]]; then
     git -C "${dest}" remote add origin "${remote}" 2>/dev/null || true

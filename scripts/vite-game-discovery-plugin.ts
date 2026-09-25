@@ -91,6 +91,7 @@ export function resolveCoreAliases(coreRoot: string): Record<string, string> {
     // Core-owned framework trees consumed by per-game repos (F9 / C2).
     '@core-scripts': path.resolve(coreRoot, 'scripts'),
     '@core-tests': path.resolve(coreRoot, 'tests'),
+    '@core-gym': path.resolve(coreRoot, 'example-games/gym'),
   };
 }
 

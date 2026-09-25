@@ -31,7 +31,9 @@
       "@balance-cards": ["src/balance-cards"],
       "@balance-cards/*": ["src/balance-cards/*"],
       "@core-scripts/*": ["scripts/*"],
-      "@core-tests/*": ["tests/*"]
+      "@core-tests/*": ["tests/*"],
+      "@core-gym": ["example-games/gym"],
+      "@core-gym/*": ["example-games/gym/*"]
     }
   },
   "include": [

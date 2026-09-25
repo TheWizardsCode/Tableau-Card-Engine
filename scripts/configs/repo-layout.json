@@ -518,6 +518,7 @@
     }
   ],
   "notes": {
+    "gameSourceRename": "Option C (F9/C1): after path selection, extract-repos.sh renames each game's source tree example-games/<game>/ -> src/ via `git filter-repo --path-rename example-games/<game>/:src/` (history-preserving). The game's own tests/ and scripts/ trees therefore live at src/tests/ and src/scripts/ in the game repo; the game's unit/browser tests stay at tests/<game>/. The core repo is not renamed.",
     "historyPreservation": "git-filter-repo --path <path>; preserves commit history for moved files.",
     "siblingLayout": "Per-game repos and the core repo are checked out as siblings; a game repo pulls the core as a git submodule at ./core.",
     "assetIncludeSemantics": "git filter-repo directory includes re-include their children and glob '*' crosses '/', so a shared asset is NEVER declared as a broad parent of a game-owned child. Rather than exclude, the layout enumerates the shared files and the disjoint shared subtrees (cards/alternative/, audio/default/) explicitly; game-owned subdirectories are simply absent.",
