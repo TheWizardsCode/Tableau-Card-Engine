@@ -16,7 +16,6 @@ import {
   ColorettoAiPlayer,
   marginalGain,
   netRowValue,
-  wholeRowValue,
 } from '../../example-games/coloretto/ColorettoAis';
 import {
   setupColorettoGame,
@@ -149,45 +148,6 @@ describe('ColorettoAis', () => {
     });
   });
 
-  describe('wholeRowValue', () => {
-    it('values a row of 3 same-colour singles at 6 (not 3)', () => {
-      const session = setupColorettoGame({ rng: makeRng() });
-      // Player has no collection (round-1 scenario).
-      session.players[0].collection = [];
-      // Row of 3 red singles: 3 red = 6 points.
-      session.rows[0].cards = [ch('red', 1, 1), ch('red', 1, 2), ch('red', 1, 3)];
-      expect(wholeRowValue(session, 0, 0)).toBe(6);
-    });
-
-    it('accounts for combined value when the player already holds cards of that colour', () => {
-      const session = setupColorettoGame({ rng: makeRng() });
-      // Player has 4 red: 4 red = 10 points.
-      session.players[0].collection = [ch('red', 2, 0), ch('red', 2, 1)];
-      // Row of 3 red singles: 4+3 = 7 red = 21 points → gain of 11.
-      // (Canonical table read: a naive per-card sum would give only 3.)
-      session.rows[0].cards = [ch('red', 1, 2), ch('red', 1, 3), ch('red', 1, 4)];
-      expect(wholeRowValue(session, 0, 0)).toBe(11);
-    });
-
-    it('values the row at 12 when the player holds 2 of that colour', () => {
-      const session = setupColorettoGame({ rng: makeRng() });
-      // Player has 2 red: 2 red = 3 points.
-      session.players[0].collection = [ch('red', 2, 0)];
-      // Row of 3 red singles: 2+3 = 5 red = 15 points → gain of 12.
-      session.rows[0].cards = [ch('red', 1, 2), ch('red', 1, 3), ch('red', 1, 4)];
-      expect(wholeRowValue(session, 0, 0)).toBe(12);
-    });
-
-    it('values mixed-colour rows as the sum of per-colour combined gains', () => {
-      const session = setupColorettoGame({ rng: makeRng() });
-      // Player has no collection.
-      session.players[0].collection = [];
-      // Row: 2 red + 1 blue → 2 red = 3, 1 blue = 1 → total 4.
-      session.rows[0].cards = [ch('red', 2, 1), ch('blue', 1, 2)];
-      expect(wholeRowValue(session, 0, 0)).toBe(4);
-    });
-  });
-
   describe('netRowValue', () => {
     it('is positive when a row benefits the player more than opponents', () => {
       const session = setupColorettoGame({ rng: makeRng() });
@@ -231,21 +191,14 @@ describe('ColorettoAis', () => {
       forceIdentityTurnOrder(session);
       // Player 0 collects red; opponent 1 collects blue.
       session.players[0].collection = [ch('red', 1, 0)];
-      session.players[1].collection = [ch('blue', 2, 1)];
+      session.players[1].collection = [ch('blue', 1, 1)];
       // Top card of the deck is a red single.
-      session.deck = [ch('red', 1, 10), ch('blue', 1, 9)];
-      // Row 0 is a green single: player 0 holds no green (combined gain 1
-      // < threshold), and opponent 1 gains only +1 from it.
-      session.rows[0].cards = [ch('green', 1, 2)];
-      // Rows 1 and 2 are blue singles: player 0 holds no blue (combined
-      // gain 1 < threshold), but opponent 1 already holds 2 blue, so a blue
-      // single is worth +3 to them.
+      session.deck = [ch('blue', 1, 9), ch('red', 1, 10)];
+      // Row 0 suits player 0 (red); row 1 suits opponent 1 (blue).
+      session.rows[0].cards = [ch('red', 1, 2)];
       session.rows[1].cards = [ch('blue', 1, 3)];
-      session.rows[2].cards = [ch('blue', 1, 4)];
 
-      // No row meets the take threshold (combined gain = 1 each).
-      // Placing red on row 0: my gain 1+2=3, opp gain 1+1=2 → net +1.
-      // Placing red on rows 1/2: my gain 1+2=3, opp gain 3+1=4 → net −1.
+      // No row meets the take threshold (net take values are 1 and -1).
       const action = HeuristicStrategy.chooseAction(session, 0, makeRng());
       expect(action.type).toBe('place');
       expect(action.rowIndex).toBe(0);
@@ -258,17 +211,12 @@ describe('ColorettoAis', () => {
       session.players[0].collection = [ch('red', 1, 0)];
       session.players[1].collection = [ch('blue', 2, 1)];
       // Top card of the deck is a red single.
-      session.deck = [ch('red', 1, 10), ch('blue', 1, 9)];
-      // Row 0 is a green single (player doesn't hold green, combined gain = 1
-      // < threshold; weak for opponent too).
-      session.rows[0].cards = [ch('green', 1, 2)];
+      session.deck = [ch('blue', 1, 9), ch('red', 1, 10)];
+      // Row 0 is a red single (good for me, weak for the opponent).
+      session.rows[0].cards = [ch('red', 1, 2)];
       // Row 1 is a blue single (weak for me, strong for the opponent).
       session.rows[1].cards = [ch('blue', 1, 3)];
-      // Row 2 is another blue single (strong for the opponent).
-      session.rows[2].cards = [ch('blue', 1, 4)];
 
-      // Neither row meets the take threshold (combined gain = 1 each).
-      // Row 0 is weak for the opponent; rows 1/2 are strong for the opponent.
       const action = HeuristicStrategy.chooseAction(session, 0, makeRng());
       expect(action.type).toBe('place');
       expect(action.rowIndex).toBe(0);
@@ -282,45 +230,6 @@ describe('ColorettoAis', () => {
       const a1 = HeuristicStrategy.chooseAction(session1, 0, makeRng(123));
       const a2 = HeuristicStrategy.chooseAction(session2, 0, makeRng(123));
       expect(a1).toEqual(a2);
-    });
-
-    it('takes a row of 5 same-colour singles in round 1 with empty collections', () => {
-      const session = setupColorettoGame({ rng: makeRng() });
-      forceIdentityTurnOrder(session);
-      // Round 1: all collections empty.
-      session.players[0].collection = [];
-      session.players[1].collection = [];
-      // Row 0: 5 red singles → wholeRowValue = 15 (5 red = 15).
-      session.rows[0].cards = [
-        ch('red', 1, 1), ch('red', 1, 2), ch('red', 1, 3),
-        ch('red', 1, 4), ch('red', 1, 5),
-      ];
-      // netRowValue = 0 (all players value identically), but wholeRowValue = 15.
-      const action = HeuristicStrategy.chooseAction(session, 0, makeRng());
-      expect(action).toEqual({ type: 'take', rowIndex: 0 });
-    });
-
-    it('does not take a row of 1 single in round 1 (below threshold)', () => {
-      const session = setupColorettoGame({ rng: makeRng() });
-      forceIdentityTurnOrder(session);
-      session.players[0].collection = [];
-      session.players[1].collection = [];
-      // Row 0: 1 red single → wholeRowValue = 1, netRowValue = 0.
-      session.rows[0].cards = [ch('red', 1, 1)];
-      // Both values are below threshold → must place (not take).
-      const action = HeuristicStrategy.chooseAction(session, 0, makeRng());
-      expect(action.type).toBe('place');
-    });
-
-    it('takes a row of 3 same-colour singles in round 1 (combined value 6 ≥ threshold)', () => {
-      const session = setupColorettoGame({ rng: makeRng() });
-      forceIdentityTurnOrder(session);
-      session.players[0].collection = [];
-      session.players[1].collection = [];
-      // Row 0: 3 red singles → wholeRowValue = 6.
-      session.rows[0].cards = [ch('red', 1, 1), ch('red', 1, 2), ch('red', 1, 3)];
-      const action = HeuristicStrategy.chooseAction(session, 0, makeRng());
-      expect(action).toEqual({ type: 'take', rowIndex: 0 });
     });
   });
 

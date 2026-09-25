@@ -893,17 +893,6 @@ describe('ColorettoScene (browser)', () => {
     game = await bootGame();
     const scene = await startTwoPlayerGame(game);
 
-    // The heuristic now takes a row proactively when one is valuable enough
-    // (round-1 take fix, CG-0MUCIHPES005ZURM), but this test exercises the AI
-    // *placement* animation pipeline: pin the AI to a deterministic place.
-    const ai = scene.aiScheduler.aiPlayers[1];
-    if (ai) {
-      (ai as any).strategy = {
-        name: 'always-place',
-        chooseAction: () => ({ type: 'place', rowIndex: 0 }),
-      };
-    }
-
     // The board may already hold a card from the AI's lead turn when the
     // randomized turn order put the AI first (startTwoPlayerGame awaits the
     // human turn, so the AI's first placement precedes this point).
@@ -985,17 +974,8 @@ describe('ColorettoScene (browser)', () => {
     // the human's first turn may share the row).
     expect(scene.session.rows[0].cards.some((c: { type: string }) => c.type === 'last-round')).toBe(true);
     // The human's placement was their final turn; the AI (still active)
-    // gets one more animated turn. Pin the AI to always-place so the final
-    // turn is deterministic (the heuristic AI may now take a row when it
-    // contains a bonus card, which has no flightCard and would break the
-    // flightCard assertions below — CG-0MUE0EB0Z002FISV).
-    const ai = scene.aiScheduler.aiPlayers[1];
-    if (ai) {
-      (ai as any).strategy = {
-        name: 'always-place',
-        chooseAction: () => ({ type: 'place', rowIndex: 0 }),
-      };
-    }
+    // gets one more animated turn.
+    expect(scene.phaseManager.current).toBe('ai-thinking');
 
     // Rendered state while the round is still in play: exactly one 'LR'
     // face in the scene, at the resting position (the row slot renders an
