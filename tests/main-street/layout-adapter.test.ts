@@ -136,6 +136,15 @@ describe('MainStreetLayoutAdapter: HUD/market geometry source of truth', () => {
     expect(geometry.hudStrip.x + geometry.hudStrip.width).toBe(layout.hudRight);
   });
 
+  it('reserves the Community Favour band inside the HUD strip', () => {
+    const layout = computeMainStreetLayoutWithSll();
+    expect(layout.favourBandLeft).toBe(layout.hudLeft + 120);
+    expect(layout.favourBandRight).toBe(layout.favourBandLeft + 2 * layout.favourButtonW);
+    // Band sits strictly inside the strip, right of the Coins readout.
+    expect(layout.favourBandLeft).toBeGreaterThan(layout.hudLeft);
+    expect(layout.favourBandRight).toBeLessThan(layout.hudRight);
+  });
+
   it('defines a hudBar SLL zone whose edges coincide with the market box at 1280x720', () => {
     const parsed = parseScreenLayoutDocument(mainStreetLayoutJson);
     expect(parsed.valid).toBe(true);

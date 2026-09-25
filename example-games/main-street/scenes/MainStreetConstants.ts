@@ -22,6 +22,14 @@ export const MARKET_BOX_MARGIN_PX = 20;
 
 /** Height (px) of the HUD strip bar. */
 export const HUD_BAR_HEIGHT_PX = 28;
+
+/**
+ * Horizontal offset (px) from the HUD strip's left edge where the reserved
+ * Community Favour button band begins. The band holds both favour buttons
+ * (`[rep→coins][coins→rep]`) between the Coins and Reputation readouts
+ * (CG-0MUFAISSZ002TE1B / CG-0MUFAITED0088AGN).
+ */
+export const HUD_FAVOUR_BAND_OFFSET_PX = 120;
 export const BASE_MARKET_CARD_W = 140;
 export const BASE_MARKET_CARD_H = 80;
 export const BASE_MARKET_ROW_GAP = 10;
@@ -232,6 +240,10 @@ export interface SceneLayout {
   hudRight: number;
   /** Width of the HUD strip bar (`hudRight - hudLeft`). */
   hudWidth: number;
+  /** Left edge X of the reserved Community Favour button band in the HUD strip. */
+  favourBandLeft: number;
+  /** Right edge X of the reserved Community Favour button band in the HUD strip. */
+  favourBandRight: number;
   /** X/Y of the staff-applicant overlay centre (SLL applicantOverlay zone). */
   applicantCenterX: number;
   applicantCenterY: number;

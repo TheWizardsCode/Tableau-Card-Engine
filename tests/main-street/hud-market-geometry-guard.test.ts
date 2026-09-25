@@ -41,6 +41,15 @@ describe('geometry single source of truth', () => {
     expect(geometry.hudStrip.width).toBe(layout.hudWidth);
   });
 
+  it('test-harness favour buttons sit inside the reserved favour band', () => {
+    const layout = computeMainStreetLayoutWithSll();
+    const geometry = computeMainStreetLayoutGeometry();
+    const repToCoins = geometry.favourRepToCoinsButton;
+    const coinsToRep = geometry.favourCoinsToRepButton;
+    expect(repToCoins.x).toBeGreaterThanOrEqual(layout.favourBandLeft);
+    expect(coinsToRep.x + coinsToRep.width).toBeLessThanOrEqual(layout.favourBandRight);
+  });
+
   it('market renderer contains no inline duplicated market-edge literals', () => {
     const source = readFileSync(MARKET_RENDERER_PATH, 'utf8');
     // Forbid the legacy inline computations this item eliminated.

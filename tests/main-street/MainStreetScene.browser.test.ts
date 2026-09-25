@@ -846,12 +846,13 @@ describe('MainStreetScene browser tests', () => {
     // Bank 2 actions (cap) and leave 1 remaining
     scene.state.bankedActions = 2;
     scene.state.actionsRemaining = 1;
-    scene.refreshHud();
+    scene.refreshActionButtons();
 
-    const hudList = scene.hudContainer.list as Phaser.GameObjects.GameObject[];
-    const actionText = hudList.find(
+    // The counter lives in the action cluster (above End Turn), not the HUD strip
+    // (CG-0MUFAISSZ002TE1B / CG-0MUFAITX70081W41).
+    const actionList = scene.actionContainer.list as Phaser.GameObjects.GameObject[];
+    const actionText = actionList.find(
       (obj) => obj instanceof Phaser.GameObjects.Text
-        && (obj as any)._hudTransient
         && (obj as Phaser.GameObjects.Text).text.includes('action'),
     ) as Phaser.GameObjects.Text | undefined;
 
@@ -868,12 +869,11 @@ describe('MainStreetScene browser tests', () => {
 
     scene.state.bankedActions = 0;
     scene.state.actionsRemaining = 1;
-    scene.refreshHud();
+    scene.refreshActionButtons();
 
-    const hudList = scene.hudContainer.list as Phaser.GameObjects.GameObject[];
-    const actionText = hudList.find(
+    const actionList = scene.actionContainer.list as Phaser.GameObjects.GameObject[];
+    const actionText = actionList.find(
       (obj) => obj instanceof Phaser.GameObjects.Text
-        && (obj as any)._hudTransient
         && (obj as Phaser.GameObjects.Text).text.includes('action'),
     ) as Phaser.GameObjects.Text | undefined;
 

@@ -18,7 +18,7 @@ import { getAffordableBusinessCards, getAffordableUpgradeCards, getEmptySlots } 
 import type { SpecializationSkill } from '../MainStreetStaffSkills';
 import { STAFF_SKILL_CHIP_COLORS, getSkill, hasPeekCapableStaff } from '../MainStreetStaffSkills';
 import type { PendingApplicant } from '../MainStreetState';
-import { BOX_STROKE, CHALLENGE_LINE_H, CHALLENGE_PAD, CHALLENGE_TITLE_H, LOG_COLORS, LOG_FONT_SIZE, LOG_LINE_H, LOG_PAD, LOG_TITLE_H } from './MainStreetConstants';
+import { BOX_STROKE, CHALLENGE_LINE_H, CHALLENGE_PAD, CHALLENGE_TITLE_H, HUD_BAR_HEIGHT_PX, LOG_COLORS, LOG_FONT_SIZE, LOG_LINE_H, LOG_PAD, LOG_TITLE_H } from './MainStreetConstants';
 import { HUD_ARIA_LABELS, buildActionTooltip, buildCoinsTooltip, buildReputationTooltip, buildScoreTooltip } from './MainStreetHudTooltips';
 import type { MainStreetRendererContext } from './MainStreetRendererContext';
 import { buildUpgradeOverlaySpec } from './UpgradeOverlaySpec';
@@ -106,53 +106,44 @@ export function refreshHud(renderer: MainStreetRendererContext): void {
     const reputation = deferredWindow && s.previousReputation !== null
       ? s.previousReputation
       : s.state.resourceBank.reputation;
-    const { gameW, hudY } = s.layout;
+    const { hudLeft, hudRight, hudWidth, favourBandRight, hudY } = s.layout;
 
-    // Background strip - 50% width, centered
-    const strip = markHudTransient(s.add.rectangle(gameW / 2, hudY, gameW * 0.5, 28, 0x1a1408, 0.6));
+    // Background strip — market-aligned to `hudLeft`..`hudRight` (AC2,
+    // CG-0MUFAISSZ002TE1B). `setOrigin(0, 0.5)` makes x the left edge, so the
+    // strip spans exactly [hudLeft, hudLeft + hudWidth] with no half-width maths.
+    const strip = markHudTransient(
+      s.add.rectangle(hudLeft, hudY, hudWidth, HUD_BAR_HEIGHT_PX, 0x1a1408, 0.6),
+    );
+    strip.setOrigin(0, 0.5);
     strip.setStrokeStyle(1, BOX_STROKE, 0.5);
     s.hudContainer.add(strip);
 
-    // Coins - left-aligned in strip
-    const stripWidth = gameW * 0.5;
-    const stripLeft = (gameW - stripWidth) / 2;
+    // Coins - left-aligned at the strip's left edge
     // Integer economy — HUD shows whole numbers (CG-0MTIO1M15001E9Y6).
-    const coinText = markHudTransient(s.add.text(stripLeft + 10, hudY, `Coins: ${Math.round(coins)}`, {
+    const coinText = markHudTransient(s.add.text(hudLeft + 10, hudY, `Coins: ${Math.round(coins)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ffcc44', fontFamily: FONT_FAMILY,
     }).setOrigin(0, 0.5));
     s.hudContainer.add(coinText);
 
-    // Action counter - next to coins
-    const banked = s.state.bankedActions ?? 0;
-    const actionLabel = `${s.state.actionsRemaining} action${s.state.actionsRemaining !== 1 ? 's' : ''} left`
-      + (banked > 0 ? ` (${banked} banked)` : '');
-    const actionText = markHudTransient(s.add.text(
-      coinText.x + coinText.width + 16,
-      hudY,
-      actionLabel,
-      {
-        fontSize: '14px', fontStyle: 'bold',
-        color: s.state.actionsRemaining > 0 ? '#aaffaa' : '#ff6666',
-        fontFamily: FONT_FAMILY,
-      }
-    ).setOrigin(0, 0.5));
-    s.hudContainer.add(actionText);
-
-    // Reputation - centered in strip
-    const repText = markHudTransient(s.add.text(stripLeft + stripWidth * 0.5, hudY, `Reputation: ${Math.round(reputation)}`, {
+    // Reputation — left-aligned right of the reserved Community Favour band so
+    // the two never overlap once the buttons move into the strip
+    // (CG-0MUFAITED0088AGN).
+    const repText = markHudTransient(s.add.text(favourBandRight + 40, hudY, `Reputation: ${Math.round(reputation)}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#88bbff', fontFamily: FONT_FAMILY,
-    }).setOrigin(0.5, 0.5));
+    }).setOrigin(0, 0.5));
     s.hudContainer.add(repText);
+    // Centre of the reputation text — used for the +/- delta pop position.
+    const repX = repText.x + repText.width / 2;
 
-    // Score - right-aligned in strip (shows x / y where y is the win threshold)
-    const scoreText = markHudTransient(s.add.text(stripLeft + stripWidth - 10, hudY, `Score: ${Math.round(score)}/${s.state.config.winThreshold}`, {
+    // Score - right-aligned at the strip's right edge (shows x / y where y is the win threshold)
+    const scoreText = markHudTransient(s.add.text(hudRight - 10, hudY, `Score: ${Math.round(score)}/${s.state.config.winThreshold}`, {
       fontSize: '16px', fontStyle: 'bold', color: '#ff8844', fontFamily: FONT_FAMILY,
     }).setOrigin(1, 0.5));
     s.hudContainer.add(scoreText);
 
-    // Week/year label — small text at the far right of the HUD strip (CG-0MTT0K9RX0004QTE).
+    // Week/year label — small text under the Score at the strip's right edge (CG-0MTT0K9RX0004QTE).
     const weekText = markHudTransient(s.add.text(
-      stripLeft + stripWidth - 10,
+      hudRight - 10,
       hudY + 18,
       weekLabel(s.state.week, s.state.year),
       {
@@ -164,19 +155,23 @@ export function refreshHud(renderer: MainStreetRendererContext): void {
     ).setOrigin(1, 0));
     s.hudContainer.add(weekText);
 
+    // NOTE: the actions-remaining counter is intentionally NOT rendered in the
+    // HUD strip. It lives in the action cluster above the End Turn button
+    // (CG-0MUFAITX70081W41) so the player sees the action budget next to the
+    // control it gates. Its tooltip moves with it (see `refreshActionButtons`).
+
     // HUD tooltip zones (desktop: pointer hover, mobile: tap toggle)
     if (!s.replayMode) {
       attachHudTooltipZone(s, coinText, HUD_ARIA_LABELS.coins, () => buildCoinsTooltip(s.state));
       attachHudTooltipZone(s, repText, HUD_ARIA_LABELS.rep, () => buildReputationTooltip(s.state));
       attachHudTooltipZone(s, scoreText, HUD_ARIA_LABELS.score, () => buildScoreTooltip(s.state, s.campaign));
-      attachHudTooltipZone(s, actionText, HUD_ARIA_LABELS.action, () => buildActionTooltip(s.state));
     }
 
     s.animateHudValueChanges({
       coins,
       reputation,
-      coinX: stripLeft + 70,
-      repX: stripLeft + stripWidth * 0.5,
+      coinX: hudLeft + 70,
+      repX,
       hudY,
     });
   
@@ -261,6 +256,34 @@ export function refreshChallengeTracker(renderer: MainStreetRendererContext): vo
   
 }
 
+/**
+ * Render the actions-remaining counter right-aligned above the action cluster's
+ * button row, with the shared action tooltip attached (CG-0MUFAITX70081W41).
+ *
+ * The counter lives in `actionContainer` (never the HUD strip) so it sits next
+ * to the End Turn / Cancel button it gates. `actionContainer.removeAll(true)`
+ * on each refresh cleans it up — no transient tagging needed.
+ */
+function renderActionCounter(
+  s: MainStreetRendererContext['scene'],
+  rightX: number,
+  by: number,
+): Phaser.GameObjects.Text {
+  const banked = s.state.bankedActions ?? 0;
+  const actionLabel = `${s.state.actionsRemaining} action${s.state.actionsRemaining !== 1 ? 's' : ''} left`
+    + (banked > 0 ? ` (${banked} banked)` : '');
+  const actionText = s.add.text(rightX, by - 22, actionLabel, {
+    fontSize: '14px', fontStyle: 'bold',
+    color: s.state.actionsRemaining > 0 ? '#aaffaa' : '#ff6666',
+    fontFamily: FONT_FAMILY,
+  }).setOrigin(1, 1);
+  s.actionContainer.add(actionText);
+  if (!s.replayMode) {
+    attachHudTooltipZone(s, actionText, HUD_ARIA_LABELS.action, () => buildActionTooltip(s.state));
+  }
+  return actionText;
+}
+
 export function refreshActionButtons(renderer: MainStreetRendererContext): void {
 
     const s = renderer.scene;
@@ -293,6 +316,10 @@ export function refreshActionButtons(renderer: MainStreetRendererContext): void 
         fontSize: '12px', color: '#887766', fontFamily: FONT_FAMILY,
       }).setOrigin(1, 1);
       s.actionContainer.add(summary);
+
+      // Actions-remaining counter — right-aligned, stacked above the summary
+      // line and the End Turn button (CG-0MUFAITX70081W41).
+      renderActionCounter(s, rightX, by);
 
       // End Turn button (right-aligned)
       const btnW = s.layout.actionButtonW;
@@ -387,6 +414,9 @@ export function refreshActionButtons(renderer: MainStreetRendererContext): void 
       const handCount = hand.length;
       const selected = s.pendingHandIndex !== null ? hand[s.pendingHandIndex] : undefined;
       s.hintBar.setText(`Card in hand (${handCount}) — click an empty slot to place`);
+
+      // Keep the action budget visible while placing from hand.
+      renderActionCounter(s, rightX, by);
 
       const btnW = s.layout.actionButtonW;
 
@@ -486,6 +516,9 @@ export function refreshActionButtons(renderer: MainStreetRendererContext): void 
 
       const cardName = s.pendingBusinessCard?.name ?? '???';
       s.hintBar.setText(`Place "${cardName}" -- click an empty slot`);
+
+      // Keep the action budget visible while placing a business.
+      renderActionCounter(s, rightX, by);
 
       // Cancel button (right-aligned)
       const btnW = s.layout.actionButtonW;

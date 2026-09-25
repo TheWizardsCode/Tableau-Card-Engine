@@ -14,6 +14,7 @@ import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema'
 import type { SceneLayout } from './MainStreetConstants';
 import {
   BASE_HUD_Y,
+  HUD_FAVOUR_BAND_OFFSET_PX,
   MARKET_BOX_MARGIN_PX,
   BASE_MARKET_CARD_W,
   BASE_MARKET_CARD_H,
@@ -111,6 +112,13 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
   const favourCoinsToRepCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'favourCoinsToRepButton', 'center', viewport, 1);
   const favourRepToCoinsCenter = anchorPoint(MAIN_STREET_SLL_LAYOUT, 'favourRepToCoinsButton', 'center', viewport, 1);
 
+  // ── Reserved Community Favour band inside the HUD strip ──────
+  // The band sits immediately right of the Coins readout and holds both
+  // favour buttons (`[rep→coins][coins→rep]`). Reputation is laid out to the
+  // right of this band so the two never overlap (CG-0MUFAISSZ002TE1B).
+  const favourBandLeft = hudLeft + HUD_FAVOUR_BAND_OFFSET_PX;
+  const favourBandRight = favourBandLeft + 2 * favourButtonW;
+
   // ── Staff applicant overlay (CG-0MSTOATDU006UGAX) ──────────────
   // The applicant card + buttons render from the applicantOverlay SLL zone
   // center anchor. Falls back to screen centre when the zone is absent
@@ -167,6 +175,8 @@ export function computeMainStreetLayoutWithSll(): SceneLayout {
     hudLeft,
     hudRight,
     hudWidth,
+    favourBandLeft,
+    favourBandRight,
     applicantCenterX,
     applicantCenterY,
     challengeX: Math.round(challengeTopLeft.x),
