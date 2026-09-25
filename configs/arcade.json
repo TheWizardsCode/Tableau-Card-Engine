@@ -1,5 +1,5 @@
 {
-  "$comment": "Sample preset: a small non-empty subset used to prove the 1..n assembly boundary cases (a distribution with a few games, not all). Part of CG-0MTRO6Y2N009B9CF.",
+  "$comment": "Arcade preset: a small non-empty subset used to prove the 1..n assembly boundary cases (a distribution with a few games, not all). Part of epic CG-0MTR7DLMY008CK17; named distribution preset formalised by F5 CG-0MTRO77XA006YZZC. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; in the flat launcher checkout they resolve from example-games/<id>/ instead.",
   "games": [
     {
       "id": "main-street",

@@ -33,7 +33,7 @@ cd "$PROJECT_DIR"
 # The test suites exercise every game, so tests always build/test against the
 # full preset regardless of the ambient GAMES_CONFIG (which defaults to
 # `core-only` for production builds). See scripts/vite-game-discovery-plugin.ts.
-export GAMES_CONFIG="${GAMES_CONFIG:-all}"
+export GAMES_CONFIG="${GAMES_CONFIG:-full}"
 
 echo "=== Browser Test Env Pre-check ==="
 npx tsx scripts/check-browser-test-env.ts

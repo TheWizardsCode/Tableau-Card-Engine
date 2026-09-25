@@ -1,5 +1,5 @@
 {
-  "$comment": "Full preset: the engine + Gym + all eight example games. Used by the launcher distribution's complete build and by the full test suite. Part of CG-0MTRO6Y2N009B9CF.",
+  "$comment": "Full preset: the engine + Gym + all eight example games. Used by the launcher distribution's complete build and by the full test suite (the shell runners default to GAMES_CONFIG=full). Part of epic CG-0MTR7DLMY008CK17; named distribution preset formalised by F5 CG-0MTRO77XA006YZZC. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; in the flat launcher checkout they resolve from example-games/<id>/ instead.",
   "games": [
     {
       "id": "beleaguered-castle",

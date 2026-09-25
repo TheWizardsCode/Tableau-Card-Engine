@@ -37,7 +37,7 @@ import {
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 /** The real presets that must exist in the monorepo. */
-const PRESETS = ['core-only', 'all', 'sample'] as const;
+const PRESETS = ['core-only', 'solo', 'arcade', 'deluxe', 'full'] as const;
 
 let tmpRoot: string;
 
@@ -109,8 +109,8 @@ describe('configs/ presets', () => {
     expect(cfg.games).toEqual([]);
   });
 
-  it('all declares every example game', () => {
-    const cfg = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'all.json'));
+  it('full declares every example game', () => {
+    const cfg = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'full.json'));
     expect(cfg.games.map((g) => g.id).sort()).toEqual(
       [
         'beleaguered-castle',
@@ -125,19 +125,19 @@ describe('configs/ presets', () => {
     );
   });
 
-  it('sample is a proper non-empty subset of all (1..n boundary case)', () => {
-    const all = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'all.json'));
-    const sample = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'sample.json'));
-    expect(sample.games.length).toBeGreaterThan(0);
-    expect(sample.games.length).toBeLessThan(all.games.length);
-    const allIds = new Set(all.games.map((g) => g.id));
-    for (const g of sample.games) {
-      expect(allIds.has(g.id), `${g.id} not in all.json`).toBe(true);
+  it('arcade is a proper non-empty subset of full (1..n boundary case)', () => {
+    const full = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'full.json'));
+    const arcade = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'arcade.json'));
+    expect(arcade.games.length).toBeGreaterThan(0);
+    expect(arcade.games.length).toBeLessThan(full.games.length);
+    const fullIds = new Set(full.games.map((g) => g.id));
+    for (const g of arcade.games) {
+      expect(fullIds.has(g.id), `${g.id} not in full.json`).toBe(true);
     }
   });
 
   it('every preset game points at the sibling <game>/example-games layout', () => {
-    const cfg = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'all.json'));
+    const cfg = loadGamesConfig(path.join(REPO_ROOT, 'configs', 'full.json'));
     for (const g of cfg.games) {
       expect(g.path).toContain('tce-');
       expect(g.scenePath).toContain(`example-games/${g.id}`);
@@ -154,13 +154,13 @@ describe('selectConfigPath', () => {
   });
 
   it('resolves a named preset from GAMES_CONFIG', () => {
-    const p = selectConfigPath(REPO_ROOT, { GAMES_CONFIG: 'sample' });
-    expect(path.basename(p)).toBe('sample.json');
+    const p = selectConfigPath(REPO_ROOT, { GAMES_CONFIG: 'arcade' });
+    expect(path.basename(p)).toBe('arcade.json');
   });
 
   it('accepts an explicit path', () => {
-    const p = selectConfigPath(REPO_ROOT, { GAMES_CONFIG: 'configs/all.json' });
-    expect(p.endsWith(path.join('configs', 'all.json'))).toBe(true);
+    const p = selectConfigPath(REPO_ROOT, { GAMES_CONFIG: 'configs/full.json' });
+    expect(p.endsWith(path.join('configs', 'full.json'))).toBe(true);
   });
 
   it('throws a clear error for an unknown preset name', () => {
@@ -172,7 +172,7 @@ describe('selectConfigPath', () => {
 
 describe('loadGamesConfig', () => {
   it('throws an actionable error when the file does not exist', () => {
-    expect(() => loadGamesConfig('/nonexistent/configs/all.json')).toThrow(
+    expect(() => loadGamesConfig('/nonexistent/configs/full.json')).toThrow(
       /not found/i,
     );
   });
@@ -452,8 +452,8 @@ describe('resolveCoreAliases', () => {
 // ── selectedGameIds (test-profile filtering) ─────────────────────────────
 
 describe('selectedGameIds', () => {
-  it('returns every game for the all preset', () => {
-    const ids = selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'all' });
+  it('returns every game for the full preset', () => {
+    const ids = selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'full' });
     expect(ids.length).toBe(8);
     expect(ids).toContain('golf');
     expect(ids).toContain('main-street');
@@ -463,8 +463,8 @@ describe('selectedGameIds', () => {
     expect(selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'core-only' })).toEqual([]);
   });
 
-  it('returns only the sample preset games', () => {
-    const ids = selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'sample' });
+  it('returns only the arcade preset games', () => {
+    const ids = selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'arcade' });
     expect(ids.sort()).toEqual(['golf', 'main-street']);
   });
 
@@ -486,12 +486,12 @@ describe('test runners select the full game preset', () => {
   ];
 
   for (const runner of runners) {
-    it(`${runner} exports GAMES_CONFIG=all by default`, () => {
+    it(`${runner} exports GAMES_CONFIG=full by default`, () => {
       const p = path.join(REPO_ROOT, 'scripts', runner);
       const src = fs.readFileSync(p, 'utf-8');
       // The suites exercise every game, so a core-only default would silently
       // skip game coverage.
-      expect(src).toMatch(/export GAMES_CONFIG="\$\{GAMES_CONFIG:-all\}"/);
+      expect(src).toMatch(/export GAMES_CONFIG="\$\{GAMES_CONFIG:-full\}"/);
     });
   }
 });

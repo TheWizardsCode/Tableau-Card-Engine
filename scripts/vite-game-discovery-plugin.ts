@@ -164,7 +164,7 @@ export interface DiscoveredGame extends GameConfigEntry {
 /**
  * Resolve the config path for a build.
  *
- * Accepts a preset name (`all`) or an explicit path (`configs/all.json`).
+ * Accepts a preset name (`full`) or an explicit path (`configs/full.json`).
  * An unknown preset name is a hard error: silently falling back would ship a
  * distribution missing the games the operator asked for.
  *

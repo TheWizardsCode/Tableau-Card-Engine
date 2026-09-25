@@ -13,7 +13,7 @@ cd "$PROJECT_DIR"
 # The test suites exercise every game, so tests always build/test against the
 # full preset regardless of the ambient GAMES_CONFIG (which defaults to
 # `core-only` for production builds). See scripts/vite-game-discovery-plugin.ts.
-export GAMES_CONFIG="${GAMES_CONFIG:-all}"
+export GAMES_CONFIG="${GAMES_CONFIG:-full}"
 
 # Fast-fail pre-check: the tutorial E2E parts below run in headless
 # Chromium via Playwright. Detect a missing prerequisite up front

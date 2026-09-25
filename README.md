@@ -33,8 +33,10 @@ The game catalogue is **config-driven**. A build selects a preset with
 
 ```bash
 npm run build                          # core-only (engine + Gym)
-GAMES_CONFIG=sample npm run build      # configs/sample.json (a small subset)
-GAMES_CONFIG=all npm run build         # configs/all.json (every game)
+GAMES_CONFIG=solo npm run build        # configs/solo.json (one game)
+GAMES_CONFIG=arcade npm run build      # configs/arcade.json (a small subset)
+GAMES_CONFIG=deluxe npm run build      # configs/deluxe.json (a different subset)
+GAMES_CONFIG=full npm run build        # configs/full.json (every game)
 GAMES_CONFIG=configs/full.json npm run build   # an explicit preset path
 ```
 
@@ -107,13 +109,15 @@ Which games a build contains is selected by a preset in `configs/`:
 | Preset | Games | Use |
 |---|---|---|
 | `configs/core-only.json` | none (engine + Gym) | core-only build; the default |
-| `configs/sample.json` | a small subset (golf, main-street) | partial-distribution smoke |
-| `configs/all.json` | all eight games | full distribution |
+| `configs/solo.json` | golf | minimum non-empty distribution (1 game + Gym) |
+| `configs/arcade.json` | golf, main-street | partial distribution |
+| `configs/deluxe.json` | feudalism, lost-cities | partial distribution (distinct game set) |
+| `configs/full.json` | all eight games | full distribution (all games + Gym) |
 
 ```bash
-GAMES_CONFIG=all npm run build            # web build (dist/)
-GAMES_CONFIG=all npm run build:electron   # desktop build
-GAMES_CONFIG=all npm run package          # packaged desktop binary
+GAMES_CONFIG=full npm run build            # web build (dist/)
+GAMES_CONFIG=full npm run build:electron   # desktop build
+GAMES_CONFIG=full npm run package          # packaged desktop binary
 ```
 
 A game is resolved **locally first** (`example-games/<id>/`, the flat layout
@@ -150,7 +154,7 @@ Engine imports (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`,
 tableau-card-engine/
 ├── src/                   Engine modules (core-engine, card-system, rule-engine, ui, ai, balance-cards)
 ├── example-games/         Example games; gym stays in core, the rest move to their own repos
-├── configs/               Build presets (core-only, sample, all)
+├── configs/               Build presets (core-only, solo, arcade, deluxe, full)
 ├── scripts/               Core tooling (build/test runners, extraction, game discovery)
 ├── electron/              Desktop launcher (Electron main process, preload, content locator)
 ├── public/assets/         Shared assets (canonical deck, default SFX); game assets move with their game

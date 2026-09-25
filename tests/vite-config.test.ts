@@ -111,7 +111,7 @@ describe('smoke/dev test lists follow the selected preset', () => {
   it('keeps game test paths when the games are selected', () => {
     const original = process.env.GAMES_CONFIG;
     try {
-      process.env.GAMES_CONFIG = 'all';
+      process.env.GAMES_CONFIG = 'full';
       const smoke = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'smoke');
       expect(smoke).toContain('tests/golf/GolfScene.browser.test.ts');
       expect(smoke).toContain('tests/gym/GymSceneSmoke.browser.test.ts');
@@ -139,10 +139,10 @@ describe('smoke/dev test lists follow the selected preset', () => {
     }
   });
 
-  it('keeps only the sample preset games for a partial checkout', () => {
+  it('keeps only the arcade preset games for a partial checkout', () => {
     const original = process.env.GAMES_CONFIG;
     try {
-      process.env.GAMES_CONFIG = 'sample';
+      process.env.GAMES_CONFIG = 'arcade';
       const dev = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'dev');
       expect(dev).toContain('tests/golf/GolfScene.browser.test.ts');
       expect(dev).toContain('tests/main-street/MainStreetScene.browser.test.ts');
@@ -159,7 +159,7 @@ describe('smoke/dev test lists follow the selected preset', () => {
     try {
       // Select everything so the full explicit lists are produced; a stale
       // path is silently ignored by Vitest, so guard it here.
-      process.env.GAMES_CONFIG = 'all';
+      process.env.GAMES_CONFIG = 'full';
       const config = viteConfig({ command: 'build', mode: 'production' }) as unknown;
       for (const name of ['smoke', 'dev']) {
         for (const file of includeFor(config, name)) {

@@ -76,7 +76,7 @@ export interface CoreManifest {
   devDependencies?: Record<string, string>;
 }
 
-/** A discovered game entry, as recorded in the core's `configs/all.json`. */
+/** A discovered game entry, as recorded in the core's `configs/full.json`. */
 export interface GameEntryRef {
   id: string;
   path: string;
@@ -98,7 +98,7 @@ export interface ScaffoldOptions {
    */
   coreRel?: string;
   /** Scene module path relative to the game repo root. Resolved from the
-   * core's `configs/all.json` when omitted. */
+   * core's `configs/full.json` when omitted. */
   scenePath?: string;
   /** Optional replay-adapter module path relative to the game repo root. */
   adapterPath?: string;
@@ -141,7 +141,7 @@ export function readCoreManifest(coreRoot: string): CoreManifest {
 }
 
 /**
- * Resolve the scene/adapter paths for a game from the core's `configs/all.json`.
+ * Resolve the scene/adapter paths for a game from the core's `configs/full.json`.
  *
  * Returns `undefined` when the preset is absent or the game is not listed;
  * callers then fall back to {@link defaultScenePath}.
@@ -150,7 +150,7 @@ export function findGameInPreset(
   coreRoot: string,
   game: string,
 ): GameEntryRef | undefined {
-  const p = path.join(coreRoot, GAME_REPO_CONFIGS_DIR, 'all.json');
+  const p = path.join(coreRoot, GAME_REPO_CONFIGS_DIR, 'full.json');
   if (!fs.existsSync(p)) return undefined;
   try {
     const raw = JSON.parse(fs.readFileSync(p, 'utf-8')) as { games?: unknown };

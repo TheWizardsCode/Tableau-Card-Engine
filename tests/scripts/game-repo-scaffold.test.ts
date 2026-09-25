@@ -80,7 +80,7 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
   fs.writeFileSync(path.join(core, 'package.json'), JSON.stringify(MANIFEST));
   fs.writeFileSync(path.join(core, 'index.html'), '<html><body></body></html>\n');
   fs.writeFileSync(
-    path.join(core, 'configs', 'all.json'),
+    path.join(core, 'configs', 'full.json'),
     JSON.stringify({
       games: [
         {
@@ -249,7 +249,7 @@ describe('renderPreset', () => {
 });
 
 describe('findGameInPreset', () => {
-  it('reads the scene path for a game from the core all.json preset', () => {
+  it('reads the scene path for a game from the core full.json preset', () => {
     const { core } = makeLayout('golf');
     expect(findGameInPreset(core, 'golf')?.scenePath).toBe(
       'example-games/golf/scenes/GolfScene.ts',

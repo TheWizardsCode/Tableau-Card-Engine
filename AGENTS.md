@@ -31,7 +31,7 @@ tableau-card-engine/
 ├── example-games/
 │   ├── gym/               # Gym demo scenes (stays in core)
 │   └── <game>/            # each game is its own tce-<game> repo
-├── configs/               # build presets: core-only.json, sample.json, all.json
+├── configs/               # build presets: core-only, solo, arcade, deluxe, full
 ├── scripts/               # core tooling (runners, extraction, game discovery)
 ├── public/assets/         # shared assets (cards/ + CREDITS.md); game assets move with their game
 ├── tests/                 # Vitest test files

@@ -92,11 +92,24 @@ of 1..n games (a distribution), without editing source.
 Select a preset with the `GAMES_CONFIG` environment variable:
 
 ```bash
-npm run build                      # default preset: core-only (Gym only)
-GAMES_CONFIG=sample npm run build  # a small subset (configs/sample.json)
-GAMES_CONFIG=all npm run build     # every game (configs/all.json)
+npm run build                       # default preset: core-only (Gym only)
+GAMES_CONFIG=solo npm run build     # one game (configs/solo.json)
+GAMES_CONFIG=arcade npm run build   # a small subset (configs/arcade.json)
+GAMES_CONFIG=deluxe npm run build   # a different subset (configs/deluxe.json)
+GAMES_CONFIG=full npm run build     # every game (configs/full.json)
 GAMES_CONFIG=/path/to/my.json npm run build   # an explicit preset
 ```
+
+The launcher ships these named presets (the `1 game` and `all games` cases are
+the boundary distributions):
+
+| Preset | Games |
+|---|---|
+| `configs/core-only.json` | none — engine + Gym (default) |
+| `configs/solo.json` | golf |
+| `configs/arcade.json` | golf, main-street |
+| `configs/deluxe.json` | feudalism, lost-cities |
+| `configs/full.json` | all eight games |
 
 Presets live in `configs/` and list the sibling game repos to include:
 
@@ -109,7 +122,7 @@ Presets live in `configs/` and list the sibling game repos to include:
 }
 ```
 
-`GAMES_CONFIG` can also be a bare preset name (`all`) or an explicit path. An
+`GAMES_CONFIG` can also be a bare preset name (`full`) or an explicit path. An
 unknown preset name fails the build rather than silently shipping fewer games.
 
 > **Two config locations, two purposes:** `configs/*.json` (this section) are
@@ -148,7 +161,7 @@ required; `thumbnail` is optional.
 
 > **Test suites always use the full preset.** The shell runners
 > (`scripts/run-ci-tests.sh`, `run-dev-tests.sh`, `run-smoke-tests.sh`,
-> `run-tutorial-tests.sh`) export `GAMES_CONFIG=all` by default, because tests
+> `run-tutorial-tests.sh`) export `GAMES_CONFIG=full` by default, because tests
 > exercise every game. Override with an explicit `GAMES_CONFIG=…` if needed.
 
 > **`.worklog/worktrees/` layouts:** the local lookup uses `<root>/<scenePath>`,
