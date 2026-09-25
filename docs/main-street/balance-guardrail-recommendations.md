@@ -180,6 +180,17 @@ For reference, an earlier sweep with a different seed prefix (`mc-baseline-`) ga
 
 Loss decomposition (greedy, 60 turns): bankruptcy dominates on all difficulties (Medium 100% of losses; Hard 92% bankruptcy / 8% reputation collapse). No run hits the 60-turn harness cap.
 
+> **CG-0MUE03DGQ005KPZ7 re-baseline (2026-09-25, producer-approved):** the
+> 2026-09-12 snapshot was unratified and ~900 commits stale. A three-point
+> attribution found the drift was 100% cumulative balance change (per-action
+> challenge evaluation contributed 0.000), so the baseline was regenerated on
+> the current dev tip. The authoritative values now live in
+> `docs/main-street/monte-carlo-baseline.json` (commit-stamped): greedy Easy
+> 0.910 / Medium 0.615 / Hard 0.440; additive banking-greedy Medium 0.825.
+> See [monte-carlo-attribution-analysis.md](monte-carlo-attribution-analysis.md).
+> (Narrative table above is retained as the dated 2026-08-21 evidence; the
+> current baseline is the committed JSON.)
+
 ---
 
 ## 3. Research & rationale

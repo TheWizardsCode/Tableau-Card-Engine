@@ -128,6 +128,21 @@ between the 2026-09-12 baseline and the current dev state.
 See the full [attribution analysis](monte-carlo-attribution-analysis.md) for
 detailed mechanism explanation and recommendations.
 
+### Re-baseline (producer approved, 2026-09-25)
+
+With no regression found, `docs/main-street/monte-carlo-baseline.json` was
+regenerated on the current dev tip (producer decision Q2, within the work item).
+The new snapshot records:
+
+| Difficulty | winRate | coins/turn | medianScore |
+|-----------|---------|------------|-------------|
+| Easy | 0.910 | 942.17 | 11332.5 |
+| Medium | 0.615 | 632.99 | 12332.5 |
+| Hard | 0.440 | 459.92 | 1095.5 |
+
+The snapshot is stamped with `commitSha` and the design-intent / drift guardrails
+pass against it.
+
 ## See Also
 
 - **[Balance Process & Tooling PRD](prd-balance-process-and-tooling.md)** — Defines the structured balance review process, micro/macro metrics, and baseline management strategy that build on these Monte Carlo results.

@@ -1,60 +1,62 @@
 {
   "source": "Generated from MainStreetMonteCarlo.runAllCombinations",
-  "generatedAt": "2026-09-12T23:20:26.578Z",
+  "generatedAt": "2026-09-25T07:17:24.207Z",
+  "commitSha": "33468728a3e2c2e05df6d12d7ac35da14a1e7241",
   "seeds": 200,
   "maxTurns": 60,
   "strategy": "greedy",
   "metrics": {
-    "winRate": 0.83,
-    "averageCoinsPerTurn": 639.5983083213823
+    "winRate": 0.615,
+    "averageCoinsPerTurn": 632.9923581211316
   },
   "difficultyMatrix": [
     {
       "difficulty": "Easy",
-      "winRate": 0.855,
-      "averageCoinsPerTurn": 779.5695569458596,
-      "medianScore": 11034.5
+      "winRate": 0.91,
+      "averageCoinsPerTurn": 942.1733544441666,
+      "medianScore": 11332.5
     },
     {
       "difficulty": "Medium",
-      "winRate": 0.83,
-      "averageCoinsPerTurn": 639.5983083213823,
-      "medianScore": 13177.5
+      "winRate": 0.615,
+      "averageCoinsPerTurn": 632.9923581211316,
+      "medianScore": 12332.5
     },
     {
       "difficulty": "Hard",
-      "winRate": 0.565,
-      "averageCoinsPerTurn": 423.4599651791195,
-      "medianScore": 15370
+      "winRate": 0.44,
+      "averageCoinsPerTurn": 459.91585959273834,
+      "medianScore": 1095.5
     }
   ],
   "bankingGreedy": {
     "source": "Generated from MainStreetMonteCarlo.runAllCombinations",
-    "generatedAt": "2026-09-22T00:13:59.000Z",
+    "generatedAt": "2026-09-25T07:17:24.224Z",
+    "commitSha": "33468728a3e2c2e05df6d12d7ac35da14a1e7241",
     "strategy": "banking-greedy",
     "note": "Additive regression snapshot for BankingGreedyStrategy (CG-0MT3JMGA60091J8W AC5). Recorded on the same 200-seed / 60-turn canonical profile as the greedy block above; the greedy block is unchanged and is never replaced by this variant. Drift is reported, never silently accepted — see the drift-report workflow in tests/main-street/monte-carlo-guardrails.test.ts and docs/main-street/balance-guardrail-recommendations.md.",
     "metrics": {
-      "winRate": 0.845,
-      "averageCoinsPerTurn": 721.5768957260202
+      "winRate": 0.825,
+      "averageCoinsPerTurn": 713.6445099476504
     },
     "difficultyMatrix": [
       {
         "difficulty": "Easy",
-        "winRate": 0.895,
-        "averageCoinsPerTurn": 880.8775288175876,
-        "medianScore": 11050.5
+        "winRate": 0.89,
+        "averageCoinsPerTurn": 873.0545057650679,
+        "medianScore": 11162
       },
       {
         "difficulty": "Medium",
-        "winRate": 0.845,
-        "averageCoinsPerTurn": 721.5768957260202,
-        "medianScore": 13141.5
+        "winRate": 0.825,
+        "averageCoinsPerTurn": 713.6445099476504,
+        "medianScore": 12967
       },
       {
         "difficulty": "Hard",
-        "winRate": 0.58,
-        "averageCoinsPerTurn": 450.1193969902652,
-        "medianScore": 15349
+        "winRate": 0.59,
+        "averageCoinsPerTurn": 486.04638068889864,
+        "medianScore": 15281
       }
     ]
   }

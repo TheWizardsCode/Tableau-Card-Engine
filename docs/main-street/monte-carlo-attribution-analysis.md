@@ -78,6 +78,29 @@ The drift-report → attribution → recommendation workflow was exercised end-t
 - **Stale "after" figures:** The brief's cited 0.635 was captured at an earlier commit and had drifted to 0.615 by the time of this analysis. Ensure drift reports always specify the exact commit SHA.
 - **Automated commit tracking:** The drift-report tool (`drift-report.ts`) should record the commit SHA alongside metrics for reproducibility.
 
+## Re-Baseline (AC6, producer approval 2026-09-25)
+
+With the attribution complete and no regression found, the producer approved
+re-baselining (`docs/main-street/balance-guardrail-recommendations.md` §0, Q2 =
+within this item). The committed baseline was regenerated on the current dev tip
+via `scripts/generate-main-street-monte-baseline.ts`.
+
+| Difficulty | New baseline winRate | New baseline coins/turn | New baseline medianScore |
+|-----------|----------------------|-------------------------|--------------------------|
+| Easy | 0.910 | 942.17 | 11332.5 |
+| Medium | **0.615** | 632.99 | 12332.5 |
+| Hard | 0.440 | 459.92 | 1095.5 |
+
+The new baseline is stamped with `commitSha` (see `monte-carlo-baseline.json`)
+and the additive `bankingGreedy` block was regenerated alongside it (Medium
+0.825). The design-intent guardrail bands (Medium 0.45–0.95) and the drift
+guardrails both pass against the new snapshot.
+
+**Rationale:** the 2026-09-12 snapshot was unratified and ~900 commits stale;
+the observed drift is the cumulative consequence of deliberate, approved balance
+changes, not a regression. Recording the current equilibrium gives future drift
+reports a trustworthy, commit-stamped reference.
+
 ## Determinism Verification
 
 The control run was executed twice at the same code state with identical results:
@@ -95,5 +118,5 @@ This confirms the harness is deterministic with the canonical seed set (mc-balan
 - **CG-0MU37CKRR008252I** — Per-action challenge evaluation (the change under investigation)
 - **CG-0MU8N8B52003HCJ5** — The re-run that originally detected the drift
 - `docs/main-street/balance-guardrail-recommendations.md` — Drift-report-then-ask decision tree
-- `docs/main-street/monte-carlo-baseline.json` — Committed baseline (2026-09-12)
+- `docs/main-street/monte-carlo-baseline.json` — Committed baseline (regenerated 2026-09-25 with `commitSha`)
 - `docs/main-street/monte-carlo-control-run.json` — Control run results (per-action DISABLED)
