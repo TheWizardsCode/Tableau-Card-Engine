@@ -12,8 +12,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
-import { createOverlayBackground, dismissOverlay } from '../../src/ui/Overlay';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
+import { createOverlayBackground, dismissOverlay } from '@ui/Overlay';
 
 // ── Boot helper ────────────────────────────────────────────
 

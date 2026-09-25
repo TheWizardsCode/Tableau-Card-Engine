@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createCard } from '../../src/card-system/Card';
+import { createCard } from '@card-system/Card';
 import { createGolfGrid } from '../../example-games/golf/GolfGrid';
 import type { GolfGrid } from '../../example-games/golf/GolfGrid';
 import {

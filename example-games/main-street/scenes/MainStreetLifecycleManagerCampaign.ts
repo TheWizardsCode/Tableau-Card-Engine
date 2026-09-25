@@ -9,7 +9,7 @@
  * @module
  */
 
-import { createDefaultResumeOverlay } from '../../../src/core-engine';
+import { createDefaultResumeOverlay } from '@core-engine';
 import { CSV_CHECKSUM } from '../MainStreetCards';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import { createDefaultCampaignProgress, loadCampaignProgress, updateCampaignAfterRun } from '../MainStreetSaveLoad';

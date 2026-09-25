@@ -8,7 +8,7 @@ import {
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 
 function uniqueTemplateIds(deckIds: string[]): string[] {
   return [...new Set(deckIds.map(id => id.replace(/-\d+$/, '')))].sort();

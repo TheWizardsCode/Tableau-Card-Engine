@@ -1,4 +1,4 @@
-import type { TfGeneratedModule } from '../../../src/core-engine';
+import type { TfGeneratedModule } from '@core-engine';
 
 /**
  * Static shim import target for tf-generated module wiring.

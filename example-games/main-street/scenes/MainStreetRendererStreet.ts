@@ -9,8 +9,8 @@
  * @module
  */
 
-import { FONT_FAMILY, HandView } from '../../../src/ui';
-import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
+import { FONT_FAMILY, HandView } from '@ui';
+import { mainStreetRenderCardSvg } from '@ui/Renderer/adapters/MainStreetAdapter';
 import { computeSynergyPairs } from '../MainStreetAdjacency';
 import type { BusinessCard, CommunitySpaceCard, StaffCard } from '../MainStreetCards';
 import { synergyColor } from '../MainStreetCards';

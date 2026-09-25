@@ -23,11 +23,11 @@ import {
 import type {
   DifficultyConfig,
   DifficultyPresetRegistry,
-} from '../../src/core-engine/DifficultyPresets';
+} from '@core-engine/DifficultyPresets';
 import {
   createPresetLookup,
   getPresetNames,
-} from '../../src/core-engine/DifficultyPresets';
+} from '@core-engine/DifficultyPresets';
 
 import {
   setupMainStreetGame,

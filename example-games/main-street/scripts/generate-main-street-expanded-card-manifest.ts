@@ -7,7 +7,7 @@ import {
   createUpgradeDeck,
 } from '../MainStreetCards';
 import { TIER_DEFINITIONS } from '../MainStreetTiers';
-import { createSeededRng } from '../../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 
 function uniqueTemplateIds(ids: string[]): string[] {
   return [...new Set(ids.map(id => id.replace(/-\d+$/, '')))].sort();

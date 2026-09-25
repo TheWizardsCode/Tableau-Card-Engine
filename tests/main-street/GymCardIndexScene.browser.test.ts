@@ -19,8 +19,8 @@ import Phaser from 'phaser';
 import { GymCardIndexScene } from '../../example-games/main-street/gym/GymCardIndexScene';
 import { GYM_CARD_INDEX_KEY } from '../../example-games/main-street/gym/GymCardIndexScene';
 import { SYNERGY_TYPES, cardSynergyTypes } from '../../example-games/main-street/gym/GymCardIndex';
-import { GAME_W, GAME_H } from '../../src/ui/constants';
-import { waitForScene } from '../helpers/waitForScene';
+import { GAME_W, GAME_H } from '@ui/constants';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 describe('GymCardIndexScene browser integration', () => {
   let game: Phaser.Game | null = null;

@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { LegalityResult } from '../../src/rule-engine';
+import type { LegalityResult } from '@rule-engine';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, classifyEffect } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard } from './MainStreetCards';

@@ -10,7 +10,7 @@
 
 import Phaser from 'phaser';
 import { CARD_TEMPLATE_NAMES } from '../MainStreetCards';
-import { FONT_FAMILY, moveGameObject } from '../../../src/ui';
+import { FONT_FAMILY, moveGameObject } from '@ui';
 import { SFX_KEYS } from './MainStreetConstants';
 import type { MainStreetAnimatorContext } from './MainStreetAnimatorContext';
 

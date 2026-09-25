@@ -27,7 +27,7 @@ import type {
   ReplayAdapter,
   ValidationResult,
   TakeoverOptions,
-} from '../../../../scripts/adapters/ReplayAdapter';
+} from '@core-scripts/adapters/ReplayAdapter';
 
 // ── Lost Cities transcript types (minimal, for adapter) ────
 

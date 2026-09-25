@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 async function bootGame(): Promise<Phaser.Game> {
   let container = document.getElementById('game-container');

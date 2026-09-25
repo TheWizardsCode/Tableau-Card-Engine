@@ -25,7 +25,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import { getBusinessTemplates, type BusinessCard } from '../../example-games/main-street/MainStreetCards';
 import type { MainStreetState } from '../../example-games/main-street/MainStreetState';
 

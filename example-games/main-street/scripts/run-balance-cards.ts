@@ -19,7 +19,7 @@ import {
   validateCsvRows,
   runBalancingPass,
   formatSummaryTable,
-} from '../../../src/balance-cards';
+} from '@balance-cards';
 
 // ── Default paths ─────────────────────────────────────────────────────
 

@@ -18,7 +18,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
 import type { BeleagueredCastleState } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
 import { FOUNDATION_SUITS } from '../../example-games/beleaguered-castle/BeleagueredCastleState';

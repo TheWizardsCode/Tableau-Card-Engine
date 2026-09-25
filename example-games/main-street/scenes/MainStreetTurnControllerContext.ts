@@ -11,7 +11,7 @@
 import type { BusinessCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import type { SynergyPair } from '../MainStreetAdjacency';
 import type { TurnResult } from '../MainStreetEngine';
-import type { DragDropPayload } from '../../../src/ui/dragDrop';
+import type { DragDropPayload } from '@ui/dragDrop';
 
 export interface MainStreetTurnControllerContext {
   readonly scene: any;

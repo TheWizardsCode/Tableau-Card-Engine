@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import type { ReplayAdapter, ValidationResult, TakeoverOptions } from '../../../../scripts/adapters/ReplayAdapter';
+import type { ReplayAdapter, ValidationResult, TakeoverOptions } from '@core-scripts/adapters/ReplayAdapter';
 
 /**
  * Minimal ReplayAdapter for Main Street.

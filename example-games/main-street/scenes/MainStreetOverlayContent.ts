@@ -5,14 +5,14 @@ import type { EventCard, StaffCard } from '../MainStreetCards';
 import { SFX_KEYS } from './MainStreetConstants';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import type { TurnResult } from '../MainStreetEngine';
-import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '../../../src/ui';
-import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
+import { FONT_FAMILY, createOverlayBackground, createOverlayButton, dismissOverlay } from '@ui';
+import { COMMON_SFX_KEYS, safePlaySound } from '@core-engine/SoundManager';
 import { TIER_DEFINITIONS, ORDERED_TIER_DEFINITIONS, highestUnlockedTier } from '../MainStreetTiers';
 import {
   isBuyAndPlacePremiumDialogDismissed,
   setBuyAndPlacePremiumDialogDismissed,
 } from '../MainStreetPrefs';
-import { t, registerLocale } from '../../../src/core-engine/I18n';
+import { t, registerLocale } from '@core-engine/I18n';
 import {
   UNDO_CHALLENGE_I18N_KEYS,
   UNDO_CHALLENGE_EN_BUNDLE,

@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 import {
   RandomStrategy,
   HeuristicStrategy,

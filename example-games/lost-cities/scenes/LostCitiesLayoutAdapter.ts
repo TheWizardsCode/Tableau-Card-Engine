@@ -6,8 +6,8 @@
  * @module example-games/lost-cities/scenes/LostCitiesLayoutAdapter
  */
 
-import { anchorPoint } from '../../../src/ui/screen-layout';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import { anchorPoint } from '@ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
 import lcLayoutJson from '../layouts/lost-cities.layout.json';
 
 const parsedLayout = parseScreenLayoutDocument(lcLayoutJson);

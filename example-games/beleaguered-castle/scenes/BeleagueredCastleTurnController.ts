@@ -5,8 +5,8 @@ import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import {
   applyMove, undoMove, findSafeAutoMoves, isWon, hasNoMoves, hasValuableMoves, isTriviallyWinnable, getAutoCompleteMoves,
 } from '../BeleagueredCastleRules';
-import type { Command } from '../../../src/core-engine/UndoRedoManager';
-import { UndoRedoManager, CompoundCommand } from '../../../src/core-engine/UndoRedoManager';
+import type { Command } from '@core-engine/UndoRedoManager';
+import { UndoRedoManager, CompoundCommand } from '@core-engine/UndoRedoManager';
 import type { BCTranscriptRecorder } from '../GameTranscript';
 import { AUTO_COMPLETE_DELAY } from './BeleagueredCastleConstants';
 

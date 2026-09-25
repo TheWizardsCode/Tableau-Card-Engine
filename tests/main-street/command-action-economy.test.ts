@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 import {
   buyBusinessCommand,
   moveToHandCommand,

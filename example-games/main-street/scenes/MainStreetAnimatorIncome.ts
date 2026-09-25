@@ -10,7 +10,7 @@
  */
 
 import Phaser from 'phaser';
-import { FONT_FAMILY, moveGameObject, popTextOrIcon } from '../../../src/ui';
+import { FONT_FAMILY, moveGameObject, popTextOrIcon } from '@ui';
 import type { SlotIncome, SlotPhaseBreakdown } from '../MainStreetAdjacency';
 import { applyEndOfTurnDeltas } from '../MainStreetEngine';
 import type { PendingEndOfTurnDeltas } from '../MainStreetEngine';

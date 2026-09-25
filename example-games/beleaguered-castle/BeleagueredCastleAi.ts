@@ -36,8 +36,8 @@ import {
   isLegalFoundationMove,
   rankValue,
 } from './BeleagueredCastleRules';
-import type { AiStrategyBase } from '../../src/ai';
-import { AiPlayer, pickBest } from '../../src/ai';
+import type { AiStrategyBase } from '@ai';
+import { AiPlayer, pickBest } from '@ai';
 
 // ── Search configuration ────────────────────────────────────
 

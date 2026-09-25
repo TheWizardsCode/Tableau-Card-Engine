@@ -2,7 +2,7 @@
  * SushiGoConstants -- shared layout, styling, and audio constants for Sushi Go!
  */
 
-import { GAME_W } from '../../../src/ui';
+import { GAME_W } from '@ui';
 import type { SushiGoCardType } from '../SushiGoCards';
 
 export const ANIM_DURATION = 300;

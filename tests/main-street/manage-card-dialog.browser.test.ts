@@ -24,7 +24,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import { createStaffDeck, getBusinessTemplates, type BusinessCard, type StaffCard } from '../../example-games/main-street/MainStreetCards';
 
 // ── Boot helpers (mirrors sell-demolition.browser.test.ts) ──

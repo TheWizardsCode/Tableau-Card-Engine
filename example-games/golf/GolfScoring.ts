@@ -12,7 +12,7 @@
  * Face-down cards are scored by their rank (they still count).
  */
 
-import type { Card, Rank } from '../../src/card-system/Card';
+import type { Card, Rank } from '@card-system/Card';
 import type { GolfGrid } from './GolfGrid';
 import type { AiVisibleGrid, AiVisibleCardSlot } from './GolfGame';
 import type { GolfMove } from './GolfRules';

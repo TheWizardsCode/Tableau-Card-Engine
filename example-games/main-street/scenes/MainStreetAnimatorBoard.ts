@@ -10,7 +10,7 @@
  */
 
 import { synergyColor } from '../MainStreetCards';
-import { FONT_FAMILY, moveGameObject, popTextOrIcon } from '../../../src/ui';
+import { FONT_FAMILY, moveGameObject, popTextOrIcon } from '@ui';
 import type { SynergyPair } from '../MainStreetAdjacency';
 import { SFX_KEYS } from './MainStreetConstants';
 import { synergyLineEndpoints } from './synergyLineEndpoints';

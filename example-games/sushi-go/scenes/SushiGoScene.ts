@@ -20,12 +20,12 @@ import {
 } from '../SushiGoGame';
 import { SushiGoAiPlayer, GreedyStrategy } from '../AiStrategy';
 import { SushiGoTranscriptRecorder } from '../GameTranscript';
-import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import type { EventSoundMapping } from '@core-engine/SoundManager';
 import {
   markSceneValid,
   markSceneInvalid,
   rasteriseSvgToTexture,
-} from '../../../src/core-engine';
+} from '@core-engine';
 import {
   CardGameScene,
   GAME_W, GAME_H, FONT_FAMILY,
@@ -35,8 +35,8 @@ import {
   createSceneTitle,
   TooltipManager,
   audioPathWithFallback,
-} from '../../../src/ui';
-import type { HelpSection, TooltipRenderContext } from '../../../src/ui';
+} from '@ui';
+import type { HelpSection, TooltipRenderContext } from '@ui';
 import helpContent from '../help-content.json';
 
 import {

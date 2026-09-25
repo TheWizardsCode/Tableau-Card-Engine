@@ -22,9 +22,9 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
-import { UndoRedoManager } from '../../src/core-engine';
+import { UndoRedoManager } from '@core-engine';
 
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import { createStaffDeck, type BusinessCard, type StaffCard } from '../../example-games/main-street/MainStreetCards';
 import {
   canPlaceStaffOnBusiness,

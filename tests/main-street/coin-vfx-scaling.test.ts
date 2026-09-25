@@ -16,7 +16,7 @@ const { popTextOrIcon, moveGameObject } = vi.hoisted(() => ({
   popTextOrIcon: vi.fn(() => Promise.resolve()),
   moveGameObject: vi.fn(() => ({})),
 }));
-vi.mock('../../src/ui', () => ({ FONT_FAMILY: 'sans-serif', popTextOrIcon, moveGameObject }));
+vi.mock('@ui', () => ({ FONT_FAMILY: 'sans-serif', popTextOrIcon, moveGameObject }));
 import { MainStreetAnimator } from '../../example-games/main-street/scenes/MainStreetAnimator';
 import { SFX_KEYS } from '../../example-games/main-street/scenes/MainStreetConstants';
 

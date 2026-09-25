@@ -10,7 +10,7 @@ import {
   parseScreenLayoutDocument,
   validateScreenLayoutDocument,
   type ScreenLayoutDocument,
-} from '../../src/ui/screen-layout-schema';
+} from '@ui/screen-layout-schema';
 
 function errorContainsPath(
   result: ReturnType<typeof validateScreenLayoutDocument>,

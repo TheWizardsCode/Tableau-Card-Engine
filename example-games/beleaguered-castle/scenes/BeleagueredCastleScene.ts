@@ -2,8 +2,8 @@
  * BeleagueredCastleScene -- the main Phaser scene for Beleaguered Castle.
  */
 import Phaser from 'phaser';
-import type { Rank, Suit } from '../../../src/card-system/Card';
-import { createCard, RANKS } from '../../../src/card-system/Card';
+import type { Rank, Suit } from '@card-system/Card';
+import { createCard, RANKS } from '@card-system/Card';
 import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
 import {
@@ -26,10 +26,10 @@ import {
   createGameOverOverlay,
   createDragDropManager,
   DEFAULT_DRAG_DISTANCE_THRESHOLD,
-} from '../../../src/ui';
-import type { DragDropManager, DragDropPayload } from '../../../src/ui';
-import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
-import type { HelpSection } from '../../../src/ui';
+} from '@ui';
+import type { DragDropManager, DragDropPayload } from '@ui';
+import type { EventSoundMapping } from '@core-engine/SoundManager';
+import type { HelpSection } from '@ui';
 import helpContent from '../help-content.json';
 
 import {
@@ -51,18 +51,18 @@ import {
 import { BeleagueredCastleRenderer } from './BeleagueredCastleRenderer';
 import type { BCTopCardDragData, BCZoneDragData } from './BeleagueredCastleRenderer';
 import { BeleagueredCastleTurnController } from './BeleagueredCastleTurnController';
-import { moveGameObject, cardTextureKey } from '../../../src/ui';
-import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
+import { moveGameObject, cardTextureKey } from '@ui';
+import { shakeIllegalMove } from '@ui/shakeIllegalMove';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayButton,
   createActionButton,
   HintBar,
-} from '../../../src/ui';
-import { createHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
-import { SaveLoadStore } from '../../../src/core-engine';
-import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
-import { CheckpointManager } from '../../../src/core-engine';
+} from '@ui';
+import { createHudText } from '@ui/Renderer/adapters/BeleagueredCastleAdapter';
+import { SaveLoadStore } from '@core-engine';
+import { TranscriptStore, autoSaveTranscript } from '@core-engine/transcript';
+import { CheckpointManager } from '@core-engine';
 import { bcStateSerializer } from '../BeleagueredCastleSaveLoad';
 import type { BCSerializedState } from '../BeleagueredCastleSaveLoad';
 

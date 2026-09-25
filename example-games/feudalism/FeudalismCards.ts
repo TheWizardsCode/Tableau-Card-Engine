@@ -104,11 +104,11 @@ export interface PatronTile {
 // Deck / shuffle utilities
 // ---------------------------------------------------------------------------
 
-import { shuffleArray } from '../../src/card-system/Deck';
+import { shuffleArray } from '@card-system/Deck';
 
 // Re-export so existing consumers (tests, other modules) can still import
 // shuffleArray from this file without breaking.
-export { shuffleArray } from '../../src/card-system/Deck';
+export { shuffleArray } from '@card-system/Deck';
 
 // ---------------------------------------------------------------------------
 // Token supply initialization

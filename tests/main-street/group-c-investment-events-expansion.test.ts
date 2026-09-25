@@ -31,11 +31,11 @@ import {
   type DurationEventCard,
   type SynergyType,
 } from '../../example-games/main-street/MainStreetCards';
-import { validateCsvRows } from '../../src/balance-cards';
+import { validateCsvRows } from '@balance-cards';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { resolveEvent, processEndOfTurn, executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
 
 // ── Design contract (from epic CG-0MSQE2NLX003ADIY, Group C) ──────────

@@ -30,10 +30,10 @@ import type {
   AiVisibleGrid,
 } from '../../example-games/golf/GolfGame';
 import { isLegalMove } from '../../example-games/golf/GolfRules';
-import { createCard } from '../../src/card-system/Card';
-import { CardMemoryTracker } from '../../src/ai/CardMemoryTracker';
+import { createCard } from '@card-system/Card';
+import { CardMemoryTracker } from '@ai/CardMemoryTracker';
 import { createGolfGrid } from '../../example-games/golf/GolfGrid';
-import { Pile } from '../../src/card-system/Pile';
+import { Pile } from '@card-system/Pile';
 import { createRoundEndState } from '../../example-games/golf/GolfRules';
 
 // Deterministic RNG for testing

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { getInfluence, getWinnerIndex, setupFeudalismGame } from '../../example-games/feudalism/FeudalismGame';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -14,7 +14,7 @@ import { setupMainStreetGame } from '../../example-games/main-street/MainStreetS
 import { executeWeekStart, executeAction } from '../../example-games/main-street/MainStreetEngine';
 import { discardFromHand } from '../../example-games/main-street/MainStreetMarketHand';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard } from '../../example-games/main-street/MainStreetCards';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 import { discardFromHandCommand } from '../../example-games/main-street/MainStreetCommands';
 
 // ── Helpers ────────────────────────────────────────────────────

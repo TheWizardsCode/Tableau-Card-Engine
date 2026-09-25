@@ -13,8 +13,8 @@ import {
   dismissOverlay,
   createOverlayButton,
   FONT_FAMILY,
-} from '../../../src/ui';
-import { t } from '../../../src/core-engine/I18n';
+} from '@ui';
+import { t } from '@core-engine/I18n';
 import type { TutorialStorageAdapter } from '../TutorialState';
 import {
   loadTutorialState,

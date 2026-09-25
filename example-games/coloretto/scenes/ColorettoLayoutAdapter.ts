@@ -8,8 +8,8 @@
  * @module example-games/coloretto/scenes/ColorettoLayoutAdapter
  */
 
-import { anchorPoint } from '../../../src/ui/screen-layout';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import { anchorPoint } from '@ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
 import colorettoLayoutJson from '../layouts/coloretto.layout.json';
 
 const parsedLayout = parseScreenLayoutDocument(colorettoLayoutJson);

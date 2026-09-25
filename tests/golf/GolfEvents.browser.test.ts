@@ -11,12 +11,12 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import type { GameEventEmitter } from '../../src/core-engine/GameEventEmitter';
+import type { GameEventEmitter } from '@core-engine/GameEventEmitter';
 import type {
   TurnCompletedPayload,
   GameEndedPayload,
-} from '../../src/core-engine/GameEventEmitter';
-import { waitForScene } from '../helpers/waitForScene';
+} from '@core-engine/GameEventEmitter';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 // ── Helpers ─────────────────────────────────────────────────
 

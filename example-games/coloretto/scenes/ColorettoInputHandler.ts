@@ -12,7 +12,7 @@
  */
 
 import Phaser from 'phaser';
-import { GAME_W, FONT_FAMILY } from '../../../src/ui';
+import { GAME_W, FONT_FAMILY } from '@ui';
 
 // ── Public types ───────────────────────────────────────────
 

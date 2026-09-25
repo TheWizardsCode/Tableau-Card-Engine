@@ -7,7 +7,7 @@
  * @module
  */
 
-import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
+import { createActiveEffect } from '@core-engine/ActiveEffect';
 import { applyCompetitiveIncome, getSlotOwnerId } from './MainStreetAdjacency';
 import type { EventCard, SynergyType, SpecializationSkill, DurationEventCard } from './MainStreetCards';
 import { isDurationEventCard } from './MainStreetCards';

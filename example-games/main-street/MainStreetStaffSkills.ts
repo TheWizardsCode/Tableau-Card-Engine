@@ -31,7 +31,7 @@
 
 import type { SpecializationSkill, SpecializationSkillCategory } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 export type { SpecializationSkill, SpecializationSkillCategory } from './MainStreetCards';
 export { STACKED_SKILL_CATEGORIES } from './MainStreetCards';

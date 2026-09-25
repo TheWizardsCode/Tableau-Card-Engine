@@ -2,7 +2,7 @@ import {
   SaveLoadStore,
   CheckpointManager,
   type SaveSerializer,
-} from '../../src/core-engine';
+} from '@core-engine';
 import {
   type MainStreetCampaignProgress,
   type MainStreetSerializedState,

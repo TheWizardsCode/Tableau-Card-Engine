@@ -13,8 +13,8 @@
  */
 
 import Phaser from 'phaser';
-import { FONT_FAMILY } from '../../../src/ui';
-import { createOverlayButton } from '../../../src/ui';
+import { FONT_FAMILY } from '@ui';
+import { createOverlayButton } from '@ui';
 import {
   BrowserStatsStorageAdapter,
   loadStats,

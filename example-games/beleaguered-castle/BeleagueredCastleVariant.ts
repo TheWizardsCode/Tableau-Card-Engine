@@ -11,7 +11,7 @@
  * checkpoints need no schema changes.
  */
 
-import type { StorageLike } from '../../src/core-engine/SoundManager';
+import type { StorageLike } from '@core-engine/SoundManager';
 import { BC_VARIANTS, type BCVariant } from './BeleagueredCastleRules';
 
 // Re-export the supported-variants registry so consumers of the persistence

@@ -28,7 +28,7 @@ import {
   GreedyStrategy,
 } from '../AiStrategy';
 import { LCTranscriptRecorder } from '../GameTranscript';
-import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import type { EventSoundMapping } from '@core-engine/SoundManager';
 import {
   CardGameScene,
   OverlayManager,
@@ -37,8 +37,8 @@ import {
   FONT_FAMILY,
   GAME_W, GAME_H,
   audioPathWithFallback,
-} from '../../../src/ui';
-import type { HelpSection, TooltipRenderContext } from '../../../src/ui';
+} from '@ui';
+import type { HelpSection, TooltipRenderContext } from '@ui';
 import helpContent from '../help-content.json';
 
 import {

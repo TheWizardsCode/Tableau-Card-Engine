@@ -9,20 +9,20 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { ScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
+import type { ScreenLayoutDocument } from '@ui/screen-layout-schema';
 import {
   composeResolvedLayouts,
   type ComposeResolvedLayoutsIssue,
-} from '../../src/ui/screen-layout-compose';
+} from '@ui/screen-layout-compose';
 import {
   getZoneRect,
   ScreenLayoutMappingError,
   type LayoutViewport,
-} from '../../src/ui/screen-layout';
+} from '@ui/screen-layout';
 import {
   parseScreenLayoutDocument,
   validateScreenLayoutDocument,
-} from '../../src/ui/screen-layout-schema';
+} from '@ui/screen-layout-schema';
 
 import baseLayout from '../../example-games/main-street/layouts/main-street.layout.json';
 import tutorialLayout from '../../example-games/main-street/layouts/main-street-tutorial.layout.json';

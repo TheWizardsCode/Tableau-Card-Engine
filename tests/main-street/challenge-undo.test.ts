@@ -38,7 +38,7 @@ import {
   type BusinessCard,
 } from '../../example-games/main-street/MainStreetCards';
 import { performUndo } from '../../example-games/main-street/scenes/MainStreetTurnControllerTurnFlow';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 
 // ── Helpers ─────────────────────────────────────────────────
 

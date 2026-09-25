@@ -17,7 +17,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 import {
   assignSkillsToApplicants,
   getSkill,

@@ -22,7 +22,7 @@ import { TranscriptRecorder } from '../../example-games/golf/GameTranscript';
 import type { GameTranscript } from '../../example-games/golf/GameTranscript';
 import { scoreGrid } from '../../example-games/golf/GolfScoring';
 import { isGridFullyRevealed } from '../../example-games/golf/GolfGrid';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 // ── Helpers ─────────────────────────────────────────────────
 

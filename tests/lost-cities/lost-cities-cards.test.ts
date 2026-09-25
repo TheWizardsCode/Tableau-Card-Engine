@@ -20,7 +20,7 @@ import {
   EXPEDITION_HEX,
   colorDisplayName,
 } from '../../example-games/lost-cities/LostCitiesCards';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 // ── Constants ──────────────────────────────────────────────
 

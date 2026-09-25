@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createBusinessDeck, createCommunitySpaceDeck, createEventDeck, createUpgradeDeck, createStaffDeck } from '../../example-games/main-street/MainStreetCards';
 import { TIER_DEFINITIONS } from '../../example-games/main-street/MainStreetTiers';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 
 function allTemplateIds(): Set<string> {
   const rng = createSeededRng(42);

@@ -32,7 +32,7 @@ import type {
   UpgradeCard,
   StaffCard,
 } from '../../example-games/main-street/MainStreetCards';
-import { resetI18n, registerLocale, setLocale } from '../../src/core-engine/I18n';
+import { resetI18n, registerLocale, setLocale } from '@core-engine/I18n';
 
 // ---------------------------------------------------------------------------
 // Helpers

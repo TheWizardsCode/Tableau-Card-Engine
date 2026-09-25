@@ -11,9 +11,9 @@
  * @module
  */
 
-import { shuffleArray } from '../../src/card-system';
-import { createSeededRng } from '../../src/core-engine';
-import { createEconomyLedger } from '../../src/rule-engine/EconomyLedger';
+import { shuffleArray } from '@card-system';
+import { createSeededRng } from '@core-engine';
+import { createEconomyLedger } from '@rule-engine/EconomyLedger';
 import {
   type BusinessCard,
   type CommunitySpaceCard,

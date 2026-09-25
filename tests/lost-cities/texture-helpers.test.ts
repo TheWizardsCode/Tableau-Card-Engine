@@ -20,7 +20,7 @@ import {
   cardAssetKey,
   compactAssetKey,
 } from '../../example-games/lost-cities/LostCitiesCards';
-import { makeTextureKey } from '../../src/core-engine/SvgHelpers';
+import { makeTextureKey } from '@core-engine/SvgHelpers';
 
 // ── Constants ────────────────────────────────────────────────
 

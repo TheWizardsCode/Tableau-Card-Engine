@@ -6,8 +6,8 @@
  * migration epic (CG-0MPDWKITM006Y08I).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { HandView } from '../../src/ui/HandView';
-import { PileView } from '../../src/ui/PileView';
+import { HandView } from '@ui/HandView';
+import { PileView } from '@ui/PileView';
 
 // ── Minimal Phaser scene mock ───────────────────────────────
 

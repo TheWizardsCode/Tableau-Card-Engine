@@ -2,8 +2,8 @@
  * Factory function to create a Phaser game instance for Blackjack.
  * Used by both main.ts and browser tests.
  */
-import { createCardGame } from '../../src/ui/createCardGame';
-import type { CardGameOptions } from '../../src/ui/createCardGame';
+import { createCardGame } from '@ui/createCardGame';
+import type { CardGameOptions } from '@ui/createCardGame';
 import { BlackjackScene } from './scenes/BlackjackScene';
 
 export type BlackjackGameOptions = Partial<Pick<CardGameOptions, 'parent' | 'width' | 'height' | 'type'>>;

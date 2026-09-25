@@ -13,9 +13,9 @@
 
 import { describe, it, expect, afterEach, afterAll } from 'vitest';
 import Phaser from 'phaser';
-import type { GameEventEmitter } from '../../src/core-engine/GameEventEmitter';
+import type { GameEventEmitter } from '@core-engine/GameEventEmitter';
 import type { BoardSnapshot, CardSnapshot } from '../../example-games/golf/GameTranscript';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 // ── Helpers ─────────────────────────────────────────────────
 

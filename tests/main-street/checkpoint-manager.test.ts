@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SaveLoadStore, CheckpointManager } from '../../src/core-engine';
+import { SaveLoadStore, CheckpointManager } from '@core-engine';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 
 import {

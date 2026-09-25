@@ -18,7 +18,7 @@ import {
   MARKET_CARD_GAP,
   MARKET_TIER_GAP,
 } from '../../example-games/feudalism/scenes/FeudalismConstants';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 // ── Constants ───────────────────────────────────────────────
 

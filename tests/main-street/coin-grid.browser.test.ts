@@ -9,8 +9,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 
-import { waitForScene } from '../helpers/waitForScene';
-import { mainStreetRenderCardSvg } from '../../src/ui/Renderer/adapters/MainStreetAdapter';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
+import { mainStreetRenderCardSvg } from '@ui/Renderer/adapters/MainStreetAdapter';
 import {
   COIN_GRID_FULL_KEY,
   createCoinGrid,

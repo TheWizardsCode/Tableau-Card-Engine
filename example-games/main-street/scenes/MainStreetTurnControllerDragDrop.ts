@@ -8,8 +8,8 @@
 
 import { playIllegalFeedback, matchesRequiredCard } from './MainStreetTurnControllerUtils';
 
-import { DEFAULT_DRAG_DISTANCE_THRESHOLD, createDragDropManager } from '../../../src/ui/dragDrop';
-import type { DragDropPayload } from '../../../src/ui/dragDrop';
+import { DEFAULT_DRAG_DISTANCE_THRESHOLD, createDragDropManager } from '@ui/dragDrop';
+import type { DragDropPayload } from '@ui/dragDrop';
 import { computeSynergyPairs } from '../MainStreetAdjacency';
 import { buyAndPlaceBusinessCommand, buyAndPlaceUpgradeCommand } from '../MainStreetCommands';
 import { canBuyAndPlaceUpgrade, canPurchaseBusiness } from '../MainStreetMarket';

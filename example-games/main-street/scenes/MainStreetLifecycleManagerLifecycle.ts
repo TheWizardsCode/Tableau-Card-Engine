@@ -8,11 +8,11 @@
  * @module
  */
 
-import { SaveLoadStore, UndoRedoManager, createTfPlayer, markSceneInvalid, markSceneValid } from '../../../src/core-engine';
-import type { Command } from '../../../src/core-engine';
-import { TooltipManager, createSingleSelectionManager } from '../../../src/ui';
-import type { HelpSection } from '../../../src/ui';
-import { getEndTurnKeybind } from '../../../src/ui/SettingsStore';
+import { SaveLoadStore, UndoRedoManager, createTfPlayer, markSceneInvalid, markSceneValid } from '@core-engine';
+import type { Command } from '@core-engine';
+import { TooltipManager, createSingleSelectionManager } from '@ui';
+import type { HelpSection } from '@ui';
+import { getEndTurnKeybind } from '@ui/SettingsStore';
 import { DIFFICULTY_NAMES } from '../MainStreetDifficulty';
 import { createMainStreetCheckpointManager, saveCampaignProgress } from '../MainStreetSaveLoad';
 import { setupMainStreetGame } from '../MainStreetState';

@@ -19,7 +19,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 // ── Constants (must match FeudalismScene / ui constants) ────
 const GAME_W = 1280;

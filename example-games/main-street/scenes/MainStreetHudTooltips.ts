@@ -23,7 +23,7 @@ import { reputationCoinMultiplier, applyReputationMultiplier } from '../MainStre
 import { ORDERED_TIER_DEFINITIONS } from '../MainStreetTiers';
 import { computeScore } from '../MainStreetEngine';
 import type { MainStreetState, MainStreetCampaignProgress } from '../MainStreetState';
-import { t, registerLocale } from '../../../src/core-engine/I18n';
+import { t, registerLocale } from '@core-engine/I18n';
 
 // ── i18n Keys ───────────────────────────────────────────────
 

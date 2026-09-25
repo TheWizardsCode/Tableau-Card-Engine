@@ -32,7 +32,7 @@ import {
   getUpgradeTemplates,
   getStaffCardTemplates,
 } from '../../example-games/main-street/MainStreetCards';
-import { isDevMode } from '../../src/ui/debug/DebugToolsRegistry';
+import { isDevMode } from '@ui/debug/DebugToolsRegistry';
 import { createMarketCardCheatTool } from '../../example-games/main-street/debug/MarketCardCheatOverlay';
 
 // ── Helpers ─────────────────────────────────────────────────

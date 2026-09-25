@@ -6,8 +6,8 @@
  * @module example-games/beleaguered-castle/scenes/BeleagueredCastleLayoutAdapter
  */
 
-import { anchorPoint } from '../../../src/ui/screen-layout';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import { anchorPoint } from '@ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
 import bcLayoutJson from '../layouts/beleaguered-castle.layout.json';
 
 const parsedLayout = parseScreenLayoutDocument(bcLayoutJson);

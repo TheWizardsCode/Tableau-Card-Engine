@@ -8,10 +8,10 @@
  * @module
  */
 
-import { moveGameObject } from '../../../src/ui';
+import { moveGameObject } from '@ui';
 import type { PendingEndOfTurnDeltas } from '../MainStreetEngine';
 import { CARD_BACK_TEMPLATE, SFX_KEYS } from './MainStreetConstants';
-import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
+import { mainStreetRenderCardSvg } from '@ui/Renderer/adapters/MainStreetAdapter';
 import type { MainStreetAnimatorContext } from './MainStreetAnimatorContext';
 
 

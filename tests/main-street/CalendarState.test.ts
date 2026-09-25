@@ -7,7 +7,7 @@ import {
   serializeMainStreetState,
   setupMainStreetGame,
 } from '../../example-games/main-street/MainStreetState';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 import { processEndOfTurn, executeWeekStart, resolveEventChoice, finishDeferredEndOfTurn } from '../../example-games/main-street/MainStreetEngine';
 
 describe('CalendarState (CG-0MTT0K9RX0004QTE / F2)', () => {

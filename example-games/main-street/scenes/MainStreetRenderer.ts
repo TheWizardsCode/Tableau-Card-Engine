@@ -10,7 +10,7 @@
  */
 
 import Phaser from 'phaser';
-import type { HandView } from '../../../src/ui';
+import type { HandView } from '@ui';
 import type { BusinessCard, CommunitySpaceCard, EventCard, UpgradeCard, StaffCard } from '../MainStreetCards';
 import type { MapSlotNode, RoadBand } from '../MainStreetMapView';
 import type { SceneLayout } from './MainStreetConstants';

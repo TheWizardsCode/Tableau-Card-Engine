@@ -8,7 +8,7 @@
 // ── Audio asset keys ──────────────────────────────────────
 // All SFX keys use the standard `sfx-` prefix — no game-specific prefix.
 // See docs/SFX_CONVENTION.md for the naming convention.
-import { COMMON_SFX_KEYS } from '../../../src/core-engine/SoundManager';
+import { COMMON_SFX_KEYS } from '@core-engine/SoundManager';
 
 export const SFX_KEYS = {
   CARD_PICKUP: 'sfx-card-pickup',

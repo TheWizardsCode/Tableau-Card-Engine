@@ -20,8 +20,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
-import { COMMON_SFX_KEYS } from '../../src/core-engine/SoundManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
+import { COMMON_SFX_KEYS } from '@core-engine/SoundManager';
 import { UNIFIED_TUTORIAL_STEPS } from '../../example-games/main-street/TutorialFlow';
 import { DRAG_TRANSFER_DURATION_MIN_MS, DRAG_TRANSFER_DURATION_MAX_MS } from '../../example-games/main-street/scenes/MainStreetConstants';
 

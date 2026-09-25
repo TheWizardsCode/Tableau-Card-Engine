@@ -13,11 +13,11 @@
  * @module example-games/blackjack/BlackjackGame
  */
 
-import type { Card } from '../../src/card-system/Card';
-import { createStandardDeck } from '../../src/card-system/Deck';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
-import { shuffle } from '../../src/card-system/Deck';
-import { Pile } from '../../src/card-system/Pile';
+import type { Card } from '@card-system/Card';
+import { createStandardDeck } from '@card-system/Deck';
+import { createSeededRng } from '@core-engine/SeededRng';
+import { shuffle } from '@card-system/Deck';
+import { Pile } from '@card-system/Pile';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -290,7 +290,7 @@ export function dealerPlay(state: BlackjackGameState): void {
  * @param state  The game state to modify.
  * @returns The reverted card, or undefined if the player hand is empty.
  */
-export function revertHit(state: BlackjackGameState): import('../../src/card-system/Card').Card | undefined {
+export function revertHit(state: BlackjackGameState): import('@card-system/Card').Card | undefined {
   if (state.playerHand.cards.isEmpty()) return undefined;
 
   const removed = state.playerHand.cards.pop();

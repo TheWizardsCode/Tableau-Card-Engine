@@ -4,7 +4,7 @@ import validMainStreetLayout from '../../example-games/main-street/tests/fixture
 import type {
   ScreenLayoutDocument,
   PixelPoint,
-} from '../../src/ui/screen-layout-schema';
+} from '@ui/screen-layout-schema';
 import {
   adaptLayoutWithFallback,
   anchorPoint,
@@ -12,7 +12,7 @@ import {
   normalizedToPixels,
   pixelToNormalized,
   type ScreenLayoutIssue,
-} from '../../src/ui/screen-layout';
+} from '@ui/screen-layout';
 
 const layout = validMainStreetLayout as ScreenLayoutDocument;
 

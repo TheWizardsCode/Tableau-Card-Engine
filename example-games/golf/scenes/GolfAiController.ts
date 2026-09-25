@@ -2,7 +2,7 @@
  * GolfAiController -- handles AI turn execution for 9-Card Golf.
  */
 
-import type { Card } from '../../../src/card-system/Card';
+import type { Card } from '@card-system/Card';
 import type { GolfAction, TurnResult } from '../GolfGame';
 import {
   executeTurn,
@@ -12,10 +12,10 @@ import {
 import type { AiPlayer } from '../AiStrategy';
 import { countVisibleRanks } from '../AiStrategy';
 import type { TranscriptRecorder } from '../GameTranscript';
-import type { GameEventEmitter } from '../../../src/core-engine';
+import type { GameEventEmitter } from '@core-engine';
 import type { TurnPhase } from './GolfConstants';
-import type { PhaseManager } from '../../../src/ui';
-import { AiDecisionRecorder } from '../../../src/ui/debug/AiDecisionRecorder';
+import type { PhaseManager } from '@ui';
+import { AiDecisionRecorder } from '@ui/debug/AiDecisionRecorder';
 import type { GolfSession } from '../GolfGame';
 import { AI_DELAY, AI_SHOW_DRAW_DELAY, SWAP_ANIM_DURATION } from './GolfConstants';
 

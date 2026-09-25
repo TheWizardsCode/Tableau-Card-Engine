@@ -23,7 +23,7 @@ import {
 } from '../../example-games/golf/GolfGame';
 import type { GolfAction } from '../../example-games/golf/GolfGame';
 import { AiPlayer, RandomStrategy, GreedyStrategy } from '../../example-games/golf/AiStrategy';
-import { createCard } from '../../src/card-system/Card';
+import { createCard } from '@card-system/Card';
 import { createGolfGrid } from '../../example-games/golf/GolfGrid';
 
 // Deterministic RNG

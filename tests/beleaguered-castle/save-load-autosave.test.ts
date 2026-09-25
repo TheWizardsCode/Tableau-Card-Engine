@@ -10,8 +10,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SaveLoadStore } from '../../src/core-engine';
-import { TranscriptStore, autoSaveTranscript } from '../../src/core-engine/transcript';
+import { SaveLoadStore } from '@core-engine';
+import { TranscriptStore, autoSaveTranscript } from '@core-engine/transcript';
 import { deal } from '../../example-games/beleaguered-castle/BeleagueredCastleRules';
 import {
   serializeBCState,

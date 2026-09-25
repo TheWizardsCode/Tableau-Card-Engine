@@ -21,7 +21,7 @@ import {
   createEconomyLedger,
   type EconomyLedger,
   type EconomyLedgerConfig,
-} from '../../src/rule-engine/EconomyLedger';
+} from '@rule-engine/EconomyLedger';
 
 import {
   setupMainStreetGame,

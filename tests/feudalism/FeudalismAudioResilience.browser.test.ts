@@ -16,8 +16,8 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { safePlaySound } from '../../src/core-engine/SoundManager';
-import { waitForScene } from '../helpers/waitForScene';
+import { safePlaySound } from '@core-engine/SoundManager';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 // ── Helpers ─────────────────────────────────────────────────
 

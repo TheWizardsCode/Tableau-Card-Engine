@@ -47,7 +47,7 @@ import {
   executeWeekStart,
   canPlaceFromHand,
 } from '../../example-games/main-street/MainStreetEngine';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 
 // ── Feature Detection ───────────────────────────────────────
 

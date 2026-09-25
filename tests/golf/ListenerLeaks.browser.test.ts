@@ -12,7 +12,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ describe('ListenerRegistry: no listener leaks (browser)', () => {
       ? countListeners(scene.input.keyboard, 'keydown')
       : 0;
 
-    const { HelpPanel } = await import('../../src/ui/HelpPanel');
+    const { HelpPanel } = await import('@ui/HelpPanel');
     const panel = new HelpPanel(scene, {
       sections: [
         { heading: 'H1', body: 'Content '.repeat(40) },
@@ -99,7 +99,7 @@ describe('ListenerRegistry: no listener leaks (browser)', () => {
       ? countListeners(scene.input.keyboard, 'keydown')
       : 0;
 
-    const { SettingsPanel } = await import('../../src/ui/SettingsPanel');
+    const { SettingsPanel } = await import('@ui/SettingsPanel');
     const soundManager = (scene as unknown as { soundManager: unknown }).soundManager;
     expect(soundManager).toBeDefined();
 

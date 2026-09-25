@@ -2,10 +2,10 @@
  * GolfAnimator -- handles all card animations and tweens for 9-Card Golf.
  */
 
-import type { Card } from '../../../src/card-system/Card';
+import type { Card } from '@card-system/Card';
 import type { TurnResult } from '../GolfGame';
-import { cardTextureKey, flipCard } from '../../../src/ui';
-import type { SoundManager } from '../../../src/core-engine';
+import { cardTextureKey, flipCard } from '@ui';
+import type { SoundManager } from '@core-engine';
 import {
   GOLF_CARD_W,
   ANIM_DURATION, SWAP_ANIM_DURATION,

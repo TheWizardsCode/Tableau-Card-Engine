@@ -22,7 +22,7 @@ const overlay = vi.hoisted(() => {
   return { buttons };
 });
 
-vi.mock('../../src/ui', () => {
+vi.mock('@ui', () => {
   return {
     FONT_FAMILY: 'Arial',
     createOverlayBackground: vi.fn(() => ({ objects: [] })),
@@ -45,15 +45,15 @@ vi.mock('../../src/ui', () => {
   };
 });
 
-import { createOverlayButton, dismissOverlay } from '../../src/ui';
+import { createOverlayButton, dismissOverlay } from '@ui';
 import { MainStreetOverlayContent } from '../../example-games/main-street/scenes/MainStreetOverlayContent';
 import { performUndo } from '../../example-games/main-street/scenes/MainStreetTurnControllerTurnFlow';
 import {
   UNDO_CHALLENGE_I18N_KEYS,
   UNDO_CHALLENGE_EN_STRINGS,
 } from '../../example-games/main-street/i18n/undo-challenge-en';
-import { t } from '../../src/core-engine/I18n';
-import { UndoRedoManager, type Command } from '../../src/core-engine/UndoRedoManager';
+import { t } from '@core-engine/I18n';
+import { UndoRedoManager, type Command } from '@core-engine/UndoRedoManager';
 
 // ── Mock scene ──────────────────────────────────────────────
 

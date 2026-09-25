@@ -9,8 +9,8 @@
 
 import {
   anchorPoint,
-} from '../../../src/ui/screen-layout';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+} from '@ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
 import type { SceneLayout } from './MainStreetConstants';
 import {
   BASE_HUD_Y,

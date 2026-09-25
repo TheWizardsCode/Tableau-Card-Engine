@@ -18,7 +18,7 @@
  *   const transcript = recorder.finalize('win', moveCount, elapsedSeconds);
  */
 
-import type { Rank, Suit } from '../../src/card-system/Card';
+import type { Rank, Suit } from '@card-system/Card';
 import type {
   BeleagueredCastleState,
   BCMove,
@@ -28,7 +28,7 @@ import {
   snapshotCard,
   TranscriptRecorderBase,
   type CardSnapshot,
-} from '../../src/core-engine/transcript';
+} from '@core-engine/transcript';
 
 // Re-export so existing consumers that import from this module still work.
 export { snapshotCard };

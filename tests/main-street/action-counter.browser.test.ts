@@ -11,7 +11,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 const TUTORIAL_STATE_KEY = 'tce-main-street-tutorial-state';
 

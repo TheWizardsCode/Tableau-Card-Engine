@@ -19,11 +19,11 @@
  * @module
  */
 
-import { FONT_FAMILY } from '../../../src/ui';
-import { t, registerLocale } from '../../../src/core-engine/I18n';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
-import { composeResolvedLayouts } from '../../../src/ui/screen-layout-compose';
-import { type LayoutViewport } from '../../../src/ui/screen-layout';
+import { FONT_FAMILY } from '@ui';
+import { t, registerLocale } from '@core-engine/I18n';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
+import { composeResolvedLayouts } from '@ui/screen-layout-compose';
+import { type LayoutViewport } from '@ui/screen-layout';
 
 import {
   BANKING_HINT_STEP,

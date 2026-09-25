@@ -86,6 +86,11 @@ export function resolveCoreAliases(coreRoot: string): Record<string, string> {
     '@rule-engine': path.resolve(coreRoot, 'src/rule-engine'),
     '@ui': path.resolve(coreRoot, 'src/ui'),
     '@ai': path.resolve(coreRoot, 'src/ai'),
+    // Core-owned `src/` module without a top-level alias (balance-card tooling).
+    '@balance-cards': path.resolve(coreRoot, 'src/balance-cards'),
+    // Core-owned framework trees consumed by per-game repos (F9 / C2).
+    '@core-scripts': path.resolve(coreRoot, 'scripts'),
+    '@core-tests': path.resolve(coreRoot, 'tests'),
   };
 }
 

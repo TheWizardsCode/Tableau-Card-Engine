@@ -17,7 +17,7 @@ import {
   createBusinessDeck,
   type BusinessCard,
 } from '../../example-games/main-street/MainStreetCards';
-import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
+import { createActiveEffect } from '@core-engine/ActiveEffect';
 
 // ── Helpers ───────────────────────────────────────────────────────
 

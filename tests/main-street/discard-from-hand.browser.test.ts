@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import { TUTORIAL_STATE_STORAGE_KEY } from '../../example-games/main-street/TutorialState';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
 

@@ -12,7 +12,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import { EXPEDITION_COLORS } from '../../example-games/lost-cities/LostCitiesCards';
 
 // ── Helpers ─────────────────────────────────────────────────

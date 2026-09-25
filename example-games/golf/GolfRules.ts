@@ -20,12 +20,12 @@
  *     their 9 cards face-up before the first turn.
  */
 
-import type { Card } from '../../src/card-system/Card';
-import type { LegalityResult } from '../../src/rule-engine/index';
+import type { Card } from '@card-system/Card';
+import type { LegalityResult } from '@rule-engine/index';
 import type { GolfGrid } from './GolfGrid';
 import { gridIndex, isGridFullyRevealed } from './GolfGrid';
 
-export type { LegalityResult } from '../../src/rule-engine/index';
+export type { LegalityResult } from '@rule-engine/index';
 
 // ── Draw source ─────────────────────────────────────────────
 

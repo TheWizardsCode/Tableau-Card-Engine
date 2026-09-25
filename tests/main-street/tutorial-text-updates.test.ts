@@ -21,7 +21,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { UNIFIED_TUTORIAL_STEPS, resolveTutorialStepText } from '../../example-games/main-street/TutorialFlow';
 import { TUTORIAL_EN_BUNDLE } from '../../example-games/main-street/i18n/tutorial-en';
-import { resetI18n, registerLocale, t, formatCurrency } from '../../src/core-engine/I18n';
+import { resetI18n, registerLocale, t, formatCurrency } from '@core-engine/I18n';
 import {
   getCsvRows,
   getBaseTypeId,

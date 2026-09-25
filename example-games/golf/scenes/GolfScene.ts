@@ -11,7 +11,7 @@
  *   - GolfReplayController: replay mode state injection and takeover
  */
 
-import type { Card } from '../../../src/card-system/Card';
+import type { Card } from '@card-system/Card';
 import type { GolfMove } from '../GolfRules';
 import type { GolfSession } from '../GolfGame';
 import {
@@ -20,15 +20,15 @@ import {
 import { AiPlayer, GreedyStrategy, RandomStrategy } from '../AiStrategy';
 import type { AiStrategy } from '../AiStrategy';
 import { TranscriptRecorder } from '../GameTranscript';
-import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import type { EventSoundMapping } from '@core-engine/SoundManager';
 import {
   CardGameScene,
   preloadCardAssets,
   PhaseManager,
   OverlayManager,
   audioPathWithFallback,
-} from '../../../src/ui';
-import type { HelpSection } from '../../../src/ui';
+} from '@ui';
+import type { HelpSection } from '@ui';
 import helpContent from '../help-content.json';
 
 import {

@@ -2,14 +2,14 @@
  * GolfTurnController -- handles human turn execution and turn flow for 9-Card Golf.
  */
 
-import type { Card } from '../../../src/card-system/Card';
+import type { Card } from '@card-system/Card';
 import type { GolfMove, DrawSource } from '../GolfRules';
 import type { GolfSession, GolfAction, TurnResult } from '../GolfGame';
 import { executeTurn } from '../GolfGame';
 import type { TranscriptRecorder } from '../GameTranscript';
-import type { GameEventEmitter } from '../../../src/core-engine';
+import type { GameEventEmitter } from '@core-engine';
 import type { TurnPhase } from './GolfConstants';
-import type { PhaseManager } from '../../../src/ui';
+import type { PhaseManager } from '@ui';
 
 export class GolfTurnController {
   drawnCard: Card | null = null;

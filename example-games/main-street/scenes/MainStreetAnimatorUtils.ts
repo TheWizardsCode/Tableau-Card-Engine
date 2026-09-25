@@ -10,7 +10,7 @@
  */
 
 import Phaser from 'phaser';
-import { FONT_FAMILY, popTextOrIcon } from '../../../src/ui';
+import { FONT_FAMILY, popTextOrIcon } from '@ui';
 import type { SlotPhaseBreakdown } from '../MainStreetAdjacency';
 import { computeSynergyPairs } from '../MainStreetAdjacency';
 import { synergyLineEndpoints } from './synergyLineEndpoints';

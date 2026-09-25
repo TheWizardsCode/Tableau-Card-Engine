@@ -23,7 +23,7 @@ import {
   HUD_ARIA_STRINGS,
   HUD_ARIA_LABELS,
 } from '../../example-games/main-street/scenes/MainStreetHudTooltips';
-import { t, setLocale, registerLocale, resetI18n } from '../../src/core-engine/I18n';
+import { t, setLocale, registerLocale, resetI18n } from '@core-engine/I18n';
 
 import {
   setupMainStreetGame,

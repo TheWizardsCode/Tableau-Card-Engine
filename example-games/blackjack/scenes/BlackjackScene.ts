@@ -10,8 +10,8 @@
  */
 
 import Phaser from 'phaser';
-import { GAME_W, GAME_H, FONT_FAMILY } from '../../../src/ui/constants';
-import { createHudText } from '../../../src/ui/Renderer';
+import { GAME_W, GAME_H, FONT_FAMILY } from '@ui/constants';
+import { createHudText } from '@ui/Renderer';
 import {
   createBlackjackGameState,
   dealInitialHands,
@@ -23,19 +23,19 @@ import {
   revertDeal,
 } from '../BlackjackGame';
 import type { BlackjackGameState } from '../BlackjackGame';
-import { anchorPoint } from '../../../src/ui/screen-layout';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
-import type { ScreenLayoutDocument, PixelPoint } from '../../../src/ui/screen-layout-schema';
-import { CardGameScene, getCardTexture, preloadCardAssets, HandView, flipCard } from '../../../src/ui';
-import type { HelpSection } from '../../../src/ui';
-import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
-import { audioPathWithFallback } from '../../../src/ui/CardGameScene';
-import { UndoRedoManager } from '../../../src/core-engine/UndoRedoManager';
-import type { Command } from '../../../src/core-engine/UndoRedoManager';
-import { OverlayManager } from '../../../src/ui/OverlayManager';
-import { createGameOverOverlay } from '../../../src/ui/GameOverOverlay';
-import { moveGameObject } from '../../../src/ui/moveGameObject';
-import { getReducedMotion } from '../../../src/ui/SettingsStore';
+import { anchorPoint } from '@ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
+import type { ScreenLayoutDocument, PixelPoint } from '@ui/screen-layout-schema';
+import { CardGameScene, getCardTexture, preloadCardAssets, HandView, flipCard } from '@ui';
+import type { HelpSection } from '@ui';
+import type { EventSoundMapping } from '@core-engine/SoundManager';
+import { audioPathWithFallback } from '@ui/CardGameScene';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
+import type { Command } from '@core-engine/UndoRedoManager';
+import { OverlayManager } from '@ui/OverlayManager';
+import { createGameOverOverlay } from '@ui/GameOverOverlay';
+import { moveGameObject } from '@ui/moveGameObject';
+import { getReducedMotion } from '@ui/SettingsStore';
 import blackjackLayoutJson from '../layouts/blackjack.layout.json';
 import helpContent from '../help-content.json';
 
@@ -110,7 +110,7 @@ function resolveBkAnchor(
 class HitCommand implements Command {
   readonly description = 'Hit';
 
-  private card: import('../../../src/card-system/Card').Card | null = null;
+  private card: import('@card-system/Card').Card | null = null;
   private prevMessage = '';
 
   constructor(
@@ -153,7 +153,7 @@ class HitCommand implements Command {
 class DealCommand implements Command {
   readonly description = 'Deal';
 
-  private dealtCards: import('../../../src/card-system/Card').Card[] = [];
+  private dealtCards: import('@card-system/Card').Card[] = [];
 
   constructor(private state: BlackjackGameState) {}
 

@@ -9,7 +9,7 @@
 
 import { playIllegalFeedback } from './MainStreetTurnControllerUtils';
 
-import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
+import { TranscriptStore, autoSaveTranscript } from '@core-engine/transcript';
 import type { EventCard } from '../MainStreetCards';
 import { playEventCommand, resolveEventChoiceCommand } from '../MainStreetCommands';
 import { applyEndOfTurnDeltas, executeWeekStart, finishDeferredEndOfTurn, finishDeferredTurnClosing, processEndOfTurn } from '../MainStreetEngine';

@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SaveLoadStore } from '../../src/core-engine';
+import { SaveLoadStore } from '@core-engine';
 import {
   setupMainStreetGame,
   type MainStreetState,
@@ -40,7 +40,7 @@ import {
   createUpgradeDeck,
   createStaffDeck,
 } from '../../example-games/main-street/MainStreetCards';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 import { CHALLENGE_TEMPLATES } from '../../example-games/main-street/MainStreetChallenges';
 
 // ── Test Helpers ────────────────────────────────────────────

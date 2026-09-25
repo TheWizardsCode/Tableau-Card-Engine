@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createEventDeck } from '../../example-games/main-street/MainStreetCards';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 
 describe('Positive Incident Multiplier', () => {
   it('applies integer multipliers exactly', () => {

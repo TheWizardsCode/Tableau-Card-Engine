@@ -22,7 +22,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import type { EventCard } from '../../example-games/main-street/MainStreetCards';
 import { createStaffDeck } from '../../example-games/main-street/MainStreetCards';
 

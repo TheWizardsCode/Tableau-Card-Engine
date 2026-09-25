@@ -9,7 +9,7 @@
  * @module
  */
 
-import { toCommand, type ReversibleAction } from '../../src/core-engine/ActionCommands';
+import { toCommand, type ReversibleAction } from '@core-engine/ActionCommands';
 import { evaluateChallengesAfterAction } from './MainStreetChallenges';
 import type { MainStreetState } from './MainStreetState';
 import {

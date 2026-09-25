@@ -19,10 +19,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { COMMON_SFX_KEYS } from '../../src/core-engine/SoundManager';
+import { COMMON_SFX_KEYS } from '@core-engine/SoundManager';
 import { executeWeekStart } from '../../example-games/main-street/MainStreetEngine';
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 
 /** Business card factory (matches action-economy test convention). */
 function makeBiz(id: string, name: string, cost: number): any {

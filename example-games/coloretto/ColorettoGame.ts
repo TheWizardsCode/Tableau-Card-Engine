@@ -27,10 +27,10 @@ import {
   roundsForPlayerCount,
   ROW_CAPACITY,
 } from './ColorettoCards';
-import { shuffleArray } from '../../src/card-system/Deck';
-import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
-import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
-import type { LegalityResult } from '../../src/rule-engine/index';
+import { shuffleArray } from '@card-system/Deck';
+import type { MultiplayerSetupOptions } from '@core-engine/SetupOptions';
+import { resolveSetupOptions } from '@core-engine/SetupOptions';
+import type { LegalityResult } from '@rule-engine/index';
 import {
   resolvePlayerScoring,
   scorePlayerRound,

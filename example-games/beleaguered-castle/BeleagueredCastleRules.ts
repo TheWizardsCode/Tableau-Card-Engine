@@ -22,14 +22,14 @@
  * - All other rules are identical to classic.
  */
 
-import type { Card, Rank, Suit } from '../../src/card-system/Card';
-import { RANKS } from '../../src/card-system/Card';
-import { createStandardDeck, shuffle } from '../../src/card-system/Deck';
-import { Pile } from '../../src/card-system/Pile';
-import { rankValue } from '../../src/card-system/rankValue';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
-import type { BaseSetupOptions } from '../../src/core-engine/SetupOptions';
-import { resolveBaseSetupOptions } from '../../src/core-engine/SetupOptions';
+import type { Card, Rank, Suit } from '@card-system/Card';
+import { RANKS } from '@card-system/Card';
+import { createStandardDeck, shuffle } from '@card-system/Deck';
+import { Pile } from '@card-system/Pile';
+import { rankValue } from '@card-system/rankValue';
+import { createSeededRng } from '@core-engine/SeededRng';
+import type { BaseSetupOptions } from '@core-engine/SetupOptions';
+import { resolveBaseSetupOptions } from '@core-engine/SetupOptions';
 import type {
   BeleagueredCastleState,
   BCMove,
@@ -40,11 +40,11 @@ import {
   CARDS_PER_COLUMN,
   FOUNDATION_SUITS,
 } from './BeleagueredCastleState';
-import type { LegalityResult } from '../../src/rule-engine/index';
+import type { LegalityResult } from '@rule-engine/index';
 
 // Re-export rankValue so existing consumers importing from this file
 // continue to work without import-path changes.
-export { rankValue } from '../../src/card-system/rankValue';
+export { rankValue } from '@card-system/rankValue';
 
 // ── Rank utilities ──────────────────────────────────────────
 
@@ -68,7 +68,7 @@ export function foundationIndex(suit: Suit): number {
 
 // Shared deterministic RNG factory from core-engine.
 // Re-exported here for backward compatibility with existing consumers.
-export { createSeededRng } from '../../src/core-engine/SeededRng';
+export { createSeededRng } from '@core-engine/SeededRng';
 
 // ── Deal ────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { addLog } from '../MainStreetState';
 import { generateHint, type HintResult } from '../MainStreetHint';
 import { recordMainStreetEvent } from '../MainStreetTranscript';
-import { FONT_FAMILY } from '../../../src/ui';
+import { FONT_FAMILY } from '@ui';
 import { LOG_SCROLL_SPEED, LOG_TITLE_H } from './MainStreetConstants';
 import { streetViewportRect } from '../MainStreetMapView';
 

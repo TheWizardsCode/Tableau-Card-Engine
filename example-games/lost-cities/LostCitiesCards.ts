@@ -239,6 +239,6 @@ export function createLostCitiesDeck(): LostCitiesCard[] {
  *
  * @returns The same array reference (mutated).
  */
-import { shuffleArray } from '../../src/card-system/Deck';
+import { shuffleArray } from '@card-system/Deck';
 
 export const shuffleDeck: typeof shuffleArray = shuffleArray;

@@ -47,9 +47,9 @@ import {
   countJokers,
 } from '../ColorettoScoring';
 import type { JokerAssignment } from '../ColorettoScoring';
-import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
-import { markSceneValid, markSceneInvalid } from '../../../src/core-engine';
-import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
+import { autoSaveTranscript, TranscriptStore } from '@core-engine/transcript';
+import { markSceneValid, markSceneInvalid } from '@core-engine';
+import type { EventSoundMapping } from '@core-engine/SoundManager';
 import {
   CardGameScene,
   GAME_W,
@@ -61,8 +61,8 @@ import {
   createOverlayBackground,
   createOverlayButton,
   shakeIllegalMove,
-} from '../../../src/ui';
-import type { HelpSection } from '../../../src/ui';
+} from '@ui';
+import type { HelpSection } from '@ui';
 import helpContent from '../help-content.json';
 import { computeColorettoLayout } from './ColorettoLayoutAdapter';
 import { ColorettoRenderer } from './ColorettoRenderer';

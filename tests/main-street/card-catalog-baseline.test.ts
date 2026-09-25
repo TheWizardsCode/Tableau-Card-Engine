@@ -7,7 +7,7 @@ import {
   createEventDeck,
   createUpgradeDeck,
 } from '../../example-games/main-street/MainStreetCards';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 
 interface BaselineCatalog {
   source: string;

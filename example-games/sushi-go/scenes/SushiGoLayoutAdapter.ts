@@ -6,8 +6,8 @@
  * @module example-games/sushi-go/scenes/SushiGoLayoutAdapter
  */
 
-import { anchorPoint } from '../../../src/ui/screen-layout';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import { anchorPoint } from '@ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
 import sushiLayoutJson from '../layouts/sushi-go.layout.json';
 
 const parsedLayout = parseScreenLayoutDocument(sushiLayoutJson);

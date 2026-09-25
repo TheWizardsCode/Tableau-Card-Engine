@@ -10,17 +10,17 @@
  *   - Turn execution (draw + move + round-end check)
  */
 
-import type { Card } from '../../src/card-system/Card';
-import type { GameState } from '../../src/core-engine/GameState';
-import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
-import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
+import type { Card } from '@card-system/Card';
+import type { GameState } from '@core-engine/GameState';
+import type { MultiplayerSetupOptions } from '@core-engine/SetupOptions';
+import { resolveSetupOptions } from '@core-engine/SetupOptions';
 import {
   advanceTurn,
   startGame,
   endGame,
-} from '../../src/core-engine/TurnSequencer';
-import { createStandardDeck, shuffle, drawOrThrow } from '../../src/card-system/Deck';
-import { Pile } from '../../src/card-system/Pile';
+} from '@core-engine/TurnSequencer';
+import { createStandardDeck, shuffle, drawOrThrow } from '@card-system/Deck';
+import { Pile } from '@card-system/Pile';
 import type { GolfGrid } from './GolfGrid';
 import { createGolfGrid, GRID_SIZE } from './GolfGrid';
 import type {

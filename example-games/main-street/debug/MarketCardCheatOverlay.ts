@@ -11,8 +11,8 @@
  */
 
 import type Phaser from 'phaser';
-import type { DebugToolsEntry } from '../../../src/ui/debug/DebugToolsRegistry';
-import { createOverlayDialog, type OverlayDialogHandle } from '../../../src/ui/Overlay';
+import type { DebugToolsEntry } from '@ui/debug/DebugToolsRegistry';
+import { createOverlayDialog, type OverlayDialogHandle } from '@ui/Overlay';
 import {
   getBusinessTemplates,
   getCommunitySpaceTemplates,

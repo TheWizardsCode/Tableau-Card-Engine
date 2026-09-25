@@ -27,7 +27,7 @@ const { popTextOrIcon, moveGameObject } = vi.hoisted(() => ({
   moveGameObject: vi.fn((_opts?: unknown) => ({})),
 }));
 
-vi.mock('../../src/ui', () => ({
+vi.mock('@ui', () => ({
   FONT_FAMILY: 'sans-serif',
   popTextOrIcon,
   moveGameObject,

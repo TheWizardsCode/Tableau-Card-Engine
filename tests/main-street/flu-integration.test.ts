@@ -18,7 +18,7 @@ import {
   resolveIncident,
 } from '../../example-games/main-street/MainStreetEngine';
 import { runMonteCarlo } from '../../example-games/main-street/MainStreetMonteCarlo';
-import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
+import { createActiveEffect } from '@core-engine/ActiveEffect';
 import type { EventCard, BusinessCard } from '../../example-games/main-street/MainStreetCards';
 
 /**

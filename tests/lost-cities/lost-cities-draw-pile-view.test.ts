@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CARD_H } from '../../example-games/lost-cities/scenes/LostCitiesConstants';
-import { PileView } from '../../src/ui/PileView';
+import { PileView } from '@ui/PileView';
 
 // Mock Phaser before any module that imports it is loaded.
 // Phaser's OS detection (node_modules/phaser/src/device/OS.js) accesses

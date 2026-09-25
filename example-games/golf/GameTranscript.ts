@@ -17,7 +17,7 @@ import {
   snapshotCard,
   TranscriptRecorderBase,
   type CardSnapshot,
-} from '../../src/core-engine/transcript';
+} from '@core-engine/transcript';
 
 // Re-export so existing consumers that import from this module still work.
 export { snapshotCard };

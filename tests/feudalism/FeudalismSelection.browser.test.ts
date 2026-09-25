@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import type { ResourceType } from '../../example-games/feudalism/FeudalismCards';
 
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 async function bootGame(): Promise<Phaser.Game> {
   let container = document.getElementById('game-container');

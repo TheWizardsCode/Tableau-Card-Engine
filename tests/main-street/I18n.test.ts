@@ -11,7 +11,7 @@ import {
   setLocale,
   getLocale,
   resetI18n,
-} from '../../src/core-engine/I18n';
+} from '@core-engine/I18n';
 
 // ── Pure unit tests (reset I18n between each test) ──────────────
 

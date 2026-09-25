@@ -5,11 +5,11 @@ import {
   CardGameScene,
   HintBar,
   TooltipManager,
-} from '../../../src/ui';
-import type { SelectionController, SingleSelectionManager } from '../../../src/ui';
-import { SaveLoadStore, CheckpointManager } from '../../../src/core-engine';
-import { UndoRedoManager } from '../../../src/core-engine';
-import type { DragDropManager } from '../../../src/ui';
+} from '@ui';
+import type { SelectionController, SingleSelectionManager } from '@ui';
+import { SaveLoadStore, CheckpointManager } from '@core-engine';
+import { UndoRedoManager } from '@core-engine';
+import type { DragDropManager } from '@ui';
 import type { MainStreetSerializedState, PendingApplicant } from '../MainStreetState';
 import { setStreetGridLattice } from '../MainStreetState';
 import { hireStaffApplicant, declineStaffApplicant } from '../MainStreetEngine';
@@ -40,10 +40,10 @@ import {
 } from '../MainStreetMapView';
 import { createMarketCardCheatTool } from '../debug/MarketCardCheatOverlay';
 import { createStaffApplicantCheatTool } from '../debug/StaffApplicantCheatOverlay';
-import { createSessionExportTool } from '../../../src/ui/debug/SessionExportTool';
-import { createStateInspectorTool } from '../../../src/ui/debug/StateInspectorOverlay';
-import { createGameEventLogTool } from '../../../src/ui/debug/GameEventLogOverlay';
-import { createAiDecisionViewerTool } from '../../../src/ui/debug/AiDecisionOverlay';
+import { createSessionExportTool } from '@ui/debug/SessionExportTool';
+import { createStateInspectorTool } from '@ui/debug/StateInspectorOverlay';
+import { createGameEventLogTool } from '@ui/debug/GameEventLogOverlay';
+import { createAiDecisionViewerTool } from '@ui/debug/AiDecisionOverlay';
 
 type UIPhase =
   | 'idle'               // Waiting for WeekStart
@@ -68,8 +68,8 @@ export class MainStreetScene extends CardGameScene {
     difficultyNames?: readonly string[],
     defaultDifficulty?: string,
     hasTooltips?: boolean,
-    skillRating?: import('../../../src/ui/SettingsPanel').SkillRatingConfig,
-    debugTools?: import('../../../src/ui/debug/DebugToolsRegistry').DebugToolsEntry[],
+    skillRating?: import('@ui/SettingsPanel').SkillRatingConfig,
+    debugTools?: import('@ui/debug/DebugToolsRegistry').DebugToolsEntry[],
   ): void {
     // Escape cancels an in-progress hand-card targeting phase before it opens
     // the settings panel (CG-0MT3IYSRL001VVUP).

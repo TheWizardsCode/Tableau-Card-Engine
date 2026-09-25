@@ -203,7 +203,7 @@ export function createSushiGoDeck(): SushiGoCard[] {
  * aliased as `shuffleDeck` for backward compatibility with existing
  * consumer code.
  */
-import { shuffleArray } from '../../src/card-system/Deck';
+import { shuffleArray } from '@card-system/Deck';
 
 export const shuffleDeck: typeof shuffleArray = shuffleArray;
 

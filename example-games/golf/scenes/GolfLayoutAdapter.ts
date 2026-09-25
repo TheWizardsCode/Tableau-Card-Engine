@@ -8,8 +8,8 @@
  * @module example-games/golf/scenes/GolfLayoutAdapter
  */
 
-import { anchorPoint } from '../../../src/ui/screen-layout';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
+import { anchorPoint } from '@ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
 import golfLayoutJson from '../layouts/golf.layout.json';
 import {
   GOLF_CARD_W, GOLF_CARD_H, CARD_GAP,

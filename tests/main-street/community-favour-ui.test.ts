@@ -8,8 +8,8 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { parseScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
-import { anchorPoint } from '../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
+import { anchorPoint } from '@ui/screen-layout';
 import layoutJson from '../../example-games/main-street/layouts/main-street.layout.json';
 import { computeMainStreetLayoutWithSll } from '../../example-games/main-street/scenes/MainStreetLayoutAdapter';
 

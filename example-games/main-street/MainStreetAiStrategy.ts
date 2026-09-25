@@ -16,8 +16,8 @@
  * @module
  */
 
-import type { AiStrategyBase } from '../../src/ai';
-import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
+import type { AiStrategyBase } from '@ai';
+import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '@ai';
 import { recordMainStreetEvent } from './MainStreetTranscript';
 import { hasPeekCapableStaff } from './MainStreetStaffSkills';
 import { syncResourceBankToLedger, type MainStreetState, type PlayerRecord } from './MainStreetState';

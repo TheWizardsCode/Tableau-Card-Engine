@@ -3,13 +3,13 @@
  */
 
 import type { TranscriptRecorder } from '../GameTranscript';
-import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
-import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
-import { GAME_W, GAME_H, OverlayManager, createGameOverOverlay } from '../../../src/ui';
+import { TranscriptStore, autoSaveTranscript } from '@core-engine/transcript';
+import type { SoundManager, GameEventEmitter } from '@core-engine';
+import { GAME_W, GAME_H, OverlayManager, createGameOverOverlay } from '@ui';
 import { createActionButton } from '@ui/Renderer';
 import {
   createGolfHudText,
-} from '../../../src/ui/Renderer/adapters/GolfAdapter';
+} from '@ui/Renderer/adapters/GolfAdapter';
 import { SFX_KEYS } from './GolfConstants';
 import type { GolfSession } from '../GolfGame';
 

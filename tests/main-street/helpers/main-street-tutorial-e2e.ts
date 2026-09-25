@@ -12,7 +12,7 @@
  */
 import Phaser from 'phaser';
 import { page } from '@vitest/browser/context';
-import { waitForScene } from '../../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import { advanceTutorialStep, getCurrentStep, UNIFIED_TUTORIAL_STEPS } from '../../../example-games/main-street/TutorialFlow';
 import { PREMIUM_DIALOG_DISMISSED_KEY } from '../../../example-games/main-street/MainStreetPrefs';
 

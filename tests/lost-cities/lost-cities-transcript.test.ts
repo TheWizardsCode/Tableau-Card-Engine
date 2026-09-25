@@ -35,7 +35,7 @@ import {
   RandomStrategy,
   LostCitiesAiPlayer,
 } from '../../example-games/lost-cities/AiStrategy';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 // ── Test card factories ────────────────────────────────────
 

@@ -32,7 +32,7 @@ import {
   dismissOverlay,
   createOverlayBackground,
   createOverlayButton,
-} from '../../../src/ui';
+} from '@ui';
 
 // ── Constants ──────────────────────────────────────────────
 

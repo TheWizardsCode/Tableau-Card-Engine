@@ -31,12 +31,12 @@ import {
   getLegalPhase1Actions,
   getLegalPhase2Actions,
 } from './LostCitiesRules';
-import type { AiStrategyBase } from '../../src/ai';
+import type { AiStrategyBase } from '@ai';
 import {
   AiPlayer as AiPlayerBase,
   pickRandom,
   CardMemoryTracker,
-} from '../../src/ai';
+} from '@ai';
 
 // ---------------------------------------------------------------------------
 // Strategy interface

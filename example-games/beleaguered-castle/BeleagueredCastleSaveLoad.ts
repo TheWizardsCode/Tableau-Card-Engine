@@ -14,11 +14,11 @@
  *   only run checkpoints are saved.
  */
 
-import type { Rank, Suit } from '../../src/card-system/Card';
-import { createCard } from '../../src/card-system/Card';
-import { Pile } from '../../src/card-system/Pile';
-import type { SaveSerializer } from '../../src/core-engine';
-import { SaveLoadStore } from '../../src/core-engine';
+import type { Rank, Suit } from '@card-system/Card';
+import { createCard } from '@card-system/Card';
+import { Pile } from '@card-system/Pile';
+import type { SaveSerializer } from '@core-engine';
+import { SaveLoadStore } from '@core-engine';
 import type { BeleagueredCastleState } from './BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from './BeleagueredCastleState';
 

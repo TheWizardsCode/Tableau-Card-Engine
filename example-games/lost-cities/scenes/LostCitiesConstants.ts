@@ -1,7 +1,7 @@
 /**
  * LostCitiesConstants — shared layout, styling, timing, and audio constants.
  */
-import { GAME_W, GAME_H, FONT_FAMILY } from '../../../src/ui';
+import { GAME_W, GAME_H, FONT_FAMILY } from '@ui';
 
 // ── Card dimensions ───────────────────────────────────────
 export const CARD_W = 95;
@@ -88,7 +88,7 @@ export const AI_ANIM_DURATION = 450;
 // ── Audio asset keys ──────────────────────────────────────
 // All SFX keys use the standard `sfx-` prefix — no game-specific prefix.
 // See docs/SFX_CONVENTION.md for the naming convention.
-import { COMMON_SFX_KEYS } from '../../../src/core-engine/SoundManager';
+import { COMMON_SFX_KEYS } from '@core-engine/SoundManager';
 
 export const SFX_KEYS = {
   CARD_SELECT: 'sfx-card-select',

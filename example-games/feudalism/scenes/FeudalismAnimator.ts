@@ -14,7 +14,7 @@ import {
   RESOURCE_FILL, RESOURCE_LABEL_COLOR,
   MOVE_DURATION,
 } from './FeudalismConstants';
-import { moveGameObject } from '../../../src/ui';
+import { moveGameObject } from '@ui';
 
 export class FeudalismAnimator {
   /** When true, all animations are skipped. */

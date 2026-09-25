@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import { applyIncome, recalculateCard } from '../../example-games/main-street/MainStreetAdjacency';
 import { executeWeekStart, endTurnHeadless } from '../../example-games/main-street/MainStreetEngine';
-import { createActiveEffect } from '../../src/core-engine/ActiveEffect';
+import { createActiveEffect } from '@core-engine/ActiveEffect';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
 
 /**

@@ -37,7 +37,7 @@ import {
   findConstrainedIncidentIndex,
   recordIncidentDraw,
 } from '../../example-games/main-street/MainStreetCards';
-import { shuffleArray } from '../../src/card-system';
+import { shuffleArray } from '@card-system';
 
 // ── Helpers ─────────────────────────────────────────────────
 

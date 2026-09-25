@@ -43,17 +43,17 @@
 import Phaser from 'phaser';
 
 import { GymSceneBase } from '../../gym/scenes/GymSceneBase';
-import { GAME_W } from '../../../src/ui/constants';
-import { createHudText } from '../../../src/ui/Renderer';
-import { anchorPoint } from '../../../src/ui/screen-layout';
+import { GAME_W } from '@ui/constants';
+import { createHudText } from '@ui/Renderer';
+import { anchorPoint } from '@ui/screen-layout';
 import {
   parseScreenLayoutDocument,
   type PixelPoint,
   type ScreenLayoutDocument,
-} from '../../../src/ui/screen-layout-schema';
-import { TooltipManager } from '../../../src/ui/Tooltip';
-import { createOverlayDialog, type OverlayDialogHandle } from '../../../src/ui/Overlay';
-import { getTooltips } from '../../../src/ui/SettingsStore';
+} from '@ui/screen-layout-schema';
+import { TooltipManager } from '@ui/Tooltip';
+import { createOverlayDialog, type OverlayDialogHandle } from '@ui/Overlay';
+import { getTooltips } from '@ui/SettingsStore';
 import {
   buildCardIndex,
   buildCardTooltip,

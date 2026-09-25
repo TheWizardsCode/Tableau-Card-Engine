@@ -24,7 +24,7 @@ import type { ColorettoCard } from '../ColorettoCards';
 import { colorLabel, colorHex } from '../ColorettoCards';
 import type { ColorettoSession } from '../ColorettoGame';
 import { getCurrentPlayerIndex, getRoundTurnOrder } from '../ColorettoGame';
-import { FONT_FAMILY, moveGameObject } from '../../../src/ui';
+import { FONT_FAMILY, moveGameObject } from '@ui';
 import { computeColorettoLayout } from './ColorettoLayoutAdapter';
 import {
   colorCounts,

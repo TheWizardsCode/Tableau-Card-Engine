@@ -11,8 +11,8 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 /**
  * Clear persistent storage (localStorage + IndexedDB) so a checkpoint saved

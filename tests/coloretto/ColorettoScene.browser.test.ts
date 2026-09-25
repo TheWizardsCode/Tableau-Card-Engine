@@ -13,7 +13,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import { createColorettoDeck } from '../../example-games/coloretto/ColorettoCards';
 
 // Visual constants mirrored from ColorettoScene (deliberately kept in

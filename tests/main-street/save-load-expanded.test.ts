@@ -23,8 +23,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import { SaveLoadStore } from '../../src/core-engine';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { SaveLoadStore } from '@core-engine';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 import {
   setupMainStreetGame,
   serializeMainStreetState,

@@ -64,7 +64,7 @@
  * @module
  */
 
-import { t, formatCurrency } from '../../src/core-engine/I18n';
+import { t, formatCurrency } from '@core-engine/I18n';
 import { bankingHintKey, tutorialKey } from './i18n/tutorial-en';
 import { getCsvRows, getBaseTypeId } from './MainStreetCards';
 import type { BusinessCard, CommunitySpaceCard } from './MainStreetCards';

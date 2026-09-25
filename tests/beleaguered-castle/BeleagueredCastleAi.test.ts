@@ -11,9 +11,9 @@ import {
   BeleagueredCastleAiPlayer,
 } from '../../example-games/beleaguered-castle/BeleagueredCastleAi';
 import type { BeleagueredCastleState, BCMove } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
-import { Pile } from '../../src/card-system/Pile';
-import { createCard } from '../../src/card-system/Card';
-import type { Card } from '../../src/card-system/Card';
+import { Pile } from '@card-system/Pile';
+import { createCard } from '@card-system/Card';
+import type { Card } from '@card-system/Card';
 
 // ── Helpers ─────────────────────────────────────────────────
 

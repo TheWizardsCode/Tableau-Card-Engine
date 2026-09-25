@@ -9,8 +9,8 @@ import {
   TABLEAU_CARD_W, TABLEAU_CARD_H, TABLEAU_GROUP_GAP, TABLEAU_CARD_GAP,
   PLAYER_TABLEAU_Y, AI_TABLEAU_Y, SCORING_TOOLTIPS,
 } from './SushiGoConstants';
-import { GAME_W } from '../../../src/ui';
-import type { TooltipManager } from '../../../src/ui';
+import { GAME_W } from '@ui';
+import type { TooltipManager } from '@ui';
 import { SushiGoCardFactory } from './SushiGoCardFactory';
 import { SushiGoRenderer } from './SushiGoRenderer';
 import {

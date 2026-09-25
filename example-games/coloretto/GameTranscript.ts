@@ -16,7 +16,7 @@
  * @module
  */
 
-import { TranscriptRecorderBase } from '../../src/core-engine/transcript';
+import { TranscriptRecorderBase } from '@core-engine/transcript';
 import type { ChameleonColor, ColorettoCard } from './ColorettoCards';
 import type {
   ColorettoAction,

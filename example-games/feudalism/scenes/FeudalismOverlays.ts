@@ -7,13 +7,13 @@ import { tierDisplayName, resourceDisplayName, formatCost } from '../FeudalismCa
 import type { FeudalismSession } from '../FeudalismGame';
 import { getInfluence, getWinnerIndex } from '../FeudalismGame';
 import { FeudalismTranscriptRecorder } from '../GameTranscript';
-import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
+import { autoSaveTranscript, TranscriptStore } from '@core-engine/transcript';
 import {
   GAME_W, GAME_H, FONT_FAMILY,
   createOverlayButton,
   createGameOverOverlay,
   OverlayManager,
-} from '../../../src/ui';
+} from '@ui';
 import { SFX_KEYS, OVERLAY_DEPTH, OVERLAY_BG_ALPHA } from './FeudalismConstants';
 
 const transcriptStore = new TranscriptStore();

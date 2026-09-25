@@ -17,7 +17,7 @@
  * @module
  */
 import { describe, it, expect } from 'vitest';
-import { UndoRedoManager } from '../../src/core-engine';
+import { UndoRedoManager } from '@core-engine';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {

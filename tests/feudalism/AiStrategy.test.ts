@@ -15,7 +15,7 @@ import {
 import {
   totalTokens,
 } from '../../example-games/feudalism/FeudalismCards';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG

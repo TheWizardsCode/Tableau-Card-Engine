@@ -84,8 +84,8 @@ import {
 } from './MainStreetCards';
 import { getPreset, type DifficultyName } from './MainStreetDifficulty';
 import { deriveUnlockedCardIds } from './MainStreetTiers';
-import { createSeededRng } from '../../src/core-engine';
-import { createEconomyLedger } from '../../src/rule-engine/EconomyLedger';
+import { createSeededRng } from '@core-engine';
+import { createEconomyLedger } from '@rule-engine/EconomyLedger';
 import { CHALLENGE_TEMPLATES, selectChallenges } from './MainStreetChallenges';
 import { getBaseTypeId } from './MainStreetCards';
 import { UNIFIED_TUTORIAL_STEPS, type TutorialControllerState } from './TutorialFlow';

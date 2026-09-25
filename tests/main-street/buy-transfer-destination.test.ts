@@ -19,7 +19,7 @@ import { setupMainStreetGame } from '../../example-games/main-street/MainStreetS
 import { MainStreetTurnController } from '../../example-games/main-street/scenes/MainStreetTurnController';
 import { canPurchaseEvent } from '../../example-games/main-street/MainStreetMarket';
 import { createBusinessDeck, createEventDeck } from '../../example-games/main-street/MainStreetCards';
-import { HandView } from '../../src/ui/HandView';
+import { HandView } from '@ui/HandView';
 
 // ── Minimal Phaser mock (for real HandView instances) ──────
 // HandView uses scene.add.image(), scene.add.text(), scene.tweens.

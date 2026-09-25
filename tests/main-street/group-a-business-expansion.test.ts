@@ -32,9 +32,9 @@ import {
   type BusinessCard,
   type SynergyType,
 } from '../../example-games/main-street/MainStreetCards';
-import { validateCsvRows } from '../../src/balance-cards';
+import { validateCsvRows } from '@balance-cards';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 
 // ── Design contract (from epic CG-0MSQE2NLX003ADIY, Group A) ──────────
 

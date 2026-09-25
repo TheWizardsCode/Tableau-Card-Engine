@@ -5,8 +5,8 @@
 // description: Stale disable batch: Applicant 44, community-space-types 226, LegalityResult 43,50 — remove or convert to valid handling; part of CG-0MTP6KUL80008VMR.
 // -->
 import { describe, it, expect } from 'vitest';
-import type { LegalityResult } from '../../src/rule-engine/index';
-import { RULE_ENGINE_VERSION } from '../../src/rule-engine/index';
+import type { LegalityResult } from '@rule-engine/index';
+import { RULE_ENGINE_VERSION } from '@rule-engine/index';
 // The legalAction/illegalAction functions are imported dynamically in tests
 // below because the helper constructors are added by a separate,
 // subsequent work item (CG-0MQIO5OLD001EDZH).  Once that item is complete
@@ -46,13 +46,13 @@ function _assertNarrowing(result: LegalityResult): string {
 
 /** A legal result constructed via legalAction() must also satisfy LegalityResult. */
 function _assertHelperLegal(): LegalityResult {
-  const { legalAction } = require('../../src/rule-engine/index');
+  const { legalAction } = require('@rule-engine/index');
   return legalAction();
 }
 
 /** An illegal result constructed via illegalAction() must satisfy LegalityResult. */
 function _assertHelperIllegal(): LegalityResult {
-  const { illegalAction } = require('../../src/rule-engine/index');
+  const { illegalAction } = require('@rule-engine/index');
   return illegalAction('test reason');
 }
 
@@ -127,7 +127,7 @@ describe('rule-engine / LegalityResult', () => {
 
   it('games can build validators on the legalAction/illegalAction helpers', async () => {
     const { legalAction, illegalAction } = await import(
-      '../../src/rule-engine/index'
+      '@rule-engine/index'
     );
     const validateMove = (rank: number): LegalityResult =>
       rank > 0 ? legalAction() : illegalAction('rank must be positive');
@@ -146,7 +146,7 @@ describe('rule-engine / LegalityResult', () => {
 
     it('legalAction() returns { legal: true }', async () => {
       const { legalAction } = await import(
-        '../../src/rule-engine/index'
+        '@rule-engine/index'
       );
       const result = legalAction();
       expect(result).toEqual({ legal: true });
@@ -160,7 +160,7 @@ describe('rule-engine / LegalityResult', () => {
 
     it('illegalAction(reason) returns { legal: false, reason }', async () => {
       const { illegalAction } = await import(
-        '../../src/rule-engine/index'
+        '@rule-engine/index'
       );
       const result = illegalAction('not allowed');
       expect(result).toEqual({ legal: false, reason: 'not allowed' });
@@ -175,7 +175,7 @@ describe('rule-engine / LegalityResult', () => {
 
     it('illegalAction accepts empty string reason', async () => {
       const { illegalAction } = await import(
-        '../../src/rule-engine/index'
+        '@rule-engine/index'
       );
       const result = illegalAction('');
       expect(result).toEqual({ legal: false, reason: '' });
@@ -183,7 +183,7 @@ describe('rule-engine / LegalityResult', () => {
 
     it('illegalAction handles special characters in reason', async () => {
       const { illegalAction } = await import(
-        '../../src/rule-engine/index'
+        '@rule-engine/index'
       );
       const reason = '🚫 invalid: card <9> not in hand!';
       const result = illegalAction(reason);
@@ -192,7 +192,7 @@ describe('rule-engine / LegalityResult', () => {
 
     it('legalAction result narrows correctly with if/else', async () => {
       const { legalAction, illegalAction } = await import(
-        '../../src/rule-engine/index'
+        '@rule-engine/index'
       );
       const legal = legalAction();
       const illegal = illegalAction('nope');

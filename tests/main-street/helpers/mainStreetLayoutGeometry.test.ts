@@ -15,8 +15,8 @@ import {
   assertFavourButtonsAdjacent,
   type MainStreetLayoutGeometry,
 } from './mainStreetLayoutGeometry';
-import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
-import { anchorPoint } from '../../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
+import { anchorPoint } from '@ui/screen-layout';
 import mainStreetLayoutJson from '../../../example-games/main-street/layouts/main-street.layout.json';
 import { BASE_HUD_Y } from '../../../example-games/main-street/scenes/MainStreetConstants';
 

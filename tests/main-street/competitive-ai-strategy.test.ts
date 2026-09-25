@@ -19,7 +19,7 @@ import {
   setupMainStreetGame,
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 import {
   enumerateCompetitiveLegalActions,
   enumerateLegalActions,

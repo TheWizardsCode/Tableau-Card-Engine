@@ -9,15 +9,15 @@
 
 import { playIllegalFeedback, matchesRequiredCard } from './MainStreetTurnControllerUtils';
 
-import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
-import { FONT_FAMILY } from '../../../src/ui/constants';
-import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
+import { COMMON_SFX_KEYS, safePlaySound } from '@core-engine/SoundManager';
+import { FONT_FAMILY } from '@ui/constants';
+import { popTextOrIcon } from '@ui/popTextOrIcon';
 import type { BusinessCard, EventCard, StaffCard, UpgradeCard } from '../MainStreetCards';
 import { discardFromHandCommand, hireStaffCardCommand, moveEventToHandCommand, moveToHandCommand, peekIncidentDeckCommand, refreshMarketCommand } from '../MainStreetCommands';
 import { SFX_KEYS } from './MainStreetConstants';
 // Import the concrete module (not the `src/ui` barrel) so Node unit tests that
 // import this controller module do not pull in browser-only UI modules.
-import { discardCard } from '../../../src/ui/discardCard';
+import { discardCard } from '@ui/discardCard';
 import { executeAction } from '../MainStreetEngine';
 import { turnLabel } from '../MainStreetFormatting';
 import { canAddToHand, canPurchaseEvent, canPurchaseStaff, canRefreshMarket } from '../MainStreetMarket';

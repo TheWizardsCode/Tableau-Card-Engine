@@ -15,8 +15,8 @@ import type { SushiGoPlayerState, PickAction } from './SushiGoGame';
 import {
   scoreTableau,
 } from './SushiGoScoring';
-import type { AiStrategyBase } from '../../src/ai';
-import { AiPlayer as AiPlayerBase, pickRandom } from '../../src/ai';
+import type { AiStrategyBase } from '@ai';
+import { AiPlayer as AiPlayerBase, pickRandom } from '@ai';
 
 // ── Strategy interface ──────────────────────────────────────
 

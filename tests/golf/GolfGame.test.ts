@@ -10,10 +10,10 @@ import {
   executeTurn,
 } from '../../example-games/golf/GolfGame';
 import { countFaceUp, isGridFullyRevealed } from '../../example-games/golf/GolfGrid';
-import { createCard } from '../../src/card-system/Card';
+import { createCard } from '@card-system/Card';
 import { createGolfGrid } from '../../example-games/golf/GolfGrid';
 import type { GolfSharedState } from '../../example-games/golf/GolfGame';
-import { Pile } from '../../src/card-system/Pile';
+import { Pile } from '@card-system/Pile';
 import { createRoundEndState } from '../../example-games/golf/GolfRules';
 
 // Deterministic RNG for testing (simple LCG)

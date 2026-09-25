@@ -2,16 +2,16 @@
  * GolfReplayController -- handles replay mode APIs and takeover overlay for 9-Card Golf.
  */
 
-import type { Card, Rank, Suit } from '../../../src/card-system/Card';
+import type { Card, Rank, Suit } from '@card-system/Card';
 import { scoreVisibleCards } from '../GolfScoring';
 import type { BoardSnapshot, CardSnapshot } from '../GameTranscript';
-import { GAME_W, GAME_H } from '../../../src/ui';
+import { GAME_W, GAME_H } from '@ui';
 import { createActionButton } from '@ui/Renderer';
 import {
   createGolfHudText,
   createOverlayBackground,
   dismissOverlay,
-} from '../../../src/ui/Renderer/adapters/GolfAdapter';
+} from '@ui/Renderer/adapters/GolfAdapter';
 import type { GolfSession } from '../GolfGame';
 import type { GolfRenderer } from './GolfRenderer';
 

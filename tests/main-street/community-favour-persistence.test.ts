@@ -82,7 +82,7 @@ describe('favourUsedThisTurn persistence', () => {
   });
 
   it('checkpoint save/load through the MainStreetSaveLoad adapter preserves the flag', async () => {
-    const { SaveLoadStore } = await import('../../src/core-engine');
+    const { SaveLoadStore } = await import('@core-engine');
     const { createMainStreetCheckpointManager } = await import('../../example-games/main-street/MainStreetSaveLoad');
     const store = new SaveLoadStore();
     const mgr = createMainStreetCheckpointManager(store);

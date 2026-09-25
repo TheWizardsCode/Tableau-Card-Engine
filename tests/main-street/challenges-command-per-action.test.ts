@@ -26,7 +26,7 @@ import {
   GRID_SIZE,
   type BusinessCard,
 } from '../../example-games/main-street/MainStreetCards';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 
 // ── Helpers ─────────────────────────────────────────────────
 

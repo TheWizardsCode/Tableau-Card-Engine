@@ -22,7 +22,7 @@ import {
   moveToHandCommand,
   playBusinessFromHandCommand,
 } from '../../example-games/main-street/MainStreetCommands';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 
 /** Fresh MarketPhase state with a full action budget. */
 function setupMarketState(): ReturnType<typeof setupMainStreetGame> {

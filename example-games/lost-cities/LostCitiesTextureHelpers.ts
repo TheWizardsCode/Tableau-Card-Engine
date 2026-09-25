@@ -26,14 +26,14 @@
  *     or `compactAssetKey()`.
  */
 
-export { markSceneInvalid } from '../../src/core-engine/SvgHelpers';
+export { markSceneInvalid } from '@core-engine/SvgHelpers';
 
 import {
   getOrCreateTexture,
   fetchSvgText,
   markSceneValid,
   makeTextureKey,
-} from '../../src/core-engine/SvgHelpers';
+} from '@core-engine/SvgHelpers';
 import { EXPEDITION_COLORS, CARD_BACK_KEY } from './LostCitiesCards';
 
 // ── Card dimension constants (copied from LostCitiesConstants to avoid

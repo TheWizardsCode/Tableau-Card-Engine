@@ -14,8 +14,8 @@
  *   can be reconstructed deterministically on restore.
  */
 
-import { createSeededRng, type SaveSerializer, SaveLoadStore, deserializeWithVersion } from '../../src/core-engine';
-import type { VersionedPayload } from '../../src/core-engine';
+import { createSeededRng, type SaveSerializer, SaveLoadStore, deserializeWithVersion } from '@core-engine';
+import type { VersionedPayload } from '@core-engine';
 import type { FeudalismSession, FeudalismPlayerState, FeudalismPhase } from './FeudalismGame';
 import type { DevelopmentCard, PatronTile, Tier, ResourceTokens } from './FeudalismCards';
 

@@ -16,8 +16,8 @@ import {
   TranscriptStore,
   autoSaveTranscript,
   TranscriptRecorderBase,
-} from '../../src/core-engine/transcript';
-import { SaveLoadStore } from '../../src/core-engine';
+} from '@core-engine/transcript';
+import { SaveLoadStore } from '@core-engine';
 import {
   setupMainStreetGame,
   serializeMainStreetState,
@@ -217,7 +217,7 @@ describe('Main Street transcript autosave integration (CG-0MP12WI75001L9P4)', ()
   });
 
   it('consolidated module exports are accessible from @core-engine/transcript barrel', async () => {
-    const mod = await import('../../src/core-engine/transcript');
+    const mod = await import('@core-engine/transcript');
     expect(mod.TranscriptRecorderBase).toBeDefined();
     expect(mod.TranscriptStore).toBeDefined();
     expect(mod.autoSaveTranscript).toBeDefined();
@@ -228,16 +228,16 @@ describe('Main Street transcript autosave integration (CG-0MP12WI75001L9P4)', ()
   });
 
   it('backward-compatible top-level exports still work', async () => {
-    const ts = await import('../../src/core-engine/TranscriptStore');
+    const ts = await import('@core-engine/TranscriptStore');
     expect(ts.TranscriptStore).toBeDefined();
 
-    const tr = await import('../../src/core-engine/TranscriptRecorder');
+    const tr = await import('@core-engine/TranscriptRecorder');
     expect(tr.TranscriptRecorderBase).toBeDefined();
 
-    const as = await import('../../src/core-engine/autoSaveTranscript');
+    const as = await import('@core-engine/autoSaveTranscript');
     expect(as.autoSaveTranscript).toBeDefined();
 
-    const tt = await import('../../src/core-engine/TranscriptTypes');
+    const tt = await import('@core-engine/TranscriptTypes');
     expect(tt.snapshotCard).toBeDefined();
   });
 });

@@ -13,7 +13,7 @@ import { applyCompetitiveEventEffects } from './MainStreetEngineEvents';
 import { decideEventChoice, updateCompetitiveScores } from './MainStreetEngineScoring';
 import { appendTurnNetRow, checkCompetitiveEndConditions, checkImmediateLoss, processEndOfTurn, resolveEventChoice, resolveIncident, resolvePendingEventChoice } from './MainStreetEngineTurnClosing';
 import { PlayerAction, TurnResult } from './MainStreetEngineTypes';
-import { decayActiveEffects } from '../../src/core-engine/ActiveEffect';
+import { decayActiveEffects } from '@core-engine/ActiveEffect';
 import { applyIncome, applyCompetitiveIncome } from './MainStreetAdjacency';
 import type { IncomeResult } from './MainStreetAdjacency';
 import type { EventCard } from './MainStreetCards';

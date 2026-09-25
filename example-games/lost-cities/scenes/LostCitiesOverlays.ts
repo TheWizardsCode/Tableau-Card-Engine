@@ -5,12 +5,12 @@ import Phaser from 'phaser';
 import { EXPEDITION_COLORS } from '../LostCitiesCards';
 import type { LostCitiesSession, RoundScoreResult } from '../LostCitiesGame';
 import { getMatchWinner, startNextRound } from '../LostCitiesGame';
-import { autoSaveTranscript, TranscriptStore } from '../../../src/core-engine/transcript';
-import { GAME_W, GAME_H, OverlayManager } from '../../../src/ui';
+import { autoSaveTranscript, TranscriptStore } from '@core-engine/transcript';
+import { GAME_W, GAME_H, OverlayManager } from '@ui';
 import {
   createLcHudText,
   createActionButton,
-} from '../../../src/ui/Renderer/adapters/LostCitiesAdapter';
+} from '@ui/Renderer/adapters/LostCitiesAdapter';
 import { SFX_KEYS } from './LostCitiesConstants';
 import type { LCTranscriptRecorder } from '../GameTranscript';
 

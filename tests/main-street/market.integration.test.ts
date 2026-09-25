@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { setupMainStreetGame, type MainStreetState } from '../../example-games/main-street/MainStreetState';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 import {
   refillMarket,
   getAffordableBusinessCards,

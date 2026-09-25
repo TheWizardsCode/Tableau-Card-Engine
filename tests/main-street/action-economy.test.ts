@@ -38,7 +38,7 @@ import {
   canPlayEvent,
   canPurchaseEvent,
 } from '../../example-games/main-street/MainStreetMarket';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 
 // ── Helpers ─────────────────────────────────────────────────
 

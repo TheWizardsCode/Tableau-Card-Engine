@@ -7,15 +7,15 @@ import {
   GAME_H,
   FONT_FAMILY,
   OverlayManager,
-} from '../../../src/ui';
+} from '@ui';
 import { createActionButton } from '@ui/Renderer';
 
 import { scoreTableauBreakdown } from '../SushiGoScoring';
 import type { SushiGoSession, RoundResult } from '../SushiGoGame';
 import { getWinnerIndex } from '../SushiGoGame';
-import type { SoundManager, GameEventEmitter } from '../../../src/core-engine';
+import type { SoundManager, GameEventEmitter } from '@core-engine';
 import { SushiGoTranscriptRecorder } from '../GameTranscript';
-import { TranscriptStore, autoSaveTranscript } from '../../../src/core-engine/transcript';
+import { TranscriptStore, autoSaveTranscript } from '@core-engine/transcript';
 import { SFX_KEYS } from './SushiGoConstants';
 
 const transcriptStore = new TranscriptStore();

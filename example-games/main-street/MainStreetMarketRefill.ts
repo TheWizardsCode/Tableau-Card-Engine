@@ -9,8 +9,8 @@
  * @module
  */
 
-import type { LegalityResult } from '../../src/rule-engine';
-import { shuffleArray } from '../../src/card-system';
+import type { LegalityResult } from '@rule-engine';
+import { shuffleArray } from '@card-system';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, classifyEffect, refillSingleRowMarket } from './MainStreetState';
 import type { BusinessCard, CommunitySpaceCard, UpgradeCard, EventCard, AnyCard, StaffCard } from './MainStreetCards';

@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { deserializeWithVersion } from '../../src/core-engine';
+import { deserializeWithVersion } from '@core-engine';
 import {
   serializeMainStreetState,
   deserializeMainStreetState,

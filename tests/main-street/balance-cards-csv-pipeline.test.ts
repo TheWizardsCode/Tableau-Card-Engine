@@ -25,7 +25,7 @@ import {
   toCsvString,
   parseCsv,
   validateRow,
-} from '../../src/balance-cards';
+} from '@balance-cards';
 
 const CSV_PATH = resolve(process.cwd(), 'example-games/main-street/card-data.csv');
 

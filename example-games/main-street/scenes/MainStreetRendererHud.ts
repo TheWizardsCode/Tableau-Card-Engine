@@ -9,8 +9,8 @@
  * @module
  */
 
-import { FONT_FAMILY, HintBar, clearTransientHud, markHudTransient } from '../../../src/ui';
-import { attachHudTooltipZone, createMainStreetHintButton, mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
+import { FONT_FAMILY, HintBar, clearTransientHud, markHudTransient } from '@ui';
+import { attachHudTooltipZone, createMainStreetHintButton, mainStreetRenderCardSvg } from '@ui/Renderer/adapters/MainStreetAdapter';
 import type { StaffCard } from '../MainStreetCards';
 import { computeScore } from '../MainStreetEngine';
 import { buildCardTooltipInfo, turnLabel, weekLabel } from '../MainStreetFormatting';

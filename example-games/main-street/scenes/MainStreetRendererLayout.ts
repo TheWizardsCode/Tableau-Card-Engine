@@ -8,7 +8,7 @@
  * @module
  */
 
-import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
+import { mainStreetRenderCardSvg } from '@ui/Renderer/adapters/MainStreetAdapter';
 import type { EventCard } from '../MainStreetCards';
 import { buildCardTooltipInfo } from '../MainStreetFormatting';
 import type { SceneLayout } from './MainStreetConstants';

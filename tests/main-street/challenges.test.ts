@@ -23,11 +23,11 @@ import {
 
 import type { BusinessCard, SynergyType } from '../../example-games/main-street/MainStreetCards';
 import { CHALLENGE_BONUS_POINTS, GRID_SIZE } from '../../example-games/main-street/MainStreetCards';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 import type {
   ChallengeDefinition,
   ActiveChallengeRecord,
-} from '../../src/core-engine/ChallengeSystem';
+} from '@core-engine/ChallengeSystem';
 
 // ── Helpers ─────────────────────────────────────────────────
 

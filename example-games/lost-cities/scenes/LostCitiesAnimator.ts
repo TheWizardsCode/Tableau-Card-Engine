@@ -29,7 +29,7 @@ import {
   AI_ANIM_DURATION,
 } from './LostCitiesConstants';
 import { LostCitiesRenderer } from './LostCitiesRenderer';
-import { flipCard, moveGameObject, shakeIllegalMove, FONT_FAMILY } from '../../../src/ui';
+import { flipCard, moveGameObject, shakeIllegalMove, FONT_FAMILY } from '@ui';
 
 export class LostCitiesAnimator {
   /** When true, all animations are skipped and sprites snap to final state. */

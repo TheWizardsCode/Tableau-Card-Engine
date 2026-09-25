@@ -10,7 +10,7 @@
  *
  * @module example-games/lost-cities/scenes/LostCitiesRenderer
  */
-import type { Card } from '../../../src/card-system/Card';
+import type { Card } from '@card-system/Card';
 import Phaser from 'phaser';
 import type { ExpeditionColor, LostCitiesCard } from '../LostCitiesCards';
 import {
@@ -29,8 +29,8 @@ import {
   ensureLcBackTexture,
   applyEnsuredTexture,
 } from '../LostCitiesTextureHelpers';
-import { HandView } from '../../../src/ui/HandView';
-import { PileView, type CardPile } from '../../../src/ui/PileView';
+import { HandView } from '@ui/HandView';
+import { PileView, type CardPile } from '@ui/PileView';
 import {
   TABLEAU_LEFT,
   laneX,

@@ -9,7 +9,7 @@
  * Columns are indices {0,3,6}, {1,4,7}, {2,5,8}.
  */
 
-import type { Card } from '../../src/card-system/Card';
+import type { Card } from '@card-system/Card';
 
 export const GRID_ROWS = 3;
 export const GRID_COLS = 3;

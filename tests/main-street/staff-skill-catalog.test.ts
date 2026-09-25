@@ -27,7 +27,7 @@ import {
   assignSkillsToApplicants,
   type SkillCategory,
 } from '../../example-games/main-street/MainStreetStaffSkills';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 // ── AC1: type defined in MainStreetCards with full metadata ─
 

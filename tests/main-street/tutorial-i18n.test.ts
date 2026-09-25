@@ -20,7 +20,7 @@ import {
   TUTORIAL_EN_BUNDLE,
   TUTORIAL_I18N_KEY_PREFIX,
 } from '../../example-games/main-street/i18n/tutorial-en';
-import { resetI18n, registerLocale, setLocale, t, getLocale, formatCurrency } from '../../src/core-engine/I18n';
+import { resetI18n, registerLocale, setLocale, t, getLocale, formatCurrency } from '@core-engine/I18n';
 import { getCsvRows, getBaseTypeId } from '../../example-games/main-street/MainStreetCards';
 
 describe('Tutorial i18n: English bundle registration', () => {

@@ -24,8 +24,8 @@
 import type { LostCitiesCard, ExpeditionColor } from './LostCitiesCards';
 import { EXPEDITION_COLORS, canPlayAfter } from './LostCitiesCards';
 
-import type { LegalityResult } from '../../src/rule-engine/index';
-export type { LegalityResult } from '../../src/rule-engine/index';
+import type { LegalityResult } from '@rule-engine/index';
+export type { LegalityResult } from '@rule-engine/index';
 
 // ── Turn phases ─────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { CARD_TEMPLATE_NAMES, getCsvRows } from '../MainStreetCards';
-import { rasteriseSvgToTexture, makeTextureKey } from '../../../src/core-engine';
+import { rasteriseSvgToTexture, makeTextureKey } from '@core-engine';
 import { generateCardSvgFromCsvRow, replaceCardTitleInSvg } from './MainStreetCardSvgGenerator';
 import { CARD_BACK_TEMPLATE } from './MainStreetConstants';
 

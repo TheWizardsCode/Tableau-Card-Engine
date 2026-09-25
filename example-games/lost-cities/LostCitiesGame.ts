@@ -49,8 +49,8 @@ import {
 } from './LostCitiesRules';
 import { scoreRound, scoreRoundDetailed } from './LostCitiesScoring';
 
-import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
-import { resolveSetupOptions } from '../../src/core-engine/SetupOptions';
+import type { MultiplayerSetupOptions } from '@core-engine/SetupOptions';
+import { resolveSetupOptions } from '@core-engine/SetupOptions';
 import type { ExpeditionScoreBreakdown } from './LostCitiesScoring';
 
 // ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ export function setupLostCitiesGame(
  * Get the current active player.
  *
  * NOTE: This remains game-specific rather than using the shared
- * {@link import('../../src/core-engine/TurnSequencer').getCurrentPlayer}
+ * {@link import('@core-engine/TurnSequencer').getCurrentPlayer}
  * because Lost Cities nests the current player index inside
  * `session.round.currentPlayer` (a `PlayerId`), whereas the shared
  * helper expects `currentPlayerIndex` at the top level of the state

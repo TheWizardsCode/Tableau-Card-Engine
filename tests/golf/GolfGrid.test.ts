@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createCard } from '../../src/card-system/Card';
-import type { Card } from '../../src/card-system/Card';
+import { createCard } from '@card-system/Card';
+import type { Card } from '@card-system/Card';
 import {
   createGolfGrid,
   gridIndex,

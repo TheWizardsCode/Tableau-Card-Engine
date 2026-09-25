@@ -21,7 +21,7 @@
  * @module
  */
 
-import { TranscriptRecorderBase } from '../../src/core-engine/transcript';
+import { TranscriptRecorderBase } from '@core-engine/transcript';
 import type { SushiGoCard } from './SushiGoCards';
 import type { SushiGoSession, PickAction, RoundResult } from './SushiGoGame';
 

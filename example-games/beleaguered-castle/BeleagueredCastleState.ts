@@ -6,8 +6,8 @@
  * and Phaser UI).
  */
 
-import type { Suit } from '../../src/card-system/Card';
-import { Pile } from '../../src/card-system/Pile';
+import type { Suit } from '@card-system/Card';
+import { Pile } from '@card-system/Pile';
 
 // ── Constants ───────────────────────────────────────────────
 

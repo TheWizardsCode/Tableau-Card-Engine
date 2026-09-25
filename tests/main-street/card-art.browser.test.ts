@@ -25,7 +25,7 @@ import {
   getOrCreateTexture,
   markSceneInvalid,
   markSceneValid,
-} from '../../src/core-engine/SvgHelpers';
+} from '@core-engine/SvgHelpers';
 import { generateBusinessCardSvg } from '../../example-games/main-street/scenes/MainStreetCardSvgGenerator';
 import type { BusinessCard } from '../../example-games/main-street/MainStreetCards';
 

@@ -18,7 +18,7 @@ import {
   getWinnerIndex,
 } from '../../example-games/coloretto/ColorettoGame';
 import { ColorettoTranscriptRecorder, snapshotCard } from '../../example-games/coloretto/GameTranscript';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 import type { ColorettoSession } from '../../example-games/coloretto/ColorettoGame';
 
 function makeRng(seed: number = 42) {

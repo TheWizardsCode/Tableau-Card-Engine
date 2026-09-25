@@ -30,10 +30,10 @@ import {
   incidentPolarity,
   isDurationEventCard,
 } from '../../example-games/main-street/MainStreetCards';
-import { validateCsvRows } from '../../src/balance-cards';
+import { validateCsvRows } from '@balance-cards';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import { resolveEvent } from '../../example-games/main-street/MainStreetEngine';
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 
 // ── Design contract ───────────────────────────────────────────────────
 

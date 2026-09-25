@@ -28,10 +28,10 @@ import {
   FOUNDATION_SUITS,
 } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
 import type { BeleagueredCastleState } from '../../example-games/beleaguered-castle/BeleagueredCastleState';
-import type { BaseSetupOptions } from '../../src/core-engine/SetupOptions';
-import { Pile } from '../../src/card-system/Pile';
-import { createCard } from '../../src/card-system/Card';
-import type { Card } from '../../src/card-system/Card';
+import type { BaseSetupOptions } from '@core-engine/SetupOptions';
+import { Pile } from '@card-system/Pile';
+import { createCard } from '@card-system/Card';
+import type { Card } from '@card-system/Card';
 
 // ── Helpers ─────────────────────────────────────────────────
 

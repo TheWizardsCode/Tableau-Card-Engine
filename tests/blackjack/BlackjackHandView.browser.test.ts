@@ -16,12 +16,12 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 import {
   createBlackjackGameState,
 } from '../../example-games/blackjack/BlackjackGame';
-import { cardTextureKey } from '../../src/ui/CardTextureHelpers';
-import { setReducedMotion } from '../../src/ui/SettingsStore';
+import { cardTextureKey } from '@ui/CardTextureHelpers';
+import { setReducedMotion } from '@ui/SettingsStore';
 
 // ── Constants ─────────────────────────────────────────────
 const SCENE_KEY = 'BlackjackScene';

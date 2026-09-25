@@ -7,8 +7,8 @@
  * @module
  */
 
-import { COMMON_SFX_KEYS, safePlaySound } from '../../../src/core-engine/SoundManager';
-import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
+import { COMMON_SFX_KEYS, safePlaySound } from '@core-engine/SoundManager';
+import { shakeIllegalMove } from '@ui/shakeIllegalMove';
 
 /**
  * Play illegal-move sound and shake animation on a card target.

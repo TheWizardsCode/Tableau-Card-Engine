@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SaveLoadStore } from '../../src/core-engine';
+import { SaveLoadStore } from '@core-engine';
 import { setupMainStreetGame } from '../../example-games/main-street/MainStreetState';
 import type { MainStreetState } from '../../example-games/main-street/MainStreetState';
 import {

@@ -49,7 +49,7 @@ function makeBiz(overrides: Partial<BusinessCard> & { name: string; synergyTypes
 }
 
 // Build decks once for template validation (use multiplier=1 to test raw templates)
-import { createSeededRng } from '../../src/core-engine';
+import { createSeededRng } from '@core-engine';
 const _rng = createSeededRng(42);
 const businessDeck = createBusinessDeck(1); // 1 copy = template count
 const eventDeck = createEventDeck(1, undefined, _rng, 1); // template-only view

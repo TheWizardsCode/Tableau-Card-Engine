@@ -16,8 +16,8 @@ import { legalActions, topCard } from './ColorettoGame';
 import { pointsForCount, colorCounts, BONUS_POINTS } from './ColorettoScoring';
 import { COLORS } from './ColorettoCards';
 import type { ChameleonColor, ColorettoCard } from './ColorettoCards';
-import type { AiStrategyBase } from '../../src/ai';
-import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '../../src/ai';
+import type { AiStrategyBase } from '@ai';
+import { AiPlayer as AiPlayerBase, pickRandom, pickBest } from '@ai';
 
 // ── Strategy interface ──────────────────────────────────────
 

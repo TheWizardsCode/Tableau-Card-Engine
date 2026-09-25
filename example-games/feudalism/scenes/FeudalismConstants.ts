@@ -1,7 +1,7 @@
 /**
  * FeudalismConstants — shared layout, styling, timing, and audio constants.
  */
-import { GAME_W, GAME_H } from '../../../src/ui';
+import { GAME_W, GAME_H } from '@ui';
 import type { ResourceOrWild } from '../FeudalismCards';
 export { GAME_W, GAME_H };
 

@@ -21,7 +21,7 @@ import {
   createOpponentDrawHistory,
   estimatePositiveScoreProbability,
 } from '../../example-games/lost-cities/AiStrategy';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 import type {
   InvestmentCard,
 } from '../../example-games/lost-cities/LostCitiesCards';

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Pile } from '../../src/card-system/Pile';
-import { createCard } from '../../src/card-system/Card';
+import { Pile } from '@card-system/Pile';
+import { createCard } from '@card-system/Card';
 import { deal, applyMove, getLegalMoves, hasNoMoves, hasValuableMoves, isTriviallyWinnable, getAutoCompleteMoves } from '../../example-games/beleaguered-castle/BeleagueredCastleRules';
 import { BCTranscriptRecorder } from '../../example-games/beleaguered-castle/GameTranscript';
 import { BeleagueredCastleTurnController } from '../../example-games/beleaguered-castle/scenes/BeleagueredCastleTurnController';

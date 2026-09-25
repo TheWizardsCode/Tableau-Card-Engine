@@ -15,8 +15,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SaveLoadStore } from '../../src/core-engine';
-import { createSeededRng } from '../../src/core-engine';
+import { SaveLoadStore } from '@core-engine';
+import { createSeededRng } from '@core-engine';
 import {
   setupFeudalismGame,
   executeTurn,
@@ -31,7 +31,7 @@ import {
   createFeudalismSerializer,
   FEUDALISM_GAME_TYPE,
 } from '../../example-games/feudalism/FeudalismSaveLoad';
-import { CheckpointManager } from '../../src/core-engine';
+import { CheckpointManager } from '@core-engine';
 
 // ── Test helpers ────────────────────────────────────────────
 

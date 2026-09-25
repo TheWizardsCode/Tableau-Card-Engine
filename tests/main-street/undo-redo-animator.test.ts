@@ -26,7 +26,7 @@ const { popTextOrIcon, moveGameObject } = vi.hoisted(() => ({
   moveGameObject: vi.fn((_opts?: unknown) => ({})),
 }));
 
-vi.mock('../../src/ui', () => ({
+vi.mock('@ui', () => ({
   FONT_FAMILY: 'sans-serif',
   popTextOrIcon,
   moveGameObject,
@@ -37,7 +37,7 @@ import { SFX_KEYS } from '../../example-games/main-street/scenes/MainStreetConst
 
 // ── Mock scene helpers ──────────────────────────────────────
 
-import { createMockSceneWithTweens } from '../helpers/MockFactory';
+import { createMockSceneWithTweens } from '@core-tests/helpers/MockFactory';
 
 function createMockScene(overrides: Record<string, unknown> = {}) {
   return {

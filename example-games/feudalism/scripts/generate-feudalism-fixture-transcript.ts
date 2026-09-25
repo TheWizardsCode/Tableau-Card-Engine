@@ -12,7 +12,7 @@
 
 import { writeFileSync, mkdirSync } from 'fs';
 import { dirname, resolve } from 'path';
-import { createSeededRng } from '../../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 import {
   setupFeudalismGame,
   executeTurn,

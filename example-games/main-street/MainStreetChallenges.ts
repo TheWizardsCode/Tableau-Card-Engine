@@ -36,11 +36,11 @@ import { CHALLENGE_BONUS_POINTS } from './MainStreetCards';
 import type {
   ChallengeDefinition,
   ActiveChallengeRecord,
-} from '../../src/core-engine/ChallengeSystem';
+} from '@core-engine/ChallengeSystem';
 import {
   selectChallenges as genericSelectChallenges,
   evaluateChallenges as genericEvaluateChallenges,
-} from '../../src/core-engine/ChallengeSystem';
+} from '@core-engine/ChallengeSystem';
 
 // ── Challenge Types ─────────────────────────────────────────
 

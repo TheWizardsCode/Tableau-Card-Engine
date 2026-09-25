@@ -15,7 +15,7 @@
  * structurally by the type system.
  */
 
-import type { Card } from '../../src/card-system/Card';
+import type { Card } from '@card-system/Card';
 import type { GolfMove, DrawSource } from './GolfRules';
 import { scoreAiVisibleGrid, simulateAiMoveScore, cardPointValue } from './GolfScoring';
 import type {
@@ -26,8 +26,8 @@ import type {
 } from './GolfGame';
 import { enumerateAiLegalMoves, enumerateAiDrawSources } from './GolfGame';
 import { GRID_ROWS, GRID_COLS } from './GolfGrid';
-import type { AiStrategyBase } from '../../src/ai';
-import { AiPlayer as AiPlayerBase, pickRandom, pickBest, CardMemoryTracker } from '../../src/ai';
+import type { AiStrategyBase } from '@ai';
+import { AiPlayer as AiPlayerBase, pickRandom, pickBest, CardMemoryTracker } from '@ai';
 
 // ── Strategy interface ──────────────────────────────────────
 

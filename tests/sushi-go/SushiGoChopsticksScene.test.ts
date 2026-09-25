@@ -10,7 +10,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock src/ui to avoid loading Phaser (browser-only) in Node tests
-vi.mock('../../src/ui', () => ({
+vi.mock('@ui', () => ({
   GAME_W: 1280,
   GAME_H: 720,
   FONT_FAMILY: 'sans-serif',

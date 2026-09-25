@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { StorageLike } from '../../src/core-engine/SoundManager';
+import type { StorageLike } from '@core-engine/SoundManager';
 import {
   getBcVariant,
   setBcVariant,

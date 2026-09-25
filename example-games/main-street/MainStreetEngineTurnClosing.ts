@@ -14,7 +14,7 @@ import { executeWeekStart } from './MainStreetEngineWeekStart';
 import { computeEventDeltas, resolveEvent } from './MainStreetEngineEvents';
 import { decideEventChoice, updateCompetitiveScores, updateScore } from './MainStreetEngineScoring';
 import { EndOfTurnOptions, EventChoiceResolution, PendingEndOfTurnDeltas, PlayerAction, SinglePlayerTurnClosingContext, TurnResult } from './MainStreetEngineTypes';
-import { decayActiveEffects } from '../../src/core-engine/ActiveEffect';
+import { decayActiveEffects } from '@core-engine/ActiveEffect';
 import { applyIncome } from './MainStreetAdjacency';
 import type { EventCard } from './MainStreetCards';
 import { isDurationEventCard, recordIncidentDraw, findConstrainedIncidentIndex, getEventTemplates, getBaseTypeId } from './MainStreetCards';

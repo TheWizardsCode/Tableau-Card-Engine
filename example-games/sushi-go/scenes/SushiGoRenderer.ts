@@ -2,7 +2,7 @@
  * SushiGoRenderer -- creates and refreshes all visual game objects for Sushi Go!
  */
 
-import { GAME_W, GAME_H, FONT_FAMILY } from '../../../src/ui';
+import { GAME_W, GAME_H, FONT_FAMILY } from '@ui';
 import { createSceneTitle } from '@ui/Renderer';
 import type { SushiGoCard, SushiGoCardType } from '../SushiGoCards';
 import { cardLabel } from '../SushiGoCards';

@@ -48,7 +48,7 @@ function createLocalStorageMock(): Storage {
 
 // ── Imports ─────────────────────────────────────────────────
 
-import { SaveLoadStore } from '../../../src/core-engine';
+import { SaveLoadStore } from '@core-engine';
 import { setupMainStreetGame } from '../MainStreetState';
 import type { MainStreetState } from '../MainStreetState';
 import {

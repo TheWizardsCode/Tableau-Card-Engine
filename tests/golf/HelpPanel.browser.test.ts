@@ -8,7 +8,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { waitForScene } from '../helpers/waitForScene';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -82,7 +82,7 @@ function collectFromSceneAndHud<T extends Phaser.GameObjects.GameObject>(
 
 describe('UI module exports (browser)', () => {
   it('should export HelpPanel, HelpButton, and UI_VERSION', async () => {
-    const ui = await import('../../src/ui/index');
+    const ui = await import('@ui/index');
     expect(ui.UI_VERSION).toBe('0.1.0');
     expect(typeof ui.HelpPanel).toBe('function');
     expect(typeof ui.HelpButton).toBe('function');
@@ -146,7 +146,7 @@ describe('HelpPanel browser tests', () => {
   });
 
   it('should export HelpButtonPosition and SettingsButtonPosition types', async () => {
-    const ui = await import('../../src/ui/index');
+    const ui = await import('@ui/index');
     // Type-only exports cannot be checked at runtime, but we can verify
     // that the module imports without errors and the types are available
     expect(ui.HelpPanel).toBeDefined();
@@ -169,7 +169,7 @@ describe('HelpPanel browser tests', () => {
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 
     // Create a HelpPanel with showButton: false
-    const { HelpPanel } = await import('../../src/ui/HelpPanel');
+    const { HelpPanel } = await import('@ui/HelpPanel');
     const panel = new HelpPanel(scene, {
       sections: [{ heading: 'Test', body: 'Test body' }],
       showButton: false,
@@ -196,7 +196,7 @@ describe('HelpPanel browser tests', () => {
     await waitForScene(game, 'GolfScene');
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 
-    const { HelpPanel } = await import('../../src/ui/HelpPanel');
+    const { HelpPanel } = await import('@ui/HelpPanel');
     const panel = new HelpPanel(scene, {
       sections: [{ heading: 'Test', body: 'Test body' }],
     });
@@ -223,7 +223,7 @@ describe('HelpPanel browser tests', () => {
     await waitForScene(game, 'GolfScene');
     const scene = game.scene.getScene('GolfScene') as Phaser.Scene;
 
-    const { HelpPanel } = await import('../../src/ui/HelpPanel');
+    const { HelpPanel } = await import('@ui/HelpPanel');
     const panel = new HelpPanel(scene, {
       sections: [{ heading: 'Test', body: 'Test body' }],
     });

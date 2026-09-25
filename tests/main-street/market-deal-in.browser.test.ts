@@ -20,8 +20,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Phaser from 'phaser';
 
-import { waitForScene } from '../helpers/waitForScene';
-import { destroyPhaserGame } from '../helpers/phaserCanvasPool';
+import { waitForScene } from '@core-tests/helpers/waitForScene';
+import { destroyPhaserGame } from '@core-tests/helpers/phaserCanvasPool';
 
 // ── Boot helpers (mirrors MainStreetScene.browser.test.ts) ──
 

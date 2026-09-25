@@ -13,10 +13,10 @@ import {
 import type { FeudalismSession } from '../FeudalismGame';
 import { getInfluence, getBonuses } from '../FeudalismGame';
 import { addCropIcon, cssColorToNumber } from './CropIconRenderer';
-import { FONT_FAMILY, GAME_W, GAME_H, createOverlayBackground } from '../../../src/ui';
-import type { SingleSelectionManager, SelectionController } from '../../../src/ui';
-import { createSelectionState, createSingleSelectionManager } from '../../../src/ui';
-import { createGameZone } from '../../../src/ui/Renderer';
+import { FONT_FAMILY, GAME_W, GAME_H, createOverlayBackground } from '@ui';
+import type { SingleSelectionManager, SelectionController } from '@ui';
+import { createSelectionState, createSingleSelectionManager } from '@ui';
+import { createGameZone } from '@ui/Renderer';
 import {
   PATRON_W, PATRON_H, PATRON_X,
   SUPPLY_TOKEN_R, SUPPLY_GAP, SUPPLY_TOTAL_H, SUPPLY_X, SUPPLY_Y,
@@ -29,7 +29,7 @@ import {
   ACTION_Y, INSTRUCTION_Y,
   RESOURCE_FILL, RESOURCE_TEXT_COLOR, RESOURCE_ICON_COLOR, RESOURCE_LABEL_COLOR,
 } from './FeudalismConstants';
-import { createFeudalismActionButton } from '../../../src/ui/Renderer/adapters/FeudalismAdapter';
+import { createFeudalismActionButton } from '@ui/Renderer/adapters/FeudalismAdapter';
 import {
   buildTokenEntries,
   getBonusRenderOrder,

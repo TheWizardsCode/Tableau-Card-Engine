@@ -9,8 +9,8 @@
  * @module
  */
 
-import { DEFAULT_DRAG_DISTANCE_THRESHOLD, FONT_FAMILY, createSelectionState } from '../../../src/ui';
-import { mainStreetRenderCardSvg } from '../../../src/ui/Renderer/adapters/MainStreetAdapter';
+import { DEFAULT_DRAG_DISTANCE_THRESHOLD, FONT_FAMILY, createSelectionState } from '@ui';
+import { mainStreetRenderCardSvg } from '@ui/Renderer/adapters/MainStreetAdapter';
 import type { BusinessCard, CommunitySpaceCard, EventCard, StaffCard, UpgradeCard } from '../MainStreetCards';
 import { MARKET_TOTAL_SLOTS } from '../MainStreetCards';
 import { buildCardTooltipInfo } from '../MainStreetFormatting';

@@ -197,7 +197,7 @@ export function canPlaceFromHand(
   handIndex: number,
   slotIndex: number,
   premiumCost?: number,
-): import('../../src/rule-engine').LegalityResult {
+): import('@rule-engine').LegalityResult {
   const hand = state.hand ?? [];
 
   // Validate hand index
@@ -245,7 +245,7 @@ export function canPlaceFromHand(
 export function canSellFromHand(
   state: MainStreetState,
   handIndex: number,
-): import('../../src/rule-engine').LegalityResult {
+): import('@rule-engine').LegalityResult {
   const hand = state.hand ?? [];
 
   // Validate hand index
@@ -277,7 +277,7 @@ export function canSellFromHand(
 export function canSellFromTableau(
   state: MainStreetState,
   slotIndex: number,
-): import('../../src/rule-engine').LegalityResult {
+): import('@rule-engine').LegalityResult {
   // Validate slot index
   if (slotIndex < 0 || slotIndex >= 10) {
     return { legal: false, reason: `Invalid slot index: ${slotIndex}. Must be 0-9.` };
@@ -325,7 +325,7 @@ export function canSellBusiness(
   state: MainStreetState,
   slotIndex: number,
   isPlacingMode: boolean = false,
-): import('../../src/rule-engine').LegalityResult {
+): import('@rule-engine').LegalityResult {
   return canSellBusinessFromMarket(state, slotIndex, isPlacingMode);
 }
 
@@ -826,7 +826,7 @@ export function canPlaceStaffOnBusiness(
   state: MainStreetState,
   staffId: string,
   slotIndex: number,
-): import('../../src/rule-engine').LegalityResult {
+): import('@rule-engine').LegalityResult {
   const staffIndex = (state.staffCards ?? []).findIndex(c => c.id === staffId);
   if (staffIndex === -1) {
     return { legal: false, reason: `Staff card ${staffId} is not hired.` };

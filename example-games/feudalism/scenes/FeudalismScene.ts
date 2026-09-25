@@ -7,8 +7,8 @@ import type { FeudalismSession } from '../FeudalismGame';
 import { setupFeudalismGame } from '../FeudalismGame';
 import { FeudalismAiPlayer, GreedyStrategy } from '../AiStrategy';
 import { FeudalismTranscriptRecorder } from '../GameTranscript';
-import type { EventSoundMapping } from '../../../src/core-engine/SoundManager';
-import { SaveLoadStore, CheckpointManager, createDefaultResumeOverlay } from '../../../src/core-engine';
+import type { EventSoundMapping } from '@core-engine/SoundManager';
+import { SaveLoadStore, CheckpointManager, createDefaultResumeOverlay } from '@core-engine';
 import {
   createFeudalismSerializer,
   FEUDALISM_GAME_TYPE,
@@ -22,8 +22,8 @@ import {
   OverlayManager,
   createSceneTitle,
   audioPathWithFallback,
-} from '../../../src/ui';
-import type { HelpSection } from '../../../src/ui';
+} from '@ui';
+import type { HelpSection } from '@ui';
 import helpContent from '../help-content.json';
 
 import {

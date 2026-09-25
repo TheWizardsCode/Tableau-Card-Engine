@@ -27,10 +27,10 @@ import {
   MAX_TOKENS,
 } from './FeudalismCards';
 
-import type { MultiplayerSetupOptions } from '../../src/core-engine/SetupOptions';
-import { resolveSetupOptions, createSeededRng } from '../../src/core-engine';
-import { getCurrentPlayer } from '../../src/core-engine/TurnSequencer';
-import type { LegalityResult } from '../../src/rule-engine/index';
+import type { MultiplayerSetupOptions } from '@core-engine/SetupOptions';
+import { resolveSetupOptions, createSeededRng } from '@core-engine';
+import { getCurrentPlayer } from '@core-engine/TurnSequencer';
+import type { LegalityResult } from '@rule-engine/index';
 
 // Re-export getCurrentPlayer so consumers can import from FeudalismGame
 export { getCurrentPlayer };

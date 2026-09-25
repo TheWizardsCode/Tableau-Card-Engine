@@ -23,7 +23,7 @@ import {
   deserializeMainStreetState,
   type MainStreetState,
 } from '../../example-games/main-street/MainStreetState';
-import { UndoRedoManager } from '../../src/core-engine/UndoRedoManager';
+import { UndoRedoManager } from '@core-engine/UndoRedoManager';
 import {
   type EventCard,
   getEventTemplates,

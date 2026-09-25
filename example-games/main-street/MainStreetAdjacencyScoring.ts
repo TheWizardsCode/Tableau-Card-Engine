@@ -15,7 +15,7 @@ import { getBaseTypeId } from './MainStreetCards';
 import type { MainStreetState } from './MainStreetState';
 import { addLog, describeEventEffects, syncResourceBankToLedger } from './MainStreetState';
 import { applyReputationMultiplier, roundInt } from './MainStreetDifficulty';
-import { applyActiveEffectMultiplier } from '../../src/core-engine/ActiveEffect';
+import { applyActiveEffectMultiplier } from '@core-engine/ActiveEffect';
 import { computePerBusinessSkillBuffs, getEmployedSpecializationSkillsForBusiness } from './MainStreetStaffBuffs';
 import type { GridDims } from './MainStreetAdjacencyGeometry';
 import { hasAdjacentSameType, resolveNeighbors } from './MainStreetAdjacencyGeometry';

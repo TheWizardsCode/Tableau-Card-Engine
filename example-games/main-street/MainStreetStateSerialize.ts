@@ -11,8 +11,8 @@
  * @module
  */
 
-import { createSeededRng } from '../../src/core-engine';
-import { createEconomyLedger } from '../../src/rule-engine/EconomyLedger';
+import { createSeededRng } from '@core-engine';
+import { createEconomyLedger } from '@rule-engine/EconomyLedger';
 import {
   type EventCard,
   type StaffCard,

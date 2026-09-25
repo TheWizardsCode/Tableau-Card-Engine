@@ -18,11 +18,20 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
+      "@core-engine": ["src/core-engine"],
       "@core-engine/*": ["src/core-engine/*"],
+      "@card-system": ["src/card-system"],
       "@card-system/*": ["src/card-system/*"],
+      "@rule-engine": ["src/rule-engine"],
       "@rule-engine/*": ["src/rule-engine/*"],
+      "@ui": ["src/ui"],
       "@ui/*": ["src/ui/*"],
-      "@ai/*": ["src/ai/*"]
+      "@ai": ["src/ai"],
+      "@ai/*": ["src/ai/*"],
+      "@balance-cards": ["src/balance-cards"],
+      "@balance-cards/*": ["src/balance-cards/*"],
+      "@core-scripts/*": ["scripts/*"],
+      "@core-tests/*": ["tests/*"]
     }
   },
   "include": [

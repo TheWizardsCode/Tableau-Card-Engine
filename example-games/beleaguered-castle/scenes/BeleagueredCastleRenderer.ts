@@ -7,11 +7,11 @@
 import Phaser from 'phaser';
 import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
-import { HandView, PileView } from '../../../src/ui';
-import { GAME_W, GAME_H } from '../../../src/ui';
-import type { DragDropManager, DragDropPayload } from '../../../src/ui';
+import { HandView, PileView } from '@ui';
+import { GAME_W, GAME_H } from '@ui';
+import type { DragDropManager, DragDropPayload } from '@ui';
 import { createSceneTitle } from '@ui/Renderer';
-import { createBcHudText } from '../../../src/ui/Renderer/adapters/BeleagueredCastleAdapter';
+import { createBcHudText } from '@ui/Renderer/adapters/BeleagueredCastleAdapter';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
   DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION,

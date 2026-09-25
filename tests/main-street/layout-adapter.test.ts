@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { computeMainStreetLayoutWithSll } from '../../example-games/main-street/scenes/MainStreetLayoutAdapter';
-import { parseScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
-import { getZoneRect } from '../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
+import { getZoneRect } from '@ui/screen-layout';
 import mainStreetLayoutJson from '../../example-games/main-street/layouts/main-street.layout.json';
 import {
   computeMainStreetLayoutGeometry,

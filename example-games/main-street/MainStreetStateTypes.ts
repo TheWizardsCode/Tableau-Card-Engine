@@ -13,8 +13,8 @@
  */
 
 import type { StreetCameraState } from './MainStreetMapView';
-import type { ActiveEffect } from '../../src/core-engine';
-import type { EconomyLedger } from '../../src/rule-engine/EconomyLedger';
+import type { ActiveEffect } from '@core-engine';
+import type { EconomyLedger } from '@rule-engine/EconomyLedger';
 import type {
   BusinessCard,
   CommunitySpaceCard,

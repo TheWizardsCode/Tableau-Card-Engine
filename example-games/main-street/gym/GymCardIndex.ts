@@ -41,7 +41,7 @@ import {
 } from '../MainStreetCards';
 import { buildCardTooltipInfo, resolveDescription, type SynergyRateCard } from '../MainStreetFormatting';
 import { EASY_PRESET } from '../MainStreetDifficulty';
-import { formatCurrency } from '../../../src/core-engine/I18n';
+import { formatCurrency } from '@core-engine/I18n';
 
 // ── Canonical group orders ──────────────────────────────────
 

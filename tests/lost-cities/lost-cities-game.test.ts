@@ -28,7 +28,7 @@ import type {
   Phase1Action,
   Phase2Action,
 } from '../../example-games/lost-cities/LostCitiesRules';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 // ── Setup tests ────────────────────────────────────────────
 

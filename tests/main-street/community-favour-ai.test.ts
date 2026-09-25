@@ -21,7 +21,7 @@ import {
   GreedyStrategy,
   MainStreetAiPlayer,
 } from '../../example-games/main-street/MainStreetAiStrategy';
-import { createSeededRng } from '../../src/core-engine/SeededRng';
+import { createSeededRng } from '@core-engine/SeededRng';
 
 function createTestState(seed: string = 'cf-ai-test'): MainStreetState {
   const state = setupMainStreetGame({ seed });

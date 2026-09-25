@@ -7,15 +7,15 @@
  */
 
 import { scoreVisibleCards, scoreGrid } from '../GolfScoring';
-import type { Card } from '../../../src/card-system/Card';
+import type { Card } from '@card-system/Card';
 import type { GolfSession } from '../GolfGame';
-import { GAME_W, GAME_H } from '../../../src/ui';
+import { GAME_W, GAME_H } from '@ui';
 import { createSceneTitle } from '@ui/Renderer';
-import { PileView } from '../../../src/ui/PileView';
+import { PileView } from '@ui/PileView';
 import {
   createGolfHudText,
   getCardTexture,
-} from '../../../src/ui/Renderer/adapters/GolfAdapter';
+} from '@ui/Renderer/adapters/GolfAdapter';
 import {
   GOLF_CARD_H, CARD_GAP,
   GRID_ROWS,
@@ -26,7 +26,7 @@ import {
   type GolfLayout,
 } from './GolfLayoutAdapter';
 
-import type { CardPile } from '../../../src/ui/PileView';
+import type { CardPile } from '@ui/PileView';
 
 /**
  * Lightweight adapter that wraps a plain Card[] with the PileView CardPile
