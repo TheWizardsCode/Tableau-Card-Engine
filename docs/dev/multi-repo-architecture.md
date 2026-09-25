@@ -219,6 +219,15 @@ files / 1840 tests) and the Gym smoke profile boots (2 files / 20 tests).
 
 ## 5. Per-game repo scaffold (F4)
 
+> **Superseded layout (F9 / Option C).** The `example-games/<game>/` +
+> `src -> <core>/src` symlink layout described in this section is reworked by
+> feature F9 (CG-0MUH0NTRG007GDME): per-game repos use a flat repo-root `src/`
+> with alias-only engine imports. The deciding record — per-game root shape,
+> non-source tree placement, symlink disposition, import contract and the
+> `scenePath` contract — is
+> [`per-game-src-layout-decision.md`](./per-game-src-layout-decision.md).
+> This section remains accurate for the F4 baseline it describes.
+
 `scripts/extract-repos.sh` (F1) splits a game's tree out of the monorepo but
 leaves it unbuildable: a game repo has no `package.json`, `vite.config.ts`,
 `tsconfig.json`, `main.ts` or `index.html`. `scripts/game-repo-scaffold.ts`
@@ -301,6 +310,10 @@ scaffold wires the local composition that F5 (launcher distribution) and F7
 - **F5** makes the launcher assemble 1..n games for web + Electron builds.
 - **F6** updates `README.md`, `docs/DEVELOPER.md` and `AGENTS.md`.
 - **F7** runs the full build + test gate.
+
+Feature **F9** (CG-0MUH0NTRG007GDME) then reworks the per-game layout to a flat
+repo-root `src/` with alias-only engine imports; see
+[`per-game-src-layout-decision.md`](./per-game-src-layout-decision.md).
 
 Verification for this feature is the unit suite
 [`tests/scripts/extract-repos.test.ts`](../../tests/scripts/extract-repos.test.ts)
