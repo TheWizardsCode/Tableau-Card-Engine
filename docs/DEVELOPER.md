@@ -360,6 +360,31 @@ The tutorial E2E tests are split into 6 part files (1-6 tests per file). Each pa
 
 The replay E2E tests live in `tests/e2e/replay-*.test.ts` and use a dedicated Node.js project (`replay-e2e`) with `pool: 'forks'` + `singleFork: true`. This isolates them from the parallel unit test pool, ensuring the Vite dev server started by `scripts/replay.ts` has uncontested CPU for its initial cold compilation. The replay tests start and stop their own dev server per run via `scripts/dev-server-utils.ts`.
 
+### Skill-integrated test profiles
+
+The staged profiles above are exposed to the global `test` skill through a project-local extension, so agents can run a profile without memorising the `--project` flags:
+
+| `/skill:test --type` | Underlying profile | What it runs |
+|----------------------|--------------------|--------------|
+| `unit` | `--project unit` | Node.js logic/data/integration tests (seconds) |
+| `smoke` | `--project smoke` | One representative file per game + core/UI smoke (~2 min) |
+| `dev` | `--project dev` | Smoke + key E2E per game (~3.5 min) |
+| `browser` | `--project browser` | All non-tutorial browser tests (~6–8 min) |
+| `tutorial` | `tutorial-part1..6` | Main Street tutorial parts, one browser instance each (~4 min; order `part1, part2, part4, part5, part6, part3`) |
+| `e2e` | `tutorial` + `replay-e2e` | Every tutorial part plus the Playwright replay project |
+| `electron` | `scripts/run-electron-smoke.sh` | Display-aware Electron launch smoke |
+| `full` (default) | `npm test` | The genuine full CI suite (unit → browser → tutorial → electron) |
+
+- **`full` is deliberately omitted** from the extension's `types` map, so a bare `/skill:test` keeps resolving to the real full CI suite. **Only `--type full` populates the audit-accepted full-suite cache entry** — typed runs use independent cache keys and can never satisfy a "full test suite passes" AC.
+- Browser-dependent types (`smoke`, `dev`, `browser`, `tutorial`, `e2e`) chain `scripts/check-browser-test-env.ts` first, so a missing Playwright prerequisite (`npx playwright install chromium`) fails fast with remediation steps instead of an opaque Vitest browser timeout.
+- Every typed Vitest command runs through `scripts/vitest-run-with-retry.ts` — the retry-once + wall-clock hang-timeout wrapper (exit 124 `[hang-timeout]` on a true hang, which is never retried).
+- Commands also load `scripts/vitest-tap-reporter.ts` alongside the default reporter. It emits flat TAP for each failed test (`not ok N - <file> > <suite > test>` plus `error: |-` / `stack: |-` YAML blocks) that the global runner's `parse_node_failures` understands, so a red typed run creates per-test `test-failure` items instead of an opaque suite-level failure.
+- Configuration lives in `.pi/skills_extensions/test/extension.json`; the stage-selection policy prose is in `.pi/skills_extensions/test/SKILL_PREFIX.md`.
+
+Common invocations: `/skill:test --type unit` (fast feedback during implementation),
+`/skill:test --type dev` (pre-audit), and `/skill:test` or `/skill:test --type full`
+(release / pre-`in_review` evidence).
+
 #### CPU-contention mitigation (unit and browser tests)
 
 Full-suite runs can intermittently fail at teardown with

@@ -90,6 +90,8 @@ Rules of thumb:
 - **Full tests are only required on release.** Do not wait 15 min for feedback during normal implementation.
 - Tutorial E2E parts (`tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`) are excluded from smoke/dev profiles. See `docs/DEVELOPER.md#smoke-tests` / `#dev-tests` for the full project table.
 
+**Skill-integrated entry point (`/skill:test --type`):** the same staged profiles are exposed to the global test skill through a project-local extension (`.pi/skills_extensions/test/extension.json` plus the `SKILL_PREFIX.md` policy hook): `unit`, `smoke`, `dev`, `browser`, `tutorial`, `e2e` and `electron`. `full` is deliberately omitted, so a bare `/skill:test` keeps running the genuine full CI suite and remains the **only** run that populates the audit-accepted full-suite cache entry. Browser-dependent types chain `scripts/check-browser-test-env.ts` first; every typed Vitest command streams full output through `scripts/vitest-run-with-retry.ts` (retry-once + wall-clock hang timeout) and loads `scripts/vitest-tap-reporter.ts` alongside the default reporter, so a red typed run triages per test. See `docs/DEVELOPER.md#skill-integrated-test-profiles`.
+
 #### When to run which tests
 
 `npm test` runs the full suite via `scripts/run-ci-tests.sh` in three stages, in this order:
