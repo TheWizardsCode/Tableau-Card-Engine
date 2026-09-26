@@ -308,7 +308,7 @@ export function formatCardDetailLines(entry: CardIndexEntry): string[] {
         `Ongoing cost: ${ongoing > 0 ? `-${ongoing}/turn` : ABSENT_FIELD}`,
       );
       lines.push(
-        `Reputation: ${totalRep > 0 ? `+${totalRep}/turn` : ABSENT_FIELD}`,
+        `Reputation: ${totalRep !== 0 ? `${totalRep > 0 ? '+' : ''}${totalRep}/turn` : ABSENT_FIELD}`,
       );
       field(lines, 'Synergy types', (c.synergyTypes ?? []).join('/'));
       field(lines, 'Synergy coin bonus', orAbsent(c.synergyCoinBonus));

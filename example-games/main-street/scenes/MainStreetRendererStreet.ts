@@ -14,7 +14,7 @@ import { mainStreetRenderCardSvg } from '@ui/Renderer/adapters/MainStreetAdapter
 import { computeSynergyPairs } from '../MainStreetAdjacency';
 import type { BusinessCard, CommunitySpaceCard, StaffCard } from '../MainStreetCards';
 import { synergyColor } from '../MainStreetCards';
-import { buildCardTooltipInfo, formatEmployedStaffSummary, formatSynergyRate } from '../MainStreetFormatting';
+import { buildCardTooltipInfo, formatEmployedStaffSummary, formatPerTurnReputation, formatSynergyRate } from '../MainStreetFormatting';
 import type { MapSlotNode, RoadBand } from '../MainStreetMapView';
 import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL, containerTransform, mapRoadBands, streetViewportRect, visibleMapSlots, zoomScale } from '../MainStreetMapView';
 import { BOX_STROKE, LOG_TITLE_H, ROAD_COLOUR, ROAD_DASH_LENGTH, ROAD_DASH_PERIOD, ROAD_MARKING_COLOUR, ROAD_MARKING_WIDTH, ZOOM_ANIMATION_MS } from './MainStreetConstants';
@@ -730,8 +730,9 @@ export function drawBusinessSlot(renderer: MainStreetRendererContext, x: number,
         }
         const isCommunitySpace = (biz as any).family === 'community-space';
         const label = isCommunitySpace ? 'Community Space' : 'Business';
-        const totalRep = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
-        const repInfo = totalRep > 0 ? `\nReputation: +${totalRep}/turn` : '';
+        const totalRep = (biz.reputationPerTurn ?? 0) + (biz.reputationBonus ?? 0);
+        const repSuffix = formatPerTurnReputation(totalRep);
+        const repInfo = repSuffix !== '' ? `\nReputation: ${repSuffix}` : '';
         const synergyRate = formatSynergyRate(biz, s.state.config);
         const synergyInfo = synergyRate !== null ? `\nSynergy bonus: ${synergyRate} of base income per adjacent matching business` : '';
         // Employed-staff enumeration appended to the business's own info

@@ -224,7 +224,7 @@ export function generateBusinessCardSvg(
 ): string {
   const isUpgraded = card.level > 0;
   const totalIncome = card.baseIncome + card.incomeBonus;
-  const totalRep = (card.reputationPerTurn ?? 0) + card.reputationBonus;
+  const totalRep = (card.reputationPerTurn ?? 0) + (card.reputationBonus ?? 0);
 
   const primarySynergy = card.synergyTypes[0];
   const bgFill = CARD_BG[primarySynergy] ?? CARD_BG.default;
@@ -259,10 +259,12 @@ export function generateBusinessCardSvg(
       ? `<text x="${TEXT_MIN_X}" y="35" font-family="${FONT}" font-size="9" fill="#44ff44" font-weight="bold" text-anchor="start">Income: +${totalIncome}/turn</text>`
       : '';
 
-  // Reputation label: right column, below income, omitted when 0
+  // Reputation label: right column, below income, omitted when 0. Negative
+  // values (e.g. the Pawn Shop penalty, CG-0MUAYBA0L000XLK3) are surfaced too;
+  // the sign is carried by the number itself.
   const repLabel =
-    totalRep > 0
-      ? `<text x="${TEXT_MIN_X}" y="47" font-family="${FONT}" font-size="9" fill="#88bbff" font-weight="bold" text-anchor="start">+${fmtRep(totalRep)}/turn</text>`
+    totalRep !== 0
+      ? `<text x="${TEXT_MIN_X}" y="47" font-family="${FONT}" font-size="9" fill="#88bbff" font-weight="bold" text-anchor="start">${totalRep > 0 ? '+' : ''}${fmtRep(totalRep)}/turn</text>`
       : '';
 
   // Level badge: top-right, only for upgraded cards

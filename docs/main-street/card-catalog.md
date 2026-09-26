@@ -115,7 +115,7 @@ Park has been reclassified as a **Community Space** card (see below).
 
 | ID | Name | Cost | Income | Synergy | Upgrade Path | Description | Rationale |
 |----|------|------|--------|---------|--------------|-------------|-----------|
-| `biz-pawnshop` | Pawn Shop | 300 | 230 (rep +5/turn, ongoing −75/turn) | Commerce | Pawn Shop | Second-hand goods. Does not provide or receive synergy bonuses. | Budget Commerce option; makes Commerce synergies viable. |
+| `biz-pawnshop` | Pawn Shop | 200 | 230 (rep −10/turn, ongoing −75/turn) | Commerce | Pawn Shop | Second-hand goods. Does not provide or receive synergy bonuses. | Budget Commerce option; drains reputation each turn. |
 | `biz-boutique` | Boutique | 300 | 230 (rep +5/turn, ongoing −75/turn) | Commerce | Boutique | Curated fashion. Gains 50% of base income per adjacent Commerce business (scales with difficulty). | Mid-tier Commerce; distinct flavour from Hardware Store. |
 
 #### Service (new synergy type)

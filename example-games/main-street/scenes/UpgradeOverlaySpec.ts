@@ -127,7 +127,7 @@ export function buildUpgradeOverlaySpec(
 ): UpgradeOverlaySpec {
   const isUpgraded = biz.level > 0;
   const totalIncome = biz.baseIncome + biz.incomeBonus;
-  const totalReputation = (biz.reputationPerTurn ?? 0) + biz.reputationBonus;
+  const totalReputation = (biz.reputationPerTurn ?? 0) + (biz.reputationBonus ?? 0);
 
   // Level badge: top-right corner, only for upgraded cards
   // Container origin is at card centre, so subtract width/2 and height/2
@@ -188,17 +188,15 @@ export function buildUpgradeOverlaySpec(
       })()
     : null;
 
-  // Reputation text: centred below income, shown for any card with reputation > 0
-  // Container origin is at card centre, so x=0 is horizontal centre
-  // and a small positive y offset places it below the income label.
-
-  // Format to at most 1 decimal place, stripping trailing zeros (e.g. 0.2, 0.3, 1.0 -> 1)
-  const repFormatted = totalReputation > 0
-    ? String(Math.round(totalReputation))
-    : '0';
-  const reputationText: OverlayTextSpec | null = totalReputation > 0
+  // Reputation text: left-aligned below income. Shown for any non-zero
+  // reputation — including negative values such as the Pawn Shop penalty
+  // (CG-0MUAYBA0L000XLK3). Container origin is at card centre; the sign is
+  // carried by the number itself. The zero-check uses the raw total (not the
+  // rounded value) so the historical `+0/turn` output for fractional legacy
+  // values is preserved.
+  const reputationText: OverlayTextSpec | null = totalReputation !== 0
     ? {
-        text: `+${repFormatted}/turn`,
+        text: `${totalReputation > 0 ? '+' : ''}${Math.round(totalReputation)}/turn`,
         x: Math.round(-width / 2 + TEXT_MIN_X_SVG),
         y: Math.round(height * 0.1),
         fontSize: '11px',

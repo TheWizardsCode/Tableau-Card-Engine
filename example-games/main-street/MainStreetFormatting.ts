@@ -125,6 +125,24 @@ export function formatTooltipDelta(value: number): string {
 }
 
 /**
+ * Formats a per-turn reputation total with an explicit sign, e.g. `+5/turn`
+ * or `-10/turn`, returning an empty string when the total is zero (no
+ * reputation effect).
+ *
+ * Negative per-turn reputation is possible (Pawn Shop penalty,
+ * CG-0MUAYBA0L000XLK3); earlier display code only surfaced positive values,
+ * which hid the penalty from the player.
+ *
+ * @param totalReputation  The card's reputation-per-turn (including bonuses).
+ * @returns The signed `/<turn>` suffix, or `''` when zero.
+ */
+export function formatPerTurnReputation(totalReputation: number): string {
+  const rounded = Math.round(totalReputation);
+  if (rounded === 0) return '';
+  return `${rounded > 0 ? '+' : ''}${rounded}/turn`;
+}
+
+/**
  * Build the hover tooltip text for a Main Street card.
  *
  * All families render their cost line through `formatCurrency()` so the
@@ -147,14 +165,16 @@ export function buildCardTooltipInfo(
     case 'business': {
       const b = card;
       const bTotalRep = (b.reputationPerTurn ?? 0) + (b.reputationBonus ?? 0);
-      const bRepInfo = bTotalRep > 0 ? `\nReputation: +${bTotalRep}/turn` : '';
+      const bRepSuffix = formatPerTurnReputation(bTotalRep);
+      const bRepInfo = bRepSuffix !== '' ? `\nReputation: ${bRepSuffix}` : '';
       const bOngoingInfo = `\nOngoing cost: -${b.ongoingCost ?? 0}/turn`;
       return `Business: ${b.name}\nCost: ${formatCurrency(b.cost)}\nIncome: +${b.baseIncome + (b.incomeBonus || 0)}/turn${bOngoingInfo}${bRepInfo}\nSynergy: ${(b.synergyTypes || []).join('/')}\n${resolveDescription(b.description ?? '', b, config)}`;
     }
     case 'community-space': {
       const cs = card;
       const csTotalRep = (cs.reputationPerTurn ?? 0) + (cs.reputationBonus ?? 0);
-      const csRepInfo = csTotalRep > 0 ? `\nReputation: +${csTotalRep}/turn` : '';
+      const csRepSuffix = formatPerTurnReputation(csTotalRep);
+      const csRepInfo = csRepSuffix !== '' ? `\nReputation: ${csRepSuffix}` : '';
       const csOngoingInfo = `\nOngoing cost: -${cs.ongoingCost ?? 0}/turn`;
       return `Community Space: ${cs.name}\nCost: ${formatCurrency(cs.cost)}\nIncome: +${cs.baseIncome + (cs.incomeBonus || 0)}/turn${csOngoingInfo}${csRepInfo}\nSynergy: ${(cs.synergyTypes || []).join('/')}\n${resolveDescription(cs.description ?? '', cs, config)}`;
     }
@@ -203,7 +223,8 @@ export function buildCardTooltipInfo(
         `Hand slots: +${st.handSlotsAdded}`,
       ];
       lines.push(`Ongoing cost: -${st.ongoingCost ?? 0}/turn`);
-      if ((st.reputationPerTurn ?? 0) > 0) lines.push(`Reputation: +${st.reputationPerTurn}/turn`);
+      const stRepInfo = formatPerTurnReputation(st.reputationPerTurn ?? 0);
+      if (stRepInfo !== '') lines.push(`Reputation: ${stRepInfo}`);
       if ((st.refreshCostDiscount ?? 0) > 0) lines.push(`Refresh discount: -${st.refreshCostDiscount} per refresh`);
       if ((st.taxAuditRate ?? 0) > 0) lines.push(`Tax Audit: losses reduced to ${Math.round((st.taxAuditRate ?? 0) * 100)}%`);
       if ((st.actionsPerTurn ?? 0) > 0) lines.push(`Actions: +${st.actionsPerTurn}/week`);
