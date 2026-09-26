@@ -142,6 +142,67 @@ describe('dragDrop module registration', () => {
     expect(Object.keys(mock.events).sort()).toEqual(['drag', 'dragend', 'dragstart', 'drop']);
   });
 
+  it('flushes the pending hit-test queue so the registered object is immediately hit-testable', () => {
+    // Simulate Phaser's InputPlugin lifecycle: `setInteractive()`/
+    // `setDraggable()` queue the object for insertion, and the plugin promotes
+    // `_pendingInsertion` into its active hit-test `_list` on the next
+    // `preUpdate`. A pointer event before that flush is silently dropped
+    // (the post-deal first-click race — CG-0MUHL624W007G8EG).
+    const pendingInsertion: unknown[] = [];
+    const hitList: unknown[] = [];
+    const mock = createMockScene();
+    mock.input.setDraggable = vi.fn((go: unknown, value: boolean) => {
+      if (value) pendingInsertion.push(go);
+    });
+    mock.input._pendingInsertion = pendingInsertion;
+    mock.input._list = hitList;
+    const { manager } = makeManager({}, mock);
+
+    const go = createMockGameObject();
+    go.input = { draggable: false };
+    manager.registerDraggable({ gameObject: go as unknown as DraggableGameObject });
+
+    // The object is hit-testable immediately — no preUpdate required.
+    expect(hitList).toContain(go);
+    expect(pendingInsertion).not.toContain(go);
+  });
+
+  it('flushing preserves other pending objects without duplicating already-listed ones', () => {
+    const other = createMockGameObject(10, 10, 1);
+    const alreadyListed = createMockGameObject(20, 20, 2);
+    // `alreadyListed` is both queued and already active (Phaser's preUpdate
+    // dedupe guard); `other` is queued only.
+    const pendingInsertion: unknown[] = [other, alreadyListed];
+    const hitList: unknown[] = [alreadyListed];
+    const mock = createMockScene();
+    mock.input._pendingInsertion = pendingInsertion;
+    mock.input._list = hitList;
+    const { manager } = makeManager({}, mock);
+
+    const go = createMockGameObject();
+    go.input = { draggable: false };
+    manager.registerDraggable({ gameObject: go as unknown as DraggableGameObject });
+
+    // `other` was promoted, `alreadyListed` is not duplicated, and the
+    // pending queue is now empty.
+    expect(hitList).toContain(other);
+    expect(hitList.filter((o) => o === alreadyListed)).toHaveLength(1);
+    expect(pendingInsertion).toHaveLength(0);
+  });
+
+  it('registration is a no-op safe when the input plugin exposes no pending queue', () => {
+    // Lightweight fakes (and non-Phaser scenes) omit `_pendingInsertion`;
+    // the flush must not throw and the registration must still succeed.
+    const { mock, manager } = makeManager();
+    const go = createMockGameObject();
+    go.input = { draggable: false };
+
+    expect(() =>
+      manager.registerDraggable({ gameObject: go as unknown as DraggableGameObject }),
+    ).not.toThrow();
+    expect(mock.input.setDraggable).toHaveBeenCalledWith(go, true);
+  });
+
   it('registerDraggable sets the draggable flag via scene.input', () => {
     const { mock, manager } = makeManager();
     const go = createMockGameObject();

@@ -289,6 +289,14 @@ draggable on every board render (`makeDraggable`).
 
 ### Behaviour
 
+- **Immediate hit-testability:** `registerDraggable()` promotes Phaser's
+  pending hit-test insertion queue into the active input list straight away
+  (instead of waiting for the next `preUpdate`), so a pointer event arriving
+  on the very next frame hits a newly registered draggable. This removes the
+  post-deal first-click race where the first click after an animated deal was
+  silently dropped (CG-0MUHL624W007G8EG). The flush mirrors `InputPlugin`'s
+  own `_pendingInsertion` → `_list` promotion and is a no-op when the
+  plugin's internals are unavailable.
 - **Pickup veto** (`canPickUp` returns `false`): the object stays at its origin
   and the illegal-feedback hook fires — the "cannot drag this card" case.
 - **Valid drop**: the object's depth is restored and `onDrop` fires (the caller
