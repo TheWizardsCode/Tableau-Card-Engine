@@ -19,7 +19,7 @@ import { addLog } from '../MainStreetState';
 import { finalizeMainStreetTranscript, recordMainStreetEvent } from '../MainStreetTranscript';
 import type { TutorialActionType } from '../TutorialFlow';
 import { ensureTutorialMarketForUpcomingSteps } from '../TutorialScenario';
-import { BrowserLocalStorageAdapter, hasSeenBankingHint, loadTutorialState, markBankingHintShown, saveTutorialState } from '../TutorialState';
+import { BrowserLocalStorageAdapter, hasSeenBankingHint, loadTutorialState, markBankingHintShown, saveTutorialState, shouldTriggerBankingHint } from '../TutorialState';
 import type { MainStreetTurnControllerContext } from './MainStreetTurnControllerContext';
 import { celebrateChallengeIds } from './MainStreetChallengeCelebration';
 
@@ -106,7 +106,7 @@ export function endTurn(tcCtx: MainStreetTurnControllerContext): void {
     s.refreshActionButtons();
 
     // ── Banking hint trigger (CG-0MT3JK16W006A66P) ────────────────
-    // Contextual one-shot hint: when the tutorial is active, the player
+    // Contextual one-shot hint: when the tutorial is NOT active, the player
     // ends a turn with at least one unused action (a bankable action), and
     // the hint has not yet been shown, remember the candidate and fire the
     // HUD-highlighting hint AFTER the non-blocking `processEndOfTurn` runs.
@@ -115,13 +115,17 @@ export function endTurn(tcCtx: MainStreetTurnControllerContext): void {
     let pendingBankingHint = false;
     try {
       const tut = (s as any).tutorialController as any;
-      if (tut?.isActive && s.state.actionsRemaining > 0) {
-        const ts = loadTutorialState(new BrowserLocalStorageAdapter());
-        if (!hasSeenBankingHint(ts)) {
-          pendingBankingHint = true;
-          const next = markBankingHintShown(ts);
-          void saveTutorialState(new BrowserLocalStorageAdapter(), next).catch(() => {});
-        }
+      const ts = loadTutorialState(new BrowserLocalStorageAdapter());
+      if (
+        shouldTriggerBankingHint({
+          tutorialActive: tut?.isActive === true,
+          actionsRemaining: s.state.actionsRemaining,
+          alreadyShown: hasSeenBankingHint(ts),
+        })
+      ) {
+        pendingBankingHint = true;
+        const next = markBankingHintShown(ts);
+        void saveTutorialState(new BrowserLocalStorageAdapter(), next).catch(() => {});
       }
     } catch { /* banking hint trigger must never block the turn */ }
 

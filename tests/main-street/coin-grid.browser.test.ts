@@ -2,9 +2,10 @@
  * Browser tests for the on-card coin grid (CG-0MTDE9H0C0061D51).
  *
  * Verifies the Phaser wrapper (`createCoinGrid`) renders packed coins on a
- * real Main Street card face, re-packs on `addCoins`, renders half coins for
- * 0.5 remainders, stays on-card for small cards / many coins (never clipped),
- * and moves with the card container.
+ * real Main Street card face, left-aligned and growing rightwards,
+ * re-packs on `addCoins`, renders whole coins for fractional counts, stays
+ * on-card for small cards / many coins (never clipped), and moves with the
+ * card container.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
@@ -97,10 +98,18 @@ describe('Main Street on-card coin grid', () => {
 
     const icons = coinIcons(grid);
     expect(icons).toHaveLength(3);
-    for (const icon of icons) {
+    // Left-aligned: the first coin sits at the card's left inset + half a coin,
+    // not at the card centre, and later coins extend to the right.
+    const cardLeft = -70; // card local half-width
+    const firstCardLocalX = icons[0].x + grid.container.x;
+    expect(firstCardLocalX).toBeCloseTo(cardLeft + 8 + layout.coinSize / 2, 0);
+    for (let i = 0; i < icons.length; i++) {
+      const icon = icons[i];
       expect((icon as Phaser.GameObjects.Image).texture.key).toBe(COIN_GRID_FULL_KEY);
-      // All icons are inside the card container's local half-extents.
-      expect(Math.abs(icon.x + grid.container.x)).toBeLessThanOrEqual(70 + 1);
+      const localX = icon.x + grid.container.x;
+      // All icons are inside the card container's local half-extents (never clipped).
+      expect(localX).toBeGreaterThanOrEqual(cardLeft - 1);
+      expect(localX).toBeLessThanOrEqual(70 + 1);
       expect(Math.abs(icon.y + grid.container.y)).toBeLessThanOrEqual(40 + 1);
     }
   });
@@ -193,6 +202,10 @@ describe('Main Street on-card coin grid', () => {
 
     const icons = coinIcons(grid);
     expect(icons).toHaveLength(20);
+
+    // Left-aligned: the first coin sits in the card's left half (not centred).
+    const firstLocalX = icons[0].x + grid.container.x;
+    expect(firstLocalX).toBeLessThan(0);
 
     // Every icon stays within the small card's world bounds (+0.5px tolerance).
     const minX = card.x - 30.5;

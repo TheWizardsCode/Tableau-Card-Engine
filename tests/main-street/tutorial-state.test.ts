@@ -10,6 +10,7 @@ import {
   saveTutorialState,
   clearTutorialState,
   bridgeLegacyTutorialSeen,
+  shouldTriggerBankingHint,
   TUTORIAL_STATE_SCHEMA_VERSION,
   TUTORIAL_STATE_STORAGE_KEY,
   BrowserLocalStorageAdapter,
@@ -477,5 +478,51 @@ describe('BrowserLocalStorageAdapter', () => {
     expect(noWindowAdapter.getItem('any-key')).toBeNull();
     expect(() => noWindowAdapter.setItem('any-key', 'value')).not.toThrow();
     expect(() => noWindowAdapter.removeItem('any-key')).not.toThrow();
+  });
+});
+
+// ── shouldTriggerBankingHint (CG-0MUACDDMX004KWY8) ──────────
+
+describe('shouldTriggerBankingHint', () => {
+  it('does NOT trigger while the tutorial is active', () => {
+    // Regression: the banking hint previously fired mid-tutorial and
+    // dead-ended tutorial progression (CG-0MUACDDMX004KWY8).
+    expect(
+      shouldTriggerBankingHint({
+        tutorialActive: true,
+        actionsRemaining: 2,
+        alreadyShown: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('triggers in normal play with an unused action and no prior hint', () => {
+    expect(
+      shouldTriggerBankingHint({
+        tutorialActive: false,
+        actionsRemaining: 1,
+        alreadyShown: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('does NOT trigger when there are no bankable actions remaining', () => {
+    expect(
+      shouldTriggerBankingHint({
+        tutorialActive: false,
+        actionsRemaining: 0,
+        alreadyShown: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('does NOT trigger once the hint has already been shown (one-shot)', () => {
+    expect(
+      shouldTriggerBankingHint({
+        tutorialActive: false,
+        actionsRemaining: 2,
+        alreadyShown: true,
+      }),
+    ).toBe(false);
   });
 });

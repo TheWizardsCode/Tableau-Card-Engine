@@ -7,6 +7,10 @@
  * number of coins into a bounded area.
  *
  * Packing policy (per the epic):
+ *  - the grid is left-aligned on the card: it starts at the left edge of the
+ *    available region and grows rightwards (row-major, left→right, top→bottom),
+ *    so the first coin always sits at the left edge and later coins never
+ *    re-centre the layout;
  *  - the grid starts at 5 columns per row; when space runs out it grows to
  *    10 columns, then 15 columns, and beyond that continues scaling (more
  *    rows, then shrinking coin size, then overlap as a last resort);
@@ -21,7 +25,7 @@
 
 import type Phaser from 'phaser';
 
-/** One coin icon within a layout (position is relative to the grid centre). */
+/** One coin icon within a layout (position is relative to the grid anchor: left edge for X, vertical centre for Y). */
 export interface CoinPlacement {
   x: number;
   y: number;
@@ -47,7 +51,7 @@ export interface CoinGridLayout {
   shrinkApplied: boolean;
   /** True when spacing went negative (coins overlap) to fit. */
   overlapApplied: boolean;
-  /** Icon positions, row-major, relative to the grid centre. */
+  /** Icon positions, row-major, left-aligned to the grid anchor (first coin in each row at x = w/2). */
   placements: CoinPlacement[];
 }
 
@@ -115,8 +119,10 @@ export function gridColumns(iconCount: number): number {
  * Pure packing computation: lays `count` integer coins into a grid that always fits inside
  * the available region, so no coin is ever clipped.
  *
- * The returned placements are relative to the grid centre; the caller anchors
- * that centre on the card. `availableWidth`/`availableHeight` bound the grid
+ * The returned placements are left-aligned relative to the grid origin: the
+ * first icon in each row sits at `w/2` from the origin and subsequent icons
+ * extend to the right, so the layout reads left→right and never re-centres
+ * as coins are added. `availableWidth`/`availableHeight` bound the grid
  * footprint; if the natural grid is too big the layout first tightens the
  * horizontal spacing, then shrinks the coin size, and only if that would make
  * coins illegible (< `MIN_COIN_SIZE`) lets spacing go negative (overlap).
@@ -193,7 +199,6 @@ export function packCoins(
     shrinkApplied = true;
   }
 
-  const finalGridW = columns * w + (columns - 1) * s;
   const finalGridH = rows * w + (rows - 1) * s;
 
   const placements: CoinPlacement[] = [];
@@ -201,7 +206,7 @@ export function packCoins(
     const col = i % columns;
     const row = Math.floor(i / columns);
     placements.push({
-      x: col * (w + s) - finalGridW / 2 + w / 2,
+      x: col * (w + s) + w / 2,
       y: row * (w + s) - finalGridH / 2 + w / 2,
       // The half coin is the final icon in the row-major order.
       half: halfCoin && i === iconCount - 1,
@@ -227,7 +232,7 @@ export function packCoins(
 // ---------------------------------------------------------------------------
 
 export interface CoinGridOptions {
-  /** Region the grid must fit within (defaults to the bottom-right quadrant). */
+  /** Region the grid must fit within (defaults to the full card width minus left/right insets). */
   availableWidth?: number;
   availableHeight?: number;
   /** Requested coin diameter in px (default `COIN_GRID_SIZE`). */
@@ -252,6 +257,9 @@ export interface CoinGridHandle {
 /** Fallback card size when `card.getBounds()` cannot resolve dimensions. */
 const FALLBACK_CARD_W = 140;
 const FALLBACK_CARD_H = 80;
+
+/** Default left/right inset (px) between the card edge and the coin grid. */
+const COIN_GRID_LEFT_INSET = 8;
 
 function ensureCoinTextures(scene: Phaser.Scene): void {
   if (scene.textures.exists(COIN_GRID_FULL_KEY)) return;
@@ -283,14 +291,16 @@ function ensureCoinTextures(scene: Phaser.Scene): void {
 }
 
 /**
- * Create a coin grid anchored to a card container. The grid's centre is
+ * Create a coin grid anchored to a card container. The grid's anchor is
  * placed at (`anchorX`, `anchorY`) in the card's local coordinates; because
  * the grid container is parented to the card it moves and scales with the
  * card automatically.
  *
- * Defaults: the grid occupies the bottom-right quadrant of the card
- * (`availableWidth`/`availableHeight` default to half the card's bounds, and
- * the anchor defaults to that quadrant's centre).
+ * Defaults: the grid is left-aligned within the card face — `availableWidth`
+ * defaults to the full card width minus left/right insets, and the anchor
+ * defaults to the left edge (with the same inset), keeping the first coin at
+ * the card's left inset. `availableHeight` defaults to the lower portion of
+ * the card so the coins sit in the bottom half.
  */
 export function createCoinGrid(
   scene: Phaser.Scene,
@@ -305,10 +315,11 @@ export function createCoinGrid(
   const cardW = bounds.width > 0 ? bounds.width : FALLBACK_CARD_W;
   const cardH = bounds.height > 0 ? bounds.height : FALLBACK_CARD_H;
 
-  // Default region: the bottom-right quadrant of the card face.
-  const availableWidth = options?.availableWidth ?? cardW / 2;
+  // Default region: the left-aligned grid fills the card width (minus insets)
+  // in the lower half of the card face.
+  const availableWidth = options?.availableWidth ?? cardW - COIN_GRID_LEFT_INSET * 2;
   const availableHeight = options?.availableHeight ?? cardH / 2;
-  const anchorXPos = anchorX ?? cardW / 4;
+  const anchorXPos = anchorX ?? -cardW / 2 + COIN_GRID_LEFT_INSET;
   const anchorYPos = anchorY ?? cardH / 4;
   const coinSize = options?.coinSize ?? COIN_GRID_SIZE;
   const spacing = options?.spacing ?? COIN_GRID_SPACING;

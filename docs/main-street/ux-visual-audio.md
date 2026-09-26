@@ -81,9 +81,10 @@ void popTextOrIcon({
   (`IncomeResult.phaseBreakdown`, child 1) and reveals each phase in order:
   **base → synergy → reputation → events → upcoming → collect**.
   - Each producing street slot hosts an on-card coin grid
-    (`createCoinGrid`, child 2) in its bottom-right quadrant; the grid
-    fills progressively as base coins count out (staggered reveal,
-    rounded to nearest 0.5 at the animation layer only). Base income
+    (`createCoinGrid`, child 2) anchored to the card's left inset;
+    the grid is left-aligned and grows rightwards (row-major,
+    left→right, top→bottom) as base coins count out (staggered reveal,
+    rounded to nearest whole coin at the animation layer only). Base income
     EXCLUDES board adjacency synergy: `SlotPhaseBreakdown.baseIncome` is
     base-only and `synergyBonus` carries the synergy
     (CG-0MTV6LZEA003YS3E), so the per-slot phase sum still equals the

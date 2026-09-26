@@ -35,8 +35,9 @@ income choreography** instead of a single fly-to-HUD burst:
   (`INCOME_FLIGHT_STAGGER_MS`). Each stream carries the receiver's
   per-neighbour share (split so shares sum exactly) and lands in its coin grid.
 - **On-card coin grids** (`createCoinGrid`, `example-games/main-street/coin-grid.ts`)
-  render each producing slot's contribution in the card's bottom-right
-  quadrant, filling progressively; phase contributions fly in/out; the
+  render each producing slot's contribution left-aligned on the card
+  (starting at the card's left inset and growing rightwards), filling
+  progressively; phase contributions fly in/out; the
   collection finale lands a `+total` pop at the HUD coins counter.
 - **Pacing:** `INCOME_PHASE_GAP_MS` (2200ms) between phases — collection at
   ≈11s. The turn controller defers the week start (250ms poll, 16s cap)
