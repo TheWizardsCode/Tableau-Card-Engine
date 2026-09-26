@@ -1,0 +1,11 @@
+{
+  "$comment": "Per-game preset: Coloretto only (plus the core-owned Gym). Use `GAMES_CONFIG=coloretto` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "coloretto",
+      "path": "../tce-coloretto",
+      "scenePath": "example-games/coloretto/scenes/ColorettoScene.ts",
+      "siblingScenePath": "src/scenes/ColorettoScene.ts"
+    }
+  ]
+}

@@ -89,7 +89,8 @@ imports `virtual:game-registry` and never hardcodes game imports. This is what
 lets a checkout build with no games (the core-engine repo) or with any subset
 of 1..n games (a distribution), without editing source.
 
-Select a preset with the `GAMES_CONFIG` environment variable:
+Select a preset with the `GAMES_CONFIG` environment variable (a preset name or
+an explicit path; default `core-only`):
 
 ```bash
 npm run build                       # default preset: core-only (Gym only)
@@ -97,11 +98,12 @@ GAMES_CONFIG=solo npm run build     # one game (configs/solo.json)
 GAMES_CONFIG=arcade npm run build   # a small subset (configs/arcade.json)
 GAMES_CONFIG=deluxe npm run build   # a different subset (configs/deluxe.json)
 GAMES_CONFIG=full npm run build     # every game (configs/full.json)
+GAMES_CONFIG=main-street npm run build # one named game (configs/main-street.json)
 GAMES_CONFIG=/path/to/my.json npm run build   # an explicit preset
 ```
 
-The launcher ships these named presets (the `1 game` and `all games` cases are
-the boundary distributions):
+The launcher ships two preset families. **Distribution presets** describe build
+shapes (the `1 game` and `all games` cases are the boundary distributions):
 
 | Preset | Games |
 |---|---|
@@ -111,7 +113,15 @@ the boundary distributions):
 | `configs/deluxe.json` | feudalism, lost-cities |
 | `configs/full.json` | all eight games |
 
-Presets live in `configs/` and list the sibling game repos to include:
+**Per-game presets** (`configs/<game-id>.json`) each select exactly one game,
+so `GAMES_CONFIG=<game-id>` builds or runs just that game (plus the
+always-present Gym) for a fast development loop — for every example game
+(`beleaguered-castle`, `blackjack`, `coloretto`, `feudalism`, `golf`,
+`lost-cities`, `main-street`, `sushi-go`). Per-game presets are additive: the
+distribution presets above are unchanged.
+
+Presets live in `configs/`, are **data only**, and list the sibling game repos
+to include:
 
 ```json
 {
@@ -122,42 +132,26 @@ Presets live in `configs/` and list the sibling game repos to include:
 }
 ```
 
-`GAMES_CONFIG` can also be a bare preset name (`full`) or an explicit path. An
-unknown preset name fails the build rather than silently shipping fewer games.
+An unknown preset **name** fails the build rather than silently shipping fewer
+games. A game is resolved **locally first** (`example-games/<id>/…`, the flat
+monorepo layout), then at the Option C sibling `src/` layout
+(`../tce-<id>/src/…`), then at the legacy sibling layout
+(`../tce-<id>/example-games/<id>/…`), so one preset set works in every
+composition. A missing game fails the build with a message naming it and every
+path it looked in. The **Gym is core-owned and always present**, including in a
+core-only build.
+
+> **Full reference:** [Config-Driven Game Catalogue](dev/game-configuration.md)
+> is the authoritative guide to the preset schema (required and optional
+> fields, the `$comment` annotation), selection, the three-step resolution
+> order, the `GAME_INFO` convention and its bounded parsing, validation/failure
+> modes, and how to author a new preset.
 
 > **Two config locations, two purposes:** `configs/*.json` (this section) are
 > **build presets** selecting which games a build includes; the repo partition
 > used by the extraction tooling lives separately at
 > `scripts/configs/repo-layout.json` (see
 > [Multi-Repo Architecture](dev/multi-repo-architecture.md)).
-
-A game is resolved **locally first** (`example-games/<id>/…`, the flat
-monorepo layout) and then **as a sibling repo** (`../tce-<id>/…`, the composed
-distribution layout), so one preset set works before and after the split. A
-missing game fails the build with a message naming the game and both paths it
-looked in.
-
-The **Gym is core-owned and always present**, including in a core-only build.
-
-##### The `GAME_INFO` convention
-
-Every game's scene module exports its selector metadata next to its scene
-class:
-
-```ts
-export class GolfScene extends CardGameScene { /* … */ }
-
-export const GAME_INFO = {
-  sceneKey: 'GolfScene',
-  title: '9-Card Golf',
-  description: 'Single-round Golf (human vs. AI). …',
-  thumbnail: 'games/golf/thumbnail',   // optional; relative to assets/
-} as const;
-```
-
-The plugin parses this at build time (it cannot import the module, which
-requires a browser/Phaser context). `sceneKey`, `title` and `description` are
-required; `thumbnail` is optional.
 
 > **Test suites always use the full preset.** The shell runners
 > (`scripts/run-ci-tests.sh`, `run-dev-tests.sh`, `run-smoke-tests.sh`,
@@ -1146,7 +1140,10 @@ git submodule add git@github.com:TheWizardsCode/tableau-card-engine-core.git cor
    ```
 
    `adapterPath` is optional; include it when the game supports replay. Games
-   without an entry simply do not appear in that build.
+   without an entry simply do not appear in that build. Also add a per-game
+   preset `configs/<game-id>.json` (one game entry) so the game can be built in
+   isolation, and add its entry to `configs/full.json`; see
+   [Config-Driven Game Catalogue](dev/game-configuration.md).
 9. Add a `[ Menu ]` button to the game scene that calls `this.scene.start('GameSelectorScene')` for navigation back to the selector
 10. Add transcript recording:
     - Create `example-games/<game-name>/GameTranscript.ts` with transcript types and a `TranscriptRecorder` extending `TranscriptRecorderBase<T>` from `src/core-engine/TranscriptRecorder.ts`

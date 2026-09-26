@@ -134,6 +134,19 @@ function runFixtureWithTapReporter(): { stdout: string; stderr: string } {
   return { stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
+/**
+ * Per-test timeout for the two tests that spawn a nested Vitest CLI.
+ *
+ * The nested process must boot Vite + Vitest before it can report; its
+ * `spawnSync` budget is 180s (above). The Vitest default test timeout (15s)
+ * is shorter than that boot can take on a contended CI/agent host, so these
+ * tests were spuriously timing out and leaving the child running (producing a
+ * `[vitest-worker] Timeout calling "onTaskUpdate"` unhandled error). Give them
+ * an explicit budget below the `spawnSync` cap so a slow boot cannot fail
+ * them while a genuine hang is still bounded.
+ */
+const FIXTURE_CLI_TIMEOUT_MS = 120_000;
+
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
@@ -298,7 +311,7 @@ describe('global parse_node_failures compatibility', () => {
     expect(record).toBeDefined();
     expect(record!.stdout_excerpt.length).toBeGreaterThan(0);
     expect(record!.stack_trace.length).toBeGreaterThan(0);
-  });
+  }, FIXTURE_CLI_TIMEOUT_MS);
 });
 
 // ---------------------------------------------------------------------------
@@ -324,5 +337,5 @@ describe('deliberately-failing fixture through the CLI reporter', () => {
     // Default reporter summary preserved.
     expect(combined).toContain('Test Files');
     expect(combined).toMatch(/failed/);
-  });
+  }, FIXTURE_CLI_TIMEOUT_MS);
 });

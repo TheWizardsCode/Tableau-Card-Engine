@@ -24,7 +24,13 @@
  * ## Selecting a preset
  *
  * Set `GAMES_CONFIG` (env var or Vite `--mode`) to a preset name
- * (`core-only`, `all`, `sample`) or an explicit path. Default: `core-only`.
+ * (`core-only`, `solo`, `arcade`, `deluxe`, `full`, or a per-game
+ * `<game-id>` such as `main-street`) or an explicit path. Default:
+ * `core-only`.
+ *
+ * The preset schema, the three-step resolution order, the `GAME_INFO`
+ * convention and the authoring steps are documented in
+ * `docs/dev/game-configuration.md`.
  *
  * ## GAME_INFO convention
  *

@@ -1,0 +1,13 @@
+{
+  "$comment": "Per-game preset: 9-Card Golf only (plus the core-owned Gym). Use `GAMES_CONFIG=golf` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "golf",
+      "path": "../tce-golf",
+      "scenePath": "example-games/golf/scenes/GolfScene.ts",
+      "siblingScenePath": "src/scenes/GolfScene.ts",
+      "adapterPath": "example-games/golf/scripts/adapters/GolfReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/GolfReplayAdapter.ts"
+    }
+  ]
+}

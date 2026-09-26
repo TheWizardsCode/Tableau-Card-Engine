@@ -1,0 +1,13 @@
+{
+  "$comment": "Per-game preset: Lost Cities only (plus the core-owned Gym). Use `GAMES_CONFIG=lost-cities` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "lost-cities",
+      "path": "../tce-lost-cities",
+      "scenePath": "example-games/lost-cities/scenes/LostCitiesScene.ts",
+      "siblingScenePath": "src/scenes/LostCitiesScene.ts",
+      "adapterPath": "example-games/lost-cities/scripts/adapters/LostCitiesReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/LostCitiesReplayAdapter.ts"
+    }
+  ]
+}

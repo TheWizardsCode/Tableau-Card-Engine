@@ -1,0 +1,13 @@
+{
+  "$comment": "Per-game preset: Sushi Go! only (plus the core-owned Gym). Use `GAMES_CONFIG=sushi-go` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "sushi-go",
+      "path": "../tce-sushi-go",
+      "scenePath": "example-games/sushi-go/scenes/SushiGoScene.ts",
+      "siblingScenePath": "src/scenes/SushiGoScene.ts",
+      "adapterPath": "example-games/sushi-go/scripts/adapters/SushiGoReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/SushiGoReplayAdapter.ts"
+    }
+  ]
+}

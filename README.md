@@ -37,11 +37,17 @@ GAMES_CONFIG=solo npm run build        # configs/solo.json (one game)
 GAMES_CONFIG=arcade npm run build      # configs/arcade.json (a small subset)
 GAMES_CONFIG=deluxe npm run build      # configs/deluxe.json (a different subset)
 GAMES_CONFIG=full npm run build        # configs/full.json (every game)
+GAMES_CONFIG=main-street npm run build # configs/main-street.json (one named game)
 GAMES_CONFIG=configs/full.json npm run build   # an explicit preset path
 ```
 
-See [Repository Map](#repository-map-multi-repo-layout) below and
-[Config-Driven Game Catalogue](docs/DEVELOPER.md#config-driven-game-catalogue).
+Every example game also ships a per-game preset (`configs/<game-id>.json`), so
+`GAMES_CONFIG=<game-id>` builds or runs just that game (plus the always-present
+Gym) for a fast development loop.
+
+See [Repository Map](#repository-map-multi-repo-layout) below and the
+[Config-Driven Game Catalogue](docs/dev/game-configuration.md) reference for
+the preset schema, resolution order, `GAME_INFO` convention and authoring steps.
 
 ## Desktop Launcher (Electron) & Steam Packaging
 
@@ -113,6 +119,7 @@ Which games a build contains is selected by a preset in `configs/`:
 | `configs/arcade.json` | golf, main-street | partial distribution |
 | `configs/deluxe.json` | feudalism, lost-cities | partial distribution (distinct game set) |
 | `configs/full.json` | all eight games | full distribution (all games + Gym) |
+| `configs/<game-id>.json` | that one game | per-game preset (one game + Gym) — e.g. `configs/main-street.json` |
 
 ```bash
 GAMES_CONFIG=full npm run build            # web build (dist/)

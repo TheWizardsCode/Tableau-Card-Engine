@@ -15,7 +15,10 @@ The machine-readable form of every decision here lives in
 [`scripts/configs/repo-layout.json`](../../scripts/configs/repo-layout.json) —
 that file is the single source of truth consumed by both the extraction script
 (`scripts/extract-repos.sh`, this feature) and the distribution builds
-(`configs/*.json` presets + Vite discovery plugin, F3).
+(`configs/*.json` presets + Vite discovery plugin, F3). The `configs/` presets
+shipped by the launcher — including the per-game `configs/<game-id>.json` set —
+and the preset schema, resolution order and `GAME_INFO` convention are
+documented in full in [Config-Driven Game Catalogue](game-configuration.md).
 
 ---
 
@@ -261,7 +264,9 @@ to the launcher distribution).
 - **`main.ts`, `env.d.ts`, `index.html`** — the entry point and its
 virtual-module types.
 - **`configs/game.json`** — a single-game preset whose `scenePath` is
-`src/scenes/<Game>Scene.ts`.
+`src/scenes/<Game>Scene.ts`. (The launcher repo ships the analogous per-game
+presets as `configs/<game-id>.json`; see
+[Config-Driven Game Catalogue](game-configuration.md).)
 
 ### Option C layout — flat `src/`, no compatibility symlinks (F9)
 

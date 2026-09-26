@@ -52,6 +52,12 @@ const PRESET_GAMES: Record<string, readonly string[]> = {
   full: ALL_GAME_IDS,
 };
 
+/**
+ * Every per-game preset (`configs/<game-id>.json`) is derived from the game
+ * list rather than hand-listed, so adding a game cannot silently omit one.
+ */
+const PER_GAME_PRESETS = ALL_GAME_IDS;
+
 /** The scene class each game registers with the Game Selector. */
 const SCENE_KEY: Record<string, string> = {
   'beleaguered-castle': 'BeleagueredCastleScene',
@@ -166,6 +172,71 @@ describe('generated selector catalogue', () => {
       Object.keys(PRESET_GAMES).map((name) => registryFor(name)),
     );
     expect(distinct.size).toBe(Object.keys(PRESET_GAMES).length);
+  });
+});
+
+// ── Per-game presets ──────────────────────────────────────────────────────
+
+/**
+ * One `configs/<game-id>.json` per example game, each selecting exactly that
+ * game (plus the always-present core-owned Gym). These are additive to the
+ * distribution presets above, so a developer can build/run a single game in
+ * isolation (`GAMES_CONFIG=<game-id>`).
+ */
+describe('per-game presets', () => {
+  it('ships one configs/<game-id>.json for every example game (AC3)', () => {
+    for (const id of PER_GAME_PRESETS) {
+      expect(
+        fs.existsSync(path.join(REPO_ROOT, 'configs', `${id}.json`)),
+        `configs/${id}.json missing`,
+      ).toBe(true);
+    }
+  });
+
+  for (const id of PER_GAME_PRESETS) {
+    it(`configs/${id}.json ships exactly one game entry: ${id}`, () => {
+      const cfg = loadPreset(id);
+      expect(cfg.games.map((g) => g.id)).toEqual([id]);
+      // AC5: sibling repo path form and the monorepo src/ layout pairing.
+      const g = cfg.games[0];
+      expect(g.path).toBe(`../tce-${id}`);
+      expect(g.scenePath).toBe(`example-games/${id}/scenes/${SCENE_KEY[id]}.ts`);
+      expect(g.siblingScenePath).toBe(
+        g.scenePath.replace(`example-games/${id}/`, 'src/'),
+      );
+    });
+
+    it(`configs/${id}.json resolves to the real ${SCENE_KEY[id]} scene module`, () => {
+      const games = discoverGames(loadPreset(id), REPO_ROOT);
+      expect(games).toHaveLength(1);
+      expect(games[0].id).toBe(id);
+      expect(games[0].sceneClass).toBe(SCENE_KEY[id]);
+      expect(fs.existsSync(games[0].absoluteScenePath)).toBe(true);
+    });
+
+    it(`GAMES_CONFIG=${id} generates ${id} + Gym and no other game (AC4)`, () => {
+      expect(selectedGameIds(REPO_ROOT, { GAMES_CONFIG: id })).toEqual([id]);
+      const src = registryFor(id);
+      // Gym is core-owned and always present.
+      expect(src).toContain('GymRouterScene');
+      expect(src).toContain(SCENE_KEY[id]);
+      for (const other of ALL_GAME_IDS) {
+        if (other === id) continue;
+        expect(src, `${other} unexpectedly present in ${id}`).not.toContain(
+          SCENE_KEY[other],
+        );
+      }
+      // Exactly one game import alias is emitted.
+      expect(new Set(src.match(/__game\d+/g) ?? []).size).toBe(1);
+    });
+  }
+
+  it('per-game presets are additive and leave distribution presets unchanged (AC1 constraint)', () => {
+    for (const [name, expected] of Object.entries(PRESET_GAMES)) {
+      expect(loadPreset(name).games.map((g) => g.id).sort()).toEqual(
+        [...expected].sort(),
+      );
+    }
   });
 });
 

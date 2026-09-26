@@ -1,0 +1,11 @@
+{
+  "$comment": "Per-game preset: Blackjack only (plus the core-owned Gym). Use `GAMES_CONFIG=blackjack` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "blackjack",
+      "path": "../tce-blackjack",
+      "scenePath": "example-games/blackjack/scenes/BlackjackScene.ts",
+      "siblingScenePath": "src/scenes/BlackjackScene.ts"
+    }
+  ]
+}
