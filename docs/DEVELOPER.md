@@ -650,6 +650,29 @@ The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameTy
   (exit 124). Bound the loop with a counter/`for`, stop on no-progress, or arrange the
   state directly so the assertion is reachable without iteration.
 
+### Test-suite review (value audit)
+
+The suite is periodically audited for low-value tests. The committed report
+[`docs/dev/test-suite-review.md`](dev/test-suite-review.md) classifies every
+`*.test.ts` file as `keep` / `remove` / `clean-up` against the six documented
+anti-patterns (source-code-grep, placeholder/tautological, self-referential
+simulations, duplicates of core coverage, type-level/structural-only,
+zero-assertion browser tests), with per-file evidence, per-group counts, and a
+full classification table. Each removal/clean-up recommendation is tracked as a
+child work item under the audit parent.
+
+Re-run the audit with the repo-local **`test-review` skill**
+([`.pi/skills/test-review/SKILL.md`](../.pi/skills/test-review/SKILL.md), invoked
+as `/skill:test-review`): it documents the discovery probes, the classification
+procedure, the report format, the re-run/diff workflow, and the child-work-item
+convention (plus the optional helper
+`.pi/skills/test-review/scripts/scan-self-referential.sh`).
+
+> The audit is **analysis-only**: it never deletes or modifies test files — the
+> recommendation children execute the changes through the normal implement →
+> audit gate. Precedent cleanups: CG-0MS9AGG3N003ASCR (2026-07-31, 32 files),
+> CG-0MTCOPO8U001UW2Y (2026-09-20, 501 files reviewed).
+
 ### Smoke Tests
 
 Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedback during implementation. The smoke profile runs one representative test per game plus core engine/UI smoke tests — target runtime is ~30 seconds for 10 files.

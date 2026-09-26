@@ -73,6 +73,8 @@ npm run package          # Package a desktop binary for the host platform (packa
 
 Each example game should have its own set of tests to ensure that the game mechanics work as expected and to prevent regressions as the engine evolves. Additionally, the core engine should have comprehensive tests covering all critical functionalities.
 
+**Periodic test-suite review:** the suite is audited for low-value tests via the repo-local [`test-review` skill](.pi/skills/test-review/SKILL.md) (`/skill:test-review`). The audit classifies every `*.test.ts` file against six documented anti-patterns, records the result in [`docs/dev/test-suite-review.md`](docs/dev/test-suite-review.md), and creates a child work item for each removal/clean-up recommendation. The audit itself is analysis-only and never edits tests.
+
 #### Running Test Profiles
 
 Three test profiles are available, selected via `--project` (or the npm scripts):
