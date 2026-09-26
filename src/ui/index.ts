@@ -166,8 +166,20 @@ export { HelpButton } from './HelpButton';
 export type { HelpButtonConfig } from './HelpButton';
 
 export { SettingsPanel, DEPTH_SETTINGS_BUTTON } from './SettingsPanel';
-export { TooltipManager } from './Tooltip';
-export type { TooltipRenderContext, PhaserTooltipRenderFn, TooltipManagerConfig } from './Tooltip';
+export {
+  TooltipManager,
+  clampTooltipToBounds,
+  computeViewportTooltipPosition,
+  TOOLTIP_BOUNDS_MARGIN,
+  TOOLTIP_HOVER_OFFSET,
+} from './Tooltip';
+export type {
+  TooltipRenderContext,
+  PhaserTooltipRenderFn,
+  TooltipManagerConfig,
+  TooltipPosition,
+  ViewportTooltipPositionOptions,
+} from './Tooltip';
 export type { SettingsPanelConfig, SettingsButtonPosition } from './SettingsPanel';
 
 export { SettingsButton } from './SettingsButton';

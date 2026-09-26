@@ -34,6 +34,7 @@ import {
   OverlayManager,
   createSceneHeader,
   TooltipManager,
+  clampTooltipToBounds,
   FONT_FAMILY,
   GAME_W, GAME_H,
   audioPathWithFallback,
@@ -306,8 +307,9 @@ export class LostCitiesScene extends CardGameScene {
           tooltipY = (ctx.y ?? 0) - ((ctx.height as number | undefined) ?? 0) / 2 - boxH - 6;
         }
 
-        tooltipX = Phaser.Math.Clamp(tooltipX, 4, GAME_W - boxW - 4);
-        tooltipY = Phaser.Math.Clamp(tooltipY, 4, GAME_H - boxH - 4);
+        const clamped = clampTooltipToBounds(tooltipX, tooltipY, boxW, boxH, GAME_W, GAME_H, 4);
+        tooltipX = clamped.x;
+        tooltipY = clamped.y;
 
         const bg = scene.add.rectangle(
           boxW / 2, boxH / 2,

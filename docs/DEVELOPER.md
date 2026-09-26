@@ -2728,6 +2728,40 @@ import { SettingsButton } from '@ui';
 const settingsButton = new SettingsButton(this, settingsPanel);
 ```
 
+### Tooltip Manager
+
+The `TooltipManager` (`src/ui/Tooltip.ts`) displays contextual information (card details, scoring rules, HUD explanations) on hover. It has two rendering modes:
+
+- **DOM mode** (default) — a `div` overlay appended to `document.body`.
+- **Phaser mode** — caller-supplied game objects rendered via a `phaserRender` callback.
+
+```typescript
+import { TooltipManager } from '@ui';
+
+const tooltip = new TooltipManager(this, settingsPanel);
+cardSprite.setInteractive({ useHandCursor: true });
+cardSprite.on('pointerover', () => tooltip.show('Card info', cardSprite.x, cardSprite.y));
+cardSprite.on('pointerout', () => tooltip.hide());
+```
+
+**Bounds guarantee.** A tooltip must never render (partially) outside its visible bounds — an off-screen DOM tooltip used to extend the page's scrollable area and make the page "resize to make space". Both modes are now clamped:
+
+- **DOM mode** positions the node with `position: fixed`, measures it once per `show()` (a single synchronous reflow, no per-frame layout thrash and no resize listeners), then flips it above/left of the hover point when there is not enough room and finally clamps it to the viewport with a 4 px margin. Because the node is `position: fixed` it can never contribute to the document's scrollable overflow, so showing/hiding a tooltip never changes the document scroll size. The legacy world→screen mapping (canvas bounding rect + camera scroll + scale) is unchanged.
+- **Phaser mode** delegates layout to the caller's `phaserRender` callback. Use the exported, unit-tested helper to keep the container inside the game canvas:
+
+  ```typescript
+  import { clampTooltipToBounds } from '@ui';
+
+  const boxW = text.width + padding * 2;
+  const boxH = text.height + padding * 2;
+  const { x, y } = clampTooltipToBounds(rawX, rawY, boxW, boxH, GAME_W, GAME_H);
+  container.setPosition(x, y);
+  ```
+
+  `clampTooltipToBounds(x, y, tooltipWidth, tooltipHeight, boundsWidth, boundsHeight, margin = 4)` is opt-in and never repositions a caller-managed container on its own, so a callback that already clamps is unaffected. Lost Cities, Sushi Go and the Gym tooltip demo all use it; `computeViewportTooltipPosition(...)` exposes the DOM flip+clamp maths for unit tests.
+
+**Guards.** In non-DOM environments (`document`/`window` undefined) the manager stays inert; when the canvas bounding rect cannot be read it hides, and when viewport dimensions are unavailable it falls back to the legacy unclamped placement. `pointer-events: none`, the maximum `z-index` and reduced-motion behaviour are preserved. A tooltip larger than the viewport or canvas cannot fit — it is pinned to the margin and partial visibility is accepted.
+
 ### UI Component Base Class (`UIComponentBase`)
 
 `UIComponentBase` (`src/ui/UIComponentBase.ts`) provides the shared lifecycle contract for reusable UI widgets. `HelpButton`, `SettingsButton`, and `Slider` extend it, and new components should too — it removes the repeated `destroyed` flag, idempotency guard, and manual listener bookkeeping that previously had to be re-implemented (and could leak listeners when a component was destroyed mid-interaction).

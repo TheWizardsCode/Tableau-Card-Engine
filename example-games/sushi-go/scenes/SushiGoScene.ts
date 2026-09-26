@@ -34,6 +34,7 @@ import {
   HandView,
   createSceneTitle,
   TooltipManager,
+  clampTooltipToBounds,
   audioPathWithFallback,
 } from '@ui';
 import type { HelpSection, TooltipRenderContext } from '@ui';
@@ -446,12 +447,13 @@ export class SushiGoScene extends CardGameScene {
         let tooltipX = (ctx.x ?? 0) - boxW / 2;
         let tooltipY = (ctx.y ?? 0) + TOOLTIP_Y_OFFSET;
 
-        tooltipX = Phaser.Math.Clamp(tooltipX, TOOLTIP_CLAMP_BOUNDARY, GAME_W - boxW - TOOLTIP_CLAMP_BOUNDARY);
-        tooltipY = Phaser.Math.Clamp(tooltipY, TOOLTIP_CLAMP_BOUNDARY, GAME_H - boxH - TOOLTIP_CLAMP_BOUNDARY);
+        const clamped = clampTooltipToBounds(tooltipX, tooltipY, boxW, boxH, GAME_W, GAME_H, TOOLTIP_CLAMP_BOUNDARY);
+        tooltipX = clamped.x;
+        tooltipY = clamped.y;
 
         if (tooltipY < (ctx.y ?? 0) + TOOLTIP_FLIP_THRESHOLD && tooltipY + boxH > (ctx.y ?? 0) - TOOLTIP_FLIP_THRESHOLD) {
           tooltipY = (ctx.y ?? 0) - TOOLTIP_Y_OFFSET - boxH;
-          tooltipY = Phaser.Math.Clamp(tooltipY, TOOLTIP_CLAMP_BOUNDARY, GAME_H - boxH - TOOLTIP_CLAMP_BOUNDARY);
+          tooltipY = clampTooltipToBounds(tooltipX, tooltipY, boxW, boxH, GAME_W, GAME_H, TOOLTIP_CLAMP_BOUNDARY).y;
         }
 
         const bg = scene.add.rectangle(
