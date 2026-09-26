@@ -529,9 +529,9 @@ export function create(lmCtx: MainStreetLifecycleManagerContext): void {
               // shuffling. This guarantees exactly which cards appear in
               // the market and incident deck, independent of deck
               // composition. The tutorial always uses Easy difficulty
-              // (10 starting coins after CG-0MSP26Q5N002EH8P re-tune, 5
+              // (1000 starting coins after CG-0MSP26Q5N002EH8P re-tune, 500
               // starting reputation); the scenario overrides the coin
-              // budget to 16 for the tutorial's fixed buy plan.
+              // budget to 1200 for the tutorial's fixed buy plan.
               //
               // The scenario system uses the STANDARD_TUTORIAL_SCENARIO
               // definition which references only Tier-1 cards, ensuring

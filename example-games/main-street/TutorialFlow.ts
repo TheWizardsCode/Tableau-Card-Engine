@@ -38,10 +38,10 @@
  *
  * ## Coin Budget Analysis (TutorialScenario, Easy difficulty)
  *
- * With the TutorialScenario system and Easy difficulty (12 coins, 5 reputation):
+ * With the TutorialScenario system and Easy difficulty (1200 coins, 500 reputation):
  *
- * - Market development row: Bakery ($3), **Laundromat ($4)**, **Bookshop ($3)**
- * - Local Festival ($3) bought on day 3 — the event move costs 1 action
+ * - Market development row: Bakery ($300), **Laundromat ($400)**, **Bookshop ($300)**
+ * - Local Festival ($300) bought on day 3 — the event move costs 1 action
  *   (CG-0MTFWBNL30043ZBM), just like a business move-to-hand
  * - Incidents in queue (5 deterministic, all budget-safe for the tutorial
  *   street): Community Award (+200 rep) ×3, Rainy Day (0 coins — no Food
@@ -237,8 +237,8 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     gate: 'action',
     requiredAction: 'select-business',
     // The TutorialScenario system (TutorialScenario.ts) guarantees the Laundromat
-    // (biz-laundromat-0) is present in the development row. It costs $4, leaving
-    // 12 coins for the later purchases.
+    // (biz-laundromat-0) is present in the development row. It costs $400, leaving
+    // 1200 coins for the later purchases.
     requiredCardId: 'biz-laundromat-0',
   },
   {
@@ -306,7 +306,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     highlightZone: 'festivalCard',
     gate: 'action',
     requiredAction: 'buy-event',
-    // The TutorialScenario system puts Local Festival (evt-festival, $3)
+    // The TutorialScenario system puts Local Festival (evt-festival, $300)
     // on the market row. Taking an Investment event to hand costs 1 action
     // (CG-0MTFWBNL30043ZBM), so T8 ends day 2 first — T10 spends day 3's
     // fresh action and T11 ends that day.
@@ -392,7 +392,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T17',
     titleKey: tutorialKey('T17', 'title'),
     bodyKey: tutorialKey('T17', 'body'),
-    // Day 4, split 2 of the Bookshop purchase: place from hand at LISTED $3
+    // Day 4, split 2 of the Bookshop purchase: place from hand at LISTED $300
     // (plan-ahead — no premium). Body references the Bookshop
     // ({cardName}/{cost}) via referencedCardId — no gate here.
     highlightZone: 'streetGrid',
@@ -434,7 +434,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
     id: 'T21',
     titleKey: tutorialKey('T21', 'title'),
     bodyKey: tutorialKey('T21', 'body'),
-    // Day 6, split 2 of the Library purchase: place from hand at LISTED $7
+    // Day 6, split 2 of the Library purchase: place from hand at LISTED $700
     // NEXT TO the Bookshop (synergyCardId) for the Culture adjacency bonus —
     // see isSynergyAdjacentPlacement(). referencedCardId feeds the
     // {cardName}/{cost} placeholders from live card data (no market gate).
@@ -678,7 +678,7 @@ export function isSynergyAdjacentPlacement(
 export type TutorialCardDataParams = {
   /** The card's `name` column (e.g. `'Laundromat'`). */
   cardName: string;
-  /** The card's `cost` column formatted via `formatCurrency()` (e.g. `'€4'`). */
+  /** The card's `cost` column formatted via `formatCurrency()` (e.g. `'€400'`). */
   cost: string;
   /** Event cards only: the `coinDelta` as `+N coins` (e.g. `'+200 coins'`). */
   bonus: string;

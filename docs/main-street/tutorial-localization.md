@@ -36,7 +36,7 @@ time, so rebalancing card data never leaves the tutorial stale.
 | Placeholder | Resolved from | Example |
 |-------------|---------------|---------|
 | `{cardName}` | card's `name` column | `Laundromat` |
-| `{cost}` | card's `cost` column via `formatCurrency()` | `€4` |
+| `{cost}` | card's `cost` column via `formatCurrency()` | `€400` |
 | `{bonus}` | event card's `coinDelta` as `+N coins` | `+200 coins` |
 
 Example (T3 body in `tutorial-en.ts`):
@@ -149,7 +149,7 @@ Tutorial text follows these editorial principles:
 | 4 | T4 | Your Hand | confirm | hand |
 | 5 | T5 | Upcoming Incidents | confirm | incidentQueue |
 | 6 | T6 | End Turn (week 1 → 2) | action (end-turn) | endTurnButton |
-| 7 | T7 | Place the Laundromat (listed $4) | action (place-business) | streetGrid |
+| 7 | T7 | Place the Laundromat (listed $400) | action (place-business) | streetGrid |
 | 8 | T8 | More than Businesses | confirm | investmentsRow (aliases the single market row) |
 | 9 | T9 | Buy the Local Festival | action (buy-event) | festivalCard (card-level) |
 | 10 | T10 | End this turn (week 2 → 3) | action (end-turn) | endTurnButton |
@@ -157,11 +157,11 @@ Tutorial text follows these editorial principles:
 | 12 | T12 | Costs and Reputation | confirm (informative) | developmentRow |
 | 13 | T13 | Community Favour | action (community-favour, rep→coins) | actionButtons (HUD strip favour band) |
 | 14 | T14 | End this turn (week 3 → 4) | action (end-turn) | endTurnButton |
-| 15 | T15 | Place the Bookshop (listed $3) | action (place-business) | streetGrid |
+| 15 | T15 | Place the Bookshop (listed $300) | action (place-business) | streetGrid |
 | 16 | T16 | End this turn (week 4 → 5) | action (end-turn) | endTurnButton |
 | 17 | T17 | Move the Library to hand | action (select-business) | developmentRow |
 | 18 | T18 | End this turn (week 5 → 6) | action (end-turn) | endTurnButton |
-| 19 | T19 | Build a Library next to the Bookshop (listed $7) | action (place-business + synergy) | streetGrid |
+| 19 | T19 | Build a Library next to the Bookshop (listed $700) | action (place-business + synergy) | streetGrid |
 | 20 | T20 | Triggering Events | action (play-event) | hand |
 | 21 | T21 | Success and Failure | confirm | hud (scoring bar) |
 | 22 | T22 | Challenges | confirm | challengePanel |
@@ -221,7 +221,7 @@ authoritative walkthrough lives in the `Coin Budget (Easy / 1200 coins)` table i
 **Never hardcode card facts.** If the text references a card's name, cost, or
 income bonus, keep the `{cardName}` / `{cost}` / `{bonus}` placeholder tokens
 in place and let the resolver inject the live values from `card-data.csv`.
-Hardcoding a value (e.g. writing `€4` or `Laundromat` directly) will go stale
+Hardcoding a value (e.g. writing `€400` or `Laundromat` directly) will go stale
 whenever the card is rebalanced.  Do not change a card's name or price in
 the tutorial text — change `card-data.csv` instead; the tutorial follows
 automatically.

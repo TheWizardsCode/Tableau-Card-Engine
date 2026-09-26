@@ -149,12 +149,12 @@ export interface GameConfig extends DifficultyConfig {
   readonly favourCoinsToRepCost: number;
   /**
    * Reputation consumed to gain coins via Community Favour.
-   * Default 2 (2 rep → N coins, where N = favourRepToCoinsCoinGain).
+   * Default 200 (200 rep → N coins, where N = favourRepToCoinsCoinGain).
    */
   readonly favourRepToCoinsRepCost: number;
   /**
    * Coins gained when spending reputation via Community Favour.
-   * Default 3 (2 rep → 3 coins). Round-trip is lossy,
+   * Default 300 (200 rep → 300 coins). Round-trip is lossy,
    * preventing infinite arbitrage.
    */
   readonly favourRepToCoinsCoinGain: number;

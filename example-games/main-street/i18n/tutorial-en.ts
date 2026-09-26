@@ -280,7 +280,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
     'Move the Library to hand',
   // {cardName}/{cost} resolved from card-data.csv (cs-library) at render time.
   // Two-turn plan-ahead (CG-0MT53NXGZ004H5AE): moving the Library to hand
-  // uses this week's one action; it will be placed next week at listed $7 next to
+  // uses this week's one action; it will be placed next week at listed $700 next to
   // the Bookshop (culture adjacency). Only ONE Culture partner is needed to
   // trigger the festival at T20, so holding it a week is safe.
   [tutorialKey('T19', 'body')]:
@@ -300,7 +300,7 @@ export const TUTORIAL_EN_BUNDLE: Record<string, string> = {
   // to the Bookshop (a Culture business) earns the Culture adjacency bonus.
   // Adjacency is 8-way (Chebyshev): placing the Library diagonally next to the
   // Bookshop counts just as much as orthogonally. Listed-cost placement from
-  // hand (plan-ahead) — no same-week premium for the $7 card.
+  // hand (plan-ahead) — no same-week premium for the $700 card.
   [tutorialKey('T21', 'body')]:
     'Click the **{cardName}** in your hand, then click a slot **next to {synergyCardName}** — orthogonally or diagonally — to place it at its listed cost and gain the Culture bonus.',
 
