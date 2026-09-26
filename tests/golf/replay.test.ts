@@ -32,6 +32,18 @@ const FIXTURE_TRANSCRIPT = path.join(
  * are lazily imported only on the replay path, so validation/error paths
  * exit in a few seconds even under parallel CPU load
  * (see CG-0MSAXWIK70050RDA).
+ *
+ * The spawned CLI is pinned to a preset that includes Golf. `scripts/replay.ts`
+ * registers its adapters from the active build preset
+ * (`scripts/adapters/index.ts` → `registerConfiguredAdapters`), and the default
+ * preset is `core-only` (`scripts/vite-game-discovery-plugin.ts`), which
+ * registers no adapters at all. These tests exercise the Golf adapter, so
+ * without the pin a bare `npx vitest run --project unit tests/golf/...` (or the
+ * `/skill:test --type unit` profile, neither of which sets `GAMES_CONFIG`)
+ * fails to auto-detect Golf with "Available adapters: none". Only `npm test`
+ * and the smoke/dev shell runners export `GAMES_CONFIG="${GAMES_CONFIG:-full}"`.
+ * The fallback applies only when `GAMES_CONFIG` is unset, so an explicitly
+ * supplied preset is always preserved (see CG-0MUILDS3200656TU).
  */
 function runReplay(
   args: string[],
@@ -46,7 +58,10 @@ function runReplay(
       encoding: 'utf-8',
       timeout: timeoutMs,
       killSignal: 'SIGKILL',
-      env: { ...process.env },
+      // Fall back to the `full` preset only when `GAMES_CONFIG` is unset, so the
+      // test is hermetic under the default (core-only) unit profile while an
+      // explicitly supplied preset remains untouched. See the helper docblock.
+      env: { ...process.env, GAMES_CONFIG: process.env.GAMES_CONFIG ?? 'full' },
     },
   );
 
