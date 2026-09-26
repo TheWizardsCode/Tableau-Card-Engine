@@ -25,11 +25,14 @@ interface MockOverlay {
   rotation: number;
   depth: number;
   active: boolean;
+  strokeColor?: number;
+  strokeWidth?: number;
   setPosition: ReturnType<typeof vi.fn>;
   setOrigin: ReturnType<typeof vi.fn>;
   setDepth: ReturnType<typeof vi.fn>;
   setAlpha: ReturnType<typeof vi.fn>;
   setRotation: ReturnType<typeof vi.fn>;
+  setStrokeStyle: ReturnType<typeof vi.fn>;
   destroy: ReturnType<typeof vi.fn>;
 }
 
@@ -71,6 +74,11 @@ function createMockScene(): { scene: Phaser.Scene; overlays: MockOverlay[] } {
             }),
             setRotation: vi.fn((r: number) => {
               overlay.rotation = r;
+              return overlay;
+            }),
+            setStrokeStyle: vi.fn((width: number, strokeColor: number) => {
+              overlay.strokeWidth = width;
+              overlay.strokeColor = strokeColor;
               return overlay;
             }),
             destroy: vi.fn(() => {
@@ -164,6 +172,29 @@ describe('createCardHighlight', () => {
 
     expect(overlays[0].alpha).toBe(0.35);
     expect(overlays[0].depth).toBeCloseTo(7.01, 5);
+    // No stroke unless requested.
+    expect(overlays[0].setStrokeStyle).not.toHaveBeenCalled();
+  });
+
+  it('draws an outline when strokeColor is supplied', () => {
+    const card = createMockCard();
+    const { overlays } = makeHighlight(card, {
+      strokeColor: 0x33ff33,
+      strokeWidth: 4,
+    });
+
+    // The outline is what makes the selection unmistakable under Canvas
+    // (the fill alone is a subtle wash) — CG-0MUHKD7S8007EEAC.
+    expect(overlays[0].setStrokeStyle).toHaveBeenCalledWith(4, 0x33ff33);
+    expect(overlays[0].strokeWidth).toBe(4);
+    expect(overlays[0].strokeColor).toBe(0x33ff33);
+  });
+
+  it('defaults the outline width to 3 when only strokeColor is supplied', () => {
+    const card = createMockCard();
+    const { overlays } = makeHighlight(card, { strokeColor: 0x33ff33 });
+
+    expect(overlays[0].setStrokeStyle).toHaveBeenCalledWith(3, 0x33ff33);
   });
 
   it("preserves the card's rotation and origin on the overlay", () => {

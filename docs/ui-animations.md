@@ -339,6 +339,10 @@ const highlight = createCardHighlight({
   target: topCardSprite,
   color: SELECTION_TINT,
   alpha: 0.35,
+  // A bright outline makes the selection unmistakable in both renderers
+  // (the semi-transparent fill alone reads as a subtle wash under Canvas).
+  strokeColor: SELECTION_STROKE, // 0x33ff33
+  strokeWidth: 4,
 });
 
 // Card moved/tweened while highlighted: re-align the overlay.
@@ -357,6 +361,8 @@ highlight.destroy();
 | `color` | `number` | required | Overlay fill colour and WebGL tint |
 | `alpha` | `number` | 0.35 | Overlay alpha |
 | `depthOffset` | `number` | 0.01 | Overlay depth above the target's current depth |
+| `strokeColor` | `number` | `undefined` | Optional outline colour; omitted → no outline |
+| `strokeWidth` | `number` | 3 | Outline width in px (only used when `strokeColor` is set) |
 
 ### API
 

@@ -49,6 +49,10 @@ export const HIGHLIGHT_ALPHA = 0.3;
 export const SELECTION_TINT = 0xaaffaa;
 /** Alpha for the persistent Canvas-compatible selection highlight overlay. */
 export const SELECTION_ALPHA = 0.35;
+/** Outline colour for the persistent selection highlight (both renderers). */
+export const SELECTION_STROKE = 0x33ff33;
+/** Outline width (px) for the persistent selection highlight. */
+export const SELECTION_STROKE_WIDTH = 4;
 
 // ── Overlay display ───────────────────────────────────────
 export const OVERLAY_DEPTH = 2000;

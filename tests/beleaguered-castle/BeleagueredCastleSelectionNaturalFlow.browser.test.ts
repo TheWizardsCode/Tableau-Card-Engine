@@ -70,10 +70,11 @@ async function clearPersistentStorage(): Promise<void> {
 
 /**
  * Boot the game through the natural (non-reduced-motion) path: cleared
- * storage, a fixed seed, and `Phaser.CANVAS`. The variant popup is still
- * shown (it is part of the natural flow) and must be dismissed by the caller.
+ * storage, a fixed seed, and the requested renderer (default `CANVAS`). The
+ * variant popup is still shown (it is part of the natural flow) and must be
+ * dismissed by the caller.
  */
-async function bootNaturalGame(seed: number): Promise<Phaser.Game> {
+async function bootNaturalGame(seed: number, type: number = Phaser.CANVAS): Promise<Phaser.Game> {
   await clearPersistentStorage();
   // Explicitly ensure reduced-motion test mode is off — a preceding test in
   // the same page context may have enabled it.
@@ -90,7 +91,7 @@ async function bootNaturalGame(seed: number): Promise<Phaser.Game> {
     '../../example-games/beleaguered-castle/createBeleagueredCastleGame'
   );
   const game = createBeleagueredCastleGame({
-    type: Phaser.CANVAS,
+    type,
     parent: 'game-container',
     width: GAME_W,
     height: GAME_H,
@@ -126,6 +127,19 @@ function dispatchMouse(type: string, worldX: number, worldY: number): void {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Dispatch a full *real* DOM click (down + up) at world coordinates. Unlike
+ * `.emit('pointerdown')`, this exercises Phaser's real input hit-test path —
+ * the same path a player's mouse uses — so it guards the operator's actual
+ * interaction flow (CG-0MUHKD7S8007EEAC).
+ */
+async function realClick(worldX: number, worldY: number): Promise<void> {
+  dispatchMouse('mousedown', worldX, worldY);
+  await wait(60);
+  dispatchMouse('mouseup', worldX, worldY);
+  await wait(60);
 }
 
 async function waitForCondition(
@@ -191,6 +205,23 @@ async function chooseClassicVariant(scene: Scene): Promise<void> {
     'variant popup to appear',
   );
   findText(scene, '[ Classic ]')!.emit('pointerdown');
+}
+
+/**
+ * Dismiss the variant popup with a *real* DOM click on the `[ Classic ]`
+ * button, then wait for the animated deal to settle. This is the exact
+ * natural boot a player experiences (CG-0MUHKD7S8007EEAC).
+ */
+async function chooseClassicVariantRealClick(scene: Scene): Promise<void> {
+  await waitForCondition(
+    () => findText(scene, '[ Classic ]') !== undefined,
+    'variant popup to appear',
+  );
+  const btn = findText(scene, '[ Classic ]')!;
+  await realClick(btn.x, btn.y);
+  await waitForCondition(() => scene.isDealComplete(), 'natural deal to complete', 20_000);
+  // Let the final deal frame settle so the board is fully hit-testable.
+  await wait(400);
 }
 
 /**
@@ -368,4 +399,83 @@ describe('Beleaguered Castle natural-flow selection (browser)', () => {
     await waitForCondition(() => (scene as any).selectedCol === null, 'same-card deselect');
     expect((scene as any).selectedCol).toBeNull();
   });
+
+  // ── Real-DOM natural flow (operator path) ────────────────
+  // The tests above reproduce the post-deal race deterministically by
+  // dispatching the click synchronously inside the deal-complete callback.
+  // The tests below instead drive the *whole* flow with real DOM clicks —
+  // dismiss the variant popup, wait for the animated deal, then click the
+  // top card — mirroring exactly what a player does. They run under both
+  // Canvas and WebGL so selection (and its Canvas-visible highlight) is
+  // guarded across renderers (CG-0MUHKD7S8007EEAC).
+  const RENDERERS: Array<[string, number]> = [
+    ['Canvas', Phaser.CANVAS],
+    ['WebGL', Phaser.WEBGL],
+  ];
+
+  it.each(RENDERERS)(
+    'real-click natural flow selects on the first click and shows a highlight (%s)',
+    async (_label, type) => {
+      game = await bootNaturalGame(SEEDS[0], type);
+      const scene = getScene(game);
+      await chooseClassicVariantRealClick(scene);
+
+      const src = topSprite(scene, 0);
+      await realClick(src.x, src.y);
+
+      expect((scene as any).selectedCol).toBe(0);
+
+      // A persistent highlight overlay is present and aligned with the card
+      // (Canvas-visible; raw setTint is a no-op there).
+      const highlights = (scene.bcRenderer as any).selectionHighlights as Map<number, any>;
+      expect(highlights.has(0)).toBe(true);
+      const overlay = highlights.get(0).overlay;
+      expect(overlay.active).toBe(true);
+      expect(Math.abs(overlay.x - src.x)).toBeLessThan(2);
+      expect(Math.abs(overlay.y - src.y)).toBeLessThan(2);
+      expect(overlay.depth).toBeGreaterThan(src.depth);
+    },
+    30_000,
+  );
+
+  it(
+    'real-click natural flow: select then destination click executes one undoable move',
+    async () => {
+      game = await bootNaturalGame(SEEDS[0]);
+      const scene = getScene(game);
+      await chooseClassicVariantRealClick(scene);
+
+      const state = scene.getGameState();
+      const moves = getLegalMoves(state);
+      const move = moves.find((m) => m.kind === 'tableau-to-foundation') ?? moves[0];
+      expect(move).toBeTruthy();
+      const src = topSprite(scene, move!.fromCol);
+      const moveCountBefore = state.moveCount;
+
+      await realClick(src.x, src.y);
+      await waitForCondition(
+        () => (scene as any).selectedCol === move!.fromCol,
+        'real-click selection',
+      );
+
+      const zone = move!.kind === 'tableau-to-foundation'
+        ? (scene.foundationDropZones[move!.toFoundation!] as Phaser.GameObjects.Zone)
+        : tableauZone(scene, move!.toCol!);
+      await realClick(zone.x, zone.y);
+
+      await waitForCondition(
+        () => state.moveCount === moveCountBefore + 1,
+        'real-click destination to execute the move',
+      );
+      expect(state.moveCount).toBe(moveCountBefore + 1);
+      expect(scene.getUndoManager().canUndo()).toBe(true);
+      await waitForCondition(
+        () => (scene as any).selectedCol === null,
+        'selection to clear after the real-click move',
+      );
+      const highlights = (scene.bcRenderer as any).selectionHighlights as Map<number, unknown>;
+      expect(highlights.size).toBe(0);
+    },
+    30_000,
+  );
 });

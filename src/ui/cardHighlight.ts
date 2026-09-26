@@ -31,6 +31,14 @@ export interface CardHighlightOptions {
    * renders just above the card. @default 0.01
    */
   depthOffset?: number;
+  /**
+   * Optional outline colour drawn around the overlay. A stroke makes the
+   * selection unmistakable under both WebGL and Canvas (the semi-transparent
+   * fill alone can read as a subtle wash). Omitted → no outline.
+   */
+  strokeColor?: number;
+  /** Outline width in px. Only used when {@link strokeColor} is set. @default 3 */
+  strokeWidth?: number;
 }
 
 /** A live card highlight created by {@link createCardHighlight}. */
@@ -52,6 +60,9 @@ const DEFAULT_HIGHLIGHT_ALPHA = 0.35;
 /** Default depth offset so the overlay renders just above the card. */
 const DEFAULT_DEPTH_OFFSET = 0.01;
 
+/** Default outline width when a `strokeColor` is supplied. */
+const DEFAULT_STROKE_WIDTH = 3;
+
 /** Fallback card dimensions when the target exposes none. */
 const FALLBACK_CARD_W = 96;
 const FALLBACK_CARD_H = 130;
@@ -71,6 +82,8 @@ export function createCardHighlight(
     color,
     alpha = DEFAULT_HIGHLIGHT_ALPHA,
     depthOffset = DEFAULT_DEPTH_OFFSET,
+    strokeColor,
+    strokeWidth = DEFAULT_STROKE_WIDTH,
   } = options;
 
   const t = target as unknown as {
@@ -105,6 +118,12 @@ export function createCardHighlight(
     .setOrigin(t.originX ?? 0.5, t.originY ?? 0.5)
     .setRotation(t.rotation ?? 0)
     .setDepth((t.depth ?? 0) + depthOffset);
+
+  // Optional outline: the fill alone can read as a subtle wash, so a stroke
+  // makes the selection unmistakable in both renderers (CG-0MUHKD7S8007EEAC).
+  if (strokeColor !== undefined && typeof overlay.setStrokeStyle === 'function') {
+    overlay.setStrokeStyle(strokeWidth, strokeColor);
+  }
 
   let destroyed = false;
 
