@@ -17,10 +17,10 @@ fixed **baseline skill on every applicant**.
 
 | Category | Skills | Impact range | Balance notes |
 |---|---|---|---|
-| **Income Boost** | Networker, Chef de Cuisine, DJ, Sales Champion, Tech Guru | **+0.2–0.5 coins/turn, or +20% of a business's income** (Food / Entertainment per-type) | Percent bonuses apply to the business's cached income at income phase; flat bonuses add coins. Adjacency-scoped (Networker +0.2/adjacent synergy, Tech Guru +1 synergy range for Entertainment) are kept out of the per-business income fold. |
-| **Reputation Boost** | Town Gossip (baseline), Community Builder, Brand Ambassador, PR Strategist | **+0.1–0.15 rep/turn, or +50% rep gains** from incidents/investments | Community Builder is street-wide (all businesses); PR Strategist is Service-only; Brand Ambassador multi-*plies event-source rep gains* (incidents + investments), not per-turn rep. |
-| **Cost Reduction** | Cost Cutter, Negotiator, Operations Manager | **−0.5–1 cost, −15% street-wide ongoing** | See the "street-wide flag" below for Cost Cutter. |
-| **Incident Mitigation** | Quality Inspector, Risk Manager, Security Consultant, Compliance Officer | **−15% incident probability, −30% coin damage, −0.5 rep damage, theft immunity** | Probability and immunity are engine-modeled (see wiring notes). |
+| **Income Boost** | Networker, Chef de Cuisine, DJ, Sales Champion, Tech Guru | **+20–50 coins/turn, or +20% of a business's income** (Food / Entertainment per-type) | Percent bonuses apply to the business's cached income at income phase; flat bonuses add coins. Adjacency-scoped (Networker +20/adjacent synergy, Tech Guru +1 synergy range for Entertainment) are kept out of the per-business income fold. |
+| **Reputation Boost** | Town Gossip (baseline), Community Builder, Brand Ambassador, PR Strategist | **+10–15 rep/turn, or +50% rep gains** from incidents/investments | Community Builder is street-wide (all businesses); PR Strategist is Service-only; Brand Ambassador multi-*plies event-source rep gains* (incidents + investments), not per-turn rep. |
+| **Cost Reduction** | Cost Cutter, Negotiator, Operations Manager | **−50–100 cost, −15% street-wide ongoing** | See the "street-wide flag" below for Cost Cutter. |
+| **Incident Mitigation** | Quality Inspector, Risk Manager, Security Consultant, Compliance Officer | **−15% incident probability, −30% coin damage, −50 rep damage, theft immunity** | Probability and immunity are engine-modeled (see wiring notes). |
 
 **Stacking constraint (AC3/AC4):** no single staff member may hold **more than 1 income-boost
 skill AND more than 1 reputation-boost skill** simultaneously (beyond the fixed Town Gossip

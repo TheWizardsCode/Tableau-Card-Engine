@@ -44,7 +44,7 @@
  * - Local Festival ($3) bought on day 3 — the event move costs 1 action
  *   (CG-0MTFWBNL30043ZBM), just like a business move-to-hand
  * - Incidents in queue (5 deterministic, all budget-safe for the tutorial
- *   street): Community Award (+2 rep) ×3, Rainy Day (0 coins — no Food
+ *   street): Community Award (+200 rep) ×3, Rainy Day (0 coins — no Food
  *   businesses are placed) ×2. See TutorialScenario.ts.
  *
  * ### Budget Walkthrough (two-turn plan-ahead, listed-cost placements)
@@ -261,7 +261,7 @@ export const UNIFIED_TUTORIAL_STEPS: readonly UnifiedTutorialStepDef[] = [
   {
     id: 'T6',
     // Day-1 End Turn: ends the day in which the Laundromat was moved to
-    // hand. The first incident (Community Award, +2 rep) resolves here.
+    // hand. The first incident (Community Award, +200 rep) resolves here.
     titleKey: tutorialKey('T6', 'title'),
     bodyKey: tutorialKey('T6', 'body'),
     highlightZone: 'endTurnButton',
@@ -680,7 +680,7 @@ export type TutorialCardDataParams = {
   cardName: string;
   /** The card's `cost` column formatted via `formatCurrency()` (e.g. `'€4'`). */
   cost: string;
-  /** Event cards only: the `coinDelta` as `+N coins` (e.g. `'+2 coins'`). */
+  /** Event cards only: the `coinDelta` as `+N coins` (e.g. `'+200 coins'`). */
   bonus: string;
   /** Synergy-partner card's `name` column (e.g. `'Bookshop'`), when `synergyCardId` is set. */
   synergyCardName?: string;

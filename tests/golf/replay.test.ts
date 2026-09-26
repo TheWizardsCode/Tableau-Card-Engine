@@ -20,7 +20,7 @@ import * as os from 'node:os';
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const FIXTURE_TRANSCRIPT = path.join(
   PROJECT_ROOT,
-  '../../example-games/golf/tests/fixtures/transcripts/fixture-game.json',
+  'example-games/golf/tests/fixtures/transcripts/fixture-game.json',
 );
 
 // ── Helpers ─────────────────────────────────────────────────

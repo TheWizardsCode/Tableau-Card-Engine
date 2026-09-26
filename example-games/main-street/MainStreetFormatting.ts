@@ -163,7 +163,7 @@ export function buildCardTooltipInfo(
       // For SpecificSynergy events the raw coinDelta is a per-match value
       // (the engine multiplies it by the count of matching businesses).
       // Showing the raw delta alongside the per-match effect text is
-      // confusing — players see "Coins: +5.000" even when there are zero
+      // confusing — players see "Coins: +5" even when there are zero
       // matching businesses on the street (effective gain = 0).  The
       // effect text already describes the per-match behaviour, so we
       // suppress the detail line for these events entirely.
@@ -172,7 +172,12 @@ export function buildCardTooltipInfo(
       // and can be shown as a flat value.
       let detail = '';
       if (options.includeEventDetail && e.target !== 'SpecificSynergy') {
-        const coins = formatTooltipDelta(e.coinDelta);
+        // Percentage-based coin effects (e.g. the Tax Audit's `-0.45`) ignore
+        // the flat `coinDelta`; render the applied percentage so the detail
+        // line never contradicts the effect text.
+        const coins = e.coinPercentDelta !== undefined
+          ? `${e.coinPercentDelta < 0 ? '-' : '+'}${Math.round(Math.abs(e.coinPercentDelta) * 100)}%`
+          : formatTooltipDelta(e.coinDelta);
         const rep = formatTooltipDelta(e.reputationDelta);
         detail = `\nCoins: ${coins}, Rep: ${rep}`;
       }

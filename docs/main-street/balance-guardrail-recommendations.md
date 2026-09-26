@@ -147,27 +147,27 @@ The old 20–80% greedy test band (`monte-carlo-greedy-guardrail.test.ts`) was r
 
 ## 2. Measured baseline (evidence)
 
-Generated with `runAllCombinations()` — greedy, 200 seeds, 60 max turns, `mc-balance-` prefix (the canonical seed stream already used by `monte-carlo-baseline.json`). These values reproduce the committed Medium baseline exactly (0.62 / 1.8456), confirming determinism.
+Generated with `runAllCombinations()` — greedy, 200 seeds, 60 max turns, `mc-balance-` prefix (the canonical seed stream already used by `monte-carlo-baseline.json`). These values reproduce the committed Medium baseline exactly (0.62 / 184.56), confirming determinism.
 
 | Difficulty | winRate | avgCoinsPerTurn | medianScore | In recommended bands? |
 |------------|---------|-----------------|-------------|------------------------|
-| Easy | 0.835 | 2.678 | 130.4 | ✓ (margin to cap: 6.5 pts) |
-| Medium | 0.620 | 2.210 | 153.7 | ✓ (margins: 13 / 13 pts) |
-| Hard | 0.155 | 0.679 | 6.8 | ✓ (margins: 5 / 25 pts) |
+| Easy | 0.835 | 267.8 | 13040 | ✓ (margin to cap: 6.5 pts) |
+| Medium | 0.620 | 221.0 | 15370 | ✓ (margins: 13 / 13 pts) |
+| Hard | 0.155 | 67.9 | 680 | ✓ (margins: 5 / 25 pts) |
 
 > **CG-0MSTOATDQ005XDET re-baseline (2026-08-21):** the Community Favour
 > rep→coins fallback (`GreedyStrategy` Priority 9, used only when the AI is
 > genuinely stalled — cannot afford the cheapest market card — and holds a
 > reputation buffer) adds turn liquidity and shifted Medium to 0.62 win rate /
-> 2.21 coins-per-turn. Baselines and bands were regenerated from the current
+> 221 coins-per-turn. Baselines and bands were regenerated from the current
 > code (`scripts/generate-main-street-monte-baseline.ts` + the difficulty
 > matrix in `monte-carlo-baseline.json`). Loss decomposition is still
 > bankruptcy-dominated; no run hits the 60-turn harness cap.
 >
 > **CG-0MSVYPEZ90085SHE re-baseline (2026-08-24, operator-chosen option A):**
-> business cards now incur an ongoing cost (`max(0.25, cost/4)` coins/turn)
+> business cards now incur an ongoing cost (`max(25, cost/4)` coins/turn)
 > **even while held in hand**, so business income was raised
-> (`income = old income + 2.4 × ongoing cost`) and every business gained
+> (`income = old income + 240 × ongoing cost`) and every business gained
 > tiered reputation-per-turn to feed the late-game income multiplier.
 > Hand-held cards drain coins every turn, so winning runs are short (~10-turn)
 > sprints that bank 50–80 coins: measured Medium liquidity 5.76 (band widened
@@ -220,7 +220,7 @@ The producer ruling (CG-0MSP26Q5N002EH8P) defines net liquidity as `finalCoins/t
 - **0–6:** winning runs under hand-cost economics are short rich sprints — incomes comfortably cover the per-card drain (including held cards), so the AI banks a large reserve before crossing the score threshold at ~turn 10. The economy is *income-rich* rather than *tight*: the binding tension is placement timing and hand management, not per-turn affordability.
 - **Too high (> 6):** liquidity accumulates beyond any spending sink, purchases become trivial, and "can't afford anything" tension disappears.
 
-This is consistent with, and complementary to, the **gross** income band of 4–8 coins/turn (G3): gross income covers costs and events, while net liquidity measures the reserve at the end. The net band remains a **critical** guardrail (producer ruling) — codified in §3.3, `thresholds.ts`, and the guardrail tests — but since CG-0MSVYPEZ90085SHE the win-rate ladder is the primary balance gate and liquidity is a pacing signal.
+This is consistent with, and complementary to, the **gross** income band of 400–800 coins/turn (G3): gross income covers costs and events, while net liquidity measures the reserve at the end. The net band remains a **critical** guardrail (producer ruling) — codified in §3.3, `thresholds.ts`, and the guardrail tests — but since CG-0MSVYPEZ90085SHE the win-rate ladder is the primary balance gate and liquidity is a pacing signal.
 
 ### 3.3 medianScore — 120–180 (greedy/Medium)
 
@@ -238,12 +238,12 @@ This is consistent with, and complementary to, the **gross** income band of 4–
 |----------|---------|
 | Is winRate (Medium, 62%) above the recommended cap? | No — 62% is mid-band in 45–75%. The old 30–60% cap is revised, not enforced. |
 | Are Easy / Hard outside design intent? | No — 83.5% / 22% are inside 60–90% / 15–40%. |
-| Is any metric off its producer-ruled band? | No — avgCoinsPerTurn 1.85 ∈ [0, 2]; medianScore 153 ∈ [120, 180]. |
+| Is any metric off its producer-ruled band? | No — avgCoinsPerTurn 185 ∈ [0, 200]; medianScore 15300 ∈ [12000, 18000]. |
 | Is the difficulty ladder monotone? | Yes — ≈80 / ≈60 / ≈25 (measured across two seed sets). |
 
 A re-tune would only be warranted if a preset drifted outside its design-intent band *after* these bands are enforced. If that happens, the lever order from CG-0MSP26Q5N002EH8P applies: **presets first** (`MainStreetDifficulty.ts` — starting coins, synergy bonus, win threshold, positive incident multiplier), and `card-data.csv` only for card-level outliers.
 
-**Monitoring flags:** Easy measured 83.5% — close to the 90% cap, though with >6 pts of headroom on the deterministic seed set. If a future card-pool or rule change pushes Easy above 90%, prefer the preset levers (e.g., nudge Easy's `startingCoins` 10 → 9 or `synergyBonusPerNeighbor` 0.5 → 0.45) over band-widening.
+**Monitoring flags:** Easy measured 83.5% — close to the 90% cap, though with >6 pts of headroom on the deterministic seed set. If a future card-pool or rule change pushes Easy above 90%, prefer the preset levers (e.g., nudge Easy's `startingCoins` 1000 → 900 or `synergyBonusPerNeighbor` 0.5 → 0.45) over band-widening.
 
 ---
 

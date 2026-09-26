@@ -55,13 +55,13 @@ income choreography** instead of a single fly-to-HUD burst:
 
 Main Street has a **Community Favour** resource exchange available once per turn during the market phase (a **FREE** action — it does **not** consume `actionsRemaining`):
 
-- **coins → reputation:** spend `favourCoinsToRepCost` (default **2**) coins for **+1** reputation.
-- **reputation → coins:** spend `favourRepToCoinsRepCost` (default **2**) reputation for `favourRepToCoinsCoinGain` (default **3**) coins.
+- **coins → reputation:** spend `favourCoinsToRepCost` (default **200**) coins for **+1** reputation.
+- **reputation → coins:** spend `favourRepToCoinsRepCost` (default **200**) reputation for `favourRepToCoinsCoinGain` (default **300**) coins.
 
 Rules:
 - **Once per turn:** `state.favourUsedThisTurn` gates the exchange; reset at each `WeekStart`.
 - **MarketPhase only:** rejected outside the market phase.
-- **Lossy round-trip:** 2 coins → 1 rep → 1.5 coins (2→3 rate), so the exchange cannot be arbitraged.
+- **Lossy round-trip:** 200 coins → 1 reputation, while 200 reputation → 300 coins, so the exchange cannot be arbitraged.
 - **Configurable:** the three rates live on `GameConfig` and are tuned per-difficulty in `MainStreetDifficulty.ts` (defaults on all three presets).
 - **UI:** two SLL-positioned buttons inside the **HUD strip**, between the Coins and Reputation readouts (`favourRepToCoinsButton` → `favourCoinsToRepButton`, left-to-right `[rep→coins][coins→rep]`; rendered in `MainStreetRenderer.refreshHud`). Each carries an i18n tooltip (`buildCoinsToRepTooltip` / `buildRepToCoinsTooltip`) describing the exact rate and the once-per-turn limit. They are disabled when the input resource is insufficient or the gate is spent.
 - **HUD layout:** the HUD strip is **market-aligned** (spans `hudLeft`..`hudRight`, matching the market box edges), and the **actions-remaining counter** (`2 actions left (1 banked)`) lives in the action cluster directly above the End Turn / Cancel button rather than in the strip.

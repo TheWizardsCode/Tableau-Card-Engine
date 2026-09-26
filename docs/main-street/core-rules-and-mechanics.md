@@ -62,7 +62,7 @@ committing changes to player-facing text or docs.
 | **Synergy Types** | string[] | One or more tags that interact with adjacent cards (e.g., `Food`). |
 | **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this business. |
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
-| **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g., Clinic provides +0.2 rep/turn). Default 0. |
+| **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g., Clinic provides +20 rep/turn). Default 0. |
 | **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase** for business cards placed on the street grid. Cards held in hand are not charged (CG-0MTC31LN3000UHDY); sold cards are not charged either (CG-0MU3VH7QW006A2XA). Defaults to 0 for cards without a CSV value. Mirrors the StaffCard/CommunitySpaceCard `ongoingCost` mechanic. |
 | **Description** | string | Flavor text and any special rules. |
 
@@ -109,7 +109,7 @@ committing changes to player-facing text or docs.
 | **Target Business** | string | Exact name of the business this upgrade applies to. |
 | **Cost** | number (coins) | Purchase price from the market. |
 | **Income Bonus** | number (coins) | Additional income added to the base income after upgrade. |
-| **Reputation Bonus** | number (optional) | Additional reputation contributed each turn (e.g., Medical Center provides +0.1 rep/turn). Default 0. |
+| **Reputation Bonus** | number (optional) | Additional reputation contributed each turn (e.g., Medical Center provides +10 rep/turn). Default 0. |
 | **Synergy Range Bonus** | number (optional) | Extends the adjacency range for synergy (e.g., from 1 slot to 2 slots). |
 | **Description** | string | Flavor text. |
 
@@ -134,8 +134,8 @@ Community space cards (e.g. Park, Library) are a separate card family (`communit
 | **Name** | string | Human‑readable title (e.g., *Library*). |
 | **Cost** | number (coins) | Purchase price from the market. |
 | **Base Income** | number (coins per turn) | Income generated each **IncomePhase** before synergy. Some community spaces earn no income at all (e.g. Library `baseIncome = 0`). |
-| **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase** (e.g. Library costs 0.25 coins/turn to run). Defaults to 0. Mirrors the StaffCard `ongoingCost` mechanic. |
-| **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g. Library provides +0.1 rep/turn). Default 0. |
+| **Ongoing Cost** | number (coins per turn) | Per‑turn running cost deducted each **IncomePhase** (e.g. Library costs 25 coins/turn to run). Defaults to 0. Mirrors the StaffCard `ongoingCost` mechanic. |
+| **Reputation Per Turn** | number (optional) | Reputation contributed each turn during IncomePhase (e.g. Library provides +10 rep/turn). Default 0. |
 | **Synergy Types** | string[] | One or more tags that interact with adjacent cards (e.g., `Culture`). |
 | **Upgrade Path** | string (optional) | Identifier of the Upgrade card that can transform this community space. |
 | **Max Level** | number (optional) | Number of upgrade steps (default 1). |
@@ -180,7 +180,7 @@ interface GameState {
 - **Market** – a single row of 3 face‑up cards drawn from the Business, Community Space, Upgrade, and Event (Investment‑trigger) decks, always with ≥1 Business/Community‑Space card. The row is refilled at week start; taking a card to hand costs **1 action** (CG-0MSTOF1N5005PK2R businesses, CG-0MTFWBNL30043ZBM events) but no coins, and the listed cost is paid when the card is played or placed.
 - **Incident Deck** – hidden face-down deck of Incident cards, order rebuilt constraint-aware at build/reshuffle (CG-0MSTOATDP000JNHH). The top card reveals and resolves each turn during IncidentPhase; when the deck runs out, resolved events are shuffled back in.
 - **ActiveEffect System** – some events (e.g. `evt-flu-outbreak`) create duration-based modifiers instead of one-shot deltas. ActiveEffects are tracked in `state.activeEffects: ActiveEffect[]` and decay each turn during EndCheck. See [ActiveEffect System](#-activeeffect-system) below.
-- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +0.2 rep/turn). Reputation also counts 1:1 toward the final score (`finalScore = coins + reputation + challengeBonuses`).
+- **ResourceBank** – tracks `coins` (start 8) and `reputation` (start 3). Reputation can increase during the IncomePhase via `reputationPerTurn` from certain Health-synergy cards (e.g. Clinic provides +20 rep/turn). Reputation also counts 1:1 toward the final score (`finalScore = coins + reputation + challengeBonuses`).
 
 ### Spatial API migration note
 
@@ -226,7 +226,7 @@ stateDiagram-v2
    - `resourceBank.coins += totalIncome`.
    - `totalReputationPerTurn` is calculated from all placed cards (some Health-synergy cards like the Clinic provide `reputationPerTurn`). Upgrades may also contribute `reputationBonus`. Synergy reputation from adjacent neighbors is only earned from **different-type** businesses; same-type neighbors contribute 0 reputation synergy.
    - `resourceBank.reputation += totalReputationPerTurn`.
-   - **Ongoing costs** (staff cards, community-space cards, and business cards **placed on the street grid** with `ongoingCost > 0` — e.g. the Library's 0.25 coins/turn; business cards held in hand are not charged, CG-0MTC31LN3000UHDY) are deducted from coins after income. Deductions are clamped at 0 coins (the player is never driven below zero) and logged.
+   - **Ongoing costs** (staff cards, community-space cards, and business cards **placed on the street grid** with `ongoingCost > 0` — e.g. the Library's 25 coins/turn; business cards held in hand are not charged, CG-0MTC31LN3000UHDY) are deducted from coins after income. Deductions are clamped at 0 coins (the player is never driven below zero) and logged.
 6. **IncidentPhase** – Reveal and resolve the top card of the face‑down incident deck. The player knows only how many incidents remain (card back + count); the revealed card's effect posts to the activity log. When the deck is exhausted, resolved events are reshuffled back in with the order rebuilt constraint‑aware (CG-0MSTOATDP000JNHH).
 7. **EndCheck** – Evaluate win/loss conditions.
 8. Loop back to **WeekStart** for the next turn.
@@ -362,7 +362,7 @@ All randomness is **deterministic** when the same seed is used, enabling automat
 
 Every resource-mutating action appends an entry to the activity log showing its **effective (post-mitigation) coin and reputation deltas** (CG-0MT5W7UJJ0065MEZ):
 
-- Enriched entries append a compact delta description built by `describeEventEffects` — e.g. `(+3.000 coins, +2 rep)`, `(-1.000 coins)`, `(+1 rep)`, or `(no effect)` — computed from the resources actually changed (after discounts, clamps, multipliers, and event resolution).
+- Enriched entries append a compact delta description built by `describeEventEffects` — e.g. `(+3 coins, +2 rep)`, `(-1 coins)`, `(+1 rep)`, or `(no effect)` — computed from the resources actually changed (after discounts, clamps, multipliers, and event resolution).
 - Entry colour classification (`gain` / `loss` / `neutral`) is derived by `classifyEffect` from the same effective net (coins + rep), so a mixed exchange colours consistently with its net effect.
 - Examples: purchases, upgrades, sells, staff hire/layoff, ongoing-cost deductions (including the clamped `Insufficient coins for ...` shortfall), market refreshes, Community Favour exchanges, events played from hand (cost *plus* resolved effects), investments, and incident resolutions.
 

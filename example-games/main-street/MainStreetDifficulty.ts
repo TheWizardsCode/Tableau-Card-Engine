@@ -144,7 +144,7 @@ export interface GameConfig extends DifficultyConfig {
   // ── Community Favour ────────────────────────────────────
   /**
    * Coins consumed to gain 1 reputation via Community Favour.
-   * Default 2 (2 coins → 1 rep).
+   * Default 200 (200 coins → 1 rep).
    */
   readonly favourCoinsToRepCost: number;
   /**
@@ -183,7 +183,7 @@ export const EASY_PRESET: Readonly<GameConfig> = {
   incidentMaxStreak: 2,
   reputationCoinDivisor: 8000,
   maxReputationCoinMultiplier: 1.5,
-  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  // Community Favour: 200 coins → 1 rep; 200 rep → 300 coins.
   favourCoinsToRepCost: 200,
   favourRepToCoinsRepCost: 200,
   favourRepToCoinsCoinGain: 300,
@@ -212,7 +212,7 @@ export const MEDIUM_PRESET: Readonly<GameConfig> = {
   incidentMaxStreak: 2,
   reputationCoinDivisor: 8000,
   maxReputationCoinMultiplier: 1.5,
-  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  // Community Favour: 200 coins → 1 rep; 200 rep → 300 coins.
   favourCoinsToRepCost: 200,
   favourRepToCoinsRepCost: 200,
   favourRepToCoinsCoinGain: 300,
@@ -241,7 +241,7 @@ export const HARD_PRESET: Readonly<GameConfig> = {
   incidentMaxStreak: 3,
   reputationCoinDivisor: 8000,
   maxReputationCoinMultiplier: 1.5,
-  // Community Favour: 2 coins → 1 rep; 2 rep → 3 coins.
+  // Community Favour: 200 coins → 1 rep; 200 rep → 300 coins.
   favourCoinsToRepCost: 200,
   favourRepToCoinsRepCost: 200,
   favourRepToCoinsCoinGain: 300,

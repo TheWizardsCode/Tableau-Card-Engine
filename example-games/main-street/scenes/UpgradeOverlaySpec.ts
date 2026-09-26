@@ -88,10 +88,10 @@ export interface OverlayBorderSpec {
 export interface UpgradeOverlaySpec {
   /** Level badge text (e.g. "Lvl 2"), null for base cards. */
   levelBadge: OverlayTextSpec | null;
-  /** Combined cash line (e.g. "+2 / -0.75"), null when income and cost are both 0.
+  /** Combined cash line (e.g. "+230 / -75"), null when income and cost are both 0.
    *  Replaces the former separate income/cost overlays (CG-0MTCP76MP0088TQW). */
   cashLine: OverlayTextSpec | null;
-  /** Per-turn reputation text (e.g. "+0.2/turn"), null when total reputation is 0. */
+  /** Per-turn reputation text (e.g. "+20/turn"), null when total reputation is 0. */
   reputationText: OverlayTextSpec | null;
   /** Border/glow for upgraded cards, null for base cards. */
   upgradeBorder: OverlayBorderSpec | null;

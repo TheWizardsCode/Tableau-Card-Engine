@@ -349,8 +349,8 @@ export function consumeAction(state: MainStreetState): void {
  *   - `rep-to-coins`: spends `favourRepToCoinsRepCost` reputation for
  *     `favourRepToCoinsCoinGain` coins.
  *
- * The round-trip is lossy (e.g. 2 coins → 1 rep → 1.5 coins on the default
- * 2→3 rate), preventing infinite arbitrage.
+ * The round-trip is lossy (e.g. 200 coins → 1 reputation, while 200 reputation
+ * → 300 coins on the default rates), preventing infinite arbitrage.
  *
  * @param state   Current game state (mutated in-place).
  * @param direction Exchange direction.

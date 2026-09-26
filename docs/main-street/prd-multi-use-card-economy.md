@@ -65,13 +65,13 @@ Staff cards are a new card family (`family: 'staff'`) that expand the player's h
 
 | Card | Cost | Ongoing Cost | Slots Added | Ability | Description |
 |------|------|-------------|-------------|---------|-------------|
-| Apprentice | 2 | 0.5 | +1 | — | Budget entry point *(Group F).* |
-| Assistant | 3 | 1 | +1 | — | Low-cost, low upkeep |
-| Manager | 7 | 2.5 | +2 | — | Mid-range balanced option |
-| Socialite | 8 | 1.5 | +1 | +0.1 rep/turn | **NEW** reputation ability *(Group F).* |
-| Accountant | 8 | 1.5 | +1 | refresh −1 | **NEW** economy ability *(Group F).* |
-| Director | 14 | 4 | +3 | — | High investment, high capacity |
-| Executive | 20 | 5 | +4 | — | Premium slot capacity *(Group F).* |
+| Apprentice | 200 | 50 | +1 | — | Budget entry point *(Group F).* |
+| Assistant | 300 | 100 | +1 | — | Low-cost, low upkeep |
+| Manager | 700 | 250 | +2 | — | Mid-range balanced option |
+| Socialite | 800 | 150 | +1 | +10 rep/turn | **NEW** reputation ability *(Group F).* |
+| Accountant | 800 | 150 | +1 | refresh −1 | **NEW** economy ability *(Group F).* |
+| Director | 1400 | 400 | +3 | — | High investment, high capacity |
+| Executive | 2000 | 500 | +4 | — | Premium slot capacity *(Group F).* |
 
 #### Rules
 
@@ -84,7 +84,7 @@ Staff cards are a new card family (`family: 'staff'`) that expand the player's h
 - Laid-off staff cards return to `discards.staff` (available again via the standard market refill/cycle pipeline — CG-0MT2WTN0L004JA53)
 - Insufficient coins for ongoing cost: deducts what's available (down to 0)
 - **Staff abilities** (optional fields on `StaffCard`, Group F): `reputationPerTurn`
-  (e.g. Socialite +0.1 rep/turn, applied in the income phase) and
+  (e.g. Socialite +10 rep/turn, applied in the income phase) and
   `refreshCostDiscount` (e.g. Accountant −1 to the market refresh cost,
   clamped at 0). Staff without abilities behave exactly as before.
 

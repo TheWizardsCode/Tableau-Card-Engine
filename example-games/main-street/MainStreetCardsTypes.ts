@@ -343,7 +343,7 @@ export interface StaffCard {
   readonly allowedBusinessTypes?: readonly string[];
   /**
    * Optional reputation granted per turn during the income phase
-   * (e.g. the Socialite's +0.1 rep/turn ability — Group F,
+   * (e.g. the Socialite's +10 rep/turn ability — Group F,
    * CG-0MSQJ7VL9009JHF4).
    */
   readonly reputationPerTurn?: number;
@@ -384,7 +384,7 @@ export interface CommunitySpaceCard {
   readonly baseIncome: number;
   /**
    * Ongoing per-turn coin cost paid each IncomePhase (e.g. the Library costs
-   * 0.25 coins/turn to run). Defaults to 0 for community spaces without a
+   * 25 coins/turn to run). Defaults to 0 for community spaces without a
    * running cost. Mirrors the StaffCard `ongoingCost` mechanic.
    */
   readonly ongoingCost: number;

@@ -55,9 +55,9 @@ When a card's cost changes, its reward fields (baseIncome, coinDelta, synergy bo
 
 | Card | Handling |
 |------|----------|
-| **Pawn Shop** | No synergy bonuses; cost reduced by 2 from curve estimate |
-| **Clinic** | reputationPerTurn = +0.2 factored into cost calculation (weight × 30) |
-| **Library (`cs-library`)** | Community-space curve formula **excludes `ongoingCost`**. The Library's 0.25 coins/turn running cost is not part of the cost formula; its cost was hand-set to the tier-1 formula result (4 base + 0.1 rep × 30 = 7, Standard band) per planning Q6. The Library participates in Culture synergy with default rates (empty `synergyCoinBonus` → 0.5 coin rate, `synergyRepBonus` → 0, Park model) — it contributes to adjacent Culture businesses' synergy and can receive rep synergy from rep-bonus neighbours (reversed from synergy-neutral by CG-0MSKS963N000ZSTU). Community spaces with a running cost may need manual review. |
+| **Pawn Shop** | No synergy bonuses; cost reduced by 200 from curve estimate |
+| **Clinic** | reputationPerTurn = +20 factored into cost calculation (weight × 30) |
+| **Library (`cs-library`)** | Community-space curve formula **excludes `ongoingCost`**. The Library's 25 coins/turn running cost is not part of the cost formula; its cost was hand-set to the tier-1 formula result (400 base + 10 rep × 30 = 700, Standard band) per planning Q6. The Library participates in Culture synergy with default rates (empty `synergyCoinBonus` → 0.5 coin rate, `synergyRepBonus` → 0, Park model) — it contributes to adjacent Culture businesses' synergy and can receive rep synergy from rep-bonus neighbours (reversed from synergy-neutral by CG-0MSKS963N000ZSTU). Community spaces with a running cost may need manual review. |
 
 ## Per-Family Strategy
 
@@ -163,13 +163,13 @@ income per turn (`totalCoinsEarned/totalTurns`) and is not the `avgCoinsPerTurn`
 |---|---:|---:|
 | Win rate | 64.5% | 65.0% |
 | Median final score | 154.4 | 157.0 |
-| Avg coins/turn (liquidity) | 2.557 | 2.745 |
-| Approx. income/turn (positive deltas) | 4.38 | 4.63 |
+| Avg coins/turn (liquidity) | 255.7 | 274.5 |
+| Approx. income/turn (positive deltas) | 438 | 463 |
 
 ### Economy re-tune (CG-0MSP26Q5N002EH8P, 2026-08-13)
 
 After the concurrent card-data rebalance (CG-0MSQJ7VL9009JHF4) landed on dev, the Medium/Greedy
-`avgCoinsPerTurn` measured **4.118** — well above the 0–2 net-liquidity band. Per the lever
+`avgCoinsPerTurn` measured **411.8** — well above the 0–200 net-liquidity band. Per the lever
 order (difficulty presets first, card data only for outliers), the `MainStreetDifficulty.ts`
 presets were re-tuned:
 

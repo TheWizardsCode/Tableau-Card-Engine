@@ -574,7 +574,7 @@ export function applyIncome(
     });
     repPerTurn += baseRep + buffs.reputation.flat;
   }
-  // Staff reputation abilities (e.g. the Socialite's +0.1 rep/turn —
+  // Staff reputation abilities (e.g. the Socialite's +10 rep/turn —
   // Group F, CG-0MSQJ7VL9009JHF4) also accrue during the income phase.
   for (const staff of state.staffCards ?? []) {
     repPerTurn += staff.reputationPerTurn ?? 0;

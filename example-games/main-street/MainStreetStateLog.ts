@@ -16,8 +16,8 @@ import type { MainStreetState, LogEntryType } from './MainStreetStateTypes';
  * coin/reputation change pair for activity-log entries (CG-0MT5W7UJJ0065MEZ).
  *
  * Examples:
- *   - `+3.000 coins, +2 rep` for a gain of 3 coins and 2 reputation
- *   - `-1.000 coins` for a pure coin loss
+ *   - `+3 coins, +2 rep` for a gain of 3 coins and 2 reputation
+ *   - `-1 coins` for a pure coin loss
  *   - `+1 rep` for a pure reputation gain
  *   - `no effect` when both deltas are zero
  *
