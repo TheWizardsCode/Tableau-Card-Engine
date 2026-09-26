@@ -58,6 +58,19 @@ const PRESET_GAMES: Record<string, readonly string[]> = {
  */
 const PER_GAME_PRESETS = ALL_GAME_IDS;
 
+/**
+ * True when at least one game checkout is reachable — in-tree
+ * (`example-games/<id>`, the monorepo launcher) or as a sibling
+ * (`../tce-<id>`, the published core checkout). The launcher-only tests below
+ * resolve scene modules and therefore only run when a game checkout exists;
+ * a bare core clone (engine + Gym + shell, no games) skips them.
+ */
+const HAS_ANY_GAME_CHECKOUT = ALL_GAME_IDS.some(
+  (id) =>
+    fs.existsSync(path.join(REPO_ROOT, 'example-games', id)) ||
+    fs.existsSync(path.join(REPO_ROOT, '..', `tce-${id}`)),
+);
+
 /** The scene class each game registers with the Game Selector. */
 const SCENE_KEY: Record<string, string> = {
   'beleaguered-castle': 'BeleagueredCastleScene',
@@ -126,14 +139,21 @@ describe('launcher distribution presets', () => {
 
 // ── Resolution in the launcher checkout ───────────────────────────────────
 
-describe('preset resolution in the launcher checkout', () => {
+describe.skipIf(!HAS_ANY_GAME_CHECKOUT)('preset resolution in the launcher checkout', () => {
   for (const name of Object.keys(PRESET_GAMES)) {
     it(`resolves configs/${name}.json to existing scene modules`, () => {
       const games = discoverGames(loadPreset(name), REPO_ROOT);
       for (const g of games) {
         expect(fs.existsSync(g.absoluteScenePath), `${g.id} scene missing`).toBe(true);
         // The launcher checkout keeps every game locally under example-games/.
-        expect(g.absoluteScenePath).toContain(`example-games/${g.id}`);
+        // Scene modules resolve in one of the two supported layouts: the
+        // monorepo launcher keeps games in-tree under `example-games/`, while
+        // the published core checkout composes sibling `tce-<game>` repos.
+        expect(
+          g.absoluteScenePath.includes(`example-games/${g.id}`) ||
+            g.absoluteScenePath.includes(`tce-${g.id}/src/`),
+          `${g.id} resolved to ${g.absoluteScenePath}`,
+        ).toBe(true);
         expect(g.sceneClass).toBe(SCENE_KEY[g.id]);
       }
     });
@@ -142,7 +162,7 @@ describe('preset resolution in the launcher checkout', () => {
 
 // ── Generated selector catalogue ──────────────────────────────────────────
 
-describe('generated selector catalogue', () => {
+describe.skipIf(!HAS_ANY_GAME_CHECKOUT)('generated selector catalogue', () => {
   for (const [name, expected] of Object.entries(PRESET_GAMES)) {
     it(`configs/${name}.json registers exactly the included games plus Gym`, () => {
       const src = registryFor(name);
@@ -183,7 +203,7 @@ describe('generated selector catalogue', () => {
  * distribution presets above, so a developer can build/run a single game in
  * isolation (`GAMES_CONFIG=<game-id>`).
  */
-describe('per-game presets', () => {
+describe.skipIf(!HAS_ANY_GAME_CHECKOUT)('per-game presets', () => {
   it('ships one configs/<game-id>.json for every example game (AC3)', () => {
     for (const id of PER_GAME_PRESETS) {
       expect(
