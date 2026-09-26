@@ -304,6 +304,69 @@ describe('Beleaguered Castle drag-to-move (browser)', () => {
     );
   });
 
+  it('shows a Canvas-visible selection highlight on the selected top card', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForDeal(scene);
+
+    const colIndex = 0;
+    const src = topSprite(scene, colIndex);
+
+    dispatchMouse('mousedown', src.x, src.y);
+    await wait(120);
+    dispatchMouse('mouseup', src.x, src.y);
+    await waitForCondition(
+      () => (scene as any).selectedCol === colIndex,
+      'column selection after click',
+    );
+
+    // The renderer tracks a persistent CardHighlight whose overlay rectangle
+    // is what makes the selection visible under the Canvas renderer (raw
+    // setTint is a no-op there — CG-0MUHL6T0I002AW5Y).
+    const highlights = (scene.bcRenderer as any).selectionHighlights as Map<number, any>;
+    expect(highlights.has(colIndex)).toBe(true);
+    const overlay = highlights.get(colIndex).overlay;
+    expect(overlay.active).toBe(true);
+    expect(overlay.fillColor).toBe(0xaaffaa);
+    // Positioned over the top card and above it in depth order.
+    expect(Math.abs(overlay.x - src.x)).toBeLessThan(2);
+    expect(Math.abs(overlay.y - src.y)).toBeLessThan(2);
+    expect(overlay.depth).toBeGreaterThan(src.depth);
+  });
+
+  it('removes the selection highlight overlay when the selected card is clicked again', async () => {
+    game = await bootGame();
+    const scene = getScene(game);
+    await waitForDeal(scene);
+
+    const colIndex = 0;
+    const src = topSprite(scene, colIndex);
+
+    // First click selects.
+    dispatchMouse('mousedown', src.x, src.y);
+    await wait(120);
+    dispatchMouse('mouseup', src.x, src.y);
+    await waitForCondition(
+      () => (scene as any).selectedCol === colIndex,
+      'column selection after first click',
+    );
+
+    const highlights = (scene.bcRenderer as any).selectionHighlights as Map<number, any>;
+    const overlay = highlights.get(colIndex).overlay;
+
+    // Second click on the same card deselects and removes the highlight.
+    dispatchMouse('mousedown', src.x, src.y);
+    await wait(120);
+    dispatchMouse('mouseup', src.x, src.y);
+    await waitForCondition(
+      () => (scene as any).selectedCol === null,
+      'column deselection after second click',
+    );
+
+    expect(overlay.active).toBe(false);
+    expect(highlights.has(colIndex)).toBe(false);
+  });
+
   it('snap-backs the card when released outside any drop zone (out-of-zone drop)', async () => {
     game = await bootGame();
     const scene = getScene(game);

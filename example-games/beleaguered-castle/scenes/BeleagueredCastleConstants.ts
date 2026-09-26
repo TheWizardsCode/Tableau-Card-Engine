@@ -47,6 +47,8 @@ export const AUTO_COMPLETE_DELAY = 100;
 export const HIGHLIGHT_VALID = 0x44ff44;
 export const HIGHLIGHT_ALPHA = 0.3;
 export const SELECTION_TINT = 0xaaffaa;
+/** Alpha for the persistent Canvas-compatible selection highlight overlay. */
+export const SELECTION_ALPHA = 0.35;
 
 // ── Overlay display ───────────────────────────────────────
 export const OVERLAY_DEPTH = 2000;

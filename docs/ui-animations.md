@@ -316,6 +316,63 @@ draggable on every board render (`makeDraggable`).
 `unregisterDropZone`, `clearDropZones`, `getDropZoneData`, `setEnabled`,
 `setReducedMotion`, `destroy` — see `src/ui/dragDrop.ts` for signatures.
 
+## createCardHighlight (Canvas-compatible card highlight)
+
+Attach a persistent, renderer-agnostic highlight to a card sprite — used for
+selection markers. `setTint()` is a no-op under Phaser 4's Canvas renderer, so
+this helper applies **both** the WebGL tint and a semi-transparent overlay
+rectangle (visible under both renderers), the same approach `HandView` uses for
+its selection state.
+
+### Import
+
+```ts
+import { createCardHighlight, type CardHighlight } from '@ui';
+```
+
+### Usage (Beleaguered Castle selection)
+
+```ts
+// Select: create the highlight and keep the returned handle.
+const highlight = createCardHighlight({
+  scene: this.scene,
+  target: topCardSprite,
+  color: SELECTION_TINT,
+  alpha: 0.35,
+});
+
+// Card moved/tweened while highlighted: re-align the overlay.
+highlight.sync();
+
+// Deselect: remove the overlay and clear the WebGL tint.
+highlight.destroy();
+```
+
+### Options (`CardHighlightOptions`)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scene` | `Phaser.Scene` | required | Scene that owns the overlay rectangle |
+| `target` | `Image \| Sprite` | required | Card sprite to highlight |
+| `color` | `number` | required | Overlay fill colour and WebGL tint |
+| `alpha` | `number` | 0.35 | Overlay alpha |
+| `depthOffset` | `number` | 0.01 | Overlay depth above the target's current depth |
+
+### API
+
+`createCardHighlight(options)` returns a `CardHighlight` with:
+
+- `overlay` — the `Phaser.GameObjects.Rectangle` that provides the
+  Canvas-visible highlight;
+- `sync()` — re-align the overlay to the target's position/rotation/depth
+  (e.g. after a tween), a no-op once destroyed;
+- `destroy()` — remove the overlay and clear the WebGL tint (idempotent).
+
+> **Persistent, not transient:** unlike `shakeIllegalMove`'s flash overlay, a
+> highlight stays attached until `destroy()`. Callers that rebuild the card
+> sprites (e.g. `HandView.setCards`) must destroy any live highlights first so
+> no orphaned rectangles linger.
+
 ## popTextOrIcon
 
 Animate a pop-up text or icon (rises, fades, and scales up briefly).

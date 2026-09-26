@@ -7,15 +7,15 @@
 import Phaser from 'phaser';
 import type { BeleagueredCastleState, BCMove } from '../BeleagueredCastleState';
 import { FOUNDATION_COUNT, TABLEAU_COUNT } from '../BeleagueredCastleState';
-import { HandView, PileView } from '@ui';
+import { HandView, PileView, createCardHighlight } from '@ui';
 import { GAME_W, GAME_H } from '@ui';
-import type { DragDropManager, DragDropPayload } from '@ui';
+import type { CardHighlight, DragDropManager, DragDropPayload } from '@ui';
 import { createSceneTitle } from '@ui/Renderer';
 import { createBcHudText } from '@ui/Renderer/adapters/BeleagueredCastleAdapter';
 import {
   BC_CARD_W, BC_CARD_H, CARD_GAP, CASCADE_OFFSET_Y,
   DRAG_DEPTH, DEAL_STAGGER, ANIM_DURATION,
-  HIGHLIGHT_VALID, HIGHLIGHT_ALPHA, SELECTION_TINT,
+  HIGHLIGHT_VALID, HIGHLIGHT_ALPHA, SELECTION_TINT, SELECTION_ALPHA,
   HINT_SOURCE_COLOR, HINT_DEST_COLOR, HINT_ALPHA, HINT_DEPTH,
   HUD_MARGIN,
   HUD_FONT_SIZE,
@@ -75,6 +75,13 @@ export class BeleagueredCastleRenderer {
   private tableauHandViews: HandView[] = [];
   private tableauDropZones: Phaser.GameObjects.Zone[] = [];
   private highlightRects: Phaser.GameObjects.Rectangle[] = [];
+
+  /**
+   * Persistent Canvas-compatible selection highlights, keyed by column.
+   * Created by {@link selectColumn} and destroyed by {@link deselectColumn}
+   * (or when the tableau sprites are rebuilt in {@link syncTableauHandViews}).
+   */
+  private selectionHighlights = new Map<number, CardHighlight>();
 
   // HUD
   private moveCountText!: Phaser.GameObjects.Text;
@@ -237,6 +244,10 @@ export class BeleagueredCastleRenderer {
    * then call setCards to rebuild the sprites at correct positions.
    */
   private syncTableauHandViews(): void {
+    // Rebuilding the sprites (via setCards) destroys the old card objects;
+    // drop any persistent selection overlays that pointed at them so they
+    // cannot linger as orphaned rectangles (CG-0MUHL6T0I002AW5Y).
+    this.clearSelectionHighlights();
     for (let col = 0; col < TABLEAU_COUNT; col++) {
       const cards = this.state.tableau[col].toArray();
       const spacing = this.computeCascadeSpacing(cards.length);
@@ -463,18 +474,40 @@ export class BeleagueredCastleRenderer {
     const hv = this.tableauHandViews[colIndex];
     if (!hv) return;
     const sprites = hv.getSprites();
-    if (sprites.length > 0) {
-      (sprites[sprites.length - 1] as any).setTint(SELECTION_TINT);
-    }
+    if (sprites.length === 0) return;
+    const top = sprites[sprites.length - 1] as Phaser.GameObjects.Image;
+
+    // Defensive: replace any existing highlight for this column.
+    this.selectionHighlights.get(colIndex)?.destroy();
+
+    this.selectionHighlights.set(
+      colIndex,
+      createCardHighlight({
+        scene: this.scene,
+        target: top,
+        color: SELECTION_TINT,
+        alpha: SELECTION_ALPHA,
+      }),
+    );
   }
 
   deselectColumn(colIndex: number): void {
-    const hv = this.tableauHandViews[colIndex];
-    if (!hv) return;
-    const sprites = hv.getSprites();
-    if (sprites.length > 0) {
-      (sprites[sprites.length - 1] as any).clearTint();
+    const highlight = this.selectionHighlights.get(colIndex);
+    if (!highlight) return;
+    highlight.destroy();
+    this.selectionHighlights.delete(colIndex);
+  }
+
+  /**
+   * Remove every persistent selection highlight. Called when the tableau
+   * sprites are rebuilt, and available to callers that want to clear the
+   * selection visually (e.g. before a hint).
+   */
+  clearSelectionHighlights(): void {
+    for (const highlight of this.selectionHighlights.values()) {
+      highlight.destroy();
     }
+    this.selectionHighlights.clear();
   }
 
   // ── Refresh ─────────────────────────────────────────────

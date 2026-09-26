@@ -33,6 +33,10 @@ export type { FlipCardOptions } from './flipCard';
 export { shakeIllegalMove } from './shakeIllegalMove';
 export type { ShakeIllegalMoveOptions } from './shakeIllegalMove';
 
+// Canvas-compatible persistent card highlight (selection/target marker)
+export { createCardHighlight } from './cardHighlight';
+export type { CardHighlight, CardHighlightOptions } from './cardHighlight';
+
 // Reusable drag-and-drop lifecycle module
 // (extracted from Beleaguered Castle; consumed by Main Street drag-to-buy)
 export {
