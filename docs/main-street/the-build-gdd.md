@@ -79,7 +79,7 @@
 |-------|------|-------------|
 | **Name** | string | Title of the event (e.g., *Local Festival*). |
 | **Trigger** | enum {`Investment`, `Incident`} | When the event resolves. **Investment** events are player-bought (generally positive) and held until played. **Incident** events happen automatically (generally negative). |
-| **Effect** | string (DSL) | Human‑readable description of the effect (e.g., `+2 coins to all Food businesses`). |
+| **Effect** | string (DSL) | Human‑readable description of the effect (e.g., `+200 coins to all Food businesses`). |
 | **Target** | enum {`All`, `SpecificSynergy`, `RandomBusiness`} | Scope of the effect. |
 
 **Example Event Card**
@@ -87,7 +87,7 @@
 {
   "name": "Local Festival",
   "trigger": "Investment",
-  "effect": "+2 coins to all Culture businesses and +1 reputation.",
+  "effect": "+200 coins to all Culture businesses and +100 reputation.",
   "target": "SpecificSynergy"
 }
 ```
@@ -281,11 +281,11 @@ Event cards are split into two trigger types:
 
 | Name | Trigger | Effect |
 |------|---------|--------|
-| Local Festival | Investment | +2 coins per Culture business and +1 reputation. |
+| Local Festival | Investment | +200 coins per Culture business and +100 reputation. |
 | Tax Audit | Incident | Lose 45% of banked coins (25% with the Accountant). |
-| Rainy Day | Incident | -1 coin per Food business this turn. |
-| Community Award | Incident | +2 reputation from community recognition. |
-| Health Inspection | Incident | -2 coins per Food business and -1 reputation. |
+| Rainy Day | Incident | -100 coin per Food business this turn. |
+| Community Award | Incident | +200 reputation from community recognition. |
+| Health Inspection | Incident | -200 coins per Food business and -100 reputation. |
 
 **Deck composition:** 5 event templates × 3 copies = 15 cards total (3 Investment, 12 Incident). At game start, the Investments market row draws 1 Investment event and the incident queue draws 2 Incidents from the shuffled event deck.
 
@@ -294,7 +294,7 @@ Event cards are split into two trigger types:
 |------|----------------|--------------|--------------|----------------------|-------------|
 | Upgrade to Patisserie | Bakery | 4 | +1 | +1 (adjacency range) | Turns a Bakery into a Patisserie, increasing income and allowing synergy with businesses two slots away. |
 | Upgrade to Bistro | Diner | 4 | +1 | +1 | Turns a Diner into a Bistro with higher foot‑traffic. |
-| Upgrade to Reader's Café | Bookshop | 3 | +1 | 0 | Transforms the Bookshop into a Reader's Café, blending books with café culture for +10 reputation per turn. |
+| Upgrade to Reader's Café | Bookshop | 300 | +100 | 0 | Transforms the Bookshop into a Reader's Café, blending books with café culture for +10 reputation per turn. |
 | ... *(more upgrades as new businesses are introduced)* |
 
 ---

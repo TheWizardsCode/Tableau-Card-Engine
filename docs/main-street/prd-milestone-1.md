@@ -562,11 +562,11 @@ The walking skeleton emits the following events through the `GameEventEmitter` f
 
 | ID | Name | Trigger | Effect | Target | Coin Delta | Rep Delta |
 |----|------|---------|--------|--------|-----------|-----------|
-| `evt-festival` | Local Festival | Investment | +2 coins per Culture business and +1 reputation | SpecificSynergy (Culture) | +2 per Culture biz | +1 |
-| `evt-rainy` | Rainy Day | Incident | -1 coin per Food business | SpecificSynergy (Food) | -1 per Food biz | 0 |
-| `evt-tax` | Tax Audit | Incident | Lose 3 coins | All | -3 | 0 |
-| `evt-award` | Community Award | Incident | +2 reputation from community recognition | All | 0 | +2 |
-| `evt-inspection` | Health Inspection | Incident | -2 coins per Food business and -1 reputation | SpecificSynergy (Food) | -2 per Food biz | -1 |
+| `evt-festival` | Local Festival | Investment | +200 coins per Culture business and +100 reputation | SpecificSynergy (Culture) | +200 per Culture biz | +100 |
+| `evt-rainy` | Rainy Day | Incident | -100 coin per Food business | SpecificSynergy (Food) | -100 per Food biz | 0 |
+| `evt-tax` | Tax Audit | Incident | Lose 300 coins | All | -300 | 0 |
+| `evt-award` | Community Award | Incident | +200 reputation from community recognition | All | 0 | +200 |
+| `evt-inspection` | Health Inspection | Incident | -200 coins per Food business and -100 reputation | SpecificSynergy (Food) | -200 per Food biz | -100 |
 
 ### Upgrade Cards
 

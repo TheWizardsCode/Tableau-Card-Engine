@@ -80,7 +80,7 @@ committing changes to player-facing text or docs.
 }
 ```
 
-> **Display note:** Business/community-space synergy descriptions use the `{SYNERGY_RATE}` token, resolved at render time to the **effective percentage** — the card's `synergyCoinBonus` (default 0.5) × the difficulty preset multiplier `synergyBonusPerNeighbor` (Easy 0.5 / Medium 0.35 / Hard 0.25, re-tuned by CG-0MSP26Q5N002EH8P). For example, a default-rate Bakery shows 25% on Easy, 17.5% on Medium, and 12.5% on Hard. Event-card effects ("+1 coin per X business") are genuine `coinDelta` effects and always remain absolute; reputation synergy (`synergyRepBonus`) also remains absolute by design.
+> **Display note:** Business/community-space synergy descriptions use the `{SYNERGY_RATE}` token, resolved at render time to the **effective percentage** — the card's `synergyCoinBonus` (default 0.5) × the difficulty preset multiplier `synergyBonusPerNeighbor` (Easy 0.5 / Medium 0.35 / Hard 0.25, re-tuned by CG-0MSP26Q5N002EH8P). For example, a default-rate Bakery shows 25% on Easy, 17.5% on Medium, and 12.5% on Hard. Event-card effects ("+100 coins per X business") are genuine `coinDelta` effects and always remain absolute; reputation synergy (`synergyRepBonus`) also remains absolute by design.
 
 ### 3.2 Event Card
 
@@ -88,7 +88,7 @@ committing changes to player-facing text or docs.
 |-------|------|-------------|
 | **Name** | string | Title of the event (e.g., *Local Festival*). |
 | **Trigger** | enum {`Investment`, `Incident`} | When the event resolves. **Investment** events are player‑bought (generally positive) and held until played. **Incident** events happen automatically (generally negative). |
-| **Effect** | string (DSL) | Human‑readable description of the effect (e.g., `+2 coins to all Food businesses`). |
+| **Effect** | string (DSL) | Human‑readable description of the effect (e.g., `+200 coins to all Food businesses`). |
 | **Target** | enum {`All`, `SpecificSynergy`, `RandomBusiness`} | Scope of the effect. |
 
 **Example Event Card**
@@ -96,7 +96,7 @@ committing changes to player-facing text or docs.
 {
   "name": "Local Festival",
   "trigger": "Investment",
-  "effect": "+2 coins to all Culture businesses and +1 reputation.",
+  "effect": "+200 coins to all Culture businesses and +100 reputation.",
   "target": "SpecificSynergy"
 }
 ```
@@ -362,7 +362,7 @@ All randomness is **deterministic** when the same seed is used, enabling automat
 
 Every resource-mutating action appends an entry to the activity log showing its **effective (post-mitigation) coin and reputation deltas** (CG-0MT5W7UJJ0065MEZ):
 
-- Enriched entries append a compact delta description built by `describeEventEffects` — e.g. `(+3 coins, +2 rep)`, `(-1 coins)`, `(+1 rep)`, or `(no effect)` — computed from the resources actually changed (after discounts, clamps, multipliers, and event resolution).
+- Enriched entries append a compact delta description built by `describeEventEffects` — e.g. `(+200 coins, +100 rep)`, `(-100 coins)`, `(+100 rep)`, or `(no effect)` — computed from the resources actually changed (after discounts, clamps, multipliers, and event resolution).
 - Entry colour classification (`gain` / `loss` / `neutral`) is derived by `classifyEffect` from the same effective net (coins + rep), so a mixed exchange colours consistently with its net effect.
 - Examples: purchases, upgrades, sells, staff hire/layoff, ongoing-cost deductions (including the clamped `Insufficient coins for ...` shortfall), market refreshes, Community Favour exchanges, events played from hand (cost *plus* resolved effects), investments, and incident resolutions.
 

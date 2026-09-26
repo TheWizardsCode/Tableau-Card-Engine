@@ -30,7 +30,7 @@
  *   upcoming action steps' required cards into the visible line (from
  *   decks/discards), mirroring the legacy two-row scenario-placing behaviour.
  *
- * ## Coin Budget (Easy / 12 coins) — cost-at-play, two-turn plan-ahead (CG-0MT53NXGZ004H5AE)
+ * ## Coin Budget (Easy / 1200 coins) — cost-at-play, two-turn plan-ahead (CG-0MT53NXGZ004H5AE)
  *
  * Every purchase is a two-turn flow: move to hand on day N (action), End
  * Turn, place from hand on day N+1 at LISTED cost (action). No same-turn
@@ -38,31 +38,31 @@
  *
  * | Step | Action                          | Coins In | Coins Out | Balance |
  * |------|---------------------------------|----------|-----------|---------|
- * | T1   | Start (Easy, 12 coins)          | 12       | 0         | 12      |
- * | T3   | Move Laundromat to hand (1 action) | 0     | 0         | 12      |
- * | T6   | End Turn (held-card cost -1)    | 0        | 1         | 11      |
- * | T7   | Place Laundromat (listed $4)    | 0        | 4         | 7       |
- * | T8   | End Turn (day 2 → 3)            | 0        | 0         | 7       |
- * | T10  | Buy Local Festival (event, $3)  | 0        | 0         | 7       |
- * | T11  | End Turn + income (~2.15)       | 2.154    | 0         | 9.154   |
- * | T12  | Move Bookshop to hand           | 0        | 0         | 9.154   |
- * | T14  | End Turn (day 4 → 5)            | 1.2      | 0         | 10.354  |
- * | T15  | Community Favour (2 rep → 3c)   | 3        | 0         | 13.354  |
- * | T16  | End Turn + income (~1.33)       | 1.333    | 0         | 14.687  |
- * | T17  | Place Bookshop (listed $3)      | 0        | 3         | 11.687  |
- * | T18  | End Turn + income (~3.91)       | 3.911    | 0         | 15.598  |
- * | T19  | Move Library to hand            | 0        | 0         | 15.598  |
- * | T20  | End Turn + income (~3.92)       | 3.918    | 0         | 19.516  |
- * | T21  | Place Library (listed $7)       | 0        | 7         | 12.516  |
- * | T22  | End Turn + income (~1)          | 1.0      | 0         | 13.516  |
- * | T23  | Play Local Festival (~+1 net)   | 1.0      | 0         | 14.516  |
- * | T24+ | Confirm steps (no cost)         | 0        | 0         | ≥ 14.5  |
+ * | T1 | Start (Easy, 1200 coins) | 1200 | 0 | 1200 |
+ * | T3 | Move Laundromat to hand (1 action) | 0 | 0 | 1200 |
+ * | T6 | End Turn (held-card cost -1) | 0 | 100 | 1100 |
+ * | T7 | Place Laundromat (listed $400) | 0 | 400 | 700 |
+ * | T8 | End Turn (day 2 → 3) | 0 | 0 | 700 |
+ * | T10 | Buy Local Festival (event, $300) | 0 | 0 | 700 |
+ * | T11 | End Turn + income (~215) | 215 | 0 | 915 |
+ * | T12 | Move Bookshop to hand | 0 | 0 | 915 |
+ * | T14 | End Turn (day 4 → 5) | 120 | 0 | 1035 |
+ * | T15 | Community Favour (200 rep → 300c) | 300 | 0 | 1335 |
+ * | T16 | End Turn + income (~133) | 133 | 0 | 1469 |
+ * | T17 | Place Bookshop (listed $300) | 0 | 300 | 1169 |
+ * | T18 | End Turn + income (~391) | 391 | 0 | 1560 |
+ * | T19 | Move Library to hand | 0 | 0 | 1560 |
+ * | T20 | End Turn + income (~392) | 392 | 0 | 1952 |
+ * | T21 | Place Library (listed $700) | 0 | 700 | 1252 |
+ * | T22 | End Turn + income (~100) | 100 | 0 | 1352 |
+ * | T23 | Play Local Festival (~+100 net) | 100 | 0 | 1452 |
+ * | T24+ | Confirm steps (no cost) | 0 | 0 | ≥ 1452 |
  *
  * All placements are at listed cost because each follows an End Turn
  * (plan-ahead). The rep→coins Community Favour exchange teaches the
  * mechanic but is not strictly required: even without it the balance before
- * the Library (18.316 - 3 favour) ≥ $7. Reputation stays safely above the
- * collapse threshold throughout (start 5, +2 rep per Community Award).
+ * the Library (1952 - 300 favour) ≥ $700. Reputation stays safely above the
+ * collapse threshold throughout (start 500, +200 rep per Community Award).
  *
  * @module
  */
@@ -138,9 +138,9 @@ export interface TutorialScenario {
  *
  * All card IDs reference Tier-1 pool cards. The market is one single row
  * (CG-0MSTOATDT009BRX2) of exactly 3 cards on day 1:
- *   - `biz-bakery` (Bakery, $3, Food) — filler slot
- *   - `biz-laundromat` (Laundromat, $4, Service) — T3 purchase target
- *   - `evt-festival` (Local Festival, $3) — T9 purchase target
+ *   - `biz-bakery` (Bakery, $300, Food) — filler slot
+ *   - `biz-laundromat` (Laundromat, $400, Service) — T3 purchase target
+ *   - `evt-festival` (Local Festival, $300) — T9 purchase target
  *
  * Later tutorial days force the remaining targets (Bookshop for T12,
  * Library for T19) into the line via `ensureTutorialMarketForUpcomingSteps`
@@ -154,14 +154,14 @@ export interface TutorialScenario {
  * The 26-step flow runs 9 days with 8 End Turns (T6, T8, T11, T14, T16, T18, T20, T22),
  * so the deterministic deck holds exactly 8 incidents. All are budget-safe
  * on the tutorial street (no Food businesses are placed):
- *   - `evt-award` (Community Award, +2 reputation) ×3
- *   - `evt-rainy` (Rainy Day, -1 coin per Food business → 0 here) ×2
+ *   - `evt-award` (Community Award, +200 reputation) ×3
+ *   - `evt-rainy` (Rainy Day, -100 coin per Food business → 0 here) ×2
  *
- * **Coin Budget:** 12 starting coins; payments happen at play time
+ * **Coin Budget:** 1200 starting coins; payments happen at play time
  * (cost-at-play, listed cost — every placement follows an End Turn, so no
- * same-turn premium is requested): Laundromat placement $4 (T7) + Bookshop
- * placement $3 (T17) + Library placement $7 (T21) + Local Festival play $3
- * (T23, net +1 with the two Culture cards) — all covered by 12 + income
+ * same-turn premium is requested): Laundromat placement $400 (T7) + Bookshop
+ * placement $300 (T17) + Library placement $700 (T21) + Local Festival play $300
+ * (T23, net +100 with the two Culture cards) — all covered by 1200 + income
  * across the eight end-turn steps + the T15 Community Favour exchange.
  * RNG-independent. See the budget table in the module docs.
  */

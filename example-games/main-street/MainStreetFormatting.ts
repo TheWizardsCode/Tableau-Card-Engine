@@ -14,7 +14,7 @@
  *
  * Reputation synergy (`synergyRepBonus`) is intentionally NOT handled
  * here — it remains an absolute-value system by design. Event-card
- * effects ("+1 coin per X business") are genuine `coinDelta` effects and
+ * effects ("+100 coins per X business") are genuine `coinDelta` effects and
  * are never tokenized.
  *
  * @module

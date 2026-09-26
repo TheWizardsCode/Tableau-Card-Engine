@@ -37,7 +37,7 @@ time, so rebalancing card data never leaves the tutorial stale.
 |-------------|---------------|---------|
 | `{cardName}` | card's `name` column | `Laundromat` |
 | `{cost}` | card's `cost` column via `formatCurrency()` | `€4` |
-| `{bonus}` | event card's `coinDelta` as `+N coins` | `+2 coins` |
+| `{bonus}` | event card's `coinDelta` as `+N coins` | `+200 coins` |
 
 Example (T3 body in `tutorial-en.ts`):
 
@@ -181,34 +181,34 @@ Card-level highlight zones (`laundromatCard`, `festivalCard`) are resolved throu
 `resolveMarketCardAnchor()` in `MainStreetTutorialHints.ts` using the deterministic
 tutorial-scenario market slots, not hardcoded pixel positions.
 
-### Scenario budget (Easy / 12 coins)
+### Scenario budget (Easy / 1200 coins)
 
-The tutorial runs the **Easy** preset with a **12-coin starting budget**. The
+The tutorial runs the **Easy** preset with a **1200-coin starting budget**. The
 two-turn flow places each card the week after its move at **listed cost** (no
 same-week premium), so every balance stays positive (CG-0MT53NXGZ004H5AE):
 
 | Step | Action | Coins In | Coins Out | Balance |
 |------|--------|----------|-----------|---------|
-| T1   | Start (Easy, 12 coins) | 12 | 0 | 12 |
-| T3   | Move Laundromat to hand (free) | 0 | 0 | 12 |
-| T6   | End Turn (held-card cost -1) | 0 | 1 | 11 |
-| T7   | Place Laundromat (listed $4) | 0 | 4 | 7 |
-| T9   | Move Local Festival to hand (free) | 0 | 0 | 7 |
-| T10  | End Turn + income (~2.15) | 2.154 | 0 | 9.154 |
-| T11  | Move Bookshop to hand (free) | 0 | 0 | 9.154 |
-| T13  | Community Favour (2 rep → 3 coins) | 3 | 0 | 12.154 |
-| T14  | End Turn + income (~1.33) | 1.333 | 0 | 13.487 |
-| T15  | Place Bookshop (listed $3) | 0 | 3 | 10.487 |
-| T16  | End Turn + income (~3.91) | 3.911 | 0 | 14.398 |
-| T17  | Move Library to hand (free) | 0 | 0 | 14.398 |
-| T18  | End Turn + income (~3.92) | 3.918 | 0 | 18.316 |
-| T19  | Place Library (listed $7) | 0 | 7 | 11.316 |
-| T20  | Play Local Festival ($3, +4 culture) | 1 | 0 | 12.316 |
+| T1 | Start (Easy, 1200 coins) | 1200 | 0 | 1200 |
+| T3 | Move Laundromat to hand (free) | 0 | 0 | 1200 |
+| T6 | End Turn (held-card cost -1) | 0 | 100 | 1100 |
+| T7 | Place Laundromat (listed $400) | 0 | 400 | 700 |
+| T9 | Move Local Festival to hand (free) | 0 | 0 | 700 |
+| T10 | End Turn + income (~215) | 215 | 0 | 915 |
+| T11 | Move Bookshop to hand (free) | 0 | 0 | 915 |
+| T13 | Community Favour (200 rep → 300 coins) | 300 | 0 | 1215 |
+| T14 | End Turn + income (~133) | 133 | 0 | 1349 |
+| T15 | Place Bookshop (listed $300) | 0 | 300 | 1049 |
+| T16 | End Turn + income (~391) | 391 | 0 | 1440 |
+| T17 | Move Library to hand (free) | 0 | 0 | 1440 |
+| T18 | End Turn + income (~392) | 392 | 0 | 1832 |
+| T19 | Place Library (listed $700) | 0 | 700 | 1132 |
+| T20 | Play Local Festival ($300, +4 culture) | 100 | 0 | 1232 |
 
 All placements are at listed cost because each follows an End Turn
 (plan-ahead). The deterministic 5-incident deck (Community Award ×3, Rainy Day
 ×2 — both non-negative on the tutorial street) never drains the balance. The
-authoritative walkthrough lives in the `Coin Budget (Easy / 12 coins)` table in
+authoritative walkthrough lives in the `Coin Budget (Easy / 1200 coins)` table in
 `example-games/main-street/TutorialScenario.ts`.
 
 ### Changing existing text

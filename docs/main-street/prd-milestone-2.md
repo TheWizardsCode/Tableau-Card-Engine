@@ -100,7 +100,7 @@ Run N+1 starts with expanded card pool
 
 ### 2.2 Tier 2 -- Rising Street
 
-**Reputation Threshold:** >= 8 reputation at end-of-run
+**Reputation Threshold:** >= 800 reputation at end-of-run
 
 **Challenge Milestone:** Complete any 2 challenges in a single run
 
@@ -110,13 +110,13 @@ Run N+1 starts with expanded card pool
 |------|------|----|-----------|
 | Business | Pawn Shop | `biz-pawnshop` | Fills the M1 Commerce gap (only Hardware Store existed). Cost 6, single-synergy Commerce. Low barrier to entry for new players. |
 | Business | Laundromat | `biz-laundromat` | Introduces the Service synergy type. Cost 6, accessible. Players begin exploring the new synergy axis. |
-| Event | Grand Opening Sale | `evt-grand-opening` | Investment event for Commerce synergy (+3 coins). Pairs with the newly unlocked Pawn Shop. |
+| Event | Grand Opening Sale | `evt-grand-opening` | Investment event for Commerce synergy (+300 coins). Pairs with the newly unlocked Pawn Shop. |
 
 **Cumulative Pool After Tier 2: 16 templates (7 Business + 6 Event + 3 Upgrade)**
 
 ### 2.3 Tier 3 -- Neighborhood
 
-**Reputation Threshold:** >= 16 reputation at end-of-run
+**Reputation Threshold:** >= 1600 reputation at end-of-run
 
 **Challenge Milestone:** Complete 1 synergy challenge AND 1 resource challenge in a single run
 
@@ -125,14 +125,14 @@ Run N+1 starts with expanded card pool
 | Type | Card | ID | Rationale |
 |------|------|----|-----------|
 | Business | Cafe | `biz-cafe` | First multi-synergy bridge card (Food + Culture). Introduces the bridge concept, rewarding strategic placement. |
-| Event | Wellness Fair | `evt-wellness-fair` | Investment event for Service synergy (+2 coins/Service, +1 rep). Supports the Service business unlocked in Tier 2. |
+| Event | Wellness Fair | `evt-wellness-fair` | Investment event for Service synergy (+200 coins/Service, +100 rep). Supports the Service business unlocked in Tier 2. |
 | Upgrade | Garden | `upg-garden` | Upgrade for Park (Culture). Gives M1 Park owners a progression path and demonstrates upgrade mechanics beyond M1. |
 
 **Cumulative Pool After Tier 3: 19 templates (8 Business + 7 Event + 4 Upgrade)**
 
 ### 2.4 Tier 4 -- District
 
-**Reputation Threshold:** >= 32 reputation at end-of-run
+**Reputation Threshold:** >= 3200 reputation at end-of-run
 
 **Challenge Milestone:** Complete any 3 challenges in a single run (at least 1 must be cross-cutting or placement)
 
@@ -141,14 +141,14 @@ Run N+1 starts with expanded card pool
 | Type | Card | ID | Rationale |
 |------|------|----|-----------|
 | Business | Arcade | `biz-arcade` | Introduces the Entertainment synergy type as a standalone business. Cost 8, anchors Entertainment strategies. |
-| Event | Block Party | `evt-block-party` | Investment event for Entertainment (+2 coins/Entertainment, +2 rep). High reward, high cost (4 coins). Pairs with Arcade. |
+| Event | Block Party | `evt-block-party` | Investment event for Entertainment (+200 coins/Entertainment, +200 rep). High reward, high cost (400 coins). Pairs with Arcade. |
 | Upgrade | Bread Factory | `upg-bread-factory` | Branching upgrade for Bakery (alternative to Patisserie). Demonstrates the branching upgrade mechanic: +2 income, no range boost. |
 
 **Cumulative Pool After Tier 4: 22 templates (9 Business + 8 Event + 5 Upgrade)**
 
 ### 2.5 Tier 5 -- Landmark
 
-**Reputation Threshold:** >= 64 reputation at end-of-run
+**Reputation Threshold:** >= 6400 reputation at end-of-run
 
 **Challenge Milestone:** Complete the "Diversified" challenge (`ch-diversified`: all 6 synergy types present) in a single run
 
@@ -157,7 +157,7 @@ Run N+1 starts with expanded card pool
 | Type | Card | ID | Rationale |
 |------|------|----|-----------|
 | Business | Day Spa | `biz-spa` | Premium multi-synergy bridge (Service + Entertainment), maxLevel 2. Unlocks the most complex business in the pool with full multi-level upgrade potential. |
-| Event | Charity Drive | `evt-charity-drive` | Investment event (+3 rep, 0 coins). Pure reputation play. Enables high-reputation strategies at the endgame tier. |
+| Event | Charity Drive | `evt-charity-drive` | Investment event (+300 rep, 0 coins). Pure reputation play. Enables high-reputation strategies at the endgame tier. |
 | Upgrade | Grand Bakehouse | `upg-grand-bakehouse` | Multi-level upgrade for Bakery (requiredLevel 1). The first Level-2 upgrade in the pool, demonstrating the full upgrade chain: Bakery -> Patisserie/Bread Factory -> Grand Bakehouse. |
 
 **Cumulative Pool After Tier 5: 25 templates (10 Business + 9 Event + 6 Upgrade)**

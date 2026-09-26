@@ -16,9 +16,9 @@ import type { MainStreetState, LogEntryType } from './MainStreetStateTypes';
  * coin/reputation change pair for activity-log entries (CG-0MT5W7UJJ0065MEZ).
  *
  * Examples:
- *   - `+3 coins, +2 rep` for a gain of 3 coins and 2 reputation
- *   - `-1 coins` for a pure coin loss
- *   - `+1 rep` for a pure reputation gain
+ *   - `+200 coins, +100 rep` for a gain of 200 coins and 100 reputation
+ *   - `-100 coins` for a pure coin loss
+ *   - `+100 rep` for a pure reputation gain
  *   - `no effect` when both deltas are zero
  *
  * @param coinChange Effective coins delta (integer).
@@ -35,7 +35,7 @@ export function describeEventEffects(coinChange: number, repChange: number): str
  * Classifies a coin/rep change pair as gain, loss, or neutral for log coloring.
  *
  * Uses the NET coin+rep heuristic (sum of both deltas); shared by every
- * enriched log site so a mixed exchange (e.g. -2 coins +1 rep) colours
+ * enriched log site so a mixed exchange (e.g. -200 coins +100 rep) colours
  * consistently with its effective net effect.
  */
 export function classifyEffect(
