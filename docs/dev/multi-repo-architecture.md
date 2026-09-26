@@ -322,6 +322,24 @@ decision), so the `tce-<game>` remotes recorded in
 scaffold wires the local composition that F5 (launcher distribution) and F7
 (integration verification) consume.
 
+### Publishing the repositories
+
+The create-and-push step is driven by `scripts/publish-repos.ts`
+(`npm run publish:repos`), whose contract is fixed in
+[`repo-publication-decision.md`](./repo-publication-decision.md):
+
+```bash
+npm run publish:repos -- --dry-run      # print the plan; runs no gh/git command
+npm run publish:repos                   # create + publish every target
+npm run publish:repos -- --target golf  # one target (core | <game> | tce-<game>)
+```
+
+Targets are resolved from `repo-layout.json`; each repository is created
+**public**, `dev` is pushed, and `main` is seeded from `dev` and set as the
+default branch. Only `dev` + `main` are published (no tags or feature
+branches), the run is idempotent and safe to repeat, and no target is ever
+force-pushed. The helper does not modify the source monorepo.
+
 ## 6. Follow-on work (not in this feature)
 
 - **F2** creates the core-engine repository from this script's `core` target.

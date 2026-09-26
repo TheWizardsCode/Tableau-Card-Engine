@@ -1200,6 +1200,28 @@ symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
 
+### Publishing the nine repositories
+
+The nine repositories named in `scripts/configs/repo-layout.json` (the core
+repo plus one `tce-<game>` per game) are created and published by
+`scripts/publish-repos.ts`:
+
+```bash
+npm run publish:repos -- --dry-run      # print the plan; runs no gh/git command
+npm run publish:repos                   # create + publish every target
+npm run publish:repos -- --target golf  # one target (core | <game> | tce-<game>)
+npm run publish:repos -- --repos-dir ../tce-repos
+```
+
+Each target is created **public**, `dev` is pushed, and `main` is seeded from
+`dev` and set as the default branch. Only `dev` and `main` are ever published
+(no tags, no feature/`wl-*` branches); the helper is idempotent (an existing
+repository is never re-created, and a target whose refs are up to date pushes
+nothing and exits 0) and never force-pushes. The full contract, including the
+safety guards and the fresh-clone verification commands, is recorded in the
+[Repo publication decision](dev/repo-publication-decision.md); the executable
+contract is `tests/scripts/repo-publication.test.ts`.
+
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 
 ## Hand & Pile Rendering

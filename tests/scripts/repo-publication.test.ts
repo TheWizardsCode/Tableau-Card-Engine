@@ -45,16 +45,16 @@ function readLayout(): Layout {
 }
 
 function writeTempLayout(overrides: {
-  coreName?: string;
+  coreSlug?: string;
   coreRemote?: string;
-  gameName?: string;
+  gameSlug?: string;
   gameRemote?: string;
 }): string {
   const layout = readLayout();
   const copy = JSON.parse(JSON.stringify(layout)) as Layout;
-  if (overrides.coreName) copy.core.name = overrides.coreName;
+  if (overrides.coreSlug) copy.core.slug = overrides.coreSlug;
   if (overrides.coreRemote) copy.core.remote = overrides.coreRemote;
-  if (overrides.gameName) copy.games[0].name = overrides.gameName;
+  if (overrides.gameSlug) copy.games[0].slug = overrides.gameSlug;
   if (overrides.gameRemote) copy.games[0].remote = overrides.gameRemote;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tce-publish-layout-'));
   const file = path.join(dir, 'repo-layout.json');
@@ -120,7 +120,7 @@ describe('repo-layout.json — publication targets', () => {
 // ── Contract (helper): authored as skips, unskipped by CG-0MUIND4FD000OQB5 ─
 
 describe('publish-repos — target resolution', () => {
-  it.skip('resolves the nine targets from repo-layout.json (no hard-coded names)', async () => {
+  it('resolves the nine targets from repo-layout.json (no hard-coded names)', async () => {
     const { loadPublishTargets } = await loadHelper();
     const targets = loadPublishTargets(LAYOUT_PATH);
     expect(targets).toHaveLength(9);
@@ -141,23 +141,23 @@ describe('publish-repos — target resolution', () => {
     );
   });
 
-  it.skip('reflects a renamed target from the layout rather than a literal', async () => {
+  it('reflects a renamed target from the layout rather than a literal', async () => {
     const { loadPublishTargets } = await loadHelper();
-    const layoutPath = writeTempLayout({ coreName: 'core-renamed' });
+    const layoutPath = writeTempLayout({ coreSlug: 'core-renamed' });
     const targets = loadPublishTargets(layoutPath);
     expect(targets.find((t: any) => t.kind === 'core')?.slug).toBe('core-renamed');
   });
 });
 
 describe('publish-repos — ref contract', () => {
-  it.skip('publishes exactly dev + main, with main as the default branch', async () => {
+  it('publishes exactly dev + main, with main as the default branch', async () => {
     const mod = await loadHelper();
     expect([...mod.PUBLISH_REFS]).toEqual(['dev', 'main']);
     expect(mod.DEFAULT_BRANCH).toBe('main');
     expect(mod.OWNER).toBe('TheWizardsCode');
   });
 
-  it.skip('rejects any ref outside {dev, main}, including tags', async () => {
+  it('rejects any ref outside {dev, main}, including tags', async () => {
     const { assertPublishRefAllowed } = await loadHelper();
     expect(() => assertPublishRefAllowed('dev')).not.toThrow();
     expect(() => assertPublishRefAllowed('main')).not.toThrow();
@@ -172,7 +172,7 @@ describe('publish-repos — creation and idempotency', () => {
     { kind: 'game' as const, slug: 'tce-golf', remote: 'git@github.com:TheWizardsCode/tce-golf.git' },
   ];
 
-  it.skip('creates a missing repository publicly and pushes dev then seeds main', async () => {
+  it('creates a missing repository publicly and pushes dev then seeds main', async () => {
     const { buildPublicationPlan } = await loadHelper();
     const plan = buildPublicationPlan(targets, {
       'tce-golf': { exists: false, heads: [], tags: [] },
@@ -184,7 +184,7 @@ describe('publish-repos — creation and idempotency', () => {
     expect(plan[0].upToDate).toBe(false);
   });
 
-  it.skip('is a no-op when the repo already has dev + main and main is default', async () => {
+  it('is a no-op when the repo already has dev + main and main is default', async () => {
     const { buildPublicationPlan } = await loadHelper();
     const plan = buildPublicationPlan(targets, {
       'tce-golf': { exists: true, heads: ['dev', 'main'], tags: [] },
@@ -194,7 +194,7 @@ describe('publish-repos — creation and idempotency', () => {
     expect(plan[0].upToDate).toBe(true);
   });
 
-  it.skip('seeds main from dev when only dev exists', async () => {
+  it('seeds main from dev when only dev exists', async () => {
     const { buildPublicationPlan } = await loadHelper();
     const plan = buildPublicationPlan(targets, {
       'tce-golf': { exists: true, heads: ['dev'], tags: [] },
@@ -204,7 +204,7 @@ describe('publish-repos — creation and idempotency', () => {
     expect(plan[0].upToDate).toBe(false);
   });
 
-  it.skip('never pushes extra remote branches or the inherited monorepo tags', async () => {
+  it('never pushes extra remote branches or the inherited monorepo tags', async () => {
     const { buildPublicationPlan } = await loadHelper();
     const plan = buildPublicationPlan(targets, {
       'tce-golf': {
@@ -219,7 +219,7 @@ describe('publish-repos — creation and idempotency', () => {
 });
 
 describe('publish-repos — safety guards and dry run', () => {
-  it.skip('creates repositories with --public and never --private', async () => {
+  it('creates repositories with --public and never --private', async () => {
     const mod = await loadHelper();
     const { calls, runner } = fakeRunner((cmd, args) => {
       if (cmd === 'gh' && args[0] === 'repo' && args[1] === 'view') {
@@ -239,7 +239,7 @@ describe('publish-repos — safety guards and dry run', () => {
     expect(create!.args).not.toContain('--private');
   });
 
-  it.skip('never emits a force push and never pushes a tag', async () => {
+  it('never emits a force push and never pushes a tag', async () => {
     const mod = await loadHelper();
     const { calls, runner } = fakeRunner((cmd, args) => {
       if (cmd === 'gh' && args[0] === 'repo' && args[1] === 'view') return { status: 1 };
@@ -259,7 +259,7 @@ describe('publish-repos — safety guards and dry run', () => {
     }
   });
 
-  it.skip('dry-run writes nothing: the runner is never invoked', async () => {
+  it('dry-run writes nothing: the runner is never invoked', async () => {
     const mod = await loadHelper();
     const { calls, runner } = fakeRunner(() => ({ status: 0 }));
     const report = mod.publishRepos({
@@ -274,7 +274,7 @@ describe('publish-repos — safety guards and dry run', () => {
     expect(report.commands.length).toBeGreaterThan(0);
   });
 
-  it.skip('restricts the run to --target and leaves the other eight untouched', async () => {
+  it('restricts the run to --target and leaves the other eight untouched', async () => {
     const mod = await loadHelper();
     const { calls, runner } = fakeRunner((cmd, args) => {
       if (cmd === 'gh' && args[0] === 'repo' && args[1] === 'view') {
@@ -294,7 +294,7 @@ describe('publish-repos — safety guards and dry run', () => {
     }
   });
 
-  it.skip('refuses a remote that is not under the configured owner', async () => {
+  it('refuses a remote that is not under the configured owner', async () => {
     const mod = await loadHelper();
     const layoutPath = writeTempLayout({
       gameRemote: 'git@github.com:SomeOtherOrg/tce-golf.git',
@@ -309,7 +309,7 @@ describe('publish-repos — safety guards and dry run', () => {
     expect(report.exitCode).not.toBe(0);
   });
 
-  it.skip('aborts rather than overwriting when a target is divergent', async () => {
+  it('aborts rather than overwriting when a target is divergent', async () => {
     const mod = await loadHelper();
     const { runner } = fakeRunner((cmd, args) => {
       if (cmd === 'gh' && args[0] === 'repo' && args[1] === 'view') return { status: 0 };
