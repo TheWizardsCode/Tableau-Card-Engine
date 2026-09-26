@@ -313,14 +313,31 @@ Verified end to end for **golf** and **main-street** against a core checkout:
 and no `src` symlink (F9/C3). The full build + test gate for the composed
 launcher is F7.
 
-### GitHub remotes are not created in this phase
+### Published GitHub remotes
 
-The scaffold writes local checkouts only. Creating the nine GitHub repositories
-and pushing the extracted history was **not authorised** in this phase (producer
-decision), so the `tce-<game>` remotes recorded in
-`scripts/configs/repo-layout.json` are documented but not yet created. The
-scaffold wires the local composition that F5 (launcher distribution) and F7
-(integration verification) consume.
+The nine repositories are **created and published** under `TheWizardsCode`:
+
+| repo | visibility | branches | default |
+|---|---|---|---|
+| `tableau-card-engine-core` | public | `dev`, `main` | `main` |
+| `tce-golf` | public | `dev`, `main` | `main` |
+| `tce-beleaguered-castle` | public | `dev`, `main` | `main` |
+| `tce-blackjack` | public | `dev`, `main` | `main` |
+| `tce-sushi-go` | public | `dev`, `main` | `main` |
+| `tce-feudalism` | public | `dev`, `main` | `main` |
+| `tce-lost-cities` | public | `dev`, `main` | `main` |
+| `tce-main-street` | public | `dev`, `main` | `main` |
+| `tce-coloretto` | public | `dev`, `main` | `main` |
+
+The core repository holds the engine + Gym + launcher shell and **no games**;
+each game repository has its source at repo-root `src/` and wires the engine as
+the `core` git submodule pointing at
+`git@github.com:TheWizardsCode/tableau-card-engine-core.git`. A fresh game
+checkout therefore pulls the engine in with `git clone --recurse-submodules`.
+Only `dev` + `main` are published (no monorepo feature/`wl-*` branches and no
+`v0.1.x` tags); `main` is seeded once from `dev` and is the default branch, and
+the initial publication is idempotent — re-running never re-creates an existing
+repository and an up-to-date target pushes nothing.
 
 ### Publishing the repositories
 
@@ -340,21 +357,26 @@ default branch. Only `dev` + `main` are published (no tags or feature
 branches), the run is idempotent and safe to repeat, and no target is ever
 force-pushed. The helper does not modify the source monorepo.
 
-## 6. Follow-on work (not in this feature)
+## 6. Follow-on work
 
-- **F2** creates the core-engine repository from this script's `core` target.
-- **F3** adds config-driven game discovery: a Vite plugin plus per-game
-  `GAME_INFO` and `configs/*.json` presets, so the Game Selector enumerates
-  only the checked-out games (currently `main.ts` statically imports all 8).
-- **F4** creates the 8 game repos and their `./core` submodule wiring.
-- **F5** makes the launcher assemble 1..n games for web + Electron builds.
-- **F6** updates `README.md`, `docs/DEVELOPER.md` and `AGENTS.md`.
-- **F7** runs the full build + test gate.
+The core split and the initial publication are complete. Remaining work:
 
-Feature **F9** (CG-0MUH0NTRG007GDME) then reworks the per-game layout to a flat
+- **Launcher submodules** — switch the `Tableau-Card-Engine` launcher's
+  `.gitmodules` to the published `tce-<game>` remotes so it composes the game
+  repos as git submodules instead of carrying in-tree `example-games/<game>`
+  trees (out of scope for the initial publication).
+- **Promotion** — keep each repository's `main` current by promoting `dev`
+  through the release process (the ship skill).
+- **CI / npm publication** — still deliberately out of scope.
+
+Feature **F9** (CG-0MUH0NTRG007GDME) reworked the per-game layout to a flat
 repo-root `src/` with alias-only engine imports; see
-[`per-game-src-layout-decision.md`](./per-game-src-layout-decision.md).
+[`per-game-src-layout-decision.md`](./per-game-src-layout-decision.md). The
+publication contract is in
+[`repo-publication-decision.md`](./repo-publication-decision.md).
 
-Verification for this feature is the unit suite
-[`tests/scripts/extract-repos.test.ts`](../../tests/scripts/extract-repos.test.ts)
-plus the end-to-end extraction evidence recorded on the work item.
+Verification is the unit suite
+[`tests/scripts/extract-repos.test.ts`](../../tests/scripts/extract-repos.test.ts),
+the publication contract suite
+[`tests/scripts/repo-publication.test.ts`](../../tests/scripts/repo-publication.test.ts),
+and the fresh-clone verification evidence recorded on the publication work item.

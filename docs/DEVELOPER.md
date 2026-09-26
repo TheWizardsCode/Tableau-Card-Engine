@@ -1222,6 +1222,33 @@ safety guards and the fresh-clone verification commands, is recorded in the
 [Repo publication decision](dev/repo-publication-decision.md); the executable
 contract is `tests/scripts/repo-publication.test.ts`.
 
+### Using a published repository
+
+A published game repository is a complete single-game TCE checkout: the engine
+is pulled in as the `core` git submodule, so a recursive clone gives you the
+engine and the game together. For example, `tce-golf`:
+
+```bash
+git clone --recurse-submodules git@github.com:TheWizardsCode/tce-golf.git
+cd tce-golf
+npm install
+npm run build            # tsc --noEmit && vite build
+npm test -- --project unit
+```
+
+The engine-only repository works the same way (it has no submodules):
+
+```bash
+git clone git@github.com:TheWizardsCode/tableau-card-engine-core.git
+cd tableau-card-engine-core
+npm install
+npm run build
+npx vitest run --project unit   # `npm test` runs the full CI suite
+```
+
+The `tce-<game>` repos use `main` as their default branch, carry only `dev` and
+`main`, and resolve every engine import through the aliases against `./core`.
+
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 
 ## Hand & Pile Rendering
