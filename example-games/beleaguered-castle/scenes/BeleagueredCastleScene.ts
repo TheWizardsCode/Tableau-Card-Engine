@@ -365,24 +365,16 @@ export class BeleagueredCastleScene extends CardGameScene {
 
     for (let col = 0; col < TABLEAU_COUNT; col++) {
       const zone = this.bcRenderer.tableauDZs[col];
-      zone.setInteractive({ useHandCursor: false });
-      zone.on('pointerdown', () => {
-        if (this.interactionBlocked) return;
-        if (this.selectedCol === null) return;
-        if (col === this.selectedCol) { this.deselectColumn(); return; }
-        if (isLegalTableauMove(this.gameState, this.selectedCol, col).legal) {
-          const move: BCMove = { kind: 'tableau-to-tableau', fromCol: this.selectedCol, toCol: col };
-          this.deselectColumn();
-          this.turnController.executePlayerMove(move);
-        } else {
-          // Illegal move feedback
-          const sprs = this.bcRenderer.tableauSprs[this.selectedCol];
-          if (sprs && sprs.length > 0) {
-            shakeIllegalMove({ scene: this, target: sprs[sprs.length - 1] });
-          }
-          this.deselectColumn();
-        }
-      });
+      zone.setInteractive({ useHandCursor: true });
+      // Clicking anywhere in a column behaves exactly like clicking its top
+      // card: a partly covered card or the empty space below the top card
+      // still selects the column (the top card remains the only movable
+      // card). This removes the "dead zone" where a click appeared to do
+      // nothing, which players read as "cannot select cards"
+      // (CG-0MUHKD7S8007EEAC). When the top card itself is clicked its own
+      // sprite handler runs instead (Phaser topOnly), so this is not a
+      // second handler for the same event.
+      zone.on('pointerdown', () => this.handleCardClick(col));
     }
   }
 

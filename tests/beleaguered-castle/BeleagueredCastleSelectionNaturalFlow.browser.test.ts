@@ -478,4 +478,46 @@ describe('Beleaguered Castle natural-flow selection (browser)', () => {
     },
     30_000,
   );
+
+  // ── Forgiving column selection (no dead zones) ───────────
+  // A click that lands on a partly covered card or on the empty space below
+  // a column's top card must still select that column's top card. Before
+  // CG-0MUHKD7S8007EEAC only the top card sprite was interactive, so these
+  // clicks did nothing and read as "cannot select cards".
+  it('selects the column when a partly covered card is clicked', async () => {
+    game = await bootNaturalGame(SEEDS[0]);
+    const scene = getScene(game);
+    await chooseClassicVariantRealClick(scene);
+
+    const sprites = scene.tableauSprites[0] as Phaser.GameObjects.Image[];
+    expect(sprites.length).toBeGreaterThan(1);
+    const top = sprites[sprites.length - 1];
+    // Just above the top card's upper edge is the visible strip of the card
+    // beneath it — inside the column zone but not on the top card sprite.
+    const coveredStripY = top.y - top.displayHeight / 2 - 10;
+    await realClick(top.x, coveredStripY);
+
+    expect((scene as any).selectedCol).toBe(0);
+    const highlights = (scene.bcRenderer as any).selectionHighlights as Map<number, unknown>;
+    expect(highlights.has(0)).toBe(true);
+  }, 30_000);
+
+  it('selects the column when the empty space below the top card is clicked', async () => {
+    game = await bootNaturalGame(SEEDS[0]);
+    const scene = getScene(game);
+    await chooseClassicVariantRealClick(scene);
+
+    const sprites = scene.tableauSprites[0] as Phaser.GameObjects.Image[];
+    const top = sprites[sprites.length - 1];
+    const zone = tableauZone(scene, 0);
+    const zoneBottom = zone.y + zone.height / 2;
+    const emptyY = top.y + top.displayHeight / 2 + 10;
+    // Only meaningful when the column does not fill the whole zone.
+    if (emptyY >= zoneBottom - 5) {
+      return;
+    }
+    await realClick(zone.x, emptyY);
+
+    expect((scene as any).selectedCol).toBe(0);
+  }, 30_000);
 });

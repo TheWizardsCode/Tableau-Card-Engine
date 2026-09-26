@@ -21,7 +21,7 @@
   },
   {
     "heading": "Controls",
-    "body": "Drag and drop: Drag a top card to a valid destination (tableau column or foundation).\n\nClick to move: Click a top card to select it (highlighted green), then click a valid destination. Click the same card again to deselect.\n\nBoth input methods work simultaneously."
+    "body": "Drag and drop: Drag a top card to a valid destination (tableau column or foundation).\n\nClick to move: Click anywhere in a column to select its top card (highlighted green), then click a valid destination. Click the same column again to deselect.\n\nBoth input methods work simultaneously."
   },
   {
     "heading": "Hints",
