@@ -40,8 +40,8 @@ is_allowed_line() {
 file_list="$(mktemp "${TMPDIR:-/tmp}/_termguard_files.XXXXXX")"
 trap 'rm -f "$file_list"' EXIT
 {
-  find docs -name '*.md' -type f 2>/dev/null
-  find example-games/main-street -name '*.ts' -type f 2>/dev/null
+  find docs -name '*.md' -type f 2>/dev/null || true
+  find example-games/main-street -name '*.ts' -type f 2>/dev/null || true
 } | sort -u > "$file_list"
 
 # Forbidden patterns (POSIX ERE) — day-as-turn tokens

@@ -110,12 +110,22 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
   );
   // The game's own tests still reach the game tree via the monorepo
   // `example-games/<game>/…` prefix; the scaffold rewrites it to `src/`.
+  // They may also import core-owned `scripts/…` modules (present only in the
+  // core checkout) and game-owned `scripts/…` modules (present locally).
   const testDir = path.join(gameRepo, 'tests', game);
   fs.mkdirSync(testDir, { recursive: true });
+  // A game-owned script lives under the game tree (`src/scripts/`).
+  fs.mkdirSync(path.join(gameRepo, 'src', 'scripts'), { recursive: true });
+  fs.writeFileSync(
+    path.join(gameRepo, 'src', 'scripts', 'game-script.ts'),
+    'export const g = 1;\n',
+  );
   fs.writeFileSync(
     path.join(testDir, `${pascalCase(game)}.test.ts`),
     [
       `import { ${pascalCase(game)}Scene } from '../../example-games/${game}/scenes/${pascalCase(game)}Scene';`,
+      `import { validateTranscriptFile } from '../../scripts/validate-transcript';`,
+      `import { g } from '../../src/scripts/game-script';`,
       `spawnSync('node', ['--import', 'tsx/esm', 'scripts/replay.ts']);`,
       `const roots = [{ dir: 'src/ui' }, { dir: 'src/core-engine' }];`,
       '',
@@ -348,6 +358,12 @@ describe('scaffoldGameRepo', () => {
     // A game test scanning a core layer resolves it through the core link too.
     expect(testSrc).toContain("'core/src/ui'");
     expect(testSrc).toContain("'core/src/core-engine'");
+    // A relative import of a core-owned script (there is no repository-root
+    // `scripts/` tree in a game repo) is repointed at the core-scripts alias;
+    // a game-owned script under `src/scripts/` is left untouched.
+    expect(testSrc).toContain("'@core-scripts/validate-transcript'");
+    expect(testSrc).not.toContain("'../../scripts/validate-transcript'");
+    expect(testSrc).toContain("'../../src/scripts/game-script'");
   });
 
   it('produces a preset the discovery plugin resolves to exactly one game', () => {

@@ -556,9 +556,19 @@ export function rewriteGameTreePaths(gameRepoRoot: string, game: string): string
         //    core checkout, not the game repo. `src/scripts/…` is untouched.
         // 3. A quoted `src/<core-dir>…` path -> `core/src/<core-dir>…`: some
         //    main-street tests scan the core's UI/engine layers directly.
+        // 4. A relative `(../)+scripts/<module>` path -> `@core-scripts/<module>`.
+        //    In the Option C layout a game repo has no repository-root
+        //    `scripts/` tree (its own scripts live under `src/scripts/`), so a
+        //    root-relative `scripts/` reference always denotes a core-owned
+        //    script and the alias resolves it against the core checkout.
         const updated = original
           .split(needle)
           .join('src/')
+          .replace(
+            /(['"])((?:\.\.\/)+)scripts\/([A-Za-z0-9_./-]+)\1/g,
+            (_match, quote: string, _dots: string, moduleName: string) =>
+              `${quote}@core-scripts/${moduleName}${quote}`,
+          )
           .split("'scripts/")
           .join("'core/scripts/")
           .split('"scripts/')

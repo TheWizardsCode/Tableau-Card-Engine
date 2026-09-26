@@ -301,7 +301,15 @@ extract_one() {
 
   # Work on a clone so the source monorepo is never rewritten in place.
   git clone --no-local --quiet "${SOURCE_REPO}" "${dest}"
-  git -C "${dest}" filter-repo --force "${rename_args[@]}" "${filter_args[@]}" "${asset_args[@]}"
+  # Argument order is significant: `git filter-repo` applies `--path`
+  # include callbacks and `--path-rename` callbacks in the order given on
+  # the command line. The includes must run FIRST so the game tree is
+  # selected by its original `example-games/<game>/` paths; the rename then
+  # rewrites the selected tree to `src/`. Reversing them (rename before
+  # includes) rewrites the path first, so the resulting `src/**` files no
+  # longer match `--path example-games/<game>` and the entire game source is
+  # silently dropped (CG-0MUHK5NND0024J1S C3).
+  git -C "${dest}" filter-repo --force "${filter_args[@]}" "${asset_args[@]}" "${rename_args[@]}"
 
   if [[ -n "${remote}" ]]; then
     git -C "${dest}" remote add origin "${remote}" 2>/dev/null || true

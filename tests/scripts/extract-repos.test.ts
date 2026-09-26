@@ -20,6 +20,7 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -132,6 +133,32 @@ describe('repo-layout.json — repo partition contract', () => {
     expect(layout.core.paths).toContain('src/ui/GameSelectorScene.ts');
     expect(layout.core.paths).toContain('src/ui/createCardGame.ts');
     expect(layout.core.paths).toContain('electron');
+  });
+
+  it('ships in core every scripts/ module imported by tests/scripts', () => {
+    // `tests/scripts` is assigned to the core repo wholesale, so every
+    // relative `../../scripts/<module>` import from those tests must resolve
+    // inside the core partition — otherwise the extracted core repo fails
+    // `tsc --noEmit` on an unresolved module (CG-0MUHK5NND0024J1S C3).
+    const layout = readLayout();
+    const testsScriptsDir = path.join(REPO_ROOT, 'tests', 'scripts');
+    const files = fs
+      .readdirSync(testsScriptsDir)
+      .filter((f) => f.endsWith('.test.ts'));
+    const importRe = /from\s+['"]\.\.\/\.\.\/(scripts\/[^'"]+)['"]/g;
+    const missing: string[] = [];
+    for (const file of files) {
+      const src = fs.readFileSync(path.join(testsScriptsDir, file), 'utf-8');
+      for (const match of src.matchAll(importRe)) {
+        const rel = match[1]; // e.g. scripts/codemod-src-imports
+        const modulePath = `${rel}.ts`;
+        const covered = layout.core.paths.some(
+          (p) => p === modulePath || rel.startsWith(`${p}/`),
+        );
+        if (!covered) missing.push(`${file}: ${rel}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
 
   it('assigns each game its own example-games subtree', () => {
@@ -349,5 +376,86 @@ describe('extract-repos.sh — dry-run plan', () => {
     expect(status).toBe(0);
     expect(stdout).toContain('tableau-card-engine-core');
     expect(stdout).not.toContain('tce-golf');
+  });
+});
+
+/** True when `git filter-repo` is installed; the real-extraction guard skips
+ * (with a documented reason) on hosts that lack the tool. */
+const HAS_FILTER_REPO = (() => {
+  try {
+    execFileSync('git', ['filter-repo', '--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+/**
+ * Regression guard for the `git filter-repo` argument ordering
+ * (CG-0MUHK5NND0024J1S C3).
+ *
+ * `git filter-repo` applies `--path` include callbacks and `--path-rename`
+ * callbacks in the order they appear on the command line. The driver must
+ * therefore pass the `--path` includes BEFORE the game-tree rename: with the
+ * rename first, the selected `example-games/<game>/**` files are rewritten to
+ * `src/**` before the include check runs, so they no longer match and the
+ * entire game source is silently dropped from the extracted repository.
+ *
+ * The dry-run assertions above only cover the printed plan; this test runs a
+ * real (single-commit) extraction so the ordering defect cannot recur
+ * unnoticed.
+ */
+describe.skipIf(!HAS_FILTER_REPO)('extract-repos.sh — real extraction', () => {
+  it('moves the game tree to src/ without dropping it', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tce-extract-'));
+    const source = path.join(tmp, 'source');
+    const outDir = path.join(tmp, 'out');
+    try {
+      // A minimal monorepo-shaped source repo: one game file, one game test
+      // file, and an unrelated root file that must not be extracted.
+      fs.mkdirSync(path.join(source, 'example-games', 'golf'), { recursive: true });
+      fs.mkdirSync(path.join(source, 'tests', 'golf'), { recursive: true });
+      fs.writeFileSync(
+        path.join(source, 'example-games', 'golf', 'GolfGame.ts'),
+        'export const x = 1;\n',
+      );
+      fs.writeFileSync(
+        path.join(source, 'tests', 'golf', 'GolfGame.test.ts'),
+        '// test\n',
+      );
+      fs.writeFileSync(path.join(source, 'unrelated.txt'), 'nope\n');
+      const git = (args: string[]) =>
+        execFileSync('git', args, { cwd: source, stdio: 'ignore' });
+      git(['init', '-q']);
+      git(['config', 'user.email', 'test@example.com']);
+      git(['config', 'user.name', 'Test']);
+      git(['add', '-A']);
+      git(['commit', '-qm', 'scratch']);
+
+      execFileSync(
+        'bash',
+        [SCRIPT_PATH, '--target', 'golf', '--source', source, '--out-dir', outDir],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf-8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 120_000,
+        },
+      );
+
+      const repo = path.join(outDir, 'tce-golf');
+      // The rename must have happened (src/ present, original tree gone) and
+      // the renamed file must not have been filtered out in the process.
+      expect(fs.existsSync(path.join(repo, 'src', 'GolfGame.ts'))).toBe(true);
+      expect(
+        fs.existsSync(path.join(repo, 'example-games', 'golf', 'GolfGame.ts')),
+      ).toBe(false);
+      expect(
+        fs.existsSync(path.join(repo, 'tests', 'golf', 'GolfGame.test.ts')),
+      ).toBe(true);
+      expect(fs.existsSync(path.join(repo, 'unrelated.txt'))).toBe(false);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
