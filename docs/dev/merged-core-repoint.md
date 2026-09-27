@@ -92,18 +92,43 @@ core's `src/` through the `@core-engine`, `@card-system`, `@rule-engine`,
 aliases, so it exercises the `./core` resolution end to end. The full build and
 unit-test verification across the whole distribution is F7.
 
-## Outstanding — `main` promotion gate
+## `main` promotion (completed)
 
-Only each repository's `dev` branch carries the repoint. The `main` branch of
-every game repo is still at the pre-Step-0 tip and therefore still references
-`tableau-card-engine-core`. `main` is a **protected branch**: promoting it
-(`git push origin dev:main`) requires explicit operator approval and was not
-performed by this work item. Until `main` is promoted, a default-branch
-recursive clone resolves the old core. This gate is recorded on the parent
-epic and must be cleared before F6 deletes `tableau-card-engine-core`.
+Each repository's `main` branch was fast-forwarded to the repoint commit with
+`git push origin dev:main` (fast-forward only, no force) after explicit operator
+approval — `main` is a protected branch.
 
-Exact command per repository, once approved:
+| Repository | `main` before | `main` after (= `dev`) |
+|---|---|---|
+| `tce-golf` | `fa49788bb33746e4e1a0d6a2c3404b7551dd0bec` | `fe1683c2da0a14a87fbffd6f31df91b32b2f0b9d` |
+| `tce-beleaguered-castle` | `2341a9e0712aa4330e61990ffdf8ae37d4f9313d` | `3745271b446eeaee08f3722149232a82343b692c` |
+| `tce-blackjack` | `05cd5801435cf468760af910c9fc3495b5756bf0` | `c01e1af94734fcccfdc8716c87cceb60192cc335` |
+| `tce-sushi-go` | `e5a22ebbac90a4e3531899ff82a14924c8e0565d` | `6495756ee7ec29c566d8872958df6dbbe735fc5c` |
+| `tce-feudalism` | `3aad19cb08b8bcce751d4d30baa34ff338304de8` | `c0cee1f51a07e9919e0bdbd5f1056980f8168a8c` |
+| `tce-lost-cities` | `26296a55b66b19f9de8849b4ac8f4d938a5908a7` | `ff2378ac71b39a42d9cf68491ab28f8a0ec57057` |
+| `tce-main-street` | `99fb2d95d3dd60cf86bcc9dc2359ce0306bf0e7d` | `2beed0af9477abafbcf43bfd8d98625732e4c2f6` |
+| `tce-coloretto` | `c02faa98c9389bf95c1be1a2a53c4da754087087` | `8cd1d08a1df459e8958b8c1c0633fe203051b1db` |
+
+After the promotion a **default-branch** (no `-b`) recursive clone resolves the
+merged core:
 
 ```bash
-git -C <tce-game-clone> push origin dev:main   # fast-forward only, no force
+git clone --recurse-submodules git@github.com:TheWizardsCode/tce-golf.git
+cd tce-golf
+git branch --show-current          # main
+git submodule status
+#  f16bc06dfd09eda694c68c78860afcc978588c12 core (v0.1.17-112-gf16bc06d)
 ```
+
+Both published branches (`dev` and `main`) of every game repository are now
+consistent, and **no published branch of any game repo references the retired
+`tableau-card-engine-core`**.
+
+## Retirement of `tableau-card-engine-core` (F6) — deliberately deferred
+
+Deleting `tableau-card-engine-core` (F6, CG-0MUJ1689Z007M58X) is intentionally
+deferred until the merged-core refactoring is otherwise complete. The old
+repository is now unreferenced by any game repo branch; it can be archived and
+then deleted later without breaking a clone. F6 remains the tracked work item
+for that retirement and also requires a `gh` token with the `delete_repo`
+scope.
