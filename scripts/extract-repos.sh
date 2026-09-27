@@ -142,7 +142,7 @@ PY
 
 # ── --list ────────────────────────────────────────────────────────────────
 # The core repo's public target name is "core" (its repo name is
-# tableau-card-engine-core); game targets keep their game name.
+# Tableau-Card-Engine); game targets keep their game name.
 if [[ "${MODE}" == "list" ]]; then
   while IFS=$'\t' read -r kind name _slug _remote _paths _assets; do
     if [[ "${kind}" == "core" ]]; then

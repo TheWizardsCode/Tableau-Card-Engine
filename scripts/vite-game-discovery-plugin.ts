@@ -77,9 +77,9 @@ export const DEFAULT_PRESET = 'core-only';
 /**
  * Build the core-module path aliases for a given core checkout root.
  *
- * In the monorepo and the core repo itself the root is this directory; in a
+ * In the merged core repo itself the root is this directory; in a
  * game repo (F4) it is the `./core` submodule — or the sibling
- * `../tableau-card-engine-core` checkout — so the same `@core-engine/*` import
+ * `../Tableau-Card-Engine` checkout — so the same `@core-engine/*` import
  * specifiers resolve from both contexts.
  *
  * @param coreRoot Absolute path to the core checkout.
@@ -558,7 +558,7 @@ export function gameDiscoveryPlugin(options: {
   env?: Record<string, string | undefined>;
   /**
    * Absolute core-repo root. A game repo (F4) sets this to its `./core`
-   * submodule (or sibling `../tableau-card-engine-core`) so the core-owned
+   * submodule (or sibling `../Tableau-Card-Engine`) so the core-owned
    * Gym resolves from the engine checkout rather than the game repo root.
    */
   coreRoot?: string;

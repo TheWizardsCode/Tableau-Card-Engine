@@ -303,7 +303,7 @@ describe('extract-repos.sh — dry-run plan', () => {
   it('succeeds and names the core repo plus all eight game repos', () => {
     const { stdout, status } = runExtract(['--dry-run']);
     expect(status).toBe(0);
-    expect(stdout).toContain('tableau-card-engine-core');
+    expect(stdout).toContain('Tableau-Card-Engine');
     for (const game of GAME_NAMES) {
       expect(stdout, `missing tce-${game} in plan`).toContain(`tce-${game}`);
     }
@@ -376,7 +376,7 @@ describe('extract-repos.sh — dry-run plan', () => {
   it('plans core as a target by its public name', () => {
     const { stdout, status } = runExtract(['--target', 'core', '--dry-run']);
     expect(status).toBe(0);
-    expect(stdout).toContain('tableau-card-engine-core');
+    expect(stdout).toContain('Tableau-Card-Engine');
     expect(stdout).not.toContain('tce-golf');
   });
 });
@@ -470,14 +470,13 @@ describe.skipIf(!HAS_FILTER_REPO)('extract-repos.sh — real extraction', () => 
 // (F5 CG-0MUJ167LG004J8JQ), and removes the in-tree games so the distribution
 // composes sibling checkouts only (F4 CG-0MUJ166VM006ULRJ).
 //
-// The `repo-layout.json` assertions below encode that end state and execute
-// against the current pre-migration layout, so their bodies fail today.
-// `it.fails` records each expected failure and keeps the suite green; when the
-// migration lands the assertion succeeds and Vitest reports an *unexpected
-// pass*, which is the signal for F3/F5 to flip `it.fails` back to a normal
-// `it` — the value then lives on as a permanent regression guard. This mirrors
-// the documented pending-contract convention in
-// `tests/scripts/repo-publication.test.ts`.
+// The `repo-layout.json` assertions below encode that end state. F3
+// (CG-0MUJ1664D009FSFF) flipped the layout/remote assertions from `it.fails`
+// to normal `it`s once `repo-layout.json` was re-partitioned; they now live on
+// as permanent regression guards. The `./core` submodule repoint (F5) and the
+// removal of the in-tree games (F4) are covered by the sibling-composition
+// assertions (`declares no game submodule entry`) and the discovery-plugin
+// contract in `tests/scripts/vite-game-discovery-plugin.test.ts`.
 
 /** The merged core's repository identity (the `repo-layout.json` core entry). */
 const MERGED_CORE = {
@@ -490,20 +489,20 @@ const MERGED_CORE = {
 const RETIRED_CORE_SLUG = 'tableau-card-engine-core';
 
 describe('merged-core topology contract (Option A)', () => {
-  it.fails('renames the core target to Tableau-Card-Engine (AC1)', () => {
+  it('renames the core target to Tableau-Card-Engine (AC1)', () => {
     const layout = readLayout();
     expect(layout.core.name).toBe(MERGED_CORE.name);
     expect(layout.core.slug).toBe(MERGED_CORE.slug);
   });
 
-  it.fails('points the core remote at Tableau-Card-Engine (AC1/AC2)', () => {
+  it('points the core remote at Tableau-Card-Engine (AC1/AC2)', () => {
     // `repo-layout.json` `core.remote` is the single source of truth every
     // game's `./core` submodule URL is repointed from in F5.
     const layout = readLayout();
     expect(layout.core.remote).toBe(MERGED_CORE.remote);
   });
 
-  it.fails('removes every tableau-card-engine-core target (AC1)', () => {
+  it('removes every tableau-card-engine-core target (AC1)', () => {
     const layout = readLayout();
     const retired = [layout.core, ...layout.games].filter(
       (repo) =>

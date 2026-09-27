@@ -11,15 +11,15 @@
  * `package.json`, `vite.config.ts`, `tsconfig.json`, `main.ts` or `index.html`
  * of its own). This module fills that gap: it adds the root configs that turn
  * an extracted game tree into a runnable single-game launcher which composes
- * the core engine checkout as a sibling (`../tableau-card-engine-core`).
+ * the core engine checkout as a sibling (`../Tableau-Card-Engine`).
  *
  * ## Composed layout (Option C — F9/C1)
  *
  * ```
  * <parent>/
- * ├── tableau-card-engine-core/   the engine + Gym + launcher shell
+ * ├── Tableau-Card-Engine/        the engine + Gym + launcher shell
  * └── tce-<game>/                 scaffolded by this module
- *     ├── core -> ../tableau-card-engine-core   (symlink, optional; git submodule)
+ *     ├── core -> ../Tableau-Card-Engine   (symlink, optional; git submodule)
  *     ├── src/                     the game tree (renamed from example-games/<game>/)
  *     │   ├── scenes/<Game>Scene.ts
  *     │   ├── scripts/adapters/<Game>ReplayAdapter.ts
@@ -49,7 +49,7 @@
  * tsx scripts/game-repo-scaffold.ts \
  *   --game golf \
  *   --game-repo-root ../tce-golf \
- *   --core-root ../tableau-card-engine-core
+ *   --core-root ../Tableau-Card-Engine
  * ```
  *
  * Run with `--help` for the full option list.
@@ -61,7 +61,15 @@ import path from 'node:path';
 // ── Public constants ──────────────────────────────────────────────────────
 
 /** Default sibling location of the core checkout relative to a game repo. */
-export const DEFAULT_CORE_REL = '../tableau-card-engine-core';
+export const DEFAULT_CORE_REL = '../Tableau-Card-Engine';
+
+/**
+ * SSH remote of the merged core that a game repo's `core` submodule points
+ * at. The single source of truth is `repo-layout.json` → `core.remote`; this
+ * constant mirrors it so the scaffold and the layout cannot drift.
+ */
+export const CORE_REMOTE =
+  'git@github.com:TheWizardsCode/Tableau-Card-Engine.git';
 
 /** Directory (relative to a game repo root) holding the build presets. */
 export const GAME_REPO_CONFIGS_DIR = 'configs';
@@ -615,7 +623,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   if (!fs.existsSync(coreRoot)) {
     throw new Error(
       `[scaffold] core checkout does not exist: ${coreRoot}. ` +
-        'Clone/check out tableau-card-engine-core next to the game repo.',
+        'Clone/check out Tableau-Card-Engine next to the game repo.',
     );
   }
 
@@ -778,7 +786,7 @@ function usage(): string {
     '  --game-repo-root <path>  Game repo root. Defaults to <repos-dir>/tce-<id>.',
     '  --repos-dir <path>       Directory holding tce-<id> checkouts.',
     '  --core-root <path>       Core engine checkout. Defaults to',
-    '                           <repos-dir-parent>/tableau-card-engine-core.',
+    '                           <repos-dir-parent>/Tableau-Card-Engine.',
     '  --core-rel <path>        Core path as used inside the game repo',
     `                           (default: ${DEFAULT_CORE_REL}).`,
     '  --layout <path>          Layout file for --all',
@@ -808,7 +816,7 @@ function main(argv: string[]): number {
 
   const reposDir = path.resolve(args.reposDir ?? path.join(process.cwd(), '..'));
   const coreRoot = path.resolve(
-    args.coreRoot ?? path.join(reposDir, 'tableau-card-engine-core'),
+    args.coreRoot ?? path.join(reposDir, 'Tableau-Card-Engine'),
   );
 
   const games = args.all

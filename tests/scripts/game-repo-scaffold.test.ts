@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  CORE_REMOTE,
   DEFAULT_CORE_REL,
   DEFAULT_GAME_PRESET,
   defaultScenePath,
@@ -72,7 +73,7 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tce-scaffold-'));
   tmpRoot = root;
 
-  const core = path.join(root, 'tableau-card-engine-core');
+  const core = path.join(root, 'Tableau-Card-Engine');
   fs.mkdirSync(path.join(core, 'configs'), { recursive: true });
   fs.mkdirSync(path.join(core, 'src', 'card-system'), { recursive: true });
   fs.mkdirSync(path.join(core, 'scripts', 'adapters'), { recursive: true });
@@ -241,7 +242,7 @@ describe('renderPackageJson', () => {
 describe('renderViteConfig', () => {
   it('imports the discovery plugin and aliases from the sibling core', () => {
     const src = renderViteConfig('golf', DEFAULT_CORE_REL);
-    expect(src).toContain("from '../tableau-card-engine-core/scripts/vite-game-discovery-plugin'");
+    expect(src).toContain("from '../Tableau-Card-Engine/scripts/vite-game-discovery-plugin'");
     expect(src).toContain('gameDiscoveryPlugin({ projectRoot: __dirname, coreRoot, env: presetEnv })');
     expect(src).toContain("GAMES_CONFIG: process.env.GAMES_CONFIG ?? 'game'");
     expect(src).toContain('resolveCoreAliases(coreRoot)');
@@ -419,6 +420,26 @@ describe('readLayoutGames', () => {
       'repo-layout.json',
     );
     expect(readLayoutGames(layout).sort()).toEqual([...GAMES].sort());
+  });
+
+  it('defaults to the merged core and its submodule remote (Option A)', () => {
+    const layout = path.resolve(
+      __dirname,
+      '..',
+      '..',
+      'scripts',
+      'configs',
+      'repo-layout.json',
+    );
+    const contract = JSON.parse(fs.readFileSync(layout, 'utf-8'));
+    // The scaffold's default sibling path and the submodule remote it mirrors
+    // must both name the merged core, so the scaffold and the layout cannot
+    // drift (F3 / CG-0MUJ1664D009FSFF).
+    expect(DEFAULT_CORE_REL).toBe('../Tableau-Card-Engine');
+    expect(CORE_REMOTE).toBe(contract.core.remote);
+    expect(CORE_REMOTE).toBe(
+      'git@github.com:TheWizardsCode/Tableau-Card-Engine.git',
+    );
   });
 });
 

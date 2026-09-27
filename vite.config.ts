@@ -64,8 +64,8 @@ export default defineConfig(({ mode, command }) => ({
   resolve: {
     // Core aliases resolve to whichever core checkout this build belongs to.
     // `CORE_ROOT` lets a game repo (F4) point them at its `./core` submodule or
-    // the sibling `../tableau-card-engine-core` checkout; it defaults to this
-    // directory, which is correct for the monorepo and the core repo itself.
+    // the sibling `../Tableau-Card-Engine` checkout; it defaults to this
+    // directory, which is correct for the merged core repo itself.
     alias: resolveCoreAliases(process.env.CORE_ROOT || __dirname),
   },
   build: {

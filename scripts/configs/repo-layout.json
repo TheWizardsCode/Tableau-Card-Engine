@@ -2,9 +2,9 @@
   "$comment": "Repo partition contract for the TCE multi-repo decomposition (epic CG-0MTR7DLMY008CK17, feature F1 CG-0MTRO6P18003AZIZ). This is the single source of truth for BOTH the extraction script (scripts/extract-repos.sh) and the distribution builds (configs/*.json presets consumed by the Vite game-discovery plugin, F3). Paths are relative to the monorepo root and use forward slashes.",
   "version": 1,
   "core": {
-    "name": "tableau-card-engine-core",
-    "slug": "tableau-card-engine-core",
-    "remote": "git@github.com:TheWizardsCode/tableau-card-engine-core.git",
+    "name": "Tableau-Card-Engine",
+    "slug": "Tableau-Card-Engine",
+    "remote": "git@github.com:TheWizardsCode/Tableau-Card-Engine.git",
     "paths": [
       "src/core-engine",
       "src/card-system",

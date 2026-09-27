@@ -131,7 +131,7 @@ export function loadPublishTargets(
 export function matchesTarget(target: PublishTarget, selector: string): boolean {
   if (selector === target.slug) return true;
   if (target.kind === 'core') {
-    return selector === 'core' || selector === 'tableau-card-engine-core';
+    return selector === 'core';
   }
   return `tce-${selector}` === target.slug;
 }
