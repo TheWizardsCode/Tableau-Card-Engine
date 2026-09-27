@@ -12,6 +12,7 @@ import Phaser from 'phaser';
 import { SoundManager } from '../../src/core-engine/SoundManager';
 import { SettingsPanel } from '../../src/ui/SettingsPanel';
 import { VERSION_LABEL_TEXT } from '../../src/ui/versionDisplay';
+import { ALPHA_BADGE_FILL, ALPHA_BADGE_LABEL } from '../../src/ui/AlphaBadge';
 import { waitForScene } from '../helpers/waitForScene';
 
 // ── Boot helper ────────────────────────────────────────────
@@ -177,5 +178,26 @@ describe('SettingsPanel version label', () => {
     for (const label of labels) {
       expect(label.visible).toBe(false);
     }
+  });
+
+  it('renders a red ALPHA badge showing the build version above the Settings title', () => {
+    const scene = game!.scene.getScene('SettingsVersionTestScene') as SettingsVersionTestScene;
+
+    const badge = scene.settingsPanel.alphaBadge;
+    expect(badge).toBeDefined();
+    expect(badge.text.text).toBe(ALPHA_BADGE_LABEL);
+    expect(badge.text.text).toContain('ALPHA');
+    expect(badge.text.text).toContain(VERSION_LABEL_TEXT);
+    expect(badge.background.fillColor).toBe(ALPHA_BADGE_FILL);
+  });
+
+  it('stacks the ALPHA badge above the Settings title within the panel', () => {
+    const scene = game!.scene.getScene('SettingsVersionTestScene') as SettingsVersionTestScene;
+
+    const badge = scene.settingsPanel.alphaBadge;
+    // The Settings title sits 30px below the panel padding (y = 50); the badge
+    // must be stacked above it, not below or clipped.
+    expect(badge.y).toBeLessThan(50);
+    expect(badge.y - badge.height / 2).toBeGreaterThanOrEqual(0);
   });
 });

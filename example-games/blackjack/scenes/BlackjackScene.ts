@@ -26,7 +26,7 @@ import type { BlackjackGameState } from '../BlackjackGame';
 import { anchorPoint } from '@ui/screen-layout';
 import { parseScreenLayoutDocument } from '@ui/screen-layout-schema';
 import type { ScreenLayoutDocument, PixelPoint } from '@ui/screen-layout-schema';
-import { CardGameScene, getCardTexture, preloadCardAssets, HandView, flipCard } from '@ui';
+import { CardGameScene, getCardTexture, preloadCardAssets, HandView, flipCard, createSceneTitle } from '@ui';
 import type { HelpSection } from '@ui';
 import type { EventSoundMapping } from '@core-engine/SoundManager';
 import { audioPathWithFallback } from '@ui/CardGameScene';
@@ -256,16 +256,15 @@ export class BlackjackScene extends CardGameScene {
     // Overlay manager
     this.overlayManager = new OverlayManager(this);
 
-    // Title
+    // Title (shared helper — inherits the ALPHA badge)
     const titlePos = resolveBkAnchor('title', 'center');
-    this.add
-      .text(titlePos.x, titlePos.y, 'Blackjack', {
-        fontSize: '28px',
-        color: COLOR_ACCENT,
-        fontFamily: FONT_FAMILY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
+    createSceneTitle(this, 'Blackjack', {
+      y: titlePos.y,
+      fontSize: '28px',
+      color: COLOR_ACCENT,
+      fontFamily: FONT_FAMILY,
+      fontStyle: 'bold',
+    });
 
     // Dealer label
     const dealerLabelPos = resolveBkAnchor('dealerLabel', 'center');

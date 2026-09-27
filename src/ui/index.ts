@@ -305,6 +305,25 @@ export type {
   SceneHeaderResult,
 } from './SceneHeader';
 
+// ALPHA badge (marks every surface as an unreleased ALPHA build)
+export {
+  createAlphaBadge,
+  computeAlphaBadgeY,
+  ALPHA_BADGE_LABEL,
+  ALPHA_BADGE_TEXT_PREFIX,
+  ALPHA_BADGE_FILL,
+  ALPHA_BADGE_TEXT_COLOR,
+  ALPHA_BADGE_FONT_SIZE,
+  ALPHA_BADGE_HEIGHT,
+  ALPHA_BADGE_PADDING_X,
+  ALPHA_BADGE_CHAR_WIDTH,
+  ALPHA_BADGE_MIN_Y,
+  ALPHA_BADGE_OVERLAP,
+  ALPHA_BADGE_DEPTH,
+  ALPHA_BADGE_DEFAULT_TITLE_FONT_SIZE,
+} from './AlphaBadge';
+export type { AlphaBadgeConfig, AlphaBadgeResult } from './AlphaBadge';
+
 // Shared Renderer API – container, HUD, tooltip, and button helpers
 export {
   createHudContainer,

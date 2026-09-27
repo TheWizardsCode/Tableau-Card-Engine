@@ -192,6 +192,14 @@ and automatic row wrapping), CardGameScene base class with
 initHelpPanel/initSettingsPanel helpers, and depth conventions for
 consistent layering.
 
+Every screen also carries a bright-red **ALPHA** badge showing the running
+version (`ALPHA v<version>`), rendered by the shared `createAlphaBadge()`
+helper. It appears automatically above/over every scene title (example games
+and Gym), the Game Selector menu, and the Help/Settings panel headers, so
+testers always know they are on an unreleased build. See
+[Build-Time Version Injection](docs/DEVELOPER.md#build-time-version-injection)
+in the Developer Guide for details.
+
 See [Shared HUD Components](docs/DEVELOPER.md#shared-hud-components) in the
 Developer Guide for full documentation and usage examples.
 

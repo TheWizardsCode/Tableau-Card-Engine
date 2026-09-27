@@ -1036,6 +1036,34 @@ placement is the bottom-left corner; scenes may pass optional position and origi
 parameters to place the label elsewhere (e.g. the game selector passes top-right
 coordinates below the GitHub icon).
 
+### ALPHA badge
+
+Every shipped surface also carries a bright-red **ALPHA** badge that includes the
+running version (`ALPHA v<version>`), so players and testers always know they are on
+an unreleased build. The badge is produced by `createAlphaBadge()` from
+`src/ui/AlphaBadge.ts` and is drawn with Phaser primitives (a red rectangle plus a
+white label) — no image assets or new dependencies, and no animation (so it is
+inherently reduced-motion safe).
+
+`createSceneTitle()` / `createSceneHeader()` render the badge by default, so every
+example-game and Gym scene inherits it with no per-game code. Callers can opt out
+via `SceneTitleConfig.showAlphaBadge: false`. The one-off titles call the factory
+directly: the Game Selector menu title, the `SettingsPanel` title, and the compact
+`Help` + ALPHA header at the top of `HelpPanel`. The existing muted version labels
+above are additive and remain in place.
+
+```typescript
+// src/ui/SceneHeader.ts wires the badge in automatically:
+import { createSceneTitle } from '@ui/SceneHeader';
+createSceneTitle(this, 'My Game');                          // title + ALPHA badge
+createSceneTitle(this, 'My Game', { showAlphaBadge: false }); // title only
+
+// One-off surfaces call the factory directly:
+import { createAlphaBadge, ALPHA_BADGE_LABEL } from '@ui/AlphaBadge';
+const badge = createAlphaBadge(this, { x: 640, titleY: 30, titleFontSizePx: 32 });
+// badge.text.text === ALPHA_BADGE_LABEL (e.g. "ALPHA v0.1.17")
+```
+
 ```typescript
 // src/ui/versionDisplay.ts provides the factory and style constants:
 import { createVersionLabel, VERSION_LABEL_TEXT } from '@ui/versionDisplay';

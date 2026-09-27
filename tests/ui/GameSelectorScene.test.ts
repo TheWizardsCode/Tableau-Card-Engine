@@ -32,6 +32,7 @@ import {
   REGISTRY_KEY_GAMES,
 } from '../../src/ui/GameSelectorScene';
 import type { GameEntry } from '../../src/ui/GameSelectorScene';
+import { ALPHA_BADGE_LABEL, ALPHA_BADGE_FILL } from '../../src/ui/AlphaBadge';
 
 // ── Test data ──────────────────────────────────────────────
 
@@ -107,6 +108,18 @@ function mockImage() {
   return image;
 }
 
+/** Create a mock Phaser.GameObjects.Rectangle. */
+function mockRect() {
+  return {
+    setOrigin: vi.fn().mockReturnThis(),
+    setDepth: vi.fn().mockReturnThis(),
+    setInteractive: vi.fn().mockReturnThis(),
+    setVisible: vi.fn().mockReturnThis(),
+    on: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
+  };
+}
+
 /** Create a mock Phaser.GameObjects.Zone. */
 function mockZone() {
   const handlers: Record<string, Function> = {};
@@ -141,6 +154,7 @@ function injectMocks(
       text: vi.fn(() => mockText()),
       graphics: vi.fn(() => mockGraphics()),
       image: vi.fn(() => mockImage()),
+      rectangle: vi.fn(() => mockRect()),
       zone: vi.fn(() => mockZone()),
     },
     load: {
@@ -510,6 +524,31 @@ describe('GameSelectorScene', () => {
       // Two cards total (two graphics + two zones)
       expect(mocks.add.graphics).toHaveBeenCalledTimes(2);
       expect(mocks.add.zone).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ── ALPHA badge ────────────────────────────────────────────
+
+  describe('ALPHA badge', () => {
+    it('renders a red ALPHA badge with the build version above the title', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [] });
+      scene.create();
+
+      // Badge background is a bright-red rectangle
+      expect(mocks.add.rectangle).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        14,
+        ALPHA_BADGE_FILL,
+        1,
+      );
+
+      // Badge label contains ALPHA + version
+      const textCalls = mocks.add.text.mock.calls as unknown[][];
+      const badgeCall = textCalls.find((c) => c[2] === ALPHA_BADGE_LABEL);
+      expect(badgeCall).toBeDefined();
     });
   });
 

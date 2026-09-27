@@ -31,6 +31,16 @@ export type {
   SceneHeaderResult,
 } from '../SceneHeader';
 export {
+  createAlphaBadge,
+  computeAlphaBadgeY,
+  ALPHA_BADGE_LABEL,
+  ALPHA_BADGE_FILL,
+  ALPHA_BADGE_TEXT_COLOR,
+  ALPHA_BADGE_HEIGHT,
+  ALPHA_BADGE_DEPTH,
+} from '../AlphaBadge';
+export type { AlphaBadgeConfig, AlphaBadgeResult } from '../AlphaBadge';
+export {
   renderCardSvg,
 } from './renderCardSvg';
 export type {

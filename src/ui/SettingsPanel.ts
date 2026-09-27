@@ -13,6 +13,8 @@ import { ListenerRegistry } from '../core-engine/ListenerRegistry';
 import { SettingsButton } from './SettingsButton';
 import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips, getCardDesign, setCardDesign, getAvailableCardDesigns } from './SettingsStore';
 import { createVersionLabel } from './versionDisplay';
+import { createAlphaBadge } from './AlphaBadge';
+import type { AlphaBadgeResult } from './AlphaBadge';
 import { isDevMode, type DebugToolsEntry } from './debug/DebugToolsRegistry';
 
 // ── Public types ────────────────────────────────────────────
@@ -253,6 +255,16 @@ export class SettingsPanel {
   // Version label (shown when panel is open, on the game canvas)
   private _versionLabel: Phaser.GameObjects.Text;
 
+  // ALPHA badge shown above/over the panel title
+  private _alphaBadge!: AlphaBadgeResult;
+
+  /**
+   * The ALPHA badge rendered above/over the "Settings" title.
+   */
+  get alphaBadge(): AlphaBadgeResult {
+    return this._alphaBadge;
+  }
+
   /**
    * The integrated settings button, or `null` when `showButton` is false.
    */
@@ -340,6 +352,17 @@ export class SettingsPanel {
     title.setOrigin(0.5, 0);
     title.setDepth(DEPTH_PANEL_CONTENT);
     this.container.add(title);
+
+    // ALPHA badge stacked above/over the panel title (kept with the panel so
+    // it slides in/out with it).
+    this._alphaBadge = createAlphaBadge(scene, {
+      x: this.panelWidth / 2,
+      titleY: PADDING + 30,
+      titleFontSizePx: 20,
+      depth: DEPTH_PANEL_CONTENT,
+    });
+    this.container.add(this._alphaBadge.background);
+    this.container.add(this._alphaBadge.text);
 
     // ── Scrollable content container ────────────────────
     this._scrollContent = scene.add.container(0, 0);
