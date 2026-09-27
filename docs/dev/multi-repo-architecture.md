@@ -394,7 +394,9 @@ The core split and the initial publication are complete. Remaining work:
   are merged into `Tableau-Card-Engine`; each game composes it as `./core`, and
   the distribution composes the game repos as siblings (no game submodules).
   The migration is driven by the child work items of CG-0MUJ0IAJM009X0Q2 and the
-  deciding record is [`merged-core-decision.md`](./merged-core-decision.md).
+  deciding record is [`merged-core-decision.md`](./merged-core-decision.md). The
+  per-repository repoint result and fresh-clone evidence are recorded in
+  [`merged-core-repoint.md`](./merged-core-repoint.md).
 - **Distribution bootstrap** — `scripts/setup-distribution.ts`
   (`npm run setup:distribution -- --dir ..`) clones the core plus the sibling
   game repos in one command, replacing the single `--recurse-submodules`
