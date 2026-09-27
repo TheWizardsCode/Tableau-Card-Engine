@@ -59,12 +59,14 @@ interface RepoLayout {
   core: {
     name: string;
     slug: string;
+    remote: string;
     paths: string[];
     assets: string[];
   };
   games: Array<{
     name: string;
     slug: string;
+    remote: string;
     paths: string[];
     assets: string[];
   }>;
@@ -457,5 +459,83 @@ describe.skipIf(!HAS_FILTER_REPO)('extract-repos.sh — real extraction', () => 
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
+  });
+});
+
+// ── Merged-core (Option A) topology contract ──────────────────────────────
+//
+// F1 / CG-0MUJ165EV0084YO2. The migration renames the core target from
+// `tableau-card-engine-core` to `Tableau-Card-Engine` (F3
+// CG-0MUJ1664D009FSFF), repoints every `tce-<game>` `./core` submodule at it
+// (F5 CG-0MUJ167LG004J8JQ), and removes the in-tree games so the distribution
+// composes sibling checkouts only (F4 CG-0MUJ166VM006ULRJ).
+//
+// The `repo-layout.json` assertions below encode that end state and execute
+// against the current pre-migration layout, so their bodies fail today.
+// `it.fails` records each expected failure and keeps the suite green; when the
+// migration lands the assertion succeeds and Vitest reports an *unexpected
+// pass*, which is the signal for F3/F5 to flip `it.fails` back to a normal
+// `it` — the value then lives on as a permanent regression guard. This mirrors
+// the documented pending-contract convention in
+// `tests/scripts/repo-publication.test.ts`.
+
+/** The merged core's repository identity (the `repo-layout.json` core entry). */
+const MERGED_CORE = {
+  name: 'Tableau-Card-Engine',
+  slug: 'Tableau-Card-Engine',
+  remote: 'git@github.com:TheWizardsCode/Tableau-Card-Engine.git',
+} as const;
+
+/** The retired core repository slug that must disappear from the layout. */
+const RETIRED_CORE_SLUG = 'tableau-card-engine-core';
+
+describe('merged-core topology contract (Option A)', () => {
+  it.fails('renames the core target to Tableau-Card-Engine (AC1)', () => {
+    const layout = readLayout();
+    expect(layout.core.name).toBe(MERGED_CORE.name);
+    expect(layout.core.slug).toBe(MERGED_CORE.slug);
+  });
+
+  it.fails('points the core remote at Tableau-Card-Engine (AC1/AC2)', () => {
+    // `repo-layout.json` `core.remote` is the single source of truth every
+    // game's `./core` submodule URL is repointed from in F5.
+    const layout = readLayout();
+    expect(layout.core.remote).toBe(MERGED_CORE.remote);
+  });
+
+  it.fails('removes every tableau-card-engine-core target (AC1)', () => {
+    const layout = readLayout();
+    const retired = [layout.core, ...layout.games].filter(
+      (repo) =>
+        repo.slug === RETIRED_CORE_SLUG ||
+        repo.remote.includes(RETIRED_CORE_SLUG),
+    );
+    expect(retired).toEqual([]);
+  });
+
+  it('keeps every game as a tce-<game> repository (AC2)', () => {
+    const layout = readLayout();
+    for (const game of layout.games) {
+      expect(game.slug).toBe(`tce-${game.name}`);
+      expect(game.remote).toBe(
+        `git@github.com:TheWizardsCode/tce-${game.name}.git`,
+      );
+    }
+  });
+
+  it('declares no game submodule entry in the core repo (AC3)', () => {
+    // The merged distribution composes games as sibling checkouts, so the
+    // core repo must never mount a game under `.gitmodules`. Absence of the
+    // file yields an empty list (the strongest form of the contract); when a
+    // `.gitmodules` does exist it must not carry any game mount.
+    const gitmodules = path.join(REPO_ROOT, '.gitmodules');
+    const gameMounts: string[] = [];
+    if (fs.existsSync(gitmodules)) {
+      const text = fs.readFileSync(gitmodules, 'utf-8');
+      for (const game of GAME_NAMES) {
+        if (text.includes(`example-games/${game}`)) gameMounts.push(game);
+      }
+    }
+    expect(gameMounts).toEqual([]);
   });
 });

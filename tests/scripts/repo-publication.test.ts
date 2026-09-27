@@ -328,3 +328,41 @@ describe('publish-repos — safety guards and dry run', () => {
     expect(report.exitCode).not.toBe(0);
   });
 });
+
+// ── Merged-core (Option A) publication contract ───────────────────────────
+//
+// F1 / CG-0MUJ165EV0084YO2. Publication must publish the merged core as
+// `Tableau-Card-Engine` and must never recreate the retired
+// `tableau-card-engine-core` repository (F3 CG-0MUJ1664D009FSFF, F6
+// CG-0MUJ1689Z007M58X). The `it.fails` lifecycle is documented in
+// `tests/scripts/extract-repos.test.ts`: the bodies fail against the current
+// pre-migration layout, Vitest records them as expected failures, and F3/F6
+// flip them to normal `it`s once the migration lands.
+
+describe('merged-core publication contract (Option A)', () => {
+  const MERGED_CORE = {
+    slug: 'Tableau-Card-Engine',
+    remote: 'git@github.com:TheWizardsCode/Tableau-Card-Engine.git',
+  } as const;
+
+  it.fails('publishes the merged core instead of tableau-card-engine-core (AC1)', () => {
+    const layout = readLayout();
+    expect(layout.core.slug).toBe(MERGED_CORE.slug);
+    expect(layout.core.remote).toBe(MERGED_CORE.remote);
+  });
+
+  it.fails('leaves no tableau-card-engine-core publication target (AC1)', () => {
+    const layout = readLayout();
+    const slugs = [layout.core, ...layout.games].map((r) => r.slug);
+    expect(slugs).not.toContain('tableau-card-engine-core');
+  });
+
+  it.fails('resolves the merged core target from repo-layout.json (AC1/AC2)', async () => {
+    const { loadPublishTargets } = await loadHelper();
+    const core = loadPublishTargets(LAYOUT_PATH).find(
+      (t: any) => t.kind === 'core',
+    );
+    expect(core?.slug).toBe(MERGED_CORE.slug);
+    expect(core?.remote).toBe(MERGED_CORE.remote);
+  });
+});

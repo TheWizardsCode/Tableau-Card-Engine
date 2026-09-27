@@ -575,3 +575,81 @@ describe('test runners select the full game preset', () => {
     });
   }
 });
+
+// ── Merged-core composition: sibling-only, no submodules ──────────────────
+//
+// F1 / CG-0MUJ165EV0084YO2. The merged-core distribution composes each game
+// from a sibling checkout (`<root>/<path>/<siblingScenePath>`) and must never
+// resolve a game through a `.gitmodules` submodule mount (AC4). The pending
+// assertion uses `it.fails` (lifecycle note in
+// `tests/scripts/extract-repos.test.ts`): today the plugin still prefers an
+// in-tree `example-games/<game>` copy for monorepo compatibility, which F4
+// CG-0MUJ166VM006ULRJ removes.
+describe('sibling-only game composition (merged core)', () => {
+  it('resolves a game from its sibling repo and ignores .gitmodules (AC4)', () => {
+    tmpRoot = makeFixture([], null);
+    const core = path.join(tmpRoot, 'tableau-card-engine-core');
+    // A .gitmodules that (wrongly) claims the game is a core submodule. The
+    // plugin must resolve the sibling checkout regardless.
+    fs.writeFileSync(
+      path.join(core, '.gitmodules'),
+      [
+        '[submodule "golf"]',
+        '\tpath = example-games/golf',
+        '\turl = git@github.com:TheWizardsCode/tce-golf.git',
+        '',
+      ].join('\n'),
+    );
+    writeSrcLayoutScene(tmpRoot, 'golf');
+    const config = {
+      games: [
+        {
+          id: 'golf',
+          path: '../tce-golf',
+          scenePath: 'example-games/golf/scenes/GolfScene.ts',
+          siblingScenePath: 'src/scenes/GolfScene.ts',
+        },
+      ],
+    };
+    const [resolved] = discoverGames(config, core);
+    expect(resolved.absoluteScenePath).toBe(
+      path.join(tmpRoot, 'tce-golf', 'src', 'scenes', 'GolfScene.ts'),
+    );
+  });
+
+  it.fails('never resolves a game from an in-tree example-games/<game> copy (AC4)', () => {
+    tmpRoot = makeFixture(['golf'], {
+      games: [
+        {
+          id: 'golf',
+          path: '../tce-golf',
+          scenePath: 'example-games/golf/scenes/GolfScene.ts',
+        },
+      ],
+    });
+    const core = path.join(tmpRoot, 'tableau-card-engine-core');
+    // Provide BOTH an in-tree copy and the sibling checkout; the sibling must
+    // win once the core is game-free (F4).
+    const localDir = path.join(core, 'example-games', 'golf', 'scenes');
+    fs.mkdirSync(localDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(localDir, 'GolfScene.ts'),
+      "export const GAME_INFO = { sceneKey: 'GolfScene', title: 'Local', description: 'd' };\n",
+    );
+    const sibling = path.join(
+      tmpRoot,
+      'tce-golf',
+      'example-games',
+      'golf',
+      'scenes',
+      'GolfScene.ts',
+    );
+    fs.writeFileSync(
+      sibling,
+      "export const GAME_INFO = { sceneKey: 'GolfScene', title: 'Sibling', description: 's' };\n",
+    );
+    const cfg = loadGamesConfig(path.join(core, 'configs', 'preset.json'));
+    const [resolved] = discoverGames(cfg, core);
+    expect(resolved.absoluteScenePath).toBe(sibling);
+  });
+});
