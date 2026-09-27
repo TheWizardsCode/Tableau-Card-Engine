@@ -5,11 +5,27 @@
 **Feature:** CG-0MTRO6P18003AZIZ — *Design architecture & extraction script with history*
 **Audience:** Engine maintainers, game developers, distribution builders
 
+> **Merged-core update (Option A).** The core repo is no longer a separate
+> `tableau-card-engine-core`: the engine, the Gym, the launcher shell and the
+> distribution live together in **`Tableau-Card-Engine`**. Each game repo
+> composes that repo as its `./core` submodule, and the multi-game distribution
+> composes the game repos as **sibling checkouts** (the core never submodules
+> games — that would be cyclic). See
+> [`merged-core-decision.md`](./merged-core-decision.md). Where this document
+> describes the separate core repository it is the historical account of the
+> first extraction (F1); the merged-core decision supersedes it.
+
 This document is the architecture decision record for decomposing the Tableau
 Card Engine (TCE) monorepo into one **core-engine** repository plus one
 repository per example game, composed back together with **git submodules**.
 It records *what moves where*, *how history is preserved*, and *how assets are
 partitioned*.
+
+> **Status of the split in this document.** The engine/Gym/launcher partition
+> described here is current and still holds; only the *repository identity* of
+> the core changed under the merged-core decision — the core repository is now
+> `Tableau-Card-Engine` (self-hosting the monorepo tree), not
+> `tableau-card-engine-core`.
 
 The machine-readable form of every decision here lives in
 [`scripts/configs/repo-layout.json`](../../scripts/configs/repo-layout.json) —
@@ -26,7 +42,7 @@ documented in full in [Config-Driven Game Catalogue](game-configuration.md).
 
 ```
 <parent>/
-├── tableau-card-engine-core/     # the engine + Gym + launcher shell
+├── Tableau-Card-Engine/          # the engine + Gym + launcher shell + assets
 ├── tce-golf/                     # one repo per game …
 ├── tce-beleaguered-castle/
 ├── tce-blackjack/
@@ -38,10 +54,14 @@ documented in full in [Config-Driven Game Catalogue](game-configuration.md).
 ```
 
 Repos are checked out as **siblings**. A game repo pulls the engine in as a git
-submodule at `./core`, so a `game + engine` checkout is itself a minimal TCE
-distribution with exactly one game. The main `Tableau-Card-Engine` repository
-becomes the **launcher/distribution**: it composes the engine with any subset
-of game submodules.
+submodule at `./core` (pointing at `Tableau-Card-Engine`), so a `game + engine`
+checkout is itself a minimal TCE distribution with exactly one game.
+`Tableau-Card-Engine` is the **single merged core**: engine + Gym + launcher
+shell + distribution. The multi-game distribution composes the game repos as
+**sibling checkouts** — the core never submodules games, which
+`git --recurse-submodules` and most tooling cannot represent (the game submodule
+of the core would itself submodule the core). See
+[`merged-core-decision.md`](./merged-core-decision.md).
 
 ### Decision table — what stays in core
 
@@ -235,13 +255,13 @@ files / 1840 tests) and the Gym smoke profile boots (2 files / 20 tests).
 leaves it unbuildable: a game repo has no `package.json`, `vite.config.ts`,
 `tsconfig.json`, `main.ts` or `index.html`. `scripts/game-repo-scaffold.ts`
 adds them, turning an extracted checkout into a runnable **single-game
-launcher** that composes the sibling core (`../tableau-card-engine-core`).
+launcher** that composes the sibling core (`../Tableau-Card-Engine`).
 
 ```bash
 # One game, next to an extracted checkout:
 tsx scripts/game-repo-scaffold.ts \
   --game golf --game-repo-root ../tce-golf \
-  --core-root ../tableau-card-engine-core
+  --core-root ../Tableau-Card-Engine
 
 # Every game in scripts/configs/repo-layout.json:
 npm run scaffold:games
@@ -315,11 +335,14 @@ launcher is F7.
 
 ### Published GitHub remotes
 
-The nine repositories are **created and published** under `TheWizardsCode`:
+The repositories are **created and published** under `TheWizardsCode`. Under the
+merged-core decision the single core repository is `Tableau-Card-Engine` (which
+is also the monorepo/launcher); the interim `tableau-card-engine-core`
+repository is retired. See [`merged-core-decision.md`](./merged-core-decision.md).
 
 | repo | visibility | branches | default |
 |---|---|---|---|
-| `tableau-card-engine-core` | public | `dev`, `main` | `main` |
+| `Tableau-Card-Engine` | public | `dev`, `main` | `main` |
 | `tce-golf` | public | `dev`, `main` | `main` |
 | `tce-beleaguered-castle` | public | `dev`, `main` | `main` |
 | `tce-blackjack` | public | `dev`, `main` | `main` |
@@ -329,10 +352,16 @@ The nine repositories are **created and published** under `TheWizardsCode`:
 | `tce-main-street` | public | `dev`, `main` | `main` |
 | `tce-coloretto` | public | `dev`, `main` | `main` |
 
+> **Historical note.** `tableau-card-engine-core` was the F1 core repository.
+> The merged-core decision retires it (F6 archives then deletes it); it is no
+> longer a publication target and no longer the `./core` submodule URL. The
+> publication contract in [`repo-publication-decision.md`](./repo-publication-decision.md)
+> is updated by F3.
+
 The core repository holds the engine + Gym + launcher shell and **no games**;
 each game repository has its source at repo-root `src/` and wires the engine as
 the `core` git submodule pointing at
-`git@github.com:TheWizardsCode/tableau-card-engine-core.git`. A fresh game
+`git@github.com:TheWizardsCode/Tableau-Card-Engine.git`. A fresh game
 checkout therefore pulls the engine in with `git clone --recurse-submodules`.
 Only `dev` + `main` are published (no monorepo feature/`wl-*` branches and no
 `v0.1.x` tags); `main` is seeded once from `dev` and is the default branch, and
@@ -361,10 +390,14 @@ force-pushed. The helper does not modify the source monorepo.
 
 The core split and the initial publication are complete. Remaining work:
 
-- **Launcher submodules** — switch the `Tableau-Card-Engine` launcher's
-  `.gitmodules` to the published `tce-<game>` remotes so it composes the game
-  repos as git submodules instead of carrying in-tree `example-games/<game>`
-  trees (out of scope for the initial publication).
+- **Merged core (Option A)** — the engine, Gym, launcher shell and distribution
+  are merged into `Tableau-Card-Engine`; each game composes it as `./core`, and
+  the distribution composes the game repos as siblings (no game submodules).
+  The migration is driven by the child work items of CG-0MUJ0IAJM009X0Q2 and the
+  deciding record is [`merged-core-decision.md`](./merged-core-decision.md).
+- **Distribution bootstrap** — a manifest/script that clones the core plus the
+  sibling game repos, replacing the single `--recurse-submodules` distribution
+  clone that the sibling composition gives up.
 - **Promotion** — keep each repository's `main` current by promoting `dev`
   through the release process (the ship skill).
 - **CI / npm publication** — still deliberately out of scope.

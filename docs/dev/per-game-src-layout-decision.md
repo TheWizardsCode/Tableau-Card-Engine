@@ -329,7 +329,7 @@ Notes:
 scripts/extract-repos.sh --target golf        # -> ../tce-golf (game tree at src/)
 tsx scripts/game-repo-scaffold.ts \
   --game golf --game-repo-root ../tce-golf \
-  --core-root ../tableau-card-engine-core
+  --core-root ../Tableau-Card-Engine
 
 # 2. Develop / build / test the single-game repo:
 cd ../tce-golf

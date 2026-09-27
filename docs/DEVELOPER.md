@@ -832,13 +832,17 @@ Audio assets are organized in `public/assets/audio/<game>/` with a fallback to
 
 ## Project Structure
 
-> **Multi-repo note.** This tree describes the **launcher checkout**, where the
-games are present locally under `example-games/`. In the decomposed layout the
-engine lives in `tableau-card-engine-core` and each game in its own `tce-<game>`
-repo, composed with git submodules. A game repo keeps the game tree at repo-root
-`src/` (the extraction renames `example-games/<game>/` -> `src/`) plus its
-`./core` submodule, and imports the engine through path aliases. See
-[Multi-Repo Architecture](dev/multi-repo-architecture.md) for the full split and
+> **Multi-repo note.** This tree describes the **merged core checkout**
+(`Tableau-Card-Engine`), where the games are present locally under
+`example-games/`. In the decomposed layout the engine, Gym, launcher shell and
+distribution live in `Tableau-Card-Engine` and each game in its own `tce-<game>`
+repo, which composes the core with a `./core` git submodule. A game repo keeps
+the game tree at repo-root `src/` (the extraction renames
+`example-games/<game>/` -> `src/`) plus its `./core` submodule, and imports the
+engine through path aliases. Full distribution checkouts compose the game repos
+as **siblings** (the core never submodules games). See
+[Multi-Repo Architecture](dev/multi-repo-architecture.md) and the
+[merged-core decision](dev/merged-core-decision.md) for the full split and
 `configs/*.json` for the build presets.
 
 ```
@@ -1008,9 +1012,9 @@ import { ENGINE_VERSION } from '@core-engine/index';
 The aliases are rooted at a single **core checkout root**, which
 `vite.config.ts` computes via `resolveCoreAliases()` from
 `scripts/vite-game-discovery-plugin.ts`. By default the root is the directory
-containing `vite.config.ts` (correct for the monorepo and the core-engine
-repo). A game repo sets `CORE_ROOT` to point the same aliases at its engine
-checkout — the `./core` submodule or the sibling `../tableau-card-engine-core`:
+containing `vite.config.ts` (correct for the merged core checkout, which *is*
+the engine repo). A game repo sets `CORE_ROOT` to point the same aliases at its
+engine checkout — the `./core` submodule or the sibling `../Tableau-Card-Engine`:
 
 ```bash
 CORE_ROOT=./core npm run build     # game-repo context
@@ -1164,7 +1168,7 @@ Option C `src/` layout (`src/scenes/<Game>Scene.ts`), then at the legacy
 ```bash
 # Scaffold a game repo alongside the core checkout
 mkdir tce-my-game && cd tce-my-game
-git submodule add git@github.com:TheWizardsCode/tableau-card-engine-core.git core
+git submodule add git@github.com:TheWizardsCode/Tableau-Card-Engine.git core
 ```
 
 ### Steps
@@ -1238,12 +1242,12 @@ CORE_ROOT=./core npm run build:electron    # desktop build
 
 An extracted game checkout (F1) has no root project files. Generate them with
 `scripts/game-repo-scaffold.ts`, which turns the checkout into a runnable
-single-game launcher against a sibling core (`../tableau-card-engine-core`):
+single-game launcher against a sibling core (`../Tableau-Card-Engine`):
 
 ```bash
 tsx scripts/game-repo-scaffold.ts \
   --game <game> --game-repo-root ../tce-<game> \
-  --core-root ../tableau-card-engine-core
+  --core-root ../Tableau-Card-Engine
 # …or every game in scripts/configs/repo-layout.json:
 npm run scaffold:games
 ```
@@ -1264,9 +1268,14 @@ and the [layout decision record](dev/per-game-src-layout-decision.md).
 
 ### Publishing the nine repositories
 
-The nine repositories named in `scripts/configs/repo-layout.json` (the core
-repo plus one `tce-<game>` per game) are created and published by
-`scripts/publish-repos.ts`:
+The nine repositories named in `scripts/configs/repo-layout.json` (the merged
+core repo `Tableau-Card-Engine` plus one `tce-<game>` per game) are created and
+published by `scripts/publish-repos.ts`:
+
+> **Merged-core note.** Under the [merged-core decision](dev/merged-core-decision.md)
+the core target is `Tableau-Card-Engine` and the interim
+`tableau-card-engine-core` repository is retired, not published. The publication
+helper/target list is updated by the F3 migration child of CG-0MUJ0IAJM009X0Q2.
 
 ```bash
 npm run publish:repos -- --dry-run      # print the plan; runs no gh/git command
@@ -1298,11 +1307,12 @@ npm run build            # tsc --noEmit && vite build
 npm test -- --project unit
 ```
 
-The engine-only repository works the same way (it has no submodules):
+The merged-core repository works the same way for the engine (it has no game
+submodules — the distribution composes games as siblings):
 
 ```bash
-git clone git@github.com:TheWizardsCode/tableau-card-engine-core.git
-cd tableau-card-engine-core
+git clone git@github.com:TheWizardsCode/Tableau-Card-Engine.git
+cd Tableau-Card-Engine
 npm install
 npm run build
 npx vitest run --project unit   # `npm test` runs the full CI suite

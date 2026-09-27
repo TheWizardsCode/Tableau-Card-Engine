@@ -65,11 +65,13 @@ See `docs/DEVELOPER.md` (Electron Launcher / Desktop Packaging) and `RELEASE.md`
 
 The Tableau Card Engine (TCE) builds increasingly complex card games as "spikes" to validate gameplay mechanics and engine APIs. Reusable components are extracted from each spike into shared engine modules. The end goal is a fully modular engine that others can use to build their own tableau card games.
 
-The project is organised as a **multi-repo distribution**. Shared engine code,
-the Gym, and the launcher shell live in the **core-engine repo**; each example
-game is its own repo that composes the engine as a git submodule. The
-`Tableau-Card-Engine` repo is the **launcher / distribution**: it composes the
-engine with any subset of game repos and produces the web and desktop builds.
+The project is organised as a **multi-repo distribution**. The engine, the
+Gym, the launcher shell and the distribution all live in **one merged core
+repository, `Tableau-Card-Engine`**; each example game is its own `tce-<game>`
+repo that composes the core as a git submodule at `./core`. The multi-game
+distribution composes the game repos as **sibling checkouts** (the core never
+submodules games — that would be cyclic). See
+[the merged-core decision](docs/dev/merged-core-decision.md).
 
 See [Repository Map (multi-repo layout)](#repository-map-multi-repo-layout).
 
@@ -77,12 +79,15 @@ See [Repository Map (multi-repo layout)](#repository-map-multi-repo-layout).
 
 ## Repository Map (multi-repo layout)
 
-TCE is split into one **core-engine** repo plus one repo per game, composed back
-together with **git submodules**. Repos are checked out as siblings:
+TCE is split into one **merged core** repo plus one repo per game. A game
+composes the core as a `./core` submodule; the distribution composes the game
+repos as siblings (no game submodules — see
+[the merged-core decision](docs/dev/merged-core-decision.md)). Repos are checked
+out as siblings:
 
 ```
 <parent>/
-├── tableau-card-engine-core/   engine + Gym + launcher shell + shared assets
+├── Tableau-Card-Engine/        engine + Gym + launcher shell + shared assets
 ├── tce-golf/                   one repo per game (pulls ./core as a submodule)
 ├── tce-beleaguered-castle/
 ├── tce-blackjack/
@@ -96,16 +101,17 @@ together with **git submodules**. Repos are checked out as siblings:
 ### Cloning
 
 ```bash
-# Engine + Gym only
-git clone git@github.com:TheWizardsCode/tableau-card-engine-core.git
+# The merged core (engine + Gym + launcher shell); carries no games
+# (example-games/ holds only gym)
+git clone git@github.com:TheWizardsCode/Tableau-Card-Engine.git
 
 # A game repo, with its engine submodule
 git clone --recurse-submodules git@github.com:TheWizardsCode/tce-golf.git
 # ...or, in an existing checkout:
 git submodule update --init --recursive
 
-# The launcher/distribution repo (engine + whichever games are configured)
-git clone --recurse-submodules git@github.com:TheWizardsCode/Tableau-Card-Engine.git
+# Full distribution: the core plus sibling game clones
+#   (the distribution bootstrap script is added by the merged-core work)
 ```
 
 ### Building a distribution
@@ -142,10 +148,10 @@ extracted game checkout has no root project files; generate them with
 the shared assets):
 
 ```bash
-# from the core repo, next to an extracted tce-golf checkout
+# from the merged core repo, next to an extracted tce-golf checkout
 tsx scripts/game-repo-scaffold.ts \
   --game golf --game-repo-root ../tce-golf \
-  --core-root ../tableau-card-engine-core
+  --core-root ../Tableau-Card-Engine
 
 cd tce-golf
 npm install

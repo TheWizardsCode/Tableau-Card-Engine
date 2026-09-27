@@ -7,6 +7,15 @@ GitHub repositories and push extracted history*
 contract*
 **Audience:** Distribution maintainers, release engineers, agents
 
+> **Superseded in part (merged core / Option A).** This record describes the
+> original **nine-repository** publication, including the interim
+> `tableau-card-engine-core` core repository. Under
+> [`merged-core-decision.md`](./merged-core-decision.md) the single core
+> repository is `Tableau-Card-Engine` and `tableau-card-engine-core` is retired;
+> the mechanism, ref contract (`dev`/`main`), idempotency and no-force guards
+> below still apply. The target list and core name are updated by the F3
+> migration child of CG-0MUJ0IAJM009X0Q2.
+
 This record fixes **how** the nine extracted repositories are created on GitHub
 and **which refs** they carry. Extraction, the `src/` rename and the scaffold are
 already decided (see
@@ -44,8 +53,9 @@ re-runnable safely, and cannot be covered by the unit suite.
 The helper must support:
 
 - **no target flag** — publish all nine targets from `repo-layout.json`;
-- **`--target <name>`** — publish one target (`core` for
-  `tableau-card-engine-core`, the game name otherwise), repeatable;
+- **`--target <name>`** — publish one target (`core` for the core repo —
+`Tableau-Card-Engine` under the merged-core decision, the game name
+otherwise), repeatable;
 - **`--dry-run`** — print the full plan and write nothing (no `gh`, no `git
   push`, no filesystem mutation outside a temp file);
 - **`--repos-dir <path>`** — directory holding the extracted/scaffolded
@@ -216,8 +226,8 @@ Repeat for `tce-main-street`, and for the core repository itself:
 
 ```bash
 tmp="$(mktemp -d)"
-git clone git@github.com:TheWizardsCode/tableau-card-engine-core.git "$tmp/tableau-card-engine-core"
-cd "$tmp/tableau-card-engine-core"
+git clone git@github.com:TheWizardsCode/Tableau-Card-Engine.git "$tmp/Tableau-Card-Engine"
+cd "$tmp/Tableau-Card-Engine"
 npm install && npm run build && npm test -- --project unit
 ```
 
