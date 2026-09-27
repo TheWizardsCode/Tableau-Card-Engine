@@ -165,13 +165,12 @@ describe('smoke/dev test lists follow the selected preset', () => {
         for (const file of includeFor(config, name)) {
           if (fs.existsSync(path.join(REPO_ROOT, file))) continue;
           // A game that is not checked out (core-only or partial checkout) has
-          // no test tree, so its entries are legitimately absent.
+          // no sibling test tree, so its entries are legitimately absent.
+          // Sibling-only (Option A): use the sibling checkout as the proxy —
+          // not `tests/<group>` / `example-games/<group>`, which may hold
+          // ignored test artifacts in a long-lived checkout.
           const group = file.split('/')[1];
-          if (
-            group &&
-            !fs.existsSync(path.join(REPO_ROOT, 'example-games', group)) &&
-            !fs.existsSync(path.join(REPO_ROOT, 'tests', group))
-          ) {
+          if (group && !fs.existsSync(path.join(REPO_ROOT, '..', `tce-${group}`))) {
             continue;
           }
           throw new Error(`${name} references missing test file: ${file}`);
