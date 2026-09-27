@@ -110,7 +110,9 @@ remain in history):
    bootstrap (F4).
 4. Re-point and re-pin each `tce-<game>` `./core` submodule at
    `Tableau-Card-Engine` (F5).
-5. Archive and delete `tableau-card-engine-core` (F6).
+5. Archive `tableau-card-engine-core` (F6 — archived 2026-09-27); deletion is
+   deferred to the follow-up `CG-0MUKGQINO002ILXA`, which is blocked by this
+   epic and runs after it (including F7) is complete and released.
 6. Verify fresh clones and the full build/test gates (F7).
 
 ## 7. Out of scope

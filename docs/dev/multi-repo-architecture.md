@@ -353,7 +353,8 @@ repository is retired. See [`merged-core-decision.md`](./merged-core-decision.md
 | `tce-coloretto` | public | `dev`, `main` | `main` |
 
 > **Historical note.** `tableau-card-engine-core` was the F1 core repository.
-> The merged-core decision retires it (F6 archives then deletes it); it is no
+> The merged-core decision retires it (F6 archived it on 2026-09-27; deletion is
+> deferred to the follow-up `CG-0MUKGQINO002ILXA`, blocked by the epic); it is no
 > longer a publication target and no longer the `./core` submodule URL. The
 > publication contract in [`repo-publication-decision.md`](./repo-publication-decision.md)
 > is updated by F3.

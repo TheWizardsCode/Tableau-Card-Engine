@@ -124,11 +124,24 @@ Both published branches (`dev` and `main`) of every game repository are now
 consistent, and **no published branch of any game repo references the retired
 `tableau-card-engine-core`**.
 
-## Retirement of `tableau-card-engine-core` (F6) — deliberately deferred
+## Retirement of `tableau-card-engine-core` (F6)
 
-Deleting `tableau-card-engine-core` (F6, CG-0MUJ1689Z007M58X) is intentionally
-deferred until the merged-core refactoring is otherwise complete. The old
-repository is now unreferenced by any game repo branch; it can be archived and
-then deleted later without breaking a clone. F6 remains the tracked work item
-for that retirement and also requires a `gh` token with the `delete_repo`
-scope.
+The retired `tableau-card-engine-core` repository was **archived** on
+2026-09-27 (F6, CG-0MUJ1689Z007M58X). It is unreferenced by any game repo
+branch (`dev` or `main`), so no clone is affected; `gh api
+repos/TheWizardsCode/tableau-card-engine-core` reports `archived: true`.
+Archiving makes the repository read-only (no pushes, issues or pull requests)
+while leaving it cloneable.
+
+**Deletion is deliberately deferred** to the follow-up work item
+`CG-0MUKGQINO002ILXA` (*Delete the retired tableau-card-engine-core
+repository*), which is **blocked by** the merged-core epic
+CG-0MUJ0IAJM009X0Q2. Keeping the archived repository available preserves the old
+filtered-history pin `2e9fc0e5` and any pre-repoint game commits during the F7
+end-to-end verification; deletion runs only after the epic is complete and
+released. It requires a `gh` token with the `delete_repo` scope:
+
+```bash
+gh auth refresh -s delete_repo
+gh repo delete TheWizardsCode/tableau-card-engine-core --yes   # → gh api returns 404
+```
