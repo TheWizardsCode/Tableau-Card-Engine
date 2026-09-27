@@ -121,6 +121,8 @@ export default defineConfig(({ mode, command }) => ({
           globals: true,
           environment: 'node',
           include: ['tests/e2e/replay-*.test.ts'],
+          // Game-owned; absent in a game-free merged core (Option A).
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 180_000,
@@ -270,6 +272,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part1',
           include: ['tests/e2e/main-street-tutorial-e2e-part1.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -288,6 +292,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part2',
           include: ['tests/e2e/main-street-tutorial-e2e-part2.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -306,6 +312,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part3',
           include: ['tests/e2e/main-street-tutorial-e2e-part3.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -324,6 +332,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part4',
           include: ['tests/e2e/main-street-tutorial-e2e-part4.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -342,6 +352,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part5',
           include: ['tests/e2e/main-street-tutorial-e2e-part5.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -360,6 +372,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part6',
           include: ['tests/e2e/main-street-tutorial-e2e-part6.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,

@@ -133,13 +133,20 @@ to include:
 ```
 
 An unknown preset **name** fails the build rather than silently shipping fewer
-games. A game is resolved **locally first** (`example-games/<id>/…`, the flat
-monorepo layout), then at the Option C sibling `src/` layout
-(`../tce-<id>/src/…`), then at the legacy sibling layout
-(`../tce-<id>/example-games/<id>/…`), so one preset set works in every
-composition. A missing game fails the build with a message naming it and every
-path it looked in. The **Gym is core-owned and always present**, including in a
-core-only build.
+games. A game is resolved **sibling-only** (the merged core carries no games at
+HEAD): first at the Option C `src/` layout (`../tce-<id>/src/…`), then at the
+legacy sibling layout (`../tce-<id>/example-games/<id>/…`). An in-tree
+`example-games/<id>/` copy is never consulted. A missing game fails the build
+with a message naming it and every path it looked in. The **Gym is core-owned
+and always present**, including in a core-only build.
+
+A full multi-game distribution is composed from the core plus sibling game
+checkouts; bootstrap it in one command:
+
+```bash
+npm run setup:distribution -- --dir ..   # clone core + all sibling game repos
+npm run setup:distribution -- --dry-run  # print the plan only
+```
 
 > **Full reference:** [Config-Driven Game Catalogue](dev/game-configuration.md)
 > is the authoritative guide to the preset schema (required and optional
@@ -155,12 +162,18 @@ core-only build.
 
 > **Test suites always use the full preset.** The shell runners
 > (`scripts/run-ci-tests.sh`, `run-dev-tests.sh`, `run-smoke-tests.sh`,
-> `run-tutorial-tests.sh`) export `GAMES_CONFIG=full` by default, because tests
-> exercise every game. Override with an explicit `GAMES_CONFIG=…` if needed.
+> `run-tutorial-tests.sh`) export `GAMES_CONFIG=full` by default, because the
+> game suites exercise every game. Override with an explicit `GAMES_CONFIG=…` if
+> needed. In a game-free core checkout the Main Street tutorial projects match
+> no files; `run-tutorial-tests.sh` skips them (and the projects set
+> `passWithNoTests`), so the core's suite stays green without sibling games.
 
-> **`.worklog/worktrees/` layouts:** the local lookup uses `<root>/<scenePath>`,
-> so presets resolve correctly inside a git worktree as well as the main
-> checkout.
+> **`.worklog/worktrees/` layouts:** the sibling lookup is relative to the
+> current project root, so presets resolve from a git worktree exactly as from
+> the main checkout. Because games are sibling checkouts (`../tce-<game>`),
+> a worktree resolves siblings next to itself (`.worklog/worktrees/tce-<game>`);
+> run distribution builds from the main checkout, or symlink siblings beside
+> the worktree.
 
 ## Building for Production
 
@@ -833,16 +846,15 @@ Audio assets are organized in `public/assets/audio/<game>/` with a fallback to
 ## Project Structure
 
 > **Multi-repo note.** This tree describes the **merged core checkout**
-(`Tableau-Card-Engine`), where the games are present locally under
-`example-games/`. In the decomposed layout the engine, Gym, launcher shell and
-distribution live in `Tableau-Card-Engine` and each game in its own `tce-<game>`
-repo, which composes the core with a `./core` git submodule. A game repo keeps
-the game tree at repo-root `src/` (the extraction renames
-`example-games/<game>/` -> `src/`) plus its `./core` submodule, and imports the
-engine through path aliases. Full distribution checkouts compose the game repos
-as **siblings** (the core never submodules games). See
+(`Tableau-Card-Engine`), which carries **no games at HEAD** (`example-games/`
+holds only the core-owned `gym`). Each game lives in its own `tce-<game>` repo
+at repo-root `src/` (the extraction renames `example-games/<game>/` -> `src/`)
+plus a `./core` git submodule pointing at `Tableau-Card-Engine`; engine imports
+resolve through path aliases. A full distribution composes the core plus the
+game repos as **sibling checkouts** (the core never submodules games);
+bootstrap it with `npm run setup:distribution -- --dir ..`. See
 [Multi-Repo Architecture](dev/multi-repo-architecture.md) and the
-[merged-core decision](dev/merged-core-decision.md) for the full split and
+[merged-core decision](dev/merged-core-decision.md) for the full split, and
 `configs/*.json` for the build presets.
 
 ```
@@ -1158,12 +1170,12 @@ When migrating an existing game to the canonical pattern:
 
 ### Repo layout
 
-A new game gets its **own repository** (`tce-<game>`) that composes the engine as
-a git submodule at `./core`. For local development against a launcher checkout,
-the game can also live at `example-games/<game-name>/`; the discovery plugin
-resolves a game **locally first**, then as a sibling `../tce-<game>` repo at the
-Option C `src/` layout (`src/scenes/<Game>Scene.ts`), then at the legacy
-`example-games/<game>/` sibling layout.
+A new game gets its **own repository** (`tce-<game>`) that composes the merged
+core as a git submodule at `./core`, with its source at repo-root `src/`. The
+core repo carries **no games at HEAD**; the discovery plugin resolves a game
+**sibling-only** (`../tce-<game>`), first at the Option C `src/` layout
+(`src/scenes/<Game>Scene.ts`) and then at the legacy `example-games/<game>/`
+sibling layout. An in-tree `example-games/<game>/` copy is never consulted.
 
 ```bash
 # Scaffold a game repo alongside the core checkout
@@ -1173,12 +1185,12 @@ git submodule add git@github.com:TheWizardsCode/Tableau-Card-Engine.git core
 
 ### Steps
 
-1. Create the game tree: `example-games/<game-name>/`
-2. Add a standalone entry point: `example-games/<game-name>/main.ts`
-3. Add a factory function: `example-games/<game-name>/createXxxGame.ts` (for browser tests)
-4. Add scenes: `example-games/<game-name>/scenes/<SceneName>.ts` (extend `Phaser.Scene`)
-5. Place game-owned assets under the game tree / `public/assets/<game-name>/` and document attribution in `public/assets/CREDITS.md`
-6. Add game-specific tests under `tests/<game-name>/`
+1. Create the game source tree: `src/` (repo root of the game repo)
+2. Add a standalone entry point: `src/main.ts`
+3. Add a factory function: `src/createXxxGame.ts` (for browser tests)
+4. Add scenes: `src/scenes/<SceneName>.ts` (extend `Phaser.Scene`)
+5. Place game-owned assets under `public/assets/<game-name>/` in the game repo and document attribution in the core `public/assets/CREDITS.md`
+6. Add game-specific tests under `tests/<game-name>/` in the game repo
 7. **Export `GAME_INFO` from the game's scene module** (do *not* edit `main.ts`):
 
    ```ts
@@ -1201,18 +1213,22 @@ git submodule add git@github.com:TheWizardsCode/Tableau-Card-Engine.git core
      "id": "my-game",
      "path": "../tce-my-game",
      "scenePath": "example-games/my-game/scenes/MyGameScene.ts",
-     "adapterPath": "example-games/my-game/scripts/adapters/MyGameReplayAdapter.ts"
+     "siblingScenePath": "src/scenes/MyGameScene.ts",
+     "adapterPath": "example-games/my-game/scripts/adapters/MyGameReplayAdapter.ts",
+     "siblingAdapterPath": "src/scripts/adapters/MyGameReplayAdapter.ts"
    }
    ```
 
-   `adapterPath` is optional; include it when the game supports replay. Games
+   `siblingScenePath` is the path in the game repo's `src/` layout and is tried
+   first; `scenePath` is the legacy sibling fallback. `adapterPath` is optional;
+   include it when the game supports replay. Games
    without an entry simply do not appear in that build. Also add a per-game
    preset `configs/<game-id>.json` (one game entry) so the game can be built in
    isolation, and add its entry to `configs/full.json`; see
    [Config-Driven Game Catalogue](dev/game-configuration.md).
 9. Add a `[ Menu ]` button to the game scene that calls `this.scene.start('GameSelectorScene')` for navigation back to the selector
 10. Add transcript recording:
-    - Create `example-games/<game-name>/GameTranscript.ts` with transcript types and a `TranscriptRecorder` extending `TranscriptRecorderBase<T>` from `src/core-engine/TranscriptRecorder.ts`
+    - Create `src/GameTranscript.ts` with transcript types and a `TranscriptRecorder` extending `TranscriptRecorderBase<T>` from the core `src/core-engine/TranscriptRecorder.ts`
     - Integrate recording into the scene: create the recorder after game setup, record each turn/action, finalize on game over, and auto-save to `TranscriptStore`
 11. Add replay support:
     - Add `loadBoardState(stateJson: string)` to the scene to reconstruct visual state from a transcript snapshot
@@ -1220,13 +1236,13 @@ git submodule add git@github.com:TheWizardsCode/Tableau-Card-Engine.git core
     - Handle `?mode=replay` URL parameter in the scene to skip normal game initialization
     - Expose `window.__GAME_EVENTS__` in replay mode for adapter communication
 12. Create a replay adapter **inside the game repo**:
-    - Create `example-games/<game-name>/scripts/adapters/<GameName>ReplayAdapter.ts` implementing the core `ReplayAdapter` interface
-    - Reference it from the preset's `adapterPath` (step 8). Registration order follows preset order; put structural-match adapters (like Golf) last. Do **not** edit `scripts/adapters/index.ts` — it is core and game-free.
+    - Create `src/scripts/adapters/<GameName>ReplayAdapter.ts` implementing the core `ReplayAdapter` interface
+    - Reference it from the preset's `siblingAdapterPath` (step 8). Registration order follows preset order; put structural-match adapters (like Golf) last. Do **not** edit the core `scripts/adapters/index.ts` — it is core and game-free.
     - Include a `gameType` field in the transcript for explicit adapter matching
 13. Generate fixture and thumbnail **inside the game repo**:
-    - Create a fixture generator script at `example-games/<game-name>/scripts/generate-<game>-fixture-transcript.ts`
-    - Generate and commit the fixture transcript at `example-games/<game-name>/tests/fixtures/transcripts/fixture-game.json`
-    - Generate and commit the thumbnail at `public/assets/games/<game-name>/thumbnail.png` using `./scripts/refresh-thumbnails.sh <game-name>`
+    - Create a fixture generator script at `src/scripts/generate-<game>-fixture-transcript.ts`
+    - Generate and commit the fixture transcript at `src/tests/fixtures/transcripts/fixture-game.json`
+    - Generate and commit the thumbnail at `public/assets/games/<game-name>/thumbnail.png` using the core `./scripts/refresh-thumbnails.sh <game-name>`
 
 ### Per-game npm scripts
 

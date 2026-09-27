@@ -395,9 +395,12 @@ The core split and the initial publication are complete. Remaining work:
   the distribution composes the game repos as siblings (no game submodules).
   The migration is driven by the child work items of CG-0MUJ0IAJM009X0Q2 and the
   deciding record is [`merged-core-decision.md`](./merged-core-decision.md).
-- **Distribution bootstrap** — a manifest/script that clones the core plus the
-  sibling game repos, replacing the single `--recurse-submodules` distribution
-  clone that the sibling composition gives up.
+- **Distribution bootstrap** — `scripts/setup-distribution.ts`
+  (`npm run setup:distribution -- --dir ..`) clones the core plus the sibling
+  game repos in one command, replacing the single `--recurse-submodules`
+  distribution clone that the sibling composition gives up. Targets come from
+  `scripts/configs/repo-layout.json`; each game's own `./core` submodule is
+  initialised recursively.
 - **Promotion** — keep each repository's `main` current by promoting `dev`
   through the release process (the ship skill).
 - **CI / npm publication** — still deliberately out of scope.

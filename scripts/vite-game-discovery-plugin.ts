@@ -297,34 +297,32 @@ export function loadGamesConfig(configPath: string): GamesConfig {
 /**
  * Resolve every configured game against the on-disk layout.
  *
- * A game is looked up in two places, in order:
+ * The merged core is **sibling-only** (Option A): `Tableau-Card-Engine`
+ * carries no games at HEAD, so every game is composed from a sibling checkout
+ * at `<projectRoot>/<entry.path>` — never from an in-tree
+ * `example-games/<game>` copy. A sibling game repo may keep its source in one
+ * of two layouts:
  *
- * 1. **Locally**, at `<projectRoot>/<scenePath>` — the flat monorepo layout,
- *    where every game already lives under `example-games/`.
- * 2. **As a sibling repo**, at `<projectRoot>/<entry.path>/<scenePath>` — the
- *    decomposed layout, where each game is its own checkout next to the core.
- *
- * Supporting both keeps one preset set working in the monorepo before the
- * split and in the composed distribution after it.
+ * 1. `src/` (Option C) via `entry.siblingScenePath` — the current layout.
+ * 2. The legacy `example-games/<game>/…` path via `entry.scenePath` — kept so a
+ *    preset keeps working for a game repo that has not migrated yet.
  *
  * @param config Parsed preset.
  * @param projectRoot Absolute repo root.
  * @returns Fully resolved games in config order.
- * @throws When a configured game is found in neither location (fail fast — a
- *   partially-populated build is worse than a failed one).
+ * @throws When a configured game is found in neither sibling location (fail
+ *   fast — a partially-populated build is worse than a failed one).
  */
 export function discoverGames(
   config: GamesConfig,
   projectRoot: string,
 ): DiscoveredGame[] {
   return config.games.map((entry) => {
-    const localScenePath = path.resolve(projectRoot, entry.scenePath);
     const siblingRoot = path.resolve(projectRoot, entry.path);
-    // Option C (F9/C1): try, in order, the monorepo `example-games/<game>/…`
-    // path, the explicit `src/`-layout sibling path, then the legacy sibling
-    // path (so a preset keeps working before and after a game repo migrates).
+    // Option C (F9/C1): try, in order, the explicit `src/`-layout sibling path,
+    // then the legacy sibling `example-games/<game>/…` path. An in-tree copy
+    // is never consulted: the merged core holds no games at HEAD.
     const candidates = [
-      localScenePath,
       ...(entry.siblingScenePath
         ? [path.resolve(siblingRoot, entry.siblingScenePath)]
         : []),

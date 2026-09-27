@@ -136,7 +136,7 @@ below; the array is processed in order.
 |---|---|---|
 | `id` | string | Stable game id (e.g. `main-street`). Also the sibling directory suffix (`tce-main-street`) and the preset filename stem. |
 | `path` | string | Sibling repo root, relative to the core/launcher root. By convention `../tce-<id>`. |
-| `scenePath` | string | Scene module path *inside the game repo*, using the flat `example-games/<id>/…` layout, e.g. `example-games/golf/scenes/GolfScene.ts`. Also tried as an in-repo fallback (see resolution order). |
+| `scenePath` | string | Scene module path in the game repo's *legacy* flat `example-games/<id>/…` layout, e.g. `example-games/golf/scenes/GolfScene.ts`. Used as the second (legacy) sibling candidate. |
 
 All three must be non-empty strings; the loader rejects a missing or empty
 field with a message naming the preset and index.
@@ -163,27 +163,26 @@ ordinary (ignored) key.
 
 ## Resolution order
 
-Each configured game is resolved against the on-disk layout by trying three
-candidate scene paths **in order**, and using the first that exists:
+Each configured game is resolved against the on-disk layout by trying two
+sibling candidate scene paths **in order**, and using the first that exists:
 
-1. **`<root>/<scenePath>`** — the flat monorepo layout, where every game
-   already lives under `example-games/`. This is what the launcher checkout and
-   the core repo use.
-2. **`<root>/<path>/<siblingScenePath>`** — the Option C `src/` layout of a
+1. **`<root>/<path>/<siblingScenePath>`** — the Option C `src/` layout of a
    sibling game repo, when `siblingScenePath` is present.
-3. **`<root>/<path>/<scenePath>`** — the legacy sibling layout, so a preset
-   keeps working before and after a game repo migrates to the `src/` layout.
+2. **`<root>/<path>/<scenePath>`** — the legacy sibling layout, so a preset
+   keeps working for a game repo that has not yet migrated to the `src/`
+   layout.
 
 `<root>` is the Vite project root (the repo being built); `<path>` is resolved
 relative to it (in the composed distribution this is the sibling checkout). The
-same order applies inside a git worktree: the local lookup uses the worktree
-root, so `.worklog/worktrees/<branch>/configs/*.json` presets resolve without
-change.
+merged core carries **no games at HEAD**, so an in-tree
+`example-games/<game>/` copy is never consulted. Presets resolve from a git
+worktree exactly as from the main checkout, relative to the worktree root —
+so a worktree needs its sibling checkouts beside it (or run distribution
+builds from the main checkout).
 
-Because the *local* lookup is tried first, a flat launcher checkout selects its
-own `example-games/<game>/` sources, while a decomposed game repo (where the
-game's source lives at repo-root `src/`) selects the sibling `src/` layout.
-One preset set therefore works in every composition.
+One preset set therefore works in every composition, because each game repo
+supplies its own source (at repo-root `src/`, or the legacy
+`example-games/<game>/`).
 
 ### Failure mode: game not found
 
@@ -193,7 +192,6 @@ candidate path that was tried:
 
 ```text
 [game-discovery] Game "golf" not found. Expected its scene module at one of:
-  /…/golf/example-games/golf/scenes/GolfScene.ts,
   /…/tce-golf/src/scenes/GolfScene.ts,
   /…/tce-golf/example-games/golf/scenes/GolfScene.ts.
 Check out the sibling repo at ../tce-golf (or remove "golf" from the preset).

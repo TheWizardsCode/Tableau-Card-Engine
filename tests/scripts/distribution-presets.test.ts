@@ -59,16 +59,13 @@ const PRESET_GAMES: Record<string, readonly string[]> = {
 const PER_GAME_PRESETS = ALL_GAME_IDS;
 
 /**
- * True when at least one game checkout is reachable — in-tree
- * (`example-games/<id>`, the monorepo launcher) or as a sibling
- * (`../tce-<id>`, the published core checkout). The launcher-only tests below
- * resolve scene modules and therefore only run when a game checkout exists;
- * a bare core clone (engine + Gym + shell, no games) skips them.
+ * True when at least one sibling game checkout is reachable at
+ * `../tce-<id>`. The merged core carries no games at HEAD (Option A), so the
+ * launcher-only resolution tests below can only run when sibling checkouts
+ * exist; a bare core clone (engine + Gym + shell, no games) skips them.
  */
-const HAS_ANY_GAME_CHECKOUT = ALL_GAME_IDS.some(
-  (id) =>
-    fs.existsSync(path.join(REPO_ROOT, 'example-games', id)) ||
-    fs.existsSync(path.join(REPO_ROOT, '..', `tce-${id}`)),
+const HAS_ANY_GAME_CHECKOUT = ALL_GAME_IDS.some((id) =>
+  fs.existsSync(path.join(REPO_ROOT, '..', `tce-${id}`)),
 );
 
 /** The scene class each game registers with the Game Selector. */
@@ -145,13 +142,12 @@ describe.skipIf(!HAS_ANY_GAME_CHECKOUT)('preset resolution in the launcher check
       const games = discoverGames(loadPreset(name), REPO_ROOT);
       for (const g of games) {
         expect(fs.existsSync(g.absoluteScenePath), `${g.id} scene missing`).toBe(true);
-        // The launcher checkout keeps every game locally under example-games/.
-        // Scene modules resolve in one of the two supported layouts: the
-        // monorepo launcher keeps games in-tree under `example-games/`, while
-        // the published core checkout composes sibling `tce-<game>` repos.
+        // Sibling-only resolution (Option A): the scene resolves through the
+        // sibling repo, in its `src/` layout or its legacy `example-games/`
+        // layout. The core never resolves a game from an in-tree copy.
         expect(
-          g.absoluteScenePath.includes(`example-games/${g.id}`) ||
-            g.absoluteScenePath.includes(`tce-${g.id}/src/`),
+          g.absoluteScenePath.includes(`tce-${g.id}/src/`) ||
+            g.absoluteScenePath.includes(`tce-${g.id}/example-games/${g.id}`),
           `${g.id} resolved to ${g.absoluteScenePath}`,
         ).toBe(true);
         expect(g.sceneClass).toBe(SCENE_KEY[g.id]);
@@ -265,5 +261,15 @@ describe.skipIf(!HAS_ANY_GAME_CHECKOUT)('per-game presets', () => {
 describe('composition is sibling directories, not git submodules (AC6)', () => {
   it('has no .gitmodules in the launcher checkout', () => {
     expect(fs.existsSync(path.join(REPO_ROOT, '.gitmodules'))).toBe(false);
+  });
+
+  it('carries no in-tree game source at HEAD — only the core-owned Gym (AC1)', () => {
+    for (const id of ALL_GAME_IDS) {
+      expect(
+        fs.existsSync(path.join(REPO_ROOT, 'example-games', id)),
+        `example-games/${id} must not exist in the merged core`,
+      ).toBe(false);
+    }
+    expect(fs.existsSync(path.join(REPO_ROOT, 'example-games', 'gym'))).toBe(true);
   });
 });

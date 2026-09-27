@@ -15,13 +15,16 @@ npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 
+# Compose a full multi-game distribution (core + sibling game checkouts):
+npm run setup:distribution -- --dir ..
+
 # Desktop / Steam packaging (Electron launcher):
 npm run build:electron   # electron-mode Vite build (relative base, file://-safe)
 npm run start:electron   # build + launch the desktop app locally
 npm run package          # package a binary for the host platform (see below)
 
 # Smoke test (headless, part of npm test):
-npx vitest run --project unit tests/main-street/smoke-scenario.test.ts
+npx vitest run --project unit tests/scripts/
 ```
 
 Note: Vitest browser runs use an internal Vite server, but the dev-only transcript persistence middleware is disabled in test mode to avoid file-system side effects and reduce harness flakiness.
@@ -110,8 +113,8 @@ git clone --recurse-submodules git@github.com:TheWizardsCode/tce-golf.git
 # ...or, in an existing checkout:
 git submodule update --init --recursive
 
-# Full distribution: the core plus sibling game clones
-#   (the distribution bootstrap script is added by the merged-core work)
+# Full distribution: the core plus sibling game clones, in one command
+npm run setup:distribution -- --dir ..
 ```
 
 ### Building a distribution
@@ -133,12 +136,12 @@ GAMES_CONFIG=full npm run build:electron   # desktop build
 GAMES_CONFIG=full npm run package          # packaged desktop binary
 ```
 
-A game is resolved **locally first** (`example-games/<id>/`, the flat layout
-used by the launcher checkout) and then **as a sibling repo** — first at the
-Option C `src/` layout (`../tce-<id>/src/…`) and then at the legacy sibling
-layout (`../tce-<id>/example-games/<id>/…`), so one preset set works in both. A
-missing game fails the build with a message naming it and listing every
-candidate path.
+A game is resolved **sibling-only**: the merged core carries no games at HEAD,
+so resolution looks first at the Option C `src/` layout
+(`../tce-<id>/src/…`) and then at the legacy sibling layout
+(`../tce-<id>/example-games/<id>/…`). An in-tree `example-games/<id>/` copy is
+never consulted. A missing game fails the build with a message naming it and
+listing every candidate path.
 
 ### Per-game development loop
 
@@ -223,9 +226,11 @@ Developer Guide for full documentation and usage examples.
 ## Example Games
 
 Each game below is its **own repository** (`tce-<game>`) that pulls the engine in
-as a `./core` submodule. In the launcher checkout they are present locally under
-`example-games/<game>/`; in a decomposed checkout they are siblings. The **Gym
-stays in the core repo** — it is the canonical core-engine feature demonstrator.
+as a `./core` submodule. The multi-game distribution composes those repos as
+**sibling checkouts** (`../tce-<game>`) alongside the merged core — the core
+carries no games at HEAD. Use `npm run setup:distribution -- --dir ..` to
+bootstrap them. The **Gym stays in the core repo** — it is the canonical
+core-engine feature demonstrator.
 
 | Game | Repo | Description |
 |------|------|-------------|
@@ -277,9 +282,9 @@ For detailed development guidance, see [`docs/DEVELOPER.md`](docs/DEVELOPER.md).
 
 ## Main Street Balance Documentation
 
-- **[Balance Process & Tooling PRD](docs/main-street/prd-balance-process-and-tooling.md)** — Comprehensive specification for game balance review process, micro/macro metrics, CLI tools, baseline management, and implementation roadmap.
-- **[Balancing Methodology](docs/main-street/balancing-methodology.md)** — Technical description of the `run-balance-cards` balancing algorithm.
-- **[Monte Carlo Sample Results](docs/main-street/monte-carlo-sample-results.md)** — Example output from the Monte Carlo balance simulation harness.
+Main Street's balance process, methodology and Monte Carlo sample results live
+with the game in the `tce-main-street` repository (`docs/`), alongside the
+game-owned balance scripts under its `src/scripts/` tree.
 
 ## AI Assisted Development
 

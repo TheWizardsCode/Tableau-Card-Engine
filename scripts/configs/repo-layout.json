@@ -27,6 +27,7 @@
       "scripts/check-browser-test-env.ts",
       "scripts/codemod-src-imports.ts",
       "scripts/game-repo-scaffold.ts",
+      "scripts/setup-distribution.ts",
       "scripts/check-terminology-guards.sh",
       "scripts/dev-server-utils.ts",
       "scripts/export-transcripts.ts",

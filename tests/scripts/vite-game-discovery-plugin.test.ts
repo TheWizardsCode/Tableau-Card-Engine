@@ -266,9 +266,9 @@ describe('discoverGames', () => {
     }
   });
 
-  it('prefers a local game tree over the sibling repo (monorepo layout)', () => {
-    // Fixture has BOTH a local example-games/golf and a tce-golf sibling;
-    // the local copy must win so one preset set works pre- and post-split.
+  it('ignores an in-tree example-games/<game> copy (sibling-only, Option A)', () => {
+    // The merged core holds no games at HEAD. Even when a stale/in-tree copy
+    // exists, resolution must come from the sibling checkout.
     tmpRoot = makeFixture(['golf'], {
       games: [
         { id: 'golf', path: '../tce-golf', scenePath: 'example-games/golf/scenes/GolfScene.ts' },
@@ -277,17 +277,16 @@ describe('discoverGames', () => {
     const core = path.join(tmpRoot, 'tableau-card-engine-core');
     const localDir = path.join(core, 'example-games', 'golf', 'scenes');
     fs.mkdirSync(localDir, { recursive: true });
-    const localScene = path.join(localDir, 'LocalGolfScene.ts');
     fs.writeFileSync(
-      localScene,
-      "export const GAME_INFO = { sceneKey: 'LocalGolfScene', title: 'Local', description: 'd' };\n",
+      path.join(localDir, 'GolfScene.ts'),
+      "export const GAME_INFO = { sceneKey: 'GolfScene', title: 'Local', description: 'd' };\n",
     );
 
     const cfg = loadGamesConfig(path.join(core, 'configs', 'preset.json'));
-    // Both point at GolfScene.ts; override the config to the local scene name.
-    cfg.games[0].scenePath = 'example-games/golf/scenes/LocalGolfScene.ts';
     const [resolved] = discoverGames(cfg, core);
-    expect(resolved.absoluteScenePath).toBe(localScene);
+    expect(resolved.absoluteScenePath).toBe(
+      path.join(tmpRoot, 'tce-golf', 'example-games', 'golf', 'scenes', 'GolfScene.ts'),
+    );
   });
 
   it('resolves a src/-layout sibling repo via siblingScenePath (Option C)', () => {
@@ -617,7 +616,7 @@ describe('sibling-only game composition (merged core)', () => {
     );
   });
 
-  it.fails('never resolves a game from an in-tree example-games/<game> copy (AC4)', () => {
+  it('never resolves a game from an in-tree example-games/<game> copy (AC4)', () => {
     tmpRoot = makeFixture(['golf'], {
       games: [
         {

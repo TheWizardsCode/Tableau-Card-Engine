@@ -15,26 +15,27 @@ This project follows a **spike-driven development** approach: example games are 
 - **Rule Engine** (`src/rule-engine/`): A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics, turn logic, and validation.
 - **AI** (`src/ai/`): Shared AI strategy abstractions and utility functions. Provides `AiStrategyBase` (base interface), `AiPlayer<TStrategy>` (generic player wrapper that binds a strategy to an RNG), `pickRandom<T>()` (uniform random selection), and `pickBest<T>()` (scored selection with random tie-breaking). Game-specific strategies extend the base types.
 - **User Interface** (`src/ui/`): A modular UI system with reusable components (buttons, menus, overlays) that can be customized and extended to fit different card game themes and styles.
-- **Example Games** (`example-games/`): A collection of sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests, and is **its own repository** (`tce-<game>`) that composes the engine as a `./core` git submodule. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features (including direct and composed Screen Layout Language (SLL) examples) and **stays in the core repo** — it is the canonical engine feature demonstrator.
+- **Example Games** (`tce-<game>` repos, composed as siblings): Sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests, and is **its own repository** (`tce-<game>`) that composes the merged core (`Tableau-Card-Engine`) as a `./core` git submodule; its source lives at repo-root `src/`. The core repo carries **no games at HEAD**. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features (including direct and composed Screen Layout Language (SLL) examples) and **stays in the core repo** — it is the canonical engine feature demonstrator.
 
 ## Directory Structure
 
 The engine + Gym + launcher shell form the **core repo**; each game is its own
-`tce-<game>` repo that pulls the engine in as a `./core` submodule. Repos are
+`tce-<game>` repo that pulls the core in as a `./core` submodule. Repos are
 siblings, composed by the launcher via `configs/*.json` presets (see
-[Multi-Repo Architecture](docs/dev/multi-repo-architecture.md)). This tree is
-the launcher checkout, where games are present locally under `example-games/`.
+[Multi-Repo Architecture](docs/dev/multi-repo-architecture.md)). The core repo
+carries **no games at HEAD**; the multi-game distribution composes the game
+repos as **sibling checkouts** (`../tce-<game>`), bootstrapped with
+`npm run setup:distribution -- --dir ..`.
 
 ```
 tableau-card-engine/
 ├── src/                   # core-engine, card-system, rule-engine, ai, balance-cards, ui
 ├── example-games/
-│   ├── gym/               # Gym demo scenes (stays in core)
-│   └── <game>/            # each game is its own tce-<game> repo
+│   └── gym/               # Gym demo scenes (the only core-owned example-games tree)
 ├── configs/               # build presets: core-only, solo, arcade, deluxe, full
-├── scripts/               # core tooling (runners, extraction, game discovery)
-├── public/assets/         # shared assets (cards/ + CREDITS.md); game assets move with their game
-├── tests/                 # Vitest test files
+├── scripts/               # core tooling (runners, extraction, game discovery, setup-distribution)
+├── public/assets/         # shared assets (cards/ + CREDITS.md); game assets live in the game repos
+├── tests/                 # Vitest test files (core + Gym suites)
 ├── dist/                  # production build output (gitignored)
 ├── AGENTS.md
 ├── package.json
@@ -56,7 +57,8 @@ npm run dev          # Start Vite dev server with hot-reload (port 3000)
 npm test             # Run Vitest test suite (non-destructive: does not modify tracked assets)
 npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally (binds to all interfaces, reachable via Tailscale/LAN)
-npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV)
+npm run setup:distribution -- --dir ..  # Clone core + sibling game repos (full distribution)
+npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV; needs the tce-main-street sibling)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
 npm run start:electron   # Build + launch the Electron desktop app locally
@@ -100,7 +102,7 @@ Rules of thumb:
 
 1. **Unit tests** (`--project unit`, Node.js) — logic, data, and integration tests in `tests/**/*.test.ts`. Fast (seconds); run them frequently during implementation.
 2. **Non-tutorial browser tests** (`--project browser`, headless Chromium) — Phaser UI/rendering tests in `tests/**/*.browser.test.ts`. Phaser needs a real browser (WebGL/Canvas) and cannot run under Node/JSDOM.
-3. **Tutorial E2E tests** (`scripts/run-tutorial-tests.sh`) — Main Street tutorial flows in `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`, each part in its own browser instance to avoid Phaser 4 canvas/GPU context exhaustion.
+3. **Tutorial E2E tests** (`scripts/run-tutorial-tests.sh`) — Main Street tutorial flows in `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`, each part in its own browser instance to avoid Phaser 4 canvas/GPU context exhaustion. These are Main Street-owned: in a game-free core checkout (no `tce-main-street` sibling) the runner skips the absent parts and the projects set `passWithNoTests`, so the core suite stays green.
 
 The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, which retries once on Vitest's transient contention-induced failures (worker RPC timeout, browser WebSocket drop) when either every file actually passed **or** the reported failures are attributable solely to the transient signature (the failed-file variant; CG-0MUIMM28K001W88F). It accepts the run as green if the retry is also a pure transient failure (no genuine failure to mask; CG-0MUF0LU4X006IXXU), and bounds every attempt with a wall-clock timeout (exit 124 `[hang-timeout]` diagnostic on a genuine hang — never retried; see CG-0MT08R2QR0070F3N). A `replay-e2e` project (`tests/e2e/replay-*.test.ts`) is also defined for Playwright-driven replay checks. See `docs/DEVELOPER.md#testing` for the full project table, CPU-contention mitigations, and guidance on writing unit and browser tests.
 
@@ -130,7 +132,7 @@ A full-suite green run at the current commit via the test skill (`/skill:test`, 
 
 Each example game is a standalone game that can independently demonstrate the capabilities of the engine. They also serve as reference implementations for how to use the engine's features and components effectively.
 
-Example games live in `example-games/<game-name>/` with their own `main.ts` entry point and `scenes/` directory. The root `index.html` loads a unified entry point (`main.ts`) that boots the **Game Selector** landing page, allowing players to choose between available games. The games are deployed to GitHub Pages at `https://thewizardscode.github.io/Tableau-Card-Engine/` via a GitHub Actions workflow that runs on every push to `main`.
+Each example game lives in its own `tce-<game>` repository with its source at repo-root `src/` (its own `main.ts` entry point and `scenes/` directory) and composes the merged core as a `./core` submodule. The core repo carries no games at HEAD; the distribution composes the game repos as sibling checkouts (`../tce-<game>`), bootstrapped with `npm run setup:distribution -- --dir ..`. The root `index.html` loads a unified entry point (`main.ts`) that boots the **Game Selector** landing page, allowing players to choose between available games. The games are deployed to GitHub Pages at `https://thewizardscode.github.io/Tableau-Card-Engine/` via a GitHub Actions workflow that runs on every push to `main`.
 
 #### Screen Layout Language (SLL) Requirement
 
