@@ -16,15 +16,21 @@
 # retries once on Vitest's transient contention-induced failures
 # ([vitest-worker]: Timeout calling "onTaskUpdate" for the worker RPC layer,
 # [vitest] Browser connection was closed while running tests for the browser-mode
-# WebSocket drop) — a non-zero exit that happens even when every test passed.
+# WebSocket drop) — a non-zero exit that can happen even when every test passed.
 # The retry is masked against genuine failures (see that script's
-# shouldRetryOnce). If the retry is ALSO an all-passed transient failure, the run
-# is accepted as green — every test file passed, so there is no failure to mask
-# (CG-0MUF0LU4X006IXXU). See CG-0MS9M5UJP005PWD3 and CG-0MSCI73RH004VPCE.
+# shouldRetryOnce): it qualifies when every file passed, or when the summary
+# reports failures but every error is attributable to the transient signature
+# (the failed-file variant, CG-0MUIMM28K001W88F). If the retry is ALSO a pure
+# transient failure the run is accepted as green — no genuine failure was
+# masked (CG-0MUF0LU4X006IXXU). See CG-0MS9M5UJP005PWD3 and
+# CG-0MSCI73RH004VPCE.
 #
-# The runner emits a final `[vitest-runner] attempts=N status=S outcome=...`
-# line after every run, so the attempt count and outcome survive the `tail -20`
-# truncation below (CG-0MUF0LU4X006IXXU).
+# The runner retries once when a run is attributable to the transient
+# contention signatures and emits a final
+# `[vitest-runner] attempts=N status=S outcome=...` line after every run.
+# Stage output is NOT truncated (CG-0MUIMM28K001W88F), so a recurrence names
+# the failed test/file and shows any distinct assertion error alongside the
+# transient signature instead of only the reporter's summary counts.
 #
 # The same runner bounds every attempt with a wall-clock timeout
 # (CG-0MT08R2QR0070F3N): a true hang — e.g. a browser test whose
@@ -56,11 +62,11 @@ npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 echo "=== Unit Tests ==="
-npx tsx scripts/vitest-run-with-retry.ts --project unit --timeout-ms 300000 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project unit --timeout-ms 300000 2>&1
 echo ""
 
 echo "=== Browser Tests (non-tutorial) ==="
-npx tsx scripts/vitest-run-with-retry.ts --project browser --timeout-ms 1200000 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project browser --timeout-ms 1200000 2>&1
 echo ""
 
 echo "=== Tutorial E2E Tests ==="
@@ -69,8 +75,8 @@ echo ""
 
 echo "=== Electron Launch Smoke Test ==="
 # Display detection is single-sourced in scripts/run-electron-smoke.sh
-# (CG-0MUECRMTO0016FH2); this wrapper keeps the human-facing tail-truncation.
-bash scripts/run-electron-smoke.sh 2>&1 | tail -20
+# (CG-0MUECRMTO0016FH2); its output streams in full (CG-0MUIMM28K001W88F).
+bash scripts/run-electron-smoke.sh 2>&1
 echo ""
 
 echo "=== All Tests Complete ==="

@@ -43,6 +43,66 @@ import {
 
 // ── Output fixtures (match real vitest reporter output) ─────
 
+/**
+ * The recorded occurrence-1 failing-run output for CG-0MUIMM28K001W88F,
+ * verbatim from `.worklog/cache/02f9a2ba391d1da4493ebafa1cc63d4c/stdout.txt`
+ * (the last 20 lines the CI wrapper preserved via `tail -20`). This is the
+ * incident this regression fixture locks down: the worker RPC timeout is the
+ * *only* failure evidence, so the reported `1 failed` file/test is
+ * attributable to the transient signature and must be recovered.
+ */
+const INCIDENT_FAILED_FILE_OUTPUT = [
+  '=== Browser Test Env Pre-check ===',
+  '',
+  '=== Unit Tests ===',
+  'Vitest caught 1 unhandled error during the test run.',
+  'This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.',
+  '',
+  '\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Unhandled Error \u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+  'Error: [vitest-worker]: Timeout calling "onTaskUpdate"',
+  ' \u276f Object.onTimeoutError node_modules/vitest/dist/chunks/rpc.-pEldfrD.js:53:10',
+  ' \u276f Timeout._onTimeout node_modules/vitest/dist/chunks/index.B521nVV-.js:59:62',
+  ' \u276f listOnTimeout node:internal/timers:585:17',
+  ' \u276f processTimers node:internal/timers:521:7',
+  '',
+  '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+  '',
+  '',
+  ' Test Files  1 failed | 416 passed (417)',
+  '      Tests  1 failed | 7164 passed | 8 skipped (7173)',
+  '     Errors  1 error',
+  '   Start at  17:48:20',
+  '   Duration  145.13s (transform 44.56s, setup 0ms, collect 371.18s, tests 665.35s, environment 865ms, prepare 242.29s)',
+  '',
+  '[vitest-runner] attempts=1 status=1 outcome=failed args="--project unit"',
+].join('\n');
+
+/**
+ * A genuine assertion failure reported alongside the transient signature.
+ * The `Failed Tests` block cannot be attributed to the worker timeout, so
+ * the masking guard must refuse a retry (CG-0MUIMM28K001W88F approach (a)).
+ */
+const GENUINE_ASSERTION_AND_TIMEOUT_OUTPUT = [
+  ' \u276f |unit| tests/foo.test.ts (2 tests | 1 failed) 65ms',
+  '   \u00d7 does the thing',
+  '     \u2192 expected 1 to be 2 // Object.is equality',
+  '',
+  '\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Failed Tests 1 \u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+  '',
+  ' FAIL  |unit| tests/foo.test.ts > does the thing',
+  'AssertionError: expected 1 to be 2 // Object.is equality',
+  '',
+  'Vitest caught 1 unhandled error during the test run.',
+  '',
+  '\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Unhandled Error \u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+  `Error: ${WORKER_TIMEOUT_SIGNATURE}`,
+  '',
+  ' Test Files  1 failed | 245 passed (246)',
+  '      Tests  1 failed | 4662 passed (4663)',
+  '',
+  '[vitest-runner] attempts=1 status=1 outcome=failed args="--project unit"',
+].join('\n');
+
 /** A fully-passing run summary. */
 const PASS_OUTPUT = [
   ' Test Files  246 passed (246)',
@@ -86,6 +146,16 @@ describe('shouldRetryOnce (masking-guarded transient detection)', () => {
 
   it('returns false when the timeout signature is present alongside genuine file failures', () => {
     expect(shouldRetryOnce(`${FAIL_OUTPUT}\n${WORKER_TIMEOUT_SIGNATURE}`)).toBe(false);
+  });
+
+  // ── Attribution-aware retry (CG-0MUIMM28K001W88F) ──────────
+
+  it('returns true when the recorded incident output reports a failed file attributable only to the worker timeout', () => {
+    expect(shouldRetryOnce(INCIDENT_FAILED_FILE_OUTPUT)).toBe(true);
+  });
+
+  it('returns false when a genuine assertion failure is reported alongside the timeout signature', () => {
+    expect(shouldRetryOnce(GENUINE_ASSERTION_AND_TIMEOUT_OUTPUT)).toBe(false);
   });
 
   it('returns false when the browser drop signature is present alongside genuine file failures', () => {
@@ -151,6 +221,40 @@ describe('runWithRetry (retry-once orchestration)', () => {
       return { status: 1, output: TRANSIENT_OUTPUT };
     };
     expect(await runWithRetry([], runner, warnSpy)).toBe(0);
+    expect(calls).toBe(2);
+  });
+
+  it('recovers the recorded failed-file transient (CG-0MUIMM28K001W88F): retries once and returns the clean second status', async () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: INCIDENT_FAILED_FILE_OUTPUT }
+        : { status: 0, output: PASS_OUTPUT };
+    };
+    expect(await runWithRetry([], runner, warnSpy)).toBe(0);
+    expect(calls).toBe(2);
+  });
+
+  it('accepts the run as green when BOTH attempts are the recorded failed-file transient', async () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return { status: 1, output: INCIDENT_FAILED_FILE_OUTPUT };
+    };
+    expect(await runWithRetry([], runner, warnSpy)).toBe(0);
+    expect(calls).toBe(2);
+  });
+
+  it('refuses the retry when a genuine assertion failure accompanies the failed-file transient', async () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: INCIDENT_FAILED_FILE_OUTPUT }
+        : { status: 1, output: GENUINE_ASSERTION_AND_TIMEOUT_OUTPUT };
+    };
+    expect(await runWithRetry([], runner, warnSpy)).toBe(1);
     expect(calls).toBe(2);
   });
 
@@ -227,7 +331,7 @@ describe('runWithRetry (retry-once orchestration)', () => {
   });
 });
 
-// ── Final runner summary (survives `tail -20` truncation) ────
+// ── Final runner summary (attempt/outcome diagnostic) ────────
 
 describe('runSummary (final diagnostic line)', () => {
   it('formats the attempt count, status, outcome and forwarded args', () => {

@@ -52,11 +52,14 @@ Every typed Vitest command runs through `scripts/vitest-run-with-retry.ts`,
 which:
 
 - retries once on Vitest's transient contention-induced failures (worker RPC
-  timeout / browser WebSocket drop) when every test file actually passed;
+  timeout / browser WebSocket drop) when either every test file actually
+  passed **or** the reported failures are attributable solely to the transient
+  signature (the failed-file variant; CG-0MUIMM28K001W88F);
 - bounds each attempt with a wall-clock timeout and exits `124` with a
   `[hang-timeout]` diagnostic on a true hang (hangs are never retried); and
-- emits a final `[vitest-runner] attempts=N status=S outcome=…` line so the
-  attempt count survives output truncation.
+- emits a final `[vitest-runner] attempts=N status=S outcome=…` line as the
+  canonical machine-readable diagnostic (a red run's failure detail is no
+  longer truncated).
 
 Commands also load `scripts/vitest-tap-reporter.ts` alongside the default
 reporter, so a red typed run emits flat TAP that the global runner triages

@@ -37,7 +37,7 @@ npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 echo "=== Smoke Tests ==="
-npx tsx scripts/vitest-run-with-retry.ts --project smoke 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project smoke 2>&1
 echo ""
 
 echo "=== Smoke Tests Complete ==="

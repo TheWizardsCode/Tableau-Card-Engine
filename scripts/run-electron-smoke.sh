@@ -17,8 +17,8 @@
 # `/skill:test --type electron` profile.
 #
 # Output streams in full (no `tail` truncation) so a typed run's failures stay
-# parseable; the human-facing CI wrapper (`run-ci-tests.sh`) applies the
-# `tail -20` truncation when it calls this script.
+# parseable; the full CI wrapper (`run-ci-tests.sh`) also streams its output in
+# full (CG-0MUIMM28K001W88F).
 #
 # `TCE_SMOKE_DRY_RUN=1` prints the command that would run (or the SKIP notice)
 # without executing it — used by the automated selection tests.

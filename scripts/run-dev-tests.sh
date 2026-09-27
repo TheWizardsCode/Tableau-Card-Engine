@@ -40,7 +40,7 @@ npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 echo "=== Dev Tests ==="
-npx tsx scripts/vitest-run-with-retry.ts --project dev 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project dev 2>&1
 echo ""
 
 echo "=== Dev Tests Complete ==="
