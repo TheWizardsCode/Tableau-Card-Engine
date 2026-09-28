@@ -67,6 +67,12 @@ export default defineConfig(({ mode, command }) => ({
     // the sibling `../Tableau-Card-Engine` checkout; it defaults to this
     // directory, which is correct for the merged core repo itself.
     alias: resolveCoreAliases(process.env.CORE_ROOT || __dirname),
+    // Sibling game repos are bundled straight from their own `src/` (a sibling
+    // has no guaranteed `node_modules`), so force shared runtime deps to
+    // resolve from this core checkout. Without this a `GAMES_CONFIG=full`
+    // distribution build fails with `Rollup failed to resolve import "phaser"`
+    // from `../tce-<game>/src/...` (F7 CG-0MUJ168XG006DOGK).
+    dedupe: ['phaser', 'tone'],
   },
   build: {
     outDir: 'dist',

@@ -95,6 +95,21 @@ describe('vite config core path aliases', () => {
   });
 });
 
+// ── Sibling shared-dependency resolution (F7, CG-0MUJ168XG006DOGK) ────────
+
+describe('vite config dedupes shared runtime deps for sibling games', () => {
+  it('resolves phaser and tone from this (core) checkout', () => {
+    const config = viteConfig({ command: 'build', mode: 'production' });
+    const dedupe = config.resolve?.dedupe ?? [];
+    // A sibling game is bundled from `../tce-<game>/src/` and has no
+    // guaranteed `node_modules`; without dedupe the `GAMES_CONFIG=full`
+    // distribution build fails with `Rollup failed to resolve import
+    // "phaser"` from the sibling's scene module.
+    expect(dedupe).toContain('phaser');
+    expect(dedupe).toContain('tone');
+  });
+});
+
 // ── Preset-aware test profiles (core-only checkout) ───────────────────────
 
 describe('smoke/dev test lists follow the selected preset', () => {
