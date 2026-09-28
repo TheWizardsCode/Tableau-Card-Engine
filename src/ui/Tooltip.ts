@@ -89,6 +89,121 @@ export interface TooltipManagerConfig {
   phaserRender?: PhaserTooltipRenderFn;
 }
 
+/** A tooltip box's top-left position. */
+export interface TooltipPosition {
+  x: number;
+  y: number;
+}
+
+/** Options for {@link computeViewportTooltipPosition}. */
+export interface ViewportTooltipPositionOptions {
+  /** Hover point X in viewport (client) coordinates. */
+  screenX: number;
+  /** Hover point Y in viewport (client) coordinates. */
+  screenY: number;
+  /** Measured tooltip width in pixels. */
+  tooltipWidth: number;
+  /** Measured tooltip height in pixels. */
+  tooltipHeight: number;
+  /** Visible viewport width in pixels. */
+  viewportWidth: number;
+  /** Visible viewport height in pixels. */
+  viewportHeight: number;
+  /** Horizontal gap between the hover point and the tooltip (default 10). */
+  offsetX?: number;
+  /** Vertical gap between the hover point and the tooltip (default 10). */
+  offsetY?: number;
+  /** Gap kept clear of every edge (default 4). */
+  margin?: number;
+}
+
+/** Default gap (px) kept between a tooltip and the bounds it must stay inside. */
+export const TOOLTIP_BOUNDS_MARGIN = 4;
+
+/** Default gap (px) between a hover point and its tooltip. */
+export const TOOLTIP_HOVER_OFFSET = 10;
+
+/**
+ * Clamp a tooltip box (top-left origin) so it stays fully inside a
+ * `boundsWidth` x `boundsHeight` region, keeping `margin` px clear of
+ * every edge.
+ *
+ * This is the shared helper for in-canvas (Phaser-mode) tooltips: games
+ * measure their tooltip box and clamp the container position with it,
+ * mirroring the Lost Cities / Sushi Go precedent. It is opt-in — the
+ * helper never repositions a caller-managed container on its own, so a
+ * callback that already clamps is unaffected.
+ *
+ * A tooltip larger than its bounds cannot fit; it is pinned to the
+ * top-left margin and partial visibility is accepted (documented
+ * behaviour).
+ *
+ * @param x             desired top-left X.
+ * @param y             desired top-left Y.
+ * @param tooltipWidth  measured tooltip width.
+ * @param tooltipHeight measured tooltip height.
+ * @param boundsWidth   width of the region the tooltip must stay inside.
+ * @param boundsHeight  height of the region the tooltip must stay inside.
+ * @param margin        gap kept clear of every edge (default 4).
+ */
+export function clampTooltipToBounds(
+  x: number,
+  y: number,
+  tooltipWidth: number,
+  tooltipHeight: number,
+  boundsWidth: number,
+  boundsHeight: number,
+  margin: number = TOOLTIP_BOUNDS_MARGIN,
+): TooltipPosition {
+  // `Math.max(margin, …)` keeps the upper bound ordered even when the
+  // tooltip is larger than its bounds (oversized tooltip case).
+  const maxX = Math.max(margin, boundsWidth - tooltipWidth - margin);
+  const maxY = Math.max(margin, boundsHeight - tooltipHeight - margin);
+  return {
+    x: Math.min(Math.max(x, margin), maxX),
+    y: Math.min(Math.max(y, margin), maxY),
+  };
+}
+
+/**
+ * Compute a viewport-relative (DOM) tooltip position: place the box
+ * below-right of the hover point, flip it above/left when there is not
+ * enough room, then clamp it as a final guard so it is always fully
+ * visible inside the viewport.
+ *
+ * Used by {@link TooltipManager}'s DOM renderer; exported so the
+ * placement can be unit-tested without a DOM.
+ */
+export function computeViewportTooltipPosition(
+  options: ViewportTooltipPositionOptions,
+): TooltipPosition {
+  const offsetX = options.offsetX ?? TOOLTIP_HOVER_OFFSET;
+  const offsetY = options.offsetY ?? TOOLTIP_HOVER_OFFSET;
+  const margin = options.margin ?? TOOLTIP_BOUNDS_MARGIN;
+
+  let x = options.screenX + offsetX;
+  let y = options.screenY + offsetY;
+
+  // Flip to the left of the hover point when the right edge would overflow.
+  if (x + options.tooltipWidth + margin > options.viewportWidth) {
+    x = options.screenX - offsetX - options.tooltipWidth;
+  }
+  // Flip above the hover point when the bottom edge would overflow.
+  if (y + options.tooltipHeight + margin > options.viewportHeight) {
+    y = options.screenY - offsetY - options.tooltipHeight;
+  }
+
+  return clampTooltipToBounds(
+    x,
+    y,
+    options.tooltipWidth,
+    options.tooltipHeight,
+    options.viewportWidth,
+    options.viewportHeight,
+    margin,
+  );
+}
+
 export class TooltipManager {
   private readonly settingsPanel?: SettingsPanel;
   private readonly node: HTMLElement | null;
@@ -112,7 +227,9 @@ export class TooltipManager {
     }
 
     const div = document.createElement('div');
-    div.style.position = 'absolute';
+    // Fixed positioning keeps the node out of the document flow, so an
+    // at-the-edge tooltip can never extend the page's scrollable area.
+    div.style.position = 'fixed';
     div.style.background = 'rgba(0,0,0,0.88)';
     div.style.color = '#ffffff';
     div.style.padding = '6px 8px';
@@ -175,7 +292,9 @@ export class TooltipManager {
     // ── DOM mode ───────────────────────────────────────────
     if (!this.node) return;
 
-    // Set text
+    // Set text and make the node displayable so it can be measured. The
+    // browser does not paint until this task completes, so there is no
+    // visible flash between the measure and the final position.
     this.node.textContent = content;
 
     // Convert game/world coordinates to client coordinates relative to the canvas
@@ -192,13 +311,42 @@ export class TooltipManager {
       const screenX = rect.left + (x - cam.scrollX) * scaleX;
       const screenY = rect.top + (y - cam.scrollY) * scaleY;
 
-      const offsetX = 10;
-      const offsetY = 10;
-
-      // Position the element and make it visible
-      this.node.style.left = `${Math.round(screenX + offsetX)}px`;
-      this.node.style.top = `${Math.round(screenY + offsetY)}px`;
       this.node.style.display = 'block';
+
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
+
+      let left: number;
+      let top: number;
+      if (
+        Number.isFinite(viewportWidth) &&
+        viewportWidth > 0 &&
+        Number.isFinite(viewportHeight) &&
+        viewportHeight > 0
+      ) {
+        // Clamp + flip into the viewport using the tooltip's measured size.
+        const position = computeViewportTooltipPosition({
+          screenX,
+          screenY,
+          tooltipWidth: this.node.offsetWidth || 0,
+          tooltipHeight: this.node.offsetHeight || 0,
+          viewportWidth,
+          viewportHeight,
+          offsetX: TOOLTIP_HOVER_OFFSET,
+          offsetY: TOOLTIP_HOVER_OFFSET,
+          margin: TOOLTIP_BOUNDS_MARGIN,
+        });
+        left = position.x;
+        top = position.y;
+      } else {
+        // No viewport available (SSR / bare test environment): keep the
+        // legacy unclamped placement so behaviour is unchanged.
+        left = screenX + TOOLTIP_HOVER_OFFSET;
+        top = screenY + TOOLTIP_HOVER_OFFSET;
+      }
+
+      this.node.style.left = `${Math.round(left)}px`;
+      this.node.style.top = `${Math.round(top)}px`;
     } catch (e) {
       // If anything fails, hide tooltip
       this.hide();

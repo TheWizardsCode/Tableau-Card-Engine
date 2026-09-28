@@ -1,0 +1,4 @@
+{
+  "$comment": "Core-only preset: the engine + Gym with no games. This is the default preset (GAMES_CONFIG unset), so a bare `npm run build` in the core-engine repo produces a Gym-only distribution. Part of CG-0MTRO6Y2N009B9CF.",
+  "games": []
+}

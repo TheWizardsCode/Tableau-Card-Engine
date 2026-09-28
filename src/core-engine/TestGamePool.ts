@@ -11,7 +11,7 @@
  * Usage:
  * ```ts
  * import { bootTestGame } from '../../src/core-engine/TestGamePool';
- * import { waitForScene } from '../helpers/waitForScene';
+ * import { waitForScene } from '../../tests/helpers/waitForScene';
  *
  * async function bootMyGame(): Promise<Phaser.Game> {
  *   const game = bootTestGame(() => createMyGame({ type: Phaser.CANVAS }));

@@ -115,4 +115,28 @@ describe('dealCard', () => {
     const midY = (startY + destY) / 2 + customArcHeight;
     expect(mockScene.tweensList[0].y).toBe(midY);
   });
+
+  it('treats an explicitly undefined arcHeight as absent (uses the default)', async () => {
+    const startX = 50;
+    const startY = 50;
+    const destX = 500;
+    const destY = 400;
+
+    target = createMockTarget(startX, startY);
+
+    const opts: DealCardOptions = {
+      scene: mockScene as any,
+      target: target as any,
+      destX,
+      destY,
+      arcHeight: undefined,
+    };
+
+    dealCard(opts);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const midY = (startY + destY) / 2 + DEFAULT_DEAL_ARC_HEIGHT;
+    expect(mockScene.tweensList[0].y).toBe(midY);
+  });
 });

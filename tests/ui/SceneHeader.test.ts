@@ -23,6 +23,16 @@ import {
   SCENE_MENU_BUTTON_WIDTH,
   SCENE_MENU_BUTTON_HEIGHT,
 } from '../../src/ui/SceneHeader';
+import {
+  createAlphaBadge,
+  computeAlphaBadgeY,
+  ALPHA_BADGE_LABEL,
+  ALPHA_BADGE_FILL,
+  ALPHA_BADGE_TEXT_COLOR,
+  ALPHA_BADGE_HEIGHT,
+  ALPHA_BADGE_MIN_Y,
+} from '../../src/ui/AlphaBadge';
+import { VERSION_LABEL_TEXT } from '../../src/ui/versionDisplay';
 import { GAME_W, FONT_FAMILY } from '../../src/ui/constants';
 
 // ── Mock helpers ────────────────────────────────────────────
@@ -285,17 +295,17 @@ describe('createSceneHeader', () => {
     scene = mockScene();
   });
 
-  it('creates both title and menu button', () => {
+  it('creates both title and menu button (plus the shared ALPHA badge)', () => {
     const result = createSceneHeader(scene, 'My Game');
 
     expect(result.title).toBeDefined();
     expect(result.menuButton).toBeDefined();
-    // Two calls: one for title, one for menu button
-    expect(scene.add.text).toHaveBeenCalledTimes(2);
+    // Three text calls: title, ALPHA badge label, and menu button label
+    expect(scene.add.text).toHaveBeenCalledTimes(3);
     // One container for menu button
     expect(scene.add.container).toHaveBeenCalledTimes(1);
-    // One rectangle for menu button
-    expect(scene.add.rectangle).toHaveBeenCalledTimes(1);
+    // Two rectangles: ALPHA badge background and menu button background
+    expect(scene.add.rectangle).toHaveBeenCalledTimes(2);
   });
 
   it('menu button navigates to GameSelectorScene', () => {
@@ -304,5 +314,121 @@ describe('createSceneHeader', () => {
     const rect = (scene as any)._mockRect;
     rect._handlers['pointerdown']();
     expect(scene.scene.start).toHaveBeenCalledWith('GameSelectorScene');
+  });
+});
+
+// ── ALPHA badge helper ──────────────────────────────────────
+
+describe('createAlphaBadge', () => {
+  let scene: ReturnType<typeof mockScene>;
+
+  beforeEach(() => {
+    scene = mockScene();
+  });
+
+  it('renders a bright-red badge background with the ALPHA + version label', () => {
+    createAlphaBadge(scene);
+
+    // Badge background: red fill, full opacity
+    expect(scene.add.rectangle).toHaveBeenCalledWith(
+      GAME_W / 2,
+      expect.any(Number),
+      expect.any(Number),
+      ALPHA_BADGE_HEIGHT,
+      ALPHA_BADGE_FILL,
+      1,
+    );
+
+    // Badge label: ALPHA + the running version string
+    expect(scene.add.text).toHaveBeenCalledWith(
+      GAME_W / 2,
+      expect.any(Number),
+      ALPHA_BADGE_LABEL,
+      expect.objectContaining({ color: ALPHA_BADGE_TEXT_COLOR }),
+    );
+  });
+
+  it('label contains both ALPHA and the build version', () => {
+    createAlphaBadge(scene);
+
+    expect(ALPHA_BADGE_LABEL).toContain('ALPHA');
+    expect(ALPHA_BADGE_LABEL).toContain(VERSION_LABEL_TEXT);
+  });
+
+  it('stacks the badge above/over the decorated title', () => {
+    const titleY = 40;
+    const result = createAlphaBadge(scene, { titleY, titleFontSizePx: 18 });
+
+    // Badge bottom sits at or above the title top edge, with only a small overlap
+    expect(result.y).toBeLessThan(titleY);
+    expect(result.y + result.height / 2).toBeLessThanOrEqual(titleY);
+    expect(result.x).toBe(GAME_W / 2);
+  });
+
+  it('never allows the badge to clip the canvas top', () => {
+    const result = createAlphaBadge(scene, { titleY: SCENE_HEADER_Y, titleFontSizePx: 18 });
+
+    expect(result.y - result.height / 2).toBeGreaterThanOrEqual(0);
+  });
+
+  it('honours an explicit anchor position', () => {
+    const result = createAlphaBadge(scene, { x: 100, y: 50 });
+
+    expect(result.x).toBe(100);
+    expect(result.y).toBe(50);
+    expect(scene.add.rectangle).toHaveBeenCalledWith(
+      100,
+      50,
+      expect.any(Number),
+      ALPHA_BADGE_HEIGHT,
+      ALPHA_BADGE_FILL,
+      1,
+    );
+  });
+
+  it('computeAlphaBadgeY clamps to the top of the canvas', () => {
+    expect(computeAlphaBadgeY(SCENE_HEADER_Y)).toBe(ALPHA_BADGE_MIN_Y);
+  });
+});
+
+// ── createSceneTitle: badge wiring ──────────────────────────
+
+describe('createSceneTitle ALPHA badge wiring', () => {
+  let scene: ReturnType<typeof mockScene>;
+
+  beforeEach(() => {
+    scene = mockScene();
+  });
+
+  it('renders the ALPHA badge by default', () => {
+    createSceneTitle(scene, 'Some Game');
+
+    // Title text + badge label
+    expect(scene.add.text).toHaveBeenCalledTimes(2);
+    expect(scene.add.rectangle).toHaveBeenCalledTimes(1);
+    expect(scene.add.text).toHaveBeenCalledWith(
+      GAME_W / 2,
+      expect.any(Number),
+      ALPHA_BADGE_LABEL,
+      expect.objectContaining({ color: ALPHA_BADGE_TEXT_COLOR }),
+    );
+  });
+
+  it('opts out of the badge when showAlphaBadge is false', () => {
+    createSceneTitle(scene, 'No Badge', { showAlphaBadge: false });
+
+    // Only the title text, no badge rectangle
+    expect(scene.add.text).toHaveBeenCalledTimes(1);
+    expect(scene.add.rectangle).not.toHaveBeenCalled();
+  });
+
+  it('positions the badge relative to a custom title Y and font size', () => {
+    createSceneTitle(scene, 'Big Title', { y: 60, fontSize: '32px' });
+
+    const rectCall = (scene.add.rectangle as any).mock.calls[0] as number[];
+    const badgeY = rectCall[1];
+
+    expect(badgeY).toBeLessThan(60);
+    expect(badgeY - ALPHA_BADGE_HEIGHT / 2).toBeGreaterThanOrEqual(0);
   });
 });

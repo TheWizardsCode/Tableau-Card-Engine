@@ -12,6 +12,7 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from './constants';
 import { createVersionLabel } from './versionDisplay';
+import { createAlphaBadge } from './AlphaBadge';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -123,6 +124,13 @@ export class GameSelectorScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY,
       })
       .setOrigin(0.5);
+
+    // ALPHA badge stacked above/over the menu title
+    createAlphaBadge(this, {
+      x: GAME_W / 2,
+      titleY: 30,
+      titleFontSizePx: 32,
+    });
 
     // Layout game cards
     this.layoutGameCards();

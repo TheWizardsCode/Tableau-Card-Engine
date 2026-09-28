@@ -32,7 +32,6 @@ export { GymMarketOfferEngineScene } from './scenes/GymMarketOfferEngineScene';
 export { GymSpatialRulesScene } from './scenes/GymSpatialRulesScene';
 export { GymTokenPileViewScene } from './scenes/GymTokenPileViewScene';
 export { GymRuleEngineScene } from './scenes/GymRuleEngineScene';
-export { GymCardIndexScene } from './scenes/GymCardIndexScene';
 
 export {
   GYM_ROUTER_KEY,
@@ -57,8 +56,6 @@ export {
   GYM_SPATIAL_RULES_KEY,
   GYM_TOKEN_PILE_VIEW_KEY,
   GYM_RULE_ENGINE_KEY,
-  GYM_CARD_INDEX_KEY,
-  GYM_BLACKJACK_KEY,
   GYM_SCENE_CATALOGUE,
 } from './GymRegistry';
 export type { GymSceneEntry } from './GymRegistry';

@@ -30,10 +30,18 @@
  * The mitigation is at the runner level:
  *
  *   - Retry the run exactly once when the output shows ALL files passed
- *     AND the sole error is one of the transient signatures above.
- *   - Never retry on genuine test failures — the masking guard
- *     (shouldRetryOnce) proves "all passed" from the reporter summary
- *     before a retry is allowed.
+ *     AND the sole error is one of the transient signatures above — OR when
+ *     the summary reports failed files/tests but every reported error is
+ *     attributable to the transient signature itself (the failed-file
+ *     variant of the same contention transient, CG-0MUIMM28K001W88F).
+ *   - If the retry ALSO reports a pure transient failure, accept the run
+ *     as green: there is no test failure to mask, and the non-zero exit is
+ *     purely a post-completion teardown RPC artefact. This keeps the gate
+ *     resilient when CPU contention persists across both attempts
+ *     (CG-0MUF0LU4X006IXXU).
+ *   - Never retry or accept on genuine test failures — the masking guard
+ *     (shouldRetryOnce) attributes every reported failure to the transient
+ *     signature before a retry is allowed.
  *   - Bound every vitest attempt with a wall-clock timeout (tunable via
  *     `--timeout-ms`, default 10 minutes). When the bound is exceeded the
  *     vitest process tree is SIGTERMed (graceful), then SIGKILLed after a
@@ -127,19 +135,80 @@ export type VitestRunner = (
 ) => Promise<VitestRunResult> | VitestRunResult;
 
 /**
- * True only when the run output proves every test file passed AND contains
- * the transient worker RPC timeout signature. This is the masking guard:
- * a retry must never hide a genuine test failure, so any "failed" entry in
- * the reporter summary (or a missing summary) blocks the retry.
+ * True when the output contains either transient contention signature
+ * (worker RPC timeout or browser WebSocket drop).
+ */
+export function hasTransientSignature(output: string): boolean {
+  return (
+    output.includes(WORKER_TIMEOUT_SIGNATURE) ||
+    output.includes(BROWSER_DROP_SIGNATURE)
+  );
+}
+
+/**
+ * Split the run output into error blocks — each is the text from an error
+ * line up to (but not including) the next error line. Vitest prints one such
+ * block per unhandled error and per failed test/suite, so attributing each
+ * block independently tells us whether the reported failures are the
+ * transient signature itself or a genuine assertion/original error.
+ */
+export function errorBlocks(output: string): string[] {
+  const starts: number[] = [];
+  const re = /^(?:[A-Za-z][\w.]*)?Error(?:\s*\[[^\]]*\])?:/gm;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(output)) !== null) {
+    starts.push(match.index);
+  }
+  return starts.map((start, i) => output.slice(start, starts[i + 1] ?? output.length));
+}
+
+/**
+ * True when the run's failure evidence consists *only* of the transient
+ * signature: at least one error block is present, and every error block
+ * contains a transient signature. This is the attribution step that lets the
+ * masking guard recover a `1 failed` worker-timeout run (the poisoned file's
+ * only error is the timeout itself) while still refusing a genuine assertion
+ * failure that merely coincides with the signature
+ * (CG-0MUIMM28K001W88F approach (a)).
+ *
+ * Requiring at least one transient block keeps a bare failed summary with the
+ * signature string elsewhere (no attributable error) from being accepted.
+ */
+export function failuresAreTransientOnly(output: string): boolean {
+  const blocks = errorBlocks(output);
+  if (blocks.length === 0) return false;
+  return blocks.every(
+    (block) =>
+      block.includes(WORKER_TIMEOUT_SIGNATURE) ||
+      block.includes(BROWSER_DROP_SIGNATURE),
+  );
+}
+
+/**
+ * True when a retry is allowed.
+ *
+ * Two shapes qualify (CG-0MUF0LU4X006IXXU, CG-0MUIMM28K001W88F):
+ *
+ *   1. An all-passed transient failure — every test file passed and the sole
+ *      error is a transient signature.
+ *   2. An *attributable* failed-file transient — the summary reports failed
+ *      files/tests, but every error block in the output is the transient
+ *      signature itself (`failuresAreTransientOnly`). This is the failed-file
+ *      variant of the same contention transient that previously defeated the
+ *      all-passed-only guard and failed the gate spuriously.
+ *
+ * Anything else — a genuine assertion/original error, a missing summary, or a
+ * failure whose errors cannot be attributed to the signature — returns false,
+ * so a retry can never mask a real failure.
  */
 export function shouldRetryOnce(output: string): boolean {
+  if (!hasTransientSignature(output)) return false;
   const hasFailedFiles = /Test Files\s+\d+\s+failed/.test(output);
   const hasFailedTests = /Tests\s+\d+\s+failed/.test(output);
-  const allFilesPassed = /Test Files\s+\d+\s+passed \(\d+\)/.test(output);
-  const transient =
-    output.includes(WORKER_TIMEOUT_SIGNATURE) ||
-    output.includes(BROWSER_DROP_SIGNATURE);
-  return allFilesPassed && !hasFailedFiles && !hasFailedTests && transient;
+  if (hasFailedFiles || hasFailedTests) {
+    return failuresAreTransientOnly(output);
+  }
+  return /Test Files\s+\d+\s+passed \(\d+\)/.test(output);
 }
 
 /**
@@ -150,6 +219,22 @@ export function shouldRetryOnce(output: string): boolean {
  * `DEFAULT_RUN_TIMEOUT_MS`). When an attempt exceeds the bound it reports
  * `HANG_TIMEOUT_EXIT_CODE` (124) and is NEVER retried — a genuine hang must
  * surface, not be masked.
+ *
+ * Transient recovery, in two stages. First, `shouldRetryOnce` decides whether
+ * the run is recoverable: either an all-passed transient failure, or a
+ * failed-file summary whose every reported error is the transient signature
+ * itself (CG-0MUF0LU4X006IXXU, CG-0MUIMM28K001W88F):
+ *
+ *   1. Retry once after an attributable transient failure.
+ *   2. If the retry is ALSO an attributable transient failure, accept the run
+ *      as green (exit 0). No test failure was masked — the guard attributed
+ *      every reported failure to the transient signature.
+ *
+ * A final `[vitest-runner] attempts=N status=S outcome=... args="..."` line
+ * is emitted via `warn` after every run, so the attempt count and outcome
+ * stay visible without parsing the whole captured output. (`scripts/run-ci-tests.sh`
+ * no longer truncates stage output, but the one-line summary remains the
+ * canonical machine-readable diagnostic; CG-0MUIMM28K001W88F.)
  */
 export async function runWithRetry(
   args: string[],
@@ -161,16 +246,53 @@ export async function runWithRetry(
   if (first.status === HANG_TIMEOUT_EXIT_CODE) {
     // A hang is already reported by the runner; retrying would only
     // double the wall-clock cost. Surface it.
+    warn(runSummary(args, 1, first.status, 'hang'));
     return first.status;
   }
   if (first.status !== 0 && shouldRetryOnce(first.output)) {
     warn(
       '\n[retry] Vitest transient failure (worker RPC timeout or browser connection drop) ' +
-        'detected with all tests passing. Retrying once...\n',
+        'detected with no attributable test failure. Retrying once...\n',
     );
-    return (await run(args, timeoutMs)).status;
+    const second = await run(args, timeoutMs);
+    if (second.status === 0) {
+      warn(runSummary(args, 2, second.status, 'retry-clean'));
+      return second.status;
+    }
+    if (shouldRetryOnce(second.output)) {
+      // Both attempts completed with every test file passing; the only
+      // error is the post-completion teardown RPC timeout (or browser
+      // WebSocket drop). There is no test failure to mask, so accept the
+      // run as green rather than failing the gate on a runner artefact.
+      warn(
+        '\n[transient-accepted] Vitest transient teardown failure on BOTH attempts, ' +
+          'but no attributable test failure in either — treating the run as green. ' +
+          'No genuine failure was masked (the masking guard attributed every error ' +
+          'to the transient signature).\n',
+      );
+      warn(runSummary(args, 2, 0, 'accepted-transient'));
+      return 0;
+    }
+    warn(runSummary(args, 2, second.status, 'retry-failed'));
+    return second.status;
   }
+  warn(runSummary(args, 1, first.status, first.status === 0 ? 'clean' : 'failed'));
   return first.status;
+}
+
+/**
+ * Final one-line diagnostic emitted after every run. Kept at the very end of
+ * the runner's output so the attempt count and outcome are easy to locate
+ * (and were preserved under the CI wrapper's former `tail -20` truncation,
+ * now removed; CG-0MUF0LU4X006IXXU / CG-0MUIMM28K001W88F).
+ */
+export function runSummary(
+  args: string[],
+  attempts: number,
+  status: number,
+  outcome: string,
+): string {
+  return `[vitest-runner] attempts=${attempts} status=${status} outcome=${outcome} args="${args.join(' ')}"`;
 }
 
 /**

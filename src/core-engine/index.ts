@@ -10,6 +10,10 @@ export const ENGINE_VERSION = '0.1.0';
 export type { BaseSetupOptions, MultiplayerSetupOptions, ResolvedBaseSetup, ResolvedSetup } from './SetupOptions';
 export { resolveBaseSetupOptions, resolveSetupOptions } from './SetupOptions';
 
+// Generic typed-defaults resolution for option objects
+export type { OptionDefaults, WithDefaults } from './config-defaults';
+export { applyDefaults, DEFAULT_MOVE_SFX_INTERVAL_MS } from './config-defaults';
+
 // Game state types and factory
 export type { GamePhase, PlayerInfo, GameState, GameStateOptions } from './GameState';
 export { createGameState } from './GameState';

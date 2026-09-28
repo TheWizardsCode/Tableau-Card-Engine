@@ -7,6 +7,7 @@
  */
 
 import { GAME_W, FONT_FAMILY } from './constants';
+import { createAlphaBadge, ALPHA_BADGE_DEFAULT_TITLE_FONT_SIZE } from './AlphaBadge';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -62,6 +63,14 @@ export interface SceneTitleConfig {
   color?: string;
   /** Font family (default: FONT_FAMILY). */
   fontFamily?: string;
+  /** Font style (e.g. 'bold'). */
+  fontStyle?: string;
+  /**
+   * Whether to render the shared red ALPHA badge above/over the title.
+   * Default: `true`. Set to `false` to opt out (e.g. for a title that is not
+   * a top-of-canvas game/screen title).
+   */
+  showAlphaBadge?: boolean;
 }
 
 /** Optional configuration for the scene menu button. */
@@ -103,10 +112,32 @@ export function createSceneTitle(
   const fontSize = config?.fontSize ?? SCENE_TITLE_FONT_SIZE;
   const color = config?.color ?? SCENE_TITLE_COLOR;
   const fontFamily = config?.fontFamily ?? FONT_FAMILY;
+  const fontStyle = config?.fontStyle;
 
-  return scene.add
-    .text(GAME_W / 2, y, title, { fontSize, color, fontFamily })
+  const titleObj = scene.add
+    .text(GAME_W / 2, y, title, {
+      fontSize,
+      color,
+      fontFamily,
+      ...(fontStyle != null ? { fontStyle } : {}),
+    })
     .setOrigin(0.5);
+
+  // Every scene/game/Gym title carries the shared ALPHA badge by default so
+  // no per-game work is required; callers may opt out via showAlphaBadge. The
+  // badge is static (reduced-motion safe) and drawn with Phaser primitives.
+  if (config?.showAlphaBadge !== false) {
+    const titleFontSizePx = Number.parseFloat(fontSize);
+    createAlphaBadge(scene, {
+      x: GAME_W / 2,
+      titleY: y,
+      titleFontSizePx: Number.isFinite(titleFontSizePx)
+        ? titleFontSizePx
+        : ALPHA_BADGE_DEFAULT_TITLE_FONT_SIZE,
+    });
+  }
+
+  return titleObj;
 }
 
 /**

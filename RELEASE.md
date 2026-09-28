@@ -93,9 +93,10 @@ Windows binary (Steam artifact)
 A second workflow, `.github/workflows/package.yml`, runs on every push to `main` (and `v*` tags, or manually via workflow_dispatch) and builds the **Windows binary** on a `windows-latest` runner:
 
 1. Checkout + Node 20, `npm ci`
-2. `npm run package:win` -- electron-mode Vite build + electron-builder NSIS packaging
-3. Smoke-tests the packaged `win-unpacked` executable with the Playwright-Electron launch test
-4. Uploads the installer (`release/TCE-Setup-<version>.exe`) as the `tce-windows-installer` workflow artifact (downloadable from the Actions run, ~90-day retention)
+2. Compose the sibling game repositories (`../tce-<game>`, the set named by `configs/full.json`) with a shallow HTTPS clone — the core repo carries no games at HEAD (multi-repo architecture)
+3. `GAMES_CONFIG=full npm run package:win` -- electron-mode Vite build + electron-builder NSIS packaging of the **full distribution** (all games + Gym)
+4. Smoke-tests the packaged `win-unpacked` executable with the Playwright-Electron launch test, which derives its expected Game Selector catalogue size from the same `GAMES_CONFIG` preset
+5. Uploads the installer (`release/TCE-Setup-<version>.exe`) as the `tce-windows-installer` workflow artifact (downloadable from the Actions run, ~90-day retention)
 
 Windows is the primary Steam target; this is how the binary is produced reproducibly without a Windows dev machine. The GitHub Pages deploy workflow is unaffected by this job. To produce the artifact for a manual release, run the workflow from the Actions tab (Run workflow) or push a `v*` tag.
 

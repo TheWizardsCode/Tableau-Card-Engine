@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import viteConfig from '../vite.config';
+
+const REPO_ROOT = path.resolve(__dirname, '..');
 
 type PluginLike = { name: string };
 
@@ -48,5 +52,179 @@ describe('vite config transcript plugin registration', () => {
     } finally {
       process.env.VITEST = originalVitest;
     }
+  });
+
+  it('registers the config-driven game discovery plugin', () => {
+    const config = viteConfig({ command: 'build', mode: 'production' });
+    const pluginNames = extractPluginNames(config.plugins);
+    expect(pluginNames).toContain('tce-game-discovery');
+  });
+});
+
+describe('vite config core path aliases', () => {
+  const ALIAS_KEYS = ['@core-engine', '@card-system', '@rule-engine', '@ui', '@ai'];
+
+  it('points core aliases at this checkout by default', () => {
+    const original = process.env.CORE_ROOT;
+    try {
+      delete process.env.CORE_ROOT;
+      const config = viteConfig({ command: 'build', mode: 'production' });
+      const alias = config.resolve?.alias as Record<string, string>;
+      for (const key of ALIAS_KEYS) {
+        expect(alias[key]).toBeTruthy();
+        expect(alias[key]).toContain('/src/');
+      }
+    } finally {
+      if (original === undefined) delete process.env.CORE_ROOT;
+      else process.env.CORE_ROOT = original;
+    }
+  });
+
+  it('honours CORE_ROOT so a game repo resolves the core submodule (AC5)', () => {
+    const original = process.env.CORE_ROOT;
+    try {
+      process.env.CORE_ROOT = '/repo/tce-golf/core';
+      const config = viteConfig({ command: 'build', mode: 'production' });
+      const alias = config.resolve?.alias as Record<string, string>;
+      expect(alias['@core-engine']).toBe('/repo/tce-golf/core/src/core-engine');
+      expect(alias['@ui']).toBe('/repo/tce-golf/core/src/ui');
+    } finally {
+      if (original === undefined) delete process.env.CORE_ROOT;
+      else process.env.CORE_ROOT = original;
+    }
+  });
+});
+
+// ── Sibling shared-dependency resolution (F7, CG-0MUJ168XG006DOGK) ────────
+
+describe('vite config dedupes shared runtime deps for sibling games', () => {
+  it('resolves phaser and tone from this (core) checkout', () => {
+    const config = viteConfig({ command: 'build', mode: 'production' });
+    const dedupe = config.resolve?.dedupe ?? [];
+    // A sibling game is bundled from `../tce-<game>/src/` and has no
+    // guaranteed `node_modules`; without dedupe the `GAMES_CONFIG=full`
+    // distribution build fails with `Rollup failed to resolve import
+    // "phaser"` from the sibling's scene module.
+    expect(dedupe).toContain('phaser');
+    expect(dedupe).toContain('tone');
+  });
+});
+
+// ── Preset-aware test profiles (core-only checkout) ───────────────────────
+
+describe('smoke/dev test lists follow the selected preset', () => {
+  interface ProjectLike {
+    test?: { name?: string; include?: string[] };
+  }
+
+  function includeFor(config: unknown, name: string): string[] {
+    const projects = (config as { test?: { projects?: ProjectLike[] } }).test?.projects ?? [];
+    const project = projects.find((p) => p.test?.name === name);
+    return project?.test?.include ?? [];
+  }
+
+  it('includes a selected game test only when it is present in this checkout', () => {
+    const original = process.env.GAMES_CONFIG;
+    try {
+      process.env.GAMES_CONFIG = 'full';
+      const smoke = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'smoke');
+      // Core-owned suites are always present.
+      expect(smoke).toContain('tests/core-engine/SvgHelpers.browser.test.ts');
+      expect(smoke).toContain('tests/gym/GymSceneSmoke.browser.test.ts');
+      // A game-owned suite is included iff its file exists in this checkout:
+      // the merged core carries no game tests (Option A), so a sibling-only
+      // checkout deliberately excludes them while an in-tree composition
+      // includes them.
+      for (const file of [
+        'tests/golf/GolfScene.browser.test.ts',
+        'tests/main-street/MainStreetScene.browser.test.ts',
+      ]) {
+        expect(smoke.includes(file)).toBe(fs.existsSync(path.join(REPO_ROOT, file)));
+      }
+    } finally {
+      if (original === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = original;
+    }
+  });
+
+  it('drops game test paths in a core-only checkout, keeping core + Gym', () => {
+    const original = process.env.GAMES_CONFIG;
+    try {
+      process.env.GAMES_CONFIG = 'core-only';
+      const smoke = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'smoke');
+      // Game suites would not resolve in a core-only checkout — referencing
+      // them makes Vitest fail with "no test files found".
+      expect(smoke).not.toContain('tests/golf/GolfScene.browser.test.ts');
+      expect(smoke).not.toContain('tests/main-street/MainStreetScene.browser.test.ts');
+      // Core-owned suites stay.
+      expect(smoke).toContain('tests/core-engine/SvgHelpers.browser.test.ts');
+      expect(smoke).toContain('tests/gym/GymSceneSmoke.browser.test.ts');
+    } finally {
+      if (original === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = original;
+    }
+  });
+
+  it('never includes games outside the selected preset', () => {
+    const original = process.env.GAMES_CONFIG;
+    try {
+      process.env.GAMES_CONFIG = 'arcade';
+      const dev = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'dev');
+      // Non-selected games are always excluded.
+      expect(dev).not.toContain('tests/coloretto/ColorettoScene.browser.test.ts');
+      expect(dev).not.toContain('tests/sushi-go/SushiGoIcons.browser.test.ts');
+      // Selected games follow the presence contract (see the previous test).
+      for (const file of [
+        'tests/golf/GolfScene.browser.test.ts',
+        'tests/main-street/MainStreetScene.browser.test.ts',
+      ]) {
+        expect(dev.includes(file)).toBe(fs.existsSync(path.join(REPO_ROOT, file)));
+      }
+    } finally {
+      if (original === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = original;
+    }
+  });
+
+  it('only references test files that exist in this checkout (no silent coverage loss)', () => {
+    const original = process.env.GAMES_CONFIG;
+    try {
+      // Select everything so the full explicit lists are produced; a stale
+      // path is silently ignored by Vitest, so guard it here. The coreOrSelected
+      // filter must drop any entry this checkout cannot resolve — including
+      // game tests that live in a sibling game repo (Option A).
+      process.env.GAMES_CONFIG = 'full';
+      const config = viteConfig({ command: 'build', mode: 'production' }) as unknown;
+      for (const name of ['smoke', 'dev']) {
+        for (const file of includeFor(config, name)) {
+          expect(
+            fs.existsSync(path.join(REPO_ROOT, file)),
+            `${name} references missing test file: ${file}`,
+          ).toBe(true);
+        }
+      }
+    } finally {
+      if (original === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = original;
+    }
+  });
+});
+
+// ── Build base-path assertions (F7 / CG-0MTRO7ECL006ID7J) ─────────────────
+
+describe('build base path per mode (F7)', () => {
+  it('production base is the GitHub Pages sub-path /Tableau-Card-Engine/', () => {
+    const config = viteConfig({ command: 'build', mode: 'production' });
+    expect(config.base).toBe('/Tableau-Card-Engine/');
+  });
+
+  it('electron base is relative (./) for file:// loading', () => {
+    const config = viteConfig({ command: 'build', mode: 'electron' });
+    expect(config.base).toBe('./');
+  });
+
+  it('dev base is / so localhost:3000 works directly', () => {
+    const config = viteConfig({ command: 'serve', mode: 'development' });
+    expect(config.base).toBe('/');
   });
 });

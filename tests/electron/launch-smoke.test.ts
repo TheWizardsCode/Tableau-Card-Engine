@@ -26,8 +26,21 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { expectedSelectorCatalogueSize } from '../../scripts/vite-game-discovery-plugin';
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const packagedBinary = process.env.TCE_SMOKE_BINARY ?? null;
+
+/**
+ * Expected Game Selector catalogue size for the preset this run was built
+ * with (games plus the always-present Gym).
+ *
+ * Derived from `GAMES_CONFIG` (default `core-only`) so the assertion tracks
+ * the configured distribution rather than a hard-coded count — which silently
+ * rotted when the example games moved out of the core repo
+ * (CG-0MULGC6VP008GPH2).
+ */
+const expectedCatalogueSize = expectedSelectorCatalogueSize(repoRoot);
 
 /** Logical game size (matches createCardGame defaults). */
 const GAME_W = 1280;
@@ -95,7 +108,7 @@ describe('Electron launcher smoke test', () => {
     expect(tce.versions.electron).toBeTruthy();
   });
 
-  it('renders the Game Selector with the full game catalogue', async () => {
+  it('renders the Game Selector with the configured game catalogue', async () => {
     const info = await page!.evaluate(() => {
       const game = (window as any).__PHASER_GAME__;
       const active = game?.scene?.getScenes(true).map((s: any) => s.scene.key) ?? [];
@@ -104,7 +117,7 @@ describe('Electron launcher smoke test', () => {
     });
 
     expect(info.active).toContain('GameSelectorScene');
-    expect(info.catalogueCount).toBeGreaterThanOrEqual(9);
+    expect(info.catalogueCount).toBeGreaterThanOrEqual(expectedCatalogueSize);
     expect(info.firstGame).toBeTruthy();
   });
 
