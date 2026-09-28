@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { GymTooltipScene } from '../../example-games/gym/scenes/GymTooltipScene';
 import { GYM_TOOLTIP_KEY } from '../../example-games/gym/GymRegistry';
+import { GAME_W, GAME_H } from '../../src/ui';
 import { waitForScene } from '../helpers/waitForScene';
 
 describe('GymTooltipScene toggle button (Disable/Enable)', () => {
@@ -147,5 +148,49 @@ describe('GymTooltipScene toggle button (Disable/Enable)', () => {
         c.text.includes('Tooltips enabled'),
     );
     expect(enableLogTexts.length).toBeGreaterThanOrEqual(1);
+  }, 10000);
+
+  /** Find the in-scene Phaser-mode tooltip container (depth 800). */
+  function findPhaserTooltipContainer(
+    scene: Phaser.Scene,
+  ): Phaser.GameObjects.Container | undefined {
+    return scene.children.list.find(
+      (c) => c instanceof Phaser.GameObjects.Container && c.depth === 800,
+    ) as Phaser.GameObjects.Container | undefined;
+  }
+
+  it('clamps Phaser-mode tooltips inside the game canvas at every edge', async () => {
+    const scene = await bootScene();
+
+    // Switch to Phaser GameObject rendering mode.
+    const phaserButton = scene.children.list.find(
+      (c) => c instanceof Phaser.GameObjects.Text && c.text === '[ Phaser Mode ]',
+    ) as Phaser.GameObjects.Text | undefined;
+    expect(phaserButton).toBeDefined();
+    phaserButton!.emit('pointerdown');
+
+    // Drive the hover path through one of the demo cards' backgrounds.
+    const demoCards = (scene as unknown as { demoCards: Phaser.GameObjects.Container[] })
+      .demoCards;
+    expect(demoCards.length).toBeGreaterThan(0);
+    const cardBg = demoCards[0].getAt(0) as Phaser.GameObjects.Rectangle;
+
+    const corners = [
+      { x: 5000, y: 5000 },
+      { x: -5000, y: -5000 },
+    ];
+
+    for (const point of corners) {
+      cardBg.emit('pointermove', point);
+
+      const container = findPhaserTooltipContainer(scene);
+      expect(container, `tooltip container at ${JSON.stringify(point)}`).toBeDefined();
+
+      const bounds = container!.getBounds();
+      expect(bounds.left, `left at ${JSON.stringify(point)}`).toBeGreaterThanOrEqual(0);
+      expect(bounds.top, `top at ${JSON.stringify(point)}`).toBeGreaterThanOrEqual(0);
+      expect(bounds.right, `right at ${JSON.stringify(point)}`).toBeLessThanOrEqual(GAME_W);
+      expect(bounds.bottom, `bottom at ${JSON.stringify(point)}`).toBeLessThanOrEqual(GAME_H);
+    }
   }, 10000);
 });

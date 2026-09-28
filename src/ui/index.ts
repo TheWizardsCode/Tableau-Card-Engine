@@ -33,6 +33,10 @@ export type { FlipCardOptions } from './flipCard';
 export { shakeIllegalMove } from './shakeIllegalMove';
 export type { ShakeIllegalMoveOptions } from './shakeIllegalMove';
 
+// Canvas-compatible persistent card highlight (selection/target marker)
+export { createCardHighlight } from './cardHighlight';
+export type { CardHighlight, CardHighlightOptions } from './cardHighlight';
+
 // Reusable drag-and-drop lifecycle module
 // (extracted from Beleaguered Castle; consumed by Main Street drag-to-buy)
 export {
@@ -162,8 +166,20 @@ export { HelpButton } from './HelpButton';
 export type { HelpButtonConfig } from './HelpButton';
 
 export { SettingsPanel, DEPTH_SETTINGS_BUTTON } from './SettingsPanel';
-export { TooltipManager } from './Tooltip';
-export type { TooltipRenderContext, PhaserTooltipRenderFn, TooltipManagerConfig } from './Tooltip';
+export {
+  TooltipManager,
+  clampTooltipToBounds,
+  computeViewportTooltipPosition,
+  TOOLTIP_BOUNDS_MARGIN,
+  TOOLTIP_HOVER_OFFSET,
+} from './Tooltip';
+export type {
+  TooltipRenderContext,
+  PhaserTooltipRenderFn,
+  TooltipManagerConfig,
+  TooltipPosition,
+  ViewportTooltipPositionOptions,
+} from './Tooltip';
 export type { SettingsPanelConfig, SettingsButtonPosition } from './SettingsPanel';
 
 export { SettingsButton } from './SettingsButton';
@@ -289,6 +305,25 @@ export type {
   SceneHeaderResult,
 } from './SceneHeader';
 
+// ALPHA badge (marks every surface as an unreleased ALPHA build)
+export {
+  createAlphaBadge,
+  computeAlphaBadgeY,
+  ALPHA_BADGE_LABEL,
+  ALPHA_BADGE_TEXT_PREFIX,
+  ALPHA_BADGE_FILL,
+  ALPHA_BADGE_TEXT_COLOR,
+  ALPHA_BADGE_FONT_SIZE,
+  ALPHA_BADGE_HEIGHT,
+  ALPHA_BADGE_PADDING_X,
+  ALPHA_BADGE_CHAR_WIDTH,
+  ALPHA_BADGE_MIN_Y,
+  ALPHA_BADGE_OVERLAP,
+  ALPHA_BADGE_DEPTH,
+  ALPHA_BADGE_DEFAULT_TITLE_FONT_SIZE,
+} from './AlphaBadge';
+export type { AlphaBadgeConfig, AlphaBadgeResult } from './AlphaBadge';
+
 // Shared Renderer API – container, HUD, tooltip, and button helpers
 export {
   createHudContainer,
@@ -318,6 +353,9 @@ export type { DebugToolsEntry } from './debug/DebugToolsRegistry';
 // Slider – reusable horizontal slider widget
 export { Slider } from './Slider';
 export type { SliderOptions } from './Slider';
+
+// UIComponentBase – shared lifecycle for reusable UI components
+export { UIComponentBase, mergeDefaults } from './UIComponentBase';
 
 // Shared Gym scene utilities – event log, deck grid
 // These helpers extract common rendering patterns from Gym demo scenes.

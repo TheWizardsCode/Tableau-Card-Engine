@@ -54,7 +54,12 @@ if [ "$CONTEXT_BUDGET_SKIP" != "1" ]; then
       :
     else
       echo "ERROR: Context budget exceeded committed thresholds." >&2
-      echo "  Run: python3 $measure --repo-root $repo_root --include-hidden --thresholds $thresholds" >&2
+      if [ -x "$repo_root/scripts/refresh-context-thresholds.sh" ]; then
+        echo "  Refresh and commit the thresholds with your change:" >&2
+        echo "    $repo_root/scripts/refresh-context-thresholds.sh" >&2
+      else
+        echo "  Run: python3 $measure --repo-root $repo_root --include-hidden --thresholds $thresholds" >&2
+      fi
       echo "  See docs/dev/context-budget.md. Set CONTEXT_BUDGET_SKIP=1 to bypass." >&2
       exit 1
     fi

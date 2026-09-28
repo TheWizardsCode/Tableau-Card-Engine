@@ -22,6 +22,7 @@ import {
   type CardSelectedPayload,
   type CardDeselectedPayload,
   type DealCardPayload,
+  type GameEventName,
 } from '../../src/core-engine/GameEventEmitter';
 
 describe('GameEventEmitter', () => {
@@ -688,6 +689,146 @@ describe('GameEventEmitter', () => {
 
       expect(listener1).toHaveBeenCalledOnce();
       expect(listener2).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Cross-game event payload consistency ──────────────
+
+  describe('cross-game payload consistency', () => {
+    /**
+     * A minimal, representative payload for every event name in
+     * `GameEventMap`. Used to drive the emitter through each key of the map
+     * via the public API. Optional fields are omitted to prove they are
+     * genuinely optional at runtime.
+     */
+    const MINIMAL_PAYLOADS: Record<GameEventName, Record<string, unknown>> = {
+      'turn-started': { turnNumber: 0, playerIndex: 0, playerName: 'A', isAI: false },
+      'turn-completed': { turnNumber: 0, playerIndex: 0, playerName: 'A', phase: 'playing' },
+      'animation-complete': { turnNumber: 0 },
+      'state-settled': { turnNumber: 0, phase: 'playing' },
+      'game-ended': { finalTurnNumber: 0, winnerIndex: -1 },
+      'card-drawn': { source: 'stock', playerIndex: 0 },
+      'card-flipped': { position: 0, playerIndex: 0 },
+      'card-swapped': { position: 0, drawnFrom: 'stock', playerIndex: 0 },
+      'card-discarded': {},
+      'card:discarded': {},
+      'card:dealt': {},
+      'card:placed': {},
+      'ui-interaction': { elementId: 'x', action: 'click' },
+      'income-gained': { amount: 1 },
+      'card-to-foundation': { suit: 'hearts', rank: 'A', foundationIndex: 0 },
+      'card-to-tableau': { suit: 'hearts', rank: 'A', columnIndex: 0 },
+      'card-pickup': { suit: 'hearts', rank: 'A', source: 'tableau' },
+      'card-snap-back': {},
+      'auto-complete-start': { cardCount: 1 },
+      'auto-complete-card': { suit: 'hearts', rank: 'A', foundationIndex: 0 },
+      'undo': {},
+      'redo': {},
+      'card-selected': { suit: 'hearts', rank: 'A', columnIndex: 0 },
+      'card-deselected': {},
+      'deal-card': { cardIndex: 0, totalCards: 1 },
+    };
+
+    it('round-trips a representative payload for every event name in GameEventMap', () => {
+      const names = Object.keys(MINIMAL_PAYLOADS) as GameEventName[];
+      expect(names.length).toBeGreaterThan(0);
+
+      for (const name of names) {
+        const local = new GameEventEmitter();
+        const received: unknown[] = [];
+        local.on(name, (payload: unknown) => {
+          received.push(payload);
+        });
+
+        const payload = MINIMAL_PAYLOADS[name];
+        local.emit(name, payload as never);
+
+        // The listener receives exactly the payload object (identity — the
+        // emitter neither clones, strips, nor synthesises fields).
+        expect(received, `event ${name} must reach its listener`).toHaveLength(1);
+        expect(received[0], `event ${name} payload identity`).toBe(payload);
+      }
+    });
+
+    it('omitting optional fields is valid — they are not synthesised at runtime', () => {
+      // `animation-complete` has an optional animationId, `card-snap-back`
+      // has an optional reason, `undo`/`redo` an optional moveDescription.
+      const emitter = new GameEventEmitter();
+      const animationListener = vi.fn();
+      const snapBackListener = vi.fn();
+      emitter.on('animation-complete', animationListener);
+      emitter.on('card-snap-back', snapBackListener);
+
+      emitter.emit('animation-complete', { turnNumber: 7 });
+      emitter.emit('card-snap-back', {});
+
+      expect(animationListener).toHaveBeenCalledWith({ turnNumber: 7 });
+      expect(animationListener).toHaveBeenCalledWith(
+        expect.not.objectContaining({ animationId: expect.anything() }),
+      );
+      expect(snapBackListener).toHaveBeenCalledWith({});
+    });
+
+    it('listenerCount tracks each event independently across the whole map', () => {
+      const local = new GameEventEmitter();
+      const names = Object.keys(MINIMAL_PAYLOADS) as GameEventName[];
+
+      // Subscribe every event exactly once
+      for (const name of names) {
+        local.on(name, () => {});
+      }
+      for (const name of names) {
+        expect(local.listenerCount(name), `count for ${name}`).toBe(1);
+      }
+
+      // Removing one event's listener leaves the others intact
+      local.removeAllListeners(names[0]);
+      expect(local.listenerCount(names[0])).toBe(0);
+      for (const name of names.slice(1)) {
+        expect(local.listenerCount(name), `count for ${name}`).toBe(1);
+      }
+    });
+  });
+
+  // ── Runtime resilience ────────────────────────────────
+
+  describe('runtime resilience', () => {
+    it('emit() is a no-op for an event with no subscribers (does not throw)', () => {
+      expect(() => {
+        emitter.emit('turn-started', {
+          turnNumber: 0,
+          playerIndex: 0,
+          playerName: 'A',
+          isAI: false,
+        });
+      }).not.toThrow();
+      expect(emitter.listenerCount('turn-started')).toBe(0);
+    });
+
+    it('emit() with a malformed payload does not throw and delivers it unchanged', () => {
+      const listener = vi.fn();
+      emitter.on('turn-started', listener);
+
+      // Runtime JS cannot enforce the TypeScript shape — a game emitting a
+      // partial payload must not crash the emitter.
+      const partial = { turnNumber: 0 } as unknown as TurnStartedPayload;
+      expect(() => emitter.emit('turn-started', partial)).not.toThrow();
+      expect(listener).toHaveBeenCalledWith(partial);
+    });
+
+    it('a throwing listener propagates (documents the current contract)', () => {
+      emitter.on('turn-started', () => {
+        throw new Error('listener failure');
+      });
+
+      expect(() =>
+        emitter.emit('turn-started', {
+          turnNumber: 0,
+          playerIndex: 0,
+          playerName: 'A',
+          isAI: false,
+        }),
+      ).toThrow('listener failure');
     });
   });
 });

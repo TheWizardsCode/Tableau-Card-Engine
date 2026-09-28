@@ -9,6 +9,8 @@
 import Phaser from 'phaser';
 import { HelpButton } from './HelpButton';
 import { ListenerRegistry } from '../core-engine/ListenerRegistry';
+import { createAlphaBadge, ALPHA_BADGE_CHAR_WIDTH, ALPHA_BADGE_PADDING_X, ALPHA_BADGE_LABEL } from './AlphaBadge';
+import type { AlphaBadgeResult } from './AlphaBadge';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -81,6 +83,12 @@ const CLOSE_BUTTON_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontStyle: 'bold',
 };
 const PADDING = 20;
+/** Vertical centre of the compact "Help" + ALPHA badge header row. */
+const HELP_HEADER_Y = 14;
+/** Gap (px) between the "Help" title and the inline ALPHA badge. */
+const HELP_HEADER_BADGE_GAP = 10;
+/** Estimated rendered width (px) of the "Help" heading at 18px bold. */
+const HELP_TITLE_WIDTH_ESTIMATE = 46;
 const SECTION_GAP = 16;
 const HEADING_BODY_GAP = 6;
 const TRACK_BAR_WIDTH = 4;
@@ -139,6 +147,24 @@ export class HelpPanel {
   // Keyboard
   private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
   private _helpButton: HelpButton | null = null;
+
+  // Compact panel header ("Help" + ALPHA badge)
+  private _helpTitle!: Phaser.GameObjects.Text;
+  private _alphaBadge!: AlphaBadgeResult;
+
+  /**
+   * The ALPHA badge rendered above/over the compact "Help" header.
+   */
+  get alphaBadge(): AlphaBadgeResult {
+    return this._alphaBadge;
+  }
+
+  /**
+   * The compact "Help" title text rendered at the top of the panel.
+   */
+  get helpTitle(): Phaser.GameObjects.Text {
+    return this._helpTitle;
+  }
 
   /**
    * The integrated help button, or `null` when `showButton` is false.
@@ -227,10 +253,27 @@ export class HelpPanel {
     this.container.add(this.closeButton);
 
     // Content container (will be masked for scrolling)
-    const contentTopY = PADDING + 10; // leave room for close button
+    const contentTopY = PADDING + 10; // leave room for close button + header row
     this.contentContainer = scene.add.container(0, contentTopY);
     this.contentContainer.setDepth(DEPTH_PANEL_CONTENT);
     this.container.add(this.contentContainer);
+
+    // Compact panel header: "Help" title with the ALPHA badge beside it. It
+    // occupies the panel's existing top padding row so the scrollable content
+    // keeps its established layout (contentTopY unchanged).
+    this._helpTitle = scene.add.text(PADDING, HELP_HEADER_Y, 'Help', HEADING_STYLE);
+    this._helpTitle.setOrigin(0, 0.5);
+    this._helpTitle.setDepth(DEPTH_PANEL_CONTENT);
+    this.container.add(this._helpTitle);
+
+    const badgeWidth = ALPHA_BADGE_LABEL.length * ALPHA_BADGE_CHAR_WIDTH + ALPHA_BADGE_PADDING_X * 2;
+    this._alphaBadge = createAlphaBadge(scene, {
+      x: PADDING + HELP_TITLE_WIDTH_ESTIMATE + HELP_HEADER_BADGE_GAP + badgeWidth / 2,
+      y: HELP_HEADER_Y,
+      depth: DEPTH_PANEL_CONTENT,
+    });
+    this.container.add(this._alphaBadge.background);
+    this.container.add(this._alphaBadge.text);
 
     // Build content sections
     this.buildContent();

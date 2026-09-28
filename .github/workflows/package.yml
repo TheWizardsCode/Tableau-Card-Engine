@@ -5,9 +5,16 @@
 # produce it, so CI builds it reproducibly. The GitHub Pages deploy workflow
 # (deploy.yml) is intentionally untouched.
 #
+# The artifact ships the FULL distribution (all games + Gym): the core repo
+# carries no games at HEAD (multi-repo architecture), so the game repos are
+# composed as sibling checkouts (`../tce-<game>`) before packaging
+# (CG-0MULGC6VP008GPH2). GAMES_CONFIG=full is set at job level so both the
+# packaging build and the launch smoke test use the same preset.
+#
 # Artifact: NSIS installer (TCE-Setup-<version>.exe). Before upload, the
 # win-unpacked binary is smoke-tested in-job via the Playwright-Electron
-# launch test (tests/electron/launch-smoke.test.ts, TCE_SMOKE_BINARY mode).
+# launch test (tests/electron/launch-smoke.test.ts, TCE_SMOKE_BINARY mode),
+# which asserts the selector catalogue matches the configured preset.
 name: Package Windows Binary
 
 on:
@@ -19,6 +26,10 @@ on:
 jobs:
   package-windows:
     runs-on: windows-latest
+    env:
+      # Ship every game in the Steam artifact. The launch smoke test derives
+      # its expected catalogue size from this same preset.
+      GAMES_CONFIG: full
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +42,21 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Compose sibling game repositories
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The core repo carries no games at HEAD (multi-repo architecture);
+          # the distribution composes the game repos as siblings. Each preset
+          # entry's `path` (e.g. `../tce-golf`) is exactly where the Vite
+          # discovery plugin looks, so `configs/full.json` is the single source
+          # of truth for the composed set. The game repos are public, so the
+          # clone needs no credentials; their own `./core` submodule is not
+          # needed here because the launcher resolves core aliases locally.
+          for repo in $(node -e "for (const g of require('./configs/full.json').games) console.log(g.path)"); do
+            git clone --depth 1 "https://github.com/TheWizardsCode/${repo#../}.git" "$repo"
+          done
 
       - name: Package Windows binary
         run: npm run package:win

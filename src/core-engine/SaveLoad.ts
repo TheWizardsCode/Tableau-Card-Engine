@@ -52,6 +52,15 @@ export interface SaveSerializer<TState, TSerialized> {
   readonly schemaVersion: number;
   serialize(state: TState): TSerialized;
   deserialize(data: TSerialized): TState;
+  /**
+   * Optional forward-migration hook (CG-0MTMYIHKO001QCWL).
+   *
+   * When a stored payload was written by an older `schemaVersion`,
+   * `migrate(data, fromVersion)` must return data shaped for the current
+   * schema. When this hook is absent, a version mismatch throws — the
+   * default, strict behaviour that guards against silent corruption.
+   */
+  migrate?(data: TSerialized, fromVersion: number): TSerialized;
 }
 
 const DEFAULT_DB_NAME = 'save-load-store';
@@ -309,12 +318,18 @@ export function deserializeWithVersion<TState, TSerialized>(
   serializer: SaveSerializer<TState, TSerialized>,
   payload: VersionedPayload<TSerialized>,
 ): TState {
+  let data = payload.data;
   if (payload.schemaVersion !== serializer.schemaVersion) {
-    throw new Error(
-      `Incompatible save version: expected ${serializer.schemaVersion}, got ${payload.schemaVersion}`,
-    );
+    // Only *older* payloads may be forward-migrated; a payload from a newer,
+    // unknown schema must never be guessed at.
+    if (payload.schemaVersion > serializer.schemaVersion || !serializer.migrate) {
+      throw new Error(
+        `Incompatible save version: expected ${serializer.schemaVersion}, got ${payload.schemaVersion}`,
+      );
+    }
+    data = serializer.migrate(data, payload.schemaVersion);
   }
-  return serializer.deserialize(payload.data);
+  return serializer.deserialize(data);
 }
 
 export class SaveLoadStore {
@@ -442,7 +457,10 @@ export class SaveLoadStore {
   ): Promise<TState | null> {
     const stored = await this.load<VersionedPayload<TSerialized>>(domain, gameType, slotId);
     if (!stored) return null;
-    if (stored.schemaVersion !== serializer.schemaVersion) {
+    if (
+      stored.schemaVersion !== serializer.schemaVersion &&
+      (stored.schemaVersion > serializer.schemaVersion || !serializer.migrate)
+    ) {
       throw new Error(
         `Incompatible save version: expected ${serializer.schemaVersion}, got ${stored.schemaVersion}`,
       );

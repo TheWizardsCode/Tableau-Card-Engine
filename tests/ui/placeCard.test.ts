@@ -86,6 +86,25 @@ describe('placeCard', () => {
     expect(totalDuration).toBe(500);
   });
 
+  it('treats an explicitly undefined duration as absent (uses the default)', async () => {
+    const opts: PlaceCardOptions = {
+      scene: mockScene as any,
+      target: target as any,
+      destX: 500,
+      destY: 400,
+      duration: undefined,
+    };
+
+    placeCard(opts);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const totalDuration =
+      (mockScene.tweensList![0] as any).duration +
+      (mockScene.tweensList![1] as any).duration;
+    expect(totalDuration).toBe(DEFAULT_PLACE_DURATION);
+  });
+
   it('uses Back.easeOut easing by default', async () => {
     const opts: PlaceCardOptions = {
       scene: mockScene as any,

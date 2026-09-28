@@ -27,6 +27,7 @@
  */
 
 import { safePlaySound, COMMON_SFX_KEYS } from '../core-engine/SoundManager';
+import { applyDefaults } from '../core-engine/config-defaults';
 import { shakeIllegalMove } from './shakeIllegalMove';
 import { emitEventOrCallback } from '../core-engine/event-emission';
 
@@ -226,6 +227,41 @@ function shakeContainer(
 }
 
 /**
+ * Flush Phaser's pending hit-test insertion queue into the active list.
+ *
+ * `setInteractive()` (and therefore `setDraggable()`) only queues a game
+ * object for insertion; the InputPlugin promotes `_pendingInsertion` into its
+ * active hit-test `_list` on the next `preUpdate`. A pointer event arriving
+ * before that flush is silently dropped. This helper performs the same
+ * promotion immediately so a newly registered draggable is hit-testable on
+ * the very next pointer event (CG-0MUHL624W007G8EG) — for example the first
+ * click after a deal animation completes (`onDealComplete` → `makeDraggable`).
+ *
+ * Mirrors `InputPlugin.preUpdate`'s insertion handling (including its
+ * `_pendingInsertion`/`_list` dedupe guard) and is a no-op when the plugin's
+ * internals are unavailable (e.g. lightweight fakes in unit tests).
+ */
+function flushPendingHitTestInsertions(scene: Phaser.Scene): void {
+  const input = scene.input as unknown as {
+    _pendingInsertion?: Phaser.GameObjects.GameObject[];
+    _list?: Phaser.GameObjects.GameObject[];
+  };
+  const pending = input?._pendingInsertion;
+  const list = input?._list;
+  if (!Array.isArray(pending) || !Array.isArray(list) || pending.length === 0) {
+    return;
+  }
+  // Promote all pending insertions (matching Phaser's own preUpdate
+  // behaviour) so we never strand another object queued alongside this one.
+  const promoted = pending.splice(0);
+  for (const obj of promoted) {
+    if (list.indexOf(obj) === -1) {
+      list.push(obj);
+    }
+  }
+}
+
+/**
  * Rectangle hit-area containment test equivalent to
  * `Phaser.Geom.Rectangle.Contains` without a runtime Phaser import
  * (keeps the module importable in Node unit tests).
@@ -255,14 +291,21 @@ function rectangleContains(
  */
 export function createDragDropManager(config: DragDropManagerConfig): DragDropManager {
   const scene = config.scene;
-  const dragDepth = config.dragDepth ?? DEFAULT_DRAG_DEPTH;
-  const snapBackDuration = config.snapBackDuration ?? DEFAULT_SNAP_BACK_DURATION;
+  const {
+    dragDepth,
+    snapBackDuration,
+    reducedMotion: initialReducedMotion,
+  } = applyDefaults(config, {
+    dragDepth: DEFAULT_DRAG_DEPTH,
+    snapBackDuration: DEFAULT_SNAP_BACK_DURATION,
+    reducedMotion: false,
+  });
 
   const draggables = new Map<DraggableGameObject, DraggableEntry>();
   const dropZones = new Map<Phaser.GameObjects.Zone, DropZoneEntry>();
 
   let enabled = true;
-  let reducedMotion = config.reducedMotion ?? false;
+  let reducedMotion = initialReducedMotion;
 
   // Apply the click-vs-drag threshold so pointerup-without-drag still
   // reaches the caller's click path (dragDistanceThreshold semantics).
@@ -498,6 +541,10 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
         }
       }
       scene.input.setDraggable(gameObject, true);
+      // Make the object hit-testable on the very next pointer event instead
+      // of waiting for the InputPlugin's next preUpdate (which is where the
+      // post-deal first-click race originated — CG-0MUHL624W007G8EG).
+      flushPendingHitTestInsertions(scene);
       draggables.set(gameObject, {
         config: objConfig,
         originX: gameObject.x,
