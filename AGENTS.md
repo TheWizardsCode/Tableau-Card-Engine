@@ -58,6 +58,7 @@ npm test             # Run Vitest test suite (non-destructive: does not modify t
 npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally (binds to all interfaces, reachable via Tailscale/LAN)
 npm run setup:distribution -- --dir ..  # Clone core + sibling game repos (full distribution)
+GAMES_CONFIG=full npm run dev           # Run all games + Gym (after setup:distribution)
 npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV; needs the tce-main-street sibling)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher

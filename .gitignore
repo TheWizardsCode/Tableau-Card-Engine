@@ -24,6 +24,23 @@ release/
 *.local
 
 ##################################
+# Composed game assets (launcher)
+##################################
+# `scripts/link-game-assets.ts` symlinks each selected sibling game's
+# game-owned assets into `public/assets/` so the launcher can serve/build
+# them. These are generated, never tracked (CG-0MUKYCG9L00587FA).
+public/assets/games/*
+public/assets/audio/beleaguered-castle
+public/assets/audio/blackjack
+public/assets/audio/coloretto
+public/assets/audio/feudalism
+public/assets/audio/golf
+public/assets/audio/lost-cities
+public/assets/audio/sushi-go
+public/assets/cards/lost-cities
+public/assets/sushi-go
+
+##################################
 # TypeScript
 ##################################
 *.tsbuildinfo

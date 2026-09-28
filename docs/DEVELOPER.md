@@ -148,6 +148,28 @@ npm run setup:distribution -- --dir ..   # clone core + all sibling game repos
 npm run setup:distribution -- --dry-run  # print the plan only
 ```
 
+#### Game asset composition
+
+`setup:distribution` checks out the game repos; it does not copy their assets.
+The launcher owns only the **shared** assets under `public/assets/`, while each
+game's **game-owned** assets live in that game repo's own `public/assets/`
+tree. `scripts/vite-game-assets-plugin.ts` (backed by
+`scripts/link-game-assets.ts`) therefore composes the selected games'
+game-owned roots into the launcher's `public/assets/` at config resolution —
+before Vite scans (`dev`) or copies (`build`) the public dir — using the
+ownership table `scripts/configs/repo-layout.json → gameAssets` and the active
+`GAMES_CONFIG` preset.
+
+- `GAMES_CONFIG=full npm run dev` / `npm run build` serve every selected
+game's thumbnails, icons and audio with no extra step.
+- Composition is idempotent; an existing correct link is untouched, a real
+  file at a destination is never clobbered, and links for games the preset no
+  longer selects are removed (so `core-only` leaves the tree clean).
+- The composed links are generated artefacts and are gitignored. Drive them
+  manually with `npx tsx scripts/link-game-assets.ts [--dry-run] [--json]`.
+
+Related work item: CG-0MUKYCG9L00587FA.
+
 > **Full reference:** [Config-Driven Game Catalogue](dev/game-configuration.md)
 > is the authoritative guide to the preset schema (required and optional
 > fields, the `$comment` annotation), selection, the three-step resolution

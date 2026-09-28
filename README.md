@@ -17,6 +17,7 @@ npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 
 # Compose a full multi-game distribution (core + sibling game checkouts):
 npm run setup:distribution -- --dir ..
+GAMES_CONFIG=full npm run dev   # run the all-games launcher (after setup:distribution)
 
 # Desktop / Steam packaging (Electron launcher):
 npm run build:electron   # electron-mode Vite build (relative base, file://-safe)
@@ -135,6 +136,32 @@ GAMES_CONFIG=full npm run build            # web build (dist/)
 GAMES_CONFIG=full npm run build:electron   # desktop build
 GAMES_CONFIG=full npm run package          # packaged desktop binary
 ```
+
+### Running the multi-game launcher locally
+
+`npm run setup:distribution -- --dir ..` is the prerequisite for the sibling
+presets: it checks out each game repo next to the launcher. Then select a
+preset — `full` for all eight games plus the Gym:
+
+```bash
+npm run setup:distribution -- --dir ..   # clone the sibling game repos (once)
+GAMES_CONFIG=full npm run dev            # launcher on http://localhost:3000
+```
+
+The launcher composes each selected game's **game-owned** assets (thumbnails,
+icons, game audio, `cards/lost-cities/`, `sushi-go/`) from its sibling checkout
+into `public/assets/` at dev/build time — see
+`scripts/vite-game-assets-plugin.ts` / `scripts/link-game-assets.ts` — so the
+Game Selector and every game load their assets with no extra step. The composed
+links are gitignored and are removed again when a preset that does not select
+the game is used (e.g. the default `core-only`).
+
+The same preset drives `npm run build`, `npm run build:electron` and the test
+profiles, so `setup:distribution` is the one prerequisite for any multi-game
+artefact.
+
+> Synthetic (ToneForge) audio for Main Street is a separate generated artefact:
+> run `npm run tf:generate` before playing Main Street if you want synthesised audio.
 
 A game is resolved **sibling-only**: the merged core carries no games at HEAD,
 so resolution looks first at the Option C `src/` layout

@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from './scripts/vite-transcript-plugin';
 import { gameDiscoveryPlugin, resolveCoreAliases, selectedGameIds } from './scripts/vite-game-discovery-plugin';
+import { gameAssetsPlugin } from './scripts/vite-game-assets-plugin';
 
 // Which games are checked out for this build/test run. Used to filter the
 // smoke/dev project test lists so a core-only checkout does not reference test
@@ -56,6 +57,12 @@ export default defineConfig(({ mode, command }) => ({
     // lets the core repo build with no games and a distribution assemble any
     // subset of 1..n games without editing source.
     gameDiscoveryPlugin(),
+    // Compose each selected sibling game's game-owned assets (thumbnails,
+    // icons, audio) into this launcher's `public/assets` before Vite scans or
+    // copies the public dir. Without this a `GAMES_CONFIG=full` dev server or
+    // build serves the games' source but 404s on every game asset
+    // (CG-0MUKYCG9L00587FA).
+    gameAssetsPlugin(),
     // Only register the transcript persistence plugin during normal dev-server runs.
     // Vitest browser uses an internal Vite server; avoid plugin middleware there to
     // prevent file-system side effects and extra request handling during tests.
