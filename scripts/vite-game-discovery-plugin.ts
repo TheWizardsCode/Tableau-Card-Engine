@@ -129,6 +129,35 @@ export function selectedGameIds(
   }
 }
 
+/**
+ * Number of core-owned Game Selector entries present in every distribution.
+ *
+ * The Gym ships in every build — including `core-only` — so a distribution's
+ * catalogue is always `selectedGameIds(...).length + this many` entries.
+ */
+export const ALWAYS_PRESENT_CATALOGUE_ENTRIES = 1;
+
+/**
+ * Expected Game Selector catalogue size for the active preset.
+ *
+ * The catalogue is the selected games plus the always-present core-owned Gym.
+ * Use it to assert a built distribution's selector size against the preset it
+ * was actually built with, instead of a hard-coded count that silently rots
+ * when the default preset or the game set changes (CG-0MULGC6VP008GPH2).
+ *
+ * Never throws (delegates to {@link selectedGameIds}).
+ *
+ * @param coreRoot Absolute core-repo root (where `configs/` lives).
+ * @param env Environment-like record (defaults to `process.env`).
+ * @returns Expected number of catalogue entries.
+ */
+export function expectedSelectorCatalogueSize(
+  coreRoot: string,
+  env: Record<string, string | undefined> = process.env,
+): number {
+  return selectedGameIds(coreRoot, env).length + ALWAYS_PRESENT_CATALOGUE_ENTRIES;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 /** One game selection inside a preset. */

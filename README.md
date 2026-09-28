@@ -61,7 +61,7 @@ TCE ships as a web app (GitHub Pages) **and** as a native desktop launcher built
 - `npm run start:electron` -- build + launch the desktop app locally.
 - `npm run package` / `package:win` / `package:linux` / `package:mac` -- produce a distributable binary (Windows NSIS installer is the primary Steam artifact) into the gitignored `release/` directory.
 - Game content can come from the bundled app or an external **Steam DLC install directory** via `--content-dir <dir>` / `TCE_CONTENT_DIR`, resolved behind a small provider interface so a future Steamworks-backed provider can be added without a rewrite.
-- The Windows binary is built reproducibly by CI (`.github/workflows/package.yml`) and uploaded as a workflow artifact on every push to `main`.
+- The Windows binary is built reproducibly by CI (`.github/workflows/package.yml`) and uploaded as a workflow artifact on every push to `main`. CI composes the sibling game repos and builds with `GAMES_CONFIG=full`, so the Steam artifact ships the full game catalogue (all games + Gym).
 
 See `docs/DEVELOPER.md` (Electron Launcher / Desktop Packaging) and `RELEASE.md` for the full workflow.
 

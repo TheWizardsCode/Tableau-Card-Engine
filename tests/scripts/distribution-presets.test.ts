@@ -24,6 +24,7 @@ import path from 'node:path';
 
 import {
   discoverGames,
+  expectedSelectorCatalogueSize,
   loadGamesConfig,
   renderGameRegistryModule,
   selectedGameIds,
@@ -112,6 +113,28 @@ describe('launcher distribution presets', () => {
     expect(loadPreset('full').games.map((g) => g.id).sort()).toEqual(
       [...ALL_GAME_IDS].sort(),
     );
+  });
+
+  it('expected selector catalogue size tracks the preset (games + always-present Gym)', () => {
+    // The Game Selector always includes the core-owned Gym, so the catalogue
+    // size is `selectedGameIds(...).length + 1`. This is the value the packaged
+    // Windows-binary launch smoke test asserts against, so it must track the
+    // preset rather than a hard-coded count (CG-0MULGC6VP008GPH2).
+    expect(
+      expectedSelectorCatalogueSize(REPO_ROOT, { GAMES_CONFIG: 'core-only' }),
+    ).toBe(1);
+    expect(
+      expectedSelectorCatalogueSize(REPO_ROOT, { GAMES_CONFIG: 'solo' }),
+    ).toBe(2);
+    expect(
+      expectedSelectorCatalogueSize(REPO_ROOT, { GAMES_CONFIG: 'full' }),
+    ).toBe(ALL_GAME_IDS.length + 1);
+    // The explicit-path form resolves identically to the named preset.
+    expect(
+      expectedSelectorCatalogueSize(REPO_ROOT, {
+        GAMES_CONFIG: 'configs/full.json',
+      }),
+    ).toBe(ALL_GAME_IDS.length + 1);
   });
 
   it('arcade and deluxe select disjoint, non-empty game sets (AC5)', () => {
