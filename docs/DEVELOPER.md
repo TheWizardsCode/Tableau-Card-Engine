@@ -735,6 +735,13 @@ Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedbac
 - `tests/ui/HelpPanel.browser.test.ts` (UI chrome)
 - `tests/gym/GymSceneSmoke.browser.test.ts` (All gym scenes boot)
 
+> **Layout note (Option A).** A game entry is included only when its test file
+> exists in *this* checkout (`vite.config.ts → coreOrSelected`). The merged core
+> carries no games, so in a sibling-only core checkout (`../tce-<game>`) the
+> smoke/dev profiles deliberately run the core + Gym suites only — a game's own
+> suite runs in its game repo. This keeps the core suite green in both layouts
+> (CG-0MUKWPTZ50040V0Q).
+
 ### Dev Tests
 
 Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehensive but still fast suite. The dev profile adds key E2E tests per game on top of all smoke tests — target runtime is ~3 minutes for ~30 files.

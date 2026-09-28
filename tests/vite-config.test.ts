@@ -123,13 +123,24 @@ describe('smoke/dev test lists follow the selected preset', () => {
     return project?.test?.include ?? [];
   }
 
-  it('keeps game test paths when the games are selected', () => {
+  it('includes a selected game test only when it is present in this checkout', () => {
     const original = process.env.GAMES_CONFIG;
     try {
       process.env.GAMES_CONFIG = 'full';
       const smoke = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'smoke');
-      expect(smoke).toContain('tests/golf/GolfScene.browser.test.ts');
+      // Core-owned suites are always present.
+      expect(smoke).toContain('tests/core-engine/SvgHelpers.browser.test.ts');
       expect(smoke).toContain('tests/gym/GymSceneSmoke.browser.test.ts');
+      // A game-owned suite is included iff its file exists in this checkout:
+      // the merged core carries no game tests (Option A), so a sibling-only
+      // checkout deliberately excludes them while an in-tree composition
+      // includes them.
+      for (const file of [
+        'tests/golf/GolfScene.browser.test.ts',
+        'tests/main-street/MainStreetScene.browser.test.ts',
+      ]) {
+        expect(smoke.includes(file)).toBe(fs.existsSync(path.join(REPO_ROOT, file)));
+      }
     } finally {
       if (original === undefined) delete process.env.GAMES_CONFIG;
       else process.env.GAMES_CONFIG = original;
@@ -154,41 +165,42 @@ describe('smoke/dev test lists follow the selected preset', () => {
     }
   });
 
-  it('keeps only the arcade preset games for a partial checkout', () => {
+  it('never includes games outside the selected preset', () => {
     const original = process.env.GAMES_CONFIG;
     try {
       process.env.GAMES_CONFIG = 'arcade';
       const dev = includeFor(viteConfig({ command: 'build', mode: 'production' }), 'dev');
-      expect(dev).toContain('tests/golf/GolfScene.browser.test.ts');
-      expect(dev).toContain('tests/main-street/MainStreetScene.browser.test.ts');
+      // Non-selected games are always excluded.
       expect(dev).not.toContain('tests/coloretto/ColorettoScene.browser.test.ts');
       expect(dev).not.toContain('tests/sushi-go/SushiGoIcons.browser.test.ts');
+      // Selected games follow the presence contract (see the previous test).
+      for (const file of [
+        'tests/golf/GolfScene.browser.test.ts',
+        'tests/main-street/MainStreetScene.browser.test.ts',
+      ]) {
+        expect(dev.includes(file)).toBe(fs.existsSync(path.join(REPO_ROOT, file)));
+      }
     } finally {
       if (original === undefined) delete process.env.GAMES_CONFIG;
       else process.env.GAMES_CONFIG = original;
     }
   });
 
-  it('only references test files that exist (no silent coverage loss)', () => {
+  it('only references test files that exist in this checkout (no silent coverage loss)', () => {
     const original = process.env.GAMES_CONFIG;
     try {
       // Select everything so the full explicit lists are produced; a stale
-      // path is silently ignored by Vitest, so guard it here.
+      // path is silently ignored by Vitest, so guard it here. The coreOrSelected
+      // filter must drop any entry this checkout cannot resolve — including
+      // game tests that live in a sibling game repo (Option A).
       process.env.GAMES_CONFIG = 'full';
       const config = viteConfig({ command: 'build', mode: 'production' }) as unknown;
       for (const name of ['smoke', 'dev']) {
         for (const file of includeFor(config, name)) {
-          if (fs.existsSync(path.join(REPO_ROOT, file))) continue;
-          // A game that is not checked out (core-only or partial checkout) has
-          // no sibling test tree, so its entries are legitimately absent.
-          // Sibling-only (Option A): use the sibling checkout as the proxy —
-          // not `tests/<group>` / `example-games/<group>`, which may hold
-          // ignored test artifacts in a long-lived checkout.
-          const group = file.split('/')[1];
-          if (group && !fs.existsSync(path.join(REPO_ROOT, '..', `tce-${group}`))) {
-            continue;
-          }
-          throw new Error(`${name} references missing test file: ${file}`);
+          expect(
+            fs.existsSync(path.join(REPO_ROOT, file)),
+            `${name} references missing test file: ${file}`,
+          ).toBe(true);
         }
       }
     } finally {

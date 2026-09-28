@@ -22,18 +22,39 @@ function selectedGames(): Set<string> {
   return selectedGamesCache;
 }
 
-/** Keep only test files that belong to a checked-out game (or to core). */
+/** Core-owned test groups that are always present in the core checkout. */
+const CORE_TEST_GROUPS = new Set([
+  'core-engine',
+  'ui',
+  'gym',
+  'handView',
+  'card-system',
+  'rule-engine',
+  'ai',
+  'core',
+]);
+
+/**
+ * Keep only test files that exist in *this* checkout.
+ *
+ * Core-owned suites (engine, Gym, UI, …) are always kept. A game-owned suite is
+ * kept only when the game is selected by the active preset **and** its test
+ * file actually exists here — in the merged core (Option A) a game's tests live
+ * in that game's own repo (`../tce-<game>/tests/<game>/…`), so referencing them
+ * from the core checkout would make Vitest resolve nothing for them and fail
+ * the profile. The existence check also makes the smoke/dev lists layout
+ * agnostic: an in-tree game test tree (if one is ever composed) is included,
+ * a sibling-only checkout deliberately excludes it, and the
+ * `tests/vite-config.test.ts` guard asserts every entry exists (CG-0MUKWPTZ50040V0Q).
+ */
 function coreOrSelected(...files: string[]): string[] {
   const games = selectedGames();
   return files.filter((f) => {
     const m = /^tests\/([^/]+)\//.exec(f);
     if (!m) return true;
-    const group = m[1];
-    // Always-present (core-owned) suites.
-    if (['core-engine', 'ui', 'gym', 'handView', 'card-system', 'rule-engine', 'ai', 'core'].includes(group)) {
-      return true;
-    }
-    return games.has(group);
+    const group = m[1] as string;
+    if (CORE_TEST_GROUPS.has(group)) return true;
+    return games.has(group) && fs.existsSync(path.resolve(__dirname, f));
   });
 }
 
