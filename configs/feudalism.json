@@ -1,0 +1,13 @@
+{
+  "$comment": "Per-game preset: Feudalism only (plus the core-owned Gym). Use `GAMES_CONFIG=feudalism` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "feudalism",
+      "path": "../tce-feudalism",
+      "scenePath": "example-games/feudalism/scenes/FeudalismScene.ts",
+      "siblingScenePath": "src/scenes/FeudalismScene.ts",
+      "adapterPath": "example-games/feudalism/scripts/adapters/FeudalismReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/FeudalismReplayAdapter.ts"
+    }
+  ]
+}

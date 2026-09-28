@@ -24,6 +24,14 @@ export interface Command {
   undo(): void;
   /** Optional human-readable description for debugging/transcripts. */
   readonly description?: string;
+  /**
+   * Optional transient marker: challenge IDs completed by this command's most
+   * recent forward execution (`execute`). Populated by Main Street's command
+   * layer so `performUndo` can warn before an undo would revert a challenge
+   * completion (CG-0MU37CKRR008252I). Generic and backward-compatible —
+   * commands that do not track completions leave it undefined.
+   */
+  completedChallengeIds?: string[];
 }
 
 /**
@@ -124,6 +132,16 @@ export class UndoRedoManager {
   /** Whether there are commands that can be undone. */
   canUndo(): boolean {
     return this.undoStack.length > 0;
+  }
+
+  /**
+   * Inspect the command that {@link undo} would apply, without popping it
+   * (CG-0MU37CKRR008252I). Returns `undefined` when the undo stack is empty.
+   * Used by Main Street's `performUndo` to warn before an undo would revoke a
+   * challenge completion.
+   */
+  peekUndo(): Command | undefined {
+    return this.undoStack[this.undoStack.length - 1];
   }
 
   /** Whether there are commands that can be redone. */

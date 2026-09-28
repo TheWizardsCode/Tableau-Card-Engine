@@ -24,6 +24,23 @@ release/
 *.local
 
 ##################################
+# Composed game assets (launcher)
+##################################
+# `scripts/link-game-assets.ts` symlinks each selected sibling game's
+# game-owned assets into `public/assets/` so the launcher can serve/build
+# them. These are generated, never tracked (CG-0MUKYCG9L00587FA).
+public/assets/games/*
+public/assets/audio/beleaguered-castle
+public/assets/audio/blackjack
+public/assets/audio/coloretto
+public/assets/audio/feudalism
+public/assets/audio/golf
+public/assets/audio/lost-cities
+public/assets/audio/sushi-go
+public/assets/cards/lost-cities
+public/assets/sushi-go
+
+##################################
 # TypeScript
 ##################################
 *.tsbuildinfo
@@ -103,4 +120,9 @@ Worklog Specific Ignores
 .pi/*
 !.pi/skills/
 !.pi/skills/**
+!.pi/test-config.json
+# Track the local skill-extension contract (project-level agent tooling that
+# must be committed and testable, e.g. the test-skill `--type` profile map).
+!.pi/skills_extensions/
+!.pi/skills_extensions/**
 .implement_state.json

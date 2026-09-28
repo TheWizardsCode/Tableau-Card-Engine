@@ -19,10 +19,10 @@
  * ### Before (old import paths)
  *
  * ```ts
- * import { TranscriptRecorderBase, type BaseTranscript } from '../../src/core-engine/TranscriptRecorder';
- * import { TranscriptStore, type StoredTranscript } from '../../src/core-engine/TranscriptStore';
- * import { autoSaveTranscript } from '../../src/core-engine/autoSaveTranscript';
- * import { CardSnapshot, snapshotCard } from '../../src/core-engine/TranscriptTypes';
+ * import { TranscriptRecorderBase, type BaseTranscript } from '../TranscriptRecorder';
+ * import { TranscriptStore, type StoredTranscript } from '../TranscriptStore';
+ * import { autoSaveTranscript } from '../autoSaveTranscript';
+ * import { CardSnapshot, snapshotCard } from '../TranscriptTypes';
  * ```
  *
  * ### After (new consolidated import)
@@ -37,7 +37,7 @@
  *   autoSaveTranscript,
  *   CardSnapshot,
  *   snapshotCard,
- * } from '../../src/core-engine/transcript';
+ * } from '.';
  * ```
  *
  * ### Backward compatibility

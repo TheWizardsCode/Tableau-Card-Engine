@@ -1,4 +1,4 @@
-import { SoundManager } from '../core-engine';
+import { SoundManager, applyDefaults, DEFAULT_MOVE_SFX_INTERVAL_MS } from '../core-engine';
 import { emitEventOrCallback } from '../core-engine/event-emission';
 import type { CardPlacedPayload } from '../core-engine/CardEventPayloads';
 
@@ -124,18 +124,24 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
     target,
     destX,
     destY,
-    duration = DEFAULT_PLACE_DURATION,
-    ease = 'Back.easeOut',
-    scale = 1,
-    scaleDurationRatio = 0.6,
+    duration,
+    ease,
+    scale,
+    scaleDurationRatio,
     gameEvents,
     cardId,
     playerIndex,
     slotIndex,
     reducedMotion,
-    soundManager = null,
+    soundManager,
     sfx,
-  } = opts;
+  } = applyDefaults(opts, {
+    duration: DEFAULT_PLACE_DURATION,
+    ease: 'Back.easeOut',
+    scale: 1,
+    scaleDurationRatio: 0.6,
+    soundManager: null,
+  });
 
   // Check for reduced motion preference (explicit param takes precedence)
   const shouldReduce = reducedMotion ?? prefersReducedMotion();
@@ -153,7 +159,7 @@ export function placeCard(opts: PlaceCardOptions): Phaser.Tweens.Tween {
     });
   }
 
-  const moveInterval = sfx?.moveIntervalMs ?? 120;
+  const moveInterval = sfx?.moveIntervalMs ?? DEFAULT_MOVE_SFX_INTERVAL_MS;
   let lastMovePlay = 0;
   let loopSound: Phaser.Sound.BaseSound | null = null;
 

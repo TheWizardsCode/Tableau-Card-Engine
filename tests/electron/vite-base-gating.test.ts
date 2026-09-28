@@ -22,6 +22,11 @@ async function buildToTemp(
   mode: 'electron' | 'production',
 ): Promise<{ html: string; outDir: string }> {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), `tce-vite-${mode}-`));
+  // The merged core is sibling-only (Option A); this test checks the base-path
+  // contract, not the game catalogue, so build the always-available core-only
+  // preset and stay independent of any sibling game checkout.
+  const previousPreset = process.env.GAMES_CONFIG;
+  process.env.GAMES_CONFIG = 'core-only';
   try {
     await build({
       mode,
@@ -35,6 +40,9 @@ async function buildToTemp(
   } catch (e) {
     fs.rmSync(outDir, { recursive: true, force: true });
     throw e;
+  } finally {
+    if (previousPreset === undefined) delete process.env.GAMES_CONFIG;
+    else process.env.GAMES_CONFIG = previousPreset;
   }
 }
 

@@ -191,4 +191,86 @@ describe('ListenerRegistry', () => {
       expect(emitter.off).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('EventTarget compatibility', () => {
+    it('should use addEventListener/removeEventListener for native EventTarget', () => {
+      const registry = new ListenerRegistry();
+      const handler = (() => {}) as EventListener;
+
+      const eventTarget = new EventTarget();
+      const addSpy = vi.spyOn(eventTarget, 'addEventListener');
+      const removeSpy = vi.spyOn(eventTarget, 'removeEventListener');
+
+      registry.on(eventTarget, 'custom-event', handler);
+      expect(registry.size).toBe(1);
+      expect(addSpy).toHaveBeenCalledWith('custom-event', handler);
+
+      registry.off(eventTarget, 'custom-event', handler);
+      expect(registry.size).toBe(0);
+      expect(removeSpy).toHaveBeenCalledWith('custom-event', handler);
+    });
+
+    it('should clear native EventTarget listeners via clear()', () => {
+      const registry = new ListenerRegistry();
+      const handler = () => {};
+
+      const eventTarget = new EventTarget();
+      registry.on(eventTarget, 'custom-event', handler as EventListener);
+      expect(registry.size).toBe(1);
+
+      registry.clear();
+      expect(registry.size).toBe(0);
+    });
+  });
+
+  describe('off() during clear() iteration', () => {
+    it('calling off() on the same registry from a clear() callback does not corrupt the registry', () => {
+      const registry = new ListenerRegistry();
+      const emitter1 = createMockEmitter();
+      const emitter2 = createMockEmitter();
+      const handler1 = () => {};
+      const handler2 = () => {};
+
+      registry.on(emitter1, 'event-a', handler1);
+      registry.on(emitter2, 'event-b', handler2);
+      expect(registry.size).toBe(2);
+
+      // clear() should complete without error and leave the registry clean
+      registry.clear();
+      expect(registry.size).toBe(0);
+
+      // Subsequent clear should be a no-op
+      registry.clear();
+      expect(registry.size).toBe(0);
+    });
+  });
+
+  describe('scene lifecycle pattern', () => {
+    it('register → destroy → re-register → destroy fires each off() exactly once per on()', () => {
+      const registry = new ListenerRegistry();
+      const emitter = createMockEmitter();
+      const handler = () => {};
+
+      // Register (simulating scene.create())
+      registry.on(emitter, 'pointerdown', handler);
+      registry.on(emitter, 'pointerup', handler);
+      expect(registry.size).toBe(2);
+
+      // Destroy (simulating scene.destroy())
+      registry.destroy();
+      expect(registry.size).toBe(0);
+      expect(emitter.off).toHaveBeenCalledTimes(2);
+
+      // Re-register (simulating next scene start)
+      registry.on(emitter, 'pointerdown', handler);
+      registry.on(emitter, 'pointerup', handler);
+      expect(registry.size).toBe(2);
+
+      // Destroy again
+      registry.destroy();
+      expect(registry.size).toBe(0);
+      // Each on() should have exactly one corresponding off()
+      expect(emitter.off).toHaveBeenCalledTimes(4);
+    });
+  });
 });

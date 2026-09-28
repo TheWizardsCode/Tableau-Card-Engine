@@ -6,7 +6,7 @@ Read the global agent instructions at `~/.pi/agent/AGENTS.md` — they define th
 
 You are a producer for the Tableau Card Engine (TCE), a game engine designed to support building single-player tableau card games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
 
-This project follows a **spike-driven development** approach: example games are built first to validate gameplay mechanics and engine APIs, then reusable components are extracted and refined into the shared engine modules. The project is organized as a **flat monorepo** with a single `package.json` at the root.
+This project follows a **spike-driven development** approach: example games are built first to validate gameplay mechanics and engine APIs, then reusable components are extracted and refined into the shared engine modules. The project is organised as a **multi-repo distribution**: the engine + Gym + launcher shell live in the core-engine repo, each game is its own repo composed via git submodules, and the `Tableau-Card-Engine` repo is the launcher/distribution. See [Multi-Repo Architecture](docs/dev/multi-repo-architecture.md).
 
 ## Components
 
@@ -15,49 +15,33 @@ This project follows a **spike-driven development** approach: example games are 
 - **Rule Engine** (`src/rule-engine/`): A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics, turn logic, and validation.
 - **AI** (`src/ai/`): Shared AI strategy abstractions and utility functions. Provides `AiStrategyBase` (base interface), `AiPlayer<TStrategy>` (generic player wrapper that binds a strategy to an RNG), `pickRandom<T>()` (uniform random selection), and `pickBest<T>()` (scored selection with random tie-breaking). Game-specific strategies extend the base types.
 - **User Interface** (`src/ui/`): A modular UI system with reusable components (buttons, menus, overlays) that can be customized and extended to fit different card game themes and styles.
-- **Example Games** (`example-games/`): A collection of sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features, including direct and composed Screen Layout Language (SLL) examples.
+- **Example Games** (`tce-<game>` repos, composed as siblings): Sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests, and is **its own repository** (`tce-<game>`) that composes the merged core (`Tableau-Card-Engine`) as a `./core` git submodule; its source lives at repo-root `src/`. The core repo carries **no games at HEAD**. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features (including direct and composed Screen Layout Language (SLL) examples) and **stays in the core repo** — it is the canonical engine feature demonstrator.
 
 ## Directory Structure
 
+The engine + Gym + launcher shell form the **core repo**; each game is its own
+`tce-<game>` repo that pulls the core in as a `./core` submodule. Repos are
+siblings, composed by the launcher via `configs/*.json` presets (see
+[Multi-Repo Architecture](docs/dev/multi-repo-architecture.md)). The core repo
+carries **no games at HEAD**; the multi-game distribution composes the game
+repos as **sibling checkouts** (`../tce-<game>`), bootstrapped with
+`npm run setup:distribution -- --dir ..`.
+
 ```
 tableau-card-engine/
-├── src/
-│   ├── core-engine/       # Game loop, state management, rendering helpers
-│   │   └── index.ts       # Barrel file / public API
-│   ├── card-system/       # Card, Deck, Hand, Pile abstractions
-│   │   └── index.ts
-│   ├── rule-engine/       # Rule definitions, validation, turn logic
-│   │   └── index.ts
-│   ├── ai/                # Shared AI strategy abstractions and utilities
-│   │   └── index.ts       # Barrel file / public API
-│   └── ui/                # Reusable UI components
-│       └── index.ts
+├── src/                   # core-engine, card-system, rule-engine, ai, balance-cards, ui
 ├── example-games/
-│   └── gym/               Gym demo scenes for core-engine features
-│       ├── README.md
-│       ├── GymRegistry.ts
-│       ├── index.ts
-│       └── scenes/
-│           ├── GymRouterScene.ts
-│           ├── GymSceneBase.ts
-│           ├── GymDeckRngScene.ts
-│           ├── GymHandPileScene.ts
-│           ├── GymOverlayUiScene.ts
-│           ├── GymUndoRedoScene.ts
-│           ├── GymTranscriptScene.ts
-│           ├── GymSaveLoadScene.ts
-│           └── GymAudioFeedbackScene.ts
-├── public/                # Static assets (images, fonts, etc.)
-│   └── assets/
-│       ├── cards/         # Card sprite assets (CC0/permissive)
-│       └── CREDITS.md     # Asset attribution
-├── tests/                 # Vitest test files
-├── dist/                  # Production build output (gitignored)
+│   └── gym/               # Gym demo scenes (the only core-owned example-games tree)
+├── configs/               # build presets: core-only, solo, arcade, deluxe, full
+├── scripts/               # core tooling (runners, extraction, game discovery, setup-distribution)
+├── public/assets/         # shared assets (cards/ + CREDITS.md); game assets live in the game repos
+├── tests/                 # Vitest test files (core + Gym suites)
+├── dist/                  # production build output (gitignored)
 ├── AGENTS.md
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
-├── index.html             # Single entry point for Vite
+├── index.html             # single entry point for Vite
 └── .gitignore
 ```
 
@@ -73,7 +57,9 @@ npm run dev          # Start Vite dev server with hot-reload (port 3000)
 npm test             # Run Vitest test suite (non-destructive: does not modify tracked assets)
 npm run build        # TypeScript check + production build to dist/
 npm run preview      # Serve production build locally (binds to all interfaces, reachable via Tailscale/LAN)
-npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV)
+npm run setup:distribution -- --dir ..  # Clone core + sibling game repos (full distribution)
+GAMES_CONFIG=full npm run dev           # Run all games + Gym (after setup:distribution)
+npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV; needs the tce-main-street sibling)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
 npm run start:electron   # Build + launch the Electron desktop app locally
@@ -90,6 +76,8 @@ npm run package          # Package a desktop binary for the host platform (packa
 
 Each example game should have its own set of tests to ensure that the game mechanics work as expected and to prevent regressions as the engine evolves. Additionally, the core engine should have comprehensive tests covering all critical functionalities.
 
+**Periodic test-suite review:** the suite is audited for low-value tests via the repo-local [`test-review` skill](.pi/skills/test-review/SKILL.md) (`/skill:test-review`). The audit classifies every `*.test.ts` file against six documented anti-patterns, records the result in [`docs/dev/test-suite-review.md`](docs/dev/test-suite-review.md), and creates a child work item for each removal/clean-up recommendation. The audit itself is analysis-only and never edits tests.
+
 #### Running Test Profiles
 
 Three test profiles are available, selected via `--project` (or the npm scripts):
@@ -105,7 +93,9 @@ Rules of thumb:
 
 - **A skill calls for testing  → run unit tests.** They are the minimum bar and give fast feedback.
 - **Full tests are only required on release.** Do not wait 15 min for feedback during normal implementation.
-- Tutorial E2E parts (`tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`) are excluded from smoke/dev profiles. See `docs/DEVELOPER.md#smoke-tests` / `#dev-tests` for the full project table.
+- Tutorial E2E parts (`tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`) are excluded from smoke/dev profiles. A game's smoke/dev entry is included only when its test file exists in the current checkout: in a sibling-only core checkout (`../tce-<game>`) the profiles run the core + Gym suites only, and a game's suite runs in its game repo (CG-0MUKWPTZ50040V0Q). See `docs/DEVELOPER.md#smoke-tests` / `#dev-tests` for the full project table.
+
+**Skill-integrated entry point (`/skill:test --type`):** the same staged profiles are exposed to the global test skill through a project-local extension (`.pi/skills_extensions/test/extension.json` plus the `SKILL_PREFIX.md` policy hook): `unit`, `smoke`, `dev`, `browser`, `tutorial`, `e2e` and `electron`. `full` is deliberately omitted, so a bare `/skill:test` keeps running the genuine full CI suite and remains the **only** run that populates the audit-accepted full-suite cache entry. Browser-dependent types chain `scripts/check-browser-test-env.ts` first; every typed Vitest command streams full output through `scripts/vitest-run-with-retry.ts` (retry-once + wall-clock hang timeout) and loads `scripts/vitest-tap-reporter.ts` alongside the default reporter, so a red typed run triages per test. See `docs/DEVELOPER.md#skill-integrated-test-profiles`.
 
 #### When to run which tests
 
@@ -113,9 +103,9 @@ Rules of thumb:
 
 1. **Unit tests** (`--project unit`, Node.js) — logic, data, and integration tests in `tests/**/*.test.ts`. Fast (seconds); run them frequently during implementation.
 2. **Non-tutorial browser tests** (`--project browser`, headless Chromium) — Phaser UI/rendering tests in `tests/**/*.browser.test.ts`. Phaser needs a real browser (WebGL/Canvas) and cannot run under Node/JSDOM.
-3. **Tutorial E2E tests** (`scripts/run-tutorial-tests.sh`) — Main Street tutorial flows in `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`, each part in its own browser instance to avoid Phaser 4 canvas/GPU context exhaustion.
+3. **Tutorial E2E tests** (`scripts/run-tutorial-tests.sh`) — Main Street tutorial flows in `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`, each part in its own browser instance to avoid Phaser 4 canvas/GPU context exhaustion. These are Main Street-owned: in a game-free core checkout (no `tce-main-street` sibling) the runner skips the absent parts and the projects set `passWithNoTests`, so the core suite stays green.
 
-The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, which retries once on Vitest's transient contention-induced failures (worker RPC timeout, browser WebSocket drop) only when every file actually passed, and bounds every attempt with a wall-clock timeout (exit 124 `[hang-timeout]` diagnostic on a genuine hang — never retried; see CG-0MT08R2QR0070F3N). A `replay-e2e` project (`tests/e2e/replay-*.test.ts`) is also defined for Playwright-driven replay checks. See `docs/DEVELOPER.md#testing` for the full project table, CPU-contention mitigations, and guidance on writing unit and browser tests.
+The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, which retries once on Vitest's transient contention-induced failures (worker RPC timeout, browser WebSocket drop) when either every file actually passed **or** the reported failures are attributable solely to the transient signature (the failed-file variant; CG-0MUIMM28K001W88F). It accepts the run as green if the retry is also a pure transient failure (no genuine failure to mask; CG-0MUF0LU4X006IXXU), and bounds every attempt with a wall-clock timeout (exit 124 `[hang-timeout]` diagnostic on a genuine hang — never retried; see CG-0MT08R2QR0070F3N). A `replay-e2e` project (`tests/e2e/replay-*.test.ts`) is also defined for Playwright-driven replay checks. See `docs/DEVELOPER.md#testing` for the full project table, CPU-contention mitigations, and guidance on writing unit and browser tests.
 
 - **During implementation** — prefer targeted runs for fast feedback (seconds, not minutes):
   - Unit: `npx vitest run --project unit tests/<game>/` or `npx vitest run --project unit tests/<game>/<name>.test.ts`
@@ -143,7 +133,7 @@ A full-suite green run at the current commit via the test skill (`/skill:test`, 
 
 Each example game is a standalone game that can independently demonstrate the capabilities of the engine. They also serve as reference implementations for how to use the engine's features and components effectively.
 
-Example games live in `example-games/<game-name>/` with their own `main.ts` entry point and `scenes/` directory. The root `index.html` loads a unified entry point (`main.ts`) that boots the **Game Selector** landing page, allowing players to choose between available games. The games are deployed to GitHub Pages at `https://thewizardscode.github.io/Tableau-Card-Engine/` via a GitHub Actions workflow that runs on every push to `main`.
+Each example game lives in its own `tce-<game>` repository with its source at repo-root `src/` (its own `main.ts` entry point and `scenes/` directory) and composes the merged core as a `./core` submodule. The core repo carries no games at HEAD; the distribution composes the game repos as sibling checkouts (`../tce-<game>`), bootstrapped with `npm run setup:distribution -- --dir ..`. The root `index.html` loads a unified entry point (`main.ts`) that boots the **Game Selector** landing page, allowing players to choose between available games. The games are deployed to GitHub Pages at `https://thewizardscode.github.io/Tableau-Card-Engine/` via a GitHub Actions workflow that runs on every push to `main`.
 
 #### Screen Layout Language (SLL) Requirement
 
@@ -516,17 +506,7 @@ All Gym demo scenes extend `GymSceneBase` (`example-games/gym/scenes/GymSceneBas
 
 ## Worklog Rules
 
-This project follows the standard Worklog (wl) workflow for work-item tracking. The full ruleset is defined in the global AGENTS.md at `~/.pi/agent/AGENTS.md` under these sections:
-
-- **Work-item Tracking with Worklog (wl)** — Core principles for using wl
-- **CRITICAL RULES** — Mandatory rules for commits, tests, and work-item hygiene
-- **Important Rules** — Recommended practices for effective wl usage
-- **Stage vs Status distinction** — Understanding the two lifecycle axes
-- **work-item Types, Descriptions, Priorities, Dependencies** — Template definitions
-- **Workflow management** — Stage progression and team coordination
-- **Work-Item Management** — CLI reference for `wl create`, `wl update`, `wl close`, etc.
-- **Project Status** — CLI reference for `wl list`, `wl show`, `wl next`, etc.
-- **Coding Disciplines** — Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution
+This project follows the standard Worklog (wl) workflow for work-item tracking. The complete ruleset — core principles, critical rules, work-item types/priorities/dependencies, workflow management, CLI reference, and coding disciplines — is defined in the always-loaded global `AGENTS.md` at `~/.pi/agent/AGENTS.md`; follow it. TCE-specific conventions follow below.
 
 ### TCE Project Conventions
 

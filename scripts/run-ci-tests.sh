@@ -5,6 +5,7 @@
 # 1. Unit tests (Node environment, fast)
 # 2. Non-tutorial browser tests
 # 3. Tutorial E2E tests (each in own browser context via workspace projects)
+# 4. Electron launch smoke test (display-aware, via run-electron-smoke.sh)
 #
 # For faster local feedback during implementation, use the test profiles
 # instead of this full suite (see docs/DEVELOPER.md#smoke-tests):
@@ -15,23 +16,41 @@
 # retries once on Vitest's transient contention-induced failures
 # ([vitest-worker]: Timeout calling "onTaskUpdate" for the worker RPC layer,
 # [vitest] Browser connection was closed while running tests for the browser-mode
-# WebSocket drop) — a non-zero exit that happens even when every test passed.
+# WebSocket drop) — a non-zero exit that can happen even when every test passed.
 # The retry is masked against genuine failures (see that script's
-# shouldRetryOnce). See CG-0MS9M5UJP005PWD3 and CG-0MSCI73RH004VPCE.
+# shouldRetryOnce): it qualifies when every file passed, or when the summary
+# reports failures but every error is attributable to the transient signature
+# (the failed-file variant, CG-0MUIMM28K001W88F). If the retry is ALSO a pure
+# transient failure the run is accepted as green — no genuine failure was
+# masked (CG-0MUF0LU4X006IXXU). See CG-0MS9M5UJP005PWD3 and
+# CG-0MSCI73RH004VPCE.
+#
+# The runner retries once when a run is attributable to the transient
+# contention signatures and emits a final
+# `[vitest-runner] attempts=N status=S outcome=...` line after every run.
+# Stage output is NOT truncated (CG-0MUIMM28K001W88F), so a recurrence names
+# the failed test/file and shows any distinct assertion error alongside the
+# transient signature instead of only the reporter's summary counts.
 #
 # The same runner bounds every attempt with a wall-clock timeout
 # (CG-0MT08R2QR0070F3N): a true hang — e.g. a browser test whose
 # requestAnimationFrame loop is starved of frames under CPU contention, or a
 # Phaser game destroy that never completes — is aborted with exit 124 and a
 # [hang-timeout] diagnostic instead of stalling the gate indefinitely. Hangs
-# are never retried. Bounds: 5 min for unit (nominal <2 min), 15 min for
-# browser (~40 files; ~6-8 min nominal, up to 12+ min under heavy
-# concurrent-suite contention). Tune with --timeout-ms if needed.
+# are never retried. Bounds: 5 min for unit (nominal <2 min), 20 min for
+# browser (115 files; ~13-15 min nominal, longer under heavy concurrent-suite
+# contention — the previous 15 min bound sat within normal run-to-run variance
+# and could abort an otherwise green stage). Tune with --timeout-ms if needed.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
+
+# The test suites exercise every game, so tests always build/test against the
+# full preset regardless of the ambient GAMES_CONFIG (which defaults to
+# `core-only` for production builds). See scripts/vite-game-discovery-plugin.ts.
+export GAMES_CONFIG="${GAMES_CONFIG:-full}"
 
 # Fast-fail pre-check: the browser stages below need Playwright's Chromium.
 # Detect a missing prerequisite up front (launch-free, <2s) and print the
@@ -43,11 +62,11 @@ npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 echo "=== Unit Tests ==="
-npx tsx scripts/vitest-run-with-retry.ts --project unit --timeout-ms 300000 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project unit --timeout-ms 300000 2>&1
 echo ""
 
 echo "=== Browser Tests (non-tutorial) ==="
-npx tsx scripts/vitest-run-with-retry.ts --project browser --timeout-ms 900000 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project browser --timeout-ms 1200000 2>&1
 echo ""
 
 echo "=== Tutorial E2E Tests ==="
@@ -55,20 +74,9 @@ bash scripts/run-tutorial-tests.sh
 echo ""
 
 echo "=== Electron Launch Smoke Test ==="
-# Launches the real Electron app (Playwright _electron). Needs a display:
-# - Linux CI/dev: xvfb-run when no DISPLAY is set (GitHub ubuntu runners ship xvfb)
-# - macOS/Windows: native display available (uname != Linux)
-# - Packaged-binary mode: TCE_SMOKE_BINARY=/path/to/exe (built by the CI
-#   packaging job) bypasses the display heuristic.
-if [ -n "${TCE_SMOKE_BINARY:-}" ]; then
-  npx vitest run --project electron 2>&1 | tail -20
-elif command -v xvfb-run >/dev/null 2>&1 && [ -z "${DISPLAY:-}" ]; then
-  xvfb-run -a npx vitest run --project electron 2>&1 | tail -20
-elif [ -n "${DISPLAY:-}" ] || [ "$(uname -s)" != "Linux" ]; then
-  npx vitest run --project electron 2>&1 | tail -20
-else
-  echo "SKIP: no display and xvfb-run unavailable (Linux). Install xvfb or set TCE_SMOKE_BINARY to run the Electron smoke test."
-fi
+# Display detection is single-sourced in scripts/run-electron-smoke.sh
+# (CG-0MUECRMTO0016FH2); its output streams in full (CG-0MUIMM28K001W88F).
+bash scripts/run-electron-smoke.sh 2>&1
 echo ""
 
 echo "=== All Tests Complete ==="

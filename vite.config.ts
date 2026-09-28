@@ -3,6 +3,60 @@ import { defineConfig } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from './scripts/vite-transcript-plugin';
+import { gameDiscoveryPlugin, resolveCoreAliases, selectedGameIds } from './scripts/vite-game-discovery-plugin';
+import { gameAssetsPlugin } from './scripts/vite-game-assets-plugin';
+
+// Which games are checked out for this build/test run. Used to filter the
+// smoke/dev project test lists so a core-only checkout does not reference test
+// files that are not present (which Vitest treats as an error).
+//
+// Resolved lazily so a test that changes GAMES_CONFIG sees the effect (the
+// config factory is re-invoked per test).
+let selectedGamesCache: Set<string> | null = null;
+function selectedGames(): Set<string> {
+  if (process.env.VITEST) {
+    // Tests mutate GAMES_CONFIG between cases; never cache under Vitest.
+    return new Set(selectedGameIds(__dirname));
+  }
+  if (!selectedGamesCache) selectedGamesCache = new Set(selectedGameIds(__dirname));
+  return selectedGamesCache;
+}
+
+/** Core-owned test groups that are always present in the core checkout. */
+const CORE_TEST_GROUPS = new Set([
+  'core-engine',
+  'ui',
+  'gym',
+  'handView',
+  'card-system',
+  'rule-engine',
+  'ai',
+  'core',
+]);
+
+/**
+ * Keep only test files that exist in *this* checkout.
+ *
+ * Core-owned suites (engine, Gym, UI, …) are always kept. A game-owned suite is
+ * kept only when the game is selected by the active preset **and** its test
+ * file actually exists here — in the merged core (Option A) a game's tests live
+ * in that game's own repo (`../tce-<game>/tests/<game>/…`), so referencing them
+ * from the core checkout would make Vitest resolve nothing for them and fail
+ * the profile. The existence check also makes the smoke/dev lists layout
+ * agnostic: an in-tree game test tree (if one is ever composed) is included,
+ * a sibling-only checkout deliberately excludes it, and the
+ * `tests/vite-config.test.ts` guard asserts every entry exists (CG-0MUKWPTZ50040V0Q).
+ */
+function coreOrSelected(...files: string[]): string[] {
+  const games = selectedGames();
+  return files.filter((f) => {
+    const m = /^tests\/([^/]+)\//.exec(f);
+    if (!m) return true;
+    const group = m[1] as string;
+    if (CORE_TEST_GROUPS.has(group)) return true;
+    return games.has(group) && fs.existsSync(path.resolve(__dirname, f));
+  });
+}
 
 // Read version from package.json (single source of truth)
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
@@ -18,19 +72,35 @@ export default defineConfig(({ mode, command }) => ({
   // be loaded via Electron's file:// protocol (no server, no absolute paths).
   base: mode === 'electron' ? './' : mode === 'production' ? '/Tableau-Card-Engine/' : '/',
   plugins: [
+    // Config-driven game discovery (F3/CG-0MTRO6Y2N009B9CF): `main.ts`
+    // imports `virtual:game-registry`, which this plugin generates from the
+    // preset selected via GAMES_CONFIG (default `core-only`). This is what
+    // lets the core repo build with no games and a distribution assemble any
+    // subset of 1..n games without editing source.
+    gameDiscoveryPlugin(),
+    // Compose each selected sibling game's game-owned assets (thumbnails,
+    // icons, audio) into this launcher's `public/assets` before Vite scans or
+    // copies the public dir. Without this a `GAMES_CONFIG=full` dev server or
+    // build serves the games' source but 404s on every game asset
+    // (CG-0MUKYCG9L00587FA).
+    gameAssetsPlugin(),
     // Only register the transcript persistence plugin during normal dev-server runs.
     // Vitest browser uses an internal Vite server; avoid plugin middleware there to
     // prevent file-system side effects and extra request handling during tests.
     ...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []),
   ],
   resolve: {
-    alias: {
-      '@core-engine': path.resolve(__dirname, 'src/core-engine'),
-      '@card-system': path.resolve(__dirname, 'src/card-system'),
-      '@rule-engine': path.resolve(__dirname, 'src/rule-engine'),
-      '@ui': path.resolve(__dirname, 'src/ui'),
-      '@ai': path.resolve(__dirname, 'src/ai'),
-    },
+    // Core aliases resolve to whichever core checkout this build belongs to.
+    // `CORE_ROOT` lets a game repo (F4) point them at its `./core` submodule or
+    // the sibling `../Tableau-Card-Engine` checkout; it defaults to this
+    // directory, which is correct for the merged core repo itself.
+    alias: resolveCoreAliases(process.env.CORE_ROOT || __dirname),
+    // Sibling game repos are bundled straight from their own `src/` (a sibling
+    // has no guaranteed `node_modules`), so force shared runtime deps to
+    // resolve from this core checkout. Without this a `GAMES_CONFIG=full`
+    // distribution build fails with `Rollup failed to resolve import "phaser"`
+    // from `../tce-<game>/src/...` (F7 CG-0MUJ168XG006DOGK).
+    dedupe: ['phaser', 'tone'],
   },
   build: {
     outDir: 'dist',
@@ -85,6 +155,8 @@ export default defineConfig(({ mode, command }) => ({
           globals: true,
           environment: 'node',
           include: ['tests/e2e/replay-*.test.ts'],
+          // Game-owned; absent in a game-free merged core (Option A).
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 180_000,
@@ -120,7 +192,7 @@ export default defineConfig(({ mode, command }) => ({
         extends: true,
         test: {
           name: 'smoke',
-          include: [
+          include: coreOrSelected(
             'tests/main-street/MainStreetScene.browser.test.ts',
             'tests/golf/GolfScene.browser.test.ts',
             'tests/feudalism/FeudalismSmokeTest.browser.test.ts',
@@ -129,9 +201,9 @@ export default defineConfig(({ mode, command }) => ({
             'tests/sushi-go/SushiGoIcons.browser.test.ts',
             'tests/lost-cities/LostCitiesRoundEnd.browser.test.ts',
             'tests/core-engine/SvgHelpers.browser.test.ts',
-            'tests/ui/HelpPanel.browser.test.ts',
+            'tests/golf/HelpPanel.browser.test.ts',
             'tests/gym/GymSceneSmoke.browser.test.ts',
-          ],
+          ),
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -151,11 +223,11 @@ export default defineConfig(({ mode, command }) => ({
         extends: true,
         test: {
           name: 'dev',
-          include: [
+          include: coreOrSelected(
             // Core + UI
             'tests/core-engine/SvgHelpers.browser.test.ts',
             'tests/core-engine/PhaserEventBridge.browser.test.ts',
-            'tests/ui/HelpPanel.browser.test.ts',
+            'tests/golf/HelpPanel.browser.test.ts',
             'tests/ui/TooltipManager.browser.test.ts',
             'tests/ui/SettingsPanelTooltips.browser.test.ts',
             // Main Street key E2E
@@ -191,7 +263,7 @@ export default defineConfig(({ mode, command }) => ({
             // Gym feature tests
             'tests/gym/GymDeckRngScene.browser.test.ts',
             'tests/gym/GymOverlayUiScene.browser.test.ts',
-          ],
+          ),
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -234,6 +306,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part1',
           include: ['tests/e2e/main-street-tutorial-e2e-part1.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -252,6 +326,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part2',
           include: ['tests/e2e/main-street-tutorial-e2e-part2.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -270,6 +346,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part3',
           include: ['tests/e2e/main-street-tutorial-e2e-part3.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -288,6 +366,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part4',
           include: ['tests/e2e/main-street-tutorial-e2e-part4.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -306,6 +386,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part5',
           include: ['tests/e2e/main-street-tutorial-e2e-part5.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,
@@ -324,6 +406,8 @@ export default defineConfig(({ mode, command }) => ({
         test: {
           name: 'tutorial-part6',
           include: ['tests/e2e/main-street-tutorial-e2e-part6.browser.test.ts'],
+          // Tutorial E2E is Main Street-owned; absent in a game-free core.
+          passWithNoTests: true,
           fileParallelism: false,
           sequence: { concurrent: false },
           testTimeout: 30_000,

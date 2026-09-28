@@ -7,8 +7,10 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Environment Setup](#environment-setup)
 - [Running Locally](#running-locally)
 - [Building for Production](#building-for-production)
+- [Config-Driven Game Catalogue](#config-driven-game-catalogue)
 - [Electron Launcher / Desktop Packaging](#electron-launcher--desktop-packaging)
 - [Testing](#testing)
+- [Startup Context Budget](#startup-context-budget)
 - [ToneForge Audio Generation](#toneforge-audio-generation)
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
@@ -76,6 +78,124 @@ The project uses a unified entry point (`main.ts` at the project root) that regi
 The game catalogue is stored in the Phaser registry (key: `gameSelector.games`) via a `preBoot` callback, so game scenes don't need to know about the catalogue to return to the selector.
 
 Each example game also retains its own standalone `main.ts` entry point and `createXxxGame.ts` factory function for independent testing and browser test use.
+
+#### Config-driven game catalogue
+
+<a id="config-driven-game-catalogue"></a>
+
+The catalogue is **generated at build time** by
+`scripts/vite-game-discovery-plugin.ts` from a config preset — `main.ts`
+imports `virtual:game-registry` and never hardcodes game imports. This is what
+lets a checkout build with no games (the core-engine repo) or with any subset
+of 1..n games (a distribution), without editing source.
+
+Select a preset with the `GAMES_CONFIG` environment variable (a preset name or
+an explicit path; default `core-only`):
+
+```bash
+npm run build                       # default preset: core-only (Gym only)
+GAMES_CONFIG=solo npm run build     # one game (configs/solo.json)
+GAMES_CONFIG=arcade npm run build   # a small subset (configs/arcade.json)
+GAMES_CONFIG=deluxe npm run build   # a different subset (configs/deluxe.json)
+GAMES_CONFIG=full npm run build     # every game (configs/full.json)
+GAMES_CONFIG=main-street npm run build # one named game (configs/main-street.json)
+GAMES_CONFIG=/path/to/my.json npm run build   # an explicit preset
+```
+
+The launcher ships two preset families. **Distribution presets** describe build
+shapes (the `1 game` and `all games` cases are the boundary distributions):
+
+| Preset | Games |
+|---|---|
+| `configs/core-only.json` | none — engine + Gym (default) |
+| `configs/solo.json` | golf |
+| `configs/arcade.json` | golf, main-street |
+| `configs/deluxe.json` | feudalism, lost-cities |
+| `configs/full.json` | all eight games |
+
+**Per-game presets** (`configs/<game-id>.json`) each select exactly one game,
+so `GAMES_CONFIG=<game-id>` builds or runs just that game (plus the
+always-present Gym) for a fast development loop — for every example game
+(`beleaguered-castle`, `blackjack`, `coloretto`, `feudalism`, `golf`,
+`lost-cities`, `main-street`, `sushi-go`). Per-game presets are additive: the
+distribution presets above are unchanged.
+
+Presets live in `configs/`, are **data only**, and list the sibling game repos
+to include:
+
+```json
+{
+  "games": [
+    { "id": "golf", "path": "../tce-golf",
+      "scenePath": "example-games/golf/scenes/GolfScene.ts" }
+  ]
+}
+```
+
+An unknown preset **name** fails the build rather than silently shipping fewer
+games. A game is resolved **sibling-only** (the merged core carries no games at
+HEAD): first at the Option C `src/` layout (`../tce-<id>/src/…`), then at the
+legacy sibling layout (`../tce-<id>/example-games/<id>/…`). An in-tree
+`example-games/<id>/` copy is never consulted. A missing game fails the build
+with a message naming it and every path it looked in. The **Gym is core-owned
+and always present**, including in a core-only build.
+
+A full multi-game distribution is composed from the core plus sibling game
+checkouts; bootstrap it in one command:
+
+```bash
+npm run setup:distribution -- --dir ..   # clone core + all sibling game repos
+npm run setup:distribution -- --dry-run  # print the plan only
+```
+
+#### Game asset composition
+
+`setup:distribution` checks out the game repos; it does not copy their assets.
+The launcher owns only the **shared** assets under `public/assets/`, while each
+game's **game-owned** assets live in that game repo's own `public/assets/`
+tree. `scripts/vite-game-assets-plugin.ts` (backed by
+`scripts/link-game-assets.ts`) therefore composes the selected games'
+game-owned roots into the launcher's `public/assets/` at config resolution —
+before Vite scans (`dev`) or copies (`build`) the public dir — using the
+ownership table `scripts/configs/repo-layout.json → gameAssets` and the active
+`GAMES_CONFIG` preset.
+
+- `GAMES_CONFIG=full npm run dev` / `npm run build` serve every selected
+game's thumbnails, icons and audio with no extra step.
+- Composition is idempotent; an existing correct link is untouched, a real
+  file at a destination is never clobbered, and links for games the preset no
+  longer selects are removed (so `core-only` leaves the tree clean).
+- The composed links are generated artefacts and are gitignored. Drive them
+  manually with `npx tsx scripts/link-game-assets.ts [--dry-run] [--json]`.
+
+Related work item: CG-0MUKYCG9L00587FA.
+
+> **Full reference:** [Config-Driven Game Catalogue](dev/game-configuration.md)
+> is the authoritative guide to the preset schema (required and optional
+> fields, the `$comment` annotation), selection, the three-step resolution
+> order, the `GAME_INFO` convention and its bounded parsing, validation/failure
+> modes, and how to author a new preset.
+
+> **Two config locations, two purposes:** `configs/*.json` (this section) are
+> **build presets** selecting which games a build includes; the repo partition
+> used by the extraction tooling lives separately at
+> `scripts/configs/repo-layout.json` (see
+> [Multi-Repo Architecture](dev/multi-repo-architecture.md)).
+
+> **Test suites always use the full preset.** The shell runners
+> (`scripts/run-ci-tests.sh`, `run-dev-tests.sh`, `run-smoke-tests.sh`,
+> `run-tutorial-tests.sh`) export `GAMES_CONFIG=full` by default, because the
+> game suites exercise every game. Override with an explicit `GAMES_CONFIG=…` if
+> needed. In a game-free core checkout the Main Street tutorial projects match
+> no files; `run-tutorial-tests.sh` skips them (and the projects set
+> `passWithNoTests`), so the core's suite stays green without sibling games.
+
+> **`.worklog/worktrees/` layouts:** the sibling lookup is relative to the
+> current project root, so presets resolve from a git worktree exactly as from
+> the main checkout. Because games are sibling checkouts (`../tce-<game>`),
+> a worktree resolves siblings next to itself (`.worklog/worktrees/tce-<game>`);
+> run distribution builds from the main checkout, or symlink siblings beside
+> the worktree.
 
 ## Building for Production
 
@@ -209,6 +329,31 @@ loader — never tsx (see the same rationale in `docs/main-street/card-catalog.m
 
 > **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only. The full test suite is run locally before every push (quality gates in `AGENTS.md`) and is intentionally not re-run in PR CI: the Phaser 4 browser suite outgrew the single-Chromium-instance context budget in the constrained CI environment (reliably hard-killed mid-run). The Monte Carlo env-var table below therefore applies to **local** runs (and any future CI that re-enables tests), not to PR CI.
 
+### Test Configuration (`.pi/test-config.json`)
+
+The repository root includes a `.pi/test-config.json` file that overrides the default
+per-command test timeout for the implement skill and the audit skill's test runner:
+
+```json
+{"timeoutPerCommand": 1500}
+```
+
+- **`timeoutPerCommand`** — maximum seconds per test-suite command (default 600 if absent).
+  TCE's full suite takes 15–19 minutes, so this is set to 1500 s to prevent premature
+timeout kills.
+
+**Why is `.pi/test-config.json` tracked by git?**
+
+Git worktrees (created by `implement.py start` and the worklog's worktree system) inherit
+only tracked files. The `.pi/*` directory is gitignored (`.gitignore:103`), which means a
+worktree would normally have no `.pi/test-config.json`. Without the file, `implement.py
+finish` silently falls back to the 600 s default timeout and the full suite is killed
+mid-run. By committing the file and adding a negation entry (`!.pi/test-config.json`) to
+`.gitignore`, every worktree inherits the correct timeout configuration automatically.
+
+This file is deliberately tracked as the simplest, most robust fix — no cross-repository
+change to the implement skill is needed.
+
 ### Monte Carlo environment variables
 
 The Main Street balance guardrail (`tests/main-street/monte-carlo-balance.test.ts`) and harness
@@ -257,6 +402,31 @@ The tutorial E2E tests are split into 6 part files (1-6 tests per file). Each pa
 
 The replay E2E tests live in `tests/e2e/replay-*.test.ts` and use a dedicated Node.js project (`replay-e2e`) with `pool: 'forks'` + `singleFork: true`. This isolates them from the parallel unit test pool, ensuring the Vite dev server started by `scripts/replay.ts` has uncontested CPU for its initial cold compilation. The replay tests start and stop their own dev server per run via `scripts/dev-server-utils.ts`.
 
+### Skill-integrated test profiles
+
+The staged profiles above are exposed to the global `test` skill through a project-local extension, so agents can run a profile without memorising the `--project` flags:
+
+| `/skill:test --type` | Underlying profile | What it runs |
+|----------------------|--------------------|--------------|
+| `unit` | `--project unit` | Node.js logic/data/integration tests (seconds) |
+| `smoke` | `--project smoke` | One representative file per game + core/UI smoke (~2 min) |
+| `dev` | `--project dev` | Smoke + key E2E per game (~3.5 min) |
+| `browser` | `--project browser` | All non-tutorial browser tests (~6–8 min) |
+| `tutorial` | `tutorial-part1..6` | Main Street tutorial parts, one browser instance each (~4 min; order `part1, part2, part4, part5, part6, part3`) |
+| `e2e` | `tutorial` + `replay-e2e` | Every tutorial part plus the Playwright replay project |
+| `electron` | `scripts/run-electron-smoke.sh` | Display-aware Electron launch smoke |
+| `full` (default) | `npm test` | The genuine full CI suite (unit → browser → tutorial → electron) |
+
+- **`full` is deliberately omitted** from the extension's `types` map, so a bare `/skill:test` keeps resolving to the real full CI suite. **Only `--type full` populates the audit-accepted full-suite cache entry** — typed runs use independent cache keys and can never satisfy a "full test suite passes" AC.
+- Browser-dependent types (`smoke`, `dev`, `browser`, `tutorial`, `e2e`) chain `scripts/check-browser-test-env.ts` first, so a missing Playwright prerequisite (`npx playwright install chromium`) fails fast with remediation steps instead of an opaque Vitest browser timeout.
+- Every typed Vitest command runs through `scripts/vitest-run-with-retry.ts` — the retry-once + wall-clock hang-timeout wrapper (exit 124 `[hang-timeout]` on a true hang, which is never retried).
+- Commands also load `scripts/vitest-tap-reporter.ts` alongside the default reporter. It emits flat TAP for each failed test (`not ok N - <file> > <suite > test>` plus `error: |-` / `stack: |-` YAML blocks) that the global runner's `parse_node_failures` understands, so a red typed run creates per-test `test-failure` items instead of an opaque suite-level failure.
+- Configuration lives in `.pi/skills_extensions/test/extension.json`; the stage-selection policy prose is in `.pi/skills_extensions/test/SKILL_PREFIX.md`.
+
+Common invocations: `/skill:test --type unit` (fast feedback during implementation),
+`/skill:test --type dev` (pre-audit), and `/skill:test` or `/skill:test --type full`
+(release / pre-`in_review` evidence).
+
 #### CPU-contention mitigation (unit and browser tests)
 
 Full-suite runs can intermittently fail at teardown with
@@ -277,16 +447,41 @@ Two mitigations are in place in this repository:
 
 1. **Worker-pool cap** — the `unit` project in `vite.config.ts` sets
    `maxWorkers: 4` to bound aggregate CPU demand from parallel tinypool workers.
-2. **Retry-once on the transient signatures** — the unit **and** browser steps in
-   `scripts/run-ci-tests.sh` run through `scripts/vitest-run-with-retry.ts`, which
-   retries the run exactly once when (and only when) the reporter summary shows
-   **all** files passed **and** the sole error is one of the transient signatures
-   (`[vitest-worker]: Timeout calling "onTaskUpdate"` or
-   `[vitest] Browser connection was closed while running tests`). The masking
-   guard (`shouldRetryOnce` in that script, unit-tested in
-   `tests/scripts/vitest-run-with-retry.test.ts`) proves "all passed" from the
-   summary before a retry is allowed, so a genuine test failure can never be
-   hidden by a retry.
+2. **Retry-once on the transient signatures (attribution-aware)** —
+   the unit **and** browser steps in `scripts/run-ci-tests.sh` run through
+   `scripts/vitest-run-with-retry.ts`, whose `shouldRetryOnce` guard recovers
+   two shapes of the same contention transient:
+
+   - **All-passed transient** — the reporter summary shows every file passed
+     and the sole error is a transient signature
+     (`[vitest-worker]: Timeout calling "onTaskUpdate"` or
+     `[vitest] Browser connection was closed while running tests`).
+   - **Attributable failed-file transient** (CG-0MUIMM28K001W88F) — the
+     summary reports failed files/tests, but every error block in the run
+     output is the transient signature itself (`failuresAreTransientOnly`).
+     This is the failed-file variant of the same contention transient: under
+     load Vitest counted the poisoned file/test as failed, which defeated the
+     previous all-passed-only guard and failed the gate spuriously even though
+     a re-run at the same commit was green.
+
+   The guard is unit-tested in `tests/scripts/vitest-run-with-retry.test.ts`,
+   including a **regression fixture** of the recorded
+   CG-0MUIMM28K001W88F failing run and its genuine-assertion counter-case. A
+   genuine assertion failure (a `Failed Tests` block carrying an
+   `AssertionError`, not the timeout) can never be retried or hidden. If the
+   retry is **also** a pure transient failure (both attempts poisoned by
+   sustained contention), the run is accepted as green (exit 0): the guard
+   attributed every reported failure to the transient signature, so there is
+   no genuine failure to mask (CG-0MUF0LU4X006IXXU).
+
+   The runner emits a final
+   `[vitest-runner] attempts=N status=S outcome=... args="..."` line after every
+   run as the canonical machine-readable diagnostic. Outcomes are `clean`,
+   `retry-clean`, `accepted-transient`, `retry-failed`, `failed` and `hang`.
+   Stage output is **no longer truncated** (CG-0MUIMM28K001W88F removed the
+   former `tail -20` in `scripts/run-ci-tests.sh`), so a recurrence names the
+   failed test/file and shows any distinct assertion error alongside the
+   transient signature.
 
 3. **Test-side hardening (browser tests)** — beyond the runner-level
    mitigations above, browser tests that drive the real Phaser pointer
@@ -350,7 +545,7 @@ Two mitigations are in place in this repository:
      `tests/main-street/hint-bar-placement.browser.test.ts`,
      `tests/main-street/undo-redo.browser.test.ts`, and
      `tests/ui/MainStreetMigration.browser.test.ts`. This is not just a
-     visual-overlay hazard: a mid-day checkpoint restores a partially-sold
+     visual-overlay hazard: a mid-week checkpoint restores a partially-sold
      market row with no business cards, so tests that assume a buyable
      business card (e.g. undo-redo's affordable-card finder) fail unless the
      checkpoint is cleared first (the ≥1-business guarantee applies at
@@ -398,10 +593,14 @@ Two mitigations are in place in this repository:
      `tests/main-street/TutorialOverlayClickThrough.browser.test.ts`);
      composite's premium-dialog wait factors loop liveness (frozen RAF
      detection) into a 60s deadline instead of a blind timer
-     (`tests/main-street/composite-click.browser.test.ts`); and peek's
+     (`tests/main-street/composite-click.browser.test.ts`); peek's
      tween-completion waits use 10s budgets
      (`tests/main-street/peek.browser.test.ts`), matching the 5-10s
-     per-wait convention. A beforeEach hook that boots a game plus waits for
+     per-wait convention; and the incident reveal's post-hold day-start
+     wait uses a 22s budget (nominal ~6s choreography + 16s contention
+     margin) in `tests/main-street/incident-reveal.browser.test.ts`, with
+     the no-incident fast path on a 14s budget. A beforeEach hook that
+     boots a game plus waits for
      UI must raise its own budget beyond Vitest's default 30s (e.g. 90s for
      the tutorial file) or the hook itself times out while the boot is still
      legitimately progressing.
@@ -440,13 +639,15 @@ process. When the bound elapses the runner exits with code **124**
 itself only ever exits 0 or 1) after printing a `[hang-timeout]` diagnostic
 with re-run guidance. Hangs are **never retried** — a genuine hang must
 surface, not be masked. `scripts/run-ci-tests.sh` sets the bounds
-explicitly: 5 minutes for the unit stage, 15 minutes for the browser stage
+explicitly: 5 minutes for the unit stage, 20 minutes for the browser stage
 (`--timeout-ms <n>`, default 10 minutes in the runner itself). The browser
-bound is deliberately generous — ~40 files at 8-10s each runs 6-8 minutes
+bound is deliberately generous — 115 files at ~7-8s each runs ~13-15 minutes
 nominal, and concurrent full-suite runs from parallel worktrees can stretch
-it past 12 — while a true hang never completes and is still bounded. Under
-`set -euo pipefail` the 124 exit aborts the gate instead of stalling it
-indefinitely.
+it further — while a true hang never completes and is still bounded. (The
+bound was raised from 15 to 20 minutes once the browser suite grew to 115
+files and normal run-to-run variance straddled the old 15-minute limit,
+risking an abort of an otherwise green stage.) Under `set -euo pipefail` the
+124 exit aborts the gate instead of stalling it indefinitely.
 
 Diagnosing a hang: `[hang-timeout]` in the output identifies the stage;
 re-run the suspected file(s) in isolation via
@@ -495,6 +696,29 @@ The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameTy
   (exit 124). Bound the loop with a counter/`for`, stop on no-progress, or arrange the
   state directly so the assertion is reachable without iteration.
 
+### Test-suite review (value audit)
+
+The suite is periodically audited for low-value tests. The committed report
+[`docs/dev/test-suite-review.md`](dev/test-suite-review.md) classifies every
+`*.test.ts` file as `keep` / `remove` / `clean-up` against the six documented
+anti-patterns (source-code-grep, placeholder/tautological, self-referential
+simulations, duplicates of core coverage, type-level/structural-only,
+zero-assertion browser tests), with per-file evidence, per-group counts, and a
+full classification table. Each removal/clean-up recommendation is tracked as a
+child work item under the audit parent.
+
+Re-run the audit with the repo-local **`test-review` skill**
+([`.pi/skills/test-review/SKILL.md`](../.pi/skills/test-review/SKILL.md), invoked
+as `/skill:test-review`): it documents the discovery probes, the classification
+procedure, the report format, the re-run/diff workflow, and the child-work-item
+convention (plus the optional helper
+`.pi/skills/test-review/scripts/scan-self-referential.sh`).
+
+> The audit is **analysis-only**: it never deletes or modifies test files — the
+> recommendation children execute the changes through the normal implement →
+> audit gate. Precedent cleanups: CG-0MS9AGG3N003ASCR (2026-07-31, 32 files),
+> CG-0MTCOPO8U001UW2Y (2026-09-20, 501 files reviewed).
+
 ### Smoke Tests
 
 Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedback during implementation. The smoke profile runs one representative test per game plus core engine/UI smoke tests — target runtime is ~30 seconds for 10 files.
@@ -510,6 +734,13 @@ Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedbac
 - `tests/core-engine/SvgHelpers.browser.test.ts` (Core SVG pipeline)
 - `tests/ui/HelpPanel.browser.test.ts` (UI chrome)
 - `tests/gym/GymSceneSmoke.browser.test.ts` (All gym scenes boot)
+
+> **Layout note (Option A).** A game entry is included only when its test file
+> exists in *this* checkout (`vite.config.ts → coreOrSelected`). The merged core
+> carries no games, so in a sibling-only core checkout (`../tce-<game>`) the
+> smoke/dev profiles deliberately run the core + Gym suites only — a game's own
+> suite runs in its game repo. This keeps the core suite green in both layouts
+> (CG-0MUKWPTZ50040V0Q).
 
 ### Dev Tests
 
@@ -609,6 +840,17 @@ This lists the installed browsers and their expected locations (e.g. `chromium-1
 
 **Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. PR CI is build-only (CG-0MT022826006EM0D) and no longer runs browser tests; local devs run `npx playwright install chromium` once (see [Browser test setup](#browser-test-setup)).
 
+## Startup Context Budget
+
+The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:
+
+```bash
+npm run context:refresh   # regenerate the thresholds, print the delta
+npm run context:check     # verify without writing (also runs in the unit profile)
+```
+
+See [docs/dev/context-budget.md](dev/context-budget.md) for what the gate measures, why the refresh is required, the exact workflow, and its fail-open behaviour.
+
 ## ToneForge Audio Generation
 
 ToneForge-generated synth artifacts are integrated via a thin adapter and are **not committed** to source control.
@@ -631,6 +873,18 @@ Audio assets are organized in `public/assets/audio/<game>/` with a fallback to
 `public/assets/audio/default/`. See `docs/SFX_CONVENTION.md` for the full convention.
 
 ## Project Structure
+
+> **Multi-repo note.** This tree describes the **merged core checkout**
+(`Tableau-Card-Engine`), which carries **no games at HEAD** (`example-games/`
+holds only the core-owned `gym`). Each game lives in its own `tce-<game>` repo
+at repo-root `src/` (the extraction renames `example-games/<game>/` -> `src/`)
+plus a `./core` git submodule pointing at `Tableau-Card-Engine`; engine imports
+resolve through path aliases. A full distribution composes the core plus the
+game repos as **sibling checkouts** (the core never submodules games);
+bootstrap it with `npm run setup:distribution -- --dir ..`. See
+[Multi-Repo Architecture](dev/multi-repo-architecture.md) and the
+[merged-core decision](dev/merged-core-decision.md) for the full split, and
+`configs/*.json` for the build presets.
 
 ```
 src/
@@ -660,6 +914,7 @@ src/
     ├── GameSelectorScene.ts Game selector landing page (GameEntry, REGISTRY_KEY_GAMES)
     ├── HelpPanel.ts         Reusable help panel component
     ├── HelpButton.ts        Help button component
+    ├── UIComponentBase.ts   Shared lifecycle base class for UI components
     └── index.ts             Barrel file / public API
 
 example-games/
@@ -795,6 +1050,20 @@ Usage in code:
 import { ENGINE_VERSION } from '@core-engine/index';
 ```
 
+The aliases are rooted at a single **core checkout root**, which
+`vite.config.ts` computes via `resolveCoreAliases()` from
+`scripts/vite-game-discovery-plugin.ts`. By default the root is the directory
+containing `vite.config.ts` (correct for the merged core checkout, which *is*
+the engine repo). A game repo sets `CORE_ROOT` to point the same aliases at its
+engine checkout — the `./core` submodule or the sibling `../Tableau-Card-Engine`:
+
+```bash
+CORE_ROOT=./core npm run build     # game-repo context
+```
+
+This keeps `@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*` and
+`@ai/*` import specifiers identical across the core repo and every game repo.
+
 ## Build-Time Version Injection
 
 The app version (from `package.json`'s `version` field) is injected at build time
@@ -811,6 +1080,34 @@ which provides consistent styling (11px font, muted grey, 60% opacity). The defa
 placement is the bottom-left corner; scenes may pass optional position and origin
 parameters to place the label elsewhere (e.g. the game selector passes top-right
 coordinates below the GitHub icon).
+
+### ALPHA badge
+
+Every shipped surface also carries a bright-red **ALPHA** badge that includes the
+running version (`ALPHA v<version>`), so players and testers always know they are on
+an unreleased build. The badge is produced by `createAlphaBadge()` from
+`src/ui/AlphaBadge.ts` and is drawn with Phaser primitives (a red rectangle plus a
+white label) — no image assets or new dependencies, and no animation (so it is
+inherently reduced-motion safe).
+
+`createSceneTitle()` / `createSceneHeader()` render the badge by default, so every
+example-game and Gym scene inherits it with no per-game code. Callers can opt out
+via `SceneTitleConfig.showAlphaBadge: false`. The one-off titles call the factory
+directly: the Game Selector menu title, the `SettingsPanel` title, and the compact
+`Help` + ALPHA header at the top of `HelpPanel`. The existing muted version labels
+above are additive and remain in place.
+
+```typescript
+// src/ui/SceneHeader.ts wires the badge in automatically:
+import { createSceneTitle } from '@ui/SceneHeader';
+createSceneTitle(this, 'My Game');                          // title + ALPHA badge
+createSceneTitle(this, 'My Game', { showAlphaBadge: false }); // title only
+
+// One-off surfaces call the factory directly:
+import { createAlphaBadge, ALPHA_BADGE_LABEL } from '@ui/AlphaBadge';
+const badge = createAlphaBadge(this, { x: 640, titleY: 30, titleFontSizePx: 32 });
+// badge.text.text === ALPHA_BADGE_LABEL (e.g. "ALPHA v0.1.17")
+```
 
 ```typescript
 // src/ui/versionDisplay.ts provides the factory and style constants:
@@ -900,33 +1197,174 @@ When migrating an existing game to the canonical pattern:
 
 > **Note:** For engine feature demonstrations (not full games), add a demo scene to the **Gym** instead of creating a new example game. See [Gym documentation](../example-games/gym/README.md) and [Gym scene index](gym/GYM_INDEX.md).
 
-1. Create a directory: `example-games/<game-name>/`
-2. Add a standalone entry point: `example-games/<game-name>/main.ts`
-3. Add a factory function: `example-games/<game-name>/createXxxGame.ts` (for browser tests)
-4. Add scenes: `example-games/<game-name>/scenes/<SceneName>.ts` (extend `Phaser.Scene`)
-5. Place assets in `public/assets/<game-name>/` and document attribution in `public/assets/CREDITS.md`
-6. Add game-specific tests under `tests/<game-name>/`
-7. Register the game in the unified entry point (`main.ts` at the project root):
-   - Import the scene class
-   - Add it to the `scene` array in the Phaser config
-   - Add a `GameEntry` to the `GAMES` catalogue array (include `thumbnail` once available)
-8. Add a `[ Menu ]` button to the game scene that calls `this.scene.start('GameSelectorScene')` for navigation back to the selector
-9. Add transcript recording:
-   - Create `example-games/<game-name>/GameTranscript.ts` with transcript types and a `TranscriptRecorder` extending `TranscriptRecorderBase<T>` from `src/core-engine/TranscriptRecorder.ts`
-   - Integrate recording into the scene: create the recorder after game setup, record each turn/action, finalize on game over, and auto-save to `TranscriptStore`
-10. Add replay support:
+### Repo layout
+
+A new game gets its **own repository** (`tce-<game>`) that composes the merged
+core as a git submodule at `./core`, with its source at repo-root `src/`. The
+core repo carries **no games at HEAD**; the discovery plugin resolves a game
+**sibling-only** (`../tce-<game>`), first at the Option C `src/` layout
+(`src/scenes/<Game>Scene.ts`) and then at the legacy `example-games/<game>/`
+sibling layout. An in-tree `example-games/<game>/` copy is never consulted.
+
+```bash
+# Scaffold a game repo alongside the core checkout
+mkdir tce-my-game && cd tce-my-game
+git submodule add git@github.com:TheWizardsCode/Tableau-Card-Engine.git core
+```
+
+### Steps
+
+1. Create the game source tree: `src/` (repo root of the game repo)
+2. Add a standalone entry point: `src/main.ts`
+3. Add a factory function: `src/createXxxGame.ts` (for browser tests)
+4. Add scenes: `src/scenes/<SceneName>.ts` (extend `Phaser.Scene`)
+5. Place game-owned assets under `public/assets/<game-name>/` in the game repo and document attribution in the core `public/assets/CREDITS.md`
+6. Add game-specific tests under `tests/<game-name>/` in the game repo
+7. **Export `GAME_INFO` from the game's scene module** (do *not* edit `main.ts`):
+
+   ```ts
+   export class MyGameScene extends CardGameScene { /* … */ }
+
+   export const GAME_INFO = {
+     sceneKey: 'MyGameScene',
+     title: 'My Game',
+     description: 'One or two sentences shown on the selector card.',
+     thumbnail: 'games/my-game/thumbnail',   // optional; relative to assets/
+   } as const;
+   ```
+
+   The Vite game-discovery plugin reads this at build time. See
+   [Config-Driven Game Catalogue](#config-driven-game-catalogue).
+8. **Add the game to a preset** in `configs/*.json`:
+
+   ```json
+   {
+     "id": "my-game",
+     "path": "../tce-my-game",
+     "scenePath": "example-games/my-game/scenes/MyGameScene.ts",
+     "siblingScenePath": "src/scenes/MyGameScene.ts",
+     "adapterPath": "example-games/my-game/scripts/adapters/MyGameReplayAdapter.ts",
+     "siblingAdapterPath": "src/scripts/adapters/MyGameReplayAdapter.ts"
+   }
+   ```
+
+   `siblingScenePath` is the path in the game repo's `src/` layout and is tried
+   first; `scenePath` is the legacy sibling fallback. `adapterPath` is optional;
+   include it when the game supports replay. Games
+   without an entry simply do not appear in that build. Also add a per-game
+   preset `configs/<game-id>.json` (one game entry) so the game can be built in
+   isolation, and add its entry to `configs/full.json`; see
+   [Config-Driven Game Catalogue](dev/game-configuration.md).
+9. Add a `[ Menu ]` button to the game scene that calls `this.scene.start('GameSelectorScene')` for navigation back to the selector
+10. Add transcript recording:
+    - Create `src/GameTranscript.ts` with transcript types and a `TranscriptRecorder` extending `TranscriptRecorderBase<T>` from the core `src/core-engine/TranscriptRecorder.ts`
+    - Integrate recording into the scene: create the recorder after game setup, record each turn/action, finalize on game over, and auto-save to `TranscriptStore`
+11. Add replay support:
     - Add `loadBoardState(stateJson: string)` to the scene to reconstruct visual state from a transcript snapshot
     - Emit a `state-settled` event (via `GameEventEmitter`) after `loadBoardState()` completes rendering
     - Handle `?mode=replay` URL parameter in the scene to skip normal game initialization
     - Expose `window.__GAME_EVENTS__` in replay mode for adapter communication
-11. Create a replay adapter:
-    - Create `scripts/adapters/<GameName>ReplayAdapter.ts` implementing the `ReplayAdapter` interface
-    - Register the adapter in `scripts/adapters/index.ts` (before Golf, which uses structural detection)
+12. Create a replay adapter **inside the game repo**:
+    - Create `src/scripts/adapters/<GameName>ReplayAdapter.ts` implementing the core `ReplayAdapter` interface
+    - Reference it from the preset's `siblingAdapterPath` (step 8). Registration order follows preset order; put structural-match adapters (like Golf) last. Do **not** edit the core `scripts/adapters/index.ts` — it is core and game-free.
     - Include a `gameType` field in the transcript for explicit adapter matching
-12. Generate fixture and thumbnail:
-    - Create a fixture generator script at `scripts/generate-<game>-fixture-transcript.ts`
-    - Generate and commit the fixture transcript at `tests/fixtures/transcripts/<game-name>/fixture-game.json`
-    - Generate and commit the thumbnail at `public/assets/games/<game-name>/thumbnail.png` using `./scripts/refresh-thumbnails.sh <game-name>`
+13. Generate fixture and thumbnail **inside the game repo**:
+    - Create a fixture generator script at `src/scripts/generate-<game>-fixture-transcript.ts`
+    - Generate and commit the fixture transcript at `src/tests/fixtures/transcripts/fixture-game.json`
+    - Generate and commit the thumbnail at `public/assets/games/<game-name>/thumbnail.png` using the core `./scripts/refresh-thumbnails.sh <game-name>`
+
+### Per-game npm scripts
+
+A game repo runs the same core toolchain against its `./core` submodule:
+
+```bash
+CORE_ROOT=./core npm run dev               # HMR dev server
+CORE_ROOT=./core npm run build             # production build
+CORE_ROOT=./core npm run build:electron    # desktop build
+```
+
+### Scaffolding a game repo
+
+An extracted game checkout (F1) has no root project files. Generate them with
+`scripts/game-repo-scaffold.ts`, which turns the checkout into a runnable
+single-game launcher against a sibling core (`../Tableau-Card-Engine`):
+
+```bash
+tsx scripts/game-repo-scaffold.ts \
+  --game <game> --game-repo-root ../tce-<game> \
+  --core-root ../Tableau-Card-Engine
+# …or every game in scripts/configs/repo-layout.json:
+npm run scaffold:games
+```
+
+It writes `package.json`, `vite.config.ts`, `tsconfig.json`, `main.ts`,
+`env.d.ts` and `configs/game.json`. Per **Option C** (F9), the game source
+lives at repo-root `src/` (the extraction renames `example-games/<game>/` ->
+`src/`) and the scaffold creates only the `core` link to the sibling engine
+checkout; engine imports resolve through the path aliases
+(`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`,
+`@balance-cards/*`, `@core-scripts/*`, `@core-tests/*`, `@core-gym/*`) rather
+than the removed `src`/`scripts`/`example-games/gym`/`tests/helpers`
+symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
+`src/…`, and core-owned CLI/core-layer references to `core/scripts/…` and
+`core/src/…`. See
+[Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
+and the [layout decision record](dev/per-game-src-layout-decision.md).
+
+### Publishing the nine repositories
+
+The nine repositories named in `scripts/configs/repo-layout.json` (the merged
+core repo `Tableau-Card-Engine` plus one `tce-<game>` per game) are created and
+published by `scripts/publish-repos.ts`:
+
+> **Merged-core note.** Under the [merged-core decision](dev/merged-core-decision.md)
+the core target is `Tableau-Card-Engine` and the interim
+`tableau-card-engine-core` repository is retired, not published. The publication
+helper/target list is updated by the F3 migration child of CG-0MUJ0IAJM009X0Q2.
+
+```bash
+npm run publish:repos -- --dry-run      # print the plan; runs no gh/git command
+npm run publish:repos                   # create + publish every target
+npm run publish:repos -- --target golf  # one target (core | <game> | tce-<game>)
+npm run publish:repos -- --repos-dir ../tce-repos
+```
+
+Each target is created **public**, `dev` is pushed, and `main` is seeded from
+`dev` and set as the default branch. Only `dev` and `main` are ever published
+(no tags, no feature/`wl-*` branches); the helper is idempotent (an existing
+repository is never re-created, and a target whose refs are up to date pushes
+nothing and exits 0) and never force-pushes. The full contract, including the
+safety guards and the fresh-clone verification commands, is recorded in the
+[Repo publication decision](dev/repo-publication-decision.md); the executable
+contract is `tests/scripts/repo-publication.test.ts`.
+
+### Using a published repository
+
+A published game repository is a complete single-game TCE checkout: the engine
+is pulled in as the `core` git submodule, so a recursive clone gives you the
+engine and the game together. For example, `tce-golf`:
+
+```bash
+git clone --recurse-submodules git@github.com:TheWizardsCode/tce-golf.git
+cd tce-golf
+npm install
+npm run build            # tsc --noEmit && vite build
+npm test -- --project unit
+```
+
+The merged-core repository works the same way for the engine (it has no game
+submodules — the distribution composes games as siblings):
+
+```bash
+git clone git@github.com:TheWizardsCode/Tableau-Card-Engine.git
+cd Tableau-Card-Engine
+npm install
+npm run build
+npx vitest run --project unit   # `npm test` runs the full CI suite
+```
+
+The `tce-<game>` repos use `main` as their default branch, carry only `dev` and
+`main`, and resolve every engine import through the aliases against `./core`.
 
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
 
@@ -983,7 +1421,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Game | Location | Key engine features demonstrated | Tests |
 |------|----------|--------------------------------|-------|
 | 9-Card Golf | `example-games/golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
-| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights), Classic/Citadel deal variants via a persisted pre-game popup (Citadel deals all 52 cards, no pre-placed aces) | `tests/beleaguered-castle/` (13 files) |
+| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights), Classic/Citadel deal variants via a persisted pre-game popup (Citadel deals all 52 cards, no pre-placed aces), Canvas-compatible selection highlight (`createCardHighlight`), natural-flow (animated-deal) first-click + click-to-move regression tests | `tests/beleaguered-castle/` (17 files) |
 | Sushi Go! | `example-games/sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
 | Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
 | Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
@@ -1175,7 +1613,7 @@ Cards without dedicated art use the `Fallback` sprite.
 #### Turn Economy (CG-0MTINZ5GG007BH44)
 
 Single-source turn cash formula (Q1=c — see `MainStreetDifficulty.ts` header):
-`dayStart snapshot (dayStartCoins/dayStartRep at DayStart) → placement deductions → applyIncome breakdown (staff buffs → income-multiplier effects → rep multiplier sampled AFTER income's own rep accrual; hand cards contribute no income — CG-0MTRDX0DN004EECN) → ongoing costs (after income, before incident) → incident (or incident-averted log entry via Risk Manager per Q3) → net row (Turn N net: coinsNow-dayStartCoins / repNow-dayStartRep) as the final log entry, including premature bankruptcy/rep-collapse and competitive closing phases`. Invariants: Q1=c rep sampling, Q2 3-decimal tooltip (`toFixed(3)`), Q3 explicit averted entry, banner→net ordering on premature exits. Canonical sites: `reputationCoinMultiplier`/`applyReputationMultiplier` (`MainStreetDifficulty.ts`), `applyIncome` (`MainStreetAdjacency.ts`), `buildCoinsTooltip`/`buildReputationTooltip` (`MainStreetHudTooltips.ts`), `appendTurnNetRow`/`processEndOfTurn`/`resolveCompetitiveClosingPhases` (`MainStreetEngine.ts`).
+`weekStart snapshot (weekStartCoins/weekStartRep at WeekStart) → placement deductions → applyIncome breakdown (staff buffs → income-multiplier effects → rep multiplier sampled AFTER income's own rep accrual; hand cards contribute no income — CG-0MTRDX0DN004EECN) → ongoing costs (after income, before incident) → incident (or incident-averted log entry via Risk Manager per Q3) → net row (Turn N net: coinsNow-weekStartCoins / repNow-weekStartRep) as the final log entry, including premature bankruptcy/rep-collapse and competitive closing phases`. Invariants: Q1=c rep sampling, Q2 3-decimal tooltip (`toFixed(3)`), Q3 explicit averted entry, banner→net ordering on premature exits. Canonical sites: `reputationCoinMultiplier`/`applyReputationMultiplier` (`MainStreetDifficulty.ts`), `applyIncome` (`MainStreetAdjacency.ts`), `buildCoinsTooltip`/`buildReputationTooltip` (`MainStreetHudTooltips.ts`), `appendTurnNetRow`/`processEndOfTurn`/`resolveCompetitiveClosingPhases` (`MainStreetEngine.ts`).
 
 #### Deferred End-of-Turn Mutation (CG-0MTR72P14000VO6Q)
 
@@ -1197,15 +1635,17 @@ finishes) and the game-over banner never appears mid-animation.
   in `TurnResult.pendingCoinDelta` / `pendingRepDelta` / `pendingScoreDelta`
   and sets `TurnResult.requiresDeferredClosing`; `state.resourceBank` and
   `state.finalScore` are NOT mutated and the closing tail (EndCheck → next
-  day) is deferred. Tutorial, reduced-motion and replay paths omit the flag
+  week) is deferred. Tutorial, reduced-motion and replay paths omit the flag
   (legacy immediate behaviour, no regression — AC5).
 - **Apply at animation end.** The scene (`MainStreetTurnController` +
   `MainStreetAnimator`) applies the deltas exactly once via
   `applyEndOfTurnDeltas` when the last animation completes (guarded by the
   scene's `endOfTurnDeltasApplied` flag so income and incident animations
   cannot double-apply), then runs `finishDeferredTurnClosing` — immediate
-  loss check, challenge evaluation against the post-delta state, EndCheck,
-  next-day advance, net row — and finally refreshes the HUD.
+  loss check, challenge evaluation against the post-delta state (the
+  end-of-turn **safety net**: challenges are normally completed immediately
+  after the action that satisfies them, per CG-0MU37CKRR008252I), EndCheck,
+  next-week advance, net row — and finally refreshes the HUD.
 - **Deferred HUD window.** `refreshHud()` (`MainStreetRenderer.ts`) renders
   the pre-animation `previousCoins` / `previousReputation` captured at
   `endTurn()` start while `incomeCollectionActive` or `incidentRevealActive`
@@ -1234,11 +1674,21 @@ available during the market phase (it does not consume `actionsRemaining`):
   arbitrage.
 - Rates are per-difficulty `GameConfig` constants in `MainStreetDifficulty.ts`
   (defaults on Easy/Medium/Hard).
-- Gating: `state.favourUsedThisTurn` (market-phase only, reset at `DayStart`),
+- Gating: `state.favourUsedThisTurn` (market-phase only, reset at `WeekStart`),
   serialized with legacy-save backfill to `false`.
-- UI: two SLL-positioned buttons in the market-phase action bar
-  (`favourCoinsToRepButton` / `favourRepToCoinsButton` zones), disabled when the
-  input resource is insufficient or the gate is spent.
+- UI: two SLL-positioned buttons inside the **market-aligned HUD strip**
+  between the Coins and Reputation readouts (`favourRepToCoinsButton` →
+  `favourCoinsToRepButton`, left-to-right `[rep→coins][coins→rep]`; rendered by
+  `MainStreetRenderer.refreshHud` and parented into `hudContainer` as transient
+  HUD children). Each carries an i18n tooltip
+  (`buildCoinsToRepTooltip` / `buildRepToCoinsTooltip`) describing the exact
+  exchange rate and the once-per-turn limit; tooltips are skipped in replay
+  mode. They are disabled when the input resource is insufficient or the gate
+  is spent.
+- HUD layout (CG-0MT5UO47U0047UKA): the HUD strip is market-aligned
+  (`hudLeft`..`hudRight` = the market box edges) and the actions-remaining
+  counter renders in the action cluster directly above the End Turn / Cancel
+  button, not in the strip.
 - AI: `MainStreetAiStrategy` enumerates the action when affordable/unused and
   scores rep→coins > 1 only when genuinely stalled (cannot afford the cheapest
   market card) with a reputation buffer; `GreedyStrategy` Priority 9 selects it
@@ -2285,13 +2735,14 @@ The tutorial layout defines these zones (all use normalized coordinates with opt
 
 | Zone ID | Description | Uses dimensions |
 |---------|-------------|-----------------|
-| `hud` | HUD strip (top bar with coins, reputation, score) | Yes (full-width bounding box) |
+| `hud` | HUD strip (market-aligned bar with coins, reputation, score, and the Community Favour buttons; width matches the market box, CG-0MUFAISSZ002TE1B) | Yes (full-width bounding box) |
 | `marketBusinessRow` | Legacy full-market-area zone (single row now drawn in the same band) | No (informational) |
 | `streetGrid` | The 2×5 street grid for placing businesses | Yes (stops before right column) |
 | `endTurnButton` | End Turn action button area | Yes |
 | `incidentQueue` | Face-down incident deck panel (card back + remaining count, CG-0MSTOATDP000JNHH) | Yes |
 | `investmentsRow` | ALIAS of `developmentRow` — the market rows were merged into one (CG-0MSTOATDT009BRX2); upgrade/event steps highlight the same single row | Yes |
 | `helpButton` | Help/settings button area | Yes |
+| `actionButtons` | Community Favour button band inside the HUD strip (relocated from the action bar, CG-0MUFAITED0088AGN) | Yes |
 
 Zones that return `null` for highlighting (no bounding box needed):
 - `center-modal` — centered overlay
@@ -2438,6 +2889,75 @@ The `SettingsButton` class renders a circular gear icon (\u2699) toggle button t
 import { SettingsButton } from '@ui';
 
 const settingsButton = new SettingsButton(this, settingsPanel);
+```
+
+### Tooltip Manager
+
+The `TooltipManager` (`src/ui/Tooltip.ts`) displays contextual information (card details, scoring rules, HUD explanations) on hover. It has two rendering modes:
+
+- **DOM mode** (default) — a `div` overlay appended to `document.body`.
+- **Phaser mode** — caller-supplied game objects rendered via a `phaserRender` callback.
+
+```typescript
+import { TooltipManager } from '@ui';
+
+const tooltip = new TooltipManager(this, settingsPanel);
+cardSprite.setInteractive({ useHandCursor: true });
+cardSprite.on('pointerover', () => tooltip.show('Card info', cardSprite.x, cardSprite.y));
+cardSprite.on('pointerout', () => tooltip.hide());
+```
+
+**Bounds guarantee.** A tooltip must never render (partially) outside its visible bounds — an off-screen DOM tooltip used to extend the page's scrollable area and make the page "resize to make space". Both modes are now clamped:
+
+- **DOM mode** positions the node with `position: fixed`, measures it once per `show()` (a single synchronous reflow, no per-frame layout thrash and no resize listeners), then flips it above/left of the hover point when there is not enough room and finally clamps it to the viewport with a 4 px margin. Because the node is `position: fixed` it can never contribute to the document's scrollable overflow, so showing/hiding a tooltip never changes the document scroll size. The legacy world→screen mapping (canvas bounding rect + camera scroll + scale) is unchanged.
+- **Phaser mode** delegates layout to the caller's `phaserRender` callback. Use the exported, unit-tested helper to keep the container inside the game canvas:
+
+  ```typescript
+  import { clampTooltipToBounds } from '@ui';
+
+  const boxW = text.width + padding * 2;
+  const boxH = text.height + padding * 2;
+  const { x, y } = clampTooltipToBounds(rawX, rawY, boxW, boxH, GAME_W, GAME_H);
+  container.setPosition(x, y);
+  ```
+
+  `clampTooltipToBounds(x, y, tooltipWidth, tooltipHeight, boundsWidth, boundsHeight, margin = 4)` is opt-in and never repositions a caller-managed container on its own, so a callback that already clamps is unaffected. Lost Cities, Sushi Go and the Gym tooltip demo all use it; `computeViewportTooltipPosition(...)` exposes the DOM flip+clamp maths for unit tests.
+
+**Guards.** In non-DOM environments (`document`/`window` undefined) the manager stays inert; when the canvas bounding rect cannot be read it hides, and when viewport dimensions are unavailable it falls back to the legacy unclamped placement. `pointer-events: none`, the maximum `z-index` and reduced-motion behaviour are preserved. A tooltip larger than the viewport or canvas cannot fit — it is pinned to the margin and partial visibility is accepted.
+
+### UI Component Base Class (`UIComponentBase`)
+
+`UIComponentBase` (`src/ui/UIComponentBase.ts`) provides the shared lifecycle contract for reusable UI widgets. `HelpButton`, `SettingsButton`, and `Slider` extend it, and new components should too — it removes the repeated `destroyed` flag, idempotency guard, and manual listener bookkeeping that previously had to be re-implemented (and could leak listeners when a component was destroyed mid-interaction).
+
+It provides:
+
+- `destroyed` / `enabled` read-only state and `setEnabled(boolean)`.
+- `protected canInteract()` — `true` while the component is live **and** enabled; event handlers should gate on it.
+- `protected on(emitter, event, handler, context?)` — registers the listener and tracks it via the shared `ListenerRegistry` (`src/core-engine/ListenerRegistry.ts`). Returns an unsubscribe closure. Every tracked listener is removed automatically by `destroy()`.
+- `protected off(emitter, event, handler)` — removes a single tracked listener early, for listeners whose lifetime is shorter than the component's (e.g. a slider's drag-scoped `pointermove`/`pointerup` handlers detached on `pointerup`).
+- `protected abstract destroyContent()` — subclass-specific game-object teardown.
+- `destroy()` — idempotent; runs `destroyContent()` exactly once, then removes all tracked listeners (cleanup still runs even if `destroyContent()` throws).
+
+The companion `mergeDefaults(defaults, overrides?)` helper merges caller options over defaults: overrides win, absent or explicitly `undefined` keys fall back to the default, and falsy values (`0`, `false`, `''`) and `null` are preserved.
+
+```typescript
+import { UIComponentBase } from '@ui';
+
+class MyWidget extends UIComponentBase {
+  private readonly box: Phaser.GameObjects.Rectangle;
+
+  constructor(scene: Phaser.Scene) {
+    super();
+    this.box = scene.add.rectangle(0, 0, 40, 40);
+    this.on(this.box, 'pointerdown', () => {
+      if (this.canInteract()) this.handleClick();
+    });
+  }
+
+  protected destroyContent(): void {
+    this.box.destroy();
+  }
+}
 ```
 
 ### Overlay Background System
@@ -2831,7 +3351,7 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   `CardGameScene.initSettingsPanel`). Visible only when running under
   `npm run dev` (`import.meta.env.DEV === true`).
 - **Function:** Toggles a dev-only `forcedStaffApplicant` flag that makes the
-  staff-applicant trigger fire deterministically at every day start, bypassing
+  staff-applicant trigger fire deterministically at every week start, bypassing
   the usual `min(income + reputation, 15)%` RNG roll. The overlay shows the
   current state (`[ON]` / `[OFF]`) and the live computed chance
   (e.g. `Staff Application [ON] — 12% chance`), which updates each time the
@@ -2841,14 +3361,14 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   eligible business with a free employment slot; if none exists — or the
   computed chance is 0 — no applicant is spawned. The trigger is also
   suppressed in tutorial/headless runs where `state.suppressApplicant` is
-  true, because `executeDayStart()` skips `resolveStaffApplicant()` entirely
+  true, because `executeWeekStart()` skips `resolveStaffApplicant()` entirely
   in that case.
 - **Session-only:** The `forcedStaffApplicant` flag is not persisted by
   save/load — it resets on a new game session.
 - **When to use:** Test the hire / decline / let-go applicant flow without
   waiting for the random trigger. Open the Settings panel (gear icon) →
   scroll to Debug Tools → click **Staff Application** → click `[  TOGGLE  ]`
-  to force an applicant on the next day start.
+  to force an applicant on the next week start.
 - **Implementation:**
   - `src/ui/debug/StaffApplicantCheatOverlay.ts` — Toggle overlay and
     `createStaffApplicantCheatTool()` factory.

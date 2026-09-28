@@ -1,0 +1,13 @@
+{
+  "$comment": "Per-game preset: Beleaguered Castle solitaire only (plus the core-owned Gym). Use `GAMES_CONFIG=beleaguered-castle` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "beleaguered-castle",
+      "path": "../tce-beleaguered-castle",
+      "scenePath": "example-games/beleaguered-castle/scenes/BeleagueredCastleScene.ts",
+      "siblingScenePath": "src/scenes/BeleagueredCastleScene.ts",
+      "adapterPath": "example-games/beleaguered-castle/scripts/adapters/BeleagueredCastleReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/BeleagueredCastleReplayAdapter.ts"
+    }
+  ]
+}

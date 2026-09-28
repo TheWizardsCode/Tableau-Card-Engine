@@ -163,7 +163,7 @@ Vertical layered building with ecological dependency rules. No card game has a "
 ## Concept 4: "Main Street"
 
 ### Elevator Pitch
-Revitalize a small town's main street by placing shop, service, and community building cards along a single row where neighboring businesses boost each other, managing a simple economy of customers, money, and reputation across day/night cycles.
+Revitalize a small town's main street by placing shop, service, and community building cards along a single row where neighboring businesses boost each other, managing a simple economy of customers, money, and reputation across weeks.
 
 ### Theme/Setting
 A charming small-town main street, circa 1950s Americana. You're the town planner bringing an empty street back to life -- bakery, bookshop, hardware store, diner, post office, park. Each business is a card with character.

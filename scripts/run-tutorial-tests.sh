@@ -10,6 +10,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
+# The test suites exercise every game, so tests always build/test against the
+# full preset regardless of the ambient GAMES_CONFIG (which defaults to
+# `core-only` for production builds). See scripts/vite-game-discovery-plugin.ts.
+export GAMES_CONFIG="${GAMES_CONFIG:-full}"
+
 # Fast-fail pre-check: the tutorial E2E parts below run in headless
 # Chromium via Playwright. Detect a missing prerequisite up front
 # (launch-free, <2s) and print the exact remediation commands instead of
@@ -20,6 +25,14 @@ npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 for part in part1 part2 part4 part5 part6 part3; do
+  # The merged core carries no Main Street tests at HEAD (Option A); skip the
+  # part when the game is not composed as a sibling checkout, so the core's
+  # full suite stays green without a game repo.
+  if [ ! -f "tests/e2e/main-street-tutorial-e2e-${part}.browser.test.ts" ]; then
+    echo "=== Tutorial E2E ${part} — skipped (no Main Street checkout) ==="
+    echo ""
+    continue
+  fi
   echo "=== Tutorial E2E ${part} ==="
   npx vitest run --project "tutorial-${part}" 2>&1 | grep -E "^===|^( ✓| ×| Test )|Tests|Test Files|FAIL"
   echo ""

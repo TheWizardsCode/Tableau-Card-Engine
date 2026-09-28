@@ -1,0 +1,13 @@
+{
+  "$comment": "Per-game preset: Main Street only (plus the core-owned Gym). Use `GAMES_CONFIG=main-street` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "main-street",
+      "path": "../tce-main-street",
+      "scenePath": "example-games/main-street/scenes/MainStreetScene.ts",
+      "siblingScenePath": "src/scenes/MainStreetScene.ts",
+      "adapterPath": "example-games/main-street/scripts/adapters/MainStreetReplayAdapter.ts",
+      "siblingAdapterPath": "src/scripts/adapters/MainStreetReplayAdapter.ts"
+    }
+  ]
+}

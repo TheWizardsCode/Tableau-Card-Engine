@@ -16,7 +16,7 @@
 
 import { GymSceneBase } from './GymSceneBase';
 import { GYM_TOOLTIP_KEY } from '../GymRegistry';
-import { GAME_W, GAME_H, FONT_FAMILY, TooltipManager } from '../../../src/ui';
+import { GAME_W, GAME_H, FONT_FAMILY, TooltipManager, clampTooltipToBounds } from '../../../src/ui';
 import { createHudText } from '../../../src/ui/Renderer';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
@@ -109,7 +109,7 @@ export class GymTooltipScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'Demonstrates the shared TooltipManager component in two rendering modes: DOM overlay (HTML div) and Phaser GameObject (in-scene containers). Tooltips provide contextual information when hovering over interactive elements, such as card ability descriptions, rule explanations, or score previews. In a real card game, tooltips let players quickly understand card effects without cluttering the main UI.'
+        body: 'Demonstrates the shared TooltipManager component in two rendering modes: DOM overlay (HTML div) and Phaser GameObject (in-scene containers). Tooltips provide contextual information when hovering over interactive elements, such as card ability descriptions, rule explanations, or score previews. In a real card game, tooltips let players quickly understand card effects without cluttering the main UI. Both modes keep the tooltip fully on-screen: the DOM overlay is clamped to the browser viewport (it uses fixed positioning, so it never extends the page or causes scrollbars), and the Phaser GameObject is clamped to the game canvas.'
       },
       {
         heading: 'Controls',
@@ -121,7 +121,7 @@ export class GymTooltipScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ DOM Mode ] → mode label updates to "Mode: DOM overlay"\n2. Hover over the red card → tooltip appears showing "Red Card" description\n3. Move pointer within the card → tooltip follows the pointer position\n4. Move pointer away from card → tooltip disappears\n5. Press [ Phaser Mode ] → mode label updates\n6. Hover over the blue card → Phaser GameObject tooltip appears with border styling\n7. Press [ Show Demo ] → demo tooltip appears at centre\n8. Press [ Disable ] → tooltips stop appearing; button shows "[ Enable ]"\n9. Press [ Enable ] → tooltips reappear on hover'
+        body: '1. Press [ DOM Mode ] → mode label updates to "Mode: DOM overlay"\n2. Hover over the red card → tooltip appears showing "Red Card" description\n3. Move pointer within the card → tooltip follows the pointer position\n4. Move pointer away from card → tooltip disappears\n5. Move the pointer to the right or bottom edge of the canvas → the DOM tooltip stays fully visible and the page does not gain a scrollbar\n6. Press [ Phaser Mode ] → mode label updates\n7. Hover over the blue card → Phaser GameObject tooltip appears with border styling\n8. Move the pointer to the canvas edge → the Phaser tooltip stays inside the game canvas\n9. Press [ Show Demo ] → demo tooltip appears at centre\n10. Press [ Disable ] → tooltips stop appearing; button shows "[ Enable ]"\n11. Press [ Enable ] → tooltips reappear on hover'
       }
     ]);
 
@@ -185,7 +185,20 @@ export class GymTooltipScene extends GymSceneBase {
 
         text.setPosition(TOOLTIP_TEXT_ORIGIN, TOOLTIP_TEXT_ORIGIN);
         container.add([bg, text]);
-        container.setPosition(ctx.x ?? 0, ctx.y ?? 0);
+
+        // Keep the tooltip fully inside the game canvas (shared helper –
+        // matches the Lost Cities / Sushi Go in-canvas clamp precedent).
+        const boxW = text.width + TOOLTIP_BG_PADDING;
+        const boxH = text.height + TOOLTIP_BG_PADDING;
+        const position = clampTooltipToBounds(
+          ctx.x ?? 0,
+          ctx.y ?? 0,
+          boxW,
+          boxH,
+          GAME_W,
+          GAME_H,
+        );
+        container.setPosition(position.x, position.y);
         container.setDepth(TOOLTIP_CONTAINER_DEPTH);
         return container;
       },

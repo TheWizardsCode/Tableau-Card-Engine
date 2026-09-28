@@ -30,12 +30,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
+# The test suites exercise every game, so tests always build/test against the
+# full preset regardless of the ambient GAMES_CONFIG (which defaults to
+# `core-only` for production builds). See scripts/vite-game-discovery-plugin.ts.
+export GAMES_CONFIG="${GAMES_CONFIG:-full}"
+
 echo "=== Browser Test Env Pre-check ==="
 npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 echo "=== Dev Tests ==="
-npx tsx scripts/vitest-run-with-retry.ts --project dev 2>&1 | tail -20
+npx tsx scripts/vitest-run-with-retry.ts --project dev 2>&1
 echo ""
 
 echo "=== Dev Tests Complete ==="
