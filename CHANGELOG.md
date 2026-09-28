@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.1.18 (2026-09-28)
+### Features
+- Tax audits now take a fair share of your coins, and hiring an Accountant reduces the cost. (CG-0MTQ7W0ZX0059R3J)
+- Internal code cleanup with no player-visible changes. (CG-0MTXDU8X0009I8TC)
+- The Coloretto AI now takes strong rows early instead of playing passively. (CG-0MUCIHPES005ZURM)
+- The turn and resource HUD is now easier to read, with your remaining actions right above End Turn and favour buttons beside your coins. (CG-0MT5UO47U0047UKA)
+- Run faster, targeted tests during development and get clearer failure reports. (CG-0MUDYCJUC009URD6)
+- Each game now has its own public repository you can clone and build on its own. (CG-0MUHK5NND0024J1S)
+- Challenges now complete instantly when you earn them, with immediate rewards and celebration. (CG-0MU37CKRR008252I)
+- Tutorial and messages now correctly say a turn lasts one week, not a day. (CG-0MTMYIHKO001QCWL)
+- See your total coins, reputation, and score after each turn in the activity log. (CG-0MTR35GBC005RMZH)
+- Watch synergy coins travel between linked businesses and land in their coin grids. (CG-0MTV6LZEA003YS3E)
+- You can now discard unwanted cards from your hand, but it costs reputation equal to the card's coin cost. (CG-0MTQ7KUVF009ELQK)
+- Build or run any single game on its own for faster testing and iteration. (CG-0MUGSBM8S007ETU5)
+- Fixed the banking tutorial hint, left-aligned the coin grid, and added week/year stamps to transcripts. (CG-0MUIXXGT5005KYND)
+- Every screen now shows a red ALPHA badge with the version number, so you always know you're on a test build. (CG-0MUI9K4F8009DYJL)
+### Bug Fixes
+- Sold cards no longer charge ongoing costs each turn. (CG-0MU3VH7QW006A2XA)
+- Full test runs no longer time out and fail before committing your work. (CG-0MUC5GVCJ0062BN7)
+- Fixed a bug that was blocking all updates to the game, so new changes can be delivered again. (CG-0MUFCL5N50023PHJ)
+- Upgrade cards now clearly show which businesses you can use them on. (CG-0MUDA70FK003J8YL)
+- Running the full test suite no longer fails when game repositories are checked out alongside the core. (CG-0MUKWPTZ50040V0Q)
+- Fixed a stray symbol in the score tooltip so the Reputation line reads clearly. (CG-0MTR12QY2001VCDC)
+- Cards now respond to your first click after the deal, and selected cards are clearly highlighted. (CG-0MUHKD7S8007EEAC)
+- Tooltips now stay fully on-screen and no longer resize the page. (CG-0MTW1IIWW0049FQZ)
+- Card text now matches the coins and reputation you actually earn. (CG-0MTW1EN0D003CSA0)
+- Pawn Shops now cost less and slightly lower your reputation each turn. (CG-0MUAYBA0L000XLK3)
+### Other
+- Added extra testing to prevent crashes and glitches during edge-case gameplay. (CG-0MTXDWI9Z009I4SE)
+- Improved stability and performance of in-game UI elements like buttons and sliders. (CG-0MTXDU804005CUN6)
+- We're investigating a drop in AI win rates to make sure the game stays fair and balanced. (CG-0MUE03DGQ005KPZ7)
+- Tests now run without getting stuck in endless retry loops, so your game updates and fixes arrive faster. (CG-0MTG62063007OCFF)
+- Tutorial now explains you can't start the festival without action points. (CG-0MUA2TPL9001FYYH)
+- Releases now ship without manual gate bypasses, so updates are more reliable. (CG-0MUDA018P0054UYB)
+
 ## v0.1.17 (2026-09-22)
 ### Features
 - Incident cards now stay on screen longer so you can read them before your turn ends. (CG-0MTW18KFK000MM3I)
