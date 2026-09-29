@@ -1893,7 +1893,7 @@ export class HandView {
       s.x ?? 0,
       s.y ?? 0,
       this.cardWidth,
-      CARD_H,
+      this.cardHeight,
       color,
     )
       .setAlpha(0.35)
