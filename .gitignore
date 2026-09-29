@@ -126,3 +126,7 @@ Worklog Specific Ignores
 !.pi/skills_extensions/
 !.pi/skills_extensions/**
 .implement_state.json
+
+# Private Steam credentials for the launcher — never commit (see
+# electron/steam-config.example.json for the shape).
+electron/steam-config.local.json
