@@ -1617,10 +1617,12 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 Each card's 64×64 art zone embeds its art as an inline base64 `data:` URI
 (required: the SVG is rasterised from a data URI, so external refs do not
 resolve). **The 64×64 zone is a layout dimension, not the render resolution** —
-Phaser rasterises the card SVG at up to 4× quality scale
-(`rasteriseSvgToTexture`, `qualityScale = Math.max(4, dpr)`), so the zone
-occupies up to 256×256 device pixels and the embedded bitmap is **256×256
-WebP**, filling it at 1:1.
+Phaser rasterises the card SVG at `Math.max(MIN_QUALITY_SCALE, dpr)` quality
+scale (`rasteriseSvgToTexture`, `MIN_QUALITY_SCALE = 2`), so the zone occupies
+up to `64 × MIN_QUALITY_SCALE = 128` device pixels (at DPR ≤ 2) and the
+embedded bitmap is **256×256 WebP**, always downscaled for crisp rendering.
+At DPR 3 the zone is `64 × 3 = 192` device pixels; the 256 WebP still
+downscales, avoiding any upscaling artefacts.
 
 The committed 1024×1024 source sprites live in
 `example-games/main-street/sprites/<Name>_1024_x_1024.png` (the source of
