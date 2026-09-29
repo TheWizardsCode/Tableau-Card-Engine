@@ -218,8 +218,16 @@ export interface HandViewOptions {
   showPositionOutlines?: boolean;
 
   /**
-   * Total number of slots to outline when `showPositionOutlines` is true.
-   * When omitted, outlines render one per current card.
+   * Total number of card slots in the hand (its capacity).
+   *
+   * When set, the horizontal card row and the ghost outlines are derived from
+   * this **fixed capacity template** rather than the current card count, so
+   * adding a card fills the next free slot to the right without re-centring
+   * the row. When omitted, the row is laid out for the current card count
+   * (legacy centred-on-count behaviour).
+   *
+   * Also caps the number of ghost outlines rendered when
+   * `showPositionOutlines` is true (one outline per slot).
    */
   maxSlots?: number;
 }
@@ -697,37 +705,16 @@ export class HandView {
   public getInsertionPosition(insertIndex: number): { x: number; y: number } {
     const count = this.cards.length;
     const index = Math.max(0, Math.min(insertIndex, count));
-    const newCount = count + 1;
 
     if (this.layoutDirection === 'vertical') {
       return { x: this.baseX, y: this.baseY + index * this.spacing };
     }
 
-    const gap = this.spacing - this.cardWidth;
-    const centerX = this._centerX ?? this.baseX;
-
-    const { positions } = layoutCardPositions({
-      count: newCount,
-      cardWidth: this.cardWidth,
-      gap,
-      centerX,
-      maxWidth: this.maxWidth,
-    });
-
-    const destX = positions[index];
-
-    let destY = this.baseY;
-    if (this.arcRadius > 0 && newCount >= 3) {
-      const first = positions[0];
-      const last = positions[positions.length - 1];
-      const arcCenterX = (first + last) / 2;
-      const halfSpan = Math.max((last - first) / 2, 1);
-      const normalized = (destX - arcCenterX) / halfSpan;
-      const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
-      destY = this.baseY - offsetY;
-    }
-
-    return { x: destX, y: destY };
+    // Predict via the same capacity row used by computeCardPositions so the
+    // deal animation ends exactly where the card will rest.
+    const row = this._computeRowPositions(count + 1);
+    const fallback = row[row.length - 1] ?? { x: this._centerX ?? this.baseX, y: this.baseY };
+    return row[index] ?? fallback;
   }
 
   /**
@@ -832,14 +819,12 @@ export class HandView {
     // Track the new base positions so a later selection raise is correct.
     this._basePositions = newPositions.map((p) => ({ x: p.x, y: p.y }));
 
-    // Precompute rotation helpers (mirrors applyLayout logic).
+    // Precompute rotation helpers (mirrors applyLayout logic). The span comes
+    // from the fixed row template so rotation is capacity-stable.
     let arcCenterX = 0;
     let halfSpan = 1;
     if (this.layoutDirection === 'horizontal' && newPositions.length >= 2) {
-      const firstX = newPositions[0].x;
-      const lastX = newPositions[newPositions.length - 1].x;
-      arcCenterX = (firstX + lastX) / 2;
-      halfSpan = Math.max((lastX - firstX) / 2, 1);
+      ({ arcCenterX, halfSpan } = this._rowArcSpan());
     }
 
     // 5. Update z-ordering to match the sorted card order.
@@ -1016,13 +1001,18 @@ export class HandView {
   }
 
   /**
-   * Update the maximum number of outline slots. Use `undefined` to fall
-   * back to one outline per current card.
+   * Update the hand's slot capacity. Use `undefined` to fall back to the
+   * legacy centred-on-count layout (one outline per current card).
+   *
+   * Capacity drives the card row as well as the outlines, so this re-lays
+   * the whole hand — the only mutation that may move existing cards.
    */
   setMaxSlots(maxSlots: number | undefined): void {
     if (maxSlots === this.maxSlots) return;
     this.maxSlots = maxSlots;
-    if (this.showPositionOutlines) this._rebuildOutlines();
+    // Capacity drives the card row as well as the outlines, so re-lay the
+    // whole hand. This is the only mutation that may move existing cards.
+    this.applyLayout();
   }
 
   /** Current maximum outline slot count. */
@@ -1290,13 +1280,14 @@ export class HandView {
   /**
    * Compute the centre position and rotation of every outline slot.
    *
-   * Occupied slots (one per current card) are placed at the **exact** card
-   * rest positions — same x/y and the same rotation — so an outline always
-   * sits directly behind the card it ghosts, with identical spacing.
-   * Extra capacity slots (`maxSlots - cards.length`) continue the same step
-   * to the right of the occupied run (cards fill the hand left-to-right).
-   * With no cards the whole `maxSlots` row is laid out as empty slots,
-   * giving an instant read of hand capacity.
+   * All slots come from the same **capacity template** used to lay out the
+   * cards (see {@link _computeRowPositions}): with `maxSlots` set that is the
+   * fixed `maxSlots`-slot row, so a slot never moves as cards are added.
+   * Occupied slots (one per current card) sit at the exact card rest positions
+   * — same x/y and the card's **actual** rotation — so an outline always sits
+   * directly behind the card it ghosts. Extra capacity slots continue the same
+   * template to the right and stay straight. With no cards the template renders
+   * as empty slots, giving an instant read of hand capacity.
    *
    * Each slot also carries its `depth`: occupied slots use `index - 0.5` so
    * they sit behind the card at `index`; extra empty slots are pushed below
@@ -1316,95 +1307,29 @@ export class HandView {
       }));
     }
 
-    const gap = this.spacing - this.cardWidth;
-    const centerX = this._centerX ?? this.baseX;
-    const n = this.cards.length;
-
+    // Horizontal: every slot comes from the shared capacity row template, so
+    // occupied slots ghost their cards exactly and extra capacity slots
+    // continue the same row to the right.
+    const template = this._computeRowPositions(count);
+    const occupiedCount = Math.min(this.cards.length, count);
     const slots: Array<{ x: number; y: number; rotation: number; depth: number }> = [];
-
-    if (n === 0) {
-      // Empty hand — lay out the full capacity row, centred on the hand
-      // centre, as straight slots (no cards to match, so no rotation).
-      const { positions } = layoutCardPositions({
-        count,
-        cardWidth: this.cardWidth,
-        gap,
-        centerX,
-        maxWidth: this.maxWidth,
-      });
-      const xs = positions.length > 0 ? positions : [centerX];
-      const arcCenterX = (xs[0] + xs[xs.length - 1]) / 2;
-      const halfSpan = Math.max((xs[xs.length - 1] - xs[0]) / 2, 1);
-      const useArcY = this.arcRadius > 0 && xs.length >= 3;
-      for (let i = 0; i < xs.length; i++) {
-        slots.push({
-          x: xs[i],
-          y: useArcY
-            ? this._outlineArcY(xs[i], arcCenterX, halfSpan)
-            : this.baseY,
-          rotation: 0,
-          depth: this._outlineDepth(i, count),
-        });
-      }
-      return slots;
-    }
-
-    // Occupied slots ghost their cards exactly — same centre and the card's
-    // **actual** rotation (custom-rendered cards may not rotate even when
-    // maxRotationDegrees is set, so the observed sprite rotation is the
-    // source of truth). Capped at `count` so capacity outlines never exceed
-    // `maxSlots` even if the hand is (transiently) over capacity.
-    const cardPositions = this.computeCardPositions();
-    const occupiedCount = Math.min(n, count);
-    for (let i = 0; i < occupiedCount; i++) {
-      const sprite = this.sprites[i];
+    for (let i = 0; i < count; i++) {
+      const pos = template[i] ?? {
+        x: (this._centerX ?? this.baseX) + i * this.spacing,
+        y: this.baseY,
+      };
+      // Occupied slots mirror the card's **actual** rotation (custom-rendered
+      // cards may not rotate even when maxRotationDegrees is set, so the
+      // observed sprite rotation is the source of truth).
+      const sprite = i < occupiedCount ? this.sprites[i] : undefined;
       slots.push({
-        x: cardPositions[i].x,
-        y: cardPositions[i].y,
+        x: pos.x,
+        y: pos.y,
         rotation: sprite ? ((sprite as any).rotation ?? 0) : 0,
         depth: this._outlineDepth(i, count),
       });
     }
-
-    // Extra capacity slots continue the same spacing to the right of the
-    // occupied run (cards fill the hand left-to-right), stay straight, and
-    // are pushed below every card so an overlapping card face is never
-    // drawn over.
-    const extras = count - occupiedCount;
-    if (extras > 0) {
-      const { step } = layoutCardPositions({
-        count: n,
-        cardWidth: this.cardWidth,
-        gap,
-        centerX,
-        maxWidth: this.maxWidth,
-      });
-      const effectiveStep = Number.isFinite(step) && step > 0 ? step : this.spacing;
-      const lastCard = cardPositions[occupiedCount - 1];
-      const arcCenterX = (cardPositions[0].x + lastCard.x) / 2;
-      const halfSpan = Math.max((lastCard.x - cardPositions[0].x) / 2, 1);
-      const useArcY = this.arcRadius > 0 && occupiedCount >= 3;
-      for (let i = 1; i <= extras; i++) {
-        const x = lastCard.x + i * effectiveStep;
-        slots.push({
-          x,
-          y: useArcY ? this._outlineArcY(x, arcCenterX, halfSpan) : lastCard.y,
-          rotation: 0,
-          depth: this._outlineDepth(occupiedCount - 1 + i, count),
-        });
-      }
-    }
-
     return slots;
-  }
-
-  /**
-   * Arc Y offset for a slot inside the hand's arc parabola, using the same
-   * formula as {@link computeCardPositions} so occupied/extended slots blend.
-   */
-  private _outlineArcY(x: number, arcCenterX: number, halfSpan: number): number {
-    const normalized = (x - arcCenterX) / halfSpan;
-    return this.baseY - ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
   }
 
   /**
@@ -1480,11 +1405,9 @@ export class HandView {
     this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
 
     // Precompute rotation helpers for horizontal mode (centre and half-span)
-    // so rotation is proportional to horizontal offset from the hand centre.
-    const firstX = positions[0].x;
-    const lastX = positions[positions.length - 1].x;
-    const arcCenterX = (firstX + lastX) / 2;
-    const halfSpan = Math.max((lastX - firstX) / 2, 1);
+    // from the fixed row template so each card's rotation is stable as cards
+    // are added (capacity-driven) rather than re-anchored per card count.
+    const { arcCenterX, halfSpan } = this._rowArcSpan();
 
     for (let i = 0; i < this.cards.length; i++) {
       const card = this.cards[i];
@@ -1715,6 +1638,88 @@ export class HandView {
     this._setCardTint(index, isSelected ? 0x88ff88 : null);
   }
 
+  /**
+   * Compute the horizontal row of slot centre positions for `count` slots.
+   *
+   * When `maxSlots` is defined the row is the **fixed capacity template** —
+   * the `maxSlots`-slot row centred on the hand centre (the same row an empty
+   * hand renders) — so slot positions never depend on how many cards are
+   * currently held. Any transient overflow beyond `maxSlots` continues the
+   * same step to the right (best-effort; normal gameplay prevents it). When
+   * `maxSlots` is omitted the row is laid out for `count` slots, preserving
+   * the legacy centred-on-count behaviour.
+   *
+   * The arc/rotation span is always derived from the full template (never
+   * from a truncated slice), so each slot's y and rotation stay stable as
+   * cards are added.
+   */
+  private _computeRowPositions(count: number): Array<{ x: number; y: number }> {
+    if (count <= 0) return [];
+
+    const gap = this.spacing - this.cardWidth;
+    const centerX = this._centerX ?? this.baseX;
+
+    const templateCount = this.maxSlots !== undefined ? Math.max(0, this.maxSlots) : count;
+    if (templateCount <= 0) return [];
+
+    const { positions, step } = layoutCardPositions({
+      count: templateCount,
+      cardWidth: this.cardWidth,
+      gap,
+      centerX,
+      maxWidth: this.maxWidth,
+    });
+
+    const templateXs = positions.length > 0
+      ? positions
+      : Array.from({ length: templateCount }, (_, i) => this.baseX + i * this.spacing);
+    const effectiveStep = Number.isFinite(step) && step > 0 ? step : this.cardWidth + gap;
+
+    // Arc span from the full template so a slot's y is card-count independent.
+    const first = templateXs[0];
+    const last = templateXs[templateXs.length - 1];
+    const arcCenterX = (first + last) / 2;
+    const halfSpan = Math.max((last - first) / 2, 1);
+    const useArc = this.arcRadius > 0 && templateXs.length >= 3;
+
+    // Slice to the requested count and extend for transient overflow slots.
+    const rowXs = templateXs.slice(0, Math.min(count, templateXs.length));
+    while (rowXs.length < count) {
+      const prev = rowXs[rowXs.length - 1] ?? centerX;
+      rowXs.push(prev + effectiveStep);
+    }
+
+    return rowXs.map((x) => {
+      if (!useArc) return { x, y: this.baseY };
+      // Inverted arc: the central slot is highest, edges fall to baseY.
+      const normalized = (x - arcCenterX) / halfSpan;
+      const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
+      return { x, y: this.baseY - offsetY };
+    });
+  }
+
+  /**
+   * The arc/rotation span of the fixed row template.
+   *
+   * Derived from the full capacity row (when `maxSlots` is set) rather than
+   * the current cards, so per-slot rotation is stable as cards are added.
+   */
+  private _rowArcSpan(): { arcCenterX: number; halfSpan: number } {
+    const templateCount = this.maxSlots !== undefined
+      ? Math.max(0, this.maxSlots)
+      : this.cards.length;
+    const template = this._computeRowPositions(templateCount);
+    if (template.length === 0) {
+      return { arcCenterX: this._centerX ?? this.baseX, halfSpan: 1 };
+    }
+    const first = template[0].x;
+    const last = template[template.length - 1].x;
+    return {
+      arcCenterX: (first + last) / 2,
+      halfSpan: Math.max((last - first) / 2, 1),
+    };
+  }
+
   /** Compute current hand card center positions (x/y). */
   private computeCardPositions(): Array<{ x: number; y: number }> {
     if (this.cards.length === 0) return [];
@@ -1727,38 +1732,8 @@ export class HandView {
       }));
     }
 
-    // ── Horizontal layout ──
-    const gap = this.spacing - this.cardWidth;
-    const centerX = this._centerX ?? this.baseX;
-
-    const { positions } = layoutCardPositions({
-      count: this.cards.length,
-      cardWidth: this.cardWidth,
-      gap,
-      centerX,
-      maxWidth: this.maxWidth,
-    });
-
-    const xs = positions.length > 0
-      ? positions
-      : this.cards.map((_, i) => this.baseX + i * this.spacing);
-
-    if (this.arcRadius <= 0 || xs.length < 3) {
-      return xs.map((x) => ({ x, y: this.baseY }));
-    }
-
-    const first = xs[0];
-    const last = xs[xs.length - 1];
-    const arcCenterX = (first + last) / 2;
-    const halfSpan = Math.max((last - first) / 2, 1);
-
-    return xs.map((x) => {
-      const normalized = (x - arcCenterX) / halfSpan;
-      // Inverted arc: central card should be at the highest point while edges remain at baseY.
-      // Use a parabolic profile that peaks at normalized=0 and falls to zero at normalized=±1.
-      const offsetY = ((1 - normalized * normalized) * halfSpan * halfSpan) / (2 * this.arcRadius);
-      return { x, y: this.baseY - offsetY };
-    });
+    // ── Horizontal layout: place the first N cards into the capacity row ──
+    return this._computeRowPositions(this.cards.length);
   }
 
   /** Apply current layout to existing display objects. */
@@ -1772,11 +1747,9 @@ export class HandView {
     const positions = this.computeCardPositions();
     this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
 
-    // Precompute rotation helpers for horizontal mode
-    const firstX = positions[0].x;
-    const lastX = positions[positions.length - 1].x;
-    const arcCenterX = (firstX + lastX) / 2;
-    const halfSpan = Math.max((lastX - firstX) / 2, 1);
+    // Precompute rotation helpers for horizontal mode from the fixed row
+    // template so per-card rotation is capacity-stable.
+    const { arcCenterX, halfSpan } = this._rowArcSpan();
 
     for (let i = 0; i < this.sprites.length && i < positions.length; i++) {
       const sprite = this.sprites[i];

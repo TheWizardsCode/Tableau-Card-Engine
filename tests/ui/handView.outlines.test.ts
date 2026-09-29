@@ -964,4 +964,293 @@ describe('HandView position outlines', () => {
 
     hv.destroy();
   });
+
+  // ── Capacity-driven, stable slots (CG-0MUAYBB4E007LWEQ) ────
+  //
+  // With `maxSlots` set, slot positions are derived from the hand's
+  // **capacity**, not its current size: adding a card fills the next slot
+  // to the right without re-centring the row.
+
+  /** Current outline slot centres, in slot order. */
+  const outlineSlots = (hv: any) =>
+    (hv.outlineRects as any[]).map((r) => ({ x: r.x, y: r.y }));
+
+  const ranks = ['A', '2', '3', '4', '5', '6', '7'] as const;
+  const suits = ['spades', 'hearts', 'clubs', 'diamonds'] as const;
+  const makeHand = (n: number): Card[] =>
+    Array.from({ length: n }, (_, i) => card(ranks[i % ranks.length], suits[i % suits.length]));
+
+  // AC 1: outline slot positions are identical for a hand of
+  // 0, 1, … maxSlots cards.
+  it('outline slot positions are capacity-derived and stable across hand sizes', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 5,
+    });
+
+    hv.setCards([]);
+    const baseline = outlineSlots(hv);
+    expect(baseline).toHaveLength(5);
+
+    for (let n = 1; n <= 5; n++) {
+      hv.setCards(makeHand(n));
+      expect(outlineSlots(hv)).toEqual(baseline);
+    }
+
+    hv.destroy();
+  });
+
+  // AC 1 (arc/rotation variant): the same stability holds with an arc.
+  it('outline slot positions are stable across hand sizes with an arc', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      arcRadius: 120,
+      maxRotationDegrees: 25,
+      showPositionOutlines: true,
+      maxSlots: 5,
+    });
+
+    hv.setCards([]);
+    const baseline = outlineSlots(hv);
+
+    for (let n = 1; n <= 5; n++) {
+      hv.setCards(makeHand(n));
+      expect(outlineSlots(hv)).toEqual(baseline);
+    }
+
+    hv.destroy();
+  });
+
+  // AC 2: adding a card leaves every already-placed card exactly where it
+  // was and fills the next empty capacity slot.
+  it('addCard leaves existing cards in place and fills the next slot', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 5,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+    const before = hv.getCardCenters();
+
+    hv.addCard(card('3', 'clubs'));
+    const after = hv.getCardCenters();
+
+    // Pre-existing cards keep their exact pre-add position.
+    expect(after.slice(0, before.length)).toEqual(before);
+
+    // The new card lands in the next capacity slot to the right.
+    expect(after[2].x).toBeGreaterThan(after[1].x);
+    expect(after[2].x).toBeCloseTo(before[1].x + 56, 6);
+
+    hv.destroy();
+  });
+
+  // AC 2 regression: successive addCard calls up to capacity never move cards.
+  it('successive adds up to capacity never move earlier cards', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 4,
+    });
+
+    hv.setCards([card('A', 'spades')]);
+    const positions: Array<{ x: number; y: number }> = [...hv.getCardCenters()];
+
+    for (let n = 2; n <= 4; n++) {
+      hv.addCard(makeHand(n)[n - 1]);
+      const now = hv.getCardCenters();
+      // Every card placed so far is unchanged.
+      for (let i = 0; i < positions.length; i++) {
+        expect(now[i]).toEqual(positions[i]);
+      }
+      positions.push(now[now.length - 1]);
+    }
+
+    // Full hand still matches the capacity template captured when empty.
+    hv.setCards([]);
+    const emptySlots = outlineSlots(hv);
+    hv.setCards(makeHand(4));
+    expect(hv.getCardCenters()).toEqual(emptySlots);
+
+    hv.destroy();
+  });
+
+  // AC 2 (rotation): per-card rotation is capacity-stable too.
+  it('adding a card does not rotate existing cards when maxSlots is set', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      arcRadius: 120,
+      maxRotationDegrees: 25,
+      showPositionOutlines: true,
+      maxSlots: 5,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+    const before = hv.getSprites().map((s) => (s as any).rotation);
+
+    hv.addCard(card('3', 'clubs'));
+    const after = hv.getSprites().map((s) => (s as any).rotation);
+
+    expect(after[0]).toBeCloseTo(before[0], 6);
+    expect(after[1]).toBeCloseTo(before[1], 6);
+
+    hv.destroy();
+  });
+
+  // AC 3: occupied slots ghost their card exactly; extras render below every card.
+  it('occupied slots track cards through adds while extras stay below', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      arcRadius: 120,
+      maxRotationDegrees: 25,
+      showPositionOutlines: true,
+      maxSlots: 5,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts'), card('3', 'clubs')]);
+    const outlines = getOutlineRects(scene);
+    const sprites = hv.getSprites();
+
+    for (let i = 0; i < sprites.length; i++) {
+      expect(outlines[i].x).toBeCloseTo((sprites[i] as any).x, 6);
+      expect(outlines[i].y).toBeCloseTo((sprites[i] as any).y, 6);
+      expect(outlines[i].rotation).toBeCloseTo((sprites[i] as any).rotation, 6);
+    }
+
+    const depth = (r: any) => r.setDepth.mock.calls[r.setDepth.mock.calls.length - 1][0];
+    for (let i = sprites.length; i < outlines.length; i++) {
+      expect(depth(outlines[i])).toBeLessThan(-0.5);
+    }
+
+    hv.destroy();
+  });
+
+  // AC 4: setMaxSlots is the only mutation that re-lays the row and always
+  // yields exactly n slots.
+  it('setMaxSlots re-lays the row and yields exactly n slots', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 3,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+    const before = hv.getCardCenters();
+    expect(getOutlineRects(scene)).toHaveLength(3);
+
+    hv.setMaxSlots(5);
+    expect(getOutlineRects(scene)).toHaveLength(5);
+    expect((hv as any).outlineRects).toHaveLength(5);
+    expect(hv.getCardCenters()).not.toEqual(before);
+
+    hv.setMaxSlots(1);
+    expect((hv as any).outlineRects).toHaveLength(1);
+
+    hv.destroy();
+  });
+
+  // AC 5: the empty-hand capacity row equals the row cards occupy when full.
+  it('empty-hand capacity row matches the fully-filled card row', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 3,
+    });
+
+    hv.setCards([]);
+    const emptySlots = outlineSlots(hv);
+    expect(emptySlots).toHaveLength(3);
+
+    hv.setCards(makeHand(3));
+    expect(hv.getCardCenters()).toEqual(emptySlots);
+
+    hv.destroy();
+  });
+
+  // Toggling outlines is purely visual and never moves cards.
+  it('toggling outlines on/off never moves cards', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 4,
+    });
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+    const before = hv.getCardCenters();
+
+    hv.setShowPositionOutlines(false);
+    expect(hv.getCardCenters()).toEqual(before);
+    expect((hv as any).outlineRects).toHaveLength(0);
+
+    hv.setShowPositionOutlines(true);
+    expect(hv.getCardCenters()).toEqual(before);
+    expect((hv as any).outlineRects).toHaveLength(4);
+
+    hv.destroy();
+  });
+
+  // Scope guard: hands without maxSlots keep the legacy centred-on-count row.
+  it('hands without maxSlots stay centred on the current card count', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+    });
+
+    hv.setCards([card('A', 'spades')]);
+    expect(hv.getCardCenters()[0].x).toBeCloseTo(60, 6);
+
+    hv.setCards([card('A', 'spades'), card('2', 'hearts')]);
+    const two = hv.getCardCenters();
+    expect(two[0].x).toBeCloseTo(32, 6);
+    expect(two[1].x).toBeCloseTo(88, 6);
+
+    hv.destroy();
+  });
+
+  // Over-capacity is best-effort: the first maxSlots slots stay fixed, the
+  // outline count is capped, and overflow cards continue with the same step.
+  it('over-capacity hands keep fixed slots, cap outlines, and extend right', () => {
+    const hv = new HandView(scene, {
+      baseX: 60,
+      baseY: 130,
+      spacing: 56,
+      showPositionOutlines: true,
+      maxSlots: 2,
+    });
+
+    hv.setCards([card('A', 'spades')]);
+    const firstX = hv.getCardCenters()[0].x;
+
+    hv.addCard(card('2', 'hearts'));
+    hv.addCard(card('3', 'clubs')); // transient overflow
+
+    const centers = hv.getCardCenters();
+    expect(centers[0].x).toBe(firstX);
+    expect(centers[2].x).toBeCloseTo(centers[1].x + 56, 6);
+    expect((hv as any).outlineRects).toHaveLength(2);
+
+    hv.destroy();
+  });
 });
