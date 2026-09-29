@@ -47,6 +47,16 @@ export interface FollowSource {
    * Returns `false` when Steam is unavailable.
    */
   isFollowing(developerSteamId: string): Promise<boolean>;
+  /**
+   * Whether `isFollowing()` is backed by a real SDK detection call.
+   *
+   * `false` means the loaded Steamworks module does not expose
+   * `ISteamFriends::IsFollowing` (the `steamworks.js` 0.4.0 binding does not),
+   * so the UI must offer a manual self-attest fallback and the launcher must
+   * not claim automatic detection. Omitted/falsy-optional is treated as
+   * "supported" by legacy callers; concrete sources should set it explicitly.
+   */
+  readonly followCheckSupported?: boolean;
   /** Release the Steamworks session (no-op when unavailable). */
   close(): void;
 }
@@ -171,6 +181,9 @@ export class FakeFollowSource implements FollowSource {
   private following: boolean;
   private readonly openResult: boolean;
 
+  /** The fake models a source whose follow check IS backed by a real API. */
+  readonly followCheckSupported = true;
+
   /** URLs passed to `openStorePage`, in call order (for assertions). */
   readonly openedUrls: string[] = [];
   /** Number of `isFollowing` calls (for re-verification assertions). */
@@ -225,7 +238,8 @@ export type UnlockReason =
   | 'follow-confirmed'
   | 'not-following'
   | 'steam-unavailable'
-  | 'config-missing';
+  | 'config-missing'
+  | 'manual-claim';
 
 export interface UnlockResult {
   unlocked: boolean;
@@ -308,6 +322,39 @@ export class SteamFollowService {
   async openFollowPage(): Promise<boolean> {
     if (!this.config || !this.source.isSteamAvailable()) return false;
     return this.source.openStorePage(this.config.storeUrl);
+  }
+
+  /**
+   * Whether automatic follow detection is available on this source. When
+   * `false`, the UI offers `claimManually()` instead (see F1 finding).
+   */
+  supportsAutomaticFollowCheck(): boolean {
+    return this.source.followCheckSupported !== false;
+  }
+
+  /**
+   * Self-attest fallback used when the Steamworks binding exposes no
+   * `ISteamFriends::IsFollowing` call: the player confirms they followed after
+   * the store page opened. Persists exactly like an automatic unlock.
+   */
+  async claimManually(): Promise<UnlockResult> {
+    const existing = await this.store.load();
+    if (existing?.unlocked) {
+      return { unlocked: true, chosenGameId: existing.chosenGameId, reason: 'already-unlocked' };
+    }
+    if (!this.config) {
+      return { unlocked: false, chosenGameId: null, reason: 'config-missing' };
+    }
+    if (!this.catalog || !resolveBonusGame(this.catalog)) {
+      return { unlocked: false, chosenGameId: null, reason: 'config-missing' };
+    }
+    const unlock: UnlockState = {
+      unlocked: true,
+      chosenGameId: this.catalog.bonusGameId,
+      unlockedAt: new Date().toISOString(),
+    };
+    await this.store.save(unlock);
+    return { unlocked: true, chosenGameId: unlock.chosenGameId, reason: 'manual-claim' };
   }
 
   /** Release the underlying Steam session. */

@@ -32,7 +32,8 @@
     "package:win": "npm run build:electron && npm run build:electron-main && electron-builder --win --publish never",
     "package:linux": "npm run build:electron && npm run build:electron-main && electron-builder --linux --publish never",
     "package:mac": "npm run build:electron && npm run build:electron-main && electron-builder --mac --publish never",
-    "balance:drift-report": "vite-node ../tce-main-street/src/scripts/balance/drift-report.ts"
+    "balance:drift-report": "vite-node ../tce-main-street/src/scripts/balance/drift-report.ts",
+    "package:steam": "node scripts/check-steamworks.mjs && npm run build:electron && npm run build:electron-main && electron-builder --win --publish never"
   },
   "dependencies": {
     "@types/semver": "^7.8.0",

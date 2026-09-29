@@ -25,6 +25,7 @@ import {
   SteamFollowService,
   resolveBonusGame,
   type BonusCatalog,
+  type FollowSource,
 } from '../../electron/steam-follow';
 import type { SteamConfig } from '../../electron/steam-config';
 
@@ -194,6 +195,43 @@ describe('SteamFollowService.openFollowPage()', () => {
 
     expect(await service.openFollowPage()).toBe(false);
     expect(source.openedUrls).toEqual([]);
+  });
+});
+
+describe('SteamFollowService manual claim fallback', () => {
+  /** A source that reports available but has no SDK follow-detection API. */
+  const noDetectionSource: FollowSource = {
+    init: async () => 'available',
+    isSteamAvailable: () => true,
+    openStorePage: async () => true,
+    isFollowing: async () => false,
+    followCheckSupported: false,
+    close: () => {},
+  };
+
+  it('reports no automatic follow check', () => {
+    const service = new SteamFollowService(noDetectionSource, new MemoryUnlockStore(), makeCatalog('feudalism'), CONFIG);
+    expect(service.supportsAutomaticFollowCheck()).toBe(false);
+  });
+
+  it('unlocks the designated bonus on a manual claim and persists it', async () => {
+    const store = new MemoryUnlockStore();
+    const service = new SteamFollowService(noDetectionSource, store, makeCatalog('feudalism'), CONFIG);
+    const result = await service.claimManually();
+    expect(result).toEqual({ unlocked: true, chosenGameId: 'feudalism', reason: 'manual-claim' });
+    expect((await store.load())?.chosenGameId).toBe('feudalism');
+  });
+
+  it('is idempotent — a second manual claim reports already-unlocked', async () => {
+    const store = new MemoryUnlockStore();
+    const service = new SteamFollowService(noDetectionSource, store, makeCatalog('feudalism'), CONFIG);
+    await service.claimManually();
+    expect((await service.claimManually()).reason).toBe('already-unlocked');
+  });
+
+  it('reports config-missing when no bonus is configured', async () => {
+    const service = new SteamFollowService(noDetectionSource, new MemoryUnlockStore(), null, CONFIG);
+    expect((await service.claimManually()).reason).toBe('config-missing');
   });
 });
 

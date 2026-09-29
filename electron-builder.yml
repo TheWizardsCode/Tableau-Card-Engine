@@ -22,12 +22,26 @@ directories:
 # The packaged app loads its content from inside the asar (see
 # electron/content-locator.ts: bundledDir = <asar>/dist). The renderer and
 # Phaser are fully bundled into dist/ by Vite, and the Electron runtime is
-# provided by electron-builder — so no node_modules are needed at runtime.
+# provided by electron-builder — so no node_modules are needed at runtime,
+# with one exception: the optional Steamworks native module (F3,
+# CG-0MSMAJQQT004SDCC).
+#
+# `steamworks.js` is NOT a package.json dependency (installing it requires a
+# native build and must not break non-Steam dev/CI installs). A Steam build
+# installs it explicitly (`npm install steamworks.js`) before packaging; the
+# globs below then pick it up and unpack the native binaries from the asar so
+# the Steam client can load them. Without it the launcher still runs — the
+# Steam feature degrades gracefully (intake AC5).
 files:
   - dist/**
   - dist-electron/**
   - package.json
-  - '!node_modules/**'
+  - 'node_modules/steamworks.js/**'
+  - '!node_modules/!(steamworks.js)/**'
+
+# Native .node/.dll artefacts cannot be loaded from inside an asar archive.
+asarUnpack:
+  - 'node_modules/steamworks.js/dist/**'
 
 asar: true
 
