@@ -503,27 +503,48 @@ Two mitigations are in place in this repository:
      retry window (30s) that leaves headroom under the test's total budget.
      Re-dispatch is safe because the interaction handler no-ops once the
      phase has moved.
-   - **Wait for a real animation frame before dispatching a pointer
-     gesture** (CG-0MUA7RRXL007GEHW): interactive game objects rebuilt by a
-     refresh (`refreshAll`/`refreshStreetGrid`) are queued in Phaser's
+   - **Step the game loop directly before dispatching a pointer gesture**
+     (CG-0MUA7RRXL007GEHW, superseded for Main Street by
+     CG-0MUE2U21C0007BKL): interactive game objects rebuilt by a refresh
+     (`refreshAll`/`refreshStreetGrid`) are queued in Phaser's
      `_pendingInsertion` and only registered with the input system during
-     `InputPlugin.preUpdate`, which runs on the game loop's RAF tick — never
-     from a `setTimeout`. A drag started after the refresh but before that
-     tick lands on a not-yet-registered hit zone, so the gesture is silently
-     dropped and the drop never fires (observed as a `waitForCondition`
-     timeout waiting for the transfer animation in
-     `tests/main-street/upgrade-drag-drop.browser.test.ts`). Gesture helpers
-     therefore await two `requestAnimationFrame` callbacks (`waitForFrames()`)
-     before the first `mousedown`, matching the established pattern in
-     `tests/main-street/expanded-viewport.browser.test.ts`.
-   - **Poll frame-gated waits on `requestAnimationFrame`**: a helper that
-     waits for the game loop to reach a state (e.g. `waitForCondition` in
-     `tests/main-street/upgrade-drag-drop.browser.test.ts`) yields to the
-     browser's animation-frame loop on every poll rather than a bare
-     `setTimeout`, so the RAF-driven `InputPlugin.preUpdate` step that
-     dispatches the queued `drop` handler is guaranteed to run. Bare
-     `setTimeout` polling can starve for seconds under concurrent-suite
-     contention even when the timeout budget is large.
+     `InputPlugin.preUpdate`, which runs on the game loop's tick — never from
+     a `setTimeout`. Under concurrent full-suite runs that tick is driven by
+     `requestAnimationFrame`, which can be starved for seconds; a drag started
+     after the refresh but before the tick lands on a not-yet-registered hit
+     zone, so the gesture is silently dropped and the drop never fires
+     (observed as a `waitForCondition` timeout waiting for the transfer
+     animation in `tests/main-street/upgrade-drag-drop.browser.test.ts`).
+     Rather than awaiting animation frames (the superseded
+     await-a-frame-before-gesture pattern, which no longer exists in the
+     tree), gesture helpers step the Phaser loop synchronously with
+     `TimeStep.step(time)` (`scene.game.loop.step(now + deltaMs)`) before the
+     first `mousedown` —
+     see `stepGame()` in `tests/main-street/upgrade-drag-drop.browser.test.ts`
+     and `tests/main-street/market-deal-in.browser.test.ts`. A complete step
+     runs input pre-update, tweens and rendering on demand, so the pending
+     insertions flush regardless of frame availability. The same
+     manual-stepping remedy is used by sibling game suites for the identical
+     “rAF does not fire consistently in headless Chromium” problem (e.g.
+     `BeleagueredCastleLayout.browser.test.ts` in the sibling
+     `tce-beleaguered-castle` repo steps tweens with `scene.tweens.tick()`).
+   - **Poll frame-gated waits by stepping the loop**: a helper that waits for
+     the game loop to reach a state (e.g. `waitForCondition` in
+     `tests/main-street/upgrade-drag-drop.browser.test.ts`) steps the loop on
+     every poll (with a short `setTimeout` yield to avoid a busy spin) rather
+     than awaiting `requestAnimationFrame`, so the polls make progress even
+     when no animation frame is granted. Bare rAF polling can starve for
+     seconds under concurrent-suite contention even when the timeout budget is
+     large.
+   - **Tear down Phaser games synchronously**
+     (`@core-tests/helpers/phaserCanvasPool`): `game.destroy()` only sets
+     `pendingDestroy`; the real teardown (renderer, tweens, input, loop) runs
+     on the next game-loop frame, which contention can delay for seconds, so
+     the previous test's loop lingers and competes with the current one for
+     frames — the same starvation that stops `InputPlugin.preUpdate`. Browser
+     suites booting one game per test call `destroyPhaserGame()`, which runs
+     `runDestroy()` synchronously and then drains Phaser's global
+     `CanvasPool`, freeing each canvas context immediately.
    - **Deterministic boot conditions**: tests that assume a buyable market
      card at boot set generous coins (e.g. `resourceBank.coins = 100`)
      rather than relying on the random seed's initial market draw — the
