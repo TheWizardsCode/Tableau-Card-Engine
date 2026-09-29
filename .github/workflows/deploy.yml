@@ -36,8 +36,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The core repo carries no games at HEAD (multi-repo architecture); the
+      # distribution composes the game repos as siblings. Each preset entry's
+      # `path` (e.g. `../tce-golf`) is exactly where the Vite discovery plugin
+      # looks, so `configs/full.json` is the single source of truth for the
+      # composed set. The game repos are public, so the clone needs no
+      # credentials; their own `./core` submodule is not needed here because
+      # the launcher resolves core aliases locally. Mirrors package.yml.
+      - name: Compose sibling game repositories
+        shell: bash
+        run: |
+          set -euo pipefail
+          for repo in $(node -e "for (const g of require('./configs/full.json').games) console.log(g.path)"); do
+            git clone --depth 1 "https://github.com/TheWizardsCode/${repo#../}.git" "$repo"
+          done
+
       - name: Build
-        run: npm run build
+        # Pin the all-games preset (configs/full.json). Without GAMES_CONFIG the
+        # game-discovery plugin defaults to `core-only`, which would publish the
+        # Gym only and silently drop the eight example games.
+        run: GAMES_CONFIG=full npm run build
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
