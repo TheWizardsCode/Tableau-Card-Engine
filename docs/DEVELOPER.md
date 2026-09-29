@@ -297,6 +297,80 @@ TCE_CONTENT_DIR=/path/to/dlc npm run start:electron
 
 The resolution lives in `electron/content-locator.ts` (pure Node, unit-tested) behind the `ContentDirectoryProvider` interface, so a future Steamworks-backed provider (option b, programmatic DLC management) can be added without changing the launcher's load path. Missing/invalid directories are rejected with a structured `ContentLocatorError` (clear message + exit code).
 
+### Steam follow-to-unlock (Steamworks)
+
+The launcher has a growth mechanic: following the developer on Steam unlocks a
+bundled bonus game (intake `CG-0MSMAJQQT004SDCC`). The mechanism is entirely
+optional — the launcher builds and runs with no Steam client and no native
+module (graceful degradation).
+
+**Modules** (all pure Node unless noted, and unit-tested under `tests/steam-follow/`):
+
+| Module | Responsibility |
+|--------|----------------|
+| `electron/steam-config.ts` | Load private credentials (env or gitignored JSON). Returns `null` when absent. |
+| `electron/steam-follow.ts` | `FollowSource` interface, `SteamFollowService` (game-agnostic unlock + persistence), `FileUnlockStore`, `FakeFollowSource`. |
+| `electron/steam-follow-steamworks.ts` | Real `SteamworksFollowSource`; dynamically imports the optional `steamworks.js`, capability-detects follow detection. |
+| `electron/steam-follow-ipc.ts` | Channel names + handler table (pure) wired to `ipcMain` in `main.ts`. |
+| `electron/bonus-catalog.ts` + `electron/bonus-catalog.json` | Config-driven bonus catalog; `bonusGameId` designates the unlocked game. |
+| `src/ui/steam-follow-client.ts` | Renderer client over the `window.tce.steamFollow` bridge (never imports the SDK). |
+| `src/ui/steam-lock.ts` | Pure lock computation for the Game Selector (`computeSteamLocks` / `applySteamLocks`). |
+
+**Private credentials (never committed).** The Steam App ID and the
+developer's SteamID64 are read from, in priority order:
+
+1. Environment variables `TCE_STEAM_APP_ID` / `TCE_STEAM_DEVELOPER_STEAM_ID`.
+2. `electron/steam-config.local.json` (**gitignored**):
+
+   ```json
+   { "app_id": "<appid>", "developer_steam_id": "7656119..." }
+   ```
+
+3. `electron/steam-config.example.json` (committed, placeholder-only) for reference.
+
+The Steamworks bootstrap also honours `steam_appid.txt` (the SDK convention) via
+`loadSteamAppId({ appRoot })`. `steam_appid.txt` and the local config must never
+be committed.
+
+**Building a Steam binary.** `steamworks.js` is intentionally **not** a
+`package.json` dependency (it is a native module; ordinary installs/CI must not
+need a native build). A Steam build installs it explicitly and uses the Steam
+package script:
+
+```bash
+npm install steamworks.js   # optional native module (once)
+npm run package:steam        # checks for steamworks.js, then Windows NSIS package
+```
+
+`scripts/check-steamworks.mjs` fails early with actionable guidance when the
+module is missing. `electron-builder.yml` packs `node_modules/steamworks.js/**`
+and unpacks its native `dist/**` from the asar. A non-Steam build uses
+`npm run package` and needs none of this.
+
+**Follow detection — capability finding.** The chosen mechanism is
+`ISteamFriends::IsFollowing(developerSteamID)`, but `steamworks.js` 0.4.0 does
+**not** expose a `friends` namespace, so automatic detection is unavailable with
+the stock binding. `SteamworksFollowSource` therefore capability-detects:
+`followCheckSupported` is `false`, the UI offers a persisted **manual claim**
+instead, and the launcher never fabricates a follow. The store page still opens
+through the real SDK (`overlay.activateToStore` / `activateToWebPage`). A custom
+native addon / newer binding that exposes `friends.isFollowing` is tracked as
+follow-up `CG-0MUN7930Y009X8Z1` and needs no TypeScript change here.
+
+**Bridge API** (`window.tce.steamFollow`, exposed by `electron/preload.cjs`):
+`getStatus`, `isSteamAvailable`, `supportsAutomaticFollowCheck`,
+`getBonusCatalog`, `openStorePage`, `isFollowing`, `claim`, `claimManually`.
+The main process owns the only concrete source; the renderer never imports the
+SDK.
+
+**Game-list gating.** The catalogue (`electron/bonus-catalog.json`) lists the
+bundled games; `bonusGameId` is unlocked on a confirmed follow and the other
+listed games render locked ("Reserved for a future milestone"). Games absent
+from the catalogue are base content and never locked. In a plain browser there
+is no bridge, so nothing is locked and the web app stays fully functional.
+
+**Manual real-Steam QA:** see [Steam follow-to-unlock — manual E2E QA](dev/steam-follow-qa.md).
+
 ### Electron smoke test
 
 The Playwright-Electron launch test (`tests/electron/launch-smoke.test.ts`) launches the real Electron app and asserts the Game Selector renders, the preload bridge is exposed, and clicking a selector card boots a game scene. It runs in its own vitest project so it never slows the regular suites:

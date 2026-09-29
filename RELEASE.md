@@ -104,6 +104,17 @@ A second workflow, `.github/workflows/package.yml`, runs on every push to `main`
 
 Windows is the primary Steam target; this is how the binary is produced reproducibly without a Windows dev machine. The GitHub Pages deploy workflow is unaffected by this job. To produce the artifact for a manual release, run the workflow from the Actions tab (Run workflow) or push a `v*` tag.
 
+Steam build (follow-to-unlock native module)
+--------------------------------------------
+`steamworks.js` is an **optional** native module, intentionally not a `package.json` dependency so ordinary installs and CI never need a native build. To produce a binary with Steam follow-to-unlock support:
+
+```bash
+npm install steamworks.js   # once, on the packaging machine
+npm run package:steam        # checks for steamworks.js, then Windows NSIS package
+```
+
+`scripts/check-steamworks.mjs` fails the build early with actionable guidance when the module is missing. `electron-builder.yml` packs `node_modules/steamworks.js/**` and unpacks its native `dist/**` from the asar. Private credentials (Steam App ID, developer SteamID64) come from a **gitignored** `electron/steam-config.local.json` or the `TCE_STEAM_APP_ID` / `TCE_STEAM_DEVELOPER_STEAM_ID` env vars — never committed. Without the native module the non-Steam `npm run package:win` build still works; the follow feature degrades gracefully. See [Steam follow-to-unlock — manual E2E QA](docs/dev/steam-follow-qa.md) for the real-account verification checklist.
+
 If you want help
 ----------------
 I can:

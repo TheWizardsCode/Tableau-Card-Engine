@@ -67,6 +67,7 @@ npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
 npm run start:electron   # Build + launch the Electron desktop app locally
 npm run package          # Package a desktop binary for the host platform (package:win/linux/mac variants)
+npm run package:steam    # Steam build: requires `npm install steamworks.js` first (Windows NSIS)
 ```
 
 ### Quality Gates
@@ -488,6 +489,41 @@ banner never appears mid-animation (CG-0MTR72P14000VO6Q).
 - **When to use:** any end-of-turn (or similar resource-payout) presentation
   where the HUD must not jump before the visual feedback lands. Keep reduced
   motion and the tutorial on the immediate path (they defer nothing).
+
+### 20. Optional Native Integrations Behind an Interface (Steamworks)
+
+Integrate optional native/desktop features (Steamworks, OS services) **behind a
+pure-Node interface with a deterministic fake**, so the app builds and runs
+without the native dependency and the logic is unit-testable with no client.
+The TCE launcher's Steam follow-to-unlock mechanic is the canonical example
+(`CG-0MSMAJQQT004SDCC`).
+
+- **Modules:** `electron/steam-follow.ts` (the `FollowSource` interface,
+  `SteamFollowService`, `FileUnlockStore`, `FakeFollowSource`),
+  `electron/steam-follow-steamworks.ts` (the real adapter; dynamically imports
+  the optional `steamworks.js`), `electron/steam-follow-ipc.ts` (pure handler
+  table over the context bridge).
+- **When to use:** any feature that depends on something not guaranteed to be
+  present at runtime (a Steam client, a native module, a desktop API). Define
+  the seam as an interface, ship a fake, and make every path total — return a
+  safe value rather than throwing when the dependency is absent.
+- **Graceful degradation:** the native module is **not** a `package.json`
+  dependency; a `package:steam` script (`scripts/check-steamworks.mjs`) requires
+  it explicitly, and the launcher degrades to a hidden/fallback CTA when it is
+  missing (never a crash).
+- **Private credentials are never committed:** Steam App ID / developer
+  SteamID64 come from env vars or a gitignored `electron/steam-config.local.json`,
+  with a placeholder `steam-config.example.json` documenting the shape.
+- **Game-agnostic config:** the unlock target is data
+  (`electron/bonus-catalog.json` → `bonusGameId`), never a hard-coded title;
+  `computeSteamLocks()` / `applySteamLocks()` gate the Game Selector from that
+  config + the follow status.
+- **Manual real-account QA:** see
+  [`docs/dev/steam-follow-qa.md`](docs/dev/steam-follow-qa.md).
+- **Known limitation:** the stock `steamworks.js` binding exposes no
+  `ISteamFriends::IsFollowing`; automatic follow detection is capability-detected
+  and falls back to a persisted manual claim (follow-up
+  `CG-0MUN7930Y009X8Z1`).
 
 ### Scene Base Class Pattern
 

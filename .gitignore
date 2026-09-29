@@ -130,3 +130,6 @@ Worklog Specific Ignores
 # Private Steam credentials for the launcher — never commit (see
 # electron/steam-config.example.json for the shape).
 electron/steam-config.local.json
+
+# Steamworks SDK bootstrap file (real app id) — never commit.
+steam_appid.txt
