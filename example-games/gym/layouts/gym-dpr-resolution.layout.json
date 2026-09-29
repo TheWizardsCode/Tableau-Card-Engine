@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "id": "gym-dpr-resolution-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "panels",
+    "controls",
+    "log"
+  ],
+  "zones": {
+    "panels": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.4
+      },
+      "anchors": {
+        "left": { "x": 0.2, "y": 0.4 },
+        "middle": { "x": 0.5, "y": 0.4 },
+        "right": { "x": 0.8, "y": 0.4 }
+      }
+    },
+    "controls": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.115
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.115 }
+      }
+    },
+    "log": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.82
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.82 }
+      }
+    }
+  }
+}
