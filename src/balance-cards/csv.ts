@@ -32,6 +32,13 @@ export interface CsvRow {
   handSlotsAdded?: string;
   refreshCostDiscount?: string;
   actionsPerTurn?: string;
+  /**
+   * Optional flat coin discount applied to buying an upgrade for the
+   * business where the staff member is employed (e.g. the Financial
+   * Advisor's "upgrade costs 100 less" ability). Parsed from the
+   * `upgradeCostDiscount` column added by CG-0MTKMGL66004I0PC.
+   */
+  upgradeCostDiscount?: string;
 }
 
 export const CSV_COLUMNS: readonly string[] = [
@@ -41,7 +48,7 @@ export const CSV_COLUMNS: readonly string[] = [
   'targetSynergy', 'coinDelta', 'reputationDelta', 'duration', 'effectType',
   'multiplier', 'targetBusiness', 'incomeBonus', 'synergyRangeBonus',
   'requiredLevel', 'reputationBonus', 'newDisplayName', 'ongoingCost', 'handSlotsAdded',
-  'refreshCostDiscount', 'actionsPerTurn', 'peekOncePerTurn',
+  'refreshCostDiscount', 'actionsPerTurn', 'peekOncePerTurn', 'upgradeCostDiscount',
 ];
 
 export const NUMERIC_COLUMNS: readonly string[] = [
@@ -49,7 +56,7 @@ export const NUMERIC_COLUMNS: readonly string[] = [
   'ongoingCost', 'reputationPerTurn', 'reputationBonus', 'synergyCoinBonus',
   'synergyRepBonus', 'synergyRangeBonus', 'requiredLevel', 'handSlotsAdded',
   'refreshCostDiscount', 'actionsPerTurn', 'maxLevel', 'duration', 'multiplier',
-  'peekOncePerTurn',
+  'peekOncePerTurn', 'upgradeCostDiscount',
 ];
 
 function parseCsvLine(line: string): string[] {
