@@ -173,7 +173,7 @@ async function initSteamFollow(): Promise<void> {
 
   const store = new FileUnlockStore(path.join(app.getPath('userData'), 'steam-unlock.json'));
   const service = new SteamFollowService(source, store, catalog, config);
-  const handlers = createSteamFollowHandlers(service, source, config);
+  const handlers = createSteamFollowHandlers(service, source, config, catalog);
 
   for (const [name, channel] of Object.entries(STEAM_FOLLOW_CHANNELS)) {
     const handler = handlers[name as keyof typeof handlers];

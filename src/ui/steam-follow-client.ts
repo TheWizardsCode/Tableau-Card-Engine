@@ -1,5 +1,5 @@
 /**
- * Renderer-side client for the Steam follow/unlock bridge (F3/F5,
+ * Renderer-side client for the Steam follow/unlock bridge (F3/F4/F5,
  * CG-0MSMAJQQT004SDCC).
  *
  * The renderer NEVER imports the Steamworks SDK. It talks to the main process
@@ -9,6 +9,7 @@
  *
  * The bridge is injectable so the client can be unit-tested without Electron.
  */
+import type { BonusCatalogLike } from './steam-lock';
 
 /** Unlock status shape shared with the main process. */
 export type SteamFollowStatus =
@@ -36,6 +37,8 @@ export interface SteamFollowBridge {
   getStatus(): Promise<SteamFollowStatus>;
   isSteamAvailable(): Promise<boolean>;
   supportsAutomaticFollowCheck(): Promise<boolean>;
+  /** The config-driven bonus catalog, or null when Steam is not available. */
+  getBonusCatalog(): Promise<BonusCatalogLike | null>;
   openStorePage(): Promise<boolean>;
   isFollowing(): Promise<boolean>;
   claim(): Promise<SteamUnlockResult>;
@@ -47,6 +50,7 @@ export interface SteamFollowClient {
   getStatus(): Promise<SteamFollowStatus>;
   isSteamAvailable(): Promise<boolean>;
   supportsAutomaticFollowCheck(): Promise<boolean>;
+  getBonusCatalog(): Promise<BonusCatalogLike | null>;
   /** Open the store page. Falls back to opening *fallbackUrl* in a new tab. */
   openStorePage(fallbackUrl?: string): Promise<boolean>;
   isFollowing(): Promise<boolean>;
@@ -59,6 +63,7 @@ export function createSteamFollowClient(bridge: SteamFollowBridge): SteamFollowC
     getStatus: () => bridge.getStatus(),
     isSteamAvailable: () => bridge.isSteamAvailable(),
     supportsAutomaticFollowCheck: () => bridge.supportsAutomaticFollowCheck(),
+    getBonusCatalog: () => bridge.getBonusCatalog(),
     async openStorePage(fallbackUrl?: string): Promise<boolean> {
       const openedInSteam = await bridge.openStorePage();
       if (openedInSteam) return true;

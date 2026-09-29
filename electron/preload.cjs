@@ -36,6 +36,7 @@ const steamFollow = {
   getStatus: () => ipcRenderer.invoke('steamFollow:getStatus'),
   isSteamAvailable: () => ipcRenderer.invoke('steamFollow:isSteamAvailable'),
   supportsAutomaticFollowCheck: () => ipcRenderer.invoke('steamFollow:supportsAutomaticFollowCheck'),
+  getBonusCatalog: () => ipcRenderer.invoke('steamFollow:getBonusCatalog'),
   openStorePage: () => ipcRenderer.invoke('steamFollow:openStorePage'),
   isFollowing: () => ipcRenderer.invoke('steamFollow:isFollowing'),
   claim: () => ipcRenderer.invoke('steamFollow:claim'),

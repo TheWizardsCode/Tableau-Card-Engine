@@ -40,7 +40,7 @@ function makeHandlers(options: { following?: boolean; available?: boolean; confi
   const store = new MemoryUnlockStore();
   const config = options.config === undefined ? CONFIG : options.config;
   const service = new SteamFollowService(source, store, CATALOG, config);
-  return { handlers: createSteamFollowHandlers(service, source, config), source, store };
+  return { handlers: createSteamFollowHandlers(service, source, config, CATALOG), source, store };
 }
 
 describe('STEAM_FOLLOW_CHANNELS', () => {
@@ -111,5 +111,10 @@ describe('createSteamFollowHandlers()', () => {
   it('supportsAutomaticFollowCheck reflects the source capability', async () => {
     const { handlers } = makeHandlers();
     expect(await handlers.supportsAutomaticFollowCheck()).toBe(true);
+  });
+
+  it('getBonusCatalog returns the configured catalog (for the lock UI)', async () => {
+    const { handlers } = makeHandlers();
+    expect(await handlers.getBonusCatalog()).toEqual(CATALOG);
   });
 });

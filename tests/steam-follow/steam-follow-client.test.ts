@@ -18,6 +18,7 @@ function makeBridge(overrides: Partial<SteamFollowBridge> = {}): SteamFollowBrid
     getStatus: vi.fn(async () => ({ state: 'locked' as const })),
     isSteamAvailable: vi.fn(async () => true),
     supportsAutomaticFollowCheck: vi.fn(async () => true),
+    getBonusCatalog: vi.fn(async () => null),
     openStorePage: vi.fn(async () => true),
     isFollowing: vi.fn(async () => false),
     claim: vi.fn(async () => ({ unlocked: true, chosenGameId: 'feudalism', reason: 'follow-confirmed' as const })),
@@ -34,6 +35,7 @@ describe('createSteamFollowClient()', () => {
     expect(await client.getStatus()).toEqual({ state: 'locked' });
     expect(await client.isSteamAvailable()).toBe(true);
     expect(await client.supportsAutomaticFollowCheck()).toBe(true);
+    expect(await client.getBonusCatalog()).toBeNull();
     expect(await client.isFollowing()).toBe(false);
     expect((await client.claim()).reason).toBe('follow-confirmed');
     expect((await client.claimManually()).reason).toBe('manual-claim');

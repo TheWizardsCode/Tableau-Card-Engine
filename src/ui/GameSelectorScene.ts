@@ -25,6 +25,13 @@ export interface GameEntry {
   description: string;
   /** Optional Phaser asset key for a thumbnail image shown on the card. */
   thumbnail?: string;
+  /**
+   * When true, the card renders locked and cannot be started (Steam bonus
+   * gating — see `steam-lock.ts`).
+   */
+  locked?: boolean;
+  /** Explains how to unlock a locked card. */
+  lockMessage?: string;
 }
 
 // ── Constants ──────────────────────────────────────────────
@@ -45,6 +52,13 @@ const CARD_BG = 0x1a3a1a;
 const CARD_BG_HOVER = 0x2a5a2a;
 const CARD_BORDER = 0x4a8a4a;
 const CARD_BORDER_HOVER = 0x88ff88;
+/** Locked-card palette (dimmed, no interaction highlight). */
+const LOCKED_CARD_BG = 0x141d16;
+const LOCKED_CARD_BG_HOVER = 0x1c281e;
+const LOCKED_CARD_BORDER = 0x3a4a3a;
+const LOCKED_TITLE = '#7f9a7f';
+const LOCKED_LABEL = '#668866';
+const LOCK_MESSAGE_COLOR = '#c9a65a';
 
 /** Thumbnail dimensions (16:9 aspect ratio, fits within card right side). */
 const THUMB_W = 120;
@@ -242,7 +256,12 @@ export class GameSelectorScene extends Phaser.Scene {
     entry: GameEntry,
   ): void {
     const bg = this.add.graphics();
-    this.drawCard(bg, x, y, cardW, cardH, CARD_BG, CARD_BORDER);
+    const locked = entry.locked === true;
+    const idleBg = locked ? LOCKED_CARD_BG : CARD_BG;
+    const idleBorder = locked ? LOCKED_CARD_BORDER : CARD_BORDER;
+    const hoverBg = locked ? LOCKED_CARD_BG_HOVER : CARD_BG_HOVER;
+    const hoverBorder = locked ? CARD_BORDER : CARD_BORDER_HOVER;
+    this.drawCard(bg, x, y, cardW, cardH, idleBg, idleBorder);
 
     const showThumb = this.hasThumbnail(entry);
 
@@ -258,7 +277,7 @@ export class GameSelectorScene extends Phaser.Scene {
     const title = this.add
       .text(x, y - cardH / 2 + 28, entry.title, {
         fontSize: '18px',
-        color: '#ffffff',
+        color: locked ? LOCKED_TITLE : '#ffffff',
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
         align: 'center',
@@ -293,15 +312,28 @@ export class GameSelectorScene extends Phaser.Scene {
       thumb.setDisplaySize(THUMB_W, THUMB_H);
     }
 
-    // Play button
+    // Play button (a locked card shows a lock action that does nothing)
     const playBtn = this.add
-      .text(x, y + cardH / 2 - 22, '[ Play ]', {
+      .text(x, y + cardH / 2 - 22, locked ? '[ Locked ]' : '[ Play ]', {
         fontSize: '14px',
-        color: '#88ff88',
+        color: locked ? LOCKED_LABEL : '#88ff88',
         fontFamily: FONT_FAMILY,
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
+
+    // Lock message (locked cards only): explains how to unlock the game.
+    if (locked && entry.lockMessage) {
+      this.add
+        .text(x, y + cardH / 2 - 44, `🔒 ${entry.lockMessage}`, {
+          fontSize: '11px',
+          color: LOCK_MESSAGE_COLOR,
+          fontFamily: FONT_FAMILY,
+          align: 'center',
+          wordWrap: { width: cardW - 32 },
+        })
+        .setOrigin(0.5, 1);
+    }
 
     // Interactive hit area
     const hitZone = this.add
@@ -310,19 +342,21 @@ export class GameSelectorScene extends Phaser.Scene {
 
     hitZone.on('pointerover', () => {
       bg.clear();
-      this.drawCard(bg, x, y, cardW, cardH, CARD_BG_HOVER, CARD_BORDER_HOVER);
-      title.setColor('#aaffaa');
-      playBtn.setColor('#aaffaa');
+      this.drawCard(bg, x, y, cardW, cardH, hoverBg, hoverBorder);
+      title.setColor(locked ? LOCK_MESSAGE_COLOR : '#aaffaa');
+      playBtn.setColor(locked ? LOCK_MESSAGE_COLOR : '#aaffaa');
     });
 
     hitZone.on('pointerout', () => {
       bg.clear();
-      this.drawCard(bg, x, y, cardW, cardH, CARD_BG, CARD_BORDER);
-      title.setColor('#ffffff');
-      playBtn.setColor('#88ff88');
+      this.drawCard(bg, x, y, cardW, cardH, idleBg, idleBorder);
+      title.setColor(locked ? LOCKED_TITLE : '#ffffff');
+      playBtn.setColor(locked ? LOCKED_LABEL : '#88ff88');
     });
 
     hitZone.on('pointerdown', () => {
+      // A locked card never starts its scene; the lock message explains why.
+      if (locked) return;
       this.scene.start(entry.sceneKey);
     });
   }

@@ -20,12 +20,28 @@
  */
 import Phaser from 'phaser';
 import { createCardGame } from './src/ui/createCardGame';
-import { GameSelectorScene, REGISTRY_KEY_GAMES } from './src/ui/GameSelectorScene';
+import { GameSelectorScene, REGISTRY_KEY_GAMES, type GameEntry } from './src/ui/GameSelectorScene';
+import { steamFollowClientFromWindow } from './src/ui/steam-follow-client';
+import { applySteamLocks, computeSteamLocks } from './src/ui/steam-lock';
 import { GAMES, SCENES } from 'virtual:game-registry';
 
 export { GAMES };
 
-// ── Phaser boot ────────────────────────────────────────────
+// ── Steam bonus locks (F4, CG-0MSMAJQQT004SDCC) ─────────────
+//
+// In the Electron launcher the bonus catalog + follow status decide which
+// games render locked. In a plain browser there is no bridge, so every game
+// stays playable (intake AC5). Any failure degrades to "no locks".
+async function resolveSteamGatedGames(): Promise<GameEntry[]> {
+  const client = steamFollowClientFromWindow();
+  if (!client) return GAMES;
+  try {
+    const [status, catalog] = await Promise.all([client.getStatus(), client.getBonusCatalog()]);
+    return applySteamLocks(GAMES, computeSteamLocks(GAMES, catalog, status));
+  } catch {
+    return GAMES;
+  }
+}
 
 // In replay mode we need `preserveDrawingBuffer: true` so that
 // `canvas.toDataURL()` returns real content.  Without this flag
@@ -33,19 +49,32 @@ export { GAMES };
 // and toDataURL() returns a black image.
 const isReplayMode = new URLSearchParams(window.location.search).get('mode') === 'replay';
 
-createCardGame({
-  backgroundColor: '#1a2a1a',
-  // Register all discovered scenes; GameSelectorScene is first so it
-  // auto-starts.
-  scenes: [GameSelectorScene, ...SCENES],
-  type: Phaser.CANVAS,
-  render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
-  callbacks: {
-    preBoot: (game: Phaser.Game) => {
-      // Store catalogue in registry before any scene starts,
-      // so GameSelectorScene.init() can read it.
-      game.registry.set(REGISTRY_KEY_GAMES, GAMES);
+/**
+ * Boot the selector once the (optional) Steam lock state has resolved.
+ *
+ * Top-level await is not an option — the Vite build target is ES2020 — so the
+ * async resolution is awaited inside this function and invoked with `void`.
+ */
+async function boot(): Promise<void> {
+  const gatedGames = await resolveSteamGatedGames();
+
+  createCardGame({
+    backgroundColor: '#1a2a1a',
+    // Register all discovered scenes; GameSelectorScene is first so it
+    // auto-starts.
+    scenes: [GameSelectorScene, ...SCENES],
+    type: Phaser.CANVAS,
+    render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
+    callbacks: {
+      preBoot: (game: Phaser.Game) => {
+        // Store catalogue in registry before any scene starts,
+        // so GameSelectorScene.init() can read it. Locked entries carry the
+        // Steam bonus lock state (see resolveSteamGatedGames above).
+        game.registry.set(REGISTRY_KEY_GAMES, gatedGames);
+      },
     },
-  },
-  exposeOnWindow: true,
-});
+    exposeOnWindow: true,
+  });
+}
+
+void boot();

@@ -9,6 +9,7 @@
  */
 import {
   SteamFollowService,
+  type BonusCatalog,
   type FollowSource,
   type FollowStatus,
   type UnlockResult,
@@ -20,6 +21,7 @@ export const STEAM_FOLLOW_CHANNELS = {
   getStatus: 'steamFollow:getStatus',
   isSteamAvailable: 'steamFollow:isSteamAvailable',
   supportsAutomaticFollowCheck: 'steamFollow:supportsAutomaticFollowCheck',
+  getBonusCatalog: 'steamFollow:getBonusCatalog',
   openStorePage: 'steamFollow:openStorePage',
   isFollowing: 'steamFollow:isFollowing',
   claim: 'steamFollow:claim',
@@ -31,6 +33,8 @@ export interface SteamFollowHandlers {
   getStatus(): Promise<FollowStatus>;
   isSteamAvailable(): Promise<boolean>;
   supportsAutomaticFollowCheck(): Promise<boolean>;
+  /** The config-driven bonus catalog (for the Game Selector lock state). */
+  getBonusCatalog(): Promise<BonusCatalog | null>;
   /** Open the store page. Returns `false` so the renderer can fall back. */
   openStorePage(): Promise<boolean>;
   /** Check the configured developer account follow state. */
@@ -51,11 +55,13 @@ export function createSteamFollowHandlers(
   service: SteamFollowService,
   source: FollowSource,
   config: SteamConfig | null,
+  catalog: BonusCatalog | null,
 ): SteamFollowHandlers {
   return {
     getStatus: () => service.getStatus(),
     isSteamAvailable: async () => source.isSteamAvailable(),
     supportsAutomaticFollowCheck: async () => service.supportsAutomaticFollowCheck(),
+    getBonusCatalog: async () => catalog,
     openStorePage: () => service.openFollowPage(),
     isFollowing: async () => {
       if (!config) return false;
