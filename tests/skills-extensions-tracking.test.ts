@@ -7,12 +7,14 @@ const repoRoot = join(__dirname, '..');
 /**
  * Return true when git considers *relativePath* ignored.
  *
- * `git check-ignore` exits 0 when the path matches an exclude rule and 1 when
- * it does not, so a non-zero exit is the "tracked / not ignored" signal.
+ * `git check-ignore --no-index --quiet` exits 0 when the path matches an
+ * exclude rule and 1 when it does not — `--no-index` is essential because
+ * without it `git check-ignore` never reports a tracked file as ignored,
+ * making the assertion vacuous (CG-0MUF6LBW600657B2).
  */
 function isGitIgnored(relativePath: string): boolean {
   try {
-    execSync(`git check-ignore ${relativePath}`, {
+    execSync(`git check-ignore --no-index --quiet ${relativePath}`, {
       stdio: 'ignore',
       cwd: repoRoot,
     });
