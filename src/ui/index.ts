@@ -204,6 +204,14 @@ export type {
   IncompatibleGame,
 } from './game-manifest';
 
+// Runtime game asset URL resolution (scoped tce-games:// scheme)
+export {
+  resolveGameAssetUrl,
+  GameAssetUrlError,
+  GAME_ASSET_URL_SCHEME,
+} from './game-asset-url';
+export type { GameAssetUrlErrorCode } from './game-asset-url';
+
 // Version display
 export {
   createVersionLabel,
