@@ -6,7 +6,9 @@ Read the global agent instructions at `~/.pi/agent/AGENTS.md` — they define th
 
 You are a producer for the Tableau Card Engine (TCE), a game engine designed to support building single-player tableau card games. Your primary goal is to create a fully modular and reusable engine. You achieve this through building increasingly complex card games and extracting reusable components from each.
 
-This project follows a **spike-driven development** approach: example games are built first to validate gameplay mechanics and engine APIs, then reusable components are extracted and refined into the shared engine modules. The project is organised as a **multi-repo distribution**: the engine + Gym + launcher shell live in the core-engine repo, each game is its own repo composed via git submodules, and the `Tableau-Card-Engine` repo is the launcher/distribution. See [Multi-Repo Architecture](docs/dev/multi-repo-architecture.md).
+This project follows a **spike-driven development** approach: example games are built first to validate gameplay mechanics and engine APIs, then reusable components are extracted and refined into the shared engine modules. The project is organised as a **multi-repo distribution**: the engine + Gym + launcher shell + distribution all live in the merged core repo (`Tableau-Card-Engine`); each example game is its own `tce-<game>` repo, checked out as a **sibling** (`../tce-<game>`) that composes the core as a git submodule at `./core`. The core never submodules games (that would be cyclic) and carries **no games at HEAD** except the Gym. See [Multi-Repo Architecture](docs/dev/multi-repo-architecture.md).
+
+**Cross-repo changes.** An agent working in the core repo **may and should** update the affected sibling `tce-<game>` repo(s) when an engine change requires it — editing code, running that repo's tests, building, committing, and pushing its `dev` branch (**never `main`**). Record the work in the game repo's own Worklog store when it has one; otherwise record the cross-repo change on the core work item. Per-repo gates are unchanged: build → test → commit, and `dev`-only pushes.
 
 ## Components
 
@@ -15,12 +17,13 @@ This project follows a **spike-driven development** approach: example games are 
 - **Rule Engine** (`src/rule-engine/`): A component that allows for the creation and enforcement of game rules, enabling complex gameplay mechanics, turn logic, and validation.
 - **AI** (`src/ai/`): Shared AI strategy abstractions and utility functions. Provides `AiStrategyBase` (base interface), `AiPlayer<TStrategy>` (generic player wrapper that binds a strategy to an RNG), `pickRandom<T>()` (uniform random selection), and `pickBest<T>()` (scored selection with random tie-breaking). Game-specific strategies extend the base types.
 - **User Interface** (`src/ui/`): A modular UI system with reusable components (buttons, menus, overlays) that can be customized and extended to fit different card game themes and styles.
-- **Example Games** (`tce-<game>` repos, composed as siblings): Sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests, and is **its own repository** (`tce-<game>`) that composes the merged core (`Tableau-Card-Engine`) as a `./core` git submodule; its source lives at repo-root `src/`. The core repo carries **no games at HEAD**. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features (including direct and composed Screen Layout Language (SLL) examples) and **stays in the core repo** — it is the canonical engine feature demonstrator.
+- **Example Games** (`tce-<game>` repos, checked out as siblings): Sample card games built using the engine, demonstrating its capabilities and serving as templates for future game development. Each example game has its own entry point, scenes, and tests, and is **its own repository** (`tce-<game>`) that composes the merged core (`Tableau-Card-Engine`) as a `./core` git submodule; its source lives at repo-root `src/`. The distribution composes the game repos as **sibling checkouts** (`../tce-<game>`) — the core never submodules games (that would be cyclic) — and the core carries **no games at HEAD**. The **Gym** (`example-games/gym/`) is a curated set of demo scenes that comprehensively showcase core-engine features (including direct and composed Screen Layout Language (SLL) examples) and **stays in the core repo** — it is the canonical engine feature demonstrator.
 
 ## Directory Structure
 
-The engine + Gym + launcher shell form the **core repo**; each game is its own
-`tce-<game>` repo that pulls the core in as a `./core` submodule. Repos are
+The engine + Gym + launcher shell + distribution form the **merged core repo**;
+each game is its own `tce-<game>` repo (checked out as a sibling) that pulls the
+core in as a `./core` submodule — the core never submodules games. Repos are
 siblings, composed by the launcher via `configs/*.json` presets (see
 [Multi-Repo Architecture](docs/dev/multi-repo-architecture.md)). The core repo
 carries **no games at HEAD**; the multi-game distribution composes the game
@@ -248,7 +251,7 @@ s.refreshAll();  // re-render the game state if it changed
 
 ### 6. Reference the sell dialog for a complete example
 
-The best reference implementation is `showSellConfirmation` in `example-games/main-street/scenes/MainStreetOverlayContent.ts`. It demonstrates:
+The best reference implementation is `showSellConfirmation` in `../tce-main-street/src/scenes/MainStreetOverlayContent.ts`. It demonstrates:
 - Using `createOverlayBackground` for the backdrop + box
 - Parenting all text and buttons into `hudContainer`
 - Using `createOverlayButton` for styled interactive buttons
@@ -278,10 +281,10 @@ Use `createSeededRng()` and `shuffleArray()` from `@core-engine` to produce dete
 
 **Documented exceptions:** Layouts that genuinely don't fit the single-row `HandView` model may keep bespoke card rendering, but only where the exception is documented in code comments and/or the scene's help text:
 
-- **Golf** — the 3×3 tableau grid (see the exception note in `example-games/golf/scenes/GolfRenderer.ts`); Golf's stock/discard piles still use `PileView`.
+- **Golf** — the 3×3 tableau grid (see the exception note in `../tce-golf/src/scenes/GolfRenderer.ts`); Golf's stock/discard piles still use `PileView`.
 - **Feudalism** — token/crop counters rendered via `CropIconRenderer` (a non-card token visual model, not a hand).
 
-New example games must not introduce bespoke hand rendering; `example-games/blackjack/scenes/BlackjackScene.ts` (migrated to `HandView` + `flipCard()`) is the canonical reference for standard hand rendering.
+New example games must not introduce bespoke hand rendering; `../tce-blackjack/src/scenes/BlackjackScene.ts` (migrated to `HandView` + `flipCard()`) is the canonical reference for standard hand rendering.
 
 - **Gym scene:** `GymHandPileScene` — `example-games/gym/scenes/GymHandPileScene.ts`
 - **Key APIs:** `HandView`, `PileView`, `flipCard()`, `discardCard()`, `moveGameObject()`, `shakeIllegalMove()`
@@ -337,13 +340,13 @@ Use `SaveLoadStore`, `serializeWithVersion()`, and `deserializeWithVersion()` fr
 
 **Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, and any future helpers — **must** be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Satisfy both via each helper's `soundManager` + `sfx` (`start`/`move`/`end`) parameters, or an equivalent event-driven `GameEventEmitter`/`SoundManager` mapping. SFX keys must follow the shared convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts` with the `sfx-` prefix per `docs/SFX_CONVENTION.md`; no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup.)
 
-**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoScene.ts` runs AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then executes the AI's action through the same animated/sounded path as a human turn.
+**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `../tce-coloretto/src/scenes/ColorettoScene.ts` runs AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then executes the AI's action through the same animated/sounded path as a human turn.
 
 **Accessibility preserved:** Reduced-motion preferences (explicit flag → SettingsStore toggle → `prefers-reduced-motion`) and the settings-panel mute/volume controls must be respected — pass the helper's `reducedMotion` flag and play SFX through `SoundManager` (or `safePlaySound()`); this rule reinforces, never weakens, that behaviour.
 
 **Documented exceptions:** Actions that legitimately have no visible or audible effect, and headless/replay/test/transcript modes (no rendering or audio), are exempt — but the exemption must be documented in code comments and/or the scene's help text.
 
-**Compliant references (not modified):** Golf's `GolfAnimator` (`example-games/golf/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates AI turns with a short delay (above); Blackjack preserves flip-sound timing and a delayed dealer-AI run (`example-games/blackjack/scenes/BlackjackScene.ts`). New example games must follow these patterns.
+**Compliant references (not modified):** Golf's `GolfAnimator` (`../tce-golf/src/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates AI turns with a short delay (above); Blackjack preserves flip-sound timing and a delayed dealer-AI run (`../tce-blackjack/src/scenes/BlackjackScene.ts`). New example games must follow these patterns.
 
 - **Gym scene:** `GymAudioFeedbackScene` — `example-games/gym/scenes/GymAudioFeedbackScene.ts`
 - **Key APIs:** `SoundManager`, `GameEventEmitter`, `EventSoundMapping`, `popTextOrIcon()`, particle emitters
@@ -466,7 +469,7 @@ only then — so the coins fly before the numbers change, and the game-over
 banner never appears mid-animation (CG-0MTR72P14000VO6Q).
 
 - **Gym scene / reference:** no Gym scene — canonical reference is
-  `example-games/main-street` (`MainStreetEngine.ts`, `scenes/MainStreetTurnController.ts`)
+  `../tce-main-street/src` (`MainStreetEngine.ts`, `scenes/MainStreetTurnController.ts`)
 - **Dual-mode engine functions:** `applyIncome` (`MainStreetAdjacency.ts`),
   the three ongoing-cost helpers, and `resolveIncident` accept
   `{ apply?: boolean }` — the default (omitted) keeps the legacy
@@ -513,5 +516,6 @@ This project follows the standard Worklog (wl) workflow for work-item tracking. 
 - Work-item prefix: **CG** (Tableau-Card-Engine)
 - Priority levels: critical → high → medium → low
 - Stage progression: idea → intake_complete → plan_complete → in_progress → in_review → done
+- **Cross-repo work:** when a core change also requires edits in a sibling `tce-<game>` repo, use that repo's Worklog store if it has one; otherwise record the cross-repo change on the core work item. Push game-repo changes to `dev` only — never `main`.
 - See project `docs/DEVELOPER.md` for additional TCE-specific development workflows.
 
