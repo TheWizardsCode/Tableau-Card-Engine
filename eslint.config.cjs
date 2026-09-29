@@ -135,6 +135,32 @@ module.exports = [
       'local/no-direct-sound-play': 'error',
     },
   },
+  // Runtime audio: enforce the "no Tone.js in runtime code" invariant on the
+  // import itself rather than via a source-text sweep (test-review C6 /
+  // CG-0MUA14GAU0063D95). The runtime game/engine must ship pre-generated audio
+  // assets; Tone.js may only be used by build-time ToneForge synthesis scripts,
+  // which live under `scripts/` (including `example-games/<game>/scripts/`) and
+  // are excluded below.
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx', 'example-games/**/*.ts', 'example-games/**/*.tsx'],
+    ignores: ['**/scripts/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'tone',
+              message:
+                'Tone.js must not be imported in runtime game/engine code. ' +
+                'Use pre-generated audio assets (see docs/SFX_CONVENTION.md); ' +
+                'build-time synthesis belongs under scripts/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Allow console uses in scripts/tools
   {
     files: ['scripts/**/*.ts', 'tools/**/*.ts'],

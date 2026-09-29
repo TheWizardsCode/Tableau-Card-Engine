@@ -1,3 +1,8 @@
+// Guard: the "no Tone.js in runtime code" invariant (test-review C6 /
+// CG-0MUA14GAU0063D95). The primary enforcement is the ESLint
+// `no-restricted-imports` rule for `tone` in `eslint.config.cjs`; this test
+// remains as the automated (CI-time) guard because the project has no wired
+// `lint` script/build step that runs ESLint. Keep the two in sync.
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
