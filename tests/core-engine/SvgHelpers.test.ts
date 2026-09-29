@@ -6,6 +6,7 @@ import {
   rasteriseSvgToTexture,
   getOrCreateTexture,
   MIN_QUALITY_SCALE,
+  SVG_TEXTURE_FILTER_MODE,
 } from '../../src/core-engine/SvgHelpers';
 
 type MockCanvas = {
@@ -199,6 +200,27 @@ describe('SvgHelpers', () => {
     );
 
     expect(createdCanvases.some((c) => c.width === 420 && c.height === 240)).toBe(true);
+  });
+
+  it('requests linear filtering for rasterised SVG textures', async () => {
+    const scene = createMockScene();
+    markSceneValid(scene);
+
+    await rasteriseSvgToTexture(
+      scene,
+      'filter-key',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
+      10,
+      10,
+      2,
+    );
+
+    // Phaser Textures.FilterMode.LINEAR === 0; NEAREST === 1. Rasterised SVG
+    // art must not use nearest-neighbour minification (it looks pixelated).
+    expect(SVG_TEXTURE_FILTER_MODE).toBe(0);
+    const texture = scene.textures.get('filter-key');
+    expect(texture.setFilter).toHaveBeenCalledWith(SVG_TEXTURE_FILTER_MODE);
+    expect(texture.setFilter).not.toHaveBeenCalledWith(1);
   });
 
   it('does not rasterise when scene is marked invalid', async () => {

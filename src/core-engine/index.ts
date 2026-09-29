@@ -224,6 +224,8 @@ export {
   makeTextureKey,
   rasteriseSvgToTexture,
   getOrCreateTexture,
+  MIN_QUALITY_SCALE,
+  SVG_TEXTURE_FILTER_MODE,
 } from './SvgHelpers';
 
 // Visibility / ownership controller for shell-scene UI groups

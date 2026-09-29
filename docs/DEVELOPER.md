@@ -1686,7 +1686,7 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
 
-#### Card art pipeline (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R)
+#### Card art pipeline (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R, CG-0MUCMB8DT003DAKR)
 
 Each card's 64×64 art zone embeds its art as an inline base64 `data:` URI
 (required: the SVG is rasterised from a data URI, so external refs do not
@@ -1697,6 +1697,19 @@ up to `64 × MIN_QUALITY_SCALE = 128` device pixels (at DPR ≤ 2) and the
 embedded bitmap is **256×256 WebP**, always downscaled for crisp rendering.
 At DPR 3 the zone is `64 × 3 = 192` device pixels; the 256 WebP still
 downscales, avoiding any upscaling artefacts.
+
+**Texture filtering (CG-0MUCMB8DT003DAKR).** Rasterised SVG textures are
+always filtered **linearly** (`SVG_TEXTURE_FILTER_MODE = 0` — Phaser's
+`Phaser.Textures.FilterMode.LINEAR`, where `NEAREST = 1`). Nearest-neighbour
+minification is what makes card art look pixelated and would defeat the whole
+native-resolution pipeline: a texture rasterised at 2× logical size is
+minified by half on a DPR-1 display. `SvgHelpers` applies linear filtering
+explicitly, and `createCardGame()` keeps `render.antialias: true` /
+`antialiasGL: true`. With `antialias: false`, Phaser's `TextureSource.init`
+calls `setFilter(NEAREST)` on **every** texture and the WebGL upload path
+ignores `LINEAR`, so the whole engine renders in pixel-art (nearest) mode. Do
+not set `antialias: false` (or `pixelArt: true`) in a card game — it is the
+Phaser pixel-art setting.
 
 The committed 1024×1024 source sprites live in
 `example-games/main-street/sprites/<Name>_1024_x_1024.png` (the source of
@@ -2079,6 +2092,33 @@ Thumbnails are static assets. Regenerate them when a game's visual appearance ch
 The engine now provides shared SVG raster helpers from `src/core-engine/SvgHelpers.ts` (exported via `src/core-engine/index.ts`).
 
 Rasterisation policy (project choice): lazy rasterisation on first use. In practice this means scenes should preload SVG *source text* (via `this.load.text`) and only rasterise to a texture when the texture is first required for rendering. This keeps preload fast and memory usage reasonable while ensuring visual fidelity when textures are needed.
+
+### Texture filtering and crispness (CG-0MUCMB8DT003DAKR)
+
+The shared pipeline rasterises at `Math.max(MIN_QUALITY_SCALE, dpr)`
+(`MIN_QUALITY_SCALE = 2`) and filters the resulting textures **linearly**
+(`SVG_TEXTURE_FILTER_MODE = 0`, exported from `@core-engine`). Best practices
+for crisp SVG art in a browser Phaser game:
+
+- **Rasterise at display density, not at a fixed multiple.** A texture drawn at
+  `logicalSize × Math.max(MIN_QUALITY_SCALE, dpr)` is 1:1 on HiDPI and only
+  mildly supersampled at DPR 1; the old fixed 4× baseline allocated 16× the
+  logical pixels for no visible gain.
+- **Use linear filtering, never nearest.** `Phaser.Textures.FilterMode` is
+  `LINEAR = 0`, `NEAREST = 1` (the inverse of an intuitive "1 = linear"
+  reading). In the Canvas renderer Phaser sets
+  `ctx.imageSmoothingEnabled = !frame.source.scaleMode`, so `scaleMode = 1`
+  disables smoothing and minified art goes blocky.
+- **Keep `antialias: true` (the default).** `antialias: false` (or
+  `pixelArt: true`) is the pixel-art setting: Phaser then forces `NEAREST` on
+  every texture. `createCardGame()` sets `antialias: true` /
+  `antialiasGL: true` so the engine stays out of nearest mode.
+- **Keep embedded bitmaps at or above the device-pixel art zone** so they are
+  only ever downscaled (the card art map's 256×256 WebP for a 64×64 zone).
+- **`drawImage()` uses the SVG's intrinsic size** (MDN); rasterising into a
+  `canvas` sized to the target device pixels is the supported way to get a
+  crisp result, and `imageSmoothingQuality = 'high'` is set on the rasterising
+  context.
 
 ### Recommended scene pattern
 

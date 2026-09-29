@@ -30,6 +30,7 @@ import {
   markSceneValid,
   markSceneInvalid,
   MIN_QUALITY_SCALE,
+  SVG_TEXTURE_FILTER_MODE,
 } from '../../../src/core-engine/SvgHelpers';
 import { GAME_W } from '../../../src/ui/constants';
 import { createHudText } from '../../../src/ui/Renderer';
@@ -198,7 +199,7 @@ export class GymDprResolutionScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'Renders the same card SVG at device pixel ratios 1, 2 and 3 side by side using the shared SvgHelpers rasterisation pipeline. Each panel shows the resolved quality scale and the resulting canvas (texture) dimensions, making the native-resolution contract visible: qualityScale = Math.max(MIN_QUALITY_SCALE, dpr) with MIN_QUALITY_SCALE = 2. At DPR 1 and 2 the canvas is 2x the logical size; at DPR 3 it follows device density (3x).',
+        body: 'Renders the same card SVG at device pixel ratios 1, 2 and 3 side by side using the shared SvgHelpers rasterisation pipeline. Each panel shows the resolved quality scale, the resulting canvas (texture) dimensions and the texture filter, making the native-resolution contract visible: qualityScale = Math.max(MIN_QUALITY_SCALE, dpr) with MIN_QUALITY_SCALE = 2, filtered LINEARLY (SVG_TEXTURE_FILTER_MODE = 0). At DPR 1 and 2 the canvas is 2x the logical size; at DPR 3 it follows device density (3x). Linear filtering is essential: a texture rasterised at 2x logical size is minified by half on a DPR-1 display, and nearest-neighbour minification would make every panel look pixelated.',
       },
       {
         heading: 'Controls',
@@ -342,7 +343,8 @@ export class GymDprResolutionScene extends GymSceneBase {
       panel.infoText.setText(
         `qualityScale = max(${MIN_QUALITY_SCALE}, ${panel.dpr}) = ×${panel.qualityScale}\n` +
         `canvas = ${srcW}×${srcH} px\n` +
-        `display = ${DPR_DEMO_LOGICAL_W}×${DPR_DEMO_LOGICAL_H} logical`,
+        `display = ${DPR_DEMO_LOGICAL_W}×${DPR_DEMO_LOGICAL_H} logical\n` +
+        `filter = LINEAR (scaleMode ${SVG_TEXTURE_FILTER_MODE})`,
       );
 
       this.logEvent(`DPR ${panel.dpr}: canvas ${srcW}×${srcH} (×${panel.qualityScale})`);
