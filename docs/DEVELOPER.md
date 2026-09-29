@@ -418,6 +418,7 @@ The staged profiles above are exposed to the global `test` skill through a proje
 | `full` (default) | `npm test` | The genuine full CI suite (unit → browser → tutorial → electron) |
 
 - **`full` is deliberately omitted** from the extension's `types` map, so a bare `/skill:test` keeps resolving to the real full CI suite. **Only `--type full` populates the audit-accepted full-suite cache entry** — typed runs use independent cache keys and can never satisfy a "full test suite passes" AC.
+- **Every typed Vitest command defaults `GAMES_CONFIG` to `full`** (preserving an explicitly supplied value), matching the shell runners. Without it a bare `/skill:test --type unit` runs under the `core-only` fallback preset, the game-discovery adapters never load, and Golf's `tests/golf/replay.test.ts` fails with `Available adapters: none` (CG-0MUIXVIBP0062A8H).
 - Browser-dependent types (`smoke`, `dev`, `browser`, `tutorial`, `e2e`) chain `scripts/check-browser-test-env.ts` first, so a missing Playwright prerequisite (`npx playwright install chromium`) fails fast with remediation steps instead of an opaque Vitest browser timeout.
 - Every typed Vitest command runs through `scripts/vitest-run-with-retry.ts` — the retry-once + wall-clock hang-timeout wrapper (exit 124 `[hang-timeout]` on a true hang, which is never retried).
 - Commands also load `scripts/vitest-tap-reporter.ts` alongside the default reporter. It emits flat TAP for each failed test (`not ok N - <file> > <suite > test>` plus `error: |-` / `stack: |-` YAML blocks) that the global runner's `parse_node_failures` understands, so a red typed run creates per-test `test-failure` items instead of an opaque suite-level failure.
@@ -425,7 +426,9 @@ The staged profiles above are exposed to the global `test` skill through a proje
 
 Common invocations: `/skill:test --type unit` (fast feedback during implementation),
 `/skill:test --type dev` (pre-audit), and `/skill:test` or `/skill:test --type full`
-(release / pre-`in_review` evidence).
+(release / pre-`in_review` evidence). Typed profiles default `GAMES_CONFIG` to
+`full` (an explicit `GAMES_CONFIG=…` still wins), so the game-discovery adapters
+load exactly as they do under the shell runners.
 
 #### CPU-contention mitigation (unit and browser tests)
 
