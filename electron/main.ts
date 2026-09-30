@@ -32,6 +32,10 @@ import { loadBonusCatalog } from './bonus-catalog.js';
 import { FileUnlockStore, SteamFollowService } from './steam-follow.js';
 import { SteamworksFollowSource } from './steam-follow-steamworks.js';
 import { STEAM_FOLLOW_CHANNELS, createSteamFollowHandlers } from './steam-follow-ipc.js';
+import { FileAchievementStore, SteamAchievementService } from './steam-achievements.js';
+import { loadAchievementManifest, validateAchievementManifest } from './achievement-manifest.js';
+import { SteamworksAchievementSource } from './steam-achievements-steamworks.js';
+import { STEAM_ACHIEVEMENT_CHANNELS, createSteamAchievementHandlers } from './steam-achievements-ipc.js';
 
 /** Directory of the compiled main process (dist-electron/). */
 const launcherDir = path.dirname(fileURLToPath(import.meta.url));
@@ -126,6 +130,11 @@ void app.whenReady().then(async () => {
   // module leaves the launcher running with the CTA degraded (intake AC5).
   await initSteamFollow();
 
+  // ── Steam achievements (F6, CG-0MUNC7EXO001LITF) ──────────────────
+  // Fully optional: a missing manifest, missing Steam, or missing native
+  // module leaves the launcher running with achievements disabled.
+  await initSteamAchievements();
+
   createWindow(resolved);
 
   // macOS: re-create a window when the dock icon is clicked and none are open.
@@ -178,6 +187,84 @@ async function initSteamFollow(): Promise<void> {
   for (const [name, channel] of Object.entries(STEAM_FOLLOW_CHANNELS)) {
     const handler = handlers[name as keyof typeof handlers];
     ipcMain.handle(channel, handler);
+  }
+
+  app.on('will-quit', () => service.close());
+}
+
+/**
+ * Initialise the Steam achievement feature and register its IPC handlers.
+ *
+ * Never throws: a missing manifest, missing Steam, or missing native module
+ * degrades to "achievements disabled" so the launcher boots normally. A
+ * manifest with validation issues is logged (non-fatal) and still used, so a
+ * typo cannot disable achievement tracking entirely.
+ */
+async function initSteamAchievements(): Promise<void> {
+  const config = loadSteamConfig();
+  const manifest = loadAchievementManifest();
+
+  if (manifest) {
+    const issues = validateAchievementManifest(manifest);
+    for (const issue of issues) {
+      console.warn(`[achievements] manifest issue (${issue.code}): ${issue.message}`);
+    }
+  } else {
+    console.warn('[achievements] no achievement manifest loaded; achievements are disabled.');
+  }
+
+  const source = new SteamworksAchievementSource({
+    appId: config ? Number(config.appId) : undefined,
+    enableOverlay: true,
+  });
+
+  try {
+    await source.init();
+  } catch (error) {
+    console.warn('[achievements] init failed; continuing without Steam:', error);
+  }
+
+  if (source.restartRequested) {
+    // Steam is relaunching the app through the Steam client — exit cleanly.
+    console.info('[achievements] Steam requested an app restart; quitting.');
+    app.quit();
+    return;
+  }
+
+  if (!source.isSteamAvailable()) {
+    console.warn('[achievements] Steam is unavailable — unlocks persist locally and re-sync later.');
+  } else if (!source.achievementApiSupported) {
+    console.warn(
+      '[achievements] The Steamworks binding exposes no achievement API; unlocks persist locally only.',
+    );
+  }
+
+  const store = new FileAchievementStore(
+    path.join(app.getPath('userData'), 'steam-achievements.json'),
+  );
+  const service = new SteamAchievementService(source, store, manifest);
+
+  // Replay any unlocks persisted while Steam was absent (offline-safe).
+  try {
+    const result = await service.resync();
+    if (result.unknown.length > 0) {
+      console.warn(
+        `[achievements] ${result.unknown.length} persisted achievement(s) are absent from the manifest: ${result.unknown.join(', ')}`,
+      );
+    }
+  } catch (error) {
+    console.warn('[achievements] resync failed; will retry on the next launch:', error);
+  }
+
+  const handlers = createSteamAchievementHandlers(service);
+
+  for (const [name, channel] of Object.entries(STEAM_ACHIEVEMENT_CHANNELS)) {
+    const handler = handlers[name as keyof typeof handlers] as (
+      ...args: unknown[]
+    ) => unknown;
+    // Adapt the pure handler table to Electron's (event, ...args) signature;
+    // `unlock` carries an achievement id, the rest take no arguments.
+    ipcMain.handle(channel, (_event, ...args: unknown[]) => handler(...args));
   }
 
   app.on('will-quit', () => service.close());

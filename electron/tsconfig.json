@@ -10,5 +10,5 @@
     "rootDir": ".",
     "sourceMap": true
   },
-  "include": ["main.ts", "content-locator.ts", "launcher-config.ts", "game-protocol.ts", "steam-config.ts", "steam-follow.ts", "steam-follow-steamworks.ts", "steam-follow-ipc.ts", "bonus-catalog.ts", "steam-achievements.ts", "achievement-manifest.ts", "steam-achievements-steamworks.ts"]
+  "include": ["main.ts", "content-locator.ts", "launcher-config.ts", "game-protocol.ts", "steam-config.ts", "steam-follow.ts", "steam-follow-steamworks.ts", "steam-follow-ipc.ts", "bonus-catalog.ts", "steam-achievements.ts", "achievement-manifest.ts", "steam-achievements-steamworks.ts", "steam-achievements-ipc.ts"]
 }

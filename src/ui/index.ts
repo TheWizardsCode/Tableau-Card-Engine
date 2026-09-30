@@ -422,3 +422,17 @@ export type {
   VisibilityOwnershipIssueReporter,
   VisibilityOwnershipControllerOptions,
 } from '../core-engine/VisibilityOwnership';
+
+// Steam achievement renderer client (F6, CG-0MUNC7EXO001LITF)
+export type {
+  AchievementUnlockReason,
+  AchievementUnlockResult,
+  AchievementResyncResult,
+  SteamAchievementsBridge,
+  SteamAchievementsClient,
+} from './steam-achievements-client';
+export {
+  createSteamAchievementsClient,
+  createSteamAchievementSink,
+  steamAchievementsClientFromWindow,
+} from './steam-achievements-client';

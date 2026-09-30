@@ -1,10 +1,11 @@
 /**
  * TCE Electron launcher — preload script (CommonJS).
  *
- * Exposes read-only host info and a narrow Steam-follow API to the renderer
- * through the context bridge. The renderer keeps `contextIsolation` enabled
- * and `nodeIntegration` disabled — no Node APIs leak into the game pages, and
- * the renderer never imports the Steamworks SDK (F3, CG-0MSMAJQQT004SDCC).
+ * Exposes read-only host info, a narrow Steam-follow API, and a narrow Steam
+ * achievements API to the renderer through the context bridge. The renderer
+ * keeps `contextIsolation` enabled and `nodeIntegration` disabled — no Node
+ * APIs leak into the game pages, and the renderer never imports the
+ * Steamworks SDK (F3, CG-0MSMAJQQT004SDCC; F6, CG-0MUNC7EXO001LITF).
  *
  * NOTE: this file is intentionally plain CommonJS (.cjs). Sandboxed preload
  * scripts cannot use ESM imports, and Electron treats a preload's format by
@@ -43,4 +44,18 @@ const steamFollow = {
   claimManually: () => ipcRenderer.invoke('steamFollow:claimManually'),
 };
 
-contextBridge.exposeInMainWorld('tce', { ...hostInfo, steamFollow });
+/**
+ * Steam achievements bridge. Every call is async and total: the main process
+ * degrades to safe values when Steam or the manifest is absent, so the
+ * renderer can forward challenge completions without branching on platform.
+ * Channel names must stay in sync with electron/steam-achievements-ipc.ts.
+ */
+const achievements = {
+  unlock: (achievementId) => ipcRenderer.invoke('steamAchievements:unlock', achievementId),
+  getUnlocked: () => ipcRenderer.invoke('steamAchievements:getUnlocked'),
+  isAvailable: () => ipcRenderer.invoke('steamAchievements:isAvailable'),
+  hasManifest: () => ipcRenderer.invoke('steamAchievements:hasManifest'),
+  resync: () => ipcRenderer.invoke('steamAchievements:resync'),
+};
+
+contextBridge.exposeInMainWorld('tce', { ...hostInfo, steamFollow, achievements });
