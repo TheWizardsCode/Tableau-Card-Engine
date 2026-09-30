@@ -168,6 +168,18 @@ export {
   evaluateChallenges,
 } from './ChallengeSystem';
 
+// Achievement system generic API (F3, CG-0MUNC7D0H00554B8)
+export type {
+  AchievementDefinition,
+  AchievementSink,
+  ChallengeToAchievementMapping,
+  AchievementSystemConfig,
+} from './AchievementSystem';
+export {
+  AchievementSystem,
+  NoOpAchievementSink,
+} from './AchievementSystem';
+
 // Difficulty presets generic API (CG-0MMJ8S9850MV4L0A)
 export type {
   DifficultyConfig,
