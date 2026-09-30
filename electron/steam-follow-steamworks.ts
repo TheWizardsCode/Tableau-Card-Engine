@@ -30,7 +30,7 @@ export interface SteamworksClientLike {
     activateToWebPage?: (url: string) => void;
   };
   friends?: {
-    isFollowing?: (steamId: bigint) => boolean;
+    isFollowing?: (steamId: bigint) => boolean | Promise<boolean>;
   };
 }
 
@@ -44,13 +44,67 @@ export interface SteamworksModuleLike {
 /** Loads the optional native module; resolves `null` when it is absent. */
 export type SteamworksModuleLoader = () => Promise<SteamworksModuleLike | null>;
 
+/**
+ * Minimal shape of the optional custom native friends addon (Option A, P1
+ * `CG-0MUNBHWY90051NAU`).
+ *
+ * The underlying SDK call (`ISteamFriends::IsFollowing`) is asynchronous, so
+ * `isFollowing` may return either a boolean or a promise for one; the adapter
+ * accepts both. The addon must resolve `false` (never reject) when Steam is
+ * not running or no user is logged in — detection must not assume a logged-in
+ * client.
+ */
+export interface NativeFriendsModuleLike {
+  /**
+   * Optional one-time initialisation. Returning `false` (or throwing) means
+   * the addon cannot provide follow detection on this build.
+   */
+  init?: () => boolean | void;
+  /** Whether the current user follows *steamId*. */
+  isFollowing: (steamId: bigint) => boolean | Promise<boolean>;
+}
+
+/** Loads the optional native friends addon; resolves `null` when absent. */
+export type NativeFriendsLoader = () => Promise<NativeFriendsModuleLike | null>;
+
 export interface SteamworksFollowSourceOptions {
   /** Steam App ID (as a number). Omit/0 → unavailable. */
   appId?: number;
   /** Override the module loader (tests inject a fake). */
   loader?: SteamworksModuleLoader;
+  /**
+   * Fallback loader for the custom native friends addon (Option A). Consulted
+   * only when the `steamworks.js` binding exposes no `friends.isFollowing`.
+   * Tests inject a fake; the real loader is wired in P3/P4.
+   */
+  nativeFriendsLoader?: NativeFriendsLoader;
   /** Enable the Electron Steam overlay hook (main process only). */
   enableOverlay?: boolean;
+  /**
+   * Upper bound (ms) for a follow check before it is treated as `false`.
+   * Guards against a hung native call; defaults to 1500 ms.
+   */
+  followCheckTimeoutMs?: number;
+}
+
+/**
+ * Resolve *promise* or, after *ms*, the *fallback* — whichever comes first.
+ * Bounds a hung native check so the IPC handler can never block forever.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
 }
 
 /** `overlay.StoreFlag` — open the store page without adding to cart. */
@@ -77,6 +131,8 @@ export const defaultSteamworksLoader: SteamworksModuleLoader = async () => {
 export class SteamworksFollowSource implements FollowSource {
   private availability: SteamAvailability = 'uninitialised';
   private client: SteamworksClientLike | null = null;
+  /** Loaded fallback addon (Option A), when the binding lacks the API. */
+  private nativeFriends: NativeFriendsModuleLike | null = null;
   /** Set when `restartAppIfNecessary` asked Steam to relaunch the app. */
   restartRequested = false;
   /** Capability flag exposed on the `FollowSource` contract. */
@@ -84,12 +140,16 @@ export class SteamworksFollowSource implements FollowSource {
 
   private readonly appId?: number;
   private readonly loader: SteamworksModuleLoader;
+  private readonly nativeFriendsLoader?: NativeFriendsLoader;
   private readonly enableOverlay: boolean;
+  private readonly followCheckTimeoutMs: number;
 
   constructor(options: SteamworksFollowSourceOptions = {}) {
     this.appId = options.appId;
     this.loader = options.loader ?? defaultSteamworksLoader;
+    this.nativeFriendsLoader = options.nativeFriendsLoader;
     this.enableOverlay = options.enableOverlay ?? false;
+    this.followCheckTimeoutMs = options.followCheckTimeoutMs ?? 1500;
   }
 
   async init(): Promise<SteamAvailability> {
@@ -116,7 +176,12 @@ export class SteamworksFollowSource implements FollowSource {
       this.client = mod.init(this.appId);
       if (this.enableOverlay) mod.electronEnableSteamOverlay?.(true);
 
-      this.followCheckSupported = typeof this.client?.friends?.isFollowing === 'function';
+      if (typeof this.client?.friends?.isFollowing === 'function') {
+        this.followCheckSupported = true;
+      } else {
+        // Binding lacks the API (steamworks.js 0.4.0) — try the custom addon.
+        this.followCheckSupported = await this.loadNativeFriends();
+      }
       this.availability = 'available';
       return this.availability;
     } catch {
@@ -128,6 +193,24 @@ export class SteamworksFollowSource implements FollowSource {
 
   isSteamAvailable(): boolean {
     return this.availability === 'available';
+  }
+
+  /**
+   * Load and validate the optional native friends addon. Returns `true` when
+   * it provides a usable follow check. Never throws.
+   */
+  private async loadNativeFriends(): Promise<boolean> {
+    if (!this.nativeFriendsLoader) return false;
+    try {
+      const native = await this.nativeFriendsLoader();
+      if (!native || typeof native.isFollowing !== 'function') return false;
+      if (typeof native.init === 'function' && native.init() === false) return false;
+      this.nativeFriends = native;
+      return true;
+    } catch {
+      this.nativeFriends = null;
+      return false;
+    }
   }
 
   async openStorePage(url: string): Promise<boolean> {
@@ -147,16 +230,35 @@ export class SteamworksFollowSource implements FollowSource {
 
   async isFollowing(developerSteamId: string): Promise<boolean> {
     if (!this.isSteamAvailable() || !this.client) return false;
-    const check = this.client.friends?.isFollowing;
-    if (typeof check !== 'function') {
-      // No SDK detection available (steamworks.js 0.4.0). The UI offers a
-      // manual claim instead; never fabricate a `true`.
-      this.followCheckSupported = false;
-      return false;
+
+    // Capability order: steamworks.js binding → native addon → manual claim.
+    const bindingCheck = this.client.friends?.isFollowing;
+    if (typeof bindingCheck === 'function') {
+      this.followCheckSupported = true;
+      return this.awaitCheck(() => bindingCheck.call(this.client!.friends, BigInt(developerSteamId)));
     }
-    this.followCheckSupported = true;
+
+    const native = this.nativeFriends;
+    if (native) {
+      this.followCheckSupported = true;
+      return this.awaitCheck(() => native.isFollowing(BigInt(developerSteamId)));
+    }
+
+    // No SDK detection available. The UI offers a manual claim instead; never
+    // fabricate a `true`.
+    this.followCheckSupported = false;
+    return false;
+  }
+
+  /**
+   * Await a follow check, bound it by a timeout, and coerce to a strict
+   * boolean. A throw, rejection, timeout, or non-`true` result is `false` —
+   * the adapter never fabricates a follow.
+   */
+  private async awaitCheck(check: () => boolean | Promise<boolean>): Promise<boolean> {
     try {
-      return check.call(this.client.friends, BigInt(developerSteamId));
+      const result = await withTimeout(Promise.resolve().then(check), this.followCheckTimeoutMs, false);
+      return result === true;
     } catch {
       return false;
     }
@@ -164,6 +266,7 @@ export class SteamworksFollowSource implements FollowSource {
 
   close(): void {
     this.client = null;
+    this.nativeFriends = null;
     this.availability = 'uninitialised';
   }
 }

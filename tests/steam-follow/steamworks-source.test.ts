@@ -157,6 +157,16 @@ describe('SteamworksFollowSource — follow detection capability', () => {
     expect(await source.isFollowing(DEV_ID)).toBe(false);
   });
 
+  it('awaits an asynchronous friends.isFollowing (boolean | Promise<boolean>)', async () => {
+    const { mod, client } = makeModule();
+    client.friends = { isFollowing: async () => true };
+    const source = new SteamworksFollowSource({ appId: APP_ID, loader: async () => mod });
+    await source.init();
+
+    expect(source.followCheckSupported).toBe(true);
+    expect(await source.isFollowing(DEV_ID)).toBe(true);
+  });
+
   it('returns false when friends.isFollowing throws', async () => {
     const { mod, client } = makeModule();
     client.friends = {
