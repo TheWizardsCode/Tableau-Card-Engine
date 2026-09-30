@@ -1,0 +1,18 @@
+{
+  "name": "tce-steam-friends",
+  "version": "0.1.0",
+  "private": true,
+  "description": "N-API addon exposing ISteamFriends::IsFollowing for the TCE launcher (Option A, CG-0MUN7930Y009X8Z1)",
+  "main": "build/Release/steam_friends.node",
+  "gypfile": true,
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "scripts": {
+    "build": "node-gyp rebuild",
+    "clean": "node-gyp clean"
+  }
+}

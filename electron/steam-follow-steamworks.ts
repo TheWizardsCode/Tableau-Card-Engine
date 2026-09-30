@@ -22,6 +22,7 @@
  * module object.
  */
 import type { FollowSource, SteamAvailability } from './steam-follow.js';
+import { defaultNativeFriendsLoader } from './steam-follow-native.js';
 
 /** Minimal shape of a `steamworks.js` client used here. */
 export interface SteamworksClientLike {
@@ -147,7 +148,7 @@ export class SteamworksFollowSource implements FollowSource {
   constructor(options: SteamworksFollowSourceOptions = {}) {
     this.appId = options.appId;
     this.loader = options.loader ?? defaultSteamworksLoader;
-    this.nativeFriendsLoader = options.nativeFriendsLoader;
+    this.nativeFriendsLoader = options.nativeFriendsLoader ?? defaultNativeFriendsLoader;
     this.enableOverlay = options.enableOverlay ?? false;
     this.followCheckTimeoutMs = options.followCheckTimeoutMs ?? 1500;
   }
