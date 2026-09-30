@@ -524,6 +524,23 @@ The TCE launcher's Steam follow-to-unlock mechanic is the canonical example
   `ISteamFriends::IsFollowing`; automatic follow detection is capability-detected
   and falls back to a persisted manual claim (follow-up
   `CG-0MUN7930Y009X8Z1`).
+- **Second instance — Steam achievements (`CG-0MSMGKSJB004MZBJ`):** the same
+  seam turns in-game challenges into persistent achievements. The engine layer
+  is Steam-free (`src/core-engine/AchievementSystem.ts`: `AchievementSystem`,
+  pluggable `AchievementSink`, `NoOpAchievementSink`); the launcher adds
+  `electron/steam-achievements.ts` (service + stores + fakes),
+  `electron/steam-achievements-steamworks.ts` (real adapter, dynamic import),
+  `electron/steam-achievements-ipc.ts` + `preload.cjs`
+  (`window.tce.achievements`), and `src/ui/steam-achievements-client.ts`
+  (renderer client + `createSteamAchievementSink()`). **Rule:** a game module
+  never imports the Steamworks SDK — it declares a challenge → achievement
+  mapping and wires the engine system. The single source of truth is
+  `electron/achievement-manifest.json` (`gameId → achievementId → steamApiName
+  → hidden`), which must match the Steamworks partner backend exactly; unlock,
+  persistence, and offline re-sync live in `SteamAchievementService`.
+  Main Street is the first consumer (`tce-main-street/src/MainStreetAchievements.ts`).
+  Manual QA: [`docs/dev/steam-achievements-qa.md`](docs/dev/steam-achievements-qa.md);
+  developer workflow: `docs/DEVELOPER.md` (Steam achievements).
 
 ### Scene Base Class Pattern
 

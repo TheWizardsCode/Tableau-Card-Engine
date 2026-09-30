@@ -371,6 +371,102 @@ is no bridge, so nothing is locked and the web app stays fully functional.
 
 **Manual real-Steam QA:** see [Steam follow-to-unlock — manual E2E QA](dev/steam-follow-qa.md).
 
+### Steam achievements (Steamworks)
+
+The engine has an **engine-generic achievement layer** (`CG-0MSMGKSJB004MZBJ`)
+that turns run-local challenges into persistent Steam achievements. It is built
+from the same seam as the follow-to-unlock feature: a pure engine layer + a
+pure-Node launcher service behind an interface with a deterministic fake, a
+real Steamworks adapter, and an IPC bridge. The whole feature is optional — the
+web build and any machine without Steam stay fully playable.
+
+**The one rule:** a game module **never** imports the Steamworks SDK. A game
+declares its achievements and maps its challenges; the launcher owns the only
+Steam-aware code. The renderer talks to the main process only through the
+`window.tce.achievements` context bridge (wrapped by
+`src/ui/steam-achievements-client.ts`).
+
+**Modules** (pure Node/TS unless noted; unit-tested under `tests/achievements/`
+and `tests/steam-achievements/`):
+
+| Module | Responsibility |
+|--------|----------------|
+| `src/core-engine/AchievementSystem.ts` | Steam-free engine layer: `AchievementDefinition`, challenge → achievement mapping, idempotent `AchievementSystem`, pluggable `AchievementSink`, `NoOpAchievementSink`. Zero Steam/Electron imports. |
+| `electron/achievement-manifest.json` | Single source of truth for `gameId → achievementId → steamApiName → hidden`. Must match the Steamworks partner backend. |
+| `electron/achievement-manifest.ts` | Pure loader + semantic validation (duplicate ids/API names, empty entries, version); returns `null`/issues rather than throwing. |
+| `electron/steam-achievements.ts` | `AchievementSource` interface, `SteamAchievementService` (idempotent, offline-safe, re-sync), `FileAchievementStore`, `MemoryAchievementStore`, deterministic fakes. |
+| `electron/steam-achievements-steamworks.ts` | Real `SteamworksAchievementSource`; dynamically imports the optional `steamworks.js`, capability-detects the achievement API. |
+| `electron/steam-achievements-ipc.ts` | Channel names + pure handler table wired to `ipcMain` in `main.ts`. |
+| `src/ui/steam-achievements-client.ts` | Renderer client over the `window.tce.achievements` bridge + `createSteamAchievementSink()` (the engine sink that forwards over IPC); returns `null` outside Electron. |
+
+**Bridge API** (`window.tce.achievements`, exposed by `electron/preload.cjs`):
+`unlock`, `getUnlocked`, `isAvailable`, `hasManifest`, `resync`.
+
+**Manifest format.** `electron/achievement-manifest.json`:
+
+```json
+{
+  "version": 1,
+  "games": [
+    {
+      "gameId": "main-street",
+      "achievements": [
+        { "achievementId": "foodie-row", "steamApiName": "TCE_MAIN_STREET_FOODIE_ROW", "hidden": false }
+      ]
+    }
+  ]
+}
+```
+
+- `steamApiName` is the **static** API name registered on the Steamworks
+  partner backend (Steam has no client-side creation). It **must match
+  exactly**; a mismatch makes Steam silently drop the unlock.
+- `achievementId` and `steamApiName` are app-global and must be unique across
+  every game in the manifest.
+- `hidden` is a **backend-only** flag (the client API cannot set it); it is
+  mirrored here for documentation and UI only.
+- The committed manifest is validated by
+  `tests/steam-achievements/steam-achievements.test.ts`.
+
+**Challenge → achievement mapping workflow for a new game:**
+
+1. Add the game's `gameId` (and each `achievementId` / `steamApiName` / `hidden`)
+   to `electron/achievement-manifest.json` and register the API names on the
+   Steamworks backend.
+2. In the game repo, create a `<Game>Achievements.ts` module (e.g.
+   `tce-main-street/src/MainStreetAchievements.ts`) that:
+   - declares an explicit `challengeId → achievementId` map,
+   - builds the `AchievementDefinition`s (titles/descriptions can be derived
+     from the challenge templates),
+   - exports `create<Game>AchievementSystem(options)` (registers the
+     definitions + mapping on the engine `AchievementSystem`),
+   - resolves the sink via the renderer client
+     (`steamAchievementsClientFromWindow()` → `createSteamAchievementSink()`,
+     else `NoOpAchievementSink`),
+   - attaches the system to the game state.
+3. Forward challenge completions to the system at the game's single completion
+   choke point (Main Street: `MainStreetChallenges.evaluateChallenges`, which
+   also covers the per-action `evaluateChallengesAfterAction` path). Everything
+   else (idempotence, persistence, re-sync, IPC) is engine/launcher code.
+4. Add a game-side drift test asserting every challenge is mapped exactly once
+   and every achievement id matches the launcher manifest (Main Street:
+   `tests/main-street/main-street-achievements.test.ts`).
+
+**Offline-safe and idempotent.** An unlock is persisted locally **before** the
+Steam call; `SteamAchievementService.resync()` replays every persisted id at
+launch, so an unlock made with Steam absent (or a failed `stats.store()`) is
+re-sent when Steam is next available. `setAchievement`/`storeStats` never throw
+and degrade to safe results, so a broken Steam install cannot crash the
+launcher. The engine sink is idempotent, so a challenge fires at most one
+unlock per achievement per session.
+
+**Manifest ↔ store mismatch detection.** See
+[Steam achievements — manual E2E QA](dev/steam-achievements-qa.md#manifest--store-mismatch-detection)
+for the procedure (automated validation + the real-account `achievement.names()`
+check).
+
+**Manual real-Steam QA:** see [Steam achievements — manual E2E QA](dev/steam-achievements-qa.md).
+
 ### Electron smoke test
 
 The Playwright-Electron launch test (`tests/electron/launch-smoke.test.ts`) launches the real Electron app and asserts the Game Selector renders, the preload bridge is exposed, and clicking a selector card boots a game scene. It runs in its own vitest project so it never slows the regular suites:
