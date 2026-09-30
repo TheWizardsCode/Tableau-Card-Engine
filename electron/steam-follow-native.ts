@@ -11,6 +11,7 @@
  * Pure Node (no Electron import) so it is unit-testable with an injected
  * importer.
  */
+import { createRequire } from 'module';
 import type {
   NativeFriendsLoader,
   NativeFriendsModuleLike,
@@ -19,8 +20,18 @@ import type {
 /** Imports a specifier; injectable so tests avoid real dynamic imports. */
 export type NativeFriendsImporter = (specifier: string) => Promise<unknown>;
 
-const defaultImporter: NativeFriendsImporter = async (specifier) =>
-  import(/* @vite-ignore */ specifier);
+const requireFromHere = createRequire(import.meta.url);
+
+const defaultImporter: NativeFriendsImporter = async (specifier) => {
+  try {
+    // `.node` addons and CommonJS packages load through require; the packaged
+    // app resolves `tce-steam-friends` from its unpacked node_modules.
+    return requireFromHere(specifier);
+  } catch {
+    // Fall back to dynamic import for ESM packages.
+    return import(/* @vite-ignore */ specifier);
+  }
+};
 
 /** Environment override for local development (a specifier or absolute path). */
 const ENV_SPECIFIER = process.env.TCE_STEAM_FRIENDS_MODULE;

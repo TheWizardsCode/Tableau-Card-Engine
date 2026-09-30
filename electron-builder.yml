@@ -37,11 +37,15 @@ files:
   - dist-electron/**
   - package.json
   - 'node_modules/steamworks.js/**'
-  - '!node_modules/!(steamworks.js)/**'
+  - 'node_modules/tce-steam-friends/**'
+  - '!node_modules/!(steamworks.js|tce-steam-friends)/**'
 
 # Native .node/.dll artefacts cannot be loaded from inside an asar archive.
+# `steamworks.js` ships its own binaries; `tce-steam-friends` is the Option A
+# follow-detection addon staged by `npm run build:steam-friends`.
 asarUnpack:
   - 'node_modules/steamworks.js/dist/**'
+  - 'node_modules/tce-steam-friends/**/*.node'
 
 asar: true
 
