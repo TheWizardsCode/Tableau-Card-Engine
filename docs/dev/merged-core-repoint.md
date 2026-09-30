@@ -133,15 +133,35 @@ repos/TheWizardsCode/tableau-card-engine-core` reports `archived: true`.
 Archiving makes the repository read-only (no pushes, issues or pull requests)
 while leaving it cloneable.
 
-**Deletion is deliberately deferred** to the follow-up work item
+**Deletion was deliberately deferred** to the follow-up work item
 `CG-0MUKGQINO002ILXA` (*Delete the retired tableau-card-engine-core
-repository*), which is **blocked by** the merged-core epic
-CG-0MUJ0IAJM009X0Q2. Keeping the archived repository available preserves the old
+repository*), which was **blocked by** the merged-core epic
+CG-0MUJ0IAJM009X0Q2. Keeping the archived repository available preserved the old
 filtered-history pin `2e9fc0e5` and any pre-repoint game commits during the F7
-end-to-end verification; deletion runs only after the epic is complete and
-released. It requires a `gh` token with the `delete_repo` scope:
+end-to-end verification; deletion ran only after the epic was complete and
+released.
+
+## Deletion of `tableau-card-engine-core` (completed)
+
+With the merged-core epic CG-0MUJ0IAJM009X0Q2 complete (`done`) and released,
+the archived repository was **deleted** on **2026-09-30** by
+CG-0MUKGQINO002ILXA, using a `gh` token with the `delete_repo` scope:
 
 ```bash
-gh auth refresh -s delete_repo
-gh repo delete TheWizardsCode/tableau-card-engine-core --yes   # → gh api returns 404
+# Pre-delete: confirm archived
+gh api repos/TheWizardsCode/tableau-card-engine-core --jq '.archived'   # → true
+
+# Delete
+gh repo delete TheWizardsCode/tableau-card-engine-core --yes            # → exit 0
+
+# Post-delete: confirm gone
+gh api repos/TheWizardsCode/tableau-card-engine-core                    # → HTTP 404 Not Found
+gh api "orgs/TheWizardsCode/repos?per_page=100" --jq '.[].name'        # no core repo besides Tableau-Card-Engine
 ```
+
+Deletion is **irreversible**: the old filtered-history pin `2e9fc0e5` and any
+pre-repoint game commits that referenced the old `./core` URL no longer
+resolve. This is safe because no published branch of any game repo references
+`tableau-card-engine-core` (see the reference sweep and fresh-clone
+verification above), and `Tableau-Card-Engine` HEAD carries no functional
+reference to the retired repository.
