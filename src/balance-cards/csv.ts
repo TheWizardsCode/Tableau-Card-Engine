@@ -39,6 +39,13 @@ export interface CsvRow {
    * `upgradeCostDiscount` column added by CG-0MTKMGL66004I0PC.
    */
   upgradeCostDiscount?: string;
+  /**
+   * Optional flat coin discount applied to business-card purchase cost,
+   * summed street-wide across hired staff (e.g. the Delivery Driver's
+   * "reduces business card purchase cost by 50" ability). Parsed from the
+   * `purchaseCostDiscount` column added by CG-0MUMCVH3N007KT1M.
+   */
+  purchaseCostDiscount?: string;
 }
 
 export const CSV_COLUMNS: readonly string[] = [
@@ -49,6 +56,7 @@ export const CSV_COLUMNS: readonly string[] = [
   'multiplier', 'targetBusiness', 'incomeBonus', 'synergyRangeBonus',
   'requiredLevel', 'reputationBonus', 'newDisplayName', 'ongoingCost', 'handSlotsAdded',
   'refreshCostDiscount', 'actionsPerTurn', 'peekOncePerTurn', 'upgradeCostDiscount',
+  'purchaseCostDiscount',
 ];
 
 export const NUMERIC_COLUMNS: readonly string[] = [
@@ -56,7 +64,7 @@ export const NUMERIC_COLUMNS: readonly string[] = [
   'ongoingCost', 'reputationPerTurn', 'reputationBonus', 'synergyCoinBonus',
   'synergyRepBonus', 'synergyRangeBonus', 'requiredLevel', 'handSlotsAdded',
   'refreshCostDiscount', 'actionsPerTurn', 'maxLevel', 'duration', 'multiplier',
-  'peekOncePerTurn', 'upgradeCostDiscount',
+  'peekOncePerTurn', 'upgradeCostDiscount', 'purchaseCostDiscount',
 ];
 
 function parseCsvLine(line: string): string[] {
