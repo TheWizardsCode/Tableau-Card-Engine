@@ -9,17 +9,21 @@ unlock/persistence/lock logic lives in `tests/steam-follow/` and the
 `tce-main-street` unit suite; run those first (`npm test` in this repo, and
 `npx vitest run --project unit` in the sibling game repo).
 
-> **Current known limitation (F3 finding).** `steamworks.js` 0.4.0 exposes no
-> `ISteamFriends::IsFollowing`, so automatic follow detection reports
-> `followCheckSupported = false` and the UI uses a **manual self-attest claim**.
-> On such a build, mark the "automatic detection" steps as N/A and validate the
-> manual-claim path instead. Follow-up: `CG-0MUN7930Y009X8Z1`.
+> **Automatic detection (P1 `CG-0MUNBHWY90051NAU` / P3 `CG-0MUNBHYAB0011XXW`).**
+> `steamworks.js` 0.4.0 exposes no `ISteamFriends::IsFollowing`, so the launcher
+> ships a small custom N-API addon (`native/steam-friends`, staged as
+> `tce-steam-friends`) that resolves the shipped `steam_api64.dll` at runtime.
+> When the addon is present and Steam has a logged-in user,
+> `followCheckSupported = true` and the automatic path below applies. Without
+> the addon — or with Steam absent / no logged-in user — the source reports
+> `followCheckSupported = false` and the UI offers a **manual self-attest
+> claim**; follow the manual-claim variant instead.
 
 ## Prerequisites
 
 - Windows machine with the **Steam client installed and logged in**.
 - A Steam account that does **not** yet follow the developer account.
-- A packaged launcher built for Steam: `npm install steamworks.js && npm run package:steam`.
+- A packaged launcher built for Steam: `npm install steamworks.js && npm run build:steam-friends && npm run package:steam` (the addon is Windows x64; no Steamworks SDK is needed at build time).
 - A Steam build with an App ID the account can run (test app id during dev).
 - The private config present (gitignored) or env vars set:
   - `electron/steam-config.local.json` with `app_id` + `developer_steam_id`, **or**
@@ -42,8 +46,9 @@ overlay**, already logged in — no browser login prompt. Console shows no crash
 
 ### 2. Follow is detected and the bonus unlocks (AC2)
 
-> If `followCheckSupported` is `false` (stock `steamworks.js`), skip to the
-> manual-claim variant.
+> `followCheckSupported` is `true` when the `tce-steam-friends` addon is built
+> into the package and Steam has a logged-in user. Use the manual-claim variant
+> when it is `false` (addon absent, Steam absent, or no logged-in user).
 
 **Automatic detection variant:**
 
@@ -103,5 +108,6 @@ functional.
 ## Reporting
 
 - File a bug work item for any Failed step, linking this plan and the work item.
-- Update this plan if the follow mechanism changes (e.g. when
-  `CG-0MUN7930Y009X8Z1` lands automatic detection).
+- Update this plan if the follow mechanism changes. Automatic detection landed
+  in `CG-0MUN7930Y009X8Z1` (Option A native addon, `native/steam-friends`); see
+  `native/steam-friends/README.md` and `docs/dev/steam-follow-native-spike.md`.

@@ -520,10 +520,16 @@ The TCE launcher's Steam follow-to-unlock mechanic is the canonical example
   config + the follow status.
 - **Manual real-account QA:** see
   [`docs/dev/steam-follow-qa.md`](docs/dev/steam-follow-qa.md).
-- **Known limitation:** the stock `steamworks.js` binding exposes no
-  `ISteamFriends::IsFollowing`; automatic follow detection is capability-detected
-  and falls back to a persisted manual claim (follow-up
-  `CG-0MUN7930Y009X8Z1`).
+- **Automatic detection (Option A):** the stock `steamworks.js` binding exposes
+  no `ISteamFriends::IsFollowing`, so a small C++ N-API addon
+  (`native/steam-friends`, staged as `tce-steam-friends`) resolves the shipped
+  `steam_api64.dll` at runtime. Detection is capability-ordered
+  (`steamworks.js` friends API → native addon → manual self-attest) and falls
+  back to a persisted manual claim when unavailable (addon absent, Steam absent,
+  or no logged-in user); the launcher never fabricates a follow. Build with
+  `npm run build:steam-friends` (Windows x64; no Steamworks SDK needed at build
+  time). See `native/steam-friends/README.md` and
+  [`docs/dev/steam-follow-native-spike.md`](docs/dev/steam-follow-native-spike.md).
 - **Second instance — Steam achievements (`CG-0MSMGKSJB004MZBJ`):** the same
   seam turns in-game challenges into persistent achievements. The engine layer
   is Steam-free (`src/core-engine/AchievementSystem.ts`: `AchievementSystem`,

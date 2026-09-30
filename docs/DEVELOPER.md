@@ -341,28 +341,49 @@ be committed.
 
 **Building a Steam binary.** `steamworks.js` is intentionally **not** a
 `package.json` dependency (it is a native module; ordinary installs/CI must not
-need a native build). A Steam build installs it explicitly and uses the Steam
-package script:
+need a native build). A Steam build installs it explicitly, builds the follow
+detection addon, and uses the Steam package script:
 
 ```bash
-npm install steamworks.js   # optional native module (once)
-npm run package:steam        # checks for steamworks.js, then Windows NSIS package
+npm install steamworks.js        # optional SDK binding (once)
+npm run build:steam-friends      # build the follow addon (Windows x64)
+npm run package:steam            # pre-flights + Windows NSIS package
 ```
 
-`scripts/check-steamworks.mjs` fails early with actionable guidance when the
-module is missing. `electron-builder.yml` packs `node_modules/steamworks.js/**`
-and unpacks its native `dist/**` from the asar. A non-Steam build uses
-`npm run package` and needs none of this.
+`scripts/check-steamworks.mjs` checks for `steamworks.js` and
+`scripts/check-steam-friends.mjs` checks for the staged `tce-steam-friends`
+addon; both fail early with actionable guidance (the addon check is a no-op
+warning on non-Windows hosts). `electron-builder.yml` packs
+`node_modules/steamworks.js/**` and `node_modules/tce-steam-friends/**`,
+unpacking their native `.node`/`dist` binaries from the asar. A non-Steam build
+uses `npm run package` and needs none of this.
 
-**Follow detection — capability finding.** The chosen mechanism is
-`ISteamFriends::IsFollowing(developerSteamID)`, but `steamworks.js` 0.4.0 does
-**not** expose a `friends` namespace, so automatic detection is unavailable with
-the stock binding. `SteamworksFollowSource` therefore capability-detects:
-`followCheckSupported` is `false`, the UI offers a persisted **manual claim**
-instead, and the launcher never fabricates a follow. The store page still opens
-through the real SDK (`overlay.activateToStore` / `activateToWebPage`). A custom
-native addon / newer binding that exposes `friends.isFollowing` is tracked as
-follow-up `CG-0MUN7930Y009X8Z1` and needs no TypeScript change here.
+**Follow detection — automatic via a custom addon (Option A).**
+`steamworks.js` 0.4.0 exposes no `friends` namespace, so the shipped
+`steam_api64.dll` is queried directly: `native/steam-friends` is a small C++
+N-API addon that resolves the already-loaded DLL and calls
+`SteamAPI_ISteamFriends_IsFollowing` (interface `SteamFriends017`), correlating
+the asynchronous `FriendsIsFollowing_t` result within a bounded timeout. It
+**never** calls `SteamAPI_Init` (no second init / DLL conflict) and resolves all
+Steam symbols at runtime, so **no Steamworks SDK is needed at build time**.
+`electron/steam-follow-native.ts` loads it as `tce-steam-friends`, and
+`SteamworksFollowSource` capability-detects in a deterministic order:
+`steamworks.js` friends API → native addon → manual self-attest. When no
+automatic check is available (addon absent, Steam absent, or no logged-in user)
+`followCheckSupported` is `false` and the UI offers a persisted **manual
+claim**; the launcher never fabricates a follow. The store page still opens
+through the real SDK (`overlay.activateToStore` / `activateToWebPage`).
+
+**Addon build prerequisites and licensing.** The addon targets **Windows x64**
+and builds with `node-gyp` + Visual Studio Build Tools
+(`npm run build:steam-friends`), staging the result as `node_modules/tce-steam-friends`.
+No Steamworks SDK is required to build it: all symbols are resolved at runtime
+from the redistributable `steam_api64.dll` that `steamworks.js` loads, so no SDK
+path or private CI secret is needed. The Steamworks SDK itself is **not
+redistributable** — its headers and import libraries must never be committed or
+shipped; only the `steam_api64.dll` redistributable may ship with the app. See
+`native/steam-friends/README.md` and the P1 spike report
+(`docs/dev/steam-follow-native-spike.md`).
 
 **Bridge API** (`window.tce.steamFollow`, exposed by `electron/preload.cjs`):
 `getStatus`, `isSteamAvailable`, `supportsAutomaticFollowCheck`,

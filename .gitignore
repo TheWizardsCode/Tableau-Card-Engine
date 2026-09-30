@@ -141,3 +141,8 @@ steam_appid.txt
 native/**/build/
 native/**/dist/
 *.node
+
+# Steamworks SDK (licence-gated; never commit). The addon needs no SDK at build
+# time, but a local SDK checkout for reference must stay out of git.
+sdk/steamworks/
+native/**/sdk/
