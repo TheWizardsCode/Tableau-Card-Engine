@@ -127,7 +127,7 @@ to include:
 {
   "games": [
     { "id": "golf", "path": "../tce-golf",
-      "scenePath": "example-games/golf/scenes/GolfScene.ts" }
+      "scenePath": "../tce-golf/src/scenes/GolfScene.ts" }
   ]
 }
 ```
@@ -875,7 +875,7 @@ Browser tests verify Phaser UI rendering and interactions in a real browser envi
 ```typescript
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { createGolfGame } from '../../example-games/golf/createGolfGame';
+import { createGolfGame } from '../../tce-golf/src/createGolfGame';
 
 describe('MyScene browser tests', () => {
   let game: Phaser.Game | null = null;
@@ -1472,10 +1472,10 @@ Follow the Golf (original reference) and Sushi Go (most recent) examples as refe
 
 **Exception carve-outs:** Layouts that genuinely don't fit the single-row `HandView` model may keep bespoke card rendering, but the exception must be documented in code comments and/or the scene's help text:
 
-- **Golf** — the 3×3 tableau grid (exception note in `example-games/golf/scenes/GolfRenderer.ts`); its stock/discard piles still use `PileView`.
+- **Golf** — the 3×3 tableau grid (exception note in `../tce-golf/src/scenes/GolfRenderer.ts`); its stock/discard piles still use `PileView`.
 - **Feudalism** — token/crop counters via `CropIconRenderer` (non-card tokens, not a hand).
 
-**Canonical reference:** `example-games/blackjack/scenes/BlackjackScene.ts` — migrated to two SLL-anchored `HandView` instances with `centerX` row anchoring and a `flipCard()`-based hole-card reveal; its browser tests (`tests/blackjack/BlackjackHandView.browser.test.ts`) verify the rendering path.
+**Canonical reference:** `../tce-blackjack/src/scenes/BlackjackScene.ts` — migrated to two SLL-anchored `HandView` instances with `centerX` row anchoring and a `flipCard()`-based hole-card reveal; its browser tests (`tests/blackjack/BlackjackHandView.browser.test.ts`) verify the rendering path.
 
 For non-standard card models (tokens, resource icons, expedition cards), use the `CardTextureResolver` / `renderCard` callbacks documented in the [UI Adapter Guide](ui/ADAPTER-GUIDE.md). See the [Gym scene index](gym/GYM_INDEX.md) for the complete HandView/PileView scene-to-API mapping.
 
@@ -1489,19 +1489,19 @@ For non-standard card models (tokens, resource icons, expedition cards), use the
 - With an empty hand, `maxSlots` outlines render centred on the hand centre — the player sees the hand's capacity before any card is drawn.
 - **Capacity-driven, stable slots (CG-0MUAYBB4E007LWEQ).** When `maxSlots` is set the card row is placed into the *same fixed capacity template* the empty hand renders, so adding a card fills the next empty slot to the right without re-centring the row — every already-placed card and every outline slot keeps its exact position (and rotation) as cards are added, up to capacity. The layout is keyed on `maxSlots !== undefined`, so toggling `showPositionOutlines` never moves cards (`showPositionOutlines` is purely visual). `setMaxSlots()` is the only mutation that re-lays the row (capacity change). Transiently over-capacity hands keep the first `maxSlots` slots fixed, cap outlines at `maxSlots`, and continue overflow cards to the right with the same step. Hands without `maxSlots` keep the legacy centred-on-count row.
 
-Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max hand size 7, toggle button) and `example-games/main-street/scenes/MainStreetRenderer.ts`. Tests: `tests/ui/handView.outlines.test.ts`, `tests/handView/gym-handpile-outlines.browser.test.ts`, `tests/main-street/hand-outlines.browser.test.ts`.
+Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max hand size 7, toggle button) and `../tce-main-street/src/scenes/MainStreetRenderer.ts`. Tests: `tests/ui/handView.outlines.test.ts`, `tests/handView/gym-handpile-outlines.browser.test.ts`, `tests/main-street/hand-outlines.browser.test.ts`.
 
 ## Animation & Sound Feedback for Player and AI Actions
 
 **Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops.)
 
-**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoAiScheduler.ts` schedules AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then dispatches the AI's action through the same animated/sounded path as a human turn (rendered by `ColorettoRenderer`, orchestrated by `ColorettoScene`).
+**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `../tce-coloretto/src/scenes/ColorettoAiScheduler.ts` schedules AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then dispatches the AI's action through the same animated/sounded path as a human turn (rendered by `ColorettoRenderer`, orchestrated by `ColorettoScene`).
 
 **Accessibility:** Reduced-motion preferences (explicit flag → SettingsStore toggle → `prefers-reduced-motion`; see the [Accessibility](ui-animations.md#accessibility) section of the animation helpers reference) and the settings-panel mute/volume controls must be respected — pass the helper's `reducedMotion` flag and play SFX through `SoundManager` (or `safePlaySound()` for overlay helpers) so mute and volume apply uniformly. This requirement reinforces, never weakens, accessibility behaviour.
 
 **Exceptions:** Actions that legitimately have no visible or audible effect, and headless/replay/test/transcript modes (no rendering or audio), are exempt. Document any exemption in code comments and/or the scene's help text.
 
-**Compliant references:** Golf's `GolfAnimator` (`example-games/golf/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates and sounds AI turns (above); Blackjack preserves flip-sound timing and runs the dealer AI on a delay (`example-games/blackjack/scenes/BlackjackScene.ts`). New games should follow these patterns.
+**Compliant references:** Golf's `GolfAnimator` (`../tce-golf/src/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates and sounds AI turns (above); Blackjack preserves flip-sound timing and runs the dealer AI on a delay (`../tce-blackjack/src/scenes/BlackjackScene.ts`). New games should follow these patterns.
 
 Gym reference scenes: [`GymAudioFeedbackScene`](../example-games/gym/scenes/GymAudioFeedbackScene.ts) (event-driven audio, mute/volume, pop text/icon) and [`GymHandPileScene`](../example-games/gym/scenes/GymHandPileScene.ts) (animated deal/discard/flip with SFX hooks). See the [Gym scene index](gym/GYM_INDEX.md) for the scene-to-API mapping.
 
@@ -1519,13 +1519,13 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 
 | Game | Location | Key engine features demonstrated | Tests |
 |------|----------|--------------------------------|-------|
-| 9-Card Golf | `example-games/golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
-| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights), Classic/Citadel deal variants via a persisted pre-game popup (Citadel deals all 52 cards, no pre-placed aces), Canvas-compatible selection highlight (`createCardHighlight`), natural-flow (animated-deal) first-click + click-to-move regression tests | `tests/beleaguered-castle/` (17 files) |
-| Sushi Go! | `example-games/sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
-| Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
-| Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
-| Main Street | `example-games/main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
-| Coloretto | `example-games/coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording. Scene decomposed into helpers: `ColorettoRenderer` (board + animations), `ColorettoInputHandler`, `ColorettoAiScheduler`, `ColorettoOverlays` | `tests/coloretto/` (7 files) |
+| 9-Card Golf | `../tce-golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
+| Beleaguered Castle | `../tce-beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights), Classic/Citadel deal variants via a persisted pre-game popup (Citadel deals all 52 cards, no pre-placed aces), Canvas-compatible selection highlight (`createCardHighlight`), natural-flow (animated-deal) first-click + click-to-move regression tests | `tests/beleaguered-castle/` (17 files) |
+| Sushi Go! | `../tce-sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
+| Feudalism | `../tce-feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
+| Lost Cities | `../tce-lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
+| Main Street | `../tce-main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
+| Coloretto | `../tce-coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording. Scene decomposed into helpers: `ColorettoRenderer` (board + animations), `ColorettoInputHandler`, `ColorettoAiScheduler`, `ColorettoOverlays` | `tests/coloretto/` (7 files) |
 
 ### Lost Cities card assets
 
@@ -1712,10 +1712,10 @@ not set `antialias: false` (or `pixelArt: true`) in a card game — it is the
 Phaser pixel-art setting.
 
 The committed 1024×1024 source sprites live in
-`example-games/main-street/sprites/<Name>_1024_x_1024.png` (the source of
+`../tce-main-street/src/sprites/<Name>_1024_x_1024.png` (the source of
 truth; the `_64_x_64.png` files are superseded legacy thumbnails). Run
 `node scripts/generate-main-street-card-art.mjs` to regenerate
-`example-games/main-street/card-art-map.json` (card name → base64 data URI,
+`../tce-main-street/src/card-art-map.json` (card name → base64 data URI,
 plus spelling aliases and a `Fallback` entry); the script downscales each
 1024×1024 sprite to 256×256 and re-encodes it as lossy WebP (quality 90),
 which keeps the inline map small (~0.6 MB) despite carrying 16× the pixels of
@@ -2077,7 +2077,7 @@ Use commit-level reverts on the feature branch if a rendering regression is disc
 
 ```bash
 git checkout <feature-branch>
-git log --oneline -- example-games/main-street/scenes src/ui tests/main-street
+git log --oneline -- ../tce-main-street/src/scenes src/ui tests/main-street
 git revert <commit-hash>
 npm test
 npm run build
@@ -2250,23 +2250,23 @@ The following games have been migrated to use SLL layout helpers:
 
 | Game | Layout file | Adapter |
 |------|------------|---------|
-| Golf | `example-games/golf/layouts/golf.layout.json` | `example-games/golf/scenes/GolfLayoutAdapter.ts` |
-| Beleaguered Castle | `example-games/beleaguered-castle/layouts/beleaguered-castle.layout.json` | `example-games/beleaguered-castle/scenes/BeleagueredCastleLayoutAdapter.ts` |
-| Main Street | `example-games/main-street/layouts/main-street.layout.json` | `example-games/main-street/scenes/MainStreetLayoutAdapter.ts` |
+| Golf | `../tce-golf/src/layouts/golf.layout.json` | `../tce-golf/src/scenes/GolfLayoutAdapter.ts` |
+| Beleaguered Castle | `../tce-beleaguered-castle/src/layouts/beleaguered-castle.layout.json` | `../tce-beleaguered-castle/src/scenes/BeleagueredCastleLayoutAdapter.ts` |
+| Main Street | `../tce-main-street/src/layouts/main-street.layout.json` | `../tce-main-street/src/scenes/MainStreetLayoutAdapter.ts` |
 
 Games with layout files and adapters ready for renderer integration:
 
 | Game | Layout file | Adapter |
 |------|------------|---------|
-| Feudalism | `example-games/feudalism/layouts/feudalism.layout.json` | `example-games/feudalism/scenes/FeudalismLayoutAdapter.ts` |
-| Sushi Go | `example-games/sushi-go/layouts/sushi-go.layout.json` | `example-games/sushi-go/scenes/SushiGoLayoutAdapter.ts` |
-| Lost Cities | `example-games/lost-cities/layouts/lost-cities.layout.json` | `example-games/lost-cities/scenes/LostCitiesLayoutAdapter.ts` |
+| Feudalism | `../tce-feudalism/src/layouts/feudalism.layout.json` | `../tce-feudalism/src/scenes/FeudalismLayoutAdapter.ts` |
+| Sushi Go | `../tce-sushi-go/src/layouts/sushi-go.layout.json` | `../tce-sushi-go/src/scenes/SushiGoLayoutAdapter.ts` |
+| Lost Cities | `../tce-lost-cities/src/layouts/lost-cities.layout.json` | `../tce-lost-cities/src/scenes/LostCitiesLayoutAdapter.ts` |
 
 ### Main Street canonical example
 
-- Layout file: `example-games/main-street/layouts/main-street.layout.json`
-- Adapter: `example-games/main-street/scenes/MainStreetLayoutAdapter.ts`
-- Renderer integration: `example-games/main-street/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
+- Layout file: `../tce-main-street/src/layouts/main-street.layout.json`
+- Adapter: `../tce-main-street/src/scenes/MainStreetLayoutAdapter.ts`
+- Renderer integration: `../tce-main-street/src/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
 
 ### Gym SLL demo example
 
@@ -2322,7 +2322,7 @@ The pipeline has two layers:
 
 #### Layer 1: Overlay Specification (`UpgradeOverlaySpec.ts`)
 
-Location: `example-games/main-street/scenes/UpgradeOverlaySpec.ts`
+Location: `../tce-main-street/src/scenes/UpgradeOverlaySpec.ts`
 
 This is a **pure data module** with no Phaser or runtime dependencies. It defines three interfaces:
 
@@ -2358,7 +2358,7 @@ BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlayS
 
 #### Layer 2: Overlay Rendering (`MainStreetRenderer.applyUpgradeOverlays()`)
 
-Location: `example-games/main-street/scenes/MainStreetRenderer.ts` — `applyUpgradeOverlays()` method.
+Location: `../tce-main-street/src/scenes/MainStreetRenderer.ts` — `applyUpgradeOverlays()` method.
 
 This method reads the `UpgradeOverlaySpec` and creates Phaser game objects as children of the card's container:
 
@@ -2695,11 +2695,11 @@ The following table lists helpers that were extracted from individual game scene
 
 | Old location (scene) | Old name | New location | New name |
 |---|---|---|---|
-| `example-games/main-street/scenes/MainStreetScene.ts` | Inline HUD container creation | `@ui/Renderer` | `createHudContainer` |
-| `example-games/main-street/scenes/MainStreetScene.ts` | Inline HUD text styling | `@ui/Renderer` | `createHudText` |
-| `example-games/main-street/scenes/MainStreetScene.ts` | Inline tooltip zone setup | `@ui/Renderer` | `attachHudTooltipZone` |
-| `example-games/main-street/scenes/MainStreetScene.ts` | Inline action button creation | `@ui/Renderer` | `createActionButton` |
-| `example-games/main-street/scenes/MainStreetRenderer.ts` | `renderCardSvg` (local) | `@ui/Renderer` | `renderCardSvg` |
+| `../tce-main-street/src/scenes/MainStreetScene.ts` | Inline HUD container creation | `@ui/Renderer` | `createHudContainer` |
+| `../tce-main-street/src/scenes/MainStreetScene.ts` | Inline HUD text styling | `@ui/Renderer` | `createHudText` |
+| `../tce-main-street/src/scenes/MainStreetScene.ts` | Inline tooltip zone setup | `@ui/Renderer` | `attachHudTooltipZone` |
+| `../tce-main-street/src/scenes/MainStreetScene.ts` | Inline action button creation | `@ui/Renderer` | `createActionButton` |
+| `../tce-main-street/src/scenes/MainStreetRenderer.ts` | `renderCardSvg` (local) | `@ui/Renderer` | `renderCardSvg` |
 ### Before and after migration examples
 
 **Before (Main Street — inline in scene):**
@@ -2836,10 +2836,10 @@ reusing base layout zones through composition.
 
 | File | Purpose |
 |------|--------|
-| `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
-| `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
-| `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T26 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
+| `../tce-main-street/src/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
+| `../tce-main-street/src/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
+| `../tce-main-street/src/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
+| `../tce-main-street/src/TutorialFlow.ts` | T1-T26 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
 
 #### How composition works
 
@@ -2923,7 +2923,7 @@ When creating a new tutorial layout file:
 5. **Add anchors** for each zone (used for tooltip positioning relative to the zone)
 6. **Validate** with `validateScreenLayoutDocument()` and `composeResolvedLayouts()` before committing
 
-See `example-games/main-street/layouts/main-street-tutorial.layout.json` for a complete example.
+See `../tce-main-street/src/layouts/main-street-tutorial.layout.json` for a complete example.
 
 #### Tutorial tooltip input routing (DOM pass-through prevention)
 
@@ -3478,9 +3478,9 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   - `src/ui/debug/MarketCardCheatOverlay.ts` — Overlay, picker, filtering
     (`filterEntries()`), keyboard navigation, and `createMarketCardCheatTool()`
     factory (label/description matched to the acceptance criteria).
-  - `example-games/main-street/MainStreetMarket.ts` — `cheatReplaceMarketCard()`
+  - `../tce-main-street/src/MainStreetMarket.ts` — `cheatReplaceMarketCard()`
     helper that performs the random-slot replacement and discard routing.
-  - `example-games/main-street/scenes/MainStreetScene.ts` — Dev-gated wiring
+  - `../tce-main-street/src/scenes/MainStreetScene.ts` — Dev-gated wiring
     (`import.meta.env.DEV` branch in `initSettingsPanel`) so the tool is
     absent/tree-shaken from production bundles.
 
@@ -3513,11 +3513,11 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
 - **Implementation:**
   - `src/ui/debug/StaffApplicantCheatOverlay.ts` — Toggle overlay and
     `createStaffApplicantCheatTool()` factory.
-  - `example-games/main-street/MainStreetState.ts` — `forcedStaffApplicant?:
+  - `../tce-main-street/src/MainStreetState.ts` — `forcedStaffApplicant?:
     boolean` dev-only field (not serialized).
-  - `example-games/main-street/MainStreetEngine.ts` — `computeApplicantChance()`
+  - `../tce-main-street/src/MainStreetEngine.ts` — `computeApplicantChance()`
     (exported) and the forced branch in `resolveStaffApplicant()`.
-  - `example-games/main-street/scenes/MainStreetScene.ts` — Dev-gated wiring
+  - `../tce-main-street/src/scenes/MainStreetScene.ts` — Dev-gated wiring
     (`import.meta.env.DEV` branch in `initSettingsPanel`).
 
 ### Adding a New Debug Tool
@@ -3593,7 +3593,7 @@ To verify production safety:
 | `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
 | `src/ui/debug/MarketCardCheatOverlay.ts` | Market Card Cheat overlay (Main Street market-replacement picker) |
 | `src/ui/debug/StaffApplicantCheatOverlay.ts` | Staff Application cheat overlay (Main Street forced-applicant toggle) |
-| `example-games/main-street/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
+| `../tce-main-street/src/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
 | `src/ui/debug/index.ts` | Debug tools barrel file |
 | `src/ui/CardGameScene.ts` | Default debug tool registration |
 | `src/ui/SettingsPanel.ts` | Debug section rendering in Settings panel |
