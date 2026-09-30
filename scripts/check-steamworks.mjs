@@ -2,11 +2,12 @@
  * Pre-flight check for a Steam build of the TCE launcher (F3,
  * CG-0MSMAJQQT004SDCC).
  *
- * `steamworks.js` is an *optional* native module — intentionally not a
- * package.json dependency so ordinary installs/CI never need a native build.
- * A Steam distribution build must install it explicitly:
+ * `steamworks.js` is a normal package.json dependency (it ships prebuilt
+ * binaries with no install-time build hook). This pre-flight still guards a
+ * Steam distribution build, since the module may be absent from a pruned
+ * install:
  *
- *   npm install steamworks.js
+ *   npm install
  *   npm run package:steam
  *
  * Exits 0 when the module resolves, non-zero with actionable guidance when it
@@ -23,8 +24,8 @@ try {
 } catch {
   console.error(
     '[steam] steamworks.js is not installed.\n' +
-      '        A Steam build requires the native module:\n\n' +
-      '            npm install steamworks.js\n' +
+      '        A Steam build requires the module:\n\n' +
+      '            npm install\n' +
       '            npm run package:steam\n\n' +
       '        For a non-Steam build use `npm run package`; the launcher builds\n' +
       '        and runs without Steam (the follow feature degrades gracefully).',

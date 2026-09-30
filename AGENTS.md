@@ -67,7 +67,7 @@ npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
 npm run start:electron   # Build + launch the Electron desktop app locally
 npm run package          # Package a desktop binary for the host platform (package:win/linux/mac variants)
-npm run package:steam    # Steam build: requires `npm install steamworks.js` first (Windows NSIS)
+npm run package:steam    # Steam build: builds the follow addon + Windows NSIS package
 ```
 
 ### Quality Gates
@@ -507,10 +507,11 @@ The TCE launcher's Steam follow-to-unlock mechanic is the canonical example
   present at runtime (a Steam client, a native module, a desktop API). Define
   the seam as an interface, ship a fake, and make every path total — return a
   safe value rather than throwing when the dependency is absent.
-- **Graceful degradation:** the native module is **not** a `package.json`
-  dependency; a `package:steam` script (`scripts/check-steamworks.mjs`) requires
-  it explicitly, and the launcher degrades to a hidden/fallback CTA when it is
-  missing (never a crash).
+- **Graceful degradation:** the native module is a normal `package.json`
+  dependency (it ships prebuilt binaries with no install-time build hook); a
+  `package:steam` script (`scripts/check-steamworks.mjs`) still pre-flights it,
+  and the launcher degrades to a hidden/fallback CTA when it is missing (never
+  a crash).
 - **Private credentials are never committed:** Steam App ID / developer
   SteamID64 come from env vars or a gitignored `electron/steam-config.local.json`,
   with a placeholder `steam-config.example.json` documenting the shape.

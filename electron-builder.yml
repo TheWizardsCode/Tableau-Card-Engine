@@ -26,12 +26,12 @@ directories:
 # with one exception: the optional Steamworks native module (F3,
 # CG-0MSMAJQQT004SDCC).
 #
-# `steamworks.js` is NOT a package.json dependency (installing it requires a
-# native build and must not break non-Steam dev/CI installs). A Steam build
-# installs it explicitly (`npm install steamworks.js`) before packaging; the
-# globs below then pick it up and unpack the native binaries from the asar so
-# the Steam client can load them. Without it the launcher still runs — the
-# Steam feature degrades gracefully (intake AC5).
+# `steamworks.js` is a normal package.json dependency (it ships prebuilt
+# binaries and has no install-time build hook, so non-Steam dev/CI installs
+# need no native toolchain). The globs below pick it up and unpack the native
+# binaries from the asar so the Steam client can load them. If the module or
+# Steam itself is unavailable the launcher still runs — the Steam feature
+# degrades gracefully (intake AC5).
 files:
   - dist/**
   - dist-electron/**

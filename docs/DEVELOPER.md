@@ -339,13 +339,13 @@ The Steamworks bootstrap also honours `steam_appid.txt` (the SDK convention) via
 `loadSteamAppId({ appRoot })`. `steam_appid.txt` and the local config must never
 be committed.
 
-**Building a Steam binary.** `steamworks.js` is intentionally **not** a
-`package.json` dependency (it is a native module; ordinary installs/CI must not
-need a native build). A Steam build installs it explicitly, builds the follow
-detection addon, and uses the Steam package script:
+**Building a Steam binary.** `steamworks.js` is declared as a normal
+`package.json` dependency: it ships prebuilt binaries for Windows/Linux/macOS
+and has no install-time build hook, so `npm install`/`npm ci` need no native
+toolchain. A Steam build still builds the follow-detection addon and uses the
+Steam package script:
 
 ```bash
-npm install steamworks.js        # optional SDK binding (once)
 npm run build:steam-friends      # build the follow addon (Windows x64)
 npm run package:steam            # pre-flights + Windows NSIS package
 ```

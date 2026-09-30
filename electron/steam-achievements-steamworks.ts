@@ -72,8 +72,8 @@ export interface SteamworksAchievementSourceOptions {
  * module. Any failure (module not installed, native ABI mismatch, no Steam) is
  * reported as `null` so the caller degrades gracefully.
  *
- * The specifier is held in a variable so TypeScript/Vite do not try to resolve
- * the optional module at build time (it is intentionally not a dependency).
+ * The specifier is held in a variable so TypeScript/Vite do not resolve the
+ * module eagerly at build time; it is loaded dynamically at runtime.
  */
 export const defaultSteamworksAchievementLoader: SteamworksAchievementModuleLoader = async () => {
   const specifier = 'steamworks.js';

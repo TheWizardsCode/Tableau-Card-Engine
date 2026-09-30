@@ -5,7 +5,16 @@
  * Electron, or browser required. Covers the happy path, capability detection,
  * every failure/throw path (methods stay total), and graceful degradation.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// `steamworks.js` is a normal package.json dependency (ships prebuilt binaries,
+// no install-time build hook), so ambient module absence can no longer be
+// relied on to exercise the loader's graceful-degradation branch. Mock the
+// import to reject instead — the same failure mode as a pruned install or a
+// load-time error.
+vi.mock('steamworks.js', () => {
+  throw new Error('steamworks.js unavailable');
+});
 
 import {
   SteamworksAchievementSource,
@@ -335,11 +344,10 @@ describe('SteamworksAchievementSource.close', () => {
   });
 });
 
-// ── Default loader (optional module absence) ────────────────
+// ── Default loader (graceful degradation) ───────────────────
 
 describe('defaultSteamworksAchievementLoader', () => {
-  it('resolves null when steamworks.js is not installed', async () => {
-    // The optional native module is intentionally not a dependency.
+  it('resolves null when the steamworks.js import fails', async () => {
     await expect(defaultSteamworksAchievementLoader()).resolves.toBeNull();
   });
 
