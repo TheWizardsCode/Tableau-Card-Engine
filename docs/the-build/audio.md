@@ -2,13 +2,17 @@
 
 This project uses a **ToneForge-generated runtime module** for synth-mapped SFX integration.
 
-- We do **not** commit generated tf artifacts.
+- The **runtime synth module** is committed to source control at
+  `public/build/tf-synths/main-street-runtime-synth.mjs`.
+- WAV files, JSON metadata, and the metadata module remain **uncommitted**.
 - Existing WAV asset playback remains as fallback.
 - Runtime integration is via `tfAdapter` + `SoundManager` synth key mapping.
 
-## Install ToneForge CLI
+## ToneForge CLI (optional)
 
-If `tf` is not available on your PATH, install ToneForge according to your environment.
+The ToneForge CLI (`tf`) is **optional** — the runtime synth module shipped
+in `public/build/tf-synths/main-street-runtime-synth.mjs` works without it.
+Install ToneForge only if you want to regenerate the module.
 
 Verify installation:
 
@@ -16,9 +20,9 @@ Verify installation:
 tf --help
 ```
 
-## Generate Main Street tf artifacts
+## Generating tf artifacts
 
-Run:
+When `tf` is available, regenerate all outputs:
 
 ```bash
 npm run tf:generate
@@ -26,10 +30,16 @@ npm run tf:generate
 
 This command executes `scripts/tf-generate-synths.sh` and writes outputs to:
 
-- `build/tf-synths/wav/*.wav`
-- `build/tf-synths/main-street-tf-module.mjs` (metadata)
-- `build/tf-synths/main-street-runtime-synth.mjs` (Tone/WebAudio runtime synth factories)
-- `build/tf-synths/*.json` metadata
+- `build/tf-synths/wav/*.wav` (generated, gitignored)
+- `build/tf-synths/main-street-tf-module.mjs` (metadata, generated)
+- `build/tf-synths/main-street-runtime-synth.mjs` (runtime synth factories)
+- `build/tf-synths/*.json` (metadata, generated)
+- **Also copied to:** `public/build/tf-synths/main-street-runtime-synth.mjs`
+  (the committed, source-controlled version)
+
+The runtime module is **always** available in `public/build/tf-synths/`,
+even without the `tf` CLI. The `build/tf-synths/` tree is gitignored and
+only exists for local regeneration.
 
 To use a custom output path:
 

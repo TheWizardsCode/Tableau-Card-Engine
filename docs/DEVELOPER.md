@@ -60,13 +60,20 @@ Starts the Vite dev server at `http://localhost:3000` with hot module replacemen
 
 ### ToneForge Synth Module
 
-If you plan to use Main Street's ToneForge-backed audio synthesis, generate the synth module first:
+Main Street ships with a committed ToneForge runtime synth module at
+`public/build/tf-synths/main-street-runtime-synth.mjs` that works out of the
+box — no `tf` CLI or generation step required. The module is loaded dynamically
+at runtime by `loadMainStreetTfModule()`.
+
+Optionally regenerate the runtime module (requires ToneForge CLI):
 
 ```bash
 npm run tf:generate
 ```
 
-If the synth module is missing, `loadMainStreetTfModule()` logs a clear warning and gracefully degrades (returns `null`). Synthesis-based audio will be unavailable but WAV-based sound effects continue to work normally.
+This writes regenerated outputs to both `build/tf-synths/` and
+`public/build/tf-synths/`. The committed file in `public/build/tf-synths/` is
+the single source of truth for shipped builds.
 
 ### Multi-Game Routing
 
@@ -1047,15 +1054,51 @@ See [docs/dev/context-budget.md](dev/context-budget.md) for what the gate measur
 
 ## ToneForge Audio Generation
 
-ToneForge-generated synth artifacts are integrated via a thin adapter and are **not committed** to source control.
+ToneForge-generated synth artifacts are integrated via a thin adapter. The
+**runtime synth module** (`public/build/tf-synths/main-street-runtime-synth.mjs`)
+is committed to source control and ships with every build. Other generated
+outputs (WAV files, JSON metadata, metadata module) remain **uncommitted** and
+are generated on-demand.
+
+### Source-controlled artefact
+
+```
+public/build/tf-synths/main-street-runtime-synth.mjs   # committed, single source of truth
+```
+
+### Generated outputs (not committed)
+
+```
+build/tf-synths/wav/*.wav                              # generated on demand
+build/tf-synths/main-street-tf-module.mjs              # generated on demand
+build/tf-synths/*.json                                 # generated on demand
+```
+
+### Regeneration
+
+When ToneForge CLI (`tf`) is available, regenerate all outputs:
 
 ```bash
 npm run tf:generate
 ```
 
-This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `build/tf-synths/`, including a runtime synth module (`main-street-runtime-synth.mjs`) used for on-the-fly synthesis.
+This runs `scripts/tf-generate-synths.sh` and writes:
 
-> **Missing module handling:** If the runtime synth module is absent, `loadMainStreetTfModule()` in `mainStreetTfModule.ts` logs a clear `console.warn` message with instructions to run `npm run tf:generate`, then gracefully returns `null` without triggering a Chromium module-loading error. Synthesis-based audio degrades silently; WAV-based SFX and game logic are unaffected.
+- WAV files and metadata to `build/tf-synths/` (gitignored, on-demand only)
+- The runtime synth module to both `build/tf-synths/` **and**
+  `public/build/tf-synths/` (the latter is the committed, shipped version)
+
+If `tf` is not installed, `npm run tf:generate` emits a warning and exits
+successfully — `npm run dev` and `npm run build` never depend on it.
+
+### Missing module handling
+
+The committed runtime module is always available in `public/build/tf-synths/`.
+If for some reason it is absent, `loadMainStreetTfModule()` in the sibling
+Main Street repo's `mainStreetTfModule.ts` logs a clear `console.warn` message
+and gracefully returns `null` without triggering a Chromium module-loading
+error. Synthesis-based audio degrades silently; WAV-based SFX and game logic
+are unaffected.
 
 See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 
