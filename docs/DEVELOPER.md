@@ -2909,11 +2909,11 @@ See the Gym SLL demo (`example-games/gym/scenes/GymSllScene.ts`) for a working e
 
 When adding a new example game, follow this pattern:
 
-1. **Create a layout JSON file** in `example-games/<game>/layouts/<game>.layout.json` with **position-only** normalized zone rectangles (`x`, `y`) and anchors. Use `baseViewport` of 1280x720 (matching the shared `GAME_W`/`GAME_H` constants).
+1. **Create a layout JSON file** in `src/layouts/<game>.layout.json` with **position-only** normalized zone rectangles (`x`, `y`) and anchors. Use `baseViewport` of 1280x720 (matching the shared `GAME_W`/`GAME_H` constants).
 
    **Important**: Layout zones define **positioning only** (`x`, `y`). Card dimensions come entirely from per-game constants (e.g., `CARD_W`, `CARD_H`), not from layout zones. The `pixelOverride` field supports exact pixel-position overrides for `x` and `y` only — no dimensions.
 
-2. **Create a layout adapter** in `example-games/<game>/scenes/<Game>LayoutAdapter.ts` that:
+2. **Create a layout adapter** in `src/scenes/<Game>LayoutAdapter.ts` that:
    - Parses the layout JSON using `parseScreenLayoutDocument`
    - Defines a typed `GameLayout` interface with the positions your renderer needs
    - Exports a `compute<Game>Layout()` function that maps SLL zones to the game-specific shape, falling back to legacy values if the SLL document is unavailable
