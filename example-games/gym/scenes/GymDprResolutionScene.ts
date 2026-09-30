@@ -6,8 +6,8 @@
  * `rasteriseSvgToTexture` at DPR 1, 2 and 3. Each panel is labelled with its
  * DPR, the resolved quality scale (`Math.max(MIN_QUALITY_SCALE, dpr)`), the
  * resulting canvas (texture) dimensions, and the logical display size. A
- * zoom toggle crops a shared detail region and displays it at 2x so the
- * supersample difference is visible.
+ * zoom toggle magnifies a shared detail region to 2x so the supersample
+ * difference is visible.
  *
  * The scene makes the native-resolution contract introduced in
  * CG-0MUCMB8DT003DAKR visually verifiable: at DPR 1 and 2 the canvas is
@@ -87,11 +87,27 @@ const TEMPLATE_ID = 'dpr-demo';
 /** Zoom factor applied to the cropped detail region. */
 const ZOOM_FACTOR = 2;
 
+/** Zoom factor applied to the cropped detail region (exported for tests). */
+export const DPR_ZOOM_FACTOR = ZOOM_FACTOR;
+
 /** Crop rectangle (logical px) used by the zoom toggle. */
 const CROP_X = 4;
 const CROP_Y = 4;
 const CROP_W = 70;
 const CROP_H = 40;
+
+/**
+ * Logical crop rectangle inspected by the zoom toggle (exported for tests).
+ *
+ * The crop is expressed in logical card pixels; each panel addresses its own
+ * rasterised texture by multiplying these values by its `qualityScale`.
+ */
+export const DPR_DEMO_CROP = {
+  x: CROP_X,
+  y: CROP_Y,
+  width: CROP_W,
+  height: CROP_H,
+} as const;
 
 /** Vertical offset of a panel title from the panel centre. */
 const PANEL_TITLE_DY = -62;
@@ -155,6 +171,25 @@ interface DprPanel {
   infoText: Phaser.GameObjects.Text;
   /** Rasterised card image (created after the first successful render). */
   image: Phaser.GameObjects.Image | null;
+  /** Active crop rectangle in texture px, or `null` when not cropped. */
+  crop: { x: number; y: number; width: number; height: number } | null;
+}
+
+/** Observable zoom state for one panel (used by tests and diagnostics). */
+export interface DprZoomMetric {
+  /** Device pixel ratio shown in this panel. */
+  dpr: number;
+  /** Whether the panel is currently showing the magnified crop. */
+  zoomed: boolean;
+  /** Crop rectangle in texture pixels, or `null` when not cropped. */
+  crop: { x: number; y: number; width: number; height: number } | null;
+  /** Texture-to-screen scale applied to the cropped region. */
+  scale: number;
+  /** Rendered width/height of the crop in screen pixels. */
+  renderedWidth: number;
+  renderedHeight: number;
+  /** Display origin in texture px — equals the crop centre when zoomed. */
+  displayOrigin: { x: number; y: number };
 }
 
 export class GymDprResolutionScene extends GymSceneBase {
@@ -203,7 +238,7 @@ export class GymDprResolutionScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: '[ Re-render ]: Rasterise all three panels again (textures are cached, so this is instant).\n[ Toggle Zoom 2x ]: Crop a shared detail region (the top-left corner) and display it at 2x. Compare how the same crop looks at each DPR.\n[ Clear ]: Destroy the panel images and reset the log.',
+        body: '[ Re-render ]: Rasterise all three panels again (textures are cached, so this is instant).\n[ Toggle Zoom 2x ]: Magnify a shared detail region (the top-left corner) to 2x the logical crop size. Cropping alone only clips — Phaser does not enlarge a cropped region — so the crop is also scaled up and re-anchored on its centre. Compare how the same region looks at each DPR.\n[ Clear ]: Destroy the panel images and reset the log.',
       },
       {
         heading: 'Usage Example',
@@ -269,6 +304,7 @@ export class GymDprResolutionScene extends GymSceneBase {
         titleText,
         infoText,
         image: null,
+        crop: null,
       });
     }
 
@@ -388,7 +424,7 @@ export class GymDprResolutionScene extends GymSceneBase {
    * Toggle the 2x zoom/crop view.
    *
    * Applies the same logical crop region to every panel, scaled into each
-   * texture's own pixel space so the comparison stays fair.
+   * texture's own pixel space and magnified so the comparison stays fair.
    */
   toggleZoom(): void {
     this.zoomed = !this.zoomed;
@@ -406,7 +442,12 @@ export class GymDprResolutionScene extends GymSceneBase {
    * Apply the current zoom state to every panel image.
    *
    * Cropping is expressed in texture pixels, so the logical crop is
-   * multiplied by each panel's quality scale.
+   * multiplied by each panel's quality scale. Phaser's `setCrop` only limits
+   * which texels are drawn — it does not enlarge them — so the crop is also
+   * scaled by `ZOOM_FACTOR / qualityScale` (giving a uniform
+   * `CROP_W*ZOOM_FACTOR` by `CROP_H*ZOOM_FACTOR` logical display size) and the
+   * origin is moved onto the crop centre so the magnified detail lands in the
+   * same place on every panel.
    */
   private applyZoom(): void {
     if (this.shuttingDown) return;
@@ -416,11 +457,25 @@ export class GymDprResolutionScene extends GymSceneBase {
 
       if (this.zoomed) {
         const q = panel.qualityScale;
-        image.setCrop(CROP_X * q, CROP_Y * q, CROP_W * q, CROP_H * q);
-        image.setDisplaySize(CROP_W * ZOOM_FACTOR, CROP_H * ZOOM_FACTOR);
+        const cropX = CROP_X * q;
+        const cropY = CROP_Y * q;
+        const cropW = CROP_W * q;
+        const cropH = CROP_H * q;
+
+        image.setCrop(cropX, cropY, cropW, cropH);
+        image.setOrigin(
+          (cropX + cropW / 2) / image.frame.realWidth,
+          (cropY + cropH / 2) / image.frame.realHeight,
+        );
+        image.setScale(ZOOM_FACTOR / q);
+        image.setPosition(panel.x, panel.y);
+        panel.crop = { x: cropX, y: cropY, width: cropW, height: cropH };
       } else {
         image.setCrop();
+        image.setOrigin(0.5, 0.5);
         image.setDisplaySize(DPR_DEMO_LOGICAL_W, DPR_DEMO_LOGICAL_H);
+        image.setPosition(panel.x, panel.y);
+        panel.crop = null;
       }
     }
   }
@@ -472,6 +527,44 @@ export class GymDprResolutionScene extends GymSceneBase {
    */
   getPanelImages(): Array<Phaser.GameObjects.Image | null> {
     return this.panels.map((panel) => panel.image);
+  }
+
+  /**
+   * Test/diagnostic: observable zoom metrics for every panel.
+   *
+   * Reports each panel's crop rectangle, texture-to-screen scale and the
+   * rendered (on-screen) size of the cropped region. When zoomed, the rendered
+   * size is `DPR_DEMO_CROP.width * DPR_ZOOM_FACTOR` on every panel and the
+   * display origin sits exactly on the crop centre — this is what proves the
+   * view magnifies the crop rather than merely clipping it.
+   */
+  getZoomMetrics(): DprZoomMetric[] {
+    return this.panels.map((panel) => {
+      const image = panel.image;
+      if (!image) {
+        return {
+          dpr: panel.dpr,
+          zoomed: false,
+          crop: null,
+          scale: 0,
+          renderedWidth: 0,
+          renderedHeight: 0,
+          displayOrigin: { x: 0, y: 0 },
+        };
+      }
+
+      const scale = Math.abs(image.scaleX);
+      const crop = panel.crop;
+      return {
+        dpr: panel.dpr,
+        zoomed: image.isCropped,
+        crop,
+        scale,
+        renderedWidth: crop ? crop.width * scale : image.displayWidth,
+        renderedHeight: crop ? crop.height * scale : image.displayHeight,
+        displayOrigin: { x: image.displayOriginX, y: image.displayOriginY },
+      };
+    });
   }
 
   // ── Logging ────────────────────────────────────────────────

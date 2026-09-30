@@ -13,8 +13,13 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
-import { GymDprResolutionScene } from '../../example-games/gym/scenes/GymDprResolutionScene';
+import {
+  DPR_DEMO_CROP,
+  DPR_ZOOM_FACTOR,
+  GymDprResolutionScene,
+} from '../../example-games/gym/scenes/GymDprResolutionScene';
 import { GYM_DPR_RESOLUTION_KEY } from '../../example-games/gym/GymRegistry';
+import { MIN_QUALITY_SCALE } from '../../src/core-engine/SvgHelpers';
 import { waitForScene } from '../helpers/waitForScene';
 
 type PanelSize = { dpr: number; width: number; height: number };
@@ -133,6 +138,50 @@ describe('GymDprResolutionScene browser integration', () => {
 
     expect(scene.isZoomActive).toBe(false);
     expect(images.every((img) => !img.isCropped)).toBe(true);
+    // The full card is restored at the shared logical display size.
+    for (const img of images) {
+      expect(img.displayWidth).toBeCloseTo(140, 0);
+      expect(img.displayHeight).toBeCloseTo(80, 0);
+    }
+  });
+
+  it('magnifies the cropped detail region to a uniform 2x display size on every panel', async () => {
+    const scene = await boot();
+    await waitForRenderedPanels(scene);
+
+    scene.toggleZoom();
+
+    const metrics = scene.getZoomMetrics();
+    expect(metrics).toHaveLength(3);
+
+    for (const metric of metrics) {
+      const qualityScale = Math.max(MIN_QUALITY_SCALE, metric.dpr);
+      expect(metric.zoomed).toBe(true);
+      expect(metric.crop).not.toBeNull();
+
+      // The logical crop is addressed in each texture's own pixel space.
+      expect(metric.crop!.x).toBeCloseTo(DPR_DEMO_CROP.x * qualityScale, 5);
+      expect(metric.crop!.y).toBeCloseTo(DPR_DEMO_CROP.y * qualityScale, 5);
+      expect(metric.crop!.width).toBeCloseTo(DPR_DEMO_CROP.width * qualityScale, 5);
+      expect(metric.crop!.height).toBeCloseTo(DPR_DEMO_CROP.height * qualityScale, 5);
+
+      // The crop is enlarged, not merely clipped: it renders at 2x the logical
+      // crop size (140x80 px) on every panel, regardless of source resolution.
+      expect(metric.renderedWidth).toBeCloseTo(DPR_DEMO_CROP.width * DPR_ZOOM_FACTOR, 5);
+      expect(metric.renderedHeight).toBeCloseTo(DPR_DEMO_CROP.height * DPR_ZOOM_FACTOR, 5);
+
+      // The object origin is re-anchored on the crop centre so the magnified
+      // detail is centred in the panel rather than pushed into a corner.
+      expect(metric.displayOrigin.x).toBeCloseTo(metric.crop!.x + metric.crop!.width / 2, 5);
+      expect(metric.displayOrigin.y).toBeCloseTo(metric.crop!.y + metric.crop!.height / 2, 5);
+    }
+
+    // At DPR 1 and 2 the 2x-scaled crop lines up 1:1 with the rasterised texels
+    // (native resolution); at DPR 3 it is downscaled from the denser texture.
+    const byDpr = new Map(metrics.map((m) => [m.dpr, m]));
+    expect(byDpr.get(1)!.scale).toBeCloseTo(1, 5);
+    expect(byDpr.get(2)!.scale).toBeCloseTo(1, 5);
+    expect(byDpr.get(3)!.scale).toBeCloseTo(DPR_ZOOM_FACTOR / 3, 5);
   });
 
   it('positions the three panels at distinct SLL anchor columns', async () => {
