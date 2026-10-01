@@ -121,7 +121,7 @@ describe('loadAchievementManifest', () => {
     expect(manifest).not.toBeNull();
     const mainStreet = findGameManifest(manifest!, 'main-street');
     expect(mainStreet).not.toBeNull();
-    expect(mainStreet?.achievements).toHaveLength(12);
+    expect(mainStreet?.achievements).toHaveLength(13);
     // The committed manifest must pass semantic validation.
     expect(validateAchievementManifest(manifest!)).toEqual([]);
   });

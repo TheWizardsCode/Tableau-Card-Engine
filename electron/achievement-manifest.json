@@ -56,6 +56,11 @@
           "hidden": false
         },
         {
+          "achievementId": "serial-seller",
+          "steamApiName": "TCE_MAIN_STREET_SERIAL_SELLER",
+          "hidden": false
+        },
+        {
           "achievementId": "synergy-master",
           "steamApiName": "TCE_MAIN_STREET_SYNERGY_MASTER",
           "hidden": false
