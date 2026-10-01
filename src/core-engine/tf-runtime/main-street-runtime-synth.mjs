@@ -8,9 +8,15 @@
  * (dev server, Vite production build, Electron bundle) and is available
  * without the `tf` CLI.
  *
+ * It lives under `src/` (not `public/`) because Vite refuses to import a
+ * module from `public/`; the runtime imports it with a static specifier, so
+ * Vite/Rollup code-splits it into a lazy chunk (Tone.js stays out of the main
+ * bundle) and resolves its `tone` dependency for every build.
+ * See CG-0MUL2G17U003C1N6.
+ *
  * To regenerate (requires ToneForge CLI):
  *   npm run tf:generate
- * The generator writes to both public/build/tf-synths/ and build/tf-synths/.
+ * The generator writes this file (the committed, single source of truth).
  */
 
 import * as Tone from 'tone';

@@ -141,9 +141,15 @@ module.exports = [
   // assets; Tone.js may only be used by build-time ToneForge synthesis scripts,
   // which live under `scripts/` (including `example-games/<game>/scripts/`) and
   // are excluded below.
+  //
+  // Narrow, documented exception: the committed ToneForge runtime synth module
+  // (`src/core-engine/tf-runtime/`) is generated output loaded via a
+  // static-specifier dynamic import, so Vite/Rollup code-splits it into its own
+  // lazy chunk and Tone.js never enters the main bundle
+  // (CG-0MUL2G17U003C1N6).
   {
     files: ['src/**/*.ts', 'src/**/*.tsx', 'example-games/**/*.ts', 'example-games/**/*.tsx'],
-    ignores: ['**/scripts/**'],
+    ignores: ['**/scripts/**', '**/tf-runtime/**'],
     rules: {
       'no-restricted-imports': [
         'error',

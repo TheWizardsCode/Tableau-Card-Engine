@@ -298,7 +298,7 @@ This approach was chosen for **performance** (no per-level SVG regeneration), **
 
 ## ToneForge runtime adapter (Main Street)
 
-Main Street can optionally route mapped SFX keys through a ToneForge-backed module via `createTfPlayer`. Run `npm run tf:generate` to emit a runtime synth module at `build/tf-synths/main-street-runtime-synth.mjs` providing on-the-fly Tone/WebAudio voices. The adapter expects module exports `factories: Record<string, () => TfVoice>` and optional `getFactory()` / `descriptors` helpers. See `docs/the-build/audio.md` for generation workflow and wiring details.
+Main Street routes mapped SFX keys through a committed ToneForge-backed module via `createTfPlayer`. The runtime synth module is committed at `src/core-engine/tf-runtime/main-street-runtime-synth.mjs` and bundled into every build, so no `tf` CLI or generation step is required. `npm run tf:generate` (when the ToneForge CLI is available) refreshes it and emits WAV/metadata outputs under `build/tf-synths/`. The adapter expects module exports `factories: Record<string, () => TfVoice>` and optional `getFactory()` / `descriptors` helpers. See `docs/the-build/audio.md` for generation workflow and wiring details.
 
 ## Contributing
 

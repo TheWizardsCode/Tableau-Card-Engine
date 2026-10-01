@@ -61,19 +61,28 @@ Starts the Vite dev server at `http://localhost:3000` with hot module replacemen
 ### ToneForge Synth Module
 
 Main Street ships with a committed ToneForge runtime synth module at
-`public/build/tf-synths/main-street-runtime-synth.mjs` that works out of the
-box — no `tf` CLI or generation step required. The module is loaded dynamically
-at runtime by `loadMainStreetTfModule()`.
+`src/core-engine/tf-runtime/main-street-runtime-synth.mjs` that works out of the
+box — no `tf` CLI or generation step required. The runtime imports it with a
+static specifier, so Vite/Rollup code-splits it into a lazy chunk (keeping
+Tone.js out of the main bundle) and ships it in every build (dev server,
+production `dist/`, and the Electron bundle).
 
-Optionally regenerate the runtime module (requires ToneForge CLI):
+> **Why not `public/`?** Vite serves `public/` verbatim and refuses to import a
+> module from it (“This file is in /public and will be copied as-is during build
+> ... it can only be referenced via HTML tags”). The committed module therefore
+> lives under `src/` and is consumed by a static-specifier dynamic import.
+
+Optionally regenerate the runtime module and WAV/metadata outputs (requires
+ToneForge CLI):
 
 ```bash
 npm run tf:generate
 ```
 
-This writes regenerated outputs to both `build/tf-synths/` and
-`public/build/tf-synths/`. The committed file in `public/build/tf-synths/` is
-the single source of truth for shipped builds.
+This refreshes the committed module at
+`src/core-engine/tf-runtime/main-street-runtime-synth.mjs` and writes the
+WAV/JSON/metadata outputs to `build/tf-synths/`. The committed module is the
+single source of truth for shipped builds.
 
 ### Multi-Game Routing
 
@@ -1076,15 +1085,23 @@ See [docs/dev/context-budget.md](dev/context-budget.md) for what the gate measur
 ## ToneForge Audio Generation
 
 ToneForge-generated synth artifacts are integrated via a thin adapter. The
-**runtime synth module** (`public/build/tf-synths/main-street-runtime-synth.mjs`)
+**runtime synth module** (`src/core-engine/tf-runtime/main-street-runtime-synth.mjs`)
 is committed to source control and ships with every build. Other generated
 outputs (WAV files, JSON metadata, metadata module) remain **uncommitted** and
 are generated on-demand.
 
+> **Why `src/` and not `public/`?** Vite refuses to import a module from
+> `public/` (“This file is in /public and will be copied as-is during build ...
+> it can only be referenced via HTML tags”). Putting the committed module under
+> `src/` lets the runtime import it with a static specifier, so Vite/Rollup
+> code-splits it into a lazy chunk (Tone.js never enters the main bundle) and
+> ships it in the dev server, the production `dist/`, and the Electron bundle.
+
 ### Source-controlled artefact
 
 ```
-public/build/tf-synths/main-street-runtime-synth.mjs   # committed, single source of truth
+src/core-engine/tf-runtime/main-street-runtime-synth.mjs   # committed, single source of truth
+src/core-engine/tf-runtime/main-street-runtime-synth.d.mts # hand-written type declaration
 ```
 
 ### Generated outputs (not committed)
@@ -1097,7 +1114,7 @@ build/tf-synths/*.json                                 # generated on demand
 
 ### Regeneration
 
-When ToneForge CLI (`tf`) is available, regenerate all outputs:
+When ToneForge CLI (`tf`) is available, regenerate the outputs:
 
 ```bash
 npm run tf:generate
@@ -1106,20 +1123,22 @@ npm run tf:generate
 This runs `scripts/tf-generate-synths.sh` and writes:
 
 - WAV files and metadata to `build/tf-synths/` (gitignored, on-demand only)
-- The runtime synth module to both `build/tf-synths/` **and**
-  `public/build/tf-synths/` (the latter is the committed, shipped version)
+- The committed runtime synth module to
+  `src/core-engine/tf-runtime/main-street-runtime-synth.mjs` (identical to the
+  committed artefact — regeneration does not drift)
 
 If `tf` is not installed, `npm run tf:generate` emits a warning and exits
 successfully — `npm run dev` and `npm run build` never depend on it.
 
 ### Missing module handling
 
-The committed runtime module is always available in `public/build/tf-synths/`.
-If for some reason it is absent, `loadMainStreetTfModule()` in the sibling
-Main Street repo's `mainStreetTfModule.ts` logs a clear `console.warn` message
-and gracefully returns `null` without triggering a Chromium module-loading
-error. Synthesis-based audio degrades silently; WAV-based SFX and game logic
-are unaffected.
+The committed runtime module is bundled into every build, so it is always
+available. Because it is imported statically there is no runtime URL fetch and
+no “module not found” Chromium error. `loadMainStreetTfModule()` in the sibling
+Main Street repo's `mainStreetTfModule.ts` returns the bundled module
+synchronously; if it is ever absent, the loader logs a warning and gracefully
+returns `null`. Synthesis-based audio degrades silently; WAV-based SFX and game
+logic are unaffected.
 
 See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 
