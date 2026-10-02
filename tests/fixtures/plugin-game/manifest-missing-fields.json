@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "fixture-game",
+      "sceneKey": "FixtureGameScene",
+      "title": "Fixture Game",
+      "description": "Missing the required coreEngineVersion and entry fields.",
+      "thumbnail": "assets/thumbnail.png"
+    }
+  ]
+}

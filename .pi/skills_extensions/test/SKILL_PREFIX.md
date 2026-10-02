@@ -24,6 +24,11 @@ audit or commit → `browser` / `tutorial` / `e2e` for targeted E2E debugging �
 
 - `full` is deliberately omitted from `extension.json`, so a bare
   `/skill:test` (no `--type`) keeps resolving to the genuine full CI suite.
+- Every typed Vitest profile defaults `GAMES_CONFIG` to `full` (an explicit
+  `GAMES_CONFIG=…` still wins), matching the project shell runners so the
+  game-discovery adapters load. Without it a bare `--type unit` runs under
+  the `core-only` fallback preset and Golf's replay tests fail with
+  `Available adapters: none` (CG-0MUIXVIBP0062A8H).
 - **Only `--type full` populates the audit-accepted full-suite cache entry.**
   The audit skill consumes that entry read-only to auto-verify
   execution-dependent acceptance criteria; a `unit`/`smoke`/`dev`/`e2e` run

@@ -188,6 +188,30 @@ export type { SettingsButtonConfig } from './SettingsButton';
 export { GameSelectorScene, REGISTRY_KEY_GAMES } from './GameSelectorScene';
 export type { GameEntry } from './GameSelectorScene';
 
+// Runtime game plugin manifest parsing + core-version compatibility
+export {
+  parseGameManifest,
+  splitByCompatibility,
+  DEFAULT_ENGINE_VERSION,
+} from './game-manifest';
+export type {
+  GameManifest,
+  GameManifestEntry,
+  GameManifestParseResult,
+  GameManifestParseSuccess,
+  GameManifestParseFailure,
+  CompatibilitySplit,
+  IncompatibleGame,
+} from './game-manifest';
+
+// Runtime game asset URL resolution (scoped tce-games:// scheme)
+export {
+  resolveGameAssetUrl,
+  GameAssetUrlError,
+  GAME_ASSET_URL_SCHEME,
+} from './game-asset-url';
+export type { GameAssetUrlErrorCode } from './game-asset-url';
+
 // Version display
 export {
   createVersionLabel,
@@ -398,3 +422,17 @@ export type {
   VisibilityOwnershipIssueReporter,
   VisibilityOwnershipControllerOptions,
 } from '../core-engine/VisibilityOwnership';
+
+// Steam achievement renderer client (F6, CG-0MUNC7EXO001LITF)
+export type {
+  AchievementUnlockReason,
+  AchievementUnlockResult,
+  AchievementResyncResult,
+  SteamAchievementsBridge,
+  SteamAchievementsClient,
+} from './steam-achievements-client';
+export {
+  createSteamAchievementsClient,
+  createSteamAchievementSink,
+  steamAchievementsClientFromWindow,
+} from './steam-achievements-client';

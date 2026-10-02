@@ -118,6 +118,30 @@ describe('GymHandPileScene outlines', () => {
       expect(rect.width).toBe(96);
       expect(rect.height).toBe(130);
     }
+
+    // ── CG-0MUAYBB4E007LWEQ: slot/card stability across an add ──
+    // Adding a card must fill the next capacity slot without re-centring
+    // the row: every outline slot and every already-placed card keeps its
+    // exact pre-add position.
+    const slotsBefore = (handView as any).outlineRects.map((r: any) => r.x);
+    const centersBefore = handView.getCardCenters();
+
+    handView.addCard(handView.getCards()[0]);
+    await wait(150);
+
+    const slotsAfter = (handView as any).outlineRects.map((r: any) => r.x);
+    const centersAfter = handView.getCardCenters();
+
+    expect(slotsAfter).toEqual(slotsBefore);
+    expect(centersAfter.length).toBe(centersBefore.length + 1);
+    for (let i = 0; i < centersBefore.length; i++) {
+      expect(centersAfter[i].x).toBeCloseTo(centersBefore[i].x, 5);
+      expect(centersAfter[i].y).toBeCloseTo(centersBefore[i].y, 5);
+    }
+    // The new card lands in the next slot to the right.
+    expect(centersAfter[centersAfter.length - 1].x).toBeGreaterThan(
+      centersAfter[centersAfter.length - 2].x,
+    );
   });
 
   it('outlines toggle OFF and back ON via API', async () => {

@@ -12,23 +12,56 @@
  * Steamworks-backed provider (option b, v2) can be inserted without changing
  * the load path. No Steam SDK is required to run locally.
  *
+ * Runtime game assets (thumbnails, sprites) are served to the renderer over the
+ * scoped `tce-games://` scheme (feature F3, CG-0MUG2ZJMS006JB40). The pure
+ * resolution/deny logic lives in `game-protocol.ts`; this file only registers
+ * the scheme and adapts the result to an Electron `Response`.
+ *
  * Compiled with `tsc -p electron/tsconfig.json` (ESM) into dist-electron/
  * and launched via `npm run start:electron` / `electron .` ("main" in
  * package.json). On headless Linux, run under xvfb (`xvfb-run electron .`).
  */
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ContentLocatorError } from './content-locator.js';
 import { resolveGameContent, type ResolvedContent } from './launcher-config.js';
+import { handleGameAssetRequest } from './game-protocol.js';
+import { loadSteamConfig } from './steam-config.js';
+import { loadBonusCatalog } from './bonus-catalog.js';
+import { FileUnlockStore, SteamFollowService } from './steam-follow.js';
+import { SteamworksFollowSource } from './steam-follow-steamworks.js';
+import { STEAM_FOLLOW_CHANNELS, createSteamFollowHandlers } from './steam-follow-ipc.js';
+import { FileAchievementStore, SteamAchievementService } from './steam-achievements.js';
+import { loadAchievementManifest, validateAchievementManifest } from './achievement-manifest.js';
+import { SteamworksAchievementSource } from './steam-achievements-steamworks.js';
+import { STEAM_ACHIEVEMENT_CHANNELS, createSteamAchievementHandlers } from './steam-achievements-ipc.js';
 
 /** Directory of the compiled main process (dist-electron/). */
 const launcherDir = path.dirname(fileURLToPath(import.meta.url));
 
-function createWindow(): void {
-  let resolved: ResolvedContent;
+/** Scheme serving per-game assets from `<contentDir>/games/` (F3). */
+const GAME_ASSET_SCHEME = 'tce-games';
+
+// Must run before app-ready: marks the scheme as standard/secure so the
+// renderer may load `tce-games://` images under file://-backed content without
+// CORS/canvas-taint issues.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: GAME_ASSET_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+    },
+  },
+]);
+
+/** Resolve the content root, surfacing a fatal dialog and exiting on failure. */
+function resolveContentOrExit(): ResolvedContent | null {
   try {
-    resolved = resolveGameContent({
+    return resolveGameContent({
       argv: process.argv,
       bundledDir: path.join(launcherDir, '..', 'dist'),
     });
@@ -36,9 +69,29 @@ function createWindow(): void {
     const message = error instanceof ContentLocatorError ? error.message : String(error);
     dialog.showErrorBox('TCE launcher — content error', message);
     app.exit(error instanceof ContentLocatorError ? error.exitCode : 1);
-    return;
+    return null;
   }
+}
 
+/**
+ * Register the deny-by-default `tce-games://` handler for *contentDir*.
+ * Invalid requests (bad scheme/id/path, traversal) and missing files both
+ * resolve to 404 — never a file outside `<contentDir>/games/`.
+ */
+function registerGameAssetProtocol(contentDir: string): void {
+  protocol.handle(GAME_ASSET_SCHEME, async (request) => {
+    const result = await handleGameAssetRequest(request.url, { contentDir });
+    // Copy into an ArrayBuffer-backed view: the DOM `BodyInit` type (and the
+    // Electron `Response`) do not accept a `Uint8Array<ArrayBufferLike>`.
+    const body = result.body ? new Uint8Array(result.body) : null;
+    return new Response(body, {
+      status: result.status,
+      headers: result.headers,
+    });
+  });
+}
+
+function createWindow(resolved: ResolvedContent): void {
   // Read-only host info for the preload bridge.
   process.env.TCE_RESOLVED_CONTENT_DIR = resolved.contentDir;
   process.env.TCE_APP_VERSION = app.getVersion();
@@ -66,14 +119,156 @@ function createWindow(): void {
   void win.loadFile(resolved.entryFile);
 }
 
-void app.whenReady().then(() => {
-  createWindow();
+void app.whenReady().then(async () => {
+  const resolved = resolveContentOrExit();
+  if (!resolved) return;
+
+  registerGameAssetProtocol(resolved.contentDir);
+
+  // ── Steam follow-to-unlock (F3, CG-0MSMAJQQT004SDCC) ──────────────
+  // Fully optional: a missing config, missing Steam, or missing native
+  // module leaves the launcher running with the CTA degraded (intake AC5).
+  await initSteamFollow();
+
+  // ── Steam achievements (F6, CG-0MUNC7EXO001LITF) ──────────────────
+  // Fully optional: a missing manifest, missing Steam, or missing native
+  // module leaves the launcher running with achievements disabled.
+  await initSteamAchievements();
+
+  createWindow(resolved);
 
   // macOS: re-create a window when the dock icon is clicked and none are open.
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createWindow(resolved);
   });
 });
+
+/**
+ * Initialise the Steam follow/unlock feature and register its IPC handlers.
+ *
+ * Never throws: every failure path degrades to "Steam unavailable" so the
+ * launcher boots normally on dev machines and non-Steam installs.
+ */
+async function initSteamFollow(): Promise<void> {
+  const config = loadSteamConfig();
+  const catalog = loadBonusCatalog();
+  const source = new SteamworksFollowSource({
+    appId: config ? Number(config.appId) : undefined,
+    enableOverlay: true,
+  });
+
+  try {
+    await source.init();
+  } catch (error) {
+    console.warn('[steam] init failed; continuing without Steam:', error);
+  }
+
+  if (source.restartRequested) {
+    // Steam is relaunching the app through the Steam client — exit cleanly.
+    console.info('[steam] Steam requested an app restart; quitting.');
+    app.quit();
+    return;
+  }
+
+  if (!source.isSteamAvailable()) {
+    console.warn(
+      '[steam] Steam is unavailable — the follow CTA will degrade gracefully (browser fallback).',
+    );
+  } else if (!source.followCheckSupported) {
+    console.warn(
+      '[steam] The Steamworks binding exposes no follow-detection API; the UI will offer a manual claim.',
+    );
+  }
+
+  const store = new FileUnlockStore(path.join(app.getPath('userData'), 'steam-unlock.json'));
+  const service = new SteamFollowService(source, store, catalog, config);
+  const handlers = createSteamFollowHandlers(service, source, config, catalog);
+
+  for (const [name, channel] of Object.entries(STEAM_FOLLOW_CHANNELS)) {
+    const handler = handlers[name as keyof typeof handlers];
+    ipcMain.handle(channel, handler);
+  }
+
+  app.on('will-quit', () => service.close());
+}
+
+/**
+ * Initialise the Steam achievement feature and register its IPC handlers.
+ *
+ * Never throws: a missing manifest, missing Steam, or missing native module
+ * degrades to "achievements disabled" so the launcher boots normally. A
+ * manifest with validation issues is logged (non-fatal) and still used, so a
+ * typo cannot disable achievement tracking entirely.
+ */
+async function initSteamAchievements(): Promise<void> {
+  const config = loadSteamConfig();
+  const manifest = loadAchievementManifest();
+
+  if (manifest) {
+    const issues = validateAchievementManifest(manifest);
+    for (const issue of issues) {
+      console.warn(`[achievements] manifest issue (${issue.code}): ${issue.message}`);
+    }
+  } else {
+    console.warn('[achievements] no achievement manifest loaded; achievements are disabled.');
+  }
+
+  const source = new SteamworksAchievementSource({
+    appId: config ? Number(config.appId) : undefined,
+    enableOverlay: true,
+  });
+
+  try {
+    await source.init();
+  } catch (error) {
+    console.warn('[achievements] init failed; continuing without Steam:', error);
+  }
+
+  if (source.restartRequested) {
+    // Steam is relaunching the app through the Steam client — exit cleanly.
+    console.info('[achievements] Steam requested an app restart; quitting.');
+    app.quit();
+    return;
+  }
+
+  if (!source.isSteamAvailable()) {
+    console.warn('[achievements] Steam is unavailable — unlocks persist locally and re-sync later.');
+  } else if (!source.achievementApiSupported) {
+    console.warn(
+      '[achievements] The Steamworks binding exposes no achievement API; unlocks persist locally only.',
+    );
+  }
+
+  const store = new FileAchievementStore(
+    path.join(app.getPath('userData'), 'steam-achievements.json'),
+  );
+  const service = new SteamAchievementService(source, store, manifest);
+
+  // Replay any unlocks persisted while Steam was absent (offline-safe).
+  try {
+    const result = await service.resync();
+    if (result.unknown.length > 0) {
+      console.warn(
+        `[achievements] ${result.unknown.length} persisted achievement(s) are absent from the manifest: ${result.unknown.join(', ')}`,
+      );
+    }
+  } catch (error) {
+    console.warn('[achievements] resync failed; will retry on the next launch:', error);
+  }
+
+  const handlers = createSteamAchievementHandlers(service);
+
+  for (const [name, channel] of Object.entries(STEAM_ACHIEVEMENT_CHANNELS)) {
+    const handler = handlers[name as keyof typeof handlers] as (
+      ...args: unknown[]
+    ) => unknown;
+    // Adapt the pure handler table to Electron's (event, ...args) signature;
+    // `unlock` carries an achievement id, the rest take no arguments.
+    ipcMain.handle(channel, (_event, ...args: unknown[]) => handler(...args));
+  }
+
+  app.on('will-quit', () => service.close());
+}
 
 // Quit when all windows are closed (except on macOS, per platform convention).
 app.on('window-all-closed', () => {

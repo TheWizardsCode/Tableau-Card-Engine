@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "fixture-game",
+      "sceneKey": "FixtureGameScene",
+      "title": "Fixture Game",
+      "description": "coreEngineVersion is not a valid semver range.",
+      "thumbnail": "assets/thumbnail.png",
+      "coreEngineVersion": "not-a-semver-range",
+      "entry": "entry.js"
+    }
+  ]
+}

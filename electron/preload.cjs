@@ -1,19 +1,19 @@
 /**
  * TCE Electron launcher — preload script (CommonJS).
  *
- * Exposes read-only host info to the renderer through the context bridge.
- * The renderer keeps `contextIsolation` enabled and `nodeIntegration`
- * disabled — no Node APIs leak into the game pages.
- *
- * The resolved content path and app version are injected by the main process
- * via environment variables (read-only from the renderer's perspective).
+ * Exposes read-only host info, a narrow Steam-follow API, and a narrow Steam
+ * achievements API to the renderer through the context bridge. The renderer
+ * keeps `contextIsolation` enabled and `nodeIntegration` disabled — no Node
+ * APIs leak into the game pages, and the renderer never imports the
+ * Steamworks SDK (F3, CG-0MSMAJQQT004SDCC; F6, CG-0MUNC7EXO001LITF).
  *
  * NOTE: this file is intentionally plain CommonJS (.cjs). Sandboxed preload
  * scripts cannot use ESM imports, and Electron treats a preload's format by
  * its extension regardless of package.json "type". It is copied verbatim
- * into dist-electron/ by the build:electron-main script.
+ * into dist-electron/ by the build:electron-main script. Channel names must
+ * stay in sync with electron/steam-follow-ipc.ts.
  */
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 const hostInfo = {
   /** Absolute path of the directory the game content was loaded from. */
@@ -28,4 +28,34 @@ const hostInfo = {
   },
 };
 
-contextBridge.exposeInMainWorld('tce', hostInfo);
+/**
+ * Steam follow-to-unlock bridge. Every call is async and total: the main
+ * process degrades to safe values when Steam is absent, so the renderer can
+ * render the CTA without branching on platform.
+ */
+const steamFollow = {
+  getStatus: () => ipcRenderer.invoke('steamFollow:getStatus'),
+  isSteamAvailable: () => ipcRenderer.invoke('steamFollow:isSteamAvailable'),
+  supportsAutomaticFollowCheck: () => ipcRenderer.invoke('steamFollow:supportsAutomaticFollowCheck'),
+  getBonusCatalog: () => ipcRenderer.invoke('steamFollow:getBonusCatalog'),
+  openStorePage: () => ipcRenderer.invoke('steamFollow:openStorePage'),
+  isFollowing: () => ipcRenderer.invoke('steamFollow:isFollowing'),
+  claim: () => ipcRenderer.invoke('steamFollow:claim'),
+  claimManually: () => ipcRenderer.invoke('steamFollow:claimManually'),
+};
+
+/**
+ * Steam achievements bridge. Every call is async and total: the main process
+ * degrades to safe values when Steam or the manifest is absent, so the
+ * renderer can forward challenge completions without branching on platform.
+ * Channel names must stay in sync with electron/steam-achievements-ipc.ts.
+ */
+const achievements = {
+  unlock: (achievementId) => ipcRenderer.invoke('steamAchievements:unlock', achievementId),
+  getUnlocked: () => ipcRenderer.invoke('steamAchievements:getUnlocked'),
+  isAvailable: () => ipcRenderer.invoke('steamAchievements:isAvailable'),
+  hasManifest: () => ipcRenderer.invoke('steamAchievements:hasManifest'),
+  resync: () => ipcRenderer.invoke('steamAchievements:resync'),
+};
+
+contextBridge.exposeInMainWorld('tce', { ...hostInfo, steamFollow, achievements });

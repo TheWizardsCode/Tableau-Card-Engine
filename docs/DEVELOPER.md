@@ -60,13 +60,29 @@ Starts the Vite dev server at `http://localhost:3000` with hot module replacemen
 
 ### ToneForge Synth Module
 
-If you plan to use Main Street's ToneForge-backed audio synthesis, generate the synth module first:
+Main Street ships with a committed ToneForge runtime synth module at
+`src/core-engine/tf-runtime/main-street-runtime-synth.mjs` that works out of the
+box — no `tf` CLI or generation step required. The runtime imports it with a
+static specifier, so Vite/Rollup code-splits it into a lazy chunk (keeping
+Tone.js out of the main bundle) and ships it in every build (dev server,
+production `dist/`, and the Electron bundle).
+
+> **Why not `public/`?** Vite serves `public/` verbatim and refuses to import a
+> module from it (“This file is in /public and will be copied as-is during build
+> ... it can only be referenced via HTML tags”). The committed module therefore
+> lives under `src/` and is consumed by a static-specifier dynamic import.
+
+Optionally regenerate the runtime module and WAV/metadata outputs (requires
+ToneForge CLI):
 
 ```bash
 npm run tf:generate
 ```
 
-If the synth module is missing, `loadMainStreetTfModule()` logs a clear warning and gracefully degrades (returns `null`). Synthesis-based audio will be unavailable but WAV-based sound effects continue to work normally.
+This refreshes the committed module at
+`src/core-engine/tf-runtime/main-street-runtime-synth.mjs` and writes the
+WAV/JSON/metadata outputs to `build/tf-synths/`. The committed module is the
+single source of truth for shipped builds.
 
 ### Multi-Game Routing
 
@@ -127,7 +143,7 @@ to include:
 {
   "games": [
     { "id": "golf", "path": "../tce-golf",
-      "scenePath": "example-games/golf/scenes/GolfScene.ts" }
+      "scenePath": "../tce-golf/src/scenes/GolfScene.ts" }
   ]
 }
 ```
@@ -297,6 +313,197 @@ TCE_CONTENT_DIR=/path/to/dlc npm run start:electron
 
 The resolution lives in `electron/content-locator.ts` (pure Node, unit-tested) behind the `ContentDirectoryProvider` interface, so a future Steamworks-backed provider (option b, programmatic DLC management) can be added without changing the launcher's load path. Missing/invalid directories are rejected with a structured `ContentLocatorError` (clear message + exit code).
 
+### Steam follow-to-unlock (Steamworks)
+
+The launcher has a growth mechanic: following the developer on Steam unlocks a
+bundled bonus game (intake `CG-0MSMAJQQT004SDCC`). The mechanism is entirely
+optional — the launcher builds and runs with no Steam client and no native
+module (graceful degradation).
+
+**Modules** (all pure Node unless noted, and unit-tested under `tests/steam-follow/`):
+
+| Module | Responsibility |
+|--------|----------------|
+| `electron/steam-config.ts` | Load private credentials (env or gitignored JSON). Returns `null` when absent. |
+| `electron/steam-follow.ts` | `FollowSource` interface, `SteamFollowService` (game-agnostic unlock + persistence), `FileUnlockStore`, `FakeFollowSource`. |
+| `electron/steam-follow-steamworks.ts` | Real `SteamworksFollowSource`; dynamically imports the optional `steamworks.js`, capability-detects follow detection. |
+| `electron/steam-follow-ipc.ts` | Channel names + handler table (pure) wired to `ipcMain` in `main.ts`. |
+| `electron/bonus-catalog.ts` + `electron/bonus-catalog.json` | Config-driven bonus catalog; `bonusGameId` designates the unlocked game. |
+| `src/ui/steam-follow-client.ts` | Renderer client over the `window.tce.steamFollow` bridge (never imports the SDK). |
+| `src/ui/steam-lock.ts` | Pure lock computation for the Game Selector (`computeSteamLocks` / `applySteamLocks`). |
+
+**Private credentials (never committed).** The Steam App ID and the
+developer's SteamID64 are read from, in priority order:
+
+1. Environment variables `TCE_STEAM_APP_ID` / `TCE_STEAM_DEVELOPER_STEAM_ID`.
+2. `electron/steam-config.local.json` (**gitignored**):
+
+   ```json
+   { "app_id": "<appid>", "developer_steam_id": "7656119..." }
+   ```
+
+3. `electron/steam-config.example.json` (committed, placeholder-only) for reference.
+
+The Steamworks bootstrap also honours `steam_appid.txt` (the SDK convention) via
+`loadSteamAppId({ appRoot })`. `steam_appid.txt` and the local config must never
+be committed.
+
+**Building a Steam binary.** `steamworks.js` is declared as a normal
+`package.json` dependency: it ships prebuilt binaries for Windows/Linux/macOS
+and has no install-time build hook, so `npm install`/`npm ci` need no native
+toolchain. A Steam build still builds the follow-detection addon and uses the
+Steam package script:
+
+```bash
+npm run build:steam-friends      # build the follow addon (Windows x64)
+npm run package:steam            # pre-flights + Windows NSIS package
+```
+
+`scripts/check-steamworks.mjs` checks for `steamworks.js` and
+`scripts/check-steam-friends.mjs` checks for the staged `tce-steam-friends`
+addon; both fail early with actionable guidance (the addon check is a no-op
+warning on non-Windows hosts). `electron-builder.yml` packs
+`node_modules/steamworks.js/**` and `node_modules/tce-steam-friends/**`,
+unpacking their native `.node`/`dist` binaries from the asar. A non-Steam build
+uses `npm run package` and needs none of this.
+
+**Follow detection — automatic via a custom addon (Option A).**
+`steamworks.js` 0.4.0 exposes no `friends` namespace, so the shipped
+`steam_api64.dll` is queried directly: `native/steam-friends` is a small C++
+N-API addon that resolves the already-loaded DLL and calls
+`SteamAPI_ISteamFriends_IsFollowing` (interface `SteamFriends017`), correlating
+the asynchronous `FriendsIsFollowing_t` result within a bounded timeout. It
+**never** calls `SteamAPI_Init` (no second init / DLL conflict) and resolves all
+Steam symbols at runtime, so **no Steamworks SDK is needed at build time**.
+`electron/steam-follow-native.ts` loads it as `tce-steam-friends`, and
+`SteamworksFollowSource` capability-detects in a deterministic order:
+`steamworks.js` friends API → native addon → manual self-attest. When no
+automatic check is available (addon absent, Steam absent, or no logged-in user)
+`followCheckSupported` is `false` and the UI offers a persisted **manual
+claim**; the launcher never fabricates a follow. The store page still opens
+through the real SDK (`overlay.activateToStore` / `activateToWebPage`).
+
+**Addon build prerequisites and licensing.** The addon targets **Windows x64**
+and builds with `node-gyp` + Visual Studio Build Tools
+(`npm run build:steam-friends`), staging the result as `node_modules/tce-steam-friends`.
+No Steamworks SDK is required to build it: all symbols are resolved at runtime
+from the redistributable `steam_api64.dll` that `steamworks.js` loads, so no SDK
+path or private CI secret is needed. The Steamworks SDK itself is **not
+redistributable** — its headers and import libraries must never be committed or
+shipped; only the `steam_api64.dll` redistributable may ship with the app. See
+`native/steam-friends/README.md` and the P1 spike report
+(`docs/dev/steam-follow-native-spike.md`).
+
+**Bridge API** (`window.tce.steamFollow`, exposed by `electron/preload.cjs`):
+`getStatus`, `isSteamAvailable`, `supportsAutomaticFollowCheck`,
+`getBonusCatalog`, `openStorePage`, `isFollowing`, `claim`, `claimManually`.
+The main process owns the only concrete source; the renderer never imports the
+SDK.
+
+**Game-list gating.** The catalogue (`electron/bonus-catalog.json`) lists the
+bundled games; `bonusGameId` is unlocked on a confirmed follow and the other
+listed games render locked ("Reserved for a future milestone"). Games absent
+from the catalogue are base content and never locked. In a plain browser there
+is no bridge, so nothing is locked and the web app stays fully functional.
+
+**Manual real-Steam QA:** see [Steam follow-to-unlock — manual E2E QA](dev/steam-follow-qa.md).
+
+### Steam achievements (Steamworks)
+
+The engine has an **engine-generic achievement layer** (`CG-0MSMGKSJB004MZBJ`)
+that turns run-local challenges into persistent Steam achievements. It is built
+from the same seam as the follow-to-unlock feature: a pure engine layer + a
+pure-Node launcher service behind an interface with a deterministic fake, a
+real Steamworks adapter, and an IPC bridge. The whole feature is optional — the
+web build and any machine without Steam stay fully playable.
+
+**The one rule:** a game module **never** imports the Steamworks SDK. A game
+declares its achievements and maps its challenges; the launcher owns the only
+Steam-aware code. The renderer talks to the main process only through the
+`window.tce.achievements` context bridge (wrapped by
+`src/ui/steam-achievements-client.ts`).
+
+**Modules** (pure Node/TS unless noted; unit-tested under `tests/achievements/`
+and `tests/steam-achievements/`):
+
+| Module | Responsibility |
+|--------|----------------|
+| `src/core-engine/AchievementSystem.ts` | Steam-free engine layer: `AchievementDefinition`, challenge → achievement mapping, idempotent `AchievementSystem`, pluggable `AchievementSink`, `NoOpAchievementSink`. Zero Steam/Electron imports. |
+| `electron/achievement-manifest.json` | Single source of truth for `gameId → achievementId → steamApiName → hidden`. Must match the Steamworks partner backend. |
+| `electron/achievement-manifest.ts` | Pure loader + semantic validation (duplicate ids/API names, empty entries, version); returns `null`/issues rather than throwing. |
+| `electron/steam-achievements.ts` | `AchievementSource` interface, `SteamAchievementService` (idempotent, offline-safe, re-sync), `FileAchievementStore`, `MemoryAchievementStore`, deterministic fakes. |
+| `electron/steam-achievements-steamworks.ts` | Real `SteamworksAchievementSource`; dynamically imports the optional `steamworks.js`, capability-detects the achievement API. |
+| `electron/steam-achievements-ipc.ts` | Channel names + pure handler table wired to `ipcMain` in `main.ts`. |
+| `src/ui/steam-achievements-client.ts` | Renderer client over the `window.tce.achievements` bridge + `createSteamAchievementSink()` (the engine sink that forwards over IPC); returns `null` outside Electron. |
+
+**Bridge API** (`window.tce.achievements`, exposed by `electron/preload.cjs`):
+`unlock`, `getUnlocked`, `isAvailable`, `hasManifest`, `resync`.
+
+**Manifest format.** `electron/achievement-manifest.json`:
+
+```json
+{
+  "version": 1,
+  "games": [
+    {
+      "gameId": "main-street",
+      "achievements": [
+        { "achievementId": "foodie-row", "steamApiName": "TCE_MAIN_STREET_FOODIE_ROW", "hidden": false }
+      ]
+    }
+  ]
+}
+```
+
+- `steamApiName` is the **static** API name registered on the Steamworks
+  partner backend (Steam has no client-side creation). It **must match
+  exactly**; a mismatch makes Steam silently drop the unlock.
+- `achievementId` and `steamApiName` are app-global and must be unique across
+  every game in the manifest.
+- `hidden` is a **backend-only** flag (the client API cannot set it); it is
+  mirrored here for documentation and UI only.
+- The committed manifest is validated by
+  `tests/steam-achievements/steam-achievements.test.ts`.
+
+**Challenge → achievement mapping workflow for a new game:**
+
+1. Add the game's `gameId` (and each `achievementId` / `steamApiName` / `hidden`)
+   to `electron/achievement-manifest.json` and register the API names on the
+   Steamworks backend.
+2. In the game repo, create a `<Game>Achievements.ts` module (e.g.
+   `tce-main-street/src/MainStreetAchievements.ts`) that:
+   - declares an explicit `challengeId → achievementId` map,
+   - builds the `AchievementDefinition`s (titles/descriptions can be derived
+     from the challenge templates),
+   - exports `create<Game>AchievementSystem(options)` (registers the
+     definitions + mapping on the engine `AchievementSystem`),
+   - resolves the sink via the renderer client
+     (`steamAchievementsClientFromWindow()` → `createSteamAchievementSink()`,
+     else `NoOpAchievementSink`),
+   - attaches the system to the game state.
+3. Forward challenge completions to the system at the game's single completion
+   choke point (Main Street: `MainStreetChallenges.evaluateChallenges`, which
+   also covers the per-action `evaluateChallengesAfterAction` path). Everything
+   else (idempotence, persistence, re-sync, IPC) is engine/launcher code.
+4. Add a game-side drift test asserting every challenge is mapped exactly once
+   and every achievement id matches the launcher manifest (Main Street:
+   `tests/main-street/main-street-achievements.test.ts`).
+
+**Offline-safe and idempotent.** An unlock is persisted locally **before** the
+Steam call; `SteamAchievementService.resync()` replays every persisted id at
+launch, so an unlock made with Steam absent (or a failed `stats.store()`) is
+re-sent when Steam is next available. `setAchievement`/`storeStats` never throw
+and degrade to safe results, so a broken Steam install cannot crash the
+launcher. The engine sink is idempotent, so a challenge fires at most one
+unlock per achievement per session.
+
+**Manifest ↔ store mismatch detection.** See
+[Steam achievements — manual E2E QA](dev/steam-achievements-qa.md#manifest--store-mismatch-detection)
+for the procedure (automated validation + the real-account `achievement.names()`
+check).
+
+**Manual real-Steam QA:** see [Steam achievements — manual E2E QA](dev/steam-achievements-qa.md).
+
 ### Electron smoke test
 
 The Playwright-Electron launch test (`tests/electron/launch-smoke.test.ts`) launches the real Electron app and asserts the Game Selector renders, the preload bridge is exposed, and clicking a selector card boots a game scene. It runs in its own vitest project so it never slows the regular suites:
@@ -418,6 +625,7 @@ The staged profiles above are exposed to the global `test` skill through a proje
 | `full` (default) | `npm test` | The genuine full CI suite (unit → browser → tutorial → electron) |
 
 - **`full` is deliberately omitted** from the extension's `types` map, so a bare `/skill:test` keeps resolving to the real full CI suite. **Only `--type full` populates the audit-accepted full-suite cache entry** — typed runs use independent cache keys and can never satisfy a "full test suite passes" AC.
+- **Every typed Vitest command defaults `GAMES_CONFIG` to `full`** (preserving an explicitly supplied value), matching the shell runners. Without it a bare `/skill:test --type unit` runs under the `core-only` fallback preset, the game-discovery adapters never load, and Golf's `tests/golf/replay.test.ts` fails with `Available adapters: none` (CG-0MUIXVIBP0062A8H).
 - Browser-dependent types (`smoke`, `dev`, `browser`, `tutorial`, `e2e`) chain `scripts/check-browser-test-env.ts` first, so a missing Playwright prerequisite (`npx playwright install chromium`) fails fast with remediation steps instead of an opaque Vitest browser timeout.
 - Every typed Vitest command runs through `scripts/vitest-run-with-retry.ts` — the retry-once + wall-clock hang-timeout wrapper (exit 124 `[hang-timeout]` on a true hang, which is never retried).
 - Commands also load `scripts/vitest-tap-reporter.ts` alongside the default reporter. It emits flat TAP for each failed test (`not ok N - <file> > <suite > test>` plus `error: |-` / `stack: |-` YAML blocks) that the global runner's `parse_node_failures` understands, so a red typed run creates per-test `test-failure` items instead of an opaque suite-level failure.
@@ -425,7 +633,9 @@ The staged profiles above are exposed to the global `test` skill through a proje
 
 Common invocations: `/skill:test --type unit` (fast feedback during implementation),
 `/skill:test --type dev` (pre-audit), and `/skill:test` or `/skill:test --type full`
-(release / pre-`in_review` evidence).
+(release / pre-`in_review` evidence). Typed profiles default `GAMES_CONFIG` to
+`full` (an explicit `GAMES_CONFIG=…` still wins), so the game-discovery adapters
+load exactly as they do under the shell runners.
 
 #### CPU-contention mitigation (unit and browser tests)
 
@@ -503,27 +713,48 @@ Two mitigations are in place in this repository:
      retry window (30s) that leaves headroom under the test's total budget.
      Re-dispatch is safe because the interaction handler no-ops once the
      phase has moved.
-   - **Wait for a real animation frame before dispatching a pointer
-     gesture** (CG-0MUA7RRXL007GEHW): interactive game objects rebuilt by a
-     refresh (`refreshAll`/`refreshStreetGrid`) are queued in Phaser's
+   - **Step the game loop directly before dispatching a pointer gesture**
+     (CG-0MUA7RRXL007GEHW, superseded for Main Street by
+     CG-0MUE2U21C0007BKL): interactive game objects rebuilt by a refresh
+     (`refreshAll`/`refreshStreetGrid`) are queued in Phaser's
      `_pendingInsertion` and only registered with the input system during
-     `InputPlugin.preUpdate`, which runs on the game loop's RAF tick — never
-     from a `setTimeout`. A drag started after the refresh but before that
-     tick lands on a not-yet-registered hit zone, so the gesture is silently
-     dropped and the drop never fires (observed as a `waitForCondition`
-     timeout waiting for the transfer animation in
-     `tests/main-street/upgrade-drag-drop.browser.test.ts`). Gesture helpers
-     therefore await two `requestAnimationFrame` callbacks (`waitForFrames()`)
-     before the first `mousedown`, matching the established pattern in
-     `tests/main-street/expanded-viewport.browser.test.ts`.
-   - **Poll frame-gated waits on `requestAnimationFrame`**: a helper that
-     waits for the game loop to reach a state (e.g. `waitForCondition` in
-     `tests/main-street/upgrade-drag-drop.browser.test.ts`) yields to the
-     browser's animation-frame loop on every poll rather than a bare
-     `setTimeout`, so the RAF-driven `InputPlugin.preUpdate` step that
-     dispatches the queued `drop` handler is guaranteed to run. Bare
-     `setTimeout` polling can starve for seconds under concurrent-suite
-     contention even when the timeout budget is large.
+     `InputPlugin.preUpdate`, which runs on the game loop's tick — never from
+     a `setTimeout`. Under concurrent full-suite runs that tick is driven by
+     `requestAnimationFrame`, which can be starved for seconds; a drag started
+     after the refresh but before the tick lands on a not-yet-registered hit
+     zone, so the gesture is silently dropped and the drop never fires
+     (observed as a `waitForCondition` timeout waiting for the transfer
+     animation in `tests/main-street/upgrade-drag-drop.browser.test.ts`).
+     Rather than awaiting animation frames (the superseded
+     await-a-frame-before-gesture pattern, which no longer exists in the
+     tree), gesture helpers step the Phaser loop synchronously with
+     `TimeStep.step(time)` (`scene.game.loop.step(now + deltaMs)`) before the
+     first `mousedown` —
+     see `stepGame()` in `tests/main-street/upgrade-drag-drop.browser.test.ts`
+     and `tests/main-street/market-deal-in.browser.test.ts`. A complete step
+     runs input pre-update, tweens and rendering on demand, so the pending
+     insertions flush regardless of frame availability. The same
+     manual-stepping remedy is used by sibling game suites for the identical
+     “rAF does not fire consistently in headless Chromium” problem (e.g.
+     `BeleagueredCastleLayout.browser.test.ts` in the sibling
+     `tce-beleaguered-castle` repo steps tweens with `scene.tweens.tick()`).
+   - **Poll frame-gated waits by stepping the loop**: a helper that waits for
+     the game loop to reach a state (e.g. `waitForCondition` in
+     `tests/main-street/upgrade-drag-drop.browser.test.ts`) steps the loop on
+     every poll (with a short `setTimeout` yield to avoid a busy spin) rather
+     than awaiting `requestAnimationFrame`, so the polls make progress even
+     when no animation frame is granted. Bare rAF polling can starve for
+     seconds under concurrent-suite contention even when the timeout budget is
+     large.
+   - **Tear down Phaser games synchronously**
+     (`@core-tests/helpers/phaserCanvasPool`): `game.destroy()` only sets
+     `pendingDestroy`; the real teardown (renderer, tweens, input, loop) runs
+     on the next game-loop frame, which contention can delay for seconds, so
+     the previous test's loop lingers and competes with the current one for
+     frames — the same starvation that stops `InputPlugin.preUpdate`. Browser
+     suites booting one game per test call `destroyPhaserGame()`, which runs
+     `runDestroy()` synchronously and then drains Phaser's global
+     `CanvasPool`, freeing each canvas context immediately.
    - **Deterministic boot conditions**: tests that assume a buyable market
      card at boot set generous coins (e.g. `resourceBank.coins = 100`)
      rather than relying on the random seed's initial market draw — the
@@ -777,7 +1008,7 @@ Browser tests verify Phaser UI rendering and interactions in a real browser envi
 ```typescript
 import { describe, it, expect, afterEach } from 'vitest';
 import Phaser from 'phaser';
-import { createGolfGame } from '../../example-games/golf/createGolfGame';
+import { createGolfGame } from '../../tce-golf/src/createGolfGame';
 
 describe('MyScene browser tests', () => {
   let game: Phaser.Game | null = null;
@@ -853,15 +1084,61 @@ See [docs/dev/context-budget.md](dev/context-budget.md) for what the gate measur
 
 ## ToneForge Audio Generation
 
-ToneForge-generated synth artifacts are integrated via a thin adapter and are **not committed** to source control.
+ToneForge-generated synth artifacts are integrated via a thin adapter. The
+**runtime synth module** (`src/core-engine/tf-runtime/main-street-runtime-synth.mjs`)
+is committed to source control and ships with every build. Other generated
+outputs (WAV files, JSON metadata, metadata module) remain **uncommitted** and
+are generated on-demand.
+
+> **Why `src/` and not `public/`?** Vite refuses to import a module from
+> `public/` (“This file is in /public and will be copied as-is during build ...
+> it can only be referenced via HTML tags”). Putting the committed module under
+> `src/` lets the runtime import it with a static specifier, so Vite/Rollup
+> code-splits it into a lazy chunk (Tone.js never enters the main bundle) and
+> ships it in the dev server, the production `dist/`, and the Electron bundle.
+
+### Source-controlled artefact
+
+```
+src/core-engine/tf-runtime/main-street-runtime-synth.mjs   # committed, single source of truth
+src/core-engine/tf-runtime/main-street-runtime-synth.d.mts # hand-written type declaration
+```
+
+### Generated outputs (not committed)
+
+```
+build/tf-synths/wav/*.wav                              # generated on demand
+build/tf-synths/main-street-tf-module.mjs              # generated on demand
+build/tf-synths/*.json                                 # generated on demand
+```
+
+### Regeneration
+
+When ToneForge CLI (`tf`) is available, regenerate the outputs:
 
 ```bash
 npm run tf:generate
 ```
 
-This runs `scripts/tf-generate-synths.sh` and writes generated outputs under `build/tf-synths/`, including a runtime synth module (`main-street-runtime-synth.mjs`) used for on-the-fly synthesis.
+This runs `scripts/tf-generate-synths.sh` and writes:
 
-> **Missing module handling:** If the runtime synth module is absent, `loadMainStreetTfModule()` in `mainStreetTfModule.ts` logs a clear `console.warn` message with instructions to run `npm run tf:generate`, then gracefully returns `null` without triggering a Chromium module-loading error. Synthesis-based audio degrades silently; WAV-based SFX and game logic are unaffected.
+- WAV files and metadata to `build/tf-synths/` (gitignored, on-demand only)
+- The committed runtime synth module to
+  `src/core-engine/tf-runtime/main-street-runtime-synth.mjs` (identical to the
+  committed artefact — regeneration does not drift)
+
+If `tf` is not installed, `npm run tf:generate` emits a warning and exits
+successfully — `npm run dev` and `npm run build` never depend on it.
+
+### Missing module handling
+
+The committed runtime module is bundled into every build, so it is always
+available. Because it is imported statically there is no runtime URL fetch and
+no “module not found” Chromium error. `loadMainStreetTfModule()` in the sibling
+Main Street repo's `mainStreetTfModule.ts` returns the bundled module
+synchronously; if it is ever absent, the loader logs a warning and gracefully
+returns `null`. Synthesis-based audio degrades silently; WAV-based SFX and game
+logic are unaffected.
 
 See `docs/the-build/audio.md` for full details (module shape, mapping, runtime wiring, CI guidance).
 
@@ -1374,10 +1651,10 @@ Follow the Golf (original reference) and Sushi Go (most recent) examples as refe
 
 **Exception carve-outs:** Layouts that genuinely don't fit the single-row `HandView` model may keep bespoke card rendering, but the exception must be documented in code comments and/or the scene's help text:
 
-- **Golf** — the 3×3 tableau grid (exception note in `example-games/golf/scenes/GolfRenderer.ts`); its stock/discard piles still use `PileView`.
+- **Golf** — the 3×3 tableau grid (exception note in `../tce-golf/src/scenes/GolfRenderer.ts`); its stock/discard piles still use `PileView`.
 - **Feudalism** — token/crop counters via `CropIconRenderer` (non-card tokens, not a hand).
 
-**Canonical reference:** `example-games/blackjack/scenes/BlackjackScene.ts` — migrated to two SLL-anchored `HandView` instances with `centerX` row anchoring and a `flipCard()`-based hole-card reveal; its browser tests (`tests/blackjack/BlackjackHandView.browser.test.ts`) verify the rendering path.
+**Canonical reference:** `../tce-blackjack/src/scenes/BlackjackScene.ts` — migrated to two SLL-anchored `HandView` instances with `centerX` row anchoring and a `flipCard()`-based hole-card reveal; its browser tests (`tests/blackjack/BlackjackHandView.browser.test.ts`) verify the rendering path.
 
 For non-standard card models (tokens, resource icons, expedition cards), use the `CardTextureResolver` / `renderCard` callbacks documented in the [UI Adapter Guide](ui/ADAPTER-GUIDE.md). See the [Gym scene index](gym/GYM_INDEX.md) for the complete HandView/PileView scene-to-API mapping.
 
@@ -1389,20 +1666,21 @@ For non-standard card models (tokens, resource icons, expedition cards), use the
 - Outlines are static (no animation), so reduced-motion is honoured by construction.
 - Occupied slots sit at exactly the card's position and rotation (`depth = index - 0.5`, behind card `index`); rotation mirrors the card sprite's **actual** rotation, so custom-rendered hands that never rotate keep straight outlines. Extra capacity slots continue the same step to the right and render below every card.
 - With an empty hand, `maxSlots` outlines render centred on the hand centre — the player sees the hand's capacity before any card is drawn.
+- **Capacity-driven, stable slots (CG-0MUAYBB4E007LWEQ).** When `maxSlots` is set the card row is placed into the *same fixed capacity template* the empty hand renders, so adding a card fills the next empty slot to the right without re-centring the row — every already-placed card and every outline slot keeps its exact position (and rotation) as cards are added, up to capacity. The layout is keyed on `maxSlots !== undefined`, so toggling `showPositionOutlines` never moves cards (`showPositionOutlines` is purely visual). `setMaxSlots()` is the only mutation that re-lays the row (capacity change). Transiently over-capacity hands keep the first `maxSlots` slots fixed, cap outlines at `maxSlots`, and continue overflow cards to the right with the same step. Hands without `maxSlots` keep the legacy centred-on-count row.
 
-Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max hand size 7, toggle button) and `example-games/main-street/scenes/MainStreetRenderer.ts`. Tests: `tests/ui/handView.outlines.test.ts`, `tests/handView/gym-handpile-outlines.browser.test.ts`, `tests/main-street/hand-outlines.browser.test.ts`.
+Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max hand size 7, toggle button) and `../tce-main-street/src/scenes/MainStreetRenderer.ts`. Tests: `tests/ui/handView.outlines.test.ts`, `tests/handView/gym-handpile-outlines.browser.test.ts`, `tests/main-street/hand-outlines.browser.test.ts`.
 
 ## Animation & Sound Feedback for Player and AI Actions
 
 **Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops.)
 
-**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `example-games/coloretto/scenes/ColorettoAiScheduler.ts` schedules AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then dispatches the AI's action through the same animated/sounded path as a human turn (rendered by `ColorettoRenderer`, orchestrated by `ColorettoScene`).
+**AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `../tce-coloretto/src/scenes/ColorettoAiScheduler.ts` schedules AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then dispatches the AI's action through the same animated/sounded path as a human turn (rendered by `ColorettoRenderer`, orchestrated by `ColorettoScene`).
 
 **Accessibility:** Reduced-motion preferences (explicit flag → SettingsStore toggle → `prefers-reduced-motion`; see the [Accessibility](ui-animations.md#accessibility) section of the animation helpers reference) and the settings-panel mute/volume controls must be respected — pass the helper's `reducedMotion` flag and play SFX through `SoundManager` (or `safePlaySound()` for overlay helpers) so mute and volume apply uniformly. This requirement reinforces, never weakens, accessibility behaviour.
 
 **Exceptions:** Actions that legitimately have no visible or audible effect, and headless/replay/test/transcript modes (no rendering or audio), are exempt. Document any exemption in code comments and/or the scene's help text.
 
-**Compliant references:** Golf's `GolfAnimator` (`example-games/golf/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates and sounds AI turns (above); Blackjack preserves flip-sound timing and runs the dealer AI on a delay (`example-games/blackjack/scenes/BlackjackScene.ts`). New games should follow these patterns.
+**Compliant references:** Golf's `GolfAnimator` (`../tce-golf/src/scenes/GolfAnimator.ts`) wires `soundManager` + `sfx` into its deal/discard/flip helpers; Coloretto animates and sounds AI turns (above); Blackjack preserves flip-sound timing and runs the dealer AI on a delay (`../tce-blackjack/src/scenes/BlackjackScene.ts`). New games should follow these patterns.
 
 Gym reference scenes: [`GymAudioFeedbackScene`](../example-games/gym/scenes/GymAudioFeedbackScene.ts) (event-driven audio, mute/volume, pop text/icon) and [`GymHandPileScene`](../example-games/gym/scenes/GymHandPileScene.ts) (animated deal/discard/flip with SFX hooks). See the [Gym scene index](gym/GYM_INDEX.md) for the scene-to-API mapping.
 
@@ -1420,13 +1698,13 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 
 | Game | Location | Key engine features demonstrated | Tests |
 |------|----------|--------------------------------|-------|
-| 9-Card Golf | `example-games/golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
-| Beleaguered Castle | `example-games/beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights), Classic/Citadel deal variants via a persisted pre-game popup (Citadel deals all 52 cards, no pre-placed aces), Canvas-compatible selection highlight (`createCardHighlight`), natural-flow (animated-deal) first-click + click-to-move regression tests | `tests/beleaguered-castle/` (17 files) |
-| Sushi Go! | `example-games/sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
-| Feudalism | `example-games/feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
-| Lost Cities | `example-games/lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
-| Main Street | `example-games/main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
-| Coloretto | `example-games/coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording. Scene decomposed into helpers: `ColorettoRenderer` (board + animations), `ColorettoInputHandler`, `ColorettoAiScheduler`, `ColorettoOverlays` | `tests/coloretto/` (7 files) |
+| 9-Card Golf | `../tce-golf/` | Card/Deck/Pile abstractions, GameState/TurnSequencer, scoring rules (A=1, 2=-2, K=0, column-of-three=0), Random/Greedy AI strategies, transcript recording, Phaser UI with 3x3 grid | `tests/golf/` (8 files) |
+| Beleaguered Castle | `../tce-beleaguered-castle/` | Single-player solitaire, UndoRedoManager (Command pattern), drag-and-drop + click-to-move, auto-move heuristics, auto-complete, win/loss detection, HelpPanel component, checkpoint autosave after each move with startup recovery, hint system (AI solver suggests best move with source/destination highlights), Classic/Citadel deal variants via a persisted pre-game popup (Citadel deals all 52 cards, no pre-placed aces), Canvas-compatible selection highlight (`createCardHighlight`), natural-flow (animated-deal) first-click + click-to-move regression tests | `tests/beleaguered-castle/` (17 files) |
+| Sushi Go! | `../tce-sushi-go/` | Card drafting (pick-and-pass hands), custom card types with set-collection scoring, multi-round match, procedural card-back textures | `tests/sushi-go/` (4 files) |
+| Feudalism | `../tce-feudalism/` | Resource management (gem tokens), tiered development cards with costs/bonuses, noble attraction, multi-action turns (take/reserve/purchase), checkpoint autosave after each turn (human + AI) with startup recovery | `tests/feudalism/` (4 files) |
+| Lost Cities | `../tce-lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
+| Main Street | `../tce-main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
+| Coloretto | `../tce-coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording. Scene decomposed into helpers: `ColorettoRenderer` (board + animations), `ColorettoInputHandler`, `ColorettoAiScheduler`, `ColorettoOverlays` | `tests/coloretto/` (7 files) |
 
 ### Lost Cities card assets
 
@@ -1587,21 +1865,36 @@ the reputation coin multiplier. Effects decay at the end of each turn during
 - Duration computation for `evt-flu-outbreak` scans the street grid for
   Clinic/Medical Center cards
 
-#### Card art pipeline (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R)
+#### Card art pipeline (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R, CG-0MUCMB8DT003DAKR)
 
 Each card's 64×64 art zone embeds its art as an inline base64 `data:` URI
 (required: the SVG is rasterised from a data URI, so external refs do not
 resolve). **The 64×64 zone is a layout dimension, not the render resolution** —
-Phaser rasterises the card SVG at up to 4× quality scale
-(`rasteriseSvgToTexture`, `qualityScale = Math.max(4, dpr)`), so the zone
-occupies up to 256×256 device pixels and the embedded bitmap is **256×256
-WebP**, filling it at 1:1.
+Phaser rasterises the card SVG at `Math.max(MIN_QUALITY_SCALE, dpr)` quality
+scale (`rasteriseSvgToTexture`, `MIN_QUALITY_SCALE = 2`), so the zone occupies
+up to `64 × MIN_QUALITY_SCALE = 128` device pixels (at DPR ≤ 2) and the
+embedded bitmap is **256×256 WebP**, always downscaled for crisp rendering.
+At DPR 3 the zone is `64 × 3 = 192` device pixels; the 256 WebP still
+downscales, avoiding any upscaling artefacts.
+
+**Texture filtering (CG-0MUCMB8DT003DAKR).** Rasterised SVG textures are
+always filtered **linearly** (`SVG_TEXTURE_FILTER_MODE = 0` — Phaser's
+`Phaser.Textures.FilterMode.LINEAR`, where `NEAREST = 1`). Nearest-neighbour
+minification is what makes card art look pixelated and would defeat the whole
+native-resolution pipeline: a texture rasterised at 2× logical size is
+minified by half on a DPR-1 display. `SvgHelpers` applies linear filtering
+explicitly, and `createCardGame()` keeps `render.antialias: true` /
+`antialiasGL: true`. With `antialias: false`, Phaser's `TextureSource.init`
+calls `setFilter(NEAREST)` on **every** texture and the WebGL upload path
+ignores `LINEAR`, so the whole engine renders in pixel-art (nearest) mode. Do
+not set `antialias: false` (or `pixelArt: true`) in a card game — it is the
+Phaser pixel-art setting.
 
 The committed 1024×1024 source sprites live in
-`example-games/main-street/sprites/<Name>_1024_x_1024.png` (the source of
+`../tce-main-street/src/sprites/<Name>_1024_x_1024.png` (the source of
 truth; the `_64_x_64.png` files are superseded legacy thumbnails). Run
 `node scripts/generate-main-street-card-art.mjs` to regenerate
-`example-games/main-street/card-art-map.json` (card name → base64 data URI,
+`../tce-main-street/src/card-art-map.json` (card name → base64 data URI,
 plus spelling aliases and a `Fallback` entry); the script downscales each
 1024×1024 sprite to 256×256 and re-encodes it as lossy WebP (quality 90),
 which keeps the inline map small (~0.6 MB) despite carrying 16× the pixels of
@@ -1963,7 +2256,7 @@ Use commit-level reverts on the feature branch if a rendering regression is disc
 
 ```bash
 git checkout <feature-branch>
-git log --oneline -- example-games/main-street/scenes src/ui tests/main-street
+git log --oneline -- ../tce-main-street/src/scenes src/ui tests/main-street
 git revert <commit-hash>
 npm test
 npm run build
@@ -1978,6 +2271,33 @@ Thumbnails are static assets. Regenerate them when a game's visual appearance ch
 The engine now provides shared SVG raster helpers from `src/core-engine/SvgHelpers.ts` (exported via `src/core-engine/index.ts`).
 
 Rasterisation policy (project choice): lazy rasterisation on first use. In practice this means scenes should preload SVG *source text* (via `this.load.text`) and only rasterise to a texture when the texture is first required for rendering. This keeps preload fast and memory usage reasonable while ensuring visual fidelity when textures are needed.
+
+### Texture filtering and crispness (CG-0MUCMB8DT003DAKR)
+
+The shared pipeline rasterises at `Math.max(MIN_QUALITY_SCALE, dpr)`
+(`MIN_QUALITY_SCALE = 2`) and filters the resulting textures **linearly**
+(`SVG_TEXTURE_FILTER_MODE = 0`, exported from `@core-engine`). Best practices
+for crisp SVG art in a browser Phaser game:
+
+- **Rasterise at display density, not at a fixed multiple.** A texture drawn at
+  `logicalSize × Math.max(MIN_QUALITY_SCALE, dpr)` is 1:1 on HiDPI and only
+  mildly supersampled at DPR 1; the old fixed 4× baseline allocated 16× the
+  logical pixels for no visible gain.
+- **Use linear filtering, never nearest.** `Phaser.Textures.FilterMode` is
+  `LINEAR = 0`, `NEAREST = 1` (the inverse of an intuitive "1 = linear"
+  reading). In the Canvas renderer Phaser sets
+  `ctx.imageSmoothingEnabled = !frame.source.scaleMode`, so `scaleMode = 1`
+  disables smoothing and minified art goes blocky.
+- **Keep `antialias: true` (the default).** `antialias: false` (or
+  `pixelArt: true`) is the pixel-art setting: Phaser then forces `NEAREST` on
+  every texture. `createCardGame()` sets `antialias: true` /
+  `antialiasGL: true` so the engine stays out of nearest mode.
+- **Keep embedded bitmaps at or above the device-pixel art zone** so they are
+  only ever downscaled (the card art map's 256×256 WebP for a 64×64 zone).
+- **`drawImage()` uses the SVG's intrinsic size** (MDN); rasterising into a
+  `canvas` sized to the target device pixels is the supported way to get a
+  crisp result, and `imageSmoothingQuality = 'high'` is set on the rasterising
+  context.
 
 ### Recommended scene pattern
 
@@ -2109,23 +2429,23 @@ The following games have been migrated to use SLL layout helpers:
 
 | Game | Layout file | Adapter |
 |------|------------|---------|
-| Golf | `example-games/golf/layouts/golf.layout.json` | `example-games/golf/scenes/GolfLayoutAdapter.ts` |
-| Beleaguered Castle | `example-games/beleaguered-castle/layouts/beleaguered-castle.layout.json` | `example-games/beleaguered-castle/scenes/BeleagueredCastleLayoutAdapter.ts` |
-| Main Street | `example-games/main-street/layouts/main-street.layout.json` | `example-games/main-street/scenes/MainStreetLayoutAdapter.ts` |
+| Golf | `../tce-golf/src/layouts/golf.layout.json` | `../tce-golf/src/scenes/GolfLayoutAdapter.ts` |
+| Beleaguered Castle | `../tce-beleaguered-castle/src/layouts/beleaguered-castle.layout.json` | `../tce-beleaguered-castle/src/scenes/BeleagueredCastleLayoutAdapter.ts` |
+| Main Street | `../tce-main-street/src/layouts/main-street.layout.json` | `../tce-main-street/src/scenes/MainStreetLayoutAdapter.ts` |
 
 Games with layout files and adapters ready for renderer integration:
 
 | Game | Layout file | Adapter |
 |------|------------|---------|
-| Feudalism | `example-games/feudalism/layouts/feudalism.layout.json` | `example-games/feudalism/scenes/FeudalismLayoutAdapter.ts` |
-| Sushi Go | `example-games/sushi-go/layouts/sushi-go.layout.json` | `example-games/sushi-go/scenes/SushiGoLayoutAdapter.ts` |
-| Lost Cities | `example-games/lost-cities/layouts/lost-cities.layout.json` | `example-games/lost-cities/scenes/LostCitiesLayoutAdapter.ts` |
+| Feudalism | `../tce-feudalism/src/layouts/feudalism.layout.json` | `../tce-feudalism/src/scenes/FeudalismLayoutAdapter.ts` |
+| Sushi Go | `../tce-sushi-go/src/layouts/sushi-go.layout.json` | `../tce-sushi-go/src/scenes/SushiGoLayoutAdapter.ts` |
+| Lost Cities | `../tce-lost-cities/src/layouts/lost-cities.layout.json` | `../tce-lost-cities/src/scenes/LostCitiesLayoutAdapter.ts` |
 
 ### Main Street canonical example
 
-- Layout file: `example-games/main-street/layouts/main-street.layout.json`
-- Adapter: `example-games/main-street/scenes/MainStreetLayoutAdapter.ts`
-- Renderer integration: `example-games/main-street/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
+- Layout file: `../tce-main-street/src/layouts/main-street.layout.json`
+- Adapter: `../tce-main-street/src/scenes/MainStreetLayoutAdapter.ts`
+- Renderer integration: `../tce-main-street/src/scenes/MainStreetRenderer.ts` (`computeLayout()` applies SLL first, then falls back)
 
 ### Gym SLL demo example
 
@@ -2181,7 +2501,7 @@ The pipeline has two layers:
 
 #### Layer 1: Overlay Specification (`UpgradeOverlaySpec.ts`)
 
-Location: `example-games/main-street/scenes/UpgradeOverlaySpec.ts`
+Location: `../tce-main-street/src/scenes/UpgradeOverlaySpec.ts`
 
 This is a **pure data module** with no Phaser or runtime dependencies. It defines three interfaces:
 
@@ -2217,7 +2537,7 @@ BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlayS
 
 #### Layer 2: Overlay Rendering (`MainStreetRenderer.applyUpgradeOverlays()`)
 
-Location: `example-games/main-street/scenes/MainStreetRenderer.ts` — `applyUpgradeOverlays()` method.
+Location: `../tce-main-street/src/scenes/MainStreetRenderer.ts` — `applyUpgradeOverlays()` method.
 
 This method reads the `UpgradeOverlaySpec` and creates Phaser game objects as children of the card's container:
 
@@ -2554,11 +2874,11 @@ The following table lists helpers that were extracted from individual game scene
 
 | Old location (scene) | Old name | New location | New name |
 |---|---|---|---|
-| `example-games/main-street/scenes/MainStreetScene.ts` | Inline HUD container creation | `@ui/Renderer` | `createHudContainer` |
-| `example-games/main-street/scenes/MainStreetScene.ts` | Inline HUD text styling | `@ui/Renderer` | `createHudText` |
-| `example-games/main-street/scenes/MainStreetScene.ts` | Inline tooltip zone setup | `@ui/Renderer` | `attachHudTooltipZone` |
-| `example-games/main-street/scenes/MainStreetScene.ts` | Inline action button creation | `@ui/Renderer` | `createActionButton` |
-| `example-games/main-street/scenes/MainStreetRenderer.ts` | `renderCardSvg` (local) | `@ui/Renderer` | `renderCardSvg` |
+| `../tce-main-street/src/scenes/MainStreetScene.ts` | Inline HUD container creation | `@ui/Renderer` | `createHudContainer` |
+| `../tce-main-street/src/scenes/MainStreetScene.ts` | Inline HUD text styling | `@ui/Renderer` | `createHudText` |
+| `../tce-main-street/src/scenes/MainStreetScene.ts` | Inline tooltip zone setup | `@ui/Renderer` | `attachHudTooltipZone` |
+| `../tce-main-street/src/scenes/MainStreetScene.ts` | Inline action button creation | `@ui/Renderer` | `createActionButton` |
+| `../tce-main-street/src/scenes/MainStreetRenderer.ts` | `renderCardSvg` (local) | `@ui/Renderer` | `renderCardSvg` |
 ### Before and after migration examples
 
 **Before (Main Street — inline in scene):**
@@ -2629,11 +2949,11 @@ See the Gym SLL demo (`example-games/gym/scenes/GymSllScene.ts`) for a working e
 
 When adding a new example game, follow this pattern:
 
-1. **Create a layout JSON file** in `example-games/<game>/layouts/<game>.layout.json` with **position-only** normalized zone rectangles (`x`, `y`) and anchors. Use `baseViewport` of 1280x720 (matching the shared `GAME_W`/`GAME_H` constants).
+1. **Create a layout JSON file** in `src/layouts/<game>.layout.json` with **position-only** normalized zone rectangles (`x`, `y`) and anchors. Use `baseViewport` of 1280x720 (matching the shared `GAME_W`/`GAME_H` constants).
 
    **Important**: Layout zones define **positioning only** (`x`, `y`). Card dimensions come entirely from per-game constants (e.g., `CARD_W`, `CARD_H`), not from layout zones. The `pixelOverride` field supports exact pixel-position overrides for `x` and `y` only — no dimensions.
 
-2. **Create a layout adapter** in `example-games/<game>/scenes/<Game>LayoutAdapter.ts` that:
+2. **Create a layout adapter** in `src/scenes/<Game>LayoutAdapter.ts` that:
    - Parses the layout JSON using `parseScreenLayoutDocument`
    - Defines a typed `GameLayout` interface with the positions your renderer needs
    - Exports a `compute<Game>Layout()` function that maps SLL zones to the game-specific shape, falling back to legacy values if the SLL document is unavailable
@@ -2695,10 +3015,10 @@ reusing base layout zones through composition.
 
 | File | Purpose |
 |------|--------|
-| `example-games/main-street/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
-| `example-games/main-street/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
-| `example-games/main-street/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
-| `example-games/main-street/TutorialFlow.ts` | T1-T26 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
+| `../tce-main-street/src/layouts/main-street.layout.json` | Canonical base layout (8 zones, position-only) |
+| `../tce-main-street/src/layouts/main-street-tutorial.layout.json` | Tutorial-specific layout (7 zones, position + dimensions) |
+| `../tce-main-street/src/scenes/MainStreetTutorialHints.ts` | Tutorial overlay manager |
+| `../tce-main-street/src/TutorialFlow.ts` | T1-T26 unified step definitions with `TutorialHighlightZone` / `TutorialActionType` types (CG-0MTNMBX5Z002U0MH) |
 
 #### How composition works
 
@@ -2782,7 +3102,7 @@ When creating a new tutorial layout file:
 5. **Add anchors** for each zone (used for tooltip positioning relative to the zone)
 6. **Validate** with `validateScreenLayoutDocument()` and `composeResolvedLayouts()` before committing
 
-See `example-games/main-street/layouts/main-street-tutorial.layout.json` for a complete example.
+See `../tce-main-street/src/layouts/main-street-tutorial.layout.json` for a complete example.
 
 #### Tutorial tooltip input routing (DOM pass-through prevention)
 
@@ -3337,9 +3657,9 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   - `src/ui/debug/MarketCardCheatOverlay.ts` — Overlay, picker, filtering
     (`filterEntries()`), keyboard navigation, and `createMarketCardCheatTool()`
     factory (label/description matched to the acceptance criteria).
-  - `example-games/main-street/MainStreetMarket.ts` — `cheatReplaceMarketCard()`
+  - `../tce-main-street/src/MainStreetMarket.ts` — `cheatReplaceMarketCard()`
     helper that performs the random-slot replacement and discard routing.
-  - `example-games/main-street/scenes/MainStreetScene.ts` — Dev-gated wiring
+  - `../tce-main-street/src/scenes/MainStreetScene.ts` — Dev-gated wiring
     (`import.meta.env.DEV` branch in `initSettingsPanel`) so the tool is
     absent/tree-shaken from production bundles.
 
@@ -3372,11 +3692,11 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
 - **Implementation:**
   - `src/ui/debug/StaffApplicantCheatOverlay.ts` — Toggle overlay and
     `createStaffApplicantCheatTool()` factory.
-  - `example-games/main-street/MainStreetState.ts` — `forcedStaffApplicant?:
+  - `../tce-main-street/src/MainStreetState.ts` — `forcedStaffApplicant?:
     boolean` dev-only field (not serialized).
-  - `example-games/main-street/MainStreetEngine.ts` — `computeApplicantChance()`
+  - `../tce-main-street/src/MainStreetEngine.ts` — `computeApplicantChance()`
     (exported) and the forced branch in `resolveStaffApplicant()`.
-  - `example-games/main-street/scenes/MainStreetScene.ts` — Dev-gated wiring
+  - `../tce-main-street/src/scenes/MainStreetScene.ts` — Dev-gated wiring
     (`import.meta.env.DEV` branch in `initSettingsPanel`).
 
 ### Adding a New Debug Tool
@@ -3452,7 +3772,7 @@ To verify production safety:
 | `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
 | `src/ui/debug/MarketCardCheatOverlay.ts` | Market Card Cheat overlay (Main Street market-replacement picker) |
 | `src/ui/debug/StaffApplicantCheatOverlay.ts` | Staff Application cheat overlay (Main Street forced-applicant toggle) |
-| `example-games/main-street/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
+| `../tce-main-street/src/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
 | `src/ui/debug/index.ts` | Debug tools barrel file |
 | `src/ui/CardGameScene.ts` | Default debug tool registration |
 | `src/ui/SettingsPanel.ts` | Debug section rendering in Settings panel |

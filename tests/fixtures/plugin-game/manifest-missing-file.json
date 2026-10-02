@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "fixture-game",
+      "sceneKey": "FixtureGameScene",
+      "title": "Fixture Game",
+      "description": "Valid metadata but the entry module is not on disk.",
+      "thumbnail": "assets/thumbnail.png",
+      "coreEngineVersion": "^0.1.0",
+      "entry": "missing-entry.js"
+    }
+  ]
+}

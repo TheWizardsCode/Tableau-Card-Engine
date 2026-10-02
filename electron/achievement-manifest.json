@@ -1,0 +1,76 @@
+{
+  "$comment": "Achievement manifest — the single source of truth for achievement id ↔ Steam API name ↔ hidden flag (intake AC4). The `steamApiName` values MUST match the achievement API names configured on the Steamworks partner backend; a mismatch causes Steam to silently drop the unlock. Validate with `validateAchievementManifest()` and (in a real Steam session) against ISteamUserStats achievement names.",
+  "version": 1,
+  "games": [
+    {
+      "gameId": "main-street",
+      "achievements": [
+        {
+          "achievementId": "foodie-row",
+          "steamApiName": "TCE_MAIN_STREET_FOODIE_ROW",
+          "hidden": false
+        },
+        {
+          "achievementId": "culture-district",
+          "steamApiName": "TCE_MAIN_STREET_CULTURE_DISTRICT",
+          "hidden": false
+        },
+        {
+          "achievementId": "commerce-hub",
+          "steamApiName": "TCE_MAIN_STREET_COMMERCE_HUB",
+          "hidden": false
+        },
+        {
+          "achievementId": "full-block",
+          "steamApiName": "TCE_MAIN_STREET_FULL_BLOCK",
+          "hidden": false
+        },
+        {
+          "achievementId": "bustling-street",
+          "steamApiName": "TCE_MAIN_STREET_BUSTLING_STREET",
+          "hidden": false
+        },
+        {
+          "achievementId": "deep-pockets",
+          "steamApiName": "TCE_MAIN_STREET_DEEP_POCKETS",
+          "hidden": false
+        },
+        {
+          "achievementId": "beloved-mayor",
+          "steamApiName": "TCE_MAIN_STREET_BELOVED_MAYOR",
+          "hidden": false
+        },
+        {
+          "achievementId": "renovator",
+          "steamApiName": "TCE_MAIN_STREET_RENOVATOR",
+          "hidden": false
+        },
+        {
+          "achievementId": "first-upgrade",
+          "steamApiName": "TCE_MAIN_STREET_FIRST_UPGRADE",
+          "hidden": false
+        },
+        {
+          "achievementId": "diversified",
+          "steamApiName": "TCE_MAIN_STREET_DIVERSIFIED",
+          "hidden": false
+        },
+        {
+          "achievementId": "serial-seller",
+          "steamApiName": "TCE_MAIN_STREET_SERIAL_SELLER",
+          "hidden": false
+        },
+        {
+          "achievementId": "synergy-master",
+          "steamApiName": "TCE_MAIN_STREET_SYNERGY_MASTER",
+          "hidden": false
+        },
+        {
+          "achievementId": "entertainment-strip",
+          "steamApiName": "TCE_MAIN_STREET_ENTERTAINMENT_STRIP",
+          "hidden": false
+        }
+      ]
+    }
+  ]
+}

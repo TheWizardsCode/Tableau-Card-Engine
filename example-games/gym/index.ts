@@ -28,6 +28,7 @@ export { GymHudComponentsScene } from './scenes/GymHudComponentsScene';
 export { GymLayoutOwnershipScene } from './scenes/GymLayoutOwnershipScene';
 export { GymParameterizedOverlayScene } from './scenes/GymParameterizedOverlayScene';
 export { GymSvgHelpersScene } from './scenes/GymSvgHelpersScene';
+export { GymDprResolutionScene } from './scenes/GymDprResolutionScene';
 export { GymMarketOfferEngineScene } from './scenes/GymMarketOfferEngineScene';
 export { GymSpatialRulesScene } from './scenes/GymSpatialRulesScene';
 export { GymTokenPileViewScene } from './scenes/GymTokenPileViewScene';
@@ -51,6 +52,7 @@ export {
   GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_PARAMETERIZED_OVERLAY_KEY,
   GYM_SVG_HELPERS_KEY,
+  GYM_DPR_RESOLUTION_KEY,
   GYM_AI_STRATEGY_KEY,
   GYM_MARKET_OFFER_ENGINE_KEY,
   GYM_SPATIAL_RULES_KEY,

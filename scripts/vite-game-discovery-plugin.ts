@@ -565,6 +565,7 @@ const GYM_SCENE_NAMES = [
   'GymLayoutOwnershipScene',
   'GymParameterizedOverlayScene',
   'GymSvgHelpersScene',
+  'GymDprResolutionScene',
   'GymMarketOfferEngineScene',
   'GymSpatialRulesScene',
   'GymTokenPileViewScene',

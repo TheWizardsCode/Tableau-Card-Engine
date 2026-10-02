@@ -61,9 +61,11 @@ TCE ships as a web app (GitHub Pages) **and** as a native desktop launcher built
 - `npm run start:electron` -- build + launch the desktop app locally.
 - `npm run package` / `package:win` / `package:linux` / `package:mac` -- produce a distributable binary (Windows NSIS installer is the primary Steam artifact) into the gitignored `release/` directory.
 - Game content can come from the bundled app or an external **Steam DLC install directory** via `--content-dir <dir>` / `TCE_CONTENT_DIR`, resolved behind a small provider interface so a future Steamworks-backed provider can be added without a rewrite.
+- **Steam follow-to-unlock** — following the developer on Steam unlocks a bundled bonus game (game-agnostic, config-driven via `electron/bonus-catalog.json`). Automatic detection uses a small custom N-API addon (`native/steam-friends`, Windows x64) because `steamworks.js` exposes no `ISteamFriends::IsFollowing`; the launcher degrades to a persisted manual claim when the addon or Steam is unavailable, and never fabricates a follow. Credentials live in a **gitignored** config (`electron/steam-config.local.json`) or env vars. Build the Steam binary with `npm install steamworks.js && npm run build:steam-friends && npm run package:steam` (see `native/steam-friends/README.md`).
+- **Steam achievements** — in-game challenges complete persistent Steam achievements through an **engine-generic** achievement layer (`src/core-engine/AchievementSystem.ts`). Games declare a challenge → achievement mapping and never import the Steam SDK; the launcher maps achievement ids to Steam API names via the single-source-of-truth manifest (`electron/achievement-manifest.json`, which must match the Steamworks partner backend). Unlocks are idempotent, persist offline, and re-sync when Steam is next available.
 - The Windows binary is built reproducibly by CI (`.github/workflows/package.yml`) and uploaded as a workflow artifact on every push to `main`. CI composes the sibling game repos and builds with `GAMES_CONFIG=full`, so the Steam artifact ships the full game catalogue (all games + Gym).
 
-See `docs/DEVELOPER.md` (Electron Launcher / Desktop Packaging) and `RELEASE.md` for the full workflow.
+See `docs/DEVELOPER.md` (Electron Launcher / Desktop Packaging; Steam achievements), `docs/dev/steam-follow-qa.md` and `docs/dev/steam-achievements-qa.md` (manual Steam QA), and `RELEASE.md` for the full workflow.
 
 ## What Is This?
 
@@ -296,7 +298,7 @@ This approach was chosen for **performance** (no per-level SVG regeneration), **
 
 ## ToneForge runtime adapter (Main Street)
 
-Main Street can optionally route mapped SFX keys through a ToneForge-backed module via `createTfPlayer`. Run `npm run tf:generate` to emit a runtime synth module at `build/tf-synths/main-street-runtime-synth.mjs` providing on-the-fly Tone/WebAudio voices. The adapter expects module exports `factories: Record<string, () => TfVoice>` and optional `getFactory()` / `descriptors` helpers. See `docs/the-build/audio.md` for generation workflow and wiring details.
+Main Street routes mapped SFX keys through a committed ToneForge-backed module via `createTfPlayer`. The runtime synth module is committed at `src/core-engine/tf-runtime/main-street-runtime-synth.mjs` and bundled into every build, so no `tf` CLI or generation step is required. `npm run tf:generate` (when the ToneForge CLI is available) refreshes it and emits WAV/metadata outputs under `build/tf-synths/`. The adapter expects module exports `factories: Record<string, () => TfVoice>` and optional `getFactory()` / `descriptors` helpers. See `docs/the-build/audio.md` for generation workflow and wiring details.
 
 ## Contributing
 

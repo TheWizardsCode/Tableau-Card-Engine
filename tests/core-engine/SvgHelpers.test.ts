@@ -5,6 +5,8 @@ import {
   makeTextureKey,
   rasteriseSvgToTexture,
   getOrCreateTexture,
+  MIN_QUALITY_SCALE,
+  SVG_TEXTURE_FILTER_MODE,
 } from '../../src/core-engine/SvgHelpers';
 
 type MockCanvas = {
@@ -116,25 +118,109 @@ describe('SvgHelpers', () => {
     expect(makeTextureKey('mind', 48, 65, 2)).toBe('ms_card_mind_48x65@2');
   });
 
-  it('rasterises SVG and scales canvas using quality scale (>= 4x)', async () => {
-    const scene = createMockScene();
-    markSceneValid(scene);
+  it('uses MIN_QUALITY_SCALE constant', () => {
+    expect(MIN_QUALITY_SCALE).toBe(2);
+  });
+
+  it('rasterises SVG at the correct resolution for each DPR', async () => {
+    // DPR 1: qualityScale = Math.max(2, 1) = 2 => 10x20 -> 20x40
+    const sceneDpr1 = createMockScene();
+    markSceneValid(sceneDpr1);
 
     await rasteriseSvgToTexture(
-      scene,
-      'test-key',
+      sceneDpr1,
+      'dpr1-key',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="20"></svg>',
+      10,
+      20,
+      1,
+    );
+
+    expect(createdCanvases.some((c) => c.width === 20 && c.height === 40)).toBe(true);
+
+    // DPR 2: qualityScale = Math.max(2, 2) = 2 => 10x20 -> 20x40
+    const sceneDpr2 = createMockScene();
+    markSceneValid(sceneDpr2);
+
+    await rasteriseSvgToTexture(
+      sceneDpr2,
+      'dpr2-key',
       '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="20"></svg>',
       10,
       20,
       2,
     );
 
-    expect(addedCanvases).toHaveLength(1);
-    // Depending on environment and placeholder handling we may create one or more
-    // canvases. Ensure at least one created canvas matches the expected size.
-    expect(createdCanvases.length).toBeGreaterThanOrEqual(1);
-    const found = createdCanvases.some((c) => c.width === 40 && c.height === 80);
-    expect(found).toBe(true);
+    expect(createdCanvases.some((c) => c.width === 20 && c.height === 40)).toBe(true);
+
+    // DPR 3: qualityScale = Math.max(2, 3) = 3 => 10x20 -> 30x60
+    const sceneDpr3 = createMockScene();
+    markSceneValid(sceneDpr3);
+
+    await rasteriseSvgToTexture(
+      sceneDpr3,
+      'dpr3-key',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="20"></svg>',
+      10,
+      20,
+      3,
+    );
+
+    expect(createdCanvases.some((c) => c.width === 30 && c.height === 60)).toBe(true);
+  });
+
+  it('rasterises SVG at the correct resolution for a card-sized canvas', async () => {
+    // Card dimensions: 140x80 logical
+    // DPR 1: qualityScale=2 => 280x160
+    const sceneDpr1 = createMockScene();
+    markSceneValid(sceneDpr1);
+
+    await rasteriseSvgToTexture(
+      sceneDpr1,
+      'card-dpr1',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80"></svg>',
+      140,
+      80,
+      1,
+    );
+
+    expect(createdCanvases.some((c) => c.width === 280 && c.height === 160)).toBe(true);
+
+    // DPR 3: qualityScale=3 => 420x240
+    const sceneDpr3 = createMockScene();
+    markSceneValid(sceneDpr3);
+
+    await rasteriseSvgToTexture(
+      sceneDpr3,
+      'card-dpr3',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="80"></svg>',
+      140,
+      80,
+      3,
+    );
+
+    expect(createdCanvases.some((c) => c.width === 420 && c.height === 240)).toBe(true);
+  });
+
+  it('requests linear filtering for rasterised SVG textures', async () => {
+    const scene = createMockScene();
+    markSceneValid(scene);
+
+    await rasteriseSvgToTexture(
+      scene,
+      'filter-key',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
+      10,
+      10,
+      2,
+    );
+
+    // Phaser Textures.FilterMode.LINEAR === 0; NEAREST === 1. Rasterised SVG
+    // art must not use nearest-neighbour minification (it looks pixelated).
+    expect(SVG_TEXTURE_FILTER_MODE).toBe(0);
+    const texture = scene.textures.get('filter-key');
+    expect(texture.setFilter).toHaveBeenCalledWith(SVG_TEXTURE_FILTER_MODE);
+    expect(texture.setFilter).not.toHaveBeenCalledWith(1);
   });
 
   it('does not rasterise when scene is marked invalid', async () => {
