@@ -16,12 +16,16 @@
  *   established order (part3 last) plus the `replay-e2e` project.
  * - AC6: `full` is deliberately omitted so bare `/skill:test` runs the real
  *   full CI suite.
+ * - AC8: every typed Vitest command defaults `GAMES_CONFIG` to `full` (while
+ *   preserving an explicit override), so the game-discovery adapters load and
+ *   a bare `/skill:test --type unit` no longer fails Golf's replay tests
+ *   (CG-0MUIXVIBP0062A8H).
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -85,6 +89,11 @@ const TUTORIAL_PART_ORDER = [
 
 // Browser-dependent types that must chain check-browser-test-env.ts
 const BROWSER_DEPENDENT_TYPES = ['smoke', 'dev', 'browser', 'tutorial', 'e2e'];
+
+// Typed profiles whose commands invoke Vitest through `npx tsx`. `electron` is
+// excluded: it is a shell-script profile (`scripts/run-electron-smoke.sh`), not
+// a Vitest command, and its caller already exports the preset.
+const VITEST_TYPES = ['unit', 'smoke', 'dev', 'browser', 'tutorial', 'e2e'];
 
 // ---------------------------------------------------------------------------
 // AC1: extension.json structure and required types
@@ -280,6 +289,81 @@ describe('AC5 — tutorial/e2e part coverage and ordering', () => {
     // The extension's tutorial commands must match the canonical part order
     // from run-tutorial-tests.sh.
     expect(extensionProjects).toEqual(expectedProjects);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC8: typed Vitest commands default GAMES_CONFIG to full
+// ---------------------------------------------------------------------------
+
+describe('AC8 — typed Vitest commands default GAMES_CONFIG to full', () => {
+  const types = loadExtensionTypes();
+
+  /**
+   * Execute *command* with a stubbed `npx` on `PATH` that echoes the
+   * `GAMES_CONFIG` value it observes, and return one line per `npx` call.
+   *
+   * This exercises the real shell semantics of the command (the `bash -c`
+   * wrapper and the `export GAMES_CONFIG="${GAMES_CONFIG:-full}"` default)
+   * rather than inspecting the command string.
+   */
+  function gamesConfigSeenBy(
+    command: string,
+    ambient: string | undefined,
+  ): string[] {
+    const stubDir = mkdtempSync(join(tmpdir(), 'tce-npx-stub-'));
+    try {
+      const npxPath = join(stubDir, 'npx');
+      writeFileSync(
+        npxPath,
+        '#!/usr/bin/env bash\nprintf "%s\\n" "${GAMES_CONFIG:-<unset>}"\n',
+      );
+      chmodSync(npxPath, 0o755);
+
+      const env: NodeJS.ProcessEnv = { ...process.env };
+      env.PATH = `${stubDir}${delimiter}${process.env.PATH ?? ''}`;
+      if (ambient === undefined) delete env.GAMES_CONFIG;
+      else env.GAMES_CONFIG = ambient;
+
+      const result = spawnSync('bash', ['-c', command], {
+        cwd: REPO_ROOT,
+        env,
+        encoding: 'utf-8',
+      });
+      if (result.status !== 0) {
+        throw new Error(result.stderr || `command exited ${result.status}`);
+      }
+      return result.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
+    } finally {
+      rmSync(stubDir, { recursive: true, force: true });
+    }
+  }
+
+  it('defaults GAMES_CONFIG to full for every typed Vitest command', () => {
+    for (const type of VITEST_TYPES) {
+      const cmds = normaliseCommands(types as Record<string, string | string[]>, type);
+      expect(cmds.length).toBeGreaterThan(0);
+      for (const command of cmds) {
+        const seen = gamesConfigSeenBy(command, undefined);
+        expect(seen.length, `${type}: no npx invocation observed`).toBeGreaterThan(0);
+        for (const value of seen) {
+          expect(value, `${type}: GAMES_CONFIG not defaulted to full`).toBe('full');
+        }
+      }
+    }
+  });
+
+  it('preserves an explicitly supplied GAMES_CONFIG for every typed Vitest command', () => {
+    for (const type of VITEST_TYPES) {
+      const cmds = normaliseCommands(types as Record<string, string | string[]>, type);
+      for (const command of cmds) {
+        const seen = gamesConfigSeenBy(command, 'solo');
+        expect(seen.length).toBeGreaterThan(0);
+        for (const value of seen) {
+          expect(value, `${type}: explicit GAMES_CONFIG override lost`).toBe('solo');
+        }
+      }
+    }
   });
 });
 

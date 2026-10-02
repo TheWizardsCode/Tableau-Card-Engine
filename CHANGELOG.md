@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.1.19 (2026-10-02)
+### Features
+- Games can now be built and shipped individually or in custom bundles, so you get faster updates and smaller downloads. (CG-0MTR7DLMY008CK17)
+- Staff discounts now match their card text, so you pay the advertised reduced prices. (CG-0MTKMGL66004I0PC)
+- Main Street's synth sound effects now work in every build without extra setup. (CG-0MUL2G17U003C1N6)
+- Parks now cost 40 coins per turn to maintain, making Park spam a real trade-off. (CG-0MU9NW9EP003B1AK)
+- Cards now use less memory while staying sharp on all screens. (CG-0MUCMB8DT003DAKR)
+- Compare card art quality at different screen resolutions in the new Gym scene. (CG-0MUN3ZWU80012T5P)
+- Steam features now install automatically, so Steam builds work without extra setup. (CG-0MUOFUXVT0040Z8O)
+### Bug Fixes
+- Lost Cities card highlights now perfectly match card size when hovering. (CG-0MUHJHH7M0056O5Q)
+- The Serial Seller achievement now unlocks properly when you complete the Main Street challenge. (CG-0MUQ50RST0034AI2)
+- The website now includes all 8 games plus the Gym instead of just the Gym. (CG-0MUGSGH7Q002NOA1)
+- Tests now properly verify that local config files stay private, preventing accidental exposure of your settings. (CG-0MUF6LBW600657B2)
+- Unit tests now run correctly without manual configuration. (CG-0MUIXVIBP0062A8H)
+- Cards in your hand now stay in place when you draw or add new ones. (CG-0MUAYBB4E007LWEQ)
+- Finishing a work item now pushes your changes automatically, even when they update context files. (CG-0MUFIBB2X008A136)
+- Upcoming card gains and losses now animate to the right place, so you can see who paid and who benefited. (CG-0MUA1UH3A008M4BS)
+### Other
+- Developer docs now point to the correct game source locations, so modding and contribution guides stay accurate. (CG-0MUMCI1FK009MDIR)
+- The old core repository is gone, so everyone uses the single current core. (CG-0MUKGQINO002ILXA)
+- Updated developer docs to keep game tests reliable under heavy load. (CG-0MUMQGUQQ000DIOQ)
+- Improves game stability and performance through internal code cleanup. (CG-0MUEUWE8400951Z9)
+- We reviewed the whole test suite and flagged outdated tests so future updates stay fast and reliable. (CG-0MTCOPO8U001UW2Y)
+
 ## v0.1.18 (2026-09-28)
 ### Features
 - Tax audits now take a fair share of your coins, and hiring an Accountant reduces the cost. (CG-0MTQ7W0ZX0059R3J)

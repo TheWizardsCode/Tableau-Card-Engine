@@ -1,0 +1,5 @@
+{
+  "_comment": "Example Steam config for the TCE launcher. Copy to steam-config.local.json (gitignored) and fill in the real values, or set TCE_STEAM_APP_ID / TCE_STEAM_DEVELOPER_STEAM_ID environment variables. Real credentials MUST NOT be committed.",
+  "app_id": "",
+  "developer_steam_id": ""
+}

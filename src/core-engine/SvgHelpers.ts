@@ -6,6 +6,37 @@ const textureCache = new Map<string, Promise<void>>();
 /** Tracks scenes that are still safe for texture operations. */
 const validScenes = new WeakSet<Phaser.Scene>();
 
+/**
+ * Minimum quality scale for SVG rasterisation.
+ *
+ * The render scale is `Math.max(MIN_QUALITY_SCALE, dpr)`, so at DPR 1 the
+ * canvas is at 2× logical size (a mild supersample), and on HiDPI displays
+ * it follows device density.  This keeps texture memory bounded compared
+ * to the old 4× baseline while preserving legibility for thin strokes and
+ * small text.
+ */
+export const MIN_QUALITY_SCALE = 2;
+
+/**
+ * Phaser texture filter mode applied to rasterised SVG textures.
+ *
+ * Phaser's `Phaser.Textures.FilterMode` constants are `LINEAR = 0` and
+ * `NEAREST = 1` — note the reverse of an intuitive "1 = linear" reading.
+ * SVG-derived art (card faces, icons) is vector/raster art with text and
+ * curved strokes, not pixel art, so it must use **linear** filtering:
+ * textures are rasterised at `Math.max(MIN_QUALITY_SCALE, dpr)` times the
+ * logical size and are therefore frequently minified when displayed, and
+ * nearest-neighbour minification produces the blocky, pixelated look this
+ * helper exists to avoid.
+ *
+ * Phaser forces every texture to `NEAREST` when the game config sets
+ * `antialias: false`; selecting linear here overrides that for SVG textures
+ * regardless of the global renderer config.  The numeric literal is used
+ * instead of a runtime `Phaser.Textures.FilterMode` import because this
+ * core-engine helper imports Phaser as a *type only*.
+ */
+export const SVG_TEXTURE_FILTER_MODE = 0;
+
 /** Registers a scene as valid for texture operations. */
 export function markSceneValid(scene: Phaser.Scene): void {
   validScenes.add(scene);
@@ -53,8 +84,16 @@ function svgToDataUri(svgText: string): string {
 /**
  * Rasterises an SVG string into a Phaser texture.
  *
- * Rendering uses a quality scale of at least 4x logical size (or DPR if higher)
- * to preserve edge clarity when downscaled at draw time.
+ * Rendering uses a quality scale of `Math.max(MIN_QUALITY_SCALE, dpr)`, i.e.
+ * a minimum of 2× logical size (or the device pixel ratio, whichever is
+ * higher).  This yields native-resolution textures on HiDPI displays while
+ * keeping memory bounded on standard-DPR screens.
+ *
+ * The resulting texture is filtered **linearly**
+ * ({@link SVG_TEXTURE_FILTER_MODE}); nearest-neighbour minification of an
+ * SVG raster is what makes card art look pixelated, so the filter is applied
+ * explicitly even when the game disables antialiasing (which otherwise makes
+ * Phaser default every texture to nearest).
  */
 export async function rasteriseSvgToTexture(
   scene: Phaser.Scene,
@@ -64,7 +103,7 @@ export async function rasteriseSvgToTexture(
   height: number,
   dpr: number = (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
 ): Promise<void> {
-  const qualityScale = Math.max(4, dpr);
+  const qualityScale = Math.max(MIN_QUALITY_SCALE, dpr);
 
   const existing = textureCache.get(key);
   if (existing) {
@@ -104,7 +143,7 @@ export async function rasteriseSvgToTexture(
           scene.textures.addCanvas(key, pc);
           const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
           if (texture?.setFilter) {
-            texture.setFilter(1);
+            texture.setFilter(SVG_TEXTURE_FILTER_MODE);
           }
           placeholderCanvas = pc;
         } catch {
@@ -161,8 +200,7 @@ export async function rasteriseSvgToTexture(
 
                 const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
                 if (texture?.setFilter) {
-                  // Phaser uses 1 for linear filtering; avoid runtime Phaser import in core helpers.
-                  texture.setFilter(1);
+                  texture.setFilter(SVG_TEXTURE_FILTER_MODE);
                 }
               }
             } else {
@@ -171,7 +209,7 @@ export async function rasteriseSvgToTexture(
               // (filter) if available.
               const texture = scene.textures.get(key) as { setFilter?: (mode: number) => void } | undefined;
               if (texture?.setFilter) {
-                texture.setFilter(1);
+                texture.setFilter(SVG_TEXTURE_FILTER_MODE);
               }
             }
           } catch {

@@ -18,7 +18,7 @@ The GitHub Actions workflow (.github/workflows/deploy.yml) runs on every push to
 3. Install Playwright Chromium (required for browser tests): npx playwright install chromium
 4. Run Monte Carlo harness (on a separate job) and upload artifacts
 5. Run tests: npm test (unit + browser; environment variables on main branch enable stricter Monte Carlo checks)
-6. Build production bundle: npm run build (vite -> dist/)
+6. Compose the sibling game repositories, then build the full launcher distribution: GAMES_CONFIG=full npm run build (vite -> dist/). The core repo carries no games at HEAD, so the public `tce-<game>` repos listed in configs/full.json are cloned as siblings (`../tce-<game>`) first. The `full` preset bundles the engine + Gym + all eight example games; without `GAMES_CONFIG` the game-discovery plugin would default to the core-only preset (Gym only).
 7. Configure Pages, upload the dist/ directory as a Pages artifact, and deploy via actions/deploy-pages@v4
 
 Only one deployment runs at a time; if a new push arrives while a deployment is in progress, the previous run is cancelled.
@@ -75,7 +75,11 @@ npm test
 # Reproduce main CI tests
 MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.30 MONTE_MAX_WIN_RATE=0.60 npm test
 
-# Production build
+# Production build (full launcher distribution, as deployed to Pages).
+# Requires the sibling game repos: npm run setup:distribution -- --dir ..
+GAMES_CONFIG=full npm run build
+
+# Core-only build (Gym only) — the local default
 npm run build
 
 # Install Playwright Chromium (if running browser tests locally)
@@ -99,6 +103,17 @@ A second workflow, `.github/workflows/package.yml`, runs on every push to `main`
 5. Uploads the installer (`release/TCE-Setup-<version>.exe`) as the `tce-windows-installer` workflow artifact (downloadable from the Actions run, ~90-day retention)
 
 Windows is the primary Steam target; this is how the binary is produced reproducibly without a Windows dev machine. The GitHub Pages deploy workflow is unaffected by this job. To produce the artifact for a manual release, run the workflow from the Actions tab (Run workflow) or push a `v*` tag.
+
+Steam build (follow-to-unlock native module)
+--------------------------------------------
+`steamworks.js` is an **optional** native module, intentionally not a `package.json` dependency so ordinary installs and CI never need a native build. To produce a binary with Steam follow-to-unlock support:
+
+```bash
+npm install steamworks.js   # once, on the packaging machine
+npm run package:steam        # checks for steamworks.js, then Windows NSIS package
+```
+
+`scripts/check-steamworks.mjs` fails the build early with actionable guidance when the module is missing. `electron-builder.yml` packs `node_modules/steamworks.js/**` and unpacks its native `dist/**` from the asar. Private credentials (Steam App ID, developer SteamID64) come from a **gitignored** `electron/steam-config.local.json` or the `TCE_STEAM_APP_ID` / `TCE_STEAM_DEVELOPER_STEAM_ID` env vars — never committed. Without the native module the non-Steam `npm run package:win` build still works; the follow feature degrades gracefully. See [Steam follow-to-unlock — manual E2E QA](docs/dev/steam-follow-qa.md) for the real-account verification checklist.
 
 If you want help
 ----------------

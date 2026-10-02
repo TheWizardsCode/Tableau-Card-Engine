@@ -1,9 +1,24 @@
+// Guard: the "no Tone.js in runtime code" invariant (test-review C6 /
+// CG-0MUA14GAU0063D95). The primary enforcement is the ESLint
+// `no-restricted-imports` rule for `tone` in `eslint.config.cjs`; this test
+// remains as the automated (CI-time) guard because the project has no wired
+// `lint` script/build step that runs ESLint. Keep the two in sync.
+//
+// Narrow, documented exception: the committed ToneForge runtime synth module
+// lives in `src/core-engine/tf-runtime/` and necessarily contains a `tone`
+// import. It is generated output loaded via a *static-specifier* dynamic
+// import, so Vite/Rollup code-splits it into its own lazy chunk and Tone.js
+// never enters the main bundle (CG-0MUL2G17U003C1N6). Hand-written runtime
+// code must still never import `tone`.
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { join, extname, sep } from 'node:path';
 
 const RUNTIME_DIRS = ['src', 'example-games'];
 const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
+
+/** Generated ToneForge runtime modules are the sanctioned `tone` exception. */
+const GENERATED_TF_RUNTIME_DIR = join('src', 'core-engine', 'tf-runtime') + sep;
 
 function listRuntimeFiles(root: string): string[] {
   const out: string[] = [];
@@ -43,6 +58,7 @@ describe('runtime audio synthesis guardrails', () => {
 
     for (const dir of RUNTIME_DIRS) {
       for (const file of listRuntimeFiles(dir)) {
+        if (file.startsWith(GENERATED_TF_RUNTIME_DIR)) continue;
         const text = readFileSync(file, 'utf8');
         if (text.includes("from 'tone'") || text.includes('from "tone"')) {
           violations.push(file);

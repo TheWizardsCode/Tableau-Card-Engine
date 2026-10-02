@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "fixture-game",
+      "sceneKey": "FixtureGameScene",
+      "title": "Fixture Game",
+      "description": "First entry — valid in isolation.",
+      "thumbnail": "assets/thumbnail.png",
+      "coreEngineVersion": "^0.1.0",
+      "entry": "entry.js"
+    },
+    {
+      "id": "fixture-game",
+      "sceneKey": "FixtureGameScene",
+      "title": "Fixture Game (duplicate)",
+      "description": "Second entry repeats both id and sceneKey.",
+      "thumbnail": "assets/thumbnail.png",
+      "coreEngineVersion": "^0.1.0",
+      "entry": "entry.js"
+    }
+  ]
+}

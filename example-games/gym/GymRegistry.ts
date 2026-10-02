@@ -73,6 +73,9 @@ export const GYM_PARAMETERIZED_OVERLAY_KEY = 'GymParameterizedOverlayScene';
 /** SvgHelpers (SVG Rasterisation Pipeline) demo scene key. */
 export const GYM_SVG_HELPERS_KEY = 'GymSvgHelpersScene';
 
+/** DPR Resolution Comparison demo scene key. */
+export const GYM_DPR_RESOLUTION_KEY = 'GymDprResolutionScene';
+
 /** Market Offer Engine demo scene key. */
 export const GYM_MARKET_OFFER_ENGINE_KEY = 'GymMarketOfferEngineScene';
 
@@ -195,6 +198,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'SVG Rasterisation Pipeline',
     description:
       'Fetch SVG text from an asset URL, rasterise it to a Phaser texture at configurable sizes, verify texture caching via getOrCreateTexture, and toggle scene validity with markSceneValid/markSceneInvalid.',
+  },
+  {
+    sceneKey: GYM_DPR_RESOLUTION_KEY,
+    title: 'DPR Resolution Comparison',
+    description:
+      'Rasterise the same card SVG at DPR 1, 2 and 3 side by side, showing the resolved quality scale and canvas dimensions for each. Toggle a 2x zoom/crop to compare fine detail.',
   },
   {
     sceneKey: GYM_MARKET_OFFER_ENGINE_KEY,

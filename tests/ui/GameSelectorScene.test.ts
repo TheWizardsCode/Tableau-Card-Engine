@@ -498,6 +498,52 @@ describe('GameSelectorScene', () => {
     });
   });
 
+  // ── Locked (Steam bonus) cards ────────────────────────
+
+  describe('locked cards', () => {
+    const LOCKED_GAME: GameEntry = {
+      sceneKey: 'FeudalismScene',
+      title: 'Feudalism',
+      description: 'A locked bonus game.',
+      locked: true,
+      lockMessage: 'Follow us on Steam to unlock',
+    };
+
+    it('does not start the scene when a locked card is clicked', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [LOCKED_GAME] });
+      scene.create();
+
+      const zone = mocks.add.zone.mock.results[0].value;
+      zone._handlers['pointerdown']();
+
+      expect(mocks.scene.start).not.toHaveBeenCalled();
+    });
+
+    it('renders the lock message and a Locked label', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [LOCKED_GAME] });
+      scene.create();
+
+      const textContents = (mocks.add.text.mock.calls as unknown as Array<[number, number, string]>).map(
+        (call) => call[2],
+      );
+      expect(textContents).toContain('[ Locked ]');
+      expect(textContents.some((t) => String(t).includes('Follow us on Steam to unlock'))).toBe(true);
+    });
+
+    it('still starts the scene for an unlocked card', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [GAME_NO_THUMB] });
+      scene.create();
+
+      const zone = mocks.add.zone.mock.results[0].value;
+      zone._handlers['pointerdown']();
+
+      expect(mocks.scene.start).toHaveBeenCalledWith('TestScene');
+    });
+  });
+
   // ── Mixed game list ───────────────────────────────────
 
   describe('mixed game list (with and without thumbnails)', () => {

@@ -126,3 +126,22 @@ Worklog Specific Ignores
 !.pi/skills_extensions/
 !.pi/skills_extensions/**
 .implement_state.json
+
+# Private Steam credentials for the launcher — never commit (see
+# electron/steam-config.example.json for the shape).
+electron/steam-config.local.json
+
+# Steamworks SDK bootstrap file (real app id) — never commit.
+steam_appid.txt
+
+# Native Steam friends addon build artefacts (P3, CG-0MUNBHYAB0011XXW).
+# The .node binary is built per-machine against Electron's ABI and must never
+# be committed (see native/steam-friends/README.md).
+native/**/build/
+native/**/dist/
+*.node
+
+# Steamworks SDK (licence-gated; never commit). The addon needs no SDK at build
+# time, but a local SDK checkout for reference must stay out of git.
+sdk/steamworks/
+native/**/sdk/

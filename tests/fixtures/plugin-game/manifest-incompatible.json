@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "fixture-game",
+      "sceneKey": "FixtureGameScene",
+      "title": "Fixture Game",
+      "description": "Synthetic runtime game used by plugin loader tests.",
+      "thumbnail": "assets/thumbnail.png",
+      "coreEngineVersion": "^9.0.0",
+      "entry": "entry.js"
+    }
+  ]
+}

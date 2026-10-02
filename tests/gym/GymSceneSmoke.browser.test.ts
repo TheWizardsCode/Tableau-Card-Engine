@@ -13,6 +13,7 @@ import { GymUndoRedoScene } from '../../example-games/gym/scenes/GymUndoRedoScen
 import { GymTranscriptScene } from '../../example-games/gym/scenes/GymTranscriptScene';
 import { GymSaveLoadScene } from '../../example-games/gym/scenes/GymSaveLoadScene';
 import { GymSvgHelpersScene } from '../../example-games/gym/scenes/GymSvgHelpersScene';
+import { GymDprResolutionScene } from '../../example-games/gym/scenes/GymDprResolutionScene';
 import { GymMarketOfferEngineScene } from '../../example-games/gym/scenes/GymMarketOfferEngineScene';
 import { GymSpatialRulesScene } from '../../example-games/gym/scenes/GymSpatialRulesScene';
 import { GymTokenPileViewScene } from '../../example-games/gym/scenes/GymTokenPileViewScene';
@@ -41,6 +42,7 @@ import {
   GYM_LAYOUT_OWNERSHIP_KEY,
   GYM_PARAMETERIZED_OVERLAY_KEY,
   GYM_SVG_HELPERS_KEY,
+  GYM_DPR_RESOLUTION_KEY,
   GYM_AI_STRATEGY_KEY,
   GYM_MARKET_OFFER_ENGINE_KEY,
   GYM_SPATIAL_RULES_KEY,
@@ -63,6 +65,7 @@ const SCENES = [
   { key: GYM_LAYOUT_OWNERSHIP_KEY, Scene: GymLayoutOwnershipScene },
   { key: GYM_PARAMETERIZED_OVERLAY_KEY, Scene: GymParameterizedOverlayScene },
   { key: GYM_SVG_HELPERS_KEY, Scene: GymSvgHelpersScene },
+  { key: GYM_DPR_RESOLUTION_KEY, Scene: GymDprResolutionScene },
   { key: GYM_AI_STRATEGY_KEY, Scene: GymAiStrategyScene },
   { key: GYM_MARKET_OFFER_ENGINE_KEY, Scene: GymMarketOfferEngineScene },
   { key: GYM_SPATIAL_RULES_KEY, Scene: GymSpatialRulesScene },

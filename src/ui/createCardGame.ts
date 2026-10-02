@@ -132,8 +132,14 @@ export function createCardGame(options: CardGameOptions): Phaser.Game {
       autoRound: true,
     },
     render: {
-      antialias: false,
-      antialiasGL: false,
+      // SVG-derived card art (and the rest of the UI) is vector/raster art,
+      // not pixel art: keep antialiasing and linear texture filtering enabled.
+      // With `antialias: false`, Phaser's `TextureSource.init` calls
+      // `setFilter(NEAREST)` on every texture, so minified card SVGs render
+      // blocky/pixelated (CG-0MUCMB8DT003DAKR). WebGL also only uses LINEAR
+      // filtering when `antialias` is true.
+      antialias: true,
+      antialiasGL: true,
       roundPixels: true,
       ...renderOverrides,
     } as Phaser.Types.Core.RenderConfig & { resolution?: number },
