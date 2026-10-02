@@ -248,6 +248,33 @@ describe('renderViteConfig', () => {
     expect(src).toContain('resolveCoreAliases(coreRoot)');
     expect(src).toContain("name: 'unit'");
   });
+
+  it('derives the production Pages base from the package name with a PAGES_BASE override', () => {
+    const src = renderViteConfig('main-street', DEFAULT_CORE_REL);
+
+    // Mode gating: electron stays relative, dev stays at root, production is
+    // derived — mirroring the generated game-repo configs (MS-0MUQZH5PH001JXLV).
+    expect(src).toContain("mode === 'electron' ? './'");
+    expect(src).toContain("mode === 'production' ? resolvePagesBase() : '/'");
+    expect(src).toContain('PAGES_BASE');
+
+    // Evaluate the emitted helper with injectable pkg/process so the base
+    // behaviour (not just its presence) is asserted.
+    const fnMatch = src.match(/function resolvePagesBase\(\): string \{([\s\S]*?)\n\}/);
+    expect(fnMatch, 'resolvePagesBase missing from scaffolded config').not.toBeNull();
+    const body = fnMatch![1];
+    const derive = (name: string, pagesBase?: string): string =>
+      new Function('pkg', 'process', `return (function () {${body}})();`)(
+        { name },
+        { env: pagesBase === undefined ? {} : { PAGES_BASE: pagesBase } },
+      ) as string;
+
+    expect(derive('tce-main-street')).toBe('/tce-main-street/');
+    expect(derive('@scope/game')).toBe('/game/');
+    expect(derive('tce-main-street', '/custom-base/')).toBe('/custom-base/');
+    expect(derive('tce-main-street', 'custom-base')).toBe('/custom-base/');
+    expect(derive('tce-main-street', '/')).toBe('/');
+  });
 });
 
 describe('renderTsconfig', () => {
