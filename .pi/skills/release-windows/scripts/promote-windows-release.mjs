@@ -19,6 +19,12 @@
 // `--dry-run` prints the exact commands/actions without touching origin
 // (no artifact download, no release/tag creation).
 //
+// `--run-id <id>` pins the artifact source to a specific workflow run. CI
+// uses it on a tag push: the just-started run is still `in_progress`, so
+// "latest successful run" would resolve to the *previous* release. When the
+// flag is absent the script auto-resolves the latest successful run (the
+// manual `/skill:release-windows` path).
+//
 // Exit codes: 0 success/skip; 1 fatal (no run, download failure, missing
 // installer, release creation failure).
 //
@@ -145,6 +151,37 @@ export function extractReleaseUrlFromCreateOutput(output) {
   return match ? match[0].replace(/[),;]$/, '') : null;
 }
 
+/**
+ * Parse the full `process.argv` into a plain options object.
+ *
+ * Pure (no side effects, no I/O) so the CLI wiring in `main()` stays thin and
+ * the flag handling is unit-testable. An empty or `--`-prefixed value after
+ * `--run-id` is treated as "not provided" (falls back to auto-resolve).
+ *
+ * @param {string[]} argv the full argument vector, e.g. `process.argv`
+ * @returns {{ help: boolean, dryRun: boolean, runId: string|null }}
+ */
+export function parseCliArgs(argv) {
+  const args = Array.isArray(argv) ? argv.slice(2) : [];
+  let runId = null;
+  const runIdIndex = args.indexOf('--run-id');
+  if (runIdIndex !== -1) {
+    const candidate = args[runIdIndex + 1];
+    if (
+      typeof candidate === 'string' &&
+      candidate !== '' &&
+      !candidate.startsWith('--')
+    ) {
+      runId = candidate;
+    }
+  }
+  return {
+    help: args.includes('--help') || args.includes('-h'),
+    dryRun: args.includes('--dry-run'),
+    runId,
+  };
+}
+
 // ── CLI wiring (gh via child_process) ────────────────────────
 
 function runGh(args, { capture = true } = {}) {
@@ -254,12 +291,16 @@ function usage() {
     'promote-windows-release.mjs — promote the latest Windows Setup artifact to a draft GitHub Release',
     '',
     'Usage:',
-    '  node promote-windows-release.mjs [--dry-run] [--help]',
+    '  node promote-windows-release.mjs [--dry-run] [--run-id <id>] [--help]',
     '',
     'Options:',
-    '  --dry-run  Print the exact commands/actions without touching origin',
-    '             (no artifact download, no release/tag creation).',
-    '  --help     Show this help.',
+    '  --dry-run       Print the exact commands/actions without touching origin',
+    '                  (no artifact download, no release/tag creation).',
+    '  --run-id <id>   Promote the artifact from a specific workflow run id.',
+    '                  Used by CI on a tag push, where the current run is not',
+    '                  yet reported as successful. Default: the latest',
+    '                  successful run.',
+    '  --help          Show this help.',
     '',
     'Prerequisites:',
     '  gh CLI authenticated with repo scope; run from the repo root.',
@@ -276,14 +317,13 @@ function readChangelogText() {
 }
 
 async function main(argv) {
-  const args = argv.slice(2);
-  if (args.includes('--help') || args.includes('-h')) {
+  const { help, dryRun, runId: explicitRunId } = parseCliArgs(argv);
+  if (help) {
     process.stdout.write(usage());
     return 0;
   }
-  const dryRun = args.includes('--dry-run');
 
-  const runId = resolveLatestSuccessfulRunId();
+  const runId = explicitRunId ?? resolveLatestSuccessfulRunId();
   if (runId === null) {
     process.stderr.write(
       `error: no successful '${WORKFLOW_QUERY}' run found (gh run list ` +

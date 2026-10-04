@@ -18,6 +18,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildGhReleaseCreateArgs,
   extractReleaseUrlFromCreateOutput,
+  parseCliArgs,
 } from '../../.pi/skills/release-windows/scripts/promote-windows-release.mjs';
 
 describe('buildGhReleaseCreateArgs', () => {
@@ -66,5 +67,43 @@ describe('extractReleaseUrlFromCreateOutput', () => {
   it('returns null when the output contains no https URL', () => {
     expect(extractReleaseUrlFromCreateOutput('something went wrong\n')).toBeNull();
     expect(extractReleaseUrlFromCreateOutput('')).toBeNull();
+  });
+});
+
+describe('parseCliArgs', () => {
+  it('defaults to auto-resolving the run when no flags are passed', () => {
+    expect(parseCliArgs(['node', 'promote-windows-release.mjs'])).toEqual({
+      help: false,
+      dryRun: false,
+      runId: null,
+    });
+  });
+
+  it('pins the run id when --run-id is provided', () => {
+    expect(
+      parseCliArgs(['node', 'script.mjs', '--run-id', '31609434642']).runId,
+    ).toBe('31609434642');
+  });
+
+  it('treats a missing or flag-like --run-id value as not provided', () => {
+    expect(parseCliArgs(['node', 'script.mjs', '--run-id']).runId).toBeNull();
+    expect(
+      parseCliArgs(['node', 'script.mjs', '--run-id', '--dry-run']).runId,
+    ).toBeNull();
+  });
+
+  it('parses --dry-run and --help independently of --run-id', () => {
+    expect(parseCliArgs(['node', 'script.mjs', '--dry-run']).dryRun).toBe(true);
+    expect(parseCliArgs(['node', 'script.mjs', '--help']).help).toBe(true);
+    expect(parseCliArgs(['node', 'script.mjs', '-h']).help).toBe(true);
+    expect(
+      parseCliArgs(['node', 'script.mjs', '--dry-run', '--help']).dryRun,
+    ).toBe(true);
+  });
+
+  it('returns defaults for non-array input', () => {
+    expect(
+      parseCliArgs(null as unknown as string[]),
+    ).toEqual({ help: false, dryRun: false, runId: null });
   });
 });
