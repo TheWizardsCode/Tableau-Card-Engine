@@ -115,6 +115,32 @@ function loadNumber(
 // ── SoundManager ────────────────────────────────────────────
 
 /**
+ * Diagnostic snapshot of the manager's ToneForge synth integration.
+ *
+ * Consumed by the dev-only debug tools (e.g. the ToneForge status entry) so
+ * the active/inactive state and load diagnostics are visible at runtime.
+ */
+export interface SynthStatus {
+  /** True when a synth player is attached **and** at least one key is mapped. */
+  active: boolean;
+  /** Number of synth factories the integration reports (mapped keys by default). */
+  factoryCount: number;
+  /** Last error encountered while loading the synth module, or null. */
+  lastLoadError: string | null;
+}
+
+/**
+ * Optional diagnostics supplied alongside a synth integration so the
+ * manager can surface load metadata without knowing how it was produced.
+ */
+export interface SynthIntegrationDiagnostics {
+  /** Number of factories in the loaded synth module. */
+  factoryCount?: number;
+  /** Last error encountered while loading the synth module (or null to clear). */
+  lastLoadError?: string | null;
+}
+
+/**
  * Configuration options for {@link SoundManager}.
  */
 export interface SoundManagerOptions {
@@ -137,6 +163,12 @@ export interface SoundManagerOptions {
    * Example: `{ 'sfx-place': 'card-place' }`.
    */
   synthKeyMap?: Record<string, string>;
+
+  /**
+   * Optional diagnostics describing the loaded synth module. When omitted,
+   * the factory count is derived from the size of `synthKeyMap`.
+   */
+  synthDiagnostics?: SynthIntegrationDiagnostics;
 
   /**
    * Optional game namespace to scope Phaser audio asset keys.
@@ -176,6 +208,13 @@ export class SoundManager {
   private readonly storage: StorageLike | null;
   private synthPlayer: SoundPlayer | null;
   private synthKeyMap: Record<string, string>;
+  private synthFactoryCount: number;
+  private synthLastLoadError: string | null;
+  private retainedSynthIntegration: {
+    player: SoundPlayer;
+    keyMap: Record<string, string>;
+    factoryCount: number;
+  } | null = null;
   private readonly registry = new Map<string, string>();
   private readonly eventUnsubs: Array<() => void> = [];
   private readonly namespace: string;
@@ -188,6 +227,16 @@ export class SoundManager {
 
     this.synthPlayer = options?.synthPlayer ?? null;
     this.synthKeyMap = options?.synthKeyMap ?? {};
+    this.synthFactoryCount =
+      options?.synthDiagnostics?.factoryCount ?? Object.keys(this.synthKeyMap).length;
+    this.synthLastLoadError = options?.synthDiagnostics?.lastLoadError ?? null;
+    if (this.synthPlayer) {
+      this.retainedSynthIntegration = {
+        player: this.synthPlayer,
+        keyMap: { ...this.synthKeyMap },
+        factoryCount: this.synthFactoryCount,
+      };
+    }
     this.namespace = options?.namespace ?? '';
 
     // Resolve storage backend
@@ -317,15 +366,99 @@ export class SoundManager {
   /**
    * Attach or replace synth integration at runtime.
    * Useful when a tf module is loaded asynchronously after scene boot.
+   *
+   * The attached integration is remembered so a later detach can be reversed
+   * with {@link restoreSynthIntegration} without a scene restart. Pass
+   * `diagnostics` to report module-level metadata (factory count, load error).
    */
   setSynthIntegration(
     synthPlayer: SoundPlayer | null,
     synthKeyMap: Record<string, string> = {},
+    diagnostics?: SynthIntegrationDiagnostics,
   ): void {
     this.synthPlayer = synthPlayer;
     this.synthKeyMap = synthKeyMap;
+    if (synthPlayer) {
+      this.synthFactoryCount =
+        diagnostics?.factoryCount ?? Object.keys(synthKeyMap).length;
+      this.retainedSynthIntegration = {
+        player: synthPlayer,
+        keyMap: { ...synthKeyMap },
+        factoryCount: this.synthFactoryCount,
+      };
+    }
+    if (diagnostics?.lastLoadError !== undefined) {
+      this.synthLastLoadError = diagnostics.lastLoadError;
+    }
     this.synthPlayer?.setMute(this._muted);
     this.synthPlayer?.setVolume(this._volume);
+  }
+
+  /**
+   * Update synth-module diagnostics without touching the attached player.
+   * Used to record a failed async module load so the debug tools can report it.
+   */
+  setSynthDiagnostics(diagnostics: SynthIntegrationDiagnostics): void {
+    if (diagnostics.factoryCount !== undefined) {
+      this.synthFactoryCount = diagnostics.factoryCount;
+    }
+    if (diagnostics.lastLoadError !== undefined) {
+      this.synthLastLoadError = diagnostics.lastLoadError;
+    }
+  }
+
+  // ── Synth status (read-only diagnostics) ─────────────────
+
+  /**
+   * Whether ToneForge synth playback is currently active.
+   *
+   * Active requires both a non-null synth player and at least one mapped key;
+   * a synth player with an empty key map can never intercept playback.
+   */
+  isSynthActive(): boolean {
+    return this.synthPlayer !== null && Object.keys(this.synthKeyMap).length > 0;
+  }
+
+  /**
+   * Read-only snapshot of the synth integration for diagnostics.
+   * Does not mutate any state and leaves existing playback untouched.
+   */
+  getSynthStatus(): SynthStatus {
+    return {
+      active: this.isSynthActive(),
+      factoryCount: this.synthFactoryCount,
+      lastLoadError: this.synthLastLoadError,
+    };
+  }
+
+  /**
+   * Detach the synth player/mapping so keys fall back to the WAV/Phaser path.
+   * The previous integration is retained for {@link restoreSynthIntegration}.
+   *
+   * @returns true when a synth integration was actually detached.
+   */
+  detachSynthIntegration(): boolean {
+    if (!this.synthPlayer) return false;
+    this.retainedSynthIntegration = {
+      player: this.synthPlayer,
+      keyMap: { ...this.synthKeyMap },
+      factoryCount: this.synthFactoryCount,
+    };
+    this.synthPlayer = null;
+    this.synthKeyMap = {};
+    return true;
+  }
+
+  /**
+   * Re-attach the most recently detached synth integration, if any.
+   *
+   * @returns true when a retained integration was restored.
+   */
+  restoreSynthIntegration(): boolean {
+    if (!this.retainedSynthIntegration) return false;
+    const { player, keyMap, factoryCount } = this.retainedSynthIntegration;
+    this.setSynthIntegration(player, keyMap, { factoryCount });
+    return true;
   }
 
   // ── Event-to-sound mapping ──────────────────────────────
