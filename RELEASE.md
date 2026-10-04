@@ -104,6 +104,19 @@ A second workflow, `.github/workflows/package.yml`, runs on every push to `main`
 
 Windows is the primary Steam target; this is how the binary is produced reproducibly without a Windows dev machine. The GitHub Pages deploy workflow is unaffected by this job. To produce the artifact for a manual release, run the workflow from the Actions tab (Run workflow) or push a `v*` tag.
 
+**Automatic draft GitHub Release.** On a `v*` tag push the workflow's
+`promote-release` job promotes the installer to a **draft** GitHub Release
+using `CHANGELOG.md` notes for the tagged version (falling back to
+`--generate-notes` when the section is absent). It attaches
+`TCE-Setup-<version>.exe`, reuses the existing `v<version>` tag, and is
+idempotent (an existing release for that version is reported, not
+overwritten). The job is `continue-on-error`, so a promotion failure never
+fails the workflow or the Pages deploy; it is surfaced in the job summary with
+instructions to run `/skill:release-windows` manually. **The draft is the
+operator's approval gate** — review it and click **Publish release** in the
+GitHub UI; nothing is published automatically. Verify a draft exists with
+`gh release list --draft`.
+
 Steam build (follow-to-unlock native module)
 --------------------------------------------
 `steamworks.js` is an **optional** native module, intentionally not a `package.json` dependency so ordinary installs and CI never need a native build. To produce a binary with Steam follow-to-unlock support:

@@ -282,6 +282,17 @@ Output goes to the gitignored `release/` directory. Config: `electron-builder.ym
 
 `.pi/skills/release-windows/` provides a repo-local skill (`/skill:release-windows`) that promotes the latest CI-built Windows installer to a **draft** GitHub Release — the operator's approval gate is the draft itself (review + publish in the GitHub UI; no pre-approval is requested to create the draft).
 
+> **This promotion now runs automatically in CI.** On a `v*` tag push (the
+> ship skill's `dev`→`main` release), the `promote-release` job in
+> `.github/workflows/package.yml` creates the draft release with no manual
+> invocation; a failure is non-blocking (it never fails the Pages deploy) and
+> is reported in the job summary. **This skill is the documented manual
+> fallback** — use it to regenerate/re-check a draft, or to dry-run the
+> promotion path before a tag. The final step is still the operator's: review
+> the draft and publish it in the GitHub UI.
+
+The helper script is the single implementation shared by CI and the manual path. The CI job pins the run with `--run-id "${{ github.run_id }}"` (the current run is still `in_progress` on a tag push, so the "latest successful run" auto-resolve would otherwise pick the previous release); the manual invocation below uses the auto-resolve default.
+
 **Prerequisites:** `gh` CLI authenticated with `repo` scope. Invoke from the repo root.
 
 **Invocation:**

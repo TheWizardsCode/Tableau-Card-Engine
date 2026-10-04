@@ -74,6 +74,8 @@ npm run package:steam    # Steam build: builds the follow addon + Windows NSIS p
 
 **Release (promoting `dev` to `main`):** run the full test suite (`npm test`) and build (`npm run build`). Full suite is the **only** time the complete test suite is required.
 
+> **Windows release promotion is automatic.** When a release tags `v<version>` (the ship skill's `dev`→`main` promotion), the `promote-release` job in `.github/workflows/package.yml` promotes the freshly built Windows installer to a **draft** GitHub Release automatically — agents no longer need to run `/skill:release-windows` after a release. The draft is the operator's approval gate: review and publish it in the GitHub UI. A promotion failure is non-blocking (it never fails the Pages deploy) and is surfaced in the job summary. `/skill:release-windows` remains the documented manual fallback (regenerate a draft, or dry-run the path before a tag). See [Release process](RELEASE.md#windows-binary-steam-artifact).
+
 **During implementation:** unit tests are the minimum. Run the appropriate test profile for your context (see [Running Test Profiles](#running-test-profiles) below).
 
 **Before any push to origin:** ensure unit tests pass (`npm test -- --project unit`) and the build succeeds (`npm run build`). Full browser + tutorial E2E suites are not required on every push.
