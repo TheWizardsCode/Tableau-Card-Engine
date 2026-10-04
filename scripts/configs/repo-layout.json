@@ -33,6 +33,7 @@
       "scripts/export-transcripts.ts",
       "scripts/extract-repos.sh",
       "scripts/generate-all-thumbnails.ts",
+      "scripts/generate-app-icons.ts",
       "scripts/generate-sfx.mjs",
       "scripts/generate-thumbnail.ts",
       "scripts/refresh-context-thresholds.sh",

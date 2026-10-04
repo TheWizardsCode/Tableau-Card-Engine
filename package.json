@@ -26,6 +26,7 @@
     "transcripts:export": "tsx scripts/export-transcripts.ts",
     "save-load-smoke": "vite-node ../tce-main-street/src/scripts/save-load-smoke.ts",
     "tf:generate": "scripts/tf-generate-synths.sh",
+    "generate:icons": "tsx scripts/generate-app-icons.ts",
     "build:electron-main": "node scripts/build-electron-main.mjs",
     "build:steam-friends": "node scripts/build-steam-friends.mjs",
     "start:electron": "npm run build:electron && npm run build:electron-main && electron .",
