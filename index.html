@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      App icon wiring (CG-0MUTTXRWZ009NUB9). The hrefs are deliberately
+      base-relative (no leading slash, no dot-slash) so `public/` files copied
+      verbatim by Vite resolve correctly under all three build bases: the
+      GitHub Pages sub-path, the dev-server root, and Electron's file:// base.
+    -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="manifest" href="site.webmanifest" />
     <title>Tableau Card Engine</title>
     <style>
       body {

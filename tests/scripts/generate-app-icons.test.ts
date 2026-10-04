@@ -73,19 +73,20 @@ describe('generateAppIcons', () => {
     // writers; the committed public/ PNGs are generated separately by the
     // `generate:icons` npm script and are intentionally tracked.
     const repoBuildIcon = path.join(REPO_ROOT, 'build', 'icon.png');
-    const repoBuildIconBefore = fs.existsSync(repoBuildIcon)
-      ? fs.readFileSync(repoBuildIcon)
-      : null;
+    const existedBefore = fs.existsSync(repoBuildIcon);
+    const bytesBefore = existedBefore ? fs.readFileSync(repoBuildIcon) : null;
 
     await generateAppIcons({ sourceSvg: SOURCE_SVG, publicDir, buildDir, log: NO_LOG });
 
-    const repoBuildIconAfter = fs.existsSync(repoBuildIcon)
-      ? fs.readFileSync(repoBuildIcon)
-      : null;
-    expect(
-      repoBuildIconAfter === null ? null : repoBuildIconAfter.equals(repoBuildIconBefore ?? Buffer.alloc(0)),
-      'a temp-dir run must not modify the repo build/ icon',
-    ).toBe(true);
+    const existedAfter = fs.existsSync(repoBuildIcon);
+    // The run must neither create nor modify the repo build/ icon.
+    expect(existedAfter).toBe(existedBefore);
+    if (existedBefore && existedAfter) {
+      expect(
+        fs.readFileSync(repoBuildIcon).equals(bytesBefore as Buffer),
+        'a temp-dir run must not modify the repo build/ icon',
+      ).toBe(true);
+    }
   });
 
   it('is idempotent — a second run produces byte-identical artefacts', async () => {
