@@ -93,12 +93,12 @@ Three test profiles are available, selected via `--project` (or the npm scripts)
 | **Unit** | `npx vitest run --project unit tests/<game>/` | seconds | Node.js logic/data/integration tests | **Minimum required** whenever a skill or task calls for testing; run during implementation and before any push |
 | **Smoke** | `npm run test:smoke` | ~2 min | One representative file per game + core/UI smoke tests | Quick validation during active implementation |
 | **Dev** | `npm run test:dev` | ~3.5 min | Smoke + key E2E per game | Pre-audit / pre-commit check |
-| **Full** | `npm test` | ~15 min | Complete unit + browser + tutorial E2E suite | **Only required on release** (promoting `dev` to `main`) |
+| **Full** | `npm test` | ~18–21 min | Complete unit + browser + tutorial E2E suite | **Only required on release** (promoting `dev` to `main`) |
 
 Rules of thumb:
 
 - **A skill calls for testing  → run unit tests.** They are the minimum bar and give fast feedback.
-- **Full tests are only required on release.** Do not wait 15 min for feedback during normal implementation.
+- **Full tests are only required on release.** Do not wait 20 min for feedback during normal implementation.
 - Tutorial E2E parts (`tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`) are excluded from smoke/dev profiles. A game's smoke/dev entry is included only when its test file exists in the current checkout: in a sibling-only core checkout (`../tce-<game>`) the profiles run the core + Gym suites only, and a game's suite runs in its game repo (CG-0MUKWPTZ50040V0Q). See `docs/DEVELOPER.md#smoke-tests` / `#dev-tests` for the full project table.
 
 **Skill-integrated entry point (`/skill:test --type`):** the same staged profiles are exposed to the global test skill through a project-local extension (`.pi/skills_extensions/test/extension.json` plus the `SKILL_PREFIX.md` policy hook): `unit`, `smoke`, `dev`, `browser`, `tutorial`, `e2e` and `electron`. `full` is deliberately omitted, so a bare `/skill:test` keeps running the genuine full CI suite and remains the **only** run that populates the audit-accepted full-suite cache entry. Browser-dependent types chain `scripts/check-browser-test-env.ts` first; every typed Vitest command defaults `GAMES_CONFIG` to `full` (an explicit `GAMES_CONFIG=…` still wins) so the game-discovery adapters load, and streams full output through `scripts/vitest-run-with-retry.ts` (retry-once + wall-clock hang timeout) while loading `scripts/vitest-tap-reporter.ts` alongside the default reporter, so a red typed run triages per test. See `docs/DEVELOPER.md#skill-integrated-test-profiles`.
@@ -119,7 +119,7 @@ The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, whic
   - **Profiles** (see [Running Test Profiles](#running-test-profiles) for full guidance):
     - `npm run test:smoke` (~2 min) — **quick validation** during active implementation. One representative file per game + core/UI smoke tests.
     - `npm run test:dev` (~3.5 min) — **pre-audit / pre-commit** check. Smoke + key E2E per game.
-    - `npm run test` (full suite, ~15 min) — **release only**. Full browser + tutorial E2E suites.
+    - `npm run test` (full suite, ~18–21 min) — **release only**. Full browser + tutorial E2E suites.
   Tutorial E2E parts are excluded from smoke/dev profiles. Full project table in `docs/DEVELOPER.md#smoke-tests` / `#dev-tests`.
 - **Before any push to origin** — run unit tests (`npm test -- --project unit`) and `npm run build`. Full suite (`npm test`) is only required on release.
 

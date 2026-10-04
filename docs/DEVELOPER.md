@@ -628,7 +628,7 @@ per-command test timeout for the implement skill and the audit skill's test runn
 ```
 
 - **`timeoutPerCommand`** — maximum seconds per test-suite command (default 600 if absent).
-  TCE's full suite takes 15–19 minutes, so this is set to 1500 s to prevent premature
+  TCE's full suite takes 18–21 minutes, so this is set to 1500 s (25 min) to prevent premature
 timeout kills.
 
 **Why is `.pi/test-config.json` tracked by git?**
@@ -680,8 +680,8 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` (excludes `replay-*.test.ts`) | Logic, data, and integration tests — runs in parallel (worker pool capped at `maxWorkers: 4`; see contention mitigation below) |
 | `replay-e2e` | Node.js (fork pool) | `tests/e2e/replay-*.test.ts` | Playwright-driven replay e2e tests. Runs in its own fork (`singleFork: true`) after unit tests to avoid Vite cold-start CPU contention |
-| `smoke` | Chromium (Playwright) | 10 explicit files (see [smoke profile](#smoke-tests)) | One representative test per game + core engine/UI smoke. ~30s for rapid feedback during implementation |
-| `dev` | Chromium (Playwright) | 30 explicit files (see [dev profile](#dev-tests)) | Smoke + key E2E per game. ~3 min for the implement/audit workflow |
+| `smoke` | Chromium (Playwright) | 10 explicit files (see [smoke profile](#smoke-tests)) | One representative test per game + core engine/UI smoke. ~2 min for rapid feedback during implementation |
+| `dev` | Chromium (Playwright) | 30 explicit files (see [dev profile](#dev-tests)) | Smoke + key E2E per game. ~3.5 min for the implement/audit workflow |
 | `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | All non-tutorial Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
 | `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance; requires [browser test setup](#browser-test-setup)) |
 
@@ -1034,7 +1034,7 @@ convention (plus the optional helper
 
 ### Smoke Tests
 
-Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedback during implementation. The smoke profile runs one representative test per game plus core engine/UI smoke tests — target runtime is ~30 seconds for 10 files.
+Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedback during implementation. The smoke profile runs one representative test per game plus core engine/UI smoke tests — target runtime is ~2 min for 10 files.
 
 **Smoke profile files:**
 - `tests/main-street/MainStreetScene.browser.test.ts` (Main Street core game flow)
@@ -1057,7 +1057,7 @@ Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedbac
 
 ### Dev Tests
 
-Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehensive but still fast suite. The dev profile adds key E2E tests per game on top of all smoke tests — target runtime is ~3 minutes for ~30 files.
+Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehensive but still fast suite. The dev profile adds key E2E tests per game on top of all smoke tests — target runtime is ~3.5 min for ~30 files.
 
 **Dev profile coverage:**
 - All smoke files (above)
