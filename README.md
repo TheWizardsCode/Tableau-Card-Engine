@@ -300,6 +300,8 @@ This approach was chosen for **performance** (no per-level SVG regeneration), **
 
 Main Street routes mapped SFX keys through a committed ToneForge-backed module via `createTfPlayer`. The runtime synth module is committed at `src/core-engine/tf-runtime/main-street-runtime-synth.mjs` and bundled into every build, so no `tf` CLI or generation step is required. `npm run tf:generate` (when the ToneForge CLI is available) refreshes it and emits WAV/metadata outputs under `build/tf-synths/`. The adapter expects module exports `factories: Record<string, () => TfVoice>` and optional `getFactory()` / `descriptors` helpers. See `docs/the-build/audio.md` for generation workflow and wiring details.
 
+In dev mode (`npm run dev`), the Settings panel's **Debug Tools** section includes a **ToneForge** entry showing whether synth integration is `Active` or `Inactive` (live, without reopening the panel) together with the mapped factory count and the last module load error. Clicking it toggles ToneForge on/off at runtime — no scene restart — so you can A/B compare synthesised audio against the fallback WAV/Phaser path. See `docs/DEVELOPER.md#toneforge` for details.
+
 ## Contributing
 
 1. **Track work with Worklog** -- every change must be associated with a `wl` work item. See `AGENTS.md` for Worklog usage.

@@ -3632,6 +3632,39 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   - `src/ui/debug/AiDecisionRecorder.ts` — Recording singleton
   - `src/ui/debug/AiDecisionOverlay.ts` — Display overlay
 
+#### ToneForge
+
+- **Label:** "ToneForge"
+- **Location:** Debug Tools section of the Settings panel. Unlike the four
+  engine-generic tools above, this entry is injected into the **effective**
+  debug-tools list by `CardGameScene.initSettingsPanel` (via
+  `resolveEffectiveDebugTools`), so it appears even for games that supply their
+  own `debugTools` list (e.g. Main Street) — no game-specific registration is
+  required. It is present whenever the scene has a `SoundManager`.
+- **Function:** Reports whether ToneForge runtime synthesis is currently
+  active and toggles it on/off at runtime, **without a scene restart**:
+  - **Live status text:** `Active` / `Inactive` plus the mapped factory count
+    and, when one was recorded, the last module load error (e.g.
+    `Inactive · 0 factories · load error: module exploded`). The text is a
+    `() => string` description that `SettingsPanel` re-resolves on a 500 ms
+    poll while the panel is open, so an async module load or a toggle is
+    reflected immediately without closing and reopening the panel.
+  - **Toggle:** Clicking the label detaches the synth player/mapping when
+    synthesis is active (keys fall back to the existing WAV/Phaser path) and
+    restores the previously attached integration when inactive. No entry is
+    added when there is no `SoundManager`.
+- **When to use:** Verify that the ToneForge wiring is actually in use — the
+  operator no longer has to guess from the sound — and A/B compare synthesised
+  audio against the fallback audio. Open the Settings panel (gear icon) →
+  scroll to Debug Tools → click **ToneForge** to toggle.
+- **Implementation:**
+  - `src/ui/debug/ToneForgeStatusTool.ts` — `createToneForgeStatusTool()`,
+    `withToneForgeStatusTool()` and `resolveEffectiveDebugTools()`.
+  - `src/core-engine/SoundManager.ts` — read-only `isSynthActive()` /
+    `getSynthStatus()` and the `detachSynthIntegration()` /
+    `restoreSynthIntegration()` toggle API.
+  - `src/ui/CardGameScene.ts` — dev-gated effective-list injection.
+
 #### Market Card Cheat (Main Street only)
 
 - **Label:** "Market Card Cheat"
@@ -3731,6 +3764,11 @@ Adding a new debug tool requires minimal code:
    }
    ```
 
+   `description` may also be a `() => string` function for tools whose status
+   changes at runtime (e.g. the **ToneForge** tool). `SettingsPanel` resolves it
+   at render time and re-resolves it on a 500 ms poll while the panel is open,
+   so the text stays live. Existing static-string descriptions are unchanged.
+
 2. **(Optional) Export from the barrel** by adding to `src/ui/debug/index.ts`.
 
 3. **Register the tool** by adding it to the default debug tools array in
@@ -3749,7 +3787,11 @@ Adding a new debug tool requires minimal code:
    ```
 
    Alternatively, pass a custom `debugTools` array directly to
-   `initSettingsPanel()` from any game scene to override the defaults.
+   `initSettingsPanel()` from any game scene to override the defaults. Note that
+   the engine still injects the dev-only **ToneForge** entry into the
+   **effective** list (via `resolveEffectiveDebugTools`) regardless of whether a
+   game supplies its own tools — de-duplicated by label, and omitted entirely in
+   production builds.
 
 4. **Write tests** (at minimum, verify the factory returns a valid entry).
 
@@ -3783,10 +3825,11 @@ To verify production safety:
 | `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
 | `src/ui/debug/MarketCardCheatOverlay.ts` | Market Card Cheat overlay (Main Street market-replacement picker) |
 | `src/ui/debug/StaffApplicantCheatOverlay.ts` | Staff Application cheat overlay (Main Street forced-applicant toggle) |
+| `src/ui/debug/ToneForgeStatusTool.ts` | ToneForge status/toggle tool + effective-list injection helpers |
 | `../tce-main-street/src/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
 | `src/ui/debug/index.ts` | Debug tools barrel file |
-| `src/ui/CardGameScene.ts` | Default debug tool registration |
-| `src/ui/SettingsPanel.ts` | Debug section rendering in Settings panel |
+| `src/ui/CardGameScene.ts` | Default debug tool registration + effective-list injection |
+| `src/ui/SettingsPanel.ts` | Debug section rendering (incl. live function descriptions) in Settings panel |
 
 ## Troubleshooting
 
