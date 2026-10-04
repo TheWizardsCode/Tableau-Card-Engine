@@ -15,7 +15,7 @@ import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybin
 import { createVersionLabel } from './versionDisplay';
 import { createAlphaBadge } from './AlphaBadge';
 import type { AlphaBadgeResult } from './AlphaBadge';
-import { isDevMode, type DebugToolsEntry } from './debug/DebugToolsRegistry';
+import { isDevMode, resolveDebugToolDescription, type DebugToolsEntry } from './debug/DebugToolsRegistry';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -845,8 +845,9 @@ export class SettingsPanel {
         label.on('pointerout', () => label.setColor('#88ccff'));
         this._scrollContent.add(label);
 
-        // Description (smaller, below label)
-        const desc = scene.add.text(PADDING, toolY + 22, tool.description, {
+        // Description (smaller, below label). Function descriptions are
+        // resolved at render time so the text reflects live state.
+        const desc = scene.add.text(PADDING, toolY + 22, resolveDebugToolDescription(tool), {
           fontSize: '12px',
           color: '#aaaaaa',
           fontFamily: 'Arial, sans-serif',
