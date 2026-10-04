@@ -60,8 +60,14 @@ const STORAGE_KEY_VOLUME = 'tce-sound-volume';
  * directly.
  */
 export interface SoundPlayer {
-  /** Play a previously loaded sound by its asset key. */
-  play(key: string): void;
+  /**
+   * Play a previously loaded sound by its asset key.
+   *
+   * May return `false` to signal that the key could **not** be handled
+   * (e.g. a synth player with no factory for the mapped key), so the caller
+   * can fall back to another backend. Returning `void`/`true` means handled.
+   */
+  play(key: string): boolean | void;
   /** Stop a currently playing sound by its asset key. */
   stop(key: string): void;
   /** Set the global volume (0.0 = silent, 1.0 = full). */
@@ -297,8 +303,11 @@ export class SoundManager {
     if (this._muted) return;
     const synthMappedKey = this.synthKeyMap[key];
     if (this.synthPlayer && synthMappedKey !== undefined) {
-      this.synthPlayer.play(synthMappedKey);
-      return;
+      // A synth player returns `false` when it has no factory for the mapped
+      // key; fall through to the WAV/Phaser path so the sound is never
+      // silently dropped (CG-0MUU9PSWC009CW76).
+      const handled = this.synthPlayer.play(synthMappedKey);
+      if (handled !== false) return;
     }
 
     const assetKey = this.registry.get(key);

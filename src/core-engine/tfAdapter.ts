@@ -26,6 +26,14 @@ export interface CreateTfPlayerOptions {
 
 export interface TfPlayer extends SoundPlayer {
   toggleMute(): boolean;
+  /**
+   * Play a synth voice for a logical key.
+   *
+   * @returns `true` when a voice was played, `false` when the key could not
+   *          be handled (no matching factory, or voice creation failed) so
+   *          the caller falls back to the WAV/Phaser path.
+   */
+  play(logicalKey: string): boolean;
 }
 
 export function createTfPlayer(
@@ -62,9 +70,9 @@ export function createTfPlayer(
   };
 
   return {
-    play: (logicalKey: string) => {
+    play: (logicalKey: string): boolean => {
       const factory = resolveFactory(logicalKey);
-      if (!factory) return;
+      if (!factory) return false;
 
       try {
         const voice = factory();
@@ -72,8 +80,10 @@ export function createTfPlayer(
         voice.setMute?.(muted);
         voice.play?.();
         activeVoices.set(logicalKey, voice);
+        return true;
       } catch {
         logger.warn(`[tfAdapter] Failed to create tf voice for key "${logicalKey}"`);
+        return false;
       }
     },
 

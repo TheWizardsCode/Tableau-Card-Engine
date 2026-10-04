@@ -40,7 +40,9 @@ function createRecordingPlayer(): { player: SoundPlayer; played: string[] } {
   return {
     played,
     player: {
-      play: (key: string) => played.push(key),
+      play: (key: string) => {
+        played.push(key);
+      },
       stop: () => {},
       setVolume: () => {},
       setMute: () => {},
@@ -72,9 +74,9 @@ describe('ToneForge runtime activation (real browser)', () => {
     const synthPlayer = createTfPlayer(runtimeSynth.TF_RUNTIME_MODULE, { keyMap: KEY_MAP });
     const synthCalls: string[] = [];
     const originalPlay = synthPlayer.play.bind(synthPlayer);
-    synthPlayer.play = (key: string) => {
+    synthPlayer.play = (key: string): boolean => {
       synthCalls.push(key);
-      originalPlay(key);
+      return originalPlay(key);
     };
 
     manager.setSynthIntegration(synthPlayer, KEY_MAP);
