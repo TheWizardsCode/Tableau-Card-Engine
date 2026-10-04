@@ -301,6 +301,54 @@ npm run package:mac    # dmg
 
 Output goes to the gitignored `release/` directory. Config: `electron-builder.yml` (app id `com.thewizardscode.tableaucardengine`, asar containing only `dist/` + `dist-electron/` + `package.json` — the renderer and Phaser are Vite-bundled, so no `node_modules` are needed). Packaging runs with `--publish never` (private repo; binaries are uploaded to Steam manually). The Windows binary is also built reproducibly by CI on every push to `main` (`.github/workflows/package.yml`) and uploaded as a workflow artifact; CI composes the sibling game repos and builds with `GAMES_CONFIG=full`, so the Steam artifact ships the **full distribution** (all games + Gym, `CG-0MULGC6VP008GPH2`).
 
+### Application icon
+
+The app icon (browser favicon, Apple touch icon, web app manifest, and the
+packaged desktop/installer icon) derives from a **single tracked
+source-of-truth SVG**: `public/favicon.svg` — the "tableau emblem", an original
+in-house mark (CC0; see `public/assets/CREDITS.md`). Never hand-edit the
+generated PNG/ICO/ICNS variants.
+
+```bash
+npm run generate:icons   # regenerate every variant from public/favicon.svg
+```
+
+`scripts/generate-app-icons.ts` rasterises the emblem with `sharp` (`^0.33.0`, an
+existing dependency) and writes:
+
+| Artefact | Size | Purpose |
+|----------|------|---------|
+| `public/icon-32.png` | 32×32 | manifest / legacy favicon |
+| `public/icon-192.png` | 192×192 | web app manifest (Android) |
+| `public/icon-512.png` | 512×512 | web app manifest / PWA |
+| `public/apple-touch-icon.png` | 180×180 | iOS home screen |
+| `build/icon.png` | 1024×1024 | electron-builder `.ico`/`.icns` source |
+
+The committed web PNGs live under `public/`; the Electron resource
+`build/icon.png` is generated at package time because `build/` is gitignored.
+Every `package*` npm script therefore runs `npm run generate:icons` **before**
+`electron-builder`, and `electron-builder.yml` points `win`/`linux`/`mac`
+(plus the NSIS installer/uninstaller icons) at `build/icon.png`;
+electron-builder derives the Windows `.ico` and macOS `.icns` from that ≥512px
+PNG, so no extra packer dependency is needed.
+
+**Base-relative link convention.** The icon/manifest `<link>`s in `index.html`
+(and the favicon link in `public/404.html`) use **base-relative** hrefs — with
+no leading slash and no `./`:
+
+```html
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="site.webmanifest" />
+```
+
+Vite copies `public/` verbatim, so a base-relative href resolves correctly under
+all three build bases without per-mode code: the GitHub Pages sub-path, the
+dev-server root, and Electron's `file://` base. An absolute `/favicon.ico` would
+404 on GitHub Pages. `tests/electron/app-icon-build-output.test.ts` asserts the
+emitted HTML/manifest and that each referenced file exists in the output for all
+three modes. See `CG-0MUTTXRWZ009NUB9`.
+
 ### Skill: release-windows
 
 `.pi/skills/release-windows/` provides a repo-local skill (`/skill:release-windows`) that promotes the latest CI-built Windows installer to a **draft** GitHub Release — the operator's approval gate is the draft itself (review + publish in the GitHub UI; no pre-approval is requested to create the draft).
@@ -1326,6 +1374,15 @@ public/assets/
 │   ├── sushi-go/thumbnail.png
 │   └── feudalism/thumbnail.png
 └── CREDITS.md              Asset attribution
+
+public/ (app icon — see "Application icon")
+├── favicon.svg             tableau-emblem source of truth (CC0)
+├── icon-32.png             manifest / legacy favicon (generated)
+├── icon-192.png            manifest (Android, generated)
+├── icon-512.png            manifest / PWA (generated)
+├── apple-touch-icon.png    iOS home screen (generated)
+├── site.webmanifest        web app manifest
+└── 404.html                Not Found page
 
 tests/
 ├── fixtures/transcripts/   Fixture transcripts for replay tests (one per game)

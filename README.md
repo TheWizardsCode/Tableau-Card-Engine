@@ -14,6 +14,7 @@ npm test             # run Vitest test suite (non-destructive: does not modify t
 npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
+npm run generate:icons # regenerate app icons from public/favicon.svg (the tableau emblem)
 
 # Compose a full multi-game distribution (core + sibling game checkouts):
 npm run setup:distribution -- --dir ..
