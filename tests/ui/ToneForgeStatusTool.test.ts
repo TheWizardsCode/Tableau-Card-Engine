@@ -9,8 +9,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { SoundManager, type SoundPlayer } from '../../src/core-engine/SoundManager';
 import {
   createToneForgeStatusTool,
+  resolveEffectiveDebugTools,
   TONEFORGE_DEBUG_TOOL_LABEL,
   TONEFORGE_UNAVAILABLE_DESCRIPTION,
+  withToneForgeStatusTool,
 } from '../../src/ui/debug/ToneForgeStatusTool';
 import { resolveDebugToolDescription } from '../../src/ui/debug/DebugToolsRegistry';
 
@@ -98,5 +100,91 @@ describe('createToneForgeStatusTool', () => {
     const tool = createToneForgeStatusTool(manager);
 
     expect(resolveDebugToolDescription(tool)).toContain('1 factory');
+  });
+});
+
+describe('withToneForgeStatusTool (effective-list injection)', () => {
+  const otherTool = {
+    label: 'State Inspector',
+    description: 'Inspect game state',
+    activate: () => {},
+  };
+
+  it('appends the ToneForge entry to the supplied list', () => {
+    const result = withToneForgeStatusTool([otherTool], createActiveManager());
+
+    expect(result).toHaveLength(2);
+    expect(result.map((t) => t.label)).toContain(TONEFORGE_DEBUG_TOOL_LABEL);
+  });
+
+  it('injects even when the game supplies its own debug tools list', () => {
+    // Main Street passes an explicit list rather than relying on defaults;
+    // the engine must still surface the ToneForge entry.
+    const gameOwned = [otherTool, { ...otherTool, label: 'Market Card Cheat' }];
+    const result = withToneForgeStatusTool(gameOwned, createActiveManager());
+
+    expect(result.map((t) => t.label)).toContain(TONEFORGE_DEBUG_TOOL_LABEL);
+  });
+
+  it('de-duplicates when a game already registered a ToneForge entry', () => {
+    const existing = createToneForgeStatusTool(createActiveManager());
+    const result = withToneForgeStatusTool([otherTool, existing], createActiveManager());
+
+    expect(result.filter((t) => t.label === TONEFORGE_DEBUG_TOOL_LABEL)).toHaveLength(1);
+  });
+
+  it('works with an empty list', () => {
+    const result = withToneForgeStatusTool([], null);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe(TONEFORGE_DEBUG_TOOL_LABEL);
+    expect(resolveDebugToolDescription(result[0])).toBe(TONEFORGE_UNAVAILABLE_DESCRIPTION);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [otherTool];
+    withToneForgeStatusTool(input, createActiveManager());
+
+    expect(input).toHaveLength(1);
+  });
+});
+
+describe('resolveEffectiveDebugTools (dev/prod gate)', () => {
+  const otherTool = {
+    label: 'State Inspector',
+    description: 'Inspect game state',
+    activate: () => {},
+  };
+
+  it('injects the ToneForge entry in dev mode', () => {
+    const result = resolveEffectiveDebugTools([otherTool], createActiveManager(), true);
+
+    expect(result.map((t) => t.label)).toContain(TONEFORGE_DEBUG_TOOL_LABEL);
+  });
+
+  it('does NOT inject the ToneForge entry in production', () => {
+    const result = resolveEffectiveDebugTools([otherTool], createActiveManager(), false);
+
+    expect(result.map((t) => t.label)).not.toContain(TONEFORGE_DEBUG_TOOL_LABEL);
+    expect(result).toEqual([otherTool]);
+  });
+
+  it('returns the game tools unchanged in production', () => {
+    const gameTools = [otherTool];
+    const result = resolveEffectiveDebugTools(gameTools, createActiveManager(), false);
+
+    expect(result).toBe(gameTools);
+  });
+
+  it('handles an undefined game list in dev mode', () => {
+    const result = resolveEffectiveDebugTools(undefined, createActiveManager(), true);
+
+    expect(result.map((t) => t.label)).toContain(TONEFORGE_DEBUG_TOOL_LABEL);
+  });
+
+  it('handles an undefined game list in production', () => {
+    const result = resolveEffectiveDebugTools(undefined, createActiveManager(), false);
+
+    expect(result).toEqual([]);
   });
 });

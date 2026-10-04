@@ -375,6 +375,7 @@ export { isDevMode, resolveDebugToolDescription } from './debug/DebugToolsRegist
 export type { DebugToolsEntry } from './debug/DebugToolsRegistry';
 export {
   createToneForgeStatusTool,
+  withToneForgeStatusTool,
   TONEFORGE_DEBUG_TOOL_LABEL,
   TONEFORGE_UNAVAILABLE_DESCRIPTION,
 } from './debug/ToneForgeStatusTool';

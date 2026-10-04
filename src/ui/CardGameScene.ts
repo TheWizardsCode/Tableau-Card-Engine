@@ -37,7 +37,7 @@ import { createSessionExportTool } from './debug/SessionExportTool';
 import { createStateInspectorTool } from './debug/StateInspectorOverlay';
 import { createGameEventLogTool } from './debug/GameEventLogOverlay';
 import { createAiDecisionViewerTool } from './debug/AiDecisionOverlay';
-import { GlobalEventBuffer } from './debug/GlobalEventBuffer';
+import { resolveEffectiveDebugTools } from './debug/ToneForgeStatusTool';import { GlobalEventBuffer } from './debug/GlobalEventBuffer';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
 import { createSceneMenuButton } from './SceneHeader';
@@ -292,19 +292,28 @@ export abstract class CardGameScene extends Phaser.Scene {
     // In production builds, `import.meta.env.DEV` is `false`, so the
     // creator functions are never called and Vite/Rollup tree-shakes
     // the entire debug tool modules from the production bundle.
-    const effectiveDebugTools = debugTools ?? (import.meta.env.DEV ? [
+    const gameTools = debugTools ?? (import.meta.env.DEV ? [
       createSessionExportTool(),
       createStateInspectorTool(),
       createGameEventLogTool(),
       createAiDecisionViewerTool(),
     ] : []);
+    // Resolve the **effective** list, injecting the ToneForge status entry so
+    // it is present even for games that supply their own `debugTools` (which
+    // replace the engine defaults above). `resolveEffectiveDebugTools` is a
+    // no-op in production, so the status tool tree-shakes from the bundle.
+    const resolvedDebugTools = resolveEffectiveDebugTools(
+      gameTools,
+      this.soundManager ?? null,
+      import.meta.env.DEV,
+    );
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
       difficultyNames,
       defaultDifficulty,
       hasTooltips: hasTooltips ?? true,
       skillRating,
-      debugTools: effectiveDebugTools,
+      debugTools: resolvedDebugTools,
       canToggle: settingsToggleVeto,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;

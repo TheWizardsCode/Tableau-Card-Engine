@@ -73,3 +73,50 @@ export function createToneForgeStatusTool(
     },
   };
 }
+
+/**
+ * Append the ToneForge status entry to a debug-tools list, unless an entry with
+ * the same label is already present (de-duplication by label).
+ *
+ * Called by the engine on the **effective** debug-tools list, so the entry also
+ * appears when a game supplies its own `debugTools` (which bypasses the engine
+ * default list). The caller must invoke this only in dev mode so the module is
+ * tree-shaken from production bundles.
+ *
+ * @param tools        Existing debug tools (may already contain a ToneForge entry).
+ * @param soundManager The scene's SoundManager, captured by reference.
+ * @returns A new array; the input array is never mutated.
+ */
+export function withToneForgeStatusTool(
+  tools: DebugToolsEntry[],
+  soundManager: SoundManager | null,
+): DebugToolsEntry[] {
+  if (tools.some((tool) => tool.label === TONEFORGE_DEBUG_TOOL_LABEL)) {
+    return tools;
+  }
+  return [...tools, createToneForgeStatusTool(soundManager)];
+}
+
+/**
+ * Resolve the effective debug-tools list for a scene.
+ *
+ * Always injects the ToneForge status entry when `devMode` is true,
+ * de-duplicated by label; in production (`devMode` false) no entry is added so
+ * the status tool tree-shakes out of the bundle. Extracted as a pure function
+ * so the dev/prod gate and de-duplication are unit-testable without a scene.
+ *
+ * @param gameTools    Tools supplied by the game, if any.
+ * @param soundManager The scene's SoundManager, captured by reference.
+ * @param devMode      Whether dev-mode debug tools are active.
+ * @returns The effective debug-tools list (never the same array mutated).
+ */
+export function resolveEffectiveDebugTools(
+  gameTools: DebugToolsEntry[] | undefined,
+  soundManager: SoundManager | null,
+  devMode: boolean,
+): DebugToolsEntry[] {
+  if (!devMode) {
+    return gameTools ?? [];
+  }
+  return withToneForgeStatusTool(gameTools ?? [], soundManager);
+}

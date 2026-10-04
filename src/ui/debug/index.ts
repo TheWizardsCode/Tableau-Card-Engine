@@ -14,6 +14,8 @@ export { createGameEventLogTool } from './GameEventLogOverlay';
 export { createAiDecisionViewerTool } from './AiDecisionOverlay';
 export {
   createToneForgeStatusTool,
+  withToneForgeStatusTool,
+  resolveEffectiveDebugTools,
   TONEFORGE_DEBUG_TOOL_LABEL,
   TONEFORGE_UNAVAILABLE_DESCRIPTION,
 } from './ToneForgeStatusTool';

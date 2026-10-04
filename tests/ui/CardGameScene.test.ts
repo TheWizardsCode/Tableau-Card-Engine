@@ -252,6 +252,11 @@ class TestScene extends CardGameScene {
     this.initHelpPanel(sections);
   }
   public callInitSettingsPanel() { this.initSettingsPanel(); }
+  public callInitSettingsPanelWithTools(
+    tools: Array<{ label: string; description: string | (() => string); activate: (s: unknown) => void }>,
+  ) {
+    this.initSettingsPanel(undefined, undefined, undefined, undefined, tools as never);
+  }
   public callEmitStateSettled(turnNumber: number, phase: 'setup' | 'playing' | 'ended') {
     this.emitStateSettled(turnNumber, phase);
   }
@@ -323,6 +328,53 @@ describe('CardGameScene', () => {
       // Button is created inside the panel (showButton:true by default)
       expect(scene._settingsPanel.settingsButton).toBeDefined();
       expect(MockSettingsButton).toHaveBeenCalledOnce();
+    });
+
+    it('injects the ToneForge entry into the engine default tool list', () => {
+      scene.callInitHUDContainer();
+      scene.callInitEventSystem();
+      scene.callInitSoundSystem(['sfx-test'], {});
+      scene.callInitSettingsPanel();
+
+      const calls = MockSettingsPanel.mock.calls;
+      const config = calls[calls.length - 1]?.[1] as {
+        debugTools?: Array<{ label: string }>;
+      };
+      expect(config.debugTools?.map((t) => t.label)).toContain('ToneForge');
+    });
+
+    it('injects the ToneForge entry even when a game supplies its own debug tools', () => {
+      scene.callInitHUDContainer();
+      scene.callInitEventSystem();
+      scene.callInitSoundSystem(['sfx-test'], {});
+      scene.callInitSettingsPanelWithTools([
+        { label: 'Market Card Cheat', description: 'cheat', activate: () => {} },
+      ]);
+
+      const calls = MockSettingsPanel.mock.calls;
+      const config = calls[calls.length - 1]?.[1] as {
+        debugTools?: Array<{ label: string }>;
+      };
+      const labels = config.debugTools?.map((t) => t.label) ?? [];
+      expect(labels).toContain('ToneForge');
+      expect(labels).toContain('Market Card Cheat');
+    });
+
+    it('de-duplicates when the game already registers a ToneForge entry', () => {
+      scene.callInitHUDContainer();
+      scene.callInitEventSystem();
+      scene.callInitSoundSystem(['sfx-test'], {});
+      scene.callInitSettingsPanelWithTools([
+        { label: 'ToneForge', description: 'game-owned', activate: () => {} },
+      ]);
+
+      const calls = MockSettingsPanel.mock.calls;
+      const config = calls[calls.length - 1]?.[1] as {
+        debugTools?: Array<{ label: string; description: string | (() => string) }>;
+      };
+      const toneForgeEntries = (config.debugTools ?? []).filter((t) => t.label === 'ToneForge');
+      expect(toneForgeEntries).toHaveLength(1);
+      expect(toneForgeEntries[0].description).toBe('game-owned');
     });
   });
   describe('detectReplayMode()', () => {
