@@ -9,6 +9,36 @@ This project uses a **ToneForge-generated runtime module** for synth-mapped SFX 
 - Existing WAV asset playback remains as fallback.
 - Runtime integration is via `tfAdapter` + `SoundManager` synth key mapping.
 
+## Activation and fallback policy
+
+The async loader attaches the committed runtime module to `SoundManager` after
+scene boot (`loadMainStreetTfModule()` -> `createTfPlayer()` ->
+`setSynthIntegration()`). Once it settles, `SoundManager.isSynthActive()`
+returns `true` and synth-mapped keys play through `tfAdapter`. The debug
+**ToneForge** entry reports `Active`/`Inactive` and toggles synthesis at
+runtime without a scene restart (`detachSynthIntegration()` /
+`restoreSynthIntegration()`).
+
+A load or normalisation failure is **loud**: `loadMainStreetTfModule()` emits a
+`console.warn` naming the reason and retains diagnostics readable via
+`getMainStreetTfDiagnostics()` (`loaded`, `factoryCount`, `lastLoadError`),
+which the scene forwards to `SoundManager.setSynthDiagnostics()`.
+
+**Missing-factory fallback.** A logical key may map to a factory the runtime
+module does not ship (for example the `sfx-income-*` and
+`sfx-challenge-complete` entries currently map to factories absent from the
+committed module). `tfAdapter`'s player reports whether it handled a key and
+`SoundManager.play()` falls through to the WAV/Phaser path when it did not — so
+a synth-mapped key with no matching factory is **never silently dropped**
+(CG-0MUU9PSWC009CW76).
+
+> **Environment note.** Synthesised voices can only be constructed in a real
+> browser, where a Web Audio context exists. Under Node (no Web Audio context)
+> Tone.js cannot construct *any* `Gain` node, so unit tests must assert the
+> wiring/structural contract and rely on browser tests
+> (`tests/core-engine/tf-runtime-integration.browser.test.ts`) for voice
+> construction.
+
 ## ToneForge CLI (optional)
 
 The ToneForge CLI (`tf`) is **optional** — the runtime synth module shipped
@@ -62,16 +92,19 @@ Runtime integration points:
 
 - `src/core-engine/tfAdapter.ts` (`createTfPlayer`)
 - `src/core-engine/SoundManager.ts` (`synthPlayer` + `synthKeyMap`)
-- `example-games/main-street/scenes/MainStreetScene.ts`
+- `../tce-main-street/src/tf/mainStreetTfModule.ts` (the async loader)
+- `../tce-main-street/src/scenes/MainStreetLifecycleManagerLifecycle.ts` (scene wiring)
 
 Default source-controlled shim:
 
-- `tce-main-street/src/tf/mainStreetTfModule.ts`
+- `../tce-main-street/src/tf/mainStreetTfModule.ts`
 
-The shim statically imports the committed runtime module
-(`@core-engine/tf-runtime/main-street-runtime-synth.mjs`) and exposes it through
-`MAIN_STREET_TF_MODULE`, so `getMainStreetTfModule()` returns it synchronously.
-When no module is available the game continues to use WAV fallback.
+The shim imports the committed runtime module
+(`@core-engine/tf-runtime/main-street-runtime-synth.mjs`) with a **static
+specifier** and resolves it asynchronously (`loadMainStreetTfModule()`).
+`getMainStreetTfModule()` returns the cached normalised module once the load
+has settled (and, for tests, any `globalThis.__MAIN_STREET_TF_MODULE__`
+injection). When no module is available the game continues to use WAV fallback.
 
 For direct injection (used by tests), set:
 

@@ -84,6 +84,29 @@ This refreshes the committed module at
 WAV/JSON/metadata outputs to `build/tf-synths/`. The committed module is the
 single source of truth for shipped builds.
 
+**Runtime activation.** The sibling app's loader
+(`../tce-main-street/src/tf/mainStreetTfModule.ts`) resolves the module
+asynchronously after scene boot and attaches it to `SoundManager` via
+`createTfPlayer()` / `setSynthIntegration()`. Once settled,
+`SoundManager.isSynthActive()` is `true`, the debug **ToneForge** entry reports
+`Active`, and the entry can toggle synthesis at runtime without a scene
+restart. A load/normalisation failure logs a `console.warn` with the reason and
+retains diagnostics (`getMainStreetTfDiagnostics()`) that the scene forwards to
+`SoundManager.setSynthDiagnostics()`.
+
+**Missing-factory fallback.** A logical key mapped to a factory the module does
+not ship is **never silently dropped**: `tfAdapter` reports whether it handled
+the key and `SoundManager.play()` falls back to the WAV/Phaser path when it did
+not (CG-0MUU9PSWC009CW76). This is why the `sfx-income-*` and
+`sfx-challenge-complete` mappings still produce audio despite having no matching
+factory.
+
+> **Testing note.** Synthesised voices require a real Web Audio context, so they
+> cannot be constructed under Node (Tone.js cannot build *any* `Gain` node
+> there). Unit tests assert the wiring/structural contract; voice construction
+> is covered by `tests/core-engine/tf-runtime-integration.browser.test.ts` in a
+> real browser.
+
 ### Multi-Game Routing
 
 The project uses a unified entry point (`main.ts` at the project root) that registers a `GameSelectorScene` as the initial Phaser scene alongside all example game scenes. Navigation works as follows:
