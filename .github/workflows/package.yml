@@ -102,6 +102,17 @@ jobs:
         with:
           node-version: 20
 
+      - name: Pre-flight promotion (dry-run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Read-only pre-flight: resolve the pinned run, derive the version
+          # from package.json, confirm the tce-windows-installer artifact is
+          # attached, and print the exact commands the real step will run.
+          # Fails fast (before the real step) when the artifact is missing.
+          node .pi/skills/release-windows/scripts/promote-windows-release.mjs \
+            --dry-run --run-id "${{ github.run_id }}"
+
       - name: Promote Windows installer to draft release
         id: promote
         env:

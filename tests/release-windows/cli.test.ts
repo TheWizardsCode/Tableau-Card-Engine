@@ -18,6 +18,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildGhReleaseCreateArgs,
   extractReleaseUrlFromCreateOutput,
+  hasRequiredArtifact,
   parseCliArgs,
 } from '../../.pi/skills/release-windows/scripts/promote-windows-release.mjs';
 
@@ -105,5 +106,27 @@ describe('parseCliArgs', () => {
     expect(
       parseCliArgs(null as unknown as string[]),
     ).toEqual({ help: false, dryRun: false, runId: null });
+  });
+});
+
+describe('hasRequiredArtifact', () => {
+  it('is true when the installer artifact is attached to the run', () => {
+    expect(
+      hasRequiredArtifact(['tce-windows-installer', 'other-artifact']),
+    ).toBe(true);
+  });
+
+  it('is false when the installer artifact is absent or the list is empty', () => {
+    expect(hasRequiredArtifact(['other-artifact'])).toBe(false);
+    expect(hasRequiredArtifact([])).toBe(false);
+  });
+
+  it('is false for non-array input (defensive)', () => {
+    expect(hasRequiredArtifact(null as unknown as string[])).toBe(false);
+  });
+
+  it('honours a custom artifact name', () => {
+    expect(hasRequiredArtifact(['custom'], 'custom')).toBe(true);
+    expect(hasRequiredArtifact(['tce-windows-installer'], 'custom')).toBe(false);
   });
 });

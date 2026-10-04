@@ -50,3 +50,12 @@ export interface CliOptions {
 
 /** Parse the full `process.argv` into CLI options (pure). */
 export function parseCliArgs(argv: string[]): CliOptions;
+
+/**
+ * True when a run's artifact-name list contains the expected installer
+ * artifact (defaults to the `tce-windows-installer` artifact).
+ */
+export function hasRequiredArtifact(
+  artifactNames: string[],
+  artifactName?: string,
+): boolean;

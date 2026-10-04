@@ -182,6 +182,18 @@ export function parseCliArgs(argv) {
   };
 }
 
+/**
+ * True when a run's artifact-name list contains the expected installer
+ * artifact. Pure so the dry-run pre-flight decision is unit-testable.
+ *
+ * @param {string[]} artifactNames artifact names attached to a workflow run
+ * @param {string} [artifactName] expected artifact name
+ * @returns {boolean}
+ */
+export function hasRequiredArtifact(artifactNames, artifactName = ARTIFACT_NAME) {
+  return Array.isArray(artifactNames) && artifactNames.includes(artifactName);
+}
+
 // ── CLI wiring (gh via child_process) ────────────────────────
 
 function runGh(args, { capture = true } = {}) {
@@ -258,6 +270,24 @@ function releaseUrl(version) {
   }
 }
 
+/**
+ * Artifact names attached to a workflow run (read-only API call).
+ * Used by `--dry-run --run-id` to verify the installer artifact is present
+ * before the real promotion step attempts to download it.
+ */
+function listRunArtifactNames(runId) {
+  const out = runGh([
+    'api',
+    `repos/{owner}/{repo}/actions/runs/${runId}/artifacts`,
+    '--jq',
+    '.artifacts[].name',
+  ]);
+  return out
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+}
+
 /** True when the remote already has a `v<version>` tag. */
 function remoteTagExists(version) {
   try {
@@ -295,7 +325,9 @@ function usage() {
     '',
     'Options:',
     '  --dry-run       Print the exact commands/actions without touching origin',
-    '                  (no artifact download, no release/tag creation).',
+    '                  (no artifact download, no release/tag creation). With',
+    '                  --run-id it also verifies the run has the installer',
+    '                  artifact attached (a read-only API check).',
     '  --run-id <id>   Promote the artifact from a specific workflow run id.',
     '                  Used by CI on a tag push, where the current run is not',
     '                  yet reported as successful. Default: the latest',
@@ -345,13 +377,30 @@ async function main(argv) {
 
   if (dryRun) {
     process.stdout.write(
-      `# dry-run: latest successful ${WORKFLOW_QUERY}: run ${runId}\n` +
+      `# dry-run: ${explicitRunId ? 'pinned' : 'latest successful'} ${WORKFLOW_QUERY}: run ${runId}\n` +
         `# version (from package.json, artifact filename in real run): ${expectedVersion}\n`,
     );
     const existing = releaseUrl(expectedVersion);
     if (existing) {
       process.stdout.write(`# would SKIP: release v${expectedVersion} already exists at ${existing}\n`);
       return 0;
+    }
+    // Pre-flight (CI): when the run is pinned, confirm the installer artifact
+    // is actually attached before the real step tries to download it. This
+    // is read-only (no download) and turns a missing-artifact failure into a
+    // clear pre-flight diagnostic.
+    if (explicitRunId) {
+      const names = listRunArtifactNames(explicitRunId);
+      if (!hasRequiredArtifact(names)) {
+        process.stderr.write(
+          `error: run ${explicitRunId} has no '${ARTIFACT_NAME}' artifact ` +
+            `(found: ${names.length ? names.join(', ') : 'none'})\n`,
+        );
+        return 1;
+      }
+      process.stdout.write(
+        `# verified run ${explicitRunId} has the '${ARTIFACT_NAME}' artifact\n`,
+      );
     }
     logCommand([
       'run',
