@@ -13,6 +13,9 @@ import Phaser from 'phaser';
 import { GAME_W, GAME_H } from './constants';
 import { createVersionLabel } from './versionDisplay';
 import { createAlphaBadge } from './AlphaBadge';
+import { anchorPoint } from './screen-layout';
+import type { ScreenLayoutDocument } from './screen-layout-schema';
+import type { IncompatibleGame } from './game-manifest';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -23,7 +26,12 @@ export interface GameEntry {
   title: string;
   /** Short description (1-2 sentences). */
   description: string;
-  /** Optional Phaser asset key for a thumbnail image shown on the card. */
+  /**
+   * Optional thumbnail reference shown on the card. Static games pass a
+   * bare asset key (loaded from `assets/<key>.png`); runtime-plugin games
+   * pass an already-resolved URL (e.g. `tce-games://<id>/assets/x.png`),
+   * which is loaded directly from that URL.
+   */
   thumbnail?: string;
   /**
    * When true, the card renders locked and cannot be started (Steam bonus
@@ -41,7 +49,62 @@ const SCENE_KEY = 'GameSelectorScene';
 /** Registry key where the game catalogue is stored. */
 export const REGISTRY_KEY_GAMES = 'gameSelector.games';
 
+/**
+ * Registry key where incompatible runtime games are stored (F5). The Game
+ * Selector hides these from the grid and lists them in a notice instead.
+ */
+export const REGISTRY_KEY_INCOMPATIBLE_GAMES = 'gameSelector.incompatibleGames';
+
 const FONT_FAMILY = 'monospace';
+
+/**
+ * SLL document for the Game Selector's non-grid chrome. Only the
+ * incompatible-games notice needs a position here (the card grid keeps its
+ * own adaptive layout); positioning it through `anchorPoint` keeps the
+ * notice free of hardcoded pixel coordinates (runtime-plugin F5).
+ */
+const SELECTOR_LAYOUT: ScreenLayoutDocument = {
+  version: 1,
+  id: 'game-selector',
+  baseViewport: { width: GAME_W, height: GAME_H },
+  requiredZones: ['notice'],
+  zones: {
+    notice: {
+      rect: { x: 0.5, y: 0.97 },
+      anchors: {
+        bottomCenter: { x: 0.5, y: 0.97 },
+      },
+    },
+  },
+};
+
+/**
+ * Vertical space reserved above the notice zone when incompatible games are
+ * present, so the card grid never overlaps the notice. Not applied when
+ * there is no notice — the static-only selector stays pixel-identical.
+ */
+const NOTICE_RESERVED_H = 48;
+
+/** Regex matching any URL with a scheme (e.g. `tce-games://`, `data:`). */
+const THUMBNAIL_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
+
+/** True when *thumbnail* is an already-resolved URL rather than an asset key. */
+function isThumbnailUrl(thumbnail: string): boolean {
+  return THUMBNAIL_URL_PATTERN.test(thumbnail);
+}
+
+/**
+ * Shape guard for registry-sourced incompatible-game notices. The registry is
+ * an untyped store, so a malformed value must be ignored rather than crash
+ * the selector (graceful degradation, AC4).
+ */
+function isIncompatibleGame(value: unknown): value is IncompatibleGame {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { entry?: unknown; reason?: unknown };
+  if (typeof candidate.reason !== 'string') return false;
+  if (typeof candidate.entry !== 'object' || candidate.entry === null) return false;
+  return typeof (candidate.entry as { title?: unknown }).title === 'string';
+}
 
 /** Maximum card dimensions -- actual size may shrink to fit the grid. */
 const MAX_CARD_W = 400;
@@ -86,12 +149,13 @@ export class GameSelectorScene extends Phaser.Scene {
   static readonly KEY = SCENE_KEY;
 
   private games: GameEntry[] = [];
+  private incompatibleGames: IncompatibleGame[] = [];
 
   constructor() {
     super({ key: SCENE_KEY });
   }
 
-  init(data: { games?: GameEntry[] }): void {
+  init(data: { games?: GameEntry[]; incompatibleGames?: IncompatibleGame[] }): void {
     if (data.games) {
       this.games = data.games;
     } else {
@@ -101,13 +165,26 @@ export class GameSelectorScene extends Phaser.Scene {
         this.games = fromRegistry as GameEntry[];
       }
     }
+
+    if (data.incompatibleGames) {
+      this.incompatibleGames = data.incompatibleGames.filter(isIncompatibleGame);
+    } else {
+      const fromRegistry = this.registry.get(REGISTRY_KEY_INCOMPATIBLE_GAMES);
+      if (Array.isArray(fromRegistry)) {
+        this.incompatibleGames = fromRegistry.filter(isIncompatibleGame);
+      }
+    }
   }
 
   preload(): void {
     for (const entry of this.games) {
-      if (entry.thumbnail) {
-        this.load.image(entry.thumbnail, `assets/${entry.thumbnail}.png`);
-      }
+      if (!entry.thumbnail) continue;
+      // Static entries carry a bare asset key; runtime-plugin entries carry an
+      // already-resolved URL (e.g. `tce-games://…`) and are loaded directly.
+      const url = isThumbnailUrl(entry.thumbnail)
+        ? entry.thumbnail
+        : `assets/${entry.thumbnail}.png`;
+      this.load.image(entry.thumbnail, url);
     }
 
     // Load GitHub Octocat icon from inline SVG data URI
@@ -148,6 +225,9 @@ export class GameSelectorScene extends Phaser.Scene {
 
     // Layout game cards
     this.layoutGameCards();
+
+    // Runtime-plugin incompatibility notice (hidden games + reason)
+    this.renderIncompatibleNotice();
 
     // Version label (top-right corner, below the GitHub icon)
     createVersionLabel(
@@ -211,9 +291,12 @@ export class GameSelectorScene extends Phaser.Scene {
 
     const { cols, rows } = this.computeGrid(count);
 
-    // Available space for the card grid
+    // Available space for the card grid. When incompatible runtime games are
+    // listed in the notice, reserve a band at the bottom so the grid does not
+    // overlap it.
     const availW = GAME_W - 2 * GRID_MARGIN;
-    const availH = GAME_H - HEADER_H - GRID_MARGIN;
+    const noticeReserve = this.incompatibleGames.length > 0 ? NOTICE_RESERVED_H : 0;
+    const availH = GAME_H - HEADER_H - GRID_MARGIN - noticeReserve;
 
     // Card size: fit within the available space, capped at the maximums
     const cardW = Math.min(MAX_CARD_W, Math.floor((availW - (cols - 1) * CARD_GAP) / cols));
@@ -235,6 +318,40 @@ export class GameSelectorScene extends Phaser.Scene {
       const y = originY + row * (cardH + CARD_GAP);
       this.createGameCard(x, y, cardW, cardH, this.games[i]);
     }
+  }
+
+  // ── Incompatible runtime games notice ──────────────────
+
+  /**
+   * Render a non-blocking notice listing runtime games that were discovered
+   * but cannot run under this launcher's core-engine version. The games are
+   * absent from the card grid (they are never part of `this.games`).
+   *
+   * Positioned through SLL (`anchorPoint`) so no pixel coordinates are
+   * hardcoded here.
+   */
+  private renderIncompatibleNotice(): void {
+    if (this.incompatibleGames.length === 0) return;
+
+    const point = anchorPoint(SELECTOR_LAYOUT, 'notice', 'bottomCenter', {
+      width: GAME_W,
+      height: GAME_H,
+    });
+
+    const body = this.incompatibleGames
+      .map((game) => `Incompatible game: ${game.entry.title} — ${game.reason}`)
+      .join('\n');
+
+    this.add
+      .text(point.x, point.y, body, {
+        fontSize: '12px',
+        color: '#ffcc66',
+        fontFamily: FONT_FAMILY,
+        align: 'center',
+        lineSpacing: 2,
+        wordWrap: { width: GAME_W - 2 * GRID_MARGIN },
+      })
+      .setOrigin(0.5, 1);
   }
 
   // ── Card rendering ─────────────────────────────────────
