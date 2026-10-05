@@ -60,6 +60,28 @@
       })();
     </script>
 
+    <!--
+      Suppress Vite HMR WebSocket ping errors in the browser console.
+      These are harmless noise when accessing the dev server via Tailscale
+      or other network proxies — the HMR client retries and reconnects
+      automatically. We intercept only the specific error pattern so real
+      console.error calls are unaffected.
+    -->
+    <script>
+      (function () {
+        // Guard against double-wrapping.
+        if (window.__hmrErrorSuppressed) return;
+        window.__hmrErrorSuppressed = true;
+        var _origError = console.error;
+        console.error = function () {
+          var args = Array.prototype.slice.call(arguments);
+          var msg = (args[0] || '');
+          if (typeof msg === 'string' && /WebSocket connection to .+ failed: ping/.test(msg)) return;
+          _origError.apply(console, args);
+        };
+      })();
+    </script>
+
     <script type="module" src="/main.ts"></script>
   </body>
 </html>

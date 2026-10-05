@@ -109,6 +109,15 @@ export default defineConfig(({ mode, command }) => ({
   server: {
     port: 3000,
     open: false,
+    // Suppress the full-screen compilation overlay (keeps the dev experience
+    // clean — errors still appear in the console but without the intrusive
+    // full-page overlay). Per Vite docs this does NOT suppress the WebSocket
+    // ping error that appears in the console when the HMR connection drops
+    // (e.g. via Tailscale); that is noise from Vite's HMR client and is
+    // harmless.
+    hmr: {
+      overlay: false,
+    },
     watch: {
       // Exclude dev-output trees from the file watcher (fix for
       // CG-0MSXL0A25009WZVK — dev-server heap OOM). Every file written into a
