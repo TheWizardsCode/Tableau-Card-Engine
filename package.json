@@ -9,6 +9,7 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "build:electron": "tsc --noEmit && vite build --mode electron",
+    "build:game-artifact": "tsx scripts/build-game-artifact.mjs",
     "preview": "vite preview --host",
     "test": "bash scripts/run-ci-tests.sh",
     "test:smoke": "bash scripts/run-smoke-tests.sh",

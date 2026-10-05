@@ -153,9 +153,13 @@ describe('repo-layout.json — repo partition contract', () => {
       const src = fs.readFileSync(path.join(testsScriptsDir, file), 'utf-8');
       for (const match of src.matchAll(importRe)) {
         const rel = match[1]; // e.g. scripts/codemod-src-imports
-        const modulePath = `${rel}.ts`;
-        const covered = layout.core.paths.some(
-          (p) => p === modulePath || rel.startsWith(`${p}/`),
+        // Extensionless imports map to a `.ts` module; imports that already
+        // carry an extension (e.g. `.mjs`) name the module directly.
+        const candidates = [`${rel}.ts`, rel];
+        const covered = layout.core.paths.some((p) =>
+          candidates.some(
+            (candidate) => candidate === p || candidate.startsWith(`${p}/`),
+          ),
         );
         if (!covered) missing.push(`${file}: ${rel}`);
       }
