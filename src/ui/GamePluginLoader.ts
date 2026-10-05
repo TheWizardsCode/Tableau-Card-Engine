@@ -329,6 +329,10 @@ export async function loadGamePlugins(
         sceneKey: entry.sceneKey,
         title: entry.title,
         description: entry.description,
+        // The selector activates this id before starting the scene so the
+        // game's own assets resolve through `tce-games://<id>/…`
+        // (CG-0MUVJWSZO004KZTA).
+        runtimeGameId: entry.id,
         ...(thumbnail !== undefined ? { thumbnail } : {}),
       },
       scene,

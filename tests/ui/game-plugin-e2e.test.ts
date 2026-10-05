@@ -32,6 +32,7 @@ import {
   discoverRuntimeGames,
 } from '../../src/ui/game-plugin-boot';
 import { loadGamePlugins } from '../../src/ui/GamePluginLoader';
+import { handleGameAssetRequest } from '../../electron/game-protocol.js';
 import type { GameEntry } from '../../src/ui/GameSelectorScene';
 
 const GAME_ID = 'e2e-game';
@@ -57,6 +58,9 @@ const PNG_BYTES = Buffer.from(
   'base64',
 );
 
+/** Distinctive bytes so the protocol test can prove the artifact copy is served. */
+const WAV_BYTES = Buffer.from('RIFF-e2e-game-audio');
+
 const STATIC_GAMES: GameEntry[] = [
   { sceneKey: 'StaticScene', title: 'Static Game', description: 'static' },
 ];
@@ -80,6 +84,11 @@ function createFixture(): void {
   const thumbDir = path.join(gameDir, 'public', 'assets', 'games', GAME_ID);
   fs.mkdirSync(thumbDir, { recursive: true });
   fs.writeFileSync(path.join(thumbDir, 'thumbnail.png'), PNG_BYTES);
+
+  // Game-owned audio, packaged into the artifact and served via tce-games://.
+  const audioDir = path.join(gameDir, 'public', 'assets', 'audio', GAME_ID);
+  fs.mkdirSync(audioDir, { recursive: true });
+  fs.writeFileSync(path.join(audioDir, 'card-draw.wav'), WAV_BYTES);
 }
 
 function fixtureConfig() {
@@ -140,6 +149,7 @@ describe('runtime game plugins — end-to-end', () => {
       sceneKey: SCENE_CLASS,
       title: 'E2E Game',
       description: 'A synthetic runtime game for end-to-end verification.',
+      runtimeGameId: GAME_ID,
       thumbnail: `tce-games://${GAME_ID}/assets/thumbnail.png`,
     });
 
@@ -192,6 +202,19 @@ describe('runtime game plugins — end-to-end', () => {
     expect(payload.games).toEqual(STATIC_GAMES);
     expect(payload.incompatible).toHaveLength(1);
     expect(payload.pluginsLoaded).toBe(0);
+  }, 60_000);
+
+  it('scenario 4: the artifact\'s game audio is served through tce-games://', async () => {
+    await buildIntoContentDir();
+
+    const result = await handleGameAssetRequest(
+      `tce-games://${GAME_ID}/assets/audio/${GAME_ID}/card-draw.wav`,
+      { contentDir },
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.headers['content-type']).toBe('audio/wav');
+    expect(Buffer.from(result.body as Uint8Array)).toEqual(WAV_BYTES);
   }, 60_000);
 
   it('scenario 3a: a missing manifest degrades to the static catalogue', async () => {

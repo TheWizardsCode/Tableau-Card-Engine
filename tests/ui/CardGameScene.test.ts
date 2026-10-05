@@ -8,7 +8,7 @@
  * minimal `window` on `globalThis` for the tests that need URL parsing.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Polyfill window for Node environment ───────────────────
 
@@ -217,7 +217,8 @@ vi.mock('../../src/ui/Renderer', () => ({
 }));
 
 // Import after mocks are set up
-import { CardGameScene } from '../../src/ui/CardGameScene';
+import { CardGameScene, audioPathWithFallback } from '../../src/ui/CardGameScene';
+import { setActiveRuntimeGame } from '../../src/ui/game-asset-url';
 
 // ── Concrete test subclass ─────────────────────────────────
 
@@ -461,6 +462,56 @@ describe('CardGameScene', () => {
         synthPlayer,
         synthKeyMap: { 'sfx-place': 'card-place' },
       });
+    });
+
+    it('exposes exists() backed by the Phaser audio cache', () => {
+      const exists = vi.fn((key: string) => key === 'sfx-present');
+      (scene as unknown as { sound: unknown }).sound = {
+        play: vi.fn(),
+        stopByKey: vi.fn(),
+        volume: 1,
+        mute: false,
+        game: { cache: { audio: { exists } } },
+      };
+
+      scene.callInitSoundSystem(['sfx-present'], {});
+
+      const player = MockSoundManager.mock.calls[0][0] as {
+        exists?: (key: string) => boolean;
+      };
+      expect(player.exists).toBeTypeOf('function');
+      expect(player.exists!('sfx-present')).toBe(true);
+      expect(player.exists!('sfx-missing')).toBe(false);
+      expect(exists).toHaveBeenCalledWith('sfx-missing');
+    });
+  });
+
+  describe('audioPathWithFallback()', () => {
+    afterEach(() => setActiveRuntimeGame(null));
+
+    it('returns the game-specific path then the shared default (static)', () => {
+      expect(audioPathWithFallback('golf', 'card-draw.wav')).toEqual([
+        'assets/audio/golf/card-draw.wav',
+        'assets/audio/default/card-draw.wav',
+      ]);
+    });
+
+    it('resolves the game-specific path to the active runtime artifact', () => {
+      setActiveRuntimeGame('golf');
+
+      expect(audioPathWithFallback('golf', 'turn-change.wav')).toEqual([
+        'tce-games://golf/assets/audio/golf/turn-change.wav',
+        'assets/audio/default/turn-change.wav',
+      ]);
+    });
+
+    it('restores launcher-relative paths once the runtime game is cleared', () => {
+      setActiveRuntimeGame('golf');
+      setActiveRuntimeGame(null);
+
+      expect(audioPathWithFallback('golf', 'turn-change.wav')[0]).toBe(
+        'assets/audio/golf/turn-change.wav',
+      );
     });
   });
 

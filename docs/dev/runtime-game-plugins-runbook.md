@@ -16,7 +16,10 @@ no launcher rebuild required.
   manifest.json                # { version, games: [entry, …] }
   <game-id>/
     entry.js                   # ESM: named scene-class export + GAME_INFO
-    assets/thumbnail.png       # optional thumbnail (manifest "thumbnail")
+    assets/
+      thumbnail.png            # optional thumbnail (manifest "thumbnail")
+      audio/<game-id>/*.wav    # game-owned audio (packaged by the builder)
+      games/<game-id>/*        # game-owned icons/sprites
 ```
 
 `manifest.json` entry fields: `id`, `sceneKey`, `title`, `description`,
@@ -50,6 +53,13 @@ build/game-artifacts/
 `entry.js` externalises `phaser` and the engine aliases
 (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`), so the
 artifact does not bundle a second engine/Phaser copy.
+
+The builder also packages the game's **game-owned assets** into
+`<artifact>/assets/` (`copyGameOwnedAssets`) — real files the game repo owns
+(game audio, icons, game-specific cards). Symlinks to the shared core assets
+are skipped: the launcher supplies those. A game-specific audio file that is
+absent from the artifact falls back to the launcher's shared
+`assets/audio/default/…` at runtime.
 
 ## Shared-dependency resolution (import map)
 
@@ -158,8 +168,9 @@ For the full Electron packaged path, install a real game artifact (the
 fixture, or Golf) and run `npm run start:electron`: the runtime game appears in
 the selector alongside the static games and starts when its card is clicked.
 
-> **Note:** a real game that *also* loads its own audio/icons hits the separate
-> per-game asset gap — see below.
+> **Note:** a real game that also loads its own audio/icons is supported by the
+> per-game asset packaging described below; the fixture itself ships no assets
+> so that scenario D stays focused on module resolution.
 
 ### E — build verification of the injected import map
 
@@ -172,14 +183,38 @@ check is:
 grep -c 'type="importmap"' dist/index.html   # → 1
 ```
 
-## Per-game assets (separate concern)
+## Per-game asset resolution
 
-The import map resolves externalised **modules** — it makes the artifact's
-`entry.js` import and its scene class register and boot. A runtime game's own
-**assets** (audio, icons) are not yet resolved relative to the artifact: a
-game scene loads them from launcher-relative paths
-(`audioPathWithFallback('golf', …)` → `assets/audio/golf/…`), which 404 in a
-launcher built without that game and aborts the scene. This is why the
-minimal `runtime-fixture` (no game assets) starts cleanly while Golf's scene
-aborts on `golf:sfx-turn-change`. Tracked by **CG-0MUVJWSZO004KZTA**
-("Runtime game plugin per-game asset resolution (audio/textures)").
+The import map resolves externalised **modules**. A runtime game's own
+**assets** (audio, icons) are packaged in its artifact and served through the
+scoped `tce-games://` protocol:
+
+- The builder copies the game's game-owned assets into
+  `<artifact>/assets/` (skipping symlinks to the shared core assets).
+- The Game Selector activates the runtime game
+  (`setActiveRuntimeGame(<id>)`) before starting its scene, so
+  `audioPathWithFallback('golf', …)` resolves to
+  `tce-games://golf/assets/audio/golf/…` instead of a launcher-relative path.
+- When the artifact omits an optional SFX, the `tce-games://` handler serves
+  the launcher's shared `<contentDir>/assets/audio/default/<file>`; if it is
+  absent everywhere, `SoundManager` skips the key rather than aborting the
+  scene.
+
+### Scenario E — a game with its own assets
+
+Build and install a real game artifact (e.g. Golf and its audio), then launch
+the packaged launcher and click its selector card.
+
+Expected:
+
+- The game starts and renders; its game-specific audio plays.
+- No `Audio key "…" not found in cache` errors, and no 404s for
+  `tce-games://<id>/assets/audio/…` in the renderer console.
+- A game audio file that the artifact omits silently falls back to the shared
+  default (or is skipped) with no scene abort.
+
+Automated coverage: `tests/electron/game-protocol.test.ts` (shared-audio
+fallback + traversal denial), `tests/ui/game-asset-url.test.ts` (active runtime
+game base), `tests/ui/CardGameScene.test.ts` (`audioPathWithFallback`),
+`tests/core-engine/SoundManager.test.ts` (missing-key skip), and
+`tests/scripts/build-game-artifact.test.ts` (asset packaging).

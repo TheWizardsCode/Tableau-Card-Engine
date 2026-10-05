@@ -20,6 +20,7 @@ import {
   GAME_ASSET_SCHEME,
   mimeTypeForPath,
   resolveAssetFilePath,
+  resolveSharedAudioFallback,
   handleGameAssetRequest,
   registerGameAssetHandler,
   type GameAssetFileReader,
@@ -61,6 +62,12 @@ describe('mimeTypeForPath', () => {
     expect(mimeTypeForPath('a.jpeg')).toBe('image/jpeg');
     expect(mimeTypeForPath('a.webp')).toBe('image/webp');
     expect(mimeTypeForPath('a.svg')).toBe('image/svg+xml');
+  });
+
+  it('maps audio types served through the shared-default fallback', () => {
+    expect(mimeTypeForPath('turn-change.wav')).toBe('audio/wav');
+    expect(mimeTypeForPath('music.mp3')).toBe('audio/mpeg');
+    expect(mimeTypeForPath('music.ogg')).toBe('audio/ogg');
   });
 
   it('falls back to application/octet-stream for unknown or missing extensions', () => {
@@ -147,6 +154,62 @@ describe('resolveAssetFilePath', () => {
   });
 });
 
+describe('resolveSharedAudioFallback', () => {
+  it('maps a game-relative audio path to the shared default', () => {
+    expect(
+      resolveSharedAudioFallback(contentDir, [
+        'assets',
+        'audio',
+        'golf',
+        'turn-change.wav',
+      ]),
+    ).toEqual({
+      filePath: path.join(contentDir, 'assets', 'audio', 'default', 'turn-change.wav'),
+      mimeType: 'audio/wav',
+    });
+  });
+
+  it('preserves nested segments after the game audio directory', () => {
+    expect(
+      resolveSharedAudioFallback(contentDir, [
+        'assets',
+        'audio',
+        'golf',
+        'sets',
+        'turn-change.wav',
+      ])?.filePath,
+    ).toBe(path.join(contentDir, 'assets', 'audio', 'default', 'sets', 'turn-change.wav'));
+  });
+
+  it('returns null for non-audio paths', () => {
+    expect(
+      resolveSharedAudioFallback(contentDir, ['assets', 'thumbnail.png']),
+    ).toBeNull();
+    expect(
+      resolveSharedAudioFallback(contentDir, ['entries', 'entry.js']),
+    ).toBeNull();
+  });
+
+  it('returns null when there is no file after the game audio directory', () => {
+    expect(
+      resolveSharedAudioFallback(contentDir, ['assets', 'audio', 'golf']),
+    ).toBeNull();
+  });
+
+  it('never resolves outside the shared default root', () => {
+    expect(
+      resolveSharedAudioFallback(contentDir, [
+        'assets',
+        'audio',
+        'default',
+        '..',
+        '..',
+        'secret.wav',
+      ]),
+    ).toBeNull();
+  });
+});
+
 describe('handleGameAssetRequest', () => {
   it('serves an existing asset with the correct content type', async () => {
     const body = Buffer.from('png-bytes');
@@ -224,6 +287,88 @@ describe('handleGameAssetRequest', () => {
 
     expect(result.status).toBe(404);
     expect(result.body).toBeNull();
+  });
+
+  it('serves the shared default when a game audio file is absent', async () => {
+    const defaultDir = path.join(contentDir, 'assets', 'audio', 'default');
+    fs.mkdirSync(defaultDir, { recursive: true });
+    const wav = Buffer.from('RIFF-shared-default');
+    fs.writeFileSync(path.join(defaultDir, 'turn-change.wav'), wav);
+
+    const result = await handleGameAssetRequest(
+      'tce-games://golf/assets/audio/golf/turn-change.wav',
+      { contentDir },
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.headers['content-type']).toBe('audio/wav');
+    expect(Buffer.from(result.body as Uint8Array)).toEqual(wav);
+  });
+
+  it('prefers the game-specific audio file over the shared default', async () => {
+    const gameAudioDir = path.join(
+      contentDir,
+      GAMES_DIRNAME,
+      'golf',
+      'assets',
+      'audio',
+      'golf',
+    );
+    fs.mkdirSync(gameAudioDir, { recursive: true });
+    const gameBytes = Buffer.from('RIFF-game-specific');
+    fs.writeFileSync(path.join(gameAudioDir, 'turn-change.wav'), gameBytes);
+
+    const defaultDir = path.join(contentDir, 'assets', 'audio', 'default');
+    fs.mkdirSync(defaultDir, { recursive: true });
+    fs.writeFileSync(path.join(defaultDir, 'turn-change.wav'), Buffer.from('RIFF-default'));
+
+    const result = await handleGameAssetRequest(
+      'tce-games://golf/assets/audio/golf/turn-change.wav',
+      { contentDir },
+    );
+
+    expect(result.status).toBe(200);
+    expect(Buffer.from(result.body as Uint8Array)).toEqual(gameBytes);
+  });
+
+  it('does not fall back for a non-audio game asset', async () => {
+    const defaultDir = path.join(contentDir, 'assets', 'audio', 'default');
+    fs.mkdirSync(defaultDir, { recursive: true });
+    fs.writeFileSync(path.join(defaultDir, 'thumbnail.png'), PNG_BYTES);
+
+    const result = await handleGameAssetRequest(
+      'tce-games://golf/assets/thumbnail.png',
+      { contentDir },
+    );
+
+    expect(result.status).toBe(404);
+  });
+
+  it('returns 404 when neither the game audio nor the shared default exists', async () => {
+    const result = await handleGameAssetRequest(
+      'tce-games://golf/assets/audio/golf/absent.wav',
+      { contentDir },
+    );
+
+    expect(result.status).toBe(404);
+    expect(result.body).toBeNull();
+  });
+
+  it('uses the injected reader for the fallback read', async () => {
+    const readFile = vi.fn<GameAssetFileReader>(async (filePath: string) => {
+      if (filePath.includes(`${path.sep}default${path.sep}`)) {
+        return Buffer.from('RIFF-default');
+      }
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    });
+
+    const result = await handleGameAssetRequest(
+      'tce-games://golf/assets/audio/golf/x.wav',
+      { contentDir, readFile },
+    );
+
+    expect(result.status).toBe(200);
+    expect(readFile).toHaveBeenCalledTimes(2);
   });
 });
 

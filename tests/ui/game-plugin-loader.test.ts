@@ -106,6 +106,7 @@ describe('loadGamePlugins — successful discovery', () => {
       sceneKey: 'FixtureGameScene',
       title: 'Fixture Game',
       description: 'Synthetic runtime game used by plugin loader tests.',
+      runtimeGameId: 'fixture-game',
       thumbnail: `${GAME_ASSET_URL_SCHEME}://fixture-game/assets/thumbnail.png`,
     });
     expect(typeof loaded.scene).toBe('function');

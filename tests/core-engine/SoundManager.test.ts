@@ -112,6 +112,21 @@ describe('SoundManager', () => {
       expect(player.play).not.toHaveBeenCalled();
     });
 
+    it('skips a registered key the player reports as unavailable', () => {
+      const availability = vi.fn((key: string) => key === 'sfx-present');
+      const p = { ...createMockPlayer(), exists: availability };
+      const mgr = new SoundManager(p, { storage: null });
+      mgr.register('present', 'sfx-present');
+      mgr.register('missing', 'sfx-missing');
+
+      mgr.play('present');
+      mgr.play('missing');
+
+      expect(p.play).toHaveBeenCalledWith('sfx-present');
+      expect(p.play).not.toHaveBeenCalledWith('sfx-missing');
+      expect(availability).toHaveBeenCalledWith('sfx-missing');
+    });
+
     it('should not play when muted', () => {
       sm.register('card-flip', 'sfx-flip');
       sm.setMute(true);

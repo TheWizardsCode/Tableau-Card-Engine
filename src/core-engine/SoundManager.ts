@@ -68,6 +68,14 @@ export interface SoundPlayer {
    * can fall back to another backend. Returning `void`/`true` means handled.
    */
   play(key: string): boolean | void;
+  /**
+   * Whether a previously loaded sound is available to {@link play}.
+   *
+   * Optional. When provided, {@link SoundManager.play} skips a key the backend
+   * cannot play (e.g. an optional SFX that failed to load) instead of letting
+   * the backend throw — so a missing sound never aborts the game loop.
+   */
+  exists?(key: string): boolean;
   /** Stop a currently playing sound by its asset key. */
   stop(key: string): void;
   /** Set the global volume (0.0 = silent, 1.0 = full). */
@@ -312,6 +320,11 @@ export class SoundManager {
 
     const assetKey = this.registry.get(key);
     if (assetKey === undefined) return;
+    // A key absent from the backend's cache cannot be played. Guarding here
+    // keeps an optional SFX (e.g. one omitted from a runtime game artifact)
+    // from throwing out of Phaser's WebAudioSound constructor and aborting the
+    // scene (CG-0MUVJWSZO004KZTA).
+    if (this.player.exists && !this.player.exists(assetKey)) return;
     this.player.play(assetKey);
   }
 

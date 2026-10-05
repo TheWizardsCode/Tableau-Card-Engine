@@ -16,6 +16,7 @@ import path from 'node:path';
 
 import {
   buildGameArtifact,
+  copyGameOwnedAssets,
   isSharedExternal,
   mergeManifestEntry,
   renderArtifactEntry,
@@ -75,6 +76,11 @@ function createFixture(): void {
   const thumbDir = path.join(gameDir, 'public', 'assets', 'games', GAME_ID);
   fs.mkdirSync(thumbDir, { recursive: true });
   fs.writeFileSync(path.join(thumbDir, 'thumbnail.png'), PNG_BYTES);
+
+  // Game-owned audio, which the builder must package for the runtime artifact.
+  const audioDir = path.join(gameDir, 'public', 'assets', 'audio', GAME_ID);
+  fs.mkdirSync(audioDir, { recursive: true });
+  fs.writeFileSync(path.join(audioDir, 'card-draw.wav'), Buffer.from('RIFF'));
 }
 
 /** The preset-equivalent config pointing at the fixture game. */
@@ -163,6 +169,39 @@ describe('artifact builder — pure helpers', () => {
       help: true,
     });
   });
+
+  it('copies game-owned assets and skips shared-asset symlinks', () => {
+    const src = path.join(root, 'asset-src');
+    const dest = path.join(root, 'asset-dest');
+    fs.mkdirSync(path.join(src, 'audio', 'golf'), { recursive: true });
+    fs.mkdirSync(path.join(src, 'games', 'golf'), { recursive: true });
+    fs.writeFileSync(path.join(src, 'audio', 'golf', 'card-draw.wav'), 'wav');
+    fs.writeFileSync(path.join(src, 'games', 'golf', 'icon.png'), 'img');
+    fs.writeFileSync(path.join(src, 'CREDITS.md'), 'credits');
+
+    // A shared core asset is included as a symlink and must not be copied.
+    const shared = path.join(root, 'shared.wav');
+    fs.writeFileSync(shared, 'shared');
+    fs.symlinkSync(shared, path.join(src, 'audio', 'shared.wav'));
+
+    const copied = copyGameOwnedAssets(src, dest);
+
+    expect(copied.sort()).toEqual([
+      'audio/golf/card-draw.wav',
+      'games/golf/icon.png',
+    ]);
+    expect(
+      fs.existsSync(path.join(dest, 'audio', 'golf', 'card-draw.wav')),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(dest, 'CREDITS.md'))).toBe(false);
+    expect(fs.existsSync(path.join(dest, 'audio', 'shared.wav'))).toBe(false);
+  });
+
+  it('returns an empty list when the game has no assets directory', () => {
+    expect(
+      copyGameOwnedAssets(path.join(root, 'no-such-dir'), path.join(root, 'out')),
+    ).toEqual([]);
+  });
 });
 
 describe('buildGameArtifact', () => {
@@ -180,6 +219,13 @@ describe('buildGameArtifact', () => {
     expect(fs.existsSync(path.join(result.outDir, 'assets', 'thumbnail.png'))).toBe(
       true,
     );
+    // Game-owned audio is packaged so the artifact is self-contained.
+    expect(result.assets).toContain(`audio/${GAME_ID}/card-draw.wav`);
+    expect(
+      fs.existsSync(
+        path.join(result.outDir, 'assets', 'audio', GAME_ID, 'card-draw.wav'),
+      ),
+    ).toBe(true);
 
     // Externalised: Phaser/engine imports are kept, their runtime is not bundled.
     const bundle = fs.readFileSync(result.entryPath, 'utf-8');
@@ -230,6 +276,7 @@ describe('buildGameArtifact', () => {
       sceneKey: SCENE_CLASS,
       title: 'Fixture Artifact',
       description: 'Synthetic runtime artifact built by the reference builder.',
+      runtimeGameId: GAME_ID,
       thumbnail: `tce-games://${GAME_ID}/assets/thumbnail.png`,
     });
 

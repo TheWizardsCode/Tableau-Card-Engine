@@ -49,6 +49,7 @@ function loadedGame(
       sceneKey,
       title: `Dynamic ${id}`,
       description: 'dynamic',
+      runtimeGameId: id,
       thumbnail: `tce-games://${id}/assets/thumbnail.png`,
     },
     scene,
@@ -123,6 +124,13 @@ describe('buildGameBootPayload', () => {
       'SceneB',
     ]);
     expect(payload.scenes).toEqual([StaticScene, DynamicScene, DynamicScene]);
+    // Runtime entries keep the artifact id the selector activates for asset
+    // resolution; static entries have none.
+    expect(payload.games.map((game) => game.runtimeGameId)).toEqual([
+      undefined,
+      'game-a',
+      'game-b',
+    ]);
     expect(payload.incompatible).toEqual([INCOMPATIBLE]);
     expect(payload.pluginsLoaded).toBe(2);
   });

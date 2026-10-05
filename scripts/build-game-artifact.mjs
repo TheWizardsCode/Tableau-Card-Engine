@@ -78,6 +78,59 @@ function resolveThumbnailSource(gameRoot, info) {
 }
 
 /**
+ * Copy a game's **game-owned** assets into the artifact.
+ *
+ * A game repo's `public/assets/` tree mixes the assets it owns (game audio,
+ * game-specific cards, icons) with symlinks to the shared core assets created
+ * by `linkSharedAssets()`. Only the real entries are copied: the shared assets
+ * are supplied by the launcher, so following the symlinks would duplicate them
+ * and defeat the point of a runtime artifact.
+ *
+ * Game-owned assets copied here (e.g. `audio/<gameDir>/…`) are served to the
+ * renderer through the scoped `tce-games://<id>/…` scheme; a game whose
+ * artifact omits an optional SFX still falls back to the launcher's shared
+ * `assets/audio/default/…` at runtime (CG-0MUVJWSZO004KZTA).
+ *
+ * @param {string} sourceAssetsDir Absolute `<gameRoot>/public/assets` path.
+ * @param {string} destAssetsDir   Absolute `<artifact>/assets` path.
+ * @param {object} [options]
+ * @param {string[]} [options.skipNames] Basenames to skip (default: CREDITS.md).
+ * @returns {string[]} Copied paths relative to the artifact `assets/` root,
+ *                     slash-separated (for reporting and tests).
+ */
+export function copyGameOwnedAssets(sourceAssetsDir, destAssetsDir, options = {}) {
+  const copied = [];
+  if (!fs.existsSync(sourceAssetsDir)) return copied;
+  const skip = new Set(options.skipNames ?? ['CREDITS.md']);
+
+  const walk = (srcDir, relDir) => {
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+      if (skip.has(entry.name)) continue;
+
+      const src = path.join(srcDir, entry.name);
+      const rel = relDir ? path.join(relDir, entry.name) : entry.name;
+
+      // A symlink points at a shared core asset — the launcher owns it.
+      // (readdirSync does not follow links, so a symlink is neither file nor
+      // directory here.)
+      if (entry.isSymbolicLink()) continue;
+
+      if (entry.isDirectory()) {
+        walk(src, rel);
+      } else if (entry.isFile()) {
+        const dest = path.join(destAssetsDir, rel);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(src, dest);
+        copied.push(rel.split(path.sep).join('/'));
+      }
+    }
+  };
+
+  walk(sourceAssetsDir, '');
+  return copied;
+}
+
+/**
  * Render the temporary artifact entry module.
  *
  * Re-exports the scene class under the name the discovery plugin derived from
@@ -194,12 +247,20 @@ export async function buildGameArtifact(options) {
     fs.rmSync(entryDir, { recursive: true, force: true });
   }
 
-  // Copy the declared thumbnail into the artifact's assets/ directory.
+  // Package the game's own assets so the artifact is self-contained: game
+  // audio, game-specific cards and icons become `<artifact>/assets/…`, served
+  // through `tce-games://<id>/…` (CG-0MUVJWSZO004KZTA).
   const gameRoot = path.resolve(projectRoot, discovered.path);
+  const assetsDir = path.join(outDir, 'assets');
+  const copiedAssets = copyGameOwnedAssets(
+    path.join(gameRoot, 'public', 'assets'),
+    assetsDir,
+  );
+
+  // Copy the declared thumbnail into the artifact's assets/ directory.
   const thumbnailSource = resolveThumbnailSource(gameRoot, discovered.info);
   let manifestThumbnail;
   if (thumbnailSource) {
-    const assetsDir = path.join(outDir, 'assets');
     fs.mkdirSync(assetsDir, { recursive: true });
     fs.copyFileSync(thumbnailSource, path.join(assetsDir, 'thumbnail.png'));
     manifestThumbnail = 'assets/thumbnail.png';
@@ -227,6 +288,8 @@ export async function buildGameArtifact(options) {
     manifestPath,
     manifestEntry,
     sceneClass: discovered.sceneClass,
+    // Game-owned assets packaged into `<artifact>/assets/` (slash-separated).
+    assets: copiedAssets,
     // True when no shared dependency was inlined into the emitted bundle.
     externalised: {
       phaser: !bundleHasPhaserRuntime(bundle),

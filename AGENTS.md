@@ -597,11 +597,19 @@ example (`CG-0MTRO7VMI000F3A5`).
   [`docs/dev/runtime-game-plugins-runbook.md`](docs/dev/runtime-game-plugins-runbook.md),
   reference docs
   [`docs/DEVELOPER.md` → Runtime Game Plugins](docs/DEVELOPER.md#runtime-game-plugins).
-- **Per-game assets (separate concern, in progress):** the import map resolves
-  external *modules*; a runtime game's own audio/icons are not yet resolved
-  relative to the artifact, so a game with game-specific assets aborts on a
-  missing-audio error in a launcher built without it. Tracked by
-  **CG-0MUVJWSZO004KZTA**.
+- **Per-game asset resolution:** a runtime game's own audio/icons are packaged
+  in its artifact (the builder copies the game's real, non-symlink assets) and
+  resolved through the scoped `tce-games://` protocol. The plugin loader tags
+  each runtime entry with `runtimeGameId`; the Game Selector calls
+  `setActiveRuntimeGame(id)` before starting the scene (and clears it on
+  entry), so `audioPathWithFallback` resolves to
+  `tce-games://<id>/assets/audio/…`. When the artifact omits an optional SFX,
+  the protocol serves the launcher's shared `assets/audio/default/…`
+  (`resolveSharedAudioFallback`), and `SoundManager` skips a key the backend
+  cannot play, so a missing sound never aborts the scene. Verify with
+  `tests/electron/game-protocol.test.ts`, `tests/ui/game-asset-url.test.ts`,
+  `tests/ui/CardGameScene.test.ts`, `tests/core-engine/SoundManager.test.ts`,
+  and `tests/scripts/build-game-artifact.test.ts`; runbook scenario E.
 - **Test seams:** the loader takes `{ contentDir, engineVersion, importer,
   fetchManifest }`; tests inject a stub importer/fetcher. Fixtures live in
   `tests/fixtures/plugin-game/`; builder↔loader↔selector coverage is in

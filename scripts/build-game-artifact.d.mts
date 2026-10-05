@@ -43,6 +43,17 @@ export const SHARED_EXTERNAL_MATCHERS: ReadonlyArray<string | RegExp>;
 /** True when *id* is a shared dependency that must stay external. */
 export function isSharedExternal(id: string): boolean;
 
+/**
+ * Copy a game's game-owned assets (real, non-symlink entries under its
+ * `public/assets`) into the artifact's `assets/` directory. Returns the copied
+ * paths relative to the artifact `assets/` root (slash-separated).
+ */
+export function copyGameOwnedAssets(
+  sourceAssetsDir: string,
+  destAssetsDir: string,
+  options?: { skipNames?: string[] },
+): string[];
+
 /** Render the temporary artifact entry module source. */
 export function renderArtifactEntry(
   discovered: Pick<
@@ -77,6 +88,8 @@ export interface BuildGameArtifactResult {
   manifestPath: string;
   manifestEntry: ArtifactManifestEntry;
   sceneClass: string;
+  /** Game-owned assets copied into `<artifact>/assets/` (slash-separated). */
+  assets: string[];
   externalised: { phaser: boolean; sharedSpecifiers: number };
   bundleBytes: number;
 }

@@ -16,6 +16,7 @@ import { createAlphaBadge } from './AlphaBadge';
 import { anchorPoint } from './screen-layout';
 import type { ScreenLayoutDocument } from './screen-layout-schema';
 import type { IncompatibleGame } from './game-manifest';
+import { setActiveRuntimeGame } from './game-asset-url';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -40,6 +41,12 @@ export interface GameEntry {
   locked?: boolean;
   /** Explains how to unlock a locked card. */
   lockMessage?: string;
+  /**
+   * Runtime-plugin games only: the artifact id under `<contentDir>/games/`.
+   * The selector activates it before starting the scene so the game's own
+   * assets resolve through `tce-games://<id>/…` (CG-0MUVJWSZO004KZTA).
+   */
+  runtimeGameId?: string;
 }
 
 // ── Constants ──────────────────────────────────────────────
@@ -156,6 +163,9 @@ export class GameSelectorScene extends Phaser.Scene {
   }
 
   init(data: { games?: GameEntry[]; incompatibleGames?: IncompatibleGame[] }): void {
+    // Entering the selector ends any runtime game: its artifact-relative asset
+    // base must not bleed into the static catalogue (CG-0MUVJWSZO004KZTA).
+    setActiveRuntimeGame(null);
     if (data.games) {
       this.games = data.games;
     } else {
@@ -474,6 +484,9 @@ export class GameSelectorScene extends Phaser.Scene {
     hitZone.on('pointerdown', () => {
       // A locked card never starts its scene; the lock message explains why.
       if (locked) return;
+      // Runtime games resolve their own assets relative to their artifact;
+      // static games keep launcher-relative paths (null clears the base).
+      setActiveRuntimeGame(entry.runtimeGameId ?? null);
       this.scene.start(entry.sceneKey);
     });
   }

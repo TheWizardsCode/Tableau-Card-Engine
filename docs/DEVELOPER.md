@@ -1791,8 +1791,9 @@ add *drop-in* games afterwards.
 > Runtime artifacts externalise `phaser` and the engine aliases; the packaged
 > launcher resolves those bare specifiers with a generated **import map** — see
 > [Shared-dependency resolution](#shared-dependency-resolution-tce-shared-import-map)
-> below. (Per-game *assets* — audio, icons — are a separate concern tracked by
-> **CG-0MUVJWSZO004KZTA**.)
+> below. Each artifact also packages its own **game-owned assets** (audio,
+> icons, game-specific cards), resolved through the scoped `tce-games://`
+> protocol — see [Per-game asset resolution](#per-game-asset-resolution).
 
 ### Artifact layout
 
@@ -1801,7 +1802,10 @@ add *drop-in* games afterwards.
   manifest.json                 # the catalogue of runtime games
   <game-id>/
     entry.js                    # ESM: named scene-class export + GAME_INFO
-    assets/thumbnail.png        # optional thumbnail (manifest "thumbnail")
+    assets/
+      thumbnail.png             # optional thumbnail (manifest "thumbnail")
+      audio/<game-id>/*.wav     # game-owned audio (packaged from the game repo)
+      games/<game-id>/*         # game-owned icons/sprites
 ```
 
 `<contentDir>` is the content directory the launcher resolved (bundled `dist/`
@@ -1861,6 +1865,41 @@ from `<contentDir>/games/<id>/…` through a deny-by-default protocol handler
 (`electron/game-protocol.ts`). Requests that are absolute, contain `..`/NUL, or
 escape the game directory are denied (404); unknown extensions are served as
 `application/octet-stream`.
+
+**Shared-audio fallback.** A game artifact may legitimately omit an optional
+SFX that the launcher ships in its shared `assets/audio/default/` set. When a
+request for `games/<id>/assets/audio/<dir>/<rest…>` names a file absent from the
+artifact, the handler serves `<contentDir>/assets/audio/default/<rest…>` instead
+(`resolveSharedAudioFallback`) — a genuine runtime fallback. Only paths shaped
+`assets/audio/…` are eligible; anything else is a hard 404.
+
+### Per-game asset resolution
+
+A runtime game scene loads its own assets through the same engine helpers as a
+static game (e.g. `audioPathWithFallback('golf', 'card-draw.wav')`), but the
+paths must resolve to the *artifact*, not the launcher's `public/` root. The
+glue is the **active runtime game base**:
+
+- The plugin loader tags each runtime entry with its artifact id
+  (`GameEntry.runtimeGameId`).
+- The Game Selector calls `setActiveRuntimeGame(id)` immediately before
+  starting a runtime scene and `setActiveRuntimeGame(null)` when it is
+  (re)entered (`src/ui/GameSelectorScene.ts`).
+- `audioPathWithFallback` resolves the game-specific URL through
+  `resolveActiveGameAssetUrl` (`src/ui/game-asset-url.ts`), producing
+  `tce-games://<id>/assets/audio/<dir>/<file>` for a runtime game, and keeps the
+  launcher-relative path for the static catalogue.
+
+> **Phaser caveat:** an array passed to `this.load.audio()` is a list of
+> *format* alternatives — Phaser loads only the first decodable entry, it is
+> **not** an HTTP fallback. `audioPathWithFallback` therefore relies on the
+> `tce-games://` handler for fallback (above) and on `SoundManager` for safety:
+> `SoundPlayer.exists()` is consulted before playing, so a key that is absent
+> from the audio cache (an optional SFX missing everywhere) is skipped rather
+> than throwing out of Phaser's `WebAudioSound` constructor and aborting the
+> scene. The reference builder (`scripts/build-game-artifact.mjs`,
+> `copyGameOwnedAssets`) packages the game's real (non-symlink) assets —
+> symlinks point at the shared core assets the launcher already ships.
 
 ### Producing an artifact
 
@@ -1937,11 +1976,14 @@ covers every bare specifier a real built artifact emits). The packaged
 scenarios are in the
 [verification runbook](dev/runtime-game-plugins-runbook.md) (scenario D).
 
-> **Per-game assets are a separate concern.** The import map resolves external
-> *modules*. A runtime game's own audio/icons are not yet resolved relative to
-> the artifact: Golf's `audioPathWithFallback('golf', …)` 404s in a launcher
-> built without Golf and aborts the scene. Tracked by
-> **CG-0MUVJWSZO004KZTA**.
+> **Per-game assets are resolved separately from the import map.** The import
+> map resolves external *modules*; a runtime game's own audio/icons are
+> packaged in its artifact and served through `tce-games://` (see
+> [Per-game asset resolution](#per-game-asset-resolution)). The reference
+> builder copies game-owned assets (`copyGameOwnedAssets`), the selector sets
+> the active runtime game base, and `SoundManager` skips an audio key the
+> backend cannot play — so a runtime game boots and plays without the launcher
+> having been rebuilt with its assets.
 
 ## Hand & Pile Rendering
 

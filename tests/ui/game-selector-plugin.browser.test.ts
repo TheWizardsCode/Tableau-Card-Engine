@@ -24,6 +24,10 @@ import {
   type GameEntry,
 } from '../../src/ui/GameSelectorScene';
 import type { IncompatibleGame } from '../../src/ui/game-manifest';
+import {
+  getActiveRuntimeGame,
+  setActiveRuntimeGame,
+} from '../../src/ui/game-asset-url';
 import { waitForScene } from '../helpers/waitForScene';
 
 /** Deterministic 1×1 transparent PNG used as an in-browser (data URL) thumbnail. */
@@ -63,6 +67,7 @@ async function bootSelector(
 }
 
 afterEach(() => {
+  setActiveRuntimeGame(null);
   if (game) {
     game.destroy(true, false);
     game = null;
@@ -164,5 +169,49 @@ describe('GameSelectorScene — runtime plugin integration', () => {
     expect(sceneTexts(scene)).toContain('Broken Thumb');
     // ... but without the thumbnail image, and without throwing.
     expect(sceneImageKeys(scene)).not.toContain(UNLOADABLE_THUMB);
+  });
+
+  it('activates a runtime game id when its card starts the scene', async () => {
+    const RUNTIME_SCENE_KEY = 'RuntimeAssetScene';
+    const scene = await bootSelector([
+      {
+        sceneKey: RUNTIME_SCENE_KEY,
+        title: 'Runtime Asset Game',
+        description: 'dynamic game with its own assets',
+        runtimeGameId: 'runtime-asset-game',
+      },
+    ]);
+
+    game!.scene.add(
+      RUNTIME_SCENE_KEY,
+      class extends Phaser.Scene {
+        constructor() {
+          super({ key: RUNTIME_SCENE_KEY });
+        }
+      },
+      false,
+    );
+
+    const zone = scene.children.list.find(
+      (child): child is Phaser.GameObjects.Zone =>
+        child instanceof Phaser.GameObjects.Zone,
+    );
+    expect(zone).toBeTruthy();
+
+    // Entering the selector cleared the base; clicking the card sets it again.
+    setActiveRuntimeGame(null);
+    zone!.emit('pointerdown');
+
+    expect(getActiveRuntimeGame()).toBe('runtime-asset-game');
+    await waitForScene(game!, RUNTIME_SCENE_KEY);
+    expect(game!.scene.isActive(RUNTIME_SCENE_KEY)).toBe(true);
+  });
+
+  it('clears the active runtime game when the selector initialises', async () => {
+    setActiveRuntimeGame('previous-game');
+
+    await bootSelector([{ sceneKey: 'StaticScene', title: 'Static', description: 'static' }]);
+
+    expect(getActiveRuntimeGame()).toBeNull();
   });
 });
