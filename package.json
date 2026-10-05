@@ -10,6 +10,7 @@
     "build": "tsc --noEmit && vite build",
     "build:electron": "tsc --noEmit && vite build --mode electron",
     "build:game-artifact": "tsx scripts/build-game-artifact.mjs",
+    "verify:runtime-plugin": "node scripts/verify-runtime-plugin-e2e.mjs",
     "preview": "vite preview --host",
     "test": "bash scripts/run-ci-tests.sh",
     "test:smoke": "bash scripts/run-smoke-tests.sh",

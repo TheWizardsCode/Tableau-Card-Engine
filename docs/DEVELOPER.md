@@ -1788,10 +1788,11 @@ adds a manifest entry, with no launcher rebuild. This complements the
 the build): build-time presets decide the *shipped* catalogue, runtime plugins
 add *drop-in* games afterwards.
 
-> The packaged shared-dependency resolution needed to make an externalised
-> artifact *playable* is still in progress — see
-> [Known limitation: shared dependencies](#known-limitation-shared-dependencies)
-> below and work item **CG-0MUV9Y71Z002W8N2**.
+> Runtime artifacts externalise `phaser` and the engine aliases; the packaged
+> launcher resolves those bare specifiers with a generated **import map** — see
+> [Shared-dependency resolution](#shared-dependency-resolution-tce-shared-import-map)
+> below. (Per-game *assets* — audio, icons — are a separate concern tracked by
+> **CG-0MUVJWSZO004KZTA**.)
 
 ### Artifact layout
 
@@ -1890,17 +1891,57 @@ and the game's `GAME_INFO`. The output directory is gitignored.
 If the manifest is missing, malformed, or a game fails to load, the launcher
 continues with the statically-registered games and logs the error.
 
-### Known limitation: shared dependencies
+### Shared-dependency resolution (`tce-shared` import map)
 
 The reference builder externalises `phaser` and the engine aliases (so a second
 engine copy is never bundled), which leaves **bare ESM specifiers** in
-`entry.js`. A plain browser/Electron renderer has no resolver for bare
-specifiers, so a drop-in artifact is not yet *playable* in the packaged
-launcher until the launcher exposes its single engine/Phaser copies through an
-import map (or equivalent). Until then the loader still discovers, validates,
-and lists the game (and reports incompatible ones). Tracked by
-**CG-0MUV9Y71Z002W8N2**; the packaged verification runbook is
-[docs/dev/runtime-game-plugins-runbook.md](dev/runtime-game-plugins-runbook.md).
+`entry.js` — e.g. `import { resolveSetupOptions } from "@core-engine/SetupOptions"`.
+A plain browser/Electron renderer has no resolver for bare specifiers.
+
+The **electron-mode launcher build** closes this gap with a browser **import
+map**, emitted by `scripts/vite-runtime-shared-plugin.ts` (pure logic in
+`scripts/runtime-shared-import-map.ts`):
+
+- Every engine module under `src/{core-engine,card-system,rule-engine,ai,ui}` is
+  emitted as its own Rollup entry with a **stable, path-derived** output name
+  (`tce-shared/<alias>/<module>.js` — never a content hash), and
+  `src/runtime-shared/phaser.js` re-exports Phaser as `tce-shared/phaser.js`.
+- Because those entries live in the **same build** as the launcher, Rollup
+  deduplicates the engine/Phaser modules: the launcher and every runtime
+  artifact share **one module instance** (no second Phaser/engine — class
+  identity is preserved). `preserveEntrySignatures: 'strict'` keeps each
+  entry's named exports.
+- A `<script type="importmap">` mapping every known specifier is injected at
+  `head-prepend` in `dist/index.html`, before the launcher's module script, so
+  it is active when `src/ui/GamePluginLoader.ts` dynamically imports an
+  artifact.
+
+The map is derived from the launcher's own source tree, so it is deterministic
+across builds and covers deep subpaths (`@ui/Renderer`,
+`@ui/Renderer/adapters/GolfAdapter`, `@core-engine/transcript`, …). Web builds
+are unaffected — the plugin is enabled only for `--mode electron` (runtime
+plugins are Electron-only).
+
+Verify the packaged path (builds the electron launcher + the
+`tests/fixtures/runtime-plugin-fixture` artifact, then checks in a real
+Chromium that the fixture is discovered and starts):
+
+```bash
+npm run verify:runtime-plugin
+```
+
+Automated coverage:
+`tests/ui/runtime-shared-import-map.test.ts` (discovery, determinism, deep
+specifiers) and `tests/ui/runtime-shared-artifact-coverage.test.ts` (the map
+covers every bare specifier a real built artifact emits). The packaged
+scenarios are in the
+[verification runbook](dev/runtime-game-plugins-runbook.md) (scenario D).
+
+> **Per-game assets are a separate concern.** The import map resolves external
+> *modules*. A runtime game's own audio/icons are not yet resolved relative to
+> the artifact: Golf's `audioPathWithFallback('golf', …)` 404s in a launcher
+> built without Golf and aborts the scene. Tracked by
+> **CG-0MUVJWSZO004KZTA**.
 
 ## Hand & Pile Rendering
 

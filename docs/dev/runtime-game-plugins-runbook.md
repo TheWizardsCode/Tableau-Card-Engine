@@ -51,6 +51,19 @@ build/game-artifacts/
 (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`), so the
 artifact does not bundle a second engine/Phaser copy.
 
+## Shared-dependency resolution (import map)
+
+Because the artifact externalises those modules, `entry.js` contains bare ESM
+specifiers (`@core-engine/SetupOptions`, `@ui/Renderer`, `phaser`, …). The
+electron-mode launcher resolves them with a generated browser **import map**
+(`scripts/vite-runtime-shared-plugin.ts`): each engine module is emitted as a
+stable `tce-shared/<alias>/<module>.js` entry (path-derived names, no hashes),
+Phaser is re-exported as `tce-shared/phaser.js`, and a
+`<script type="importmap">` is injected into `dist/index.html` ahead of the
+module script. Sharing one build means one engine/Phaser module instance
+(class identity preserved). See
+[DEVELOPER.md → Runtime Game Plugins](../DEVELOPER.md#runtime-game-plugins).
+
 ## Installing the artifact for a packaged launcher
 
 1. Resolve the launcher's content directory (bundled `dist/` by default, or the
@@ -112,14 +125,61 @@ npx vitest run --project unit tests/ui/game-plugin-e2e.test.ts
 It covers: compatible load + merge, incompatible hide + notice list,
 missing manifest, malformed manifest, and the no-content-dir browser path.
 
-## Known limitation — shared-dependency resolution in the packaged renderer
+The shared-dependency resolution is covered by
+[`tests/ui/runtime-shared-import-map.test.ts`](../../tests/ui/runtime-shared-import-map.test.ts)
+(discovery, determinism, deep specifiers) and
+[`tests/ui/runtime-shared-artifact-coverage.test.ts`](../../tests/ui/runtime-shared-artifact-coverage.test.ts)
+(the import map covers every bare specifier a real built artifact emits).
 
-The reference builder externalises `phaser` and the engine aliases (as the
-artifact contract requires), which leaves **bare ESM specifiers** in `entry.js`.
-A plain browser/Electron renderer has no resolver for bare specifiers, so a
-drop-in artifact is not yet playable in the packaged launcher until the launcher
-exposes its bundled engine/Phaser through an import map (or equivalent shared
-registry). This gap is tracked by **CG-0MUV9Y71Z002W8N2** (see the parent epic,
-`discovered-from` the runtime-plugin feature). The automated harness above
-injects the importer, so it verifies the builder↔loader↔selector contract
-independently of that resolution work.
+### D — shared-dependency resolution (startable artifact)
+
+This is the scenario the import map closes. It is reproduced end-to-end by:
+
+```bash
+npm run verify:runtime-plugin
+```
+
+which builds the electron launcher, builds the minimal
+`tests/fixtures/runtime-plugin-fixture` artifact into `dist/games/`, serves
+`dist/` and, in a real Chromium, asserts the fixture is discovered **and** its
+scene starts. A discovery hit proves the artifact's bare specifiers resolved
+through the import map; a start hit proves the scene shares the launcher's
+single Phaser instance.
+
+Expected output:
+
+```
+[verify] catalogue: ["GymRouterScene","RuntimeFixtureScene"]
+[verify] runtime fixture discovered + started ✓
+[verify] PASS — runtime game plugin shared-dependency resolution works.
+```
+
+For the full Electron packaged path, install a real game artifact (the
+fixture, or Golf) and run `npm run start:electron`: the runtime game appears in
+the selector alongside the static games and starts when its card is clicked.
+
+> **Note:** a real game that *also* loads its own audio/icons hits the separate
+> per-game asset gap — see below.
+
+### E — build verification of the injected import map
+
+After `npm run build:electron`, `dist/index.html` must contain an
+`importmap` script whose entries all resolve to emitted files. The unit test
+`tests/ui/runtime-shared-import-map.test.ts` asserts the mapping; a quick manual
+check is:
+
+```bash
+grep -c 'type="importmap"' dist/index.html   # → 1
+```
+
+## Per-game assets (separate concern)
+
+The import map resolves externalised **modules** — it makes the artifact's
+`entry.js` import and its scene class register and boot. A runtime game's own
+**assets** (audio, icons) are not yet resolved relative to the artifact: a
+game scene loads them from launcher-relative paths
+(`audioPathWithFallback('golf', …)` → `assets/audio/golf/…`), which 404 in a
+launcher built without that game and aborts the scene. This is why the
+minimal `runtime-fixture` (no game assets) starts cleanly while Golf's scene
+aborts on `golf:sfx-turn-change`. Tracked by **CG-0MUVJWSZO004KZTA**
+("Runtime game plugin per-game asset resolution (audio/textures)").

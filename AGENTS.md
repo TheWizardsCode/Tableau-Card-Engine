@@ -585,14 +585,23 @@ example (`CG-0MTRO7VMI000F3A5`).
   second Phaser/engine copy; the reference builder externalises `phaser` and
   the `@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`
   aliases. The launcher supplies those at runtime.
-- **Known limitation (in progress):** externalised bare specifiers have no
-  resolver in a plain browser/Electron renderer yet, so a drop-in game is
-  discovered/listed but not playable in the packaged launcher until the
-  launcher exposes its single engine/Phaser copies (import map or equivalent).
-  Tracked by **CG-0MUV9Y71Z002W8N2**; runbook
+- **Shared-dependency resolution (`tce-shared` import map):** externalised
+  bare specifiers are resolved by the launcher's generated import map
+  (`scripts/vite-runtime-shared-plugin.ts` + `scripts/runtime-shared-import-map.ts`),
+  which emits a stable path-named chunk per engine module (`tce-shared/**`),
+  re-exports Phaser as `tce-shared/phaser.js`, and injects
+  `<script type="importmap">` into `dist/index.html` at `head-prepend`. One build
+  means one engine/Phaser instance (class identity preserved). Electron-mode
+  only; deterministic (no hash reliance). Verify with
+  `npm run verify:runtime-plugin`; runbook
   [`docs/dev/runtime-game-plugins-runbook.md`](docs/dev/runtime-game-plugins-runbook.md),
   reference docs
   [`docs/DEVELOPER.md` → Runtime Game Plugins](docs/DEVELOPER.md#runtime-game-plugins).
+- **Per-game assets (separate concern, in progress):** the import map resolves
+  external *modules*; a runtime game's own audio/icons are not yet resolved
+  relative to the artifact, so a game with game-specific assets aborts on a
+  missing-audio error in a launcher built without it. Tracked by
+  **CG-0MUVJWSZO004KZTA**.
 - **Test seams:** the loader takes `{ contentDir, engineVersion, importer,
   fetchManifest }`; tests inject a stub importer/fetcher. Fixtures live in
   `tests/fixtures/plugin-game/`; builder↔loader↔selector coverage is in
