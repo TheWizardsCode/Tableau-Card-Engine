@@ -54,6 +54,13 @@ See [Repository Map](#repository-map-multi-repo-layout) below and the
 [Config-Driven Game Catalogue](docs/dev/game-configuration.md) reference for
 the preset schema, resolution order, `GAME_INFO` convention and authoring steps.
 
+In addition to the build-time catalogue, the **Electron launcher can load games
+at runtime**: a game built as an artifact (ESM `entry.js` + assets) can be
+dropped into `<contentDir>/games/` and declared in a `games/manifest.json`, so
+it appears in the Game Selector without rebuilding the launcher. Each entry
+declares a compatible core-engine version range; incompatible games are hidden
+and noted. See [Runtime Game Plugins](docs/DEVELOPER.md#runtime-game-plugins).
+
 ## Desktop Launcher (Electron) & Steam Packaging
 
 TCE ships as a web app (GitHub Pages) **and** as a native desktop launcher built with **Electron** (`electron/`), for Steam distribution. The launcher boots the same built web app in a desktop window:

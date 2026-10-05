@@ -553,6 +553,52 @@ The TCE launcher's Steam follow-to-unlock mechanic is the canonical example
   Manual QA: [`docs/dev/steam-achievements-qa.md`](docs/dev/steam-achievements-qa.md);
   developer workflow: `docs/DEVELOPER.md` (Steam achievements).
 
+### 21. Runtime Game Plugins (Drop-in Games)
+
+Augment the **build-time** game catalogue with games discovered from a content
+directory at launcher startup, so a distribution can add or update a game
+**without rebuilding the launcher**. The runtime plugin loader is the canonical
+example (`CG-0MTRO7VMI000F3A5`).
+
+- **When to use:** shipping an Electron launcher whose game set must change
+  post-build (dropping in a new game, or updating one). This is additive to the
+  config-driven preset catalogue — runtime games never replace the static
+  entries, and a failure degrades to the static catalogue (never a blank
+  screen). Web-runtime plugins are out of scope; Electron only.
+- **Modules:** `src/ui/GamePluginLoader.ts` (async `loadGamePlugins` with
+  injected `importer`/`fetchManifest` — unit-testable without Electron),
+  `src/ui/game-manifest.ts` (`parseGameManifest` + `splitByCompatibility`,
+  never throws), `src/ui/game-asset-url.ts` (`tce-games://<id>/<path>` builder),
+  `src/ui/game-plugin-boot.ts` (`discoverRuntimeGames` + `buildGameBootPayload`
+  merge), `electron/game-protocol.ts` (deny-by-default `tce-games://` handler),
+  and `scripts/build-game-artifact.mjs` (the reference artifact builder). The
+  selector renders runtime entries through the same card path as static ones
+  and lists incompatible games in an SLL-positioned notice
+  (`REGISTRY_KEY_INCOMPATIBLE_GAMES`).
+- **Contract:** `<contentDir>/games/manifest.json` declares games shaped
+  `{ id, sceneKey, title, description, thumbnail?, coreEngineVersion, entry }`;
+  each artifact ships `entry.js` (named scene-class export + `GAME_INFO`) and
+  `assets/`. Thumbnails load over `tce-games://`, not the launcher's `public/`.
+  Every entry declares a `coreEngineVersion` **semver range**; incompatible
+  games are hidden and reported, and duplicate `id`/`sceneKey` is rejected.
+- **Externalised shared dependencies:** a runtime artifact must **not** bundle a
+  second Phaser/engine copy; the reference builder externalises `phaser` and
+  the `@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`
+  aliases. The launcher supplies those at runtime.
+- **Known limitation (in progress):** externalised bare specifiers have no
+  resolver in a plain browser/Electron renderer yet, so a drop-in game is
+  discovered/listed but not playable in the packaged launcher until the
+  launcher exposes its single engine/Phaser copies (import map or equivalent).
+  Tracked by **CG-0MUV9Y71Z002W8N2**; runbook
+  [`docs/dev/runtime-game-plugins-runbook.md`](docs/dev/runtime-game-plugins-runbook.md),
+  reference docs
+  [`docs/DEVELOPER.md` → Runtime Game Plugins](docs/DEVELOPER.md#runtime-game-plugins).
+- **Test seams:** the loader takes `{ contentDir, engineVersion, importer,
+  fetchManifest }`; tests inject a stub importer/fetcher. Fixtures live in
+  `tests/fixtures/plugin-game/`; builder↔loader↔selector coverage is in
+  `tests/ui/game-plugin-loader.test.ts`, `tests/ui/game-plugin-boot.test.ts`,
+  and `tests/ui/game-plugin-e2e.test.ts`.
+
 ### Scene Base Class Pattern
 
 All Gym demo scenes extend `GymSceneBase` (`example-games/gym/scenes/GymSceneBase.ts`), which provides shared utilities:

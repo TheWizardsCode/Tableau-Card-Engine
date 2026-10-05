@@ -15,6 +15,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
+- [Runtime Game Plugins](#runtime-game-plugins)
 - [Hand & Pile Rendering](#hand--pile-rendering)
 - [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
 - [Example Games](#example-games)
@@ -1777,6 +1778,129 @@ The `tce-<game>` repos use `main` as their default branch, carry only `dev` and
 `main`, and resolve every engine import through the aliases against `./core`.
 
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
+
+## Runtime Game Plugins
+
+The Electron launcher can also load games **at runtime** — a distribution
+operator drops a built game artifact into the launcher's content directory and
+adds a manifest entry, with no launcher rebuild. This complements the
+[config-driven catalogue](#config-driven-game-catalogue) (games compiled into
+the build): build-time presets decide the *shipped* catalogue, runtime plugins
+add *drop-in* games afterwards.
+
+> The packaged shared-dependency resolution needed to make an externalised
+> artifact *playable* is still in progress — see
+> [Known limitation: shared dependencies](#known-limitation-shared-dependencies)
+> below and work item **CG-0MUV9Y71Z002W8N2**.
+
+### Artifact layout
+
+```
+<contentDir>/games/
+  manifest.json                 # the catalogue of runtime games
+  <game-id>/
+    entry.js                    # ESM: named scene-class export + GAME_INFO
+    assets/thumbnail.png        # optional thumbnail (manifest "thumbnail")
+```
+
+`<contentDir>` is the content directory the launcher resolved (bundled `dist/`
+by default; a Steam DLC directory via `--content-dir <dir>` / `TCE_CONTENT_DIR`;
+see [DLC content directory](#dlc-content-directory-steam-model)).
+
+### `games/manifest.json` schema
+
+```json
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "golf",
+      "sceneKey": "GolfScene",
+      "title": "9-Card Golf",
+      "description": "Lowest score wins.",
+      "thumbnail": "assets/thumbnail.png",
+      "coreEngineVersion": "^0.1.0",
+      "entry": "entry.js"
+    }
+  ]
+}
+```
+
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `version` | yes | Manifest schema version (currently `1`). |
+| `games` | yes | Array of game entries. |
+| `games[].id` | yes | Stable game id; also the artifact directory name. Lower-cased slug. |
+| `games[].sceneKey` | yes | Phaser scene key the launcher registers/starts the game under. |
+| `games[].title` | yes | Display name shown on the selector card. |
+| `games[].description` | yes | Short description shown on the card. |
+| `games[].thumbnail` | no | Artifact-relative path; served over `tce-games://<id>/<path>`. |
+| `games[].coreEngineVersion` | yes | Semver range of compatible core-engine versions. |
+| `games[].entry` | yes | Artifact-relative path to the ESM entry module. |
+
+Duplicate `id`/`sceneKey` values, missing fields, and invalid semver ranges are
+rejected as validation errors (the launcher logs them and continues with the
+static catalogue). Parsing lives in `src/ui/game-manifest.ts`.
+
+### Compatibility rule
+
+Each entry declares `coreEngineVersion` (a semver range such as `^0.1.0`).
+At load time the launcher checks it with `semver.satisfies(engineVersion,
+range)` against `ENGINE_VERSION` from `@core-engine`. Incompatible games are
+**hidden** from the card grid and listed in a notice, e.g.
+`Incompatible game: 9-Card Golf — requires core v^9.0.0 (launcher is v0.1.0)`.
+Anyone may build incompatible games; only compatible ones run.
+
+### `tce-games://` asset protocol
+
+Thumbnails and other per-game assets are **not** loaded from the launcher's
+`public/` directory. The renderer builds `tce-games://<id>/<relative-path>`
+URLs (`src/ui/game-asset-url.ts`) and the Electron main process serves them
+from `<contentDir>/games/<id>/…` through a deny-by-default protocol handler
+(`electron/game-protocol.ts`). Requests that are absolute, contain `..`/NUL, or
+escape the game directory are denied (404); unknown extensions are served as
+`application/octet-stream`.
+
+### Producing an artifact
+
+The reference builder turns a configured game into an artifact using Vite
+library mode:
+
+```bash
+npm run build:game-artifact -- --game golf --preset configs/golf.json
+```
+
+It writes `build/game-artifacts/manifest.json` and
+`build/game-artifacts/<id>/` (`entry.js` + `assets/`). `phaser` and the engine
+aliases (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`,
+`@ai/*`) are externalised so the artifact does not bundle a second engine copy.
+The emitted `entry.js` re-exports the scene class (named after the scene module)
+and the game's `GAME_INFO`. The output directory is gitignored.
+
+### Installing an artifact
+
+1. Copy `build/game-artifacts/manifest.json` and the `build/game-artifacts/<id>/`
+   directory into `<contentDir>/games/` (merge the manifest if runtime games
+   already exist).
+2. Relaunch the Electron launcher. The plugin loader
+   (`src/ui/GamePluginLoader.ts`) reads the manifest, dynamically imports each
+   compatible `entry.js`, and merges the games into the selector alongside the
+   static catalogue.
+
+If the manifest is missing, malformed, or a game fails to load, the launcher
+continues with the statically-registered games and logs the error.
+
+### Known limitation: shared dependencies
+
+The reference builder externalises `phaser` and the engine aliases (so a second
+engine copy is never bundled), which leaves **bare ESM specifiers** in
+`entry.js`. A plain browser/Electron renderer has no resolver for bare
+specifiers, so a drop-in artifact is not yet *playable* in the packaged
+launcher until the launcher exposes its single engine/Phaser copies through an
+import map (or equivalent). Until then the loader still discovers, validates,
+and lists the game (and reports incompatible ones). Tracked by
+**CG-0MUV9Y71Z002W8N2**; the packaged verification runbook is
+[docs/dev/runtime-game-plugins-runbook.md](dev/runtime-game-plugins-runbook.md).
 
 ## Hand & Pile Rendering
 
