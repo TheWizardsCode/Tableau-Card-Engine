@@ -17,10 +17,13 @@ import path from 'path';
 import {
   GAMES_DIRNAME,
   DEFAULT_MIME_TYPE,
+  GAME_ASSET_SCHEME,
   mimeTypeForPath,
   resolveAssetFilePath,
   handleGameAssetRequest,
+  registerGameAssetHandler,
   type GameAssetFileReader,
+  type ProtocolRegistrar,
 } from '../../electron/game-protocol.js';
 import { resolveGameAssetUrl, GAME_ASSET_URL_SCHEME } from '../../src/ui/game-asset-url';
 
@@ -221,5 +224,65 @@ describe('handleGameAssetRequest', () => {
 
     expect(result.status).toBe(404);
     expect(result.body).toBeNull();
+  });
+});
+
+/** Capture the handler registered against a fake Electron `protocol`. */
+function fakeProtocol() {
+  const handlers = new Map<string, (request: { url: string }) => Promise<Response>>();
+  const protocolLike: ProtocolRegistrar = {
+    handle: (scheme, handler) => {
+      handlers.set(scheme, handler);
+    },
+  };
+  return { protocolLike, handlers };
+}
+
+describe('registerGameAssetHandler (Electron wiring seam)', () => {
+  it('registers the tce-games scheme', () => {
+    const { protocolLike, handlers } = fakeProtocol();
+
+    registerGameAssetHandler(protocolLike, contentDir);
+
+    expect(GAME_ASSET_SCHEME).toBe('tce-games');
+    expect(handlers.has(GAME_ASSET_SCHEME)).toBe(true);
+  });
+
+  it('serves an existing asset as a 200 Response with the right content type', async () => {
+    writeAsset('assets/thumbnail.png');
+    const { protocolLike, handlers } = fakeProtocol();
+    registerGameAssetHandler(protocolLike, contentDir);
+
+    const response = await handlers.get(GAME_ASSET_SCHEME)!({
+      url: 'tce-games://fixture-game/assets/thumbnail.png',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('image/png');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    expect(bytes.subarray(0, 8).equals(PNG_BYTES)).toBe(true);
+  });
+
+  it('adapts a denied traversal request to a 404 Response', async () => {
+    const { protocolLike, handlers } = fakeProtocol();
+    registerGameAssetHandler(protocolLike, contentDir);
+
+    const response = await handlers.get(GAME_ASSET_SCHEME)!({
+      url: 'tce-games://fixture-game/%2e%2e%2fsecret.png',
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe('');
+  });
+
+  it('returns 404 for a request for a missing file', async () => {
+    const { protocolLike, handlers } = fakeProtocol();
+    registerGameAssetHandler(protocolLike, contentDir);
+
+    const response = await handlers.get(GAME_ASSET_SCHEME)!({
+      url: 'tce-games://fixture-game/assets/absent.png',
+    });
+
+    expect(response.status).toBe(404);
   });
 });

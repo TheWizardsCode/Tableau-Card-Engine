@@ -50,8 +50,8 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
  */
 const GAME_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 
-/** The scheme served by {@link handleGameAssetRequest}. */
-const GAME_ASSET_URL_SCHEME = 'tce-games';
+/** Scheme served by {@link handleGameAssetRequest}. */
+export const GAME_ASSET_SCHEME = 'tce-games';
 
 /** Select a MIME type from a file path's extension (case-insensitive). */
 export function mimeTypeForPath(filePath: string): string {
@@ -135,7 +135,7 @@ export function resolveAssetFilePath(
     return null;
   }
 
-  if (url.protocol !== `${GAME_ASSET_URL_SCHEME}:`) return null;
+  if (url.protocol !== `${GAME_ASSET_SCHEME}:`) return null;
 
   const gameId = url.hostname.toLowerCase();
   if (!GAME_ID_PATTERN.test(gameId)) return null;
@@ -189,4 +189,40 @@ export async function handleGameAssetRequest(
   } catch {
     return { status: 404, headers: {}, body: null };
   }
+}
+
+/**
+ * Minimal Electron `protocol` surface {@link registerGameAssetHandler} needs.
+ * Kept structural so the Electron-free unit test can pass a fake.
+ */
+export interface ProtocolRegistrar {
+  handle(
+    scheme: string,
+    handler: (request: { url: string }) => Promise<Response>,
+  ): void;
+}
+
+/**
+ * Register the deny-by-default `tce-games://` handler against a
+ * `protocol`-like object, adapting {@link handleGameAssetRequest}'s plain
+ * result to an Electron `Response`.
+ *
+ * Split out of `electron/main.ts` (feature F6, CG-0MUG2ZLGI006Y20G) so the
+ * wiring — scheme, content root, and Response adaptation — is unit-testable
+ * without booting Electron.
+ */
+export function registerGameAssetHandler(
+  protocolLike: ProtocolRegistrar,
+  contentDir: string,
+): void {
+  protocolLike.handle(GAME_ASSET_SCHEME, async (request) => {
+    const result = await handleGameAssetRequest(request.url, { contentDir });
+    // Copy into an ArrayBuffer-backed view: the DOM `BodyInit` type (and the
+    // Electron `Response`) do not accept a `Uint8Array<ArrayBufferLike>`.
+    const body = result.body ? new Uint8Array(result.body) : null;
+    return new Response(body, {
+      status: result.status,
+      headers: result.headers,
+    });
+  });
 }
