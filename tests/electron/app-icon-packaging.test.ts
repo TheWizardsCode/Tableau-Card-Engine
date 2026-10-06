@@ -5,8 +5,9 @@
  * The packaged desktop app must show the tableau emblem instead of the default
  * Electron icon. That requires two pieces of wiring that are easy to lose:
  *   1. `electron-builder.yml` declares an icon for Windows, Linux, and macOS
- *      (plus the NSIS installer/uninstaller icons), pointing at the generated
- *      `build/icon.png`; and
+ *      pointing at the generated `build/icon.png`, and the NSIS
+ *      installer/uninstaller keys point at the generated `build/icon.ico`
+ *      (NSIS rejects a PNG as an "invalid icon file"); and
  *   2. every `package*` npm script runs `npm run generate:icons` first, because
  *      `build/` is gitignored — the resource only exists after generation.
  *
@@ -58,6 +59,7 @@ function yamlScalar(block: string, key: string): string | undefined {
 }
 
 const GENERATED_ICON = 'build/icon.png';
+const GENERATED_ICO = 'build/icon.ico';
 
 describe('electron-builder icon configuration', () => {
   it.each([
@@ -70,11 +72,13 @@ describe('electron-builder icon configuration', () => {
     expect(yamlScalar(block, 'icon'), `${key}.icon must be declared`).toBe(GENERATED_ICON);
   });
 
-  it('declares the NSIS installer and uninstaller icons', () => {
+  it('declares the NSIS installer and uninstaller icons as a real .ico (never a PNG)', () => {
     const nsis = yamlBlock(BUILDER_YML, 'nsis');
     expect(nsis, 'nsis: section must exist').not.toBe('');
-    expect(yamlScalar(nsis, 'installerIcon')).toBe(GENERATED_ICON);
-    expect(yamlScalar(nsis, 'uninstallerIcon')).toBe(GENERATED_ICON);
+    // NSIS rejects a PNG for these keys with `invalid icon file`, so a
+    // regression that points them back at build/icon.png must fail here.
+    expect(yamlScalar(nsis, 'installerIcon')).toBe(GENERATED_ICO);
+    expect(yamlScalar(nsis, 'uninstallerIcon')).toBe(GENERATED_ICO);
   });
 
   it('points the icon base at the generated (gitignored) build resources dir', () => {

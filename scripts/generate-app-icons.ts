@@ -16,6 +16,9 @@
  *   Desktop (`build/` is gitignored — generated at package time):
  *     build/icon.png             1024x1024 electron-builder derives
  *                                          .ico/.icns from this >=512px PNG
+ *     build/icon.ico             multi-size Windows ICO for the NSIS
+ *                                          installer/uninstaller (NSIS rejects
+ *                                          PNG files for these keys)
  *
  * Usage:
  *   npx tsx scripts/generate-app-icons.ts
@@ -25,7 +28,7 @@
  * See CG-0MUTTXRWZ009NUB9 / CG-0MUU3Q3C8007AGQ5.
  */
 
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, renameSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
@@ -65,6 +68,51 @@ export const APP_ICON_TARGETS: readonly AppIconTarget[] = [
   { file: 'icon.png', dir: 'build', width: 1024, height: 1024, purpose: 'electron-builder .ico/.icns source' },
 ];
 
+/** File name of the Windows ICO derived from `build/icon.png` for NSIS. */
+export const BUILD_ICO_FILE = 'icon.ico';
+
+/**
+ * Convert the generated desktop PNG into a Windows ICO.
+ *
+ * Injectable so unit tests can supply a deterministic stub instead of shelling
+ * out to electron-builder's icons toolset (which downloads a toolchain).
+ */
+export type IcoConverter = (sourcePng: string, outFile: string) => Promise<void>;
+
+/**
+ * Default ICO converter — reuses electron-builder's own icon toolset so the
+ * NSIS installer/uninstaller icons are the same multi-size resource
+ * electron-builder derives from `win.icon`.
+ *
+ * NSIS requires a real ICO container for `installerIcon`/`uninstallerIcon` (it
+ * rejects a raw PNG as an "invalid icon file"), so `generate:icons` must emit
+ * `build/icon.ico` before electron-builder runs.
+ *
+ * The deep import is intentional: `app-builder-lib` is electron-builder's
+ * icon-conversion engine and is version-pinned by the `electron-builder`
+ * dependency. It adds no new runtime dependency — `package*` would download
+ * the icons toolset for `win.icon` regardless, and electron-builder caches it.
+ */
+async function convertPngToIco(sourcePng: string, outFile: string): Promise<void> {
+  const { convertIcon } = await import('app-builder-lib/out/util/iconConverter.js');
+  const outDir = dirname(outFile);
+  mkdirSync(outDir, { recursive: true });
+  const { icons } = await convertIcon({
+    sources: [sourcePng],
+    fallbackSources: [],
+    roots: [ROOT],
+    format: 'ico',
+    outDir,
+  });
+  const produced = icons[0]?.file;
+  if (!produced || !existsSync(produced)) {
+    throw new Error(`Icon conversion produced no .ico for ${sourcePng}`);
+  }
+  if (resolve(produced) !== resolve(outFile)) {
+    renameSync(produced, outFile);
+  }
+}
+
 export interface GenerateAppIconsOptions {
   /** Path to the source-of-truth emblem SVG. */
   sourceSvg?: string;
@@ -74,10 +122,12 @@ export interface GenerateAppIconsOptions {
   buildDir?: string;
   /** Optional progress logger (defaults to `console.log`; pass a no-op in tests). */
   log?: (message: string) => void;
+  /** Override the Windows ICO converter (tests inject a deterministic stub). */
+  icoConverter?: IcoConverter;
 }
 
 export interface GenerateAppIconsResult {
-  /** Absolute path of every artefact written, in target order. */
+  /** Absolute path of every artefact written: the PNG targets, then the derived Windows ICO. */
   written: string[];
 }
 
@@ -89,8 +139,9 @@ export interface GenerateAppIconsResult {
  * intrinsic viewBox), then resized with `fit: 'contain'` onto a transparent
  * square canvas.
  *
- * @throws Error when the source SVG does not exist (fail loudly rather than
- *   silently shipping a stale/absent icon).
+ * @throws Error when the source SVG does not exist, or when the injected/real
+ *   ICO converter fails (fail loudly rather than silently shipping a
+ *   stale/absent icon or an NSIS-incompatible PNG).
  */
 export async function generateAppIcons(
   options: GenerateAppIconsOptions = {},
@@ -131,6 +182,19 @@ export async function generateAppIcons(
     log(`  ${target.file.padEnd(22)} ${target.width}x${target.height}  ${target.purpose}`);
     written.push(outPath);
   }
+
+  // NSIS rejects a PNG for installerIcon/uninstallerIcon (it needs a real ICO
+  // container), so derive `build/icon.ico` from the desktop PNG here — before
+  // electron-builder runs — rather than handing it the PNG.
+  const desktopPng = APP_ICON_TARGETS.find((target) => target.dir === 'build');
+  if (!desktopPng) {
+    throw new Error('No desktop (build/) icon target is defined.');
+  }
+  const icoPath = join(buildDir, BUILD_ICO_FILE);
+  const convertIco = options.icoConverter ?? convertPngToIco;
+  await convertIco(join(buildDir, desktopPng.file), icoPath);
+  log(`  ${BUILD_ICO_FILE.padEnd(22)} multi-size   NSIS installer/uninstaller icon`);
+  written.push(icoPath);
 
   return { written };
 }

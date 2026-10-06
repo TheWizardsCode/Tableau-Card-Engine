@@ -324,14 +324,20 @@ existing dependency) and writes:
 | `public/icon-512.png` | 512×512 | web app manifest / PWA |
 | `public/apple-touch-icon.png` | 180×180 | iOS home screen |
 | `build/icon.png` | 1024×1024 | electron-builder `.ico`/`.icns` source |
+| `build/icon.ico` | multi-size | NSIS installer/uninstaller icon |
 
-The committed web PNGs live under `public/`; the Electron resource
-`build/icon.png` is generated at package time because `build/` is gitignored.
-Every `package*` npm script therefore runs `npm run generate:icons` **before**
-`electron-builder`, and `electron-builder.yml` points `win`/`linux`/`mac`
-(plus the NSIS installer/uninstaller icons) at `build/icon.png`;
+The committed web PNGs live under `public/`; the Electron resources
+`build/icon.png` and `build/icon.ico` are generated at package time because
+`build/` is gitignored. Every `package*` npm script therefore runs
+`npm run generate:icons` **before** `electron-builder`, and
+`electron-builder.yml` points `win`/`linux`/`mac` at `build/icon.png`;
 electron-builder derives the Windows `.ico` and macOS `.icns` from that ≥512px
-PNG, so no extra packer dependency is needed.
+PNG, so no extra packer dependency is needed. The NSIS
+`installerIcon`/`uninstallerIcon` keys point at `build/icon.ico` instead: NSIS
+requires a real ICO container and rejects a raw PNG as an *invalid icon file*.
+`generate:icons` derives that ICO from `build/icon.png` using electron-builder's
+own icon toolset (cached for the packaging step), so the installer icon matches
+the application icon exactly (`CG-0MUWQJ279009KBMM`).
 
 **Base-relative link convention.** The icon/manifest `<link>`s in `index.html`
 (and the favicon link in `public/404.html`) use **base-relative** hrefs — with

@@ -65,9 +65,12 @@ win:
 
 nsis:
   oneClick: false
-  # Emblem-derived installer/uninstaller icons (CG-0MUTTXRWZ009NUB9).
-  installerIcon: build/icon.png
-  uninstallerIcon: build/icon.png
+  # NSIS requires a real .ico container for these keys — it rejects a PNG as
+  # an "invalid icon file". `npm run generate:icons` writes
+  # `build/icon.ico` (multi-size, derived from the emblem) before
+  # electron-builder runs (CG-0MUTTXRWZ009NUB9 / CG-0MUWQJ279009KBMM).
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
   # perMachine: true makes the installer require admin elevation
   # (RequestExecutionLevel admin), which is needed for two reasons:
   #   1. The user installs to Program Files (requires admin anyway).
