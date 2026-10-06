@@ -5,6 +5,7 @@ import fs from 'fs';
 import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from './scripts/vite-transcript-plugin';
 import { gameDiscoveryPlugin, resolveCoreAliases, selectedGameIds } from './scripts/vite-game-discovery-plugin';
 import { gameAssetsPlugin } from './scripts/vite-game-assets-plugin';
+import { runtimeSharedPlugin } from './scripts/vite-runtime-shared-plugin';
 
 // Which games are checked out for this build/test run. Used to filter the
 // smoke/dev project test lists so a core-only checkout does not reference test
@@ -84,6 +85,13 @@ export default defineConfig(({ mode, command }) => ({
     // build serves the games' source but 404s on every game asset
     // (CG-0MUKYCG9L00587FA).
     gameAssetsPlugin(),
+    // Runtime game plugin shared dependencies (CG-0MUV9Y71Z002W8N2): in the
+    // packaged Electron launcher only, emit a stable shared-runtime chunk per
+    // engine module + an import map in index.html so dynamically-imported game
+    // artifacts resolve their externalised bare specifiers (`phaser`,
+    // `@core-engine/*`, …) to the launcher's single engine/Phaser copies. Web
+    // builds are excluded — runtime plugins are Electron-only.
+    runtimeSharedPlugin({ enabled: mode === 'electron' }),
     // Only register the transcript persistence plugin during normal dev-server runs.
     // Vitest browser uses an internal Vite server; avoid plugin middleware there to
     // prevent file-system side effects and extra request handling during tests.
@@ -109,6 +117,15 @@ export default defineConfig(({ mode, command }) => ({
   server: {
     port: 3000,
     open: false,
+    // Suppress the full-screen compilation overlay (keeps the dev experience
+    // clean — errors still appear in the console but without the intrusive
+    // full-page overlay). Per Vite docs this does NOT suppress the WebSocket
+    // ping error that appears in the console when the HMR connection drops
+    // (e.g. via Tailscale); that is noise from Vite's HMR client and is
+    // harmless.
+    hmr: {
+      overlay: false,
+    },
     watch: {
       // Exclude dev-output trees from the file watcher (fix for
       // CG-0MSXL0A25009WZVK — dev-server heap OOM). Every file written into a

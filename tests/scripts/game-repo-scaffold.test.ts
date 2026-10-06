@@ -22,6 +22,7 @@ import {
   defaultScenePath,
   findGameInPreset,
   linkSharedAssets,
+  linkSharedPublicAssets,
   pascalCase,
   readLayoutGames,
   renderPackageJson,
@@ -47,6 +48,32 @@ const GAMES = [
   'main-street',
   'coloretto',
 ] as const;
+
+/** The root app-icon files a game repo composes from the core (CG-0MUUFZSE90061KKL). */
+const ROOT_ICONS = [
+  'favicon.svg',
+  'apple-touch-icon.png',
+  'icon-32.png',
+  'icon-192.png',
+  'icon-512.png',
+  'site.webmanifest',
+] as const;
+
+/**
+ * Populate a fixture core with the root app-icon files and the
+ * `sharedPublicRoot` layout that names them, mirroring the real core layout.
+ */
+function writeCoreIconLayout(core: string): void {
+  fs.mkdirSync(path.join(core, 'public'), { recursive: true });
+  for (const icon of ROOT_ICONS) {
+    fs.writeFileSync(path.join(core, 'public', icon), `${icon}\n`);
+  }
+  fs.mkdirSync(path.join(core, 'scripts', 'configs'), { recursive: true });
+  fs.writeFileSync(
+    path.join(core, 'scripts', 'configs', 'repo-layout.json'),
+    JSON.stringify({ sharedPublicRoot: [...ROOT_ICONS] }),
+  );
+}
 
 const MANIFEST: CoreManifest = {
   version: '9.9.9',
@@ -168,6 +195,46 @@ describe('linkSharedAssets', () => {
   });
 });
 
+// ── Shared public-root icon linking ───────────────────────────────────────
+
+describe('linkSharedPublicAssets', () => {
+  it('links the core root app-icon files into the game repo public root', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    writeCoreIconLayout(core);
+
+    const linked = linkSharedPublicAssets(gameRepo, core);
+    expect(linked).toHaveLength(ROOT_ICONS.length);
+    for (const icon of ROOT_ICONS) {
+      expect(fs.realpathSync(path.join(gameRepo, 'public', icon))).toBe(
+        fs.realpathSync(path.join(core, 'public', icon)),
+      );
+    }
+    // Re-running does not recreate an existing link (idempotent).
+    expect(linkSharedPublicAssets(gameRepo, core)).toHaveLength(0);
+  });
+
+  it('is a no-op when the core layout has no sharedPublicRoot list', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    expect(linkSharedPublicAssets(gameRepo, core)).toEqual([]);
+  });
+
+  it('skips entries whose core source file is absent', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    fs.mkdirSync(path.join(core, 'public'), { recursive: true });
+    fs.writeFileSync(path.join(core, 'public', 'favicon.svg'), 'x');
+    fs.mkdirSync(path.join(core, 'scripts', 'configs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(core, 'scripts', 'configs', 'repo-layout.json'),
+      JSON.stringify({ sharedPublicRoot: ['favicon.svg', 'missing.png'] }),
+    );
+
+    const linked = linkSharedPublicAssets(gameRepo, core);
+    expect(linked).toHaveLength(1);
+    expect(path.basename(linked[0])).toBe('favicon.svg');
+    expect(fs.existsSync(path.join(gameRepo, 'public', 'missing.png'))).toBe(false);
+  });
+});
+
 // ── Naming helpers ────────────────────────────────────────────────────────
 
 describe('game id helpers', () => {
@@ -247,6 +314,33 @@ describe('renderViteConfig', () => {
     expect(src).toContain("GAMES_CONFIG: process.env.GAMES_CONFIG ?? 'game'");
     expect(src).toContain('resolveCoreAliases(coreRoot)');
     expect(src).toContain("name: 'unit'");
+  });
+
+  it('derives the production Pages base from the package name with a PAGES_BASE override', () => {
+    const src = renderViteConfig('main-street', DEFAULT_CORE_REL);
+
+    // Mode gating: electron stays relative, dev stays at root, production is
+    // derived — mirroring the generated game-repo configs (MS-0MUQZH5PH001JXLV).
+    expect(src).toContain("mode === 'electron' ? './'");
+    expect(src).toContain("mode === 'production' ? resolvePagesBase() : '/'");
+    expect(src).toContain('PAGES_BASE');
+
+    // Evaluate the emitted helper with injectable pkg/process so the base
+    // behaviour (not just its presence) is asserted.
+    const fnMatch = src.match(/function resolvePagesBase\(\): string \{([\s\S]*?)\n\}/);
+    expect(fnMatch, 'resolvePagesBase missing from scaffolded config').not.toBeNull();
+    const body = fnMatch![1];
+    const derive = (name: string, pagesBase?: string): string =>
+      new Function('pkg', 'process', `return (function () {${body}})();`)(
+        { name },
+        { env: pagesBase === undefined ? {} : { PAGES_BASE: pagesBase } },
+      ) as string;
+
+    expect(derive('tce-main-street')).toBe('/tce-main-street/');
+    expect(derive('@scope/game')).toBe('/game/');
+    expect(derive('tce-main-street', '/custom-base/')).toBe('/custom-base/');
+    expect(derive('tce-main-street', 'custom-base')).toBe('/custom-base/');
+    expect(derive('tce-main-street', '/')).toBe('/');
   });
 });
 
@@ -365,6 +459,28 @@ describe('scaffoldGameRepo', () => {
     expect(testSrc).toContain("'@core-scripts/validate-transcript'");
     expect(testSrc).not.toContain("'../../scripts/validate-transcript'");
     expect(testSrc).toContain("'../../src/scripts/game-script'");
+  });
+
+  it('composes the core root app-icon files into public/ and reports them', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    writeCoreIconLayout(core);
+
+    const result = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    expect(
+      result.publicLinks
+        .map((p) => path.relative(path.join(gameRepo, 'public'), p))
+        .sort(),
+    ).toEqual([...ROOT_ICONS].sort());
+    for (const icon of ROOT_ICONS) {
+      expect(fs.realpathSync(path.join(gameRepo, 'public', icon))).toBe(
+        fs.realpathSync(path.join(core, 'public', icon)),
+      );
+    }
+
+    // A re-scaffold is a no-op for the already-composed icon links.
+    const second = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+    expect(second.publicLinks).toEqual([]);
   });
 
   it('produces a preset the discovery plugin resolves to exactly one game', () => {

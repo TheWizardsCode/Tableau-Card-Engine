@@ -30,6 +30,7 @@ import type {
 } from '../core-engine';
 import { HelpPanel } from './HelpPanel';
 import { HelpButton } from './HelpButton';
+import { resolveActiveGameAssetUrl } from './game-asset-url';
 import { SettingsPanel } from './SettingsPanel';
 import type { SkillRatingConfig } from './SettingsPanel';
 import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
@@ -37,6 +38,7 @@ import { createSessionExportTool } from './debug/SessionExportTool';
 import { createStateInspectorTool } from './debug/StateInspectorOverlay';
 import { createGameEventLogTool } from './debug/GameEventLogOverlay';
 import { createAiDecisionViewerTool } from './debug/AiDecisionOverlay';
+import { resolveEffectiveDebugTools } from './debug/ToneForgeStatusTool';
 import { GlobalEventBuffer } from './debug/GlobalEventBuffer';
 import { SettingsButton } from './SettingsButton';
 import type { HelpSection } from './HelpPanel';
@@ -47,29 +49,45 @@ import { reloadCardTexturesForDesign } from './CardTextureHelpers';
 // ── Audio path utility ───────────────────────────────────────
 
 /**
- * Build an array of audio asset URLs with fallback to `assets/audio/default/`.
+ * Build the audio asset URL(s) for a game, with the shared default alongside.
  *
- * Phaser's loader accepts an array of URLs for `this.load.audio()` and tries
- * each in order until one succeeds. This enables the convention where each
- * game stores its audio in `assets/audio/<gameDir>/` and shared/common sounds
- * are placed in `assets/audio/default/`.
+ * Each game stores its audio in `assets/audio/<gameDir>/` and shared/common
+ * sounds live in `assets/audio/default/`.
+ *
+ * **Phaser caveat:** Phaser treats an array passed to `this.load.audio()` as
+ * *format alternatives* — it selects the first entry whose extension the
+ * browser can decode and loads only that one. It is therefore not an HTTP
+ * fallback. The two entries returned here are:
+ *
+ *   1. the game-specific URL (or, for a runtime game, its `tce-games://`
+ *      artifact URL), and
+ *   2. the shared default URL.
+ *
+ * Phaser loads (1). A genuinely missing (1) resolves to the shared default
+ * *inside the `tce-games://` handler* for runtime games; for the static
+ * catalogue the game-specific file is composed into the launcher, so it is
+ * present. A key that is absent everywhere is skipped by `SoundManager` rather
+ * than throwing (CG-0MUVJWSZO004KZTA).
  *
  * @param gameDir  Subdirectory under `assets/audio/` for the current game.
  * @param filename Audio filename (e.g. `'card-draw.wav'`).
- * @returns Array of URLs: [game-specific, default]
+ * @returns Array of URLs: [game-specific (runtime-aware), default]
  *
  * @example
  * ```ts
  * this.load.audio('sfx-card-draw', audioPathWithFallback('golf', 'card-draw.wav'));
- * // Tries assets/audio/golf/card-draw.wav first,
- * // then assets/audio/default/card-draw.wav
+ * // Static build:    assets/audio/golf/card-draw.wav
+ * // Runtime artifact: tce-games://golf/assets/audio/golf/card-draw.wav
  * ```
  */
 export function audioPathWithFallback(gameDir: string, filename: string): string[] {
-  return [
-    `assets/audio/${gameDir}/${filename}`,
-    `assets/audio/default/${filename}`,
-  ];
+  const gameSpecific = `assets/audio/${gameDir}/${filename}`;
+  const sharedDefault = `assets/audio/default/${filename}`;
+
+  // A runtime game's audio lives inside its artifact and is served through the
+  // scoped `tce-games://` scheme; a static game keeps launcher-relative paths.
+  const runtimeUrl = resolveActiveGameAssetUrl(gameSpecific);
+  return [runtimeUrl ?? gameSpecific, sharedDefault];
 }
 
 /**
@@ -222,6 +240,11 @@ export abstract class CardGameScene extends Phaser.Scene {
       stop: (key: string) => { phaserSound.stopByKey(key); },
       setVolume: (v: number) => { phaserSound.volume = v; },
       setMute: (m: boolean) => { phaserSound.mute = m; },
+      // Phaser's WebAudioSound constructor throws for a key that is not in the
+      // audio cache. Reporting availability lets SoundManager skip an optional
+      // SFX that failed to load (e.g. absent from a runtime artifact) instead
+      // of aborting the game loop (CG-0MUVJWSZO004KZTA).
+      exists: (key: string) => phaserSound.game.cache.audio.exists(key),
     };
     this.soundManager = new SoundManager(player, {
       synthPlayer: options?.synthPlayer ?? null,
@@ -292,19 +315,28 @@ export abstract class CardGameScene extends Phaser.Scene {
     // In production builds, `import.meta.env.DEV` is `false`, so the
     // creator functions are never called and Vite/Rollup tree-shakes
     // the entire debug tool modules from the production bundle.
-    const effectiveDebugTools = debugTools ?? (import.meta.env.DEV ? [
+    const gameTools = debugTools ?? (import.meta.env.DEV ? [
       createSessionExportTool(),
       createStateInspectorTool(),
       createGameEventLogTool(),
       createAiDecisionViewerTool(),
     ] : []);
+    // Resolve the **effective** list, injecting the ToneForge status entry so
+    // it is present even for games that supply their own `debugTools` (which
+    // replace the engine defaults above). `resolveEffectiveDebugTools` is a
+    // no-op in production, so the status tool tree-shakes from the bundle.
+    const resolvedDebugTools = resolveEffectiveDebugTools(
+      gameTools,
+      this.soundManager ?? null,
+      import.meta.env.DEV,
+    );
     this.settingsPanel = new SettingsPanel(this, {
       soundManager: this.soundManager,
       difficultyNames,
       defaultDifficulty,
       hasTooltips: hasTooltips ?? true,
       skillRating,
-      debugTools: effectiveDebugTools,
+      debugTools: resolvedDebugTools,
       canToggle: settingsToggleVeto,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;

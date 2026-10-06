@@ -211,17 +211,31 @@ export class GymSvgHelpersScene extends GymSceneBase {
   // ── Actions ────────────────────────────────────────────────
 
   /**
+   * Whether this scene is still running. False once the scene has shut down
+   * or been destroyed. Async continuations (asset fetches, rasterisation)
+   * must check this after every `await`: a pending promise can settle after
+   * the scene was torn down (e.g. between browser-test cases), and touching
+   * `scene.add` / game objects then throws an unhandled rejection.
+   */
+  private isSceneActive(): boolean {
+    return Boolean(this.sys && this.sys.isActive && this.sys.isActive());
+  }
+
+  /**
    * Fetch the raw SVG text from the demo asset URL and display it.
    */
   private async fetchSvg(): Promise<void> {
     try {
-      this.svgText = await fetchSvgText(DEMO_SVG_URL);
+      const text = await fetchSvgText(DEMO_SVG_URL);
+      if (!this.isSceneActive()) return;
+      this.svgText = text;
       const displayText = this.svgText.length > MAX_SVG_DISPLAY_LENGTH
         ? this.svgText.substring(0, MAX_SVG_DISPLAY_LENGTH) + '\n... (truncated)'
         : this.svgText;
       this.svgTextDisplay.setText(displayText);
       this.logEvent(`SVG fetched (${this.svgText.length} chars) from ${DEMO_SVG_URL}`);
     } catch (e) {
+      if (!this.isSceneActive()) return;
       this.logEvent(`Fetch error: ${(e as Error).message}`);
       this.svgTextDisplay.setText(`Failed to fetch SVG: ${(e as Error).message}`);
     }
@@ -244,10 +258,12 @@ export class GymSvgHelpersScene extends GymSceneBase {
 
     try {
       await rasteriseSvgToTexture(this, key, this.svgText, width, height);
+      if (!this.isSceneActive()) return;
 
       // Update the texture display
       this.showTexture(key, width, height, dpr);
     } catch (e) {
+      if (!this.isSceneActive()) return;
       this.logEvent(`Rasterise error: ${(e as Error).message}`);
     }
   }
@@ -276,6 +292,7 @@ export class GymSvgHelpersScene extends GymSceneBase {
     // Wait for the first call to complete
     if (result1.promise) {
       await result1.promise;
+      if (!this.isSceneActive()) return;
       this.logEvent('Call 1 texture generated.');
     }
 
@@ -374,6 +391,9 @@ export class GymSvgHelpersScene extends GymSceneBase {
     if (this.eventLog.length > MAX_LOG_EVENTS) {
       this.eventLog.shift();
     }
+    // Defensive: never render into a scene that has been shut down /
+    // destroyed (a late async continuation may still call logEvent).
+    if (!this.isSceneActive()) return;
     this.eventLogResult.render(this.eventLog);
     // Read statusText to suppress unused-variable warning
     void this.statusText;

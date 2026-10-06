@@ -24,6 +24,8 @@
       "scripts/adapters",
       "scripts/configs",
       "scripts/build-electron-main.mjs",
+      "scripts/build-game-artifact.mjs",
+      "scripts/build-game-artifact.d.mts",
       "scripts/check-browser-test-env.ts",
       "scripts/codemod-src-imports.ts",
       "scripts/game-repo-scaffold.ts",
@@ -33,6 +35,7 @@
       "scripts/export-transcripts.ts",
       "scripts/extract-repos.sh",
       "scripts/generate-all-thumbnails.ts",
+      "scripts/generate-app-icons.ts",
       "scripts/generate-sfx.mjs",
       "scripts/generate-thumbnail.ts",
       "scripts/refresh-context-thresholds.sh",
@@ -383,6 +386,14 @@
     "audio/score-reveal.wav",
     "audio/turn-change.wav",
     "audio/ui-click.wav"
+  ],
+  "sharedPublicRoot": [
+    "favicon.svg",
+    "apple-touch-icon.png",
+    "icon-32.png",
+    "icon-192.png",
+    "icon-512.png",
+    "site.webmanifest"
   ],
   "gameAssets": [
     {

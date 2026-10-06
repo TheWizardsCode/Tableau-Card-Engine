@@ -13,6 +13,7 @@ pnpm-debug.log*
 dist/
 dist-electron/
 build/
+build/game-artifacts/
 release/
 *.js.map
 *.tsbuildinfo

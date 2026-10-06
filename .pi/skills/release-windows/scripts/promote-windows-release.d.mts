@@ -37,3 +37,25 @@ export function buildGhReleaseCreateArgs(
 
 /** Extract the release URL from `gh release create` stdout; null when absent. */
 export function extractReleaseUrlFromCreateOutput(output: string): string | null;
+
+/** Parsed CLI options for the promote script. */
+export interface CliOptions {
+  /** `--help`/`-h` was passed. */
+  help: boolean;
+  /** `--dry-run` was passed. */
+  dryRun: boolean;
+  /** Value of `--run-id`, or `null` when absent/invalid (auto-resolve). */
+  runId: string | null;
+}
+
+/** Parse the full `process.argv` into CLI options (pure). */
+export function parseCliArgs(argv: string[]): CliOptions;
+
+/**
+ * True when a run's artifact-name list contains the expected installer
+ * artifact (defaults to the `tce-windows-installer` artifact).
+ */
+export function hasRequiredArtifact(
+  artifactNames: string[],
+  artifactName?: string,
+): boolean;

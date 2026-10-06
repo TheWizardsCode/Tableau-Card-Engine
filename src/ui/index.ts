@@ -371,8 +371,14 @@ export type {
 
 // Debug tools registry
 // @module @ui/debug/DebugToolsRegistry
-export { isDevMode } from './debug/DebugToolsRegistry';
+export { isDevMode, resolveDebugToolDescription } from './debug/DebugToolsRegistry';
 export type { DebugToolsEntry } from './debug/DebugToolsRegistry';
+export {
+  createToneForgeStatusTool,
+  withToneForgeStatusTool,
+  TONEFORGE_DEBUG_TOOL_LABEL,
+  TONEFORGE_UNAVAILABLE_DESCRIPTION,
+} from './debug/ToneForgeStatusTool';
 
 // Slider – reusable horizontal slider widget
 export { Slider } from './Slider';

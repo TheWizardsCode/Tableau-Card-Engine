@@ -15,7 +15,7 @@ import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybin
 import { createVersionLabel } from './versionDisplay';
 import { createAlphaBadge } from './AlphaBadge';
 import type { AlphaBadgeResult } from './AlphaBadge';
-import { isDevMode, type DebugToolsEntry } from './debug/DebugToolsRegistry';
+import { isDevMode, resolveDebugToolDescription, type DebugToolsEntry } from './debug/DebugToolsRegistry';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -141,6 +141,13 @@ const SLIDER_HANDLE_COLOR = 0xffffff;
 
 const DIFFICULTY_STORAGE_KEY = 'tce-selected-difficulty';
 
+/**
+ * Refresh interval (ms) for live (function-valued) debug-tool descriptions
+ * while the panel is open. Purely a dev-mode diagnostic; short enough to feel
+ * immediate, long enough to be negligible.
+ */
+const DEBUG_DESCRIPTION_POLL_MS = 500;
+
 // Depth layers (high values so panel renders above game content)
 const DEPTH_INPUT_BLOCKER = 900;
 const DEPTH_PANEL_BG = 901;
@@ -237,6 +244,13 @@ export class SettingsPanel {
   private _scrollContent: Phaser.GameObjects.Container;
   private _scrollY = 0;
   private _maxContentY = 0;
+
+  // Live debug-tool descriptions (function-valued descriptions only)
+  private _liveDebugDescriptions: Array<{
+    tool: DebugToolsEntry;
+    text: Phaser.GameObjects.Text;
+  }> = [];
+  private _debugRefreshTimer: Phaser.Time.TimerEvent | null = null;
 
   // State
   private _isOpen = false;
@@ -845,8 +859,9 @@ export class SettingsPanel {
         label.on('pointerout', () => label.setColor('#88ccff'));
         this._scrollContent.add(label);
 
-        // Description (smaller, below label)
-        const desc = scene.add.text(PADDING, toolY + 22, tool.description, {
+        // Description (smaller, below label). Function descriptions are
+        // resolved at render time so the text reflects live state.
+        const desc = scene.add.text(PADDING, toolY + 22, resolveDebugToolDescription(tool), {
           fontSize: '12px',
           color: '#aaaaaa',
           fontFamily: 'Arial, sans-serif',
@@ -855,6 +870,12 @@ export class SettingsPanel {
         desc.setOrigin(0, 0.5);
         desc.setDepth(DEPTH_PANEL_CONTENT);
         this._scrollContent.add(desc);
+
+        // Function descriptions track live state and are refreshed while the
+        // panel is open (see refreshLiveDebugDescriptions / startDebugRefreshPoll).
+        if (typeof tool.description === 'function') {
+          this._liveDebugDescriptions.push({ tool, text: desc });
+        }
 
         toolY += 52; // spacing for next tool
       }
@@ -1020,6 +1041,10 @@ export class SettingsPanel {
     this._scrollContent.y = 0;
     this.container.setVisible(true);
 
+    // Refresh live debug descriptions immediately, then poll while open.
+    this.refreshLiveDebugDescriptions();
+    this.startDebugRefreshPoll();
+
     // Show version label on the canvas
     this._versionLabel.setVisible(true);
     this.syncControlsToSoundManager();
@@ -1060,6 +1085,9 @@ export class SettingsPanel {
 
     this._isOpen = false;
 
+    // Stop the live debug refresh poll while the panel is closed.
+    this.stopDebugRefreshPoll();
+
     // Hide version label
     this._versionLabel.setVisible(false);
 
@@ -1098,6 +1126,9 @@ export class SettingsPanel {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+
+    // Stop the live debug refresh poll.
+    this.stopDebugRefreshPoll();
 
     // Remove keyboard listener
     if (this.keyboardListener) {
@@ -1141,6 +1172,49 @@ export class SettingsPanel {
 
     // Destroy the main container (destroys all children)
     this.container.destroy();
+  }
+
+  // ── Private: Live debug descriptions ────────────────────
+
+  /**
+   * Re-resolve every function-valued debug description and update its text.
+   * No-op when no tools expose a live description.
+   */
+  private refreshLiveDebugDescriptions(): void {
+    if (this._liveDebugDescriptions.length === 0) return;
+    for (const { tool, text } of this._liveDebugDescriptions) {
+      if (!text.active) continue;
+      try {
+        text.setText(resolveDebugToolDescription(tool));
+      } catch {
+        // A live status getter must never break the panel render loop.
+      }
+    }
+  }
+
+  /**
+   * Start the low-frequency refresh poll for live debug descriptions.
+   * Only runs in dev mode with at least one function description present, and
+   * is a no-op when the poll is already running.
+   */
+  private startDebugRefreshPoll(): void {
+    if (this._debugRefreshTimer) return;
+    if (!isDevMode() || this._liveDebugDescriptions.length === 0) return;
+    this._debugRefreshTimer = this.scene.time.addEvent({
+      delay: DEBUG_DESCRIPTION_POLL_MS,
+      loop: true,
+      callback: () => {
+        if (this.destroyed || !this._isOpen) return;
+        this.refreshLiveDebugDescriptions();
+      },
+    });
+  }
+
+  /** Stop the live debug refresh poll if one is running. */
+  private stopDebugRefreshPoll(): void {
+    if (!this._debugRefreshTimer) return;
+    this._debugRefreshTimer.remove();
+    this._debugRefreshTimer = null;
   }
 
   // ── Private: Mute toggle ─────────────────────────────────

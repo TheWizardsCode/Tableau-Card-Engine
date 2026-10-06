@@ -388,7 +388,42 @@ default branch. Only `dev` + `main` are published (no tags or feature
 branches), the run is idempotent and safe to repeat, and no target is ever
 force-pushed. The helper does not modify the source monorepo.
 
-## 6. Follow-on work
+## 6. Runtime game plugins (drop-in games)
+
+Alongside the build-time `configs/<preset>.json` composition above, the
+**Electron launcher** can discover games at runtime from a content directory —
+no launcher rebuild. A distribution operator builds a game artifact
+(`npm run build:game-artifact -- --game <id>`), drops it into
+`<contentDir>/games/<id>/`, and adds an entry to `<contentDir>/games/manifest.json`.
+At startup the renderer's plugin loader (`src/ui/GamePluginLoader.ts`) reads the
+manifest, dynamically imports each compatible `entry.js`, and merges the games
+into the Game Selector next to the static catalogue. Each entry declares a
+`coreEngineVersion` semver range; incompatible games are hidden and noted.
+
+| | Build-time preset | Runtime plugin |
+|---|---|---|
+| **How a game is added** | Edit `configs/<preset>.json`, check out the sibling repo, rebuild | Drop `games/<id>/` + a manifest entry into the content dir |
+| **When it is decided** | Build time | Launcher startup |
+| **Add/update without rebuilding** | No | Yes |
+| **Dependency model** | Bundled with the launcher | Externalised (`phaser` + engine aliases) and supplied by the launcher at runtime |
+| **Version safety** | Same commit as the engine | `coreEngineVersion` range checked at load; incompatible games hidden |
+| **Scope** | Every build (browser + Electron) | Electron launcher only (web runtime is out of scope) |
+| **Trade-off** | Simplest, smallest, most predictable | Flexible post-ship; requires the launcher to resolve the artifact's shared dependencies |
+
+Both paths are additive: runtime plugins **augment** the static catalogue, never
+replace it. If the manifest is missing/malformed or a game fails to load, the
+launcher boots with the static games only. The full schema, artifact layout,
+`tce-games://` asset protocol, and build/install workflow are documented in
+[`../DEVELOPER.md` → Runtime Game Plugins](../DEVELOPER.md#runtime-game-plugins);
+the packaged verification runbook is
+[`runtime-game-plugins-runbook.md`](./runtime-game-plugins-runbook.md).
+
+> **Current limitation.** Externalising `phaser` + the engine aliases leaves
+> bare ESM specifiers in the artifact, which a plain browser/Electron renderer
+> cannot resolve yet — so a drop-in game is discovered and listed but not yet
+> playable in the packaged launcher. Tracked by **CG-0MUV9Y71Z002W8N2**.
+
+## 7. Follow-on work
 
 The core split and the initial publication are complete. Remaining work:
 

@@ -134,3 +134,55 @@ export function resolveGameAssetUrl(gameId: string, relativePath: string): strin
   const normalisedPath = normaliseRelativePath(relativePath);
   return `${GAME_ASSET_URL_SCHEME}://${normalisedId}/${normalisedPath}`;
 }
+
+// ── Active runtime game (renderer-side asset base) ───────────
+
+/**
+ * The runtime game whose scene is currently active, or `null` while the static
+ * catalogue is showing.
+ *
+ * A runtime game's own assets (audio, icons) live inside its artifact under
+ * `<contentDir>/games/<id>/`, which the renderer can only reach through the
+ * scoped `tce-games://` scheme. Asset helpers such as
+ * `audioPathWithFallback` consult this state so a runtime game's relative
+ * paths resolve to its artifact instead of the launcher's `public/` root
+ * (CG-0MUVJWSZO004KZTA).
+ *
+ * The Game Selector sets it immediately before starting a runtime scene and
+ * clears it when the selector is (re)entered, so switching back to a static
+ * game restores launcher-relative paths.
+ */
+let activeRuntimeGameId: string | null = null;
+
+/**
+ * Set (or clear) the active runtime game.
+ *
+ * An invalid id clears the state rather than storing an unusable URL host: the
+ * asset helpers must never emit a malformed `tce-games://` URL.
+ */
+export function setActiveRuntimeGame(gameId: string | null): void {
+  if (typeof gameId !== 'string' || gameId.trim() === '') {
+    activeRuntimeGameId = null;
+    return;
+  }
+  const normalised = gameId.toLowerCase();
+  activeRuntimeGameId = GAME_ID_PATTERN.test(normalised) ? normalised : null;
+}
+
+/** The active runtime game id, or `null` when the static catalogue is showing. */
+export function getActiveRuntimeGame(): string | null {
+  return activeRuntimeGameId;
+}
+
+/**
+ * Resolve a game-artifact-relative asset path for the active runtime game.
+ *
+ * Returns `null` when no runtime game is active (the caller should then keep
+ * its launcher-relative path). The active id is validated by
+ * {@link setActiveRuntimeGame}, so this only throws {@link GameAssetUrlError}
+ * when *relativePath* is itself unsafe.
+ */
+export function resolveActiveGameAssetUrl(relativePath: string): string | null {
+  if (!activeRuntimeGameId) return null;
+  return resolveGameAssetUrl(activeRuntimeGameId, relativePath);
+}

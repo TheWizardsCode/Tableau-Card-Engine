@@ -8,7 +8,7 @@
  * minimal `window` on `globalThis` for the tests that need URL parsing.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Polyfill window for Node environment ───────────────────
 
@@ -217,7 +217,8 @@ vi.mock('../../src/ui/Renderer', () => ({
 }));
 
 // Import after mocks are set up
-import { CardGameScene } from '../../src/ui/CardGameScene';
+import { CardGameScene, audioPathWithFallback } from '../../src/ui/CardGameScene';
+import { setActiveRuntimeGame } from '../../src/ui/game-asset-url';
 
 // ── Concrete test subclass ─────────────────────────────────
 
@@ -252,6 +253,11 @@ class TestScene extends CardGameScene {
     this.initHelpPanel(sections);
   }
   public callInitSettingsPanel() { this.initSettingsPanel(); }
+  public callInitSettingsPanelWithTools(
+    tools: Array<{ label: string; description: string | (() => string); activate: (s: unknown) => void }>,
+  ) {
+    this.initSettingsPanel(undefined, undefined, undefined, undefined, tools as never);
+  }
   public callEmitStateSettled(turnNumber: number, phase: 'setup' | 'playing' | 'ended') {
     this.emitStateSettled(turnNumber, phase);
   }
@@ -323,6 +329,53 @@ describe('CardGameScene', () => {
       // Button is created inside the panel (showButton:true by default)
       expect(scene._settingsPanel.settingsButton).toBeDefined();
       expect(MockSettingsButton).toHaveBeenCalledOnce();
+    });
+
+    it('injects the ToneForge entry into the engine default tool list', () => {
+      scene.callInitHUDContainer();
+      scene.callInitEventSystem();
+      scene.callInitSoundSystem(['sfx-test'], {});
+      scene.callInitSettingsPanel();
+
+      const calls = MockSettingsPanel.mock.calls;
+      const config = calls[calls.length - 1]?.[1] as {
+        debugTools?: Array<{ label: string }>;
+      };
+      expect(config.debugTools?.map((t) => t.label)).toContain('ToneForge');
+    });
+
+    it('injects the ToneForge entry even when a game supplies its own debug tools', () => {
+      scene.callInitHUDContainer();
+      scene.callInitEventSystem();
+      scene.callInitSoundSystem(['sfx-test'], {});
+      scene.callInitSettingsPanelWithTools([
+        { label: 'Market Card Cheat', description: 'cheat', activate: () => {} },
+      ]);
+
+      const calls = MockSettingsPanel.mock.calls;
+      const config = calls[calls.length - 1]?.[1] as {
+        debugTools?: Array<{ label: string }>;
+      };
+      const labels = config.debugTools?.map((t) => t.label) ?? [];
+      expect(labels).toContain('ToneForge');
+      expect(labels).toContain('Market Card Cheat');
+    });
+
+    it('de-duplicates when the game already registers a ToneForge entry', () => {
+      scene.callInitHUDContainer();
+      scene.callInitEventSystem();
+      scene.callInitSoundSystem(['sfx-test'], {});
+      scene.callInitSettingsPanelWithTools([
+        { label: 'ToneForge', description: 'game-owned', activate: () => {} },
+      ]);
+
+      const calls = MockSettingsPanel.mock.calls;
+      const config = calls[calls.length - 1]?.[1] as {
+        debugTools?: Array<{ label: string; description: string | (() => string) }>;
+      };
+      const toneForgeEntries = (config.debugTools ?? []).filter((t) => t.label === 'ToneForge');
+      expect(toneForgeEntries).toHaveLength(1);
+      expect(toneForgeEntries[0].description).toBe('game-owned');
     });
   });
   describe('detectReplayMode()', () => {
@@ -409,6 +462,56 @@ describe('CardGameScene', () => {
         synthPlayer,
         synthKeyMap: { 'sfx-place': 'card-place' },
       });
+    });
+
+    it('exposes exists() backed by the Phaser audio cache', () => {
+      const exists = vi.fn((key: string) => key === 'sfx-present');
+      (scene as unknown as { sound: unknown }).sound = {
+        play: vi.fn(),
+        stopByKey: vi.fn(),
+        volume: 1,
+        mute: false,
+        game: { cache: { audio: { exists } } },
+      };
+
+      scene.callInitSoundSystem(['sfx-present'], {});
+
+      const player = MockSoundManager.mock.calls[0][0] as {
+        exists?: (key: string) => boolean;
+      };
+      expect(player.exists).toBeTypeOf('function');
+      expect(player.exists!('sfx-present')).toBe(true);
+      expect(player.exists!('sfx-missing')).toBe(false);
+      expect(exists).toHaveBeenCalledWith('sfx-missing');
+    });
+  });
+
+  describe('audioPathWithFallback()', () => {
+    afterEach(() => setActiveRuntimeGame(null));
+
+    it('returns the game-specific path then the shared default (static)', () => {
+      expect(audioPathWithFallback('golf', 'card-draw.wav')).toEqual([
+        'assets/audio/golf/card-draw.wav',
+        'assets/audio/default/card-draw.wav',
+      ]);
+    });
+
+    it('resolves the game-specific path to the active runtime artifact', () => {
+      setActiveRuntimeGame('golf');
+
+      expect(audioPathWithFallback('golf', 'turn-change.wav')).toEqual([
+        'tce-games://golf/assets/audio/golf/turn-change.wav',
+        'assets/audio/default/turn-change.wav',
+      ]);
+    });
+
+    it('restores launcher-relative paths once the runtime game is cleared', () => {
+      setActiveRuntimeGame('golf');
+      setActiveRuntimeGame(null);
+
+      expect(audioPathWithFallback('golf', 'turn-change.wav')[0]).toBe(
+        'assets/audio/golf/turn-change.wav',
+      );
     });
   });
 

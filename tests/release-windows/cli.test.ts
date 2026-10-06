@@ -18,6 +18,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildGhReleaseCreateArgs,
   extractReleaseUrlFromCreateOutput,
+  hasRequiredArtifact,
+  parseCliArgs,
 } from '../../.pi/skills/release-windows/scripts/promote-windows-release.mjs';
 
 describe('buildGhReleaseCreateArgs', () => {
@@ -66,5 +68,65 @@ describe('extractReleaseUrlFromCreateOutput', () => {
   it('returns null when the output contains no https URL', () => {
     expect(extractReleaseUrlFromCreateOutput('something went wrong\n')).toBeNull();
     expect(extractReleaseUrlFromCreateOutput('')).toBeNull();
+  });
+});
+
+describe('parseCliArgs', () => {
+  it('defaults to auto-resolving the run when no flags are passed', () => {
+    expect(parseCliArgs(['node', 'promote-windows-release.mjs'])).toEqual({
+      help: false,
+      dryRun: false,
+      runId: null,
+    });
+  });
+
+  it('pins the run id when --run-id is provided', () => {
+    expect(
+      parseCliArgs(['node', 'script.mjs', '--run-id', '31609434642']).runId,
+    ).toBe('31609434642');
+  });
+
+  it('treats a missing or flag-like --run-id value as not provided', () => {
+    expect(parseCliArgs(['node', 'script.mjs', '--run-id']).runId).toBeNull();
+    expect(
+      parseCliArgs(['node', 'script.mjs', '--run-id', '--dry-run']).runId,
+    ).toBeNull();
+  });
+
+  it('parses --dry-run and --help independently of --run-id', () => {
+    expect(parseCliArgs(['node', 'script.mjs', '--dry-run']).dryRun).toBe(true);
+    expect(parseCliArgs(['node', 'script.mjs', '--help']).help).toBe(true);
+    expect(parseCliArgs(['node', 'script.mjs', '-h']).help).toBe(true);
+    expect(
+      parseCliArgs(['node', 'script.mjs', '--dry-run', '--help']).dryRun,
+    ).toBe(true);
+  });
+
+  it('returns defaults for non-array input', () => {
+    expect(
+      parseCliArgs(null as unknown as string[]),
+    ).toEqual({ help: false, dryRun: false, runId: null });
+  });
+});
+
+describe('hasRequiredArtifact', () => {
+  it('is true when the installer artifact is attached to the run', () => {
+    expect(
+      hasRequiredArtifact(['tce-windows-installer', 'other-artifact']),
+    ).toBe(true);
+  });
+
+  it('is false when the installer artifact is absent or the list is empty', () => {
+    expect(hasRequiredArtifact(['other-artifact'])).toBe(false);
+    expect(hasRequiredArtifact([])).toBe(false);
+  });
+
+  it('is false for non-array input (defensive)', () => {
+    expect(hasRequiredArtifact(null as unknown as string[])).toBe(false);
+  });
+
+  it('honours a custom artifact name', () => {
+    expect(hasRequiredArtifact(['custom'], 'custom')).toBe(true);
+    expect(hasRequiredArtifact(['tce-windows-installer'], 'custom')).toBe(false);
   });
 });

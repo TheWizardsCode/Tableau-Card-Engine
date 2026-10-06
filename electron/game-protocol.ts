@@ -42,6 +42,11 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
   '.js': 'text/javascript',
   '.css': 'text/css',
   '.txt': 'text/plain',
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
 };
 
 /**
@@ -50,8 +55,8 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
  */
 const GAME_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 
-/** The scheme served by {@link handleGameAssetRequest}. */
-const GAME_ASSET_URL_SCHEME = 'tce-games';
+/** Scheme served by {@link handleGameAssetRequest}. */
+export const GAME_ASSET_SCHEME = 'tce-games';
 
 /** Select a MIME type from a file path's extension (case-insensitive). */
 export function mimeTypeForPath(filePath: string): string {
@@ -113,21 +118,25 @@ function normaliseUrlPath(decodedPath: string): string[] | null {
   return segments.length > 0 ? segments : null;
 }
 
+/** A validated `tce-games://` request: game id + traversal-free segments. */
+interface ParsedGameAssetRequest {
+  readonly gameId: string;
+  readonly segments: readonly string[];
+}
+
 /**
- * Validate a `tce-games://` request URL and resolve it to an absolute file path
- * inside `<contentDir>/games/<id>/`.
+ * Validate and split a `tce-games://<id>/<path>` URL.
  *
  * Returns `null` (deny) for a non-`tce-games` scheme, an invalid game id,
- * malformed percent-encoding, an absolute path, or any path that escapes the
- * game's artifact directory — so callers can answer with a 404 without leaking
- * whether a file exists. Raw `..` segments are normalised away by the WHATWG
- * URL parser; encoded forms (`%2e%2e%2f`, `..%2f`, `%2e%2e%5c`) survive
+ * malformed percent-encoding, or an absolute/traversal path. Shared by
+ * {@link resolveAssetFilePath} and {@link resolveSharedAudioFallback} so both
+ * apply the same validation. Raw `..` segments are normalised away by the
+ * WHATWG URL parser; encoded forms (`%2e%2e%2f`, `..%2f`, `%2e%2e%5c`) survive
  * parsing and are rejected here.
  */
-export function resolveAssetFilePath(
-  contentDir: string,
+function parseGameAssetRequest(
   requestUrl: string | URL,
-): GameAssetPathResolution | null {
+): ParsedGameAssetRequest | null {
   let url: URL;
   try {
     url = typeof requestUrl === 'string' ? new URL(requestUrl) : requestUrl;
@@ -135,7 +144,7 @@ export function resolveAssetFilePath(
     return null;
   }
 
-  if (url.protocol !== `${GAME_ASSET_URL_SCHEME}:`) return null;
+  if (url.protocol !== `${GAME_ASSET_SCHEME}:`) return null;
 
   const gameId = url.hostname.toLowerCase();
   if (!GAME_ID_PATTERN.test(gameId)) return null;
@@ -150,13 +159,68 @@ export function resolveAssetFilePath(
   const segments = normaliseUrlPath(decodedPath);
   if (!segments) return null;
 
-  const gameRoot = path.resolve(contentDir, GAMES_DIRNAME, gameId);
-  const filePath = path.resolve(gameRoot, ...segments);
+  return { gameId, segments };
+}
+
+/**
+ * Validate a `tce-games://` request URL and resolve it to an absolute file path
+ * inside `<contentDir>/games/<id>/`.
+ *
+ * Returns `null` (deny) for a non-`tce-games` scheme, an invalid game id,
+ * malformed percent-encoding, an absolute path, or any path that escapes the
+ * game's artifact directory — so callers can answer with a 404 without leaking
+ * whether a file exists.
+ */
+export function resolveAssetFilePath(
+  contentDir: string,
+  requestUrl: string | URL,
+): GameAssetPathResolution | null {
+  const parsed = parseGameAssetRequest(requestUrl);
+  if (!parsed) return null;
+
+  const gameRoot = path.resolve(contentDir, GAMES_DIRNAME, parsed.gameId);
+  const filePath = path.resolve(gameRoot, ...parsed.segments);
 
   // Defence in depth: the segments are already traversal-free, but never trust
   // a resolved path that lands outside the game's own directory.
   const prefix = gameRoot + path.sep;
   if (filePath !== gameRoot && !filePath.startsWith(prefix)) return null;
+
+  return { filePath, mimeType: mimeTypeForPath(filePath) };
+}
+
+/**
+ * Shared-default fallback for a missing per-game audio asset.
+ *
+ * A runtime game artifact ships its own assets, but a game may legitimately
+ * omit an optional SFX that the launcher ships in its shared
+ * `assets/audio/default/` set. When a request for
+ * `games/<id>/assets/audio/<dir>/<rest…>` names a file absent from the
+ * artifact, the launcher serves `<contentDir>/assets/audio/default/<rest…>`
+ * instead — a genuine runtime fallback (CG-0MUVJWSZO004KZTA).
+ *
+ * Returns `null` for any path that is not game audio, or that would escape the
+ * shared default root, so the caller answers 404.
+ */
+export function resolveSharedAudioFallback(
+  contentDir: string,
+  gameRelativeSegments: readonly string[],
+): GameAssetPathResolution | null {
+  // Expected shape: assets/audio/<gameDir>/<rest…> — at least one rest segment.
+  if (
+    gameRelativeSegments.length < 4 ||
+    gameRelativeSegments[0] !== 'assets' ||
+    gameRelativeSegments[1] !== 'audio'
+  ) {
+    return null;
+  }
+
+  const rest = gameRelativeSegments.slice(3);
+  const defaultRoot = path.resolve(contentDir, 'assets', 'audio', 'default');
+  const filePath = path.resolve(defaultRoot, ...rest);
+
+  const prefix = defaultRoot + path.sep;
+  if (!filePath.startsWith(prefix)) return null;
 
   return { filePath, mimeType: mimeTypeForPath(filePath) };
 }
@@ -172,6 +236,11 @@ export async function handleGameAssetRequest(
   requestUrl: string | URL,
   options: GameAssetRequestOptions,
 ): Promise<GameAssetRequestResult> {
+  const parsed = parseGameAssetRequest(requestUrl);
+  if (!parsed) {
+    return { status: 404, headers: {}, body: null };
+  }
+
   const resolved = resolveAssetFilePath(options.contentDir, requestUrl);
   if (!resolved) {
     return { status: 404, headers: {}, body: null };
@@ -187,6 +256,57 @@ export async function handleGameAssetRequest(
       body,
     };
   } catch {
+    // The game-specific file is absent. For audio paths, fall back to the
+    // launcher's shared default before denying (CG-0MUVJWSZO004KZTA).
+    const fallback = resolveSharedAudioFallback(options.contentDir, parsed.segments);
+    if (fallback) {
+      try {
+        const body = await readFile(fallback.filePath);
+        return {
+          status: 200,
+          headers: { 'content-type': fallback.mimeType },
+          body,
+        };
+      } catch {
+        // No shared default either — fall through to the 404.
+      }
+    }
     return { status: 404, headers: {}, body: null };
   }
+}
+
+/**
+ * Minimal Electron `protocol` surface {@link registerGameAssetHandler} needs.
+ * Kept structural so the Electron-free unit test can pass a fake.
+ */
+export interface ProtocolRegistrar {
+  handle(
+    scheme: string,
+    handler: (request: { url: string }) => Promise<Response>,
+  ): void;
+}
+
+/**
+ * Register the deny-by-default `tce-games://` handler against a
+ * `protocol`-like object, adapting {@link handleGameAssetRequest}'s plain
+ * result to an Electron `Response`.
+ *
+ * Split out of `electron/main.ts` (feature F6, CG-0MUG2ZLGI006Y20G) so the
+ * wiring — scheme, content root, and Response adaptation — is unit-testable
+ * without booting Electron.
+ */
+export function registerGameAssetHandler(
+  protocolLike: ProtocolRegistrar,
+  contentDir: string,
+): void {
+  protocolLike.handle(GAME_ASSET_SCHEME, async (request) => {
+    const result = await handleGameAssetRequest(request.url, { contentDir });
+    // Copy into an ArrayBuffer-backed view: the DOM `BodyInit` type (and the
+    // Electron `Response`) do not accept a `Uint8Array<ArrayBufferLike>`.
+    const body = result.body ? new Uint8Array(result.body) : null;
+    return new Response(body, {
+      status: result.status,
+      headers: result.headers,
+    });
+  });
 }

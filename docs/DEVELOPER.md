@@ -15,6 +15,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
+- [Runtime Game Plugins](#runtime-game-plugins)
 - [Hand & Pile Rendering](#hand--pile-rendering)
 - [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
 - [Example Games](#example-games)
@@ -83,6 +84,29 @@ This refreshes the committed module at
 `src/core-engine/tf-runtime/main-street-runtime-synth.mjs` and writes the
 WAV/JSON/metadata outputs to `build/tf-synths/`. The committed module is the
 single source of truth for shipped builds.
+
+**Runtime activation.** The sibling app's loader
+(`../tce-main-street/src/tf/mainStreetTfModule.ts`) resolves the module
+asynchronously after scene boot and attaches it to `SoundManager` via
+`createTfPlayer()` / `setSynthIntegration()`. Once settled,
+`SoundManager.isSynthActive()` is `true`, the debug **ToneForge** entry reports
+`Active`, and the entry can toggle synthesis at runtime without a scene
+restart. A load/normalisation failure logs a `console.warn` with the reason and
+retains diagnostics (`getMainStreetTfDiagnostics()`) that the scene forwards to
+`SoundManager.setSynthDiagnostics()`.
+
+**Missing-factory fallback.** A logical key mapped to a factory the module does
+not ship is **never silently dropped**: `tfAdapter` reports whether it handled
+the key and `SoundManager.play()` falls back to the WAV/Phaser path when it did
+not (CG-0MUU9PSWC009CW76). This is why the `sfx-income-*` and
+`sfx-challenge-complete` mappings still produce audio despite having no matching
+factory.
+
+> **Testing note.** Synthesised voices require a real Web Audio context, so they
+> cannot be constructed under Node (Tone.js cannot build *any* `Gain` node
+> there). Unit tests assert the wiring/structural contract; voice construction
+> is covered by `tests/core-engine/tf-runtime-integration.browser.test.ts` in a
+> real browser.
 
 ### Multi-Game Routing
 
@@ -278,9 +302,68 @@ npm run package:mac    # dmg
 
 Output goes to the gitignored `release/` directory. Config: `electron-builder.yml` (app id `com.thewizardscode.tableaucardengine`, asar containing only `dist/` + `dist-electron/` + `package.json` — the renderer and Phaser are Vite-bundled, so no `node_modules` are needed). Packaging runs with `--publish never` (private repo; binaries are uploaded to Steam manually). The Windows binary is also built reproducibly by CI on every push to `main` (`.github/workflows/package.yml`) and uploaded as a workflow artifact; CI composes the sibling game repos and builds with `GAMES_CONFIG=full`, so the Steam artifact ships the **full distribution** (all games + Gym, `CG-0MULGC6VP008GPH2`).
 
+### Application icon
+
+The app icon (browser favicon, Apple touch icon, web app manifest, and the
+packaged desktop/installer icon) derives from a **single tracked
+source-of-truth SVG**: `public/favicon.svg` — the "tableau emblem", an original
+in-house mark (CC0; see `public/assets/CREDITS.md`). Never hand-edit the
+generated PNG/ICO/ICNS variants.
+
+```bash
+npm run generate:icons   # regenerate every variant from public/favicon.svg
+```
+
+`scripts/generate-app-icons.ts` rasterises the emblem with `sharp` (`^0.33.0`, an
+existing dependency) and writes:
+
+| Artefact | Size | Purpose |
+|----------|------|---------|
+| `public/icon-32.png` | 32×32 | manifest / legacy favicon |
+| `public/icon-192.png` | 192×192 | web app manifest (Android) |
+| `public/icon-512.png` | 512×512 | web app manifest / PWA |
+| `public/apple-touch-icon.png` | 180×180 | iOS home screen |
+| `build/icon.png` | 1024×1024 | electron-builder `.ico`/`.icns` source |
+
+The committed web PNGs live under `public/`; the Electron resource
+`build/icon.png` is generated at package time because `build/` is gitignored.
+Every `package*` npm script therefore runs `npm run generate:icons` **before**
+`electron-builder`, and `electron-builder.yml` points `win`/`linux`/`mac`
+(plus the NSIS installer/uninstaller icons) at `build/icon.png`;
+electron-builder derives the Windows `.ico` and macOS `.icns` from that ≥512px
+PNG, so no extra packer dependency is needed.
+
+**Base-relative link convention.** The icon/manifest `<link>`s in `index.html`
+(and the favicon link in `public/404.html`) use **base-relative** hrefs — with
+no leading slash and no `./`:
+
+```html
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="site.webmanifest" />
+```
+
+Vite copies `public/` verbatim, so a base-relative href resolves correctly under
+all three build bases without per-mode code: the GitHub Pages sub-path, the
+dev-server root, and Electron's `file://` base. An absolute `/favicon.ico` would
+404 on GitHub Pages. `tests/electron/app-icon-build-output.test.ts` asserts the
+emitted HTML/manifest and that each referenced file exists in the output for all
+three modes. See `CG-0MUTTXRWZ009NUB9`.
+
 ### Skill: release-windows
 
 `.pi/skills/release-windows/` provides a repo-local skill (`/skill:release-windows`) that promotes the latest CI-built Windows installer to a **draft** GitHub Release — the operator's approval gate is the draft itself (review + publish in the GitHub UI; no pre-approval is requested to create the draft).
+
+> **This promotion now runs automatically in CI.** On a `v*` tag push (the
+> ship skill's `dev`→`main` release), the `promote-release` job in
+> `.github/workflows/package.yml` creates the draft release with no manual
+> invocation; a failure is non-blocking (it never fails the Pages deploy) and
+> is reported in the job summary. **This skill is the documented manual
+> fallback** — use it to regenerate/re-check a draft, or to dry-run the
+> promotion path before a tag. The final step is still the operator's: review
+> the draft and publish it in the GitHub UI.
+
+The helper script is the single implementation shared by CI and the manual path. The CI job pins the run with `--run-id "${{ github.run_id }}"` (the current run is still `in_progress` on a tag push, so the "latest successful run" auto-resolve would otherwise pick the previous release); the manual invocation below uses the auto-resolve default.
 
 **Prerequisites:** `gh` CLI authenticated with `repo` scope. Invoke from the repo root.
 
@@ -546,7 +629,7 @@ per-command test timeout for the implement skill and the audit skill's test runn
 ```
 
 - **`timeoutPerCommand`** — maximum seconds per test-suite command (default 600 if absent).
-  TCE's full suite takes 15–19 minutes, so this is set to 1500 s to prevent premature
+  TCE's full suite takes 18–21 minutes, so this is set to 1500 s (25 min) to prevent premature
 timeout kills.
 
 **Why is `.pi/test-config.json` tracked by git?**
@@ -598,8 +681,8 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 |---------|-------------|-------------|---------|
 | `unit` | Node.js | `tests/**/*.test.ts` (excludes `replay-*.test.ts`) | Logic, data, and integration tests — runs in parallel (worker pool capped at `maxWorkers: 4`; see contention mitigation below) |
 | `replay-e2e` | Node.js (fork pool) | `tests/e2e/replay-*.test.ts` | Playwright-driven replay e2e tests. Runs in its own fork (`singleFork: true`) after unit tests to avoid Vite cold-start CPU contention |
-| `smoke` | Chromium (Playwright) | 10 explicit files (see [smoke profile](#smoke-tests)) | One representative test per game + core engine/UI smoke. ~30s for rapid feedback during implementation |
-| `dev` | Chromium (Playwright) | 30 explicit files (see [dev profile](#dev-tests)) | Smoke + key E2E per game. ~3 min for the implement/audit workflow |
+| `smoke` | Chromium (Playwright) | 10 explicit files (see [smoke profile](#smoke-tests)) | One representative test per game + core engine/UI smoke. ~2 min for rapid feedback during implementation |
+| `dev` | Chromium (Playwright) | 30 explicit files (see [dev profile](#dev-tests)) | Smoke + key E2E per game. ~3.5 min for the implement/audit workflow |
 | `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | All non-tutorial Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
 | `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance; requires [browser test setup](#browser-test-setup)) |
 
@@ -952,7 +1035,7 @@ convention (plus the optional helper
 
 ### Smoke Tests
 
-Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedback during implementation. The smoke profile runs one representative test per game plus core engine/UI smoke tests — target runtime is ~30 seconds for 10 files.
+Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedback during implementation. The smoke profile runs one representative test per game plus core engine/UI smoke tests — target runtime is ~2 min for 10 files.
 
 **Smoke profile files:**
 - `tests/main-street/MainStreetScene.browser.test.ts` (Main Street core game flow)
@@ -975,7 +1058,7 @@ Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedbac
 
 ### Dev Tests
 
-Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehensive but still fast suite. The dev profile adds key E2E tests per game on top of all smoke tests — target runtime is ~3 minutes for ~30 files.
+Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehensive but still fast suite. The dev profile adds key E2E tests per game on top of all smoke tests — target runtime is ~3.5 min for ~30 files.
 
 **Dev profile coverage:**
 - All smoke files (above)
@@ -1293,6 +1376,15 @@ public/assets/
 │   └── feudalism/thumbnail.png
 └── CREDITS.md              Asset attribution
 
+public/ (app icon — see "Application icon")
+├── favicon.svg             tableau-emblem source of truth (CC0)
+├── icon-32.png             manifest / legacy favicon (generated)
+├── icon-192.png            manifest (Android, generated)
+├── icon-512.png            manifest / PWA (generated)
+├── apple-touch-icon.png    iOS home screen (generated)
+├── site.webmanifest        web app manifest
+└── 404.html                Not Found page
+
 tests/
 ├── fixtures/transcripts/   Fixture transcripts for replay tests (one per game)
 ├── ai/                     AiPlayer, pickRandom, pickBest, barrel export tests
@@ -1588,6 +1680,48 @@ symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
 
+### App icon linkage (`sharedPublicRoot`)
+
+Every `tce-<game>` repo is its own Vite app with its own `index.html` and
+`public/` directory, so the core's root app-icon set is composed into a game
+repo's `public/` root by the same scaffold that links the shared deck and SFX.
+
+`scripts/configs/repo-layout.json` declares the six shared root files in
+`sharedPublicRoot`:
+
+- `favicon.svg`
+- `apple-touch-icon.png`
+- `icon-32.png`
+- `icon-192.png`
+- `icon-512.png`
+- `site.webmanifest`
+
+`scaffoldGameRepo()` calls `linkSharedPublicAssets(gameRepoRoot, coreRoot)`
+(likewise exported for tests), which symlinks each `core/public/<file>` next to
+the game's own `public/` root and records the created paths in the scaffold
+result's `publicLinks`. The linkage is idempotent, derives every target
+relatively, and keeps `core/public/favicon.svg` — generated by
+`scripts/generate-app-icons.ts` — the **single source of truth** for the emblem;
+game repos never commit a hand-authored or divergent icon copy.
+
+A game repo's `index.html` declares the three base-relative links immediately
+before `<title>`:
+
+```html
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="site.webmanifest" />
+```
+
+The hrefs are deliberately **base-relative** — no leading `/` and no `./` —
+because Vite copies `public/` files verbatim and the same link must resolve
+under all three build bases: the dev-server root (`/`), a GitHub Pages project
+sub-path (`/<repo>/`), and Electron's `file://` base (`./`). The
+`site.webmanifest` references the `icon-192.png`/`icon-512.png` files that sit
+beside it. `public/assets/CREDITS.md` records the emblem's provenance; no
+game-specific icon variants are supported. See CG-0MUUFZSE90061KKL and the
+parent icon work CG-0MUTTXRWZ009NUB9.
+
 ### Publishing the nine repositories
 
 The nine repositories named in `scripts/configs/repo-layout.json` (the merged
@@ -1644,6 +1778,212 @@ The `tce-<game>` repos use `main` as their default branch, carry only `dev` and
 `main`, and resolve every engine import through the aliases against `./core`.
 
 Follow the Golf (original reference) and Sushi Go (most recent) examples as reference implementations.
+
+## Runtime Game Plugins
+
+The Electron launcher can also load games **at runtime** — a distribution
+operator drops a built game artifact into the launcher's content directory and
+adds a manifest entry, with no launcher rebuild. This complements the
+[config-driven catalogue](#config-driven-game-catalogue) (games compiled into
+the build): build-time presets decide the *shipped* catalogue, runtime plugins
+add *drop-in* games afterwards.
+
+> Runtime artifacts externalise `phaser` and the engine aliases; the packaged
+> launcher resolves those bare specifiers with a generated **import map** — see
+> [Shared-dependency resolution](#shared-dependency-resolution-tce-shared-import-map)
+> below. Each artifact also packages its own **game-owned assets** (audio,
+> icons, game-specific cards), resolved through the scoped `tce-games://`
+> protocol — see [Per-game asset resolution](#per-game-asset-resolution).
+
+### Artifact layout
+
+```
+<contentDir>/games/
+  manifest.json                 # the catalogue of runtime games
+  <game-id>/
+    entry.js                    # ESM: named scene-class export + GAME_INFO
+    assets/
+      thumbnail.png             # optional thumbnail (manifest "thumbnail")
+      audio/<game-id>/*.wav     # game-owned audio (packaged from the game repo)
+      games/<game-id>/*         # game-owned icons/sprites
+```
+
+`<contentDir>` is the content directory the launcher resolved (bundled `dist/`
+by default; a Steam DLC directory via `--content-dir <dir>` / `TCE_CONTENT_DIR`;
+see [DLC content directory](#dlc-content-directory-steam-model)).
+
+### `games/manifest.json` schema
+
+```json
+{
+  "version": 1,
+  "games": [
+    {
+      "id": "golf",
+      "sceneKey": "GolfScene",
+      "title": "9-Card Golf",
+      "description": "Lowest score wins.",
+      "thumbnail": "assets/thumbnail.png",
+      "coreEngineVersion": "^0.1.0",
+      "entry": "entry.js"
+    }
+  ]
+}
+```
+
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `version` | yes | Manifest schema version (currently `1`). |
+| `games` | yes | Array of game entries. |
+| `games[].id` | yes | Stable game id; also the artifact directory name. Lower-cased slug. |
+| `games[].sceneKey` | yes | Phaser scene key the launcher registers/starts the game under. |
+| `games[].title` | yes | Display name shown on the selector card. |
+| `games[].description` | yes | Short description shown on the card. |
+| `games[].thumbnail` | no | Artifact-relative path; served over `tce-games://<id>/<path>`. |
+| `games[].coreEngineVersion` | yes | Semver range of compatible core-engine versions. |
+| `games[].entry` | yes | Artifact-relative path to the ESM entry module. |
+
+Duplicate `id`/`sceneKey` values, missing fields, and invalid semver ranges are
+rejected as validation errors (the launcher logs them and continues with the
+static catalogue). Parsing lives in `src/ui/game-manifest.ts`.
+
+### Compatibility rule
+
+Each entry declares `coreEngineVersion` (a semver range such as `^0.1.0`).
+At load time the launcher checks it with `semver.satisfies(engineVersion,
+range)` against `ENGINE_VERSION` from `@core-engine`. Incompatible games are
+**hidden** from the card grid and listed in a notice, e.g.
+`Incompatible game: 9-Card Golf — requires core v^9.0.0 (launcher is v0.1.0)`.
+Anyone may build incompatible games; only compatible ones run.
+
+### `tce-games://` asset protocol
+
+Thumbnails and other per-game assets are **not** loaded from the launcher's
+`public/` directory. The renderer builds `tce-games://<id>/<relative-path>`
+URLs (`src/ui/game-asset-url.ts`) and the Electron main process serves them
+from `<contentDir>/games/<id>/…` through a deny-by-default protocol handler
+(`electron/game-protocol.ts`). Requests that are absolute, contain `..`/NUL, or
+escape the game directory are denied (404); unknown extensions are served as
+`application/octet-stream`.
+
+**Shared-audio fallback.** A game artifact may legitimately omit an optional
+SFX that the launcher ships in its shared `assets/audio/default/` set. When a
+request for `games/<id>/assets/audio/<dir>/<rest…>` names a file absent from the
+artifact, the handler serves `<contentDir>/assets/audio/default/<rest…>` instead
+(`resolveSharedAudioFallback`) — a genuine runtime fallback. Only paths shaped
+`assets/audio/…` are eligible; anything else is a hard 404.
+
+### Per-game asset resolution
+
+A runtime game scene loads its own assets through the same engine helpers as a
+static game (e.g. `audioPathWithFallback('golf', 'card-draw.wav')`), but the
+paths must resolve to the *artifact*, not the launcher's `public/` root. The
+glue is the **active runtime game base**:
+
+- The plugin loader tags each runtime entry with its artifact id
+  (`GameEntry.runtimeGameId`).
+- The Game Selector calls `setActiveRuntimeGame(id)` immediately before
+  starting a runtime scene and `setActiveRuntimeGame(null)` when it is
+  (re)entered (`src/ui/GameSelectorScene.ts`).
+- `audioPathWithFallback` resolves the game-specific URL through
+  `resolveActiveGameAssetUrl` (`src/ui/game-asset-url.ts`), producing
+  `tce-games://<id>/assets/audio/<dir>/<file>` for a runtime game, and keeps the
+  launcher-relative path for the static catalogue.
+
+> **Phaser caveat:** an array passed to `this.load.audio()` is a list of
+> *format* alternatives — Phaser loads only the first decodable entry, it is
+> **not** an HTTP fallback. `audioPathWithFallback` therefore relies on the
+> `tce-games://` handler for fallback (above) and on `SoundManager` for safety:
+> `SoundPlayer.exists()` is consulted before playing, so a key that is absent
+> from the audio cache (an optional SFX missing everywhere) is skipped rather
+> than throwing out of Phaser's `WebAudioSound` constructor and aborting the
+> scene. The reference builder (`scripts/build-game-artifact.mjs`,
+> `copyGameOwnedAssets`) packages the game's real (non-symlink) assets —
+> symlinks point at the shared core assets the launcher already ships.
+
+### Producing an artifact
+
+The reference builder turns a configured game into an artifact using Vite
+library mode:
+
+```bash
+npm run build:game-artifact -- --game golf --preset configs/golf.json
+```
+
+It writes `build/game-artifacts/manifest.json` and
+`build/game-artifacts/<id>/` (`entry.js` + `assets/`). `phaser` and the engine
+aliases (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`,
+`@ai/*`) are externalised so the artifact does not bundle a second engine copy.
+The emitted `entry.js` re-exports the scene class (named after the scene module)
+and the game's `GAME_INFO`. The output directory is gitignored.
+
+### Installing an artifact
+
+1. Copy `build/game-artifacts/manifest.json` and the `build/game-artifacts/<id>/`
+   directory into `<contentDir>/games/` (merge the manifest if runtime games
+   already exist).
+2. Relaunch the Electron launcher. The plugin loader
+   (`src/ui/GamePluginLoader.ts`) reads the manifest, dynamically imports each
+   compatible `entry.js`, and merges the games into the selector alongside the
+   static catalogue.
+
+If the manifest is missing, malformed, or a game fails to load, the launcher
+continues with the statically-registered games and logs the error.
+
+### Shared-dependency resolution (`tce-shared` import map)
+
+The reference builder externalises `phaser` and the engine aliases (so a second
+engine copy is never bundled), which leaves **bare ESM specifiers** in
+`entry.js` — e.g. `import { resolveSetupOptions } from "@core-engine/SetupOptions"`.
+A plain browser/Electron renderer has no resolver for bare specifiers.
+
+The **electron-mode launcher build** closes this gap with a browser **import
+map**, emitted by `scripts/vite-runtime-shared-plugin.ts` (pure logic in
+`scripts/runtime-shared-import-map.ts`):
+
+- Every engine module under `src/{core-engine,card-system,rule-engine,ai,ui}` is
+  emitted as its own Rollup entry with a **stable, path-derived** output name
+  (`tce-shared/<alias>/<module>.js` — never a content hash), and
+  `src/runtime-shared/phaser.js` re-exports Phaser as `tce-shared/phaser.js`.
+- Because those entries live in the **same build** as the launcher, Rollup
+  deduplicates the engine/Phaser modules: the launcher and every runtime
+  artifact share **one module instance** (no second Phaser/engine — class
+  identity is preserved). `preserveEntrySignatures: 'strict'` keeps each
+  entry's named exports.
+- A `<script type="importmap">` mapping every known specifier is injected at
+  `head-prepend` in `dist/index.html`, before the launcher's module script, so
+  it is active when `src/ui/GamePluginLoader.ts` dynamically imports an
+  artifact.
+
+The map is derived from the launcher's own source tree, so it is deterministic
+across builds and covers deep subpaths (`@ui/Renderer`,
+`@ui/Renderer/adapters/GolfAdapter`, `@core-engine/transcript`, …). Web builds
+are unaffected — the plugin is enabled only for `--mode electron` (runtime
+plugins are Electron-only).
+
+Verify the packaged path (builds the electron launcher + the
+`tests/fixtures/runtime-plugin-fixture` artifact, then checks in a real
+Chromium that the fixture is discovered and starts):
+
+```bash
+npm run verify:runtime-plugin
+```
+
+Automated coverage:
+`tests/ui/runtime-shared-import-map.test.ts` (discovery, determinism, deep
+specifiers) and `tests/ui/runtime-shared-artifact-coverage.test.ts` (the map
+covers every bare specifier a real built artifact emits). The packaged
+scenarios are in the
+[verification runbook](dev/runtime-game-plugins-runbook.md) (scenario D).
+
+> **Per-game assets are resolved separately from the import map.** The import
+> map resolves external *modules*; a runtime game's own audio/icons are
+> packaged in its artifact and served through `tce-games://` (see
+> [Per-game asset resolution](#per-game-asset-resolution)). The reference
+> builder copies game-owned assets (`copyGameOwnedAssets`), the selector sets
+> the active runtime game base, and `SoundManager` skips an audio key the
+> backend cannot play — so a runtime game boots and plays without the launcher
+> having been rebuilt with its assets.
 
 ## Hand & Pile Rendering
 
@@ -3621,6 +3961,39 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   - `src/ui/debug/AiDecisionRecorder.ts` — Recording singleton
   - `src/ui/debug/AiDecisionOverlay.ts` — Display overlay
 
+#### ToneForge
+
+- **Label:** "ToneForge"
+- **Location:** Debug Tools section of the Settings panel. Unlike the four
+  engine-generic tools above, this entry is injected into the **effective**
+  debug-tools list by `CardGameScene.initSettingsPanel` (via
+  `resolveEffectiveDebugTools`), so it appears even for games that supply their
+  own `debugTools` list (e.g. Main Street) — no game-specific registration is
+  required. It is present whenever the scene has a `SoundManager`.
+- **Function:** Reports whether ToneForge runtime synthesis is currently
+  active and toggles it on/off at runtime, **without a scene restart**:
+  - **Live status text:** `Active` / `Inactive` plus the mapped factory count
+    and, when one was recorded, the last module load error (e.g.
+    `Inactive · 0 factories · load error: module exploded`). The text is a
+    `() => string` description that `SettingsPanel` re-resolves on a 500 ms
+    poll while the panel is open, so an async module load or a toggle is
+    reflected immediately without closing and reopening the panel.
+  - **Toggle:** Clicking the label detaches the synth player/mapping when
+    synthesis is active (keys fall back to the existing WAV/Phaser path) and
+    restores the previously attached integration when inactive. No entry is
+    added when there is no `SoundManager`.
+- **When to use:** Verify that the ToneForge wiring is actually in use — the
+  operator no longer has to guess from the sound — and A/B compare synthesised
+  audio against the fallback audio. Open the Settings panel (gear icon) →
+  scroll to Debug Tools → click **ToneForge** to toggle.
+- **Implementation:**
+  - `src/ui/debug/ToneForgeStatusTool.ts` — `createToneForgeStatusTool()`,
+    `withToneForgeStatusTool()` and `resolveEffectiveDebugTools()`.
+  - `src/core-engine/SoundManager.ts` — read-only `isSynthActive()` /
+    `getSynthStatus()` and the `detachSynthIntegration()` /
+    `restoreSynthIntegration()` toggle API.
+  - `src/ui/CardGameScene.ts` — dev-gated effective-list injection.
+
 #### Market Card Cheat (Main Street only)
 
 - **Label:** "Market Card Cheat"
@@ -3720,6 +4093,11 @@ Adding a new debug tool requires minimal code:
    }
    ```
 
+   `description` may also be a `() => string` function for tools whose status
+   changes at runtime (e.g. the **ToneForge** tool). `SettingsPanel` resolves it
+   at render time and re-resolves it on a 500 ms poll while the panel is open,
+   so the text stays live. Existing static-string descriptions are unchanged.
+
 2. **(Optional) Export from the barrel** by adding to `src/ui/debug/index.ts`.
 
 3. **Register the tool** by adding it to the default debug tools array in
@@ -3738,7 +4116,11 @@ Adding a new debug tool requires minimal code:
    ```
 
    Alternatively, pass a custom `debugTools` array directly to
-   `initSettingsPanel()` from any game scene to override the defaults.
+   `initSettingsPanel()` from any game scene to override the defaults. Note that
+   the engine still injects the dev-only **ToneForge** entry into the
+   **effective** list (via `resolveEffectiveDebugTools`) regardless of whether a
+   game supplies its own tools — de-duplicated by label, and omitted entirely in
+   production builds.
 
 4. **Write tests** (at minimum, verify the factory returns a valid entry).
 
@@ -3772,10 +4154,11 @@ To verify production safety:
 | `src/ui/debug/AiDecisionOverlay.ts` | AI decision viewer overlay |
 | `src/ui/debug/MarketCardCheatOverlay.ts` | Market Card Cheat overlay (Main Street market-replacement picker) |
 | `src/ui/debug/StaffApplicantCheatOverlay.ts` | Staff Application cheat overlay (Main Street forced-applicant toggle) |
+| `src/ui/debug/ToneForgeStatusTool.ts` | ToneForge status/toggle tool + effective-list injection helpers |
 | `../tce-main-street/src/MainStreetMarket.ts` | `cheatReplaceMarketCard()` — random-slot replacement + discard routing |
 | `src/ui/debug/index.ts` | Debug tools barrel file |
-| `src/ui/CardGameScene.ts` | Default debug tool registration |
-| `src/ui/SettingsPanel.ts` | Debug section rendering in Settings panel |
+| `src/ui/CardGameScene.ts` | Default debug tool registration + effective-list injection |
+| `src/ui/SettingsPanel.ts` | Debug section rendering (incl. live function descriptions) in Settings panel |
 
 ## Troubleshooting
 

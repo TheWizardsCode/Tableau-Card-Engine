@@ -1,0 +1,368 @@
+#!/usr/bin/env node
+/**
+ * Reference runtime game artifact builder (feature F7, CG-0MUG2ZM3K007QSVH).
+ *
+ * Turns one configured game into a loadable runtime artifact that the
+ * Electron plugin loader (`src/ui/GamePluginLoader.ts`) can discover from
+ * `<contentDir>/games/manifest.json`:
+ *
+ *   build/game-artifacts/
+ *     manifest.json              ← merged entry (id, sceneKey, …, entry)
+ *     <id>/
+ *       entry.js                 ← ESM: re-exports the scene + GAME_INFO
+ *       assets/thumbnail.png     ← copied from the game's public assets
+ *
+ * The artifact is built in Vite **library mode**. Phaser and the engine
+ * aliases (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`,
+ * `@ai/*`) are externalised so the artifact never bundles a second copy of the
+ * engine or Phaser — the launcher supplies those at runtime.
+ *
+ * Usage (via the `build:game-artifact` npm script, which runs it under tsx):
+ *
+ *   npm run build:game-artifact -- --game golf
+ *   npm run build:game-artifact -- --game golf --preset configs/golf.json
+ *   npm run build:game-artifact -- --game golf --out build/game-artifacts
+ *
+ * This is a deliberately minimal reference: it builds one game on demand and
+ * merges its manifest entry. A full per-game release pipeline is out of scope.
+ *
+ * @see docs/DEVELOPER.md — "Runtime game plugins"
+ */
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+
+import { build as viteBuild } from 'vite';
+
+import {
+  DEFAULT_PRESET,
+  discoverGames,
+  loadGamesConfig,
+  selectConfigPath,
+} from './vite-game-discovery-plugin.ts';
+
+/** Default directory (relative to the repo root) for built artifacts. */
+export const DEFAULT_OUT_ROOT = path.join('build', 'game-artifacts');
+
+/** Default core-engine compatibility range declared in the manifest. */
+export const DEFAULT_CORE_ENGINE_RANGE = '^0.1.0';
+
+/**
+ * Shared dependencies the artifact must not bundle. Kept in one place so the
+ * build and its tests agree on exactly what "externalised" means.
+ */
+export const SHARED_EXTERNAL_MATCHERS = [
+  'phaser',
+  /^@core-engine(\/.*)?$/,
+  /^@card-system(\/.*)?$/,
+  /^@rule-engine(\/.*)?$/,
+  /^@ui(\/.*)?$/,
+  /^@ai(\/.*)?$/,
+];
+
+/** True when *id* is a shared dependency that must stay external. */
+export function isSharedExternal(id) {
+  return SHARED_EXTERNAL_MATCHERS.some((matcher) =>
+    typeof matcher === 'string' ? id === matcher : matcher.test(id),
+  );
+}
+
+/** Resolve a game's declared thumbnail asset inside its repo, or `null`. */
+function resolveThumbnailSource(gameRoot, info) {
+  if (!info.thumbnail) return null;
+  const candidate = path.join(gameRoot, 'public', 'assets', `${info.thumbnail}.png`);
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
+/**
+ * Copy a game's **game-owned** assets into the artifact.
+ *
+ * A game repo's `public/assets/` tree mixes the assets it owns (game audio,
+ * game-specific cards, icons) with symlinks to the shared core assets created
+ * by `linkSharedAssets()`. Only the real entries are copied: the shared assets
+ * are supplied by the launcher, so following the symlinks would duplicate them
+ * and defeat the point of a runtime artifact.
+ *
+ * Game-owned assets copied here (e.g. `audio/<gameDir>/…`) are served to the
+ * renderer through the scoped `tce-games://<id>/…` scheme; a game whose
+ * artifact omits an optional SFX still falls back to the launcher's shared
+ * `assets/audio/default/…` at runtime (CG-0MUVJWSZO004KZTA).
+ *
+ * @param {string} sourceAssetsDir Absolute `<gameRoot>/public/assets` path.
+ * @param {string} destAssetsDir   Absolute `<artifact>/assets` path.
+ * @param {object} [options]
+ * @param {string[]} [options.skipNames] Basenames to skip (default: CREDITS.md).
+ * @returns {string[]} Copied paths relative to the artifact `assets/` root,
+ *                     slash-separated (for reporting and tests).
+ */
+export function copyGameOwnedAssets(sourceAssetsDir, destAssetsDir, options = {}) {
+  const copied = [];
+  if (!fs.existsSync(sourceAssetsDir)) return copied;
+  const skip = new Set(options.skipNames ?? ['CREDITS.md']);
+
+  const walk = (srcDir, relDir) => {
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+      if (skip.has(entry.name)) continue;
+
+      const src = path.join(srcDir, entry.name);
+      const rel = relDir ? path.join(relDir, entry.name) : entry.name;
+
+      // A symlink points at a shared core asset — the launcher owns it.
+      // (readdirSync does not follow links, so a symlink is neither file nor
+      // directory here.)
+      if (entry.isSymbolicLink()) continue;
+
+      if (entry.isDirectory()) {
+        walk(src, rel);
+      } else if (entry.isFile()) {
+        const dest = path.join(destAssetsDir, rel);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(src, dest);
+        copied.push(rel.split(path.sep).join('/'));
+      }
+    }
+  };
+
+  walk(sourceAssetsDir, '');
+  return copied;
+}
+
+/**
+ * Render the temporary artifact entry module.
+ *
+ * Re-exports the scene class under the name the discovery plugin derived from
+ * the scene module filename, and re-exports the game's `GAME_INFO` so the
+ * loader can read it at runtime.
+ */
+export function renderArtifactEntry(discovered) {
+  return [
+    '// AUTO-GENERATED by scripts/build-game-artifact.mjs — do not edit.',
+    `export { ${discovered.sceneClass} } from ${JSON.stringify(discovered.absoluteScenePath)};`,
+    `export const GAME_INFO = ${JSON.stringify(discovered.info, null, 2)};`,
+    '',
+  ].join('\n');
+}
+
+/** Upsert *entry* (keyed by id) into `<outRoot>/manifest.json`. */
+export function mergeManifestEntry(outRoot, entry) {
+  const manifestPath = path.join(outRoot, 'manifest.json');
+  let document = { version: 1, games: [] };
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      if (parsed && Array.isArray(parsed.games)) {
+        document = { version: parsed.version ?? 1, games: parsed.games };
+      }
+    } catch {
+      // Malformed existing manifest — start a fresh one rather than fail.
+      document = { version: 1, games: [] };
+    }
+  }
+
+  const remaining = document.games.filter((game) => game.id !== entry.id);
+  document.games = [...remaining, entry].sort((a, b) => a.id.localeCompare(b.id));
+  fs.writeFileSync(manifestPath, `${JSON.stringify(document, null, 2)}\n`, 'utf-8');
+  return { manifestPath, document };
+}
+
+/**
+ * Build one game into a runtime artifact.
+ *
+ * @param {object} options
+ * @param {string} options.gameId           Game id from the preset.
+ * @param {string} [options.projectRoot]    Repo root (default: cwd).
+ * @param {string} [options.presetPath]     Explicit preset path.
+ * @param {object} [options.config]         Pre-loaded preset (tests); wins over presetPath.
+ * @param {string} [options.outRoot]        Artifacts root (default: build/game-artifacts).
+ * @param {string} [options.coreEngineVersion] Manifest compatibility range.
+ * @returns {Promise<object>} Build result (paths + manifest entry).
+ */
+export async function buildGameArtifact(options) {
+  const projectRoot = path.resolve(options.projectRoot ?? process.cwd());
+  const outRoot = path.resolve(projectRoot, options.outRoot ?? DEFAULT_OUT_ROOT);
+  const coreEngineVersion = options.coreEngineVersion ?? DEFAULT_CORE_ENGINE_RANGE;
+
+  const config =
+    options.config ??
+    loadGamesConfig(
+      options.presetPath ??
+        selectConfigPath(projectRoot, process.env.GAMES_CONFIG ? process.env : { GAMES_CONFIG: DEFAULT_PRESET }),
+    );
+
+  const games = discoverGames(config, projectRoot);
+  const discovered = games.find((game) => game.id === options.gameId);
+  if (!discovered) {
+    throw new Error(
+      `[build-game-artifact] Game "${options.gameId}" is not in the selected preset ` +
+        `(available: ${games.map((g) => g.id).join(', ') || '(none)'}).`,
+    );
+  }
+
+  const outDir = path.join(outRoot, discovered.id);
+  fs.mkdirSync(outDir, { recursive: true });
+
+  // Write the generated entry inside the output dir (a sibling of the built
+  // chunk) and build it. The entry itself lives in a temp file so a failed
+  // build never leaves a stray source in the repo.
+  const entryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tce-artifact-'));
+  const entryFile = path.join(entryDir, 'entry.ts');
+  fs.writeFileSync(entryFile, renderArtifactEntry(discovered), 'utf-8');
+
+  try {
+    await viteBuild({
+      root: projectRoot,
+      configFile: false,
+      logLevel: 'warn',
+      resolve: {
+        // The scene import is absolute; keep the TS extensions Vite needs.
+        extensions: ['.ts', '.tsx', '.js', '.mjs', '.json'],
+      },
+      esbuild: { tsconfigRaw: '{}' },
+      build: {
+        outDir,
+        emptyOutDir: true,
+        // Do not copy the repo's `public/` dir into the artifact: the artifact
+        // ships only its own entry + assets, and the launcher owns its public
+        // icons/manifest. (Otherwise Vite would copy the core repo's icons and
+        // `assets/CREDITS.md` into every game artifact.)
+        copyPublicDir: false,
+        minify: false,
+        target: 'es2020',
+        lib: {
+          entry: entryFile,
+          formats: ['es'],
+          name: 'TceGameArtifact',
+          fileName: () => 'entry.js',
+        },
+        rollupOptions: {
+          external: isSharedExternal,
+          output: { entryFileNames: 'entry.js' },
+        },
+      },
+    });
+  } finally {
+    fs.rmSync(entryDir, { recursive: true, force: true });
+  }
+
+  // Package the game's own assets so the artifact is self-contained: game
+  // audio, game-specific cards and icons become `<artifact>/assets/…`, served
+  // through `tce-games://<id>/…` (CG-0MUVJWSZO004KZTA).
+  const gameRoot = path.resolve(projectRoot, discovered.path);
+  const assetsDir = path.join(outDir, 'assets');
+  const copiedAssets = copyGameOwnedAssets(
+    path.join(gameRoot, 'public', 'assets'),
+    assetsDir,
+  );
+
+  // Copy the declared thumbnail into the artifact's assets/ directory.
+  const thumbnailSource = resolveThumbnailSource(gameRoot, discovered.info);
+  let manifestThumbnail;
+  if (thumbnailSource) {
+    fs.mkdirSync(assetsDir, { recursive: true });
+    fs.copyFileSync(thumbnailSource, path.join(assetsDir, 'thumbnail.png'));
+    manifestThumbnail = 'assets/thumbnail.png';
+  }
+
+  const manifestEntry = {
+    id: discovered.id,
+    sceneKey: discovered.info.sceneKey,
+    title: discovered.info.title,
+    description: discovered.info.description,
+    ...(manifestThumbnail ? { thumbnail: manifestThumbnail } : {}),
+    coreEngineVersion,
+    entry: 'entry.js',
+  };
+  const { manifestPath } = mergeManifestEntry(outRoot, manifestEntry);
+
+  const entryJs = path.join(outDir, 'entry.js');
+  const bundle = fs.existsSync(entryJs) ? fs.readFileSync(entryJs, 'utf-8') : '';
+
+  return {
+    id: discovered.id,
+    outDir,
+    outRoot,
+    entryPath: entryJs,
+    manifestPath,
+    manifestEntry,
+    sceneClass: discovered.sceneClass,
+    // Game-owned assets packaged into `<artifact>/assets/` (slash-separated).
+    assets: copiedAssets,
+    // True when no shared dependency was inlined into the emitted bundle.
+    externalised: {
+      phaser: !bundleHasPhaserRuntime(bundle),
+      sharedSpecifiers: SHARED_EXTERNAL_MATCHERS.length,
+    },
+    bundleBytes: Buffer.byteLength(bundle),
+  };
+}
+
+/**
+ * Heuristic: does the emitted bundle inline Phaser's runtime? Externalised
+ * builds keep only `from "phaser"` import statements, so canonical Phaser
+ * runtime tokens (`WebGLRenderer`, `Phaser v`, …) must be absent.
+ */
+function bundleHasPhaserRuntime(bundle) {
+  return /WebGLRenderer|CanvasRenderer|Phaser v?\d/.test(bundle);
+}
+
+// ── CLI ───────────────────────────────────────────────────────────────────
+
+/** Parse `--key value` / `--flag` arguments into an object. */
+export function parseArgs(argv) {
+  const args = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (!token.startsWith('--')) continue;
+    const key = token.slice(2);
+    const next = argv[i + 1];
+    if (next === undefined || next.startsWith('--')) {
+      args[key] = true;
+    } else {
+      args[key] = next;
+      i += 1;
+    }
+  }
+  return args;
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.help || !args.game) {
+    process.stdout.write(
+      'Usage: npm run build:game-artifact -- --game <id> [--preset <path>] [--out <dir>] [--core-version <range>]\n',
+    );
+    process.exitCode = args.help ? 0 : 1;
+    return;
+  }
+
+  const result = await buildGameArtifact({
+    gameId: args.game,
+    presetPath: typeof args.preset === 'string' ? args.preset : undefined,
+    outRoot: typeof args.out === 'string' ? args.out : undefined,
+    coreEngineVersion:
+      typeof args['core-version'] === 'string' ? args['core-version'] : undefined,
+  });
+
+  process.stdout.write(
+    [
+      `Built runtime game artifact "${result.id}"`,
+      `  entry:    ${path.relative(process.cwd(), result.entryPath)}`,
+      `  manifest: ${path.relative(process.cwd(), result.manifestPath)}`,
+      `  size:     ${result.bundleBytes} bytes`,
+      '',
+    ].join('\n'),
+  );
+}
+
+// Only run the CLI when invoked directly (not when imported by a test).
+const invokedDirectly =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) {
+  main().catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}
