@@ -30,8 +30,10 @@ vi.mock('phaser', () => {
 import {
   GameSelectorScene,
   REGISTRY_KEY_GAMES,
+  REGISTRY_KEY_INCOMPATIBLE_GAMES,
 } from '../../src/ui/GameSelectorScene';
 import type { GameEntry } from '../../src/ui/GameSelectorScene';
+import type { IncompatibleGame } from '../../src/ui/game-manifest';
 import { ALPHA_BADGE_LABEL, ALPHA_BADGE_FILL } from '../../src/ui/AlphaBadge';
 
 // ── Test data ──────────────────────────────────────────────
@@ -47,6 +49,25 @@ const GAME_WITH_THUMB: GameEntry = {
   title: 'Thumbnail Game',
   description: 'A test game with a thumbnail.',
   thumbnail: 'games/test/thumbnail',
+};
+
+const GAME_WITH_URL_THUMB: GameEntry = {
+  sceneKey: 'PluginScene',
+  title: 'Plugin Game',
+  description: 'A runtime game with a resolved thumbnail URL.',
+  thumbnail: 'tce-games://plugin-game/assets/thumbnail.png',
+};
+
+const INCOMPATIBLE_GAME: IncompatibleGame = {
+  entry: {
+    id: 'future',
+    sceneKey: 'FutureScene',
+    title: 'Future Game',
+    description: 'Requires a newer core.',
+    coreEngineVersion: '^9.0.0',
+    entry: 'entry.js',
+  },
+  reason: 'requires core v^9.0.0 (launcher is v0.1.0)',
 };
 
 // ── Mock helpers ────────────────────────────────────────────
@@ -278,6 +299,29 @@ describe('GameSelectorScene', () => {
       expect(mocks.load.image).toHaveBeenCalledWith(
         'github-icon',
         expect.stringContaining('data:image/svg+xml'),
+      );
+    });
+
+    it('loads a runtime-plugin thumbnail directly from its resolved URL', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [GAME_WITH_URL_THUMB] });
+      scene.preload();
+
+      // The resolved URL is used as both the texture key and the source.
+      expect(mocks.load.image).toHaveBeenCalledWith(
+        'tce-games://plugin-game/assets/thumbnail.png',
+        'tce-games://plugin-game/assets/thumbnail.png',
+      );
+    });
+
+    it('keeps loading bare asset keys from assets/<key>.png (static behaviour)', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [GAME_WITH_THUMB] });
+      scene.preload();
+
+      expect(mocks.load.image).toHaveBeenCalledWith(
+        'games/test/thumbnail',
+        'assets/games/test/thumbnail.png',
       );
     });
   });
@@ -570,6 +614,80 @@ describe('GameSelectorScene', () => {
       // Two cards total (two graphics + two zones)
       expect(mocks.add.graphics).toHaveBeenCalledTimes(2);
       expect(mocks.add.zone).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ── Incompatible runtime games notice ──────────────────
+
+  describe('incompatible runtime games', () => {
+    it('exports REGISTRY_KEY_INCOMPATIBLE_GAMES', () => {
+      expect(REGISTRY_KEY_INCOMPATIBLE_GAMES).toBe(
+        'gameSelector.incompatibleGames',
+      );
+    });
+
+    it('accepts incompatible games from init data', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [GAME_NO_THUMB], incompatibleGames: [INCOMPATIBLE_GAME] });
+      scene.create();
+
+      const textContents = (
+        mocks.add.text.mock.calls as unknown as Array<[number, number, string]>
+      ).map((call) => call[2]);
+      expect(
+        textContents.some(
+          (text) =>
+            typeof text === 'string' &&
+            text.includes('Incompatible game: Future Game') &&
+            text.includes('requires core v^9.0.0'),
+        ),
+      ).toBe(true);
+    });
+
+    it('falls back to the registry when init data omits incompatible games', () => {
+      const mocks = injectMocks(scene);
+      mocks.registry.get.mockImplementation((key: string) =>
+        key === REGISTRY_KEY_INCOMPATIBLE_GAMES ? [INCOMPATIBLE_GAME] : undefined,
+      );
+      scene.init({ games: [GAME_NO_THUMB] });
+      scene.create();
+
+      expect(mocks.registry.get).toHaveBeenCalledWith(
+        REGISTRY_KEY_INCOMPATIBLE_GAMES,
+      );
+      const textContents = (
+        mocks.add.text.mock.calls as unknown as Array<[number, number, string]>
+      ).map((call) => call[2]);
+      expect(
+        textContents.some(
+          (text) => typeof text === 'string' && text.includes('Future Game'),
+        ),
+      ).toBe(true);
+    });
+
+    it('renders no notice when there are no incompatible games', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [GAME_NO_THUMB] });
+      scene.create();
+
+      const textContents = (
+        mocks.add.text.mock.calls as unknown as Array<[number, number, string]>
+      ).map((call) => call[2]);
+      expect(
+        textContents.some(
+          (text) => typeof text === 'string' && text.includes('Incompatible game:'),
+        ),
+      ).toBe(false);
+    });
+
+    it('does not render an incompatible game as a card', () => {
+      const mocks = injectMocks(scene);
+      scene.init({ games: [GAME_NO_THUMB], incompatibleGames: [INCOMPATIBLE_GAME] });
+      scene.create();
+
+      // Only the one compatible entry becomes a card.
+      expect(mocks.add.graphics).toHaveBeenCalledTimes(1);
+      expect(mocks.add.zone).toHaveBeenCalledTimes(1);
     });
   });
 

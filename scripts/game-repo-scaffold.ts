@@ -133,6 +133,8 @@ export interface ScaffoldResult {
   rewritten: string[];
   /** Shared core assets linked into `public/assets` (F1 asset table). */
   assetLinks: string[];
+  /** Core root app-icon files linked into `public/` (CG-0MUUFZSE90061KKL). */
+  publicLinks: string[];
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────
@@ -259,6 +261,25 @@ const coreRoot = path.resolve(__dirname, '${coreRel}');
 const pkg = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'),
 );
+/**
+ * Production base path for the GitHub Pages project site.
+ *
+ * Derived generically from the package name (the last path segment, so a
+ * scoped package name yields its final segment), with a PAGES_BASE environment
+ * override for forks or custom domains. No hard-coded repository name, so a
+ * re-scaffold never regresses the Pages deployment.
+ */
+function resolvePagesBase(): string {
+  const override = process.env.PAGES_BASE;
+  if (override && override.trim() !== '') {
+    const trimmed = override.trim();
+    const stripped = trimmed.split('/').filter(Boolean).join('/');
+    return stripped === '' ? '/' : '/' + stripped + '/';
+  }
+  const name = String(pkg.name ?? 'app');
+  const segment = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name;
+  return '/' + segment + '/';
+}
 // A game repo's only preset is ./configs/${DEFAULT_GAME_PRESET}.json; the
 // plugin default (core-only) applies to the core repo. GAMES_CONFIG can
 // still override for an ad-hoc build.
@@ -271,8 +292,9 @@ export default defineConfig(({ mode }) => ({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
-  // Electron loads the bundle over file://, so relative asset URLs are required.
-  base: mode === 'electron' ? './' : '/',
+  // Electron uses file:// → relative paths; production (GitHub Pages)
+  // uses the project path derived from the package name; dev uses root.
+  base: mode === 'electron' ? './' : mode === 'production' ? resolvePagesBase() : '/',
   plugins: [
     // Reads ./configs/${DEFAULT_GAME_PRESET}.json and generates
     // 'virtual:game-registry' (Gym from the core + this one game).
@@ -485,6 +507,74 @@ function ensureDirSymlink(linkPath: string, targetPath: string): boolean {
 }
 
 /**
+ * Read a string-array field from the core's `repo-layout.json` contract.
+ *
+ * Returns an empty list when the layout file, the field, or a valid array is
+ * absent — callers then compose nothing rather than throwing.
+ */
+function readLayoutList(coreRoot: string, key: string): string[] {
+  const layoutPath = path.join(coreRoot, 'scripts', 'configs', 'repo-layout.json');
+  if (!fs.existsSync(layoutPath)) return [];
+  try {
+    const layout = JSON.parse(fs.readFileSync(layoutPath, 'utf-8')) as Record<
+      string,
+      unknown
+    >;
+    const list = layout[key];
+    return Array.isArray(list)
+      ? list.filter((a): a is string => typeof a === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Realise one shared entry as a link under the game repo's `public/<subdir>`.
+ *
+ * The link target is stored relative to the link's own directory so a nested
+ * link stays valid when the composed sibling layout is moved. Directories get
+ * a `dir` symlink with a Windows `junction` fallback; files get a plain file
+ * symlink (falling back to a byte copy on platforms where symlinks are
+ * unavailable). Missing sources and already-existing links are skipped, which
+ * makes composition idempotent.
+ *
+ * @returns `true` when a new link was created.
+ */
+function linkSharedEntry(
+  gameRepoRoot: string,
+  coreRoot: string,
+  subdir: string,
+  entry: string,
+): boolean {
+  const clean = entry.replace(/\/+$/, '');
+  if (!clean) return false;
+  const target = path.join(coreRoot, 'public', subdir, clean);
+  const link = path.join(gameRepoRoot, 'public', subdir, clean);
+  if (!fs.existsSync(target)) return false;
+  if (fs.lstatSync(link, { throwIfNoEntry: false })) return false;
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  const relTarget = path.relative(path.dirname(link), target);
+  if (fs.statSync(target).isDirectory()) {
+    try {
+      fs.symlinkSync(relTarget, link, 'dir');
+    } catch {
+      // Windows without developer mode needs a junction for directories.
+      fs.symlinkSync(relTarget, link, 'junction');
+    }
+  } else {
+    try {
+      fs.symlinkSync(relTarget, link);
+    } catch {
+      // Windows without developer mode cannot create file symlinks; a copy
+      // keeps the app runnable (the icon set is small and static).
+      fs.copyFileSync(target, link);
+    }
+  }
+  return true;
+}
+
+/**
  * Link the core-owned shared assets into the game repo's `public/assets`.
  *
  * The F1 asset audit (`repo-layout.json → sharedAssets`) enumerates the shared
@@ -498,40 +588,35 @@ export function linkSharedAssets(
   gameRepoRoot: string,
   coreRoot: string,
 ): string[] {
-  const layoutPath = path.join(coreRoot, 'scripts', 'configs', 'repo-layout.json');
-  if (!fs.existsSync(layoutPath)) return [];
-  let shared: string[] = [];
-  try {
-    const layout = JSON.parse(fs.readFileSync(layoutPath, 'utf-8')) as {
-      sharedAssets?: unknown;
-    };
-    if (Array.isArray(layout.sharedAssets)) {
-      shared = layout.sharedAssets.filter((a): a is string => typeof a === 'string');
-    }
-  } catch {
-    return [];
-  }
-
   const linked: string[] = [];
-  for (const entry of shared) {
-    const clean = entry.replace(/\/+$/, '');
-    if (!clean) continue;
-    const target = path.join(coreRoot, 'public', 'assets', clean);
-    const link = path.join(gameRepoRoot, 'public', 'assets', clean);
-    if (!fs.existsSync(target)) continue;
-    if (fs.lstatSync(link, { throwIfNoEntry: false })) continue;
-    fs.mkdirSync(path.dirname(link), { recursive: true });
-    const relTarget = path.relative(path.dirname(link), target);
-    if (fs.statSync(target).isDirectory()) {
-      try {
-        fs.symlinkSync(relTarget, link, 'dir');
-      } catch {
-        fs.symlinkSync(relTarget, link, 'junction');
-      }
-    } else {
-      fs.symlinkSync(relTarget, link);
+  for (const entry of readLayoutList(coreRoot, 'sharedAssets')) {
+    if (linkSharedEntry(gameRepoRoot, coreRoot, 'assets', entry)) {
+      linked.push(path.join(gameRepoRoot, 'public', 'assets', entry.replace(/\/+$/, '')));
     }
-    linked.push(link);
+  }
+  return linked;
+}
+
+/**
+ * Link the core-owned root app-icon files into the game repo's `public/` root.
+ *
+ * The icon set is generated from the tracked `core/public/favicon.svg`
+ * (CG-0MUTTXRWZ009NUB9) and enumerated by `repo-layout.json → sharedPublicRoot`.
+ * Composing them here keeps the game repo's `index.html` base-relative icon
+ * links resolving in dev, production and Electron builds without committing a
+ * divergent hand-authored copy.
+ *
+ * @returns The created symlink paths.
+ */
+export function linkSharedPublicAssets(
+  gameRepoRoot: string,
+  coreRoot: string,
+): string[] {
+  const linked: string[] = [];
+  for (const entry of readLayoutList(coreRoot, 'sharedPublicRoot')) {
+    if (linkSharedEntry(gameRepoRoot, coreRoot, '', entry)) {
+      linked.push(path.join(gameRepoRoot, 'public', entry.replace(/\/+$/, '')));
+    }
   }
   return linked;
 }
@@ -701,6 +786,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   }
 
   const assetLinks = linkSharedAssets(gameRepoRoot, coreRoot);
+  const publicLinks = linkSharedPublicAssets(gameRepoRoot, coreRoot);
 
   const rewritten = rewriteGameTreePaths(gameRepoRoot, options.game);
 
@@ -717,6 +803,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     symlinks,
     rewritten,
     assetLinks,
+    publicLinks,
   };
 }
 
@@ -855,6 +942,9 @@ function main(argv: string[]): number {
       }
       if (result.assetLinks.length) {
         console.log(`  linked ${result.assetLinks.length} shared asset(s)`);
+      }
+      if (result.publicLinks.length) {
+        console.log(`  linked ${result.publicLinks.length} root app-icon file(s)`);
       }
     } catch (err) {
       failures += 1;

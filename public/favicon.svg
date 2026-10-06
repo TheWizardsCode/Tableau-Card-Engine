@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tableau Card Engine — tableau emblem.
+
+  Provenance: original in-house artwork created for the Tableau Card Engine.
+  Licence: CC0-1.0 (public-domain dedication) — free for any use, no
+  attribution required. Recorded in public/assets/CREDITS.md.
+
+  This file is the single tracked source of truth for every web and desktop
+  icon variant. Do not hand-edit the generated PNG/ICO/ICNS derivatives;
+  regenerate them with `npm run icons:generate` (see scripts/generate-app-icons.ts).
+
+  Design notes: a flat, high-contrast tableau — a 2x2 grid of cards, one per
+  suit, on a rounded navy badge. The four cream cards over the deep navy field
+  give the mark a distinctive silhouette that survives downscaling to 16x16,
+  and the coloured pips read as a card motif rather than a generic grid.
+  Deliberately built from filled shapes only — no hairline strokes that would
+  disappear at the smallest favicon size.
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  width="64"
+  height="64"
+  role="img"
+  aria-label="Tableau Card Engine"
+>
+  <title>Tableau Card Engine</title>
+
+  <!-- Rounded table badge (the emblem field) -->
+  <rect x="0" y="0" width="64" height="64" rx="14" ry="14" fill="#12233f" />
+
+  <!-- Tableau: a 2x2 grid of cards, one suit per cell -->
+  <!-- Top-left card: red heart -->
+  <g transform="translate(20 19)">
+    <rect x="-11" y="-12" width="22" height="24" rx="3" fill="#f7f3e8" />
+    <path
+      fill="#d64545"
+      d="M0 5 C-1.8 3 -6 0.3 -6 -2.6 C-6 -4.8 -4.3 -6.4 -2.4 -6.4 C-1.2 -6.4 -0.4 -5.8 0 -5 C0.4 -5.8 1.2 -6.4 2.4 -6.4 C4.3 -6.4 6 -4.8 6 -2.6 C6 0.3 1.8 3 0 5 Z"
+    />
+  </g>
+
+  <!-- Top-right card: navy spade -->
+  <g transform="translate(44 19)">
+    <rect x="-11" y="-12" width="22" height="24" rx="3" fill="#f7f3e8" />
+    <path
+      fill="#12233f"
+      d="M0 -6.8 C-2.8 -4.2 -6.4 -1.8 -6.4 1.6 C-6.4 3.8 -4.8 5.5 -2.6 5.5 C-1.6 5.5 -0.8 5.1 -0.1 4.5 L0 4.4 L0.1 4.5 C0.8 5.1 1.6 5.5 2.6 5.5 C4.8 5.5 6.4 3.8 6.4 1.6 C6.4 -1.8 2.8 -4.2 0 -6.8 Z M-1.3 4.8 L1.3 4.8 L2 7.6 L-2 7.6 Z"
+    />
+  </g>
+
+  <!-- Bottom-left card: gold diamond -->
+  <g transform="translate(20 47)">
+    <rect x="-11" y="-12" width="22" height="24" rx="3" fill="#f7f3e8" />
+    <path fill="#e0b54a" d="M0 -6.8 L5.2 -0.2 L0 6.4 L-5.2 -0.2 Z" />
+  </g>
+
+  <!-- Bottom-right card: teal club -->
+  <g transform="translate(44 47)">
+    <rect x="-11" y="-12" width="22" height="24" rx="3" fill="#f7f3e8" />
+    <g fill="#2e8b8b">
+      <circle cx="0" cy="-3.4" r="3.1" />
+      <circle cx="-3.4" cy="1.4" r="3.1" />
+      <circle cx="3.4" cy="1.4" r="3.1" />
+      <path d="M-1.3 3.4 L1.3 3.4 L2 7.6 L-2 7.6 Z" />
+    </g>
+  </g>
+</svg>

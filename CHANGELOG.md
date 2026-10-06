@@ -1,19 +1,18 @@
 # Changelog
 
 ## v0.1.20 (2026-10-06)
-> **Release focus:** This release focuses on improving audio controls and playback quality, along with fixing game icons and launcher integration so new games load and appear correctly. It also resolves build and save reliability issues, including Windows installer creation and concurrent session conflicts.
+> **Release focus:** This release focuses on improving the launcher and web experience, including adding a proper game icon for browser tabs and bookmarks, allowing new games to be added without reinstalling, and fixing a sync bug so completed tasks stay completed. It also upgrades Main Street sound effects to rich synthesised audio with a live dev toggle, and includes documentation and code cleanup updates.
 ### Features
-- See if synthesized audio is active and switch it on or off while playing. (CG-0MUTU0K17008HP35)
+- See whether synthesized audio is active and switch it on or off live in dev settings. (CG-0MUTU0K17008HP35)
 - The game now has its own icon in browser tabs, bookmarks, and desktop apps. (CG-0MUTTXRWZ009NUB9)
-- New games made from the template will load correctly on GitHub Pages. (CG-0MURAK8MX009WWUC)
-- New games can now be added to the launcher without a full rebuild. (CG-0MTRO7VMI000F3A5)
+- Add new games to the launcher without reinstalling or rebuilding it. (CG-0MTRO7VMI000F3A5)
 ### Bug Fixes
-- Completed work no longer gets undone when multiple sessions save at the same time. (CG-0MUUFGXFX004O2X7)
-- Main Street sound effects now play as intended instead of falling back to lower-quality audio. (CG-0MUTU0MFE0077H0F)
-- Windows installers now build correctly so you can install and play on PC. (CG-0MUWQJ279009KBMM)
-- Cleaned up internal code formatting with no impact on gameplay. (CG-0MUU4T81I009B1K4)
-- Each game now shows its proper icon in the browser tab and bookmarks. (CG-0MUUFZSE90061KKL)
-- Release notes now match what CI actually does, so contributors stop chasing steps that never run. (CG-0MUIGWT96001UEY7)
+- Completed tasks no longer revert to open during sync, so your progress stays saved. (CG-0MUUFGXFX004O2X7)
+- Main Street sound effects now play as rich synthesised audio instead of the degraded fallback. (CG-0MUTU0MFE0077H0F)
+- No gameplay changes; just a behind-the-scenes code cleanup. (CG-0MUU4T81I009B1K4)
+- Each game now shows the correct TCE icon in browser tabs, bookmarks, and home screens. (CG-0MUUFZSE90061KKL)
+- New games built from the template will load correctly on their web pages. (CG-0MURAK8MX009WWUC)
+- Release guide now matches the actual build process, so contributors won't waste time on steps that don't run. (CG-0MUIGWT96001UEY7)
 ### Other
 - Test timing docs now match real runtimes, so release planning is more accurate. (CG-0MUEMB3OJ005DPLH)
 

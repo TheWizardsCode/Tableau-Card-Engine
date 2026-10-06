@@ -14,6 +14,7 @@ npm test             # run Vitest test suite (non-destructive: does not modify t
 npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
+npm run generate:icons # regenerate app icons from public/favicon.svg (the tableau emblem)
 
 # Compose a full multi-game distribution (core + sibling game checkouts):
 npm run setup:distribution -- --dir ..
@@ -52,6 +53,13 @@ Gym) for a fast development loop.
 See [Repository Map](#repository-map-multi-repo-layout) below and the
 [Config-Driven Game Catalogue](docs/dev/game-configuration.md) reference for
 the preset schema, resolution order, `GAME_INFO` convention and authoring steps.
+
+In addition to the build-time catalogue, the **Electron launcher can load games
+at runtime**: a game built as an artifact (ESM `entry.js` + assets) can be
+dropped into `<contentDir>/games/` and declared in a `games/manifest.json`, so
+it appears in the Game Selector without rebuilding the launcher. Each entry
+declares a compatible core-engine version range; incompatible games are hidden
+and noted. See [Runtime Game Plugins](docs/DEVELOPER.md#runtime-game-plugins).
 
 ## Desktop Launcher (Electron) & Steam Packaging
 
@@ -299,6 +307,8 @@ This approach was chosen for **performance** (no per-level SVG regeneration), **
 ## ToneForge runtime adapter (Main Street)
 
 Main Street routes mapped SFX keys through a committed ToneForge-backed module via `createTfPlayer`. The runtime synth module is committed at `src/core-engine/tf-runtime/main-street-runtime-synth.mjs` and bundled into every build, so no `tf` CLI or generation step is required. `npm run tf:generate` (when the ToneForge CLI is available) refreshes it and emits WAV/metadata outputs under `build/tf-synths/`. The adapter expects module exports `factories: Record<string, () => TfVoice>` and optional `getFactory()` / `descriptors` helpers. See `docs/the-build/audio.md` for generation workflow and wiring details.
+
+In dev mode (`npm run dev`), the Settings panel's **Debug Tools** section includes a **ToneForge** entry showing whether synth integration is `Active` or `Inactive` (live, without reopening the panel) together with the mapped factory count and the last module load error. Clicking it toggles ToneForge on/off at runtime — no scene restart — so you can A/B compare synthesised audio against the fallback WAV/Phaser path. See `docs/DEVELOPER.md#toneforge` for details.
 
 ## Contributing
 

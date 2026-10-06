@@ -82,9 +82,37 @@ describe('createTfPlayer', () => {
 
     const player = createTfPlayer(tfModule, { logger: { warn } });
 
-    expect(() => player.play('missing-sfx')).not.toThrow();
+    // Returns false so the caller can fall back to the WAV/Phaser path
+    // rather than dropping the sound silently (CG-0MUU9PSWC009CW76).
+    expect(player.play('missing-sfx')).toBe(false);
     expect(warn).toHaveBeenCalledWith(
       '[tfAdapter] Missing tf factory for key "missing-sfx" (mapped: "missing-sfx")',
     );
+  });
+
+  it('returns true when a voice was played', () => {
+    const tfModule: TfGeneratedModule = {
+      factories: { 'card-draw': () => ({ play: vi.fn() }) },
+    };
+
+    const player = createTfPlayer(tfModule);
+
+    expect(player.play('card-draw')).toBe(true);
+  });
+
+  it('returns false when voice creation throws', () => {
+    const warn = vi.fn();
+    const tfModule: TfGeneratedModule = {
+      factories: {
+        'card-draw': () => {
+          throw new Error('boom');
+        },
+      },
+    };
+
+    const player = createTfPlayer(tfModule, { logger: { warn } });
+
+    expect(player.play('card-draw')).toBe(false);
+    expect(warn).toHaveBeenCalledWith('[tfAdapter] Failed to create tf voice for key "card-draw"');
   });
 });
