@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.20 (2026-10-06)
+> **Release focus:** This release focuses on improving audio controls and playback quality, along with fixing game icons and launcher integration so new games load and appear correctly. It also resolves build and save reliability issues, including Windows installer creation and concurrent session conflicts.
+### Features
+- See if synthesized audio is active and switch it on or off while playing. (CG-0MUTU0K17008HP35)
+- The game now has its own icon in browser tabs, bookmarks, and desktop apps. (CG-0MUTTXRWZ009NUB9)
+- New games made from the template will load correctly on GitHub Pages. (CG-0MURAK8MX009WWUC)
+- New games can now be added to the launcher without a full rebuild. (CG-0MTRO7VMI000F3A5)
+### Bug Fixes
+- Completed work no longer gets undone when multiple sessions save at the same time. (CG-0MUUFGXFX004O2X7)
+- Main Street sound effects now play as intended instead of falling back to lower-quality audio. (CG-0MUTU0MFE0077H0F)
+- Windows installers now build correctly so you can install and play on PC. (CG-0MUWQJ279009KBMM)
+- Cleaned up internal code formatting with no impact on gameplay. (CG-0MUU4T81I009B1K4)
+- Each game now shows its proper icon in the browser tab and bookmarks. (CG-0MUUFZSE90061KKL)
+- Release notes now match what CI actually does, so contributors stop chasing steps that never run. (CG-0MUIGWT96001UEY7)
+### Other
+- Test timing docs now match real runtimes, so release planning is more accurate. (CG-0MUEMB3OJ005DPLH)
+
 ## v0.1.19 (2026-10-02)
 ### Features
 - Games can now be built and shipped individually or in custom bundles, so you get faster updates and smaller downloads. (CG-0MTR7DLMY008CK17)
