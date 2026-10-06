@@ -1,0 +1,9 @@
+{
+  "games": [
+    {
+      "id": "runtime-fixture",
+      "path": "tests/fixtures/runtime-plugin-fixture",
+      "scenePath": "src/RuntimeFixtureScene.ts"
+    }
+  ]
+}

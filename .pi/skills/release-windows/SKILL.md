@@ -15,16 +15,27 @@ Release. This skill closes that gap with a repeatable, one-command flow.
 
 **When to use this skill:**
 
+> **Automatic path first.** Since CG-0MUMSWPGY0016N97 the promotion runs
+> automatically in CI: on a `v*` tag push, the `promote-release` job in
+> `.github/workflows/package.yml` invokes this same helper to create the draft
+> release (non-blocking; failures are surfaced in the job summary). You do
+> **not** need to run this skill after an ordinary `dev`→`main` release — just
+> review and publish the draft it created.
+
+Use this skill as the **manual fallback** when:
+
 - The operator wants the latest Windows installer available as a GitHub Release
-  draft for review and publishing.
+  draft for review and publishing (e.g. the CI promotion failed or was skipped).
 - A release draft needs regenerating or re-checking after a new CI run.
+- The promotion path needs a dry-run check before a tag is pushed.
 
 **Operator approval model:** creating the **draft** needs no pre-approval — the
 draft itself is the approval gate. The operator reviews the draft in the GitHub
 UI and clicks **Publish release** to complete the release. This skill never
 publishes and never marks a release as pre-release.
 
-**Target audience:** AI agents and the operator invoking `/skill:release-windows`.
+**Target audience:** CI (the automated job) and AI agents / the operator
+invoking `/skill:release-windows`.
 
 ## 2. Prerequisites
 
@@ -47,6 +58,17 @@ node .pi/skills/release-windows/scripts/promote-windows-release.mjs --dry-run
 # Create the draft release:
 node .pi/skills/release-windows/scripts/promote-windows-release.mjs
 ```
+
+CI (`.github/workflows/package.yml`, job `promote-release`) runs the same two
+steps on a `v*` tag push, pinning the current run with `--run-id`:
+
+```bash
+node .pi/skills/release-windows/scripts/promote-windows-release.mjs --dry-run --run-id "${{ github.run_id }}"
+node .pi/skills/release-windows/scripts/promote-windows-release.mjs --run-id "${{ github.run_id }}"
+```
+
+With `--run-id`, `--dry-run` additionally verifies (read-only) that the run has
+the `tce-windows-installer` artifact before the real step runs.
 
 The script performs these steps (mirroring the `--dry-run` output):
 

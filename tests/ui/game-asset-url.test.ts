@@ -9,13 +9,20 @@
  * a URL that could point outside the game's artifact directory.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 
 import {
   resolveGameAssetUrl,
+  resolveActiveGameAssetUrl,
+  setActiveRuntimeGame,
+  getActiveRuntimeGame,
   GameAssetUrlError,
   GAME_ASSET_URL_SCHEME,
 } from '../../src/ui/game-asset-url';
+
+afterEach(() => {
+  setActiveRuntimeGame(null);
+});
 
 describe('GAME_ASSET_URL_SCHEME', () => {
   it('is the tce-games scheme', () => {
@@ -114,5 +121,41 @@ describe('resolveGameAssetUrl', () => {
       expect(error).toBeInstanceOf(GameAssetUrlError);
       expect((error as GameAssetUrlError).code).toBe('INVALID_GAME_ID');
     }
+  });
+});
+
+describe('active runtime game asset base', () => {
+  it('defaults to no active runtime game', () => {
+    expect(getActiveRuntimeGame()).toBeNull();
+    expect(resolveActiveGameAssetUrl('assets/audio/golf/card-draw.wav')).toBeNull();
+  });
+
+  it('resolves an artifact-relative path for the active game', () => {
+    setActiveRuntimeGame('golf');
+
+    expect(getActiveRuntimeGame()).toBe('golf');
+    expect(resolveActiveGameAssetUrl('assets/audio/golf/card-draw.wav')).toBe(
+      'tce-games://golf/assets/audio/golf/card-draw.wav',
+    );
+  });
+
+  it('lower-cases the active id to match URL host semantics', () => {
+    setActiveRuntimeGame('Golf');
+    expect(getActiveRuntimeGame()).toBe('golf');
+  });
+
+  it('clears the base for null, empty, or invalid ids', () => {
+    for (const bad of [null, '', '   ', 'a/b', '../etc']) {
+      setActiveRuntimeGame('golf');
+      setActiveRuntimeGame(bad as string | null);
+      expect(getActiveRuntimeGame()).toBeNull();
+      expect(resolveActiveGameAssetUrl('assets/x.png')).toBeNull();
+    }
+  });
+
+  it('switching back to the static catalogue clears the base', () => {
+    setActiveRuntimeGame('golf');
+    setActiveRuntimeGame(null);
+    expect(resolveActiveGameAssetUrl('assets/audio/golf/card-draw.wav')).toBeNull();
   });
 });

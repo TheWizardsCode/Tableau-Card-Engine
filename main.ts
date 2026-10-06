@@ -20,7 +20,18 @@
  */
 import Phaser from 'phaser';
 import { createCardGame } from './src/ui/createCardGame';
-import { GameSelectorScene, REGISTRY_KEY_GAMES, type GameEntry } from './src/ui/GameSelectorScene';
+import {
+  GameSelectorScene,
+  REGISTRY_KEY_GAMES,
+  REGISTRY_KEY_INCOMPATIBLE_GAMES,
+  type GameEntry,
+} from './src/ui/GameSelectorScene';
+import { ENGINE_VERSION } from './src/core-engine';
+import {
+  buildGameBootPayload,
+  discoverRuntimeGames,
+  readContentDirFromWindow,
+} from './src/ui/game-plugin-boot';
 import { steamFollowClientFromWindow } from './src/ui/steam-follow-client';
 import { applySteamLocks, computeSteamLocks } from './src/ui/steam-lock';
 import { GAMES, SCENES } from 'virtual:game-registry';
@@ -56,21 +67,43 @@ const isReplayMode = new URLSearchParams(window.location.search).get('mode') ===
  * async resolution is awaited inside this function and invoked with `void`.
  */
 async function boot(): Promise<void> {
+  // 1. Static catalogue, with Steam bonus locks applied. In a plain browser
+  //    there is no bridge, so every game stays playable.
   const gatedGames = await resolveSteamGatedGames();
+
+  // 2. Runtime game plugins (Electron launcher only). Without a content
+  //    directory (browser / core-only build) discovery is skipped and the
+  //    catalogue is exactly the static one. Any manifest/load failure has
+  //    already been logged and degrades to the static catalogue.
+  const pluginResult = await discoverRuntimeGames({
+    contentDir: readContentDirFromWindow(),
+    engineVersion: ENGINE_VERSION,
+  });
+
+  // 3. Merge static + runtime games/scenes for Phaser registration.
+  const payload = buildGameBootPayload({
+    staticGames: gatedGames,
+    staticScenes: SCENES,
+    pluginResult,
+  });
 
   createCardGame({
     backgroundColor: '#1a2a1a',
     // Register all discovered scenes; GameSelectorScene is first so it
     // auto-starts.
-    scenes: [GameSelectorScene, ...SCENES],
+    scenes: [GameSelectorScene, ...payload.scenes],
     type: Phaser.CANVAS,
     render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
     callbacks: {
       preBoot: (game: Phaser.Game) => {
-        // Store catalogue in registry before any scene starts,
-        // so GameSelectorScene.init() can read it. Locked entries carry the
-        // Steam bonus lock state (see resolveSteamGatedGames above).
-        game.registry.set(REGISTRY_KEY_GAMES, gatedGames);
+        // Store the merged catalogue (and any incompatible runtime games) in
+        // the registry before any scene starts, so GameSelectorScene.init()
+        // can read them. Locked entries carry the Steam bonus lock state.
+        game.registry.set(REGISTRY_KEY_GAMES, payload.games);
+        game.registry.set(
+          REGISTRY_KEY_INCOMPATIBLE_GAMES,
+          payload.incompatible,
+        );
       },
     },
     exposeOnWindow: true,

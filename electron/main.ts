@@ -26,7 +26,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ContentLocatorError } from './content-locator.js';
 import { resolveGameContent, type ResolvedContent } from './launcher-config.js';
-import { handleGameAssetRequest } from './game-protocol.js';
+import { registerGameAssetHandler, GAME_ASSET_SCHEME } from './game-protocol.js';
 import { loadSteamConfig } from './steam-config.js';
 import { loadBonusCatalog } from './bonus-catalog.js';
 import { FileUnlockStore, SteamFollowService } from './steam-follow.js';
@@ -41,7 +41,7 @@ import { STEAM_ACHIEVEMENT_CHANNELS, createSteamAchievementHandlers } from './st
 const launcherDir = path.dirname(fileURLToPath(import.meta.url));
 
 /** Scheme serving per-game assets from `<contentDir>/games/` (F3). */
-const GAME_ASSET_SCHEME = 'tce-games';
+// (imported from game-protocol.ts)
 
 // Must run before app-ready: marks the scheme as standard/secure so the
 // renderer may load `tce-games://` images under file://-backed content without
@@ -77,18 +77,12 @@ function resolveContentOrExit(): ResolvedContent | null {
  * Register the deny-by-default `tce-games://` handler for *contentDir*.
  * Invalid requests (bad scheme/id/path, traversal) and missing files both
  * resolve to 404 — never a file outside `<contentDir>/games/`.
+ *
+ * The handler itself is Electron-free and lives in `game-protocol.ts` so it
+ * can be unit-tested; this is the thin Electron wiring (F6).
  */
 function registerGameAssetProtocol(contentDir: string): void {
-  protocol.handle(GAME_ASSET_SCHEME, async (request) => {
-    const result = await handleGameAssetRequest(request.url, { contentDir });
-    // Copy into an ArrayBuffer-backed view: the DOM `BodyInit` type (and the
-    // Electron `Response`) do not accept a `Uint8Array<ArrayBufferLike>`.
-    const body = result.body ? new Uint8Array(result.body) : null;
-    return new Response(body, {
-      status: result.status,
-      headers: result.headers,
-    });
-  });
+  registerGameAssetHandler(protocol, contentDir);
 }
 
 function createWindow(resolved: ResolvedContent): void {

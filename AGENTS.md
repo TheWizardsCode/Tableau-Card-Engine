@@ -74,6 +74,8 @@ npm run package:steam    # Steam build: builds the follow addon + Windows NSIS p
 
 **Release (promoting `dev` to `main`):** run the full test suite (`npm test`) and build (`npm run build`). Full suite is the **only** time the complete test suite is required.
 
+> **Windows release promotion is automatic.** When a release tags `v<version>` (the ship skill's `dev`→`main` promotion), the `promote-release` job in `.github/workflows/package.yml` promotes the freshly built Windows installer to a **draft** GitHub Release automatically — agents no longer need to run `/skill:release-windows` after a release. The draft is the operator's approval gate: review and publish it in the GitHub UI. A promotion failure is non-blocking (it never fails the Pages deploy) and is surfaced in the job summary. `/skill:release-windows` remains the documented manual fallback (regenerate a draft, or dry-run the path before a tag). See [Release process](RELEASE.md#windows-binary-steam-artifact).
+
 **During implementation:** unit tests are the minimum. Run the appropriate test profile for your context (see [Running Test Profiles](#running-test-profiles) below).
 
 **Before any push to origin:** ensure unit tests pass (`npm test -- --project unit`) and the build succeeds (`npm run build`). Full browser + tutorial E2E suites are not required on every push.
@@ -91,12 +93,12 @@ Three test profiles are available, selected via `--project` (or the npm scripts)
 | **Unit** | `npx vitest run --project unit tests/<game>/` | seconds | Node.js logic/data/integration tests | **Minimum required** whenever a skill or task calls for testing; run during implementation and before any push |
 | **Smoke** | `npm run test:smoke` | ~2 min | One representative file per game + core/UI smoke tests | Quick validation during active implementation |
 | **Dev** | `npm run test:dev` | ~3.5 min | Smoke + key E2E per game | Pre-audit / pre-commit check |
-| **Full** | `npm test` | ~15 min | Complete unit + browser + tutorial E2E suite | **Only required on release** (promoting `dev` to `main`) |
+| **Full** | `npm test` | ~18–21 min | Complete unit + browser + tutorial E2E suite | **Only required on release** (promoting `dev` to `main`) |
 
 Rules of thumb:
 
 - **A skill calls for testing  → run unit tests.** They are the minimum bar and give fast feedback.
-- **Full tests are only required on release.** Do not wait 15 min for feedback during normal implementation.
+- **Full tests are only required on release.** Do not wait 20 min for feedback during normal implementation.
 - Tutorial E2E parts (`tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts`) are excluded from smoke/dev profiles. A game's smoke/dev entry is included only when its test file exists in the current checkout: in a sibling-only core checkout (`../tce-<game>`) the profiles run the core + Gym suites only, and a game's suite runs in its game repo (CG-0MUKWPTZ50040V0Q). See `docs/DEVELOPER.md#smoke-tests` / `#dev-tests` for the full project table.
 
 **Skill-integrated entry point (`/skill:test --type`):** the same staged profiles are exposed to the global test skill through a project-local extension (`.pi/skills_extensions/test/extension.json` plus the `SKILL_PREFIX.md` policy hook): `unit`, `smoke`, `dev`, `browser`, `tutorial`, `e2e` and `electron`. `full` is deliberately omitted, so a bare `/skill:test` keeps running the genuine full CI suite and remains the **only** run that populates the audit-accepted full-suite cache entry. Browser-dependent types chain `scripts/check-browser-test-env.ts` first; every typed Vitest command defaults `GAMES_CONFIG` to `full` (an explicit `GAMES_CONFIG=…` still wins) so the game-discovery adapters load, and streams full output through `scripts/vitest-run-with-retry.ts` (retry-once + wall-clock hang timeout) while loading `scripts/vitest-tap-reporter.ts` alongside the default reporter, so a red typed run triages per test. See `docs/DEVELOPER.md#skill-integrated-test-profiles`.
@@ -117,7 +119,7 @@ The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, whic
   - **Profiles** (see [Running Test Profiles](#running-test-profiles) for full guidance):
     - `npm run test:smoke` (~2 min) — **quick validation** during active implementation. One representative file per game + core/UI smoke tests.
     - `npm run test:dev` (~3.5 min) — **pre-audit / pre-commit** check. Smoke + key E2E per game.
-    - `npm run test` (full suite, ~15 min) — **release only**. Full browser + tutorial E2E suites.
+    - `npm run test` (full suite, ~18–21 min) — **release only**. Full browser + tutorial E2E suites.
   Tutorial E2E parts are excluded from smoke/dev profiles. Full project table in `docs/DEVELOPER.md#smoke-tests` / `#dev-tests`.
 - **Before any push to origin** — run unit tests (`npm test -- --project unit`) and `npm run build`. Full suite (`npm test`) is only required on release.
 
@@ -354,6 +356,8 @@ Use `SaveLoadStore`, `serializeWithVersion()`, and `deserializeWithVersion()` fr
 - **When to use:** Wire `SoundManager` to `GameEventEmitter` for event-driven audio (e.g., card deal → play deal sound). Use `popTextOrIcon()` for lightweight score-change or undo/redo notifications. Add particle effects for celebrations. Provide mute toggle and volume slider with immediate effect.
 - **Key features:** Auto-discovery of sound keys, mute toggling with immediate effect, invalid sound handled safely, volume slider, pop text/icon feedback, particle celebration with reduced-motion fallback.
 
+**ToneForge runtime-synth diagnostics (dev-only):** when a game wires ToneForge runtime synthesis (`SoundManager.setSynthIntegration`), the Settings panel's **Debug Tools** section shows a **ToneForge** entry whose live status reports `Active`/`Inactive` plus the mapped factory count and any module load error, and whose click toggles synthesis on/off at runtime (no scene restart) for A/B audio comparison. The engine injects the entry into the **effective** debug-tools list (`resolveEffectiveDebugTools` in `src/ui/debug/ToneForgeStatusTool.ts`), de-duplicated by label, so it appears even for games that pass their own `debugTools` list (e.g. Main Street) and it is tree-shaken from production. `SoundManager` exposes `isSynthActive()` / `getSynthStatus()` and `detachSynthIntegration()` / `restoreSynthIntegration()` to support this; existing callers are unaffected when the diagnostic API is unused.
+
 ### 9. Screen Layout Language (SLL) for Declarative Positioning
 
 Define UI layouts declaratively using JSON layout files with **Screen Layout Language (SLL)** instead of hardcoded pixel positions. SLL provides a responsive layout system with zones, anchors, and viewport normalization.
@@ -548,6 +552,69 @@ The TCE launcher's Steam follow-to-unlock mechanic is the canonical example
   Main Street is the first consumer (`tce-main-street/src/MainStreetAchievements.ts`).
   Manual QA: [`docs/dev/steam-achievements-qa.md`](docs/dev/steam-achievements-qa.md);
   developer workflow: `docs/DEVELOPER.md` (Steam achievements).
+
+### 21. Runtime Game Plugins (Drop-in Games)
+
+Augment the **build-time** game catalogue with games discovered from a content
+directory at launcher startup, so a distribution can add or update a game
+**without rebuilding the launcher**. The runtime plugin loader is the canonical
+example (`CG-0MTRO7VMI000F3A5`).
+
+- **When to use:** shipping an Electron launcher whose game set must change
+  post-build (dropping in a new game, or updating one). This is additive to the
+  config-driven preset catalogue — runtime games never replace the static
+  entries, and a failure degrades to the static catalogue (never a blank
+  screen). Web-runtime plugins are out of scope; Electron only.
+- **Modules:** `src/ui/GamePluginLoader.ts` (async `loadGamePlugins` with
+  injected `importer`/`fetchManifest` — unit-testable without Electron),
+  `src/ui/game-manifest.ts` (`parseGameManifest` + `splitByCompatibility`,
+  never throws), `src/ui/game-asset-url.ts` (`tce-games://<id>/<path>` builder),
+  `src/ui/game-plugin-boot.ts` (`discoverRuntimeGames` + `buildGameBootPayload`
+  merge), `electron/game-protocol.ts` (deny-by-default `tce-games://` handler),
+  and `scripts/build-game-artifact.mjs` (the reference artifact builder). The
+  selector renders runtime entries through the same card path as static ones
+  and lists incompatible games in an SLL-positioned notice
+  (`REGISTRY_KEY_INCOMPATIBLE_GAMES`).
+- **Contract:** `<contentDir>/games/manifest.json` declares games shaped
+  `{ id, sceneKey, title, description, thumbnail?, coreEngineVersion, entry }`;
+  each artifact ships `entry.js` (named scene-class export + `GAME_INFO`) and
+  `assets/`. Thumbnails load over `tce-games://`, not the launcher's `public/`.
+  Every entry declares a `coreEngineVersion` **semver range**; incompatible
+  games are hidden and reported, and duplicate `id`/`sceneKey` is rejected.
+- **Externalised shared dependencies:** a runtime artifact must **not** bundle a
+  second Phaser/engine copy; the reference builder externalises `phaser` and
+  the `@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`
+  aliases. The launcher supplies those at runtime.
+- **Shared-dependency resolution (`tce-shared` import map):** externalised
+  bare specifiers are resolved by the launcher's generated import map
+  (`scripts/vite-runtime-shared-plugin.ts` + `scripts/runtime-shared-import-map.ts`),
+  which emits a stable path-named chunk per engine module (`tce-shared/**`),
+  re-exports Phaser as `tce-shared/phaser.js`, and injects
+  `<script type="importmap">` into `dist/index.html` at `head-prepend`. One build
+  means one engine/Phaser instance (class identity preserved). Electron-mode
+  only; deterministic (no hash reliance). Verify with
+  `npm run verify:runtime-plugin`; runbook
+  [`docs/dev/runtime-game-plugins-runbook.md`](docs/dev/runtime-game-plugins-runbook.md),
+  reference docs
+  [`docs/DEVELOPER.md` → Runtime Game Plugins](docs/DEVELOPER.md#runtime-game-plugins).
+- **Per-game asset resolution:** a runtime game's own audio/icons are packaged
+  in its artifact (the builder copies the game's real, non-symlink assets) and
+  resolved through the scoped `tce-games://` protocol. The plugin loader tags
+  each runtime entry with `runtimeGameId`; the Game Selector calls
+  `setActiveRuntimeGame(id)` before starting the scene (and clears it on
+  entry), so `audioPathWithFallback` resolves to
+  `tce-games://<id>/assets/audio/…`. When the artifact omits an optional SFX,
+  the protocol serves the launcher's shared `assets/audio/default/…`
+  (`resolveSharedAudioFallback`), and `SoundManager` skips a key the backend
+  cannot play, so a missing sound never aborts the scene. Verify with
+  `tests/electron/game-protocol.test.ts`, `tests/ui/game-asset-url.test.ts`,
+  `tests/ui/CardGameScene.test.ts`, `tests/core-engine/SoundManager.test.ts`,
+  and `tests/scripts/build-game-artifact.test.ts`; runbook scenario E.
+- **Test seams:** the loader takes `{ contentDir, engineVersion, importer,
+  fetchManifest }`; tests inject a stub importer/fetcher. Fixtures live in
+  `tests/fixtures/plugin-game/`; builder↔loader↔selector coverage is in
+  `tests/ui/game-plugin-loader.test.ts`, `tests/ui/game-plugin-boot.test.ts`,
+  and `tests/ui/game-plugin-e2e.test.ts`.
 
 ### Scene Base Class Pattern
 

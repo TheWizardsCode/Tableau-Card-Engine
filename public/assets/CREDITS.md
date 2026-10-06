@@ -9,6 +9,18 @@ All assets in this directory are licensed for free commercial use.
 
 Rendering guidance: The project's canonical card art is 140×190 (portrait). All runtime renderers should preserve aspect ratio (fit-inside) when deriving thumbnails for market slots, street slots, hand sprites, and UI components. See `docs/main-street/card-dimensions.md` for recommended mappings and Phaser examples.
 
+## Application Icon — Tableau Emblem
+
+The application icon (favicon, Apple touch icon, web app manifest, and packaged
+desktop/installer icon) is the **tableau emblem**:
+
+- **Source**: `public/favicon.svg` — original in-house SVG (single source of truth for every variant)
+- **License**: CC0-1.0 / Public Domain (original in-house artwork, no external assets used)
+- **Generator**: Run `npm run generate:icons` (`scripts/generate-app-icons.ts`) to rasterise every web and desktop variant from the SVG
+- **Variants**: `public/icon-32.png`, `public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png`, and the gitignored `build/icon.png` (electron-builder derives `.ico`/`.icns` from it)
+
+See `docs/DEVELOPER.md` (Application icon) and `CG-0MUTTXRWZ009NUB9`.
+
 ## Playing Card Assets
 
 52 card face SVGs and 1 card back SVG sourced from:

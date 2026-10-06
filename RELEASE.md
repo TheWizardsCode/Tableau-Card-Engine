@@ -7,31 +7,35 @@ Quick summary
 -------------
 - Releases are performed automatically by GitHub Actions on every push to the main branch.
 - The site is published to GitHub Pages at: https://thewizardscode.github.io/Tableau-Card-Engine/
-- The release workflow runs tests and a production build; deployments are blocked if tests or the build fail.
+- The release workflow builds the full distribution and deploys to GitHub Pages; deployments are blocked if the build fails.
 
 What the release workflow does
 -----------------------------
 The GitHub Actions workflow (.github/workflows/deploy.yml) runs on every push to main and performs the following steps:
 
-1. Checkout the repository and set up Node.js (Node 20).
-2. Install dependencies: npm ci
-3. Install Playwright Chromium (required for browser tests): npx playwright install chromium
-4. Run Monte Carlo harness (on a separate job) and upload artifacts
-5. Run tests: npm test (unit + browser; environment variables on main branch enable stricter Monte Carlo checks)
-6. Compose the sibling game repositories, then build the full launcher distribution: GAMES_CONFIG=full npm run build (vite -> dist/). The core repo carries no games at HEAD, so the public `tce-<game>` repos listed in configs/full.json are cloned as siblings (`../tce-<game>`) first. The `full` preset bundles the engine + Gym + all eight example games; without `GAMES_CONFIG` the game-discovery plugin would default to the core-only preset (Gym only).
-7. Configure Pages, upload the dist/ directory as a Pages artifact, and deploy via actions/deploy-pages@v4
+1. Checkout
+2. Setup Node.js
+3. Install dependencies
+4. Compose sibling game repositories
+5. Build
+6. Configure Pages
+7. Upload artifact
+8. Deploy to GitHub Pages
 
 Only one deployment runs at a time; if a new push arrives while a deployment is in progress, the previous run is cancelled.
 
 Important notes about CI and tests
 ---------------------------------
-- Browser tests require Playwright's Chromium. The workflow installs it automatically, but to reproduce locally run:
-
-  npx playwright install chromium
-
-- The main branch CI runs a stricter set of Monte Carlo checks (MONTE_SEEDS=200, MONTE_MIN_WIN_RATE=0.30, MONTE_MAX_WIN_RATE=0.60). To reproduce main branch CI locally:
-
-  MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.30 MONTE_MAX_WIN_RATE=0.60 npm test
+- **CI is build-only.** Both `deploy.yml` (main branch) and
+  `pr-checks.yml` (pull requests) run `npm run build` only — TypeScript
+  compile and Vite bundle.  No test, Playwright, or Monte Carlo steps run in CI.
+- **Tests are run locally.** The full test suite (`npm test`) should be run
+  locally before every release; unit tests (`npm test -- --project unit`) are
+  the minimum during development.  See [AGENTS.md quality gates]
+  (AGENTS.md#quality-gates) for the full guidance.
+- **Monte Carlo is a local balance tool.** `npm run monte-carlo` validates
+  game balance from a JSON transcript and requires the `../tce-main-street`
+  sibling — it is not run by any CI workflow.
 
 Vite base path
 --------------
@@ -61,19 +65,20 @@ Verifying a deployment
 Pre-release checklist (recommended before merging to main)
 ---------------------------------------------------------
 - [ ] Run the full test suite locally: npm test
-- [ ] Reproduce main CI Monte Carlo locally if you changed game balance code:
-      MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.30 MONTE_MAX_WIN_RATE=0.60 npm test
+- [ ] Run local Monte Carlo balance checks if you changed game balance code
+      (requires `../tce-main-street` sibling):
+      `GAMES_CONFIG=full npm run monte-carlo`
 - [ ] Run a production build locally: npm run build
 - [ ] Ensure any changed assets are committed under public/assets/ and credited in public/assets/CREDITS.md
 - [ ] Update docs if the release changes developer workflows or CI (docs/DEVELOPER.md and AGENTS.md)
 
 Manual commands (local)
 -----------------------
-# Fast local tests
-npm test
+# Fast local unit tests
+npm test -- --project unit
 
-# Reproduce main CI tests
-MONTE_SEEDS=200 MONTE_MIN_WIN_RATE=0.30 MONTE_MAX_WIN_RATE=0.60 npm test
+# Full test suite (unit + browser + tutorial E2E; ~20 min)
+npm test
 
 # Production build (full launcher distribution, as deployed to Pages).
 # Requires the sibling game repos: npm run setup:distribution -- --dir ..
@@ -82,15 +87,15 @@ GAMES_CONFIG=full npm run build
 # Core-only build (Gym only) — the local default
 npm run build
 
-# Install Playwright Chromium (if running browser tests locally)
-npx playwright install chromium
+# Monte Carlo balance validation (local only; requires ../tce-main-street sibling)
+GAMES_CONFIG=full npm run monte-carlo
 
 Where the workflow lives
 ------------------------
 The deploy workflow lives at: .github/workflows/deploy.yml
 
-- Monte Carlo artifacts (from the monte-carlo job) are uploaded to the Actions artifacts for inspection.
-- The build-and-deploy job uploads dist/ as a Pages artifact and calls actions/deploy-pages@v4 to publish.
+- The build-and-deploy job uploads dist/ as a Pages artifact and calls
+  actions/deploy-pages@v4 to publish.
 
 Windows binary (Steam artifact)
 -------------------------------
@@ -103,6 +108,19 @@ A second workflow, `.github/workflows/package.yml`, runs on every push to `main`
 5. Uploads the installer (`release/TCE-Setup-<version>.exe`) as the `tce-windows-installer` workflow artifact (downloadable from the Actions run, ~90-day retention)
 
 Windows is the primary Steam target; this is how the binary is produced reproducibly without a Windows dev machine. The GitHub Pages deploy workflow is unaffected by this job. To produce the artifact for a manual release, run the workflow from the Actions tab (Run workflow) or push a `v*` tag.
+
+**Automatic draft GitHub Release.** On a `v*` tag push the workflow's
+`promote-release` job promotes the installer to a **draft** GitHub Release
+using `CHANGELOG.md` notes for the tagged version (falling back to
+`--generate-notes` when the section is absent). It attaches
+`TCE-Setup-<version>.exe`, reuses the existing `v<version>` tag, and is
+idempotent (an existing release for that version is reported, not
+overwritten). The job is `continue-on-error`, so a promotion failure never
+fails the workflow or the Pages deploy; it is surfaced in the job summary with
+instructions to run `/skill:release-windows` manually. **The draft is the
+operator's approval gate** — review it and click **Publish release** in the
+GitHub UI; nothing is published automatically. Verify a draft exists with
+`gh release list --draft`.
 
 Steam build (follow-to-unlock native module)
 --------------------------------------------
