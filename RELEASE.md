@@ -122,6 +122,37 @@ operator's approval gate** — review it and click **Publish release** in the
 GitHub UI; nothing is published automatically. Verify a draft exists with
 `gh release list --draft`.
 
+### `package-windows` is not a PR-required status check (exemption)
+
+The `package-windows` job is triggered by the `v*` tag push (and by pushes to
+`main`/manual dispatch), not by the pull request. The ship skill's release
+script (`merge-dev-to-main.sh`) creates that tag on the release branch's merge
+commit — the same commit that is the head of the automated dev→main PR. The
+tag push therefore starts a `package-windows` check run against the PR head
+commit, and `waitForPRMerge` in `run-release.js` sees it in the PR's
+`statusCheckRollup`.
+
+**It is not a PR-required check by intent.** It builds and smoke-tests the
+Windows artifact independently of the source merge; a failure there (for
+example a flaky packaging runner, or a smoke-test false positive on a missing
+generated thumbnail — the class of failure addressed by
+CG-0MUX17L47000O4CE) must not block the dev→main merge. The `promote-release`
+job is already `continue-on-error`, so the draft-release step never gates the
+deploy either.
+
+**Exemption procedure for the operator.** When `package-windows` fails on a
+release PR and the source itself is sound (both workflows' source changes
+already passed the local quality gates, or the failure is upstream of the
+merge):
+
+1. Do **not** wait on the `package-windows` check — it is advisory for the
+   merge.
+2. Re-run the release with `--force`, which skips the `waitForPRMerge`
+   status-check wait; or merge the dev→main PR manually in the GitHub UI.
+3. Address the Windows artifact separately: inspect the failed job, re-run the
+   workflow as needed, and use `/skill:release-windows` to regenerate the
+   draft release if the artifact is missing.
+
 Steam build (follow-to-unlock native module)
 --------------------------------------------
 `steamworks.js` is an **optional** native module, intentionally not a `package.json` dependency so ordinary installs and CI never need a native build. To produce a binary with Steam follow-to-unlock support:
