@@ -14,6 +14,8 @@ game — all without editing source.
 - Plugin implementation: [`scripts/vite-game-discovery-plugin.ts`](../../scripts/vite-game-discovery-plugin.ts)
 - Repo partition (a *different* config): [`scripts/configs/repo-layout.json`](../../scripts/configs/repo-layout.json) — see
   [Multi-Repo Architecture](multi-repo-architecture.md)
+- New-game lifecycle: the canonical [Creating a New Game](creating-a-new-game.md)
+  guide links here for its registration stage (stage 7).
 
 ## Selecting a preset
 

@@ -15,6 +15,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
+- [Game Repository Setup & Publication](#game-repository-setup--publication)
 - [Runtime Game Plugins](#runtime-game-plugins)
 - [Hand & Pile Rendering](#hand--pile-rendering)
 - [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
@@ -1727,7 +1728,27 @@ When migrating an existing game to the canonical pattern:
 
 ## Adding an Example Game
 
+> **Canonical guide:** the full end-to-end lifecycle — concept/ideation,
+> intake/planning, repo scaffold, architecture/implementation (SLL, HUD,
+> audio/SFX, reduced motion, persistence, AI), testing profiles, CI/release,
+> registration, assets/licensing, docs and publication — now lives in
+> [**Creating a New Game**](dev/creating-a-new-game.md). Start there. Its
+> [definition-of-done pointer](dev/creating-a-new-game.md#definition-of-done)
+> leads to the single authoritative compliance checklist.
+>
+> **Deep dives:** [Multi-Repo Architecture](dev/multi-repo-architecture.md) ·
+> [Config-Driven Game Catalogue](dev/game-configuration.md) ·
+> [Per-game `src/` layout](dev/per-game-src-layout-decision.md) · [Repo
+> publication decision](dev/repo-publication-decision.md).
+
 > **Note:** For engine feature demonstrations (not full games), add a demo scene to the **Gym** instead of creating a new example game. See [Gym documentation](../example-games/gym/README.md) and [Gym scene index](gym/GYM_INDEX.md).
+
+## Game Repository Setup & Publication
+
+The detailed repo-layout, scaffold and publication reference behind the
+lifecycle guide's stages 3, 7, 8 and 10. The lifecycle framing itself lives in
+[Creating a New Game](dev/creating-a-new-game.md); this section is the
+technical deep dive.
 
 ### Repo layout
 

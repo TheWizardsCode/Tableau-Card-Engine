@@ -21,6 +21,10 @@ repository per example game, composed back together with **git submodules**.
 It records *what moves where*, *how history is preserved*, and *how assets are
 partitioned*.
 
+> **New to creating a game?** Start with the canonical
+> [Creating a New Game](creating-a-new-game.md) end-to-end guide; this document
+> is the architecture deep dive behind its repo-scaffold stage (stage 3).
+
 > **Status of the split in this document.** The engine/Gym/launcher partition
 > described here is current and still holds; only the *repository identity* of
 > the core changed under the merged-core decision — the core repository is now

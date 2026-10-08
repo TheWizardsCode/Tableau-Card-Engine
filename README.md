@@ -317,6 +317,7 @@ In dev mode (`npm run dev`), the Settings panel's **Debug Tools** section includ
 2. **Quality gates** -- before pushing, ensure `npm test` passes and `npm run build` succeeds.
 3. **Update docs** -- if you change tooling, scripts, directory structure, or developer workflow, update `docs/DEVELOPER.md` and `AGENTS.md` in the same PR or as a child work item.
 4. **Asset licensing** -- all assets must be CC0, MIT, Apache 2.0, or similarly permissive. Document attribution in `public/assets/CREDITS.md`.
+5. **Creating a new game** -- follow the [Creating a New Game guide](docs/dev/creating-a-new-game.md) for the full lifecycle, from concept to publication.
 
 For detailed development guidance, see [`docs/DEVELOPER.md`](docs/DEVELOPER.md).
 
