@@ -33,22 +33,31 @@ import {
   readContentDirFromWindow,
 } from './src/ui/game-plugin-boot';
 import { steamFollowClientFromWindow } from './src/ui/steam-follow-client';
+import { contentUnlockClientFromWindow } from './src/ui/content-unlock-client';
 import { applySteamLocks, computeSteamLocks } from './src/ui/steam-lock';
 import { GAMES, SCENES } from 'virtual:game-registry';
 
 export { GAMES };
 
-// ── Steam bonus locks (F4, CG-0MSMAJQQT004SDCC) ─────────────
+// ── Unified game locks (F4/F6, CG-0MSMAJQQT004SDCC / CG-0MUZGBTD1007G84S) ──
 //
-// In the Electron launcher the bonus catalog + follow status decide which
-// games render locked. In a plain browser there is no bridge, so every game
-// stays playable (intake AC5). Any failure degrades to "no locks".
+// In the Electron launcher the bonus catalog + follow status + generalised
+// action-reward unlock state decide which games render locked. The generalised
+// `contentUnlocks` records are folded into the same pure computation the
+// in-game DLC gate uses, so the selector and the gate agree. In a plain browser
+// there is no bridge, so every game stays playable (intake AC5). Any failure
+// degrades to "no locks".
 async function resolveSteamGatedGames(): Promise<GameEntry[]> {
   const client = steamFollowClientFromWindow();
   if (!client) return GAMES;
   try {
-    const [status, catalog] = await Promise.all([client.getStatus(), client.getBonusCatalog()]);
-    return applySteamLocks(GAMES, computeSteamLocks(GAMES, catalog, status));
+    const [status, catalog, unlockRecords] = await Promise.all([
+      client.getStatus(),
+      client.getBonusCatalog(),
+      contentUnlockClientFromWindow().getUnlocks(),
+    ]);
+    const unlockedTargets = unlockRecords.map((record) => record.target);
+    return applySteamLocks(GAMES, computeSteamLocks(GAMES, catalog, status, unlockedTargets));
   } catch {
     return GAMES;
   }

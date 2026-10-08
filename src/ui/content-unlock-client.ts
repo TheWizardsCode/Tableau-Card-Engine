@@ -108,8 +108,14 @@ export function contentUnlockClientFromWindow(): ContentUnlockClient {
   return createContentUnlockClient(bridge);
 }
 
-/** Structural guard mirroring `isUnlockTarget` in `electron/action-rewards-ipc`. */
-function isUnlockTarget(value: unknown): value is UnlockTargetLike {
+/**
+ * Structural guard mirroring `isUnlockTarget` in `electron/action-rewards-ipc`.
+ *
+ * Exported so the pure lock computation (`steam-lock.ts`, F6) shares one
+ * definition of a well-formed game/DLC target and never diverges from the
+ * renderer read client.
+ */
+export function isUnlockTarget(value: unknown): value is UnlockTargetLike {
   if (typeof value !== 'object' || value === null) return false;
   const candidate = value as Record<string, unknown>;
   if (candidate.kind === 'game') {

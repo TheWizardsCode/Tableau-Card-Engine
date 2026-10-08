@@ -419,7 +419,7 @@ module (graceful degradation).
 | `electron/steam-follow-ipc.ts` | Channel names + handler table (pure) wired to `ipcMain` in `main.ts`. |
 | `electron/bonus-catalog.ts` + `electron/bonus-catalog.json` | Config-driven bonus catalog; `bonusGameId` designates the unlocked game. |
 | `src/ui/steam-follow-client.ts` | Renderer client over the `window.tce.steamFollow` bridge (never imports the SDK). |
-| `src/ui/steam-lock.ts` | Pure lock computation for the Game Selector (`computeSteamLocks` / `applySteamLocks`). |
+| `src/ui/steam-lock.ts` | Pure unified lock computation for the Game Selector (`computeSteamLocks` / `applySteamLocks`) and the shared game/DLC predicate (`isTargetUnlocked` / `isDlcUnlocked`). |
 
 **Private credentials (never committed).** The Steam App ID and the
 developer's SteamID64 are read from, in priority order:
@@ -494,6 +494,17 @@ bundled games; `bonusGameId` is unlocked on a confirmed follow and the other
 listed games render locked ("Reserved for a future milestone"). Games absent
 from the catalogue are base content and never locked. In a plain browser there
 is no bridge, so nothing is locked and the web app stays fully functional.
+
+The lock computation is generalised to consume the **unified unlock state**
+(`CG-0MUZGBTD1007G84S`): the follow status plus the targets unlocked by the
+platform-action/achievement rules. `main.ts` folds every persisted
+`contentUnlocks` record's target into `computeSteamLocks`, so a catalogue entry
+gated by an action-reward rule (`gatedBy`) unlocks when its rule is satisfied.
+The same pure predicate (`isTargetUnlocked`, with the DLC convenience wrapper
+`isDlcUnlocked`) answers game **and** DLC targets, so the Game Selector and an
+in-game DLC gate read one source of truth. An action-gated-but-locked entry
+shows an action message; a missing/empty/malformed state locks nothing extra and
+never throws.
 
 **Manual real-Steam QA:** see [Steam follow-to-unlock — manual E2E QA](dev/steam-follow-qa.md).
 
