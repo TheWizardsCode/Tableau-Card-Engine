@@ -10,5 +10,5 @@
     "rootDir": ".",
     "sourceMap": true
   },
-  "include": ["main.ts", "content-locator.ts", "launcher-config.ts", "game-protocol.ts", "pack-protocol.ts", "steam-config.ts", "steam-follow.ts", "steam-follow-steamworks.ts", "steam-follow-native.ts", "steam-follow-ipc.ts", "bonus-catalog.ts", "steam-achievements.ts", "achievement-manifest.ts", "steam-achievements-steamworks.ts", "steam-achievements-ipc.ts", "unlock-rules.ts", "action-verifiers.ts", "action-rewards.ts", "action-rewards-config.ts", "action-rewards-ipc.ts"]
+  "include": ["main.ts", "content-locator.ts", "launcher-config.ts", "game-protocol.ts", "pack-protocol.ts", "steam-config.ts", "steam-follow.ts", "steam-follow-steamworks.ts", "steam-follow-native.ts", "steam-follow-ipc.ts", "bonus-catalog.ts", "steam-achievements.ts", "achievement-manifest.ts", "steam-achievements-steamworks.ts", "steam-achievements-ipc.ts", "unlock-rules.ts", "action-verifiers.ts", "action-rewards.ts", "action-rewards-config.ts", "action-rewards-ipc.ts", "card-pack-catalog.ts", "card-pack-entitlements.ts", "card-pack-entitlements-steamworks.ts", "card-pack-ipc.ts"]
 }
