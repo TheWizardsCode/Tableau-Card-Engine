@@ -497,6 +497,43 @@ is no bridge, so nothing is locked and the web app stays fully functional.
 
 **Manual real-Steam QA:** see [Steam follow-to-unlock — manual E2E QA](dev/steam-follow-qa.md).
 
+### Action-reward config and drift validator
+
+The follow-to-unlock mechanism is generalised into **platform-agnostic
+action rewards** (`CG-0MUZF156A007OUIT`): any action on any platform can unlock
+any target. The declarative data lives in `electron/action-rewards.json` and is
+guarded against drift by `electron/action-rewards-config.ts`.
+
+**`electron/action-rewards.json`** declares, as data only:
+
+- `rules` — the unified `UnlockRule` model (`trigger.kind:
+  'platform-action' | 'achievement'`, `target.kind: 'game' | 'dlc'`).
+- `actionUrls` — `ruleId` → the page the player visits to perform the action.
+- `verifiers` — the `ActionVerifierConfig` resolution map (rule → action →
+  platform → default); a platform with no detection API resolves to the
+  `manual-self-attest` verifier.
+
+Nothing in the reward logic hard-codes a game title, platform, action, or URL —
+retargeting a reward is a config edit. The shipped rule is `itchio-follow`
+(itch.io follow → the designated bundled `golf` game), consistent with the
+`gatedBy` entry in `electron/bonus-catalog.json`.
+
+**`electron/action-rewards-config.ts`** loads the file (returning `null` on
+missing/corrupt config — never throws) and exposes
+`validateActionRewardsConfig(config, registry)`. The registry is built with
+`buildActionRewardRegistry(catalog, verifierIds)` from the bonus catalog and the
+verifier registry, so validation is against the launcher's *real* capabilities.
+The validator rejects a rule whose **target** game is not in the catalog, whose
+game **scene** is not registered in the build, or that resolves to an
+unregistered **verifier**; it also rejects duplicate rule ids / `(platform,
+action)` pairs and a catalog `gatedBy` that names an unconfigured rule. The
+shipped config passes cleanly; unit tests live in
+`tests/platform-action-rewards/action-rewards-config.test.ts`.
+
+```bash
+npx vitest run --project unit tests/platform-action-rewards/action-rewards-config.test.ts
+```
+
 ### Steam achievements (Steamworks)
 
 The engine has an **engine-generic achievement layer** (`CG-0MSMGKSJB004MZBJ`)

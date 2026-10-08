@@ -1,0 +1,20 @@
+{
+  "_comment": "Config-driven platform-action rewards (CG-0MUZGBS9A002X9DQ). Each rule maps a (platform, action) to a target (game or DLC); 'actionUrls' is the page opened for the player to perform the action; 'verifiers' selects the verification method per rule/action/platform. Nothing here is hard-coded in logic: game ids and scene keys are validated against bonus-catalog.json by action-rewards-config.ts. itch.io exposes no follow-detection API, so the itch.io follow resolves to the manual self-attest verifier (documented honour-system caveat).",
+  "version": 1,
+  "rules": [
+    {
+      "id": "itchio-follow",
+      "trigger": { "kind": "platform-action", "platform": "itch.io", "action": "follow" },
+      "target": { "kind": "game", "gameId": "golf" }
+    }
+  ],
+  "actionUrls": {
+    "itchio-follow": "https://wizardscode.itch.io/"
+  },
+  "verifiers": {
+    "defaultVerifierId": "manual-self-attest",
+    "platforms": {
+      "itch.io": "manual-self-attest"
+    }
+  }
+}

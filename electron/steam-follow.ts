@@ -80,6 +80,12 @@ export interface BonusCatalogEntry {
   sceneKey: string;
   /** Short description for the unlock UI. */
   description: string;
+  /**
+   * Optional id of the action-reward rule (`electron/action-rewards.json`)
+   * that unlocks this entry (F4, CG-0MUZGBS9A002X9DQ). Data only — validated
+   * for drift against the configured rules; never interpreted as logic here.
+   */
+  gatedBy?: string;
 }
 
 /**
