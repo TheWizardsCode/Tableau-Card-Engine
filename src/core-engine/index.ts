@@ -251,3 +251,14 @@ export type {
   VisibilityOwnershipControllerOptions,
 } from './VisibilityOwnership';
 export { VisibilityOwnershipController } from './VisibilityOwnership';
+
+// Pure in-game DLC gate helper (CG-0MUZGBTWW00729L4)
+export type {
+  DlcGateTarget,
+  DlcUnlockReader,
+  DlcGateReason,
+  DlcGateResult,
+  DlcGate,
+  DlcGateOptions,
+} from './DlcGate';
+export { createDlcGate } from './DlcGate';

@@ -88,6 +88,9 @@ export const GYM_TOKEN_PILE_VIEW_KEY = 'GymTokenPileViewScene';
 /** Rule Engine demo scene key. */
 export const GYM_RULE_ENGINE_KEY = 'GymRuleEngineScene';
 
+/** In-game DLC gate proof scene key. */
+export const GYM_DLC_UNLOCK_KEY = 'GymDlcUnlockScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -228,6 +231,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Rule Engine: LegalityResult + EconomyLedger',
     description:
       'Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions) and EconomyLedger resource tracking with constraint enforcement.',
+  },
+  {
+    sceneKey: GYM_DLC_UNLOCK_KEY,
+    title: 'In-game DLC Gate',
+    description:
+      'Gate a DLC content item on the unified action-reward unlock state with the pure DlcGate helper. The content stays locked until the action is verified, then becomes reachable (locked → verified → reachable).',
   },
 ];
 
