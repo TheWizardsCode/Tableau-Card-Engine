@@ -41,6 +41,25 @@ export function parseCsv(csv: string, headers?: string[]): Record<string, string
 }
 
 /**
+ * Return the header columns of a CSV string using the same parsing rules as
+ * {@link parseCsv}. Unlike {@link parseCsv} the result is available even when
+ * the document has no data rows, which lets callers validate or compare a
+ * schema (e.g. a card pack whose rows must match a base pool's columns)
+ * independently of its content.
+ *
+ * @param csv      The full CSV text (header + optional data rows).
+ * @param headers  Optional pre-defined header array, returned as a copy.
+ * @returns The header column names, or an empty array for empty input.
+ */
+export function parseCsvHeader(csv: string, headers?: string[]): string[] {
+  if (headers) return [...headers];
+  if (!csv || csv.trim() === '') return [];
+  const lines = splitLines(csv);
+  if (lines.length === 0) return [];
+  return parseLine(lines[0]);
+}
+
+/**
  * Split a CSV string into individual lines, handling quoted newlines.
  * Within double-quoted fields, literal newlines are preserved and the
  * field is treated as a single logical line.

@@ -226,7 +226,7 @@ export { ListenerRegistry } from './ListenerRegistry';
 export { getSceneRegistry, removeSceneRegistry } from './scene-registry';
 
 // CSV data loader (CG-0MR6ZR23J006ZDNZ)
-export { parseCsv } from './CsvLoader';
+export { parseCsv, parseCsvHeader } from './CsvLoader';
 
 // Shared SVG rasterisation helpers (CG-0MOZNXU4Y0043NR3)
 export {
@@ -280,3 +280,11 @@ export {
   splitPacksByCompatibility,
   filterPacksByGameId,
 } from './CardPackManifest';
+
+// Base+pack CSV merge and merged checksum (CG-0MUZIS14J003LQDW)
+export type {
+  CardPackCsv,
+  CardPackMergeConflict,
+  CardPackMergeResult,
+} from './CardPackMerge';
+export { mergeCardPackCsv, computeMergedChecksum } from './CardPackMerge';
