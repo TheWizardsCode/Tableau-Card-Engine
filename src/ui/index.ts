@@ -212,6 +212,14 @@ export {
 } from './game-asset-url';
 export type { GameAssetUrlErrorCode } from './game-asset-url';
 
+// Card-pack asset URL resolution (scoped tce-packs:// scheme)
+export {
+  resolveCardPackAssetUrl,
+  CardPackUrlError,
+  CARD_PACK_URL_SCHEME,
+} from './card-pack-url';
+export type { CardPackUrlErrorCode } from './card-pack-url';
+
 // Version display
 export {
   createVersionLabel,
