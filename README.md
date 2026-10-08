@@ -61,6 +61,14 @@ it appears in the Game Selector without rebuilding the launcher. Each entry
 declares a compatible core-engine version range; incompatible games are hidden
 and noted. See [Runtime Game Plugins](docs/DEVELOPER.md#runtime-game-plugins).
 
+Games can also be extended at the **card level**: a **card pack** (a manifest +
+a CSV fragment in the game's existing card schema + optional art) dropped into
+`<contentDir>/packs/` adds new cards to an existing game, optionally gated by
+entitlement. Build a pack with
+`npm run build:card-pack -- --input <packSourceDir>`; the reference Main Street
+pack lives at `tests/fixtures/reference-packs/main-street/`. See
+[Card Packs](docs/DEVELOPER.md#card-packs).
+
 ## Desktop Launcher (Electron) & Steam Packaging
 
 TCE ships as a web app (GitHub Pages) **and** as a native desktop launcher built with **Electron** (`electron/`), for Steam distribution. The launcher boots the same built web app in a desktop window:

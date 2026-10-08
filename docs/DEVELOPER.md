@@ -17,6 +17,7 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Adding an Example Game](#adding-an-example-game)
 - [Game Repository Setup & Publication](#game-repository-setup--publication)
 - [Runtime Game Plugins](#runtime-game-plugins)
+- [Card Packs](#card-packs)
 - [Hand & Pile Rendering](#hand--pile-rendering)
 - [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
 - [Example Games](#example-games)
@@ -2168,6 +2169,62 @@ scenarios are in the
 > the active runtime game base, and `SoundManager` skips an audio key the
 > backend cannot play — so a runtime game boots and plays without the launcher
 > having been rebuilt with its assets.
+
+## Card Packs
+
+Card packs are the card-level sibling of [runtime game plugins](#runtime-game-plugins): a
+distribution operator drops a pack into the launcher's content directory to
+extend an already-installed game with new cards and art, without rebuilding the
+launcher (feature `CG-0MUZFD1WR0031QTB`; Main Street is the first consumer). A
+pack is a manifest + a CSV fragment in the **game's existing card schema** +
+optional assets, merged into the base pool at load time. Packs are additive and
+may be entitlement-gated (Steam DLC).
+
+### Pack layout
+
+```
+<contentDir>/packs/
+  manifest.json                 # pack catalogue ({ version, packs[] })
+  <gameId>/<packId>/
+    cards.csv                   # CSV fragment (same header as the base pool)
+    assets/…                    # pack art, served over tce-packs://
+```
+
+Each manifest entry declares `id`, `gameId`, `title`, `description`, `version`,
+`coreEngineVersion` (a semver range), `cards`, optional `assets`, and optional
+`entitlement.steamAppId`. The contract lives in
+`src/core-engine/CardPackManifest.ts`; the merge seam that turns base + packs
+into one pool is `src/core-engine/CardPackMerge.ts`. The renderer discovers
+packs with `src/ui/CardPackLoader.ts` and resolves pack assets through the
+`tce-packs://` protocol (`src/ui/card-pack-url.ts`, `electron/pack-protocol.ts`).
+
+### Producing a pack
+
+The reference builder validates an authored pack source tree, copies its real
+(non-symlink) files, and merges its manifest entry into an installable packs
+root:
+
+```bash
+npm run build:card-pack -- --input tests/fixtures/reference-packs/main-street
+```
+
+It writes `build/card-packs/packs/manifest.json` (upserted, not overwritten)
+and `build/card-packs/packs/<gameId>/<packId>/` (the CSV fragment + copied
+assets). Symlinks are skipped — they point at shared core assets the launcher
+already ships (the same `copyGameOwnedAssets` convention as
+`build:game-artifact`). A pack whose CSV header is invalid is rejected whole and
+reported; an invalid manifest refuses the build. Copy
+`build/card-packs/packs/` into `<contentDir>/packs/` to install the packs.
+
+The **reference pack** is the Main Street Foundations pack at
+`tests/fixtures/reference-packs/main-street/` — one business, one event and one
+upgrade card plus two art assets. It is the worked example for the contract and
+is built and asserted by `tests/scripts/build-card-pack.test.ts`.
+
+> A pack's CSV fragment must reuse the *base game's* header exactly; the merge
+> rejects a fragment whose header differs. Duplicate card ids across the base
+> and the packs are reported as structural conflicts, and the offending pack is
+> dropped whole.
 
 ## Hand & Pile Rendering
 
