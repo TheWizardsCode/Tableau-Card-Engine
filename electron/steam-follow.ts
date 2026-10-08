@@ -17,6 +17,13 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { SteamConfig } from './steam-config.js';
+import {
+  ActionRewardService,
+  type ContentUnlockRecord,
+  type ContentUnlockStore,
+} from './action-rewards.js';
+import { ActionVerifierRegistry, STEAM_FOLLOW_VERIFIER_ID, SteamFollowActionVerifier } from './action-verifiers.js';
+import { createUnlockRuleSet, targetKey, type UnlockRuleSet, type UnlockTarget } from './unlock-rules.js';
 
 // ── Follow source contract ─────────────────────────────────
 
@@ -159,6 +166,83 @@ export class FileUnlockStore implements UnlockStore {
   }
 }
 
+// ── Unified-persistence bridge ─────────────────────────────
+
+/**
+ * Adapts the legacy single-game `UnlockStore` to the unified, target-keyed
+ * `ContentUnlockStore` so `SteamFollowService` can route its unlock through
+ * `ActionRewardService` without changing its public surface or its persisted
+ * on-disk format (intake AC3 / backward compatibility).
+ *
+ * Only game targets are representable; the Steam follow reward targets a
+ * whole game, so that is sufficient here.
+ */
+class LegacyUnlockStoreAdapter implements ContentUnlockStore {
+  constructor(private readonly store: UnlockStore) {}
+
+  async getAll(): Promise<ContentUnlockRecord[]> {
+    const state = await this.store.load();
+    if (!state?.unlocked || !state.chosenGameId) return [];
+    const target: UnlockTarget = { kind: 'game', gameId: state.chosenGameId };
+    return [
+      { key: targetKey(target), target, unlockedAt: state.unlockedAt ?? new Date().toISOString() },
+    ];
+  }
+
+  async isUnlocked(target: UnlockTarget): Promise<boolean> {
+    const state = await this.store.load();
+    return !!state?.unlocked && state.chosenGameId === target.gameId;
+  }
+
+  async unlock(
+    target: UnlockTarget,
+    unlockedAt: string = new Date().toISOString(),
+  ): Promise<ContentUnlockRecord> {
+    await this.store.save({ unlocked: true, chosenGameId: target.gameId, unlockedAt });
+    return { key: targetKey(target), target, unlockedAt };
+  }
+}
+
+/** Platform/action identifiers for the Steam follow reward (data, not logic). */
+const STEAM_FOLLOW_RULE_ID = 'steam-follow';
+const STEAM_PLATFORM = 'steam';
+const STEAM_FOLLOW_ACTION = 'follow';
+
+/**
+ * Build the generalised reward service that backs the Steam follow reward.
+ *
+ * The follow rule targets the config-designated bonus game (never a
+ * hard-coded title) and resolves the Steam verifier through the pluggable
+ * seam, so the legacy Steam flow and the generalised service share one path.
+ */
+function buildSteamFollowRewardService(
+  source: FollowSource,
+  store: UnlockStore,
+  catalog: BonusCatalog | null,
+  config: SteamConfig | null,
+): ActionRewardService {
+  const registry = new ActionVerifierRegistry(STEAM_FOLLOW_VERIFIER_ID).register(
+    new SteamFollowActionVerifier(source, config?.developerSteamId ?? null),
+  );
+  const bonus = catalog ? resolveBonusGame(catalog) : null;
+  const rules: UnlockRuleSet | null = bonus
+    ? createUnlockRuleSet([
+        {
+          id: STEAM_FOLLOW_RULE_ID,
+          trigger: { kind: 'platform-action', platform: STEAM_PLATFORM, action: STEAM_FOLLOW_ACTION },
+          target: { kind: 'game', gameId: bonus.id },
+        },
+      ])
+    : null;
+
+  return new ActionRewardService({
+    rules,
+    store: new LegacyUnlockStoreAdapter(store),
+    verifiers: registry,
+    verifierConfig: { rules: { [STEAM_FOLLOW_RULE_ID]: STEAM_FOLLOW_VERIFIER_ID } },
+  });
+}
+
 // ── Deterministic fake follow source ───────────────────────
 
 export interface FakeFollowSourceOptions {
@@ -260,14 +344,28 @@ export type FollowStatus =
  * hard-coded title. Once unlocked, the state is persisted and **not
  * re-verified** on subsequent launches (intake AC3) — `refresh()` short-
  * circuits to `already-unlocked` without calling the follow source.
+ *
+ * Backward-compatible shim over the generalised reward flow: detection and
+ * persistence run through `ActionRewardService` (the same path as every other
+ * platform-action reward), bridged to the legacy single-game `UnlockStore` by
+ * `LegacyUnlockStoreAdapter`. The public surface and reasons are unchanged.
  */
 export class SteamFollowService {
+  /**
+   * The generalised reward service the Steam follow rule runs through. This
+   * makes the Steam reward one consumer of the same `ActionRewardService`
+   * path as every other platform-action reward.
+   */
+  private readonly reward: ActionRewardService;
+
   constructor(
     private readonly source: FollowSource,
     private readonly store: UnlockStore,
     private readonly catalog: BonusCatalog | null,
     private readonly config: SteamConfig | null,
-  ) {}
+  ) {
+    this.reward = buildSteamFollowRewardService(this.source, this.store, this.catalog, this.config);
+  }
 
   /**
    * Current status for the launcher UI. Cheap — reads persisted state only.
@@ -293,25 +391,19 @@ export class SteamFollowService {
     if (!this.config) {
       return { unlocked: false, chosenGameId: null, reason: 'config-missing' };
     }
-    if (!this.catalog || !resolveBonusGame(this.catalog)) {
+    const bonus = this.catalog ? resolveBonusGame(this.catalog) : null;
+    if (!bonus) {
       return { unlocked: false, chosenGameId: null, reason: 'config-missing' };
     }
     if (!this.source.isSteamAvailable()) {
       return { unlocked: false, chosenGameId: null, reason: 'steam-unavailable' };
     }
 
-    const following = await this.source.isFollowing(this.config.developerSteamId);
-    if (!following) {
-      return { unlocked: false, chosenGameId: null, reason: 'not-following' };
+    const [result] = await this.reward.refresh();
+    if (result && (result.outcome === 'unlocked' || result.outcome === 'already-unlocked')) {
+      return { unlocked: true, chosenGameId: bonus.id, reason: 'follow-confirmed' };
     }
-
-    const unlock: UnlockState = {
-      unlocked: true,
-      chosenGameId: this.catalog.bonusGameId,
-      unlockedAt: new Date().toISOString(),
-    };
-    await this.store.save(unlock);
-    return { unlocked: true, chosenGameId: unlock.chosenGameId, reason: 'follow-confirmed' };
+    return { unlocked: false, chosenGameId: null, reason: 'not-following' };
   }
 
   /**
@@ -345,16 +437,15 @@ export class SteamFollowService {
     if (!this.config) {
       return { unlocked: false, chosenGameId: null, reason: 'config-missing' };
     }
-    if (!this.catalog || !resolveBonusGame(this.catalog)) {
+    const bonus = this.catalog ? resolveBonusGame(this.catalog) : null;
+    if (!bonus) {
       return { unlocked: false, chosenGameId: null, reason: 'config-missing' };
     }
-    const unlock: UnlockState = {
-      unlocked: true,
-      chosenGameId: this.catalog.bonusGameId,
-      unlockedAt: new Date().toISOString(),
-    };
-    await this.store.save(unlock);
-    return { unlocked: true, chosenGameId: unlock.chosenGameId, reason: 'manual-claim' };
+    const [result] = await this.reward.refresh({ attested: true });
+    if (result && (result.outcome === 'unlocked' || result.outcome === 'already-unlocked')) {
+      return { unlocked: true, chosenGameId: bonus.id, reason: 'manual-claim' };
+    }
+    return { unlocked: false, chosenGameId: null, reason: 'not-following' };
   }
 
   /** Release the underlying Steam session. */
