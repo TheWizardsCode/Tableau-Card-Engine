@@ -4,7 +4,7 @@
  * Provides foundational framework functionalities including
  * game loop management, state management, and rendering helpers.
  */
-export const ENGINE_VERSION = '0.1.0';
+export { ENGINE_VERSION } from './engine-version';
 
 // Shared setup option types and helpers
 export type { BaseSetupOptions, MultiplayerSetupOptions, ResolvedBaseSetup, ResolvedSetup } from './SetupOptions';
@@ -262,3 +262,21 @@ export type {
   DlcGateOptions,
 } from './DlcGate';
 export { createDlcGate } from './DlcGate';
+
+// Card-pack manifest contract + core-version compatibility (CG-0MUZIS0K7006C5WU)
+export type {
+  CardPackEntitlement,
+  CardPackManifestEntry,
+  CardPackManifest,
+  CardPackManifestParseSuccess,
+  CardPackManifestParseFailure,
+  CardPackManifestParseResult,
+  IncompatiblePack,
+  PackCompatibilitySplit,
+} from './CardPackManifest';
+export {
+  DEFAULT_ENGINE_VERSION,
+  parseCardPackManifest,
+  splitPacksByCompatibility,
+  filterPacksByGameId,
+} from './CardPackManifest';
