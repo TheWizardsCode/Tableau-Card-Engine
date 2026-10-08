@@ -534,6 +534,30 @@ shipped config passes cleanly; unit tests live in
 npx vitest run --project unit tests/platform-action-rewards/action-rewards-config.test.ts
 ```
 
+### Generalised content-unlock bridge (renderer read API)
+
+The generalised unlock state is exposed to the renderer through an **additive**
+context-bridge surface (`CG-0MUZGBSSQ009ISHG`, feature F5) — the legacy
+`window.tce.steamFollow` surface and every `steamFollow:*` channel are
+unchanged.
+
+| Module | Responsibility |
+|--------|----------------|
+| `electron/action-rewards-ipc.ts` | `ACTION_REWARD_CHANNELS` (`contentUnlocks:isUnlocked`, `contentUnlocks:getUnlocks`, `contentUnlocks:refresh`) plus the **total** handler table wired to `ipcMain` in `main.ts`. |
+| `electron/preload.cjs` | Exposes the additive `window.tce.contentUnlocks` bridge. |
+| `src/ui/content-unlock-client.ts` | Total read client over the bridge (`isUnlocked(target)`, `getUnlocks()`); the browser fallback reports "not unlocked" and never throws. |
+
+**Total read API.** `isUnlocked({ kind: 'game', gameId })` and
+`isUnlocked({ kind: 'dlc', gameId, dlcId })` answer whether a target is
+unlocked; `getUnlocks()` returns every persisted record. In a plain browser (no
+Electron bridge) `contentUnlockClientFromWindow()` still returns a client whose
+`isUnlocked()` is `false` and `getUnlocks()` is `[]`, so a DLC/game gate never
+branches on the runtime and never crashes when the state cannot be read.
+
+```bash
+npx vitest run --project unit tests/platform-action-rewards/ tests/ui/content-unlock-client.test.ts
+```
+
 ### Steam achievements (Steamworks)
 
 The engine has an **engine-generic achievement layer** (`CG-0MSMGKSJB004MZBJ`)

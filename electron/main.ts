@@ -32,6 +32,9 @@ import { loadBonusCatalog } from './bonus-catalog.js';
 import { FileUnlockStore, SteamFollowService } from './steam-follow.js';
 import { SteamworksFollowSource } from './steam-follow-steamworks.js';
 import { STEAM_FOLLOW_CHANNELS, createSteamFollowHandlers } from './steam-follow-ipc.js';
+import { ActionRewardService, FileContentUnlockStore } from './action-rewards.js';
+import { loadActionRewardsConfig } from './action-rewards-config.js';
+import { ACTION_REWARD_CHANNELS, createActionRewardHandlers } from './action-rewards-ipc.js';
 import { FileAchievementStore, SteamAchievementService } from './steam-achievements.js';
 import { loadAchievementManifest, validateAchievementManifest } from './achievement-manifest.js';
 import { SteamworksAchievementSource } from './steam-achievements-steamworks.js';
@@ -128,6 +131,11 @@ void app.whenReady().then(async () => {
   // Fully optional: a missing manifest, missing Steam, or missing native
   // module leaves the launcher running with achievements disabled.
   await initSteamAchievements();
+
+  // ── Generalised content unlocks (F5, CG-0MUZGBSSQ009ISHG) ─────────
+  // Fully optional: a missing config degrades to a no-op read API (never
+  // throws), so the renderer can gate content without branching on platform.
+  initContentUnlocks();
 
   createWindow(resolved);
 
@@ -262,6 +270,36 @@ async function initSteamAchievements(): Promise<void> {
   }
 
   app.on('will-quit', () => service.close());
+}
+
+/**
+ * Initialise the generalised content-unlock bridge and register its IPC
+ * handlers.
+ *
+ * Never throws: a missing/corrupt action-rewards config degrades to an empty
+ * rule set, and the unified `FileContentUnlockStore` treats a missing file as
+ * "nothing unlocked" — so the read API is always total. The generalised
+ * `contentUnlocks:*` surface is additive; the legacy `steamFollow:*` path is
+ * untouched.
+ */
+function initContentUnlocks(): void {
+  const config = loadActionRewardsConfig();
+  const store = new FileContentUnlockStore(
+    path.join(app.getPath('userData'), 'content-unlocks.json'),
+  );
+  const service = new ActionRewardService({
+    rules: config ? { version: config.version, rules: config.rules } : null,
+    store,
+    verifierConfig: config?.verifiers ?? null,
+  });
+  const handlers = createActionRewardHandlers(service);
+
+  for (const [name, channel] of Object.entries(ACTION_REWARD_CHANNELS)) {
+    const handler = handlers[name as keyof typeof handlers] as (
+      ...args: unknown[]
+    ) => unknown;
+    ipcMain.handle(channel, (_event, ...args: unknown[]) => handler(...args));
+  }
 }
 
 // Quit when all windows are closed (except on macOS, per platform convention).

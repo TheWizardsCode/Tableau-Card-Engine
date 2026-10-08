@@ -6,11 +6,11 @@
  * 3. Copy the CommonJS preload (electron/preload.cjs) into dist-electron/
  *    verbatim — sandboxed preloads cannot use ESM, so it is authored and
  *    shipped as CJS.
- * 4. Copy the runtime JSON data files (bonus catalog, achievement manifest)
- *    into dist-electron/ so the loaders (which resolve them relative to the
- *    compiled module) find them at runtime. Local/private config
- *    (steam-config.local.json) is deliberately NOT copied — it is resolved
- *    from `electron/` or the environment (see steam-config.ts).
+ * 4. Copy the runtime JSON data files (bonus catalog, achievement manifest,
+ *    action-rewards config) into dist-electron/ so the loaders (which resolve
+ *    them relative to the compiled module) find them at runtime. Local/private
+ *    config (steam-config.local.json) is deliberately NOT copied — it is
+ *    resolved from `electron/` or the environment (see steam-config.ts).
  *
  * Invoked by `npm run build:electron-main`.
  */
@@ -23,7 +23,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'dist-electron');
 
 /** Runtime JSON data files (not TypeScript) copied next to the compiled code. */
-const RUNTIME_JSON_FILES = ['bonus-catalog.json', 'achievement-manifest.json'];
+const RUNTIME_JSON_FILES = ['bonus-catalog.json', 'achievement-manifest.json', 'action-rewards.json'];
 
 fs.rmSync(outDir, { recursive: true, force: true });
 execSync('npx tsc -p electron/tsconfig.json', { cwd: root, stdio: 'inherit' });
