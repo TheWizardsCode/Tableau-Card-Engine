@@ -569,6 +569,91 @@ branches on the runtime and never crashes when the state cannot be read.
 npx vitest run --project unit tests/platform-action-rewards/ tests/ui/content-unlock-client.test.ts
 ```
 
+### Adding a platform, action, or verifier
+
+Rules are **data**. Adding a reward is normally a config edit, not a code change:
+
+1. **Add the rule** to `electron/action-rewards.json` under `rules` — a
+   `platform-action` trigger (`platform` + `action`) with a `game` or `dlc`
+   target. Add its URL to `actionUrls` (`ruleId` → the page the player visits).
+2. **Pick the verifier** in the same file's `verifiers` map. Resolution
+   precedence is rule id → `(platform, action)` → platform → `defaultVerifierId`
+   → the `manual-self-attest` fallback, so a platform with no detection API
+   needs no entry at all (it gets self-attest).
+3. **If a new verification method is needed**, implement `ActionVerifier`
+   (`electron/action-verifiers.ts`) — `id`, `label`,
+   `supportsAutomaticVerification()`, `openActionPage()`, and a **total**
+   `verify()` (never throws; degrade to `unavailable` so the UI offers
+   self-attest). Register it in the launcher's `ActionVerifierRegistry` and add
+   its id to the validator's `verifierIds`. Nothing else changes — the registry,
+   reward service, store, and IPC are untouched.
+4. **If the rule unlocks a catalogued game**, record the gating link as
+   `gatedBy: <ruleId>` on that entry in `electron/bonus-catalog.json`.
+5. **Validate.** `validateActionRewardsConfig(config, buildActionRewardRegistry(catalog, verifierIds))`
+   must report no drift (unknown target game/scene, unregistered verifier,
+   duplicate rule id/action, or a `gatedBy` naming an unconfigured rule). It is
+   asserted on the shipped config in
+   `tests/platform-action-rewards/action-rewards-config.test.ts` and exercised
+   end-to-end in `tests/platform-action-rewards/action-rewards-e2e.test.ts`.
+
+### Gating in-game DLC (cross-repo model)
+
+DLC is **content inside a game**, not a whole game, so its gate spans two
+repositories by design:
+
+- **Core repo owns the mechanism** — the unified `UnlockRule`/`UnlockTarget`
+  model, the `ContentUnlockStore`, the read API (`contentUnlockClientFromWindow()`),
+  and the pure, framework-free
+  [`createDlcGate`](../../src/core-engine/DlcGate.ts).
+- **Each game repo owns its DLC content and the gating call site.** The DLC is
+  identified by `{ kind: 'dlc', gameId, dlcId }`, where `dlcId` is owned by that
+  game's content definition — there is no central DLC registry. The gate is a
+  **pure, read-only check layered over the existing content-delivery path**
+  (`electron/content-locator.ts`); it does not change how DLC content is located.
+
+A game gates a content item through one call, injecting the renderer client as
+the reader (so the same code works in a plain browser, where it reports
+*not unlocked*):
+
+```ts
+import { createDlcGate } from '@core-engine/DlcGate';
+import { contentUnlockClientFromWindow } from '@ui/content-unlock-client';
+
+const client = contentUnlockClientFromWindow();
+const gate = createDlcGate({
+  gameId: 'main-street',
+  isUnlocked: (target) => client.isUnlocked(target),
+});
+
+if (await gate.isUnlocked('riverfront-pack')) {
+  // render / start the DLC content
+} else {
+  // render the documented locked-state presentation
+}
+```
+
+The gate is **total**: an absent reader, a throwing reader, a non-boolean
+result, or a malformed target all report *not unlocked* (`check()` returns
+`reason: 'locked' | 'unreadable'`), so a DLC whose state cannot be read is
+unreachable rather than fatal. The Game Selector's `isDlcUnlocked` predicate
+(`src/ui/steam-lock.ts`) reads the **same** unified state, so locked/unlocked
+results are consistent between the launcher and the game. The canonical proof
+is the Gym's `GymDlcUnlockScene`; per-game roll-out across the catalogue is
+tracked as follow-up work.
+
+### Self-attestation is an honour system (caveat)
+
+The default verifier for platforms with no public detection API (e.g. an
+itch.io follow) is `manual-self-attest`: the player clicks through to the
+action page and then confirms they completed it. This is **trivially
+bypassable** — the unlock is not cryptographically tied to the action. It is
+accepted as a deliberate trade-off: verification is a pluggable seam, so a
+specific platform can later be upgraded to API/OAuth detection without
+changing the unlock flow, store, or IPC. Never present a self-attested reward
+as an automatically verified one, and never fabricate an unlock when no
+verifier can run (the service reports `verification-unavailable` and offers the
+self-attest path instead).
+
 ### Steam achievements (Steamworks)
 
 The engine has an **engine-generic achievement layer** (`CG-0MSMGKSJB004MZBJ`)
