@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "id": "fixture-pack",
+      "gameId": "fixture-game",
+      "title": "Fixture Pack",
+      "description": "Valid shape, but `coreEngineVersion` is outside the launcher's range.",
+      "version": "1.0.0",
+      "coreEngineVersion": "^9.0.0",
+      "cards": "cards.csv",
+      "assets": ["assets/icon.png"]
+    }
+  ]
+}
