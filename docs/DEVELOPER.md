@@ -2226,6 +2226,14 @@ is built and asserted by `tests/scripts/build-card-pack.test.ts`.
 > and the packs are reported as structural conflicts, and the offending pack is
 > dropped whole.
 
+### Manual QA
+
+The automated suite covers the contract, loader, merge, entitlement, listing and
+save/load policy. The parts that need a packaged Electron run, a real content
+directory and (for the locked case) a real Steam DLC app id are covered by the
+[card-packs manual QA plan](dev/card-packs-qa.md) (installed/entitled,
+present/locked, missing).
+
 ## Hand & Pile Rendering
 
 **Requirement:** Example games **must** render hands and piles through the core engine's hand-management code — `HandView`, `PileView`, and related helpers such as `flipCard()`. Hand-rolling card rows with manual sprite arrays and hardcoded positioning is not an accepted pattern; using the shared components means engine improvements (animations, reduced-motion fallbacks, DPR-aware textures, selection) propagate to every game automatically.
