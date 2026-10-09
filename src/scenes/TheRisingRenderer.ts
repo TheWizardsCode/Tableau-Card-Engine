@@ -294,6 +294,18 @@ export class TheRisingRenderer {
     this.cloudedModel.setSpirits(this.resolveSpirits(this.state.cloudedSpiritIds));
     this.cloudedPile.update();
 
+    this.refreshHud();
+  }
+
+  /**
+   * Repaint only the HUD counters (Memory / clock / Insight) from the current
+   * state, without rebuilding the card rows.
+   *
+   * Used when a state change affects only the HUD (e.g. the end-of-turn clock
+   * advance) so an in-flight card animation is not destroyed by a full row
+   * rebuild.
+   */
+  refreshHud(): void {
     this.memoryText.setText(`Memory ${this.state.memory}/${this.state.maxMemory}`);
     this.clockText.setText(`Rising Clock ${this.state.clock}`);
     this.insightText.setText(`Insight ${this.state.insight}/${this.state.insightTarget}`);

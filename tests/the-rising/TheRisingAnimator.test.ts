@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   dealCard: vi.fn((_opts: Record<string, unknown>) => ({ stop: vi.fn() })),
   placeCard: vi.fn((_opts: Record<string, unknown>) => ({ stop: vi.fn() })),
   shakeIllegalMove: vi.fn((_opts: Record<string, unknown>) => undefined),
+  popTextOrIcon: vi.fn((_opts: Record<string, unknown>) => Promise.resolve()),
   safePlaySound: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock('@ui', () => ({
   dealCard: mocks.dealCard,
   placeCard: mocks.placeCard,
   shakeIllegalMove: mocks.shakeIllegalMove,
+  popTextOrIcon: mocks.popTextOrIcon,
 }));
 
 vi.mock('@core-engine', () => ({
@@ -50,6 +52,7 @@ describe('TheRisingAnimator', () => {
     mocks.dealCard.mockClear();
     mocks.placeCard.mockClear();
     mocks.shakeIllegalMove.mockClear();
+    mocks.popTextOrIcon.mockClear();
     mocks.safePlaySound.mockClear();
   });
 
@@ -157,5 +160,67 @@ describe('TheRisingAnimator', () => {
     tweenOptions.onComplete?.();
     expect(target.setX).toHaveBeenCalledWith(40);
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  // ── AC1: Insight / clock / result feedback ──────────────
+
+  it('pops the Insight award through popTextOrIcon and plays the score-reveal SFX once', () => {
+    const scene = makeScene();
+    const soundManager = makeSoundManager();
+    const animator = new TheRisingAnimator(scene as never, soundManager);
+
+    animator.popInsight(7, { x: 100, y: 200 });
+
+    expect(mocks.popTextOrIcon).toHaveBeenCalledTimes(1);
+    const options = mocks.popTextOrIcon.mock.calls[0][0] as Record<string, unknown>;
+    expect(options.x).toBe(100);
+    expect(options.y).toBe(200);
+    expect(options.label).toBe('+7 Insight');
+    // Exactly one sound per action (no double-play).
+    expect(soundManager.play).toHaveBeenCalledTimes(1);
+    expect(soundManager.play).toHaveBeenCalledWith(THERISING_SFX_KEYS.INSIGHT_REVEAL);
+  });
+
+  it('still plays the Insight SFX under reduced motion (feedback is never lost)', () => {
+    const scene = makeScene();
+    const soundManager = makeSoundManager();
+    const animator = new TheRisingAnimator(scene as never, soundManager);
+    animator.reducedMotion = true;
+
+    animator.popInsight(3, { x: 1, y: 2 });
+
+    expect(soundManager.play).toHaveBeenCalledWith(THERISING_SFX_KEYS.INSIGHT_REVEAL);
+    expect((mocks.popTextOrIcon.mock.calls[0][0] as Record<string, unknown>).reducedMotion).toBe(true);
+  });
+
+  it('pops the clock advance and plays the turn-change SFX once', () => {
+    const scene = makeScene();
+    const soundManager = makeSoundManager();
+    const animator = new TheRisingAnimator(scene as never, soundManager);
+
+    animator.popClockAdvance(1322, { x: 640, y: 60 });
+
+    expect(mocks.popTextOrIcon).toHaveBeenCalledTimes(1);
+    expect((mocks.popTextOrIcon.mock.calls[0][0] as Record<string, unknown>).label)
+      .toBe('Rising Clock 1322');
+    expect(soundManager.play).toHaveBeenCalledTimes(1);
+    expect(soundManager.play).toHaveBeenCalledWith(THERISING_SFX_KEYS.TURN_CHANGE);
+  });
+
+  it('plays the win or loss sting for a finished session and nothing while in progress', () => {
+    const scene = makeScene();
+    const soundManager = makeSoundManager();
+    const animator = new TheRisingAnimator(scene as never, soundManager);
+
+    animator.playGameResult('won');
+    expect(soundManager.play).toHaveBeenLastCalledWith(THERISING_SFX_KEYS.GAME_WIN);
+
+    animator.playGameResult('lost');
+    expect(soundManager.play).toHaveBeenLastCalledWith(THERISING_SFX_KEYS.GAME_LOST);
+
+    animator.playGameResult('in-progress');
+    // In-progress plays nothing, so the last sound is still the loss sting.
+    expect(soundManager.play).toHaveBeenLastCalledWith(THERISING_SFX_KEYS.GAME_LOST);
+    expect(soundManager.play).toHaveBeenCalledTimes(2);
   });
 });

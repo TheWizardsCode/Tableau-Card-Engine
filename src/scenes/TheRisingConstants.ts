@@ -26,6 +26,8 @@ export const THERISING_SFX_KEYS = {
   SPIRIT_REVEAL: 'sfx-card-flip',
   /** Illegal placement / unaffordable meet feedback. */
   ILLEGAL_MOVE: COMMON_SFX_KEYS.ILLEGAL_MOVE,
+  /** Insight is awarded (conversation choice or placement). */
+  INSIGHT_REVEAL: COMMON_SFX_KEYS.SCORE_REVEAL,
   /** Generic UI click. */
   UI_CLICK: COMMON_SFX_KEYS.UI_CLICK,
   /** The clock advances at end of turn. */
@@ -42,6 +44,7 @@ export const THERISING_AUDIO_FILES: Readonly<Record<keyof typeof THERISING_SFX_K
   SPIRIT_PLACE: 'card-swap.wav',
   SPIRIT_REVEAL: 'card-flip.wav',
   ILLEGAL_MOVE: 'illegal-move.wav',
+  INSIGHT_REVEAL: 'score-reveal.wav',
   UI_CLICK: 'ui-click.wav',
   TURN_CHANGE: 'turn-change.wav',
   GAME_WIN: 'game-win.wav',

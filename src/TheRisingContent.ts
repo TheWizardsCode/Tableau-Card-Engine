@@ -18,7 +18,7 @@
  * @module TheRisingContent
  */
 
-import { createSeededRng } from '@core-engine';
+import { createSeededRng } from '@core-engine/SeededRng';
 import { shuffleArray } from '@card-system';
 import sourcesJson from './data/sources.json';
 

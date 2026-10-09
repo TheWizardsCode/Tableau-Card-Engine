@@ -23,8 +23,9 @@ import {
   CardGameScene,
   audioPathWithFallback,
 } from '@ui/CardGameScene';
-import type { HelpSection } from '@ui/HelpPanel';
-import { getReducedMotion } from '@ui/SettingsStore';
+import { getReducedMotion, getSelectedDifficulty } from '@ui/SettingsStore';
+import { SaveLoadStore } from '@core-engine';
+import { TranscriptStore } from '@core-engine/transcript';
 import { GAME_H, GAME_W } from '@ui/constants';
 import {
   TheRisingRenderer,
@@ -40,33 +41,27 @@ import {
   THERISING_AUDIO_NAMESPACE,
   THERISING_SFX_KEYS,
 } from './TheRisingConstants';
-import { createInitialState, type RisingState } from '../TheRisingState';
+import {
+  THERISING_DEFAULT_DIFFICULTY,
+  THERISING_DIFFICULTIES,
+  createInitialState,
+  resolveDifficulty,
+  type Difficulty,
+  type RisingState,
+} from '../TheRisingState';
 import { TheRisingTurnController } from './TheRisingTurnController';
+import { TheRisingTranscriptRecorder } from '../TheRisingTranscript';
+import {
+  saveTurnCheckpoint,
+} from '../TheRisingSaveLoad';
+import { buildRisingHelpSections, risingHelpValuesFor } from '../TheRisingHelpContent';
 
 /** The scene key used to register and start {@link TheRisingScene}. */
 export const THERISING_SCENE_KEY = 'TheRisingScene';
 
-/** Static help content shown in the in-game help panel. */
-export const THERISING_HELP_SECTIONS: readonly HelpSection[] = [
-  {
-    heading: 'About 1916: The Rising',
-    body: 'You are a seanchaí, a keeper of memory. Meet the spirits of Irish '
-      + 'history and rebuild the timeline from the Norman landings to the '
-      + 'Easter Rising.',
-  },
-  {
-    heading: 'The board',
-    body: 'The Spirit Row offers the figures you can meet. Meeting a spirit '
-      + 'costs Memory and reveals a first-person testimony. Placed spirits sit '
-      + 'on the Timeline in chronological order. The HUD shows your remaining '
-      + 'Memory, the Rising clock and your accumulated Insight.',
-  },
-  {
-    heading: 'Goal',
-    body: 'Complete the seven-chapter timeline in the correct order and reach '
-      + 'the Insight target before the Rising clock reaches 1916.',
-  },
-];
+// The help copy lives in `src/help-content.json`; the scene builds the
+// difficulty-specific sections at runtime via `buildRisingHelpSections`.
+export { THERISING_HELP_SECTIONS } from '../TheRisingHelpContent';
 
 /**
  * The 1916: The Rising scene.
@@ -85,6 +80,14 @@ export class TheRisingScene extends CardGameScene {
   public animator!: TheRisingAnimator;
   /** The interactive turn controller (clicks, drag-and-drop, undo/redo). */
   public turnController!: TheRisingTurnController;
+  /** The transcript recorder for this session. */
+  public transcriptRecorder!: TheRisingTranscriptRecorder;
+  /** The transcript persistence store. */
+  public transcriptStore!: TranscriptStore;
+  /** The shared save/load store backing end-of-turn checkpoints. */
+  public saveStore!: SaveLoadStore;
+  /** The resolved difficulty preset for this session. */
+  public difficulty: Difficulty = THERISING_DEFAULT_DIFFICULTY;
   /**
    * Live modal-overlay objects (conversation dialogue), following the shared
    * AGENTS.md overlay convention. The overlay module pushes its objects here
@@ -137,8 +140,24 @@ export class TheRisingScene extends CardGameScene {
     const viewport = this.resolveViewport();
     this.risingLayout = createTheRisingLayout(THE_RISING_LAYOUT, viewport);
 
-    // A fresh session. Interaction and dealing are layered on by later phases.
-    this.risingState = createInitialState({ seed: 0 });
+    // Difficulty preset: the persisted settings-panel selection, defaulting to
+    // Normal. The preset drives starting Memory, the Insight target and the
+    // clock band width (AC5).
+    this.difficulty = this.resolveSessionDifficulty();
+
+    // A fresh session.
+    this.risingState = createInitialState({ seed: 0, difficulty: this.difficulty });
+
+    // Transcript recording (AC2): auto-saved to browser storage on every key
+    // event. Skipped in replay mode, which renders silently.
+    this.transcriptRecorder = new TheRisingTranscriptRecorder(this.risingState);
+    this.transcriptStore = new TranscriptStore();
+    if (!this.replayMode) {
+      this.transcriptRecorder.attachAutoSave(this.transcriptStore);
+    }
+
+    // End-of-turn checkpoint autosave (AC3).
+    this.saveStore = new SaveLoadStore();
 
     this.boardRenderer = new TheRisingRenderer(this, this.risingState, this.risingLayout);
     this.boardRenderer.refreshAll();
@@ -155,7 +174,9 @@ export class TheRisingScene extends CardGameScene {
       getState: () => this.risingState,
       setState: (state) => { this.risingState = state; },
       panel: this.hudContainer,
+      transcript: this.transcriptRecorder,
       onStateSettled: (turn) => this.emitStateSettled(turn, 'playing'),
+      onTurnCompleted: (state) => this.onTurnCompleted(state),
     });
     this.turnController.attach();
 
@@ -174,10 +195,12 @@ export class TheRisingScene extends CardGameScene {
       this.refreshUndoRedoButtonState();
     }
 
-    // Help and settings panels (skipped in replay mode).
+    // Help and settings panels (skipped in replay mode). The help copy is
+    // built from `src/help-content.json` with the live difficulty values so
+    // the Insight target in the text matches the active session (AC6).
     if (!this.replayMode) {
-      this.initHelpPanel([...THERISING_HELP_SECTIONS]);
-      this.initSettingsPanel();
+      this.initHelpPanel(buildRisingHelpSections(risingHelpValuesFor(this.difficulty)));
+      this.initSettingsPanel(THERISING_DIFFICULTIES, this.difficulty, false);
     }
 
     this.emitStateSettled(this.risingState.turn, 'setup');
@@ -212,6 +235,30 @@ export class TheRisingScene extends CardGameScene {
       width: width > 0 ? width : GAME_W,
       height: height > 0 ? height : GAME_H,
     };
+  }
+
+  /**
+   * Resolve the difficulty preset from the persisted settings-panel selection,
+   * falling back to Normal when none is stored or the value is unknown.
+   */
+  private resolveSessionDifficulty(): Difficulty {
+    try {
+      return resolveDifficulty(getSelectedDifficulty(undefined, THERISING_DIFFICULTIES));
+    } catch {
+      return THERISING_DEFAULT_DIFFICULTY;
+    }
+  }
+
+  /**
+   * End-of-turn hook: autosave a checkpoint so a session can be resumed.
+   *
+   * Storage is best-effort — a failure (or unavailable storage) never blocks
+   * play, and the checkpoint save is fire-and-forget.
+   */
+  private onTurnCompleted(state: RisingState): void {
+    void saveTurnCheckpoint(this.saveStore, state).catch(() => {
+      // A failed checkpoint save must never interrupt play.
+    });
   }
 
   private resolveReducedMotion(): boolean {

@@ -27,7 +27,7 @@
  */
 
 import Phaser from 'phaser';
-import { type Command, UndoRedoManager } from '@core-engine';
+import { CompoundCommand, UndoRedoManager } from '@core-engine';
 import { illegalAction, legalAction, type LegalityResult } from '@rule-engine';
 import { createDragDropManager, type DragDropManager } from '@ui';
 import {
@@ -37,7 +37,9 @@ import {
 import {
   applyPlacement,
   canPlaceFromHand,
+  evaluateOutcome,
   isSlotLegal,
+  type PlacementScore,
 } from '../TheRisingRules';
 import { transition, type RisingState } from '../TheRisingState';
 import {
@@ -46,10 +48,17 @@ import {
   conversationOptions,
   meetSpirit,
 } from '../TheRisingEconomy';
-import { completeTurn } from '../TheRisingClock';
+import { completeTurn, type ClockAdvanceResult } from '../TheRisingClock';
 import { ROSTER, type Spirit, type Testimony } from '../TheRisingContent';
 import { RISING_CARD_H, RISING_CARD_W, TheRisingRenderer } from './TheRisingRenderer';
 import type { TheRisingAnimator } from './TheRisingAnimator';
+import type { TheRisingTranscriptRecorder } from '../TheRisingTranscript';
+import { AdvanceClockCommand, PlaceSpiritCommand } from './TheRisingCommands';
+
+// The turn's undo/redo commands live in a Phaser-free module
+// (`TheRisingCommands.ts`) so they can be unit-tested in Node; they are
+// re-exported here for callers that referenced them on the controller.
+export { PlaceSpiritCommand, AdvanceClockCommand } from './TheRisingCommands';
 
 /** The UI interaction mode (separate from the pure state-machine phase). */
 export type RisingUiPhase = 'idle' | 'conversing' | 'placing';
@@ -110,38 +119,12 @@ export interface RisingTurnControllerOptions {
   readonly panel?: Phaser.GameObjects.Container | null;
   /** Called whenever the board reaches a settled state. */
   readonly onStateSettled?: (turn: number, phase: string) => void;
+  /** Called once a turn has fully completed (placement + clock advance). */
+  readonly onTurnCompleted?: (state: RisingState) => void;
+  /** Optional transcript recorder; every key action is recorded when present. */
+  readonly transcript?: TheRisingTranscriptRecorder;
   /** Optional shared undo/redo manager (a fresh one is created by default). */
   readonly undoRedo?: UndoRedoManager;
-}
-
-/**
- * A reversible placement command.
- *
- * Swaps the whole {@link RisingState} before/after the move. `execute()` also
- * replays the place animation from the captured source position, so both the
- * original placement and a redo animate identically.
- */
-export class PlaceSpiritCommand implements Command {
-  readonly description: string;
-
-  constructor(
-    private readonly controller: TheRisingTurnController,
-    private readonly before: RisingState,
-    private readonly after: RisingState,
-    private readonly spiritId: string,
-    private readonly source: { x: number; y: number } | undefined,
-  ) {
-    this.description = `Place ${spiritId} on the timeline`;
-  }
-
-  execute(): void {
-    this.controller.applyState(this.after);
-    this.controller.animatePlacement(this.spiritId, this.source);
-  }
-
-  undo(): void {
-    this.controller.applyState(this.before);
-  }
 }
 
 /**
@@ -170,6 +153,8 @@ export class TheRisingTurnController {
   private readonly setState: (state: RisingState) => void;
   private readonly panel: Phaser.GameObjects.Container | null;
   private readonly onStateSettled?: (turn: number, phase: string) => void;
+  private readonly onTurnCompleted?: (state: RisingState) => void;
+  private readonly transcript: TheRisingTranscriptRecorder | null;
   private readonly rosterById: ReadonlyMap<string, Spirit>;
 
   private dragManager: DragDropManager | null = null;
@@ -186,6 +171,8 @@ export class TheRisingTurnController {
     this.setState = options.setState;
     this.panel = options.panel ?? null;
     this.onStateSettled = options.onStateSettled;
+    this.onTurnCompleted = options.onTurnCompleted;
+    this.transcript = options.transcript ?? null;
     this.undoRedo = options.undoRedo ?? new UndoRedoManager();
     this.rosterById = new Map(ROSTER.spirits.map((spirit) => [spirit.id, spirit]));
   }
@@ -256,6 +243,18 @@ export class TheRisingTurnController {
     this.onStateSettled?.(state.turn, state.phase);
   }
 
+  /**
+   * Apply a state that only affects the HUD (e.g. the end-of-turn clock
+   * advance) without rebuilding the card rows, so an in-flight placement
+   * animation is not destroyed.
+   */
+  applyStateHudOnly(state: RisingState): void {
+    this.setState(state);
+    this.renderer.setState(state);
+    this.renderer.refreshHud();
+    this.onStateSettled?.(state.turn, state.phase);
+  }
+
   /** Animate a just-placed spirit from `source` to its timeline resting spot. */
   animatePlacement(spiritId: string, source: { x: number; y: number } | undefined): void {
     const sprite = this.renderer.findSpiritSprite('timeline', spiritId);
@@ -267,6 +266,22 @@ export class TheRisingTurnController {
     }
     this.animator.placeOnTimeline({
       target: sprite as unknown as Phaser.GameObjects.Container,
+      destination,
+    });
+  }
+
+  /** Animate a spirit being dealt from the Spirit Row into the hand. */
+  animateDeal(spiritId: string, source: { x: number; y: number } | undefined): void {
+    const sprite = this.renderer.findSpiritSprite('hand', spiritId);
+    if (!sprite) return;
+    const destination = { x: sprite.x, y: sprite.y };
+    if (source) {
+      sprite.x = source.x;
+      sprite.y = source.y;
+    }
+    this.animator.dealFromMarket({
+      target: sprite as unknown as Phaser.GameObjects.Container,
+      source: source ?? destination,
       destination,
     });
   }
@@ -304,7 +319,18 @@ export class TheRisingTurnController {
       return talking.result;
     }
 
+    const sourceSprite = this.renderer.findSpiritSprite('market', spirit.id);
+    const source = sourceSprite ? { x: sourceSprite.x, y: sourceSprite.y } : undefined;
+
     this.applyState(talking.state);
+    this.animateDeal(spirit.id, source);
+    this.transcript?.recordSpiritMet(
+      state.turn,
+      spirit.id,
+      spirit.name,
+      meet.cost,
+      talking.state.memory,
+    );
     this.openConversation(spirit, state);
     return legalAction();
   }
@@ -367,6 +393,15 @@ export class TheRisingTurnController {
       return choice.result;
     }
     session.testimony = choice.testimony;
+
+    this.transcript?.recordQuestionChosen(
+      this.getState().turn,
+      session.spirit.id,
+      optionIndex,
+      choice.testimonyIndex ?? -1,
+      choice.testimony.question,
+      choice.insightAwarded,
+    );
 
     // Rebuild the board (Insight changed, phase → placing) but keep the
     // overlay open so the testimony can be revealed.
@@ -497,10 +532,18 @@ export class TheRisingTurnController {
     const completed = completeTurn(placed.state);
     const after = completed.result.legal ? completed.state : placed.state;
 
-    this.undoRedo.execute(new PlaceSpiritCommand(this, state, after, spirit.id, source));
+    this.transcript?.recordSpiritMet(state.turn, spirit.id, spirit.name, met.cost, met.state.memory);
+    this.transcript?.recordQuestionChosen(
+      state.turn,
+      spirit.id,
+      0,
+      choice.testimonyIndex ?? -1,
+      choice.testimony?.question ?? '',
+      choice.insightAwarded,
+    );
+    this.commitTurn(state, placed.state, after, spirit.id, placed.score, source, completed.clock);
     this.selectedHandIndex = null;
     this.uiPhase = 'idle';
-    this.onStateSettled?.(after.turn, after.phase);
     return legalAction();
   }
 
@@ -540,23 +583,100 @@ export class TheRisingTurnController {
     const state = this.getState();
     const legality = canPlaceFromHand(state, spirit.id, slotIndex);
     if (!legality.legal) {
+      this.transcript?.recordPlacementAttempted(
+        state.turn, spirit.id, slotIndex, false, legality.reason,
+      );
       this.rejectSpirit(spirit.id);
       return legality;
     }
 
     const placed = applyPlacement(state, spirit, slotIndex);
-    if (!placed.result.legal || !placed.score) {
+    if (!placed.result.legal) {
+      this.transcript?.recordPlacementAttempted(
+        state.turn, spirit.id, slotIndex, false, placed.result.reason,
+      );
+      this.rejectSpirit(spirit.id);
+      return placed.result;
+    }
+    if (!placed.score) {
       this.rejectSpirit(spirit.id);
       return placed.result;
     }
     const completed = completeTurn(placed.state);
     const after = completed.result.legal ? completed.state : placed.state;
 
-    this.undoRedo.execute(new PlaceSpiritCommand(this, state, after, spirit.id, source));
+    this.commitTurn(state, placed.state, after, spirit.id, placed.score, source, completed.clock);
     this.selectedHandIndex = null;
     this.uiPhase = 'idle';
-    this.onStateSettled?.(after.turn, after.phase);
     return legalAction();
+  }
+
+  /**
+   * Commit a completed turn: the placement and the clock advance are one
+   * {@link CompoundCommand} (one undo step). Records the transcript events,
+   * plays the Insight/clock feedback, notifies the checkpoint hook and checks
+   * for a session end.
+   */
+  private commitTurn(
+    before: RisingState,
+    placed: RisingState,
+    after: RisingState,
+    spiritId: string,
+    score: PlacementScore,
+    source: { x: number; y: number } | undefined,
+    clock: ClockAdvanceResult | null,
+  ): void {
+    const turn = before.turn;
+    const slotIndex = placed.timeline.findIndex((entry) => entry.spiritId === spiritId);
+
+    this.undoRedo.execute(new CompoundCommand(
+      [
+        new PlaceSpiritCommand(this, before, placed, spiritId, source),
+        new AdvanceClockCommand(this, placed, after),
+      ],
+      `Play turn ${turn + 1}: ${spiritId}`,
+    ));
+
+    this.transcript?.recordPlacementAttempted(turn, spiritId, slotIndex, true);
+    this.transcript?.recordInsightAwarded(
+      turn,
+      spiritId,
+      score.base,
+      score.eraBonus,
+      score.total,
+      placed.insight,
+      score.completedEraId,
+    );
+    if (clock) {
+      this.transcript?.recordClockAdvanced(turn, clock.previousYear, clock.newYear, clock.step);
+    }
+
+    const sprite = this.renderer.findSpiritSprite('timeline', spiritId);
+    if (sprite) {
+      this.animator.popInsight(score.total, {
+        x: sprite.x,
+        y: sprite.y - RISING_CARD_H / 2 - 12,
+      });
+    }
+    if (clock) {
+      this.animator.popClockAdvance(clock.newYear, {
+        x: this.renderer.clockText.x,
+        y: this.renderer.clockText.y + 18,
+      });
+    }
+
+    this.onTurnCompleted?.(after);
+    this.maybeRecordGameEnd(after);
+  }
+
+  /** Record and finalize the transcript when a turn ends the session. */
+  private maybeRecordGameEnd(state: RisingState): void {
+    if (!this.transcript) return;
+    const evaluation = evaluateOutcome(state);
+    if (evaluation.outcome === 'in-progress') return;
+    this.transcript.recordGameEnd(state, evaluation);
+    this.transcript.finalize(this.transcript.buildResult(state, evaluation));
+    this.animator.playGameResult(evaluation.outcome);
   }
 
   // ── Undo / redo (AC5) ───────────────────────────────────

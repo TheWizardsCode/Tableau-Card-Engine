@@ -23,7 +23,7 @@
  */
 
 import { shuffleArray } from '@card-system';
-import { createSeededRng } from '@core-engine';
+import { createSeededRng } from '@core-engine/SeededRng';
 import {
   createEconomyLedger,
   illegalAction,

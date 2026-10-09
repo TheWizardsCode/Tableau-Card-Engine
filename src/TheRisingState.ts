@@ -67,6 +67,23 @@ export function isDifficulty(value: unknown): value is Difficulty {
   return value === 'easy' || value === 'normal' || value === 'hard';
 }
 
+/** Every difficulty preset, easiest first. */
+export const THERISING_DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
+
+/** The default difficulty when none is selected. */
+export const THERISING_DEFAULT_DIFFICULTY: Difficulty = 'normal';
+
+/**
+ * Coerce an arbitrary value to a difficulty preset, falling back when it is
+ * not one of the known presets.
+ */
+export function resolveDifficulty(
+  value: unknown,
+  fallback: Difficulty = THERISING_DEFAULT_DIFFICULTY,
+): Difficulty {
+  return isDifficulty(value) ? value : fallback;
+}
+
 /** The year the Rising clock starts at. */
 export const RISING_START_YEAR = 1169;
 

@@ -11,7 +11,7 @@
  */
 
 import Phaser from 'phaser';
-import { dealCard, placeCard, shakeIllegalMove } from '@ui';
+import { dealCard, placeCard, popTextOrIcon, shakeIllegalMove } from '@ui';
 import { safePlaySound, type SoundManager } from '@core-engine';
 import { THERISING_SFX_KEYS } from './TheRisingConstants';
 
@@ -159,6 +159,55 @@ export class TheRisingAnimator {
   }
 
   /**
+   * Pop a `+N Insight` notification and play the shared score-reveal SFX.
+   *
+   * The popup uses the shared `popTextOrIcon` helper; the SFX is played
+   * explicitly (and exactly once) because that helper has no audio of its own.
+   * Under reduced motion the popup is skipped by the helper but the SFX still
+   * plays, so the award is never silent.
+   */
+  popInsight(amount: number, at?: { x: number; y: number }): void {
+    this.playSfx(THERISING_SFX_KEYS.INSIGHT_REVEAL);
+    if (!at) return;
+    void popTextOrIcon({
+      scene: this.scene,
+      x: at.x,
+      y: at.y,
+      label: `+${amount} Insight`,
+      reducedMotion: this.reducedMotion,
+      style: { color: '#88ff88' },
+    });
+  }
+
+  /**
+   * Pop the advanced Rising Clock year and play the shared turn-change SFX.
+   *
+   * As with {@link popInsight}, the SFX plays once regardless of reduced motion
+   * so the turn transition is always audible.
+   */
+  popClockAdvance(year: number, at?: { x: number; y: number }): void {
+    this.playSfx(THERISING_SFX_KEYS.TURN_CHANGE);
+    if (!at) return;
+    void popTextOrIcon({
+      scene: this.scene,
+      x: at.x,
+      y: at.y,
+      label: `Rising Clock ${year}`,
+      reducedMotion: this.reducedMotion,
+      style: { color: '#e8e2d0' },
+    });
+  }
+
+  /** Play the win or loss sting for a finished session. */
+  playGameResult(outcome: 'won' | 'lost' | 'in-progress'): void {
+    if (outcome === 'won') {
+      this.playSfx(THERISING_SFX_KEYS.GAME_WIN);
+    } else if (outcome === 'lost') {
+      this.playSfx(THERISING_SFX_KEYS.GAME_LOST);
+    }
+  }
+
+  /**
    * Schedule an optional completion callback after an animation.
    *
    * The core movement helpers (`dealCard` / `placeCard`) chain their own
@@ -175,10 +224,15 @@ export class TheRisingAnimator {
   }
 
   private playIllegalMoveSound(): void {
+    this.playSfx(THERISING_SFX_KEYS.ILLEGAL_MOVE);
+  }
+
+  /** Play an SFX through the shared SoundManager, falling back to scene audio. */
+  private playSfx(key: string): void {
     if (this.soundManager) {
-      this.soundManager.play(THERISING_SFX_KEYS.ILLEGAL_MOVE);
+      this.soundManager.play(key);
       return;
     }
-    safePlaySound(this.scene, THERISING_SFX_KEYS.ILLEGAL_MOVE);
+    safePlaySound(this.scene, key);
   }
 }

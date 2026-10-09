@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "How to Play",
+      "body": "You are a seanchaí, a keeper of memory. Meet the spirits of Irish history and rebuild the timeline from the Norman landings to the Easter Rising.\nClick a Spirit Row card to meet that spirit — it costs {{meetCost}} Memory and reveals a first-person testimony. Choose a question to hear the testimony and gain Insight, then place the spirit on the Timeline in chronological order.\nEach completed turn advances the Rising Clock one decade-band. Complete the seven-era timeline and reach the Insight target before the Clock reaches {{finalYear}} to win."
+    },
+    {
+      "heading": "Features",
+      "body": "Pure, deterministic game logic: the timeline legality, scoring, Memory economy and clock are all renderer-free and seeded, so the same seed always produces the same conversation sequence.\nShared engine components throughout: HandView and PileView render every card row, the SLL layout document positions the board, UndoRedoManager backs placement undo/redo, TranscriptRecorderBase records a replayable transcript, and SaveLoadStore persists versioned checkpoints.\nAudio/visual feedback for every action via the shared movement helpers (deal, place, illegal-move shake) and the Insight/Clock popups."
+    },
+    {
+      "heading": "Controls",
+      "body": "[ Spirit Row card ]: Click to meet the spirit (spends {{meetCost}} Memory) and open its conversation.\n[ Question button ]: Choose one of the spirit's 2–3 questions; the testimony is revealed and Insight is awarded.\n[ Continue ]: Close the conversation and move into placing mode.\n[ Hand card ]: Click to select a met spirit for placement.\n[ Timeline slot ]: Click an empty slot to place the selected spirit; an illegal slot shakes the card.\n[ Drag and drop ]: Drag a Spirit Row card or a hand card onto a timeline slot (priced identically to the click flow).\n[ Undo ] / [ Redo ]: Step back or forward through placements.\n[ Help ] / [ Settings ]: Open the rules panel or the settings panel (volume, difficulty)."
+    },
+    {
+      "heading": "Win / Loss Conditions",
+      "body": "Win: place every target spirit on the Timeline in non-decreasing chronological order and reach {{insightTarget}} Insight before the Rising Clock reaches {{finalYear}}.\nLose: the Rising Clock reaches {{finalYear}} with the timeline incomplete, or Memory is depleted while spirits remain unplaced.\nInsight comes from choosing a testimony (+1) and from each correct placement (base {{baseInsight}}, plus an era-completion bonus of {{eraBonus}})."
+    },
+    {
+      "heading": "Usage Example",
+      "body": "In a session, click Strongbow in the Spirit Row to spend one Memory. Choose the question about the Norman landing to hear his testimony and gain Insight, then click the first timeline slot to place him at 1169. The Clock advances one decade-band and the turn ends. Repeat for each era until the timeline spans {{startYear}}–{{finalYear}} and the Insight bar is full."
+    },
+    {
+      "heading": "Test Plan",
+      "body": "1. Meet an affordable spirit → Memory decreases by {{meetCost}}, the spirit moves to hand, the conversation opens.\n2. Meet an unaffordable spirit → rejected with an illegal-move shake and no state change.\n3. Choose a question → Insight increases by 1 and the testimony is revealed.\n4. Place a spirit in the correct slot → Insight increases and the Clock advances; the card is committed.\n5. Place a spirit in a wrong slot → rejected, the timeline is unchanged.\n6. Undo a placement → the card returns to hand and the Clock rewinds; redo reinstates it.\n7. Complete the timeline at or above the Insight target → the session is won.\n8. Deplete Memory or let the Clock reach {{finalYear}} with the timeline incomplete → the session is lost."
+    }
+  ]
+}
