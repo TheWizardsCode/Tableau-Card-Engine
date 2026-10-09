@@ -201,3 +201,54 @@ Programmatic crop-themed icons drawn on resource tokens in the Feudalism game:
 - **License**: MIT (original procedural art, no external assets used)
 - **Format**: Generated as in-memory Phaser textures (no static image files)
 - **Icons**: Oats (grain heads), Flax (five-petal flower), Wheat (chevron ear), Barley (awned ear), Turnip (root bulb), Mead (honeycomb)
+
+## Historical Sources — 1916: The Rising
+
+_1916: The Rising_ is a commemorative example game whose spirit roster is
+drawn from published, citable histories. The canonical, machine-readable
+citation table lives in `src/data/sources.json` (exposed as `SOURCES` by
+`src/TheRisingContent.ts`); the entries below mirror it for attribution.
+
+Every spirit card cites at least one primary reference and every first-person
+testimony is attributed to a source. Authors, titles and dates are those of the
+works consulted; any errors of interpretation are the game's own, and the
+framing is commemorative rather than partisan.
+
+### Books and reference works
+
+- **Grace O'Malley: The Biography of Ireland's Pirate Queen 1530-1603** — Anne Chambers, Gill & Macmillan (revised edition Gill Books, 2018), 1979 (`chambers-grace-omalley`)
+- **Constance Markievicz: Irish Revolutionary** — Anne Haverty, Pandora, 1988 (`haverty-markievicz`)
+- **A New History of Ireland, Vol. II: Medieval Ireland 1169-1534** — Art Cosgrove (editor), Oxford University Press, 1987 (`new-history-ireland-2`)
+- **Annals of the Famine in Ireland, in 1847, 1848, and 1849** — Asenath Nicholson, E. French, New York (reissued Irish Academic Press, 1998), 1851 (`nicholson-annals`)
+- **Easter 1916: The Irish Rebellion** — Charles Townshend, Allen Lane / Penguin, 2005 (`townshend-easter-1916`)
+- **This Great Calamity: The Irish Famine 1845-52** — Christine Kinealy, Gill & Macmillan, 1994 (`kinealy-great-calamity`)
+- **James Connolly: A Full Life** — Donal Nevin, Gill & Macmillan, 2005 (`nevin-connolly`)
+- **Land and Popular Politics in Ireland: County Mayo from the Plantation to the Land War** — Donald E. Jordan Jr., Cambridge University Press, 1994 (`jordan-land-popular-politics`)
+- **Charles Stewart Parnell** — F. S. L. Lyons, Collins, 1977 (`lyons-parnell`)
+- **The Rising: Ireland: Easter 1916** — Fearghal McGarry, Oxford University Press, 2010 (`mcgarry-the-rising`)
+- **Tyrone's Rebellion: The Outbreak of the Nine Years War in Tudor Ireland** — Hiram Morgan, Boydell Press, 1993 (`morgan-tyrones-rebellion`)
+- **Jacobite Ireland 1685-91** — J. G. Simms, Routledge & Kegan Paul, 1969 (`simms-jacobite-ireland`)
+- **Dictionary of Irish Biography** — James McGuire and James Quinn (general editors), Royal Irish Academy / Cambridge University Press, 2009. https://www.dib.ie (`dib`)
+- **Patrick Pearse: The Making of a Revolutionary** — Joost Augusteijn, Palgrave Macmillan, 2010 (`augusteijn-pearse`)
+- **Jonathan Swift: His Life and His World** — Leo Damrosch, Yale University Press, 2013 (`damrosch-swift`)
+- **Maud Gonne: Ireland's Joan of Arc** — Margaret Ward, Pandora, 1990 (`ward-maud-gonne`)
+- **Wolfe Tone: Prophet of Irish Independence** — Marianne Elliott, Yale University Press, 1989 (`elliott-wolfe-tone`)
+- **Irish Society, Anglo-Norman Settlers, Angevin Kingship: Interactions in Ireland in the Late Twelfth Century** — Marie Therese Flanagan, Oxford University Press, 1989 (`flanagan-anglo-norman`)
+- **Confederate Ireland 1642-1649: A Constitutional and Political Analysis** — Micheál Ó Siochrú, Four Courts Press, 1999 (`ohart-confederate-ireland`)
+- **The United Irishmen: Popular Politics in Ulster and Dublin, 1791-1798** — Nancy J. Curtin, Clarendon Press, 1994 (`curtin-united-irishmen`)
+- **O'Connell: The Life of Daniel O'Connell 1775-1847** — Oliver MacDonagh, Weidenfeld & Nicolson, 1991 (`macdonagh-oconnell`)
+- **The Fenians in Context: Irish Politics and Society 1848-82** — R. V. Comerford, Wolfhound Press, 1985 (`comerford-fenians`)
+- **The Norman Invasion of Ireland** — Richard Roche, Anvil Books, 1970 (`roche-norman-invasion`)
+- **The Oxford Companion to Irish History** — S. J. Connolly (editor), Oxford University Press, 2007 (`oxford-companion-irish-history`)
+- **A New History of Ireland, Vol. IV: Eighteenth-Century Ireland 1691-1800** — T. W. Moody and W. E. Vaughan (editors), Oxford University Press, 1986 (`new-history-ireland-4`)
+- **A New History of Ireland, Vol. III: Early Modern Ireland 1534-1691** — T. W. Moody, F. X. Martin and F. J. Byrne (editors), Oxford University Press, 1976 (`new-history-ireland-3`)
+- **A New History of Ireland, Vol. V: Ireland under the Union, I: 1801-1870** — W. E. Vaughan (editor), Oxford University Press, 1989 (`new-history-ireland-5`)
+- **A New History of Ireland, Vol. VI: Ireland under the Union, II: 1870-1921** — W. E. Vaughan (editor), Oxford University Press, 1996 (`new-history-ireland-6`)
+
+### Scholarly papers and chapters
+
+- **Gaelic society and economy in the high Middle Ages** — Kenneth Nicholls, Oxford University Press (chapter in A New History of Ireland, Vol. II), 1987 (`nicholls-gaelic-recovery`)
+
+### Archives and exhibitions
+
+- **1916: The Easter Rising - online exhibition and digitised collections** — National Library of Ireland, National Library of Ireland, 2016. https://www.nli.ie/1916 (`nli-1916`)

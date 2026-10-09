@@ -146,3 +146,8 @@ native/**/dist/
 # time, but a local SDK checkout for reference must stay out of git.
 sdk/steamworks/
 native/**/sdk/
+
+# Committed source data (the `data/` rule above targets runtime artifacts;
+# game content data is tracked).
+!src/data/
+!src/data/sources.json

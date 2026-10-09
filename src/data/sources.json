@@ -1,0 +1,269 @@
+{
+  "dib": {
+    "id": "dib",
+    "title": "Dictionary of Irish Biography",
+    "author": "James McGuire and James Quinn (general editors)",
+    "year": 2009,
+    "kind": "book",
+    "publisher": "Royal Irish Academy / Cambridge University Press",
+    "url": "https://www.dib.ie"
+  },
+  "new-history-ireland-2": {
+    "id": "new-history-ireland-2",
+    "title": "A New History of Ireland, Vol. II: Medieval Ireland 1169-1534",
+    "author": "Art Cosgrove (editor)",
+    "year": 1987,
+    "kind": "book",
+    "publisher": "Oxford University Press",
+    "isbn": "978-0-19-821755-3"
+  },
+  "new-history-ireland-3": {
+    "id": "new-history-ireland-3",
+    "title": "A New History of Ireland, Vol. III: Early Modern Ireland 1534-1691",
+    "author": "T. W. Moody, F. X. Martin and F. J. Byrne (editors)",
+    "year": 1976,
+    "kind": "book",
+    "publisher": "Oxford University Press",
+    "isbn": "978-0-19-820242-4"
+  },
+  "new-history-ireland-4": {
+    "id": "new-history-ireland-4",
+    "title": "A New History of Ireland, Vol. IV: Eighteenth-Century Ireland 1691-1800",
+    "author": "T. W. Moody and W. E. Vaughan (editors)",
+    "year": 1986,
+    "kind": "book",
+    "publisher": "Oxford University Press",
+    "isbn": "978-0-19-821742-3"
+  },
+  "new-history-ireland-5": {
+    "id": "new-history-ireland-5",
+    "title": "A New History of Ireland, Vol. V: Ireland under the Union, I: 1801-1870",
+    "author": "W. E. Vaughan (editor)",
+    "year": 1989,
+    "kind": "book",
+    "publisher": "Oxford University Press",
+    "isbn": "978-0-19-821743-0"
+  },
+  "new-history-ireland-6": {
+    "id": "new-history-ireland-6",
+    "title": "A New History of Ireland, Vol. VI: Ireland under the Union, II: 1870-1921",
+    "author": "W. E. Vaughan (editor)",
+    "year": 1996,
+    "kind": "book",
+    "publisher": "Oxford University Press",
+    "isbn": "978-0-19-821744-7"
+  },
+  "oxford-companion-irish-history": {
+    "id": "oxford-companion-irish-history",
+    "title": "The Oxford Companion to Irish History",
+    "author": "S. J. Connolly (editor)",
+    "year": 2007,
+    "kind": "book",
+    "publisher": "Oxford University Press",
+    "isbn": "978-0-19-923483-7"
+  },
+  "nicholls-gaelic-recovery": {
+    "id": "nicholls-gaelic-recovery",
+    "title": "Gaelic society and economy in the high Middle Ages",
+    "author": "Kenneth Nicholls",
+    "year": 1987,
+    "kind": "paper",
+    "publisher": "Oxford University Press (chapter in A New History of Ireland, Vol. II)"
+  },
+  "flanagan-anglo-norman": {
+    "id": "flanagan-anglo-norman",
+    "title": "Irish Society, Anglo-Norman Settlers, Angevin Kingship: Interactions in Ireland in the Late Twelfth Century",
+    "author": "Marie Therese Flanagan",
+    "year": 1989,
+    "kind": "book",
+    "publisher": "Oxford University Press",
+    "isbn": "978-0-19-822154-8"
+  },
+  "roche-norman-invasion": {
+    "id": "roche-norman-invasion",
+    "title": "The Norman Invasion of Ireland",
+    "author": "Richard Roche",
+    "year": 1970,
+    "kind": "book",
+    "publisher": "Anvil Books"
+  },
+  "chambers-grace-omalley": {
+    "id": "chambers-grace-omalley",
+    "title": "Grace O'Malley: The Biography of Ireland's Pirate Queen 1530-1603",
+    "author": "Anne Chambers",
+    "year": 1979,
+    "kind": "book",
+    "publisher": "Gill & Macmillan (revised edition Gill Books, 2018)",
+    "isbn": "978-0-7171-8287-9"
+  },
+  "morgan-tyrones-rebellion": {
+    "id": "morgan-tyrones-rebellion",
+    "title": "Tyrone's Rebellion: The Outbreak of the Nine Years War in Tudor Ireland",
+    "author": "Hiram Morgan",
+    "year": 1993,
+    "kind": "book",
+    "publisher": "Boydell Press",
+    "isbn": "978-0-85115-683-6"
+  },
+  "ohart-confederate-ireland": {
+    "id": "ohart-confederate-ireland",
+    "title": "Confederate Ireland 1642-1649: A Constitutional and Political Analysis",
+    "author": "Micheál Ó Siochrú",
+    "year": 1999,
+    "kind": "book",
+    "publisher": "Four Courts Press",
+    "isbn": "978-1-85182-400-5"
+  },
+  "simms-jacobite-ireland": {
+    "id": "simms-jacobite-ireland",
+    "title": "Jacobite Ireland 1685-91",
+    "author": "J. G. Simms",
+    "year": 1969,
+    "kind": "book",
+    "publisher": "Routledge & Kegan Paul",
+    "isbn": "978-0-7100-6346-7"
+  },
+  "damrosch-swift": {
+    "id": "damrosch-swift",
+    "title": "Jonathan Swift: His Life and His World",
+    "author": "Leo Damrosch",
+    "year": 2013,
+    "kind": "book",
+    "publisher": "Yale University Press",
+    "isbn": "978-0-300-16499-2"
+  },
+  "elliott-wolfe-tone": {
+    "id": "elliott-wolfe-tone",
+    "title": "Wolfe Tone: Prophet of Irish Independence",
+    "author": "Marianne Elliott",
+    "year": 1989,
+    "kind": "book",
+    "publisher": "Yale University Press",
+    "isbn": "978-0-300-04637-0"
+  },
+  "curtin-united-irishmen": {
+    "id": "curtin-united-irishmen",
+    "title": "The United Irishmen: Popular Politics in Ulster and Dublin, 1791-1798",
+    "author": "Nancy J. Curtin",
+    "year": 1994,
+    "kind": "book",
+    "publisher": "Clarendon Press",
+    "isbn": "978-0-19-820587-6"
+  },
+  "macdonagh-oconnell": {
+    "id": "macdonagh-oconnell",
+    "title": "O'Connell: The Life of Daniel O'Connell 1775-1847",
+    "author": "Oliver MacDonagh",
+    "year": 1991,
+    "kind": "book",
+    "publisher": "Weidenfeld & Nicolson",
+    "isbn": "978-0-297-82017-3"
+  },
+  "kinealy-great-calamity": {
+    "id": "kinealy-great-calamity",
+    "title": "This Great Calamity: The Irish Famine 1845-52",
+    "author": "Christine Kinealy",
+    "year": 1994,
+    "kind": "book",
+    "publisher": "Gill & Macmillan",
+    "isbn": "978-0-7171-4011-4"
+  },
+  "nicholson-annals": {
+    "id": "nicholson-annals",
+    "title": "Annals of the Famine in Ireland, in 1847, 1848, and 1849",
+    "author": "Asenath Nicholson",
+    "year": 1851,
+    "kind": "book",
+    "publisher": "E. French, New York (reissued Irish Academic Press, 1998)"
+  },
+  "comerford-fenians": {
+    "id": "comerford-fenians",
+    "title": "The Fenians in Context: Irish Politics and Society 1848-82",
+    "author": "R. V. Comerford",
+    "year": 1985,
+    "kind": "book",
+    "publisher": "Wolfhound Press",
+    "isbn": "978-0-86327-331-6"
+  },
+  "lyons-parnell": {
+    "id": "lyons-parnell",
+    "title": "Charles Stewart Parnell",
+    "author": "F. S. L. Lyons",
+    "year": 1977,
+    "kind": "book",
+    "publisher": "Collins",
+    "isbn": "978-0-00-211682-9"
+  },
+  "jordan-land-popular-politics": {
+    "id": "jordan-land-popular-politics",
+    "title": "Land and Popular Politics in Ireland: County Mayo from the Plantation to the Land War",
+    "author": "Donald E. Jordan Jr.",
+    "year": 1994,
+    "kind": "book",
+    "publisher": "Cambridge University Press",
+    "isbn": "978-0-521-46683-7"
+  },
+  "ward-maud-gonne": {
+    "id": "ward-maud-gonne",
+    "title": "Maud Gonne: Ireland's Joan of Arc",
+    "author": "Margaret Ward",
+    "year": 1990,
+    "kind": "book",
+    "publisher": "Pandora",
+    "isbn": "978-0-04-440558-5"
+  },
+  "mcgarry-the-rising": {
+    "id": "mcgarry-the-rising",
+    "title": "The Rising: Ireland: Easter 1916",
+    "author": "Fearghal McGarry",
+    "year": 2010,
+    "kind": "book",
+    "publisher": "Oxford University Press",
+    "isbn": "978-0-19-280186-2"
+  },
+  "townshend-easter-1916": {
+    "id": "townshend-easter-1916",
+    "title": "Easter 1916: The Irish Rebellion",
+    "author": "Charles Townshend",
+    "year": 2005,
+    "kind": "book",
+    "publisher": "Allen Lane / Penguin",
+    "isbn": "978-0-14-101216-7"
+  },
+  "augusteijn-pearse": {
+    "id": "augusteijn-pearse",
+    "title": "Patrick Pearse: The Making of a Revolutionary",
+    "author": "Joost Augusteijn",
+    "year": 2010,
+    "kind": "book",
+    "publisher": "Palgrave Macmillan",
+    "isbn": "978-0-230-22254-4"
+  },
+  "nevin-connolly": {
+    "id": "nevin-connolly",
+    "title": "James Connolly: A Full Life",
+    "author": "Donal Nevin",
+    "year": 2005,
+    "kind": "book",
+    "publisher": "Gill & Macmillan",
+    "isbn": "978-0-7171-3911-0"
+  },
+  "haverty-markievicz": {
+    "id": "haverty-markievicz",
+    "title": "Constance Markievicz: Irish Revolutionary",
+    "author": "Anne Haverty",
+    "year": 1988,
+    "kind": "book",
+    "publisher": "Pandora",
+    "isbn": "978-0-86358-259-0"
+  },
+  "nli-1916": {
+    "id": "nli-1916",
+    "title": "1916: The Easter Rising - online exhibition and digitised collections",
+    "author": "National Library of Ireland",
+    "year": 2016,
+    "kind": "archive",
+    "publisher": "National Library of Ireland",
+    "url": "https://www.nli.ie/1916"
+  }
+}
