@@ -112,6 +112,24 @@ describe('createCardPackListingState', () => {
   });
 });
 
+describe('createCardPackListingState — purchase affordance', () => {
+  it('marks only the declared locked packs as purchasable', () => {
+    const state = createCardPackListingState(exampleResult(), ['locked-pack']);
+    const byId = Object.fromEntries(state.rows.map((row) => [row.id, row]));
+
+    expect(byId['locked-pack'].purchasable).toBe(true);
+    // An already-entitled pack is owned, and an incompatible pack is unusable.
+    expect(byId['free-pack'].purchasable).toBe(false);
+    expect(byId['unlocked-pack'].purchasable).toBe(false);
+    expect(byId['old-pack'].purchasable).toBe(false);
+  });
+
+  it('offers no purchase affordance by default', () => {
+    const state = createCardPackListingState(exampleResult());
+    expect(state.rows.every((row) => !row.purchasable)).toBe(true);
+  });
+});
+
 describe('toggleCardPack', () => {
   it('disables an entitled pack and re-enables it', () => {
     const initial = createCardPackListingState(exampleResult());

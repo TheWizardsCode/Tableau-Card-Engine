@@ -93,6 +93,12 @@ export interface CardPackListingRow {
   readonly enabled: boolean;
   /** Whether the enable/disable control is available (false when locked). */
   readonly toggleable: boolean;
+  /**
+   * Whether a purchase affordance is offered for this row. Only a locked pack
+   * that the caller declared purchasable can be purchased (an already-entitled
+   * pack is owned, so it never shows one).
+   */
+  readonly purchasable: boolean;
 }
 
 /** Immutable listing state derived from a loader result. */
@@ -109,8 +115,12 @@ export interface CardPackListingState {
  */
 export function createCardPackListingState(
   result: CardPackLoadResult,
+  purchasablePackIds: readonly string[] = [],
 ): CardPackListingState {
   const rows: CardPackListingRow[] = [];
+  const purchasable = new Set(
+    Array.isArray(purchasablePackIds) ? purchasablePackIds : [],
+  );
 
   for (const pack of result.packs) {
     const state: CardPackRowState = pack.status.state === 'unlocked' ? 'unlocked' : 'free';
@@ -123,6 +133,8 @@ export function createCardPackListingState(
       lockReason: null,
       enabled: pack.enabled,
       toggleable: true,
+      // An entitled pack is owned: a purchase affordance would be meaningless.
+      purchasable: false,
     });
   }
 
@@ -136,6 +148,7 @@ export function createCardPackListingState(
       lockReason: pack.reason,
       enabled: false,
       toggleable: false,
+      purchasable: purchasable.has(pack.manifest.id),
     });
   }
 
@@ -149,6 +162,8 @@ export function createCardPackListingState(
       lockReason: pack.reason,
       enabled: false,
       toggleable: false,
+      // A core-incompatible pack cannot be purchased into a usable state.
+      purchasable: false,
     });
   }
 
@@ -255,6 +270,14 @@ export interface CardPackListingOptions {
   readonly onToggle?: (state: CardPackListingState) => void;
   /** Called when the close control is activated. */
   readonly onClose?: () => void;
+  /**
+   * Pack ids that offer a (dev/QA simulated) purchase control when locked.
+   * Content-unlock gating is a caller concern, so the caller supplies the
+   * declaration as data rather than the listing guessing it.
+   */
+  readonly purchasablePackIds?: readonly string[];
+  /** Called when the purchase control is activated for a purchasable pack. */
+  readonly onPurchase?: (packId: string) => void;
 }
 
 const PANEL_BG = 0x101a14;
@@ -264,6 +287,7 @@ const BODY_COLOUR = '#dddddd';
 const MUTED_COLOUR = '#8a9a8a';
 const LOCK_COLOUR = '#c9a65a';
 const ENABLED_COLOUR = '#88ff88';
+const PURCHASE_COLOUR = '#7ec8e3';
 
 /**
  * Reusable, SLL-positioned card-pack listing.
@@ -280,6 +304,8 @@ export class CardPackListing {
   private readonly viewport: LayoutViewport;
   private readonly onToggle?: (state: CardPackListingState) => void;
   private readonly onClose?: () => void;
+  private readonly purchasablePackIds: readonly string[];
+  private readonly onPurchase?: (packId: string) => void;
 
   private state: CardPackListingState;
   private container: Phaser.GameObjects.Container;
@@ -294,8 +320,10 @@ export class CardPackListing {
     };
     this.onToggle = options.onToggle;
     this.onClose = options.onClose;
+    this.purchasablePackIds = options.purchasablePackIds ?? [];
+    this.onPurchase = options.onPurchase;
     this.state = options.result
-      ? createCardPackListingState(options.result)
+      ? createCardPackListingState(options.result, this.purchasablePackIds)
       : { rows: [] };
 
     this.container = scene.add.container(0, 0);
@@ -315,7 +343,7 @@ export class CardPackListing {
   /** Replace the rendered loader result (recomputes rows and enabled defaults). */
   setResult(result: CardPackLoadResult): void {
     if (this.destroyed) return;
-    this.state = createCardPackListingState(result);
+    this.state = createCardPackListingState(result, this.purchasablePackIds);
     this.render();
   }
 
@@ -327,6 +355,22 @@ export class CardPackListing {
     this.state = next;
     this.render();
     this.onToggle?.(this.state);
+    return true;
+  }
+
+  /**
+   * Activate the purchase affordance for *packId*.
+   *
+   * Ignored (returns `false`) unless the row is a locked, caller-declared
+   * purchasable pack; on success the injected `onPurchase` callback runs. The
+   * listing never mutates its own state here — the caller re-discovers and
+   * calls {@link setResult}, so the row reflects the real unlock state.
+   */
+  purchase(packId: string): boolean {
+    if (this.destroyed) return false;
+    const row = this.state.rows.find((candidate) => candidate.id === packId);
+    if (!row || !row.purchasable) return false;
+    this.onPurchase?.(packId);
     return true;
   }
 
@@ -449,6 +493,20 @@ export class CardPackListing {
   ): Phaser.GameObjects.Text {
     const x = planRow.rightX - 12;
     if (!row.toggleable) {
+      // A locked pack the caller declared purchasable offers a dev/QA
+      // simulated-purchase control; every other locked pack stays read-only.
+      if (row.purchasable) {
+        const purchase = this.scene.add
+          .text(x, planRow.centerY, '[ Purchase ]', {
+            fontFamily: FONT_FAMILY,
+            fontSize: '13px',
+            color: PURCHASE_COLOUR,
+          })
+          .setOrigin(1, 0.5)
+          .setInteractive({ useHandCursor: true });
+        purchase.on('pointerdown', () => this.purchase(row.id));
+        return purchase;
+      }
       return this.scene.add
         .text(x, planRow.centerY, '[ Locked ]', {
           fontFamily: FONT_FAMILY,
