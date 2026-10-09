@@ -85,6 +85,12 @@ export class TheRisingScene extends CardGameScene {
   public animator!: TheRisingAnimator;
   /** The interactive turn controller (clicks, drag-and-drop, undo/redo). */
   public turnController!: TheRisingTurnController;
+  /**
+   * Live modal-overlay objects (conversation dialogue), following the shared
+   * AGENTS.md overlay convention. The overlay module pushes its objects here
+   * and resets the array on dismiss.
+   */
+  public overlayObjects: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super({ key: THERISING_SCENE_KEY });
@@ -193,6 +199,7 @@ export class TheRisingScene extends CardGameScene {
         // The renderer may be partially constructed if create() failed.
       }
     }
+    this.overlayObjects = [];
     this.shutdownBase();
   }
 

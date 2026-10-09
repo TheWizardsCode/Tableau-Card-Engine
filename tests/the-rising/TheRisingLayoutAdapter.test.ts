@@ -98,4 +98,31 @@ describe('TheRisingLayoutAdapter', () => {
     // The shipped canonical viewport is exported unchanged for callers.
     expect(THE_RISING_VIEWPORT).toEqual({ width: 1280, height: 720 });
   });
+
+  it('resolves the conversation overlay content anchors top-to-bottom at the centre', () => {
+    const overlay = createTheRisingLayout(THE_RISING_LAYOUT, VIEWPORT).conversationOverlay;
+    const anchors = [
+      overlay.title,
+      overlay.intro,
+      overlay.question,
+      overlay.testimony,
+      overlay.options,
+      overlay.insight,
+      overlay.confirm,
+      overlay.cancel,
+    ];
+    for (const anchor of anchors) {
+      expect(anchor.x).toBeCloseTo(VIEWPORT.width / 2, 5);
+      expect(anchor.y).toBeGreaterThan(0);
+      expect(anchor.y).toBeLessThan(VIEWPORT.height);
+    }
+    // The question view reads title → intro → options → cancel.
+    expect(overlay.title.y).toBeLessThan(overlay.intro.y);
+    expect(overlay.intro.y).toBeLessThan(overlay.options.y);
+    expect(overlay.options.y).toBeLessThan(overlay.cancel.y);
+    // The reveal view reads question → testimony → insight → confirm.
+    expect(overlay.question.y).toBeLessThan(overlay.testimony.y);
+    expect(overlay.testimony.y).toBeLessThan(overlay.insight.y);
+    expect(overlay.insight.y).toBeLessThan(overlay.confirm.y);
+  });
 });

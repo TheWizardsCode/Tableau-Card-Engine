@@ -92,6 +92,14 @@ const FALLBACK_ANCHORS: Readonly<Record<string, Readonly<Record<string, PixelPoi
   },
   conversationOverlay: {
     center: { x: 0.5, y: 0.5 },
+    title: { x: 0.5, y: 0.31 },
+    intro: { x: 0.5, y: 0.37 },
+    options: { x: 0.5, y: 0.46 },
+    question: { x: 0.5, y: 0.36 },
+    testimony: { x: 0.5, y: 0.44 },
+    insight: { x: 0.5, y: 0.6 },
+    confirm: { x: 0.5, y: 0.66 },
+    cancel: { x: 0.5, y: 0.7 },
   },
 };
 
@@ -232,6 +240,14 @@ export interface TheRisingLayout {
   };
   readonly conversationOverlay: {
     readonly center: PixelPoint;
+    readonly title: PixelPoint;
+    readonly intro: PixelPoint;
+    readonly options: PixelPoint;
+    readonly question: PixelPoint;
+    readonly testimony: PixelPoint;
+    readonly insight: PixelPoint;
+    readonly confirm: PixelPoint;
+    readonly cancel: PixelPoint;
   };
 }
 
@@ -284,6 +300,14 @@ export function createTheRisingLayout(
     },
     conversationOverlay: {
       center: resolveAnchor('conversationOverlay', 'center', viewport, layout),
+      title: resolveAnchor('conversationOverlay', 'title', viewport, layout),
+      intro: resolveAnchor('conversationOverlay', 'intro', viewport, layout),
+      options: resolveAnchor('conversationOverlay', 'options', viewport, layout),
+      question: resolveAnchor('conversationOverlay', 'question', viewport, layout),
+      testimony: resolveAnchor('conversationOverlay', 'testimony', viewport, layout),
+      insight: resolveAnchor('conversationOverlay', 'insight', viewport, layout),
+      confirm: resolveAnchor('conversationOverlay', 'confirm', viewport, layout),
+      cancel: resolveAnchor('conversationOverlay', 'cancel', viewport, layout),
     },
   };
 }

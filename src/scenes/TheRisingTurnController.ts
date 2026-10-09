@@ -30,7 +30,10 @@ import Phaser from 'phaser';
 import { type Command, UndoRedoManager } from '@core-engine';
 import { illegalAction, legalAction, type LegalityResult } from '@rule-engine';
 import { createDragDropManager, type DragDropManager } from '@ui';
-import { createOverlayBackground, createOverlayButton, dismissOverlay } from '@ui';
+import {
+  showConversationOverlay,
+  type ConversationOverlayHandle,
+} from './TheRisingOverlayContent';
 import {
   applyPlacement,
   canPlaceFromHand,
@@ -54,10 +57,13 @@ export type RisingUiPhase = 'idle' | 'conversing' | 'placing';
 /** Distance (px) a selected hand card is raised out of the hand row. */
 export const HAND_SELECTION_LIFT = 20;
 
-/** Overlay depth convention: backdrop, box, then interactive content. */
-export const CONVERSATION_BACKDROP_DEPTH = 199;
-export const CONVERSATION_BOX_DEPTH = 200;
-export const CONVERSATION_CONTENT_DEPTH = 201;
+// Re-export the overlay depth convention for callers that referenced it here
+// before the conversation UI was extracted into TheRisingOverlayContent (F6).
+export {
+  CONVERSATION_BACKDROP_DEPTH,
+  CONVERSATION_BOX_DEPTH,
+  CONVERSATION_CONTENT_DEPTH,
+} from './TheRisingOverlayContent';
 
 /** Data attached to a draggable Spirit Row card. */
 export interface MarketDragData {
@@ -82,10 +88,8 @@ export interface ConversationSession {
   readonly spirit: Spirit;
   /** The state before the meet (used by Cancel to abort and refund Memory). */
   readonly beforeState: RisingState;
-  /** Backdrop + box objects (always present while open). */
-  readonly frameObjects: Phaser.GameObjects.GameObject[];
-  /** Swappable content objects (question buttons, then testimony + Continue). */
-  contentObjects: Phaser.GameObjects.GameObject[];
+  /** The overlay presentation handle (owns the display objects). */
+  readonly overlay: ConversationOverlayHandle;
   /** The testimony chosen this conversation, once selected. */
   testimony: Testimony | null;
 }
@@ -173,7 +177,6 @@ export class TheRisingTurnController {
   private timelineSlots: Phaser.GameObjects.Zone[] = [];
   private gestureDragged = false;
   private attached = false;
-  private escapeListener: ((event: KeyboardEvent) => void) | null = null;
 
   constructor(options: RisingTurnControllerOptions) {
     this.scene = options.scene;
@@ -215,7 +218,6 @@ export class TheRisingTurnController {
       },
     });
 
-    this.installEscapeListener();
     this.refresh();
   }
 
@@ -226,10 +228,6 @@ export class TheRisingTurnController {
     this.clearTimelineSlots();
     this.dragManager?.destroy();
     this.dragManager = null;
-    if (this.escapeListener) {
-      this.scene.input.keyboard?.off('keydown-ESC', this.escapeListener);
-      this.escapeListener = null;
-    }
     this.attached = false;
   }
 
@@ -311,88 +309,50 @@ export class TheRisingTurnController {
     return legalAction();
   }
 
-  // ── Conversation bridge (AC1; the full overlay UI is F6) ─
+  // ── Conversation bridge (AC1; the overlay UI lives in F6) ─
 
   /**
    * Open the conversation overlay for a freshly met spirit.
    *
-   * The overlay is intentionally minimal here (spirit name, introduction and
-   * the deterministic questions). The dedicated conversation presentation is
-   * F6's `TheRisingOverlayContent.ts`, which can replace this method without
-   * changing the interaction contract used by the tests.
+   * The presentation is delegated to {@link showConversationOverlay} in
+   * `TheRisingOverlayContent.ts`: it renders the spirit name, introduction and
+   * deterministic questions, parents every object into the HUD container, and
+   * owns the depth/overlay-object conventions. This controller remains the
+   * single source of truth — question choices are routed back through
+   * {@link handleConversationChoice}, and Cancel/Continue route back through
+   * {@link cancelConversation}/{@link closeConversation}.
    */
   openConversation(spirit: Spirit, beforeState: RisingState): void {
     this.closeConversation(false);
     this.uiPhase = 'conversing';
 
-    const frame = createOverlayBackground(
-      this.scene,
-      { depth: CONVERSATION_BACKDROP_DEPTH, alpha: 0.6 },
-      { width: 620, height: 360, color: 0x141a26, alpha: 1, depth: CONVERSATION_BOX_DEPTH },
-    );
-
-    const session: ConversationSession = {
+    const questions = conversationOptions(this.getState(), spirit.id);
+    const overlay = showConversationOverlay({
+      scene: this.scene,
+      layout: this.renderer.getLayout(),
       spirit,
-      beforeState,
-      frameObjects: [...frame.objects],
-      contentObjects: [],
-      testimony: null,
-    };
-    this.conversation = session;
-
-    const centre = this.renderer.getLayout().conversationOverlay.center;
-    const title = this.scene.add
-      .text(centre.x, centre.y - 140, spirit.name, {
-        fontSize: '22px',
-        fontStyle: 'bold',
-        color: '#f0c040',
-      })
-      .setOrigin(0.5)
-      .setDepth(CONVERSATION_CONTENT_DEPTH);
-    session.contentObjects.push(title);
-
-    const intro = this.scene.add
-      .text(centre.x, centre.y - 108, spirit.summary, {
-        fontSize: '13px',
-        color: '#c7cdd8',
-        align: 'center',
-        wordWrap: { width: 540 },
-      })
-      .setOrigin(0.5)
-      .setDepth(CONVERSATION_CONTENT_DEPTH);
-    session.contentObjects.push(intro);
-
-    const options = conversationOptions(this.getState(), spirit.id);
-    options.forEach((option, index) => {
-      const button = createOverlayButton(
-        this.scene,
-        centre.x,
-        centre.y - 40 + index * 44,
-        `[ ${option.question} ]`,
-        CONVERSATION_CONTENT_DEPTH,
-        { fontSize: '14px' },
-      );
-      button.on('pointerdown', () => this.handleConversationChoice(option.index));
-      session.contentObjects.push(button);
+      questions,
+      panel: this.panel,
+      reducedMotion: this.animator.reducedMotion,
+      onChoose: (optionIndex) => {
+        this.handleConversationChoice(optionIndex);
+      },
+      onCancel: () => {
+        this.cancelConversation();
+      },
     });
 
-    const cancel = createOverlayButton(
-      this.scene,
-      centre.x,
-      centre.y + 132,
-      '[ Cancel ]',
-      CONVERSATION_CONTENT_DEPTH,
-      { color: '#d99', hoverColor: '#fbb' },
-    );
-    cancel.on('pointerdown', () => this.cancelConversation());
-    session.contentObjects.push(cancel);
-
-    this.parentConversationObjects(session.contentObjects);
+    this.conversation = {
+      spirit,
+      beforeState,
+      overlay,
+      testimony: null,
+    };
   }
 
   /**
    * Handle a question choice: award the testimony's Insight through the pure
-   * economy module, reveal the testimony and offer a Continue button.
+   * economy module, then reveal the testimony and offer a Continue button.
    */
   handleConversationChoice(optionIndex: number): LegalityResult {
     const session = this.conversation;
@@ -411,43 +371,9 @@ export class TheRisingTurnController {
     // Rebuild the board (Insight changed, phase → placing) but keep the
     // overlay open so the testimony can be revealed.
     this.applyState(choice.state);
-
-    this.clearConversationContent();
-    const centre = this.renderer.getLayout().conversationOverlay.center;
-
-    const testimonyLabel = this.scene.add
-      .text(centre.x, centre.y - 120, '“' + choice.testimony.answer + '”', {
-        fontSize: '14px',
-        fontStyle: 'italic',
-        color: '#e8e2d0',
-        align: 'center',
-        wordWrap: { width: 540 },
-      })
-      .setOrigin(0.5)
-      .setDepth(CONVERSATION_CONTENT_DEPTH);
-    session.contentObjects.push(testimonyLabel);
-
-    const insight = this.scene.add
-      .text(centre.x, centre.y + 40, `+${choice.insightAwarded} Insight`, {
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: '#88ff88',
-      })
-      .setOrigin(0.5)
-      .setDepth(CONVERSATION_CONTENT_DEPTH);
-    session.contentObjects.push(insight);
-
-    const continueButton = createOverlayButton(
-      this.scene,
-      centre.x,
-      centre.y + 110,
-      '[ Continue ]',
-      CONVERSATION_CONTENT_DEPTH,
-    );
-    continueButton.on('pointerdown', () => this.closeConversation(true));
-    session.contentObjects.push(continueButton);
-
-    this.parentConversationObjects(session.contentObjects);
+    session.overlay.reveal(choice.testimony, choice.insightAwarded, () => {
+      this.closeConversation(true);
+    });
     return legalAction();
   }
 
@@ -462,8 +388,7 @@ export class TheRisingTurnController {
       if (toPlacing) this.uiPhase = 'placing';
       return;
     }
-    const session = this.conversation;
-    dismissOverlay([...session.contentObjects, ...session.frameObjects]);
+    this.conversation.overlay.dismiss();
     this.conversation = null;
     this.uiPhase = toPlacing ? 'placing' : 'idle';
   }
@@ -475,7 +400,7 @@ export class TheRisingTurnController {
   cancelConversation(): void {
     const session = this.conversation;
     if (!session) return;
-    dismissOverlay([...session.contentObjects, ...session.frameObjects]);
+    session.overlay.dismiss();
     this.conversation = null;
     this.uiPhase = 'idle';
     this.applyState(session.beforeState);
@@ -810,37 +735,5 @@ export class TheRisingTurnController {
       this.renderer.findSpiritSprite('market', spiritId) ??
       this.renderer.findSpiritSprite('timeline', spiritId);
     this.animator.rejectPlacement(sprite as unknown as Phaser.GameObjects.Container);
-  }
-
-  /** Clear the swappable conversation content, keeping the frame. */
-  private clearConversationContent(): void {
-    const session = this.conversation;
-    if (!session) return;
-    dismissOverlay(session.contentObjects);
-    session.contentObjects = [];
-  }
-
-  /** Parent conversation objects into the HUD container (correct z-order). */
-  private parentConversationObjects(objects: Phaser.GameObjects.GameObject[]): void {
-    if (!this.panel) return;
-    for (const object of objects) {
-      try {
-        this.panel.add(object);
-      } catch {
-        // The object may already be parented; never let z-ordering crash.
-      }
-    }
-  }
-
-  /** Dismiss the conversation when Escape is pressed. */
-  private installEscapeListener(): void {
-    const keyboard = this.scene.input.keyboard;
-    if (!keyboard) return;
-    this.escapeListener = (): void => {
-      if (this.conversation) {
-        this.cancelConversation();
-      }
-    };
-    keyboard.on('keydown-ESC', this.escapeListener);
   }
 }
