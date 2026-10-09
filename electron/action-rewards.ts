@@ -222,7 +222,7 @@ export interface ActionRewardConfig {
   verifierConfig?: ActionVerifierConfig | null;
 }
 
-/** Per-refresh inputs (player attestation, configured action URLs). */
+/** Per-refresh inputs (player attestation, configured action URLs, scope). */
 export interface ActionRewardRefreshOptions {
   /**
    * Whether the player self-attested to completing every action. Only an
@@ -231,6 +231,19 @@ export interface ActionRewardRefreshOptions {
   attested?: boolean;
   /** `ruleId` → action URL, passed through to the verifier's request. */
   actionUrls?: Record<string, string>;
+  /**
+   * Rule-scope filter: when supplied, only these rule ids are evaluated and
+   * **every other rule is left untouched**. An empty array evaluates nothing;
+   * an absent/`undefined` value evaluates every rule (the historical
+   * behaviour). This is what stops a scoped refresh from collateral-attesting
+   * unrelated rewards.
+   */
+  ruleIds?: readonly string[];
+  /**
+   * Explicit dev/QA simulated-purchase signal, forwarded to the verifier's
+   * request. Only an explicit `true` counts (see `SimulatedPurchaseVerifier`).
+   */
+  simulatePurchase?: boolean;
 }
 
 /**
@@ -310,12 +323,16 @@ export class ActionRewardService {
    */
   async refresh(options: ActionRewardRefreshOptions = {}): Promise<ActionRewardResult[]> {
     const rules = this.ruleSet?.rules ?? [];
+    const scope = normaliseRuleIds(options.ruleIds);
     const results: ActionRewardResult[] = [];
     const unlockedKeys = await this.loadUnlockedKeys();
 
     for (const rule of rules) {
       const platformRule = asPlatformActionRule(rule);
       if (!platformRule) continue;
+      // A scoped refresh evaluates only the named rule(s); every other rule is
+      // skipped so it is never verified or self-attested.
+      if (scope && !scope.has(platformRule.id)) continue;
 
       const key = targetKey(platformRule.target);
       if (unlockedKeys.has(key)) {
@@ -372,6 +389,7 @@ export class ActionRewardService {
       action: rule.trigger.action,
       attested: options.attested === true,
     };
+    if (options.simulatePurchase === true) request.simulatePurchase = true;
     const actionUrl = options.actionUrls?.[rule.id];
     if (typeof actionUrl === 'string') request.actionUrl = actionUrl;
 
@@ -398,6 +416,21 @@ export class ActionRewardService {
 }
 
 // ── Internal guards ────────────────────────────────────────
+
+/**
+ * Normalise a rule-scope filter.
+ *
+ * `undefined`/non-array → `null` (no scope: evaluate every rule). An array
+ * (including an empty one) → the set of non-empty string ids it names, so an
+ * empty array scopes to "nothing".
+ */
+function normaliseRuleIds(value: unknown): Set<string> | null {
+  if (!Array.isArray(value)) return null;
+  const ids = value.filter(
+    (id): id is string => typeof id === 'string' && id.length > 0,
+  );
+  return new Set(ids);
+}
 
 function normaliseRuleSet(ruleSet: UnlockRuleSet | null | undefined): UnlockRuleSet | null {
   if (!isRecord(ruleSet)) return null;

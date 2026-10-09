@@ -46,18 +46,50 @@ export interface ContentUnlockRecordLike {
   unlockedAt: string;
 }
 
+/**
+ * Scoped refresh inputs (`contentUnlocks:refresh`).
+ *
+ * `ruleIds` scopes verification to the named reward rule(s) so unrelated
+ * rewards are never evaluated; `simulatePurchase` is the explicit dev/QA
+ * simulated-purchase signal consumed by the simulated-purchase verifier.
+ */
+export interface ContentUnlockRefreshOptions {
+  /** Rule-scope filter; absent evaluates every rule, `[]` evaluates none. */
+  ruleIds?: string[];
+  /** Explicit dev/QA simulated-purchase signal. */
+  simulatePurchase?: boolean;
+  /** Self-attestation flag (unchanged semantics; ignored by scoped rules). */
+  attested?: boolean;
+}
+
+/** One rule outcome returned by a refresh (structural subset of the main result). */
+export interface ContentUnlockRefreshResult {
+  /** The rule that produced the result. */
+  ruleId: string;
+  /** The rule's target key (`game:<id>` / `dlc:<g>:<d>`). */
+  key: string;
+  /** `unlocked` / `already-unlocked` / `not-verified` / … (opaque string). */
+  outcome: string;
+}
+
 /** The subset of the `window.tce.contentUnlocks` bridge the client needs. */
 export interface ContentUnlockBridge {
   isUnlocked(target: UnlockTargetLike): Promise<boolean>;
   getUnlocks(): Promise<ContentUnlockRecordLike[]>;
+  refresh?(options?: ContentUnlockRefreshOptions): Promise<ContentUnlockRefreshResult[]>;
 }
 
-/** Total read API over the unified content-unlock state. */
+/** Total read/refresh API over the unified content-unlock state. */
 export interface ContentUnlockClient {
   /** Whether a target is unlocked. Missing/erroring bridge → `false`. */
   isUnlocked(target: UnlockTargetLike): Promise<boolean>;
   /** Every persisted unlock record. Missing/erroring bridge → `[]`. */
   getUnlocks(): Promise<ContentUnlockRecordLike[]>;
+  /**
+   * Re-evaluate content-unlock rules, optionally scoped. Missing/erroring
+   * bridge → `[]`. Never throws; the caller always gets an array.
+   */
+  refresh(options?: ContentUnlockRefreshOptions): Promise<ContentUnlockRefreshResult[]>;
 }
 
 /**
@@ -87,7 +119,36 @@ export function createContentUnlockClient(
         return [];
       }
     },
+    async refresh(options?: ContentUnlockRefreshOptions): Promise<ContentUnlockRefreshResult[]> {
+      if (!bridge || typeof bridge.refresh !== 'function') return [];
+      try {
+        const results = await bridge.refresh(normaliseRefreshOptions(options));
+        return Array.isArray(results) ? results : [];
+      } catch {
+        return [];
+      }
+    },
   };
+}
+
+/**
+ * Normalise client-supplied refresh options to the safe subset the bridge
+ * understands: a string-only `ruleIds` scope, an explicit `simulatePurchase`,
+ * and an explicit `attested`. Never throws.
+ */
+function normaliseRefreshOptions(
+  options?: ContentUnlockRefreshOptions | null,
+): ContentUnlockRefreshOptions {
+  if (typeof options !== 'object' || options === null) return {};
+  const normalised: ContentUnlockRefreshOptions = {};
+  if (Array.isArray(options.ruleIds)) {
+    normalised.ruleIds = options.ruleIds.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0,
+    );
+  }
+  if (options.simulatePurchase === true) normalised.simulatePurchase = true;
+  if (options.attested === true) normalised.attested = true;
+  return normalised;
 }
 
 /** The subset of `window.tce` the client needs. */

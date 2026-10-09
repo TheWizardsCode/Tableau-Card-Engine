@@ -47,6 +47,7 @@ import {
 import {
   ActionVerifierRegistry,
   SELF_ATTEST_VERIFIER_ID,
+  SIMULATED_PURCHASE_VERIFIER_ID,
   STEAM_FOLLOW_VERIFIER_ID,
 } from '../../electron/action-verifiers';
 import { loadBonusCatalog } from '../../electron/bonus-catalog';
@@ -82,7 +83,11 @@ const ELECTRON_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 const CONFIG_PATH = path.join(ELECTRON_DIR, 'action-rewards.json');
 
 /** The verifier ids the launcher registers; the drift validator checks against these. */
-const REGISTERED_VERIFIER_IDS = [SELF_ATTEST_VERIFIER_ID, STEAM_FOLLOW_VERIFIER_ID];
+const REGISTERED_VERIFIER_IDS = [
+  SELF_ATTEST_VERIFIER_ID,
+  STEAM_FOLLOW_VERIFIER_ID,
+  SIMULATED_PURCHASE_VERIFIER_ID,
+];
 
 /** The itch.io rule's designated game (data from the shipped config/catalog). */
 const GOLF: GameTarget = { kind: 'game', gameId: 'golf' };

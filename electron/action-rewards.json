@@ -1,11 +1,16 @@
 {
-  "_comment": "Config-driven platform-action rewards (CG-0MUZGBS9A002X9DQ). Each rule maps a (platform, action) to a target (game or DLC); 'actionUrls' is the page opened for the player to perform the action; 'verifiers' selects the verification method per rule/action/platform. Nothing here is hard-coded in logic: game ids and scene keys are validated against bonus-catalog.json by action-rewards-config.ts. itch.io exposes no follow-detection API, so the itch.io follow resolves to the manual self-attest verifier (documented honour-system caveat).",
+  "_comment": "Config-driven platform-action rewards (CG-0MUZGBS9A002X9DQ). Each rule maps a (platform, action) to a target (game or DLC); 'actionUrls' is the page opened for the player to perform the action; 'verifiers' selects the verification method per rule/action/platform. Nothing here is hard-coded in logic: game ids and scene keys are validated against bonus-catalog.json by action-rewards-config.ts. itch.io exposes no follow-detection API, so the itch.io follow resolves to the manual self-attest verifier (documented honour-system caveat). The dev/simulate-purchase rule is a dev/QA-only simulated purchase: it is scoped by rule id and only verifies when a caller explicitly requests simulatePurchase, so a global self-attest refresh can never collateral-unlock it.",
   "version": 1,
   "rules": [
     {
       "id": "itchio-follow",
       "trigger": { "kind": "platform-action", "platform": "itch.io", "action": "follow" },
       "target": { "kind": "game", "gameId": "golf" }
+    },
+    {
+      "id": "main-street-residential-pack-purchase",
+      "trigger": { "kind": "platform-action", "platform": "dev", "action": "simulate-purchase" },
+      "target": { "kind": "dlc", "gameId": "main-street", "dlcId": "main-street-residential-pack" }
     }
   ],
   "actionUrls": {
@@ -15,6 +20,9 @@
     "defaultVerifierId": "manual-self-attest",
     "platforms": {
       "itch.io": "manual-self-attest"
+    },
+    "actions": {
+      "dev:simulate-purchase": "simulated-purchase"
     }
   }
 }

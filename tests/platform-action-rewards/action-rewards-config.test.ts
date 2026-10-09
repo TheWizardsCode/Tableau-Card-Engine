@@ -36,6 +36,7 @@ import {
   ActionVerifierRegistry,
   FakeActionVerifier,
   SELF_ATTEST_VERIFIER_ID,
+  SIMULATED_PURCHASE_VERIFIER_ID,
   STEAM_FOLLOW_VERIFIER_ID,
   resolveVerifierForRule,
 } from '../../electron/action-verifiers';
@@ -47,7 +48,11 @@ const CONFIG_PATH = path.join(ELECTRON_DIR, 'action-rewards.json');
 const CATALOG_PATH = path.join(ELECTRON_DIR, 'bonus-catalog.json');
 
 /** Verifier ids the launcher ships. */
-const KNOWN_VERIFIER_IDS = [SELF_ATTEST_VERIFIER_ID, STEAM_FOLLOW_VERIFIER_ID];
+const KNOWN_VERIFIER_IDS = [
+  SELF_ATTEST_VERIFIER_ID,
+  STEAM_FOLLOW_VERIFIER_ID,
+  SIMULATED_PURCHASE_VERIFIER_ID,
+];
 
 /** A platform-action rule that unlocks a whole game. */
 function gameRule(id: string, platform: string, action: string, gameId: string): UnlockRule {

@@ -38,6 +38,7 @@ import { STEAM_FOLLOW_CHANNELS, createSteamFollowHandlers } from './steam-follow
 import { ActionRewardService, FileContentUnlockStore } from './action-rewards.js';
 import { loadActionRewardsConfig } from './action-rewards-config.js';
 import { ACTION_REWARD_CHANNELS, createActionRewardHandlers } from './action-rewards-ipc.js';
+import { createContentUnlockVerifierRegistry } from './action-verifiers.js';
 import { FileAchievementStore, SteamAchievementService } from './steam-achievements.js';
 import { loadAchievementManifest, validateAchievementManifest } from './achievement-manifest.js';
 import { SteamworksAchievementSource } from './steam-achievements-steamworks.js';
@@ -326,6 +327,10 @@ function initContentUnlocks(): void {
   const service = new ActionRewardService({
     rules: config ? { version: config.version, rules: config.rules } : null,
     store,
+    // Add the explicit dev/QA simulated-purchase verifier alongside the
+    // manual self-attest default. It is inert unless a scoped refresh asks for
+    // it, so the existing self-attest paths are unchanged.
+    verifiers: createContentUnlockVerifierRegistry(),
     verifierConfig: config?.verifiers ?? null,
   });
   const handlers = createActionRewardHandlers(service);

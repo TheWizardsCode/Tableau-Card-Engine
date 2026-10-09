@@ -30,12 +30,19 @@ export const ACTION_REWARD_CHANNELS = {
   refresh: 'contentUnlocks:refresh',
 } as const;
 
-/** Per-refresh inputs from the renderer (player attestation, action URLs). */
+/** Per-refresh inputs from the renderer (attestation, URLs, scope). */
 export interface ActionRewardRefreshRequest {
   /** Whether the player self-attested to completing every configured action. */
   attested?: boolean;
   /** `ruleId` → action URL, passed through to the resolved verifier. */
   actionUrls?: Record<string, string>;
+  /**
+   * Rule-scope filter: only these rule ids are evaluated. An empty array
+   * evaluates nothing; an absent value evaluates every rule.
+   */
+  ruleIds?: string[];
+  /** Explicit dev/QA simulated-purchase signal (see `SimulatedPurchaseVerifier`). */
+  simulatePurchase?: boolean;
 }
 
 /** The handler table registered on `ipcMain`. */
@@ -112,14 +119,31 @@ export function isUnlockTarget(value: unknown): value is UnlockTarget {
 
 /**
  * Normalise a renderer-supplied refresh request to the safe subset the service
- * understands: only an explicit `attested: true` and string action URLs count.
+ * understands: an explicit `attested: true`, string action URLs, a string-only
+ * `ruleIds` scope, and an explicit `simulatePurchase: true`.
  */
 function normaliseRefreshRequest(
   options: ActionRewardRefreshRequest | null | undefined,
-): { attested?: boolean; actionUrls?: Record<string, string> } {
+): {
+  attested?: boolean;
+  actionUrls?: Record<string, string>;
+  ruleIds?: string[];
+  simulatePurchase?: boolean;
+} {
   if (!isRecord(options)) return {};
-  const request: { attested?: boolean; actionUrls?: Record<string, string> } = {};
+  const request: {
+    attested?: boolean;
+    actionUrls?: Record<string, string>;
+    ruleIds?: string[];
+    simulatePurchase?: boolean;
+  } = {};
   if (options.attested === true) request.attested = true;
+  if (options.simulatePurchase === true) request.simulatePurchase = true;
+  if (Array.isArray(options.ruleIds)) {
+    request.ruleIds = options.ruleIds.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0,
+    );
+  }
   if (isRecord(options.actionUrls)) {
     const urls: Record<string, string> = {};
     for (const [key, value] of Object.entries(options.actionUrls)) {

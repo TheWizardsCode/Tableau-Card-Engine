@@ -40,6 +40,9 @@ export const SELF_ATTEST_VERIFIER_ID = 'manual-self-attest';
 /** Registry id of the Steam follow-detection adapter. */
 export const STEAM_FOLLOW_VERIFIER_ID = 'steam-follow';
 
+/** Registry id of the explicit dev/QA simulated-purchase verifier. */
+export const SIMULATED_PURCHASE_VERIFIER_ID = 'simulated-purchase';
+
 // ── Verification request/result ────────────────────────────
 
 /** Input to a verification: the action identity plus optional context. */
@@ -58,6 +61,13 @@ export interface ActionVerificationRequest {
    * explicit `true` counts; every other value is treated as "no attestation".
    */
   attested?: boolean;
+  /**
+   * Whether the caller explicitly requested a simulated (dev/QA) purchase.
+   * Only an explicit `true` counts. Consumed by the
+   * {@link SimulatedPurchaseVerifier}; other verifiers ignore it, so a global
+   * self-attest refresh can never fabricate a simulated purchase.
+   */
+  simulatePurchase?: boolean;
 }
 
 /**
@@ -146,6 +156,48 @@ export class ManualSelfAttestVerifier implements ActionVerifier {
       reason: attested
         ? 'Player attested to completing the action'
         : 'Awaiting player self-attestation',
+    };
+  }
+}
+
+// ── Simulated purchase (dev/QA) ─────────────────────────────
+
+/**
+ * A dev/QA-only verifier for an explicit **simulated purchase**.
+ *
+ * Unlike {@link ManualSelfAttestVerifier}, this verifier does **not** accept a
+ * plain `attested: true` — a purchase must be requested explicitly through
+ * `simulatePurchase: true`. That scoping is what stops a global
+ * `refresh({ attested: true })` from collateral-unlocking content gated on a
+ * simulated purchase (the residential card pack).
+ *
+ * It performs no real storefront transaction; it is the mechanism a dev/QA
+ * affordance uses to exercise the lock → unlock path deterministically.
+ */
+export class SimulatedPurchaseVerifier implements ActionVerifier {
+  readonly id = SIMULATED_PURCHASE_VERIFIER_ID;
+  readonly label = 'Simulated purchase (dev/QA)';
+
+  supportsAutomaticVerification(): boolean {
+    // There is no real storefront to poll; the signal is explicit.
+    return false;
+  }
+
+  async openActionPage(_url: string): Promise<boolean> {
+    // No native client: nothing to open for a simulated purchase.
+    return false;
+  }
+
+  async verify(request?: ActionVerificationRequest): Promise<ActionVerificationResult> {
+    const simulated = request?.simulatePurchase === true;
+    return {
+      verifierId: this.id,
+      outcome: simulated ? 'verified' : 'not-verified',
+      verified: simulated,
+      automatic: false,
+      reason: simulated
+        ? 'Simulated purchase requested'
+        : 'Awaiting an explicit simulated-purchase request',
     };
   }
 }
@@ -399,6 +451,19 @@ export function createDefaultActionVerifierRegistry(
     registry.register(new SteamFollowActionVerifier(steamSource, developerSteamId ?? null));
   }
   return registry;
+}
+
+/**
+ * Build the launcher's content-unlock verifier registry: the manual
+ * self-attest default plus the explicit dev/QA simulated-purchase verifier.
+ *
+ * The simulated-purchase verifier is registered unconditionally because it is
+ * inert unless a scoped request explicitly asks for it
+ * (`simulatePurchase: true`), so registering it does not weaken any existing
+ * self-attest path.
+ */
+export function createContentUnlockVerifierRegistry(): ActionVerifierRegistry {
+  return new ActionVerifierRegistry().register(new SimulatedPurchaseVerifier());
 }
 
 /**
