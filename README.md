@@ -15,6 +15,7 @@ npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 npm run generate:icons # regenerate app icons from public/favicon.svg (the tableau emblem)
+npm run build:card-pack -- --input <packSourceDir>  # build an installable card pack (see docs/DEVELOPER.md#card-packs)
 
 # Compose a full multi-game distribution (core + sibling game checkouts):
 npm run setup:distribution -- --dir ..

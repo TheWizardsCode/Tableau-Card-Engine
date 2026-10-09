@@ -7,8 +7,11 @@ Steam DLC entitlement (Main Street is the first consumer).
 
 This plan exercises the parts that need a **packaged Electron run**, a
 **real content directory**, and (for the locked scenario) a **real Steam DLC
-app id** — things the automated suite cannot cover. Automated coverage of the
-loader, merge, entitlement, save/load and missing-pack policy lives in:
+app id** — things the automated suite cannot cover. For the end-to-end
+lifecycle itself (authoring, building, installing and gating a pack), see the
+[card-packs runbook](card-packs-runbook.md); this document is its manual
+verification companion. Automated coverage of the loader, merge, entitlement,
+save/load and missing-pack policy lives in:
 
 - core: `tests/core-engine/card-pack-manifest.test.ts`,
   `tests/core-engine/card-pack-merge.test.ts`,

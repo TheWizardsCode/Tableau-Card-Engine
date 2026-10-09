@@ -2178,7 +2178,9 @@ extend an already-installed game with new cards and art, without rebuilding the
 launcher (feature `CG-0MUZFD1WR0031QTB`; Main Street is the first consumer). A
 pack is a manifest + a CSV fragment in the **game's existing card schema** +
 optional assets, merged into the base pool at load time. Packs are additive and
-may be entitlement-gated (Steam DLC).
+may be entitlement-gated (Steam DLC). For the full lifecycle walk-through, see
+the [card-packs runbook](dev/card-packs-runbook.md) (authoring → building →
+installing → gating).
 
 ### Pack layout
 
@@ -2197,6 +2199,76 @@ Each manifest entry declares `id`, `gameId`, `title`, `description`, `version`,
 into one pool is `src/core-engine/CardPackMerge.ts`. The renderer discovers
 packs with `src/ui/CardPackLoader.ts` and resolves pack assets through the
 `tce-packs://` protocol (`src/ui/card-pack-url.ts`, `electron/pack-protocol.ts`).
+
+### Loading a pack
+
+The renderer discovers a game's packs with `loadCardPacks`
+(`src/ui/CardPackLoader.ts`) from the launcher-resolved content directory:
+
+1. Read `<contentDir>/packs/manifest.json` through `fetch`.
+2. Parse and validate it (`parseCardPackManifest`) — never throws.
+3. Filter to the running game (`filterPacksByGameId`) and partition by core
+   compatibility (`splitPacksByCompatibility`).
+4. Resolve entitlement for the compatible batch through the injected resolver.
+5. Fetch each entitled pack's CSV fragment over
+   `tce-packs://<gameId>/<packId>/<cards>` and expose its `assets` as resolved
+   `tce-packs://` URLs (the game's asset loader fetches the binaries; the
+   loader never reads image/audio bytes itself).
+
+The loader is **environment-injected** (`contentDir`, `gameId`,
+`engineVersion`, `fetchManifest`, `fetchCsv`/`importer`,
+`resolveEntitlement`), so it is unit-testable without Electron, a network, or a
+real content directory. Main Street calls `bootstrapMainStreetCardPacks()`
+**before scene setup**, so the first deal already includes pack cards; a game
+feeds the returned packs to the core merge seam
+([`mergeCardPackCsv`](../src/core-engine/CardPackMerge.ts), see below).
+
+### Entitlement
+
+A pack with no `entitlement` is **free** base content. A pack gated on Steam
+DLC is resolved by the main-process seam
+(`electron/card-pack-entitlements.ts`): a pure `PackEntitlementSource` interface
+with a deterministic `FakeEntitlementSource` and a real Steamworks adapter
+(`electron/card-pack-entitlements-steamworks.ts`, dynamic optional import +
+`apps.isDlcInstalled` capability detection). The pack → DLC app-id mapping is
+**data** (`electron/card-pack-dlc-catalog.json`), never hard-coded, and resolves
+by exact `(packId, gameId)` → wildcard `packId` → the pack's own manifest
+`entitlement.steamAppId` (`electron/card-pack-catalog.ts`).
+
+The renderer never imports the SDK; a total read client
+(`src/ui/card-pack-client.ts`, `cardPackClientFromWindow()`) reads status
+through the `window.tce.cardPacks` bridge
+(`electron/preload.cjs` → `electron/card-pack-ipc.ts`). Each pack resolves to
+`free`, `unlocked` or `locked`:
+
+| State | Meaning |
+|-------|---------|
+| `free` | No entitlement declared; enabled by default. |
+| `unlocked` | Gated and the DLC is owned; enabled by default, toggleable. |
+| `locked` | Gated and not owned / Steam unavailable / no DLC API; read-only with a reason. |
+
+Lock reasons: `Requires Steam DLC <appId>.`, `Steam is unavailable.`, or
+`Pack bridge unavailable.` In a plain browser (no bridge) an ungated pack reads
+`free` and a gated pack `locked`, so the web build plays base content and never
+crashes. A capability gap (a binding with no DLC API) is never treated as
+entitlement — the pack stays locked; the launcher never fabricates an unlock.
+
+### Degradation
+
+Every card-pack layer is **total** — a failure degrades to base content rather
+than crashing the game. A missing/malformed manifest is reported structurally;
+an incompatible pack is hidden from play and listed with a reason; a gated pack
+that is not owned is listed locked and its cards are absent; a fragment whose
+header does not match the base schema, or that contributes a duplicate card id,
+is dropped **whole** (never partially merged).
+
+Main Street additionally persists the active pack set (`activePacks: { id,
+version }[]`) and the merged `csvChecksum` / `csvData` with every save. On load
+the merged CSV is restored from the save, a pack named in the save but not
+active produces a `missing`/`disabled` warning and play continues on base
+content, and the game refuses to resume **only** when a live card instance needs
+a missing template (`MissingCardPackTemplateError`). `mergeMainStreetCardPool()`
+is the single merge entry point that feeds `loadTemplatesFromCsv()`.
 
 ### Producing a pack
 
@@ -2227,6 +2299,10 @@ is built and asserted by `tests/scripts/build-card-pack.test.ts`.
 > dropped whole.
 
 ### Manual QA
+
+The step-by-step lifecycle runbook — **authoring → building → installing →
+gating**, with the reference pack as a worked example — is
+[`docs/dev/card-packs-runbook.md`](dev/card-packs-runbook.md).
 
 The automated suite covers the contract, loader, merge, entitlement, listing and
 save/load policy. The parts that need a packaged Electron run, a real content
