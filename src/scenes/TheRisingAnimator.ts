@@ -103,11 +103,13 @@ export class TheRisingAnimator {
    * Play rejection feedback for an illegal placement / unaffordable meet.
    *
    * Uses the shared `shakeIllegalMove` helper (which plays `sfx-illegal-move`
-   * itself). Under reduced motion the shake is skipped but the SFX still plays,
-   * so the rejection is audible without motion.
+   * itself) for Image/Sprite targets. Spirit cards are custom-rendered
+   * `Container`s with no tint component, so a container-safe position shake +
+   * SFX is used instead. Under reduced motion the shake is skipped but the SFX
+   * still plays, so the rejection is audible without motion.
    */
   rejectPlacement(
-    target: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite | null | undefined,
+    target: RisingCardTarget | null | undefined,
     onComplete?: () => void,
   ): void {
     if (this.reducedMotion) {
@@ -116,11 +118,43 @@ export class TheRisingAnimator {
       return;
     }
 
-    shakeIllegalMove({
-      scene: this.scene,
-      target,
-      soundKey: THERISING_SFX_KEYS.ILLEGAL_MOVE,
-      onComplete,
+    const tintable = target as unknown as
+      | (RisingCardTarget & { setTint?: (tint: number) => void })
+      | null
+      | undefined;
+
+    if (tintable && typeof tintable.setTint === 'function') {
+      shakeIllegalMove({
+        scene: this.scene,
+        target: tintable as Phaser.GameObjects.Image,
+        soundKey: THERISING_SFX_KEYS.ILLEGAL_MOVE,
+        onComplete,
+      });
+      return;
+    }
+
+    if (!target) {
+      this.playIllegalMoveSound();
+      onComplete?.();
+      return;
+    }
+
+    // Container-safe shake: no tint component, so shake the x position and
+    // play the illegal-move SFX ourselves (never double-played — this branch
+    // does not call `shakeIllegalMove`).
+    this.playIllegalMoveSound();
+    const originalX = target.x;
+    this.scene.tweens.add({
+      targets: target as unknown as object,
+      x: originalX - 5,
+      duration: 50,
+      yoyo: true,
+      repeat: 2,
+      ease: 'Sine.inOut',
+      onComplete: () => {
+        target.setX(originalX);
+        onComplete?.();
+      },
     });
   }
 

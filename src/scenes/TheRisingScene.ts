@@ -41,6 +41,7 @@ import {
   THERISING_SFX_KEYS,
 } from './TheRisingConstants';
 import { createInitialState, type RisingState } from '../TheRisingState';
+import { TheRisingTurnController } from './TheRisingTurnController';
 
 /** The scene key used to register and start {@link TheRisingScene}. */
 export const THERISING_SCENE_KEY = 'TheRisingScene';
@@ -82,6 +83,8 @@ export class TheRisingScene extends CardGameScene {
   public boardRenderer!: TheRisingRenderer;
   /** The card animator (deal, place, reject). */
   public animator!: TheRisingAnimator;
+  /** The interactive turn controller (clicks, drag-and-drop, undo/redo). */
+  public turnController!: TheRisingTurnController;
 
   constructor() {
     super({ key: THERISING_SCENE_KEY });
@@ -137,6 +140,34 @@ export class TheRisingScene extends CardGameScene {
     this.animator = new TheRisingAnimator(this, this.soundManager);
     this.animator.reducedMotion = this.resolveReducedMotion();
 
+    // Interactive layer: market/hand/timeline clicks, drag-and-drop and the
+    // placement undo/redo history (F5).
+    this.turnController = new TheRisingTurnController({
+      scene: this,
+      renderer: this.boardRenderer,
+      animator: this.animator,
+      getState: () => this.risingState,
+      setState: (state) => { this.risingState = state; },
+      panel: this.hudContainer,
+      onStateSettled: (turn) => this.emitStateSettled(turn, 'playing'),
+    });
+    this.turnController.attach();
+
+    // Undo/redo buttons reflect the placement history (AC5).
+    if (!this.replayMode) {
+      this.initUndoRedoButtons(
+        () => {
+          this.turnController.undo();
+          this.refreshUndoRedoButtonState();
+        },
+        () => {
+          this.turnController.redo();
+          this.refreshUndoRedoButtonState();
+        },
+      );
+      this.refreshUndoRedoButtonState();
+    }
+
     // Help and settings panels (skipped in replay mode).
     if (!this.replayMode) {
       this.initHelpPanel([...THERISING_HELP_SECTIONS]);
@@ -148,6 +179,13 @@ export class TheRisingScene extends CardGameScene {
 
   /** Destroy owned display objects and run the shared base cleanup. */
   shutdown(): void {
+    if (this.turnController) {
+      try {
+        this.turnController.destroy();
+      } catch {
+        // The controller may be partially constructed if create() failed.
+      }
+    }
     if (this.boardRenderer) {
       try {
         this.boardRenderer.destroy();
@@ -175,6 +213,19 @@ export class TheRisingScene extends CardGameScene {
       return getReducedMotion();
     } catch {
       return false;
+    }
+  }
+
+  /** Sync the undo/redo button enabled state with the placement history. */
+  private refreshUndoRedoButtonState(): void {
+    if (!this.turnController) return;
+    try {
+      this.refreshUndoRedoButtons(
+        this.turnController.undoRedo.canUndo(),
+        this.turnController.undoRedo.canRedo(),
+      );
+    } catch {
+      // Ignore — buttons may not exist in replay mode.
     }
   }
 }

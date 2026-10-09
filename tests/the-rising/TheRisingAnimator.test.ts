@@ -34,10 +34,11 @@ import type { SoundManager } from '../../src/core-engine/SoundManager';
 
 interface FakeScene {
   time: { delayedCall: ReturnType<typeof vi.fn> };
+  tweens: { add: ReturnType<typeof vi.fn> };
 }
 
 function makeScene(): FakeScene {
-  return { time: { delayedCall: vi.fn() } };
+  return { time: { delayedCall: vi.fn() }, tweens: { add: vi.fn() } };
 }
 
 function makeSoundManager(): SoundManager {
@@ -122,16 +123,39 @@ describe('TheRisingAnimator', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('delegates rejection feedback to shakeIllegalMove when motion is allowed', () => {
+  it('delegates rejection feedback to shakeIllegalMove for a tintable target', () => {
     const scene = makeScene();
     const animator = new TheRisingAnimator(scene as never, null);
     const onComplete = vi.fn();
+    const target = { x: 0, y: 0, setTint: vi.fn(), clearTint: vi.fn(), setX: vi.fn() };
 
-    animator.rejectPlacement({} as never, onComplete);
+    animator.rejectPlacement(target as never, onComplete);
 
     expect(mocks.shakeIllegalMove).toHaveBeenCalledTimes(1);
     const options = mocks.shakeIllegalMove.mock.calls[0][0];
     expect(options.soundKey).toBe(THERISING_SFX_KEYS.ILLEGAL_MOVE);
     expect(options.onComplete).toBe(onComplete);
+  });
+
+  it('shakes a non-tintable Container target in place and plays the illegal-move SFX', () => {
+    const scene = makeScene();
+    const soundManager = makeSoundManager();
+    const animator = new TheRisingAnimator(scene as never, soundManager);
+    const onComplete = vi.fn();
+    const target = { x: 40, y: 10, setX: vi.fn((x: number) => { target.x = x; }) };
+
+    animator.rejectPlacement(target as never, onComplete);
+
+    // Containers have no tint component, so the shared shake helper is skipped
+    // and a position shake is used instead (with the same SFX).
+    expect(mocks.shakeIllegalMove).not.toHaveBeenCalled();
+    expect(scene.tweens.add).toHaveBeenCalledTimes(1);
+    expect(soundManager.play).toHaveBeenCalledWith(THERISING_SFX_KEYS.ILLEGAL_MOVE);
+
+    // The tween completion restores the original x and calls onComplete.
+    const tweenOptions = scene.tweens.add.mock.calls[0][0] as { onComplete?: () => void };
+    tweenOptions.onComplete?.();
+    expect(target.setX).toHaveBeenCalledWith(40);
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });

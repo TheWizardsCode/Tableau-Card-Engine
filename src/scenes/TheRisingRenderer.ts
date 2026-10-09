@@ -142,6 +142,24 @@ export class TheRisingRenderer {
     return this.layout;
   }
 
+  /**
+   * Return the rendered display object for a spirit in a named band, or
+   * `undefined` when the spirit is not currently rendered there.
+   *
+   * The display object is a `Container` whose `name` is
+   * `` `${zone}-spirit-${spiritId}` ``.
+   */
+  findSpiritSprite(
+    zone: 'market' | 'timeline' | 'hand',
+    spiritId: string,
+  ): (Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform) | undefined {
+    const view = zone === 'market' ? this.marketView : zone === 'hand' ? this.handView : this.timelineView;
+    const name = `${zone}-spirit-${spiritId}`;
+    return (view.getSprites() as Array<Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform>).find(
+      (sprite) => sprite.name === name,
+    );
+  }
+
   // ── Construction helpers ────────────────────────────────
 
   private createBandLabel(point: { x: number; y: number }, text: string): Phaser.GameObjects.Text {
@@ -202,6 +220,14 @@ export class TheRisingRenderer {
   ): Phaser.GameObjects.Container {
     const container = this.scene.add.container(0, 0);
     container.setName(`${zone}-spirit-${spirit.id}`);
+
+    // Make the custom-rendered card clickable/draggable. A Container has no
+    // texture, so an explicit local hit area is required; its children are
+    // centred on (0, 0) so the rectangle spans the card bounds.
+    container.setInteractive(
+      new Phaser.Geom.Rectangle(-RISING_CARD_W / 2, -RISING_CARD_H / 2, RISING_CARD_W, RISING_CARD_H),
+      Phaser.Geom.Rectangle.Contains,
+    );
 
     const halfH = RISING_CARD_H / 2;
 
