@@ -1,0 +1,150 @@
+/**
+ * TheRisingAnimator -- card animations for 1916: The Rising.
+ *
+ * Every animation is wired to the core-engine movement helpers (`dealCard`,
+ * `placeCard`, `shakeIllegalMove`) so it is both animated and audible through
+ * the shared `SoundManager` (AC5). When reduced motion is requested, movement
+ * helpers snap to their destination and the reject feedback skips the shake —
+ * but the illegal-move SFX still plays so feedback is never lost.
+ *
+ * @module src/scenes/TheRisingAnimator
+ */
+
+import Phaser from 'phaser';
+import { dealCard, placeCard, shakeIllegalMove } from '@ui';
+import { safePlaySound, type SoundManager } from '@core-engine';
+import { THERISING_SFX_KEYS } from './TheRisingConstants';
+
+/** Duration (ms) of the deal/place animations. */
+export const RISING_ANIM_DURATION = 380;
+
+/** A transformable card display object (a sprite or container). */
+export type RisingCardTarget = Phaser.GameObjects.Components.Transform &
+  Phaser.GameObjects.GameObject;
+
+/** Options for dealing a spirit from the Spirit Row. */
+export interface DealFromMarketOptions {
+  /** The card display object to animate. */
+  readonly target: RisingCardTarget;
+  /** Source position (usually the Spirit Row slot). */
+  readonly source: { x: number; y: number };
+  /** Destination position (usually the hand). */
+  readonly destination: { x: number; y: number };
+  /** Called once the deal animation completes. */
+  readonly onComplete?: () => void;
+}
+
+/** Options for placing a spirit on the timeline. */
+export interface PlaceOnTimelineOptions {
+  /** The card display object to animate. */
+  readonly target: RisingCardTarget;
+  /** Destination position (the timeline slot). */
+  readonly destination: { x: number; y: number };
+  /** Called once the place animation completes. */
+  readonly onComplete?: () => void;
+}
+
+/**
+ * Drives card movement and feedback animations for The Rising.
+ */
+export class TheRisingAnimator {
+  /** When true, movement snaps and the reject shake is skipped. */
+  reducedMotion = false;
+
+  constructor(
+    private readonly scene: Phaser.Scene,
+    private readonly soundManager: SoundManager | null,
+  ) {}
+
+  /**
+   * Animate a spirit being dealt from the Spirit Row into the hand.
+   *
+   * Plays `sfx-card-draw` at the start; the reveal sound plays at the end so a
+   * card entering the hand is both seen and heard.
+   */
+  dealFromMarket(options: DealFromMarketOptions): Phaser.Tweens.Tween {
+    const tween = dealCard({
+      scene: this.scene,
+      target: options.target,
+      sourceX: options.source.x,
+      sourceY: options.source.y,
+      destX: options.destination.x,
+      destY: options.destination.y,
+      duration: RISING_ANIM_DURATION,
+      reducedMotion: this.reducedMotion,
+      soundManager: this.soundManager,
+      sfx: { start: THERISING_SFX_KEYS.SPIRIT_DEAL, end: THERISING_SFX_KEYS.SPIRIT_REVEAL },
+    });
+    this.scheduleCompletion(options.onComplete, RISING_ANIM_DURATION);
+    return tween;
+  }
+
+  /**
+   * Animate a spirit snapping onto the timeline.
+   *
+   * Plays `sfx-card-swap` at the start of the placement motion.
+   */
+  placeOnTimeline(options: PlaceOnTimelineOptions): Phaser.Tweens.Tween {
+    const tween = placeCard({
+      scene: this.scene,
+      target: options.target,
+      destX: options.destination.x,
+      destY: options.destination.y,
+      duration: RISING_ANIM_DURATION,
+      reducedMotion: this.reducedMotion,
+      soundManager: this.soundManager,
+      sfx: { start: THERISING_SFX_KEYS.SPIRIT_PLACE },
+    });
+    this.scheduleCompletion(options.onComplete, RISING_ANIM_DURATION);
+    return tween;
+  }
+
+  /**
+   * Play rejection feedback for an illegal placement / unaffordable meet.
+   *
+   * Uses the shared `shakeIllegalMove` helper (which plays `sfx-illegal-move`
+   * itself). Under reduced motion the shake is skipped but the SFX still plays,
+   * so the rejection is audible without motion.
+   */
+  rejectPlacement(
+    target: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite | null | undefined,
+    onComplete?: () => void,
+  ): void {
+    if (this.reducedMotion) {
+      this.playIllegalMoveSound();
+      onComplete?.();
+      return;
+    }
+
+    shakeIllegalMove({
+      scene: this.scene,
+      target,
+      soundKey: THERISING_SFX_KEYS.ILLEGAL_MOVE,
+      onComplete,
+    });
+  }
+
+  /**
+   * Schedule an optional completion callback after an animation.
+   *
+   * The core movement helpers (`dealCard` / `placeCard`) chain their own
+   * sub-tweens internally and expose no completion option, so the callback is
+   * timed against the helper's known total duration (and snaps to the reduced-
+   * motion duration when motion is off).
+   */
+  private scheduleCompletion(
+    onComplete: (() => void) | undefined,
+    duration: number,
+  ): void {
+    if (!onComplete) return;
+    this.scene.time.delayedCall(this.reducedMotion ? 50 : duration, onComplete);
+  }
+
+  private playIllegalMoveSound(): void {
+    if (this.soundManager) {
+      this.soundManager.play(THERISING_SFX_KEYS.ILLEGAL_MOVE);
+      return;
+    }
+    safePlaySound(this.scene, THERISING_SFX_KEYS.ILLEGAL_MOVE);
+  }
+}
