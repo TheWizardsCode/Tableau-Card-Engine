@@ -558,7 +558,7 @@ unchanged.
 |--------|----------------|
 | `electron/action-rewards-ipc.ts` | `ACTION_REWARD_CHANNELS` (`contentUnlocks:isUnlocked`, `contentUnlocks:getUnlocks`, `contentUnlocks:refresh`) plus the **total** handler table wired to `ipcMain` in `main.ts`. |
 | `electron/preload.cjs` | Exposes the additive `window.tce.contentUnlocks` bridge. |
-| `src/ui/content-unlock-client.ts` | Total read client over the bridge (`isUnlocked(target)`, `getUnlocks()`); the browser fallback reports "not unlocked" and never throws. |
+| `src/ui/content-unlock-client.ts` | Total client over the bridge (`isUnlocked(target)`, `getUnlocks()`, `refresh(options)`); the browser fallback reports "not unlocked" / `[]` and never throws. |
 
 **Total read API.** `isUnlocked({ kind: 'game', gameId })` and
 `isUnlocked({ kind: 'dlc', gameId, dlcId })` answer whether a target is
@@ -566,6 +566,13 @@ unlocked; `getUnlocks()` returns every persisted record. In a plain browser (no
 Electron bridge) `contentUnlockClientFromWindow()` still returns a client whose
 `isUnlocked()` is `false` and `getUnlocks()` is `[]`, so a DLC/game gate never
 branches on the runtime and never crashes when the state cannot be read.
+
+**Scoped refresh.** `refresh(options)` re-evaluates the configured reward rules.
+`options.ruleIds` is an additive **scope filter** (only the named rules are
+evaluated; absent means every rule, `[]` means none) and
+`options.simulatePurchase` is the explicit dev/QA simulated-purchase signal
+consumed by `SimulatedPurchaseVerifier`. A scoped refresh therefore never
+self-attests an unrelated rule — see [Scoped simulated purchase](#scoped-simulated-purchase-devqa).
 
 ```bash
 npx vitest run --project unit tests/platform-action-rewards/ tests/ui/content-unlock-client.test.ts
@@ -2252,6 +2259,44 @@ Lock reasons: `Requires Steam DLC <appId>.`, `Steam is unavailable.`, or
 `free` and a gated pack `locked`, so the web build plays base content and never
 crashes. A capability gap (a binding with no DLC API) is never treated as
 entitlement — the pack stays locked; the launcher never fabricates an unlock.
+
+### Content-unlock entitlement (game-side composition)
+
+A pack may also be gated on the launcher's **unified content-unlock store**
+(`dlc:<gameId>:<packId>`) rather than (or in addition to) Steam DLC. The
+composition lives on the **game side** — the core loader's `resolveEntitlement`
+seam is unchanged — so each game decides which packs are content-unlock gated as
+**data**. Main Street is the worked example:
+`src/MainStreetContentUnlockGate.ts` declares `main-street-residential-pack`
+gated on `dlc:main-street:main-street-residential-pack` and composes the store
+on top of the Steam-DLC status via `composeContentUnlockEntitlement`; only
+declared packs are affected, and the composition is **total** (a
+missing/throwing bridge leaves a gated pack locked rather than crashing boot).
+
+### Scoped simulated purchase (dev/QA)
+
+To exercise the lock → unlock path without a storefront, the launcher ships a
+config-driven, **rule-scoped simulated purchase**. The rule is data in
+`electron/action-rewards.json`:
+
+| Field | Value |
+|-------|-------|
+| rule id | `main-street-residential-pack-purchase` |
+| trigger | platform-action `dev` / `simulate-purchase` |
+| target | `dlc:main-street:main-street-residential-pack` (key `dlc:main-street:main-street-residential-pack`) |
+| verifier | `simulated-purchase` (resolved by the `dev:simulate-purchase` action key) |
+
+`SimulatedPurchaseVerifier` (`electron/action-verifiers.ts`) verifies **only**
+when a caller explicitly requests `simulatePurchase: true` — a plain
+`refresh({ attested: true })` never unlocks the pack. `ActionRewardService.refresh`
+accepts an additive `ruleIds` scope filter plus the `simulatePurchase` signal,
+carried through the `contentUnlocks:refresh` IPC handler
+(`electron/action-rewards-ipc.ts`) → `electron/preload.cjs` → the renderer
+`ContentUnlockClient.refresh()` (`src/ui/content-unlock-client.ts`). A scoped
+refresh evaluates only the named rule, so the purchase never collateral-unlocks
+an unrelated reward (e.g. the itch.io golf follow). The reusable in-game listing
+exposes it as an optional `[ Purchase ]` row action
+(`src/ui/CardPackListing.ts` → `onPurchase`/`purchasablePackIds`).
 
 ### Degradation
 
