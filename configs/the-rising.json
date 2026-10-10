@@ -1,0 +1,11 @@
+{
+  "$comment": "Per-game preset: 1916: The Rising only (plus the core-owned Gym). Use `GAMES_CONFIG=the-rising` to build/run just this game for a fast development loop. See docs/dev/game-configuration.md.",
+  "games": [
+    {
+      "id": "the-rising",
+      "path": "../tce-the-rising",
+      "scenePath": "example-games/the-rising/scenes/TheRisingScene.ts",
+      "siblingScenePath": "src/scenes/TheRisingScene.ts"
+    }
+  ]
+}

@@ -42,6 +42,7 @@ const ALL_GAME_IDS = [
   'lost-cities',
   'main-street',
   'sushi-go',
+  'the-rising',
 ] as const;
 
 /** The canonical named presets and the exact games each ships (AC1/AC4/AC5). */
@@ -79,6 +80,7 @@ const SCENE_KEY: Record<string, string> = {
   'lost-cities': 'LostCitiesScene',
   'main-street': 'MainStreetScene',
   'sushi-go': 'SushiGoScene',
+  'the-rising': 'TheRisingScene',
 };
 
 function loadPreset(name: string) {

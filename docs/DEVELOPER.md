@@ -153,13 +153,13 @@ shapes (the `1 game` and `all games` cases are the boundary distributions):
 | `configs/solo.json` | golf |
 | `configs/arcade.json` | golf, main-street |
 | `configs/deluxe.json` | feudalism, lost-cities |
-| `configs/full.json` | all eight games |
+| `configs/full.json` | all nine games |
 
 **Per-game presets** (`configs/<game-id>.json`) each select exactly one game,
 so `GAMES_CONFIG=<game-id>` builds or runs just that game (plus the
 always-present Gym) for a fast development loop — for every example game
 (`beleaguered-castle`, `blackjack`, `coloretto`, `feudalism`, `golf`,
-`lost-cities`, `main-street`, `sushi-go`). Per-game presets are additive: the
+`lost-cities`, `main-street`, `sushi-go`, `the-rising`). Per-game presets are additive: the
 distribution presets above are unchanged.
 
 Presets live in `configs/`, are **data only**, and list the sibling game repos
@@ -1217,6 +1217,7 @@ Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedbac
 - `tests/coloretto/ColorettoScene.browser.test.ts` (Coloretto core)
 - `tests/sushi-go/SushiGoIcons.browser.test.ts` (Sushi Go rendering)
 - `tests/lost-cities/LostCitiesRoundEnd.browser.test.ts` (Lost Cities flow)
+- `tests/the-rising/the-rising-smoke.browser.test.ts` (The Rising scene boots)
 - `tests/core-engine/SvgHelpers.browser.test.ts` (Core SVG pipeline)
 - `tests/ui/HelpPanel.browser.test.ts` (UI chrome)
 - `tests/gym/GymSceneSmoke.browser.test.ts` (All gym scenes boot)
@@ -1241,6 +1242,7 @@ Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehens
 - BC key E2E: `BeleagueredCastleOverlay`, `BeleagueredCastleTurnController`, `BeleagueredCastleLayout`
 - Sushi Go key E2E: `SushiGoIcons`, `SushiGoOverlay`, `SushiGoTableauRendering`
 - Lost Cities key E2E: `LostCitiesRoundEnd`, `LostCitiesOverlayAlignment`
+- The Rising key E2E (sibling `../tce-the-rising`): `the-rising-smoke`, `the-rising-interaction`, `the-rising-overlay`
 - Coloretto: `ColorettoScene`
 - HandView: `gym-handpile-drag`, `gym-handpile-cancel`
 - Gym: `GymDeckRngScene`, `GymOverlayUiScene`
@@ -2415,6 +2417,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Lost Cities | `../tce-lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
 | Main Street | `../tce-main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
 | Coloretto | `../tce-coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording. Scene decomposed into helpers: `ColorettoRenderer` (board + animations), `ColorettoInputHandler`, `ColorettoAiScheduler`, `ColorettoOverlays` | `tests/coloretto/` (7 files) |
+| 1916: The Rising | `../tce-the-rising/` | Single-player commemorative solitaire: ordered-lane timeline placement (Lost-Cities-style legality via `LegalityResult`), a determinism-checked conversation/encounter overlay, a Memory economy (`EconomyLedger`), a Rising clock, difficulty presets, transcript recording (`TranscriptRecorderBase`), versioned save/load (`SaveLoadStore`) + checkpoints, undo/redo, SLL layout, sourced historical content | `tests/the-rising/` (9 files: 6 unit + 3 browser) |
 
 ### Lost Cities card assets
 
@@ -3150,6 +3153,7 @@ Games with layout files and adapters ready for renderer integration:
 | Feudalism | `../tce-feudalism/src/layouts/feudalism.layout.json` | `../tce-feudalism/src/scenes/FeudalismLayoutAdapter.ts` |
 | Sushi Go | `../tce-sushi-go/src/layouts/sushi-go.layout.json` | `../tce-sushi-go/src/scenes/SushiGoLayoutAdapter.ts` |
 | Lost Cities | `../tce-lost-cities/src/layouts/lost-cities.layout.json` | `../tce-lost-cities/src/scenes/LostCitiesLayoutAdapter.ts` |
+| 1916: The Rising | `../tce-the-rising/src/layouts/rising.layout.json` | `../tce-the-rising/src/scenes/TheRisingLayoutAdapter.ts` |
 
 ### Main Street canonical example
 

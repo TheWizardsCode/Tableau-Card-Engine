@@ -74,7 +74,7 @@ named by distribution, not by game:
 | [`configs/solo.json`](../../configs/solo.json) | golf | The **1 game + Gym** boundary case. |
 | [`configs/arcade.json`](../../configs/arcade.json) | main-street, golf | A small non-empty subset (1 < n < all). |
 | [`configs/deluxe.json`](../../configs/deluxe.json) | feudalism, lost-cities | A second, distinct partial distribution. |
-| [`configs/full.json`](../../configs/full.json) | all eight games | The complete distribution; the test runners default to this. |
+| [`configs/full.json`](../../configs/full.json) | all nine games | The complete distribution; the test runners default to this. |
 
 `solo` and `full` pin the boundary cases (exactly 1 game, all games). `arcade`
 and `deluxe` pin genuinely different partial distributions so the selector's

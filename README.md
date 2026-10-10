@@ -148,7 +148,7 @@ Which games a build contains is selected by a preset in `configs/`:
 | `configs/solo.json` | golf | minimum non-empty distribution (1 game + Gym) |
 | `configs/arcade.json` | golf, main-street | partial distribution |
 | `configs/deluxe.json` | feudalism, lost-cities | partial distribution (distinct game set) |
-| `configs/full.json` | all eight games | full distribution (all games + Gym) |
+| `configs/full.json` | all nine games | full distribution (all games + Gym) |
 | `configs/<game-id>.json` | that one game | per-game preset (one game + Gym) — e.g. `configs/main-street.json` |
 
 ```bash
@@ -161,7 +161,7 @@ GAMES_CONFIG=full npm run package          # packaged desktop binary
 
 `npm run setup:distribution -- --dir ..` is the prerequisite for the sibling
 presets: it checks out each game repo next to the launcher. Then select a
-preset — `full` for all eight games plus the Gym:
+preset — `full` for all nine games plus the Gym:
 
 ```bash
 npm run setup:distribution -- --dir ..   # clone the sibling game repos (once)
@@ -290,6 +290,7 @@ core-engine feature demonstrator.
 | Main Street | `tce-main-street` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score — no turn limit by default (games end via score threshold, all challenges, bankruptcy, or reputation collapse; a turn limit is opt-in via an explicit `maxTurns` config). **Annual calendar**: each turn is one week of the Irish year (weeks 1–52, year wraps); seasonal and holiday event cards only appear during their real-world week windows (e.g. St Patrick's Day in late winter, Harvest Festival in autumn). **Multi-Use Card Economy**: cards can be held in hand for synergy bonuses; staff cards expand hand capacity with ongoing costs. **Action economy**: one action per week (two with a General Manager) — move-to-hand, play-from-hand, direct buy-and-place (+50% premium), and hire-staff spend the action; refresh, sell, hint, discard, upgrades, events, and end-turn are free. Market cycles each turn. Tutorial overlay zones are defined in a separate SLL layout file (`main-street-tutorial.layout.json`) composed with the base layout. Balance analysis tools are specified in the [Balance Process & Tooling PRD](docs/main-street/prd-balance-process-and-tooling.md). |
 | Scenario: Tutorial | `tce-main-street` | Guided introduction to Main Street. 17-step tutorial overlays walk through buy → hand → place, invest → optimize → trigger, and scoring. Accessible from the Game Selector. |
 | Coloretto | `tce-coloretto` | Set-building card game (human vs. 1-4 AI). On your turn place the top deck card on a shared row (max 3) or take an entire row into your collection. Score 3 colors positively and the rest negatively across 7/5/4/3 rounds (2/3/4/5 players) using the canonical point table (1=1, 2=3, 3=6, 4=10, 5=15, 6+=21). |
+| 1916: The Rising | `tce-the-rising` | Single-player commemorative solitaire. Meet the spirits of Irish historical figures (1169–1916), hear a first-person testimony drawn from a cited source, and lay each spirit on a shared timeline in the correct chronological order before the Rising clock reaches 1916. Exercises ordered-lane placement, a dialogue/encounter overlay, a Memory economy, a deterministic clock, difficulty presets, transcripts, versioned save/load and SLL. |
 
 ## Main Street Card Upgrade Visualization
 

@@ -206,13 +206,29 @@ Programmatic crop-themed icons drawn on resource tokens in the Feudalism game:
 
 _1916: The Rising_ is a commemorative example game whose spirit roster is
 drawn from published, citable histories. The canonical, machine-readable
-citation table lives in `src/data/sources.json` (exposed as `SOURCES` by
-`src/TheRisingContent.ts`); the entries below mirror it for attribution.
+citation table lives in `../tce-the-rising/src/data/sources.json` (exposed as
+`SOURCES` by `../tce-the-rising/src/TheRisingContent.ts`); the entries below
+mirror it for attribution.
 
 Every spirit card cites at least one primary reference and every first-person
 testimony is attributed to a source. Authors, titles and dates are those of the
 works consulted; any errors of interpretation are the game's own, and the
 framing is commemorative rather than partisan.
+
+### Card art and audio
+
+- **Card art** — the spirit cards render over the project's canonical card back
+  (`cards/card_back.svg`; see **Canonical card art (project standard)** above)
+  plus procedurally drawn text labels. The game ships no bespoke card
+  illustrations and no third-party artwork.
+- **Audio** — the nine SFX in `audio/the-rising/` (`card-draw`, `card-flip`,
+  `card-swap`, `illegal-move`, `score-reveal`, `turn-change`, `ui-click`,
+  `game-win`, `game-lost`) are copies of the shared procedurally generated
+  default set; see **Audio Sound Effects — Lost Cities** and **Audio Sound
+  Effects — Game Win / Game Lost (shared default)** above. Regenerate with
+  `node scripts/generate-sfx.mjs`.
+- **Thumbnail** — `games/the-rising/thumbnail.png` is an in-house placeholder
+  generated for this repository; no third-party art is used.
 
 ### Books and reference works
 

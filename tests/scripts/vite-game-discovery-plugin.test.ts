@@ -145,6 +145,7 @@ describe('configs/ presets', () => {
         'lost-cities',
         'main-street',
         'sushi-go',
+        'the-rising',
       ].sort(),
     );
   });
@@ -533,7 +534,7 @@ describe('resolveCoreAliases', () => {
 describe('selectedGameIds', () => {
   it('returns every game for the full preset', () => {
     const ids = selectedGameIds(REPO_ROOT, { GAMES_CONFIG: 'full' });
-    expect(ids.length).toBe(8);
+    expect(ids.length).toBe(9);
     expect(ids).toContain('golf');
     expect(ids).toContain('main-street');
   });
