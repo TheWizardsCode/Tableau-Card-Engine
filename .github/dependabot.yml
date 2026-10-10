@@ -1,0 +1,62 @@
+# Dependabot configuration for Tableau-Card-Engine.
+#
+# Scheduled dependency-update PRs so stale or vulnerable devDependencies are
+# surfaced automatically instead of waiting for a manual `npm audit` — e.g. the
+# `sharp` / `vitest` advisories remediated in CG-0MV2L5H25009SNNE.
+#
+# Reference:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  # ── npm dependencies (runtime + devDependencies) ──────────────
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(dev-deps)"
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      # Vite and Vitest must move together: `@vitest/browser` and
+      # `@vitest/browser-playwright` pin an exact `vitest` peer, and Vitest
+      # peers on Vite. A single grouped PR keeps the test toolchain coherent.
+      vite-vitest:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "@vitest/*"
+      # TypeScript and its ESLint tooling.
+      typescript-eslint:
+        patterns:
+          - "typescript"
+          - "@typescript-eslint/*"
+          - "eslint"
+          - "eslint-*"
+      # Keep the Phaser bump isolated so an engine upgrade is reviewed on its
+      # own (Phaser is deliberately pinned to the 4.0.0-rc line).
+      phaser:
+        patterns:
+          - "phaser"
+
+  # ── GitHub Actions workflows (deploy.yml, package.yml, pr-checks.yml) ──
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+      include: scope
+    labels:
+      - dependencies
+      - github-actions

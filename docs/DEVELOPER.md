@@ -5,6 +5,7 @@ This document covers everything you need to develop, test, and build the Tableau
 ## Table of Contents
 
 - [Environment Setup](#environment-setup)
+- [Dependency Updates (Dependabot)](#dependency-updates-dependabot)
 - [Running Locally](#running-locally)
 - [Building for Production](#building-for-production)
 - [Config-Driven Game Catalogue](#config-driven-game-catalogue)
@@ -41,7 +42,7 @@ This document covers everything you need to develop, test, and build the Tableau
 
 **Prerequisites:**
 
-- Node.js 18+ (LTS recommended)
+- Node.js 20.9+ (matches CI; required by `vitest@4` and `sharp@0.35`)
 - npm 9+ (ships with Node.js 18+)
 - Git
 
@@ -52,6 +53,17 @@ npm install
 ```
 
 This installs Phaser 4.0.0-rc.7 as a runtime dependency and TypeScript, Vite, and Vitest as dev dependencies.
+
+### Dependency Updates (Dependabot)
+
+Scheduled dependency updates are configured in [`.github/dependabot.yml`](../.github/dependabot.yml):
+
+- **npm** (weekly, Mondays) — opens grouped update PRs for the test toolchain (`vite` / `vitest` / `@vitest/*`), TypeScript + ESLint tooling, and Phaser, plus individual PRs for the rest.
+- **github-actions** (weekly, Mondays) — keeps the workflows in `.github/workflows/` current.
+
+`vite` and `vitest` are grouped deliberately: `@vitest/browser` and `@vitest/browser-playwright` pin an **exact** `vitest` peer version, so they must move together or the browser test suite fails to resolve the provider.
+
+> Dependabot alerts (security advisories) are enabled at the repository-settings level; this file configures the scheduled **version** updates. Both feed the same dependency hygiene the `sharp` / `vitest` remediation (CG-0MV2L5H25009SNNE) addressed.
 
 ## Running Locally
 
@@ -316,7 +328,7 @@ generated PNG/ICO/ICNS variants.
 npm run generate:icons   # regenerate every variant from public/favicon.svg
 ```
 
-`scripts/generate-app-icons.ts` rasterises the emblem with `sharp` (`^0.33.0`, an
+`scripts/generate-app-icons.ts` rasterises the emblem with `sharp` (`^0.35.5`, an
 existing dependency) and writes:
 
 | Artefact | Size | Purpose |
@@ -858,7 +870,7 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 | `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | All non-tutorial Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
 | `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance; requires [browser test setup](#browser-test-setup)) |
 
-All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
+All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using Vitest browser mode: `@vitest/browser` provides the browser runtime and `@vitest/browser-playwright` supplies the Playwright provider (both are pinned to the same `vitest` version).
 
 The tutorial E2E tests are split into 6 part files (1-6 tests per file). Each part is a separate Vitest project with its own uniquely-named browser instance (`t1` through `t6`) to prevent the Phaser 4 RC GPU/Canvas context exhaustion that occurs after ~8 game create/destroy cycles in a single browser process. The runner script `scripts/run-tutorial-tests.sh` invokes each project sequentially.
 
@@ -1304,7 +1316,8 @@ The `browser` and `tutorial-part1..6` projects run in headless Chromium via Play
 **Required dependencies** (already in `package.json` devDependencies):
 
 - `playwright` — Playwright driver that launches Chromium
-- `@vitest/browser` — Vitest browser-mode provider (must match the `vitest` version)
+- `@vitest/browser` — Vitest browser-mode runtime (must match the `vitest` version)
+- `@vitest/browser-playwright` — the Playwright provider factory (must match the `vitest` version); Vitest 4 moved the provider out of `@vitest/browser` into its own package
 
 **Install Chromium:**
 
@@ -4579,7 +4592,7 @@ To verify production safety:
 **Browser tests fail or time out:**
 - Check the [browser test setup](#browser-test-setup) section — the most common cause is missing Playwright Chromium: `npx playwright install chromium` (add `--with-deps` on Linux for system libraries)
 - `npm test` runs a fast-fail pre-check (`scripts/check-browser-test-env.ts`) that prints the exact remediation command if Chromium is missing; verify the install with `npx playwright install --list`
-- Check that `@vitest/browser` version matches `vitest` version
+- Check that `@vitest/browser` and `@vitest/browser-playwright` versions match the `vitest` version (they pin an exact `vitest` peer)
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
 - If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game). A full `npm test` run that stalls indefinitely is aborted by the runner's wall-clock timeout (see [Hang timeout](#hang-timeout-bounded-wall-clock-abort)) with exit 124 and a `[hang-timeout]` diagnostic — run the suspected file in isolation to reproduce.
 - **Process/resource leak cleanup:** All browser tests should clean up Phaser.Game instances in `afterEach` using `game.destroy(true, false)` and remove the game container div. The dev server utilities (`scripts/dev-server-utils.ts`) use a simplified start-stop-per-call pattern with no reference counting. `ensureDevServer()` kills any existing process on port 3000 before starting a fresh server. `killDevServer()` unconditionally kills the child process and any remaining process on port 3000. SIGTERM/SIGINT handlers provide additional cleanup for forced exits.

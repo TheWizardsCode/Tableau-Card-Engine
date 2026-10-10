@@ -14,7 +14,8 @@
  *
  *   1. `playwright` package resolvable?
  *   2. `@vitest/browser` package resolvable?
- *   3. Playwright's Chromium binary exists at `chromium.executablePath()`?
+ *   3. `@vitest/browser-playwright` package resolvable?
+ *   4. Playwright's Chromium binary exists at `chromium.executablePath()`?
  *
  * The check sequence and remediation text are pure, injectable functions
  * (following the pattern of `scripts/vitest-run-with-retry.ts`) so every
@@ -30,7 +31,11 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 /** A prerequisite that can be missing for the browser test stages. */
-export type MissingPrereq = 'playwright' | '@vitest/browser' | 'chromium';
+export type MissingPrereq =
+  | 'playwright'
+  | '@vitest/browser'
+  | '@vitest/browser-playwright'
+  | 'chromium';
 
 /** Injectable dependencies for detection (defaults hit the real env). */
 export interface CheckEnvDeps {
@@ -73,6 +78,8 @@ function defaultChromiumExecutablePath(): string | null {
 const PREREQ_LABELS: Record<MissingPrereq, string> = {
   playwright: 'Playwright package (`playwright` in devDependencies)',
   '@vitest/browser': '@vitest/browser package (must match the vitest version)',
+  '@vitest/browser-playwright':
+    '@vitest/browser-playwright package (Vitest 4 provider; must match the vitest version)',
   chromium: 'Playwright Chromium browser binary',
 };
 
@@ -89,6 +96,8 @@ export function detectMissingPrereqs(deps: CheckEnvDeps = {}): MissingPrereq[] {
   const missing: MissingPrereq[] = [];
   if (!resolveModule('playwright')) missing.push('playwright');
   if (!resolveModule('@vitest/browser')) missing.push('@vitest/browser');
+  if (!resolveModule('@vitest/browser-playwright'))
+    missing.push('@vitest/browser-playwright');
   const exePath = chromiumExecutablePath();
   if (!exePath || !pathExists(exePath)) missing.push('chromium');
   return missing;
@@ -134,7 +143,7 @@ export function runCheck(
 ): number {
   const missing = detectMissingPrereqs(deps);
   if (missing.length === 0) {
-    print('Browser-test environment OK: playwright, @vitest/browser, and Chromium are present.');
+    print('Browser-test environment OK: playwright, @vitest/browser, @vitest/browser-playwright, and Chromium are present.');
     return 0;
   }
   print(buildRemediationMessage(missing, deps.platform ?? process.platform));

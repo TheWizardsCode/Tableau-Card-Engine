@@ -22,9 +22,14 @@ if (typeof globalThis.window === 'undefined') {
 // ── Mocks ──────────────────────────────────────────────────
 
 const { MockPhaserGame } = vi.hoisted(() => {
-  const MockPhaserGame = vi.fn().mockImplementation(() => ({
-    destroy: vi.fn(),
-  }));
+  // Vitest 4 requires a `function`/`class` implementation for a mock used with
+  // `new` — an arrow function is not constructable. See
+  // https://vitest.dev/api/vi#vi-spyon.
+  const MockPhaserGame = vi.fn<(...args: any[]) => any>(function () {
+    return {
+      destroy: vi.fn(),
+    };
+  });
   return { MockPhaserGame };
 });
 

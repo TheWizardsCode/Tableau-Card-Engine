@@ -1,5 +1,5 @@
-/// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
+import { playwright } from '@vitest/browser-playwright';
 import path from 'path';
 import fs from 'fs';
 import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from './scripts/vite-transcript-plugin';
@@ -226,11 +226,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
@@ -286,11 +285,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
@@ -306,11 +304,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
@@ -330,11 +327,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium', name: 't1' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
@@ -350,11 +346,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium', name: 't2' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
@@ -370,11 +365,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium', name: 't3' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
@@ -390,11 +384,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium', name: 't4' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
@@ -410,11 +403,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium', name: 't5' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
@@ -430,11 +422,10 @@ export default defineConfig(({ mode, command }) => ({
           testTimeout: 30_000,
           browser: {
             enabled: true,
-            provider: 'playwright',
+            provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium', name: 't6' }],
             viewport: { width: 900, height: 700 },
-            isolate: true,
           },
         },
       },
