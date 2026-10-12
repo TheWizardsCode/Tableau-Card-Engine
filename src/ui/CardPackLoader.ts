@@ -26,9 +26,13 @@
  *     or a real content directory — see `tests/ui/card-pack-loader.test.ts`.
  *
  * Each loaded pack carries the fetched CSV text (for
- * {@link mergeCardPackCsv}) and its declared assets as resolved `tce-packs://`
- * URLs — the game's asset loader (Phaser) fetches the binaries through the
- * scoped protocol, so this module never loads image/audio bytes itself.
+ * {@link mergeCardPackCsv}), its declared assets as resolved `tce-packs://`
+ * URLs, and those assets' bytes inlined as `data:` URIs keyed by card id
+ * (the asset's filename stem) — so a game that rasterises card faces from a
+ * `data:` URI can render a pack's bespoke art without a hidden, game-local
+ * art map. Asset bytes are read through the injectable
+ * {@link CardPackAssetFetcher} transport (default `fetch` + `arrayBuffer`),
+ * with no scheme-specific branching.
  *
  * @see src/ui/card-pack-client.ts — the entitlement read client (F6).
  * @see src/ui/card-pack-url.ts — the `tce-packs://` URL builder (F4).
@@ -83,6 +87,16 @@ export type CardPackManifestFetcher = (url: string) => Promise<string>;
 export type CardPackCsvFetcher = (url: string) => Promise<string>;
 
 /**
+ * Reads a pack asset's bytes from a resolved `tce-packs://` (or bundled) URL.
+ *
+ * Injected so tests can serve fixture bytes without a network or the scoped
+ * protocol, and so a browser distribution can supply bundled asset URLs
+ * unchanged. The default uses the renderer's global `fetch` +
+ * `arrayBuffer()`; no scheme-specific branching is performed.
+ */
+export type CardPackAssetFetcher = (url: string) => Promise<Uint8Array>;
+
+/**
  * Dynamically imports a module from a URL — the fallback text transport when
  * {@link CardPackLoaderOptions.fetchCsv} is not supplied (e.g. a Vite
  * `?raw` dynamic import). Returns the imported value; a bare string, a module
@@ -119,6 +133,8 @@ export interface CardPackLoaderOptions {
   readonly fetchManifest?: CardPackManifestFetcher;
   /** CSV transport; takes precedence over {@link importer}. Defaults to `fetch`. */
   readonly fetchCsv?: CardPackCsvFetcher;
+  /** Asset-byte transport; defaults to `fetch` + `arrayBuffer`. */
+  readonly fetchAsset?: CardPackAssetFetcher;
   /** Fallback text transport via dynamic import; used when `fetchCsv` is absent. */
   readonly importer?: CardPackModuleImporter;
   /** Entitlement resolver; absent treats every compatible pack as free. */
@@ -133,6 +149,12 @@ export interface LoadedCardPack {
   readonly csv: string;
   /** Resolved `tce-packs://` asset URLs declared by the pack. */
   readonly assetUrls: readonly string[];
+  /**
+   * Declared asset bytes inlined as `data:<media>;base64,…` URIs, keyed by
+   * card id (the asset's filename stem). An asset that could not be read is
+   * omitted here and reported in {@link CardPackLoadResult.errors}.
+   */
+  readonly assetDataUris: Readonly<Record<string, string>>;
   /** The player's entitlement status for the pack. */
   readonly status: PackEntitlementStatusLike;
   /** Whether the pack is active; entitled packs are enabled by default. */
@@ -176,6 +198,67 @@ async function defaultFetchText(url: string): Promise<string> {
     throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
   }
   return response.text();
+}
+
+/** Default asset-byte transport: the renderer's global `fetch`. */
+async function defaultFetchAssetBytes(url: string): Promise<Uint8Array> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+/** Media type by lowercase file extension, for the inlined `data:` URI. */
+const ASSET_MEDIA_TYPES: Readonly<Record<string, string>> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.bmp': 'image/bmp',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+  '.json': 'application/json',
+};
+
+/** Media type for an asset path, from its extension; generic when unknown. */
+function assetMediaType(assetPath: string): string {
+  const withoutQuery = assetPath.split(/[?#]/)[0];
+  const dot = withoutQuery.lastIndexOf('.');
+  const extension = dot >= 0 ? withoutQuery.slice(dot).toLowerCase() : '';
+  return ASSET_MEDIA_TYPES[extension] ?? 'application/octet-stream';
+}
+
+/**
+ * The card id for a declared asset path under Option A: the filename stem
+ * (extension removed; directories and query/fragment ignored). A path with
+ * no extension falls back to its basename.
+ */
+function assetCardId(assetPath: string): string {
+  const withoutQuery = assetPath.split(/[?#]/)[0];
+  const base = withoutQuery.slice(withoutQuery.lastIndexOf('/') + 1);
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(0, dot) : base;
+}
+
+/** Base64-encode *bytes* without Node builtins (renderer-safe). */
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(offset, offset + chunkSize),
+    );
+  }
+  return btoa(binary);
+}
+
+/** Inline *bytes* as a `data:` URI with the media type for *assetPath*. */
+function inlineAssetDataUri(assetPath: string, bytes: Uint8Array): string {
+  return `data:${assetMediaType(assetPath)};base64,${bytesToBase64(bytes)}`;
 }
 
 /**
@@ -342,6 +425,7 @@ export async function loadCardPacks(
   const statuses = await resolveEntitlements(split.compatible, options.resolveEntitlement);
 
   const loadCsv = resolveCsvLoader(options);
+  const fetchAsset = options.fetchAsset ?? defaultFetchAssetBytes;
 
   for (let index = 0; index < split.compatible.length; index += 1) {
     const pack = split.compatible[index];
@@ -369,13 +453,27 @@ export async function loadCardPacks(
     }
 
     const assetUrls: string[] = [];
+    const assetDataUris: Record<string, string> = {};
     for (const asset of pack.assets ?? []) {
+      let assetUrl: string;
       try {
-        assetUrls.push(resolveCardPackAssetUrl(pack.gameId, pack.id, asset));
+        assetUrl = resolveCardPackAssetUrl(pack.gameId, pack.id, asset);
       } catch (error) {
         errors.push({
           id: pack.id,
           reason: `Invalid asset "${asset}": ${errorMessage(error)}`,
+        });
+        continue;
+      }
+      assetUrls.push(assetUrl);
+
+      try {
+        const bytes = await fetchAsset(assetUrl);
+        assetDataUris[assetCardId(asset)] = inlineAssetDataUri(asset, bytes);
+      } catch (error) {
+        errors.push({
+          id: pack.id,
+          reason: `Failed to read asset "${asset}": ${errorMessage(error)}`,
         });
       }
     }
@@ -384,6 +482,7 @@ export async function loadCardPacks(
       manifest: pack,
       csv,
       assetUrls,
+      assetDataUris,
       status,
       enabled: true,
     });

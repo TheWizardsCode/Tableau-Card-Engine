@@ -275,6 +275,17 @@ describe('buildCardPack — reference Main Street pack', () => {
         seenCsvUrls.push(url);
         return fs.readFileSync(built.csvPath, 'utf-8');
       },
+      fetchAsset: async (url) => {
+        const parsed = new URL(url);
+        const [packId, ...rest] = decodeURIComponent(parsed.pathname)
+          .split('/')
+          .filter(Boolean);
+        return new Uint8Array(
+          fs.readFileSync(
+            path.join(contentDir, 'packs', parsed.hostname, packId, ...rest),
+          ),
+        );
+      },
     });
 
     expect(loaded.errors).toEqual([]);
@@ -282,6 +293,9 @@ describe('buildCardPack — reference Main Street pack', () => {
     expect(loaded.packs).toHaveLength(1);
     expect(loaded.packs[0].manifest.id).toBe(REFERENCE_PACK_ID);
     expect(loaded.packs[0].csv).toContain('biz-ms-foundations-teahouse');
+    expect(
+      loaded.packs[0].assetDataUris['biz-ms-foundations-teahouse'],
+    ).toMatch(/^data:image\/png;base64,/);
     expect(seenCsvUrls[0]).toBe(
       `tce-packs://${REFERENCE_GAME_ID}/${REFERENCE_PACK_ID}/cards.csv`,
     );

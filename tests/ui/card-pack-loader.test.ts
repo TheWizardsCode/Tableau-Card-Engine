@@ -56,16 +56,38 @@ function diskCsvFetcher(packsDir: string, calls: string[] = []) {
   return { fetcher, calls };
 }
 
+/**
+ * Asset-byte transport that reads the file named by a `tce-packs://` URL from
+ * a materialised `packs/` tree, recording the URLs it was asked for.
+ */
+function diskAssetFetcher(packsDir: string, calls: string[] = []) {
+  const fetcher = async (url: string): Promise<Uint8Array> => {
+    calls.push(url);
+    const parsed = new URL(url);
+    const segments = decodeURIComponent(parsed.pathname).split('/').filter(Boolean);
+    const packId = segments[0];
+    const relative = segments.slice(1).join('/');
+    return new Uint8Array(
+      fs.readFileSync(path.join(packsDir, parsed.hostname, packId, relative)),
+    );
+  };
+  return { fetcher, calls };
+}
+
 describe('loadCardPacks — successful discovery', () => {
   it('discovers the game`s entitled packs with CSV text and tce-packs:// assets', async () => {
     await withCardPackFixture(async (fixture) => {
       const { fetcher, calls } = diskCsvFetcher(fixture.packsDir);
+      const { fetcher: fetchAsset, calls: assetCalls } = diskAssetFetcher(
+        fixture.packsDir,
+      );
 
       const result = await loadCardPacks({
         contentDir: fixture.contentDir,
         gameId: FIXTURE_GAME_ID,
         fetchManifest: diskManifestFetcher(fixture.manifestPath),
         fetchCsv: fetcher,
+        fetchAsset,
       });
 
       expect(result.errors).toEqual([]);
@@ -83,6 +105,12 @@ describe('loadCardPacks — successful discovery', () => {
       expect(first.assetUrls).toEqual([
         `${CARD_PACK_URL_SCHEME}://${FIXTURE_GAME_ID}/${FIXTURE_PACK_ID}/assets/icon.png`,
       ]);
+      expect(first.assetDataUris).toEqual({
+        icon: expect.stringMatching(/^data:image\/png;base64,/),
+      });
+      expect(assetCalls).toContain(
+        `${CARD_PACK_URL_SCHEME}://${FIXTURE_GAME_ID}/${FIXTURE_PACK_ID}/assets/icon.png`,
+      );
       expect(calls).toContain(
         `${CARD_PACK_URL_SCHEME}://${FIXTURE_GAME_ID}/${FIXTURE_PACK_ID}/cards.csv`,
       );
@@ -248,6 +276,7 @@ describe('loadCardPacks — degradation', () => {
           if (url.includes(`/${FIXTURE_PACK_ID}/`)) throw new Error('protocol denied');
           return readCommittedPackCsv(FIXTURE_PACK_TWO_ID);
         },
+        fetchAsset: async () => new Uint8Array([137, 80, 78, 71]),
       });
 
       expect(result.packs.map((pack) => pack.manifest.id)).toEqual([FIXTURE_PACK_TWO_ID]);
@@ -310,6 +339,83 @@ describe('loadCardPacks — degradation', () => {
 
       expect(result.packs).toHaveLength(2);
       expect(result.packs[0].csv).toBe(readCommittedPackCsv(FIXTURE_PACK_ID));
+    });
+  });
+});
+
+describe('loadCardPacks — asset inlining', () => {
+  it('inlines each declared asset as a data URI keyed by card id (filename stem)', async () => {
+    await withCardPackFixture(async (fixture) => {
+      const manifest = makeCardPackManifestJson([
+        { id: FIXTURE_PACK_ID, assets: ['assets/biz-solar.png', 'assets/theme.mp3'] },
+      ]);
+      fs.writeFileSync(fixture.manifestPath, manifest, 'utf-8');
+
+      const assetBytes: Record<string, Uint8Array> = {
+        'biz-solar.png': new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+        'theme.mp3': new Uint8Array([73, 68, 51, 4, 0, 0, 0]),
+      };
+      const calls: string[] = [];
+
+      const result = await loadCardPacks({
+        contentDir: fixture.contentDir,
+        gameId: FIXTURE_GAME_ID,
+        fetchManifest: diskManifestFetcher(fixture.manifestPath),
+        fetchCsv: async () => readCommittedPackCsv(FIXTURE_PACK_ID),
+        fetchAsset: async (url: string) => {
+          calls.push(url);
+          const filename = url.split('/').pop() ?? '';
+          const bytes = assetBytes[filename];
+          if (!bytes) throw new Error(`no fixture bytes for ${url}`);
+          return bytes;
+        },
+      });
+
+      expect(result.errors).toEqual([]);
+      const pack = result.packs[0];
+      expect(pack.assetUrls).toHaveLength(2);
+      expect(Object.keys(pack.assetDataUris).sort()).toEqual(['biz-solar', 'theme']);
+
+      const png = pack.assetDataUris['biz-solar'];
+      expect(png).toMatch(/^data:image\/png;base64,/);
+      expect(
+        Buffer.from(png.split(',')[1], 'base64').equals(
+          Buffer.from(assetBytes['biz-solar.png']),
+        ),
+      ).toBe(true);
+
+      expect(pack.assetDataUris['theme']).toMatch(/^data:audio\/mpeg;base64,/);
+      expect(calls).toHaveLength(2);
+    });
+  });
+
+  it('reports a missing/unreadable asset structurally and omits it without dropping the pack', async () => {
+    await withCardPackFixture(async (fixture) => {
+      const manifest = makeCardPackManifestJson([
+        { id: FIXTURE_PACK_ID, assets: ['assets/present.png', 'assets/missing.png'] },
+      ]);
+      fs.writeFileSync(fixture.manifestPath, manifest, 'utf-8');
+
+      const result = await loadCardPacks({
+        contentDir: fixture.contentDir,
+        gameId: FIXTURE_GAME_ID,
+        fetchManifest: diskManifestFetcher(fixture.manifestPath),
+        fetchCsv: async () => readCommittedPackCsv(FIXTURE_PACK_ID),
+        fetchAsset: async (url: string) => {
+          if (url.endsWith('missing.png')) throw new Error('not found');
+          return new Uint8Array([1, 2, 3]);
+        },
+      });
+
+      expect(result.packs).toHaveLength(1);
+      expect(result.packs[0].assetUrls).toHaveLength(2);
+      expect(result.packs[0].assetDataUris).toEqual({
+        present: expect.stringMatching(/^data:image\/png;base64,/),
+      });
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].id).toBe(FIXTURE_PACK_ID);
+      expect(result.errors[0].reason).toContain('assets/missing.png');
+      expect(result.errors[0].reason).toContain('not found');
     });
   });
 });

@@ -41,6 +41,7 @@ function loadedPack(
     manifest: defaultPackEntry({ id, title: `Pack ${id}` }),
     csv: '',
     assetUrls: [],
+    assetDataUris: {},
     status: {
       packId: id,
       gameId: 'fixture-game',
