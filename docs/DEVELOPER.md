@@ -3296,9 +3296,14 @@ Location: `../tce-main-street/src/scenes/UpgradeOverlaySpec.ts`
 
 This is a **pure data module** with no Phaser or runtime dependencies. It defines three interfaces:
 
-- **`OverlayTextSpec`** – Describes a text overlay with `text`, `x`, `y`, `fontSize`, `color`, and `fontStyle` properties.
-- **`OverlayBorderSpec`** – Describes a border/glow overlay with `color` (hex number) and `strokeWidth` (pixels).
-- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `cashLine`, `reputationText`, and `upgradeBorder`.
+- **`OverlayTextSpec`** – Describes a text overlay with `text`, `x`, `y`, `fontSize`, `color`, and `fontStyle` properties (plus optional per-segment colouring for the two-tone cash line).
+- **`OverlayAccentSpec`** – Describes the top-left corner upgrade accent with container-local `x`, `y`, `width`, `height`, `color`, and `alpha`.
+- **`OverlayShaderEffectSpec`** – Describes the Canvas-compatible shader-style upgrade accent: ordered gradient `colourStops`, `animationDurationMs`, `animationEasing`, `animationAmplitude`, and the `staticForm` flag.
+- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `levelAccent`, `cashLine`, `reputationText`, and `shaderEffect`.
+
+The module also exports the pure, Phaser-free helpers `sampleShaderGradient()`
+(linear interpolation across the gradient stops) and
+`shouldAnimateShaderEffect()` (reduced-motion / replay gating).
 
 > **Note (CG-0MT24MHGZ0025O20):** The upgraded business **name is not part of
 > the overlay spec** — per manual review it must render as part of the card
@@ -3311,24 +3316,25 @@ The key function is `buildUpgradeOverlaySpec(biz: BusinessCard, width: number, h
 
 ```
 BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlaySpec
-  (level, name,          (pure function,              (positioned text
-   baseIncome,            no Phaser deps)               specs + border
-   incomeBonus,                                          spec)
+  (level, name,          (pure function,              (positioned text,
+   baseIncome,            no Phaser deps)               accent + shader
+   incomeBonus,                                          effect specs)
    ongoingCost)
 ```
 
 **Logic:**
-- Base cards (`level === 0`): level badge and border are `null`; the cash line is populated when income or cost > 0.
+- Base cards (`level === 0`): every overlay field is `null` — the renderer skips overlay creation entirely, so base cards render identically to before.
 - Upgraded cards (`level > 0`): The non-name overlays are populated:
-  - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-right corner, 10px bold.
+  - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-left corner, 10px bold.
+  - **Level accent** — small filled top-left corner rectangle (`0xffaa22`, 30×16) marking the upgrade now that the outer card frame carries the owner's colour (F4 of MS-0MUWNTN8W006C7EF).
+  - **Shader effect** — Canvas-compatible shader-style accent (`shaderEffect`): ordered gold/highlight gradient stops plus deterministic shimmer animation parameters and a `staticForm` flag. It is rendered as a named `ms-upgrade-shader` `Graphics` accent confined to the top-left upgrade region (never a full-card stroke) and is the visual upgrade distinction.
   - **Cash line** — `"+X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the ` / ` separator in neutral grey (`#dddddd`). The former `Cash:` prefix was removed by manual review (CG-0MTORJ5FS006B0UN) — the colouring carries the meaning. The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `+2`, `-0.75`) (CG-0MTCP76MP0088TQW).
   - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below the cash line.
-  - **Upgrade border** — Golden stroke (`0xffaa22`), 3px width, around the card perimeter.
   - **Name** — NOT an overlay: baked into the card's SVG via a display-name variant texture (CG-0MT24MHGZ0025O20).
 
-#### Layer 2: Overlay Rendering (`MainStreetRenderer.applyUpgradeOverlays()`)
+#### Layer 2: Overlay Rendering (`applyUpgradeOverlays()`)
 
-Location: `../tce-main-street/src/scenes/MainStreetRenderer.ts` — `applyUpgradeOverlays()` method.
+Location: `../tce-main-street/src/scenes/MainStreetRendererStreet.ts` — `applyUpgradeOverlays()` function.
 
 This method reads the `UpgradeOverlaySpec` and creates Phaser game objects as children of the card's container:
 
@@ -3339,10 +3345,25 @@ UpgradeOverlaySpec ──► applyUpgradeOverlays() ──► Phaser text/graphi
 ```
 
 **Rendering order (back to front within the container):**
-1. Upgrade border (transparent fill, golden stroke) — drawn behind text but on top of card image.
-2. Level badge text (gold, top-right).
-3. Cash line text (two-tone: green income / red cost, centre, above reputation).
-4. Reputation text (blue, below cash line).
+1. Level accent (filled top-left corner rectangle) — the upgrade indicator that replaces the removed full-card border.
+2. Shader effect (`ms-upgrade-shader` `Graphics`) — a stripped gradient sampled from `shaderEffect.colourStops` with `sampleShaderGradient()`, confined to the accent region so it never becomes a full-card stroke.
+3. Level badge text (gold, top-left) — drawn after the accent/shader so the badge text stays legible on top.
+4. Cash line text (two-tone: green income / red cost, right-hand text column).
+5. Reputation text (blue, below cash line).
+
+**Motion:** when `shouldAnimateShaderEffect({ reducedMotion, replayMode })`
+is true the renderer adds a deterministic `ms-upgrade-shimmer` rectangle and
+tween (fixed duration/easing/amplitude, `yoyo`, `repeat: -1`). With reduced
+motion enabled or in replay/headless mode the static gradient is drawn and **no**
+shimmer or tween is created. The tween is killed when the card container is
+destroyed, so refreshes never leak tweens. The effect is presentation-only — it
+never mutates game state, transcript or replay output.
+
+**Owner-coloured outer border:** the full-card upgrade border has been removed
+(F4 of MS-0MUWNTN8W006C7EF). `drawBusinessSlot()` draws the card's outer frame
+in the owner's seat colour instead (transparent-filled, so it never obscures the
+card face), and the shader effect is confined to the top-left upgrade accent so
+the two never conflict.
 
 The upgraded card NAME is not an overlay — it is part of the card's SVG
 face (display-name variant texture, CG-0MT24MHGZ0025O20).
@@ -3359,8 +3380,10 @@ they have no overlay pipeline.
 // manager rasterises a display-name variant with the upgraded name baked in.
 mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH, biz.displayName);
 
-// Apply the remaining upgrade overlays (level badge, cash line, rep, border)
-this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
+// Apply the upgrade overlays (level accent, shader effect, level badge,
+// cash line, reputation). The outer frame is the owner's seat colour,
+// drawn separately by drawBusinessSlot().
+applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ```
 
 ### Data Flow Diagram
@@ -3390,8 +3413,9 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ┌─────────────────────┐     ┌─────────────────────────────┐
 │  Base SVG texture   │     │  buildUpgradeOverlaySpec()  │
 │  (cached, reused)   │     │  → levelBadge: "Lvl 2"      │
-│  + display-name     │     │  → cashLine: "+8"          │
-│  variant (upgraded) │     │  → upgradeBorder: gold 3px   │
+│  + display-name     │     │  → levelAccent: gold corner │
+│  variant (upgraded) │     │  → shaderEffect: gradient    │
+│                     │     │  → cashLine: "+8"          │
 │                     │     │  (name is baked into the     │
 │                     │     │   variant texture, not here) │
 └─────────────────────┘     └──────────────┬──────────────┘
@@ -3400,7 +3424,8 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
                               ┌─────────────────────────────┐
                               │  applyUpgradeOverlays()     │
                               │  Creates Phaser objects:    │
-                              │  - Rectangle (golden border)│
+                              │  - Rectangle (level accent) │
+                              │  - Graphics  (shader accent)│
                               │  - Text (level, cash line, rep)│
                               └─────────────────────────────┘
 ```
@@ -3410,8 +3435,8 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 To add or modify upgrade overlays:
 
 1. **Modify `buildUpgradeOverlaySpec()`** in `UpgradeOverlaySpec.ts` to compute new overlay specs. Keep it pure — no Phaser imports.
-2. **Modify `applyUpgradeOverlays()`** in `MainStreetRenderer.ts` to create the corresponding Phaser objects.
-3. **Add unit tests** for `buildUpgradeOverlaySpec()` in `tests/main-street/UpgradeOverlaySpec.test.ts` (this file tests the pure spec builder, not Phaser rendering).
+2. **Modify `applyUpgradeOverlays()`** in `MainStreetRendererStreet.ts` to create the corresponding Phaser objects.
+3. **Add unit tests** for `buildUpgradeOverlaySpec()` in `tests/main-street/upgrade-overlay-spec.test.ts` (this file tests the pure spec builder, not Phaser rendering).
 
 **Example: Adding a star icon for level 3+ cards:**
 
@@ -3428,7 +3453,7 @@ const starIcon: OverlayTextSpec | null = biz.level >= 3
   ? { text: '\u2605', x: 4, y: Math.round(height / 2), fontSize: '16px', color: '#ffdd44' }
   : null;
 
-// In applyUpgradeOverlays() in MainStreetRenderer.ts:
+// In applyUpgradeOverlays() in MainStreetRendererStreet.ts:
 if (spec.starIcon) {
   const star = this.scene.add.text(spec.starIcon.x, spec.starIcon.y, spec.starIcon.text, {
     fontSize: spec.starIcon.fontSize, color: spec.starIcon.color,
