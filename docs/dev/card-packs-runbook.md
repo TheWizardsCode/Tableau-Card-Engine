@@ -128,7 +128,9 @@ Authoring rules:
   conflict**, and the offending pack is dropped **whole**.
 - **Only add rows.** A pack cannot remove or replace a base card.
 - Art assets referenced from a row's art columns must be listed in the
-  manifest's `assets` and exist under the pack directory.
+  manifest's `assets` and exist under the pack directory. Name each asset
+  `<cardId>.png` so the loader can key it by card id (Option A: the asset
+  filename stem is the card id).
 - Add the pack's art to `public/assets/CREDITS.md` when it ships in the core
   repo; a game repo attributes it in its own credits. Licences must be
   MIT/Apache-2.0/CC0-compatible.
@@ -224,12 +226,22 @@ already includes pack cards.
 
 ### Pack assets
 
-Pack art/audio is never loaded as raw bytes by the loader; it is resolved to a
-`tce-packs://<gameId>/<packId>/<path>` URL
+Pack art/audio is resolved to a `tce-packs://<gameId>/<packId>/<path>` URL
 (`src/ui/card-pack-url.ts`) and served by the Electron main process through a
 **deny-by-default** handler (`electron/pack-protocol.ts`). Absolute paths, NUL
 bytes, `..`, and directory escapes all resolve to **404**; no file outside
 `<contentDir>/packs/<gameId>/<packId>/` is ever served.
+
+The loader also reads each declared asset's bytes through the injectable
+`fetchAsset(url) => Promise<Uint8Array>` transport (default `fetch` +
+`arrayBuffer`) and inlines them as `data:<media>;base64,…` URIs keyed by card id
+(the asset filename stem) on `LoadedCardPack.assetDataUris`
+(`CG-0MV590RLL0026M7G`) — so a game that rasterises card faces from a `data:`
+URI can render a pack's bespoke art without a game-local art map. A missing,
+unreadable or malformed asset is reported structurally and omitted; the card
+degrades to the game's own fallback art with a logged warning — never a crash
+or a blank face. Main Street registers the inlined URIs in
+`src/MainStreetCardPackArt.ts` before generating card textures.
 
 ## 4. Gate a pack (optional)
 

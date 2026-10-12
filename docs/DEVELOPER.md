@@ -2234,16 +2234,41 @@ The renderer discovers a game's packs with `loadCardPacks`
 4. Resolve entitlement for the compatible batch through the injected resolver.
 5. Fetch each entitled pack's CSV fragment over
    `tce-packs://<gameId>/<packId>/<cards>` and expose its `assets` as resolved
-   `tce-packs://` URLs (the game's asset loader fetches the binaries; the
-   loader never reads image/audio bytes itself).
+   `tce-packs://` URLs. Each declared asset's bytes are then read through the
+   injectable `fetchAsset(url) => Promise<Uint8Array>` transport (default
+   `fetch` + `arrayBuffer`) and inlined as `data:<media>;base64,…` URIs keyed
+   by card id (the asset filename stem) on `LoadedCardPack.assetDataUris`. A
+   missing/unreadable/malformed asset is reported structurally and omitted —
+   never thrown — so a game that rasterises faces from a `data:` URI can render
+   a pack's bespoke art without a game-local art map.
 
 The loader is **environment-injected** (`contentDir`, `gameId`,
-`engineVersion`, `fetchManifest`, `fetchCsv`/`importer`,
+`engineVersion`, `fetchManifest`, `fetchCsv`/`importer`, `fetchAsset`,
 `resolveEntitlement`), so it is unit-testable without Electron, a network, or a
 real content directory. Main Street calls `bootstrapMainStreetCardPacks()`
 **before scene setup**, so the first deal already includes pack cards; a game
 feeds the returned packs to the core merge seam
 ([`mergeCardPackCsv`](../src/core-engine/CardPackMerge.ts), see below).
+
+### Pack art (self-containment)
+
+A pack's declared `assets/<cardId>.png` are the only art it needs; the game's
+generated base art map is **not** a pack dependency. The loader inlines each
+asset as a `data:` URI (`LoadedCardPack.assetDataUris`, keyed by card id), so a
+game that rasterises card faces from a `data:` URI (Phaser SVG textures) can
+render the pack's bespoke art directly. The transport is environment-injected
+and contains **no scheme-specific branching**, so the same path works for
+Electron `tce-packs://` URLs (read by `electron/pack-protocol.ts`) and for the
+bundled browser asset URLs supplied by `MS-0MV1O7EGG004MWGD`.
+
+The game owns the render-time registry: Main Street registers the inlined URIs
+in `src/MainStreetCardPackArt.ts` during `bootstrapMainStreetCardPacks()` —
+before `MainStreetSvgTextureManager` generates textures — and resolves a card
+with `getCardArtDataUriForCard(cardId, cardName)`: pack registry → base
+name-keyed map → `Fallback`. Degradation is graceful: a pack that fails to load
+leaves the registry base-only, and a missing asset makes that card fall through
+to the base map and then `Fallback` with a logged warning — never a crash or a
+blank face.
 
 ### Entitlement
 
@@ -2624,7 +2649,10 @@ truth; the `_64_x_64.png` files are superseded legacy thumbnails). Run
 plus spelling aliases and a `Fallback` entry); the script downscales each
 1024×1024 sprite to 256×256 and re-encodes it as lossy WebP (quality 90),
 which keeps the inline map small (~0.6 MB) despite carrying 16× the pixels of
-the old 64×64 PNG map.
+the old 64×64 PNG map. The map is **base-pool only**: a card pack's sprites are
+not baked into it (see [Pack art (self-containment)](#pack-art-self-containment))
+— Main Street emits the pack's own `assets/<cardId>.png` from those sprites with
+`npm run generate:pack-assets`.
 Both `MainStreetCardArt.ts` (runtime CSV generator) and
 `scripts/generate-main-street-card-svgs.mjs` (static SVGs) consume the map.
 Cards without dedicated art use the `Fallback` sprite.
