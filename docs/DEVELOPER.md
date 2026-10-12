@@ -3298,12 +3298,13 @@ This is a **pure data module** with no Phaser or runtime dependencies. It define
 
 - **`OverlayTextSpec`** – Describes a text overlay with `text`, `x`, `y`, `fontSize`, `color`, and `fontStyle` properties (plus optional per-segment colouring for the two-tone cash line).
 - **`OverlayAccentSpec`** – Describes the top-left corner upgrade accent with container-local `x`, `y`, `width`, `height`, `color`, and `alpha`.
-- **`OverlayShaderEffectSpec`** – Describes the Canvas-compatible shader-style upgrade accent: ordered gradient `colourStops`, `animationDurationMs`, `animationEasing`, `animationAmplitude`, and the `staticForm` flag.
+- **`OverlayShaderEffectSpec`** – Describes the Canvas-compatible shader-style upgrade accent: ordered gradient `colourStops`, `animationDurationMs`, `animationEasing`, the `staticForm` flag, and the sheen/highlight render parameters (`sheenAlpha`, `highlightColour`, `highlightAlpha`, `highlightBand`).
 - **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `levelAccent`, `cashLine`, `reputationText`, and `shaderEffect`.
 
 The module also exports the pure, Phaser-free helpers `sampleShaderGradient()`
-(linear interpolation across the gradient stops) and
-`shouldAnimateShaderEffect()` (reduced-motion / replay gating).
+(linear interpolation across the gradient stops), `wrapShaderPhase()` and
+`circularDistance()` (seamless sweep maths) and `shouldAnimateShaderEffect()`
+(reduced-motion / replay gating).
 
 > **Note (CG-0MT24MHGZ0025O20):** The upgraded business **name is not part of
 > the overlay spec** — per manual review it must render as part of the card
@@ -3327,7 +3328,7 @@ BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlayS
 - Upgraded cards (`level > 0`): The non-name overlays are populated:
   - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-left corner, 10px bold.
   - **Level accent** — small filled top-left corner rectangle (`0xffaa22`, 30×16) marking the upgrade now that the outer card frame carries the owner's colour (F4 of MS-0MUWNTN8W006C7EF).
-  - **Shader effect** — Canvas-compatible shader-style accent (`shaderEffect`): ordered gold/highlight gradient stops plus deterministic shimmer animation parameters and a `staticForm` flag. It is rendered as a named `ms-upgrade-shader` `Graphics` accent confined to the top-left upgrade region (never a full-card stroke) and is the visual upgrade distinction.
+  - **Shader effect** — Canvas-compatible shader-style accent (`shaderEffect`): ordered gold → pale → warm-white → gold gradient stops (the warm-white foil stop makes the shard visibly brighter than the flat gold accent it accompanies), a moving white highlight band (`highlightColour`/`highlightAlpha`/`highlightBand`), deterministic shimmer animation parameters, and a `staticForm` flag. It is rendered as a named `ms-upgrade-shader` `Graphics` **corner shard** (a translucent right triangle filling the card's top-left quadrant, with a radial alpha falloff) confined to that quadrant — never a full-card stroke — and is the visual upgrade distinction (MS-0MUWNTQ5L0075Y38).
   - **Cash line** — `"+X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the ` / ` separator in neutral grey (`#dddddd`). The former `Cash:` prefix was removed by manual review (CG-0MTORJ5FS006B0UN) — the colouring carries the meaning. The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `+2`, `-0.75`) (CG-0MTCP76MP0088TQW).
   - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below the cash line.
   - **Name** — NOT an overlay: baked into the card's SVG via a display-name variant texture (CG-0MT24MHGZ0025O20).
@@ -3346,18 +3347,19 @@ UpgradeOverlaySpec ──► applyUpgradeOverlays() ──► Phaser text/graphi
 
 **Rendering order (back to front within the container):**
 1. Level accent (filled top-left corner rectangle) — the upgrade indicator that replaces the removed full-card border.
-2. Shader effect (`ms-upgrade-shader` `Graphics`) — a stripped gradient sampled from `shaderEffect.colourStops` with `sampleShaderGradient()`, confined to the accent region so it never becomes a full-card stroke.
+2. Shader effect (`ms-upgrade-shader` `Graphics`) — a translucent diagonal gradient **corner shard** sampled from `shaderEffect.colourStops` with `sampleShaderGradient()`. The shard fills the card's top-left quadrant (a right triangle with a radial alpha falloff so the card art stays legible beneath it) plus a moving white highlight band, so it never becomes a full-card stroke and never masks the right-hand text column. The shipped gradient includes a warm-white foil stop, so the shard is visibly brighter than the flat gold accent at the same spot — the earlier same-colour gradient was invisible in manual review (MS-0MUWNTQ5L0075Y38).
 3. Level badge text (gold, top-left) — drawn after the accent/shader so the badge text stays legible on top.
 4. Cash line text (two-tone: green income / red cost, right-hand text column).
 5. Reputation text (blue, below cash line).
 
 **Motion:** when `shouldAnimateShaderEffect({ reducedMotion, replayMode })`
-is true the renderer adds a deterministic `ms-upgrade-shimmer` rectangle and
-tween (fixed duration/easing/amplitude, `yoyo`, `repeat: -1`). With reduced
-motion enabled or in replay/headless mode the static gradient is drawn and **no**
-shimmer or tween is created. The tween is killed when the card container is
-destroyed, so refreshes never leak tweens. The effect is presentation-only — it
-never mutates game state, transcript or replay output.
+is true the renderer tweens a phase value (`repeat: -1`, fixed
+duration/easing) whose `onUpdate` redraws the shard gradient with the highlight
+band sweeping seamlessly across it. With reduced motion enabled or in
+replay/headless mode the static gradient is drawn and **no** tween is created.
+The tween is killed when the card container is destroyed, so refreshes never
+leak tweens. The effect is presentation-only — it never mutates game state,
+transcript or replay output.
 
 **Owner-coloured outer border:** the full-card upgrade border has been removed
 (F4 of MS-0MUWNTN8W006C7EF). `drawBusinessSlot()` draws the card's outer frame
@@ -3414,7 +3416,7 @@ applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 │  Base SVG texture   │     │  buildUpgradeOverlaySpec()  │
 │  (cached, reused)   │     │  → levelBadge: "Lvl 2"      │
 │  + display-name     │     │  → levelAccent: gold corner │
-│  variant (upgraded) │     │  → shaderEffect: gradient    │
+│  variant (upgraded) │     │  → shaderEffect: shard       │
 │                     │     │  → cashLine: "+8"          │
 │                     │     │  (name is baked into the     │
 │                     │     │   variant texture, not here) │
@@ -3425,7 +3427,7 @@ applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
                               │  applyUpgradeOverlays()     │
                               │  Creates Phaser objects:    │
                               │  - Rectangle (level accent) │
-                              │  - Graphics  (shader accent)│
+                              │  - Graphics  (shader shard) │
                               │  - Text (level, cash line, rep)│
                               └─────────────────────────────┘
 ```
