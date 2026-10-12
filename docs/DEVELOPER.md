@@ -2250,6 +2250,42 @@ real content directory. Main Street calls `bootstrapMainStreetCardPacks()`
 feeds the returned packs to the core merge seam
 ([`mergeCardPackCsv`](../src/core-engine/CardPackMerge.ts), see below).
 
+### Pack sources (additive, game-side)
+
+The loader's `contentDir` / `fetchManifest` / `fetchCsv` / `fetchAsset` options
+are **environment seams**, so a game can supply card-pack content from a source
+other than the Electron content directory **without changing this loader** —
+the transports are the only coupling. Main Street is the worked example (all
+changes are game-side; `src/ui/CardPackLoader.ts` is untouched):
+
+- `src/MainStreetPackSources.ts` defines a `PackSource` (a stable `id` plus
+  `readPackFile(path)` and an optional `resolvePackFileUrl(path)`) and an
+  ordered `PackSourceRegistry`. The registry is consulted in registration order
+  and is **total** — an unknown pack ref, a missing file, a rejecting source or
+  an empty registry all resolve to `null`, and the loader degrades to base
+  content.
+- `createBundledPackSource()` is the first source: it bakes the game's committed
+  `packs/` tree into the build with Vite `import.meta.glob` (`?raw` for the
+  manifest and CSVs, `?url` for asset binaries), so the web build needs no
+  content-directory copy step.
+- `createPackSourceTransports(registry)` adapts a registry to the loader's
+  `fetchManifest` / `fetchCsv` / `fetchAsset` callbacks, mapping the loader's
+  `tce-packs://` URLs to packs-relative paths so the browser path issues **no
+  `tce-packs://` request**. Explicit transports always win, which keeps the
+  Electron content-directory path byte-for-byte unchanged.
+
+**Adding a source additively.** Implement `PackSource` (return `null`, never
+throw), then register it **after** the sources it should defer to
+(`registry.add(mySource)`, or construct
+`new PackSourceRegistry([bundled, mySource])`). Registration is idempotent by
+`id` and never removes or reorders existing sources, so adding a source cannot
+change the ones already present. A **same-origin** source reads `<base>/packs/…`
+with `fetch`; a **remote** source fetches a hosted bundle by URL. Either way the
+renderer loader, the merge seam and the in-game listing stay unchanged. Remote
+hosting is follow-up work (`MS-0MV26X8T200852AC`); because a remote pack injects
+card rows it adds a supply-chain surface, so future remote sources need
+signing/hashing plus the content-unlock gate.
+
 ### Pack art (self-containment)
 
 A pack's declared `assets/<cardId>.png` are the only art it needs; the game's
