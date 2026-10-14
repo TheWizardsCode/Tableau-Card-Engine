@@ -99,15 +99,21 @@ This refreshes the committed module at
 WAV/JSON/metadata outputs to `build/tf-synths/`. The committed module is the
 single source of truth for shipped builds.
 
-**Runtime activation.** The sibling app's loader
-(`../tce-main-street/src/tf/mainStreetTfModule.ts`) resolves the module
-asynchronously after scene boot and attaches it to `SoundManager` via
-`createTfPlayer()` / `setSynthIntegration()`. Once settled,
-`SoundManager.isSynthActive()` is `true`, the debug **ToneForge** entry reports
-`Active`, and the entry can toggle synthesis at runtime without a scene
-restart. A load/normalisation failure logs a `console.warn` with the reason and
-retains diagnostics (`getMainStreetTfDiagnostics()`) that the scene forwards to
-`SoundManager.setSynthDiagnostics()`.
+**Runtime activation (opt-in).** ToneForge is **off by default**
+(MS-0MV76P7BN00164RF): `SoundManager` accepts `synthPlayer` / `synthKeyMap`
+options but does **not** attach them at construction, so
+`SoundManager.isSynthActive()` is `false` and playback uses the WAV/Phaser path
+until synthesis is explicitly enabled (`enableSynth()` / `setSynthIntegration()`).
+The sibling app opts in per session from the dev-only **ToneForge** debug entry:
+enabling it lazily calls the loader
+(`../tce-main-street/src/tf/mainStreetTfModule.ts` and
+`loadMainStreetTfIntegration()`), which attaches the module via
+`createTfPlayer()` / `setSynthIntegration()`. Once attached,
+`SoundManager.isSynthActive()` is `true` and the entry can toggle synthesis at
+runtime without a scene restart. Nothing is fetched or attached on the boot
+path. A load/normalisation failure logs a `console.warn` with the reason and
+retains diagnostics (`getMainStreetTfDiagnostics()`) that the loader forwards to
+`SoundManager.setSynthDiagnostics()` so the status line stays loud.
 
 **Missing-factory fallback.** A logical key mapped to a factory the module does
 not ship is **never silently dropped**: `tfAdapter` reports whether it handled
@@ -4447,9 +4453,13 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   debug-tools list by `CardGameScene.initSettingsPanel` (via
   `resolveEffectiveDebugTools`), so it appears even for games that supply their
   own `debugTools` list (e.g. Main Street) — no game-specific registration is
-  required. It is present whenever the scene has a `SoundManager`.
+  required. It is present whenever the scene has a `SoundManager`. (Main Street
+  supplies its own dev-only ToneForge entry with a lazy loader; the engine
+  de-duplicates by label, so that game-owned entry wins.)
 - **Function:** Reports whether ToneForge runtime synthesis is currently
-  active and toggles it on/off at runtime, **without a scene restart**:
+  active and toggles it on/off at runtime, **without a scene restart**. Synth
+  is **off by default** (MS-0MV76P7BN00164RF): the status starts `Inactive` and
+  no ToneForge chunk is fetched on the boot path.
   - **Live status text:** `Active` / `Inactive` plus the mapped factory count
     and, when one was recorded, the last module load error (e.g.
     `Inactive · 0 factories · load error: module exploded`). The text is a
@@ -4457,19 +4467,23 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
     poll while the panel is open, so an async module load or a toggle is
     reflected immediately without closing and reopening the panel.
   - **Toggle:** Clicking the label detaches the synth player/mapping when
-    synthesis is active (keys fall back to the existing WAV/Phaser path) and
-    restores the previously attached integration when inactive. No entry is
-    added when there is no `SoundManager`.
+    synthesis is active (keys fall back to the existing WAV/Phaser path). When
+    inactive it **opts in**: a game may supply a `loadIntegration` loader
+    (Main Street does) that lazily loads + attaches the now-active integration;
+    otherwise the tool re-attaches the integration retained from the
+    `SoundManager` constructor. No entry is added when there is no
+    `SoundManager`.
 - **When to use:** Verify that the ToneForge wiring is actually in use — the
   operator no longer has to guess from the sound — and A/B compare synthesised
   audio against the fallback audio. Open the Settings panel (gear icon) →
   scroll to Debug Tools → click **ToneForge** to toggle.
 - **Implementation:**
-  - `src/ui/debug/ToneForgeStatusTool.ts` — `createToneForgeStatusTool()`,
+  - `src/ui/debug/ToneForgeStatusTool.ts` — `createToneForgeStatusTool()`
+    (with the optional `loadIntegration` loader),
     `withToneForgeStatusTool()` and `resolveEffectiveDebugTools()`.
   - `src/core-engine/SoundManager.ts` — read-only `isSynthActive()` /
-    `getSynthStatus()` and the `detachSynthIntegration()` /
-    `restoreSynthIntegration()` toggle API.
+    `getSynthStatus()`, the opt-in `enableSynth()`, and the
+    `detachSynthIntegration()` / `restoreSynthIntegration()` toggle API.
   - `src/ui/CardGameScene.ts` — dev-gated effective-list injection.
 
 #### Market Card Cheat (Main Street only)

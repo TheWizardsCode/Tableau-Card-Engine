@@ -442,6 +442,11 @@ export {
   TONEFORGE_DEBUG_TOOL_LABEL,
   TONEFORGE_UNAVAILABLE_DESCRIPTION,
 } from './debug/ToneForgeStatusTool';
+export type {
+  SynthIntegrationLoad,
+  SynthIntegrationLoader,
+  ToneForgeStatusToolOptions,
+} from './debug/ToneForgeStatusTool';
 
 // Slider – reusable horizontal slider widget
 export { Slider } from './Slider';

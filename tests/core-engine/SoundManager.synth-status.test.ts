@@ -20,12 +20,33 @@ function createMockPlayer(): SoundPlayer {
 }
 
 describe('SoundManager synth status', () => {
-  it('reports active when a synth player and non-empty key map are attached', () => {
+  it('is inactive by default even when synth options are supplied (opt-in)', () => {
     const manager = new SoundManager(createMockPlayer(), {
       storage: null,
       synthPlayer: createMockPlayer(),
       synthKeyMap: { 'sfx-place': 'card-place' },
     });
+
+    expect(manager.isSynthActive()).toBe(false);
+    // The retained integration's declared factory count is still surfaced for
+    // diagnostics, but synthesis is not active until explicitly enabled.
+    expect(manager.getSynthStatus()).toEqual({
+      active: false,
+      factoryCount: 1,
+      lastLoadError: null,
+    });
+
+    expect(manager.enableSynth()).toBe(true);
+    expect(manager.isSynthActive()).toBe(true);
+  });
+
+  it('reports active when a synth player and non-empty key map are enabled', () => {
+    const manager = new SoundManager(createMockPlayer(), {
+      storage: null,
+      synthPlayer: createMockPlayer(),
+      synthKeyMap: { 'sfx-place': 'card-place' },
+    });
+    manager.enableSynth();
 
     expect(manager.isSynthActive()).toBe(true);
     expect(manager.getSynthStatus()).toEqual({
@@ -48,6 +69,7 @@ describe('SoundManager synth status', () => {
       synthPlayer: createMockPlayer(),
       synthKeyMap: {},
     });
+    manager.enableSynth();
 
     expect(manager.isSynthActive()).toBe(false);
     expect(manager.getSynthStatus().active).toBe(false);
@@ -60,6 +82,7 @@ describe('SoundManager synth status', () => {
       synthKeyMap: { 'sfx-place': 'card-place' },
       synthDiagnostics: { factoryCount: 12, lastLoadError: 'module exploded' },
     });
+    manager.enableSynth();
 
     expect(manager.getSynthStatus()).toEqual({
       active: true,
@@ -104,6 +127,10 @@ describe('SoundManager synth status', () => {
     });
     manager.register('sfx-place', 'sfx-place-wav');
 
+    // Opt-in: enable the retained integration before toggling it off.
+    expect(manager.enableSynth()).toBe(true);
+    expect(manager.isSynthActive()).toBe(true);
+
     expect(manager.detachSynthIntegration()).toBe(true);
     expect(manager.isSynthActive()).toBe(false);
 
@@ -126,6 +153,7 @@ describe('SoundManager synth status', () => {
       synthDiagnostics: { factoryCount: 7 },
     });
 
+    manager.enableSynth();
     manager.detachSynthIntegration();
 
     expect(manager.getSynthStatus()).toEqual({

@@ -26,11 +26,14 @@ function createMockPlayer(): SoundPlayer {
 }
 
 function createActiveManager(): SoundManager {
-  return new SoundManager(createMockPlayer(), {
+  const manager = new SoundManager(createMockPlayer(), {
     storage: null,
     synthPlayer: createMockPlayer(),
     synthKeyMap: { 'sfx-place': 'card-place', 'sfx-deal': 'card-draw' },
   });
+  // Opt-in by default: enable the retained integration explicitly.
+  manager.enableSynth();
+  return manager;
 }
 
 describe('createToneForgeStatusTool', () => {
@@ -100,6 +103,70 @@ describe('createToneForgeStatusTool', () => {
     const tool = createToneForgeStatusTool(manager);
 
     expect(resolveDebugToolDescription(tool)).toContain('1 factory');
+  });
+});
+
+describe('createToneForgeStatusTool (opt-in lazy loader)', () => {
+  it('reports Inactive and never calls the loader while merely registered', () => {
+    const manager = new SoundManager(createMockPlayer(), { storage: null });
+    const loader = vi.fn(async () => ({
+      player: createMockPlayer(),
+      keyMap: { 'sfx-place': 'card-place' },
+      diagnostics: { factoryCount: 3 },
+    }));
+    const tool = createToneForgeStatusTool(manager, { loadIntegration: loader });
+
+    expect(manager.isSynthActive()).toBe(false);
+    expect(loader).not.toHaveBeenCalled();
+    expect(resolveDebugToolDescription(tool)).toContain('Inactive');
+  });
+
+  it('lazily loads + attaches on enable, then detaches on the next activate', async () => {
+    const manager = new SoundManager(createMockPlayer(), { storage: null });
+    const loader = vi.fn(async () => ({
+      player: createMockPlayer(),
+      keyMap: { 'sfx-place': 'card-place' },
+      diagnostics: { factoryCount: 3 },
+    }));
+    const tool = createToneForgeStatusTool(manager, { loadIntegration: loader });
+
+    tool.activate({} as never);
+    await vi.waitFor(() => expect(manager.isSynthActive()).toBe(true));
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(manager.getSynthStatus().factoryCount).toBe(3);
+    expect(resolveDebugToolDescription(tool)).toContain('Active');
+
+    // Disabling reverts to the WAV/Phaser fallback without a reload.
+    tool.activate({} as never);
+    expect(manager.isSynthActive()).toBe(false);
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(resolveDebugToolDescription(tool)).toContain('Inactive');
+  });
+
+  it('surfaces a null loader result as a load error and stays inactive', async () => {
+    const manager = new SoundManager(createMockPlayer(), { storage: null });
+    const loader = vi.fn(async () => {
+      manager.setSynthDiagnostics({ lastLoadError: 'module missing' });
+      return null;
+    });
+    const tool = createToneForgeStatusTool(manager, { loadIntegration: loader });
+
+    tool.activate({} as never);
+    await vi.waitFor(() => expect(loader).toHaveBeenCalled());
+    await vi.waitFor(() => expect(resolveDebugToolDescription(tool)).toContain('load error: module missing'));
+    expect(manager.isSynthActive()).toBe(false);
+  });
+
+  it('records a throwing loader as a load error without breaking', async () => {
+    const manager = new SoundManager(createMockPlayer(), { storage: null });
+    const loader = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    const tool = createToneForgeStatusTool(manager, { loadIntegration: loader });
+
+    expect(() => tool.activate({} as never)).not.toThrow();
+    await vi.waitFor(() => expect(resolveDebugToolDescription(tool)).toContain('load error: network down'));
+    expect(manager.isSynthActive()).toBe(false);
   });
 });
 

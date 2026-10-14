@@ -65,3 +65,14 @@ The adapter is responsible only for delegation and key mapping; synthesis genera
 2. **Asset/runtime policy:** should generated descriptor modules and WAVs be runtime build artifacts only, or should any subset be committed for deterministic demos?
 3. **Loader strategy:** static import vs dynamic import for generated module in browser bundles.
 4. **CI pathing:** confirm canonical output location for generated artifacts (`build/tf-synths/` vs `build/tf-synths-spike/`).
+
+## Opt-in default (MS-0MV76P7BN00164RF)
+
+ToneForge runtime synthesis is **off by default**. The `SoundManager` accepts
+`synthPlayer` / `synthKeyMap` constructor options for forward compatibility but
+does **not** attach them at construction — `isSynthActive()` is `false` and
+playback uses the WAV/Phaser path until synthesis is explicitly enabled via
+`enableSynth()` / `setSynthIntegration()`. Games must opt in per session; Main
+Street does so from the dev-only **ToneForge** debug tool, which lazily
+loads the committed runtime module only when synthesis is switched on (no boot
+fetch, no `[mainStreet tf]` load activity on the default path).

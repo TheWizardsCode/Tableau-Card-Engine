@@ -19,6 +19,11 @@ export {
   TONEFORGE_DEBUG_TOOL_LABEL,
   TONEFORGE_UNAVAILABLE_DESCRIPTION,
 } from './ToneForgeStatusTool';
+export type {
+  SynthIntegrationLoad,
+  SynthIntegrationLoader,
+  ToneForgeStatusToolOptions,
+} from './ToneForgeStatusTool';
 // MarketCardCheatOverlay moved to example-games/main-street/debug (Main Street-owned).
 // StaffApplicantCheatOverlay moved to example-games/main-street/debug (Main Street-owned).
 export { AiDecisionRecorder } from './AiDecisionRecorder';
