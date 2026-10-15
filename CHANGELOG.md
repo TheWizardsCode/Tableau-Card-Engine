@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.1.21 (2026-10-15)
+> **Release focus:** This release introduces a new Irish history card game while overhauling how card packs work, letting third-party packs carry their own artwork and be added as unlockable DLC. It also improves audio defaults, publishing automation, and developer tooling, including a more reliable dev server and a single up-to-date guide for creating new games.
+### Features
+- Meet the spirits of Ireland's past and rebuild history's timeline in a new card game. (CG-0MUZFNCAC008B0KZ)
+- Games now start with standard audio and only use synthesized sound when you turn it on. (CG-0MV8FZ4DX002HJ6D)
+- Card packs now display their own custom art correctly, even for third-party packs. (CG-0MV590RLL0026M7G)
+- Windows releases now publish automatically, so you get new versions faster. (CG-0MUMSWPGY0016N97)
+- Earn bonus games and in-game DLC by following us on more platforms, not just Steam. (CG-0MUZF156A007OUIT)
+- New card packs can now be added to your game as DLC, with locked packs shown in-game until unlocked. (CG-0MUZFD1WR0031QTB)
+### Bug Fixes
+- New game projects now start their dev server reliably without crashing. (CG-0MV5SEHHG000ZKUA)
+- Releases no longer get blocked by a harmless missing-thumbnail error. (CG-0MUX17L47000O4CE)
+### Other
+- New games can now be created more easily with a single, up-to-date guide. (CG-0MUZFNOE1007T57S)
+- Updated dependencies to keep the game secure and running smoothly. (CG-0MV2L5H25009SNNE)
+- Card packs now include their own artwork, so they work reliably on their own. (CG-0MV5FKKV9006NNZV)
+> [Play the alpha release](https://thewizardscode.github.io/Tableau-Card-Engine/). Provide feedback in [Discord](https://discord.gg/gUKQTFkzQ4)
+
 ## v0.1.20 (2026-10-06)
 > **Release focus:** This release focuses on improving the launcher and web experience, including adding a proper game icon for browser tabs and bookmarks, allowing new games to be added without reinstalling, and fixing a sync bug so completed tasks stay completed. It also upgrades Main Street sound effects to rich synthesised audio with a live dev toggle, and includes documentation and code cleanup updates.
 ### Features
