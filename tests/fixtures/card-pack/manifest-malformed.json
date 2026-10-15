@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "id": "fixture-pack",
+      "gameId": "fixture-game",
+      "title": "Fixture Pack",
+      "description": "Synthetic free card pack used by card-pack tests.",
+      "version": "1.0.0",
+      "coreEngineVersion": "^0.1.0",
+      "cards": "cards.csv",
+      "assets": ["assets/icon.png"],
+    }
+  ]
+}

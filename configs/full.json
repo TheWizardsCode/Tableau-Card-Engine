@@ -1,5 +1,5 @@
 {
-  "$comment": "Full preset: the engine + Gym + all eight example games. Used by the launcher distribution's complete build and by the full test suite (the shell runners default to GAMES_CONFIG=full). Part of epic CG-0MTR7DLMY008CK17; named distribution preset formalised by F5 CG-0MTRO77XA006YZZC. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; in the flat launcher checkout they resolve from example-games/<id>/ instead. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; `scenePath`/`adapterPath` are the flat-monorepo layout and `siblingScenePath`/`siblingAdapterPath` the `src/` layout of a sibling game repo (Option C, F9).",
+  "$comment": "Full preset: the engine + Gym + all nine example games. Used by the launcher distribution's complete build and by the full test suite (the shell runners default to GAMES_CONFIG=full). Part of epic CG-0MTR7DLMY008CK17; named distribution preset formalised by F5 CG-0MTRO77XA006YZZC. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; in the flat launcher checkout they resolve from example-games/<id>/ instead. Game paths are sibling repo roots (`../tce-<game>`) resolved by scripts/vite-game-discovery-plugin.ts; `scenePath`/`adapterPath` are the flat-monorepo layout and `siblingScenePath`/`siblingAdapterPath` the `src/` layout of a sibling game repo (Option C, F9).",
   "games": [
     {
       "id": "beleaguered-castle",
@@ -60,6 +60,12 @@
       "path": "../tce-coloretto",
       "scenePath": "example-games/coloretto/scenes/ColorettoScene.ts",
       "siblingScenePath": "src/scenes/ColorettoScene.ts"
+    },
+    {
+      "id": "the-rising",
+      "path": "../tce-the-rising",
+      "scenePath": "example-games/the-rising/scenes/TheRisingScene.ts",
+      "siblingScenePath": "src/scenes/TheRisingScene.ts"
     }
   ]
 }

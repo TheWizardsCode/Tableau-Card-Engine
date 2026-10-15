@@ -9,49 +9,61 @@
  * @module tests/helpers/MockFactory
  */
 
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
+
+/**
+ * Callable mock spy type.
+ *
+ * Vitest 4's `MockFn` resolves to
+ * `Mock<Procedure | Constructable>`, which is *not* callable in a typed
+ * context because the union includes a constructor signature ("Value of type
+ * 'Mock<Procedure | Constructable>' is not callable"). An explicit function
+ * signature keeps the spy callable while retaining the full `MockInstance`
+ * API (`.mockReturnValue`, `.toHaveBeenCalled`, …).
+ */
+export type MockFn = Mock<(...args: any[]) => any>;
 
 // ── Types ───────────────────────────────────────────────────
 
 /** Minimal mock of a Phaser tween. */
 export interface MockTween {
-  destroy: ReturnType<typeof vi.fn>;
+  destroy: MockFn;
 }
 
 /** Minimal mock of a Phaser text object. */
 export interface MockText {
-  setText: ReturnType<typeof vi.fn>;
-  setOrigin: ReturnType<typeof vi.fn>;
-  setDepth: ReturnType<typeof vi.fn>;
-  setTint: ReturnType<typeof vi.fn>;
-  clearTint: ReturnType<typeof vi.fn>;
-  setColor: ReturnType<typeof vi.fn>;
-  setInteractive: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
-  destroy: ReturnType<typeof vi.fn>;
+  setText: MockFn;
+  setOrigin: MockFn;
+  setDepth: MockFn;
+  setTint: MockFn;
+  clearTint: MockFn;
+  setColor: MockFn;
+  setInteractive: MockFn;
+  on: MockFn;
+  destroy: MockFn;
   text: string;
 }
 
 /** Minimal mock of a Phaser rectangle / graphics primitive. */
 export interface MockRectangle {
-  setStrokeStyle: ReturnType<typeof vi.fn>;
-  setFillStyle: ReturnType<typeof vi.fn>;
-  setDepth: ReturnType<typeof vi.fn>;
-  setInteractive: ReturnType<typeof vi.fn>;
-  setOrigin: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
-  destroy: ReturnType<typeof vi.fn>;
+  setStrokeStyle: MockFn;
+  setFillStyle: MockFn;
+  setDepth: MockFn;
+  setInteractive: MockFn;
+  setOrigin: MockFn;
+  on: MockFn;
+  destroy: MockFn;
   input: { enabled: boolean };
   _handlers: Record<string, Function>;
 }
 
 /** Minimal mock of a Phaser container. */
 export interface MockContainer {
-  add: ReturnType<typeof vi.fn>;
-  setDepth: ReturnType<typeof vi.fn>;
-  setScale: ReturnType<typeof vi.fn>;
-  setVisible: ReturnType<typeof vi.fn>;
-  destroy: ReturnType<typeof vi.fn>;
+  add: MockFn;
+  setDepth: MockFn;
+  setScale: MockFn;
+  setVisible: MockFn;
+  destroy: MockFn;
   list: unknown[];
 }
 
@@ -61,20 +73,20 @@ export interface MockImage {
   y: number;
   texture: { key: string };
   active: boolean;
-  setTexture: ReturnType<typeof vi.fn>;
-  setInteractive: ReturnType<typeof vi.fn>;
-  setTint: ReturnType<typeof vi.fn>;
-  clearTint: ReturnType<typeof vi.fn>;
-  setOrigin: ReturnType<typeof vi.fn>;
-  setAlpha: ReturnType<typeof vi.fn>;
-  setDepth: ReturnType<typeof vi.fn>;
-  setPosition: ReturnType<typeof vi.fn>;
-  setRotation: ReturnType<typeof vi.fn>;
-  setScale: ReturnType<typeof vi.fn>;
-  setDisplaySize: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
-  off: ReturnType<typeof vi.fn>;
-  destroy: ReturnType<typeof vi.fn>;
+  setTexture: MockFn;
+  setInteractive: MockFn;
+  setTint: MockFn;
+  clearTint: MockFn;
+  setOrigin: MockFn;
+  setAlpha: MockFn;
+  setDepth: MockFn;
+  setPosition: MockFn;
+  setRotation: MockFn;
+  setScale: MockFn;
+  setDisplaySize: MockFn;
+  on: MockFn;
+  off: MockFn;
+  destroy: MockFn;
   scaleX: number;
   scaleY: number;
   alpha: number;
@@ -192,31 +204,31 @@ export function createMockImage(
  * Phaser.Scene where needed.
  */
 export interface MockSceneWithTweens {
-  tweens: { add: ReturnType<typeof vi.fn> };
+  tweens: { add: MockFn };
   tweensList: Phaser.Types.Tweens.TweenBuilderConfig[];
   add: {
-    image: ReturnType<typeof vi.fn>;
-    text: ReturnType<typeof vi.fn>;
-    graphics: ReturnType<typeof vi.fn>;
-    rectangle: ReturnType<typeof vi.fn>;
-    container: ReturnType<typeof vi.fn>;
+    image: MockFn;
+    text: MockFn;
+    graphics: MockFn;
+    rectangle: MockFn;
+    container: MockFn;
   };
   sound: {
-    play: ReturnType<typeof vi.fn>;
-    add: ReturnType<typeof vi.fn>;
+    play: MockFn;
+    add: MockFn;
   };
   soundManager: {
-    play: ReturnType<typeof vi.fn>;
+    play: MockFn;
   };
   input: {
-    on: ReturnType<typeof vi.fn>;
-    off: ReturnType<typeof vi.fn>;
-    setDraggable: ReturnType<typeof vi.fn>;
+    on: MockFn;
+    off: MockFn;
+    setDraggable: MockFn;
     dragDistanceThreshold: number;
   };
   events: Record<string, (...args: any[]) => void>;
   eventsObj: Phaser.Events.EventEmitter;
-  scene: { start: ReturnType<typeof vi.fn> };
+  scene: { start: MockFn };
   _mockImage: MockImage;
   _mockText: MockText;
   _mockRect: MockRectangle;

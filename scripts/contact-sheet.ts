@@ -23,7 +23,10 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import sharp from 'sharp';
+// `OverlayOptions` is a named type export in sharp 0.35 (the old
+// `sharp.OverlayOptions` namespace access was removed when sharp moved to
+// ESM-style type declarations).
+import sharp, { type OverlayOptions } from 'sharp';
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -123,7 +126,7 @@ async function generateContactSheet(outputDir: string): Promise<string | null> {
   console.log(`[contact-sheet] Generating contact sheet: ${count} screenshots, ${rows} rows, ${gridWidth}x${gridHeight}`);
 
   // Build composite inputs for sharp
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
 
   for (let i = 0; i < count; i++) {
     const entry = entries[i];

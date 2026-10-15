@@ -4,7 +4,7 @@
  * Provides foundational framework functionalities including
  * game loop management, state management, and rendering helpers.
  */
-export const ENGINE_VERSION = '0.1.0';
+export { ENGINE_VERSION } from './engine-version';
 
 // Shared setup option types and helpers
 export type { BaseSetupOptions, MultiplayerSetupOptions, ResolvedBaseSetup, ResolvedSetup } from './SetupOptions';
@@ -226,7 +226,7 @@ export { ListenerRegistry } from './ListenerRegistry';
 export { getSceneRegistry, removeSceneRegistry } from './scene-registry';
 
 // CSV data loader (CG-0MR6ZR23J006ZDNZ)
-export { parseCsv } from './CsvLoader';
+export { parseCsv, parseCsvHeader } from './CsvLoader';
 
 // Shared SVG rasterisation helpers (CG-0MOZNXU4Y0043NR3)
 export {
@@ -251,3 +251,40 @@ export type {
   VisibilityOwnershipControllerOptions,
 } from './VisibilityOwnership';
 export { VisibilityOwnershipController } from './VisibilityOwnership';
+
+// Pure in-game DLC gate helper (CG-0MUZGBTWW00729L4)
+export type {
+  DlcGateTarget,
+  DlcUnlockReader,
+  DlcGateReason,
+  DlcGateResult,
+  DlcGate,
+  DlcGateOptions,
+} from './DlcGate';
+export { createDlcGate } from './DlcGate';
+
+// Card-pack manifest contract + core-version compatibility (CG-0MUZIS0K7006C5WU)
+export type {
+  CardPackEntitlement,
+  CardPackManifestEntry,
+  CardPackManifest,
+  CardPackManifestParseSuccess,
+  CardPackManifestParseFailure,
+  CardPackManifestParseResult,
+  IncompatiblePack,
+  PackCompatibilitySplit,
+} from './CardPackManifest';
+export {
+  DEFAULT_ENGINE_VERSION,
+  parseCardPackManifest,
+  splitPacksByCompatibility,
+  filterPacksByGameId,
+} from './CardPackManifest';
+
+// Base+pack CSV merge and merged checksum (CG-0MUZIS14J003LQDW)
+export type {
+  CardPackCsv,
+  CardPackMergeConflict,
+  CardPackMergeResult,
+} from './CardPackMerge';
+export { mergeCardPackCsv, computeMergedChecksum } from './CardPackMerge';

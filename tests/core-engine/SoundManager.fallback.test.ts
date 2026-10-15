@@ -54,6 +54,7 @@ describe('SoundManager fallback when ToneForge cannot handle a key', () => {
         'sfx-income-positive': 'income-positive-chime', // no factory
       },
     });
+    manager.enableSynth();
 
     manager.register('sfx-deal', 'ms:sfx-deal');
     manager.register('sfx-income-positive', 'ms:sfx-income-positive');
@@ -78,6 +79,7 @@ describe('SoundManager fallback when ToneForge cannot handle a key', () => {
       synthPlayer,
       synthKeyMap: { 'sfx-challenge-complete': 'success-fanfare' },
     });
+    manager.enableSynth();
     manager.register('sfx-challenge-complete', 'ms:sfx-challenge-complete');
 
     manager.play('sfx-challenge-complete');
@@ -108,6 +110,7 @@ describe('SoundManager fallback when ToneForge cannot handle a key', () => {
       synthPlayer,
       synthKeyMap: { 'sfx-deal': 'card-draw' },
     });
+    manager.enableSynth();
     manager.register('sfx-deal', 'ms:sfx-deal');
 
     manager.play('sfx-deal');
@@ -133,6 +136,7 @@ describe('SoundManager fallback when ToneForge cannot handle a key', () => {
       synthPlayer,
       synthKeyMap: { 'sfx-deal': 'card-draw' },
     });
+    manager.enableSynth();
 
     manager.setVolume(0.25);
     manager.setMute(true);
@@ -156,6 +160,7 @@ describe('SoundManager fallback when ToneForge cannot handle a key', () => {
       synthPlayer,
       synthKeyMap: { 'sfx-income-positive': 'income-positive-chime' },
     });
+    manager.enableSynth();
     manager.register('sfx-income-positive', 'ms:sfx-income-positive');
     manager.setMute(true);
 

@@ -11,13 +11,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { UIComponentBase, mergeDefaults } from '../../src/ui/UIComponentBase';
+import type { MockFn } from '../helpers/MockFactory';
 
 // ── Minimal emitter mock ─────────────────────────────────────
 
 interface MockEmitter {
   handlers: Map<string, Set<(...args: any[]) => void>>;
-  on: ReturnType<typeof vi.fn>;
-  off: ReturnType<typeof vi.fn>;
+  on: MockFn;
+  off: MockFn;
   emit: (event: string, ...args: any[]) => void;
 }
 

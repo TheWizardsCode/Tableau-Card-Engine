@@ -1,0 +1,11 @@
+{
+  "_comment": "Config-driven card-pack DLC catalog (F5, CG-0MUZIS2B8005WG4S). Maps a pack id (and optional gameId) to the Steam application id that unlocks it when owned. Nothing here is hard-coded in entitlement logic: packs absent from this catalog fall back to the pack manifest's own 'entitlement.steamAppId', and a pack with neither is free base content. Replace the placeholder entry (Steam test app 480) with a real DLC app id before shipping a gated pack.",
+  "version": 1,
+  "packs": [
+    {
+      "gameId": "main-street",
+      "packId": "main-street-founders-pack",
+      "steamAppId": 480
+    }
+  ]
+}

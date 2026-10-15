@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "id": "main-street-foundations",
+      "gameId": "main-street",
+      "title": "Main Street Foundations",
+      "description": "Reference card pack: one business, one event and one upgrade card used to demonstrate and test the card-pack builder.",
+      "version": "1.0.0",
+      "coreEngineVersion": "^0.1.0",
+      "cards": "cards.csv",
+      "assets": [
+        "assets/biz-ms-foundations-teahouse.png",
+        "assets/evt-ms-foundations-fair.png"
+      ]
+    }
+  ]
+}

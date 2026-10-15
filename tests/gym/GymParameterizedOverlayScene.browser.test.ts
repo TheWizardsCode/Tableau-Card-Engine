@@ -10,7 +10,7 @@
  *  - Scene follows Gym conventions (GymSceneBase, GymRegistry entry, barrel export)
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { page } from '@vitest/browser/context';
+import { page } from 'vitest/browser';
 import Phaser from 'phaser';
 import { GymParameterizedOverlayScene } from '../../example-games/gym/scenes/GymParameterizedOverlayScene';
 import { GYM_PARAMETERIZED_OVERLAY_KEY } from '../../example-games/gym/GymRegistry';

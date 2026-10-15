@@ -48,33 +48,47 @@ const {
 } = vi.hoisted(() => {
   const mockEmit = vi.fn();
   const mockRemoveAllListeners = vi.fn();
-  const MockGameEventEmitter = vi.fn().mockImplementation(() => ({
-    emit: mockEmit,
-    removeAllListeners: mockRemoveAllListeners,
-    on: vi.fn(),
-    off: vi.fn(),
-  }));
+  // Vitest 4 requires a `function`/`class` implementation for a mock used with
+  // `new` — an arrow function is not constructable. See
+  // https://vitest.dev/api/vi#vi-spyon.
+  const MockGameEventEmitter = vi.fn<(...args: any[]) => any>(function () {
+    return {
+      emit: mockEmit,
+      removeAllListeners: mockRemoveAllListeners,
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+  });
 
   const mockBridgeDestroy = vi.fn();
-  const MockPhaserEventBridge = vi.fn().mockImplementation(() => ({
-    destroy: mockBridgeDestroy,
-  }));
+  const MockPhaserEventBridge = vi.fn<(...args: any[]) => any>(function () {
+    return {
+      destroy: mockBridgeDestroy,
+    };
+  });
 
   const mockSmDestroy = vi.fn();
   const mockSmRegister = vi.fn();
   const mockSmConnectToEvents = vi.fn();
-  const MockSoundManager = vi.fn().mockImplementation(() => ({
-    destroy: mockSmDestroy,
-    register: mockSmRegister,
-    connectToEvents: mockSmConnectToEvents,
-  }));
+  const MockSoundManager = vi.fn<(...args: any[]) => any>(function () {
+    return {
+      destroy: mockSmDestroy,
+      register: mockSmRegister,
+      connectToEvents: mockSmConnectToEvents,
+    };
+  });
 
   const mockHelpPanelDestroy = vi.fn();
   const mockHelpButtonDestroy = vi.fn();
-  const MockHelpButton = vi.fn().mockImplementation(() => ({
-    destroy: mockHelpButtonDestroy,
-  }));
-  const MockHelpPanel = vi.fn().mockImplementation((_scene: unknown, _config: { sections?: unknown }) => {
+  const MockHelpButton = vi.fn<(...args: any[]) => any>(function () {
+    return {
+      destroy: mockHelpButtonDestroy,
+    };
+  });
+  const MockHelpPanel = vi.fn<(...args: any[]) => any>(function (
+    _scene: unknown,
+    _config: { sections?: unknown },
+  ) {
     const btn = new MockHelpButton(scene, null as any, undefined);
     return {
       destroy: mockHelpPanelDestroy,
@@ -84,10 +98,14 @@ const {
 
   const mockSettingsPanelDestroy = vi.fn();
   const mockSettingsButtonDestroy = vi.fn();
-  const MockSettingsButton = vi.fn().mockImplementation(() => ({
-    destroy: mockSettingsButtonDestroy,
-  }));
-  const MockSettingsPanel = vi.fn().mockImplementation((_scene: unknown) => {
+  const MockSettingsButton = vi.fn<(...args: any[]) => any>(function () {
+    return {
+      destroy: mockSettingsButtonDestroy,
+    };
+  });
+  const MockSettingsPanel = vi.fn<(...args: any[]) => any>(function (
+    _scene: unknown,
+  ) {
     const btn = new MockSettingsButton(scene, null as any, undefined);
     return {
       destroy: mockSettingsPanelDestroy,

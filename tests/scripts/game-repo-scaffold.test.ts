@@ -37,6 +37,7 @@ import {
   discoverGames,
   loadGamesConfig,
 } from '../../scripts/vite-game-discovery-plugin';
+import { DEV_WATCH_IGNORE_PATTERNS } from '../../scripts/vite-transcript-plugin';
 
 const GAMES = [
   'golf',
@@ -314,6 +315,20 @@ describe('renderViteConfig', () => {
     expect(src).toContain("GAMES_CONFIG: process.env.GAMES_CONFIG ?? 'game'");
     expect(src).toContain('resolveCoreAliases(coreRoot)');
     expect(src).toContain("name: 'unit'");
+  });
+
+  it('excludes .worklog and dev-output trees from the Vite file watcher (ENOSPC guard)', () => {
+    const src = renderViteConfig('golf', DEFAULT_CORE_REL);
+    // The generated config must wire the shared ignore list into the watcher so
+    // a recursive watch does not follow .worklog/worktrees symlinks into other
+    // project checkouts and exhaust fs.inotify.max_user_watches
+    // (CG-0MV5SEHHG000ZKUA).
+    expect(src).toContain(
+      "import { DEV_WATCH_IGNORE_PATTERNS } from '../Tableau-Card-Engine/scripts/vite-transcript-plugin'",
+    );
+    expect(src).toContain('ignored: [...DEV_WATCH_IGNORE_PATTERNS]');
+    // ...and the shared list must actually cover .worklog (the failure mode).
+    expect(DEV_WATCH_IGNORE_PATTERNS).toContain('**/.worklog/**');
   });
 
   it('derives the production Pages base from the package name with a PAGES_BASE override', () => {

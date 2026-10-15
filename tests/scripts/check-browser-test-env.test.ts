@@ -44,6 +44,13 @@ const NO_VITEST_BROWSER: CheckEnvDeps = {
     id === '@vitest/browser' ? null : '/node_modules/x/index.js',
 };
 
+/** @vitest/browser-playwright provider package missing entirely (Vitest 4). */
+const NO_VITEST_BROWSER_PLAYWRIGHT: CheckEnvDeps = {
+  ...ALL_PRESENT,
+  resolveModule: (id) =>
+    id === '@vitest/browser-playwright' ? null : '/node_modules/x/index.js',
+};
+
 /** Chromium binary path points at a non-existent file. */
 const NO_CHROMIUM_BINARY: CheckEnvDeps = {
   ...ALL_PRESENT,
@@ -71,6 +78,12 @@ describe('detectMissingPrereqs (launch-free detection)', () => {
     expect(detectMissingPrereqs(NO_VITEST_BROWSER)).toContain('@vitest/browser');
   });
 
+  it('detects a missing @vitest/browser-playwright provider package', () => {
+    expect(detectMissingPrereqs(NO_VITEST_BROWSER_PLAYWRIGHT)).toContain(
+      '@vitest/browser-playwright',
+    );
+  });
+
   it('detects a Chromium binary that does not exist on disk', () => {
     expect(detectMissingPrereqs(NO_CHROMIUM_BINARY)).toContain('chromium');
   });
@@ -86,7 +99,12 @@ describe('detectMissingPrereqs (launch-free detection)', () => {
       pathExists: () => false,
     };
     const missing = detectMissingPrereqs(deps);
-    expect(missing.sort()).toEqual(['@vitest/browser', 'chromium', 'playwright']);
+    expect(missing.sort()).toEqual([
+      '@vitest/browser',
+      '@vitest/browser-playwright',
+      'chromium',
+      'playwright',
+    ]);
   });
 
   it('touches only the injected functions (no browser launch, no network)', () => {
@@ -104,9 +122,9 @@ describe('detectMissingPrereqs (launch-free detection)', () => {
       },
     };
     detectMissingPrereqs(deps);
-    // Exactly two package resolutions + one path existence check — no
+    // Exactly three package resolutions + one path existence check — no
     // subprocess, no browser launch, no network.
-    expect(resolveCalls).toBe(2);
+    expect(resolveCalls).toBe(3);
     expect(pathCalls).toBe(1);
   });
 });
@@ -114,12 +132,18 @@ describe('detectMissingPrereqs (launch-free detection)', () => {
 // ── buildRemediationMessage ────────────────────────────────────
 
 describe('buildRemediationMessage (actionable remediation)', () => {
-  const allMissing: MissingPrereq[] = ['playwright', '@vitest/browser', 'chromium'];
+  const allMissing: MissingPrereq[] = [
+    'playwright',
+    '@vitest/browser',
+    '@vitest/browser-playwright',
+    'chromium',
+  ];
 
   it('lists every missing prerequisite', () => {
     const msg = buildRemediationMessage(allMissing, 'linux');
     expect(msg).toContain('playwright');
     expect(msg).toContain('@vitest/browser');
+    expect(msg).toContain('@vitest/browser-playwright');
     expect(msg).toContain('chromium');
   });
 

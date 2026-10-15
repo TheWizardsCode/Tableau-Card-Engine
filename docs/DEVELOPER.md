@@ -5,6 +5,7 @@ This document covers everything you need to develop, test, and build the Tableau
 ## Table of Contents
 
 - [Environment Setup](#environment-setup)
+- [Dependency Updates (Dependabot)](#dependency-updates-dependabot)
 - [Running Locally](#running-locally)
 - [Building for Production](#building-for-production)
 - [Config-Driven Game Catalogue](#config-driven-game-catalogue)
@@ -15,7 +16,9 @@ This document covers everything you need to develop, test, and build the Tableau
 - [Project Structure](#project-structure)
 - [Path Aliases](#path-aliases)
 - [Adding an Example Game](#adding-an-example-game)
+- [Game Repository Setup & Publication](#game-repository-setup--publication)
 - [Runtime Game Plugins](#runtime-game-plugins)
+- [Card Packs](#card-packs)
 - [Hand & Pile Rendering](#hand--pile-rendering)
 - [Animation & Sound Feedback for Player and AI Actions](#animation--sound-feedback-for-player-and-ai-actions)
 - [Example Games](#example-games)
@@ -39,7 +42,7 @@ This document covers everything you need to develop, test, and build the Tableau
 
 **Prerequisites:**
 
-- Node.js 18+ (LTS recommended)
+- Node.js 20.9+ (matches CI; required by `vitest@4` and `sharp@0.35`)
 - npm 9+ (ships with Node.js 18+)
 - Git
 
@@ -50,6 +53,17 @@ npm install
 ```
 
 This installs Phaser 4.0.0-rc.7 as a runtime dependency and TypeScript, Vite, and Vitest as dev dependencies.
+
+### Dependency Updates (Dependabot)
+
+Scheduled dependency updates are configured in [`.github/dependabot.yml`](../.github/dependabot.yml):
+
+- **npm** (weekly, Mondays) — opens grouped update PRs for the test toolchain (`vite` / `vitest` / `@vitest/*`), TypeScript + ESLint tooling, and Phaser, plus individual PRs for the rest.
+- **github-actions** (weekly, Mondays) — keeps the workflows in `.github/workflows/` current.
+
+`vite` and `vitest` are grouped deliberately: `@vitest/browser` and `@vitest/browser-playwright` pin an **exact** `vitest` peer version, so they must move together or the browser test suite fails to resolve the provider.
+
+> Dependabot alerts (security advisories) are enabled at the repository-settings level; this file configures the scheduled **version** updates. Both feed the same dependency hygiene the `sharp` / `vitest` remediation (CG-0MV2L5H25009SNNE) addressed.
 
 ## Running Locally
 
@@ -85,15 +99,21 @@ This refreshes the committed module at
 WAV/JSON/metadata outputs to `build/tf-synths/`. The committed module is the
 single source of truth for shipped builds.
 
-**Runtime activation.** The sibling app's loader
-(`../tce-main-street/src/tf/mainStreetTfModule.ts`) resolves the module
-asynchronously after scene boot and attaches it to `SoundManager` via
-`createTfPlayer()` / `setSynthIntegration()`. Once settled,
-`SoundManager.isSynthActive()` is `true`, the debug **ToneForge** entry reports
-`Active`, and the entry can toggle synthesis at runtime without a scene
-restart. A load/normalisation failure logs a `console.warn` with the reason and
-retains diagnostics (`getMainStreetTfDiagnostics()`) that the scene forwards to
-`SoundManager.setSynthDiagnostics()`.
+**Runtime activation (opt-in).** ToneForge is **off by default**
+(MS-0MV76P7BN00164RF): `SoundManager` accepts `synthPlayer` / `synthKeyMap`
+options but does **not** attach them at construction, so
+`SoundManager.isSynthActive()` is `false` and playback uses the WAV/Phaser path
+until synthesis is explicitly enabled (`enableSynth()` / `setSynthIntegration()`).
+The sibling app opts in per session from the dev-only **ToneForge** debug entry:
+enabling it lazily calls the loader
+(`../tce-main-street/src/tf/mainStreetTfModule.ts` and
+`loadMainStreetTfIntegration()`), which attaches the module via
+`createTfPlayer()` / `setSynthIntegration()`. Once attached,
+`SoundManager.isSynthActive()` is `true` and the entry can toggle synthesis at
+runtime without a scene restart. Nothing is fetched or attached on the boot
+path. A load/normalisation failure logs a `console.warn` with the reason and
+retains diagnostics (`getMainStreetTfDiagnostics()`) that the loader forwards to
+`SoundManager.setSynthDiagnostics()` so the status line stays loud.
 
 **Missing-factory fallback.** A logical key mapped to a factory the module does
 not ship is **never silently dropped**: `tfAdapter` reports whether it handled
@@ -151,13 +171,13 @@ shapes (the `1 game` and `all games` cases are the boundary distributions):
 | `configs/solo.json` | golf |
 | `configs/arcade.json` | golf, main-street |
 | `configs/deluxe.json` | feudalism, lost-cities |
-| `configs/full.json` | all eight games |
+| `configs/full.json` | all nine games |
 
 **Per-game presets** (`configs/<game-id>.json`) each select exactly one game,
 so `GAMES_CONFIG=<game-id>` builds or runs just that game (plus the
 always-present Gym) for a fast development loop — for every example game
 (`beleaguered-castle`, `blackjack`, `coloretto`, `feudalism`, `golf`,
-`lost-cities`, `main-street`, `sushi-go`). Per-game presets are additive: the
+`lost-cities`, `main-street`, `sushi-go`, `the-rising`). Per-game presets are additive: the
 distribution presets above are unchanged.
 
 Presets live in `configs/`, are **data only**, and list the sibling game repos
@@ -314,7 +334,7 @@ generated PNG/ICO/ICNS variants.
 npm run generate:icons   # regenerate every variant from public/favicon.svg
 ```
 
-`scripts/generate-app-icons.ts` rasterises the emblem with `sharp` (`^0.33.0`, an
+`scripts/generate-app-icons.ts` rasterises the emblem with `sharp` (`^0.35.5`, an
 existing dependency) and writes:
 
 | Artefact | Size | Purpose |
@@ -419,7 +439,7 @@ module (graceful degradation).
 | `electron/steam-follow-ipc.ts` | Channel names + handler table (pure) wired to `ipcMain` in `main.ts`. |
 | `electron/bonus-catalog.ts` + `electron/bonus-catalog.json` | Config-driven bonus catalog; `bonusGameId` designates the unlocked game. |
 | `src/ui/steam-follow-client.ts` | Renderer client over the `window.tce.steamFollow` bridge (never imports the SDK). |
-| `src/ui/steam-lock.ts` | Pure lock computation for the Game Selector (`computeSteamLocks` / `applySteamLocks`). |
+| `src/ui/steam-lock.ts` | Pure unified lock computation for the Game Selector (`computeSteamLocks` / `applySteamLocks`) and the shared game/DLC predicate (`isTargetUnlocked` / `isDlcUnlocked`). |
 
 **Private credentials (never committed).** The Steam App ID and the
 developer's SteamID64 are read from, in priority order:
@@ -495,7 +515,171 @@ listed games render locked ("Reserved for a future milestone"). Games absent
 from the catalogue are base content and never locked. In a plain browser there
 is no bridge, so nothing is locked and the web app stays fully functional.
 
+The lock computation is generalised to consume the **unified unlock state**
+(`CG-0MUZGBTD1007G84S`): the follow status plus the targets unlocked by the
+platform-action/achievement rules. `main.ts` folds every persisted
+`contentUnlocks` record's target into `computeSteamLocks`, so a catalogue entry
+gated by an action-reward rule (`gatedBy`) unlocks when its rule is satisfied.
+The same pure predicate (`isTargetUnlocked`, with the DLC convenience wrapper
+`isDlcUnlocked`) answers game **and** DLC targets, so the Game Selector and an
+in-game DLC gate read one source of truth. An action-gated-but-locked entry
+shows an action message; a missing/empty/malformed state locks nothing extra and
+never throws.
+
 **Manual real-Steam QA:** see [Steam follow-to-unlock — manual E2E QA](dev/steam-follow-qa.md).
+
+### Action-reward config and drift validator
+
+The follow-to-unlock mechanism is generalised into **platform-agnostic
+action rewards** (`CG-0MUZF156A007OUIT`): any action on any platform can unlock
+any target. The declarative data lives in `electron/action-rewards.json` and is
+guarded against drift by `electron/action-rewards-config.ts`.
+
+**`electron/action-rewards.json`** declares, as data only:
+
+- `rules` — the unified `UnlockRule` model (`trigger.kind:
+  'platform-action' | 'achievement'`, `target.kind: 'game' | 'dlc'`).
+- `actionUrls` — `ruleId` → the page the player visits to perform the action.
+- `verifiers` — the `ActionVerifierConfig` resolution map (rule → action →
+  platform → default); a platform with no detection API resolves to the
+  `manual-self-attest` verifier.
+
+Nothing in the reward logic hard-codes a game title, platform, action, or URL —
+retargeting a reward is a config edit. The shipped rule is `itchio-follow`
+(itch.io follow → the designated bundled `golf` game), consistent with the
+`gatedBy` entry in `electron/bonus-catalog.json`.
+
+**`electron/action-rewards-config.ts`** loads the file (returning `null` on
+missing/corrupt config — never throws) and exposes
+`validateActionRewardsConfig(config, registry)`. The registry is built with
+`buildActionRewardRegistry(catalog, verifierIds)` from the bonus catalog and the
+verifier registry, so validation is against the launcher's *real* capabilities.
+The validator rejects a rule whose **target** game is not in the catalog, whose
+game **scene** is not registered in the build, or that resolves to an
+unregistered **verifier**; it also rejects duplicate rule ids / `(platform,
+action)` pairs and a catalog `gatedBy` that names an unconfigured rule. The
+shipped config passes cleanly; unit tests live in
+`tests/platform-action-rewards/action-rewards-config.test.ts`.
+
+```bash
+npx vitest run --project unit tests/platform-action-rewards/action-rewards-config.test.ts
+```
+
+### Generalised content-unlock bridge (renderer read API)
+
+The generalised unlock state is exposed to the renderer through an **additive**
+context-bridge surface (`CG-0MUZGBSSQ009ISHG`, feature F5) — the legacy
+`window.tce.steamFollow` surface and every `steamFollow:*` channel are
+unchanged.
+
+| Module | Responsibility |
+|--------|----------------|
+| `electron/action-rewards-ipc.ts` | `ACTION_REWARD_CHANNELS` (`contentUnlocks:isUnlocked`, `contentUnlocks:getUnlocks`, `contentUnlocks:refresh`) plus the **total** handler table wired to `ipcMain` in `main.ts`. |
+| `electron/preload.cjs` | Exposes the additive `window.tce.contentUnlocks` bridge. |
+| `src/ui/content-unlock-client.ts` | Total client over the bridge (`isUnlocked(target)`, `getUnlocks()`, `refresh(options)`); the browser fallback reports "not unlocked" / `[]` and never throws. |
+
+**Total read API.** `isUnlocked({ kind: 'game', gameId })` and
+`isUnlocked({ kind: 'dlc', gameId, dlcId })` answer whether a target is
+unlocked; `getUnlocks()` returns every persisted record. In a plain browser (no
+Electron bridge) `contentUnlockClientFromWindow()` still returns a client whose
+`isUnlocked()` is `false` and `getUnlocks()` is `[]`, so a DLC/game gate never
+branches on the runtime and never crashes when the state cannot be read.
+
+**Scoped refresh.** `refresh(options)` re-evaluates the configured reward rules.
+`options.ruleIds` is an additive **scope filter** (only the named rules are
+evaluated; absent means every rule, `[]` means none) and
+`options.simulatePurchase` is the explicit dev/QA simulated-purchase signal
+consumed by `SimulatedPurchaseVerifier`. A scoped refresh therefore never
+self-attests an unrelated rule — see [Scoped simulated purchase](#scoped-simulated-purchase-devqa).
+
+```bash
+npx vitest run --project unit tests/platform-action-rewards/ tests/ui/content-unlock-client.test.ts
+```
+
+### Adding a platform, action, or verifier
+
+Rules are **data**. Adding a reward is normally a config edit, not a code change:
+
+1. **Add the rule** to `electron/action-rewards.json` under `rules` — a
+   `platform-action` trigger (`platform` + `action`) with a `game` or `dlc`
+   target. Add its URL to `actionUrls` (`ruleId` → the page the player visits).
+2. **Pick the verifier** in the same file's `verifiers` map. Resolution
+   precedence is rule id → `(platform, action)` → platform → `defaultVerifierId`
+   → the `manual-self-attest` fallback, so a platform with no detection API
+   needs no entry at all (it gets self-attest).
+3. **If a new verification method is needed**, implement `ActionVerifier`
+   (`electron/action-verifiers.ts`) — `id`, `label`,
+   `supportsAutomaticVerification()`, `openActionPage()`, and a **total**
+   `verify()` (never throws; degrade to `unavailable` so the UI offers
+   self-attest). Register it in the launcher's `ActionVerifierRegistry` and add
+   its id to the validator's `verifierIds`. Nothing else changes — the registry,
+   reward service, store, and IPC are untouched.
+4. **If the rule unlocks a catalogued game**, record the gating link as
+   `gatedBy: <ruleId>` on that entry in `electron/bonus-catalog.json`.
+5. **Validate.** `validateActionRewardsConfig(config, buildActionRewardRegistry(catalog, verifierIds))`
+   must report no drift (unknown target game/scene, unregistered verifier,
+   duplicate rule id/action, or a `gatedBy` naming an unconfigured rule). It is
+   asserted on the shipped config in
+   `tests/platform-action-rewards/action-rewards-config.test.ts` and exercised
+   end-to-end in `tests/platform-action-rewards/action-rewards-e2e.test.ts`.
+
+### Gating in-game DLC (cross-repo model)
+
+DLC is **content inside a game**, not a whole game, so its gate spans two
+repositories by design:
+
+- **Core repo owns the mechanism** — the unified `UnlockRule`/`UnlockTarget`
+  model, the `ContentUnlockStore`, the read API (`contentUnlockClientFromWindow()`),
+  and the pure, framework-free
+  [`createDlcGate`](../../src/core-engine/DlcGate.ts).
+- **Each game repo owns its DLC content and the gating call site.** The DLC is
+  identified by `{ kind: 'dlc', gameId, dlcId }`, where `dlcId` is owned by that
+  game's content definition — there is no central DLC registry. The gate is a
+  **pure, read-only check layered over the existing content-delivery path**
+  (`electron/content-locator.ts`); it does not change how DLC content is located.
+
+A game gates a content item through one call, injecting the renderer client as
+the reader (so the same code works in a plain browser, where it reports
+*not unlocked*):
+
+```ts
+import { createDlcGate } from '@core-engine/DlcGate';
+import { contentUnlockClientFromWindow } from '@ui/content-unlock-client';
+
+const client = contentUnlockClientFromWindow();
+const gate = createDlcGate({
+  gameId: 'main-street',
+  isUnlocked: (target) => client.isUnlocked(target),
+});
+
+if (await gate.isUnlocked('riverfront-pack')) {
+  // render / start the DLC content
+} else {
+  // render the documented locked-state presentation
+}
+```
+
+The gate is **total**: an absent reader, a throwing reader, a non-boolean
+result, or a malformed target all report *not unlocked* (`check()` returns
+`reason: 'locked' | 'unreadable'`), so a DLC whose state cannot be read is
+unreachable rather than fatal. The Game Selector's `isDlcUnlocked` predicate
+(`src/ui/steam-lock.ts`) reads the **same** unified state, so locked/unlocked
+results are consistent between the launcher and the game. The canonical proof
+is the Gym's `GymDlcUnlockScene`; per-game roll-out across the catalogue is
+tracked as follow-up work.
+
+### Self-attestation is an honour system (caveat)
+
+The default verifier for platforms with no public detection API (e.g. an
+itch.io follow) is `manual-self-attest`: the player clicks through to the
+action page and then confirms they completed it. This is **trivially
+bypassable** — the unlock is not cryptographically tied to the action. It is
+accepted as a deliberate trade-off: verification is a pluggable seam, so a
+specific platform can later be upgraded to API/OAuth detection without
+changing the unlock flow, store, or IPC. Never present a self-attested reward
+as an automatically verified one, and never fabricate an unlock when no
+verifier can run (the service reports `verification-unavailable` and offers the
+self-attest path instead).
 
 ### Steam achievements (Steamworks)
 
@@ -692,7 +876,7 @@ Tests use [Vitest](https://vitest.dev/) with projects configured inline in `vite
 | `browser` | Chromium (Playwright) | `tests/**/*.browser.test.ts` (excludes tutorial E2E) | All non-tutorial Phaser UI and rendering tests (requires [browser test setup](#browser-test-setup)) |
 | `tutorial-part1..6` | Chromium (Playwright, one per part) | `tests/e2e/main-street-tutorial-e2e-part{1-6}.browser.test.ts` | Main Street tutorial E2E tests (each in own browser instance; requires [browser test setup](#browser-test-setup)) |
 
-All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using `@vitest/browser` with the Playwright provider.
+All projects run via `npm test`. The browser and tutorial projects run in headless Chromium using Vitest browser mode: `@vitest/browser` provides the browser runtime and `@vitest/browser-playwright` supplies the Playwright provider (both are pinned to the same `vitest` version).
 
 The tutorial E2E tests are split into 6 part files (1-6 tests per file). Each part is a separate Vitest project with its own uniquely-named browser instance (`t1` through `t6`) to prevent the Phaser 4 RC GPU/Canvas context exhaustion that occurs after ~8 game create/destroy cycles in a single browser process. The runner script `scripts/run-tutorial-tests.sh` invokes each project sequentially.
 
@@ -1051,6 +1235,7 @@ Run `npm run test:smoke` (or `npx vitest run --project smoke`) for rapid feedbac
 - `tests/coloretto/ColorettoScene.browser.test.ts` (Coloretto core)
 - `tests/sushi-go/SushiGoIcons.browser.test.ts` (Sushi Go rendering)
 - `tests/lost-cities/LostCitiesRoundEnd.browser.test.ts` (Lost Cities flow)
+- `tests/the-rising/the-rising-smoke.browser.test.ts` (The Rising scene boots)
 - `tests/core-engine/SvgHelpers.browser.test.ts` (Core SVG pipeline)
 - `tests/ui/HelpPanel.browser.test.ts` (UI chrome)
 - `tests/gym/GymSceneSmoke.browser.test.ts` (All gym scenes boot)
@@ -1075,6 +1260,7 @@ Run `npm run test:dev` (or `npx vitest run --project dev`) for a more comprehens
 - BC key E2E: `BeleagueredCastleOverlay`, `BeleagueredCastleTurnController`, `BeleagueredCastleLayout`
 - Sushi Go key E2E: `SushiGoIcons`, `SushiGoOverlay`, `SushiGoTableauRendering`
 - Lost Cities key E2E: `LostCitiesRoundEnd`, `LostCitiesOverlayAlignment`
+- The Rising key E2E (sibling `../tce-the-rising`): `the-rising-smoke`, `the-rising-interaction`, `the-rising-overlay`
 - Coloretto: `ColorettoScene`
 - HandView: `gym-handpile-drag`, `gym-handpile-cancel`
 - Gym: `GymDeckRngScene`, `GymOverlayUiScene`
@@ -1136,7 +1322,8 @@ The `browser` and `tutorial-part1..6` projects run in headless Chromium via Play
 **Required dependencies** (already in `package.json` devDependencies):
 
 - `playwright` — Playwright driver that launches Chromium
-- `@vitest/browser` — Vitest browser-mode provider (must match the `vitest` version)
+- `@vitest/browser` — Vitest browser-mode runtime (must match the `vitest` version)
+- `@vitest/browser-playwright` — the Playwright provider factory (must match the `vitest` version); Vitest 4 moved the provider out of `@vitest/browser` into its own package
 
 **Install Chromium:**
 
@@ -1570,7 +1757,27 @@ When migrating an existing game to the canonical pattern:
 
 ## Adding an Example Game
 
+> **Canonical guide:** the full end-to-end lifecycle — concept/ideation,
+> intake/planning, repo scaffold, architecture/implementation (SLL, HUD,
+> audio/SFX, reduced motion, persistence, AI), testing profiles, CI/release,
+> registration, assets/licensing, docs and publication — now lives in
+> [**Creating a New Game**](dev/creating-a-new-game.md). Start there. Its
+> [definition-of-done pointer](dev/creating-a-new-game.md#definition-of-done)
+> leads to the single authoritative compliance checklist.
+>
+> **Deep dives:** [Multi-Repo Architecture](dev/multi-repo-architecture.md) ·
+> [Config-Driven Game Catalogue](dev/game-configuration.md) ·
+> [Per-game `src/` layout](dev/per-game-src-layout-decision.md) · [Repo
+> publication decision](dev/repo-publication-decision.md).
+
 > **Note:** For engine feature demonstrations (not full games), add a demo scene to the **Gym** instead of creating a new example game. See [Gym documentation](../example-games/gym/README.md) and [Gym scene index](gym/GYM_INDEX.md).
+
+## Game Repository Setup & Publication
+
+The detailed repo-layout, scaffold and publication reference behind the
+lifecycle guide's stages 3, 7, 8 and 10. The lifecycle framing itself lives in
+[Creating a New Game](dev/creating-a-new-game.md); this section is the
+technical deep dive.
 
 ### Repo layout
 
@@ -1991,6 +2198,245 @@ scenarios are in the
 > backend cannot play — so a runtime game boots and plays without the launcher
 > having been rebuilt with its assets.
 
+## Card Packs
+
+Card packs are the card-level sibling of [runtime game plugins](#runtime-game-plugins): a
+distribution operator drops a pack into the launcher's content directory to
+extend an already-installed game with new cards and art, without rebuilding the
+launcher (feature `CG-0MUZFD1WR0031QTB`; Main Street is the first consumer). A
+pack is a manifest + a CSV fragment in the **game's existing card schema** +
+optional assets, merged into the base pool at load time. Packs are additive and
+may be entitlement-gated (Steam DLC). For the full lifecycle walk-through, see
+the [card-packs runbook](dev/card-packs-runbook.md) (authoring → building →
+installing → gating).
+
+### Pack layout
+
+```
+<contentDir>/packs/
+  manifest.json                 # pack catalogue ({ version, packs[] })
+  <gameId>/<packId>/
+    cards.csv                   # CSV fragment (same header as the base pool)
+    assets/…                    # pack art, served over tce-packs://
+```
+
+Each manifest entry declares `id`, `gameId`, `title`, `description`, `version`,
+`coreEngineVersion` (a semver range), `cards`, optional `assets`, and optional
+`entitlement.steamAppId`. The contract lives in
+`src/core-engine/CardPackManifest.ts`; the merge seam that turns base + packs
+into one pool is `src/core-engine/CardPackMerge.ts`. The renderer discovers
+packs with `src/ui/CardPackLoader.ts` and resolves pack assets through the
+`tce-packs://` protocol (`src/ui/card-pack-url.ts`, `electron/pack-protocol.ts`).
+
+### Loading a pack
+
+The renderer discovers a game's packs with `loadCardPacks`
+(`src/ui/CardPackLoader.ts`) from the launcher-resolved content directory:
+
+1. Read `<contentDir>/packs/manifest.json` through `fetch`.
+2. Parse and validate it (`parseCardPackManifest`) — never throws.
+3. Filter to the running game (`filterPacksByGameId`) and partition by core
+   compatibility (`splitPacksByCompatibility`).
+4. Resolve entitlement for the compatible batch through the injected resolver.
+5. Fetch each entitled pack's CSV fragment over
+   `tce-packs://<gameId>/<packId>/<cards>` and expose its `assets` as resolved
+   `tce-packs://` URLs. Each declared asset's bytes are then read through the
+   injectable `fetchAsset(url) => Promise<Uint8Array>` transport (default
+   `fetch` + `arrayBuffer`) and inlined as `data:<media>;base64,…` URIs keyed
+   by card id (the asset filename stem) on `LoadedCardPack.assetDataUris`. A
+   missing/unreadable/malformed asset is reported structurally and omitted —
+   never thrown — so a game that rasterises faces from a `data:` URI can render
+   a pack's bespoke art without a game-local art map.
+
+The loader is **environment-injected** (`contentDir`, `gameId`,
+`engineVersion`, `fetchManifest`, `fetchCsv`/`importer`, `fetchAsset`,
+`resolveEntitlement`), so it is unit-testable without Electron, a network, or a
+real content directory. Main Street calls `bootstrapMainStreetCardPacks()`
+**before scene setup**, so the first deal already includes pack cards; a game
+feeds the returned packs to the core merge seam
+([`mergeCardPackCsv`](../src/core-engine/CardPackMerge.ts), see below).
+
+### Pack sources (additive, game-side)
+
+The loader's `contentDir` / `fetchManifest` / `fetchCsv` / `fetchAsset` options
+are **environment seams**, so a game can supply card-pack content from a source
+other than the Electron content directory **without changing this loader** —
+the transports are the only coupling. Main Street is the worked example (all
+changes are game-side; `src/ui/CardPackLoader.ts` is untouched):
+
+- `src/MainStreetPackSources.ts` defines a `PackSource` (a stable `id` plus
+  `readPackFile(path)` and an optional `resolvePackFileUrl(path)`) and an
+  ordered `PackSourceRegistry`. The registry is consulted in registration order
+  and is **total** — an unknown pack ref, a missing file, a rejecting source or
+  an empty registry all resolve to `null`, and the loader degrades to base
+  content.
+- `createBundledPackSource()` is the first source: it bakes the game's committed
+  `packs/` tree into the build with Vite `import.meta.glob` (`?raw` for the
+  manifest and CSVs, `?url` for asset binaries), so the web build needs no
+  content-directory copy step.
+- `createPackSourceTransports(registry)` adapts a registry to the loader's
+  `fetchManifest` / `fetchCsv` / `fetchAsset` callbacks, mapping the loader's
+  `tce-packs://` URLs to packs-relative paths so the browser path issues **no
+  `tce-packs://` request**. Explicit transports always win, which keeps the
+  Electron content-directory path byte-for-byte unchanged.
+
+**Adding a source additively.** Implement `PackSource` (return `null`, never
+throw), then register it **after** the sources it should defer to
+(`registry.add(mySource)`, or construct
+`new PackSourceRegistry([bundled, mySource])`). Registration is idempotent by
+`id` and never removes or reorders existing sources, so adding a source cannot
+change the ones already present. A **same-origin** source reads `<base>/packs/…`
+with `fetch`; a **remote** source fetches a hosted bundle by URL. Either way the
+renderer loader, the merge seam and the in-game listing stay unchanged. Remote
+hosting is follow-up work (`MS-0MV26X8T200852AC`); because a remote pack injects
+card rows it adds a supply-chain surface, so future remote sources need
+signing/hashing plus the content-unlock gate.
+
+### Pack art (self-containment)
+
+A pack's declared `assets/<cardId>.png` are the only art it needs; the game's
+generated base art map is **not** a pack dependency. The loader inlines each
+asset as a `data:` URI (`LoadedCardPack.assetDataUris`, keyed by card id), so a
+game that rasterises card faces from a `data:` URI (Phaser SVG textures) can
+render the pack's bespoke art directly. The transport is environment-injected
+and contains **no scheme-specific branching**, so the same path works for
+Electron `tce-packs://` URLs (read by `electron/pack-protocol.ts`) and for the
+bundled browser asset URLs supplied by `MS-0MV1O7EGG004MWGD`.
+
+The game owns the render-time registry: Main Street registers the inlined URIs
+in `src/MainStreetCardPackArt.ts` during `bootstrapMainStreetCardPacks()` —
+before `MainStreetSvgTextureManager` generates textures — and resolves a card
+with `getCardArtDataUriForCard(cardId, cardName)`: pack registry → base
+name-keyed map → `Fallback`. Degradation is graceful: a pack that fails to load
+leaves the registry base-only, and a missing asset makes that card fall through
+to the base map and then `Fallback` with a logged warning — never a crash or a
+blank face.
+
+### Entitlement
+
+A pack with no `entitlement` is **free** base content. A pack gated on Steam
+DLC is resolved by the main-process seam
+(`electron/card-pack-entitlements.ts`): a pure `PackEntitlementSource` interface
+with a deterministic `FakeEntitlementSource` and a real Steamworks adapter
+(`electron/card-pack-entitlements-steamworks.ts`, dynamic optional import +
+`apps.isDlcInstalled` capability detection). The pack → DLC app-id mapping is
+**data** (`electron/card-pack-dlc-catalog.json`), never hard-coded, and resolves
+by exact `(packId, gameId)` → wildcard `packId` → the pack's own manifest
+`entitlement.steamAppId` (`electron/card-pack-catalog.ts`).
+
+The renderer never imports the SDK; a total read client
+(`src/ui/card-pack-client.ts`, `cardPackClientFromWindow()`) reads status
+through the `window.tce.cardPacks` bridge
+(`electron/preload.cjs` → `electron/card-pack-ipc.ts`). Each pack resolves to
+`free`, `unlocked` or `locked`:
+
+| State | Meaning |
+|-------|---------|
+| `free` | No entitlement declared; enabled by default. |
+| `unlocked` | Gated and the DLC is owned; enabled by default, toggleable. |
+| `locked` | Gated and not owned / Steam unavailable / no DLC API; read-only with a reason. |
+
+Lock reasons: `Requires Steam DLC <appId>.`, `Steam is unavailable.`, or
+`Pack bridge unavailable.` In a plain browser (no bridge) an ungated pack reads
+`free` and a gated pack `locked`, so the web build plays base content and never
+crashes. A capability gap (a binding with no DLC API) is never treated as
+entitlement — the pack stays locked; the launcher never fabricates an unlock.
+
+### Content-unlock entitlement (game-side composition)
+
+A pack may also be gated on the launcher's **unified content-unlock store**
+(`dlc:<gameId>:<packId>`) rather than (or in addition to) Steam DLC. The
+composition lives on the **game side** — the core loader's `resolveEntitlement`
+seam is unchanged — so each game decides which packs are content-unlock gated as
+**data**. Main Street is the worked example:
+`src/MainStreetContentUnlockGate.ts` declares `main-street-residential-pack`
+gated on `dlc:main-street:main-street-residential-pack` and composes the store
+on top of the Steam-DLC status via `composeContentUnlockEntitlement`; only
+declared packs are affected, and the composition is **total** (a
+missing/throwing bridge leaves a gated pack locked rather than crashing boot).
+
+### Scoped simulated purchase (dev/QA)
+
+To exercise the lock → unlock path without a storefront, the launcher ships a
+config-driven, **rule-scoped simulated purchase**. The rule is data in
+`electron/action-rewards.json`:
+
+| Field | Value |
+|-------|-------|
+| rule id | `main-street-residential-pack-purchase` |
+| trigger | platform-action `dev` / `simulate-purchase` |
+| target | `dlc:main-street:main-street-residential-pack` (key `dlc:main-street:main-street-residential-pack`) |
+| verifier | `simulated-purchase` (resolved by the `dev:simulate-purchase` action key) |
+
+`SimulatedPurchaseVerifier` (`electron/action-verifiers.ts`) verifies **only**
+when a caller explicitly requests `simulatePurchase: true` — a plain
+`refresh({ attested: true })` never unlocks the pack. `ActionRewardService.refresh`
+accepts an additive `ruleIds` scope filter plus the `simulatePurchase` signal,
+carried through the `contentUnlocks:refresh` IPC handler
+(`electron/action-rewards-ipc.ts`) → `electron/preload.cjs` → the renderer
+`ContentUnlockClient.refresh()` (`src/ui/content-unlock-client.ts`). A scoped
+refresh evaluates only the named rule, so the purchase never collateral-unlocks
+an unrelated reward (e.g. the itch.io golf follow). The reusable in-game listing
+exposes it as an optional `[ Purchase ]` row action
+(`src/ui/CardPackListing.ts` → `onPurchase`/`purchasablePackIds`).
+
+### Degradation
+
+Every card-pack layer is **total** — a failure degrades to base content rather
+than crashing the game. A missing/malformed manifest is reported structurally;
+an incompatible pack is hidden from play and listed with a reason; a gated pack
+that is not owned is listed locked and its cards are absent; a fragment whose
+header does not match the base schema, or that contributes a duplicate card id,
+is dropped **whole** (never partially merged).
+
+Main Street additionally persists the active pack set (`activePacks: { id,
+version }[]`) and the merged `csvChecksum` / `csvData` with every save. On load
+the merged CSV is restored from the save, a pack named in the save but not
+active produces a `missing`/`disabled` warning and play continues on base
+content, and the game refuses to resume **only** when a live card instance needs
+a missing template (`MissingCardPackTemplateError`). `mergeMainStreetCardPool()`
+is the single merge entry point that feeds `loadTemplatesFromCsv()`.
+
+### Producing a pack
+
+The reference builder validates an authored pack source tree, copies its real
+(non-symlink) files, and merges its manifest entry into an installable packs
+root:
+
+```bash
+npm run build:card-pack -- --input tests/fixtures/reference-packs/main-street
+```
+
+It writes `build/card-packs/packs/manifest.json` (upserted, not overwritten)
+and `build/card-packs/packs/<gameId>/<packId>/` (the CSV fragment + copied
+assets). Symlinks are skipped — they point at shared core assets the launcher
+already ships (the same `copyGameOwnedAssets` convention as
+`build:game-artifact`). A pack whose CSV header is invalid is rejected whole and
+reported; an invalid manifest refuses the build. Copy
+`build/card-packs/packs/` into `<contentDir>/packs/` to install the packs.
+
+The **reference pack** is the Main Street Foundations pack at
+`tests/fixtures/reference-packs/main-street/` — one business, one event and one
+upgrade card plus two art assets. It is the worked example for the contract and
+is built and asserted by `tests/scripts/build-card-pack.test.ts`.
+
+> A pack's CSV fragment must reuse the *base game's* header exactly; the merge
+> rejects a fragment whose header differs. Duplicate card ids across the base
+> and the packs are reported as structural conflicts, and the offending pack is
+> dropped whole.
+
+### Manual QA
+
+The step-by-step lifecycle runbook — **authoring → building → installing →
+gating**, with the reference pack as a worked example — is
+[`docs/dev/card-packs-runbook.md`](dev/card-packs-runbook.md).
+
+The automated suite covers the contract, loader, merge, entitlement, listing and
+save/load policy. The parts that need a packaged Electron run, a real content
+directory and (for the locked case) a real Steam DLC app id are covered by the
+[card-packs manual QA plan](dev/card-packs-qa.md) (installed/entitled,
+present/locked, missing).
+
 ## Hand & Pile Rendering
 
 **Requirement:** Example games **must** render hands and piles through the core engine's hand-management code — `HandView`, `PileView`, and related helpers such as `flipCard()`. Hand-rolling card rows with manual sprite arrays and hardcoded positioning is not an accepted pattern; using the shared components means engine improvements (animations, reduced-motion fallbacks, DPR-aware textures, selection) propagate to every game automatically.
@@ -2051,6 +2497,7 @@ Open `http://localhost:3000` and click the desired game card. Each game also has
 | Lost Cities | `../tce-lost-cities/` | Two-player expeditions, two-phase turn model (play/discard then draw), ascending-play rules, investment multipliers (x2/x3/x4), multi-round match scoring, procedurally generated SVG card assets | `tests/lost-cities/` (6 files) |
 | Main Street | `../tce-main-street/` | Single-player tableau builder, responsive 2x5 grid layout, SLL integration, ToneForge audio adapter, Monte Carlo balance testing, tutorial scene | `tests/main-street/` |
 | Coloretto | `../tce-coloretto/` | Set-building tableau (take-a-row mechanic), custom card types, canonical set-collection scoring (1=1,2=3,3=6,4=10,5=15,6+=21) with positive/negative color selection, wild joker cards (declared per-joker to a color at scoring, with colour-coded declaration chips in the round-end picker) and flat +2 bonus cards in the full 49-card deck, multi-round cumulative scoring with canonical winner tie-breaks (most single-round wins, then highest single-round score), randomized turn order with the canonical per-round start-player rule (most cards taken; ties to the most recent row take), Random/Heuristic AI strategies, SLL layout, transcript recording. Scene decomposed into helpers: `ColorettoRenderer` (board + animations), `ColorettoInputHandler`, `ColorettoAiScheduler`, `ColorettoOverlays` | `tests/coloretto/` (7 files) |
+| 1916: The Rising | `../tce-the-rising/` | Single-player commemorative solitaire: ordered-lane timeline placement (Lost-Cities-style legality via `LegalityResult`), a determinism-checked conversation/encounter overlay, a Memory economy (`EconomyLedger`), a Rising clock, difficulty presets, transcript recording (`TranscriptRecorderBase`), versioned save/load (`SaveLoadStore`) + checkpoints, undo/redo, SLL layout, sourced historical content | `tests/the-rising/` (9 files: 6 unit + 3 browser) |
 
 ### Lost Cities card assets
 
@@ -2244,7 +2691,10 @@ truth; the `_64_x_64.png` files are superseded legacy thumbnails). Run
 plus spelling aliases and a `Fallback` entry); the script downscales each
 1024×1024 sprite to 256×256 and re-encodes it as lossy WebP (quality 90),
 which keeps the inline map small (~0.6 MB) despite carrying 16× the pixels of
-the old 64×64 PNG map.
+the old 64×64 PNG map. The map is **base-pool only**: a card pack's sprites are
+not baked into it (see [Pack art (self-containment)](#pack-art-self-containment))
+— Main Street emits the pack's own `assets/<cardId>.png` from those sprites with
+`npm run generate:pack-assets`.
 Both `MainStreetCardArt.ts` (runtime CSV generator) and
 `scripts/generate-main-street-card-svgs.mjs` (static SVGs) consume the map.
 Cards without dedicated art use the `Fallback` sprite.
@@ -2786,6 +3236,7 @@ Games with layout files and adapters ready for renderer integration:
 | Feudalism | `../tce-feudalism/src/layouts/feudalism.layout.json` | `../tce-feudalism/src/scenes/FeudalismLayoutAdapter.ts` |
 | Sushi Go | `../tce-sushi-go/src/layouts/sushi-go.layout.json` | `../tce-sushi-go/src/scenes/SushiGoLayoutAdapter.ts` |
 | Lost Cities | `../tce-lost-cities/src/layouts/lost-cities.layout.json` | `../tce-lost-cities/src/scenes/LostCitiesLayoutAdapter.ts` |
+| 1916: The Rising | `../tce-the-rising/src/layouts/rising.layout.json` | `../tce-the-rising/src/scenes/TheRisingLayoutAdapter.ts` |
 
 ### Main Street canonical example
 
@@ -2851,9 +3302,15 @@ Location: `../tce-main-street/src/scenes/UpgradeOverlaySpec.ts`
 
 This is a **pure data module** with no Phaser or runtime dependencies. It defines three interfaces:
 
-- **`OverlayTextSpec`** – Describes a text overlay with `text`, `x`, `y`, `fontSize`, `color`, and `fontStyle` properties.
-- **`OverlayBorderSpec`** – Describes a border/glow overlay with `color` (hex number) and `strokeWidth` (pixels).
-- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `cashLine`, `reputationText`, and `upgradeBorder`.
+- **`OverlayTextSpec`** – Describes a text overlay with `text`, `x`, `y`, `fontSize`, `color`, and `fontStyle` properties (plus optional per-segment colouring for the two-tone cash line).
+- **`OverlayAccentSpec`** – Describes the top-left corner upgrade accent with container-local `x`, `y`, `width`, `height`, `color`, and `alpha`.
+- **`OverlayShaderEffectSpec`** – Describes the Canvas-compatible shader-style upgrade accent: ordered gradient `colourStops`, `animationDurationMs`, `animationEasing`, the `staticForm` flag, and the sheen/highlight render parameters (`sheenAlpha`, `highlightColour`, `highlightAlpha`, `highlightBand`).
+- **`UpgradeOverlaySpec`** – Combines all overlay elements: `levelBadge`, `levelAccent`, `cashLine`, `reputationText`, and `shaderEffect`.
+
+The module also exports the pure, Phaser-free helpers `sampleShaderGradient()`
+(linear interpolation across the gradient stops), `wrapShaderPhase()` and
+`circularDistance()` (seamless sweep maths) and `shouldAnimateShaderEffect()`
+(reduced-motion / replay gating).
 
 > **Note (CG-0MT24MHGZ0025O20):** The upgraded business **name is not part of
 > the overlay spec** — per manual review it must render as part of the card
@@ -2866,24 +3323,25 @@ The key function is `buildUpgradeOverlaySpec(biz: BusinessCard, width: number, h
 
 ```
 BusinessCard state ──► buildUpgradeOverlaySpec() ──► UpgradeOverlaySpec
-  (level, name,          (pure function,              (positioned text
-   baseIncome,            no Phaser deps)               specs + border
-   incomeBonus,                                          spec)
+  (level, name,          (pure function,              (positioned text,
+   baseIncome,            no Phaser deps)               accent + shader
+   incomeBonus,                                          effect specs)
    ongoingCost)
 ```
 
 **Logic:**
-- Base cards (`level === 0`): level badge and border are `null`; the cash line is populated when income or cost > 0.
+- Base cards (`level === 0`): every overlay field is `null` — the renderer skips overlay creation entirely, so base cards render identically to before.
 - Upgraded cards (`level > 0`): The non-name overlays are populated:
-  - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-right corner, 10px bold.
+  - **Level badge** — `"Lvl N"` in gold (`#ffdd44`), top-left corner, 10px bold.
+  - **Level accent** — small filled top-left corner rectangle (`0xffaa22`, 30×16) marking the upgrade now that the outer card frame carries the owner's colour (F4 of MS-0MUWNTN8W006C7EF).
+  - **Shader effect** — Canvas-compatible shader-style accent (`shaderEffect`): ordered gold → pale → warm-white → gold gradient stops (the warm-white foil stop makes the shard visibly brighter than the flat gold accent it accompanies), a moving white highlight band (`highlightColour`/`highlightAlpha`/`highlightBand`), deterministic shimmer animation parameters, and a `staticForm` flag. It is rendered as a named `ms-upgrade-shader` `Graphics` **corner shard** (a translucent right triangle filling the card's top-left quadrant, with a radial alpha falloff) confined to that quadrant — never a full-card stroke — and is the visual upgrade distinction (MS-0MUWNTQ5L0075Y38).
   - **Cash line** — `"+X / -Y"` (combined `baseIncome + incomeBonus` minus `ongoingCost`) rendered as **two-tone segments**: income in green (`#44ff44`), ongoing cost in red (`#ff6644`), with the ` / ` separator in neutral grey (`#dddddd`). The former `Cash:` prefix was removed by manual review (CG-0MTORJ5FS006B0UN) — the colouring carries the meaning. The renderer draws each segment as its own text object laid out side-by-side (`OverlayTextSpec.segments`, CG-0MTDMOYOL008IQVO). Centred, 11px bold. Shown only when income or cost > 0; zero components are omitted (e.g. `+2`, `-0.75`) (CG-0MTCP76MP0088TQW).
   - **Reputation text** — `"+R/turn"` in blue (`#88bbff`), below the cash line.
-  - **Upgrade border** — Golden stroke (`0xffaa22`), 3px width, around the card perimeter.
   - **Name** — NOT an overlay: baked into the card's SVG via a display-name variant texture (CG-0MT24MHGZ0025O20).
 
-#### Layer 2: Overlay Rendering (`MainStreetRenderer.applyUpgradeOverlays()`)
+#### Layer 2: Overlay Rendering (`applyUpgradeOverlays()`)
 
-Location: `../tce-main-street/src/scenes/MainStreetRenderer.ts` — `applyUpgradeOverlays()` method.
+Location: `../tce-main-street/src/scenes/MainStreetRendererStreet.ts` — `applyUpgradeOverlays()` function.
 
 This method reads the `UpgradeOverlaySpec` and creates Phaser game objects as children of the card's container:
 
@@ -2894,10 +3352,26 @@ UpgradeOverlaySpec ──► applyUpgradeOverlays() ──► Phaser text/graphi
 ```
 
 **Rendering order (back to front within the container):**
-1. Upgrade border (transparent fill, golden stroke) — drawn behind text but on top of card image.
-2. Level badge text (gold, top-right).
-3. Cash line text (two-tone: green income / red cost, centre, above reputation).
-4. Reputation text (blue, below cash line).
+1. Level accent (filled top-left corner rectangle) — the upgrade indicator that replaces the removed full-card border.
+2. Shader effect (`ms-upgrade-shader` `Graphics`) — a translucent diagonal gradient **corner shard** sampled from `shaderEffect.colourStops` with `sampleShaderGradient()`. The shard fills the card's top-left quadrant (a right triangle with a radial alpha falloff so the card art stays legible beneath it) plus a moving white highlight band, so it never becomes a full-card stroke and never masks the right-hand text column. The shipped gradient includes a warm-white foil stop, so the shard is visibly brighter than the flat gold accent at the same spot — the earlier same-colour gradient was invisible in manual review (MS-0MUWNTQ5L0075Y38).
+3. Level badge text (gold, top-left) — drawn after the accent/shader so the badge text stays legible on top.
+4. Cash line text (two-tone: green income / red cost, right-hand text column).
+5. Reputation text (blue, below cash line).
+
+**Motion:** when `shouldAnimateShaderEffect({ reducedMotion, replayMode })`
+is true the renderer tweens a phase value (`repeat: -1`, fixed
+duration/easing) whose `onUpdate` redraws the shard gradient with the highlight
+band sweeping seamlessly across it. With reduced motion enabled or in
+replay/headless mode the static gradient is drawn and **no** tween is created.
+The tween is killed when the card container is destroyed, so refreshes never
+leak tweens. The effect is presentation-only — it never mutates game state,
+transcript or replay output.
+
+**Owner-coloured outer border:** the full-card upgrade border has been removed
+(F4 of MS-0MUWNTN8W006C7EF). `drawBusinessSlot()` draws the card's outer frame
+in the owner's seat colour instead (transparent-filled, so it never obscures the
+card face), and the shader effect is confined to the top-left upgrade accent so
+the two never conflict.
 
 The upgraded card NAME is not an overlay — it is part of the card's SVG
 face (display-name variant texture, CG-0MT24MHGZ0025O20).
@@ -2914,8 +3388,10 @@ they have no overlay pipeline.
 // manager rasterises a display-name variant with the upgraded name baked in.
 mainStreetRenderCardSvg(s, cardContainer, biz.id, renderW, renderH, biz.displayName);
 
-// Apply the remaining upgrade overlays (level badge, cash line, rep, border)
-this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
+// Apply the upgrade overlays (level accent, shader effect, level badge,
+// cash line, reputation). The outer frame is the owner's seat colour,
+// drawn separately by drawBusinessSlot().
+applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ```
 
 ### Data Flow Diagram
@@ -2945,8 +3421,9 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 ┌─────────────────────┐     ┌─────────────────────────────┐
 │  Base SVG texture   │     │  buildUpgradeOverlaySpec()  │
 │  (cached, reused)   │     │  → levelBadge: "Lvl 2"      │
-│  + display-name     │     │  → cashLine: "+8"          │
-│  variant (upgraded) │     │  → upgradeBorder: gold 3px   │
+│  + display-name     │     │  → levelAccent: gold corner │
+│  variant (upgraded) │     │  → shaderEffect: shard       │
+│                     │     │  → cashLine: "+8"          │
 │                     │     │  (name is baked into the     │
 │                     │     │   variant texture, not here) │
 └─────────────────────┘     └──────────────┬──────────────┘
@@ -2955,7 +3432,8 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
                               ┌─────────────────────────────┐
                               │  applyUpgradeOverlays()     │
                               │  Creates Phaser objects:    │
-                              │  - Rectangle (golden border)│
+                              │  - Rectangle (level accent) │
+                              │  - Graphics  (shader shard) │
                               │  - Text (level, cash line, rep)│
                               └─────────────────────────────┘
 ```
@@ -2965,8 +3443,8 @@ this.applyUpgradeOverlays(cardContainer, biz, renderW, renderH);
 To add or modify upgrade overlays:
 
 1. **Modify `buildUpgradeOverlaySpec()`** in `UpgradeOverlaySpec.ts` to compute new overlay specs. Keep it pure — no Phaser imports.
-2. **Modify `applyUpgradeOverlays()`** in `MainStreetRenderer.ts` to create the corresponding Phaser objects.
-3. **Add unit tests** for `buildUpgradeOverlaySpec()` in `tests/main-street/UpgradeOverlaySpec.test.ts` (this file tests the pure spec builder, not Phaser rendering).
+2. **Modify `applyUpgradeOverlays()`** in `MainStreetRendererStreet.ts` to create the corresponding Phaser objects.
+3. **Add unit tests** for `buildUpgradeOverlaySpec()` in `tests/main-street/upgrade-overlay-spec.test.ts` (this file tests the pure spec builder, not Phaser rendering).
 
 **Example: Adding a star icon for level 3+ cards:**
 
@@ -2983,7 +3461,7 @@ const starIcon: OverlayTextSpec | null = biz.level >= 3
   ? { text: '\u2605', x: 4, y: Math.round(height / 2), fontSize: '16px', color: '#ffdd44' }
   : null;
 
-// In applyUpgradeOverlays() in MainStreetRenderer.ts:
+// In applyUpgradeOverlays() in MainStreetRendererStreet.ts:
 if (spec.starIcon) {
   const star = this.scene.add.text(spec.starIcon.x, spec.starIcon.y, spec.starIcon.text, {
     fontSize: spec.starIcon.fontSize, color: spec.starIcon.color,
@@ -3975,9 +4453,13 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
   debug-tools list by `CardGameScene.initSettingsPanel` (via
   `resolveEffectiveDebugTools`), so it appears even for games that supply their
   own `debugTools` list (e.g. Main Street) — no game-specific registration is
-  required. It is present whenever the scene has a `SoundManager`.
+  required. It is present whenever the scene has a `SoundManager`. (Main Street
+  supplies its own dev-only ToneForge entry with a lazy loader; the engine
+  de-duplicates by label, so that game-owned entry wins.)
 - **Function:** Reports whether ToneForge runtime synthesis is currently
-  active and toggles it on/off at runtime, **without a scene restart**:
+  active and toggles it on/off at runtime, **without a scene restart**. Synth
+  is **off by default** (MS-0MV76P7BN00164RF): the status starts `Inactive` and
+  no ToneForge chunk is fetched on the boot path.
   - **Live status text:** `Active` / `Inactive` plus the mapped factory count
     and, when one was recorded, the last module load error (e.g.
     `Inactive · 0 factories · load error: module exploded`). The text is a
@@ -3985,19 +4467,23 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
     poll while the panel is open, so an async module load or a toggle is
     reflected immediately without closing and reopening the panel.
   - **Toggle:** Clicking the label detaches the synth player/mapping when
-    synthesis is active (keys fall back to the existing WAV/Phaser path) and
-    restores the previously attached integration when inactive. No entry is
-    added when there is no `SoundManager`.
+    synthesis is active (keys fall back to the existing WAV/Phaser path). When
+    inactive it **opts in**: a game may supply a `loadIntegration` loader
+    (Main Street does) that lazily loads + attaches the now-active integration;
+    otherwise the tool re-attaches the integration retained from the
+    `SoundManager` constructor. No entry is added when there is no
+    `SoundManager`.
 - **When to use:** Verify that the ToneForge wiring is actually in use — the
   operator no longer has to guess from the sound — and A/B compare synthesised
   audio against the fallback audio. Open the Settings panel (gear icon) →
   scroll to Debug Tools → click **ToneForge** to toggle.
 - **Implementation:**
-  - `src/ui/debug/ToneForgeStatusTool.ts` — `createToneForgeStatusTool()`,
+  - `src/ui/debug/ToneForgeStatusTool.ts` — `createToneForgeStatusTool()`
+    (with the optional `loadIntegration` loader),
     `withToneForgeStatusTool()` and `resolveEffectiveDebugTools()`.
   - `src/core-engine/SoundManager.ts` — read-only `isSynthActive()` /
-    `getSynthStatus()` and the `detachSynthIntegration()` /
-    `restoreSynthIntegration()` toggle API.
+    `getSynthStatus()`, the opt-in `enableSynth()`, and the
+    `detachSynthIntegration()` / `restoreSynthIntegration()` toggle API.
   - `src/ui/CardGameScene.ts` — dev-gated effective-list injection.
 
 #### Market Card Cheat (Main Street only)
@@ -4211,7 +4697,7 @@ To verify production safety:
 **Browser tests fail or time out:**
 - Check the [browser test setup](#browser-test-setup) section — the most common cause is missing Playwright Chromium: `npx playwright install chromium` (add `--with-deps` on Linux for system libraries)
 - `npm test` runs a fast-fail pre-check (`scripts/check-browser-test-env.ts`) that prints the exact remediation command if Chromium is missing; verify the install with `npx playwright install --list`
-- Check that `@vitest/browser` version matches `vitest` version
+- Check that `@vitest/browser` and `@vitest/browser-playwright` versions match the `vitest` version (they pin an exact `vitest` peer)
 - Browser tests boot a real Phaser game and may take 8-10 seconds each
 - If tests hang, check for unresolved game instances (ensure `afterEach` destroys the game). A full `npm test` run that stalls indefinitely is aborted by the runner's wall-clock timeout (see [Hang timeout](#hang-timeout-bounded-wall-clock-abort)) with exit 124 and a `[hang-timeout]` diagnostic — run the suspected file in isolation to reproduce.
 - **Process/resource leak cleanup:** All browser tests should clean up Phaser.Game instances in `afterEach` using `game.destroy(true, false)` and remove the game container div. The dev server utilities (`scripts/dev-server-utils.ts`) use a simplified start-stop-per-call pattern with no reference counting. `ensureDevServer()` kills any existing process on port 3000 before starting a fresh server. `killDevServer()` unconditionally kills the child process and any remaining process on port 3000. SIGTERM/SIGINT handlers provide additional cleanup for forced exits.

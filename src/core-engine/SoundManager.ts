@@ -239,15 +239,21 @@ export class SoundManager {
   constructor(player: SoundPlayer, options?: SoundManagerOptions) {
     this.player = player;
 
-    this.synthPlayer = options?.synthPlayer ?? null;
-    this.synthKeyMap = options?.synthKeyMap ?? {};
+    // Opt-in by default (MS-0MV76P7BN00164RF). Synth options passed here are
+    // accepted and **retained** so an explicit enable can attach them later,
+    // but the integration is NOT attached at construction: `isSynthActive()`
+    // is false and playback uses the WAV/Phaser path until synthesis is
+    // explicitly turned on (see {@link enableSynth} / {@link setSynthIntegration}).
+    this.synthPlayer = null;
+    this.synthKeyMap = {};
+    const optionKeyMap = options?.synthKeyMap ?? {};
     this.synthFactoryCount =
-      options?.synthDiagnostics?.factoryCount ?? Object.keys(this.synthKeyMap).length;
+      options?.synthDiagnostics?.factoryCount ?? Object.keys(optionKeyMap).length;
     this.synthLastLoadError = options?.synthDiagnostics?.lastLoadError ?? null;
-    if (this.synthPlayer) {
+    if (options?.synthPlayer) {
       this.retainedSynthIntegration = {
-        player: this.synthPlayer,
-        keyMap: { ...this.synthKeyMap },
+        player: options.synthPlayer,
+        keyMap: { ...optionKeyMap },
         factoryCount: this.synthFactoryCount,
       };
     }
@@ -271,11 +277,11 @@ export class SoundManager {
     this._muted = loadBoolean(this.storage, STORAGE_KEY_MUTE, false);
     this._volume = loadNumber(this.storage, STORAGE_KEY_VOLUME, 0.5);
 
-    // Apply initial state to the player
+    // Apply initial state to the player. The synth player is not attached at
+    // construction (opt-in default), so there is nothing to apply to it here;
+    // `setSynthIntegration()` applies mute/volume when it is enabled.
     this.player.setMute(this._muted);
     this.player.setVolume(this._volume);
-    this.synthPlayer?.setMute(this._muted);
-    this.synthPlayer?.setVolume(this._volume);
   }
 
   // ── Registration ────────────────────────────────────────
@@ -414,6 +420,23 @@ export class SoundManager {
     }
     this.synthPlayer?.setMute(this._muted);
     this.synthPlayer?.setVolume(this._volume);
+  }
+
+  /**
+   * Explicitly enable the synth integration retained from the constructor
+   * options (opt-in default, MS-0MV76P7BN00164RF).
+   *
+   * The integration supplied via {@link SoundManagerOptions.synthPlayer} /
+   * {@link SoundManagerOptions.synthKeyMap} is retained but **not** attached at
+   * construction, so a consumer that wants synth playback must opt in here (or
+   * call {@link setSynthIntegration} directly with a freshly loaded
+   * integration). Idempotent when synthesis is already active.
+   *
+   * @returns true when a synth integration is now active.
+   */
+  enableSynth(): boolean {
+    if (this.isSynthActive()) return true;
+    return this.restoreSynthIntegration();
   }
 
   /**

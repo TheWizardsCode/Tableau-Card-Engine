@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "id": "fixture-pack",
+      "gameId": "fixture-game",
+      "title": "Fixture Pack",
+      "description": "First entry — valid in isolation.",
+      "version": "1.0.0",
+      "coreEngineVersion": "^0.1.0",
+      "cards": "cards.csv",
+      "assets": ["assets/icon.png"]
+    },
+    {
+      "id": "fixture-pack",
+      "gameId": "fixture-game",
+      "title": "Fixture Pack (duplicate)",
+      "description": "Second entry repeats the pack id `fixture-pack`.",
+      "version": "1.0.1",
+      "coreEngineVersion": "^0.1.0",
+      "cards": "cards.csv",
+      "assets": ["assets/icon.png"]
+    }
+  ]
+}
