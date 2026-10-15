@@ -1,11 +1,14 @@
 /**
  * TCE Electron launcher — preload script (CommonJS).
  *
- * Exposes read-only host info, a narrow Steam-follow API, and a narrow Steam
- * achievements API to the renderer through the context bridge. The renderer
+ * Exposes read-only host info, a narrow Steam-follow API, a narrow Steam
+ * achievements API, the additive generalised content-unlock read API, and the
+ * card-pack entitlement read API to the renderer through the context bridge.
+ * The renderer
  * keeps `contextIsolation` enabled and `nodeIntegration` disabled — no Node
  * APIs leak into the game pages, and the renderer never imports the
- * Steamworks SDK (F3, CG-0MSMAJQQT004SDCC; F6, CG-0MUNC7EXO001LITF).
+ * Steamworks SDK (F3, CG-0MSMAJQQT004SDCC; F6, CG-0MUNC7EXO001LITF; F5,
+ * CG-0MUZGBSSQ009ISHG; F5, CG-0MUZIS2B8005WG4S).
  *
  * NOTE: this file is intentionally plain CommonJS (.cjs). Sandboxed preload
  * scripts cannot use ESM imports, and Electron treats a preload's format by
@@ -45,6 +48,19 @@ const steamFollow = {
 };
 
 /**
+ * Generalised content-unlock bridge (additive; F5, CG-0MUZGBSSQ009ISHG).
+ * Every call is async and total: the main process degrades to safe values
+ * when the config is absent, so a game can gate DLC/game content without
+ * branching on platform. The legacy `steamFollow` surface is unchanged.
+ * Channel names must stay in sync with electron/action-rewards-ipc.ts.
+ */
+const contentUnlocks = {
+  isUnlocked: (target) => ipcRenderer.invoke('contentUnlocks:isUnlocked', target),
+  getUnlocks: () => ipcRenderer.invoke('contentUnlocks:getUnlocks'),
+  refresh: (options) => ipcRenderer.invoke('contentUnlocks:refresh', options),
+};
+
+/**
  * Steam achievements bridge. Every call is async and total: the main process
  * degrades to safe values when Steam or the manifest is absent, so the
  * renderer can forward challenge completions without branching on platform.
@@ -58,4 +74,21 @@ const achievements = {
   resync: () => ipcRenderer.invoke('steamAchievements:resync'),
 };
 
-contextBridge.exposeInMainWorld('tce', { ...hostInfo, steamFollow, achievements });
+/**
+ * Card-pack entitlement bridge (F5, CG-0MUZIS2B8005WG4S). Every call is async
+ * and total: the main process degrades to a safe `locked` status when Steam,
+ * the DLC catalog, or the native module is absent, so the renderer can gate
+ * packs without branching on platform. The renderer never imports the
+ * Steamworks SDK. Channel names must stay in sync with
+ * electron/card-pack-ipc.ts.
+ */
+const cardPacks = {
+  isAvailable: () => ipcRenderer.invoke('cardPacks:isAvailable'),
+  hasCatalog: () => ipcRenderer.invoke('cardPacks:hasCatalog'),
+  supportsDlcCheck: () => ipcRenderer.invoke('cardPacks:supportsDlcCheck'),
+  getCatalog: () => ipcRenderer.invoke('cardPacks:getCatalog'),
+  getStatus: (pack) => ipcRenderer.invoke('cardPacks:getStatus', pack),
+  listStatus: (packs) => ipcRenderer.invoke('cardPacks:listStatus', packs),
+};
+
+contextBridge.exposeInMainWorld('tce', { ...hostInfo, steamFollow, achievements, contentUnlocks, cardPacks });

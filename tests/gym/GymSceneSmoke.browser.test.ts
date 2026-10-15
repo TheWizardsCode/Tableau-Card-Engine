@@ -18,6 +18,7 @@ import { GymMarketOfferEngineScene } from '../../example-games/gym/scenes/GymMar
 import { GymSpatialRulesScene } from '../../example-games/gym/scenes/GymSpatialRulesScene';
 import { GymTokenPileViewScene } from '../../example-games/gym/scenes/GymTokenPileViewScene';
 import { GymRuleEngineScene } from '../../example-games/gym/scenes/GymRuleEngineScene';
+import { GymDlcUnlockScene } from '../../example-games/gym/scenes/GymDlcUnlockScene';
 import { GymAiStrategyScene } from '../../example-games/gym/scenes/GymAiStrategyScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
 import { GymI18nScene } from '../../example-games/gym/scenes/GymI18nScene';
@@ -48,6 +49,7 @@ import {
   GYM_SPATIAL_RULES_KEY,
   GYM_TOKEN_PILE_VIEW_KEY,
   GYM_RULE_ENGINE_KEY,
+  GYM_DLC_UNLOCK_KEY,
 } from '../../example-games/gym/GymRegistry';
 
 const SCENES = [
@@ -71,6 +73,7 @@ const SCENES = [
   { key: GYM_SPATIAL_RULES_KEY, Scene: GymSpatialRulesScene },
   { key: GYM_TOKEN_PILE_VIEW_KEY, Scene: GymTokenPileViewScene },
   { key: GYM_RULE_ENGINE_KEY, Scene: GymRuleEngineScene },
+  { key: GYM_DLC_UNLOCK_KEY, Scene: GymDlcUnlockScene },
 ];
 
 describe('Gym individual scene smoke', () => {

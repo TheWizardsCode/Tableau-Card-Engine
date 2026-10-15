@@ -37,6 +37,7 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Token Pile View | `GymTokenPileViewScene` | Four token piles with different renderers (simple coloured tokens, card-back tokens, custom shaped tokens, feudalism-style). Add/remove tokens interactively with live count updates and click events. |
 | Rule Engine: LegalityResult + EconomyLedger | `GymRuleEngineScene` | Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions with multiple reason types) and EconomyLedger resource tracking (coins, reputation, score) with constraint enforcement. |
 | Card Type Index & Synergy Groups | `GymCardIndexScene` | Browse the full Main Street card pool grouped by type (family) or by synergy (multi-synergy cards listed in every matching group). Filter by name/id, hover for player-facing tooltips, click for a raw-data detail dialog. |
+| In-game DLC Gate | `GymDlcUnlockScene` | Gate a DLC content item on the unified action-reward unlock state with the pure `DlcGate` helper (`createDlcGate`). The content stays locked until the action is verified, then becomes reachable (locked → verified → reachable), with a documented locked-state presentation. |
 
 ## SLL Demo
 

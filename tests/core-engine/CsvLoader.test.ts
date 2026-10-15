@@ -1,7 +1,7 @@
 /// <reference types="vitest/globals" />
 
 import { describe, it, expect } from 'vitest';
-import { parseCsv } from '../../src/core-engine/CsvLoader';
+import { parseCsv, parseCsvHeader } from '../../src/core-engine/CsvLoader';
 
 describe('CSV Loader', () => {
   it('should parse simple CSV rows', () => {
@@ -51,5 +51,31 @@ describe('CSV Loader', () => {
   it('should return empty array for header-only CSV', () => {
     const rows = parseCsv('a,b,c');
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('CSV Header', () => {
+  it('returns the header columns of a CSV with data rows', () => {
+    expect(parseCsvHeader('a,b,c\n1,2,3')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('returns the header of a header-only CSV', () => {
+    expect(parseCsvHeader('family,id,name')).toEqual(['family', 'id', 'name']);
+  });
+
+  it('returns the supplied headers (as a copy) when provided', () => {
+    const headers = ['x', 'y'];
+    const result = parseCsvHeader('ignored', headers);
+    expect(result).toEqual(headers);
+    expect(result).not.toBe(headers);
+  });
+
+  it('returns an empty array for empty input', () => {
+    expect(parseCsvHeader('')).toEqual([]);
+    expect(parseCsvHeader('   ')).toEqual([]);
+  });
+
+  it('handles quoted header fields containing a comma', () => {
+    expect(parseCsvHeader('"a,b",c\n1,2')).toEqual(['a,b', 'c']);
   });
 });

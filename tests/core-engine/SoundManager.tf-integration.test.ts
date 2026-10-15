@@ -12,7 +12,33 @@ function createMockPlayer(): SoundPlayer {
 }
 
 describe('SoundManager tf integration', () => {
-  it('delegates mapped keys to synth player when provided', () => {
+  it('retains synth options but does not attach them at construction (opt-in)', () => {
+    const wavPlayer = createMockPlayer();
+    const synthPlayer = createMockPlayer();
+
+    const manager = new SoundManager(wavPlayer, {
+      storage: null,
+      synthPlayer,
+      synthKeyMap: { 'sfx-place': 'card-place' },
+    });
+
+    // Opt-in by default: nothing is attached until explicit enablement.
+    expect(manager.isSynthActive()).toBe(false);
+
+    manager.register('sfx-place', 'sfx-place-wav');
+    manager.play('sfx-place');
+
+    expect(wavPlayer.play).toHaveBeenCalledWith('sfx-place-wav');
+    expect(synthPlayer.play).not.toHaveBeenCalled();
+
+    // Explicit enablement activates the retained integration.
+    expect(manager.enableSynth()).toBe(true);
+    expect(manager.isSynthActive()).toBe(true);
+    manager.play('sfx-place');
+    expect(synthPlayer.play).toHaveBeenCalledWith('card-place');
+  });
+
+  it('delegates mapped keys to synth player when enabled', () => {
     const wavPlayer = createMockPlayer();
     const synthPlayer = createMockPlayer();
 
@@ -23,6 +49,7 @@ describe('SoundManager tf integration', () => {
         'sfx-place': 'card-place',
       },
     });
+    manager.enableSynth();
 
     manager.register('sfx-place', 'sfx-place-wav');
     manager.play('sfx-place');
@@ -42,6 +69,7 @@ describe('SoundManager tf integration', () => {
         'sfx-place': 'card-place',
       },
     });
+    manager.enableSynth();
 
     manager.register('sfx-click', 'click.wav');
     manager.play('sfx-click');
@@ -61,6 +89,7 @@ describe('SoundManager tf integration', () => {
         'sfx-place': 'card-place',
       },
     });
+    manager.enableSynth();
 
     manager.setVolume(0.7);
     manager.setMute(true);

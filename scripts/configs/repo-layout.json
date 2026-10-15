@@ -26,6 +26,8 @@
       "scripts/build-electron-main.mjs",
       "scripts/build-game-artifact.mjs",
       "scripts/build-game-artifact.d.mts",
+      "scripts/build-card-pack.mjs",
+      "scripts/build-card-pack.d.mts",
       "scripts/check-browser-test-env.ts",
       "scripts/codemod-src-imports.ts",
       "scripts/game-repo-scaffold.ts",

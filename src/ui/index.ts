@@ -212,6 +212,69 @@ export {
 } from './game-asset-url';
 export type { GameAssetUrlErrorCode } from './game-asset-url';
 
+// Card-pack asset URL resolution (scoped tce-packs:// scheme)
+export {
+  resolveCardPackAssetUrl,
+  CardPackUrlError,
+  CARD_PACK_URL_SCHEME,
+} from './card-pack-url';
+export type { CardPackUrlErrorCode } from './card-pack-url';
+
+// Card-pack renderer loader (F6, CG-0MUZIS2VF006NY3T)
+export {
+  loadCardPacks,
+  PACKS_DIRNAME,
+  MANIFEST_FILENAME as CARD_PACK_MANIFEST_FILENAME,
+  MANIFEST_ERROR_ID as CARD_PACK_MANIFEST_ERROR_ID,
+} from './CardPackLoader';
+export type {
+  CardPackLoaderOptions,
+  CardPackLoadResult,
+  CardPackLoadError,
+  CardPackManifestFetcher,
+  CardPackCsvFetcher,
+  CardPackModuleImporter,
+  CardPackEntitlementResolver,
+  LoadedCardPack,
+  LockedCardPack,
+} from './CardPackLoader';
+
+// Card-pack entitlement read client (F6, CG-0MUZIS2VF006NY3T)
+export {
+  createCardPackClient,
+  cardPackClientFromWindow,
+  PACK_LOCK_REASON_STEAM_UNAVAILABLE,
+  PACK_LOCK_REASON_BRIDGE_UNAVAILABLE,
+} from './card-pack-client';
+export type {
+  CardPackBridge,
+  CardPackClient,
+  CardPackStatusRef,
+  CardPackDlcCatalogLike,
+  CardPackDlcCatalogEntryLike,
+  PackEntitlementStateLike,
+  PackEntitlementStatusLike,
+} from './card-pack-client';
+
+// Card-pack listing (F6, CG-0MUZIS2VF006NY3T)
+export {
+  CardPackListing,
+  CARD_PACK_LISTING_LAYOUT,
+  createCardPackListingState,
+  toggleCardPack,
+  isCardPackEnabled,
+  enabledCardPackIds,
+  planCardPackListing,
+} from './CardPackListing';
+export type {
+  CardPackListingOptions,
+  CardPackListingRow,
+  CardPackListingState,
+  CardPackListingRowLayout,
+  CardPackListingLayoutPlan,
+  CardPackRowState,
+} from './CardPackListing';
+
 // Version display
 export {
   createVersionLabel,
@@ -378,6 +441,11 @@ export {
   withToneForgeStatusTool,
   TONEFORGE_DEBUG_TOOL_LABEL,
   TONEFORGE_UNAVAILABLE_DESCRIPTION,
+} from './debug/ToneForgeStatusTool';
+export type {
+  SynthIntegrationLoad,
+  SynthIntegrationLoader,
+  ToneForgeStatusToolOptions,
 } from './debug/ToneForgeStatusTool';
 
 // Slider – reusable horizontal slider widget

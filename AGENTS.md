@@ -74,7 +74,7 @@ npm run package:steam    # Steam build: builds the follow addon + Windows NSIS p
 
 **Release (promoting `dev` to `main`):** run the full test suite (`npm test`) and build (`npm run build`). Full suite is the **only** time the complete test suite is required.
 
-> **Windows release promotion is automatic.** When a release tags `v<version>` (the ship skill's `dev`→`main` promotion), the `promote-release` job in `.github/workflows/package.yml` promotes the freshly built Windows installer to a **draft** GitHub Release automatically — agents no longer need to run `/skill:release-windows` after a release. The draft is the operator's approval gate: review and publish it in the GitHub UI. A promotion failure is non-blocking (it never fails the Pages deploy) and is surfaced in the job summary. `/skill:release-windows` remains the documented manual fallback (regenerate a draft, or dry-run the path before a tag). See [Release process](RELEASE.md#windows-binary-steam-artifact).
+> **Windows release promotion is automatic.** When a release tags `v<version>` (the ship skill's `dev`→`main` promotion), the `promote-release` job in `.github/workflows/package.yml` promotes the freshly built Windows installer to a **draft** GitHub Release automatically — agents no longer need to run `/skill:release-windows` after a release. The draft is the operator's approval gate: review and publish it in the GitHub UI. A promotion failure is non-blocking (it never fails the Pages deploy) and is surfaced in the job summary. `/skill:release-windows` remains the documented manual fallback (regenerate a draft, or dry-run the path before a tag). **The tag-triggered `package-windows` check is not a PR-required status check** — it appears on the release PR's status rollup because the tag is created on the PR head commit, but it is advisory for the merge. If it fails while the source is sound, re-run the release with `--force` or merge the dev→main PR manually. See [Release process](RELEASE.md#package-windows-is-not-a-pr-required-status-check-exemption).
 
 **During implementation:** unit tests are the minimum. Run the appropriate test profile for your context (see [Running Test Profiles](#running-test-profiles) below).
 
@@ -615,6 +615,80 @@ example (`CG-0MTRO7VMI000F3A5`).
   `tests/fixtures/plugin-game/`; builder↔loader↔selector coverage is in
   `tests/ui/game-plugin-loader.test.ts`, `tests/ui/game-plugin-boot.test.ts`,
   and `tests/ui/game-plugin-e2e.test.ts`.
+
+### 22. Card Packs (DLC card content)
+
+Extend an **already-installed** game with new cards (and optional art/audio)
+through the launcher's content directory, **without rebuilding the launcher**.
+A card pack is the card-level sibling of the runtime game plugin: a manifest +
+a CSV fragment in the **game's existing card schema** + optional assets, merged
+into the base pool at load time. Packs are additive (they add rows, never
+replace or rebalance the base) and may be entitlement-gated by Steam DLC
+(`CG-0MUZFD1WR0031QTB`; Main Street is the first consumer).
+
+- **When to use:** shipping extra cards for a game already in a distribution, on
+the same Steam content-directory channel as whole-game DLC. A pack must reuse
+the base game's CSV header exactly and use fresh pack-scoped card ids; a pack
+is one content family's rows, not a parallel card schema. Web-runtime packs are
+out of scope; Electron only (the browser build plays base content).
+- **Modules:** `src/core-engine/CardPackManifest.ts` (`parseCardPackManifest`,
+  `splitPacksByCompatibility`, `filterPacksByGameId` — never throws),
+  `src/core-engine/CardPackMerge.ts` (`mergeCardPackCsv`,
+  `computeMergedChecksum` — the single deterministic base+pack merge seam),
+  `src/ui/CardPackLoader.ts` (`loadCardPacks` with injected
+  `fetchManifest`/`fetchCsv`/`resolveEntitlement`),
+  `src/ui/card-pack-url.ts` (`tce-packs://<gameId>/<packId>/<path>` builder),
+  `src/ui/card-pack-client.ts` (`cardPackClientFromWindow()` total read client),
+  `src/ui/CardPackListing.ts` (reusable SLL-positioned listing),
+  `electron/pack-protocol.ts` (deny-by-default `tce-packs://` handler),
+  `electron/card-pack-catalog.ts`/`card-pack-entitlements.ts`/
+  `card-pack-entitlements-steamworks.ts`/`card-pack-ipc.ts` (entitlement seam),
+  and `scripts/build-card-pack.mjs` (the reference builder).
+- **Contract:** `<contentDir>/packs/manifest.json` declares packs shaped
+  `{ id, gameId, title, description, version, coreEngineVersion, cards,
+  assets?, entitlement? }`; each pack ships `cards.csv` (base header) plus its
+  assets under `<gameId>/<packId>/`. Every entry declares a
+  `coreEngineVersion` **semver range**; incompatible packs are hidden from play
+  and listed, duplicate ids are rejected, and malformed entries are reported
+  structurally — never applied.
+- **Entitlement:** a pack with no `entitlement` is free. A gated pack maps to a
+  Steam DLC app id through **data** (`electron/card-pack-dlc-catalog.json`,
+  precedence exact `(packId, gameId)` → wildcard `packId` → manifest
+  `entitlement.steamAppId`), resolved by a pure `PackEntitlementSource` (a
+  deterministic `FakeEntitlementSource` + a Steamworks adapter that
+  dynamically imports `steamworks.js` and capability-detects
+  `apps.isDlcInstalled`). Status reaches the renderer only through
+  `window.tce.cardPacks`; states are `free` / `unlocked` / `locked` (lock
+  reasons `Requires Steam DLC <appId>.`, `Steam is unavailable.`,
+  `Pack bridge unavailable.`). A capability gap is **never** treated as
+  entitlement — the pack stays locked; never fabricate an unlock.
+- **Degradation:** every layer is total — missing/malformed manifest,
+  incompatible pack, unowned gate, mismatched CSV header, or duplicate card id
+  degrades to base content and a structural report; a conflicting/mismatched
+  pack is dropped **whole**. In a plain browser (no `window.tce`) an ungated
+  pack reads `free` and a gated pack `locked`, so the web build never crashes.
+- **Main Street consumer:** `mergeMainStreetCardPool()` is the single merge
+  entry point that feeds `loadTemplatesFromCsv()`; `bootstrapMainStreetCardPacks()`
+  discovers/merges **before scene setup**; saves persist the active pack set
+  (`activePacks`) + merged `csvChecksum`/`csvData`, load warns about a
+  missing/disabled pack and continues on base content, and resumes only when a
+  **live** card instance needs a missing template
+  (`MissingCardPackTemplateError`). The Card Packs HUD button opens the
+  reusable `CardPackListing` overlay (SLL `cardPacksButton` zone).
+- **Docs & verification:** runbook
+  [`docs/dev/card-packs-runbook.md`](docs/dev/card-packs-runbook.md)
+  (authoring → building → installing → gating), manual QA
+  [`docs/dev/card-packs-qa.md`](docs/dev/card-packs-qa.md), reference docs
+  [`docs/DEVELOPER.md` → Card Packs](docs/DEVELOPER.md#card-packs). Coverage:
+  `tests/core-engine/card-pack-manifest.test.ts`,
+  `tests/core-engine/card-pack-merge.test.ts`,
+  `tests/ui/card-pack-loader.test.ts`, `tests/ui/card-pack-url.test.ts`,
+  `tests/ui/card-pack-listing.test.ts`, `tests/ui/card-pack-client.test.ts`,
+  `tests/electron/pack-protocol.test.ts`,
+  `tests/electron/card-pack-entitlements.test.ts`,
+  `tests/scripts/build-card-pack.test.ts`; Main Street's
+  `tests/main-street/CardPackPipelineIntegration.test.ts` proves the end-to-end
+  loader → merge → save/load pipeline.
 
 ### Scene Base Class Pattern
 

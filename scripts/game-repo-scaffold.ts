@@ -256,6 +256,7 @@ import {
   gameDiscoveryPlugin,
   resolveCoreAliases,
 } from '${coreRel}/scripts/vite-game-discovery-plugin';
+import { DEV_WATCH_IGNORE_PATTERNS } from '${coreRel}/scripts/vite-transcript-plugin';
 
 const coreRoot = path.resolve(__dirname, '${coreRel}');
 const pkg = JSON.parse(
@@ -310,6 +311,14 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 3000,
     open: false,
+    watch: {
+      // Exclude dev-output trees and the .worklog/ worktree checkouts from the
+      // file watcher. .worklog/worktrees are symlinks into other full project
+      // checkouts (including a game <-> Tableau-Card-Engine cycle), so a
+      // recursive watch walks tens of thousands of directories and exhausts
+      // fs.inotify.max_user_watches (ENOSPC), crashing the dev server on startup.
+      ignored: [...DEV_WATCH_IGNORE_PATTERNS],
+    },
   },
   test: {
     projects: [

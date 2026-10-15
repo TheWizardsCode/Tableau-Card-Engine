@@ -351,6 +351,7 @@ describe('SoundManager', () => {
         synthPlayer: synth,
         synthKeyMap: { 'sfx-card-place': 'card-place' },
       });
+      mgr.enableSynth();
       // Synth-mapped keys are NOT namespace-scoped — they use the logical key directly
       mgr.register('sfx-card-place');
       mgr.play('sfx-card-place');

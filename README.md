@@ -15,6 +15,7 @@ npm run build        # TypeScript check + production build -> dist/
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 npm run generate:icons # regenerate app icons from public/favicon.svg (the tableau emblem)
+npm run build:card-pack -- --input <packSourceDir>  # build an installable card pack (see docs/DEVELOPER.md#card-packs)
 
 # Compose a full multi-game distribution (core + sibling game checkouts):
 npm run setup:distribution -- --dir ..
@@ -61,6 +62,14 @@ it appears in the Game Selector without rebuilding the launcher. Each entry
 declares a compatible core-engine version range; incompatible games are hidden
 and noted. See [Runtime Game Plugins](docs/DEVELOPER.md#runtime-game-plugins).
 
+Games can also be extended at the **card level**: a **card pack** (a manifest +
+a CSV fragment in the game's existing card schema + optional art) dropped into
+`<contentDir>/packs/` adds new cards to an existing game, optionally gated by
+entitlement. Build a pack with
+`npm run build:card-pack -- --input <packSourceDir>`; the reference Main Street
+pack lives at `tests/fixtures/reference-packs/main-street/`. See
+[Card Packs](docs/DEVELOPER.md#card-packs).
+
 ## Desktop Launcher (Electron) & Steam Packaging
 
 TCE ships as a web app (GitHub Pages) **and** as a native desktop launcher built with **Electron** (`electron/`), for Steam distribution. The launcher boots the same built web app in a desktop window:
@@ -70,6 +79,7 @@ TCE ships as a web app (GitHub Pages) **and** as a native desktop launcher built
 - `npm run package` / `package:win` / `package:linux` / `package:mac` -- produce a distributable binary (Windows NSIS installer is the primary Steam artifact) into the gitignored `release/` directory.
 - Game content can come from the bundled app or an external **Steam DLC install directory** via `--content-dir <dir>` / `TCE_CONTENT_DIR`, resolved behind a small provider interface so a future Steamworks-backed provider can be added without a rewrite.
 - **Steam follow-to-unlock** — following the developer on Steam unlocks a bundled bonus game (game-agnostic, config-driven via `electron/bonus-catalog.json`). Automatic detection uses a small custom N-API addon (`native/steam-friends`, Windows x64) because `steamworks.js` exposes no `ISteamFriends::IsFollowing`; the launcher degrades to a persisted manual claim when the addon or Steam is unavailable, and never fabricates a follow. Credentials live in a **gitignored** config (`electron/steam-config.local.json`) or env vars. Build the Steam binary with `npm install steamworks.js && npm run build:steam-friends && npm run package:steam` (see `native/steam-friends/README.md`).
+- **Platform-agnostic action rewards** — the follow mechanism is generalised so **any action on any platform** (follow on Steam, follow on itch.io, review elsewhere) can unlock a bundled game **or in-game DLC**. Rules are declarative data (`electron/action-rewards.json`); verification goes through a pluggable `ActionVerifier` seam whose default is a manual **honour-system self-attest** for platforms with no detection API. The shipped `itchio-follow` rule unlocks the `golf` game after an itch.io follow, proving a non-Steam path end-to-end while the Steam reward is unchanged. The launcher and in-game DLC gates read one unified, target-keyed unlock store (`electron/action-rewards.ts`, `src/ui/steam-lock.ts`, `src/core-engine/DlcGate.ts`). See `docs/DEVELOPER.md` (Action-reward config and drift validator; Adding a platform, action, or verifier; Gating in-game DLC).
 - **Steam achievements** — in-game challenges complete persistent Steam achievements through an **engine-generic** achievement layer (`src/core-engine/AchievementSystem.ts`). Games declare a challenge → achievement mapping and never import the Steam SDK; the launcher maps achievement ids to Steam API names via the single-source-of-truth manifest (`electron/achievement-manifest.json`, which must match the Steamworks partner backend). Unlocks are idempotent, persist offline, and re-sync when Steam is next available.
 - The Windows binary is built reproducibly by CI (`.github/workflows/package.yml`) and uploaded as a workflow artifact on every push to `main`. CI composes the sibling game repos and builds with `GAMES_CONFIG=full`, so the Steam artifact ships the full game catalogue (all games + Gym).
 
@@ -138,7 +148,7 @@ Which games a build contains is selected by a preset in `configs/`:
 | `configs/solo.json` | golf | minimum non-empty distribution (1 game + Gym) |
 | `configs/arcade.json` | golf, main-street | partial distribution |
 | `configs/deluxe.json` | feudalism, lost-cities | partial distribution (distinct game set) |
-| `configs/full.json` | all eight games | full distribution (all games + Gym) |
+| `configs/full.json` | all nine games | full distribution (all games + Gym) |
 | `configs/<game-id>.json` | that one game | per-game preset (one game + Gym) — e.g. `configs/main-street.json` |
 
 ```bash
@@ -151,7 +161,7 @@ GAMES_CONFIG=full npm run package          # packaged desktop binary
 
 `npm run setup:distribution -- --dir ..` is the prerequisite for the sibling
 presets: it checks out each game repo next to the launcher. Then select a
-preset — `full` for all eight games plus the Gym:
+preset — `full` for all nine games plus the Gym:
 
 ```bash
 npm run setup:distribution -- --dir ..   # clone the sibling game repos (once)
@@ -280,6 +290,7 @@ core-engine feature demonstrator.
 | Main Street | `tce-main-street` | Single-player tableau builder. Buy businesses/upgrades/events, place businesses on a 10-slot street rendered as a responsive 2x5 grid, and optimize score — no turn limit by default (games end via score threshold, all challenges, bankruptcy, or reputation collapse; a turn limit is opt-in via an explicit `maxTurns` config). **Annual calendar**: each turn is one week of the Irish year (weeks 1–52, year wraps); seasonal and holiday event cards only appear during their real-world week windows (e.g. St Patrick's Day in late winter, Harvest Festival in autumn). **Multi-Use Card Economy**: cards can be held in hand for synergy bonuses; staff cards expand hand capacity with ongoing costs. **Action economy**: one action per week (two with a General Manager) — move-to-hand, play-from-hand, direct buy-and-place (+50% premium), and hire-staff spend the action; refresh, sell, hint, discard, upgrades, events, and end-turn are free. Market cycles each turn. Tutorial overlay zones are defined in a separate SLL layout file (`main-street-tutorial.layout.json`) composed with the base layout. Balance analysis tools are specified in the [Balance Process & Tooling PRD](docs/main-street/prd-balance-process-and-tooling.md). |
 | Scenario: Tutorial | `tce-main-street` | Guided introduction to Main Street. 17-step tutorial overlays walk through buy → hand → place, invest → optimize → trigger, and scoring. Accessible from the Game Selector. |
 | Coloretto | `tce-coloretto` | Set-building card game (human vs. 1-4 AI). On your turn place the top deck card on a shared row (max 3) or take an entire row into your collection. Score 3 colors positively and the rest negatively across 7/5/4/3 rounds (2/3/4/5 players) using the canonical point table (1=1, 2=3, 3=6, 4=10, 5=15, 6+=21). |
+| 1916: The Rising | `tce-the-rising` | Single-player commemorative solitaire. Meet the spirits of Irish historical figures (1169–1916), hear a first-person testimony drawn from a cited source, and lay each spirit on a shared timeline in the correct chronological order before the Rising clock reaches 1916. Exercises ordered-lane placement, a dialogue/encounter overlay, a Memory economy, a deterministic clock, difficulty presets, transcripts, versioned save/load and SLL. |
 
 ## Main Street Card Upgrade Visualization
 
@@ -316,6 +327,7 @@ In dev mode (`npm run dev`), the Settings panel's **Debug Tools** section includ
 2. **Quality gates** -- before pushing, ensure `npm test` passes and `npm run build` succeeds.
 3. **Update docs** -- if you change tooling, scripts, directory structure, or developer workflow, update `docs/DEVELOPER.md` and `AGENTS.md` in the same PR or as a child work item.
 4. **Asset licensing** -- all assets must be CC0, MIT, Apache 2.0, or similarly permissive. Document attribution in `public/assets/CREDITS.md`.
+5. **Creating a new game** -- follow the [Creating a New Game guide](docs/dev/creating-a-new-game.md) for the full lifecycle, from concept to publication.
 
 For detailed development guidance, see [`docs/DEVELOPER.md`](docs/DEVELOPER.md).
 

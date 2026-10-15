@@ -11,7 +11,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
-import { page } from '@vitest/browser/context';
+import { page } from 'vitest/browser';
 import { GymOverlayUiScene } from '../../example-games/gym/scenes/GymOverlayUiScene';
 import { GYM_OVERLAY_UI_KEY } from '../../example-games/gym/GymRegistry';
 import { GAME_W, GAME_H } from '../../src/ui/constants';

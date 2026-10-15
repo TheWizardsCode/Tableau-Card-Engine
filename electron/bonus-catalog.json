@@ -1,5 +1,5 @@
 {
-  "_comment": "Config-driven bonus catalog (intake AC4 — game-agnostic). 'bonusGameId' designates which bundled game is unlocked by the Steam follow incentive; the others stay locked (reserved for future milestones). The producer designated Feudalism (CG-0MSMAJQQT004SDCC). Do not hard-code a game title elsewhere.",
+  "_comment": "Config-driven bonus catalog (intake AC4 — game-agnostic). 'bonusGameId' designates which bundled game is unlocked by the Steam follow incentive; the others stay locked. 'gatedBy' records which action-reward rule (electron/action-rewards.json) unlocks an entry — validated for drift by action-rewards-config.ts. Do not hard-code a game title elsewhere.",
   "bonusGameId": "feudalism",
   "games": [
     {
@@ -12,7 +12,8 @@
       "id": "golf",
       "title": "Golf",
       "sceneKey": "GolfScene",
-      "description": "Classic nine-card solitaire golf."
+      "description": "Classic nine-card solitaire golf.",
+      "gatedBy": "itchio-follow"
     },
     {
       "id": "feudalism",
