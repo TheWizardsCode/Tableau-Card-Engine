@@ -1893,6 +1893,26 @@ symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
 
+### Engine sync/verify scripts in generated game repos
+
+`renderPackageJson` wires every generated game repo with two engine submodule
+scripts (MS-0MVCRGKZY007DIED):
+
+- `engine:sync` — dev builds compose the **latest** engine: refuse loudly on
+  uncommitted `./core` changes, then `git submodule update --remote core`
+  (remote unreachable → warn and keep the current checkout).
+- `engine:verify` — release builds compile **exactly** the SHA pinned in the
+  game repo's `configs/engine-pin.json`: same dirty guard, then compare the
+  pin against the tracked branch's remote tip and check that SHA out exactly.
+- `build` / `build:electron` run `engine:sync` first; `build:release` runs
+  `engine:verify` instead.
+
+The script is the engine-owned `scripts/engine-sync.mjs` (+ `.d.mts` types),
+invoked through the submodule — game repos have no root `scripts/` tree
+(Option C). Game repos must declare the tracked branch in `.gitmodules`
+(e.g. `branch = dev`) so `--remote` follows development rather than the
+remote's default branch (`main`).
+
 ### App icon linkage (`sharedPublicRoot`)
 
 Every `tce-<game>` repo is its own Vite app with its own `index.html` and
