@@ -20,15 +20,16 @@
  *   then check out exactly that SHA. Release builds require the remote to be
  *   reachable so the pin can be compared; a mismatch fails the build.
  *
- * The npm scripts wrap this script:
+ * The npm scripts wrap this script (game repos have no root `scripts/`
+ * tree — Option C — so the canonical file lives in the engine repo and is
+ * invoked through the `./core` submodule):
  *
- *   "engine:sync":   "node scripts/engine-sync.mjs sync"
- *   "engine:verify": "node scripts/engine-sync.mjs verify"
+ *   "engine:sync":   "node ./core/scripts/engine-sync.mjs sync"
+ *   "engine:verify": "node ./core/scripts/engine-sync.mjs verify"
  *
  * This file is the canonical implementation in the engine repo; the game-repo
- * scaffold (`scripts/game-repo-scaffold.ts`) copies it into each game repo as
- * `scripts/engine-sync.mjs`, so edit it here and re-scaffold — never edit the
- * generated copy by hand.
+ * scaffold (`scripts/game-repo-scaffold.ts`) wires the npm scripts to it, so
+ * re-scaffolding a game repo points the scripts here — never edit a copy.
  *
  * Subcommands:
  *   node engine-sync.mjs sync|verify [--core-rel <path>] [--pin <path>]
