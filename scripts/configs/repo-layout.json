@@ -28,6 +28,8 @@
       "scripts/build-game-artifact.d.mts",
       "scripts/build-card-pack.mjs",
       "scripts/build-card-pack.d.mts",
+      "scripts/engine-sync.d.mts",
+      "scripts/engine-sync.mjs",
       "scripts/check-browser-test-env.ts",
       "scripts/codemod-src-imports.ts",
       "scripts/game-repo-scaffold.ts",

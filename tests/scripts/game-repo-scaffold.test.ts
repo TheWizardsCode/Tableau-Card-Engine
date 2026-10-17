@@ -305,6 +305,26 @@ describe('renderPackageJson', () => {
     expect(pkg.dependencies).toEqual(MANIFEST.dependencies);
     expect(pkg.devDependencies).toEqual(MANIFEST.devDependencies);
   });
+
+  it('wires engine:sync into dev builds and engine:verify into release builds', () => {
+    const pkg = JSON.parse(renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL));
+    // Dev builds compose the latest engine remote head before compiling
+    // (MS-0MVCRGKZY007DIED AC1).
+    expect(pkg.scripts.build).toBe('npm run engine:sync && tsc --noEmit && vite build');
+    expect(pkg.scripts['build:electron']).toBe(
+      'npm run engine:sync && tsc --noEmit && vite build --mode electron',
+    );
+    // Release builds verify the committed engine pin instead (AC2/AC3).
+    expect(pkg.scripts['build:release']).toBe('npm run engine:verify && tsc --noEmit && vite build');
+    // The engine-sync script lives in the engine repo — game repos have no
+    // root `scripts/` tree (Option C) and invoke it through the submodule.
+    expect(pkg.scripts['engine:sync']).toBe(
+      `node ${DEFAULT_CORE_REL}/scripts/engine-sync.mjs sync`,
+    );
+    expect(pkg.scripts['engine:verify']).toBe(
+      `node ${DEFAULT_CORE_REL}/scripts/engine-sync.mjs verify`,
+    );
+  });
 });
 
 describe('renderViteConfig', () => {

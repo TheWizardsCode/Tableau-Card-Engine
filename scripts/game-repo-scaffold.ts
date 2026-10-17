@@ -220,8 +220,17 @@ export function renderPackageJson(
         ]),
       ),
       dev: 'vite --host',
-      build: 'tsc --noEmit && vite build',
-      'build:electron': 'tsc --noEmit && vite build --mode electron',
+      build: `npm run engine:sync && tsc --noEmit && vite build`,
+      'build:electron': `npm run engine:sync && tsc --noEmit && vite build --mode electron`,
+      'build:release': `npm run engine:verify && tsc --noEmit && vite build`,
+      // Engine submodule sync/verify (MS-0MVCRGKZY007DIED): dev builds always
+      // compose the latest engine remote head; release builds compile exactly
+      // the committed `configs/engine-pin.json` SHA. The script is canonical
+      // in the engine repo (`<coreRel>/scripts/engine-sync.mjs`); game repos
+      // invoke it through the submodule — there is no game-repo `scripts/`
+      // tree (Option C).
+      'engine:sync': `node ${coreRel}/scripts/engine-sync.mjs sync`,
+      'engine:verify': `node ${coreRel}/scripts/engine-sync.mjs verify`,
       preview: 'vite preview --host',
       test: 'vitest run --project unit',
       'test:unit': 'vitest run --project unit',
