@@ -388,6 +388,8 @@ export function renderTsconfig(_game: string, coreRel: string): string {
         '@ai/*': [`${coreRel}/src/ai/*`],
         '@balance-cards': [`${coreRel}/src/balance-cards`],
         '@balance-cards/*': [`${coreRel}/src/balance-cards/*`],
+        '@story-line': [`${coreRel}/src/story-line`],
+        '@story-line/*': [`${coreRel}/src/story-line/*`],
         // Core-owned framework trees consumed by the game's own tests and
         // replay adapter (F9 / C1).
         '@core-scripts/*': [`${coreRel}/scripts/*`],

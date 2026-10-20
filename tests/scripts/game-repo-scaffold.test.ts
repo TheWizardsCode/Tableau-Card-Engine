@@ -395,6 +395,8 @@ describe('renderTsconfig', () => {
       ['@ai/*', 'src/ai/*'],
       ['@balance-cards', 'src/balance-cards'],
       ['@balance-cards/*', 'src/balance-cards/*'],
+      ['@story-line', 'src/story-line'],
+      ['@story-line/*', 'src/story-line/*'],
       ['@core-scripts/*', 'scripts/*'],
       ['@core-tests/*', 'tests/*'],
       ['@core-gym', 'example-games/gym'],
