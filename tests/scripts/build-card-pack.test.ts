@@ -204,10 +204,18 @@ describe('buildCardPack — reference Main Street pack', () => {
     const written = JSON.parse(fs.readFileSync(result.manifestPath, 'utf-8'));
     expect(written.packs[0].title).toBe('Main Street Foundations');
 
-    // CSV fragment copied, retaining the Main Street schema header.
+    // CSV fragment copied, retaining the committed reference schema header
+    // (the reference pack uses the 55-column schema: base 53 + options +
+    // piggybackable — see MS-0MV8BFOVB000HM0W / MS-0MV8KQQQ90044CM5).
+    const referencePackCsvPath = path.join(
+      REFERENCE_PACK_INPUT,
+      REFERENCE_GAME_ID,
+      REFERENCE_PACK_ID,
+      'cards.csv',
+    );
     expect(fs.existsSync(pack.csvPath)).toBe(true);
     expect(fs.readFileSync(pack.csvPath, 'utf-8').split('\n')[0]).toBe(
-      CARD_PACK_CSV_HEADER,
+      fs.readFileSync(referencePackCsvPath, 'utf-8').split('\n')[0],
     );
     expect(pack.files).toContain('cards.csv');
 

@@ -21,7 +21,6 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import {
   DEFAULT_CORE_REL,
@@ -143,7 +142,6 @@ describe('submoduleIsDirty', () => {
   });
 
   it('is true when the submodule is not (yet) a git repo', () => {
-    const f = makeFixture();
     const nonGit = tempRoot('engine-sync-ng-');
     fs.mkdirSync(path.join(nonGit, 'core'), { recursive: true });
     fs.writeFileSync(path.join(nonGit, 'core', 'x.txt'), 'x');
