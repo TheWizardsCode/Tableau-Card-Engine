@@ -44,6 +44,11 @@ npx vitest run --project browser tests/gym/*.browser.test.ts
 | In-game DLC Gate | `GymDlcUnlockScene` | `createDlcGate` (`DlcGate`, `DlcUnlockReader`), `contentUnlockClientFromWindow` (F5 total read client), SLL `anchorPoint` | [`scenes/GymDlcUnlockScene.ts`](../../example-games/gym/scenes/GymDlcUnlockScene.ts) | [`DlcGate.test.ts`](../../tests/core-engine/DlcGate.test.ts), [`GymDlcUnlock.browser.test.ts`](../../tests/gym/GymDlcUnlock.browser.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 | Storyline | `GymStorylineScene` | `createStorylineSystem`, `compileStorylineFromEvent`, `resolveStorylineOption`, `createPendingStorylineChoice`, `defaultStorylineUiAdapter` | [`scenes/GymStorylineScene.ts`](../../example-games/gym/scenes/GymStorylineScene.ts) | [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 
+
+The Storyline demo's generic engine is documented in
+[`docs/core-engine/story-line.md`](../core-engine/story-line.md) (module API,
+engine/UI adapters and this demo).
+
 ## Scene Navigation
 
 All Gym demo scenes that extend `GymSceneBase` include `[ < Prev ]` and `[ Next > ]` buttons in the header bar, positioned to the right of the `[ Menu ]` button. These cycle through the `GYM_SCENE_CATALOGUE` with wrap-around navigation.

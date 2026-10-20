@@ -1605,6 +1605,7 @@ The project defines path aliases in both `tsconfig.json` and `vite.config.ts`:
 | `@rule-engine/*` | `src/rule-engine/*` |
 | `@ai/*` | `src/ai/*` |
 | `@ui/*` | `src/ui/*` |
+| `@story-line` | `src/story-line` (generic branching story-line system) |
 
 Usage in code:
 
@@ -1625,6 +1626,9 @@ CORE_ROOT=./core npm run build     # game-repo context
 
 This keeps `@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*` and
 `@ai/*` import specifiers identical across the core repo and every game repo.
+
+The generic branching story-line system (`@story-line`) is documented in
+[`docs/core-engine/story-line.md`](core-engine/story-line.md).
 
 ## Build-Time Version Injection
 
