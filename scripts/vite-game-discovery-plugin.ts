@@ -573,6 +573,7 @@ const GYM_SCENE_NAMES = [
   'GymTokenPileViewScene',
   'GymRuleEngineScene',
   'GymDlcUnlockScene',
+  'GymStorylineScene',
 ] as const;
 
 // ── The plugin ────────────────────────────────────────────────────────────
