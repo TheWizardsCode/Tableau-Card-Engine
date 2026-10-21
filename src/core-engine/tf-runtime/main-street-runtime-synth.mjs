@@ -177,6 +177,66 @@ function crowdCheerVoice() {
   );
 }
 
+function incomePositiveVoice() {
+  return oneShotVoice(
+    () => new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.004, decay: 0.18, sustain: 0, release: 0.16 },
+      volume: -10,
+    }),
+    (synth) => {
+      const now = Tone.now();
+      ['C5', 'E5', 'G5'].forEach((note, index) => {
+        synth.triggerAttackRelease(note, '32n', now + index * 0.09);
+      });
+    },
+  );
+}
+
+function incomeNegativeVoice() {
+  return oneShotVoice(
+    () => new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.006, decay: 0.22, sustain: 0, release: 0.18 },
+      volume: -12,
+    }),
+    (synth) => {
+      const now = Tone.now();
+      ['G4', 'E4', 'C4'].forEach((note, index) => {
+        synth.triggerAttackRelease(note, '32n', now + index * 0.1);
+      });
+    },
+  );
+}
+
+function incomeNeutralVoice() {
+  return oneShotVoice(
+    () => new Tone.Synth({
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.01, decay: 0.25, sustain: 0, release: 0.2 },
+      volume: -12,
+    }),
+    (synth) => synth.triggerAttackRelease('A4', '8n'),
+  );
+}
+
+function successFanfareVoice() {
+  return oneShotVoice(
+    () => new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.005, decay: 0.2, sustain: 0.04, release: 0.22 },
+      volume: -10,
+    }),
+    (synth) => {
+      const now = Tone.now();
+      ['C5', 'E5', 'G5'].forEach((note, index) => {
+        synth.triggerAttackRelease(note, '32n', now + index * 0.11);
+      });
+      synth.triggerAttackRelease(['C5', 'E5', 'G5', 'C6'], '4n', now + 0.33);
+    },
+  );
+}
+
 export const descriptors = {
   'card-draw': { runtime: 'Tone.FMSynth' },
   'card-slide': { runtime: 'Tone.NoiseSynth' },
@@ -190,6 +250,10 @@ export const descriptors = {
   'construction-lite-hammer': { runtime: 'Tone.MetalSynth' },
   'construction-lite-saw': { runtime: 'Tone.NoiseSynth' },
   'crowd-cheer': { runtime: 'Tone.PolySynth' },
+  'income-positive-chime': { runtime: 'Tone.PolySynth' },
+  'income-negative-chime': { runtime: 'Tone.PolySynth' },
+  'income-neutral-chime': { runtime: 'Tone.Synth' },
+  'success-fanfare': { runtime: 'Tone.PolySynth' },
 };
 
 export const factories = {
@@ -220,6 +284,10 @@ export const factories = {
   'construction-lite-hammer': () => constructionHammerVoice({ lite: true }),
   'construction-lite-saw': () => constructionSawVoice({ lite: true }),
   'crowd-cheer': () => crowdCheerVoice(),
+  'income-positive-chime': () => incomePositiveVoice(),
+  'income-negative-chime': () => incomeNegativeVoice(),
+  'income-neutral-chime': () => incomeNeutralVoice(),
+  'success-fanfare': () => successFanfareVoice(),
 };
 
 export function getFactory(name) {
