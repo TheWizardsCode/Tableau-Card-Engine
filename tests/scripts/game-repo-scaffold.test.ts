@@ -19,11 +19,13 @@ import {
   CORE_REMOTE,
   DEFAULT_CORE_REL,
   DEFAULT_GAME_PRESET,
+  GAME_INITIAL_VERSION,
   defaultScenePath,
   findGameInPreset,
   linkSharedAssets,
   linkSharedPublicAssets,
   pascalCase,
+  readExistingPackageVersion,
   readLayoutGames,
   renderPackageJson,
   renderPreset,
@@ -292,7 +294,6 @@ describe('renderPackageJson', () => {
   it('names the repo for the game and reuses the core toolchain deps', () => {
     const pkg = JSON.parse(renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL));
     expect(pkg.name).toBe('tce-golf');
-    expect(pkg.version).toBe('9.9.9');
     expect(pkg.type).toBe('module');
     // Game-specific toolchain scripts are inherited from the core manifest…
     expect(pkg.scripts['save-load-smoke']).toContain('src/scripts/save-load-smoke');
@@ -304,6 +305,27 @@ describe('renderPackageJson', () => {
     expect(pkg.scripts.test).toBe('vitest run --project unit');
     expect(pkg.dependencies).toEqual(MANIFEST.dependencies);
     expect(pkg.devDependencies).toEqual(MANIFEST.devDependencies);
+  });
+
+  it('seeds a new game repo with an engine-independent baseline version', () => {
+    // The core manifest deliberately declares a different version: a game repo
+    // owns its own version and must never inherit the engine's
+    // (CG-0MVGF2QE9008NA5R).
+    expect(MANIFEST.version).toBe('9.9.9');
+    const pkg = JSON.parse(renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL));
+    expect(pkg.version).toBe(GAME_INITIAL_VERSION);
+    expect(pkg.version).toBe('0.1.0');
+    expect(pkg.version).not.toBe(MANIFEST.version);
+  });
+
+  it('writes an explicitly supplied version verbatim', () => {
+    const pkg = JSON.parse(
+      renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL, '1.4.2'),
+    );
+    expect(pkg.version).toBe('1.4.2');
+    // An explicit version is the only thing that can diverge from the baseline;
+    // the core manifest version still never leaks through.
+    expect(pkg.version).not.toBe(MANIFEST.version);
   });
 
   it('wires engine:sync into dev builds and engine:verify into release builds', () => {
@@ -496,6 +518,102 @@ describe('scaffoldGameRepo', () => {
     expect(testSrc).toContain("'@core-scripts/validate-transcript'");
     expect(testSrc).not.toContain("'../../scripts/validate-transcript'");
     expect(testSrc).toContain("'../../src/scripts/game-script'");
+  });
+
+  it('seeds a new game repo package.json with the 0.1.0 baseline', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    // Assert the real on-disk write, not just the rendered template.
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(gameRepo, 'package.json'), 'utf-8'),
+    );
+    expect(pkg.version).toBe('0.1.0');
+    expect(result.version).toBe('0.1.0');
+    expect(result.versionSource).toBe('baseline');
+  });
+
+  it('preserves an existing repo version on re-scaffold', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    // Simulate a released game: its own release history owns its version.
+    const pkgPath = path.join(gameRepo, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    pkg.version = '0.1.17';
+    fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    expect(result.version).toBe('0.1.17');
+    expect(result.versionSource).toBe('preserved');
+    expect(readExistingPackageVersion(gameRepo)).toBe('0.1.17');
+    expect(JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version).toBe('0.1.17');
+
+    // A further re-scaffold is version-neutral (no drift toward the core's).
+    const third = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+    expect(third.version).toBe('0.1.17');
+    expect(third.versionSource).toBe('preserved');
+  });
+
+  it('falls back to the baseline when the existing package.json is unusable', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const pkgPath = path.join(gameRepo, 'package.json');
+
+    // Malformed JSON is treated as no existing version.
+    fs.writeFileSync(pkgPath, '{ not json', 'utf-8');
+    expect(readExistingPackageVersion(gameRepo)).toBeUndefined();
+    const malformed = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+    expect(malformed.version).toBe('0.1.0');
+    expect(malformed.versionSource).toBe('baseline');
+
+    // A package.json with no string version is treated the same way.
+    fs.writeFileSync(pkgPath, JSON.stringify({ name: 'tce-golf' }), 'utf-8');
+    expect(readExistingPackageVersion(gameRepo)).toBeUndefined();
+    const missingField = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+    expect(missingField.version).toBe('0.1.0');
+    expect(missingField.versionSource).toBe('baseline');
+  });
+
+  it('honours an explicit version override over the preserved one', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    const pkgPath = path.join(gameRepo, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    pkg.version = '0.1.17';
+    fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      version: '2.0.0',
+    });
+
+    expect(result.version).toBe('2.0.0');
+    expect(result.versionSource).toBe('explicit');
+    expect(JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version).toBe('2.0.0');
   });
 
   it('composes the core root app-icon files into public/ and reports them', () => {

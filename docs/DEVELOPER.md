@@ -1637,6 +1637,15 @@ via Vite's `define` in `vite.config.ts`. The global constant `__APP_VERSION__` i
 replaced with the version string during the Vite transform phase (both dev server
 and production builds).
 
+In the multi-repo distribution the label therefore shows the **composing repo's**
+version: a game repo's `vite.config.ts` reads that game's own `package.json`, so
+the label is the **game** version; the core repo shows the **engine** version.
+The two are independent — a game repo owns its version (the scaffold seeds
+`0.1.0`, preserves it on re-scaffold, and a game release bumps only that game's
+`package.json`), so engine and game releases proceed at different cadences. See
+[Creating a New Game §3 — per-game version policy](dev/creating-a-new-game.md#per-game-version-policy)
+and [Per-game repo scaffold](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4).
+
 The version is displayed as `v<version>` (e.g. `v0.1.7`) in two locations:
 - The **GameSelectorScene** menu screen (top-right corner, below the GitHub icon)
 - The **SettingsPanel** overlay (shown on the game canvas when the panel opens)

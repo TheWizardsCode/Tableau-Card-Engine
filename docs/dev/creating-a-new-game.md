@@ -129,6 +129,27 @@ root app-icon/public assets. Engine imports resolve through the path aliases
 (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`, …)
 against `./core`.
 
+### Per-game version policy
+
+**A game repo owns its own version — it is not the engine version.** The
+scaffold seeds a brand-new game repo at `0.1.0`, **preserves** the `version`
+already in the repo's `package.json` when re-scaffolding (so an existing game is
+never renumbered), and accepts an explicit `--version <semver>` override for
+cases where a specific version must be stamped. It never copies the core's
+`version`.
+
+Game releases are therefore independent of engine releases: a release cut
+inside `tce-<game>` bumps only that game's `package.json` (the ship
+`bump-version.js` resolves the invoking repo's own root via
+`git rev-parse --show-toplevel`), and the first release of a newly scaffolded
+game tags `v0.1.1`. The version label shown on game screens comes from the
+game's own `package.json` (`__APP_VERSION__` in its `vite.config.ts`), so it
+follows the game build, not the engine build — see
+[Build-Time Version Injection](../DEVELOPER.md#build-time-version-injection).
+
+Existing sibling game repos keep their current numbers; they diverge from the
+engine at their next release rather than being renumbered.
+
 ---
 
 ## 4. Architecture and implementation
