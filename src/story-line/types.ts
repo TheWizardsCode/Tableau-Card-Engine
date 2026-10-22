@@ -84,6 +84,62 @@ export interface ChoiceClarityLabels {
 }
 
 /**
+ * Declarative affordability cost for a story-line option.
+ *
+ * Every specified component is a required payment: an option is only
+ * affordable when the player has at least `coins` coins **and** at least
+ * `reputation` reputation. An unspecified component is unconstrained (it is
+ * never defaulted to zero).
+ */
+export interface OptionCost {
+  /** Coins the player must pay to select the option. */
+  readonly coins?: number;
+  /** Reputation the player must pay to select the option. */
+  readonly reputation?: number;
+}
+
+/**
+ * Declarative resource delta applied when a story-line option resolves.
+ *
+ * Each specified component is a signed delta (`-5` deducts, `5` grants). An
+ * unspecified component leaves that resource unchanged.
+ */
+export interface OptionExtraEffect {
+  /** Coin delta applied on resolution. */
+  readonly coins?: number;
+  /** Reputation delta applied on resolution. */
+  readonly reputation?: number;
+}
+
+/**
+ * A single declarative threshold condition on one resource.
+ *
+ * Conditions are pure data (field / operator / numeric value) so they can be
+ * authored, serialised and validated without executable callbacks.
+ */
+export interface Condition {
+  /** The resource the condition tests. */
+  readonly field: 'coins' | 'reputation';
+  /** Comparison applied between the current resource and {@link value}. */
+  readonly op: '>=' | '<=' | '>' | '<' | '==';
+  /** Numeric threshold the current resource is compared against. */
+  readonly value: number;
+}
+
+/**
+ * One ordered declarative successor rule.
+ *
+ * When {@link when} matches the current resources, {@link successorId} is the
+ * pushed successor card id; `null` ends the chain.
+ */
+export interface ConditionalSuccessorRule {
+  /** Condition evaluated against the current resources at resolution time. */
+  readonly when: Condition;
+  /** Successor card id to push when the rule matches; `null` ends the chain. */
+  readonly successorId: string | null;
+}
+
+/**
  * A single option within a story-line's ordered option list.
  *
  * The engine resolves options in declaration order; the player selects one.
@@ -103,6 +159,10 @@ export interface StorylineOption<TState = unknown> {
    * Ordered candidate successor card ids. At resolution time exactly one
    * candidate is selected with a single seeded `rng()` draw. An empty list
    * is a terminal option — the chain ends and no draw is consumed.
+   *
+   * Only consulted when neither {@link successorResolver} nor a matching
+   * {@link conditionalSuccessors} rule determines the successor (see
+   * {@link conditionalSuccessors} for the full precedence contract).
    */
   readonly successorIds?: readonly string[];
   /** Whether the event's intrinsic effect applies when this option is chosen. */
@@ -118,12 +178,46 @@ export interface StorylineOption<TState = unknown> {
   /**
    * Optional runtime successor resolver evaluated at resolution time. When
    * present, its return value is used as the pushed successor card id
-   * instead of {@link successorId} / {@link successorIds}. Returns
-   * `null`/`undefined` to end the chain. Consumes no RNG.
+   * instead of {@link conditionalSuccessors} / {@link successorIds} /
+   * {@link successorId}. Returns `null`/`undefined` to end the chain.
+   * Consumes no RNG.
    *
    * Contract: must be a pure function — no observable side effects.
    */
   readonly successorResolver?: (state: TState) => string | null | undefined;
+  /**
+   * Optional declarative affordability cost.
+   *
+   * Declared contract (applied by the draw-time filtering and resolution
+   * helpers): an option is presented only when every specified cost component
+   * is affordable, and selecting it deducts the cost from the game state via
+   * the engine adapter's resource-mutation seam. Cost is **independent of
+   * {@link effectPolicy}** — it is a real payment made in addition to the
+   * card's intrinsic effect (which {@link effectPolicy} governs separately).
+   */
+  readonly cost?: OptionCost;
+  /**
+   * Optional declarative resource delta applied when the option resolves.
+   *
+   * Declared contract: applied after any {@link cost} deduction and
+   * **independently of {@link effectPolicy}** (it applies for both `'apply'`
+   * and `'skip'`). Its deltas are reported in the resolution's `coinChange` /
+   * `repChange`.
+   */
+  readonly extraEffect?: OptionExtraEffect;
+  /**
+   * Ordered declarative successor rules evaluated at resolution time against
+   * the current resources. The first rule whose {@link Condition} matches
+   * determines the pushed successor card id (`null` ends the chain). A
+   * matching rule consumes no RNG draw.
+   *
+   * Successor precedence (documented contract):
+   * 1. {@link successorResolver} callback, when present;
+   * 2. the first matching {@link conditionalSuccessors} rule;
+   * 3. {@link successorIds} — a single seeded random draw;
+   * 4. legacy {@link successorId}.
+   */
+  readonly conditionalSuccessors?: readonly ConditionalSuccessorRule[];
 }
 
 /** A card's compiled story-line option list. */

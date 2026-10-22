@@ -51,6 +51,10 @@ import type {
 export type {
   ChoiceClarityLabels,
   CompiledStoryline,
+  Condition,
+  ConditionalSuccessorRule,
+  OptionCost,
+  OptionExtraEffect,
   PendingStorylineChoice,
   StorylineCard,
   StorylineEngineAdapter,
