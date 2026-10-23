@@ -8,12 +8,16 @@
  * story-line module and its **default UI adapter** (no Main Street code), so
  * it doubles as a worked example of the pluggable seams:
  *
- * - `createStorylineSystem({ engine })` binds a tiny in-scene engine adapter
- *   (seeded rng, effect application, activity log, chain-card sink) to the
- *   default presentation adapter.
+ * - `createStorylineSystem({ engine })` binds a tiny engine adapter (seeded
+ *   rng, effect application, activity log, chain-card sink) to the default
+ *   presentation adapter.
  * - `compileStorylineFromEvent` / `createPendingStorylineChoice` drive the
  *   choice dialog; `resolveStorylineOption` applies the effect and pushes the
  *   successor card.
+ *
+ * The demo's fixture and every decision it makes live in the Phaser-free
+ * `../GymStorylineDemo` module, which is unit-tested directly; this scene only
+ * renders what those pure transitions return.
  *
  * @module example-games/gym/scenes/GymStorylineScene
  */
@@ -24,100 +28,21 @@ import { GYM_STORYLINE_KEY } from '../GymRegistry';
 import { createHudText } from '../../../src/ui/Renderer';
 import { GAME_W } from '../../../src/ui/constants';
 import {
-  createStorylineSystem,
-  type PendingStorylineChoice,
-  type StorylineCard,
-  type StorylineEngineAdapter,
-  type StorylineLogEntry,
-  type StorylineOption,
-  type StorylineSystem,
+  applyDemoChoice,
+  createDemoRuntime,
+  drawDemoCard,
+  startDemo,
+  type DemoDraw,
+  type DemoRuntime,
+  type DemoState,
+} from '../GymStorylineDemo';
+import type {
+  PendingStorylineChoice,
+  StorylineCard,
+  StorylineOption,
+  StorylineSystem,
 } from '@story-line';
 import { SCENE_HEADER_Y } from './GymConstants';
-
-/** The demo's minimal game state. */
-interface DemoState {
-  coins: number;
-  reputation: number;
-  turn: number;
-  rngSeed: number;
-  activityLog: StorylineLogEntry[];
-  deck: StorylineCard[];
-}
-
-/** The demo's card catalogue (templates, no instance serials). */
-const DEMO_CARDS: readonly StorylineCard[] = [
-  {
-    id: 'gym-story-start',
-    name: 'Town Meeting',
-    storylineId: 'gym-story',
-    storylineTitle: 'Gym Storyline',
-    effect: 'Lose 50 coins',
-    coinDelta: -50,
-    options: 'Invest|gym-story-invest;Ignore|gym-story-ignore',
-  },
-  {
-    id: 'gym-story-invest',
-    name: 'Public Investment',
-    storylineId: 'gym-story',
-    storylineTitle: 'Gym Storyline',
-    effect: 'Gain 120 coins',
-    coinDelta: 120,
-    options: 'Celebrate|gym-story-end;Double down|',
-  },
-  {
-    id: 'gym-story-ignore',
-    name: 'Neglected Roads',
-    storylineId: 'gym-story',
-    storylineTitle: 'Gym Storyline',
-    effect: 'Lose 80 coins',
-    coinDelta: -80,
-    options: 'Repair|gym-story-end;Let it be|',
-  },
-  {
-    id: 'gym-story-end',
-    name: 'New Beginning',
-    storylineId: 'gym-story',
-    storylineTitle: 'Gym Storyline',
-    effect: 'Gain 60 reputation',
-    reputationDelta: 60,
-  },
-];
-
-const TEMPLATES = new Map<string, StorylineCard>(
-  DEMO_CARDS.map((card) => [card.id, card]),
-);
-
-/** Deterministic LCG so the demo is replay-safe (no candidate draws here). */
-function nextRandom(state: DemoState): number {
-  state.rngSeed = (state.rngSeed * 1664525 + 1013904223) >>> 0;
-  return state.rngSeed / 0x100000000;
-}
-
-/** Engine adapter mapping the generic seams onto the demo state. */
-function createDemoEngine(): StorylineEngineAdapter<DemoState, StorylineCard> {
-  return {
-    rng: (state) => nextRandom(state),
-    applyEffect: (state, card) => {
-      state.coins += card.coinDelta ?? 0;
-      state.reputation += card.reputationDelta ?? 0;
-    },
-    applyResourceDelta: (state, delta) => {
-      state.coins += delta.coins ?? 0;
-      state.reputation += delta.reputation ?? 0;
-    },
-    getResources: (state) => ({ coins: state.coins, reputation: state.reputation }),
-    appendLog: (state, text) => {
-      state.activityLog.push({ turn: state.turn, text });
-    },
-    getActivityLog: (state) => state.activityLog,
-    getTemplate: (id) => TEMPLATES.get(id) ?? null,
-    getBaseTypeId: (id) => id.replace(/-\d+$/, ''),
-    getChainScanCards: (state) => state.deck,
-    pushChainCard: (state, card) => {
-      state.deck.push(card);
-    },
-  };
-}
 
 const LOG_MAX_LINES = 6;
 
@@ -126,11 +51,20 @@ export class GymStorylineScene extends GymSceneBase {
     super({ key: GYM_STORYLINE_KEY });
   }
 
-  private system!: StorylineSystem<DemoState, StorylineCard>;
-  private state!: DemoState;
+  private demo!: DemoRuntime;
   private currentCard: StorylineCard | null = null;
   private pending: PendingStorylineChoice<DemoState, StorylineCard> | null = null;
   private finished = false;
+
+  /** The demo's mutable state (owned by the pure demo runtime). */
+  private get state(): DemoState {
+    return this.demo.state;
+  }
+
+  /** The wired story-line system (generic seams + default UI adapter). */
+  private get system(): StorylineSystem<DemoState, StorylineCard> {
+    return this.demo.system;
+  }
 
   private titleText!: Phaser.GameObjects.Text;
   private subtitleText!: Phaser.GameObjects.Text;
@@ -158,11 +92,11 @@ export class GymStorylineScene extends GymSceneBase {
       },
       {
         heading: 'Test plan',
-        body: '1. The Town Meeting card offers Invest / Ignore.\n2. Picking Invest gains 120 coins and deals Public Investment, which offers Celebrate / Double down.\n3. Celebrate deals the terminal New Beginning card, applies its reputation effect, and ends the chain.\n4. Double down (a terminal option) ends the chain immediately with no successor.\n5. Reset returns to the first card.',
+        body: '1. The Town Meeting card offers Invest / Ignore; either choice applies Town Meeting\'s effect (-50 coins) and deals the matching successor.\n2. Invest deals Public Investment, which offers Celebrate / Double down; Celebrate applies +120 coins and deals the terminal New Beginning card.\n3. New Beginning has no options: drawing it applies its +60 reputation effect and ends the chain.\n4. Double down (a terminal option) ends the chain immediately with no successor.\n5. Reset returns to the first card.',
       },
     ]);
 
-    this.system = createStorylineSystem({ engine: createDemoEngine() });
+    this.demo = createDemoRuntime();
 
     const cx = GAME_W / 2;
     this.titleText = createHudText(this, cx, SCENE_HEADER_Y + 30, '', '#ffffff', {
@@ -196,19 +130,12 @@ export class GymStorylineScene extends GymSceneBase {
   }
 
   private resetDemo(): void {
-    this.state = {
-      coins: 1000,
-      reputation: 50,
-      turn: 1,
-      rngSeed: 0x5eed,
-      activityLog: [],
-      deck: [],
-    };
+    this.demo = createDemoRuntime();
     this.finished = false;
     this.pending = null;
     this.currentCard = null;
     this.clearOptionButtons();
-    this.showCard(TEMPLATES.get('gym-story-start')!);
+    this.renderDraw(startDemo(this.demo));
   }
 
   private clearOptionButtons(): void {
@@ -216,34 +143,29 @@ export class GymStorylineScene extends GymSceneBase {
     this.optionButtons = [];
   }
 
-  /** Draws a card: renders a choice, or applies a terminal card and ends. */
+  /**
+   * Draws a card and renders the pure decision's outcome: options for a
+   * branching card, or the applied effect and a finished chain for a terminal
+   * card.
+   */
   private showCard(card: StorylineCard): void {
+    this.renderDraw(drawDemoCard(this.system, this.state, card));
+  }
+
+  /** Renders the outcome of a pure draw (options, or a finished chain). */
+  private renderDraw(draw: DemoDraw): void {
+    const card = draw.card;
     this.currentCard = card;
-    this.pending = null;
+    this.pending = draw.pending;
     this.clearOptionButtons();
 
     this.titleText.setText(this.system.ui.choiceDialogTitle(card));
     this.subtitleText.setText(this.system.ui.choiceDialogSubtitle(card));
-    this.cardText.setText(
-      `${card.name} — ${card.effect ?? 'no effect'}`,
-    );
+    this.cardText.setText(`${card.name} — ${card.effect ?? 'no effect'}`);
 
-    if (this.system.eventHasStoryline(card)) {
-      this.pending = this.system.createPendingStorylineChoice(card, this.state);
-      const options = this.system.getPendingStorylineOptions(this.pending!, this.state);
-      this.renderOptions(card, options);
+    if (!draw.finished) {
+      this.renderOptions(card, draw.options);
     } else {
-      // Terminal (non-choice) card: apply its effect and end the chain.
-      const before = this.system.engine.getResources(this.state);
-      this.system.engine.applyEffect(this.state, card);
-      const after = this.system.engine.getResources(this.state);
-      const line = this.system.ui.storyUpdateLine(
-        card,
-        'accept',
-        after.coins - before.coins,
-        after.reputation - before.reputation,
-      );
-      if (line) this.system.engine.appendLog(this.state, line);
       this.finished = true;
       this.statusText.setText('Chain complete — press Reset to play again.');
     }
@@ -276,16 +198,13 @@ export class GymStorylineScene extends GymSceneBase {
   private choose(option: StorylineOption<DemoState>): void {
     if (!this.pending || !this.currentCard || this.finished) return;
     const card = this.currentCard;
-    const result = this.system.resolveStorylineOption(this.state, card, option);
-    this.system.markChoiceResolved(this.pending, option.label);
-
-    const line = this.system.ui.storyUpdateLine(
+    const result = applyDemoChoice(
+      this.system,
+      this.state,
       card,
-      option.label,
-      result.coinChange,
-      result.repChange,
+      option,
+      this.pending,
     );
-    if (line) this.system.engine.appendLog(this.state, line);
 
     // Remove the spent option buttons before rendering the next card.
     this.clearOptionButtons();
