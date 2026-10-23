@@ -27,6 +27,66 @@ and returns a {@link StorylineSystem} with:
 | Resolution | `resolveStorylineOption`, `pushChainCard` |
 | Pending choice | `createPendingStorylineChoice`, `getPendingStorylineOptions`, `markChoiceResolved` |
 | Journal | `parseStoryUpdate`, `buildJournal`, `journalIsEmpty`, `journalTitle` |
+| Validation | `validateStorylineOptions` (declarative metadata guard) |
+
+### Story-line options
+
+A `StorylineOption` is the unit a player chooses from. Core describes options
+**programmatically** via `registerStorylineOptions` — the CSV `options` column
+is a *label/outcome* shorthand and cannot author the extended fields below
+(producer decision: programmatic only).
+
+| Field | Type | When it applies |
+|---|---|---|
+| `label` | `string` | always |
+| `effectPolicy` | `'apply' \| 'skip'` | always — controls the card's intrinsic effect |
+| `condition?` | `(state) => boolean` | draw time — omit the option when `false` |
+| `successorId?` | `string \| null` | resolution — legacy single successor |
+| `successorIds?` | `string[]` | resolution — one seeded random draw picks a candidate |
+| `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence |
+| `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins |
+| `cost?` | `{ coins?; reputation? }` | draw time **and** resolution — affordability gate + real payment |
+| `extraEffect?` | `{ coins?; reputation? }` | resolution — additional resource gain |
+
+```ts
+import { createStorylineSystem, validateStorylineOptions } from '@story-line';
+
+storyline.registerStorylineOptions('evt-mystery', [
+  {
+    label: 'Hire a detective',
+    effectPolicy: 'apply',
+    cost: { coins: 100, reputation: 5 },
+    extraEffect: { coins: 10 },
+    conditionalSuccessors: [
+      { when: { field: 'coins', op: '>=', value: 500 }, successorId: 'evt-rich-outcome' },
+      { when: { field: 'reputation', op: '<', value: 10 }, successorId: null },
+    ],
+    successorId: 'evt-default-outcome',
+  },
+  {
+    label: 'Walk away',
+    effectPolicy: 'skip',
+  },
+]);
+
+const { valid, issues } = validateStorylineOptions(
+  storyline.getStorylineOptions(eventCard, state),
+);
+```
+
+Semantics:
+
+- **`cost`** — an affordability *gate* at draw time (an option the player
+  cannot afford is **omitted**, never disabled) and a *real payment* at
+  resolution. An unspecified component is unconstrained. Costs are paid in
+  addition to whatever `effectPolicy` does — `skip` still pays.
+- **`extraEffect`** — a resource *gain* applied after the cost payment,
+  independently of `effectPolicy`. Negative extras are rejected by
+  `validateStorylineOptions`.
+- **`conditionalSuccessors`** — ordered declarative rules. The first rule
+  whose `when` condition matches the **post-resolution** resources determines
+  the pushed card; `null` ends the chain. Rules are evaluated before any
+  random draw and consume no RNG.
 
 ### Compilation
 
@@ -39,21 +99,38 @@ Precedence: **registered options > CSV `options` encoding > legacy
   options, `|` separates the label from candidate ids, `,` separates
   candidates). An empty candidate list is a **terminal** option. Every
   CSV-authored option carries `effectPolicy: 'apply'`.
-- Registry/CSV options can carry a `condition(state)` callback, evaluated once
-  at draw time; options whose condition returns `false` are omitted from the
-  presented list.
+- Draw-time filtering is **combined**: a registered option is omitted when its
+  `condition(state)` callback returns `false` **or** its declarative `cost`
+  exceeds the player's current coins/reputation. Options without a cost are
+  always included; a cost exactly equal to the balance is affordable.
+  Filtering happens once, when the option list is compiled at draw time, and
+  the result is frozen into `PendingStorylineChoice.options`, where consumers
+  (including AI scoring) read the stable presented list.
 
 ### Resolution
 
-`resolveStorylineOption(state, card, option)` applies the option's
-`effectPolicy` (`apply` runs the card effect, `skip` does not), then resolves
-the successor with this precedence:
+`resolveStorylineOption(state, card, option)` runs the full lifecycle for a
+selected option:
 
-1. `option.successorResolver(state)` — a callback; `null`/`undefined` ends the
-   chain. Consumes no RNG.
-2. `option.successorIds` — exactly **one** seeded `rng()` draw selects a
-   candidate. An empty list is terminal and consumes no draw.
-3. `option.successorId` — a legacy single id, pushed directly (no draw).
+1. **`effectPolicy`** — `apply` runs the card effect, `skip` does not
+   (unchanged legacy step).
+2. **Cost payment** — the option's `cost` is deducted through the engine
+   adapter's resource-mutation seam, in addition to the effect.
+3. **Extra effect** — the option's `extraEffect` gains are applied, also
+   through the resource-mutation seam.
+4. **Deltas** — `coinChange` / `repChange` account for all three steps; each
+   applied cost/extra effect appends an activity-log line (`Cost paid: -100
+   coins.`, `Extra effect: +10 coins.`).
+5. **Successor** — resolved with this precedence:
+
+   1. `option.successorResolver(state)` — a callback; `null`/`undefined` ends
+      the chain. Consumes no RNG.
+   2. `option.conditionalSuccessors` — evaluated in declaration order against
+      the post-resolution resources; the first matching rule's `successorId`
+      is pushed (`null` ends the chain). A matching rule consumes no RNG.
+   3. `option.successorIds` — exactly **one** seeded `rng()` draw selects a
+      candidate. An empty list is terminal and consumes no draw.
+   4. `option.successorId` — a legacy single id, pushed directly (no draw).
 
 The pushed card uses deterministic serial naming: `${base}-${maxSerial+1}`,
 scanning every card the engine adapter returns from `getChainScanCards`.
@@ -108,7 +185,8 @@ content validates cleanly.
 |---|---|
 | `rng(state)` | Returns the next seeded value in `[0, 1)`. |
 | `applyEffect(state, card)` | Applies the card's intrinsic effect. |
-| `getResources(state)` | Current `{ coins, reputation }` for delta reporting. |
+| `applyResourceDelta?(state, { coins?, reputation? })` | **Optional** resource-mutation seam core uses to deduct costs and apply extra effects. A legacy adapter that omits it compiles and runs unchanged; core then leaves resources untouched and appends a warning line instead. |
+| `getResources(state)` | Current `{ coins, reputation }` for delta reporting and condition evaluation. |
 | `appendLog(state, text, kind?)` | Appends to the game activity log. |
 | `getActivityLog(state)` | The game's append-only log (`{ turn, text }`). |
 | `getTemplate(id)` | Template lookup for chain-card creation. |
@@ -118,7 +196,9 @@ content validates cleanly.
 
 The adapter is the **only** path from core logic into game state, which keeps
 the module deterministic and replay-safe (one seeded draw per candidate
-selection).
+selection). All new declarative semantics — cost payments, extra effects and
+condition evaluation — go through `getResources` + `applyResourceDelta`, so no
+new coupling is introduced.
 
 ## UI adapter
 
@@ -144,7 +224,9 @@ const ui = {
 ```
 
 The Gym demo uses the default adapter, demonstrating that no game code is
-required to present the mechanic.
+required to present the mechanic. The demo's fixtures are unchanged by the
+cost/extra-effect/conditional-successor extension: it exercises the legacy
+experience, and no Gym fixture uses the new fields.
 
 ## Gym demo
 
@@ -159,9 +241,12 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 ## Testing
 
 - `tests/story-line/compile.test.ts` — legacy and CSV compilation, registry
-  precedence, draw-time condition filtering.
-- `tests/story-line/resolve.test.ts` — apply/skip, successor precedence, the
-  one-draw rule, deterministic serial naming, pending-choice lifecycle.
+  precedence, draw-time condition **and cost** filtering, snapshot stability.
+- `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
+  effects, conditional successors, successor precedence, the one-draw rule,
+  deterministic serial naming, pending-choice lifecycle.
+- `tests/story-line/validate.test.ts` — declarative metadata validation
+  (costs, extra effects, conditions, dangling successors).
 - `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state.
 - `tests/story-line/ui-adapter.test.ts` — default adapter wording and the
   pluggable override seam.

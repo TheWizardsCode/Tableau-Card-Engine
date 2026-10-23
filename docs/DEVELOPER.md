@@ -1630,6 +1630,17 @@ This keeps `@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*` and
 The generic branching story-line system (`@story-line`) is documented in
 [`docs/core-engine/story-line.md`](core-engine/story-line.md).
 
+**Authoring seam.** The extended option model — declarative `cost`,
+`extraEffect` and `conditionalSuccessors` — is **programmatic** only: register
+it with `registerStorylineOptions(eventId, options)` and validate the list with
+`validateStorylineOptions(...)`. The CSV `options` column
+(`label|cardA,cardB;label2|cardC`) stays a label/outcome shorthand and cannot
+author the extended fields, so existing CSV content is unaffected. The engine
+adapter's optional `applyResourceDelta(state, { coins?, reputation? })` method
+is the seam core uses to deduct costs and apply extra effects; an adapter that
+omits it keeps compiling and running unchanged (core warns in the activity log
+instead of mutating resources).
+
 ## Build-Time Version Injection
 
 The app version (from `package.json`'s `version` field) is injected at build time
