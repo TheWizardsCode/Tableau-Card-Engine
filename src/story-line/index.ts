@@ -90,6 +90,7 @@ export {
   compileStorylineFromEvent,
   createStorylineOptionRegistry,
   eventHasStoryline,
+  isOptionAffordable,
 } from './compile';
 export type { StorylineOptionRegistry } from './compile';
 
@@ -131,7 +132,9 @@ export function createStorylineSystem<
     card: TCard,
     state?: TState,
   ): CompiledStoryline<TState> =>
-    compileStorylineFromEvent(card, registry, state);
+    compileStorylineFromEvent(card, registry, state, (s) =>
+      engine.getResources(s),
+    );
 
   const getStorylineOptions = (
     card: TCard,

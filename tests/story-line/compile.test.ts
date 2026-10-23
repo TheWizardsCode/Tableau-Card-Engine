@@ -305,6 +305,150 @@ describe('draw-time condition filtering', () => {
   });
 });
 
+// ── AC3: draw-time cost filtering ───────────────────────────
+
+describe('draw-time cost filtering', () => {
+  it('omits an option whose coin cost exceeds the balance', () => {
+    const { system, state } = makeSystem();
+    state.coins = 100;
+    system.registerStorylineOptions('evt-cost', [
+      { label: 'Cheap', effectPolicy: 'apply', cost: { coins: 50 } },
+      { label: 'Too dear', effectPolicy: 'apply', cost: { coins: 101 } },
+    ]);
+
+    expect(
+      system.getStorylineOptions(makeCard({ id: 'evt-cost' }), state).map((o) => o.label),
+    ).toEqual(['Cheap']);
+  });
+
+  it('omits an option whose reputation cost exceeds the balance', () => {
+    const { system, state } = makeSystem();
+    state.reputation = 10;
+    system.registerStorylineOptions('evt-cost-rep', [
+      { label: 'Affordable', effectPolicy: 'apply', cost: { reputation: 10 } },
+      { label: 'Unaffordable', effectPolicy: 'apply', cost: { reputation: 11 } },
+    ]);
+
+    expect(
+      system.getStorylineOptions(makeCard({ id: 'evt-cost-rep' }), state).map((o) => o.label),
+    ).toEqual(['Affordable']);
+  });
+
+  it('treats a cost equal to the current balance as affordable (boundary)', () => {
+    const { system, state } = makeSystem();
+    state.coins = 75;
+    state.reputation = 3;
+    system.registerStorylineOptions('evt-cost-boundary', [
+      {
+        label: 'Exact',
+        effectPolicy: 'apply',
+        cost: { coins: 75, reputation: 3 },
+      },
+    ]);
+
+    expect(
+      system.getStorylineOptions(makeCard({ id: 'evt-cost-boundary' }), state).map(
+        (o) => o.label,
+      ),
+    ).toEqual(['Exact']);
+  });
+
+  it('enforces both the coin and reputation gates when both are specified', () => {
+    const { system, state } = makeSystem();
+    state.coins = 100;
+    state.reputation = 5;
+    system.registerStorylineOptions('evt-cost-both', [
+      { label: 'Both ok', effectPolicy: 'apply', cost: { coins: 100, reputation: 5 } },
+      { label: 'Coins ok, rep short', effectPolicy: 'apply', cost: { coins: 100, reputation: 6 } },
+      { label: 'Rep ok, coins short', effectPolicy: 'apply', cost: { coins: 101, reputation: 5 } },
+    ]);
+
+    expect(
+      system.getStorylineOptions(makeCard({ id: 'evt-cost-both' }), state).map((o) => o.label),
+    ).toEqual(['Both ok']);
+  });
+
+  it('always includes options without a cost', () => {
+    const { system, state } = makeSystem();
+    state.coins = 0;
+    state.reputation = 0;
+    system.registerStorylineOptions('evt-cost-free', [
+      { label: 'Free', effectPolicy: 'apply' },
+      { label: 'Free skip', effectPolicy: 'skip' },
+    ]);
+
+    expect(
+      system.getStorylineOptions(makeCard({ id: 'evt-cost-free' }), state).map((o) => o.label),
+    ).toEqual(['Free', 'Free skip']);
+  });
+
+  it('applies the condition callback and the cost gate together', () => {
+    const { system, state } = makeSystem();
+    state.coins = 50;
+    system.registerStorylineOptions('evt-cost-and-cond', [
+      { label: 'Cond fails', effectPolicy: 'apply', condition: () => false, cost: { coins: 10 } },
+      { label: 'Cost fails', effectPolicy: 'apply', condition: () => true, cost: { coins: 51 } },
+      { label: 'Both pass', effectPolicy: 'apply', condition: () => true, cost: { coins: 50 } },
+    ]);
+
+    expect(
+      system.getStorylineOptions(makeCard({ id: 'evt-cost-and-cond' }), state).map(
+        (o) => o.label,
+      ),
+    ).toEqual(['Both pass']);
+  });
+
+  it('keeps a stable draw-time snapshot of the cost-filtered list', () => {
+    const { system, state } = makeSystem();
+    state.coins = 100;
+    system.registerStorylineOptions('evt-cost-snapshot', [
+      { label: 'Pay', effectPolicy: 'apply', cost: { coins: 100 } },
+      { label: 'Free', effectPolicy: 'apply' },
+    ]);
+    const card = makeCard({ id: 'evt-cost-snapshot' });
+
+    const pending = system.createPendingStorylineChoice(card, state);
+    expect(pending).not.toBeNull();
+    // Resources change after the draw: the frozen snapshot must not change.
+    state.coins = 0;
+    expect(system.getPendingStorylineOptions(pending!, state).map((o) => o.label)).toEqual([
+      'Pay',
+      'Free',
+    ]);
+  });
+
+  it('re-applies the cost filter when a legacy pending choice has no snapshot', () => {
+    const { system, state } = makeSystem();
+    state.coins = 100;
+    system.registerStorylineOptions('evt-cost-legacy', [
+      { label: 'Pay', effectPolicy: 'apply', cost: { coins: 100 } },
+    ]);
+    const card = makeCard({ id: 'evt-cost-legacy' });
+    const pending = system.createPendingStorylineChoice(card);
+    expect(pending).not.toBeNull();
+    expect(pending!.options).toBeUndefined();
+
+    expect(system.getPendingStorylineOptions(pending!, state).map((o) => o.label)).toEqual([
+      'Pay',
+    ]);
+    state.coins = 99;
+    expect(system.getPendingStorylineOptions(pending!, state)).toEqual([]);
+  });
+
+  it('inherits cost-filtered options into the pending snapshot at draw time', () => {
+    const { system, state } = makeSystem();
+    state.coins = 10;
+    system.registerStorylineOptions('evt-cost-draw', [
+      { label: 'Affordable', effectPolicy: 'apply', cost: { coins: 10 } },
+      { label: 'Unaffordable', effectPolicy: 'apply', cost: { coins: 11 } },
+      { label: 'Free', effectPolicy: 'apply' },
+    ]);
+
+    const pending = system.createPendingStorylineChoice(makeCard({ id: 'evt-cost-draw' }), state);
+    expect(pending?.options?.map((o) => o.label)).toEqual(['Affordable', 'Free']);
+  });
+});
+
 // ── eventHasStoryline semantics ─────────────────────────────
 
 describe('eventHasStoryline', () => {

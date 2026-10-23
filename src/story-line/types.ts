@@ -242,6 +242,11 @@ export interface PendingStorylineChoice<
   /**
    * Draw-time snapshot of the compiled option list. When present, resolution
    * reads this frozen list (condition callbacks are never re-evaluated).
+   *
+   * The snapshot is **cost-filtered** as well: an option whose declarative
+   * `cost` exceeded the player's coins/reputation at draw time is absent from
+   * this list. Consumers (e.g. AI scoring) must read this snapshot — it is the
+   * presented list, computed once at draw time and stable thereafter.
    */
   options?: readonly StorylineOption<TState>[];
 }

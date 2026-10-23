@@ -13,6 +13,7 @@
 
 import type {
   CompiledStoryline,
+  OptionCost,
   StorylineCard,
   StorylineOption,
 } from './types';
@@ -120,6 +121,29 @@ export function parseStorylineOptionsEncoding<TState>(
 }
 
 /**
+ * True when the player's current resources cover the option's declarative
+ * `cost`.
+ *
+ * An option with no `cost` is always affordable. Every specified cost
+ * component is a required gate: the option is affordable only when the
+ * player has at least `cost.coins` coins **and** at least `cost.reputation`
+ * reputation. An unspecified component is unconstrained (never defaulted to
+ * zero). A cost exactly equal to the current balance is affordable.
+ *
+ * @param option    The option to check (its `cost` may be absent).
+ * @param resources Current spendable resources.
+ */
+export function isOptionAffordable(
+  option: { cost?: OptionCost },
+  resources: { coins: number; reputation: number },
+): boolean {
+  if (!option.cost) return true;
+  const coins = option.cost.coins ?? 0;
+  const reputation = option.cost.reputation ?? 0;
+  return resources.coins >= coins && resources.reputation >= reputation;
+}
+
+/**
  * Compiles a card's story-line into the generalised option model.
  *
  * Precedence: explicit registry options > CSV `options` encoding > legacy
@@ -132,30 +156,42 @@ export function parseStorylineOptionsEncoding<TState>(
  *   empty option list.
  * - Legacy choice cards → two options [Accept(apply), Reject(skip)].
  *
- * When `state` is provided, registry options whose `condition` callback
- * returns `false` are omitted from the result (draw-time filtering).
+ * When `state` **and** a resources oracle are provided, registry options are
+ * filtered at draw time: an option is omitted when its `condition` callback
+ * returns `false` **or** its declarative `cost` exceeds the current
+ * resources ({@link isOptionAffordable}). Without a resources oracle (or
+ * without state) no cost filtering happens — legacy behaviour is preserved.
  *
- * @param event    The story-line card.
- * @param registry The option registry to consult (base-type-id keyed).
- * @param state    Optional game state for draw-time condition filtering.
+ * @param event        The story-line card.
+ * @param registry     The option registry to consult (base-type-id keyed).
+ * @param state        Optional game state for draw-time condition filtering.
+ * @param getResources Optional resources oracle for draw-time cost
+ *                     affordability filtering. Reads the current spendable
+ *                     resources from `state`; when absent, cost-gated options
+ *                     are never filtered (legacy behaviour).
  */
 export function compileStorylineFromEvent<TState, TCard extends StorylineCard>(
   event: TCard,
   registry: StorylineOptionRegistry<TState>,
   state?: TState,
+  getResources?: (state: TState) => { coins: number; reputation: number },
 ): CompiledStoryline<TState> {
   const storylineId = event.storylineId ?? null;
   const registered = registry.get(event.id);
   if (registered) {
     const options = registered.map((o) => ({ ...o }));
     if (state) {
-      // Filter by condition at draw time: omit options whose condition
-      // callback returns false. Options without a condition (or whose
-      // condition returns true) are included unchanged.
+      // Filter at draw time: omit options whose condition callback returns
+      // false or whose declarative cost exceeds the current resources.
+      // Options without a condition (or whose condition returns true) and
+      // without an unaffordable cost are included unchanged.
+      const resources = getResources ? getResources(state) : null;
       return {
         storylineId,
         compiledOptions: options.filter(
-          (o) => o.condition == null || o.condition(state),
+          (o) =>
+            (o.condition == null || o.condition(state)) &&
+            (resources == null || isOptionAffordable(o, resources)),
         ),
       };
     }
