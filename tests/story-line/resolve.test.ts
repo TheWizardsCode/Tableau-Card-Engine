@@ -325,13 +325,13 @@ describe('cost payment and extra effects', () => {
       label: 'Pay and gain',
       effectPolicy: 'skip',
       cost: { coins: 100 },
-      extraEffect: { coins: 30, reputation: -2 },
+      extraEffect: { coins: 30, reputation: 2 },
     });
 
     expect(res.coinChange).toBe(-70);
-    expect(res.repChange).toBe(-2);
+    expect(res.repChange).toBe(2);
     expect(state.coins).toBe(930);
-    expect(state.reputation).toBe(48);
+    expect(state.reputation).toBe(52);
   });
 
   it('applies the policy effect before the cost and the extra effect', () => {

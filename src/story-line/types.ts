@@ -103,6 +103,10 @@ export interface OptionCost {
  *
  * Each specified component is a signed delta (`-5` deducts, `5` grants). An
  * unspecified component leaves that resource unchanged.
+ *
+ * Authoring rule: extra effects are **gains**, so a negative component is
+ * rejected by {@link validateStorylineOptions} (`negative-extra-effect`).
+ * Resolution itself stays permissive and applies whatever is declared.
  */
 export interface OptionExtraEffect {
   /** Coin delta applied on resolution. */

@@ -58,6 +58,48 @@ the successor with this precedence:
 The pushed card uses deterministic serial naming: `${base}-${maxSerial+1}`,
 scanning every card the engine adapter returns from `getChainScanCards`.
 
+## Validation
+
+`validateStorylineOptions(options, { knownTemplateIds? })` statically validates
+the **declarative** parts of an option list — `cost`, `extraEffect` and
+`conditionalSuccessors`. It never throws and never mutates the list, and it
+works on any source: options registered with `registerStorylineOptions`,
+options compiled from a CSV `options` encoding, or an option list assembled by
+a game.
+
+```ts
+import { validateStorylineOptions } from '@story-line';
+
+const { valid, issues } = validateStorylineOptions(
+  storyline.getStorylineOptions(card, state),
+  { knownTemplateIds: allCardTemplateIds },
+);
+if (!valid) {
+  for (const issue of issues) {
+    console.warn(`${issue.path}: ${issue.message}`);
+  }
+}
+```
+
+Rules:
+
+| Code | Rejects |
+|---|---|
+| `non-positive-cost` | `cost.coins` / `cost.reputation` equal to zero or negative. |
+| `negative-extra-effect` | `extraEffect.coins` / `extraEffect.reputation` below zero (extra effects are gains). |
+| `unknown-condition-field` | A condition field other than `coins` / `reputation`. |
+| `unknown-condition-op` | An operator other than `>=`, `<=`, `>`, `<`, `==`. |
+| `non-numeric-value` | A non-finite (or non-numeric) cost, extra-effect or condition value. |
+| `dangling-conditional-successor` | A rule targeting an id outside `knownTemplateIds` (checked only when the catalogue is supplied). |
+| `invalid-successor-id` | A rule `successorId` that is neither a string nor `null`. |
+| `invalid-conditional-successors` | A `conditionalSuccessors` value that is not an array of rule objects. |
+| `invalid-condition` | A rule without a `when` condition object. |
+
+Validation is authoring-time only: runtime resolution remains permissive, so a
+list that fails validation still resolves exactly as declared. No shipped CSV
+content uses `cost`, `extraEffect` or `conditionalSuccessors`, so all shipped
+content validates cleanly.
+
 ## Engine adapter
 
 `StorylineEngineAdapter<TState, TCard>` inverts all state coupling:

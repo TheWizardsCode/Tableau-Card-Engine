@@ -85,6 +85,13 @@ export {
   pushChainCard,
   resolveStorylineOption,
 } from './resolve';
+export { validateStorylineOptions } from './validate';
+export type {
+  StorylineValidationCode,
+  StorylineValidationIssue,
+  StorylineValidationResult,
+  ValidateStorylineOptionsOptions,
+} from './validate';
 export {
   buildJournal,
   journalIsEmpty,
