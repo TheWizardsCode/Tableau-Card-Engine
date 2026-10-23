@@ -80,7 +80,11 @@ export {
   defaultJournalTitle,
   defaultStorylineSummary,
 } from './ui-adapter';
-export { pushChainCard, resolveStorylineOption } from './resolve';
+export {
+  evaluateCondition,
+  pushChainCard,
+  resolveStorylineOption,
+} from './resolve';
 export {
   buildJournal,
   journalIsEmpty,

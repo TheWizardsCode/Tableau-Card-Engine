@@ -20,22 +20,61 @@
  *
  * 1. `successorResolver` callback (when present) — invoked for the successor
  *    id; a `null`/`undefined` return ends the chain. Consumes no RNG.
- * 2. Candidate set (`successorIds`) — exactly **one** seeded `engine.rng()`
+ * 2. Declarative `conditionalSuccessors` — evaluated in declaration order
+ *    against the post-resolution resources; the first matching rule's
+ *    `successorId` is pushed (`null` ends the chain). A matching rule
+ *    consumes no RNG draw; when no rule matches, resolution falls through
+ *    to the random/legacy steps below.
+ * 3. Candidate set (`successorIds`) — exactly **one** seeded `engine.rng()`
  *    draw selects the successor uniformly at random (one draw per selection,
  *    at resolution time; replay with the same seed yields the same
  *    successor). An **empty** candidate list is a terminal option — the
  *    chain ends without consuming a draw.
- * 3. Legacy single `successorId` — pushed directly, no draw.
+ * 4. Legacy single `successorId` — pushed directly, no draw.
  *
  * @module
  */
 
 import type {
+  Condition,
   StorylineCard,
   StorylineEngineAdapter,
   StorylineOption,
   StorylineResolution,
 } from './types';
+
+/**
+ * True when a declarative condition matches the current resources.
+ *
+ * Pure: no RNG, no state mutation, no logging. The `==` operator compares
+ * numerically (`5 == 5.0`); equality boundaries follow the usual numeric
+ * semantics for the ordered operators.
+ *
+ * @param condition The field/op/value rule to evaluate.
+ * @param resources Current spendable resources.
+ */
+export function evaluateCondition(
+  condition: Condition,
+  resources: { coins: number; reputation: number },
+): boolean {
+  const current = resources[condition.field];
+  switch (condition.op) {
+    case '>=':
+      return current >= condition.value;
+    case '<=':
+      return current <= condition.value;
+    case '>':
+      return current > condition.value;
+    case '<':
+      return current < condition.value;
+    case '==':
+      return current === condition.value;
+    default: {
+      const exhaustive: never = condition.op;
+      return exhaustive;
+    }
+  }
+}
 
 /**
  * Formats a signed resource delta for the activity log, omitting zero
@@ -173,22 +212,44 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
   const coinChange = after.coins - before.coins;
   const repChange = after.reputation - before.reputation;
 
-  // Determine the successor id (precedence per the module doc): the uniform
-  // draw consumes exactly one rng() call per selection.
+  // Determine the successor id (precedence per the module doc): a matching
+  // declarative rule consumes no rng(); the uniform candidate draw consumes
+  // exactly one rng() call per selection.
   let resolvedSuccessor: string | null | undefined;
   if (option.successorResolver != null) {
     resolvedSuccessor = option.successorResolver(state);
-  } else if (option.successorIds != null) {
-    resolvedSuccessor =
-      option.successorIds.length > 0
-        ? option.successorIds[Math.floor(adapter.rng(state) * option.successorIds.length)]
-        : null; // terminal option — the chain ends, no draw.
+  } else if (option.conditionalSuccessors != null && option.conditionalSuccessors.length > 0) {
+    // First matching rule wins (declaration order, post-resolution resources);
+    // when no rule matches, fall through to the random/legacy resolution.
+    const match = option.conditionalSuccessors.find((rule) =>
+      evaluateCondition(rule.when, after),
+    );
+    resolvedSuccessor = match
+      ? match.successorId
+      : resolveRawSuccessor(state, adapter, option);
   } else {
-    resolvedSuccessor = option.successorId;
+    resolvedSuccessor = resolveRawSuccessor(state, adapter, option);
   }
 
   // Push successor card if one exists.
   const pushedCard = pushChainCard(state, adapter, resolvedSuccessor);
 
   return { pushedCard, coinChange, repChange };
+}
+
+/**
+ * Legacy successor resolution: the candidate-set random draw when
+ * `successorIds` is declared, otherwise the single `successorId`.
+ */
+function resolveRawSuccessor<TState, TCard extends StorylineCard>(
+  state: TState,
+  adapter: StorylineEngineAdapter<TState, TCard>,
+  option: StorylineOption<TState>,
+): string | null | undefined {
+  if (option.successorIds != null) {
+    return option.successorIds.length > 0
+      ? option.successorIds[Math.floor(adapter.rng(state) * option.successorIds.length)]
+      : null; // terminal option — the chain ends, no draw.
+  }
+  return option.successorId;
 }

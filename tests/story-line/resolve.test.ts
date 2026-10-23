@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { createStorylineSystem } from '../../src/story-line';
+import { createStorylineSystem, evaluateCondition } from '../../src/story-line';
 import {
   addTemplate,
   makeAdapter,
@@ -429,5 +429,244 @@ describe('cost payment and extra effects', () => {
         e.text.includes('applyResourceDelta'),
       ),
     ).toBe(true);
+  });
+});
+
+// ── C4: declarative conditional successors ──────────────────
+
+describe('declarative conditional successors', () => {
+  it('picks the first matching rule (greater-than threshold)', () => {
+    const { system, state, map } = setup([makeCard({ id: 'evt-high' })]);
+    expect(map.size).toBe(1);
+    state.coins = 600;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '>', value: 500 }, successorId: 'evt-high' },
+      ],
+      successorId: 'evt-fallback',
+    });
+
+    expect(res.pushedCard?.id).toBe('evt-high-0');
+    expect(state.rngCalls).toBe(0);
+  });
+
+  it('does not match below the threshold', () => {
+    const { system, state, map } = setup([
+      makeCard({ id: 'evt-low' }),
+      makeCard({ id: 'evt-fallback' }),
+    ]);
+    state.coins = 400;
+    expect(map.size).toBe(2);
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '>', value: 500 }, successorId: 'evt-low' },
+      ],
+      successorId: 'evt-fallback',
+    });
+
+    expect(res.pushedCard?.id).toBe('evt-fallback-0');
+  });
+
+  it('treats equality as a match for >= (boundary)', () => {
+    const { system, state } = setup([makeCard({ id: 'evt-eq' })]);
+    state.reputation = 42;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'reputation', op: '>=', value: 42 }, successorId: 'evt-eq' },
+      ],
+      successorId: 'evt-fallback',
+    });
+
+    expect(res.pushedCard?.id).toBe('evt-eq-0');
+  });
+
+  it('treats equality as a non-match for > (boundary)', () => {
+    const { system, state } = setup([
+      makeCard({ id: 'evt-eq' }),
+      makeCard({ id: 'evt-fallback' }),
+    ]);
+    state.reputation = 42;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'reputation', op: '>', value: 42 }, successorId: 'evt-eq' },
+      ],
+      successorId: 'evt-fallback',
+    });
+
+    expect(res.pushedCard?.id).toBe('evt-fallback-0');
+  });
+
+  it('evaluates rules sequentially and takes the first match', () => {
+    const { system, state } = setup([
+      makeCard({ id: 'evt-first' }),
+      makeCard({ id: 'evt-second' }),
+    ]);
+    state.coins = 100;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '>=', value: 50 }, successorId: 'evt-first' },
+        { when: { field: 'coins', op: '>=', value: 0 }, successorId: 'evt-second' },
+      ],
+    });
+
+    expect(res.pushedCard?.id).toBe('evt-first-0');
+  });
+
+  it('a matching rule consumes no RNG draw', () => {
+    const { system, state } = setup([makeCard({ id: 'evt-branch' })]);
+    state.coins = 10;
+    state.rngQueue = [0]; // would select evt-a if the draw ran
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '<=', value: 10 }, successorId: 'evt-branch' },
+      ],
+      successorIds: ['evt-cand'],
+    });
+
+    expect(res.pushedCard?.id).toBe('evt-branch-0');
+    expect(state.rngCalls).toBe(0);
+  });
+
+  it('runs ahead of the random candidate draw', () => {
+    const { system, state } = setup([makeCard({ id: 'evt-rule' })]);
+    state.coins = 1;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '>=', value: 0 }, successorId: 'evt-rule' },
+      ],
+      successorIds: ['evt-cand-a', 'evt-cand-b'],
+    });
+
+    expect(res.pushedCard?.id).toBe('evt-rule-0');
+    expect(state.rngCalls).toBe(0);
+  });
+
+  it('keeps the callback resolver at the highest precedence', () => {
+    const { system, state } = setup([makeCard({ id: 'evt-resolved' })]);
+    state.coins = 1;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      successorResolver: () => 'evt-resolved',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '>=', value: 0 }, successorId: 'evt-rule' },
+      ],
+    });
+
+    expect(res.pushedCard?.id).toBe('evt-resolved-0');
+    expect(state.rngCalls).toBe(0);
+  });
+
+  it('a matching null target ends the chain without pushing a card', () => {
+    const { system, state } = setup();
+    state.coins = 999;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '>=', value: 500 }, successorId: null },
+      ],
+      successorId: 'evt-fallback',
+    });
+
+    expect(res.pushedCard).toBeNull();
+    expect(state.deck).toHaveLength(0);
+  });
+
+  it('falls back to the legacy single successorId when no rule matches', () => {
+    const { system, state } = setup([makeCard({ id: 'evt-legacy' })]);
+    state.coins = 10;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Branch',
+      effectPolicy: 'skip',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '>', value: 100 }, successorId: 'unused' },
+      ],
+      successorId: 'evt-legacy',
+    });
+    expect(res.pushedCard?.id).toBe('evt-legacy-0');
+  });
+
+  it('evaluates rules against the post-effect resources', () => {
+    const { system, state } = setup([
+      makeCard({ id: 'evt-with-effect', coinDelta: -50 }),
+    ]);
+    state.coins = 100;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card', coinDelta: -50 }), {
+      label: 'Branch',
+      effectPolicy: 'apply',
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '<=', value: 50 }, successorId: 'evt-with-effect' },
+      ],
+      successorId: 'evt-fallback',
+    });
+
+    // The card effect drops coins 100 → 50, so the <= 50 rule matches and
+    // the pushed successor must be the rule's target (not the fallback).
+    expect(res.pushedCard?.id).toBe('evt-with-effect-0');
+  });
+
+  it('behaves unchanged when conditionalSuccessors is absent', () => {
+    const { system, state } = setup([makeCard({ id: 'evt-cand' })]);
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
+      label: 'Pick',
+      effectPolicy: 'skip',
+      successorIds: ['evt-cand'],
+    });
+
+    expect(state.rngCalls).toBe(1);
+    expect(res.pushedCard).not.toBeNull();
+  });
+});
+
+// ── C4: pure condition helper ───────────────────────────────
+
+describe('evaluateCondition', () => {
+  const resources = { coins: 100, reputation: 5 };
+
+  it('implements every declarative operator at and around the boundary', () => {
+    expect(evaluateCondition({ field: 'coins', op: '>=', value: 100 }, resources)).toBe(true);
+    expect(evaluateCondition({ field: 'coins', op: '>=', value: 101 }, resources)).toBe(false);
+    expect(evaluateCondition({ field: 'coins', op: '<=', value: 100 }, resources)).toBe(true);
+    expect(evaluateCondition({ field: 'coins', op: '<=', value: 99 }, resources)).toBe(false);
+    expect(evaluateCondition({ field: 'coins', op: '>', value: 99 }, resources)).toBe(true);
+    expect(evaluateCondition({ field: 'coins', op: '>', value: 100 }, resources)).toBe(false);
+    expect(evaluateCondition({ field: 'coins', op: '<', value: 101 }, resources)).toBe(true);
+    expect(evaluateCondition({ field: 'coins', op: '<', value: 100 }, resources)).toBe(false);
+    expect(evaluateCondition({ field: 'coins', op: '==', value: 100 }, resources)).toBe(true);
+    expect(evaluateCondition({ field: 'coins', op: '==', value: 99 }, resources)).toBe(false);
+  });
+
+  it('reads the field named by the condition', () => {
+    expect(evaluateCondition({ field: 'reputation', op: '>=', value: 5 }, resources)).toBe(true);
+    expect(evaluateCondition({ field: 'reputation', op: '>=', value: 6 }, resources)).toBe(false);
+    expect(evaluateCondition({ field: 'reputation', op: '<=', value: 5 }, resources)).toBe(true);
+    expect(evaluateCondition({ field: 'reputation', op: '>', value: 5 }, resources)).toBe(false);
   });
 });
