@@ -270,6 +270,24 @@ export interface StorylineEngineAdapter<TState, TCard extends StorylineCard> {
   rng(state: TState): number;
   /** Apply the card's intrinsic effect to the game state. */
   applyEffect(state: TState, card: TCard): void;
+  /**
+   * Optional resource-mutation seam: apply a signed resource delta to the
+   * game state.
+   *
+   * Core uses this to deduct an option's declarative `cost` and to apply its
+   * `extraEffect` without importing game types. Each specified component is a
+   * signed delta (`-5` deducts, `5` grants); an unspecified component leaves
+   * that resource unchanged.
+   *
+   * Optional for backwards compatibility: an adapter that predates the seam
+   * (or deliberately does not expose resources for mutation) omits it. In
+   * that case core leaves the state untouched and appends a warning line to
+   * the activity log whenever a cost or extra effect needs applying.
+   */
+  applyResourceDelta?(
+    state: TState,
+    delta: { coins?: number; reputation?: number },
+  ): void;
   /** Current spendable resources, for delta calculation. */
   getResources(state: TState): { coins: number; reputation: number };
   /** Append a line to the game's activity log. */

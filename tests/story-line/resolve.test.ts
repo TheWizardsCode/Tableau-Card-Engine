@@ -273,3 +273,161 @@ describe('pending-choice lifecycle', () => {
     expect(pending.resolved).toBe(true);
   });
 });
+
+// ── C3: cost payment and extra effects ──────────────────────
+
+describe('cost payment and extra effects', () => {
+  it('deducts the option cost and reports it in the deltas', () => {
+    const { system, state } = setup();
+    const card = makeCard({ id: 'evt-cost', name: 'Cost' });
+    const res = system.resolveStorylineOption(state, card, {
+      label: 'Pay',
+      effectPolicy: 'skip',
+      cost: { coins: 100, reputation: 5 },
+    });
+
+    expect(state.coins).toBe(900);
+    expect(state.reputation).toBe(45);
+    expect(res.coinChange).toBe(-100);
+    expect(res.repChange).toBe(-5);
+  });
+
+  it('applies extraEffect independently of the effect policy', () => {
+    const { system, state } = setup();
+    const card = makeCard({ id: 'evt-extra', coinDelta: -200, reputationDelta: 5 });
+
+    const applied = system.resolveStorylineOption(state, card, {
+      label: 'Accept',
+      effectPolicy: 'apply',
+      extraEffect: { coins: 10, reputation: 2 },
+    });
+    // -200 (policy) + 10 (extra effect)
+    expect(applied.coinChange).toBe(-190);
+    expect(applied.repChange).toBe(7);
+    expect(state.coins).toBe(810);
+    expect(state.reputation).toBe(57);
+
+    const skipped = system.resolveStorylineOption(state, card, {
+      label: 'Reject',
+      effectPolicy: 'skip',
+      extraEffect: { coins: 10, reputation: 2 },
+    });
+    // The card effect is skipped; the extra effect still applies.
+    expect(skipped.coinChange).toBe(10);
+    expect(skipped.repChange).toBe(2);
+    expect(state.coins).toBe(820);
+    expect(state.reputation).toBe(59);
+  });
+
+  it('combines cost and extraEffect in one resolution', () => {
+    const { system, state } = setup();
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-both' }), {
+      label: 'Pay and gain',
+      effectPolicy: 'skip',
+      cost: { coins: 100 },
+      extraEffect: { coins: 30, reputation: -2 },
+    });
+
+    expect(res.coinChange).toBe(-70);
+    expect(res.repChange).toBe(-2);
+    expect(state.coins).toBe(930);
+    expect(state.reputation).toBe(48);
+  });
+
+  it('applies the policy effect before the cost and the extra effect', () => {
+    const { map } = setup();
+    const calls: string[] = [];
+    const engine = makeAdapter(map);
+    const applyEffect = engine.applyEffect.bind(engine);
+    const applyResourceDelta = engine.applyResourceDelta!.bind(engine);
+    engine.applyEffect = (state, card) => {
+      calls.push(`effect:${card.id}`);
+      applyEffect(state, card);
+    };
+    engine.applyResourceDelta = (state, delta) => {
+      calls.push(`delta:${delta.coins ?? 0}`);
+      applyResourceDelta(state, delta);
+    };
+    const ordered = createStorylineSystem({ engine });
+    const state = makeState();
+
+    ordered.resolveStorylineOption(state, makeCard({ id: 'evt-order' }), {
+      label: 'Ordered',
+      effectPolicy: 'apply',
+      cost: { coins: 100 },
+      extraEffect: { coins: 25 },
+    });
+
+    expect(calls).toEqual(['effect:evt-order', 'delta:-100', 'delta:25']);
+    expect(state.coins).toBe(925);
+  });
+
+  it('logs the cost payment before the extra effect', () => {
+    const { system, state } = setup();
+    system.resolveStorylineOption(state, makeCard({ id: 'evt-log' }), {
+      label: 'Logged',
+      effectPolicy: 'skip',
+      cost: { coins: 5 },
+      extraEffect: { reputation: 1 },
+    });
+
+    const texts = state.activityLog.map((e) => e.text);
+    expect(texts).toEqual([
+      'Cost paid: -5 coins.',
+      'Extra effect: +1 reputation.',
+    ]);
+  });
+
+  it('can drive resources to zero (loss-check precondition)', () => {
+    const { system, state } = setup();
+    state.coins = 25;
+    state.reputation = 2;
+
+    system.resolveStorylineOption(state, makeCard({ id: 'evt-zero' }), {
+      label: 'All in',
+      effectPolicy: 'skip',
+      cost: { coins: 25, reputation: 2 },
+    });
+
+    expect(state.coins).toBe(0);
+    expect(state.reputation).toBe(0);
+  });
+
+  it('behaves identically when cost and extraEffect are absent', () => {
+    const { system, state } = setup();
+    const card = makeCard({ id: 'evt-plain', coinDelta: -40, reputationDelta: 3 });
+    const res = system.resolveStorylineOption(state, card, {
+      label: 'Accept',
+      effectPolicy: 'apply',
+    });
+
+    expect(res.coinChange).toBe(-40);
+    expect(res.repChange).toBe(3);
+    expect(state.coins).toBe(960);
+    expect(state.reputation).toBe(53);
+    expect(state.activityLog).toHaveLength(0);
+  });
+
+  it('leaves resources untouched and warns when the adapter has no mutation seam', () => {
+    const { map, state } = setup();
+    const engine = makeAdapter(map);
+    // Simulate a legacy adapter implementor predating `applyResourceDelta`.
+    delete (engine as { applyResourceDelta?: unknown }).applyResourceDelta;
+    const legacy = createStorylineSystem({ engine });
+
+    const res = legacy.resolveStorylineOption(state, makeCard({ id: 'evt-legacy-seam' }), {
+      label: 'Pay',
+      effectPolicy: 'skip',
+      cost: { coins: 100 },
+      extraEffect: { coins: 10 },
+    });
+
+    expect(state.coins).toBe(1000);
+    expect(res.coinChange).toBe(0);
+    expect(
+      state.activityLog.some((e) =>
+        e.text.includes('applyResourceDelta'),
+      ),
+    ).toBe(true);
+  });
+});

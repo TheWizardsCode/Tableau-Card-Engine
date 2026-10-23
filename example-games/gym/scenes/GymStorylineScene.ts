@@ -101,6 +101,10 @@ function createDemoEngine(): StorylineEngineAdapter<DemoState, StorylineCard> {
       state.coins += card.coinDelta ?? 0;
       state.reputation += card.reputationDelta ?? 0;
     },
+    applyResourceDelta: (state, delta) => {
+      state.coins += delta.coins ?? 0;
+      state.reputation += delta.reputation ?? 0;
+    },
     getResources: (state) => ({ coins: state.coins, reputation: state.reputation }),
     appendLog: (state, text) => {
       state.activityLog.push({ turn: state.turn, text });
