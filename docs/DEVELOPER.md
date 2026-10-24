@@ -1423,6 +1423,42 @@ artefacts (`example-games/gym/content/storyline-manifest.json` and
 See [Core: Generic Story-Line System](core-engine/story-line.md#authoring-seams-content-manifest-validator-author)
 for the adapter contract, validator codes, manifest shape and API examples.
 
+### Story-line Editor Test Harness
+
+The story-line editor lives in later slices; its shared test foundation is
+already in `tests/story-line/editor/` so every editor slice can be driven
+test-first (CG-0MVHZ2LS3008ATY9):
+
+- **Fixtures** (`fixtures.ts`) — copies the committed content CSV and
+  generated manifest/Mermaid artefacts into an isolated OS temp directory and
+  returns the paths, so edit tests never mutate committed files. All source
+  paths derive from the generator's exported defaults (`DEFAULT_CONTENT_PATH`,
+  `DEFAULT_GRAPH_OUTPUTS`, `DEFAULT_MANIFEST_SCHEMA_PATH`), so an artefact or
+  schema move fails the fixture existence assertions loudly instead of silently
+  copying a stale file.
+- **Write-path guard** (`write-path-guard.ts`) — a reusable static scan over the
+  editor source roots (`src/story-line/editor/`, `tools/storyline-editor/`,
+  `scripts/storyline-editor-*`) asserting no editor module performs a file
+  write/delete; every edit must go through the transactional author API
+  (`applyContentEditToFile`). Roots that do not exist yet are reported as
+  `skipped`, so the guard is green before the feature code lands.
+- **Manifest schema guard** (`manifest-schema.test.ts`) — validates the
+  committed manifest artefact and a manifest regenerated from the fixture copy
+  against `schemas/story-line-manifest.schema.json` with the existing `ajv`
+  devDependency.
+
+**Browser-test path (decided).** The editor is a non-Phaser, non-game dev page,
+so its renderers are plain-DOM modules. The core `browser` project drives them
+**directly** — `harness.browser.test.ts` imports and mounts the DOM module into
+Vitest's real Chromium document and asserts rendered output and events. No
+second dev server, page boot, game loop or new runtime dependency is involved.
+The editor *page* is served by its own config, `vite.editor.config.ts` (root
+`tools/storyline-editor`, port 5174, output `dist/editor/`), which keeps the
+game/build config (`vite.config.ts`) untouched and keeps the editor out of the
+production game bundle and packaged Electron app. The harness browser test is
+part of the `dev` test profile, and `story-line` is a core test group so the
+smoke/dev lists always keep it.
+
 ## Startup Context Budget
 
 The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:

@@ -44,7 +44,8 @@
     "example-games/**/*.ts",
     "tests/**/*.ts",
     "scripts/**/*.ts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "vite.editor.config.ts"
   ],
   "exclude": [
     "node_modules",

@@ -51,6 +51,7 @@ export type {
   StorylineManifest,
 } from './manifest';
 export {
+  DEFAULT_MANIFEST_SCHEMA_PATH,
   briefEventDescription,
   buildStorylineManifest,
   buildStorylineManifestFromCsv,

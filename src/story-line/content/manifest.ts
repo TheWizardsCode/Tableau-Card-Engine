@@ -30,6 +30,15 @@ import {
 import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
 import { findCycles } from './validate';
 
+/**
+ * Canonical repository-relative path of the generic manifest JSON schema.
+ *
+ * Shared by the authoring toolchain and the editor test harness so a schema
+ * move is caught loudly (the derived path stops resolving) instead of silently
+ * validating against a stale copy.
+ */
+export const DEFAULT_MANIFEST_SCHEMA_PATH = 'schemas/story-line-manifest.schema.json' as const;
+
 // ── Manifest types ──────────────────────────────────────────
 
 /** One option of a choice node, as it appears in the manifest. */
