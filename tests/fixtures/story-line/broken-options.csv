@@ -1,0 +1,2 @@
+card_key,card_name,flavour,arc,arc_name,choices,payoff
+tav-open,Open the Door,A stranger knocks at the tavern door.,tav,Tavern Nights,AdmitWithoutPipe,2

@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tableau-card-engine.example/schemas/story-line-manifest.schema.json",
+  "title": "TCE Story-Line Content Manifest",
+  "description": "Game-agnostic, machine-readable manifest of a story-line content graph, generated from a game's content CSV through its content adapter (src/story-line/content/manifest.ts). Deterministic: sorted nodes/edges and no timestamps, so regeneration from the same content is byte-identical.",
+  "type": "object",
+  "required": ["version", "source", "gameId", "storylineIds", "nodes", "edges", "cycles"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Manifest schema version."
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Generator provenance (deterministic — no timestamp)."
+    },
+    "gameId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Game id of the content adapter that produced the manifest."
+    },
+    "storylineIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "description": "Sorted story-line ids present in the graph."
+    },
+    "nodes": {
+      "type": "array",
+      "description": "Card nodes, sorted by base card id.",
+      "items": { "$ref": "#/definitions/node" }
+    },
+    "edges": {
+      "type": "array",
+      "description": "Option edges, sorted by source, label, candidate index and target.",
+      "items": { "$ref": "#/definitions/edge" }
+    },
+    "cycles": {
+      "type": "array",
+      "description": "Detected cycles (a first-class shape); each entry is a sorted cycle path of base card ids.",
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true
+      }
+    }
+  },
+  "definitions": {
+    "node": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "storylineId",
+        "storylineTitle",
+        "hasChoices",
+        "optionCount",
+        "options",
+        "effect",
+        "impact",
+        "fields"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "description": "Base card id." },
+        "name": { "type": "string", "minLength": 1 },
+        "storylineId": { "type": ["string", "null"] },
+        "storylineTitle": { "type": ["string", "null"] },
+        "hasChoices": { "type": "boolean" },
+        "optionCount": { "type": "integer", "minimum": 0 },
+        "options": {
+          "type": "array",
+          "description": "Ordered labelled option list; empty for plain incidents.",
+          "items": { "$ref": "#/definitions/option" }
+        },
+        "effect": { "type": "string", "description": "Human-readable effect text shown to the player." },
+        "impact": {
+          "type": "string",
+          "description": "Adapter-provided game impact description (e.g. '-50 coins'); empty when the adapter supplies none."
+        },
+        "fields": {
+          "type": "object",
+          "description": "Every game-specific column for this card, keyed by CSV column name (raw cell text).",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "option": {
+      "type": "object",
+      "required": ["label", "successorIds", "effectPolicy"],
+      "additionalProperties": false,
+      "description": "One labelled player option of a choice node.",
+      "properties": {
+        "label": { "type": "string", "minLength": 1, "description": "Player-visible option label; also the stable transcript/save token." },
+        "successorIds": {
+          "type": "array",
+          "description": "Ordered candidate successor base card ids; empty = terminal chain-end. The engine draws one uniformly at random at resolution time.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "effectPolicy": {
+          "type": "string",
+          "enum": ["apply", "skip"],
+          "description": "Whether the source card's own effect applies when this option is chosen."
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["from", "label", "to", "random", "candidateIndex", "cycle", "effectPolicy"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "type": "string", "minLength": 1, "description": "Source base card id." },
+        "label": { "type": "string", "minLength": 1, "description": "Option label." },
+        "to": {
+          "type": ["string", "null"],
+          "description": "Target base card id (one edge per candidate successor); null when the chain ends."
+        },
+        "random": {
+          "type": "boolean",
+          "description": "True when this edge is one of several random-branch candidates of the same option (candidate set size > 1)."
+        },
+        "candidateIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0-based index of this candidate within its option's ordered candidate set."
+        },
+        "cycle": { "type": "boolean", "description": "True when this edge participates in a cycle." },
+        "effectPolicy": {
+          "type": "string",
+          "enum": ["apply", "skip"],
+          "description": "Whether the source card's own effect applies when this option is chosen."
+        }
+      }
+    }
+  }
+}

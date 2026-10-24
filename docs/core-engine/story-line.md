@@ -177,7 +177,188 @@ list that fails validation still resolves exactly as declared. No shipped CSV
 content uses `cost`, `extraEffect` or `conditionalSuccessors`, so all shipped
 content validates cleanly.
 
-## Engine adapter
+## Authoring seams (content, manifest, validator, author)
+
+The runtime system above resolves a story-line; the **content toolkit** in
+[`src/story-line/content/`](../../src/story-line/content/) authors one. It is
+game-agnostic: a game supplies a **content adapter** (plain data) that maps its
+CSV columns onto the generic story-line fields, and core provides parsing, a
+manifest/graph generator, a validator and a single transactional write path.
+
+The toolkit has **no game imports and no Phaser dependency**, and only
+`author.ts` writes content. Import paths are relative (or `node:` builtins), so
+the whole toolkit also loads under plain `tsx` with no bundler.
+
+| Module | Responsibility |
+|---|---|
+| `content/types.ts` | `ContentCard` (generic card record), `ContentAdapter` / `ContentFieldMapping`, `baseIdOf`, mapping helpers. |
+| `content/csv.ts` | `parseCsv` / `serialiseCsv` (byte-identical round-trip), `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions`. |
+| `content/manifest.ts` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers (`nodeLabel`, `briefEventDescription`, `describeChoiceRouting`). |
+| `content/validate.ts` | `validateContentCards` / `validateContentCsv`, text + JSON reports, `findCycles`. |
+| `content/author.ts` | `addContentCard`, `updateContentCard`, `applyContentEditToFile` — the only content writer. |
+| `content/adapters.ts` | `GYM_CONTENT_ADAPTER` (the default), `getContentAdapter`, `DEFAULT_CONTENT_PATH`. |
+| `content/index.ts` | Barrel (also reachable as `@story-line/content`). |
+
+### Content adapter
+
+An adapter declares the game's columns, the story-line field mapping and the
+new-card defaults. Only `id` and `name` mappings are required: a game without a
+legacy two-way choice model simply omits `hasChoices` /
+`acceptNextCardId` / `rejectNextCardId`, and a game without an `options` column
+omits `options`.
+
+```ts
+import type { ContentAdapter } from '@story-line/content';
+
+export const TAVERN_ADAPTER: ContentAdapter = {
+  gameId: 'tavern',
+  columns: ['card_key', 'card_name', 'flavour', 'arc', 'arc_name', 'choices', 'payoff'],
+  fields: {
+    id: 'card_key',
+    name: 'card_name',
+    effect: 'flavour',
+    options: 'choices',
+    storylineId: 'arc',
+    storylineTitle: 'arc_name',
+  },
+  editableColumns: ['payoff'],
+  newCardDefaults: { flavour: '', choices: '', payoff: '0' },
+  // Optional: a human-readable game impact for manifest labels/diagrams.
+  describeImpact: (card) => (card.fields.payoff ? `payoff ${card.fields.payoff}` : ''),
+};
+```
+
+Every column **not** in `fields` lands in `ContentCard.fields`, keyed by column
+name, so game columns (coin/reputation deltas, renown, payoff, …) are editable
+and inspectable without core knowing what they mean. Two optional hooks keep
+game semantics out of core: `baseId` (chain-serial stripping; identity by
+default) and `describeImpact` (manifest impact text).
+
+Core ships `GYM_CONTENT_ADAPTER` as the default, backed by the committed
+[`example-games/gym/data/storylines.csv`](../../example-games/gym/data/storylines.csv)
+of the Gym demo content. Tests additionally exercise a differently shaped
+fixture adapter, proving the seam is not shaped around one game.
+
+### CSV and change detection
+
+`parseCsv` handles quoted fields, embedded commas/quotes/newlines and CRLF;
+`serialiseCsv` writes LF with a trailing newline, so a canonically quoted file
+round-trips **byte-identically** (column order preserved).
+`computeContentChecksum(csvText)` is a deterministic DJB2 hex hash (8 chars) for
+change detection — any byte change produces a different checksum.
+
+`cardsFromCsv(parsed, adapter)` projects rows onto `ContentCard`;
+`compileContentOptions(card)` applies the runtime engine's precedence (CSV
+`options` encoding → legacy `hasChoices`), so authored content compiles exactly
+as the runtime reads it.
+
+### Manifest, Mermaid and the JSON schema
+
+`buildStorylineManifest(cards, adapter)` produces a **deterministic,
+timestamp-free** manifest — sorted nodes (by id) and edges (by source, label,
+candidate index, target), sorted story-line ids and sorted cycle paths. Two
+runs over the same content are byte-identical, and the result is independent of
+input card order, which is what makes `--check` a safe drift guard.
+
+Manifest shape: `{ version, source, gameId, storylineIds, nodes, edges, cycles }`,
+where a node carries the derived story-line fields plus `impact` and `fields`
+(every game column), and an edge carries `from`, `label`, `to`, `random`,
+`candidateIndex`, `cycle` and `effectPolicy`. A terminal option becomes one
+`to: null` edge; every candidate of a multi-candidate option becomes its own
+`random` edge. Cycles are a first-class shape: they are reported and their
+edges marked, never treated as an error by the builder.
+
+The generated manifest validates against
+[`schemas/story-line-manifest.schema.json`](../../schemas/story-line-manifest.schema.json)
+(devDependency `ajv`), which is enforced in the unit suite. The committed Gym
+artefacts are `example-games/gym/data/storyline-manifest.json` and
+`example-games/gym/data/storyline-graph.mmd`; `--check` fails on drift.
+
+### Validator
+
+`validateContentCards(cards, adapter, { failOnCycle? })` is pure (never mutates,
+never throws) and returns `{ valid, issues, findings, cardCount,
+choiceCardCount, storylineIds, gameId }`.
+
+| Hard error code | Meaning |
+|---|---|
+| `duplicate-id` | Two cards share the same (base) id. |
+| `missing-required-field` | The id or name is empty. |
+| `missing-storyline-id` | A choice card declares no storyline id. |
+| `orphan-link` | A card declares accept/reject links but is not a choice card. |
+| `invalid-option` | Malformed `options` encoding, or an empty/duplicate option label. |
+| `unknown-successor` | An option (including a legacy `Accept`/`Reject` option) names an unknown card. |
+| `dangling-link` | An inert accept/reject link (on a non-choice card) names an unknown card. |
+| `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
+| `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
+
+Informational findings are `cycle` and `self-link`; they never fail validation
+unless `failOnCycle` is set. A storyline's entry card is its first member (in
+file order) with no incoming edge from another member (a closed cycle uses its
+first member), so a disconnected fragment is reported as `unreachable-card`.
+
+`formatContentValidationReport(result)` and
+`contentValidationToJson(result)` render the same issue/finding data, so the
+text and JSON reports cannot disagree.
+
+### Transactional author API
+
+Every edit is: parse → mutate in memory → validate → write atomically (temp file
++ rename). On any validation failure the original CSV is returned unchanged and
+the file is not touched; the writer re-validates the candidate itself, so no
+caller can bypass the check.
+
+```ts
+import {
+  GYM_CONTENT_ADAPTER,
+  addContentCard,
+  applyContentEditToFile,
+  updateContentCard,
+} from '@story-line/content';
+
+// Pure, in-memory (returns the candidate or the unchanged input + errors).
+const edited = addContentCard(csvText, GYM_CONTENT_ADAPTER, {
+  id: 'evt-new',
+  name: 'A New Event',
+  effect: 'Something happens.',
+});
+
+// Transactional file edit (`dryRun` returns the candidate without writing).
+const result = applyContentEditToFile({
+  contentPath: 'src/card-data.csv',
+  adapter: GYM_CONTENT_ADAPTER,
+  dryRun: true,
+  mutate: (csv) =>
+    updateContentCard(csv, GYM_CONTENT_ADAPTER, {
+      id: 'evt-tax',
+      storylineId: 'storyline-tax',
+      storylineTitle: 'Tax Arc',
+    }),
+});
+```
+
+`addContentCard` refuses a duplicate id, a missing id/name, an unknown or mapped
+game column, and any edit whose result fails validation (for example a new card
+in a story-line that nothing links to — it would be `unreachable-card`).
+`updateContentCard` changes only the supplied fields; a nullable field set to
+`null` is cleared, and setting a legacy link also marks the card as a choice.
+
+### CLIs
+
+Thin `tsx` entry points over the seams (no Vite loader, no game import):
+
+| npm script | Script | Purpose |
+|---|---|---|
+| `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
+| `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
+| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `update-card` (`--dry-run`, `--field column=value`). |
+
+Every CLI supports `--help`, resolves `--game` through the shipped adapter
+registry (default `gym`), and exits `0` on success and `1` on invalid/unreadable
+content or drift. `npm run storylines:author -- add-card --id … --dry-run`
+prints the candidate content without writing it.
+
+
 
 `StorylineEngineAdapter<TState, TCard>` inverts all state coupling:
 
@@ -250,6 +431,21 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 - `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state.
 - `tests/story-line/ui-adapter.test.ts` — default adapter wording and the
   pluggable override seam.
+- `tests/story-line/content/csv.test.ts` — byte-identical round-trip (two
+  adapter shapes), checksum determinism, projection and option compilation.
+- `tests/story-line/content/manifest.test.ts` — manifest shape, determinism and
+  input-order independence, cycle marking, filtering, Mermaid rendering, AJV
+  schema validation and `--check` drift behaviour.
+- `tests/story-line/content/validate.test.ts` — every hard-error class, cycle
+  policy, report parity and non-mutation.
+- `tests/story-line/content/author.test.ts` — transactional add/update, refusal
+  on invalid content, dry-run and atomic file writes.
+- `tests/story-line/content/adapters.test.ts` — the default adapter/registry and
+  the seam proven with a second, differently shaped adapter.
+- `tests/story-line/content/import-boundary.test.ts` — the module graph imports
+  only relative modules/`node:` builtins, and only `author.ts` writes files.
+- `tests/story-line/content/cli.test.ts` — validator/builder exit codes, report
+  output and a `tsx` subprocess smoke run of the entry points.
 
 Run the unit project with `npx vitest run --project unit` (or
 `/skill:test --type unit`). The Gym scene runs in the `smoke` project.

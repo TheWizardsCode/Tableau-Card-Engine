@@ -1,12 +1,16 @@
 /**
  * Static validation for declarative story-line option metadata.
  *
- * Core has no CSV pipeline, JSON schema or graph exporter (those are game
- * concerns). This helper validates the **declarative** parts of an option
- * list — `cost`, `extraEffect`, `conditionalSuccessors` — whether the list
- * was registered programmatically via `registerStorylineOptions`, compiled
- * from a CSV `options` encoding, or assembled by a game. It never throws and
- * never mutates the options it inspects.
+ * This helper validates the **declarative** parts of an option list — `cost`,
+ * `extraEffect`, `conditionalSuccessors` — whether the list was registered
+ * programmatically via `registerStorylineOptions`, compiled from a CSV
+ * `options` encoding, or assembled by a game. It never throws and never
+ * mutates the options it inspects.
+ *
+ * Content-level tooling (CSV parsing, the manifest/graph exporter, the JSON
+ * schema and the static content validator) lives in
+ * [`./content/`](./content/index.ts); this module stays focused on the
+ * declarative option metadata the runtime consumes.
  *
  * Validation is intentionally authoring-oriented: runtime resolution stays
  * permissive, so an option list that fails validation still resolves exactly

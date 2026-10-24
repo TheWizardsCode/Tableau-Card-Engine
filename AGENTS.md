@@ -63,6 +63,9 @@ npm run preview      # Serve production build locally (binds to all interfaces, 
 npm run setup:distribution -- --dir ..  # Clone core + sibling game repos (full distribution)
 GAMES_CONFIG=full npm run dev           # Run all games + Gym (after setup:distribution)
 npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV; needs the tce-main-street sibling)
+npm run storylines:validate  # Validate story-line content through the content adapter (default: Gym)
+npm run storylines:graph     # Regenerate the committed manifest/Mermaid artefacts (-- --check to guard drift)
+npm run storylines:author    # Transactional content edits (add-card / update-card; --dry-run supported)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
 npm run start:electron   # Build + launch the Electron desktop app locally

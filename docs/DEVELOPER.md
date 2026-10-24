@@ -1347,6 +1347,38 @@ This lists the installed browsers and their expected locations (e.g. `chromium-1
 
 **Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. PR CI is build-only (CG-0MT022826006EM0D) and no longer runs browser tests; local devs run `npx playwright install chromium` once (see [Browser test setup](#browser-test-setup)).
 
+## Story-line Authoring Tooling
+
+The core engine ships a game-agnostic story-line **content** toolkit
+(`src/story-line/content/`): CSV parse/serialise + checksum, a deterministic
+manifest/Mermaid generator, a static validator and one transactional author
+API. A game plugs in only data — a content adapter mapping its CSV columns onto
+the generic story-line fields (`id`, `name`, `effect`, choice flag,
+accept/reject or `options`, storyline id/title); every other column is carried
+as a game column. Core ships the Gym adapter as the default.
+
+Three `tsx` CLIs expose the seams (no Vite loader, no game import):
+
+```bash
+npm run storylines:validate                     # validate the Gym content
+npm run storylines:validate -- --csv path.csv --json --fail-on-cycle
+npm run storylines:graph                        # rewrite the Gym artefacts
+npm run storylines:graph -- --format json --check   # drift guard
+npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
+npm run storylines:author -- update-card --id evt-x --storyline-id storyline-x
+```
+
+Every CLI supports `--help` and `--game <adapter-id>` (default `gym`), and exits
+`0` on success/valid content and `1` on invalid content, unreadable input or
+artefact drift. The author API validates before writing and writes atomically;
+`--dry-run` prints the candidate and writes nothing. The committed Gym
+artefacts (`example-games/gym/data/storyline-manifest.json` and
+`storyline-graph.mmd`) are validated against
+`schemas/story-line-manifest.schema.json` and kept in sync by `--check`.
+
+See [Core: Generic Story-Line System](core-engine/story-line.md#authoring-seams-content-manifest-validator-author)
+for the adapter contract, validator codes, manifest shape and API examples.
+
 ## Startup Context Budget
 
 The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:
