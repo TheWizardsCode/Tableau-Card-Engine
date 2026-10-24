@@ -6,15 +6,23 @@
  * that shows the selected card's links and metadata (name, effect, routing,
  * successor targets, story-line id/title and the adapter-declared columns).
  *
- * The shell is a plain-DOM module with **no host or network dependency**: it
- * is handed one generated manifest and renders everything from that single
- * in-memory model, which is why the browser tests can mount it directly and
- * assert the rendered graph and selection behaviour without a dev server.
+ * The shell is a plain-DOM module with no *host* dependency: it is handed one
+ * generated manifest and renders everything from that single in-memory model,
+ * which is why the browser tests can mount it directly and assert the rendered
+ * graph and selection behaviour without a dev server.
+ *
+ * When it is also handed the game's content adapter, the raw content cards and
+ * the edit bridge (the host serves all three), the shell additionally exposes
+ * the curated editing workflow: an **Edit card** action for the selected node
+ * and an **Add card** action, each mounting the corresponding form (see
+ * `edit-forms.ts` / `add-card-form.ts`) whose preview, validation and apply all
+ * run through the F2 bridge — the shell itself never writes content.
  *
  * @module
  */
 
 import type { StorylineManifest } from '../../src/story-line/content/manifest';
+import { baseIdOf, type ContentAdapter, type ContentCard } from '../../src/story-line/content/types';
 import {
   buildEditorViewModel,
   type EditorViewModel,
@@ -23,6 +31,27 @@ import {
   createGraphRenderer,
   type EditorGraphRenderer,
 } from './graph-renderer';
+import type { EditApplyOutcome, EditorBridge } from './bridge-client';
+import {
+  createCardEditForm,
+  type CardEditFormHandle,
+} from './edit-forms';
+import {
+  createAddCardForm,
+  type AddCardFormHandle,
+} from './add-card-form';
+
+/** Optional editing wiring (the host supplies all three together). */
+export interface EditorShellOptions {
+  /** The game content adapter (drives the curated form fields). */
+  readonly adapter?: ContentAdapter;
+  /** The raw content cards behind the manifest nodes (editable values). */
+  readonly cards?: readonly ContentCard[];
+  /** The edit bridge (preview/validate/apply through the single author API). */
+  readonly bridge?: EditorBridge;
+  /** Called after an accepted edit (the page may remount with fresh content). */
+  readonly onApplied?: (outcome: EditApplyOutcome) => void;
+}
 
 /** The mounted shell's handle. */
 export interface EditorShell {
@@ -34,6 +63,12 @@ export interface EditorShell {
   readonly renderer: EditorGraphRenderer;
   /** Selects a card (or clears the selection with `null`). */
   selectNode(nodeId: string | null): void;
+  /** Opens the edit form for a card (no-op unless editing is wired). */
+  openEditForm(nodeId: string): void;
+  /** Opens the guided add-card form (no-op unless editing is wired). */
+  openAddForm(): void;
+  /** Closes any open edit/add form. */
+  closeEditor(): void;
   /** Removes the shell's DOM and listeners from the container. */
   dispose(): void;
 }
@@ -55,11 +90,23 @@ function el<K extends keyof HTMLElementTagNameMap>(
  *
  * @param container The element to render into (its content is replaced).
  * @param manifest  The generated story-line manifest to display.
+ * @param options   Optional editing wiring (adapter + content cards + bridge).
  * @returns The shell handle.
  */
-export function mountEditorShell(container: HTMLElement, manifest: StorylineManifest): EditorShell {
+export function mountEditorShell(
+  container: HTMLElement,
+  manifest: StorylineManifest,
+  options: EditorShellOptions = {},
+): EditorShell {
   const viewModel = buildEditorViewModel(manifest);
   container.replaceChildren();
+  const editing =
+    options.adapter && options.cards && options.bridge
+      ? { adapter: options.adapter, cards: options.cards, bridge: options.bridge }
+      : null;
+  const knownCardIds = viewModel.nodes.map((node) => node.id);
+  let openForm: CardEditFormHandle | AddCardFormHandle | null = null;
+  let selectedNodeId: string | null = null;
 
   const root = el('div', 'editor-shell');
   root.dataset.role = 'editor-shell';
@@ -94,14 +141,19 @@ export function mountEditorShell(container: HTMLElement, manifest: StorylineMani
   const fitView = el('button', 'editor-button', 'Fit view');
   fitView.type = 'button';
   fitView.dataset.action = 'fit-view';
-  actions.append(zoomIn, zoomOut, resetView, fitView);
+  const addCardButton = el('button', 'editor-button editor-button--primary', 'Add card');
+  addCardButton.type = 'button';
+  addCardButton.dataset.action = 'add-card';
+  actions.append(zoomIn, zoomOut, resetView, fitView, ...(editing ? [addCardButton] : []));
   toolbar.append(actions);
   root.append(toolbar);
 
   const readOnlyNote = el(
     'p',
     'editor-readonly-note',
-    'Read-only preview — rendered from the generated manifest. Editing arrives in a later slice.',
+    editing
+      ? 'Editing is enabled — every edit is previewed and validated before it is written through the author API.'
+      : 'Read-only preview — rendered from the generated manifest. Launch the editor with "npm run storylines:editor" to edit.',
   );
   readOnlyNote.dataset.role = 'readonly-note';
   root.append(readOnlyNote);
@@ -152,6 +204,14 @@ export function mountEditorShell(container: HTMLElement, manifest: StorylineMani
 
   details.append(detailsName, detailsId, detailsKind, detailsStoryline, meta);
 
+  // ── Editing affordance (present only when the host wired the bridge) ──
+  const editCardButton = el('button', 'editor-button editor-button--primary', 'Edit card');
+  editCardButton.type = 'button';
+  editCardButton.dataset.role = 'edit-card';
+  const editActions = el('div', 'editor-details-actions');
+  editActions.append(editCardButton);
+  if (editing) details.append(editActions);
+
   details.append(el('h4', 'editor-details-section', 'Links'));
   const links = el('ul', 'editor-links');
   links.dataset.role = 'details-links';
@@ -175,6 +235,23 @@ export function mountEditorShell(container: HTMLElement, manifest: StorylineMani
 
   sidebar.append(empty, details);
 
+  // ── Editing host: the curated edit/add form mounts here ──
+  const editorHost = el('section', 'editor-editor-host');
+  editorHost.dataset.region = 'editor';
+  editorHost.hidden = true;
+  const editorHostHeading = el('div', 'editor-editor-host-header');
+  const editorHostTitle = el('h3', 'editor-editor-host-title', 'Editing');
+  editorHostTitle.dataset.role = 'editor-host-title';
+  const closeEditorButton = el('button', 'editor-button', 'Close');
+  closeEditorButton.type = 'button';
+  closeEditorButton.dataset.role = 'close-editor';
+  editorHostHeading.append(editorHostTitle, closeEditorButton);
+  editorHost.append(editorHostHeading);
+  const editorFormHost = el('div', 'editor-editor-form-host');
+  editorFormHost.dataset.role = 'editor-form-host';
+  editorHost.append(editorFormHost);
+  sidebar.append(editorHost);
+
   main.append(graphRegion, sidebar);
   root.append(main);
 
@@ -191,6 +268,7 @@ export function mountEditorShell(container: HTMLElement, manifest: StorylineMani
   // ── Graph ──────────────────────────────────────────────────
   const renderer = createGraphRenderer(graphRegion, viewModel, {
     onSelect: (nodeId) => {
+      selectedNodeId = nodeId;
       renderDetails(nodeId);
     },
   });
@@ -291,16 +369,93 @@ export function mountEditorShell(container: HTMLElement, manifest: StorylineMani
   resetView.addEventListener('click', onReset);
   fitView.addEventListener('click', onFit);
 
+  // ── Editing wiring ─────────────────────────────────────────
+  function closeEditor(): void {
+    openForm?.dispose();
+    openForm = null;
+    editorFormHost.replaceChildren();
+    editorHost.hidden = true;
+  }
+
+  function openEditingForm(form: CardEditFormHandle | AddCardFormHandle, title: string): void {
+    closeEditor();
+    openForm = form;
+    editorHostTitle.textContent = title;
+    editorFormHost.append(form.root);
+    editorHost.hidden = false;
+  }
+
+  function openEditForm(nodeId: string): void {
+    if (!editing) return;
+    const card = editing.cards.find(
+      (candidate) => baseIdOf(editing.adapter, candidate.id) === nodeId,
+    );
+    if (!card) {
+      openEditingFormContents(
+        el('p', 'editor-details-note', `Card "${nodeId}" is not in the loaded content.`),
+        'Editing',
+      );
+      return;
+    }
+    const form = createCardEditForm({
+      adapter: editing.adapter,
+      card,
+      bridge: editing.bridge,
+      knownCardIds,
+      onApplied: (outcome) => options.onApplied?.(outcome),
+    });
+    openEditingForm(form, `Edit ${card.name}`);
+  }
+
+  function openAddForm(): void {
+    if (!editing) return;
+    const storylines = viewModel.storylines
+      .filter((group) => group.storylineId !== null)
+      .map((group) => ({ id: group.storylineId as string, title: group.title }));
+    const form = createAddCardForm({
+      adapter: editing.adapter,
+      bridge: editing.bridge,
+      storylines,
+      knownCardIds,
+      onApplied: (outcome) => options.onApplied?.(outcome),
+    });
+    openEditingForm(form, 'Add a card');
+  }
+
+  /** Replaces the editor host's content with a plain message panel. */
+  function openEditingFormContents(content: HTMLElement, title: string): void {
+    closeEditor();
+    editorHostTitle.textContent = title;
+    editorFormHost.append(content);
+    editorHost.hidden = false;
+  }
+
+  const onCloseEditor = (): void => closeEditor();
+  closeEditorButton.addEventListener('click', onCloseEditor);
+  const onEditCard = (): void => {
+    if (selectedNodeId !== null) openEditForm(selectedNodeId);
+  };
+  editCardButton.addEventListener('click', onEditCard);
+  const onAddCard = (): void => openAddForm();
+  addCardButton.addEventListener('click', onAddCard);
+
   return {
     root,
     viewModel,
     renderer,
     selectNode: (nodeId) => renderer.selectNode(nodeId),
+    openEditForm,
+    openAddForm,
+    closeEditor,
     dispose: () => {
       zoomIn.removeEventListener('click', onZoomIn);
       zoomOut.removeEventListener('click', onZoomOut);
       resetView.removeEventListener('click', onReset);
       fitView.removeEventListener('click', onFit);
+      closeEditorButton.removeEventListener('click', onCloseEditor);
+      editCardButton.removeEventListener('click', onEditCard);
+      addCardButton.removeEventListener('click', onAddCard);
+      closeEditor();
       renderer.dispose();
       container.replaceChildren();
     },

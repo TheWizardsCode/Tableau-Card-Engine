@@ -213,6 +213,216 @@
         color: #b9c0dd;
         line-height: 1.5;
       }
+      /* ── Curated editing (edit / add forms + preview panel) ── */
+      .editor-details-actions {
+        margin: 12px 0;
+      }
+      .editor-button--primary {
+        background: #3b2f6b;
+        border-color: #6d55b8;
+      }
+      .editor-button--primary:hover {
+        background: #4a3b85;
+      }
+      .editor-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .editor-editor-host {
+        margin-top: 16px;
+        border-top: 1px solid #2b2b44;
+        padding-top: 12px;
+      }
+      .editor-editor-host-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .editor-editor-host-title {
+        margin: 0 0 8px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9aa0c0;
+      }
+      .editor-form-title {
+        margin: 8px 0 10px;
+        font-size: 15px;
+      }
+      .editor-form-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .editor-form-group {
+        margin: 14px 0 0;
+        border: 1px solid #2b2b44;
+        border-radius: 8px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .editor-form-legend {
+        padding: 0 6px;
+        color: #9aa0c0;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .editor-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .editor-field-label {
+        color: #b9c0dd;
+        font-size: 12px;
+      }
+      .editor-field-input {
+        background: #0f0f1a;
+        border: 1px solid #34345a;
+        border-radius: 6px;
+        color: #e8eaf4;
+        padding: 6px 8px;
+        font: inherit;
+        font-size: 12px;
+      }
+      .editor-field-input:focus-visible {
+        outline: 2px solid #ffd166;
+        outline-offset: 1px;
+      }
+      .editor-field[data-kind='boolean'] {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+      }
+      .editor-field-hint {
+        margin: 0;
+        color: #7d84a6;
+        font-size: 11px;
+      }
+      .editor-field-error {
+        margin: 0;
+        color: #ff8b9a;
+        font-size: 11px;
+        white-space: pre-line;
+      }
+      .editor-field[data-invalid='true'] .editor-field-input {
+        border-color: #ff6b81;
+      }
+      .editor-form-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 14px 0 6px;
+      }
+      .editor-form-status {
+        margin: 0;
+        color: #9aa0c0;
+        font-size: 12px;
+      }
+      .editor-form-status[data-tone='success'],
+      .editor-preview-status[data-tone='success'] {
+        color: #7ee2a8;
+      }
+      .editor-form-status[data-tone='error'],
+      .editor-preview-status[data-tone='error'] {
+        color: #ff8b9a;
+      }
+      .editor-preview {
+        margin-top: 14px;
+        border-top: 1px solid #2b2b44;
+        padding-top: 10px;
+      }
+      .editor-preview-status {
+        margin: 0 0 4px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .editor-preview-summary,
+      .editor-preview-outcome {
+        margin: 0 0 8px;
+        color: #b9c0dd;
+        font-size: 12px;
+      }
+      .editor-preview-outcome[data-tone='success'] {
+        color: #7ee2a8;
+      }
+      .editor-preview-outcome[data-tone='error'] {
+        color: #ff8b9a;
+      }
+      .editor-diff-row {
+        border: 1px solid #2b2b44;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        background: #12121c;
+      }
+      .editor-diff-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      .editor-diff-status {
+        color: #ffd166;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 10px;
+      }
+      .editor-diff-list {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .editor-diff-change {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 8px;
+        font-size: 11px;
+      }
+      .editor-diff-column {
+        color: #9aa0c0;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        overflow-wrap: anywhere;
+      }
+      .editor-diff-values {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .editor-diff-before {
+        color: #ff8b9a;
+        text-decoration: line-through;
+      }
+      .editor-diff-after {
+        color: #7ee2a8;
+      }
+      .editor-preview-errors {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .editor-preview-error {
+        margin: 0;
+        color: #ff8b9a;
+        font-size: 11px;
+      }
+      .editor-preview-report {
+        margin: 8px 0 0;
+        max-height: 220px;
+        overflow: auto;
+        background: #0f0f1a;
+        border: 1px solid #2b2b44;
+        border-radius: 6px;
+        padding: 8px;
+        color: #b9c0dd;
+        font-size: 10px;
+        white-space: pre-wrap;
+      }
     </style>
   </head>
   <body>

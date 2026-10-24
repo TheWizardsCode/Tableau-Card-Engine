@@ -17,12 +17,30 @@ export const EDITOR_APP_ID = 'storyline-editor-app';
 export const EDITOR_MANIFEST_URL = './manifest.json';
 
 /**
+ * Browser-relative URL the page fetches the editable content from.
+ *
+ * The manifest is the graph view model; the content response adds what the
+ * curated forms need to prefill themselves — the content adapter's field
+ * mapping/defaults (declarative data only) and the raw cards (including the
+ * legacy successor-link columns the manifest deliberately does not expose).
+ */
+export const EDITOR_CONTENT_URL = './content.json';
+
+/**
  * Host-relative path the editor host serves the generated manifest on.
  *
  * Kept in sync with {@link EDITOR_MANIFEST_URL} by
  * `tests/story-line/editor/cli.test.ts`.
  */
 export const EDITOR_MANIFEST_PATH = '/manifest.json';
+
+/**
+ * Host-relative path the editor host serves the editable content on (read-only
+ * `GET`): the adapter's declarative field mapping/defaults plus the raw cards.
+ * Kept in sync with {@link EDITOR_CONTENT_URL} by
+ * `tests/story-line/editor/cli.test.ts`.
+ */
+export const EDITOR_CONTENT_PATH = '/content.json';
 
 /** Host-relative path of the preview endpoint (`POST`, returns the diff). */
 export const EDITOR_PREVIEW_PATH = '/api/preview';

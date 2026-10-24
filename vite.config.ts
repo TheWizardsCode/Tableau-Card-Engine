@@ -255,6 +255,9 @@ export default defineConfig(({ mode, command }) => ({
             // viewer coverage in viewer.browser.test.ts).
             'tests/story-line/editor/harness.browser.test.ts',
             'tests/story-line/editor/viewer.browser.test.ts',
+            // Curated card edit forms: the real edit/add round-trip on the Gym
+            // fixture through the plain-DOM forms and the preview panel.
+            'tests/story-line/editor/edit-roundtrip.browser.test.ts',
             // Main Street key E2E
             'tests/main-street/MainStreetScene.browser.test.ts',
             'tests/main-street/drag.browser.test.ts',

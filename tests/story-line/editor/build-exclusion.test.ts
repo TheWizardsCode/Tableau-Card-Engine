@@ -39,11 +39,16 @@ const EDITOR_TOKENS = [
 /** The editor's files; their absence would make the scan vacuous. */
 const EDITOR_FILES = [
   'src/story-line/editor/view-model.ts',
+  'src/story-line/editor/field-descriptors.ts',
   'tools/storyline-editor/index.html',
   'tools/storyline-editor/app.ts',
   'tools/storyline-editor/app-shell.ts',
   'tools/storyline-editor/graph-renderer.ts',
   'tools/storyline-editor/config.ts',
+  'tools/storyline-editor/bridge-client.ts',
+  'tools/storyline-editor/preview-panel.ts',
+  'tools/storyline-editor/edit-forms.ts',
+  'tools/storyline-editor/add-card-form.ts',
   'scripts/storyline-editor-cli.ts',
   'scripts/storyline-editor-server.ts',
   'vite.editor.config.ts',

@@ -41,7 +41,12 @@ import {
   storylineEditorManifestPlugin,
   EDITOR_MANIFEST_PLUGIN_NAME,
 } from '../../../scripts/storyline-editor-server';
-import { EDITOR_MANIFEST_PATH, EDITOR_MANIFEST_URL } from '../../../tools/storyline-editor/config';
+import {
+  EDITOR_CONTENT_PATH,
+  EDITOR_CONTENT_URL,
+  EDITOR_MANIFEST_PATH,
+  EDITOR_MANIFEST_URL,
+} from '../../../tools/storyline-editor/config';
 import { EDITOR_PAGE_ROOT, EDITOR_SERVER_PORT } from '../../../vite.editor.config';
 import { CONTENT_CSV_PATH, REPO_ROOT, copyEditorFixtureFiles } from './fixtures';
 
@@ -145,6 +150,12 @@ describe('editor page/host contract', () => {
     expect(EDITOR_MANIFEST_URL).toBe('./manifest.json');
     expect(EDITOR_MANIFEST_PATH).toBe('/manifest.json');
     expect(`.${EDITOR_MANIFEST_PATH}`).toBe(EDITOR_MANIFEST_URL);
+  });
+
+  it('serves the editable content at the path the page fetches', () => {
+    expect(EDITOR_CONTENT_URL).toBe('./content.json');
+    expect(EDITOR_CONTENT_PATH).toBe('/content.json');
+    expect(`.${EDITOR_CONTENT_PATH}`).toBe(EDITOR_CONTENT_URL);
   });
 });
 

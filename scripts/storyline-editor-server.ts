@@ -24,6 +24,8 @@
  */
 
 import { createServer, type Plugin, type PluginOption, type ViteDevServer } from 'vite';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   EDITOR_EDIT_KINDS,
@@ -42,17 +44,21 @@ import {
   type StorylineManifest,
 } from '../src/story-line/content/manifest';
 import { computeContentChecksum } from '../src/story-line/content/csv';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readContentCards } from '../src/story-line/content/mutate';
+import type {
+  ContentAdapter,
+  ContentCard,
+  ContentFieldMapping,
+} from '../src/story-line/content/types';
 import {
   EDITOR_API_PATHS,
+  EDITOR_CONTENT_PATH,
   EDITOR_MANIFEST_PATH,
   EDITOR_PREVIEW_PATH,
   EDITOR_VALIDATE_PATH,
 } from '../tools/storyline-editor/config';
-export { EDITOR_API_PATHS } from '../tools/storyline-editor/config';
+export { EDITOR_API_PATHS, EDITOR_CONTENT_PATH } from '../tools/storyline-editor/config';
 import editorConfig, { EDITOR_SERVER_PORT } from '../vite.editor.config';
-import type { ContentAdapter } from '../src/story-line/content/types';
 import {
   DEFAULT_MANUAL_DOC_SECTIONS,
   type ManualDocSection,
@@ -94,6 +100,95 @@ export function serveEditorManifest(
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.setHeader('Cache-Control', 'no-store');
   response.end(serialiseManifest(manifest));
+  return true;
+}
+
+// ── Editable content (read-only, for the curated forms) ─────
+
+/**
+ * The content adapter's **declarative** projection: columns, the story-line
+ * field mapping and the authoring defaults.
+ *
+ * The optional adapter hooks (`baseId`, `describeImpact`) are functions and
+ * therefore not serialisable; the page only needs the data to derive form
+ * fields, so the projection deliberately omits them (`ContentAdapter`'s hooks
+ * are optional, so the projection is structurally assignable to it).
+ */
+export type EditorContentAdapter = Omit<ContentAdapter, 'baseId' | 'describeImpact'>;
+
+/** The read-only content payload the editor page fetches to prefill forms. */
+export interface EditorContentResponse {
+  /** The adapter's game id. */
+  readonly gameId: string;
+  /** Checksum of the served content (the load-time concurrency token). */
+  readonly checksum: string;
+  /** The adapter's declarative field mapping/defaults. */
+  readonly adapter: EditorContentAdapter;
+  /** The raw content cards, in file order, including legacy link columns. */
+  readonly cards: readonly ContentCard[];
+}
+
+/**
+ * Projects an adapter to its serialisable declarative part.
+ *
+ * @param adapter The game content adapter.
+ * @returns Columns, field mapping and authoring defaults (no hooks).
+ */
+export function serialisableContentAdapter(
+  adapter: ContentAdapter,
+): EditorContentAdapter {
+  const fields: ContentFieldMapping = adapter.fields;
+  return {
+    gameId: adapter.gameId,
+    columns: adapter.columns,
+    fields,
+    ...(adapter.editableColumns !== undefined
+      ? { editableColumns: adapter.editableColumns }
+      : {}),
+    ...(adapter.newCardDefaults !== undefined
+      ? { newCardDefaults: adapter.newCardDefaults }
+      : {}),
+  };
+}
+
+/**
+ * Builds the read-only content payload for a session (adapter schema + cards).
+ *
+ * @param session The loaded editor session.
+ * @returns The content response the page fetches.
+ */
+export function buildEditorContent(session: EditorSession): EditorContentResponse {
+  return {
+    gameId: session.adapter.gameId,
+    checksum: computeContentChecksum(session.csv),
+    adapter: serialisableContentAdapter(session.adapter),
+    cards: readContentCards(session.csv, session.adapter),
+  };
+}
+
+/**
+ * Serves the editable content, or reports it was not handled.
+ *
+ * Read-only: it exposes the already-loaded session snapshot (the adapter's
+ * declarative schema plus the raw cards) so the curated forms can prefill
+ * themselves. Nothing here writes a file — every mutation still goes through
+ * the preview/validate/apply endpoints and the single author API.
+ *
+ * @param session  The current editor session.
+ * @param request  The incoming request.
+ * @param response A writable response.
+ * @returns `true` when this middleware handled the request.
+ */
+export function serveEditorContent(
+  session: EditorSession,
+  request: EditorManifestRequest,
+  response: EditorManifestResponse,
+): boolean {
+  const path = (request.url ?? '').split('?')[0];
+  if (path !== EDITOR_CONTENT_PATH) return false;
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
+  response.setHeader('Cache-Control', 'no-store');
+  response.end(JSON.stringify(buildEditorContent(session)));
   return true;
 }
 
@@ -191,22 +286,34 @@ function manifestProvider(source: EditorManifestSource): () => StorylineManifest
   return typeof source === 'function' ? source : () => source;
 }
 
-/** A Vite plugin serving the manifest to the editor page. */
-export function storylineEditorManifestPlugin(source: EditorManifestSource): Plugin {
+/**
+ * A Vite plugin serving the manifest — and, when a session is supplied, the
+ * read-only editable content — to the editor page.
+ *
+ * @param source  A fixed manifest or a provider re-read per request.
+ * @param session The loaded session; enables `GET /content.json` for the forms.
+ * @returns The Vite plugin.
+ */
+export function storylineEditorManifestPlugin(
+  source: EditorManifestSource,
+  session?: EditorSession,
+): Plugin {
   const getManifest = manifestProvider(source);
   return {
     name: EDITOR_MANIFEST_PLUGIN_NAME,
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const handled = serveEditorManifest(getManifest(), req, {
-          setHeader: (name, value) => {
+        const response = {
+          setHeader: (name: string, value: string) => {
             res.setHeader(name, value);
           },
-          end: (body) => {
+          end: (body?: string) => {
             res.end(body);
           },
-        });
-        if (!handled) next();
+        };
+        if (serveEditorManifest(getManifest(), req, response)) return;
+        if (session && serveEditorContent(session, req, response)) return;
+        next();
       });
     },
   };
@@ -489,7 +596,7 @@ export async function createEditorHost(options: EditorHostOptions): Promise<Edit
 
   const plugins: PluginOption[] = [
     ...(editorConfig.plugins ?? []),
-    storylineEditorManifestPlugin(source),
+    storylineEditorManifestPlugin(source, session),
   ];
   if (session) plugins.push(storylineEditorApiPlugin(session));
 
