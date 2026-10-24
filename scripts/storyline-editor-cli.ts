@@ -1,24 +1,29 @@
 #!/usr/bin/env node
 /**
- * Story-line editor CLI — the single launch point for the read-only editor.
+ * Story-line editor CLI — the single launch point for the editor.
  *
  * ```bash
  * npm run storylines:editor                       # Gym content, http://127.0.0.1:5174
  * npm run storylines:editor -- --port 5180
  * npm run storylines:editor -- --content path/to/storylines.csv
  * npm run storylines:editor -- --adapter ./my-game-adapter.ts
+ * npm run storylines:editor -- --apply '{"edit":{"kind":"update-card","spec":{...}}}'
  * npm run storylines:editor -- --help
  * ```
  *
  * The CLI resolves a game's **content adapter** (a shipped id such as `gym`,
- * or a module exporting one), reads the content CSV through it, builds the
- * deterministic manifest, and hands both the manifest and the dedicated editor
- * Vite config to {@link createEditorHost}. The page then renders from that one
- * manifest — there is no per-node network round-trip.
+ * or a module exporting one), loads the content CSV into an **editor session**
+ * (the snapshot plus its concurrency checksum) and either
  *
- * `tsx` is the core tooling runner (no Vite loader), and nothing here writes a
- * file: the manifest is served from memory, so the editor stays inside the
- * epic's single-write-path rule.
+ * - boots the editor host with that session (manifest + preview/validate/apply
+ *   endpoints), or
+ * - with `--apply`, runs the same write bridge headlessly and exits non-zero
+ *   when the edit is refused (invalid content, or content that changed on disk
+ *   since load) — scripted/CI edits go through the same single write path.
+ *
+ * `tsx` is the core tooling runner (no Vite loader), and the content CSV is
+ * only ever written by the core author API: the host serves the manifest from
+ * memory, and the CLI's apply mode delegates to the bridge.
  *
  * @module
  */
@@ -32,6 +37,7 @@ import {
   DEFAULT_CONTENT_PATH,
   getContentAdapter,
 } from '../src/story-line/content/adapters';
+import { applyEdit, EDITOR_EDIT_KINDS, type EditorEdit } from '../src/story-line/editor/api';
 import {
   buildStorylineManifestFromCsv,
   type StorylineManifest,
@@ -42,26 +48,34 @@ import { EDITOR_SERVER_PORT } from '../vite.editor.config';
 import {
   createEditorHost,
   DEFAULT_EDITOR_HOST,
+  loadEditorSession,
   type EditorHost,
 } from './storyline-editor-server';
 
 /** CLI usage text. */
-export const EDITOR_USAGE = `Open the read-only story-line editor (a local dev tool).
+export const EDITOR_USAGE = `Open the story-line editor (a local dev tool) or apply one edit headlessly.
 
 Usage:
   npm run storylines:editor -- [options]
 
 Options:
-  --content <path>    Content CSV to load (default: ${DEFAULT_CONTENT_PATH})
-  --adapter <module>  Content adapter: a shipped id (default: gym) or a module
-                      path/specifier exporting a ContentAdapter as its default,
-                      \`adapter\` or \`contentAdapter\` export
-  --port <number>     Dev-server port (default: ${EDITOR_SERVER_PORT})
-  --host <host>       Bind host (default: ${DEFAULT_EDITOR_HOST}; loopback only)
-  --help              Show this help
+  --content <path>          Content CSV to load (default: ${DEFAULT_CONTENT_PATH})
+  --adapter <module>        Content adapter: a shipped id (default: gym) or a module
+                            path/specifier exporting a ContentAdapter as its default,
+                            \`adapter\` or \`contentAdapter\` export
+  --port <number>           Dev-server port (default: ${EDITOR_SERVER_PORT})
+  --host <host>             Bind host (default: ${DEFAULT_EDITOR_HOST}; loopback only)
+  --apply <json|@file>      Apply one edit through the write bridge, print the JSON
+                            result and exit (no dev server). The JSON is
+                            { "edit": { "kind": ..., "spec": { ... } },
+                              "expectedChecksum": "<hex, optional>",
+                              "dryRun": false, "artefactPaths": { 
+                                "json": ..., "mermaid": ... } }
+  --dry-run                 With --apply: preview and validate without writing
+  --help                    Show this help
 
-Exit codes: 0 = serving / help shown, 1 = bad option, unknown adapter,
-unreadable content or host failure.`.trim();
+Exit codes: 0 = serving / applied / help shown, 1 = bad option, unknown adapter,
+unreadable content, host failure or a refused edit (invalid or stale content).`.trim();
 
 /** Loads a module specifier (a real dynamic `import()` by default). */
 export type AdapterImporter = (specifier: string) => Promise<unknown>;
@@ -78,6 +92,10 @@ export interface StorylineEditorCliOptions {
   readonly contentPath: string;
   /** Raw `--adapter` value (a shipped id or a module specifier). */
   readonly adapterRef: string | undefined;
+  /** Raw `--apply` value (inline JSON or `@file`), undefined when serving. */
+  readonly apply: string | undefined;
+  /** With `--apply`: preview and validate, write nothing. */
+  readonly dryRun: boolean;
 }
 
 /** Optional seams for tests. */
@@ -114,6 +132,8 @@ export function parseStorylineEditorArgs(argv: readonly string[]): StorylineEdit
     host: flags.get('host') ?? DEFAULT_EDITOR_HOST,
     contentPath: flags.get('content') ?? DEFAULT_CONTENT_PATH,
     adapterRef: flags.get('adapter'),
+    apply: flags.get('apply'),
+    dryRun: flags.has('dry-run'),
   };
 }
 
@@ -250,16 +270,16 @@ export async function launchEditor(
     };
   }
 
-  let loaded: LoadedEditorManifest;
+  let session;
   try {
-    loaded = loadEditorManifest(options.contentPath, adapter);
+    session = loadEditorSession({ contentPath: options.contentPath, adapter });
   } catch (error) {
     return { ok: false, code: 1, message: (error as Error).message };
   }
 
   try {
     const host = await createEditorHost({
-      manifest: loaded.manifest,
+      session,
       port: options.port,
       host: options.host,
     });
@@ -273,13 +293,189 @@ export async function launchEditor(
   }
 }
 
+// ── Headless apply (the same bridge, no dev server) ─────────
+
+/** A parsed `--apply` payload. */
+export interface EditorApplyRequest {
+  /** The edit to apply. */
+  readonly edit: EditorEdit;
+  /** Optional explicit concurrency token (defaults to the load-time checksum). */
+  readonly expectedChecksum?: string;
+  /** When true, preview and validate without writing. */
+  readonly dryRun?: boolean;
+  /** Optional generated-artefact paths (defaults to the committed Gym artefacts). */
+  readonly artefactPaths?: { readonly json: string; readonly mermaid: string };
+}
+
+/**
+ * Parses an `--apply` payload (inline JSON, or `@path` to a JSON file).
+ *
+ * @param raw     The `--apply` value from argv.
+ * @param baseDir Base directory for an `@path` (default `process.cwd()`).
+ * @returns The parsed request, or an actionable error.
+ */
+export function parseEditorApplyRequest(
+  raw: string,
+  baseDir: string = process.cwd(),
+): { readonly request: EditorApplyRequest } | { readonly error: string } {
+  let text = raw;
+  if (raw.startsWith('@')) {
+    const file = resolve(baseDir, raw.slice(1));
+    try {
+      text = readFileSync(file, 'utf-8');
+    } catch (error) {
+      return { error: `cannot read --apply payload ${file}: ${(error as Error).message}` };
+    }
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    return { error: `--apply must be JSON (inline or @file): ${(error as Error).message}` };
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return { error: '--apply must be a JSON object' };
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const edit = record.edit;
+  if (typeof edit !== 'object' || edit === null || Array.isArray(edit)) {
+    return { error: '--apply requires an "edit" object ({ kind, spec })' };
+  }
+  const kind = (edit as Record<string, unknown>).kind;
+  const spec = (edit as Record<string, unknown>).spec;
+  if (typeof kind !== 'string' || EDITOR_EDIT_KINDS.every((known) => known !== kind)) {
+    return {
+      error: `--apply edit.kind "${String(kind)}" is not one of: ${EDITOR_EDIT_KINDS.join(', ')}`,
+    };
+  }
+  if (typeof spec !== 'object' || spec === null || Array.isArray(spec)) {
+    return { error: '--apply edit.spec must be an object' };
+  }
+  if (record.expectedChecksum !== undefined && typeof record.expectedChecksum !== 'string') {
+    return { error: '--apply expectedChecksum must be a string when supplied' };
+  }
+  if (record.dryRun !== undefined && typeof record.dryRun !== 'boolean') {
+    return { error: '--apply dryRun must be a boolean when supplied' };
+  }
+  if (record.artefactPaths !== undefined) {
+    const paths = record.artefactPaths;
+    if (typeof paths !== 'object' || paths === null || Array.isArray(paths)) {
+      return { error: '--apply artefactPaths must be an object { json, mermaid }' };
+    }
+    for (const key of ['json', 'mermaid'] as const) {
+      if (typeof (paths as Record<string, unknown>)[key] !== 'string') {
+        return { error: `--apply artefactPaths.${key} must be a string` };
+      }
+    }
+  }
+
+  return {
+    request: {
+      edit: edit as unknown as EditorEdit,
+      ...(record.expectedChecksum !== undefined
+        ? { expectedChecksum: record.expectedChecksum as string }
+        : {}),
+      ...(record.dryRun !== undefined ? { dryRun: record.dryRun as boolean } : {}),
+      ...(record.artefactPaths !== undefined
+        ? { artefactPaths: record.artefactPaths as EditorApplyRequest['artefactPaths'] }
+        : {}),
+    },
+  };
+}
+
+/** Runs one headless apply through the write bridge. */
+export interface EditorApplyOutcome {
+  /** True when the edit was accepted (written, or valid on a dry run). */
+  readonly ok: boolean;
+  /** Process exit code (0 accepted, 1 refused/failed). */
+  readonly code: number;
+  /** The bridge result, when the edit got that far. */
+  readonly result?: import('../src/story-line/editor/api').EditApplyResult;
+  /** Actionable failure message. */
+  readonly message: string;
+}
+
+/**
+ * Applies one edit headlessly (`--apply`).
+ *
+ * The load-time checksum is the default concurrency token, so an external edit
+ * between load and apply is refused rather than clobbered.
+ *
+ * @param options Content path and CLI flags.
+ * @param adapter The game content adapter.
+ * @param request The parsed apply payload.
+ * @returns The bridge result plus an exit code.
+ */
+export function applyHeadlessEdit(
+  options: StorylineEditorCliOptions,
+  adapter: ContentAdapter,
+  request: EditorApplyRequest,
+): EditorApplyOutcome {
+  let session;
+  try {
+    session = loadEditorSession({ contentPath: options.contentPath, adapter });
+  } catch (error) {
+    return { ok: false, code: 1, message: (error as Error).message };
+  }
+
+  const result = applyEdit({
+    contentPath: session.contentPath,
+    adapter,
+    edit: request.edit,
+    expectedChecksum: request.expectedChecksum ?? session.checksum,
+    dryRun: request.dryRun ?? options.dryRun,
+    artefactPaths: request.artefactPaths ?? session.artefactPaths,
+    manualDocs: session.manualDocs,
+    baseDir: session.baseDir,
+  });
+
+  return { ok: result.ok, code: result.ok ? 0 : 1, result, message: result.message };
+}
+
+/**
+ * Runs the `--apply` mode: resolve the adapter, parse the payload, apply once.
+ *
+ * @param options The CLI options (including the raw `--apply` value).
+ * @param deps Optional test seams.
+ * @returns Process exit code (0 accepted, 1 refused/failed).
+ */
+async function runApplyMode(
+  options: StorylineEditorCliOptions,
+  deps: StorylineEditorCliDeps,
+): Promise<number> {
+  const adapter = await resolveEditorAdapter(options.adapterRef, deps.importer);
+  if (!adapter) {
+    process.stderr.write(
+      `storyline-editor: unknown --adapter "${options.adapterRef ?? ''}" — use a shipped adapter id ` +
+        '(gym) or a module exporting a ContentAdapter\n',
+    );
+    return 1;
+  }
+
+  const parsed = parseEditorApplyRequest(options.apply as string);
+  if ('error' in parsed) {
+    process.stderr.write(`storyline-editor: ${parsed.error}\n`);
+    return 1;
+  }
+
+  const outcome = applyHeadlessEdit(options, adapter, parsed.request);
+  if (outcome.result) {
+    process.stdout.write(`${JSON.stringify(outcome.result, null, 2)}\n`);
+  }
+  if (!outcome.ok) process.stderr.write(`storyline-editor: ${outcome.message}\n`);
+  return outcome.code;
+}
+
 /**
  * Runs the editor CLI.
  *
  * @param argv Raw arguments (defaults to `process.argv.slice(2)`).
  * @param deps Optional test seams.
- * @returns Exit code: 0 when serving (the dev server keeps the process alive)
- *          or when help was shown, 1 on any failure.
+ * @returns Exit code: 0 when serving (the dev server keeps the process alive),
+ *          when help was shown or when a headless apply succeeded; 1 on any
+ *          failure, including a refused edit.
  */
 export async function runStorylineEditorCli(
   argv: readonly string[] = process.argv.slice(2),
@@ -296,6 +492,10 @@ export async function runStorylineEditorCli(
   if (options.help) {
     process.stdout.write(`${EDITOR_USAGE}\n`);
     return 0;
+  }
+
+  if (options.apply !== undefined) {
+    return runApplyMode(options, deps);
   }
 
   const launched = await launchEditor(options, deps);

@@ -8,6 +8,11 @@
  * source roots and reports any fs write/delete call; the consumer then asserts
  * there are none (`assertSingleWritePath`).
  *
+ * Two sanctioned writers are exempted from a scan of the **content** roots
+ * (they live outside the editor roots anyway): `author.ts`, which owns the
+ * content CSV, and `artefacts.ts`, which owns the **generated** Mermaid/JSON
+ * artefacts — regenerating a generated file is not a CSV edit path.
+ *
  * The scan is **tolerant of the editor modules not existing yet**: an absent
  * root is reported as `skipped` (with the future path), so the guard is green
  * before the feature code lands and meaningful the moment it does.
@@ -89,6 +94,15 @@ export interface WritePathScanOptions {
 
 /** Absolute path of the core author module — the single sanctioned writer. */
 export const CONTENT_AUTHOR_MODULE = 'src/story-line/content/author.ts';
+
+/** Absolute path of the generated-artefact writer (mermaid/json, never a CSV). */
+export const CONTENT_ARTEFACT_MODULE = 'src/story-line/content/artefacts.ts';
+
+/** Every module allowed to write files (content CSV + generated artefacts). */
+export const SANCTIONED_WRITE_MODULES = [
+  CONTENT_AUTHOR_MODULE,
+  CONTENT_ARTEFACT_MODULE,
+] as const;
 
 /** Recursively lists every `.ts` file under a directory. */
 function listTsFiles(dir: string): string[] {

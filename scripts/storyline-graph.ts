@@ -35,17 +35,22 @@ import {
 } from '../src/story-line/content/adapters';
 import {
   buildStorylineManifestFromCsv,
-  renderMermaid,
-  serialiseManifest,
   type StorylineManifest,
 } from '../src/story-line/content/manifest';
+import {
+  DEFAULT_ARTEFACT_PATHS,
+  renderArtefacts,
+} from '../src/story-line/content/artefacts';
 import { parseArgv } from './storyline-cli-support';
 
-/** Default committed artefact paths, relative to the repository root. */
-export const DEFAULT_GRAPH_OUTPUTS = {
-  mermaid: 'example-games/gym/content/storyline-graph.mmd',
-  json: 'example-games/gym/content/storyline-manifest.json',
-} as const;
+/**
+ * Default committed artefact paths, relative to the repository root.
+ *
+ * The canonical declaration lives with the generated-artefact module
+ * (`src/story-line/content/artefacts.ts`); this CLI re-exports it so existing
+ * importers keep working against one source of truth.
+ */
+export const DEFAULT_GRAPH_OUTPUTS = DEFAULT_ARTEFACT_PATHS;
 
 /** CLI usage text. */
 export const GRAPH_USAGE = `Export a deterministic story-line manifest or Mermaid flowchart.
@@ -105,7 +110,7 @@ export function renderGraphArtefact(
   format: 'mermaid' | 'json',
   manifest: StorylineManifest,
 ): string {
-  return format === 'json' ? serialiseManifest(manifest) : renderMermaid(manifest);
+  return renderArtefacts(manifest)[format];
 }
 
 /**

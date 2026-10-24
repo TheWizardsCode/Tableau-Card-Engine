@@ -16,8 +16,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
-  CONTENT_AUTHOR_MODULE,
   DEFAULT_EDITOR_ROOTS,
+  SANCTIONED_WRITE_MODULES,
   assertSingleWritePath,
   scanWritePaths,
 } from './write-path-guard';
@@ -49,16 +49,17 @@ describe('story-line editor write-path guard', () => {
     }
   });
 
-  it('passes on the shipped content modules when the author module is exempted', () => {
-    // The single-write-path property already holds for the generalised
-    // toolchain: only author.ts writes, so scanning everything else is clean.
+  it('passes on the shipped content modules when the sanctioned writers are exempted', () => {
+    // The single-write-path property of the content layer: only author.ts
+    // (the content CSV) and artefacts.ts (the generated mermaid/json) write;
+    // scanning everything else is clean.
     const scan = scanWritePaths({
       baseDir: REPO_ROOT,
       roots: ['src/story-line/content'],
-      exclude: [CONTENT_AUTHOR_MODULE],
+      exclude: SANCTIONED_WRITE_MODULES,
     });
 
-    expect(scan.scanned.length).toBeGreaterThanOrEqual(6);
+    expect(scan.scanned.length).toBeGreaterThanOrEqual(7);
     expect(scan.violations).toEqual([]);
     expect(() => assertSingleWritePath(scan)).not.toThrow();
   });

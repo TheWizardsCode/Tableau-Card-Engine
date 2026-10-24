@@ -24,6 +24,7 @@ import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 
 import {
   cardsFromCsv,
+  computeContentChecksum,
   findMissingColumns,
   parseCsv,
   serialiseCsv,
@@ -52,6 +53,13 @@ export interface ContentFileEditResult extends ContentEditResult {
   readonly path: string;
   /** True only when the file was actually written. */
   readonly written: boolean;
+  /**
+   * True when the writer refused the edit because the file's checksum no
+   * longer matches the caller's `expectedChecksum` (concurrency guard).
+   */
+  readonly stale?: boolean;
+  /** True when the caller must reload the content before retrying. */
+  readonly reloadRequired?: boolean;
 }
 
 /** A spec for appending a new card to the content. */
@@ -285,36 +293,16 @@ export function addContentCard(
 }
 
 /**
- * Updates an existing card and validates the resulting content.
- *
- * @param csvText Current content CSV text.
- * @param adapter The game content adapter.
- * @param spec    The update (only the supplied fields are changed).
- * @returns The edit result.
+ * Shared field-application step for {@link updateContentCard} and
+ * {@link updateContentCards}: applies one spec's supplied fields to a row.
  */
-export function updateContentCard(
-  csvText: string,
+function applyUpdateFields(
+  header: string[],
+  rows: string[][],
+  row: string[],
   adapter: ContentAdapter,
   spec: UpdateContentCardSpec,
-): ContentEditResult {
-  const parsed = parseCsv(csvText);
-  const header = [...parsed.header];
-  const rows = mutableRows(parsed);
-
-  const errors = headerErrors(header, adapter);
-  if (spec.id.trim() === '') errors.push('update-card: --id is required');
-  errors.push(...fieldKeyErrors(header, adapter, spec.fields));
-  if (errors.length > 0) return { csv: csvText, ok: false, errors };
-
-  const row = findRow(header, rows, adapter, spec.id);
-  if (!row) {
-    return {
-      csv: csvText,
-      ok: false,
-      errors: [`update-card: card id "${spec.id}" not found`],
-    };
-  }
-
+): void {
   const fields = adapter.fields;
   const setNullable = (column: string | undefined, value: string | null): void => {
     if (column === undefined) return;
@@ -352,6 +340,87 @@ export function updateContentCard(
   for (const [column, value] of Object.entries(spec.fields ?? {})) {
     setColumn(header, rows, row, column, value);
   }
+}
+
+/**
+ * Updates an existing card and validates the resulting content.
+ *
+ * @param csvText Current content CSV text.
+ * @param adapter The game content adapter.
+ * @param spec    The update (only the supplied fields are changed).
+ * @returns The edit result.
+ */
+export function updateContentCard(
+  csvText: string,
+  adapter: ContentAdapter,
+  spec: UpdateContentCardSpec,
+): ContentEditResult {
+  const parsed = parseCsv(csvText);
+  const header = [...parsed.header];
+  const rows = mutableRows(parsed);
+
+  const errors = headerErrors(header, adapter);
+  if (spec.id.trim() === '') errors.push('update-card: --id is required');
+  errors.push(...fieldKeyErrors(header, adapter, spec.fields));
+  if (errors.length > 0) return { csv: csvText, ok: false, errors };
+
+  const row = findRow(header, rows, adapter, spec.id);
+  if (!row) {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [`update-card: card id "${spec.id}" not found`],
+    };
+  }
+
+  applyUpdateFields(header, rows, row, adapter, spec);
+  return finalise(csvText, serialiseCsv({ header, rows }), adapter);
+}
+
+/**
+ * Applies several card updates in one in-memory pass and validates the
+ * combined result once.
+ *
+ * This is the batch counterpart of {@link updateContentCard}: every spec is
+ * applied to the same row matrix, then the whole candidate is validated a
+ * single time (`finalise`). It is what a storyline-level rename uses — a
+ * group of member cards reassigned as one author operation, written once
+ * through {@link applyContentEditToFile}.
+ *
+ * @param csvText Current content CSV text.
+ * @param adapter The game content adapter.
+ * @param specs   The updates to apply, in order.
+ * @returns The edit result (one validation over the combined candidate).
+ */
+export function updateContentCards(
+  csvText: string,
+  adapter: ContentAdapter,
+  specs: readonly UpdateContentCardSpec[],
+): ContentEditResult {
+  if (specs.length === 0) {
+    return { csv: csvText, ok: true, errors: [] };
+  }
+
+  const parsed = parseCsv(csvText);
+  const header = [...parsed.header];
+  const rows = mutableRows(parsed);
+
+  for (const spec of specs) {
+    const errors = headerErrors(header, adapter);
+    if (spec.id.trim() === '') errors.push('update-card: --id is required');
+    errors.push(...fieldKeyErrors(header, adapter, spec.fields));
+    if (errors.length > 0) return { csv: csvText, ok: false, errors };
+
+    const row = findRow(header, rows, adapter, spec.id);
+    if (!row) {
+      return {
+        csv: csvText,
+        ok: false,
+        errors: [`update-card: card id "${spec.id}" not found`],
+      };
+    }
+    applyUpdateFields(header, rows, row, adapter, spec);
+  }
 
   return finalise(csvText, serialiseCsv({ header, rows }), adapter);
 }
@@ -368,6 +437,14 @@ export interface ApplyContentEditOptions {
   readonly mutate: ContentMutation;
   /** When true, validate and return the candidate without writing. */
   readonly dryRun?: boolean;
+  /**
+   * Concurrency guard: the content checksum captured when the caller loaded
+   * the file. When the file on disk does not match, the writer refuses (no
+   * write) and returns `stale`/`reloadRequired` so the caller can instruct a
+   * reload instead of clobbering a concurrent edit. Reuses the single
+   * checksum implementation from the content model.
+   */
+  readonly expectedChecksum?: string;
 }
 
 /**
@@ -384,8 +461,31 @@ export interface ApplyContentEditOptions {
 export function applyContentEditToFile(
   options: ApplyContentEditOptions,
 ): ContentFileEditResult {
-  const { contentPath, adapter, mutate, dryRun = false } = options;
+  const { contentPath, adapter, mutate, dryRun = false, expectedChecksum } = options;
   const original = readFileSync(contentPath, 'utf-8');
+
+  // ── Concurrency guard (before any mutation, on the writer's own read): ──
+  // the caller loaded a snapshot; if the file moved on since, an edit would
+  // silently clobber someone else's change. Refuse instead, and instruct a
+  // reload. Reuses computeContentChecksum — there is no second hash.
+  if (expectedChecksum !== undefined) {
+    const actual = computeContentChecksum(original);
+    if (actual !== expectedChecksum) {
+      return {
+        csv: original,
+        ok: false,
+        errors: [
+          `content changed on disk since load (checksum ${actual} ≠ expected ${expectedChecksum}) — ` +
+            'reload the editor and retry your edit',
+        ],
+        path: contentPath,
+        written: false,
+        stale: true,
+        reloadRequired: true,
+      };
+    }
+  }
+
   const result = mutate(original);
 
   if (!result.ok) {

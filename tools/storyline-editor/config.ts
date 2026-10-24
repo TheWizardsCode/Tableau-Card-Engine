@@ -23,3 +23,19 @@ export const EDITOR_MANIFEST_URL = './manifest.json';
  * `tests/story-line/editor/cli.test.ts`.
  */
 export const EDITOR_MANIFEST_PATH = '/manifest.json';
+
+/** Host-relative path of the preview endpoint (`POST`, returns the diff). */
+export const EDITOR_PREVIEW_PATH = '/api/preview';
+
+/** Host-relative path of the validate endpoint (`POST`, validator report only). */
+export const EDITOR_VALIDATE_PATH = '/api/validate';
+
+/** Host-relative path of the apply endpoint (`POST`, the only write). */
+export const EDITOR_APPLY_PATH = '/api/apply';
+
+/** Every host API path the editor page may call, with its operation. */
+export const EDITOR_API_PATHS = {
+  preview: EDITOR_PREVIEW_PATH,
+  validate: EDITOR_VALIDATE_PATH,
+  apply: EDITOR_APPLY_PATH,
+} as const;

@@ -10,7 +10,9 @@
  * - every import in `src/story-line/content/**` and in the authoring CLIs is a
  *   relative path or a `node:` builtin (no `phaser`, no game alias, no package
  *   that a game-only toolchain would pull in);
- * - only `author.ts` may import `node:fs` — it is the single content writer.
+ * - `node:fs` importing is confined to the two sanctioned writers, declared in
+ *   the editor write-path guard: `author.ts` (the content CSV) and
+ *   `artefacts.ts` (the generated mermaid/json artefacts).
  *
  * @module
  */
@@ -19,7 +21,11 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { SANCTIONED_WRITE_MODULES } from '../editor/write-path-guard';
 import { REPO_ROOT } from './test-support';
+
+/** The basenames of the sanctioned writers (they live in this content dir). */
+const SANCTIONED_BASENAMES = new Set(SANCTIONED_WRITE_MODULES.map((file) => file.split('/').pop()));
 
 /** Recursively lists `.ts` files under a directory. */
 function listTypeScriptFiles(dir: string): string[] {
@@ -83,18 +89,21 @@ describe('story-line content import boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('confines file writing to author.ts (the single content writer)', () => {
+  it('confines file writing to the sanctioned writers (author + artefacts)', () => {
     const importFs = CONTENT_FILES.filter(
       (file) =>
-        !file.endsWith('/author.ts') &&
+        !SANCTIONED_BASENAMES.has(file.split('/').pop() ?? '') &&
         importSpecifiers(readFileSync(file, 'utf-8')).some(
           (specifier) => specifier === 'node:fs',
         ),
     );
     expect(importFs).toEqual([]);
 
+    // The two sanctioned writers really write.
     const authorSource = readFileSync(join(CONTENT_DIR, 'author.ts'), 'utf-8');
     expect(authorSource).toContain('writeFileSync');
     expect(authorSource).toContain('renameSync');
+    const artefactsSource = readFileSync(join(CONTENT_DIR, 'artefacts.ts'), 'utf-8');
+    expect(artefactsSource).toContain('writeFileSync');
   });
 });

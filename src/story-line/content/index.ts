@@ -10,11 +10,13 @@
  * | CSV + checksum | `csv` | `parseCsv`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
  * | Manifest + Mermaid | `manifest` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers |
  * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports |
- * | Transactional authoring | `author` | `addContentCard`, `updateContentCard`, `applyContentEditToFile` |
+ * | Transactional authoring | `author` | `addContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
+ * | Generated artefacts | `artefacts` | `renderArtefacts`, `checkArtefacts`, `writeArtefacts`, `previewArtefacts`, `DEFAULT_ARTEFACT_PATHS` |
  * | Shipped adapters | `adapters` | `GYM_CONTENT_ADAPTER`, `DEFAULT_CONTENT_ADAPTER`, `getContentAdapter` |
  *
- * Nothing here imports a game repository or Phaser, and
- * `applyContentEditToFile` is the only content writer.
+ * Nothing here imports a game repository or Phaser,
+ * `applyContentEditToFile` is the only content writer, and `writeArtefacts` is
+ * the only generated-artefact writer.
  *
  * @module
  */
@@ -93,7 +95,23 @@ export {
   hasContentCard,
   readContentCards,
   updateContentCard,
+  updateContentCards,
 } from './author';
+
+export type {
+  ArtefactContent,
+  ArtefactDrift,
+  ArtefactFormat,
+  ArtefactPaths,
+  ArtefactWriteResult,
+} from './artefacts';
+export {
+  DEFAULT_ARTEFACT_PATHS,
+  checkArtefacts,
+  previewArtefacts,
+  renderArtefacts,
+  writeArtefacts,
+} from './artefacts';
 
 export {
   CONTENT_ADAPTERS,

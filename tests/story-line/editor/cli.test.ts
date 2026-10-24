@@ -26,6 +26,7 @@ import {
 } from '../../../src/story-line/content/manifest';
 import {
   parseStorylineEditorArgs,
+  parseEditorApplyRequest,
   isContentAdapter,
   loadEditorManifest,
   resolveAdapterSpecifier,
@@ -42,7 +43,7 @@ import {
 } from '../../../scripts/storyline-editor-server';
 import { EDITOR_MANIFEST_PATH, EDITOR_MANIFEST_URL } from '../../../tools/storyline-editor/config';
 import { EDITOR_PAGE_ROOT, EDITOR_SERVER_PORT } from '../../../vite.editor.config';
-import { CONTENT_CSV_PATH, REPO_ROOT } from './fixtures';
+import { CONTENT_CSV_PATH, REPO_ROOT, copyEditorFixtureFiles } from './fixtures';
 
 /** Builds the Gym manifest from the committed content CSV. */
 function gymManifest(): StorylineManifest {
@@ -100,6 +101,8 @@ describe('parseStorylineEditorArgs', () => {
       host: '127.0.0.1',
       contentPath: DEFAULT_CONTENT_PATH,
       adapterRef: undefined,
+      apply: undefined,
+      dryRun: false,
     });
   });
 
@@ -114,6 +117,9 @@ describe('parseStorylineEditorArgs', () => {
         '5180',
         '--host',
         '0.0.0.0',
+        '--apply',
+        '{"edit":{"kind":"update-card","spec":{"id":"a","name":"b"}}}',
+        '--dry-run',
         '--help',
       ]),
     ).toEqual({
@@ -122,6 +128,8 @@ describe('parseStorylineEditorArgs', () => {
       host: '0.0.0.0',
       contentPath: 'custom/storylines.csv',
       adapterRef: './my-adapter.ts',
+      apply: '{"edit":{"kind":"update-card","spec":{"id":"a","name":"b"}}}',
+      dryRun: true,
     });
   });
 
@@ -347,7 +355,7 @@ describe('runStorylineEditorCli', () => {
 
     // The usage text is the user-facing contract: every documented flag.
     expect(stdout).toContain('Usage:');
-    for (const flag of ['--content', '--adapter', '--port', '--host', '--help']) {
+    for (const flag of ['--content', '--adapter', '--port', '--host', '--apply', '--dry-run', '--help']) {
       expect(stdout).toContain(flag);
     }
     expect(stdout).toBe(`${EDITOR_USAGE}\n`);
@@ -390,5 +398,159 @@ describe('runStorylineEditorCli', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Usage:');
     expect(result.stdout).toContain('--adapter');
+  });
+});
+
+describe('headless --apply (the same bridge, no dev server)', () => {
+  it('is wired into the CLI run: a refused edit exits non-zero and leaves the content byte-identical', async () => {
+    const before = readFileSync(CONTENT_CSV_PATH, 'utf-8');
+    const payload = JSON.stringify({
+      edit: { kind: 'update-card', spec: { id: 'gym-story-start', options: 'Invest|gym-story-invest;Ignore|gym-story-ghost' } },
+    });
+
+    const { code, stdout, stderr } = await captureCli([
+      '--content',
+      DEFAULT_CONTENT_PATH,
+      '--apply',
+      payload,
+    ]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain('refused to write');
+    expect(stderr).toContain('gym-story-ghost');
+
+    const result = JSON.parse(stdout) as {
+      ok: boolean;
+      status: string;
+      written: boolean;
+      errors: string[];
+    };
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe('invalid');
+    expect(result.written).toBe(false);
+    expect(result.errors.join(' ')).toContain('gym-story-ghost');
+
+    // The content CSV is byte-identical after the refused edit.
+    expect(readFileSync(CONTENT_CSV_PATH, 'utf-8')).toBe(before);
+  });
+
+  it('applies a valid edit against a fixture copy and regenerates the artefacts', async () => {
+    const fixture = copyEditorFixtureFiles();
+    try {
+      const before = readFileSync(fixture.csvPath, 'utf-8');
+      const payload = JSON.stringify({
+        edit: { kind: 'update-card', spec: { id: 'gym-story-invest', name: 'Municipal Investment' } },
+        artefactPaths: { json: fixture.manifestPath, mermaid: fixture.mermaidPath },
+      });
+
+      const { code, stdout, stderr } = await captureCli([
+        '--content',
+        fixture.csvPath,
+        '--apply',
+        payload,
+      ]);
+
+      expect(stderr).toBe('');
+      expect(code).toBe(0);
+      const result = JSON.parse(stdout) as {
+        ok: boolean;
+        status: string;
+        written: boolean;
+        artefacts: { ok: boolean; regenerated: boolean };
+        manualDocumentationRequired: boolean;
+      };
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe('applied');
+      expect(result.written).toBe(true);
+      expect(result.artefacts.ok).toBe(true);
+      expect(result.artefacts.regenerated).toBe(true);
+      // The Gym demo section documents the edited row by hand.
+      expect(result.manualDocumentationRequired).toBe(true);
+
+      expect(readFileSync(fixture.csvPath, 'utf-8')).toBe(
+        before.replace('Public Investment', 'Municipal Investment'),
+      );
+      expect(readFileSync(fixture.manifestPath, 'utf-8')).toContain('Municipal Investment');
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  it('supports dry-run: exit 0 and nothing written', async () => {
+    const before = readFileSync(CONTENT_CSV_PATH, 'utf-8');
+    const payload = JSON.stringify({
+      edit: { kind: 'update-card', spec: { id: 'gym-story-invest', name: 'Municipal Investment' } },
+      dryRun: true,
+    });
+
+    const { code, stdout } = await captureCli([
+      '--content',
+      DEFAULT_CONTENT_PATH,
+      '--apply',
+      payload,
+    ]);
+
+    expect(code).toBe(0);
+    const result = JSON.parse(stdout) as { status: string; written: boolean };
+    expect(result.status).toBe('dry-run');
+    expect(result.written).toBe(false);
+    expect(readFileSync(CONTENT_CSV_PATH, 'utf-8')).toBe(before);
+  });
+
+  it('rejects a malformed payload with a non-zero exit', async () => {
+    const { code, stderr } = await captureCli([
+      '--content',
+      DEFAULT_CONTENT_PATH,
+      '--apply',
+      '{not json',
+    ]);
+    expect(code).toBe(1);
+    expect(stderr).toContain('--apply must be JSON');
+  });
+});
+
+describe('parseEditorApplyRequest', () => {
+  it('parses inline JSON, an @file payload and rejects bad shapes', () => {
+    const inline = parseEditorApplyRequest(
+      '{"edit":{"kind":"update-card","spec":{"id":"a","name":"b"}},"dryRun":true}',
+    );
+    expect('request' in inline).toBe(true);
+    if ('request' in inline) {
+      expect(inline.request.edit.kind).toBe('update-card');
+      expect(inline.request.dryRun).toBe(true);
+      expect(inline.request.expectedChecksum).toBeUndefined();
+    }
+
+    const badJson = parseEditorApplyRequest('nope');
+    expect('error' in badJson ? badJson.error : '').toContain('JSON');
+    const missingEdit = parseEditorApplyRequest('{"a":1}');
+    expect('error' in missingEdit ? missingEdit.error : '').toContain('"edit"');
+    const badKind = parseEditorApplyRequest('{"edit":{"kind":"boom","spec":{}}}');
+    expect('error' in badKind ? badKind.error : '').toContain('boom');
+    const bare = parseEditorApplyRequest(
+      '{"edit":{"kind":"update-card","spec":{"id":"a","name":"b"}}}',
+    );
+    if (!('error' in bare)) {
+      expect(bare.request.artefactPaths).toBeUndefined();
+    }
+  });
+
+  it('reads an @file payload relative to baseDir', () => {
+    const temp = mkdtempSync(join(tmpdir(), 'tce-editor-apply-'));
+    try {
+      const file = join(temp, 'edit.json');
+      writeFileSync(
+        file,
+        '{"edit":{"kind":"set-storyline","spec":{"id":"a","storylineId":"arc","storylineTitle":"Arc"}}}',
+        'utf-8',
+      );
+      const parsed = parseEditorApplyRequest(`@${file}`, temp);
+      expect('request' in parsed).toBe(true);
+      if ('request' in parsed) {
+        expect(parsed.request.edit.kind).toBe('set-storyline');
+      }
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
   });
 });
