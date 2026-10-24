@@ -34,11 +34,27 @@ import {
   runSummary,
   runVitestSync,
   parseTimeoutArgs,
+  parseRunnerArgs,
   hangTimeoutMessage,
+  listHangMessage,
   HANG_TIMEOUT_EXIT_CODE,
   DEFAULT_RUN_TIMEOUT_MS,
+  LIST_TIMEOUT_MS,
   resolveVitestBin,
+  deriveExpectedFiles,
+  parseExpectedSet,
+  normaliseFiles,
+  looksLikeUnknownStaticParse,
+  evaluateCoverage,
+  coverageDiagnostic,
+  coverageSuffix,
+  coverageLabelFromReport,
+  ExecutedSetCapture,
+  defaultReadExecutedFiles,
+  parseExecutedFromOutput,
+  PreflightError,
   type VitestRunner,
+  type VitestListRunner,
 } from '../../scripts/vitest-run-with-retry';
 
 // ── Output fixtures (match real vitest reporter output) ─────
@@ -488,5 +504,542 @@ describe('resolveVitestBin (local bin resolution)', () => {
   it('resolves an existing vitest entry under node_modules', () => {
     const bin = resolveVitestBin();
     expect(fs.existsSync(bin)).toBe(true);
+  });
+});
+
+// ── Opt-in project-coverage gate (CG-0MVL21CVM003VK5H) ──────
+//
+// The runner previously decided acceptance purely from output text, so a run
+// that silently dropped part of the suite could be accepted as green. The
+// opt-in expectation makes any missing (or extra) executed file a genuine
+// failure that neither retry nor `accepted-transient` can mask.
+
+const CWD = process.cwd();
+
+/** The incident shape: transient signature + all-passed summary + a dropped file. */
+const INCIDENT_DROPPED_GROUP_OUTPUT = [
+  `${PASS_OUTPUT}\nError: ${WORKER_TIMEOUT_SIGNATURE}`,
+].join('\n');
+
+describe('parseRunnerArgs (opt-in expectation flags)', () => {
+  it('defaults to no expectation when the flags are absent', () => {
+    expect(parseRunnerArgs(['--project', 'unit'])).toEqual({
+      timeoutMs: DEFAULT_RUN_TIMEOUT_MS,
+      forwarded: ['--project', 'unit'],
+      expectedFiles: [],
+      expectProjectCoverage: false,
+    });
+  });
+
+  it('parses a repeatable --expected-file <path> in both spellings', () => {
+    const parsed = parseRunnerArgs([
+      '--expected-file',
+      'tests/a.test.ts',
+      '--expected-file=tests/b.test.ts',
+      '--project',
+      'unit',
+    ]);
+    expect(parsed.expectedFiles).toEqual(['tests/a.test.ts', 'tests/b.test.ts']);
+    expect(parsed.forwarded).toEqual(['--project', 'unit']);
+    expect(parsed.expectProjectCoverage).toBe(false);
+  });
+
+  it('parses --expect-project-coverage and keeps it out of the forwarded args', () => {
+    const parsed = parseRunnerArgs(['--expect-project-coverage', '--project', 'browser']);
+    expect(parsed.expectProjectCoverage).toBe(true);
+    expect(parsed.expectedFiles).toEqual([]);
+    expect(parsed.forwarded).toEqual(['--project', 'browser']);
+  });
+
+  it('combines --timeout-ms with the expectation flags', () => {
+    const parsed = parseRunnerArgs([
+      '--expect-project-coverage',
+      '--timeout-ms=120000',
+      '--expected-file',
+      'tests/a.test.ts',
+    ]);
+    expect(parsed.timeoutMs).toBe(120_000);
+    expect(parsed.expectProjectCoverage).toBe(true);
+    expect(parsed.expectedFiles).toEqual(['tests/a.test.ts']);
+    expect(parsed.forwarded).toEqual([]);
+  });
+
+  it('rejects a missing --expected-file value', () => {
+    expect(() => parseRunnerArgs(['--expected-file'])).toThrow(/Invalid --expected-file/);
+    expect(() => parseRunnerArgs(['--expected-file='])).toThrow(/Invalid --expected-file/);
+  });
+
+  it('still rejects an invalid --timeout-ms value', () => {
+    expect(() => parseRunnerArgs(['--timeout-ms', 'soon'])).toThrow(/Invalid --timeout-ms/);
+  });
+
+  it('parseTimeoutArgs remains a forwarding subset parser', () => {
+    expect(parseTimeoutArgs(['--expected-file', 'tests/a.test.ts', '--project', 'unit'])).toEqual({
+      timeoutMs: DEFAULT_RUN_TIMEOUT_MS,
+      forwarded: ['--project', 'unit'],
+    });
+  });
+});
+
+describe('expected-set normalisation and parsing', () => {
+  it('normalises absolute and file:// paths to repo-relative POSIX', () => {
+    expect(
+      normaliseFiles(
+        [
+          path.join(CWD, 'tests', 'b.test.ts'),
+          path.join(CWD, 'tests', 'a.test.ts'),
+          path.join(CWD, 'tests', 'a.test.ts'),
+          `file://${path.join(CWD, 'tests', 'c.test.ts')}`,
+        ],
+        CWD,
+      ),
+    ).toEqual(['tests/a.test.ts', 'tests/b.test.ts', 'tests/c.test.ts']);
+  });
+
+  it('normalises browser-mode http(s) names via the /@fs/ Vite escape', () => {
+    expect(
+      normaliseFiles(
+        [
+          `http://localhost:5173/@fs${path.join(CWD, 'tests', 'a.test.ts')}`,
+          `https://example.test/@fs${path.join(CWD, 'tests', 'b.test.ts')}?browser=1`,
+        ],
+        CWD,
+      ),
+    ).toEqual(['tests/a.test.ts', 'tests/b.test.ts']);
+  });
+
+  it('normalises a relative path with a leading ./', () => {
+    expect(normaliseFiles(['./tests/a.test.ts'], CWD)).toEqual(['tests/a.test.ts']);
+  });
+
+  it('parses the Vitest 4.x vitest list array shape', () => {
+    const stdout = JSON.stringify([
+      { file: path.join(CWD, 'tests/b.test.ts'), projectName: 'unit' },
+      { file: path.join(CWD, 'tests/a.test.ts'), projectName: 'unit' },
+    ]);
+    expect(parseExpectedSet(stdout, CWD)).toEqual(['tests/a.test.ts', 'tests/b.test.ts']);
+  });
+
+  it('parses plain string entries and the { testFiles } wrapper shape', () => {
+    expect(parseExpectedSet(JSON.stringify(['tests/a.test.ts']), CWD)).toEqual([
+      'tests/a.test.ts',
+    ]);
+    expect(
+      parseExpectedSet(
+        JSON.stringify({ testFiles: [{ file: path.join(CWD, 'tests/b.test.ts') }] }),
+        CWD,
+      ),
+    ).toEqual(['tests/b.test.ts']);
+  });
+
+  it('throws on unparsable JSON so callers can fail closed', () => {
+    expect(() => parseExpectedSet('not json')).toThrow();
+  });
+
+  it('detects only plausible --staticParse rejections', () => {
+    expect(looksLikeUnknownStaticParse('CACError: Unknown option `--staticParse`')).toBe(true);
+    expect(looksLikeUnknownStaticParse('error: option --staticParse is invalid')).toBe(true);
+    expect(looksLikeUnknownStaticParse('Test Files  1 failed (1)')).toBe(false);
+    expect(looksLikeUnknownStaticParse('')).toBe(false);
+  });
+});
+
+describe('deriveExpectedFiles (pre-flight vitest list)', () => {
+  const listOutput = JSON.stringify([
+    { file: path.join(CWD, 'tests/b.test.ts'), projectName: 'unit' },
+    { file: path.join(CWD, 'tests/a.test.ts'), projectName: 'unit' },
+  ]);
+
+  it('derives the normalised set from a successful collection', async () => {
+    const seen: string[][] = [];
+    const runList: VitestListRunner = (args) => {
+      seen.push(args);
+      return { status: 0, output: listOutput };
+    };
+    await expect(deriveExpectedFiles(['--project', 'unit'], runList, CWD)).resolves.toEqual([
+      'tests/a.test.ts',
+      'tests/b.test.ts',
+    ]);
+    // Collection-only: --filesOnly --json --staticParse + forwarded filters,
+    // and no browser launch flags.
+    expect(seen[0]).toEqual(['--staticParse', '--filesOnly', '--json', '--project', 'unit']);
+  });
+
+  it('retries once without --staticParse when the consumer rejects the flag', async () => {
+    const seen: string[][] = [];
+    const runList: VitestListRunner = (args) => {
+      seen.push(args);
+      return seen.length === 1
+        ? { status: 1, output: 'CACError: Unknown option `--staticParse`' }
+        : { status: 0, output: listOutput };
+    };
+    await expect(deriveExpectedFiles(['--project', 'unit'], runList, CWD)).resolves.toEqual([
+      'tests/a.test.ts',
+      'tests/b.test.ts',
+    ]);
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).not.toContain('--staticParse');
+  });
+
+  it('fails closed on a non-zero collection that is not a --staticParse rejection', async () => {
+    const runList: VitestListRunner = () => ({ status: 1, output: 'boom: cannot load config' });
+    await expect(deriveExpectedFiles([], runList, CWD)).rejects.toBeInstanceOf(PreflightError);
+  });
+
+  it('fails closed on a collection hang (exit 124)', async () => {
+    const runList: VitestListRunner = () => ({
+      status: HANG_TIMEOUT_EXIT_CODE,
+      output: listHangMessage(120),
+    });
+    await expect(deriveExpectedFiles([], runList, CWD)).rejects.toThrow(/exit 124/);
+  });
+
+  it('fails closed on an empty file set', async () => {
+    const runList: VitestListRunner = () => ({ status: 0, output: '[]' });
+    await expect(deriveExpectedFiles([], runList, CWD)).rejects.toThrow(/empty file set/);
+  });
+
+  it('fails closed on unparsable collection output', async () => {
+    const runList: VitestListRunner = () => ({ status: 0, output: '<html>oops</html>' });
+    await expect(deriveExpectedFiles([], runList, CWD)).rejects.toThrow(/unparsable JSON/);
+  });
+
+  it('bounds the collection with the list timeout', async () => {
+    const timeouts: number[] = [];
+    const runList: VitestListRunner = (_args, timeoutMs) => {
+      timeouts.push(timeoutMs);
+      return { status: 0, output: listOutput };
+    };
+    await deriveExpectedFiles([], runList, CWD);
+    expect(timeouts).toEqual([LIST_TIMEOUT_MS]);
+  });
+});
+
+describe('evaluateCoverage / coverageDiagnostic', () => {
+  it('passes when the sets match (order and duplicates ignored)', () => {
+    const report = evaluateCoverage(
+      ['tests/a.test.ts', 'tests/b.test.ts'],
+      ['tests/b.test.ts', 'tests/a.test.ts', 'tests/a.test.ts'],
+      CWD,
+    );
+    expect(report).toEqual({
+      ok: true,
+      expected: 2,
+      ran: 2,
+      missing: [],
+      extra: [],
+      indeterminate: false,
+    });
+  });
+
+  it('fails and names a missing file', () => {
+    const report = evaluateCoverage(['tests/a.test.ts', 'tests/b.test.ts'], ['tests/a.test.ts'], CWD);
+    expect(report.ok).toBe(false);
+    expect(report.missing).toEqual(['tests/b.test.ts']);
+    expect(report.extra).toEqual([]);
+    expect(report).toMatchObject({ expected: 2, ran: 1 });
+  });
+
+  it('fails and names an extra file', () => {
+    const report = evaluateCoverage(['tests/a.test.ts'], ['tests/a.test.ts', 'tests/z.test.ts'], CWD);
+    expect(report.ok).toBe(false);
+    expect(report.extra).toEqual(['tests/z.test.ts']);
+    expect(report.missing).toEqual([]);
+  });
+
+  it('fails closed as indeterminate when the executed set is unreadable', () => {
+    const report = evaluateCoverage(['tests/a.test.ts'], null, CWD);
+    expect(report.ok).toBe(false);
+    expect(report.indeterminate).toBe(true);
+    expect(report.missing).toEqual(['tests/a.test.ts']);
+    expect(coverageDiagnostic(report)).toContain('indeterminate');
+  });
+
+  it('diagnostic names every missing/extra file and states expected=N ran=M', () => {
+    const report = evaluateCoverage(
+      ['tests/a.test.ts', 'tests/b.test.ts'],
+      ['tests/a.test.ts', 'tests/z.test.ts'],
+      CWD,
+    );
+    const diagnostic = coverageDiagnostic(report);
+    expect(diagnostic).toContain('expected=2 ran=2');
+    expect(diagnostic).toContain('tests/b.test.ts');
+    expect(diagnostic).toContain('tests/z.test.ts');
+    expect(diagnostic).toContain('Missing files');
+    expect(diagnostic).toContain('Extra files');
+  });
+
+  it('records the expectation state for the summary line', () => {
+    expect(coverageSuffix({ kind: 'unset' })).toBe(' expected=unset');
+    expect(coverageSuffix({ kind: 'set', expected: 3, ran: 2 })).toBe(' expected=3 ran=2');
+    expect(coverageLabelFromReport(evaluateCoverage(['a.test.ts'], ['a.test.ts'], CWD))).toEqual({
+      kind: 'set',
+      expected: 1,
+      ran: 1,
+    });
+    expect(coverageLabelFromReport(evaluateCoverage(['a.test.ts'], null, CWD)).kind).toBe(
+      'set-indeterminate',
+    );
+  });
+});
+
+describe('ExecutedSetCapture (attempt file-set capture)', () => {
+  function tmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'vitest-capture-'));
+  }
+
+  it('appends the JSON reporter alongside the default reporter', () => {
+    const dir = tmpDir();
+    const capture = new ExecutedSetCapture({ workDir: dir, cwd: CWD });
+    const augmented = capture.augmentArgs(['--project', 'unit']);
+    expect(augmented[0]).toBe('--project');
+    expect(augmented).toContain('--reporter=default');
+    expect(augmented).toContain('--reporter=json');
+    expect(augmented).toContain(`--outputFile.json=${capture.artefactPath}`);
+    expect(capture.artefactPath.startsWith(dir)).toBe(true);
+    capture.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads the executed set from the JSON artifact and cleans it up', () => {
+    const dir = tmpDir();
+    const capture = new ExecutedSetCapture({ workDir: dir, cwd: CWD });
+    fs.writeFileSync(
+      capture.artefactPath,
+      JSON.stringify({
+        testResults: [
+          { name: path.join(CWD, 'tests', 'b.test.ts'), status: 'passed' },
+          { name: path.join(CWD, 'tests', 'a.test.ts'), status: 'failed' },
+        ],
+      }),
+    );
+    expect(capture.executedFiles({ status: 1, output: '' })).toEqual([
+      'tests/a.test.ts',
+      'tests/b.test.ts',
+    ]);
+    capture.cleanup();
+    expect(fs.existsSync(capture.artefactPath)).toBe(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('falls back to default-reporter per-file lines when the artifact is absent', () => {
+    const dir = tmpDir();
+    const capture = new ExecutedSetCapture({ workDir: dir, cwd: CWD });
+    const output = [
+      ' ✓ |unit| tests/scripts/a.test.ts (18 tests) 55ms',
+      ' ❯ |unit| tests/scripts/b.test.ts (3 tests | 1 failed) 8ms',
+      ' Test Files  1 failed | 1 passed (2)',
+    ].join('\n');
+    expect(capture.executedFiles({ status: 1, output })).toEqual([
+      'tests/scripts/a.test.ts',
+      'tests/scripts/b.test.ts',
+    ]);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns null (indeterminable) when neither source yields a set', () => {
+    const dir = tmpDir();
+    const capture = new ExecutedSetCapture({ workDir: dir, cwd: CWD });
+    expect(capture.executedFiles({ status: 1, output: 'Test Files  1 passed (1)' })).toBeNull();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns null for a hang regardless of any artifact', () => {
+    const dir = tmpDir();
+    const capture = new ExecutedSetCapture({ workDir: dir, cwd: CWD });
+    expect(
+      capture.executedFiles({ status: HANG_TIMEOUT_EXIT_CODE, output: '[hang-timeout]' }),
+    ).toBeNull();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('parseExecutedFromOutput returns null when no per-file lines exist', () => {
+    expect(parseExecutedFromOutput(PASS_OUTPUT, CWD)).toBeNull();
+  });
+
+  it('defaultReadExecutedFiles prefers the artifact over per-file lines', () => {
+    const dir = tmpDir();
+    const artefact = path.join(dir, 'report.json');
+    fs.writeFileSync(artefact, JSON.stringify({ testResults: [{ name: '/repo/tests/art.test.ts' }] }));
+    expect(defaultReadExecutedFiles(' ✓ |unit| tests/line.test.ts (1 test) 3ms', artefact, '/repo')).toEqual([
+      'tests/art.test.ts',
+    ]);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('runWithRetry (opt-in coverage gate)', () => {
+  const warnSpy: (msg: string) => void = () => {};
+  const expected = ['tests/a.test.ts', 'tests/b.test.ts'];
+
+  /** An injected reader returning a fixed executed set for every attempt. */
+  const readerFor =
+    (ran: string[] | null) =>
+    (): string[] | null =>
+      ran;
+
+  it('parity: with no expectation, decisions and exit codes match the legacy runner', async () => {
+    const fixtures = [PASS_OUTPUT, TRANSIENT_OUTPUT, BROWSER_DROP_OUTPUT, FAIL_OUTPUT];
+    for (const fixture of fixtures) {
+      const legacy = await runWithRetry([], () => ({ status: 1, output: fixture }), warnSpy);
+      const withEmptyOptions = await runWithRetry(
+        [],
+        () => ({ status: 1, output: fixture }),
+        warnSpy,
+        DEFAULT_RUN_TIMEOUT_MS,
+        {},
+      );
+      const withEmptyExpected = await runWithRetry(
+        [],
+        () => ({ status: 1, output: fixture }),
+        warnSpy,
+        DEFAULT_RUN_TIMEOUT_MS,
+        { expectedFiles: [] },
+      );
+      expect(withEmptyOptions).toBe(legacy);
+      expect(withEmptyExpected).toBe(legacy);
+    }
+  });
+
+  it('parity: expectation-free summaries record expected=unset', async () => {
+    const messages: string[] = [];
+    await runWithRetry([], () => ({ status: 0, output: PASS_OUTPUT }), (m) => messages.push(m));
+    expect(messages.some((m) => m.includes('outcome=clean'))).toBe(true);
+    expect(messages.some((m) => m.includes('expected=unset'))).toBe(true);
+  });
+
+  it('AC5 incident shape: transient + all-passed summary + one missing file fails, names the file, never accepted', async () => {
+    const warnings: string[] = [];
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return { status: 1, output: INCIDENT_DROPPED_GROUP_OUTPUT };
+    };
+    const status = await runWithRetry([], runner, (m) => warnings.push(m), DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(['tests/a.test.ts']),
+    });
+    expect(status).not.toBe(0);
+    expect(calls).toBe(2);
+    const joined = warnings.join('\n');
+    expect(joined).toContain('tests/b.test.ts');
+    expect(joined).toContain('expected=2 ran=1');
+    expect(joined).not.toContain('outcome=accepted-transient');
+    expect(joined).toContain('outcome=coverage-failed');
+  });
+
+  it('fails on an extra file (any set difference is a defect)', async () => {
+    const warnings: string[] = [];
+    const status = await runWithRetry([], () => ({ status: 0, output: PASS_OUTPUT }), (m) => warnings.push(m), DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(['tests/a.test.ts', 'tests/b.test.ts', 'tests/z.test.ts']),
+    });
+    expect(status).toBe(1);
+    expect(warnings.join('\n')).toContain('tests/z.test.ts');
+    expect(warnings.join('\n')).toContain('outcome=coverage-failed');
+  });
+
+  it('fails closed when an expectation is supplied but the executed set is indeterminable', async () => {
+    const warnings: string[] = [];
+    const status = await runWithRetry([], () => ({ status: 0, output: PASS_OUTPUT }), (m) => warnings.push(m), DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(null),
+    });
+    expect(status).toBe(1);
+    expect(warnings.join('\n')).toContain('indeterminate');
+    expect(warnings.join('\n')).toContain('outcome=coverage-failed');
+  });
+
+  it('never converts a coverage violation to green via the retry', async () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: INCIDENT_DROPPED_GROUP_OUTPUT }
+        : { status: 0, output: PASS_OUTPUT };
+    };
+    const status = await runWithRetry([], runner, warnSpy, DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(['tests/a.test.ts']),
+    });
+    expect(status).toBe(1);
+    expect(calls).toBe(2);
+  });
+
+  it('accepts a transient run when both attempts executed exactly the expected set', async () => {
+    const warnings: string[] = [];
+    const runner: VitestRunner = () => ({ status: 1, output: TRANSIENT_OUTPUT });
+    const status = await runWithRetry([], runner, (m) => warnings.push(m), DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(expected),
+    });
+    expect(status).toBe(0);
+    const joined = warnings.join('\n');
+    expect(joined).toContain('outcome=accepted-transient');
+    expect(joined).toContain('expected=2 ran=2');
+  });
+
+  it('records expected=N ran=M in the summary of a clean covered run', async () => {
+    const warnings: string[] = [];
+    const status = await runWithRetry([], () => ({ status: 0, output: PASS_OUTPUT }), (m) => warnings.push(m), DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(expected),
+    });
+    expect(status).toBe(0);
+    expect(warnings.join('\n')).toContain('outcome=clean');
+    expect(warnings.join('\n')).toContain('expected=2 ran=2');
+  });
+
+  it('injects the JSON reporter args only when an expectation is active', async () => {
+    const seen: string[][] = [];
+    const runner: VitestRunner = (args) => {
+      seen.push(args);
+      return { status: 0, output: PASS_OUTPUT };
+    };
+    await runWithRetry(['--project', 'unit'], runner, warnSpy);
+    await runWithRetry(['--project', 'unit'], runner, warnSpy, DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(expected),
+    });
+    expect(seen[0]).toEqual(['--project', 'unit']);
+    expect(seen[1]).toContain('--reporter=json');
+    expect(seen[1]).toContain('--reporter=default');
+    expect(seen[1].some((a) => a.startsWith('--outputFile.json='))).toBe(true);
+    // The forwarded filters survive alongside the injected capture flags.
+    expect(seen[1].slice(0, 2)).toEqual(['--project', 'unit']);
+  });
+
+  it('checks coverage on the second attempt before accepting it', async () => {
+    const warnings: string[] = [];
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: INCIDENT_DROPPED_GROUP_OUTPUT }
+        : { status: 1, output: TRANSIENT_OUTPUT };
+    };
+    const status = await runWithRetry([], runner, (m) => warnings.push(m), DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(['tests/a.test.ts']),
+    });
+    expect(status).toBe(1);
+    expect(calls).toBe(2);
+    expect(warnings.join('\n')).toContain('outcome=coverage-failed');
+    expect(warnings.join('\n')).not.toContain('outcome=accepted-transient');
+  });
+
+  it('hang precedence: a hang returns 124 and is never reported as a coverage failure', async () => {
+    const warnings: string[] = [];
+    const status = await runWithRetry(
+      [],
+      () => ({ status: HANG_TIMEOUT_EXIT_CODE, output: hangTimeoutMessage(60) }),
+      (m) => warnings.push(m),
+      DEFAULT_RUN_TIMEOUT_MS,
+      { expectedFiles: expected, readExecutedFiles: readerFor(['tests/a.test.ts']) },
+    );
+    expect(status).toBe(HANG_TIMEOUT_EXIT_CODE);
+    const joined = warnings.join('\n');
+    expect(joined).toContain('outcome=hang');
+    expect(joined).not.toContain('coverage-failed');
   });
 });

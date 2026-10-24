@@ -966,6 +966,50 @@ Two mitigations are in place in this repository:
    failed test/file and shows any distinct assertion error alongside the
    transient signature.
 
+   **Project-coverage gate (opt-in, CG-0MVL21CVM003VK5H).** The retry/acceptance
+   logic above reasons purely about the run's *output text*, so a run that
+   silently dropped part of the suite could still be accepted — Vitest's
+   `executeTests` group loop can abort after an earlier pool run rejects and
+   summarise only the executed files as green (`Test Files N passed (N)`). The
+   unit and browser stages in `scripts/run-ci-tests.sh` therefore pass
+   `--expect-project-coverage`, which makes a file-set mismatch a genuine
+   failure:
+
+   - **Expected set** — derived before the run from a collection-only
+     `vitest list --filesOnly --json --staticParse` over the same forwarded
+     project/args (`--staticParse` avoids a second Chromium start for the
+     browser stage; a consumer whose Vitest version rejects the flag is
+     retried once without it). `--expected-file <path>` (repeatable) pins an
+     explicit expected set for tests/non-standard layouts instead.
+   - **Executed set** — each attempt gets an injected
+     `--reporter=default --reporter=json --outputFile.json=<tmp>` so the set
+     is exact and independent of the caller's reporters; the artifact is
+     parsed and removed after the attempt, with a fallback to default-reporter
+     per-file lines if the artifact is missing.
+   - **Mismatch is a genuine failure** — any missing OR extra file fails the
+     stage (exit 1, `outcome=coverage-failed`) with a stderr diagnostic naming
+     every missing/extra file and stating `expected=N ran=M`. It is evaluated
+     on the first attempt before the retry decision and again on the second
+     before any acceptance, so neither `accepted-transient` nor a clean retry
+     can mask a dropped group — regardless of the run's own exit code (a
+     dropped group can exit 0 with an all-passed summary).
+   - **Fail closed** — a pre-flight collection that fails, times out (exit
+     124), or returns an empty set aborts with exit 2
+     (`[preflight-failed]`); an expectation supplied but an executed set that
+     cannot be determined fails identically. Hang semantics are unchanged: a
+     wall-clock overrun still exits 124, is never retried, and is reported
+     before any coverage check.
+   - **Auditable summary** — the `[vitest-runner]` line appends
+     `expected=N ran=M` while the gate is active (`expected=unset` without
+     it), so a downstream consumer can tell a genuine full-suite green from
+     a recovered transient. Outcome strings for expectation-free runs are
+     unchanged.
+   - **Off by default** — smoke/dev/tutorial stages and every `/skill:test
+     --type` command do not pass the flag; a consumer repo syncing this runner
+     sees byte-identical decisions until it opts in. Tested in
+     `tests/scripts/vitest-run-with-retry.test.ts` (parity fixtures + regression
+     for the incident shape).
+
 3. **Test-side hardening (browser tests)** — beyond the runner-level
    mitigations above, browser tests that drive the real Phaser pointer
    pipeline (dispatched DOM events at layout-derived canvas coordinates, e.g.
