@@ -1410,6 +1410,8 @@ npm run storylines:graph                        # rewrite the Gym artefacts
 npm run storylines:graph -- --format json --check   # drift guard
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
 npm run storylines:author -- update-card --id evt-x --storyline-id storyline-x
+npm run storylines:editor                       # open the read-only graph editor
+npm run storylines:editor -- --help             # editor flags
 ```
 
 Every CLI supports `--help` and `--game <adapter-id>` (default `gym`), and exits
@@ -1423,11 +1425,69 @@ artefacts (`example-games/gym/content/storyline-manifest.json` and
 See [Core: Generic Story-Line System](core-engine/story-line.md#authoring-seams-content-manifest-validator-author)
 for the adapter contract, validator codes, manifest shape and API examples.
 
+### Read-only Story-line Editor (viewer)
+
+A fourth `tsx` entry point, `npm run storylines:editor`, opens a **local,
+read-only** graph viewer for a game's story-lines (CG-0MVHZ2N2X0082OW7). It is a
+development tool, not a shipped game:
+
+```bash
+npm run storylines:editor                        # Gym content, http://127.0.0.1:5174
+npm run storylines:editor -- --port 5180
+npm run storylines:editor -- --content path/to/storylines.csv
+npm run storylines:editor -- --adapter ./my-game-adapter.ts
+npm run storylines:editor -- --help
+```
+
+- `--content` is the game's content CSV (default: the Gym demo content).
+- `--adapter` is a **shipped adapter id** (`gym`, the default) or a module
+  path/specifier whose default (or `adapter` / `contentAdapter`) export is a
+  `ContentAdapter` — the same declarative column mapping the CLIs use.
+- `--port` / `--host` default to `5174` and `127.0.0.1`; the tool is loopback-only
+  by design. The command exits `0` on `--help` and `1` on a bad option, an
+  unknown adapter, unreadable content or a host failure.
+
+The host reads the CSV **through the content adapter**, builds the deterministic
+manifest and serves it at `/manifest.json` from memory (`scripts/storyline-editor-server.ts`
+composes the dedicated `vite.editor.config.ts` with a manifest middleware). The
+page fetches that one manifest, so pan/zoom and node selection never round-trip
+to the host. The page (`tools/storyline-editor/`) renders one column per
+story-line group, choice cards as diamonds and plain incidents as rounded
+rectangles, cycle edges/members in red, and an option label on every link.
+Selecting a card shows its name, effect, adapter impact, routing summary,
+successor and incoming links, story-line id/title and adapter-declared columns;
+the toolbar provides zoom in/out and reset, and the graph pans by dragging and
+zooms with the wheel.
+
+The mapping step is `src/story-line/editor/view-model.ts` — a pure manifest →
+view model function that reuses the manifest's own label helpers
+(`nodeLabel`, `briefEventDescription`, `describeEventImpact`,
+`describeChoiceRouting`) and `filterManifestByStoryline` for grouping, so the
+editor can never disagree with the generated artefacts.
+
+**Build exclusion.** The editor page has its own Vite root
+(`tools/storyline-editor`) and output (`dist/editor`), and nothing in
+`index.html`, `main.ts`, `src/` or `electron/` references it. That property is
+asserted by `tests/story-line/editor/build-exclusion.test.ts` (entry documents,
+production source imports, build/packaging scripts and the Electron
+`files:` list), alongside `vite-editor-config.test.ts` for the config identity.
+
+**Read-only.** This slice renders only; the transactional write bridge, preview
+and guided edits arrive in later slices and must route every mutation through
+the core author API (`applyContentEditToFile`).
+
+Tests: `tests/story-line/editor/view-model.test.ts` diffs the view model against
+the generated manifest (nodes, edges, story-line ids/titles, cycle flags),
+`viewer.browser.test.ts` covers rendering, grouping, cycle marking, pan/zoom,
+selection and the details sidebar, and `cli.test.ts` covers launch/`--help`,
+adapter resolution, manifest loading and the host middleware.
+
 ### Story-line Editor Test Harness
 
-The story-line editor lives in later slices; its shared test foundation is
-already in `tests/story-line/editor/` so every editor slice can be driven
-test-first (CG-0MVHZ2LS3008ATY9):
+The editor host and read-only viewer now ship (see
+[Read-only Story-line Editor](#read-only-story-line-editor-viewer)); its shared
+test foundation lives in `tests/story-line/editor/` so every editor slice can be
+driven test-first (CG-0MVHZ2LS3008ATY9):
 
 - **Fixtures** (`fixtures.ts`) — copies the committed content CSV and
   generated manifest/Mermaid artefacts into an isolated OS temp directory and

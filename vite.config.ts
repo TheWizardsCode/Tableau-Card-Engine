@@ -249,10 +249,12 @@ export default defineConfig(({ mode, command }) => ({
             'tests/golf/HelpPanel.browser.test.ts',
             'tests/ui/TooltipManager.browser.test.ts',
             'tests/ui/SettingsPanelTooltips.browser.test.ts',
-            // Story-line editor harness: the non-Phaser dev-page browser path
+            // Story-line editor: the non-Phaser dev-page browser path
             // (plain-DOM renderer modules mounted directly; see
-            // tests/story-line/editor/harness.browser.test.ts).
+            // tests/story-line/editor/harness.browser.test.ts and the real
+            // viewer coverage in viewer.browser.test.ts).
             'tests/story-line/editor/harness.browser.test.ts',
+            'tests/story-line/editor/viewer.browser.test.ts',
             // Main Street key E2E
             'tests/main-street/MainStreetScene.browser.test.ts',
             'tests/main-street/drag.browser.test.ts',
