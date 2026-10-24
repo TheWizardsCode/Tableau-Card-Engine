@@ -19,13 +19,13 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..
 export const FIXTURES_DIR = join(REPO_ROOT, 'tests/fixtures/story-line');
 
 /** Absolute path of the shipped Gym story-line content. */
-export const GYM_CONTENT_PATH = join(REPO_ROOT, 'example-games/gym/data/storylines.csv');
+export const GYM_CONTENT_PATH = join(REPO_ROOT, 'example-games/gym/content/storylines.csv');
 
 /** Absolute path of the committed Gym manifest artefact. */
-export const GYM_MANIFEST_PATH = join(REPO_ROOT, 'example-games/gym/data/storyline-manifest.json');
+export const GYM_MANIFEST_PATH = join(REPO_ROOT, 'example-games/gym/content/storyline-manifest.json');
 
 /** Absolute path of the committed Gym Mermaid artefact. */
-export const GYM_MERMAID_PATH = join(REPO_ROOT, 'example-games/gym/data/storyline-graph.mmd');
+export const GYM_MERMAID_PATH = join(REPO_ROOT, 'example-games/gym/content/storyline-graph.mmd');
 
 /** Absolute path of the generic manifest JSON schema. */
 export const MANIFEST_SCHEMA_PATH = join(REPO_ROOT, 'schemas/story-line-manifest.schema.json');

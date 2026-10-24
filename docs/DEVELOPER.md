@@ -1372,7 +1372,7 @@ Every CLI supports `--help` and `--game <adapter-id>` (default `gym`), and exits
 `0` on success/valid content and `1` on invalid content, unreadable input or
 artefact drift. The author API validates before writing and writes atomically;
 `--dry-run` prints the candidate and writes nothing. The committed Gym
-artefacts (`example-games/gym/data/storyline-manifest.json` and
+artefacts (`example-games/gym/content/storyline-manifest.json` and
 `storyline-graph.mmd`) are validated against
 `schemas/story-line-manifest.schema.json` and kept in sync by `--check`.
 

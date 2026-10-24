@@ -1,0 +1,5 @@
+id,name,effect,options,hasChoices,acceptNextCardId,rejectNextCardId,storylineId,storylineTitle,trigger,cost,coinDelta,reputationDelta
+gym-story-start,Town Meeting,Lose 50 coins,Invest|gym-story-invest;Ignore|gym-story-ignore,false,,,gym-story,Gym Storyline,Incident,0,-50,0
+gym-story-invest,Public Investment,Gain 120 coins,Celebrate|gym-story-end;Double down|,false,,,gym-story,Gym Storyline,Incident,0,120,0
+gym-story-ignore,Neglected Roads,Lose 80 coins,Repair|gym-story-end;Let it be|,false,,,gym-story,Gym Storyline,Incident,0,-80,0
+gym-story-end,New Beginning,Gain 60 reputation,,false,,,gym-story,Gym Storyline,Incident,0,0,60

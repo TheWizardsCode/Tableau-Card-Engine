@@ -235,7 +235,7 @@ game semantics out of core: `baseId` (chain-serial stripping; identity by
 default) and `describeImpact` (manifest impact text).
 
 Core ships `GYM_CONTENT_ADAPTER` as the default, backed by the committed
-[`example-games/gym/data/storylines.csv`](../../example-games/gym/data/storylines.csv)
+[`example-games/gym/content/storylines.csv`](../../example-games/gym/content/storylines.csv)
 of the Gym demo content. Tests additionally exercise a differently shaped
 fixture adapter, proving the seam is not shaped around one game.
 
@@ -271,8 +271,8 @@ edges marked, never treated as an error by the builder.
 The generated manifest validates against
 [`schemas/story-line-manifest.schema.json`](../../schemas/story-line-manifest.schema.json)
 (devDependency `ajv`), which is enforced in the unit suite. The committed Gym
-artefacts are `example-games/gym/data/storyline-manifest.json` and
-`example-games/gym/data/storyline-graph.mmd`; `--check` fails on drift.
+artefacts are `example-games/gym/content/storyline-manifest.json` and
+`example-games/gym/content/storyline-graph.mmd`; `--check` fails on drift.
 
 ### Validator
 

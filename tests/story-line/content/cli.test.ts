@@ -9,17 +9,20 @@
  * @module
  */
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CONTENT_PATH } from '../../../src/story-line/content/adapters';
+import { DEFAULT_GRAPH_OUTPUTS } from '../../../scripts/storyline-graph';
 import {
   parseValidateStorylinesArgs,
   runValidateStorylinesCli,
 } from '../../../scripts/validate-storylines';
 import { REPO_ROOT, captureOutput, fixturePath, makeTempDir } from './test-support';
 
-const GYM_CONTENT = join(REPO_ROOT, 'example-games/gym/data/storylines.csv');
+const GYM_CONTENT = join(REPO_ROOT, DEFAULT_CONTENT_PATH);
 
 /** Runs a `tsx` script in a subprocess and returns its outcome. */
 function runTsx(script: string, args: readonly string[]): {
@@ -39,7 +42,7 @@ function runTsx(script: string, args: readonly string[]): {
 describe('parseValidateStorylinesArgs', () => {
   it('defaults to the Gym content and the text report', () => {
     const opts = parseValidateStorylinesArgs([]);
-    expect(opts.csvPath).toBe('example-games/gym/data/storylines.csv');
+    expect(opts.csvPath).toBe('example-games/gym/content/storylines.csv');
     expect(opts.json).toBe(false);
     expect(opts.failOnCycle).toBe(false);
     expect(opts.help).toBe(false);
@@ -131,5 +134,26 @@ describe('tsx entry points', () => {
     const result = runTsx('storyline-graph.ts', ['--format', 'json', '--check']);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('is up to date');
+  });
+});
+
+describe('shipped content location', () => {
+  it('keeps the default content and its artefacts out of any ignore rule', () => {
+    // A repo-wide `data/` ignore rule once swallowed these files while the
+    // in-worktree suite still passed, so the committed demo content silently
+    // disappeared. `git check-ignore` exits 1 when a path is *not* ignored;
+    // that is the property the shipped artefacts need (they are committed).
+    const paths = [
+      DEFAULT_CONTENT_PATH,
+      DEFAULT_GRAPH_OUTPUTS.json,
+      DEFAULT_GRAPH_OUTPUTS.mermaid,
+    ];
+    for (const path of paths) {
+      expect(existsSync(join(REPO_ROOT, path))).toBe(true);
+      const ignored = spawnSync('git', ['check-ignore', '-q', path], {
+        cwd: REPO_ROOT,
+      });
+      expect(ignored.status, `${path} must not be git-ignored`).toBe(1);
+    }
   });
 });

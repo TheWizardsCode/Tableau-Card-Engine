@@ -6,10 +6,10 @@
  * content:
  *
  * - `--format mermaid` → a Mermaid flowchart (default
- *   `example-games/gym/data/storyline-graph.mmd`);
+ *   `example-games/gym/content/storyline-graph.mmd`);
  * - `--format json` → a manifest that validates against
  *   `schemas/story-line-manifest.schema.json` (default
- *   `example-games/gym/data/storyline-manifest.json`).
+ *   `example-games/gym/content/storyline-manifest.json`).
  *
  * `--check` compares the generated output with the committed artefact and
  * exits non-zero on drift (a CI/pre-commit guard); `--out` targets any path.
@@ -43,8 +43,8 @@ import { parseArgv } from './storyline-cli-support';
 
 /** Default committed artefact paths, relative to the repository root. */
 export const DEFAULT_GRAPH_OUTPUTS = {
-  mermaid: 'example-games/gym/data/storyline-graph.mmd',
-  json: 'example-games/gym/data/storyline-manifest.json',
+  mermaid: 'example-games/gym/content/storyline-graph.mmd',
+  json: 'example-games/gym/content/storyline-manifest.json',
 } as const;
 
 /** CLI usage text. */

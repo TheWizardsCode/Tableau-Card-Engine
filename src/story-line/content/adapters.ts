@@ -17,7 +17,7 @@
 import type { ContentAdapter } from './types';
 
 /** Relative path of the default (Gym) story-line content file. */
-export const DEFAULT_CONTENT_PATH = 'example-games/gym/data/storylines.csv';
+export const DEFAULT_CONTENT_PATH = 'example-games/gym/content/storylines.csv';
 
 /**
  * The Gym demo content adapter.
