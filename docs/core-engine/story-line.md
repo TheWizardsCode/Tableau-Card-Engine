@@ -352,26 +352,153 @@ Thin `tsx` entry points over the seams (no Vite loader, no game import):
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
 | `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `update-card` (`--dry-run`, `--field column=value`). |
-| `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page (`--content`, `--game`, `--port`). |
+| `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--apply`, `--dry-run`). |
 
-Every CLI supports `--help`, resolves `--game` through the shipped adapter
-registry (default `gym`), and exits `0` on success and `1` on invalid/unreadable
-content or drift. `npm run storylines:author -- add-card --id … --dry-run`
-prints the candidate content without writing it.
+Every CLI supports `--help`, resolves `--game` (the author/validator/graph
+CLIs) or `--adapter` (the editor) through the shipped adapter registry
+(default `gym`), and exits `0` on success and `1` on invalid/unreadable content
+or drift. `npm run storylines:author -- add-card --id … --dry-run` prints the
+candidate content without writing it.
 
-### Editor
+## Editor (visual authoring tool)
 
-`npm run storylines:editor` serves a local, plain-DOM authoring page over the
-same seams (dedicated `vite.editor.config.ts`, never part of the game or
-Electron build). Its **Manage story-lines** panel lists the groups the generated
-manifest reports plus any group created in the session, and drives create,
-rename and reassign as one transactional `set-storyline-batch` edit: the
-combined member cards are validated once and written once through
-`applyContentEditToFile`, so renaming a four-member group is a single
-author-API call rather than one write per card. A story-line has no declaration
-file of its own — it exists through the cards that declare its id/title — so a
-newly created group stays in-session, listed as pending, until member cards are
-moved into it.
+`npm run storylines:editor` launches a local, plain-DOM authoring page over the
+same seams. It is a **development tool**, not a shipped game: it has its own
+Vite root ([`tools/storyline-editor/`](../../tools/storyline-editor/)) and config
+([`vite.editor.config.ts`](../../vite.editor.config.ts), port 5174, output
+`dist/editor/`), nothing in `index.html`, `main.ts`, `src/` or `electron/`
+references it, and it adds no runtime dependency. Every mutation goes through
+the single transactional author API — the page never writes the content CSV
+itself.
+
+### Launch
+
+```bash
+npm run storylines:editor                     # Gym content on http://127.0.0.1:5174
+npm run storylines:editor -- --port 5180
+npm run storylines:editor -- --host 127.0.0.1   # loopback is the default
+npm run storylines:editor -- --content path/to/storylines.csv
+npm run storylines:editor -- --adapter ./my-game-adapter.ts
+npm run storylines:editor -- --apply '{"edit":{"kind":"update-card","spec":{...}}}'
+npm run storylines:editor -- --help
+```
+
+| Option | Meaning |
+|---|---|
+| `--content <path>` | The game's content CSV (default: the Gym demo content). |
+| `--adapter <module>` | A shipped adapter id (`gym`) or a module path/specifier exporting a `ContentAdapter` as its default, `adapter` or `contentAdapter` export. |
+| `--port` / `--host` | Dev-server port (default `5174`) and bind host (default `127.0.0.1`). The tool is loopback-only by design. |
+| `--apply <json\|@file>` | Apply one edit through the write bridge, print the JSON result and exit (no dev server). `--dry-run` previews/validates while writing nothing. |
+| `--help` | Print usage and exit `0`. |
+
+The CLI resolves the adapter, loads the content into an **editor session** (the
+CSV snapshot plus its concurrency checksum) and either boots the host or — with
+`--apply` — runs the same write bridge headlessly. Exit codes: `0` when serving,
+when help was shown or when a headless apply succeeded; `1` on a bad option, an
+unknown adapter, unreadable content, a host failure or a refused edit (invalid
+or stale content).
+
+### Viewer
+
+The host serves `GET /manifest.json` from memory (built at launch from the
+content CSV + adapter) and the page fetches it **once**, so pan/zoom and node
+selection never round-trip to the host. The rendered graph is manifest-driven:
+
+- one column per story-line group;
+- choice cards drawn as diamonds, plain incidents as rounded rectangles;
+- cycle edges and cycle members highlighted;
+- an option label on every link (a terminal option is a `to: null` link);
+- drag to pan, wheel or toolbar to zoom, fit and reset;
+- selecting a node shows its name, effect, adapter `impact`, routing summary,
+successor and incoming links, story-line id/title and every adapter-declared
+game column.
+
+The mapping step is [`src/story-line/editor/view-model.ts`](../../src/story-line/editor/view-model.ts)
+— a pure manifest → view-model function that reuses the manifest's own label
+helpers (`nodeLabel`, `briefEventDescription`, `describeEventImpact`,
+`describeChoiceRouting`) and `filterManifestByStoryline` for grouping, so the
+editor can never disagree with the generated artefacts.
+
+### Edit workflow
+
+Three surfaces share one workflow — draft, preview, apply, discard:
+
+- **Edit card** — opens the selected node's card form. Core edits the generic
+story-line fields (id read-only, name, effect, choice flag, `options` encoding,
+legacy accept/reject links, story-line id/title); every adapter-declared column
+renders as an additional field without core knowing its semantics. The field
+list comes from the adapter's descriptors
+([`field-descriptors.ts`](../../src/story-line/editor/field-descriptors.ts)),
+not hard-coded column names.
+- **Add card** — a guided form that picks the story-line group (existing or a
+new one) and optionally the card that leads to the new card. With an incoming
+link the form emits a single transactional `add-linked-card` edit (append the
+card **and** add the predecessor's option), validated once and written once.
+- **Manage story-lines** — create, rename and reassign groups (below).
+
+A change stays a **pending draft** until it is applied; **Discard** throws it
+away and leaves the content file untouched. **Apply** previews again first, so a
+write can never happen without a fresh, valid preview. Inline validation errors
+are attributed to the offending field and block the write, while the full
+validator report stays visible.
+
+### Preview and validation
+
+Every edit is previewed before it is written: the preview panel renders the
+pending **diff** (only the affected rows, column by column, before → after)
+plus the validator's own report — the same text and JSON the `storylines:validate`
+CLI renders — so the author sees exactly what would be written and why it is
+(or is not) allowed. A refused edit renders its validation errors instead of a
+diff, writes nothing, and keeps the draft pending.
+
+The host exposes the bridge as `POST /api/preview`, `POST /api/validate` and
+`POST /api/apply`; the page is a client of those endpoints, so tooling can
+drive the same workflow.
+
+### Artefact regeneration and hand-written documentation
+
+After an **accepted** edit the committed Mermaid graph and JSON manifest are
+regenerated and then re-read to verify them (`writeArtefacts` → `checkArtefacts`
+in [`content/artefacts.ts`](../../src/story-line/content/artefacts.ts)). A
+"regenerated" claim is therefore verified rather than assumed, and the result
+reports any remaining drift. A dry run reports whether the artefacts **would**
+stay in sync.
+
+Hand-written documentation is never rewritten. An edit that touches a row
+documented by hand surfaces an explicit **"manual documentation update
+required"** result naming the check that now fails. The registry lives in
+[`src/story-line/editor/manual-docs.ts`](../../src/story-line/editor/manual-docs.ts);
+the shipped entry is the Gym demo's hand-maintained card catalogue.
+
+Artefact paths default to the committed Gym artefacts (`DEFAULT_ARTEFACT_PATHS`).
+A game supplies its own as a session/bridge option (`loadEditorSession({
+artefactPaths })`, `applyEdit({ artefactPaths })`) or in the `--apply` JSON
+payload; the host has no CLI flag for them yet, so editing non-Gym content from
+the served page targets the default paths — use `--apply`, or that game's own
+`storylines:graph` invocation, when its artefacts live elsewhere.
+
+### Story-line management
+
+A story-line has no declaration file of its own: it exists through the cards
+that declare its id and title. Managing one is therefore always a **batch edit
+of its member cards' story-line fields**, and the panel drives create, rename
+and reassign as one `set-storyline-batch` edit — the combined member cards are
+validated once and written once through `applyContentEditToFile`, so renaming a
+four-member group is a single author-API call, never one write per card. The
+panel lists every group the generated manifest reports plus any group created in
+the session; a newly created group with no members stays in-session, listed as
+pending, until cards are moved into it (there is nothing to write yet).
+
+### Concurrency guard
+
+The session captures the content checksum at load and hands it to the write
+bridge, which compares it with its own read of the file. If the CSV changed on
+disk since the page loaded (an external edit, a branch switch), the write is
+refused with `stale-content` (HTTP 409), nothing is written, and the page
+instructs the author to reload before retrying — a stale snapshot can never
+clobber a concurrent edit.
+
+## Engine adapter
 
 `StorylineEngineAdapter<TState, TCard>` inverts all state coupling:
 
@@ -459,6 +586,28 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
   only relative modules/`node:` builtins, and only `author.ts` writes files.
 - `tests/story-line/content/cli.test.ts` — validator/builder exit codes, report
   output and a `tsx` subprocess smoke run of the entry points.
+- `tests/story-line/editor/view-model.test.ts` — the view model diffs against the
+  generated manifest (nodes, edges, story-line ids/titles, cycle flags).
+- `tests/story-line/editor/bridge.test.ts` / `host-api.test.ts` / `cli.test.ts`
+  — the write bridge (preview/validate/apply), the host middleware and the CLI
+  (launch, `--help`, adapter resolution, headless `--apply`).
+- `tests/story-line/editor/concurrency.test.ts` — the stale-content guard refuses
+  a write and returns a reload instruction.
+- `tests/story-line/editor/preview-validate.test.ts` — broken edits are refused,
+  write nothing and surface the offending card/link.
+- `tests/story-line/editor/edit-forms.test.ts` / `add-card-form` coverage —
+  adapter-driven field descriptors, drafts, diff preview and inline error
+  attribution.
+- `tests/story-line/editor/storyline-manager.test.ts` — group derivation, draft
+  validation and one-batch writes against a temp fixture copy.
+- `tests/story-line/editor/harness.browser.test.ts` / `viewer.browser.test.ts` /
+  `edit-roundtrip.browser.test.ts` / `storyline-manager.browser.test.ts` — the
+  editor page's plain-DOM renderers run in Vitest's browser project: viewer
+  rendering, grouping, cycle marking, pan/zoom/select, and a representative
+  edit round-trip.
+- `tests/story-line/editor/build-exclusion.test.ts` / `vite-editor-config.test.ts`
+  — the editor entry is not referenced from the game/Electron build, and its
+  config is distinct from the game config.
 
 Run the unit project with `npx vitest run --project unit` (or
 `/skill:test --type unit`). The Gym scene runs in the `smoke` project.

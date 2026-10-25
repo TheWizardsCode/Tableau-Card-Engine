@@ -631,7 +631,7 @@ repositories by design:
 - **Core repo owns the mechanism** — the unified `UnlockRule`/`UnlockTarget`
   model, the `ContentUnlockStore`, the read API (`contentUnlockClientFromWindow()`),
   and the pure, framework-free
-  [`createDlcGate`](../../src/core-engine/DlcGate.ts).
+  [`createDlcGate`](../src/core-engine/DlcGate.ts).
 - **Each game repo owns its DLC content and the gating call site.** The DLC is
   identified by `{ kind: 'dlc', gameId, dlcId }`, where `dlcId` is owned by that
   game's content definition — there is no central DLC registry. The gate is a
@@ -1429,7 +1429,11 @@ for the adapter contract, validator codes, manifest shape and API examples.
 
 A fourth `tsx` entry point, `npm run storylines:editor`, opens a **local** graph
 viewer and guided editing page for a game's story-lines (viewer:
-CG-0MVHZ2N2X0082OW7). It is a development tool, not a shipped game:
+CG-0MVHZ2N2X0082OW7). It is a development tool, not a shipped game. The
+[Story-line editor walkthrough](dev/storyline-editor.md) is the
+content-designer/developer guide — supplying a content adapter, running against
+a game's content, the edit workflow, artefact regeneration and headless
+`--apply`:
 
 ```bash
 npm run storylines:editor                        # Gym content, http://127.0.0.1:5174
