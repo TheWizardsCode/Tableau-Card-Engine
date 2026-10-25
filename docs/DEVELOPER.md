@@ -1410,7 +1410,7 @@ npm run storylines:graph                        # rewrite the Gym artefacts
 npm run storylines:graph -- --format json --check   # drift guard
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
 npm run storylines:author -- update-card --id evt-x --storyline-id storyline-x
-npm run storylines:editor                       # open the read-only graph editor
+npm run storylines:editor                       # open the local graph editor
 npm run storylines:editor -- --help             # editor flags
 ```
 
@@ -1425,11 +1425,11 @@ artefacts (`example-games/gym/content/storyline-manifest.json` and
 See [Core: Generic Story-Line System](core-engine/story-line.md#authoring-seams-content-manifest-validator-author)
 for the adapter contract, validator codes, manifest shape and API examples.
 
-### Read-only Story-line Editor (viewer)
+### Story-line Editor (viewer and guided editing)
 
-A fourth `tsx` entry point, `npm run storylines:editor`, opens a **local,
-read-only** graph viewer for a game's story-lines (CG-0MVHZ2N2X0082OW7). It is a
-development tool, not a shipped game:
+A fourth `tsx` entry point, `npm run storylines:editor`, opens a **local** graph
+viewer and guided editing page for a game's story-lines (viewer:
+CG-0MVHZ2N2X0082OW7). It is a development tool, not a shipped game:
 
 ```bash
 npm run storylines:editor                        # Gym content, http://127.0.0.1:5174
@@ -1472,20 +1472,42 @@ asserted by `tests/story-line/editor/build-exclusion.test.ts` (entry documents,
 production source imports, build/packaging scripts and the Electron
 `files:` list), alongside `vite-editor-config.test.ts` for the config identity.
 
-**Read-only.** This slice renders only; the transactional write bridge, preview
-and guided edits arrive in later slices and must route every mutation through
-the core author API (`applyContentEditToFile`).
+**Editing (curated forms + story-line management).** The same toolbar also
+mounts the guided editing workflow (CG-0MVHZ2PVT0072YYK, CG-0MVHZ2RBJ004O0VD):
+**Edit card** opens the selected node's card form, **Add card** opens the guided
+add-card form (core-editable fields from the adapter's field descriptors), and
+**Manage story-lines** opens the story-line management panel. Every operation
+previews a diff and validates **before** write, then applies through the F2
+bridge — the single transactional author API (`applyContentEditToFile` in
+`src/story-line/content/author.ts`). The editor never writes the content CSV
+itself; that property is asserted by the write-path guard below.
+
+The story-line panel lists every group the generated manifest reports (its
+`storylineIds` plus each member's declared id/title) and any group created in
+the session. A story-line has no declaration file of its own — it exists
+through its member cards — so a newly created group is listed as *pending*
+(red-dashed border) until member cards are moved into it. Creating a group,
+renaming one (a batch over every member card) and reassigning member cards all
+write **one** `set-storyline-batch` edit: the combined result is validated once
+and written once, so renaming a four-member group is a single author-API call,
+never one write per member. After an accepted edit the list matches the
+regenerated manifest.
 
 Tests: `tests/story-line/editor/view-model.test.ts` diffs the view model against
 the generated manifest (nodes, edges, story-line ids/titles, cycle flags),
 `viewer.browser.test.ts` covers rendering, grouping, cycle marking, pan/zoom,
-selection and the details sidebar, and `cli.test.ts` covers launch/`--help`,
-adapter resolution, manifest loading and the host middleware.
+selection and the details sidebar, `edit-forms.test.ts` / `edit-roundtrip.browser.test.ts`
+cover the curated card forms round-trip, `storyline-manager.test.ts` (Node:
+group derivation, draft validation, one-batch writes against a temp fixture
+copy) and `storyline-manager.browser.test.ts` (real DOM: create/rename/reassign
+through an in-memory bridge) cover the story-line management panel, and
+`cli.test.ts` covers launch/`--help`, adapter resolution, manifest loading and
+the host middleware.
 
 ### Story-line Editor Test Harness
 
-The editor host and read-only viewer now ship (see
-[Read-only Story-line Editor](#read-only-story-line-editor-viewer)); its shared
+The editor host, read-only viewer and guided editing now ship (see
+[Story-line Editor](#story-line-editor-viewer-and-guided-editing)); its shared
 test foundation lives in `tests/story-line/editor/` so every editor slice can be
 driven test-first (CG-0MVHZ2LS3008ATY9):
 

@@ -352,13 +352,26 @@ Thin `tsx` entry points over the seams (no Vite loader, no game import):
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
 | `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `update-card` (`--dry-run`, `--field column=value`). |
+| `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page (`--content`, `--game`, `--port`). |
 
 Every CLI supports `--help`, resolves `--game` through the shipped adapter
 registry (default `gym`), and exits `0` on success and `1` on invalid/unreadable
 content or drift. `npm run storylines:author -- add-card --id … --dry-run`
 prints the candidate content without writing it.
 
+### Editor
 
+`npm run storylines:editor` serves a local, plain-DOM authoring page over the
+same seams (dedicated `vite.editor.config.ts`, never part of the game or
+Electron build). Its **Manage story-lines** panel lists the groups the generated
+manifest reports plus any group created in the session, and drives create,
+rename and reassign as one transactional `set-storyline-batch` edit: the
+combined member cards are validated once and written once through
+`applyContentEditToFile`, so renaming a four-member group is a single
+author-API call rather than one write per card. A story-line has no declaration
+file of its own — it exists through the cards that declare its id/title — so a
+newly created group stays in-session, listed as pending, until member cards are
+moved into it.
 
 `StorylineEngineAdapter<TState, TCard>` inverts all state coupling:
 

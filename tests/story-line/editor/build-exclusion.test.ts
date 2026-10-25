@@ -49,6 +49,7 @@ const EDITOR_FILES = [
   'tools/storyline-editor/preview-panel.ts',
   'tools/storyline-editor/edit-forms.ts',
   'tools/storyline-editor/add-card-form.ts',
+  'tools/storyline-editor/storyline-manager.ts',
   'scripts/storyline-editor-cli.ts',
   'scripts/storyline-editor-server.ts',
   'vite.editor.config.ts',

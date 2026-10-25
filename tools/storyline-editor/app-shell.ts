@@ -13,10 +13,11 @@
  *
  * When it is also handed the game's content adapter, the raw content cards and
  * the edit bridge (the host serves all three), the shell additionally exposes
- * the curated editing workflow: an **Edit card** action for the selected node
- * and an **Add card** action, each mounting the corresponding form (see
- * `edit-forms.ts` / `add-card-form.ts`) whose preview, validation and apply all
- * run through the F2 bridge — the shell itself never writes content.
+ * the curated editing workflow: an **Edit card** action for the selected node,
+ * an **Add card** action, and a **Manage story-lines** action, each mounting
+ * the corresponding form (see `edit-forms.ts` / `add-card-form.ts` /
+ * `storyline-manager.ts`) whose preview, validation and apply all run through
+ * the F2 bridge — the shell itself never writes content.
  *
  * @module
  */
@@ -32,14 +33,18 @@ import {
   type EditorGraphRenderer,
 } from './graph-renderer';
 import type { EditApplyOutcome, EditorBridge } from './bridge-client';
+import { createCardEditForm } from './edit-forms';
+import { createAddCardForm } from './add-card-form';
 import {
-  createCardEditForm,
-  type CardEditFormHandle,
-} from './edit-forms';
-import {
-  createAddCardForm,
-  type AddCardFormHandle,
-} from './add-card-form';
+  createStorylineManager,
+  type StorylineManagerHandle,
+} from './storyline-manager';
+
+/** Anything the editing host can mount (a card form or the story-line manager). */
+interface FormHandle {
+  readonly root: HTMLElement;
+  dispose(): void;
+}
 
 /** Optional editing wiring (the host supplies all three together). */
 export interface EditorShellOptions {
@@ -67,7 +72,13 @@ export interface EditorShell {
   openEditForm(nodeId: string): void;
   /** Opens the guided add-card form (no-op unless editing is wired). */
   openAddForm(): void;
-  /** Closes any open edit/add form. */
+  /**
+   * Opens the story-line management panel (no-op unless editing is wired).
+   *
+   * @returns The mounted manager, so callers/tests can drive it directly.
+   */
+  openStorylineManager(): StorylineManagerHandle | null;
+  /** Closes any open edit/add/management form. */
   closeEditor(): void;
   /** Removes the shell's DOM and listeners from the container. */
   dispose(): void;
@@ -105,7 +116,7 @@ export function mountEditorShell(
       ? { adapter: options.adapter, cards: options.cards, bridge: options.bridge }
       : null;
   const knownCardIds = viewModel.nodes.map((node) => node.id);
-  let openForm: CardEditFormHandle | AddCardFormHandle | null = null;
+  let openForm: FormHandle | null = null;
   let selectedNodeId: string | null = null;
 
   const root = el('div', 'editor-shell');
@@ -144,7 +155,20 @@ export function mountEditorShell(
   const addCardButton = el('button', 'editor-button editor-button--primary', 'Add card');
   addCardButton.type = 'button';
   addCardButton.dataset.action = 'add-card';
-  actions.append(zoomIn, zoomOut, resetView, fitView, ...(editing ? [addCardButton] : []));
+  const manageStorylinesButton = el(
+    'button',
+    'editor-button',
+    'Manage story-lines',
+  );
+  manageStorylinesButton.type = 'button';
+  manageStorylinesButton.dataset.action = 'manage-storylines';
+  actions.append(
+    zoomIn,
+    zoomOut,
+    resetView,
+    fitView,
+    ...(editing ? [manageStorylinesButton, addCardButton] : []),
+  );
   toolbar.append(actions);
   root.append(toolbar);
 
@@ -377,7 +401,7 @@ export function mountEditorShell(
     editorHost.hidden = true;
   }
 
-  function openEditingForm(form: CardEditFormHandle | AddCardFormHandle, title: string): void {
+  function openEditingForm(form: FormHandle, title: string): void {
     closeEditor();
     openForm = form;
     editorHostTitle.textContent = title;
@@ -422,6 +446,32 @@ export function mountEditorShell(
     openEditingForm(form, 'Add a card');
   }
 
+  /**
+   * Opens the story-line management panel: the manifest's story-line groups and
+   * member cards, backed by the same bridge as the card forms. Creating,
+   * renaming and reassigning all write one validated batch through it.
+   */
+  function openStorylineManager(): StorylineManagerHandle | null {
+    if (!editing) return null;
+    const groups = viewModel.storylines
+      .filter((group) => group.storylineId !== null)
+      .map((group) => ({ storylineId: group.storylineId as string, title: group.title }));
+    const members = viewModel.nodes.map((node) => ({
+      id: node.id,
+      name: node.name,
+      storylineId: node.storylineId,
+      storylineTitle: node.storylineTitle,
+    }));
+    const manager = createStorylineManager({
+      groups,
+      members,
+      bridge: editing.bridge,
+      ...(options.onApplied ? { onApplied: options.onApplied } : {}),
+    });
+    openEditingForm(manager, 'Manage story-lines');
+    return manager;
+  }
+
   /** Replaces the editor host's content with a plain message panel. */
   function openEditingFormContents(content: HTMLElement, title: string): void {
     closeEditor();
@@ -438,6 +488,10 @@ export function mountEditorShell(
   editCardButton.addEventListener('click', onEditCard);
   const onAddCard = (): void => openAddForm();
   addCardButton.addEventListener('click', onAddCard);
+  const onManageStorylines = (): void => {
+    openStorylineManager();
+  };
+  manageStorylinesButton.addEventListener('click', onManageStorylines);
 
   return {
     root,
@@ -446,6 +500,7 @@ export function mountEditorShell(
     selectNode: (nodeId) => renderer.selectNode(nodeId),
     openEditForm,
     openAddForm,
+    openStorylineManager,
     closeEditor,
     dispose: () => {
       zoomIn.removeEventListener('click', onZoomIn);
@@ -455,6 +510,7 @@ export function mountEditorShell(
       closeEditorButton.removeEventListener('click', onCloseEditor);
       editCardButton.removeEventListener('click', onEditCard);
       addCardButton.removeEventListener('click', onAddCard);
+      manageStorylinesButton.removeEventListener('click', onManageStorylines);
       closeEditor();
       renderer.dispose();
       container.replaceChildren();
