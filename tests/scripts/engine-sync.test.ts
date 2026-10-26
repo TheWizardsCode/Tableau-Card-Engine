@@ -1,17 +1,22 @@
 /**
  * Unit tests for the engine submodule sync/verify script
- * (`scripts/engine-sync.mjs`, MS-0MVCRGKZY007DIED).
+ * (`scripts/engine-sync.mjs`, MS-0MVCRGKZY007DIED; pin policy
+ * CG-0MVO268500071BPI).
  *
  * The script implements the dev/release engine-composition policies for game
- * repos:
+ * repos under one policy: **the pin tracks the tracked branch tip, and the pin
+ * and the `./core` gitlink travel together**.
  *
  * - **sync** (dev build): refuse loudly when `./core` has uncommitted changes
  *   (never clobber), then `git submodule update --remote core` so the tracked
- *   branch's remote tip is checked out. Unreachable remote → fall back to the
- *   current checkout with a warning (offline build).
+ *   branch's remote tip is checked out. When the checkout moves and the repo
+ *   has a pin, the pin is rewritten to the new HEAD and both are staged
+ *   together. Unreachable remote → fall back to the current checkout with a
+ *   warning (offline build), leaving the pin untouched.
  * - **verify** (release build): refuse loudly on local modifications, read
- *   `configs/engine-pin.json`, confirm the pinned SHA equals the
- *   remote-resolved target, then check out exactly the pinned SHA.
+ *   `configs/engine-pin.json`, compare it with the remote-resolved target, and
+ *   check out exactly that SHA. A lagging pin and a foreign pin both fail, with
+ *   distinct diagnoses.
  *
  * These tests drive real git fixtures (temp repos + local-path remotes, no
  * network) and assert observable behaviour through the exported API.
@@ -87,6 +92,7 @@ function makeFixture(): {
   pinPath: string;
   devTip: () => string;
   advanceEngine: () => string;
+  offBranchCommit: () => string;
   pinTo: (sha: string) => void;
 } {
   const root = tempRoot('engine-sync-');
@@ -126,11 +132,22 @@ function makeFixture(): {
     return devTip();
   };
 
+  /** Create a commit on a branch other than `dev` (foreign to the tracked branch). */
+  const offBranchCommit = (): string => {
+    git(engine, ['checkout', '-q', '-b', 'other']);
+    fs.appendFileSync(path.join(engine, 'version.txt'), `other${Date.now()}\n`);
+    git(engine, ['add', 'version.txt']);
+    commit(engine, 'foreign');
+    const sha = devTip();
+    git(engine, ['checkout', '-q', 'dev']);
+    return sha;
+  };
+
   const pinTo = (sha: string): void => {
     fs.writeFileSync(pinPath, JSON.stringify({ sha }));
   };
 
-  return { root, engine, game, pinPath, devTip, advanceEngine, pinTo };
+  return { root, engine, game, pinPath, devTip, advanceEngine, offBranchCommit, pinTo };
 }
 
 describe('submoduleIsDirty', () => {
@@ -188,14 +205,67 @@ describe('syncEngine — dirty-state guard (AC1)', () => {
     // --remote` actually attempts a fetch — then break its origin URL so the
     // fetch fails like an offline build would.
     const tip = f.advanceEngine();
+    f.pinTo(f.devTip()); // pin equals the checkout, not `tip`
     git(path.join(f.game, 'core'), ['remote', 'set-url', 'origin', 'http://127.0.0.1:9/nowhere.git']);
     const before = git(path.join(f.game, 'core'), ['rev-parse', 'HEAD']).stdout;
+    const pinBefore = fs.readFileSync(f.pinPath, 'utf-8');
     expect(before).not.toBe(tip);
     const res = syncEngine({ repoRoot: f.game });
     expect(res.warning).toMatch(/remote unreachable|WARNING/);
     expect(res.updated).toBe(false);
-    // Offline fallback never clobbers: the checkout is untouched.
+    expect(res.pinWritten).toBe(false);
+    // Offline fallback never clobbers: the checkout and the pin are untouched.
     expect(git(path.join(f.game, 'core'), ['rev-parse', 'HEAD']).stdout).toBe(before);
+    expect(fs.readFileSync(f.pinPath, 'utf-8')).toBe(pinBefore);
+  });
+});
+
+describe('syncEngine — the pin travels with the gitlink (AC2)', () => {
+  it('writes the pin to the new HEAD and stages it alongside the gitlink', () => {
+    const f = makeFixture();
+    f.pinTo(f.devTip());
+    const tip = f.advanceEngine();
+    const res = syncEngine({ repoRoot: f.game });
+    expect(res.updated).toBe(true);
+    expect(res.pinWritten).toBe(true);
+
+    // Pin value == new submodule HEAD.
+    const pin = JSON.parse(fs.readFileSync(f.pinPath, 'utf-8')) as { sha: string };
+    expect(pin.sha).toBe(tip);
+    expect(readPin(f.game)).toBe(tip);
+
+    // Both staged together: the index records the new gitlink and the pin.
+    const staged = git(f.game, ['diff', '--cached', '--name-only']).stdout.split('\n');
+    expect(staged).toContain(DEFAULT_PIN_REL.split(path.sep).join('/'));
+    expect(staged).toContain(DEFAULT_CORE_REL);
+    const indexGitlink = git(f.game, ['ls-files', '-s', DEFAULT_CORE_REL]).stdout.split(/\s+/)[1];
+    expect(indexGitlink).toBe(tip);
+  });
+
+  it('leaves the pin byte-identical on a second (no-op) sync', () => {
+    const f = makeFixture();
+    f.pinTo(f.devTip());
+    f.advanceEngine();
+    syncEngine({ repoRoot: f.game }); // advances + writes the pin
+    const bytes = fs.readFileSync(f.pinPath, 'utf-8');
+
+    const res = syncEngine({ repoRoot: f.game }); // no-op
+    expect(res.updated).toBe(false);
+    expect(res.pinWritten).toBe(false);
+    expect(fs.readFileSync(f.pinPath, 'utf-8')).toBe(bytes);
+  });
+
+  it('never creates a pin for a repo that has none (no spurious file)', () => {
+    const f = makeFixture();
+    fs.rmSync(f.pinPath, { force: true });
+    const tip = f.advanceEngine();
+    const res = syncEngine({ repoRoot: f.game });
+    expect(res.updated).toBe(true);
+    expect(res.pinWritten).toBe(false);
+    expect(fs.existsSync(f.pinPath)).toBe(false);
+    const staged = git(f.game, ['diff', '--cached', '--name-only']).stdout;
+    expect(staged).not.toContain('engine-pin.json');
+    expect(tip).toMatch(/^[0-9a-f]{40}$/);
   });
 });
 
@@ -220,7 +290,7 @@ describe('readPin / pin file (AC3)', () => {
   });
 });
 
-describe('verifyEngine — pin-mismatch failure path (AC2)', () => {
+describe('verifyEngine — failure paths (AC2)', () => {
   it('fails loudly on local modifications before touching anything', () => {
     const f = makeFixture();
     f.pinTo(f.devTip());
@@ -262,6 +332,34 @@ describe('verifyEngine — pin-mismatch failure path (AC2)', () => {
     expect(git(path.join(f.game, 'core'), ['rev-parse', 'HEAD']).stdout).toBe(original);
     verifyEngine({ repoRoot: f.game });
     expect(git(path.join(f.game, 'core'), ['rev-parse', 'HEAD']).stdout).toBe(tip);
+  });
+});
+
+describe('verifyEngine — lag vs bad/foreign pin diagnostics (AC2)', () => {
+  it('diagnoses LAG: pin is an ancestor of the tracked tip by N commits — re-pin', () => {
+    const f = makeFixture();
+    const oldTip = f.devTip();
+    f.advanceEngine();
+    f.advanceEngine(); // the tip is now 2 commits ahead of the pin
+    f.pinTo(oldTip);
+    expect(() => verifyEngine({ repoRoot: f.game })).toThrow(
+      /is an ancestor of the tracked dev tip by 2 commit/,
+    );
+    expect(() => verifyEngine({ repoRoot: f.game })).toThrow(/Re-pin: .*travel together/);
+    // Still a hard failure (not a warning), and nothing was checked out.
+    expect(() => verifyEngine({ repoRoot: f.game })).toThrow(EngineSyncError);
+  });
+
+  it('diagnoses a BAD/FOREIGN pin: it does not resolve on the tracked branch', () => {
+    const f = makeFixture();
+    const foreign = f.offBranchCommit();
+    expect(foreign).toMatch(/^[0-9a-f]{40}$/);
+    f.pinTo(foreign);
+    expect(() => verifyEngine({ repoRoot: f.game })).toThrow(
+      /does not resolve on the tracked branch dev/,
+    );
+    expect(() => verifyEngine({ repoRoot: f.game })).toThrow(/bad or foreign pin/);
+    expect(() => verifyEngine({ repoRoot: f.game })).toThrow(EngineSyncError);
   });
 });
 

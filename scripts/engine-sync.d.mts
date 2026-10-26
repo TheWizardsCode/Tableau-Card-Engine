@@ -13,6 +13,16 @@ export interface EnginePin {
   sha: string;
 }
 
+/** Whether the pin file has a value (i.e. this repo is pinned). */
+export declare function writePin(repoRoot: string, pinRel: string, sha: string): boolean;
+
+/** Stage the `core` gitlink and (when given) the pin file together. */
+export declare function stageEngineState(
+  repoRoot: string,
+  coreRel: string,
+  pinRel?: string | null,
+): void;
+
 /** Standard git command result. */
 export interface GitResult {
   ok: boolean;
@@ -26,6 +36,8 @@ export interface SyncResult {
   updated: boolean;
   from: string;
   to: string;
+  /** True when this run rewrote `configs/engine-pin.json` to the new HEAD. */
+  pinWritten: boolean;
   warning?: string;
 }
 
@@ -73,10 +85,11 @@ export declare function resolveShaFull(
   sha: string,
 ): string | null;
 
-/** Dev sync: guard, then follow the latest engine remote head. */
+/** Dev sync: guard, then follow the latest engine remote head; pin travels. */
 export declare function syncEngine(opts: {
   repoRoot: string;
   coreRel?: string;
+  pinRel?: string;
   log?: (line: string) => void;
 }): SyncResult;
 

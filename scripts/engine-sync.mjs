@@ -6,19 +6,30 @@
  * Game repos compose the Tableau-Card-Engine checkout as a git submodule at
  * `./core`. Two build-time policies keep that checkout coherent:
  *
+ * **Pin policy (CG-0MVO268500071BPI):** the pin tracks the engine's tracked
+ * branch tip (the core `dev` tip). A pin that lags the tip is a genuine
+ * failure, and **the pin and the `./core` gitlink always travel together** —
+ * one actor, one moment, one commit.
+ *
  * - **sync** (dev builds, `npm run engine:sync`): always compose the LATEST
  *   engine — refuse loudly when `./core` has uncommitted changes (never
  *   clobber), then run `git submodule update --remote core` so the tracked
- *   branch's remote tip is fetched and checked out. When the remote is
- *   unreachable (network failure) the build falls back to the current
- *   checkout with a warning instead of failing (risk note: offline builds
- *   keep working).
- * - **verify** (release builds, `npm run engine:verify`): pin the engine to a
- *   committed SHA — refuse loudly when `./core` has local modifications, read
- *   `configs/engine-pin.json` (a single `sha` field), confirm the pinned SHA
- *   equals the remote-resolved target (the tip of the branch `core` tracks),
- *   then check out exactly that SHA. Release builds require the remote to be
- *   reachable so the pin can be compared; a mismatch fails the build.
+ *   branch's remote tip is fetched and checked out. When the checkout moves
+ *   and the repo has a `configs/engine-pin.json`, the pin is rewritten to the
+ *   new HEAD and both the pin and the gitlink are staged together, so a
+ *   commit can never record them divergent (MS-0MVMOH2N3000T63F). When the
+ *   remote is unreachable (network failure) the build falls back to the
+ *   current checkout with a warning instead of failing, and the pin is left
+ *   untouched (risk note: offline builds keep working). Repos without a pin
+ *   file are never given one.
+ * - **verify** (release builds, `npm run engine:verify`): refuse loudly when
+ *   `./core` has local modifications, read `configs/engine-pin.json` (a
+ *   single `sha` field), and compare the pinned SHA with the remote-resolved
+ *   target (the tip of the branch `core` tracks). A pin that lags the tip
+ *   and a pin that does not resolve on the tracked branch both fail, with
+ *   distinct, actionable diagnoses (lag → re-pin; foreign → fix the pin).
+ *   On success the exact pinned SHA is checked out. Release builds require
+ *   the remote to be reachable so the pin can be compared.
  *
  * The npm scripts wrap this script (game repos have no root `scripts/`
  * tree — Option C — so the canonical file lives in the engine repo and is
@@ -202,6 +213,47 @@ export function readPin(repoRoot, pinRel = DEFAULT_PIN_REL) {
   return sha;
 }
 
+/**
+ * Rewrite the engine pin file to `sha`, preserving any other fields already
+ * present. Returns true when the file's bytes changed.
+ *
+ * The pin contract is a single `sha` field; preservation only matters for
+ * repos that have added metadata alongside it. The file is normalised to
+ * two-space JSON with a trailing newline so a re-written pin is stable.
+ */
+export function writePin(repoRoot, pinRel, sha) {
+  const pinPath = path.join(repoRoot, pinRel);
+  let data = {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(pinPath, 'utf-8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed;
+  } catch {
+    // Missing/malformed pin: write a fresh single-field pin.
+  }
+  const next = `${JSON.stringify({ ...data, sha }, null, 2)}\n`;
+  const prev = fs.existsSync(pinPath) ? fs.readFileSync(pinPath, 'utf-8') : null;
+  fs.mkdirSync(path.dirname(pinPath), { recursive: true });
+  fs.writeFileSync(pinPath, next);
+  return prev !== next;
+}
+
+/**
+ * Stage the engine state (`./core` gitlink and, when present, the pin file)
+ * so both are recorded by one commit — the "pin and gitlink travel together"
+ * invariant.
+ */
+export function stageEngineState(repoRoot, coreRel, pinRel) {
+  const paths = pinRel ? [coreRel, pinRel] : [coreRel];
+  const res = runGit(repoRoot, ['add', '--', ...paths]);
+  if (!res.ok) {
+    throw new EngineSyncError(
+      `engine:sync: could not stage ${paths.join(' + ')}:\n${res.stderr}\n` +
+        `Commit the ${coreRel} gitlink and the engine pin together; if the ` +
+        `index is locked, resolve that (e.g. a stale index.lock) and rerun.`,
+    );
+  }
+}
+
 /** Expand a (possibly short) SHA to a full 40-hex SHA via rev-parse. */
 export function resolveShaFull(repoRoot, coreRel, sha) {
   const res = runGit(corePath(repoRoot, coreRel), ['rev-parse', `${sha}^{commit}`]);
@@ -212,12 +264,14 @@ export function resolveShaFull(repoRoot, coreRel, sha) {
 /**
  * sync: refuse loudly on a dirty submodule, then `git submodule update
  * --remote core` so dev builds follow the latest engine of the tracked
- * branch. On network failure, warn and fall back to the current checkout
- * (exit 0) per the documented offline-build assumption.
+ * branch, then rewrite the pin (when the repo has one) to the new HEAD and
+ * stage the pin and the gitlink together. On network failure, warn and fall
+ * back to the current checkout (exit 0) per the documented offline-build
+ * assumption; the pin is left untouched because nothing moved.
  *
- * @returns {{ updated: boolean, from: string, to: string, warning?: string }}
+ * @returns {{ updated: boolean, from: string, to: string, pinWritten: boolean, warning?: string }}
  */
-export function syncEngine({ repoRoot, coreRel = DEFAULT_CORE_REL, log = console.log }) {
+export function syncEngine({ repoRoot, coreRel = DEFAULT_CORE_REL, pinRel = DEFAULT_PIN_REL, log = console.log }) {
   ensureSubmoduleInit(repoRoot, coreRel);
   if (submoduleIsDirty(repoRoot, coreRel)) {
     throw new EngineSyncError(
@@ -233,7 +287,13 @@ export function syncEngine({ repoRoot, coreRel = DEFAULT_CORE_REL, log = console
     if (/unable to access|could not resolve|connection timed out|operation timed out|failed to connect|fatal: unable to access/i.test(msg)) {
       log(`engine:sync: WARNING remote unreachable — using existing ${coreRel} checkout (no change).`);
       log(msg.trim());
-      return { updated: false, from: before ?? '', to: before ?? '', warning: 'remote unreachable' };
+      return {
+        updated: false,
+        from: before ?? '',
+        to: before ?? '',
+        pinWritten: false,
+        warning: 'remote unreachable',
+      };
     }
     throw new EngineSyncError(
       `engine:sync: failed to update ${coreRel}:\n${msg}\n` +
@@ -242,8 +302,37 @@ export function syncEngine({ repoRoot, coreRel = DEFAULT_CORE_REL, log = console
     );
   }
   const after = resolveShaFull(repoRoot, coreRel, 'HEAD');
-  log(`engine:sync: ${coreRel} updated ${(before ?? '').slice(0, 10)} → ${(after ?? '').slice(0, 10)}`);
-  return { updated: before !== after, from: before ?? '', to: after ?? '' };
+  if (!after) {
+    throw new EngineSyncError(
+      `engine:sync: could not resolve ${coreRel}'s HEAD after the update — inspect the submodule and retry.`,
+    );
+  }
+  log(`engine:sync: ${coreRel} updated ${(before ?? '').slice(0, 10)} → ${after.slice(0, 10)}`);
+  const updated = before !== after;
+
+  // Pin travels with the gitlink. Repos with no pin file stay unpinned — sync
+  // must never invent one (a spurious file would be committed by accident).
+  const pinPath = path.join(repoRoot, pinRel);
+  if (!fs.existsSync(pinPath)) {
+    log(`engine:sync: no engine pin at ${pinRel} — leaving the repo unpinned.`);
+    return { updated, from: before ?? '', to: after, pinWritten: false };
+  }
+  let pinFull = null;
+  try {
+    pinFull = resolveShaFull(repoRoot, coreRel, readPin(repoRoot, pinRel));
+  } catch {
+    pinFull = null; // malformed pin → rewrite it to the synced HEAD
+  }
+  const pinWritten = pinFull !== after;
+  if (pinWritten) {
+    writePin(repoRoot, pinRel, after);
+    log(
+      `engine:sync: engine pin ${pinRel} ${(pinFull ?? '(unreadable)').slice(0, 10)} → ` +
+        `${after.slice(0, 10)} (staged with the ${coreRel} gitlink)`,
+    );
+  }
+  if (updated || pinWritten) stageEngineState(repoRoot, coreRel, pinRel);
+  return { updated, from: before ?? '', to: after, pinWritten };
 }
 
 /**
@@ -269,17 +358,36 @@ export function verifyEngine({ repoRoot, coreRel = DEFAULT_CORE_REL, pinRel = DE
   runGit(repoRoot, ['submodule', 'update', '--init', '--recursive', coreRel]);
   runGit(corePath(repoRoot, coreRel), ['fetch', 'origin']);
   const pinnedFull = resolveShaFull(repoRoot, coreRel, pinned);
-  if (!pinnedFull) {
-    throw new EngineSyncError(
-      `engine:verify: pinned engine SHA ${pinned} (${pinRel}) is not reachable ` +
-        `from ${coreRel}'s remotes — check the pin.`,
-    );
-  }
+  const branch = resolveTrackedBranch(repoRoot, coreRel) || 'HEAD';
+  const rePinHint =
+    `Re-pin: set ${pinRel} to {"sha": "${target}"} and commit it together with ` +
+    `the ${coreRel} gitlink — the pin and the gitlink travel together.`;
   if (pinnedFull !== target) {
+    // Lag: the pin resolves on the tracked branch but sits behind its tip.
+    // Bad/foreign pin: it does not resolve on the tracked branch at all.
+    const isAncestor =
+      pinnedFull !== null &&
+      runGit(corePath(repoRoot, coreRel), ['merge-base', '--is-ancestor', pinnedFull, target]).ok;
+    if (isAncestor) {
+      const behind = runGit(corePath(repoRoot, coreRel), [
+        'rev-list',
+        '--count',
+        `${pinnedFull}..${target}`,
+      ]).stdout;
+      const count = behind || '?';
+      throw new EngineSyncError(
+        `engine:verify: PIN MISMATCH — the engine pin is an ancestor of the tracked ` +
+          `${branch} tip by ${count} commit(s).\n` +
+          `  pinned: ${pinnedFull} (${pinRel})\n` +
+          `  tip:    ${target} (${branch})\n` +
+          `${rePinHint}`,
+      );
+    }
     throw new EngineSyncError(
-      `engine:verify: PIN MISMATCH — pinned engine ${pinnedFull} (${pinRel}) ` +
-        `differs from the remote-resolved target ${target} of the branch ${coreRel} tracks.\n` +
-        `Update ${pinRel} to {"sha": "${target}"} alongside the release version bump.`,
+      `engine:verify: PIN MISMATCH — the pinned engine ${pinnedFull ?? pinned} (${pinRel}) ` +
+        `does not resolve on the tracked branch ${branch} (tip ${target}).\n` +
+        `This is a bad or foreign pin: it is not an ancestor of the tracked tip.\n` +
+        `${rePinHint}`,
     );
   }
   // Check out exactly the pinned SHA (detached HEAD — this is a build, not a
@@ -305,7 +413,7 @@ export function main(argv, io = { stdout: process.stdout, stderr: process.stderr
   const pinRel = flagValue('pin') ?? DEFAULT_PIN_REL;
   let result;
   try {
-    if (mode === 'sync') result = syncEngine({ repoRoot: process.cwd(), coreRel });
+    if (mode === 'sync') result = syncEngine({ repoRoot: process.cwd(), coreRel, pinRel });
     else if (mode === 'verify') result = verifyEngine({ repoRoot: process.cwd(), coreRel, pinRel });
     else {
       io.stderr.write(

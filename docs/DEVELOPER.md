@@ -2118,14 +2118,31 @@ and the [layout decision record](dev/per-game-src-layout-decision.md).
 ### Engine sync/verify scripts in generated game repos
 
 `renderPackageJson` wires every generated game repo with two engine submodule
-scripts (MS-0MVCRGKZY007DIED):
+scripts (MS-0MVCRGKZY007DIED), under one explicit policy
+(CG-0MVO268500071BPI):
+
+> **The pin tracks the tracked branch tip.** A pin that lags the tip is a
+> genuine failure — and **the pin and the `./core` gitlink always travel
+> together** (one actor, one moment, one commit).
 
 - `engine:sync` — dev builds compose the **latest** engine: refuse loudly on
   uncommitted `./core` changes, then `git submodule update --remote core`
-  (remote unreachable → warn and keep the current checkout).
+  (remote unreachable → warn and keep the current checkout). When the
+  checkout moves and the repo has a `configs/engine-pin.json`, the pin is
+  rewritten to the new HEAD and **both the pin and the gitlink are staged
+  together**, so a commit can never record them divergent. A second no-op
+  sync leaves the pin byte-identical (nothing writes unless the SHA moved).
+  Repos **without** a pin file are never given one — a repo is pinned only
+  once the release process (or a maintainer) creates the pin, after which
+  sync maintains it.
 - `engine:verify` — release builds compile **exactly** the SHA pinned in the
   game repo's `configs/engine-pin.json`: same dirty guard, then compare the
-  pin against the tracked branch's remote tip and check that SHA out exactly.
+  pin against the tracked branch's remote tip and check that SHA out
+  exactly. A **lagging** pin (an ancestor of the tracked tip by N commits)
+  fails with a lag-specific message telling the operator to re-pin — the pin
+  and gitlink travel together; a **bad/foreign** pin (does not resolve on the
+  tracked branch) fails with a different message telling the operator to fix
+  the pin. Both are hard failures; only the diagnosis and next steps differ.
 - `build` / `build:electron` run `engine:sync` first; `build:release` runs
   `engine:verify` instead.
 
