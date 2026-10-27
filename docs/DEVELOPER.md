@@ -2745,7 +2745,7 @@ Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max h
 
 ## Animation & Sound Feedback for Player and AI Actions
 
-**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops.)
+**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. `shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; pass its `reason` option (the rules-layer `LegalityResult.reason`) and it also renders the transient reason toast, so a rejected move is explained as well as animated — see [shakeIllegalMove](ui-animations.md#shakeillegalmove-illegal-move-feedback--reason-toast). `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops and renders the reason toast when an `illegalReason` resolver supplies `payload.reason`.)
 
 **AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `../tce-coloretto/src/scenes/ColorettoAiScheduler.ts` schedules AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then dispatches the AI's action through the same animated/sounded path as a human turn (rendered by `ColorettoRenderer`, orchestrated by `ColorettoScene`).
 
@@ -3468,12 +3468,22 @@ render consistently above gameplay content across all example games.
     that manages game-state overlay lifecycle. Supports types:
     `'game-over'`, `'win/loss'`, `'round-end'`, `'custom'`.
 
+3.  **`shakeIllegalMove` / `showIllegalMoveToast`** (`src/ui/shakeIllegalMove.ts`,
+    `src/ui/illegalMoveToastView.ts`, `src/ui/illegalMoveToast.ts`) — the
+    shared illegal-move feedback routine (tint + shake + `sfx-illegal-move`).
+    Pass `reason` (normally `LegalityResult.reason`) and the routine also
+    renders a transient, non-blocking reason toast — independently of the
+    shake branch, so it still appears for Containers, `null` targets and under
+    reduced motion. See
+    [UI Animation Helpers → shakeIllegalMove](ui-animations.md#shakeillegalmove-illegal-move-feedback--reason-toast).
+
 ### Depth Convention
 
-| Layer                | Depth  | Purpose                                    |
-|----------------------|--------|--------------------------------------------|
-| HUD container        | 1000   | Help/settings panels, buttons              |
-| Game-state overlays  | 2000   | Win, loss, game-over, round-end overlays   |
+| Layer                        | Depth  | Purpose                                    |
+|------------------------------|--------|--------------------------------------------|
+| HUD container                | 1000   | Help/settings panels, buttons              |
+| Illegal-move reason toast    | 1900   | Transient rejection explanation            |
+| Game-state overlays          | 2000   | Win, loss, game-over, round-end overlays   |
 
 ### Full Component Reference
 
@@ -4612,6 +4622,7 @@ The `GymButtonBar` is exported from the UI barrel (`src/ui/index.ts`) and can be
 | Panel background | 901 |
 | Panel content | 902 |
 | Panel close button | 903 |
+| Illegal-move reason toast | 1900 |
 | Overlay background | 10–2000 (game-specific) |
 | Overlay buttons | overlay depth + 1 |
 
