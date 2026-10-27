@@ -376,6 +376,12 @@ export default defineConfig(({ mode }) => ({
   ],
   resolve: {
     alias: resolveCoreAliases(coreRoot),
+    // Shared runtime deps must resolve to exactly ONE copy (phaser, tone): a
+    // second copy (e.g. an npm install inside the core submodule) becomes a
+    // distinct module id and the Node-env unit tests' vi.mock('phaser') stops
+    // applying, evaluating real Phaser on collection. Mirrors the
+    // core/vite.config.ts dedupe.
+    dedupe: ['phaser', 'tone'],
   },
   build: {
     outDir: 'dist',

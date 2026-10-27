@@ -88,6 +88,27 @@ const MANIFEST: CoreManifest = {
   devDependencies: { vite: '^6.1.0', vitest: '^3.0.0', typescript: '^5.7.0' },
 };
 
+/**
+ * Extract the balanced `resolve: { … }` body from a rendered/scaffolded Vite
+ * config. Locating the block keeps the dedupe assertions placement-aware: a
+ * bare `toContain` on the whole file would also pass if the guard drifted into
+ * an unrelated option (e.g. `build.dedupe`).
+ */
+function extractResolveBlock(src: string): string {
+  const key = src.indexOf('resolve: {');
+  expect(key, 'resolve block missing from the rendered config').toBeGreaterThanOrEqual(0);
+  const open = src.indexOf('{', key);
+  let depth = 0;
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1;
+    else if (src[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return src.slice(open + 1, i);
+    }
+  }
+  throw new Error('unbalanced resolve block in the rendered config');
+}
+
 let tmpRoot: string;
 
 beforeEach(() => {
@@ -359,6 +380,32 @@ describe('renderViteConfig', () => {
     expect(src).toContain("name: 'unit'");
   });
 
+  it('emits the single-copy resolve.dedupe guard inside the resolve block', () => {
+    const src = renderViteConfig('golf', DEFAULT_CORE_REL);
+    const block = extractResolveBlock(src);
+
+    // Shared runtime deps must resolve to exactly one copy: a second `phaser`
+    // (e.g. from an `npm install` inside the core submodule) becomes a distinct
+    // module id, so Node-env unit tests stop mocking it and real Phaser is
+    // evaluated on collection (`window is not defined`, MS-0MVK3SF54006Y6A6).
+    // Mirrors `resolve.dedupe` in core/vite.config.ts.
+    expect(block).toContain("dedupe: ['phaser', 'tone']");
+    // Placement contract: the guard sits after the alias entry, in the same
+    // `resolve` block.
+    expect(block.indexOf("dedupe: ['phaser', 'tone']")).toBeGreaterThan(
+      block.indexOf('resolveCoreAliases(coreRoot)'),
+    );
+    // The list stays exactly the two shared runtime deps.
+    const dedupeLine = block
+      .split('\n')
+      .find((line) => line.trimStart().startsWith('dedupe:'));
+    expect(dedupeLine?.trim()).toBe("dedupe: ['phaser', 'tone'],");
+    // The rationale comment explains why, so a future maintainer does not drop
+    // it as noise.
+    expect(block.toLowerCase()).toContain('one copy');
+    expect(block).toContain('core/vite.config.ts');
+  });
+
   it('excludes .worklog and dev-output trees from the Vite file watcher (ENOSPC guard)', () => {
     const src = renderViteConfig('golf', DEFAULT_CORE_REL);
     // The generated config must wire the shared ignore list into the watcher so
@@ -472,6 +519,20 @@ describe('findGameInPreset', () => {
 // ── End-to-end scaffold over a fixture ────────────────────────────────────
 
 describe('scaffoldGameRepo', () => {
+  it('writes a vite.config.ts carrying the single-copy dedupe guard', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    // Assert the real on-disk write: a re-scaffold must not drop the guard the
+    // checked-in generated configs (e.g. tce-main-street) rely on.
+    const written = fs.readFileSync(path.join(gameRepo, 'vite.config.ts'), 'utf-8');
+    const block = extractResolveBlock(written);
+    expect(block).toContain("dedupe: ['phaser', 'tone']");
+    expect(block.indexOf("dedupe: ['phaser', 'tone']")).toBeGreaterThan(
+      block.indexOf('resolveCoreAliases(coreRoot)'),
+    );
+  });
+
   it('writes the root configs, preset and only the core link', () => {
     const { core, gameRepo } = makeLayout('golf');
     const result = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
