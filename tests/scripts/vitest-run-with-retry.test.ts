@@ -2,7 +2,7 @@
  * Unit tests for the vitest transient-failure retry mitigation
  * (scripts/vitest-run-with-retry.ts).
  *
- * Vitest has three distinct contention-induced failure signatures:
+ * Vitest has four distinct contention-induced failure signatures:
  *
  *   1. Worker RPC timeout — Vitest's worker RPC layer uses birpc with a
  *      hard-coded 60s timeout (DEFAULT_TIMEOUT = 6e4 in
@@ -16,6 +16,13 @@
  *      (e.g. a requestAnimationFrame loop starved of frames); the run never
  *      exits. The runner aborts it with a bounded wall-clock timeout and
  *      exit 124. See CG-0MT08R2QR0070F3N.
+ *   4. Module fetch failure — the Vite dev server fails to serve a test
+ *      module under load, so the browser cannot dynamically import it
+ *      (`Failed to fetch dynamically imported module`); Vitest reports the
+ *      file as a failed suite. Retry-only recovery: a genuine
+ *      module-resolution regression is deterministic, so a both-attempts
+ *      module-fetch run keeps the retry's own failing status, never
+ *      `accepted-transient`. See CG-0MVNDK56G007C1U7.
  *
  * These tests verify the masking guard: retry is ONLY allowed when the
  * run reports all files passed AND the sole error is a transient signature
@@ -29,7 +36,13 @@ import path from 'node:path';
 import {
   WORKER_TIMEOUT_SIGNATURE,
   BROWSER_DROP_SIGNATURE,
+  MODULE_FETCH_SIGNATURE,
+  TRANSIENT_SIGNATURES,
+  ACCEPTABLE_TRANSIENT_SIGNATURES,
   shouldRetryOnce,
+  shouldAcceptBothAttempts,
+  failuresAreTransientOnly,
+  hasTransientSignature,
   runWithRetry,
   runSummary,
   runVitestSync,
@@ -133,6 +146,63 @@ const TRANSIENT_OUTPUT = `${PASS_OUTPUT}\nError: ${WORKER_TIMEOUT_SIGNATURE}`;
 /** A passing run whose exit was poisoned by the transient browser WebSocket drop. */
 const BROWSER_DROP_OUTPUT = `${PASS_OUTPUT}\nError: ${BROWSER_DROP_SIGNATURE}. Was the page closed unexpectedly?`;
 
+/**
+ * The recorded module-fetch failing-browser-run shape for CG-0MVNDK56G007C1U7,
+ * verbatim from the incident cache (`.git/test-cache/513dd2a255a543ca721aef90e207f1c5/stdout.txt`, commit
+ * f9762665, load avg ~8): the Vite dev server refused to serve the test modules
+ * under load, so Chromium could not dynamically import them. Two of the 64
+ * identical `Failed Suites` blocks are pinned below; divider lines and all are
+ * verbatim. The `Caused by:` line belongs to the SAME error block as its
+ * `Error:` line, so the block is attributable to `MODULE_FETCH_SIGNATURE`. The
+ * same commit's browser stage passed 37/37 files on a quiet machine — the
+ * failure is contention, not a code defect.
+ */
+const INCIDENT_MODULE_FETCH_BLOCKS = [
+  ' FAIL  |browser (chromium)| tests/smoke.phaser4.browser.test.ts [ tests/smoke.phaser4.browser.test.ts ]',
+  'Error: Failed to import test file /home/rgardler/projects/Tableau-Card-Engine/.worklog/worktrees/wl-CG-0MUI9K4F8009DYJL-add-an-alpha-banner-and-version-number-t/tests/smoke.phaser4.browser.test.ts',
+  'Caused by: TypeError: Failed to fetch dynamically imported module: http://localhost:63315/home/rgardler/projects/Tableau-Card-Engine/.worklog/worktrees/wl-CG-0MUI9K4F8009DYJL-add-an-alpha-banner-and-version-number-t/tests/smoke.phaser4.browser.test.ts?import&browserv=1790503874887',
+  ' FAIL  |browser (chromium)| tests/core-engine/PhaserEventBridge.browser.test.ts [ tests/core-engine/PhaserEventBridge.browser.test.ts ]',
+  'Error: Failed to import test file /home/rgardler/projects/Tableau-Card-Engine/.worklog/worktrees/wl-CG-0MUI9K4F8009DYJL-add-an-alpha-banner-and-version-number-t/tests/core-engine/PhaserEventBridge.browser.test.ts',
+  'Caused by: TypeError: Failed to fetch dynamically imported module: http://localhost:63315/home/rgardler/projects/Tableau-Card-Engine/.worklog/worktrees/wl-CG-0MUI9K4F8009DYJL-add-an-alpha-banner-and-version-number-t/tests/core-engine/PhaserEventBridge.browser.test.ts?import&browserv=1790503874704',
+].join('\n');
+
+/**
+ * The full attributable module-fetch run: verbatim incident blocks plus the
+ * real summary (64 failed suites / 450 tests passed — every failure is a
+ * failed dynamic import, nothing else).
+ */
+const MODULE_FETCH_OUTPUT = [
+  '\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Failed Suites 64 \u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+  '',
+  INCIDENT_MODULE_FETCH_BLOCKS,
+  '',
+  '',
+  ' Test Files  64 failed | 56 passed (120)',
+  '      Tests  450 passed (450)',
+  '',
+  '[vitest-runner] attempts=1 status=1 outcome=failed args="--project browser"',
+].join('\n');
+
+/**
+ * A genuine assertion failure reported alongside the module-fetch signature.
+ * Vitest can collect some files and fail on an assertion in one of them while
+ * other files failed to import; the assertion block cannot be attributed to
+ * the transient, so the masking guard must refuse a retry.
+ */
+const GENUINE_ASSERTION_AND_MODULE_FETCH_OUTPUT = [
+  ' FAIL  |browser (chromium)| tests/foo.browser.test.ts [ tests/foo.browser.test.ts ]',
+  `Error: Failed to import test file /repo/tests/foo.browser.test.ts`,
+  `Caused by: TypeError: ${MODULE_FETCH_SIGNATURE}: http://localhost:63315/tests/foo.browser.test.ts?import&browserv=1`,
+  '',
+  '\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Failed Tests 1 \u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+  '',
+  ' FAIL  |browser (chromium)| tests/bar.browser.test.ts > does the thing',
+  'AssertionError: expected 1 to be 2 // Object.is equality',
+  '',
+  ' Test Files  2 failed | 56 passed (58)',
+  '      Tests  1 failed | 450 passed (451)',
+].join('\n');
+
 /** A run with genuine test failures. */
 const FAIL_OUTPUT = [
   ' Test Files  1 failed | 245 passed (246)',
@@ -202,6 +272,82 @@ describe('shouldRetryOnce (masking-guarded transient detection)', () => {
 
   it('returns false on empty output', () => {
     expect(shouldRetryOnce('')).toBe(false);
+  });
+});
+
+// ── Module fetch signature (CG-0MVNDK56G007C1U7) ─────────────
+//
+// The Vite dev server can fail to serve a test module under load; Chromium
+// then cannot dynamically import it and Vitest reports the file as a failed
+// suite. It is retryable under the same every-error-block attribution rule as
+// the two original signatures, but its recovery is RETRY-ONLY: a genuine
+// module-resolution regression emits the identical text deterministically, so
+// a both-attempts module-fetch run is never `accepted-transient`.
+
+describe('module fetch signature (retry-only transient)', () => {
+  it('is a named exported constant for the Chromium module-fetch text', () => {
+    expect(MODULE_FETCH_SIGNATURE).toBe('Failed to fetch dynamically imported module');
+  });
+
+  it('is retryable but NOT acceptable on both attempts', () => {
+    expect(TRANSIENT_SIGNATURES).toContain(MODULE_FETCH_SIGNATURE);
+    expect(ACCEPTABLE_TRANSIENT_SIGNATURES).not.toContain(MODULE_FETCH_SIGNATURE);
+    // The two original signatures keep their both-attempts acceptance path.
+    expect(ACCEPTABLE_TRANSIENT_SIGNATURES).toEqual([
+      WORKER_TIMEOUT_SIGNATURE,
+      BROWSER_DROP_SIGNATURE,
+    ]);
+  });
+
+  it('attributes the verbatim incident blocks to the module-fetch signature', () => {
+    // `Caused by:` is not an error-line start, so the `Error:` + `Caused by:`
+    // pair is ONE block — the incident shape is attributable as recorded.
+    expect(failuresAreTransientOnly(MODULE_FETCH_OUTPUT)).toBe(true);
+    expect(shouldRetryOnce(MODULE_FETCH_OUTPUT)).toBe(true);
+    expect(hasTransientSignature(MODULE_FETCH_OUTPUT)).toBe(true);
+  });
+
+  it('retries a module-fetch-only failing run', () => {
+    expect(shouldRetryOnce(MODULE_FETCH_OUTPUT)).toBe(true);
+  });
+
+  it('retries an all-passed run poisoned by a module fetch error', () => {
+    expect(shouldRetryOnce(`${PASS_OUTPUT}\nError: ${MODULE_FETCH_SIGNATURE}: http://x/y`)).toBe(
+      true,
+    );
+  });
+
+  it('refuses a retry when a genuine assertion failure accompanies the module-fetch signature', () => {
+    expect(shouldRetryOnce(GENUINE_ASSERTION_AND_MODULE_FETCH_OUTPUT)).toBe(false);
+    expect(failuresAreTransientOnly(GENUINE_ASSERTION_AND_MODULE_FETCH_OUTPUT)).toBe(false);
+  });
+
+  it('refuses a retry for a failed-import block whose cause is not the module-fetch text', () => {
+    // A `Failed to import test file` block with a different cause (e.g. a
+    // syntax error) is a genuine defect, not the transient signature.
+    const syntaxError = [
+      ' FAIL  |browser (chromium)| tests/broken.browser.test.ts [ tests/broken.browser.test.ts ]',
+      'Error: Failed to import test file /repo/tests/broken.browser.test.ts',
+      'Caused by: SyntaxError: Unexpected token',
+      '',
+      ' Test Files  1 failed (1)',
+      '      Tests  no tests',
+    ].join('\n');
+    expect(shouldRetryOnce(syntaxError)).toBe(false);
+  });
+
+  it('refuses a retry when the module-fetch signature appears without a summary', () => {
+    expect(shouldRetryOnce(`Error: ${MODULE_FETCH_SIGNATURE}: http://x/y`)).toBe(false);
+  });
+
+  it('does not accept both attempts when both show the module-fetch signature', () => {
+    expect(shouldAcceptBothAttempts(MODULE_FETCH_OUTPUT)).toBe(false);
+  });
+
+  it('keeps the both-attempts acceptance path for the two original signatures', () => {
+    expect(shouldAcceptBothAttempts(TRANSIENT_OUTPUT)).toBe(true);
+    expect(shouldAcceptBothAttempts(BROWSER_DROP_OUTPUT)).toBe(true);
+    expect(shouldAcceptBothAttempts(INCIDENT_FAILED_FILE_OUTPUT)).toBe(true);
   });
 });
 
@@ -347,8 +493,50 @@ describe('runWithRetry (retry-once orchestration)', () => {
   });
 });
 
-// ── Final runner summary (attempt/outcome diagnostic) ────────
+// ── runWithRetry (module-fetch transient) ────────────────────
 
+describe('runWithRetry (module-fetch transient, CG-0MVNDK56G007C1U7)', () => {
+  const warnSpy: (msg: string) => void = () => {};
+
+  it('retries a module-fetch-only failing run and returns the retry\'s status', async () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: MODULE_FETCH_OUTPUT }
+        : { status: 0, output: PASS_OUTPUT };
+    };
+    expect(await runWithRetry(['--project', 'browser'], runner, warnSpy)).toBe(0);
+    expect(calls).toBe(2);
+  });
+
+  it('does NOT accept when both attempts show the module-fetch signature (retry-failed, retry status stands)', async () => {
+    const messages: string[] = [];
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return { status: 1, output: MODULE_FETCH_OUTPUT };
+    };
+    expect(await runWithRetry(['--project', 'browser'], runner, (m) => messages.push(m))).toBe(1);
+    expect(calls).toBe(2);
+    const joined = messages.join('\n');
+    expect(joined).toContain('outcome=retry-failed');
+    expect(joined).not.toContain('outcome=accepted-transient');
+    expect(joined).not.toContain('[transient-accepted]');
+  });
+
+  it('does not retry a module-fetch signature alongside a genuine assertion failure', async () => {
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return { status: 1, output: GENUINE_ASSERTION_AND_MODULE_FETCH_OUTPUT };
+    };
+    expect(await runWithRetry([], runner, warnSpy)).toBe(1);
+    expect(calls).toBe(1);
+  });
+});
+
+// ── Final runner summary (attempt/outcome diagnostic) ────────
 describe('runSummary (final diagnostic line)', () => {
   it('formats the attempt count, status, outcome and forwarded args', () => {
     expect(runSummary(['--project', 'unit'], 2, 0, 'accepted-transient')).toBe(
@@ -866,6 +1054,61 @@ describe('ExecutedSetCapture (attempt file-set capture)', () => {
     ]);
     fs.rmSync(dir, { recursive: true, force: true });
   });
+
+  // ── Coverage-gate evidence for the module-fetch incident ────
+  //
+  // AC: a file that failed to dynamically import must still appear in the
+  // captured executed set, so the coverage gate cannot turn a retried-green
+  // run into a `[coverage-failed]` exit. Vitest's JSON reporter
+  // (`onTestRunEnd` in node_modules/vitest) iterates EVERY collected test
+  // module task and emits `{ name: file.filepath, status: 'failed',
+  // assertionResults: [] }` for a suite whose import failed — the file is
+  // known to the run, so it is captured. (The default-reporter fallback does
+  // NOT see such files: they are printed as `FAIL … [ file ]`, not
+  // `✓ |project| file (N tests)`, which is why the JSON artifact is the
+  // primary mechanism.)
+
+  it('captures a failed-to-import suite from the JSON artifact (coverage gate is unaffected)', () => {
+    const dir = tmpDir();
+    const capture = new ExecutedSetCapture({ workDir: dir, cwd: CWD });
+    // The shape Vitest emits for a module that failed to dynamically import:
+    // the suite is present, failed, with no assertion results.
+    fs.writeFileSync(
+      capture.artefactPath,
+      JSON.stringify({
+        testResults: [
+          {
+            name: path.join(CWD, 'tests', 'smoke.phaser4.browser.test.ts'),
+            status: 'failed',
+            assertionResults: [],
+            message: `Failed to fetch dynamically imported module: http://localhost:63315/@fs${path.join(
+              CWD,
+              'tests',
+              'smoke.phaser4.browser.test.ts',
+            )}?import&browserv=1`,
+          },
+          {
+            name: path.join(CWD, 'tests', 'passed.browser.test.ts'),
+            status: 'passed',
+            assertionResults: [{ status: 'passed', title: 'ok' }],
+          },
+        ],
+      }),
+    );
+    expect(capture.executedFiles({ status: 1, output: MODULE_FETCH_OUTPUT })).toEqual([
+      'tests/passed.browser.test.ts',
+      'tests/smoke.phaser4.browser.test.ts',
+    ]);
+    capture.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('the default-reporter fallback cannot see a failed-to-import suite (why the artifact is primary)', () => {
+    // Documents the limitation the JSON artifact exists to close: the incident
+    // reports failed imports as `FAIL … [ file ]` headers, which the per-file
+    // line parser does not match.
+    expect(parseExecutedFromOutput(MODULE_FETCH_OUTPUT, CWD)).toBeNull();
+  });
 });
 
 describe('runWithRetry (opt-in coverage gate)', () => {
@@ -979,8 +1222,7 @@ describe('runWithRetry (opt-in coverage gate)', () => {
     expect(joined).toContain('expected=2 ran=2');
   });
 
-  it('records expected=N ran=M in the summary of a clean covered run', async () => {
-    const warnings: string[] = [];
+  it('records expected=N ran=M in the summary of a clean covered run', async () => {    const warnings: string[] = [];
     const status = await runWithRetry([], () => ({ status: 0, output: PASS_OUTPUT }), (m) => warnings.push(m), DEFAULT_RUN_TIMEOUT_MS, {
       expectedFiles: expected,
       readExecutedFiles: readerFor(expected),
@@ -1041,5 +1283,71 @@ describe('runWithRetry (opt-in coverage gate)', () => {
     const joined = warnings.join('\n');
     expect(joined).toContain('outcome=hang');
     expect(joined).not.toContain('coverage-failed');
+  });
+});
+
+// ── Coverage gate × module-fetch transient (CG-0MVNDK56G007C1U7) ──
+//
+// A module-fetch failure is retry-only recovery, so the coverage gate must
+// not turn a retried-green run into a `[coverage-failed]` exit: the failed
+// import is retried, and a clean retry whose executed set matches the
+// expectation is green.
+
+describe('runWithRetry (coverage gate × module-fetch)', () => {
+  const expected = ['tests/a.test.ts', 'tests/b.test.ts'];
+  const readerFor =
+    (ran: string[] | null) =>
+    (): string[] | null =>
+      ran;
+
+  it('retries a module-fetch run whose executed set matches, then returns the clean retry', async () => {
+    const warnings: string[] = [];
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: MODULE_FETCH_OUTPUT }
+        : { status: 0, output: PASS_OUTPUT };
+    };
+    const status = await runWithRetry([], runner, (m) => warnings.push(m), DEFAULT_RUN_TIMEOUT_MS, {
+      expectedFiles: expected,
+      readExecutedFiles: readerFor(expected),
+    });
+    expect(status).toBe(0);
+    expect(calls).toBe(2);
+    const joined = warnings.join('\n');
+    expect(joined).toContain('outcome=retry-clean');
+    expect(joined).not.toContain('coverage-failed');
+  });
+
+  it('still retries when the module-fetch attempt dropped a file from the executed set (transient excuse)', async () => {
+    const warnings: string[] = [];
+    let calls = 0;
+    const runner: VitestRunner = () => {
+      calls += 1;
+      return calls === 1
+        ? { status: 1, output: MODULE_FETCH_OUTPUT }
+        : { status: 0, output: PASS_OUTPUT };
+    };
+    const status = await runWithRetry(
+      [],
+      runner,
+      (m) => warnings.push(m),
+      DEFAULT_RUN_TIMEOUT_MS,
+      {
+        expectedFiles: expected,
+        // First attempt could not report the full set (the import failed), the
+        // retry executed exactly the expected set.
+        readExecutedFiles: (() => {
+          let attempt = 0;
+          return () => (attempt++ === 0 ? ['tests/a.test.ts'] : expected);
+        })(),
+      },
+    );
+    expect(status).toBe(0);
+    expect(calls).toBe(2);
+    const joined = warnings.join('\n');
+    expect(joined).toContain('outcome=retry-clean');
+    expect(joined).not.toContain('outcome=coverage-failed');
   });
 });

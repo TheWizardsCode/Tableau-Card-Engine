@@ -923,7 +923,13 @@ run. Browser-mode runs have a sibling failure mode (see CG-0MSCI73RH004VPCE): wh
 the browser RPC WebSocket is dropped under load, vitest browser mode closes the
 connection and exits non-zero with
 `[vitest] Browser connection was closed while running tests.` even though every
-file completed. Because `scripts/run-ci-tests.sh` runs with `set -euo pipefail`,
+file completed. A third sibling failure mode (see CG-0MVNDK56G007C1U7) is the
+Vite dev server failing to serve a test module under load, so the browser
+cannot dynamically import it — Vitest reports the file as a failed suite with
+`Error: Failed to import test file <path>` and
+`Caused by: TypeError: Failed to fetch dynamically imported module: …` (the
+Chromium text; the browser project only runs headless Chromium).
+Because `scripts/run-ci-tests.sh` runs with `set -euo pipefail`,
 those non-zero exits previously aborted the CI gate after the unit/browser step.
 
 Two mitigations are in place in this repository:
@@ -933,12 +939,15 @@ Two mitigations are in place in this repository:
 2. **Retry-once on the transient signatures (attribution-aware)** —
    the unit **and** browser steps in `scripts/run-ci-tests.sh` run through
    `scripts/vitest-run-with-retry.ts`, whose `shouldRetryOnce` guard recovers
-   two shapes of the same contention transient:
+   two shapes of the same contention transient (`TRANSIENT_SIGNATURES`:
+   `WORKER_TIMEOUT_SIGNATURE`, `BROWSER_DROP_SIGNATURE` and
+   `MODULE_FETCH_SIGNATURE`):
 
    - **All-passed transient** — the reporter summary shows every file passed
      and the sole error is a transient signature
-     (`[vitest-worker]: Timeout calling "onTaskUpdate"` or
-     `[vitest] Browser connection was closed while running tests`).
+     (`[vitest-worker]: Timeout calling "onTaskUpdate"`,
+     `[vitest] Browser connection was closed while running tests`, or
+     `Failed to fetch dynamically imported module`).
    - **Attributable failed-file transient** (CG-0MUIMM28K001W88F) — the
      summary reports failed files/tests, but every error block in the run
      output is the transient signature itself (`failuresAreTransientOnly`).
@@ -948,14 +957,22 @@ Two mitigations are in place in this repository:
      a re-run at the same commit was green.
 
    The guard is unit-tested in `tests/scripts/vitest-run-with-retry.test.ts`,
-   including a **regression fixture** of the recorded
-   CG-0MUIMM28K001W88F failing run and its genuine-assertion counter-case. A
-   genuine assertion failure (a `Failed Tests` block carrying an
-   `AssertionError`, not the timeout) can never be retried or hidden. If the
-   retry is **also** a pure transient failure (both attempts poisoned by
-   sustained contention), the run is accepted as green (exit 0): the guard
-   attributed every reported failure to the transient signature, so there is
-   no genuine failure to mask (CG-0MUF0LU4X006IXXU).
+   including **regression fixtures** of the recorded
+   CG-0MUIMM28K001W88F failing run and the recorded
+   CG-0MVNDK56G007C1U7 module-fetch incident, plus their genuine-assertion
+   counter-cases. A genuine assertion failure (a `Failed Tests` block carrying
+   an `AssertionError`, not the timeout) can never be retried or hidden. If the
+   retry is **also** a pure transient failure of one of the two original
+   signatures (both attempts poisoned by sustained contention), the run is
+   accepted as green (exit 0): the guard attributed every reported failure to
+   the transient signature, so there is no genuine failure to mask
+   (CG-0MUF0LU4X006IXXU). That both-attempts acceptance is deliberately **not**
+   extended to `MODULE_FETCH_SIGNATURE` (`shouldAcceptBothAttempts`): a genuine
+   module-resolution regression (mistyped import path, deleted file, 404 on an
+   asset module) emits the identical text deterministically, so a both-attempts
+   module-fetch run keeps the retry's own failing status and reports
+   `outcome=retry-failed` — module fetch is retry-only recovery
+   (CG-0MVNDK56G007C1U7).
 
    The runner emits a final
    `[vitest-runner] attempts=N status=S outcome=... args="..."` line after every
@@ -985,7 +1002,12 @@ Two mitigations are in place in this repository:
      `--reporter=default --reporter=json --outputFile.json=<tmp>` so the set
      is exact and independent of the caller's reporters; the artifact is
      parsed and removed after the attempt, with a fallback to default-reporter
-     per-file lines if the artifact is missing.
+     per-file lines if the artifact is missing. The JSON artifact is what keeps
+     the gate honest for a file that failed to dynamically import: Vitest
+     emits a `testResults` entry for every collected suite, including a failed
+     import (the `FAIL … [ file ]` header the fallback cannot match), so a
+     module-fetch retry is judged against the full expected set
+     (CG-0MVNDK56G007C1U7).
    - **Mismatch is a genuine failure** — any missing OR extra file fails the
      stage (exit 1, `outcome=coverage-failed`) with a stderr diagnostic naming
      every missing/extra file and stating `expected=N ran=M`. It is evaluated

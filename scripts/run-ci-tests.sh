@@ -26,14 +26,19 @@
 # retries once on Vitest's transient contention-induced failures
 # ([vitest-worker]: Timeout calling "onTaskUpdate" for the worker RPC layer,
 # [vitest] Browser connection was closed while running tests for the browser-mode
-# WebSocket drop) — a non-zero exit that can happen even when every test passed.
-# The retry is masked against genuine failures (see that script's
-# shouldRetryOnce): it qualifies when every file passed, or when the summary
-# reports failures but every error is attributable to the transient signature
-# (the failed-file variant, CG-0MUIMM28K001W88F). If the retry is ALSO a pure
-# transient failure the run is accepted as green — no genuine failure was
-# masked (CG-0MUF0LU4X006IXXU). See CG-0MS9M5UJP005PWD3 and
-# CG-0MSCI73RH004VPCE.
+# WebSocket drop, and "Failed to fetch dynamically imported module" for the Vite
+# dev server failing to serve a test module under load) — a non-zero exit that
+# can happen even when every test passed. The retry is masked against genuine
+# failures (see that script's shouldRetryOnce): it qualifies when every file
+# passed, or when the summary reports failures but every error is attributable
+# to the transient signature (the failed-file variant, CG-0MUIMM28K001W88F). If
+# the retry is ALSO a pure transient failure of one of the two original
+# signatures the run is accepted as green — no genuine failure was masked
+# (CG-0MUF0LU4X006IXXU). A module-fetch failure is deliberately RETRY-ONLY: a
+# genuine module-resolution regression is deterministic, so a both-attempts
+# module-fetch run keeps the retry's own failing status
+# (CG-0MVNDK56G007C1U7). See CG-0MS9M5UJP005PWD3, CG-0MSCI73RH004VPCE and
+# CG-0MVNDK56G007C1U7.
 #
 # The runner retries once when a run is attributable to the transient
 # contention signatures and emits a final

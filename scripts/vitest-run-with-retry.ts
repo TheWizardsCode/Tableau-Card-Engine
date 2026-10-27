@@ -6,8 +6,8 @@
  * into a diagnosable failure instead of an infinite stall.
  *
  * Problem (see CG-0MS9M5UJP005PWD3, CG-0MSCI73RH004VPCE,
- * CG-0MT08R2QR0070F3N): Vitest has three distinct contention-induced
- * failure signatures:
+ * CG-0MT08R2QR0070F3N, CG-0MVNDK56G007C1U7): Vitest has four distinct
+ * contention-induced failure signatures:
  *
  *   1. Worker RPC timeout — Vitest's worker RPC layer uses birpc with a
  *      hard-coded 60s timeout (DEFAULT_TIMEOUT = 6e4 in
@@ -26,6 +26,24 @@
  *      the worst case, the whole run never exits. Unlike signatures 1 and 2,
  *      a hang never produces an exit code on its own — the runner needs a
  *      bounded wall-clock timeout to detect and abort it.
+ *   4. Module fetch failure — the Vite dev server fails to serve a test
+ *      module under load, so the browser cannot dynamically import it
+ *      (`TypeError: Failed to fetch dynamically imported module: …`).
+ *      Vitest reports it as a failed suite:
+ *
+ *        FAIL  |browser (chromium)| tests/foo.browser.test.ts [ tests/foo.browser.test.ts ]
+ *        Error: Failed to import test file /abs/path/tests/foo.browser.test.ts
+ *        Caused by: TypeError: Failed to fetch dynamically imported module: http://localhost:PORT/abs/path/tests/foo.browser.test.ts?import&browserv=…
+ *
+ *      The `Caused by:` line stays inside the SAME error block as the
+ *      `Error:` line it belongs to, so `errorBlocks` attributes the block to
+ *      `MODULE_FETCH_SIGNATURE` (the incident behind CG-0MVNDK56G007C1U7 is
+ *      pinned verbatim in the runner's regression suite). The text is
+ *      Chromium-specific: Firefox emits a different message, and the browser
+ *      project only runs headless Chromium
+ *      (`scripts/check-browser-test-env.ts`), so the constant deliberately
+ *      pins the Chromium substring rather than guessing a cross-browser
+ *      pattern.
  *
  * The mitigation is at the runner level:
  *
@@ -38,7 +56,12 @@
  *     as green: there is no test failure to mask, and the non-zero exit is
  *     purely a post-completion teardown RPC artefact. This keeps the gate
  *     resilient when CPU contention persists across both attempts
- *     (CG-0MUF0LU4X006IXXU).
+ *     (CG-0MUF0LU4X006IXXU). This both-attempts acceptance is restricted to
+ *     signatures 1 and 2: a module fetch failure (signature 4) is
+ *     RETRY-ONLY recovery, because a genuine module-resolution regression
+ *     (mistyped import path, deleted file, 404 on an asset module) produces
+ *     the identical text deterministically and must surface
+ *     (CG-0MVNDK56G007C1U7).
  *   - Never retry or accept on genuine test failures — the masking guard
  *     (shouldRetryOnce) attributes every reported failure to the transient
  *     signature before a retry is allowed.
@@ -114,6 +137,44 @@ export const WORKER_TIMEOUT_SIGNATURE =
  */
 export const BROWSER_DROP_SIGNATURE =
   '[vitest] Browser connection was closed while running tests';
+
+/**
+ * The Chromium text emitted when the Vite dev server fails to serve a test
+ * module under load, so the browser cannot dynamically import it. Vitest
+ * wraps it in `Error: Failed to import test file <path>` +
+ * `Caused by: TypeError: Failed to fetch dynamically imported module: …`
+ * (CG-0MVNDK56G007C1U7).
+ *
+ * Chromium-specific by design: Firefox emits a different message, and the
+ * browser project only runs headless Chromium
+ * (`scripts/check-browser-test-env.ts`), so the exact Chromium substring is
+ * the contract this runner's fixtures pin.
+ */
+export const MODULE_FETCH_SIGNATURE =
+  'Failed to fetch dynamically imported module';
+
+/**
+ * Signatures that make a run retryable. A run is retried exactly once when
+ * every reported error block is attributable to one of these.
+ */
+export const TRANSIENT_SIGNATURES: readonly string[] = [
+  WORKER_TIMEOUT_SIGNATURE,
+  BROWSER_DROP_SIGNATURE,
+  MODULE_FETCH_SIGNATURE,
+];
+
+/**
+ * Signatures whose persistence across BOTH attempts may be accepted as green
+ * (CG-0MUF0LU4X006IXXU). Deliberately excludes `MODULE_FETCH_SIGNATURE`: a
+ * module fetch failure is retry-only recovery, so a run poisoned by it on
+ * both attempts keeps the retry's own (failing) status — a deterministic
+ * module-resolution regression must never be accepted
+ * (CG-0MVNDK56G007C1U7).
+ */
+export const ACCEPTABLE_TRANSIENT_SIGNATURES: readonly string[] = [
+  WORKER_TIMEOUT_SIGNATURE,
+  BROWSER_DROP_SIGNATURE,
+];
 
 /**
  * Wall-clock bound for a single vitest run (milliseconds). When a run
@@ -718,26 +779,55 @@ export function coverageSuffix(label: RunCoverageLabel): string {
  *      variant of the same contention transient that previously defeated the
  *      all-passed-only guard and failed the gate spuriously.
  *
- * Anything else — a genuine assertion/original error, a missing summary, or a
- * failure whose errors cannot be attributed to the signature — returns false,
- * so a retry can never mask a real failure.
+ * Any of `TRANSIENT_SIGNATURES` qualifies here, including
+ * `MODULE_FETCH_SIGNATURE` (CG-0MVNDK56G007C1U7). Anything else — a genuine
+ * assertion/original error, a missing summary, or a failure whose errors
+ * cannot be attributed to the signature — returns false, so a retry can never
+ * mask a real failure.
  */
 export function shouldRetryOnce(output: string): boolean {
-  if (!hasTransientSignature(output)) return false;
+  return hasTransientRecoveryShape(output, TRANSIENT_SIGNATURES);
+}
+
+/**
+ * True when a run that already failed once may be ACCEPTED as green after the
+ * retry. Same two attribution shapes as `shouldRetryOnce`, but restricted to
+ * `ACCEPTABLE_TRANSIENT_SIGNATURES` (signatures 1 and 2): a module fetch
+ * failure is retry-only recovery, so a both-attempts module-fetch run keeps
+ * the retry's own failing status (CG-0MVNDK56G007C1U7). The behaviour for the
+ * two original signatures is unchanged (CG-0MUF0LU4X006IXXU).
+ */
+export function shouldAcceptBothAttempts(output: string): boolean {
+  return hasTransientRecoveryShape(output, ACCEPTABLE_TRANSIENT_SIGNATURES);
+}
+
+/** True when the output contains any of `TRANSIENT_SIGNATURES`. */
+export function hasTransientSignature(output: string): boolean {
+  return containsAny(output, TRANSIENT_SIGNATURES);
+}
+
+/** True when `output` contains at least one of `signatures`. */
+function containsAny(output: string, signatures: readonly string[]): boolean {
+  return signatures.some((signature) => output.includes(signature));
+}
+
+/**
+ * The shared attribution shape behind `shouldRetryOnce` /
+ * `shouldAcceptBothAttempts`: the output must carry one of `signatures`, and
+ * either every file passed with that as the sole error, or the failed summary
+ * is attributable solely to `signatures`.
+ */
+function hasTransientRecoveryShape(
+  output: string,
+  signatures: readonly string[],
+): boolean {
+  if (!containsAny(output, signatures)) return false;
   const hasFailedFiles = /Test Files\s+\d+\s+failed/.test(output);
   const hasFailedTests = /Tests\s+\d+\s+failed/.test(output);
   if (hasFailedFiles || hasFailedTests) {
-    return failuresAreTransientOnly(output);
+    return failuresAreTransientOnly(output, signatures);
   }
   return /Test Files\s+\d+\s+passed \(\d+\)/.test(output);
-}
-
-/** True when the output contains either transient contention signature. */
-export function hasTransientSignature(output: string): boolean {
-  return (
-    output.includes(WORKER_TIMEOUT_SIGNATURE) ||
-    output.includes(BROWSER_DROP_SIGNATURE)
-  );
 }
 
 /**
@@ -758,25 +848,31 @@ export function errorBlocks(output: string): string[] {
 }
 
 /**
- * True when the run's failure evidence consists *only* of the transient
+ * True when the run's failure evidence consists *only* of a transient
  * signature: at least one error block is present, and every error block
- * contains a transient signature. This is the attribution step that lets the
- * masking guard recover a `1 failed` worker-timeout run (the poisoned file's
- * only error is the timeout itself) while still refusing a genuine assertion
+ * contains one of `signatures` (default: every retryable signature in
+ * `TRANSIENT_SIGNATURES`). This is the attribution step that lets the masking
+ * guard recover a `1 failed` worker-timeout run (the poisoned file's only
+ * error is the timeout itself) while still refusing a genuine assertion
  * failure that merely coincides with the signature
  * (CG-0MUIMM28K001W88F approach (a)).
+ *
+ * A block is the text from an error line up to the next error line, so
+ * Vitest's `Error: <message>` + `Caused by: <cause>` pair (`Caused by:` is not
+ * an error-line start) counts as ONE block — the module-fetch cause therefore
+ * attributes the `Failed to import test file` block to
+ * `MODULE_FETCH_SIGNATURE` (CG-0MVNDK56G007C1U7).
  *
  * Requiring at least one transient block keeps a bare failed summary with the
  * signature string elsewhere (no attributable error) from being accepted.
  */
-export function failuresAreTransientOnly(output: string): boolean {
+export function failuresAreTransientOnly(
+  output: string,
+  signatures: readonly string[] = TRANSIENT_SIGNATURES,
+): boolean {
   const blocks = errorBlocks(output);
   if (blocks.length === 0) return false;
-  return blocks.every(
-    (block) =>
-      block.includes(WORKER_TIMEOUT_SIGNATURE) ||
-      block.includes(BROWSER_DROP_SIGNATURE),
-  );
+  return blocks.every((block) => containsAny(block, signatures));
 }
 
 /**
@@ -794,9 +890,14 @@ export function failuresAreTransientOnly(output: string): boolean {
  * itself (CG-0MUF0LU4X006IXXU, CG-0MUIMM28K001W88F):
  *
  *   1. Retry once after an attributable transient failure.
- *   2. If the retry is ALSO an attributable transient failure, accept the run
- *      as green (exit 0). No test failure was masked — the guard attributed
- *      every reported failure to the transient signature.
+ *   2. If the retry is ALSO an attributable transient failure of an
+ *      *acceptable* signature (worker RPC timeout or browser WebSocket drop),
+ *      accept the run as green (exit 0). No test failure was masked — the
+ *      guard attributed every reported failure to the transient signature.
+ *      `MODULE_FETCH_SIGNATURE` is deliberately excluded from this
+ *      acceptance (`shouldAcceptBothAttempts`): a module fetch failure is
+ *      retry-only recovery, so its retry's own status stands
+ *      (CG-0MVNDK56G007C1U7).
  *
  * Opt-in coverage gate (AC 2/4 of CG-0MVL21CVM003VK5H): when `options.
  * expectedFiles` is supplied, every attempt's executed file set is captured
@@ -893,8 +994,8 @@ export async function runWithRetry(
   // Recoverable: attributable transient failure, or a coverage violation
   // with a transient excuse. Retry exactly once.
   warn(
-    '\n[retry] Vitest transient failure (worker RPC timeout or browser connection drop) ' +
-      'detected with no attributable test failure. Retrying once...\n',
+    '\n[retry] Vitest transient failure (worker RPC timeout, browser connection drop, ' +
+      'or module fetch failure) detected with no attributable test failure. Retrying once...\n',
   );
 
   const second = await attemptOnce();
@@ -925,12 +1026,15 @@ export async function runWithRetry(
     warn(summary(2, 0, 'retry-clean', secondCoverage ? coverageLabelFromReport(secondCoverage) : { kind: 'unset' }));
     return second.result.status;
   }
-  if (shouldRetryOnce(second.result.output)) {
+  if (shouldAcceptBothAttempts(second.result.output)) {
     // Both attempts completed with every test file passing (and, when an
     // expectation is active, the executed set matched it); the only error is
     // the post-completion teardown RPC timeout (or browser WebSocket drop).
     // There is no test failure to mask, so accept the run as green rather
-    // than failing the gate on a runner artefact.
+    // than failing the gate on a runner artefact. Deliberately NOT extended
+    // to MODULE_FETCH_SIGNATURE: a genuine module-resolution regression is
+    // deterministic, so its retry's own status must stand
+    // (CG-0MVNDK56G007C1U7).
     warn(
       '\n[transient-accepted] Vitest transient teardown failure on BOTH attempts, ' +
         'but no attributable test failure in either — treating the run as green. ' +
