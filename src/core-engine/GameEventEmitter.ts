@@ -7,6 +7,34 @@
  *
  * Games emit these events at key lifecycle points. Tools (replay,
  * testing, telemetry) subscribe to them for synchronization.
+ *
+ * # Game-specific events
+ *
+ * The engine's vocabulary is deliberately small and game-agnostic. A game
+ * (or any consumer) can declare its own typed event names without editing
+ * this module by augmenting the exported {@link GameEventMap} interface:
+ *
+ * ```ts
+ * // In the game's own source, next to its event declarations.
+ * declare module '@core-engine/GameEventEmitter' {
+ *   interface GameEventMap {
+ *     'face-off-resolved': { slot: number; winner: 'player' | 'adversary' };
+ *   }
+ * }
+ *
+ * gameEvents.emit('face-off-resolved', { slot: 2, winner: 'player' });
+ * gameEvents.on('face-off-resolved', (payload) => { … });
+ * ```
+ *
+ * Interface augmentation is used instead of a generic
+ * `GameEventEmitter<M extends GameEventMap>` parameter because it is
+ * additive and non-breaking: existing consumers keep the default map with
+ * no type parameter, declarations merge from any module in the program,
+ * and no game vocabulary ever enters the engine. The augmentation is a
+ * type-level contract only — the emitter stays name-agnostic at runtime,
+ * which is what lets {@link GameEventEmitter.onAny} forward every event
+ * (engine or game-specific) to the Phaser bridge and the debug event
+ * buffer without per-game name lists.
  */
 
 import type { GamePhase } from './GameState';
@@ -304,6 +332,18 @@ export type GameEventListener<K extends GameEventName> = (
   payload: GameEventMap[K],
 ) => void;
 
+/**
+ * A callback for every emission, regardless of event name.
+ *
+ * Used by the Phaser bridge and the debug event buffer, which forward
+ * or record engine and game-specific events alike without maintaining
+ * per-game name lists.
+ */
+export type GameEventAnyListener = (
+  eventName: GameEventName,
+  payload: GameEventMap[GameEventName],
+) => void;
+
 // ── Emitter ─────────────────────────────────────────────────
 
 /**
@@ -322,6 +362,9 @@ export class GameEventEmitter {
   private listeners: {
     [K in GameEventName]?: Array<GameEventListener<K>>;
   } = {};
+
+  /** Catch-all listeners, fired for every emission. */
+  private anyListeners: GameEventAnyListener[] = [];
 
   /**
    * Subscribe to an event. Returns an unsubscribe function.
@@ -378,30 +421,69 @@ export class GameEventEmitter {
   }
 
   /**
+   * Subscribe to every emission, whatever its name — engine or
+   * game-specific (see the module doc for the augmentation mechanism).
+   * Returns an unsubscribe function.
+   *
+   * Catch-all listeners run after the per-name listeners, in
+   * registration order, with the same snapshot semantics as {@link on}:
+   * a listener may unsubscribe during an emission without skipping its
+   * peers.
+   */
+  onAny(listener: GameEventAnyListener): () => void {
+    this.anyListeners.push(listener);
+    return () => this.offAny(listener);
+  }
+
+  /**
+   * Remove a catch-all listener registered with {@link onAny}.
+   */
+  offAny(listener: GameEventAnyListener): void {
+    const index = this.anyListeners.indexOf(listener);
+    if (index !== -1) {
+      this.anyListeners.splice(index, 1);
+    }
+  }
+
+  /**
    * Emit an event with the given payload.
    * Listeners are called synchronously in registration order.
+   * Emitting with no listeners attached is a no-op.
    */
   emit<K extends GameEventName>(event: K, payload: GameEventMap[K]): void {
     const list = this.listeners[event] as
       | Array<GameEventListener<K>>
       | undefined;
-    if (!list || list.length === 0) return;
 
-    // Copy the array so listeners can safely unsubscribe during emission
-    const snapshot = [...list];
+    if ((!list || list.length === 0) && this.anyListeners.length === 0) {
+      return;
+    }
+
+    // Copy the arrays so listeners can safely unsubscribe during emission
+    const snapshot = list ? [...list] : [];
     for (const fn of snapshot) {
       fn(payload);
+    }
+
+    const anySnapshot = [...this.anyListeners];
+    for (const fn of anySnapshot) {
+      fn(event, payload as GameEventMap[GameEventName]);
     }
   }
 
   /**
    * Remove all listeners, optionally for a specific event only.
+   *
+   * Without an argument every listener (per-name and catch-all) is
+   * removed; with an event name only that event's per-name listeners
+   * are removed and catch-all subscribers stay attached.
    */
   removeAllListeners(event?: GameEventName): void {
     if (event) {
       delete this.listeners[event];
     } else {
       this.listeners = {};
+      this.anyListeners = [];
     }
   }
 
@@ -411,5 +493,12 @@ export class GameEventEmitter {
   listenerCount(event: GameEventName): number {
     const list = this.listeners[event];
     return list ? list.length : 0;
+  }
+
+  /**
+   * Return the number of catch-all listeners (see {@link onAny}).
+   */
+  anyListenerCount(): number {
+    return this.anyListeners.length;
   }
 }

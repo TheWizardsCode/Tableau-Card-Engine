@@ -3259,6 +3259,73 @@ this.events.on('state-settled', (payload) => { /* ... */ });
 bridge.destroy();
 ```
 
+### Game-specific events
+
+The engine ships a small, game-agnostic event vocabulary. A game declares its
+own typed event names **without editing the engine** by augmenting the exported
+`GameEventMap` interface (TypeScript module augmentation):
+
+```typescript
+// In the game's own source, next to its event declarations.
+import '@core-engine/GameEventEmitter';
+
+declare module '@core-engine/GameEventEmitter' {
+  interface GameEventMap {
+    'face-off-resolved': {
+      slot: number;
+      playerTotal: number;
+      adversaryTotal: number;
+      winner: 'player' | 'adversary';
+    };
+  }
+}
+```
+
+No other engine change is needed: `on`, `once`, `off` and `emit` all work over
+the merged map, with the same type safety as the engine's own events.
+
+```typescript
+import { GameEventEmitter } from '@core-engine';
+
+const gameEvents = new GameEventEmitter();
+
+// Typed per-name subscription (the augmented name is fully typed).
+gameEvents.on('face-off-resolved', ({ slot, winner }) => {
+  console.log(`Slot ${slot} won by ${winner}`);
+});
+
+// Catch-all subscription: every emission, engine or game-specific, with
+// its name and payload. Returns an unsubscribe function.
+const offAny = gameEvents.onAny((eventName, payload) => {
+  console.log(eventName, payload);
+});
+
+gameEvents.emit('face-off-resolved', {
+  slot: 2,
+  playerTotal: 11,
+  adversaryTotal: 8,
+  winner: 'player',
+});
+
+offAny();
+```
+
+The catch-all is what makes game-specific events automatic everywhere else:
+
+- **`PhaserEventBridge`** subscribes with `onAny`, so a game-specific event
+  reaches `scene.events` under its own name with no per-game list. (The
+  Phaser → engine direction still bridges the engine's known names, because an
+  un-typed Phaser emitter cannot be enumerated.)
+- **`GlobalEventBuffer`** (the dev "Game Events" overlay's source) subscribes
+  with `onAny`, so game-specific events are buffered from session start and
+  appear in the overlay automatically.
+
+**Engine-agnostic rule:** the engine provides the *mechanism* (augmentable map
++ catch-all), never the vocabulary. Game event names and payloads live in the
+game repository; the `gym` example game and every other consumer keep working
+unchanged. Emitting with no listeners attached is a no-op, so the mechanism is
+free when unused.
+
 ## Managing Assets
 
 - All assets go in `public/assets/` and are served by Vite at the `/assets/` URL path
