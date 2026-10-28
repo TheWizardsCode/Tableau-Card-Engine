@@ -7,10 +7,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// The toast renders through `@ui/Renderer` (createHudText), whose module
-// imports Phaser. The unit project runs in Node, so stub the Phaser module —
-// the same pattern as tests/ui/renderer.test.ts.
-vi.mock('phaser', () => ({ default: {} }));
+// No `vi.mock('phaser')` stub here on purpose (CG-0MVQQ2M8E003FQMZ):
+// `shakeIllegalMove` (and the toast view it imports statically) is free of
+// Phaser **value** imports, so it loads in plain Node. If a Phaser value import
+// is ever reintroduced into this graph the import below throws
+// `ReferenceError: window is not defined` and every test in this file fails
+// loudly instead of being masked. `tests/ui/phaser-free-imports.test.ts`
+// asserts the same invariant explicitly.
 import { shakeIllegalMove } from '../../src/ui/shakeIllegalMove';
 
 // ── Mock helpers ────────────────────────────────────────────

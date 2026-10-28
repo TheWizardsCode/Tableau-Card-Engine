@@ -12,10 +12,10 @@
  * - At most **one** live toast per scene (AC "performance"): a second
  *   `showIllegalMoveToast` inside the dwell window replaces the text and
  *   restarts the timer instead of stacking (AC4).
- * - The toast is never interactive and renders with a plain text object
- *   (via `createHudText`), so it never swallows pointer input intended for
- *   cards, slots or buttons (AC2). Text objects are not interactive by
- *   default; no `input` code is touched.
+ * - The toast is never interactive and renders with a plain text object, so
+ *   it never swallows pointer input intended for cards, slots or buttons
+ *   (AC2). Text objects are not interactive by default; no `input` code is
+ *   touched.
  * - No slide/fade/scale animation in **any** mode — not even reduced motion.
  *   The toast appears instantly, holds for its full dwell, and disappears
  *   instantly, so the explanation channel never depends on animation
@@ -28,13 +28,28 @@
  * The text/timing model is framework-free and lives in
  * {@link module:ui/illegalMoveToast}.
  *
+ * ## Node-safe import graph (CG-0MVQQ2M8E003FQMZ)
+ *
+ * This module is imported **statically** by
+ * {@link module:ui/shakeIllegalMove} (and via it by
+ * {@link module:ui/dragDrop}), which downstream game unit suites import in a
+ * plain Node environment. It therefore must never evaluate Phaser at import
+ * time: `phaser` is referenced **only** through `import type` (elided at
+ * compile time) and the module must not import a Phaser-bearing module such
+ * as `./Renderer` (`createHudText`) — importing that is what broke every
+ * downstream node unit suite with `ReferenceError: window is not defined`.
+ * The toast text object is therefore built directly with `scene.add.text`
+ * using the same style `createHudText` produced. `tests/ui/phaser-free-
+ * imports.test.ts` guards this graph; the broader documented Phaser-free
+ * surface is tracked in CG-0MVS9HBN3009HIQN.
+ *
  * @module ui/illegalMoveToastView
  */
 
-import Phaser from 'phaser';
-import { createHudText } from './Renderer';
+import type Phaser from 'phaser';
 import { IllegalMoveToastModel } from './illegalMoveToast';
 import {
+  FONT_FAMILY,
   GAME_W,
   ILLEGAL_MOVE_TOAST_COLOR,
   ILLEGAL_MOVE_TOAST_DEPTH,
@@ -182,19 +197,20 @@ export function showIllegalMoveToast(
       return makeHandle(scene, existing);
     }
 
-    const gameObject = createHudText(
-      scene,
-      GAME_W / 2,
-      ILLEGAL_MOVE_TOAST_Y,
-      text,
-      ILLEGAL_MOVE_TOAST_COLOR,
-      {
-        fontSize: ILLEGAL_MOVE_TOAST_FONT_SIZE,
-        originX: 0.5,
-        originY: 0.5,
-        align: 'center',
-      },
-    );
+    // Built inline (rather than via `@ui/Renderer`'s `createHudText`) so this
+    // module stays free of Phaser value imports — see the module doc. The
+    // style reproduces `createHudText` exactly: FONT_FAMILY + bold + colour +
+    // font size (+ align when supplied), origin (0.5, 0.5).
+    const style: Phaser.Types.GameObjects.Text.TextStyle = {
+      fontFamily: FONT_FAMILY,
+      fontStyle: 'bold',
+      color: ILLEGAL_MOVE_TOAST_COLOR,
+      fontSize: ILLEGAL_MOVE_TOAST_FONT_SIZE,
+      align: 'center',
+    };
+    const gameObject = scene.add
+      .text(GAME_W / 2, ILLEGAL_MOVE_TOAST_Y, text, style)
+      .setOrigin(0.5, 0.5);
     gameObject
       .setDepth(ILLEGAL_MOVE_TOAST_DEPTH)
       .setWordWrapWidth(ILLEGAL_MOVE_TOAST_MAX_WIDTH)

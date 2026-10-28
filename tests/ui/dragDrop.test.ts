@@ -13,13 +13,14 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 
-// The toast renders through `@ui/Renderer` (createHudText), whose module
-// imports Phaser. The unit project runs in Node, so stub the Phaser module —
-// the same pattern as tests/ui/renderer.test.ts.
-vi.mock('phaser', () => ({ default: {} }));
-
+// No `vi.mock('phaser')` stub here on purpose (CG-0MVQQ2M8E003FQMZ): the
+// drag-drop graph (`dragDrop` → `shakeIllegalMove` → `illegalMoveToastView`)
+// is free of Phaser **value** imports, so it loads in plain Node. A
+// reintroduced value import would throw `ReferenceError: window is not
+// defined` at load and fail this file loudly instead of being masked.
+// `tests/ui/phaser-free-imports.test.ts` asserts the same invariant explicitly.
 import {
   createDragDropManager,
   type DragDropManager,

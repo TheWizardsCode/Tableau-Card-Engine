@@ -218,6 +218,16 @@ instead of only shaking (CG-0MVPXFHBZ004LGEB).
 import { shakeIllegalMove } from '@ui';
 ```
 
+> **Node-safe to import.** `shakeIllegalMove` — and the toast view it composes
+> (`@ui/illegalMoveToastView`) plus `@ui/dragDrop`, which imports
+> `shakeIllegalMove` — are free of Phaser **value** imports, so they load in a
+> plain Node environment (no `window`, no browser). Downstream game unit suites
+> import these deep paths safely; `tests/ui/phaser-free-imports.test.ts` guards
+> the graph with a throwing `phaser` mock (CG-0MVQQ2M8E003FQMZ). Do **not**
+> add a Phaser value import (or an import of a Phaser-bearing module like
+> `@ui/Renderer`) to these helpers without updating that guard. The broader
+> documented Phaser-free node surface is tracked in CG-0MVS9HBN3009HIQN.
+
 ### Usage
 
 ```ts
@@ -254,9 +264,10 @@ if (!result.legal) {
   shake early-return, so it appears for tintable `Image`/`Sprite` targets,
   non-tintable `Container` targets (position shake only), `null` targets, and
   when reduced motion suppresses the shake entirely.
-- **Non-blocking.** The toast is a plain non-interactive text object
-  (`createHudText`); it never swallows pointer input aimed at cards, slots or
-  buttons.
+- **Non-blocking.** The toast is a plain non-interactive text object (built
+  inline via `scene.add.text` with the same style `createHudText` produced —
+  `FONT_FAMILY`, bold, colour, font size, centre-aligned, origin `(0.5, 0.5)`);
+  it never swallows pointer input aimed at cards, slots or buttons.
 - **Depth.** `ILLEGAL_MOVE_TOAST_DEPTH = 1900` — above gameplay, the HUD
   container (1000) and dialog overlays (200), below game-state overlays (2000:
   win / loss / game-over). Styling lives in `src/ui/constants.ts`

@@ -5,19 +5,23 @@
  * The Phaser text/time/event surface is mocked: each test drives the toast
  * through its public API and asserts the rendered text, depth/wrap/stroke,
  * dwell timer, replace-on-show, early dismissal and scene-shutdown cleanup.
+ *
+ * The view is deliberately free of Phaser **value** imports (CG-0MVQQ2M8E003FQMZ)
+ * so it — and `@ui/shakeIllegalMove` / `@ui/dragDrop`, which import it
+ * statically — resolve in a plain Node environment. No `vi.mock('phaser')`
+ * stub is therefore needed here: a reintroduced Phaser value import would
+ * crash at module load and fail every test (loud red, not silent masking).
+ * `tests/ui/phaser-free-imports.test.ts` guards the same graph explicitly.
  */
 
 import { describe, expect, it, vi } from 'vitest';
 
-// The toast renders through `@ui/Renderer` (createHudText), whose module
-// imports Phaser. The unit project runs in Node, so stub the Phaser module —
-// the same pattern as tests/ui/renderer.test.ts.
-vi.mock('phaser', () => ({ default: {} }));
 import {
   dismissIllegalMoveToast,
   showIllegalMoveToast,
 } from '../../src/ui/illegalMoveToastView';
 import {
+  FONT_FAMILY,
   GAME_W,
   ILLEGAL_MOVE_TOAST_COLOR,
   ILLEGAL_MOVE_TOAST_DEPTH,
@@ -138,10 +142,16 @@ describe('showIllegalMoveToast', () => {
     expect(text.text).toBe(reason); // exact rules-layer copy (AC1/AC8)
     expect(mock.addTextCalls[0][0]).toBe(GAME_W / 2);
     expect(mock.addTextCalls[0][1]).toBe(ILLEGAL_MOVE_TOAST_Y);
-    // createHudText(x, y, text, style) — the style carries colour + font size.
-    expect(mock.addTextCalls[0][3]).toMatchObject({
+    // Style equivalence with the previous `createHudText` call: every key
+    // `createHudText` would have produced is asserted, so the inline builder
+    // cannot silently drift from `@ui/Renderer`'s defaults (risk mitigation
+    // for CG-0MVQQ2M8E003FQMZ).
+    expect(mock.addTextCalls[0][3]).toEqual({
+      fontFamily: FONT_FAMILY,
+      fontStyle: 'bold',
       color: ILLEGAL_MOVE_TOAST_COLOR,
       fontSize: ILLEGAL_MOVE_TOAST_FONT_SIZE,
+      align: 'center',
     });
     expect(text.depth).toBe(ILLEGAL_MOVE_TOAST_DEPTH);
     expect(text.wrapWidth).toBe(ILLEGAL_MOVE_TOAST_MAX_WIDTH);
@@ -150,6 +160,13 @@ describe('showIllegalMoveToast', () => {
       ILLEGAL_MOVE_TOAST_STROKE_THICKNESS,
     ]);
     expect(handle!.text).toBe(reason);
+  });
+
+  it('centres the toast text at origin (0.5, 0.5)', () => {
+    const mock = createMockScene();
+    showIllegalMoveToast({ scene: mock.scene, text: 'Rejected.' });
+
+    expect(mock.texts[0].setOrigin).toHaveBeenCalledWith(0.5, 0.5);
   });
 
   it('sits above the board/HUD but below game-state overlays', () => {

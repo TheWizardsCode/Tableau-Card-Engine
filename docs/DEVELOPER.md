@@ -1814,6 +1814,35 @@ tests/
 
 Each `src/` module has a barrel file (`index.ts`) that serves as its public API. Import engine modules using path aliases (see below).
 
+### Phaser-free `@ui` helper imports for Node tests
+
+The `@ui` **barrel** (`src/ui/index.ts`) is Phaser-bearing at evaluation
+time (it exports `CardGameScene`/`Phaser.Scene` subclasses), so it must never
+be imported by a Node unit test. Scene code may keep importing it — but a
+shared UI helper whose graph is consumed by downstream game unit suites (in
+Node, no `window`) must **not** pull Phaser (or a Phaser-bearing module such
+as `@ui/Renderer`) at evaluation time; a reintroduced value import fails every
+downstream game unit suite with `window is not defined` (CG-0MVQQ2M8E003FQMZ).
+
+Rules of thumb:
+
+- **Import deep, Phaser-free paths in Node tests:** `@ui/shakeIllegalMove`,
+  `@ui/dragDrop`, `@ui/illegalMoveToastView` and `@ui/illegalMoveToast` are
+  explicitly node-safe; other `@ui` modules (e.g. `@ui/screen-layout`,
+  `@ui/constants`) are also Phaser-free. When in doubt, probe with a readonly
+  `vite-node` import before relying on it.
+- **Do not add a Phaser value import to a node-safe helper.** Type-only usage
+  (`import type Phaser from 'phaser'`) is fine and elided at compile time; a
+  value import (or an import of a module like `@ui/Renderer` that evaluates
+  Phaser at module scope) is not.
+- **Guard:** `tests/ui/phaser-free-imports.test.ts` imports every
+  framework-free entry point under a **file-scoped** `vi.mock('phaser', …)`
+  whose factory throws, plus a negative control asserting `@ui/Renderer` fails
+  under the same mock — so a reintroduced Phaser import fails loudly. The mock
+  must stay file-scoped (never in a global setup file).
+- **Documented surface:** the broader documented Phaser-free node surface and
+  a static import-graph check are tracked in `CG-0MVS9HBN3009HIQN`.
+
 ## Path Aliases
 
 The project defines path aliases in both `tsconfig.json` and `vite.config.ts`:
