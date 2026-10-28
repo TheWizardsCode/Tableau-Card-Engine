@@ -109,6 +109,27 @@ function extractResolveBlock(src: string): string {
   throw new Error('unbalanced resolve block in the rendered config');
 }
 
+/**
+ * Extract the balanced `plugins: [ … ]` body from a rendered/scaffolded Vite
+ * config. Placement-aware like {@link extractResolveBlock}: a bare `toContain`
+ * on the whole file would also pass if the registration drifted into an
+ * unrelated array (e.g. a plugin's own `plugins` option).
+ */
+function extractPluginsBlock(src: string): string {
+  const key = src.indexOf('plugins: [');
+  expect(key, 'plugins array missing from the rendered config').toBeGreaterThanOrEqual(0);
+  const open = src.indexOf('[', key);
+  let depth = 0;
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '[') depth += 1;
+    else if (src[i] === ']') {
+      depth -= 1;
+      if (depth === 0) return src.slice(open + 1, i);
+    }
+  }
+  throw new Error('unbalanced plugins array in the rendered config');
+}
+
 let tmpRoot: string;
 
 beforeEach(() => {
@@ -406,14 +427,43 @@ describe('renderViteConfig', () => {
     expect(block).toContain('core/vite.config.ts');
   });
 
+  it('registers the transcript-persist middleware for dev serve only', () => {
+    const src = renderViteConfig('main-street', DEFAULT_CORE_REL);
+    const plugins = extractPluginsBlock(src);
+
+    // A generated game repo must wire the POST /api/transcripts middleware.
+    // Without it every game-over 404s in a normal dev session
+    // (`[TranscriptStore] Disk persistence POST returned HTTP 404`,
+    // MS-0MVREB31W004F48D).
+    expect(src).toContain(
+      "import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from '../Tableau-Card-Engine/scripts/vite-transcript-plugin'",
+    );
+    // Dev-serve only, and never during a Vitest run: the plugin writes to disk,
+    // so registering it under test would add file-system side effects (see
+    // docs/DEVELOPER.md § Transcript Persistence). Mirrors core/vite.config.ts.
+    expect(plugins).toContain(
+      "...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []),",
+    );
+    // Placement contract: after the game-discovery plugin, so discovery still
+    // runs first (the order core/vite.config.ts uses).
+    expect(plugins.indexOf('transcriptPersistPlugin()')).toBeGreaterThan(
+      plugins.indexOf('gameDiscoveryPlugin('),
+    );
+    // The factory must receive `command`, otherwise `command === 'serve'` can
+    // never be true and the middleware is silently never registered.
+    expect(src).toContain('export default defineConfig(({ command, mode }) => ({');
+  });
+
   it('excludes .worklog and dev-output trees from the Vite file watcher (ENOSPC guard)', () => {
     const src = renderViteConfig('golf', DEFAULT_CORE_REL);
     // The generated config must wire the shared ignore list into the watcher so
     // a recursive watch does not follow .worklog/worktrees symlinks into other
     // project checkouts and exhaust fs.inotify.max_user_watches
     // (CG-0MV5SEHHG000ZKUA).
-    expect(src).toContain(
-      "import { DEV_WATCH_IGNORE_PATTERNS } from '../Tableau-Card-Engine/scripts/vite-transcript-plugin'",
+    // Named import (order-tolerant: the transcript-persist plugin is imported
+    // from the same module since MS-0MVREB31W004F48D).
+    expect(src).toMatch(
+      /import \{[^}]*DEV_WATCH_IGNORE_PATTERNS[^}]*\} from '\.\.\/Tableau-Card-Engine\/scripts\/vite-transcript-plugin'/,
     );
     expect(src).toContain('ignored: [...DEV_WATCH_IGNORE_PATTERNS]');
     // ...and the shared list must actually cover .worklog (the failure mode).
@@ -530,6 +580,19 @@ describe('scaffoldGameRepo', () => {
     expect(block).toContain("dedupe: ['phaser', 'tone']");
     expect(block.indexOf("dedupe: ['phaser', 'tone']")).toBeGreaterThan(
       block.indexOf('resolveCoreAliases(coreRoot)'),
+    );
+  });
+
+  it('writes a vite.config.ts carrying the transcript-persist registration', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    // Assert the real on-disk write: a re-scaffold must not drop the
+    // registration that keeps a dev session's console free of
+    // `/api/transcripts` 404s (MS-0MVREB31W004F48D).
+    const written = fs.readFileSync(path.join(gameRepo, 'vite.config.ts'), 'utf-8');
+    expect(extractPluginsBlock(written)).toContain(
+      "command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []",
     );
   });
 

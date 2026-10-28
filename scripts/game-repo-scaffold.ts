@@ -329,7 +329,7 @@ import {
   gameDiscoveryPlugin,
   resolveCoreAliases,
 } from '${coreRel}/scripts/vite-game-discovery-plugin';
-import { DEV_WATCH_IGNORE_PATTERNS } from '${coreRel}/scripts/vite-transcript-plugin';
+import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from '${coreRel}/scripts/vite-transcript-plugin';
 
 const coreRoot = path.resolve(__dirname, '${coreRel}');
 const pkg = JSON.parse(
@@ -362,7 +362,7 @@ const presetEnv = {
   GAMES_CONFIG: process.env.GAMES_CONFIG ?? '${DEFAULT_GAME_PRESET}',
 };
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ command, mode }) => ({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
@@ -373,6 +373,12 @@ export default defineConfig(({ mode }) => ({
     // Reads ./configs/${DEFAULT_GAME_PRESET}.json and generates
     // 'virtual:game-registry' (Gym from the core + this one game).
     gameDiscoveryPlugin({ projectRoot: __dirname, coreRoot, env: presetEnv }),
+    // Persist transcripts to data/transcripts/<game>/ during a normal dev
+    // session: this is the middleware behind POST /api/transcripts, so without
+    // it every game-over 404s in the browser console. Dev-serve only, and never
+    // under Vitest (the plugin writes to disk — see the core docs/DEVELOPER.md
+    // section on Transcript Persistence). Mirrors core/vite.config.ts.
+    ...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []),
   ],
   resolve: {
     alias: resolveCoreAliases(coreRoot),

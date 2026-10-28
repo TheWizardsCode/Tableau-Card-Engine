@@ -2831,7 +2831,30 @@ When running `npm run dev`, a Vite plugin intercepts `POST /api/transcripts` req
 data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json
 ```
 
-This happens via a fire-and-forget POST from `TranscriptStore.save()`. If the POST fails (e.g. the production build is being served instead of the dev server), a `console.warn` is emitted but gameplay is not disrupted.
+This happens via a fire-and-forget POST from `TranscriptStore.save()`.
+
+The disk mirror is deliberately quiet. The request is only issued where the
+endpoint can exist (`import.meta.env.DEV`, i.e. a Vite dev server), and any
+non-2xx or unreachable outcome is reported **at most once per store instance**:
+
+- an absent endpoint (HTTP 404/405) or an unreachable dev server logs one
+  `console.debug` note and then stays silent — that condition is expected in
+  some runtimes (a production/Electron bundle, a Vitest browser run, a game
+  repo whose generated `vite.config.ts` does not register the plugin);
+- any other non-2xx status (5xx) logs one `console.warn`, because that is a
+  genuine server-side failure.
+
+Either way gameplay is never disrupted — the browser-storage save has already
+succeeded by then.
+
+**Game-repo registration contract.** The middleware is a Vite plugin
+(`transcriptPersistPlugin()` in `scripts/vite-transcript-plugin.ts`). This
+repository's `vite.config.ts` registers it for `command === 'serve'` only and
+never when `process.env.VITEST` is set, and the game-repo scaffold template
+(`scripts/game-repo-scaffold.ts` → `renderViteConfig`) emits the identical
+registration into every generated `vite.config.ts`. A game repo that 404s on
+`POST /api/transcripts` therefore has an out-of-date generated config: run the
+scaffold (or copy the `...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : [])` entry into `plugins`).
 
 The `data/` directory is gitignored, so persisted transcripts remain local to your machine.
 
