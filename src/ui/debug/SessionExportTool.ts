@@ -39,6 +39,9 @@ export function createSessionExportTool(): DebugToolsEntry {
         typeof (recorder as Record<string, unknown>).getTranscript === 'function'
       ) {
         const transcript = (recorder as Record<string, unknown>).getTranscript as () => unknown;
+        // NOTE: this inline pretty-print could adopt `stringifyPayloadSafe()`
+        // from `./formatEventLog` for cycle-safe serialisation. Deliberately
+        // left as-is here (out of scope for CG-0MVTTR0OC006PWDK).
         transcriptJson = JSON.stringify(transcript(), null, 2);
       } else {
         // Fallback: produce an empty transcript
