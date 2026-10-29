@@ -218,6 +218,17 @@ export interface OverlayDialogOptions {
   /** Enable built-in scrolling (default: true). */
   scrollable?: boolean;
 
+  /**
+   * Enable **opt-in horizontal scrolling** for content wider than the
+   * dialog's content area (default: `false`).
+   *
+   * When `false` (the default) the dialog is vertical-only: `scrollX`
+   * never moves and wide content is clipped at the content edge exactly
+   * as before. When `true`, a horizontal wheel delta (`dx`) scrolls the
+   * content box left/right, clamped to the supplied content width.
+   */
+  enableHorizontalScroll?: boolean;
+
   /** Depth for the backdrop layer (default: 200). */
   depthBase?: number;
 
@@ -280,6 +291,22 @@ export interface OverlayDialogHandle {
   scrollY: number;
 
   /**
+   * Current horizontal scroll offset in pixels (0 = left).
+   *
+   * Only moves when the dialog was created with
+   * `enableHorizontalScroll: true`; otherwise it is permanently `0`.
+   * Modify this before calling `refresh()` to change the scroll position.
+   */
+  scrollX: number;
+
+  /**
+   * Maximum horizontal scroll offset in pixels: the measured content
+   * width minus the visible content width, never below 0. Always `0`
+   * unless `enableHorizontalScroll` was requested.
+   */
+  readonly maxScrollX: number;
+
+  /**
    * The depth base used for this overlay (backdrop). Layers are at:
    * backdrop = depthBase, box = depthBase + 1, content = depthBase + 2.
    */
@@ -293,13 +320,17 @@ export interface OverlayDialogHandle {
 
   /**
    * Call after adding/removing content children in `scrollContainer`.
-   * Re-clamps `scrollY`, re-positions the scroll container, and applies
-   * or removes the geometry mask based on whether content overflows.
+   * Re-clamps `scrollY` (and `scrollX` when horizontal scrolling is
+   * enabled), re-positions the scroll container, and applies or removes
+   * the geometry mask based on whether content overflows on either axis.
    *
    * @param totalContentHeight  Total height of content in px. If
    *                            omitted, estimated from children positions.
+   * @param totalContentWidth   Total width of content in px. If omitted,
+   *                            estimated from children positions. Ignored
+   *                            unless `enableHorizontalScroll` is set.
    */
-  refresh(totalContentHeight?: number): void;
+  refresh(totalContentHeight?: number, totalContentWidth?: number): void;
 }
 
 /**
@@ -354,6 +385,7 @@ export function createOverlayDialog(
   const titleColor = options.titleColor ?? '#f0c040';
   const headerH = options.headerHeight ?? 80;
   const bottomPad = options.bottomPadding ?? 10;
+  const enableHorizontalScroll = options.enableHorizontalScroll ?? false;
 
   const objects: Phaser.GameObjects.GameObject[] = [];
 
@@ -424,6 +456,9 @@ export function createOverlayDialog(
   objects.push(maskGraphics);
 
   // ── Handle (forward-declared so the wheel handler can reference it) ──
+  // `maxScrollX` is derived from the measured content width on every
+  // `refresh()`; it stays 0 unless horizontal scrolling is opted into.
+  let maxScrollX = 0;
   const handle: OverlayDialogHandle = {
     scene,
     objects,
@@ -438,6 +473,10 @@ export function createOverlayDialog(
     scrollContainer,
     monoFont: DIALOG_MONO_FONT,
     scrollY: 0,
+    scrollX: 0,
+    get maxScrollX(): number {
+      return maxScrollX;
+    },
     depthBase,
     close,
     refresh,
@@ -447,7 +486,7 @@ export function createOverlayDialog(
   const wheelHandler = (
     pointer: Phaser.Input.Pointer,
     _gameObjects: unknown[],
-    _dx: number,
+    dx: number,
     dy: number,
   ): void => {
     if (
@@ -458,7 +497,17 @@ export function createOverlayDialog(
     }
     const oldY = handle.scrollY;
     handle.scrollY = Math.max(0, handle.scrollY + dy * 1.5);
-    if (handle.scrollY !== oldY) {
+    let moved = handle.scrollY !== oldY;
+
+    // The horizontal axis is opt-in: default dialogs ignore `dx` entirely so
+    // their behaviour (and any wheel input they consume) is unchanged.
+    if (enableHorizontalScroll) {
+      const oldX = handle.scrollX;
+      handle.scrollX = Math.max(0, handle.scrollX + dx * 1.5);
+      moved = moved || handle.scrollX !== oldX;
+    }
+
+    if (moved) {
       refresh();
     }
   };
@@ -474,13 +523,25 @@ export function createOverlayDialog(
   }
 
   /** Re-clamp scroll, reposition container, and apply/remove mask. */
-  function refresh(totalContentHeight?: number): void {
+  function refresh(totalContentHeight?: number, totalContentWidth?: number): void {
     const th = totalContentHeight ?? estimateContentHeight();
-    const maxScroll = Math.max(0, th - contentHeight);
-    handle.scrollY = Math.min(handle.scrollY, maxScroll);
-    scrollContainer.y = contentY - handle.scrollY;
+    const maxScrollY = Math.max(0, th - contentHeight);
+    handle.scrollY = Math.min(handle.scrollY, maxScrollY);
 
-    if (maxScroll > 0) {
+    // The horizontal clamp only exists for opted-in dialogs; the vertical
+    // axis is unaffected either way.
+    maxScrollX = enableHorizontalScroll
+      ? Math.max(0, (totalContentWidth ?? estimateContentWidth()) - contentWidth)
+      : 0;
+    handle.scrollX = Math.min(handle.scrollX, maxScrollX);
+
+    // Only the container translates: the geometry mask stays fixed in
+    // scene space at (contentX, contentY) with the visible content size, so
+    // both axes are clipped to the same viewport.
+    scrollContainer.y = contentY - handle.scrollY;
+    scrollContainer.x = contentX - (enableHorizontalScroll ? handle.scrollX : 0);
+
+    if (maxScrollY > 0 || maxScrollX > 0) {
       scrollContainer.setMask(maskGraphics.createGeometryMask());
     } else {
       scrollContainer.clearMask();
@@ -494,6 +555,17 @@ export function createOverlayDialog(
       maxY = Math.max(maxY, (child as any).y + 22);
     }
     return maxY;
+  }
+
+  /** Rough estimate of content width from child positions and widths. */
+  function estimateContentWidth(): number {
+    let maxX = 0;
+    for (const child of scrollContainer.list) {
+      const childX = (child as any).x ?? 0;
+      const childWidth = (child as any).width ?? 0;
+      maxX = Math.max(maxX, childX + childWidth);
+    }
+    return maxX;
   }
 
   // Hook close button
