@@ -594,3 +594,59 @@ describe('createOverlayDialog', () => {
     expect(harness.wheelHandlerCount()).toBe(0);
   });
 });
+
+describe('createOverlayDialog content-width measurement', () => {
+  let harness: ReturnType<typeof mockDialogScene>;
+
+  beforeEach(() => {
+    harness = mockDialogScene();
+  });
+
+  it('derives maxScrollX from the content children when no width is supplied', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Estimated',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(dialog, 10, dialog.contentWidth * 2);
+
+    dialog.refresh();
+
+    expect(dialog.maxScrollX).toBe(dialog.contentWidth);
+  });
+
+  it('keeps maxScrollX at 0 when the content fits the visible width', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Fits',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(dialog, 10, dialog.contentWidth - 1);
+    dialog.refresh();
+
+    expect(dialog.maxScrollX).toBe(0);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 50, 0);
+
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
+  });
+
+  it('re-clamps the horizontal offset when the content shrinks', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Shrinks',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(dialog, 10, dialog.contentWidth * 3);
+    dialog.refresh();
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 100, 0);
+    expect(dialog.scrollX).toBeGreaterThan(0);
+
+    dialog.scrollContainer.removeAll(false);
+    addDemoContent(dialog, 10, dialog.contentWidth);
+    dialog.refresh();
+
+    expect(dialog.maxScrollX).toBe(0);
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
+  });
+});

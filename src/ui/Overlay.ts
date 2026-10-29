@@ -6,7 +6,10 @@
  *
  * - {@link createOverlayBackground} — basic backdrop + optional centered box
  * - {@link createOverlayDialog} — full dialog with title, close button,
- *   and scrollable content area (geometry mask + bounds-checked wheel handler)
+ *   and a scrollable content area (geometry mask + bounds-checked wheel
+ *   handler). Vertical scrolling is always available; horizontal scrolling
+ *   is **opt-in** per dialog (`enableHorizontalScroll`) so wide, unwrapped
+ *   content is reachable instead of clipped.
  * - {@link dismissOverlay} — destroy all overlay game objects
  *
  * All overlays parent their objects into `scene.hudContainer` so they
@@ -248,6 +251,23 @@ export interface OverlayDialogOptions {
 /**
  * Handle returned by {@link createOverlayDialog} for managing the
  * overlay lifecycle and content.
+ *
+ * # Scroll axes
+ *
+ * The vertical axis is always available. The horizontal axis is opt-in and
+ * off by default, so every pre-existing caller keeps its exact behaviour:
+ *
+ * - `scrollY` — vertical offset, clamped to `max(0, contentHeight - visibleHeight)`.
+ * - `scrollX` — horizontal offset, clamped to
+ *   `max(0, totalContentWidth - contentWidth)`; permanently `0` unless the
+ *   dialog was created with `enableHorizontalScroll: true`.
+ * - `maxScrollX` — the current horizontal clamp (`0` when horizontal
+ *   scrolling is off).
+ *
+ * The two axes are independent: a wheel event carrying both `dx` and `dy`
+ * moves each by its own delta, and `refresh()` re-clamps each separately.
+ * Only the content container translates on either axis — the geometry mask
+ * stays fixed in scene space to the visible content rectangle.
  */
 export interface OverlayDialogHandle {
   /** The Phaser scene. */
@@ -350,6 +370,25 @@ export interface OverlayDialogHandle {
  * - Cleanup via `close()` (removes wheel listeners, destroys
  *   objects, calls optional `onClose` callback)
  *
+ * # Scroll contract
+ *
+ * The dialog is **vertical-only by default**. Pass
+ * `enableHorizontalScroll: true` to opt a single dialog into horizontal
+ * scrolling (the Game Events debug overlay does, because pretty-printed
+ * payload lines must never wrap). The contract is:
+ *
+ * - `refresh(totalContentHeight?, totalContentWidth?)` clamps `scrollY` to
+ *   `max(0, height - contentHeight)` and — only when opted in — `scrollX`
+ *   to `max(0, width - contentWidth)`. Omitted arguments are estimated from
+ *   the children already in `scrollContainer` (each child's `y` + 22 px for
+ *   the vertical estimate, `x` + `width` for the horizontal one).
+ * - The wheel handler scales both deltas by 1.5 and ignores `dx` entirely
+ *   unless the dialog opted in, so default behaviour is unchanged.
+ * - The geometry mask is fixed in scene space at
+ *   (`contentX`, `contentY`, `contentWidth`, `contentHeight`); only the
+ *   scroll container translates. It is applied when either axis overflows
+ *   and cleared when neither does.
+ *
  * @example
  * ```ts
  * import { createOverlayDialog } from '@ui/Overlay';
@@ -366,6 +405,17 @@ export interface OverlayDialogHandle {
  *
  * // Notify the overlay of content height for scroll clamping
  * overlay.refresh(50);
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Opt in to horizontal scrolling for wide, unwrapped content.
+ * const log = createOverlayDialog(scene, {
+ *   title: 'Game Events',
+ *   enableHorizontalScroll: true,
+ * });
+ * log.scrollContainer.add(wideText);
+ * log.refresh(wideText.y + wideText.height, wideText.width);
  * ```
  *
  * @param scene   - The active Phaser scene.
