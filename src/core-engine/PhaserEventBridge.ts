@@ -40,8 +40,17 @@ export interface PhaserLikeEventEmitter {
 
 // ── Bridge ──────────────────────────────────────────────────
 
-/** All event names we bridge. */
-const ALL_EVENTS: GameEventName[] = [
+/**
+ * Event names bridged Phaser -> engine.
+ *
+ * A Phaser event emitter is un-typed, so there is no way to enumerate the
+ * names a game may emit on the Phaser side; this list therefore stays a
+ * hard-coded set of the engine's known names. The engine -> Phaser
+ * direction does NOT use this list: it subscribes with
+ * {@link GameEventEmitter.onAny} so every event, engine or game-specific,
+ * is forwarded without per-game name lists.
+ */
+const PHASER_TO_ENGINE_EVENTS: GameEventName[] = [
   'turn-started',
   'turn-completed',
   'animation-complete',
@@ -91,24 +100,24 @@ export class PhaserEventBridge {
   // ── Engine -> Phaser ────────────────────────────────────
 
   private wireEngineToPhaser(): void {
-    for (const event of ALL_EVENTS) {
-      const unsub = this.engine.on(event, (payload: GameEventMap[typeof event]) => {
-        if (this.forwarding) return; // prevent re-entry
-        this.forwarding = true;
-        try {
-          this.phaser.emit(event, payload);
-        } finally {
-          this.forwarding = false;
-        }
-      });
-      this.engineUnsubs.push(unsub);
-    }
+    // Catch-all: every emitted event, engine or game-specific, is
+    // forwarded. No per-game name list is maintained here.
+    const unsub = this.engine.onAny((event, payload) => {
+      if (this.forwarding) return; // prevent re-entry
+      this.forwarding = true;
+      try {
+        this.phaser.emit(event, payload);
+      } finally {
+        this.forwarding = false;
+      }
+    });
+    this.engineUnsubs.push(unsub);
   }
 
   // ── Phaser -> Engine ────────────────────────────────────
 
   private wirePhaserToEngine(): void {
-    for (const event of ALL_EVENTS) {
+    for (const event of PHASER_TO_ENGINE_EVENTS) {
       const handler = (payload: unknown) => {
         if (this.forwarding) return; // prevent re-entry
         this.forwarding = true;

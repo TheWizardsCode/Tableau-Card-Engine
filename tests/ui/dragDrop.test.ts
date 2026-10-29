@@ -13,8 +13,14 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 
+// No `vi.mock('phaser')` stub here on purpose (CG-0MVQQ2M8E003FQMZ): the
+// drag-drop graph (`dragDrop` → `shakeIllegalMove` → `illegalMoveToastView`)
+// is free of Phaser **value** imports, so it loads in plain Node. A
+// reintroduced value import would throw `ReferenceError: window is not
+// defined` at load and fail this file loudly instead of being masked.
+// `tests/ui/phaser-free-imports.test.ts` asserts the same invariant explicitly.
 import {
   createDragDropManager,
   type DragDropManager,
@@ -122,7 +128,10 @@ function makeManager(
   return { manager, mock };
 }
 
-function runTweenComplete(mock: MockScene, index = 0): void {
+function runTweenComplete(
+  mock: { tweenConfigs: Phaser.Types.Tweens.TweenBuilderConfig[] },
+  index = 0,
+): void {
   const config = mock.tweenConfigs[index];
   expect(config).toBeDefined();
   (config.onComplete as (tween: Phaser.Tweens.Tween) => void)?.({} as Phaser.Tweens.Tween);
@@ -755,5 +764,203 @@ describe('dragDrop error paths', () => {
 
     // safePlaySound delegates to scene.sound.play with the shared key
     expect(mock.scene.sound.play).toHaveBeenCalledWith('sfx-illegal-move');
+  });
+});
+
+// ── Reason toast plumbing (CG-0MVPXFHBZ004LGEB) ─────────────
+
+describe('dragDrop illegal-reason toast plumbing', () => {
+  /** Toast-capable scene: add.text, time.delayedCall and a scene emitter. */
+  interface ToastMock {
+    scene: Phaser.Scene;
+    events: Record<string, (...args: any[]) => void>;
+    tweenConfigs: Phaser.Types.Tweens.TweenBuilderConfig[];
+    texts: string[];
+    timers: Array<{ delay: number; callback: () => void }>;
+    addTextMock: ReturnType<typeof vi.fn>;
+  }
+
+  function makeToastMock(): ToastMock {
+    const base = createMockScene();
+    const texts: string[] = [];
+    const timers: Array<{ delay: number; callback: () => void }> = [];
+    const addTextMock = vi.fn((_x: number, _y: number, text: string) => {
+      texts.push(text);
+      const obj: any = {
+        text,
+        setText: vi.fn((value: string) => { obj.text = value; return obj; }),
+        setOrigin: vi.fn().mockReturnThis(),
+        setDepth: vi.fn().mockReturnThis(),
+        setWordWrapWidth: vi.fn().mockReturnThis(),
+        setStroke: vi.fn().mockReturnThis(),
+        destroy: vi.fn(),
+      };
+      return obj;
+    });
+    (base.scene as any).add = { text: addTextMock };
+    (base.scene as any).time = {
+      delayedCall: vi.fn((delay: number, callback: () => void) => {
+        timers.push({ delay, callback });
+        return { remove: vi.fn() };
+      }),
+    };
+    (base.scene as any).events = { once: vi.fn(), off: vi.fn() };
+    return {
+      scene: base.scene,
+      events: base.events,
+      tweenConfigs: base.tweenConfigs,
+      texts,
+      timers,
+      addTextMock,
+    };
+  }
+
+  function makeToastManager(mock: ToastMock, config: Partial<DragDropManagerConfig> = {}) {
+    return makeManager(config, mock as unknown as MockScene);
+  }
+
+  function makeDraggable() {
+    const go = createMockGameObject();
+    go.input = { draggable: true };
+    return go;
+  }
+
+  it('pickup veto: draggable illegalReason resolver renders the toast', () => {
+    const toastMock = makeToastMock();
+    const { manager, mock } = makeToastManager(toastMock);
+    const go = makeDraggable();
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      canPickUp: () => false,
+      illegalReason: () => 'You cannot pick that card up this turn.',
+    });
+
+    mock.events.dragstart(pointer, go);
+
+    expect(toastMock.texts).toEqual(['You cannot pick that card up this turn.']);
+  });
+
+  it('pickup veto: inline payload.reason mutation inside canPickUp renders the toast', () => {
+    const toastMock = makeToastMock();
+    const { manager, mock } = makeToastManager(toastMock);
+    const go = makeDraggable();
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      canPickUp: (payload) => {
+        payload.reason = 'Inline reason wins.';
+        return false;
+      },
+    });
+
+    mock.events.dragstart(pointer, go);
+
+    expect(toastMock.texts).toEqual(['Inline reason wins.']);
+  });
+
+  it('drop rejection: zone illegalReason wins over the draggable resolver', () => {
+    const toastMock = makeToastMock();
+    const { manager, mock } = makeToastManager(toastMock);
+    const go = makeDraggable();
+    const zone = {
+      name: 'slot',
+      x: 0, y: 0, width: 10, height: 10,
+      setData: vi.fn(),
+      getData: vi.fn(() => undefined),
+    } as unknown as Phaser.GameObjects.Zone;
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      illegalReason: () => 'Draggable fallback reason.',
+    });
+    manager.registerDropZone({
+      zone,
+      data: 3,
+      canAccept: () => false,
+      illegalReason: () => 'That slot is blocked by the figure.',
+    });
+
+    mock.events.dragstart(pointer, go);
+    mock.events.drop(pointer, go, zone);
+    // Rejected drops snap back first; illegal feedback fires on completion.
+    runTweenComplete(mock);
+
+    expect(toastMock.texts).toEqual(['That slot is blocked by the figure.']);
+  });
+
+  it('drop rejection: draggable illegalReason is used when the zone has none', () => {
+    const toastMock = makeToastMock();
+    const { manager, mock } = makeToastManager(toastMock);
+    const go = makeDraggable();
+    const zone = {
+      name: 'slot',
+      x: 0, y: 0, width: 10, height: 10,
+      setData: vi.fn(),
+      getData: vi.fn(() => undefined),
+    } as unknown as Phaser.GameObjects.Zone;
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      illegalReason: () => 'Draggable fallback reason.',
+    });
+    manager.registerDropZone({ zone, canAccept: () => false });
+
+    mock.events.dragstart(pointer, go);
+    mock.events.drop(pointer, go, zone);
+    runTweenComplete(mock);
+
+    expect(toastMock.texts).toEqual(['Draggable fallback reason.']);
+  });
+
+  it('release outside any zone: draggable illegalReason renders the toast on snap-back', () => {
+    const toastMock = makeToastMock();
+    const { manager, mock } = makeToastManager(toastMock);
+    const go = makeDraggable();
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      illegalReason: () => 'There is no legal slot for that card.',
+    });
+
+    mock.events.dragstart(pointer, go);
+    mock.events.dragend(pointer, go, false);
+    // Snap-back completes, then the illegal feedback (and toast) fires.
+    runTweenComplete(mock);
+
+    expect(toastMock.texts).toEqual(['There is no legal slot for that card.']);
+  });
+
+  it('no reason available: no toast is rendered (unchanged behaviour)', () => {
+    const toastMock = makeToastMock();
+    const { manager, mock } = makeToastManager(toastMock);
+    const go = makeDraggable();
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      canPickUp: () => false,
+    });
+
+    mock.events.dragstart(pointer, go);
+
+    expect(toastMock.addTextMock).not.toHaveBeenCalled();
+  });
+
+  it('custom onIllegal hook receives the resolved payload.reason', () => {
+    const onIllegal = vi.fn();
+    const toastMock = makeToastMock();
+    const { manager, mock } = makeToastManager(toastMock, { onIllegal });
+    const go = makeDraggable();
+
+    manager.registerDraggable({
+      gameObject: go as unknown as DraggableGameObject,
+      canPickUp: () => false,
+      illegalReason: () => 'Flagged by the gate.',
+    });
+
+    mock.events.dragstart(pointer, go);
+
+    expect(onIllegal).toHaveBeenCalledTimes(1);
+    expect(onIllegal.mock.calls[0][0].reason).toBe('Flagged by the gate.');
   });
 });

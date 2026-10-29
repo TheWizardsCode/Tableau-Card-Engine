@@ -91,6 +91,9 @@ export const GYM_RULE_ENGINE_KEY = 'GymRuleEngineScene';
 /** In-game DLC gate proof scene key. */
 export const GYM_DLC_UNLOCK_KEY = 'GymDlcUnlockScene';
 
+/** Generic story-line (branching narrative) demo scene key. */
+export const GYM_STORYLINE_KEY = 'GymStorylineScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -117,6 +120,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Overlay & UI Config',
     description:
       'Open and close help/settings overlays. Toggle feedback intensity and observe live UI changes.',
+  },
+  {
+    sceneKey: GYM_STORYLINE_KEY,
+    title: 'Storyline',
+    description:
+      'Deal a branching narrative from the generic @story-line module: draw a card, pick an option, and watch the choice determine the next card until the chain ends.',
   },
   {
     sceneKey: GYM_UNDO_REDO_KEY,

@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "source": "Generated from the gym content CSV via the story-line content adapter (deterministic).",
+  "gameId": "gym",
+  "storylineIds": [
+    "gym-story"
+  ],
+  "nodes": [
+    {
+      "id": "gym-story-end",
+      "name": "New Beginning",
+      "storylineId": "gym-story",
+      "storylineTitle": "Gym Storyline",
+      "hasChoices": false,
+      "optionCount": 0,
+      "options": [],
+      "effect": "Gain 60 reputation",
+      "impact": "+60 reputation",
+      "fields": {
+        "trigger": "Incident",
+        "cost": "0",
+        "coinDelta": "0",
+        "reputationDelta": "60"
+      }
+    },
+    {
+      "id": "gym-story-ignore",
+      "name": "Neglected Roads",
+      "storylineId": "gym-story",
+      "storylineTitle": "Gym Storyline",
+      "hasChoices": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Repair",
+          "successorIds": [
+            "gym-story-end"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Let it be",
+          "successorIds": [],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "Lose 80 coins",
+      "impact": "−80 coins",
+      "fields": {
+        "trigger": "Incident",
+        "cost": "0",
+        "coinDelta": "-80",
+        "reputationDelta": "0"
+      }
+    },
+    {
+      "id": "gym-story-invest",
+      "name": "Public Investment",
+      "storylineId": "gym-story",
+      "storylineTitle": "Gym Storyline",
+      "hasChoices": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Celebrate",
+          "successorIds": [
+            "gym-story-end"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Double down",
+          "successorIds": [],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "Gain 120 coins",
+      "impact": "+120 coins",
+      "fields": {
+        "trigger": "Incident",
+        "cost": "0",
+        "coinDelta": "120",
+        "reputationDelta": "0"
+      }
+    },
+    {
+      "id": "gym-story-start",
+      "name": "Town Meeting",
+      "storylineId": "gym-story",
+      "storylineTitle": "Gym Storyline",
+      "hasChoices": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Invest",
+          "successorIds": [
+            "gym-story-invest"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Ignore",
+          "successorIds": [
+            "gym-story-ignore"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "Lose 50 coins",
+      "impact": "−50 coins",
+      "fields": {
+        "trigger": "Incident",
+        "cost": "0",
+        "coinDelta": "-50",
+        "reputationDelta": "0"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "gym-story-ignore",
+      "label": "Let it be",
+      "to": null,
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "gym-story-ignore",
+      "label": "Repair",
+      "to": "gym-story-end",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "gym-story-invest",
+      "label": "Celebrate",
+      "to": "gym-story-end",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "gym-story-invest",
+      "label": "Double down",
+      "to": null,
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "gym-story-start",
+      "label": "Ignore",
+      "to": "gym-story-ignore",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "gym-story-start",
+      "label": "Invest",
+      "to": "gym-story-invest",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    }
+  ],
+  "cycles": []
+}

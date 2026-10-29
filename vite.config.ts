@@ -33,6 +33,9 @@ const CORE_TEST_GROUPS = new Set([
   'rule-engine',
   'ai',
   'core',
+  // Story-line engine + content/authoring toolchain + editor harness; always
+  // present in a core checkout and never game-owned.
+  'story-line',
 ]);
 
 /**
@@ -246,6 +249,15 @@ export default defineConfig(({ mode, command }) => ({
             'tests/golf/HelpPanel.browser.test.ts',
             'tests/ui/TooltipManager.browser.test.ts',
             'tests/ui/SettingsPanelTooltips.browser.test.ts',
+            // Story-line editor: the non-Phaser dev-page browser path
+            // (plain-DOM renderer modules mounted directly; see
+            // tests/story-line/editor/harness.browser.test.ts and the real
+            // viewer coverage in viewer.browser.test.ts).
+            'tests/story-line/editor/harness.browser.test.ts',
+            'tests/story-line/editor/viewer.browser.test.ts',
+            // Curated card edit forms: the real edit/add round-trip on the Gym
+            // fixture through the plain-DOM forms and the preview panel.
+            'tests/story-line/editor/edit-roundtrip.browser.test.ts',
             // Main Street key E2E
             'tests/main-street/MainStreetScene.browser.test.ts',
             'tests/main-street/drag.browser.test.ts',

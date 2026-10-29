@@ -631,7 +631,7 @@ repositories by design:
 - **Core repo owns the mechanism** — the unified `UnlockRule`/`UnlockTarget`
   model, the `ContentUnlockStore`, the read API (`contentUnlockClientFromWindow()`),
   and the pure, framework-free
-  [`createDlcGate`](../../src/core-engine/DlcGate.ts).
+  [`createDlcGate`](../src/core-engine/DlcGate.ts).
 - **Each game repo owns its DLC content and the gating call site.** The DLC is
   identified by `{ kind: 'dlc', gameId, dlcId }`, where `dlcId` is owned by that
   game's content definition — there is no central DLC registry. The gate is a
@@ -923,7 +923,13 @@ run. Browser-mode runs have a sibling failure mode (see CG-0MSCI73RH004VPCE): wh
 the browser RPC WebSocket is dropped under load, vitest browser mode closes the
 connection and exits non-zero with
 `[vitest] Browser connection was closed while running tests.` even though every
-file completed. Because `scripts/run-ci-tests.sh` runs with `set -euo pipefail`,
+file completed. A third sibling failure mode (see CG-0MVNDK56G007C1U7) is the
+Vite dev server failing to serve a test module under load, so the browser
+cannot dynamically import it — Vitest reports the file as a failed suite with
+`Error: Failed to import test file <path>` and
+`Caused by: TypeError: Failed to fetch dynamically imported module: …` (the
+Chromium text; the browser project only runs headless Chromium).
+Because `scripts/run-ci-tests.sh` runs with `set -euo pipefail`,
 those non-zero exits previously aborted the CI gate after the unit/browser step.
 
 Two mitigations are in place in this repository:
@@ -933,12 +939,15 @@ Two mitigations are in place in this repository:
 2. **Retry-once on the transient signatures (attribution-aware)** —
    the unit **and** browser steps in `scripts/run-ci-tests.sh` run through
    `scripts/vitest-run-with-retry.ts`, whose `shouldRetryOnce` guard recovers
-   two shapes of the same contention transient:
+   two shapes of the same contention transient (`TRANSIENT_SIGNATURES`:
+   `WORKER_TIMEOUT_SIGNATURE`, `BROWSER_DROP_SIGNATURE` and
+   `MODULE_FETCH_SIGNATURE`):
 
    - **All-passed transient** — the reporter summary shows every file passed
      and the sole error is a transient signature
-     (`[vitest-worker]: Timeout calling "onTaskUpdate"` or
-     `[vitest] Browser connection was closed while running tests`).
+     (`[vitest-worker]: Timeout calling "onTaskUpdate"`,
+     `[vitest] Browser connection was closed while running tests`, or
+     `Failed to fetch dynamically imported module`).
    - **Attributable failed-file transient** (CG-0MUIMM28K001W88F) — the
      summary reports failed files/tests, but every error block in the run
      output is the transient signature itself (`failuresAreTransientOnly`).
@@ -948,14 +957,22 @@ Two mitigations are in place in this repository:
      a re-run at the same commit was green.
 
    The guard is unit-tested in `tests/scripts/vitest-run-with-retry.test.ts`,
-   including a **regression fixture** of the recorded
-   CG-0MUIMM28K001W88F failing run and its genuine-assertion counter-case. A
-   genuine assertion failure (a `Failed Tests` block carrying an
-   `AssertionError`, not the timeout) can never be retried or hidden. If the
-   retry is **also** a pure transient failure (both attempts poisoned by
-   sustained contention), the run is accepted as green (exit 0): the guard
-   attributed every reported failure to the transient signature, so there is
-   no genuine failure to mask (CG-0MUF0LU4X006IXXU).
+   including **regression fixtures** of the recorded
+   CG-0MUIMM28K001W88F failing run and the recorded
+   CG-0MVNDK56G007C1U7 module-fetch incident, plus their genuine-assertion
+   counter-cases. A genuine assertion failure (a `Failed Tests` block carrying
+   an `AssertionError`, not the timeout) can never be retried or hidden. If the
+   retry is **also** a pure transient failure of one of the two original
+   signatures (both attempts poisoned by sustained contention), the run is
+   accepted as green (exit 0): the guard attributed every reported failure to
+   the transient signature, so there is no genuine failure to mask
+   (CG-0MUF0LU4X006IXXU). That both-attempts acceptance is deliberately **not**
+   extended to `MODULE_FETCH_SIGNATURE` (`shouldAcceptBothAttempts`): a genuine
+   module-resolution regression (mistyped import path, deleted file, 404 on an
+   asset module) emits the identical text deterministically, so a both-attempts
+   module-fetch run keeps the retry's own failing status and reports
+   `outcome=retry-failed` — module fetch is retry-only recovery
+   (CG-0MVNDK56G007C1U7).
 
    The runner emits a final
    `[vitest-runner] attempts=N status=S outcome=... args="..."` line after every
@@ -965,6 +982,55 @@ Two mitigations are in place in this repository:
    former `tail -20` in `scripts/run-ci-tests.sh`), so a recurrence names the
    failed test/file and shows any distinct assertion error alongside the
    transient signature.
+
+   **Project-coverage gate (opt-in, CG-0MVL21CVM003VK5H).** The retry/acceptance
+   logic above reasons purely about the run's *output text*, so a run that
+   silently dropped part of the suite could still be accepted — Vitest's
+   `executeTests` group loop can abort after an earlier pool run rejects and
+   summarise only the executed files as green (`Test Files N passed (N)`). The
+   unit and browser stages in `scripts/run-ci-tests.sh` therefore pass
+   `--expect-project-coverage`, which makes a file-set mismatch a genuine
+   failure:
+
+   - **Expected set** — derived before the run from a collection-only
+     `vitest list --filesOnly --json --staticParse` over the same forwarded
+     project/args (`--staticParse` avoids a second Chromium start for the
+     browser stage; a consumer whose Vitest version rejects the flag is
+     retried once without it). `--expected-file <path>` (repeatable) pins an
+     explicit expected set for tests/non-standard layouts instead.
+   - **Executed set** — each attempt gets an injected
+     `--reporter=default --reporter=json --outputFile.json=<tmp>` so the set
+     is exact and independent of the caller's reporters; the artifact is
+     parsed and removed after the attempt, with a fallback to default-reporter
+     per-file lines if the artifact is missing. The JSON artifact is what keeps
+     the gate honest for a file that failed to dynamically import: Vitest
+     emits a `testResults` entry for every collected suite, including a failed
+     import (the `FAIL … [ file ]` header the fallback cannot match), so a
+     module-fetch retry is judged against the full expected set
+     (CG-0MVNDK56G007C1U7).
+   - **Mismatch is a genuine failure** — any missing OR extra file fails the
+     stage (exit 1, `outcome=coverage-failed`) with a stderr diagnostic naming
+     every missing/extra file and stating `expected=N ran=M`. It is evaluated
+     on the first attempt before the retry decision and again on the second
+     before any acceptance, so neither `accepted-transient` nor a clean retry
+     can mask a dropped group — regardless of the run's own exit code (a
+     dropped group can exit 0 with an all-passed summary).
+   - **Fail closed** — a pre-flight collection that fails, times out (exit
+     124), or returns an empty set aborts with exit 2
+     (`[preflight-failed]`); an expectation supplied but an executed set that
+     cannot be determined fails identically. Hang semantics are unchanged: a
+     wall-clock overrun still exits 124, is never retried, and is reported
+     before any coverage check.
+   - **Auditable summary** — the `[vitest-runner]` line appends
+     `expected=N ran=M` while the gate is active (`expected=unset` without
+     it), so a downstream consumer can tell a genuine full-suite green from
+     a recovered transient. Outcome strings for expectation-free runs are
+     unchanged.
+   - **Off by default** — smoke/dev/tutorial stages and every `/skill:test
+     --type` command do not pass the flag; a consumer repo syncing this runner
+     sees byte-identical decisions until it opts in. Tested in
+     `tests/scripts/vitest-run-with-retry.test.ts` (parity fixtures + regression
+     for the incident shape).
 
 3. **Test-side hardening (browser tests)** — beyond the runner-level
    mitigations above, browser tests that drive the real Phaser pointer
@@ -1347,6 +1413,160 @@ This lists the installed browsers and their expected locations (e.g. `chromium-1
 
 **Fast-fail pre-check:** `npm test` (`scripts/run-ci-tests.sh`) and a direct `bash scripts/run-tutorial-tests.sh` run `scripts/check-browser-test-env.ts` first. The pre-check detects a missing Chromium binary launch-free (via `chromium.executablePath()` + `fs.existsSync()`, under 2 seconds) and aborts with the exact remediation command above — instead of failing minutes later with an opaque Vitest browser error. PR CI is build-only (CG-0MT022826006EM0D) and no longer runs browser tests; local devs run `npx playwright install chromium` once (see [Browser test setup](#browser-test-setup)).
 
+## Story-line Authoring Tooling
+
+The core engine ships a game-agnostic story-line **content** toolkit
+(`src/story-line/content/`): CSV parse/serialise + checksum, a deterministic
+manifest/Mermaid generator, a static validator and one transactional author
+API. A game plugs in only data — a content adapter mapping its CSV columns onto
+the generic story-line fields (`id`, `name`, `effect`, choice flag,
+accept/reject or `options`, storyline id/title); every other column is carried
+as a game column. Core ships the Gym adapter as the default.
+
+Three `tsx` CLIs expose the seams (no Vite loader, no game import):
+
+```bash
+npm run storylines:validate                     # validate the Gym content
+npm run storylines:validate -- --csv path.csv --json --fail-on-cycle
+npm run storylines:graph                        # rewrite the Gym artefacts
+npm run storylines:graph -- --format json --check   # drift guard
+npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
+npm run storylines:author -- update-card --id evt-x --storyline-id storyline-x
+npm run storylines:editor                       # open the local graph editor
+npm run storylines:editor -- --help             # editor flags
+```
+
+Every CLI supports `--help` and `--game <adapter-id>` (default `gym`), and exits
+`0` on success/valid content and `1` on invalid content, unreadable input or
+artefact drift. The author API validates before writing and writes atomically;
+`--dry-run` prints the candidate and writes nothing. The committed Gym
+artefacts (`example-games/gym/content/storyline-manifest.json` and
+`storyline-graph.mmd`) are validated against
+`schemas/story-line-manifest.schema.json` and kept in sync by `--check`.
+
+See [Core: Generic Story-Line System](core-engine/story-line.md#authoring-seams-content-manifest-validator-author)
+for the adapter contract, validator codes, manifest shape and API examples.
+
+### Story-line Editor (viewer and guided editing)
+
+A fourth `tsx` entry point, `npm run storylines:editor`, opens a **local** graph
+viewer and guided editing page for a game's story-lines (viewer:
+CG-0MVHZ2N2X0082OW7). It is a development tool, not a shipped game. The
+[Story-line editor walkthrough](dev/storyline-editor.md) is the
+content-designer/developer guide — supplying a content adapter, running against
+a game's content, the edit workflow, artefact regeneration and headless
+`--apply`:
+
+```bash
+npm run storylines:editor                        # Gym content, http://127.0.0.1:5174
+npm run storylines:editor -- --port 5180
+npm run storylines:editor -- --content path/to/storylines.csv
+npm run storylines:editor -- --adapter ./my-game-adapter.ts
+npm run storylines:editor -- --help
+```
+
+- `--content` is the game's content CSV (default: the Gym demo content).
+- `--adapter` is a **shipped adapter id** (`gym`, the default) or a module
+  path/specifier whose default (or `adapter` / `contentAdapter`) export is a
+  `ContentAdapter` — the same declarative column mapping the CLIs use.
+- `--port` / `--host` default to `5174` and `127.0.0.1`; the tool is loopback-only
+  by design. The command exits `0` on `--help` and `1` on a bad option, an
+  unknown adapter, unreadable content or a host failure.
+
+The host reads the CSV **through the content adapter**, builds the deterministic
+manifest and serves it at `/manifest.json` from memory (`scripts/storyline-editor-server.ts`
+composes the dedicated `vite.editor.config.ts` with a manifest middleware). The
+page fetches that one manifest, so pan/zoom and node selection never round-trip
+to the host. The page (`tools/storyline-editor/`) renders one column per
+story-line group, choice cards as diamonds and plain incidents as rounded
+rectangles, cycle edges/members in red, and an option label on every link.
+Selecting a card shows its name, effect, adapter impact, routing summary,
+successor and incoming links, story-line id/title and adapter-declared columns;
+the toolbar provides zoom in/out and reset, and the graph pans by dragging and
+zooms with the wheel.
+
+The mapping step is `src/story-line/editor/view-model.ts` — a pure manifest →
+view model function that reuses the manifest's own label helpers
+(`nodeLabel`, `briefEventDescription`, `describeEventImpact`,
+`describeChoiceRouting`) and `filterManifestByStoryline` for grouping, so the
+editor can never disagree with the generated artefacts.
+
+**Build exclusion.** The editor page has its own Vite root
+(`tools/storyline-editor`) and output (`dist/editor`), and nothing in
+`index.html`, `main.ts`, `src/` or `electron/` references it. That property is
+asserted by `tests/story-line/editor/build-exclusion.test.ts` (entry documents,
+production source imports, build/packaging scripts and the Electron
+`files:` list), alongside `vite-editor-config.test.ts` for the config identity.
+
+**Editing (curated forms + story-line management).** The same toolbar also
+mounts the guided editing workflow (CG-0MVHZ2PVT0072YYK, CG-0MVHZ2RBJ004O0VD):
+**Edit card** opens the selected node's card form, **Add card** opens the guided
+add-card form (core-editable fields from the adapter's field descriptors), and
+**Manage story-lines** opens the story-line management panel. Every operation
+previews a diff and validates **before** write, then applies through the F2
+bridge — the single transactional author API (`applyContentEditToFile` in
+`src/story-line/content/author.ts`). The editor never writes the content CSV
+itself; that property is asserted by the write-path guard below.
+
+The story-line panel lists every group the generated manifest reports (its
+`storylineIds` plus each member's declared id/title) and any group created in
+the session. A story-line has no declaration file of its own — it exists
+through its member cards — so a newly created group is listed as *pending*
+(red-dashed border) until member cards are moved into it. Creating a group,
+renaming one (a batch over every member card) and reassigning member cards all
+write **one** `set-storyline-batch` edit: the combined result is validated once
+and written once, so renaming a four-member group is a single author-API call,
+never one write per member. After an accepted edit the list matches the
+regenerated manifest.
+
+Tests: `tests/story-line/editor/view-model.test.ts` diffs the view model against
+the generated manifest (nodes, edges, story-line ids/titles, cycle flags),
+`viewer.browser.test.ts` covers rendering, grouping, cycle marking, pan/zoom,
+selection and the details sidebar, `edit-forms.test.ts` / `edit-roundtrip.browser.test.ts`
+cover the curated card forms round-trip, `storyline-manager.test.ts` (Node:
+group derivation, draft validation, one-batch writes against a temp fixture
+copy) and `storyline-manager.browser.test.ts` (real DOM: create/rename/reassign
+through an in-memory bridge) cover the story-line management panel, and
+`cli.test.ts` covers launch/`--help`, adapter resolution, manifest loading and
+the host middleware.
+
+### Story-line Editor Test Harness
+
+The editor host, read-only viewer and guided editing now ship (see
+[Story-line Editor](#story-line-editor-viewer-and-guided-editing)); its shared
+test foundation lives in `tests/story-line/editor/` so every editor slice can be
+driven test-first (CG-0MVHZ2LS3008ATY9):
+
+- **Fixtures** (`fixtures.ts`) — copies the committed content CSV and
+  generated manifest/Mermaid artefacts into an isolated OS temp directory and
+  returns the paths, so edit tests never mutate committed files. All source
+  paths derive from the generator's exported defaults (`DEFAULT_CONTENT_PATH`,
+  `DEFAULT_GRAPH_OUTPUTS`, `DEFAULT_MANIFEST_SCHEMA_PATH`), so an artefact or
+  schema move fails the fixture existence assertions loudly instead of silently
+  copying a stale file.
+- **Write-path guard** (`write-path-guard.ts`) — a reusable static scan over the
+  editor source roots (`src/story-line/editor/`, `tools/storyline-editor/`,
+  `scripts/storyline-editor-*`) asserting no editor module performs a file
+  write/delete; every edit must go through the transactional author API
+  (`applyContentEditToFile`). Roots that do not exist yet are reported as
+  `skipped`, so the guard is green before the feature code lands.
+- **Manifest schema guard** (`manifest-schema.test.ts`) — validates the
+  committed manifest artefact and a manifest regenerated from the fixture copy
+  against `schemas/story-line-manifest.schema.json` with the existing `ajv`
+  devDependency.
+
+**Browser-test path (decided).** The editor is a non-Phaser, non-game dev page,
+so its renderers are plain-DOM modules. The core `browser` project drives them
+**directly** — `harness.browser.test.ts` imports and mounts the DOM module into
+Vitest's real Chromium document and asserts rendered output and events. No
+second dev server, page boot, game loop or new runtime dependency is involved.
+The editor *page* is served by its own config, `vite.editor.config.ts` (root
+`tools/storyline-editor`, port 5174, output `dist/editor/`), which keeps the
+game/build config (`vite.config.ts`) untouched and keeps the editor out of the
+production game bundle and packaged Electron app. The harness browser test is
+part of the `dev` test profile, and `story-line` is a core test group so the
+smoke/dev lists always keep it.
+
 ## Startup Context Budget
 
 The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:
@@ -1594,6 +1814,35 @@ tests/
 
 Each `src/` module has a barrel file (`index.ts`) that serves as its public API. Import engine modules using path aliases (see below).
 
+### Phaser-free `@ui` helper imports for Node tests
+
+The `@ui` **barrel** (`src/ui/index.ts`) is Phaser-bearing at evaluation
+time (it exports `CardGameScene`/`Phaser.Scene` subclasses), so it must never
+be imported by a Node unit test. Scene code may keep importing it — but a
+shared UI helper whose graph is consumed by downstream game unit suites (in
+Node, no `window`) must **not** pull Phaser (or a Phaser-bearing module such
+as `@ui/Renderer`) at evaluation time; a reintroduced value import fails every
+downstream game unit suite with `window is not defined` (CG-0MVQQ2M8E003FQMZ).
+
+Rules of thumb:
+
+- **Import deep, Phaser-free paths in Node tests:** `@ui/shakeIllegalMove`,
+  `@ui/dragDrop`, `@ui/illegalMoveToastView` and `@ui/illegalMoveToast` are
+  explicitly node-safe; other `@ui` modules (e.g. `@ui/screen-layout`,
+  `@ui/constants`) are also Phaser-free. When in doubt, probe with a readonly
+  `vite-node` import before relying on it.
+- **Do not add a Phaser value import to a node-safe helper.** Type-only usage
+  (`import type Phaser from 'phaser'`) is fine and elided at compile time; a
+  value import (or an import of a module like `@ui/Renderer` that evaluates
+  Phaser at module scope) is not.
+- **Guard:** `tests/ui/phaser-free-imports.test.ts` imports every
+  framework-free entry point under a **file-scoped** `vi.mock('phaser', …)`
+  whose factory throws, plus a negative control asserting `@ui/Renderer` fails
+  under the same mock — so a reintroduced Phaser import fails loudly. The mock
+  must stay file-scoped (never in a global setup file).
+- **Documented surface:** the broader documented Phaser-free node surface and
+  a static import-graph check are tracked in `CG-0MVS9HBN3009HIQN`.
+
 ## Path Aliases
 
 The project defines path aliases in both `tsconfig.json` and `vite.config.ts`:
@@ -1605,6 +1854,7 @@ The project defines path aliases in both `tsconfig.json` and `vite.config.ts`:
 | `@rule-engine/*` | `src/rule-engine/*` |
 | `@ai/*` | `src/ai/*` |
 | `@ui/*` | `src/ui/*` |
+| `@story-line` | `src/story-line` (generic branching story-line system) |
 
 Usage in code:
 
@@ -1626,12 +1876,35 @@ CORE_ROOT=./core npm run build     # game-repo context
 This keeps `@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*` and
 `@ai/*` import specifiers identical across the core repo and every game repo.
 
+The generic branching story-line system (`@story-line`) is documented in
+[`docs/core-engine/story-line.md`](core-engine/story-line.md).
+
+**Authoring seam.** The extended option model — declarative `cost`,
+`extraEffect` and `conditionalSuccessors` — is **programmatic** only: register
+it with `registerStorylineOptions(eventId, options)` and validate the list with
+`validateStorylineOptions(...)`. The CSV `options` column
+(`label|cardA,cardB;label2|cardC`) stays a label/outcome shorthand and cannot
+author the extended fields, so existing CSV content is unaffected. The engine
+adapter's optional `applyResourceDelta(state, { coins?, reputation? })` method
+is the seam core uses to deduct costs and apply extra effects; an adapter that
+omits it keeps compiling and running unchanged (core warns in the activity log
+instead of mutating resources).
+
 ## Build-Time Version Injection
 
 The app version (from `package.json`'s `version` field) is injected at build time
 via Vite's `define` in `vite.config.ts`. The global constant `__APP_VERSION__` is
 replaced with the version string during the Vite transform phase (both dev server
 and production builds).
+
+In the multi-repo distribution the label therefore shows the **composing repo's**
+version: a game repo's `vite.config.ts` reads that game's own `package.json`, so
+the label is the **game** version; the core repo shows the **engine** version.
+The two are independent — a game repo owns its version (the scaffold seeds
+`0.1.0`, preserves it on re-scaffold, and a game release bumps only that game's
+`package.json`), so engine and game releases proceed at different cadences. See
+[Creating a New Game §3 — per-game version policy](dev/creating-a-new-game.md#per-game-version-policy)
+and [Per-game repo scaffold](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4).
 
 The version is displayed as `v<version>` (e.g. `v0.1.7`) in two locations:
 - The **GameSelectorScene** menu screen (top-right corner, below the GitHub icon)
@@ -1892,6 +2165,43 @@ symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
 `core/src/…`. See
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
+
+### Engine sync/verify scripts in generated game repos
+
+`renderPackageJson` wires every generated game repo with two engine submodule
+scripts (MS-0MVCRGKZY007DIED), under one explicit policy
+(CG-0MVO268500071BPI):
+
+> **The pin tracks the tracked branch tip.** A pin that lags the tip is a
+> genuine failure — and **the pin and the `./core` gitlink always travel
+> together** (one actor, one moment, one commit).
+
+- `engine:sync` — dev builds compose the **latest** engine: refuse loudly on
+  uncommitted `./core` changes, then `git submodule update --remote core`
+  (remote unreachable → warn and keep the current checkout). When the
+  checkout moves and the repo has a `configs/engine-pin.json`, the pin is
+  rewritten to the new HEAD and **both the pin and the gitlink are staged
+  together**, so a commit can never record them divergent. A second no-op
+  sync leaves the pin byte-identical (nothing writes unless the SHA moved).
+  Repos **without** a pin file are never given one — a repo is pinned only
+  once the release process (or a maintainer) creates the pin, after which
+  sync maintains it.
+- `engine:verify` — release builds compile **exactly** the SHA pinned in the
+  game repo's `configs/engine-pin.json`: same dirty guard, then compare the
+  pin against the tracked branch's remote tip and check that SHA out
+  exactly. A **lagging** pin (an ancestor of the tracked tip by N commits)
+  fails with a lag-specific message telling the operator to re-pin — the pin
+  and gitlink travel together; a **bad/foreign** pin (does not resolve on the
+  tracked branch) fails with a different message telling the operator to fix
+  the pin. Both are hard failures; only the diagnosis and next steps differ.
+- `build` / `build:electron` run `engine:sync` first; `build:release` runs
+  `engine:verify` instead.
+
+The script is the engine-owned `scripts/engine-sync.mjs` (+ `.d.mts` types),
+invoked through the submodule — game repos have no root `scripts/` tree
+(Option C). Game repos must declare the tracked branch in `.gitmodules`
+(e.g. `branch = dev`) so `--remote` follows development rather than the
+remote's default branch (`main`).
 
 ### App icon linkage (`sharedPublicRoot`)
 
@@ -2464,7 +2774,7 @@ Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max h
 
 ## Animation & Sound Feedback for Player and AI Actions
 
-**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. (`shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops.)
+**Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. `shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; pass its `reason` option (the rules-layer `LegalityResult.reason`) and it also renders the transient reason toast, so a rejected move is explained as well as animated — see [shakeIllegalMove](ui-animations.md#shakeillegalmove-illegal-move-feedback--reason-toast). `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops and renders the reason toast when an `illegalReason` resolver supplies `payload.reason`.)
 
 **AI actions:** AI turns must be animated with a brief delay so the player can see and hear what the AI did (e.g. card placement / row take). Coloretto is the in-repo precedent — `../tce-coloretto/src/scenes/ColorettoAiScheduler.ts` schedules AI turns via `time.delayedCall` (750ms, 150ms under reduced motion) then dispatches the AI's action through the same animated/sounded path as a human turn (rendered by `ColorettoRenderer`, orchestrated by `ColorettoScene`).
 
@@ -2521,7 +2831,30 @@ When running `npm run dev`, a Vite plugin intercepts `POST /api/transcripts` req
 data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json
 ```
 
-This happens via a fire-and-forget POST from `TranscriptStore.save()`. If the POST fails (e.g. the production build is being served instead of the dev server), a `console.warn` is emitted but gameplay is not disrupted.
+This happens via a fire-and-forget POST from `TranscriptStore.save()`.
+
+The disk mirror is deliberately quiet. The request is only issued where the
+endpoint can exist (`import.meta.env.DEV`, i.e. a Vite dev server), and any
+non-2xx or unreachable outcome is reported **at most once per store instance**:
+
+- an absent endpoint (HTTP 404/405) or an unreachable dev server logs one
+  `console.debug` note and then stays silent — that condition is expected in
+  some runtimes (a production/Electron bundle, a Vitest browser run, a game
+  repo whose generated `vite.config.ts` does not register the plugin);
+- any other non-2xx status (5xx) logs one `console.warn`, because that is a
+  genuine server-side failure.
+
+Either way gameplay is never disrupted — the browser-storage save has already
+succeeded by then.
+
+**Game-repo registration contract.** The middleware is a Vite plugin
+(`transcriptPersistPlugin()` in `scripts/vite-transcript-plugin.ts`). This
+repository's `vite.config.ts` registers it for `command === 'serve'` only and
+never when `process.env.VITEST` is set, and the game-repo scaffold template
+(`scripts/game-repo-scaffold.ts` → `renderViteConfig`) emits the identical
+registration into every generated `vite.config.ts`. A game repo that 404s on
+`POST /api/transcripts` therefore has an out-of-date generated config: run the
+scaffold (or copy the `...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : [])` entry into `plugins`).
 
 The `data/` directory is gitignored, so persisted transcripts remain local to your machine.
 
@@ -2978,6 +3311,73 @@ this.events.on('state-settled', (payload) => { /* ... */ });
 bridge.destroy();
 ```
 
+### Game-specific events
+
+The engine ships a small, game-agnostic event vocabulary. A game declares its
+own typed event names **without editing the engine** by augmenting the exported
+`GameEventMap` interface (TypeScript module augmentation):
+
+```typescript
+// In the game's own source, next to its event declarations.
+import '@core-engine/GameEventEmitter';
+
+declare module '@core-engine/GameEventEmitter' {
+  interface GameEventMap {
+    'face-off-resolved': {
+      slot: number;
+      playerTotal: number;
+      adversaryTotal: number;
+      winner: 'player' | 'adversary';
+    };
+  }
+}
+```
+
+No other engine change is needed: `on`, `once`, `off` and `emit` all work over
+the merged map, with the same type safety as the engine's own events.
+
+```typescript
+import { GameEventEmitter } from '@core-engine';
+
+const gameEvents = new GameEventEmitter();
+
+// Typed per-name subscription (the augmented name is fully typed).
+gameEvents.on('face-off-resolved', ({ slot, winner }) => {
+  console.log(`Slot ${slot} won by ${winner}`);
+});
+
+// Catch-all subscription: every emission, engine or game-specific, with
+// its name and payload. Returns an unsubscribe function.
+const offAny = gameEvents.onAny((eventName, payload) => {
+  console.log(eventName, payload);
+});
+
+gameEvents.emit('face-off-resolved', {
+  slot: 2,
+  playerTotal: 11,
+  adversaryTotal: 8,
+  winner: 'player',
+});
+
+offAny();
+```
+
+The catch-all is what makes game-specific events automatic everywhere else:
+
+- **`PhaserEventBridge`** subscribes with `onAny`, so a game-specific event
+  reaches `scene.events` under its own name with no per-game list. (The
+  Phaser → engine direction still bridges the engine's known names, because an
+  un-typed Phaser emitter cannot be enumerated.)
+- **`GlobalEventBuffer`** (the dev "Game Events" overlay's source) subscribes
+  with `onAny`, so game-specific events are buffered from session start and
+  appear in the overlay automatically.
+
+**Engine-agnostic rule:** the engine provides the *mechanism* (augmentable map
++ catch-all), never the vocabulary. Game event names and payloads live in the
+game repository; the `gym` example game and every other consumer keep working
+unchanged. Emitting with no listeners attached is a no-op, so the mechanism is
+free when unused.
+
 ## Managing Assets
 
 - All assets go in `public/assets/` and are served by Vite at the `/assets/` URL path
@@ -3187,12 +3587,22 @@ render consistently above gameplay content across all example games.
     that manages game-state overlay lifecycle. Supports types:
     `'game-over'`, `'win/loss'`, `'round-end'`, `'custom'`.
 
+3.  **`shakeIllegalMove` / `showIllegalMoveToast`** (`src/ui/shakeIllegalMove.ts`,
+    `src/ui/illegalMoveToastView.ts`, `src/ui/illegalMoveToast.ts`) — the
+    shared illegal-move feedback routine (tint + shake + `sfx-illegal-move`).
+    Pass `reason` (normally `LegalityResult.reason`) and the routine also
+    renders a transient, non-blocking reason toast — independently of the
+    shake branch, so it still appears for Containers, `null` targets and under
+    reduced motion. See
+    [UI Animation Helpers → shakeIllegalMove](ui-animations.md#shakeillegalmove-illegal-move-feedback--reason-toast).
+
 ### Depth Convention
 
-| Layer                | Depth  | Purpose                                    |
-|----------------------|--------|--------------------------------------------|
-| HUD container        | 1000   | Help/settings panels, buttons              |
-| Game-state overlays  | 2000   | Win, loss, game-over, round-end overlays   |
+| Layer                        | Depth  | Purpose                                    |
+|------------------------------|--------|--------------------------------------------|
+| HUD container                | 1000   | Help/settings panels, buttons              |
+| Illegal-move reason toast    | 1900   | Transient rejection explanation            |
+| Game-state overlays          | 2000   | Win, loss, game-over, round-end overlays   |
 
 ### Full Component Reference
 
@@ -4331,6 +4741,7 @@ The `GymButtonBar` is exported from the UI barrel (`src/ui/index.ts`) and can be
 | Panel background | 901 |
 | Panel content | 902 |
 | Panel close button | 903 |
+| Illegal-move reason toast | 1900 |
 | Overlay background | 10–2000 (game-specific) |
 | Overlay buttons | overlay depth + 1 |
 

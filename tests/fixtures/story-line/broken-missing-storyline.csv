@@ -1,0 +1,3 @@
+card_key,card_name,flavour,arc,arc_name,choices,payoff
+tav-open,Open the Door,A stranger knocks at the tavern door.,,,Admit|tav-end,2
+tav-end,The End,The night ends.,,,,

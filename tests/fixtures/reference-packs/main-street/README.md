@@ -14,7 +14,7 @@ card-art assets:
 | File | Purpose |
 |------|---------|
 | `manifest.json` | The pack-channel manifest (`{ version, packs[] }`) declaring the pack and its relative files. |
-| `main-street/main-street-foundations/cards.csv` | The pack's CSV fragment in Main Street's `card-data.csv` schema (53 columns). |
+| `main-street/main-street-foundations/cards.csv` | The pack's CSV fragment in Main Street's `card-data.csv` schema (54 columns). |
 | `main-street/main-street-foundations/assets/*.png` | Real (non-symlink) card art copied into the built pack. |
 
 The directory is laid out like the on-disk target

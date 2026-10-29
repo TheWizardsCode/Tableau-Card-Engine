@@ -62,7 +62,7 @@ describe('vite config transcript plugin registration', () => {
 });
 
 describe('vite config core path aliases', () => {
-  const ALIAS_KEYS = ['@core-engine', '@card-system', '@rule-engine', '@ui', '@ai'];
+  const ALIAS_KEYS = ['@core-engine', '@card-system', '@rule-engine', '@ui', '@ai', '@story-line'];
 
   it('points core aliases at this checkout by default', () => {
     const original = process.env.CORE_ROOT;

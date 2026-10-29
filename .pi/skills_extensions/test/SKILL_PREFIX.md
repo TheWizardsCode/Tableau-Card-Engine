@@ -57,9 +57,13 @@ Every typed Vitest command runs through `scripts/vitest-run-with-retry.ts`,
 which:
 
 - retries once on Vitest's transient contention-induced failures (worker RPC
-  timeout / browser WebSocket drop) when either every test file actually
+  timeout, browser WebSocket drop, or a Vite dev-server module fetch failure)
+  when either every test file actually
   passed **or** the reported failures are attributable solely to the transient
-  signature (the failed-file variant; CG-0MUIMM28K001W88F);
+  signature (the failed-file variant; CG-0MUIMM28K001W88F). Acceptance after
+  both attempts is restricted to the two original signatures: module fetch is
+  retry-only, so a deterministic module-resolution regression still surfaces
+  (CG-0MVNDK56G007C1U7);
 - bounds each attempt with a wall-clock timeout and exits `124` with a
   `[hang-timeout]` diagnostic on a true hang (hangs are never retried); and
 - emits a final `[vitest-runner] attempts=N status=S outcome=…` line as the

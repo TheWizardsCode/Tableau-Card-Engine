@@ -25,12 +25,12 @@ A load or normalisation failure is **loud**: `loadMainStreetTfModule()` emits a
 which the scene forwards to `SoundManager.setSynthDiagnostics()`.
 
 **Missing-factory fallback.** A logical key may map to a factory the runtime
-module does not ship (for example the `sfx-income-*` and
-`sfx-challenge-complete` entries currently map to factories absent from the
-committed module). `tfAdapter`'s player reports whether it handled a key and
+module does not ship. `tfAdapter`'s player reports whether it handled a key and
 `SoundManager.play()` falls through to the WAV/Phaser path when it did not — so
 a synth-mapped key with no matching factory is **never silently dropped**
-(CG-0MUU9PSWC009CW76).
+(CG-0MUU9PSWC009CW76). Main Street's committed module ships a factory for all
+16 mapped keys, so its mapped keys all play through the synth
+(MS-0MV8PDNDT0033TH8).
 
 > **Environment note.** Synthesised voices can only be constructed in a real
 > browser, where a Web Audio context exists. Under Node (no Web Audio context)

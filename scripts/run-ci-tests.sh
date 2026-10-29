@@ -12,22 +12,38 @@
 #   npm run test:smoke  # ~2 min, one representative test per game
 #   npm run test:dev    # ~3.5 min, smoke + key E2E per game
 #
+# The unit and browser steps opt into the runner's project-coverage gate
+# (--expect-project-coverage, CG-0MVL21CVM003VK5H): before the run the runner
+# derives the expected test-file set from a collection-only
+# `vitest list --filesOnly --json` over the same project, captures the files
+# each attempt actually executed (injected JSON reporter), and fails the stage
+# if the sets differ. A run that silently dropped part of the suite (e.g. a
+# Vitest group-loop abort after a pool rejection) can no longer be accepted as
+# green via the transient path. A pre-flight collection failure fails closed
+# (exit 2).
+#
 # The unit and browser steps run through scripts/vitest-run-with-retry.ts, which
 # retries once on Vitest's transient contention-induced failures
 # ([vitest-worker]: Timeout calling "onTaskUpdate" for the worker RPC layer,
 # [vitest] Browser connection was closed while running tests for the browser-mode
-# WebSocket drop) — a non-zero exit that can happen even when every test passed.
-# The retry is masked against genuine failures (see that script's
-# shouldRetryOnce): it qualifies when every file passed, or when the summary
-# reports failures but every error is attributable to the transient signature
-# (the failed-file variant, CG-0MUIMM28K001W88F). If the retry is ALSO a pure
-# transient failure the run is accepted as green — no genuine failure was
-# masked (CG-0MUF0LU4X006IXXU). See CG-0MS9M5UJP005PWD3 and
-# CG-0MSCI73RH004VPCE.
+# WebSocket drop, and "Failed to fetch dynamically imported module" for the Vite
+# dev server failing to serve a test module under load) — a non-zero exit that
+# can happen even when every test passed. The retry is masked against genuine
+# failures (see that script's shouldRetryOnce): it qualifies when every file
+# passed, or when the summary reports failures but every error is attributable
+# to the transient signature (the failed-file variant, CG-0MUIMM28K001W88F). If
+# the retry is ALSO a pure transient failure of one of the two original
+# signatures the run is accepted as green — no genuine failure was masked
+# (CG-0MUF0LU4X006IXXU). A module-fetch failure is deliberately RETRY-ONLY: a
+# genuine module-resolution regression is deterministic, so a both-attempts
+# module-fetch run keeps the retry's own failing status
+# (CG-0MVNDK56G007C1U7). See CG-0MS9M5UJP005PWD3, CG-0MSCI73RH004VPCE and
+# CG-0MVNDK56G007C1U7.
 #
 # The runner retries once when a run is attributable to the transient
 # contention signatures and emits a final
-# `[vitest-runner] attempts=N status=S outcome=...` line after every run.
+# `[vitest-runner] attempts=N status=S outcome=... expected=N ran=M` line after
+# every run (expected=unset when no expectation was supplied).
 # Stage output is NOT truncated (CG-0MUIMM28K001W88F), so a recurrence names
 # the failed test/file and shows any distinct assertion error alongside the
 # transient signature instead of only the reporter's summary counts.
@@ -62,11 +78,11 @@ npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 echo "=== Unit Tests ==="
-npx tsx scripts/vitest-run-with-retry.ts --project unit --timeout-ms 300000 2>&1
+npx tsx scripts/vitest-run-with-retry.ts --expect-project-coverage --project unit --timeout-ms 300000 2>&1
 echo ""
 
 echo "=== Browser Tests (non-tutorial) ==="
-npx tsx scripts/vitest-run-with-retry.ts --project browser --timeout-ms 1200000 2>&1
+npx tsx scripts/vitest-run-with-retry.ts --expect-project-coverage --project browser --timeout-ms 1200000 2>&1
 echo ""
 
 echo "=== Tutorial E2E Tests ==="

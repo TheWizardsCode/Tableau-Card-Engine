@@ -696,12 +696,21 @@ describe('GameEventEmitter', () => {
 
   describe('cross-game payload consistency', () => {
     /**
-     * A minimal, representative payload for every event name in
+     * A minimal, representative payload for every engine event name in
      * `GameEventMap`. Used to drive the emitter through each key of the map
      * via the public API. Optional fields are omitted to prove they are
      * genuinely optional at runtime.
+     *
+     * `GameEventMap` is open to consumer augmentation (a game declares its
+     * own typed names — see `GameEventEmitter.gameEvents.test.ts`). This map
+     * covers the engine's own vocabulary, so augmented names are excluded;
+     * adding an engine event still fails compilation until a sample is
+     * added here.
      */
-    const MINIMAL_PAYLOADS: Record<GameEventName, Record<string, unknown>> = {
+    const MINIMAL_PAYLOADS: Record<
+      Exclude<GameEventName, 'synthetic-face-off-resolved'>,
+      Record<string, unknown>
+    > = {
       'turn-started': { turnNumber: 0, playerIndex: 0, playerName: 'A', isAI: false },
       'turn-completed': { turnNumber: 0, playerIndex: 0, playerName: 'A', phase: 'playing' },
       'animation-complete': { turnNumber: 0 },
@@ -730,7 +739,7 @@ describe('GameEventEmitter', () => {
     };
 
     it('round-trips a representative payload for every event name in GameEventMap', () => {
-      const names = Object.keys(MINIMAL_PAYLOADS) as GameEventName[];
+      const names = Object.keys(MINIMAL_PAYLOADS) as (keyof typeof MINIMAL_PAYLOADS)[];
       expect(names.length).toBeGreaterThan(0);
 
       for (const name of names) {
@@ -771,7 +780,7 @@ describe('GameEventEmitter', () => {
 
     it('listenerCount tracks each event independently across the whole map', () => {
       const local = new GameEventEmitter();
-      const names = Object.keys(MINIMAL_PAYLOADS) as GameEventName[];
+      const names = Object.keys(MINIMAL_PAYLOADS) as (keyof typeof MINIMAL_PAYLOADS)[];
 
       // Subscribe every event exactly once
       for (const name of names) {

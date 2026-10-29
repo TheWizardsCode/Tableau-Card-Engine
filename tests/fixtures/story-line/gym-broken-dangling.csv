@@ -1,0 +1,2 @@
+id,name,effect,options,hasChoices,acceptNextCardId,rejectNextCardId,storylineId,storylineTitle,trigger,cost,coinDelta,reputationDelta
+gym-open,Gym Open,A card that links nowhere.,Go|gym-missing,false,,,gym-arc,Gym Arc,Incident,0,0,0

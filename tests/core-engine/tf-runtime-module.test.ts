@@ -46,6 +46,10 @@ const EXPECTED_KEYS = [
   'construction-lite-hammer',
   'construction-lite-saw',
   'crowd-cheer',
+  'income-positive-chime',
+  'income-negative-chime',
+  'income-neutral-chime',
+  'success-fanfare',
 ];
 
 describe('ToneForge runtime synth module', () => {

@@ -218,6 +218,18 @@ into the game's `./core` submodule via `CORE_ROOT`. There is no `src` symlink:
 the aliases replace the F4 compatibility symlinks. See the
 [layout decision record](docs/dev/per-game-src-layout-decision.md).
 
+#### Per-game version policy
+
+A game repo owns its own version — it is never the engine's version. The
+scaffold seeds a brand-new game repo at `0.1.0`, **preserves** the `version`
+already in an existing repo's `package.json` when re-scaffolding (so an existing
+game is never renumbered), accepts an explicit `--version <semver>` override,
+and never copies the core's `version`. A release cut inside `tce-<game>` bumps
+only that game's `package.json`, so game and engine releases proceed at
+independent cadences and the version label on game screens follows the game
+build. See
+[Per-game version policy](docs/dev/creating-a-new-game.md#per-game-version-policy).
+
 ### Repository layout (this checkout)
 
 ```

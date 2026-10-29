@@ -287,6 +287,8 @@ export class TranscriptStore {
   private readonly localStoragePrefix: string;
   private initPromise: Promise<void> | null = null;
   private seqCounter: number = 0;
+  /** Set once a disk-persistence failure has been reported (log-once gate). */
+  private diskPersistenceIssueReported = false;
 
   constructor(options: TranscriptStoreOptions = {}) {
     this.maxPerGame = options.maxPerGame ?? DEFAULT_MAX_PER_GAME;
@@ -436,12 +438,21 @@ export class TranscriptStore {
    * Fire-and-forget POST to the Vite dev-server transcript plugin.
    *
    * Sends { gameType, transcript } to /api/transcripts so the plugin
-   * can write the transcript to disk during development. Errors are
-   * logged as warnings but never propagate -- this must never break
-   * the save() return path.
+   * can write the transcript to disk during development. Errors never
+   * propagate -- this must never break the save() return path.
+   *
+   * Quiet by design (MS-0MVREB31W004F48D): the request is only issued where
+   * the endpoint can exist (`import.meta.env.DEV` — a Vite dev server), and
+   * a non-2xx / unreachable outcome is reported **at most once per store
+   * instance**. Repeating a warning on every game-over for a condition that
+   * is expected in some environments (a scaffolded repo that never registered
+   * the plugin, a Vitest browser run, a production/Electron build) trains
+   * readers to ignore the console; one quiet note keeps the contract
+   * diagnosable without the noise.
    */
   private postToDisk<T>(gameType: string, transcript: T): void {
     if (typeof fetch === 'undefined') return;
+    if (!this.isDevMode()) return;
 
     fetch('/api/transcripts', {
       method: 'POST',
@@ -449,15 +460,71 @@ export class TranscriptStore {
       body: JSON.stringify({ gameType, transcript }),
     })
       .then((res) => {
-        if (!res.ok) {
-          console.warn(
+        if (res.ok) return;
+        if (res.status === 404 || res.status === 405) {
+          // Expected absence: the endpoint has not been registered (e.g. the
+          // generated vite.config.ts predates the registration, or this is a
+          // test/prod runtime with the plugin disabled). Report once, quietly.
+          this.logDiskPersistenceIssue(
+            'debug',
+            `[TranscriptStore] Disk persistence endpoint unavailable (HTTP ${res.status}); further notices suppressed this session`,
+          );
+        } else {
+          // Genuine server-side failure (5xx etc.) — still once, but louder.
+          this.logDiskPersistenceIssue(
+            'warn',
             `[TranscriptStore] Disk persistence POST returned HTTP ${res.status}`,
           );
         }
       })
       .catch((err) => {
-        console.warn('[TranscriptStore] Disk persistence POST failed:', err);
+        // Unreachable dev server (restart, host pressure) — one quiet note.
+        this.logDiskPersistenceIssue(
+          'debug',
+          '[TranscriptStore] Disk persistence POST failed; further notices suppressed this session',
+          err,
+        );
       });
+  }
+
+  /**
+   * Whether the `/api/transcripts` endpoint can exist in this runtime.
+   *
+   * Only a Vite dev server registers the transcript-persist middleware, so
+   * the disk mirror is issued from `import.meta.env.DEV` builds only. Vite
+   * replaces `import.meta.env` with a literal env object at build time, so a
+   * production bundle reads `DEV: false` and never issues the POST; the
+   * optional access keeps a plain Node import (CLI/unit tests) from throwing
+   * when `import.meta.env` is not injected. Single point of truth: override
+   * this in tests rather than fabricating a Vite env.
+   */
+  protected isDevMode(): boolean {
+    const env = (import.meta as { env?: { DEV?: string | boolean } }).env;
+    return Boolean(env?.DEV);
+  }
+
+  /**
+   * Report a disk-persistence failure at most once per store instance.
+   *
+   * `postToDisk` runs once per `save()`; without this gate a misconfigured
+   * repo or a dying dev server would flood the console with an identical
+   * message on every game-over.
+   */
+  private logDiskPersistenceIssue(
+    level: 'debug' | 'warn',
+    message: string,
+    detail?: unknown,
+  ): void {
+    if (this.diskPersistenceIssueReported) return;
+    this.diskPersistenceIssueReported = true;
+    if (level === 'warn') {
+      if (detail === undefined) console.warn(message);
+      else console.warn(message, detail);
+    } else if (detail === undefined) {
+      console.debug(message);
+    } else {
+      console.debug(message, detail);
+    }
   }
 
   /**

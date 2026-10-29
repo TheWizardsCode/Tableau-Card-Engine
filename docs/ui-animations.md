@@ -11,6 +11,7 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 | `discardCard` | Card discard animation with fade/shrink | 400ms |
 | `flipCard` | Two-phase card flip (scaleX → 0 → texture swap → scaleX → 1) | 300ms |
 | `moveGameObject` | Positional movement tween | 700ms |
+| `shakeIllegalMove` | Illegal-move feedback: tint + shake, plus an optional transient reason toast | n/a (50ms × repeats) |
 | `createDragDropManager` | Reusable drag-and-drop lifecycle (dragstart/drag/dragend/drop, snap-back, drop-zone hit-testing) | n/a |
 
 ## dealCard
@@ -204,6 +205,106 @@ import { moveGameObject } from '@ui/moveGameObject';
 | `reducedMotion` | `boolean` | undefined | When true, target snaps to destination instantly |
 | `sfx` | `object` | undefined | Optional SFX configuration (start/move/end keys) |
 
+## shakeIllegalMove (illegal-move feedback + reason toast)
+
+Shared illegal-move feedback routine: tint + horizontal shake + the
+`sfx-illegal-move` SFX. Pass a `reason` and the routine **also** renders a
+transient toast containing that text, so a refused move explains itself
+instead of only shaking (CG-0MVPXFHBZ004LGEB).
+
+### Import
+
+```ts
+import { shakeIllegalMove } from '@ui';
+```
+
+> **Node-safe to import.** `shakeIllegalMove` — and the toast view it composes
+> (`@ui/illegalMoveToastView`) plus `@ui/dragDrop`, which imports
+> `shakeIllegalMove` — are free of Phaser **value** imports, so they load in a
+> plain Node environment (no `window`, no browser). Downstream game unit suites
+> import these deep paths safely; `tests/ui/phaser-free-imports.test.ts` guards
+> the graph with a throwing `phaser` mock (CG-0MVQQ2M8E003FQMZ). Do **not**
+> add a Phaser value import (or an import of a Phaser-bearing module like
+> `@ui/Renderer`) to these helpers without updating that guard. The broader
+> documented Phaser-free node surface is tracked in CG-0MVS9HBN3009HIQN.
+
+### Usage
+
+```ts
+const result = rules.placeFigure(state, cardId, slotIndex);
+if (!result.legal) {
+  shakeIllegalMove({
+    scene: this,
+    target: cardContainer,          // Image, Sprite or Container
+    reason: result.reason,          // rules-layer copy, shown verbatim
+  });
+}
+```
+
+### Options (`ShakeIllegalMoveOptions`)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scene` | `Phaser.Scene` | required | Scene that owns the tween/toast |
+| `target` | `Image \| Sprite \| Container \| null` | required | Target to shake; `null` still shows the reason toast |
+| `tint` | `number` | `0xff4444` | Tint applied during the shake (tintable targets only) |
+| `shakeDistance` | `number` | 5 | Horizontal offset per oscillation (px) |
+| `duration` | `number` | 50 | Oscillation duration (ms) |
+| `repeat` | `number` | 2 | Extra oscillation repeats |
+| `ease` | `string` | `'Sine.inOut'` | Oscillation easing |
+| `soundKey` | `string` | `sfx-illegal-move` | SFX key; `''` suppresses the sound |
+| `reason` | `string` | — | Player-facing rejection text rendered as a toast (verbatim) |
+| `reasonDwellMs` | `number` | 2500 | Toast dwell before auto-dismissal (ms) |
+| `reducedMotion` | `boolean` | `getEffectiveReducedMotion()` | Skip the shake + SFX; the toast still renders |
+| `onComplete` | `function` | undefined | Called after the shake (or immediately under reduced motion) |
+
+### Reason-toast behaviour
+
+- **Independent of the shake branch.** The toast is rendered *before* every
+  shake early-return, so it appears for tintable `Image`/`Sprite` targets,
+  non-tintable `Container` targets (position shake only), `null` targets, and
+  when reduced motion suppresses the shake entirely.
+- **Non-blocking.** The toast is a plain non-interactive text object (built
+  inline via `scene.add.text` with the same style `createHudText` produced —
+  `FONT_FAMILY`, bold, colour, font size, centre-aligned, origin `(0.5, 0.5)`);
+  it never swallows pointer input aimed at cards, slots or buttons.
+- **Depth.** `ILLEGAL_MOVE_TOAST_DEPTH = 1900` — above gameplay, the HUD
+  container (1000) and dialog overlays (200), below game-state overlays (2000:
+  win / loss / game-over). Styling lives in `src/ui/constants.ts`
+  (`ILLEGAL_MOVE_TOAST_*`); callers never position it.
+- **Timing.** Dwell defaults to `ILLEGAL_MOVE_TOAST_DWELL_MS = 2500` and is
+  configurable per call via `reasonDwellMs` (or on
+  `IllegalMoveToastModel`/`showIllegalMoveToast`). A rejection inside the dwell
+  window **replaces** the text and restarts the timer — toasts never stack.
+- **No animation.** The toast appears, holds for its full dwell and disappears
+  instantly in every mode (reduced motion included) — no slide, fade or scale,
+  and no per-frame tween left running after dismissal.
+- **Ephemeral and scene-scoped.** It is never persisted and is not part of
+  undo/redo or the transcript; it is destroyed on scene `shutdown`/`destroy` so
+  it cannot leak across scenes. `dismissIllegalMoveToast(scene)` (or the
+  handle returned by `showIllegalMoveToast`) dismisses it early.
+- **Text is verbatim.** The rules layer owns the wording (`LegalityResult
+  .reason`); the toast never re-words or truncates it (long reasons wrap at
+  `ILLEGAL_MOVE_TOAST_MAX_WIDTH`).
+
+### Direct API
+
+The underlying model is framework-free and separately exported:
+
+```ts
+import { IllegalMoveToastModel } from '@ui';
+
+const model = new IllegalMoveToastModel({ dwellMs: 3000 });
+model.show('That figure is already exhausted.');
+model.visible;   // true
+model.remaining; // 3000
+model.tick(3000); // true — expired, model hides itself
+```
+
+`showIllegalMoveToast({ scene, text, dwellMs? })` renders the toast directly
+(returns an `IllegalMoveToastHandle` with `dismiss()`), and
+`dismissIllegalMoveToast(scene)` dismisses any live toast early.
+
 ## createDragDropManager (drag-and-drop lifecycle)
 
 Encapsulates the Phaser drag lifecycle into a single configurable core-engine
@@ -278,6 +379,7 @@ draggable on every board render (`makeDraggable`).
 | `hitArea` | `Phaser.Geom.Rectangle` | texture frame | Local-coordinate hit area (required for Containers) |
 | `canPickUp` | `(payload) => boolean` | — | Pickup veto: `false` keeps the object at its origin and fires illegal feedback |
 | `onDrop` | `(payload) => void` | — | Called when dropped on an accepting zone |
+| `illegalReason` | `(payload) => string \| undefined` | — | Rejection text for a pickup veto / invalid snap-back (rendered as a toast) |
 
 ### `DragDropZoneConfig`
 
@@ -286,6 +388,7 @@ draggable on every board render (`makeDraggable`).
 | `zone` | `Phaser.GameObjects.Zone` | required | A drop zone (created via `setRectangleDropZone`) |
 | `data` | `unknown` | — | Caller zone data (e.g. slot index) via `payload.zoneData` |
 | `canAccept` | `(payload) => boolean` | — | Zone acceptance: `false` snap-backs + illegal feedback |
+| `illegalReason` | `(payload) => string \| undefined` | — | Rejection text for this zone (wins over the draggable's resolver) |
 
 ### Behaviour
 
@@ -304,9 +407,13 @@ draggable on every board render (`makeDraggable`).
 - **Invalid drop** (no zone, rejected `canAccept`, or released outside any
   zone): the object snap-backs to its captured origin (position **and** depth)
   with illegal feedback — the "illegal move" case.
-- **Illegal feedback**: defaults to `shakeIllegalMove` (objects with `setTint`)
-  or a container-safe position shake + `safePlaySound`
-  (`COMMON_SFX_KEYS.ILLEGAL_MOVE` = `sfx-illegal-move`) for Containers.
+- **Illegal feedback**: defaults to `shakeIllegalMove` for Images **and**
+  Containers (Containers get the position shake only), playing
+  `COMMON_SFX_KEYS.ILLEGAL_MOVE` (`sfx-illegal-move`). A reason supplied by the
+  draggable's or zone's `illegalReason` resolver (or set inline on
+  `payload.reason` inside `canPickUp`/`canAccept`) is rendered as the
+  transient reason toast described above; without a reason the behaviour is
+  unchanged. Custom `onIllegal` hooks receive `payload.reason` too.
 - **Reduced motion**: snap-back restores position/depth instantly (no tween);
   runtime toggling via `setReducedMotion()`.
 

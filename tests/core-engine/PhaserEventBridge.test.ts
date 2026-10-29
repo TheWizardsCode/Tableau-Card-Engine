@@ -236,20 +236,15 @@ describe('PhaserEventBridge', () => {
     });
 
     it('should remove bridge listeners from engine', () => {
-      // Bridge registers 5 listeners on the engine (one per event)
-      expect(engine.listenerCount('turn-started')).toBe(1);
-      expect(engine.listenerCount('turn-completed')).toBe(1);
-      expect(engine.listenerCount('animation-complete')).toBe(1);
-      expect(engine.listenerCount('state-settled')).toBe(1);
-      expect(engine.listenerCount('game-ended')).toBe(1);
+      // The engine -> Phaser direction is a single catch-all subscription
+      // (`onAny`), not one listener per event name, so every engine event —
+      // including game-specific ones — is forwarded without a name list.
+      expect(engine.listenerCount('turn-started')).toBe(0);
+      expect(engine.anyListenerCount()).toBe(1);
 
       bridge.destroy();
 
-      expect(engine.listenerCount('turn-started')).toBe(0);
-      expect(engine.listenerCount('turn-completed')).toBe(0);
-      expect(engine.listenerCount('animation-complete')).toBe(0);
-      expect(engine.listenerCount('state-settled')).toBe(0);
-      expect(engine.listenerCount('game-ended')).toBe(0);
+      expect(engine.anyListenerCount()).toBe(0);
     });
 
     it('should remove bridge listeners from phaser', () => {

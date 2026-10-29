@@ -17,7 +17,7 @@
  * successfully. The real-browser proof lives in
  * `tests/core-engine/tf-runtime-integration.browser.test.ts`, and the real
  * scene attaches an active synth player (`isSynthActive() === true`,
- * 12 factories, no load error).
+ * 16 factories, no load error).
  *
  * This Node-scoped test therefore asserts only the **environment-independent
  * structural contract** — the module ships the expected factory keys and the
@@ -44,6 +44,10 @@ const RUNTIME_FACTORY_KEYS = [
   'construction-lite-hammer',
   'construction-lite-saw',
   'crowd-cheer',
+  'income-positive-chime',
+  'income-negative-chime',
+  'income-neutral-chime',
+  'success-fanfare',
 ] as const;
 
 describe('ToneForge runtime synth module structure', () => {

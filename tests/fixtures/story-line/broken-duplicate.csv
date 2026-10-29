@@ -1,0 +1,3 @@
+card_key,card_name,flavour,arc,arc_name,choices,payoff
+tav-open,Open the Door,A stranger knocks at the tavern door.,tav,Tavern Nights,,2
+tav-open,Open the Door Again,A second row reuses the id.,tav,Tavern Nights,,3
