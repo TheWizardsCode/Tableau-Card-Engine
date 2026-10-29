@@ -53,6 +53,15 @@
  * ```
  *
  * Run with `--help` for the full option list.
+ *
+ * ## Per-game version policy
+ *
+ * A scaffolded game repo owns its own `version`, decoupled from the engine's.
+ * The scaffold seeds a **new** game at {@link GAME_INITIAL_VERSION} (`0.1.0`),
+ * **preserves** the version already in a game repo's `package.json` on a
+ * re-scaffold, and accepts an explicit `--version` override. It never copies
+ * `CoreManifest.version` (CG-0MVGF2QE9008NA5R). A game release bumps only that
+ * game's version; the ship `bump-version.js` resolves the invoking repo root.
  */
 
 import fs from 'node:fs';
@@ -77,10 +86,27 @@ export const GAME_REPO_CONFIGS_DIR = 'configs';
 /** The preset filename a game repo builds with by default. */
 export const DEFAULT_GAME_PRESET = 'game';
 
+/**
+ * Version a freshly scaffolded game repo is seeded with.
+ *
+ * Per-game version policy (CG-0MVGF2QE9008NA5R): **each game repo owns its
+ * own version**, decoupled from the engine's release cadence.
+ * `renderPackageJson` never derives a game version from the core manifest; the
+ * scaffold seeds a new game at `GAME_INITIAL_VERSION`, preserves an existing
+ * game's version on re-scaffold, and a game release bumps only that game's
+ * `package.json` (the ship `bump-version.js` resolves the invoking repo root).
+ */
+export const GAME_INITIAL_VERSION = '0.1.0';
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 /** The subset of the core `package.json` the scaffold reuses. */
 export interface CoreManifest {
+  /**
+   * The **core's** version. Kept typed because a manifest is a `package.json`
+   * subset, but deliberately **unused** by the scaffold: a game repo owns its
+   * own version (CG-0MVGF2QE9008NA5R), see {@link GAME_INITIAL_VERSION}.
+   */
   version?: string;
   scripts?: Record<string, string>;
   dependencies?: Record<string, string>;
@@ -119,7 +145,16 @@ export interface ScaffoldOptions {
   adapterPath?: string;
   /** The core manifest; read from `coreRoot/package.json` when omitted. */
   coreManifest?: CoreManifest;
+  /**
+   * Explicit version for the generated `package.json`. Wins over any version
+   * already present in the game repo (preserve-on-re-scaffold); when omitted,
+   * the existing version is preserved, else {@link GAME_INITIAL_VERSION}.
+   */
+  version?: string;
 }
+
+/** Why the scaffold picked the game version it wrote. */
+export type ScaffoldVersionSource = 'explicit' | 'preserved' | 'baseline';
 
 /** Result of {@link scaffoldGameRepo}. */
 export interface ScaffoldResult {
@@ -135,6 +170,10 @@ export interface ScaffoldResult {
   assetLinks: string[];
   /** Core root app-icon files linked into `public/` (CG-0MUUFZSE90061KKL). */
   publicLinks: string[];
+  /** The version written to the game's `package.json`. */
+  version: string;
+  /** Why {@link version} was chosen. */
+  versionSource: ScaffoldVersionSource;
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────
@@ -171,6 +210,28 @@ export function readCoreManifest(coreRoot: string): CoreManifest {
 }
 
 /**
+ * Read the `version` field of an existing game repo `package.json`.
+ *
+ * Total by design: returns the string version when the file exists and parses
+ * with a string `version`; `undefined` when the file is absent, unreadable,
+ * malformed, or declares no string version — callers then fall back to
+ * {@link GAME_INITIAL_VERSION}. This is the preserve-on-re-scaffold seam: a
+ * re-scaffold must not clobber a game's own release version.
+ */
+export function readExistingPackageVersion(
+  gameRepoRoot: string,
+): string | undefined {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(gameRepoRoot, 'package.json'), 'utf-8'),
+    ) as { version?: unknown };
+    return typeof parsed.version === 'string' ? parsed.version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Resolve the scene/adapter paths for a game from the core's `configs/full.json`.
  *
  * Returns `undefined` when the preset is absent or the game is not listed;
@@ -198,10 +259,13 @@ export function renderPackageJson(
   game: string,
   manifest: CoreManifest,
   coreRel: string,
+  version: string = GAME_INITIAL_VERSION,
 ): string {
   const pkg = {
     name: `tce-${game}`,
-    version: manifest.version ?? '0.0.0',
+    // The game owns its version (CG-0MVGF2QE9008NA5R): the caller decides it
+    // (baseline / preserved / explicit), never the core manifest.
+    version,
     private: true,
     description:
       `Single-game Tableau Card Engine launcher for "${game}". ` +
@@ -220,8 +284,17 @@ export function renderPackageJson(
         ]),
       ),
       dev: 'vite --host',
-      build: 'tsc --noEmit && vite build',
-      'build:electron': 'tsc --noEmit && vite build --mode electron',
+      build: `npm run engine:sync && tsc --noEmit && vite build`,
+      'build:electron': `npm run engine:sync && tsc --noEmit && vite build --mode electron`,
+      'build:release': `npm run engine:verify && tsc --noEmit && vite build`,
+      // Engine submodule sync/verify (MS-0MVCRGKZY007DIED): dev builds always
+      // compose the latest engine remote head; release builds compile exactly
+      // the committed `configs/engine-pin.json` SHA. The script is canonical
+      // in the engine repo (`<coreRel>/scripts/engine-sync.mjs`); game repos
+      // invoke it through the submodule — there is no game-repo `scripts/`
+      // tree (Option C).
+      'engine:sync': `node ${coreRel}/scripts/engine-sync.mjs sync`,
+      'engine:verify': `node ${coreRel}/scripts/engine-sync.mjs verify`,
       preview: 'vite preview --host',
       test: 'vitest run --project unit',
       'test:unit': 'vitest run --project unit',
@@ -256,7 +329,7 @@ import {
   gameDiscoveryPlugin,
   resolveCoreAliases,
 } from '${coreRel}/scripts/vite-game-discovery-plugin';
-import { DEV_WATCH_IGNORE_PATTERNS } from '${coreRel}/scripts/vite-transcript-plugin';
+import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from '${coreRel}/scripts/vite-transcript-plugin';
 
 const coreRoot = path.resolve(__dirname, '${coreRel}');
 const pkg = JSON.parse(
@@ -289,7 +362,7 @@ const presetEnv = {
   GAMES_CONFIG: process.env.GAMES_CONFIG ?? '${DEFAULT_GAME_PRESET}',
 };
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ command, mode }) => ({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
@@ -300,9 +373,21 @@ export default defineConfig(({ mode }) => ({
     // Reads ./configs/${DEFAULT_GAME_PRESET}.json and generates
     // 'virtual:game-registry' (Gym from the core + this one game).
     gameDiscoveryPlugin({ projectRoot: __dirname, coreRoot, env: presetEnv }),
+    // Persist transcripts to data/transcripts/<game>/ during a normal dev
+    // session: this is the middleware behind POST /api/transcripts, so without
+    // it every game-over 404s in the browser console. Dev-serve only, and never
+    // under Vitest (the plugin writes to disk — see the core docs/DEVELOPER.md
+    // section on Transcript Persistence). Mirrors core/vite.config.ts.
+    ...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []),
   ],
   resolve: {
     alias: resolveCoreAliases(coreRoot),
+    // Shared runtime deps must resolve to exactly ONE copy (phaser, tone): a
+    // second copy (e.g. an npm install inside the core submodule) becomes a
+    // distinct module id and the Node-env unit tests' vi.mock('phaser') stops
+    // applying, evaluating real Phaser on collection. Mirrors the
+    // core/vite.config.ts dedupe.
+    dedupe: ['phaser', 'tone'],
   },
   build: {
     outDir: 'dist',
@@ -379,6 +464,8 @@ export function renderTsconfig(_game: string, coreRel: string): string {
         '@ai/*': [`${coreRel}/src/ai/*`],
         '@balance-cards': [`${coreRel}/src/balance-cards`],
         '@balance-cards/*': [`${coreRel}/src/balance-cards/*`],
+        '@story-line': [`${coreRel}/src/story-line`],
+        '@story-line/*': [`${coreRel}/src/story-line/*`],
         // Core-owned framework trees consumed by the game's own tests and
         // replay adapter (F9 / C1).
         '@core-scripts/*': [`${coreRel}/scripts/*`],
@@ -722,6 +809,16 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   }
 
   const manifest = options.coreManifest ?? readCoreManifest(coreRoot);
+  // Per-game version policy: an explicit override wins, else preserve an
+  // existing released version, else seed the independent baseline.
+  const existingVersion = readExistingPackageVersion(gameRepoRoot);
+  const version = options.version ?? existingVersion ?? GAME_INITIAL_VERSION;
+  const versionSource: ScaffoldVersionSource =
+    options.version !== undefined
+      ? 'explicit'
+      : existingVersion !== undefined
+        ? 'preserved'
+        : 'baseline';
   const preset = options.scenePath
     ? undefined
     : findGameInPreset(coreRoot, options.game);
@@ -743,7 +840,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
 
   writeFile(
     path.join(gameRepoRoot, 'package.json'),
-    renderPackageJson(options.game, manifest, coreRel),
+    renderPackageJson(options.game, manifest, coreRel, version),
     written,
   );
   writeFile(
@@ -813,6 +910,8 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     rewritten,
     assetLinks,
     publicLinks,
+    version,
+    versionSource,
   };
 }
 
@@ -826,6 +925,7 @@ interface CliArgs {
   reposDir?: string;
   all?: boolean;
   layout?: string;
+  version?: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -848,6 +948,10 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case '--core-rel':
         args.coreRel = next;
+        i += 1;
+        break;
+      case '--version':
+        args.version = next;
         i += 1;
         break;
       case '--repos-dir':
@@ -885,6 +989,8 @@ function usage(): string {
     '                           <repos-dir-parent>/Tableau-Card-Engine.',
     '  --core-rel <path>        Core path as used inside the game repo',
     `                           (default: ${DEFAULT_CORE_REL}).`,
+    '  --version <semver>       Explicit game package version (default:',
+    '                           preserve the repo version, else seed 0.1.0).',
     '  --layout <path>          Layout file for --all',
     '                           (default: <core-root>/scripts/configs/repo-layout.json).',
     '  -h, --help               Show this help.',
@@ -939,11 +1045,13 @@ function main(argv: string[]): number {
         coreRoot,
         coreRel,
         coreManifest: manifest,
+        version: args.version,
       });
       console.log(`Scaffolded tce-${game}`);
       console.log(`  game repo: ${result.gameRepoRoot}`);
       console.log(`  core:      ${result.coreRoot} (${result.coreRel})`);
       console.log(`  preset:    ${result.presetPath}`);
+      console.log(`  version:   ${result.version} (${result.versionSource})`);
       for (const f of result.written) console.log(`  wrote ${f}`);
       for (const l of result.symlinks) console.log(`  linked ${l}`);
       if (result.rewritten.length) {

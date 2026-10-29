@@ -42,6 +42,17 @@ npx vitest run --project browser tests/gym/*.browser.test.ts
 | DPR Resolution Comparison | `GymDprResolutionScene` | `rasteriseSvgToTexture`, `makeTextureKey`, `MIN_QUALITY_SCALE`, `markSceneValid`, `markSceneInvalid`, SLL `anchorPoint` | [`scenes/GymDprResolutionScene.ts`](../../example-games/gym/scenes/GymDprResolutionScene.ts) | [`GymDprResolutionScene.browser.test.ts`](../../tests/gym/GymDprResolutionScene.browser.test.ts) |
 | Card Type Index & Synergy Groups | `GymCardIndexScene` | Main Street template getters (`getBusinessTemplates`, `getCommunitySpaceTemplates`, `getEventTemplates`, `getUpgradeTemplates`, `getStaffCardTemplates`), `buildCardTooltipInfo`, `TooltipManager`, `createOverlayDialog`, SLL `anchorPoint` | [`scenes/GymCardIndexScene.ts`](../../example-games/gym/scenes/GymCardIndexScene.ts), [`GymCardIndex.ts`](../../example-games/gym/GymCardIndex.ts) | [`GymCardIndex.test.ts`](../../tests/gym/GymCardIndex.test.ts), [`GymCardIndexScene.browser.test.ts`](../../tests/gym/GymCardIndexScene.browser.test.ts), [`GymRegistry.test.ts`](../../tests/gym/GymRegistry.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 | In-game DLC Gate | `GymDlcUnlockScene` | `createDlcGate` (`DlcGate`, `DlcUnlockReader`), `contentUnlockClientFromWindow` (F5 total read client), SLL `anchorPoint` | [`scenes/GymDlcUnlockScene.ts`](../../example-games/gym/scenes/GymDlcUnlockScene.ts) | [`DlcGate.test.ts`](../../tests/core-engine/DlcGate.test.ts), [`GymDlcUnlock.browser.test.ts`](../../tests/gym/GymDlcUnlock.browser.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
+| Storyline | `GymStorylineScene` | `createStorylineSystem`, `compileStorylineFromEvent`, `resolveStorylineOption`, `createPendingStorylineChoice`, `defaultStorylineUiAdapter`; demo fixture + transitions (`DEMO_CARDS`, `createDemoState`, `createDemoEngine`, `createDemoRuntime`, `startDemo`, `drawDemoCard`, `applyDemoChoice`) in [`GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts) | [`scenes/GymStorylineScene.ts`](../../example-games/gym/scenes/GymStorylineScene.ts), [`GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts) | [`GymStorylineDemo.test.ts`](../../tests/gym/GymStorylineDemo.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
+
+
+The Storyline demo's generic engine is documented in
+[`docs/core-engine/story-line.md`](../core-engine/story-line.md) (module API,
+engine/UI adapters and this demo). The demo's own branching fixture and its
+pure draw/choice transitions live in the Phaser-free
+[`example-games/gym/GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts)
+and are unit-tested by `tests/gym/GymStorylineDemo.test.ts` — the scene only
+renders what those transitions return, so the fixture can be verified without
+a browser.
 
 ## Scene Navigation
 

@@ -1,0 +1,3 @@
+card_key,card_name,flavour,arc,arc_name,choices,payoff
+tav-loop-a,Loop A,The argument returns to the start.,tav,Tavern Nights,Again|tav-loop-b,1
+tav-loop-b,Loop B,The argument circles back again.,tav,Tavern Nights,Back|tav-loop-a,1

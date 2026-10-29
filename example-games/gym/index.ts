@@ -34,6 +34,7 @@ export { GymSpatialRulesScene } from './scenes/GymSpatialRulesScene';
 export { GymTokenPileViewScene } from './scenes/GymTokenPileViewScene';
 export { GymRuleEngineScene } from './scenes/GymRuleEngineScene';
 export { GymDlcUnlockScene } from './scenes/GymDlcUnlockScene';
+export { GymStorylineScene } from './scenes/GymStorylineScene';
 
 export {
   GYM_ROUTER_KEY,
@@ -60,6 +61,7 @@ export {
   GYM_TOKEN_PILE_VIEW_KEY,
   GYM_RULE_ENGINE_KEY,
   GYM_DLC_UNLOCK_KEY,
+  GYM_STORYLINE_KEY,
   GYM_SCENE_CATALOGUE,
 } from './GymRegistry';
 export type { GymSceneEntry } from './GymRegistry';

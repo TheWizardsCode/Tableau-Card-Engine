@@ -29,9 +29,21 @@ export type { PhaseManagerConfig } from './PhaseManager';
 export { flipCard } from './flipCard';
 export type { FlipCardOptions } from './flipCard';
 
-// Illegal move shake animation
+// Illegal move shake animation + reason toast
+// (`shakeIllegalMove` renders `reason` as a transient toast independently of
+// the shake branch — see docs/ui-animations.md)
 export { shakeIllegalMove } from './shakeIllegalMove';
-export type { ShakeIllegalMoveOptions } from './shakeIllegalMove';
+export type { ShakeIllegalMoveOptions, IllegalMoveTarget } from './shakeIllegalMove';
+export { IllegalMoveToastModel } from './illegalMoveToast';
+export type { IllegalMoveToastModelOptions } from './illegalMoveToast';
+export {
+  showIllegalMoveToast,
+  dismissIllegalMoveToast,
+} from './illegalMoveToastView';
+export type {
+  ShowIllegalMoveToastOptions,
+  IllegalMoveToastHandle,
+} from './illegalMoveToastView';
 
 // Canvas-compatible persistent card highlight (selection/target marker)
 export { createCardHighlight } from './cardHighlight';

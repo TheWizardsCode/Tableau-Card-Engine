@@ -6,6 +6,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// No `vi.mock('phaser')` stub here on purpose (CG-0MVQQ2M8E003FQMZ):
+// `shakeIllegalMove` (and the toast view it imports statically) is free of
+// Phaser **value** imports, so it loads in plain Node. If a Phaser value import
+// is ever reintroduced into this graph the import below throws
+// `ReferenceError: window is not defined` and every test in this file fails
+// loudly instead of being masked. `tests/ui/phaser-free-imports.test.ts`
+// asserts the same invariant explicitly.
 import { shakeIllegalMove } from '../../src/ui/shakeIllegalMove';
 
 // ── Mock helpers ────────────────────────────────────────────
@@ -281,5 +289,154 @@ describe('shakeIllegalMove', () => {
     (tweenConfigs[0].onComplete as Function)();
     expect(sprite.clearTint).toHaveBeenCalledOnce();
     expect(sprite.setX).toHaveBeenCalledWith(450);
+  });
+
+  // ── Reason toast (CG-0MVPXFHBZ004LGEB) ─────────────────
+
+  /** Toast-capable mock scene: add.text + time.delayedCall + events.once. */
+  function createToastMockScene(): {
+    scene: Phaser.Scene;
+    texts: Array<{ text: string; depth: number | null; setText: ReturnType<typeof vi.fn> }>;
+    timers: Array<{ delay: number; callback: () => void }>;
+    addTextMock: ReturnType<typeof vi.fn>;
+  } {
+    const texts: Array<{ text: string; depth: number | null; setText: ReturnType<typeof vi.fn> }> = [];
+    const timers: Array<{ delay: number; callback: () => void }> = [];
+    const base = createMockScene();
+    const addTextMock = vi.fn((_x: number, _y: number, text: string) => {
+      const obj: any = {
+        text,
+        depth: null,
+        setText: vi.fn((value: string) => { obj.text = value; return obj; }),
+        setOrigin: vi.fn().mockReturnThis(),
+        setDepth: vi.fn((d: number) => { obj.depth = d; return obj; }),
+        setWordWrapWidth: vi.fn().mockReturnThis(),
+        setStroke: vi.fn().mockReturnThis(),
+        destroy: vi.fn(),
+      };
+      texts.push(obj);
+      return obj;
+    });
+    (base as any).add.text = addTextMock;
+    (base as any).time = {
+      delayedCall: vi.fn((delay: number, callback: () => void) => {
+        timers.push({ delay, callback });
+        return { remove: vi.fn() };
+      }),
+    };
+    (base as any).events = {
+      once: vi.fn(),
+    };
+    return { scene: base as Phaser.Scene, texts, timers, addTextMock: addTextMock as any };
+  }
+
+  it('renders the reason as a toast when a reason is provided (AC1)', () => {
+    const { scene: toastScene, texts } = createToastMockScene();
+    const toastTarget = createMockTarget(120);
+
+    shakeIllegalMove({
+      scene: toastScene,
+      target: toastTarget,
+      reason: 'That figure cannot be played here.',
+    });
+
+    expect(texts).toHaveLength(1);
+    expect(texts[0].text).toBe('That figure cannot be played here.');
+    expect(tweenConfigs).toHaveLength(1); // the shake still runs
+  });
+
+  it('does not create a toast when no reason is given (AC1 backwards compat)', () => {
+    const { scene: toastScene, addTextMock } = createToastMockScene();
+
+    shakeIllegalMove({ scene: toastScene, target: createMockTarget(120) });
+
+    expect(addTextMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the toast even when the target is null (AC3)', () => {
+    const { scene: toastScene, texts } = createToastMockScene();
+
+    const result = shakeIllegalMove({
+      scene: toastScene,
+      target: null,
+      reason: 'No eligible slot on the street.',
+    });
+
+    expect(result).toBeUndefined();
+    expect(texts).toHaveLength(1);
+    expect(texts[0].text).toBe('No eligible slot on the street.');
+    expect(tweenConfigs).toHaveLength(0);
+  });
+
+  it('handles a non-tintable Container: position shake only, toast shown (AC3)', () => {
+    const { scene: toastScene, texts } = createToastMockScene();
+    const container = {
+      x: 200,
+      depth: 3,
+      setX: vi.fn((x: number) => { container.x = x; }),
+    } as unknown as Phaser.GameObjects.Container;
+
+    const tween = shakeIllegalMove({
+      scene: toastScene,
+      target: container,
+      reason: 'The street is full.',
+    });
+
+    expect(tween).toBeDefined();
+    expect(texts).toHaveLength(1);
+    expect(texts[0].text).toBe('The street is full.');
+    // Container has no setTint: neither tint nor the Canvas overlay is used.
+    const config = tweenConfigs[0];
+    expect(config.targets).toBe(container);
+    expect(config.x).toBe(195); // 200 - 5
+    (config.onComplete as Function)();
+    expect(container.setX).toHaveBeenCalledWith(200);
+  });
+
+  it('suppresses the shake (but not the toast) under reduced motion (AC3)', () => {
+    const { scene: toastScene, texts } = createToastMockScene();
+    const onComplete = vi.fn();
+
+    const result = shakeIllegalMove({
+      scene: toastScene,
+      target: createMockTarget(200),
+      reason: 'That split costs more than you hold.',
+      reducedMotion: true,
+      onComplete,
+    });
+
+    expect(result).toBeUndefined();
+    expect(tweenConfigs).toHaveLength(0);
+    expect(texts).toHaveLength(1);
+    expect(texts[0].text).toBe('That split costs more than you hold.');
+    // The completion hook still fires so callers that chain on it are safe.
+    expect(onComplete).toHaveBeenCalledOnce();
+    // The project-wide reduced-motion contract also suppresses SFX: the
+    // toast is the feedback channel.
+    expect((toastScene as unknown as { sound: { play: ReturnType<typeof vi.fn> } }).sound.play).not.toHaveBeenCalled();
+  });
+
+  it('passes a custom reasonDwellMs to the toast timer', () => {
+    const { scene: toastScene, timers } = createToastMockScene();
+
+    shakeIllegalMove({
+      scene: toastScene,
+      target: null,
+      reason: 'Blocked by the gate figure.',
+      reasonDwellMs: 1250,
+    });
+
+    expect(timers).toHaveLength(1);
+    expect(timers[0].delay).toBe(1250);
+  });
+
+  it('repeat rejects replace, never stack (AC4)', () => {
+    const { scene: toastScene, texts } = createToastMockScene();
+
+    shakeIllegalMove({ scene: toastScene, target: null, reason: 'First reason.' });
+    shakeIllegalMove({ scene: toastScene, target: null, reason: 'Second reason.' });
+
+    expect(texts).toHaveLength(1);
+    expect(texts[0].text).toBe('Second reason.');
   });
 });

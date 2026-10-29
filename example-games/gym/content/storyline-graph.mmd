@@ -1,0 +1,15 @@
+%%{ init: { "flowchart": { "curve": "basis" } } }%%
+flowchart TD
+  gym_story_end("New Beginning<br/>gym-story-end<br/>Gain 60 reputation<br/>+60 reputation")
+  gym_story_ignore{"Neglected Roads<br/>gym-story-ignore<br/>Lose 80 coins<br/>−80 coins"}
+  gym_story_invest{"Public Investment<br/>gym-story-invest<br/>Gain 120 coins<br/>+120 coins"}
+  gym_story_start{"Town Meeting<br/>gym-story-start<br/>Lose 50 coins<br/>−50 coins"}
+
+  gym_story_ignore_Let_it_be_end(["end"])
+  gym_story_ignore -->|Let it be| gym_story_ignore_Let_it_be_end
+  gym_story_ignore -->|Repair| gym_story_end
+  gym_story_invest -->|Celebrate| gym_story_end
+  gym_story_invest_Double_down_end(["end"])
+  gym_story_invest -->|Double down| gym_story_invest_Double_down_end
+  gym_story_start -->|Ignore| gym_story_ignore
+  gym_story_start -->|Invest| gym_story_invest

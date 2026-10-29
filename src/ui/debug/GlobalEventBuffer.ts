@@ -8,7 +8,7 @@
  * @module @ui/debug/GlobalEventBuffer
  */
 
-import type { GameEventEmitter, GameEventName } from '../../core-engine/GameEventEmitter';
+import type { GameEventEmitter } from '../../core-engine/GameEventEmitter';
 
 export interface BufferedEvent {
   timestamp: string;
@@ -24,8 +24,8 @@ export class GlobalEventBuffer {
   private static instance: GlobalEventBuffer | null = null;
 
   private _entries: BufferedEvent[] = [];
-  private _subscribed = false;
-  private _listeners: Array<{ event: string; fn: (payload: unknown) => void }> = [];
+  private _unsubscribe: (() => void) | null = null;
+  private _subscribedEmitter: GameEventEmitter | null = null;
 
   private constructor() {
     // singleton
@@ -38,32 +38,29 @@ export class GlobalEventBuffer {
     return GlobalEventBuffer.instance;
   }
 
-  /** Subscribe to the given emitter (idempotent). */
+  /**
+   * Subscribe to the given emitter (idempotent).
+   *
+   * Uses the emitter's catch-all subscription, so every event — engine or
+   * game-specific (declared by the game via `GameEventMap` interface
+   * augmentation) — is buffered from session start without a per-game
+   * name list here.
+   */
   subscribe(emitter: GameEventEmitter): void {
-    if (this._subscribed) return;
-    this._subscribed = true;
+    if (this._subscribedEmitter === emitter) return;
 
-    const eventNames: GameEventName[] = [
-      'turn-started', 'turn-completed', 'animation-complete',
-      'state-settled', 'game-ended', 'card-drawn', 'card-flipped',
-      'card-swapped', 'card-discarded', 'card:discarded', 'card:dealt',
-      'card:placed', 'ui-interaction', 'income-gained',
-      'card-to-foundation', 'card-to-tableau', 'card-pickup',
-      'card-snap-back', 'auto-complete-start', 'auto-complete-card',
-      'undo', 'redo', 'card-selected', 'card-deselected', 'deal-card',
-    ];
+    // Re-binding to a different emitter (e.g. after a scene restart) replaces
+    // the previous subscription instead of silently missing the new session.
+    this._unsubscribe?.();
+    this._subscribedEmitter = emitter;
 
-    for (const name of eventNames) {
-      const fn = (payload: unknown) => {
-        this._entries.push({
-          timestamp: new Date().toISOString().slice(11, 23),
-          eventName: name as string,
-          payload,
-        });
-      };
-      emitter.on(name, fn);
-      this._listeners.push({ event: name as string, fn });
-    }
+    this._unsubscribe = emitter.onAny((eventName, payload) => {
+      this._entries.push({
+        timestamp: new Date().toISOString().slice(11, 23),
+        eventName,
+        payload,
+      });
+    });
   }
 
   /** Get all buffered events. */
@@ -78,6 +75,6 @@ export class GlobalEventBuffer {
 
   /** Whether the buffer has been subscribed. */
   get subscribed(): boolean {
-    return this._subscribed;
+    return this._subscribedEmitter !== null;
   }
 }

@@ -1,0 +1,4 @@
+card_key,card_name,flavour,arc,arc_name,choices,payoff
+tav-open,Open the Door,A stranger knocks at the tavern door.,tav,Tavern Nights,Admit|tav-inn;Turn away|,2
+tav-inn,The Common Room,The fire is warm and the room falls quiet.,tav,Tavern Nights,Listen|tav-tale;Retire|,5
+tav-tale,A Tale Worth Telling,The stranger speaks of the long road south.,tav,Tavern Nights,,8

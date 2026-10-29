@@ -276,7 +276,11 @@ What it writes into the game repo:
 - **`package.json`** — name `tce-<game>`, the core's dependencies and
 devDependencies, and the core toolchain scripts (`save-load-smoke`,
 `monte-carlo`, `replay`, …) with the repo entry points (`dev`, `build`,
-`build:electron`, `test`) overridden.
+`build:electron`, `test`) overridden. Its **`version` belongs to the game,
+not the engine** (CG-0MVGF2QE9008NA5R): a new repo is seeded at `0.1.0`, a
+re-scaffold preserves the version already in the repo (`--version` overrides),
+and the core manifest's version is never copied. Each game's release bump is
+repo-local, so engine and game releases can proceed at different cadences.
 - **`vite.config.ts`** — imports `gameDiscoveryPlugin` and `resolveCoreAliases`
 from the sibling core and reads `configs/game.json` (Gym + this one game) by
 default; `GAMES_CONFIG` can still override for an ad-hoc build.

@@ -12,6 +12,18 @@ function fakeTranscript(id: number = 1) {
   };
 }
 
+/**
+ * Disk-persistence log lines only.
+ *
+ * The store also warns about unrelated conditions (e.g. the localStorage
+ * fallback), so log-volume assertions filter to the disk-mirror messages.
+ */
+function diskLogs(spy: { mock: { calls: unknown[][] } }): string[] {
+  return spy.mock.calls
+    .map((call) => String(call[0]))
+    .filter((line) => line.includes('Disk persistence') || line.includes('persistence endpoint'));
+}
+
 // ── localStorage mock ──────────────────────────────────────
 
 /**
@@ -59,6 +71,7 @@ describe('TranscriptStore', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it('should export TranscriptStore from barrel', async () => {
@@ -319,7 +332,33 @@ describe('TranscriptStore', () => {
       });
     });
 
-    it('should still return StoredTranscript when POST returns HTTP 500', async () => {
+    it('skips the POST entirely when not running under a Vite dev server', async () => {
+      // The endpoint only exists behind the dev server's transcript plugin
+      // (production/Electron bundles, and Vitest browser runs, have no
+      // `/api/transcripts` middleware). Issuing the request there can only
+      // produce noise, so the DEV gate removes it entirely
+      // (MS-0MVREB31W004F48D). The gate reads `import.meta.env.DEV` through
+      // `isDevMode()`, which is overridden here so the test does not depend on
+      // the runner's injected Vite env.
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      vi.stubGlobal('fetch', fetchMock);
+
+      class NonDevStore extends TranscriptStore {
+        protected override isDevMode(): boolean {
+          return false;
+        }
+      }
+      const store = new NonDevStore();
+      const result = await store.save('golf', fakeTranscript(1));
+
+      // Save still succeeds — only the disk mirror is skipped.
+      expect(result).not.toBeNull();
+      // Give any stray microtask a chance to run before asserting absence.
+      await Promise.resolve();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should still return StoredTranscript when POST returns HTTP 500, warning once', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
       vi.stubGlobal('fetch', fetchMock);
@@ -335,29 +374,50 @@ describe('TranscriptStore', () => {
       await vi.waitFor(() => expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Disk persistence POST returned HTTP 500'),
       ));
-
-      warnSpy.mockRestore();
     });
 
-    it('should still return StoredTranscript when POST throws a network error', async () => {
+    it('logs an absent endpoint (HTTP 404) at most once, at debug, across repeated saves', async () => {
+      // A missing `/api/transcripts` middleware (a game repo whose generated
+      // `vite.config.ts` does not register the plugin, or any runtime without
+      // it) is an *expected* absence: report it once, quietly, and stay silent
+      // afterwards instead of warning on every single game-over.
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const store = new TranscriptStore();
+      for (let i = 0; i < 3; i += 1) {
+        await store.save('main-street', fakeTranscript(i + 1));
+      }
+
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(String(debugSpy.mock.calls[0]?.[0])).toContain('HTTP 404');
+      // No warning or error for an expected absence (the store's unrelated
+      // localStorage-fallback note is not a disk-persistence log).
+      expect(diskLogs(warnSpy)).toEqual([]);
+      expect(diskLogs(errorSpy)).toEqual([]);
+    });
+
+    it('logs a network failure at most once, at debug, across repeated saves', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
       const fetchMock = vi.fn().mockRejectedValue(new Error('Network error'));
       vi.stubGlobal('fetch', fetchMock);
 
       const store = new TranscriptStore();
-      const transcript = fakeTranscript(1);
-      const result = await store.save('golf', transcript);
+      for (let i = 0; i < 3; i += 1) {
+        await store.save('golf', fakeTranscript(i + 1));
+      }
 
-      expect(result).not.toBeNull();
-      expect(result!.gameType).toBe('golf');
-
-      // Allow the fire-and-forget promise to settle and check warning
-      await vi.waitFor(() => expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Disk persistence POST failed'),
-        expect.any(Error),
-      ));
-
-      warnSpy.mockRestore();
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(String(debugSpy.mock.calls[0]?.[0])).toContain('Disk persistence POST failed');
+      expect(diskLogs(warnSpy)).toEqual([]);
+      expect(diskLogs(errorSpy)).toEqual([]);
     });
 
     it('should not call fetch when fetch is undefined', async () => {

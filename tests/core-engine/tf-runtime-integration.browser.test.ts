@@ -63,7 +63,7 @@ describe('ToneForge runtime activation (real browser)', () => {
       }
     }
 
-    expect(Object.keys(runtimeSynth.factories ?? {})).toHaveLength(12);
+    expect(Object.keys(runtimeSynth.factories ?? {})).toHaveLength(16);
     expect(failures).toEqual([]);
   });
 
@@ -101,6 +101,6 @@ describe('ToneForge runtime activation (real browser)', () => {
       { factoryCount: Object.keys(runtimeSynth.factories ?? {}).length },
     );
 
-    expect(manager.getSynthStatus().factoryCount).toBe(12);
+    expect(manager.getSynthStatus().factoryCount).toBe(16);
   });
 });

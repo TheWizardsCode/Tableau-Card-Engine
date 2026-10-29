@@ -57,6 +57,9 @@ const {
       removeAllListeners: mockRemoveAllListeners,
       on: vi.fn(),
       off: vi.fn(),
+      // The engine's catch-all subscription; CardGameScene's debug event
+      // buffer subscribes with it in DEV.
+      onAny: vi.fn(() => vi.fn()),
     };
   });
 

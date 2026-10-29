@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Story-line editor · Tableau Card Engine</title>
+    <!--
+      Development tool only. This page is served by the dedicated editor host
+      (`npm run storylines:editor`, root `tools/storyline-editor`, config
+      `vite.editor.config.ts`) and is deliberately NOT referenced from the
+      production game entry (`index.html` / `main.ts`) or the Electron package.
+    -->
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #0d0d16;
+        color: #e8eaf4;
+        min-height: 100vh;
+      }
+      #storyline-editor-app {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      .editor-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 100vh;
+        padding: 16px 20px 24px;
+        box-sizing: border-box;
+      }
+      .editor-toolbar {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .editor-title {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: 0.01em;
+      }
+      .editor-summary {
+        margin: 4px 0 0;
+        color: #9aa0c0;
+        font-size: 13px;
+      }
+      .editor-toolbar-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .editor-button {
+        background: #23233a;
+        border: 1px solid #3b3b60;
+        color: #e8eaf4;
+        border-radius: 8px;
+        padding: 7px 14px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .editor-button:hover {
+        background: #2d2d4a;
+      }
+      .editor-button:focus-visible {
+        outline: 2px solid #ffd166;
+        outline-offset: 2px;
+      }
+      .editor-readonly-note {
+        margin: 0;
+        padding: 8px 12px;
+        border-left: 3px solid #b98cff;
+        background: #171727;
+        color: #b9c0dd;
+        font-size: 12px;
+        border-radius: 6px;
+      }
+      .editor-main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 16px;
+        flex: 1 1 auto;
+        min-height: 520px;
+      }
+      .editor-graph {
+        min-height: 520px;
+        border: 1px solid #2b2b44;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #12121c;
+      }
+      .editor-sidebar {
+        border: 1px solid #2b2b44;
+        border-radius: 12px;
+        background: #14141f;
+        padding: 14px 16px;
+        overflow: auto;
+        font-size: 13px;
+      }
+      .editor-sidebar-title,
+      .editor-legend-title {
+        margin: 0 0 10px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9aa0c0;
+      }
+      .editor-sidebar-empty,
+      .editor-details-note {
+        color: #7d84a6;
+        font-size: 12px;
+      }
+      .editor-details-name {
+        margin: 0 0 2px;
+        font-size: 16px;
+      }
+      .editor-details-id {
+        margin: 0 0 10px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 11px;
+        color: #9aa0c0;
+      }
+      .editor-details-kind,
+      .editor-details-storyline {
+        margin: 0 0 6px;
+        color: #c9cfeb;
+      }
+      .editor-details-meta,
+      .editor-fields {
+        display: grid;
+        grid-template-columns: 84px minmax(0, 1fr);
+        gap: 4px 10px;
+        margin: 12px 0;
+      }
+      .editor-details-meta dt,
+      .editor-fields dt {
+        color: #9aa0c0;
+        font-size: 12px;
+      }
+      .editor-details-meta dd,
+      .editor-fields dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .editor-field-row {
+        display: contents;
+      }
+      .editor-details-section {
+        margin: 14px 0 6px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9aa0c0;
+      }
+      .editor-links {
+        margin: 0;
+        padding-left: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .editor-link-item {
+        color: #d7dcf3;
+      }
+      .editor-legend {
+        border-top: 1px solid #23233a;
+        padding-top: 10px;
+      }
+      .editor-legend-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .editor-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid #2b2b44;
+        border-radius: 999px;
+        padding: 5px 12px;
+        font-size: 12px;
+        color: #c9cfeb;
+        background: #171727;
+        cursor: pointer;
+      }
+      .editor-legend-swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        background: #b98cff;
+      }
+      .editor-message {
+        margin: 48px auto;
+        max-width: 640px;
+        border: 1px solid #2b2b44;
+        border-radius: 12px;
+        background: #14141f;
+        padding: 24px 28px;
+      }
+      .editor-message h1 {
+        margin-top: 0;
+        font-size: 20px;
+      }
+      .editor-message p {
+        color: #b9c0dd;
+        line-height: 1.5;
+      }
+      /* ── Curated editing (edit / add forms + preview panel) ── */
+      .editor-details-actions {
+        margin: 12px 0;
+      }
+      .editor-button--primary {
+        background: #3b2f6b;
+        border-color: #6d55b8;
+      }
+      .editor-button--primary:hover {
+        background: #4a3b85;
+      }
+      .editor-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .editor-editor-host {
+        margin-top: 16px;
+        border-top: 1px solid #2b2b44;
+        padding-top: 12px;
+      }
+      .editor-editor-host-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .editor-editor-host-title {
+        margin: 0 0 8px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9aa0c0;
+      }
+      .editor-form-title {
+        margin: 8px 0 10px;
+        font-size: 15px;
+      }
+      .editor-form-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .editor-form-group {
+        margin: 14px 0 0;
+        border: 1px solid #2b2b44;
+        border-radius: 8px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .editor-form-legend {
+        padding: 0 6px;
+        color: #9aa0c0;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .editor-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .editor-field-label {
+        color: #b9c0dd;
+        font-size: 12px;
+      }
+      .editor-field-input {
+        background: #0f0f1a;
+        border: 1px solid #34345a;
+        border-radius: 6px;
+        color: #e8eaf4;
+        padding: 6px 8px;
+        font: inherit;
+        font-size: 12px;
+      }
+      .editor-field-input:focus-visible {
+        outline: 2px solid #ffd166;
+        outline-offset: 1px;
+      }
+      .editor-field[data-kind='boolean'] {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+      }
+      .editor-field-hint {
+        margin: 0;
+        color: #7d84a6;
+        font-size: 11px;
+      }
+      .editor-field-error {
+        margin: 0;
+        color: #ff8b9a;
+        font-size: 11px;
+        white-space: pre-line;
+      }
+      .editor-field[data-invalid='true'] .editor-field-input {
+        border-color: #ff6b81;
+      }
+      .editor-form-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 14px 0 6px;
+      }
+      .editor-form-status {
+        margin: 0;
+        color: #9aa0c0;
+        font-size: 12px;
+      }
+      .editor-form-status[data-tone='success'],
+      .editor-preview-status[data-tone='success'] {
+        color: #7ee2a8;
+      }
+      .editor-form-status[data-tone='error'],
+      .editor-preview-status[data-tone='error'] {
+        color: #ff8b9a;
+      }
+      .editor-preview {
+        margin-top: 14px;
+        border-top: 1px solid #2b2b44;
+        padding-top: 10px;
+      }
+      .editor-preview-status {
+        margin: 0 0 4px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .editor-preview-summary,
+      .editor-preview-outcome {
+        margin: 0 0 8px;
+        color: #b9c0dd;
+        font-size: 12px;
+      }
+      .editor-preview-outcome[data-tone='success'] {
+        color: #7ee2a8;
+      }
+      .editor-preview-outcome[data-tone='error'] {
+        color: #ff8b9a;
+      }
+      .editor-diff-row {
+        border: 1px solid #2b2b44;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        background: #12121c;
+      }
+      .editor-diff-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 0 0 6px;
+        font-size: 12px;
+      }
+      .editor-diff-status {
+        color: #ffd166;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 10px;
+      }
+      .editor-diff-list {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .editor-diff-change {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 8px;
+        font-size: 11px;
+      }
+      .editor-diff-column {
+        color: #9aa0c0;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        overflow-wrap: anywhere;
+      }
+      .editor-diff-values {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .editor-diff-before {
+        color: #ff8b9a;
+        text-decoration: line-through;
+      }
+      .editor-diff-after {
+        color: #7ee2a8;
+      }
+      .editor-preview-errors {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .editor-preview-error {
+        margin: 0;
+        color: #ff8b9a;
+        font-size: 11px;
+      }
+      .editor-preview-report {
+        margin: 8px 0 0;
+        max-height: 220px;
+        overflow: auto;
+        background: #0f0f1a;
+        border: 1px solid #2b2b44;
+        border-radius: 6px;
+        padding: 8px;
+        color: #b9c0dd;
+        font-size: 10px;
+        white-space: pre-wrap;
+      }
+      /* ── Story-line management ── */
+      .editor-storyline-manager {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .editor-storyline-groups {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .editor-storyline-group {
+        border: 1px solid #2b2b44;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #12121c;
+      }
+      .editor-storyline-group[data-pending='true'] {
+        border-style: dashed;
+      }
+      .editor-storyline-group-header {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .editor-storyline-group-title {
+        margin: 0;
+        font-size: 14px;
+      }
+      .editor-storyline-group-meta {
+        color: #9aa0c0;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 11px;
+      }
+      .editor-storyline-pending {
+        color: #ffd166;
+        font-size: 11px;
+      }
+      .editor-storyline-members {
+        list-style: none;
+        margin: 8px 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .editor-storyline-member {
+        color: #c9cfeb;
+        font-size: 12px;
+      }
+      .editor-storyline-member label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      .editor-storyline-member-id {
+        color: #7d84a6;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 11px;
+      }
+      .editor-storyline-create {
+        border: 1px solid #2b2b44;
+        border-radius: 8px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: #14141f;
+      }
+      .editor-storyline-inline-fields {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .editor-storyline-inline-fields .editor-field {
+        flex: 1 1 140px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="storyline-editor-app"></div>
+    <script type="module" src="./app.ts"></script>
+  </body>
+</html>

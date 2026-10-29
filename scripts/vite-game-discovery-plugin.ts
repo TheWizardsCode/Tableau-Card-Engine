@@ -94,6 +94,8 @@ export function resolveCoreAliases(coreRoot: string): Record<string, string> {
     '@ai': path.resolve(coreRoot, 'src/ai'),
     // Core-owned `src/` module without a top-level alias (balance-card tooling).
     '@balance-cards': path.resolve(coreRoot, 'src/balance-cards'),
+    // Generic game-agnostic story-line system (branching card narratives).
+    '@story-line': path.resolve(coreRoot, 'src/story-line'),
     // Core-owned framework trees consumed by per-game repos (F9 / C2).
     '@core-scripts': path.resolve(coreRoot, 'scripts'),
     '@core-tests': path.resolve(coreRoot, 'tests'),
@@ -571,6 +573,7 @@ const GYM_SCENE_NAMES = [
   'GymTokenPileViewScene',
   'GymRuleEngineScene',
   'GymDlcUnlockScene',
+  'GymStorylineScene',
 ] as const;
 
 // ── The plugin ────────────────────────────────────────────────────────────

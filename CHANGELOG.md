@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.1.22 (2026-10-29)
+> **Release focus:** This release focuses on strengthening the shared engine and tooling behind the games, with more reliable CI testing, automatic engine syncing, consistent card actions, and custom event logging. It also expands branching story choices with coin and reputation requirements, adds on-screen reasons for rejected moves, and gives each game its own version number.
+### Features
+- CI test runs now fail loudly if any test files are silently skipped, so broken code can't slip through as a false pass. (CG-0MVL21CVM003VK5H)
+- Branching story choices are now powered by a shared system, paving the way for richer narratives. (CG-0MVH2H67H002M27B)
+- Engine updates now stay in sync automatically, so releases no longer fail or need manual fixes. (CG-0MVO268500071BPI)
+- Card actions now behave more consistently across all games, reducing bugs and glitches. (CG-0MTXDWHDT009Q2IU)
+- Games can now add their own custom events, and every event is automatically logged for debugging. (CG-0MVRAT58G002RYRL)
+- Rejected moves now show a brief on-screen reason so you know why a move was refused. (CG-0MVPXFHBZ004LGEB)
+- Game updates now stay in sync with engine improvements for a smoother experience. (CG-0MVD0IZDR008921Q)
+- The Rising's face-off sounds are now documented so future games can reuse them consistently. (CG-0MVFQ6QOZ003FVO4)
+- Browser tests now retry once when a loaded machine drops a module fetch, so test gates reflect your code, not CPU load. (CG-0MVNDK56G007C1U7)
+- New game repos now keep a single copy of Phaser and Tone, preventing mysterious startup crashes. (CG-0MVPWPWLA008FTDJ)
+- Story choices can now require coins or reputation, show extra effects, and branch based on your status. (CG-0MVI013DU000KEAB)
+### Bug Fixes
+- New game projects now save transcripts correctly, and dev consoles no longer spam warnings. (CG-0MVSIB5LH0069LB3)
+- Illegal-move toasts no longer break game tests, so your suite runs clean again. (CG-0MVQQ2M8E003FQMZ)
+- Fixed internal build and test issues so future game updates can ship smoothly. (CG-0MVFU3JTN00841OR)
+- Each game now shows its own version number, separate from the engine's. (CG-0MVGF2QE9008NA5R)
+### Other
+- Storylines work exactly as before, with the Gym demo and all Main Street arcs verified. (CG-0MVHY82PQ004Q3B9)
+> [Play the alpha release](https://thewizardscode.github.io/Tableau-Card-Engine/). Provide feedback in [Discord](https://discord.gg/gUKQTFkzQ4)
+
 ## v0.1.21 (2026-10-15)
 > **Release focus:** This release introduces a new Irish history card game while overhauling how card packs work, letting third-party packs carry their own artwork and be added as unlockable DLC. It also improves audio defaults, publishing automation, and developer tooling, including a more reliable dev server and a single up-to-date guide for creating new games.
 ### Features

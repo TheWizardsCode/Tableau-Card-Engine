@@ -16,8 +16,10 @@
  *   raise while dragging;
  * - valid-drop highlight callbacks (fired on dragstart, cleared on dragend);
  * - snap-back animation with reduced-motion fallback;
- * - illegal-feedback hooks (shake + `sfx-illegal-move`), defaulting to a
- *   container-safe shake that works for both Images and Containers.
+ * - illegal-feedback hooks (shake + `sfx-illegal-move` + optional reason
+ *   toast), defaulting to a container-safe `shakeIllegalMove` that works for
+ *   both Images and Containers and explains a rejection when an
+ *   `illegalReason` resolver (or an inline `payload.reason`) is present.
  *
  * Main Street consumes this module for drag-to-buy/place
  * (CG-0MSKSAREE007AYSZ) and Beleaguered Castle is refactored onto it
@@ -29,6 +31,7 @@
 import { safePlaySound, COMMON_SFX_KEYS } from '../core-engine/SoundManager';
 import { applyDefaults } from '../core-engine/config-defaults';
 import { shakeIllegalMove } from './shakeIllegalMove';
+import type { IllegalMoveTarget } from './shakeIllegalMove';
 import { emitEventOrCallback } from '../core-engine/event-emission';
 
 /**
@@ -61,6 +64,17 @@ export interface DragDropPayload<TData = unknown> {
   zone?: Phaser.GameObjects.Zone;
   /** Caller-attached zone data (e.g. slot index) for the drop target. */
   zoneData?: unknown;
+  /**
+   * Player-facing explanation for the rejection (e.g. `LegalityResult.reason`).
+   *
+   * Populated by the per-registration `illegalReason` resolvers when a drag
+   * is vetoed or a drop is refused; validation callbacks (`canPickUp` /
+   * `canAccept`) may also set it directly on the payload they receive. When
+   * present, the default illegal feedback renders it as a toast (in addition
+   * to the shake + `sfx-illegal-move`); custom `onIllegal` hooks receive it
+   * too.
+   */
+  reason?: string;
 }
 
 /** Payload for the 'card:drag-started' event. */
@@ -112,6 +126,14 @@ export interface DragDropObjectConfig<TData = unknown> {
    * `canAccept` validation passes.
    */
   onDrop?: (payload: DragDropPayload<TData>) => void;
+  /**
+   * Resolves the player-facing rejection reason when this object's drag is
+   * vetoed (`canPickUp` returns `false`) or an invalid drop snap-backs. The
+   * resolved string lands on `payload.reason`, where the default illegal
+   * feedback renders it as a toast. Mutating `payload.reason` inside
+   * `canPickUp` works as an alternative.
+   */
+  illegalReason?: (payload: DragDropPayload<TData>) => string | undefined;
 }
 
 /** Config for a single drop zone. */
@@ -125,6 +147,13 @@ export interface DragDropZoneConfig<TZoneData = unknown> {
    * (snap-back + illegal feedback).
    */
   canAccept?: (payload: DragDropPayload) => boolean;
+  /**
+   * Resolves the player-facing rejection reason when this zone refuses the
+   * drop (`canAccept` returns `false`). Takes precedence over the draggable's
+   * own `illegalReason`. Mutating `payload.reason` inside `canAccept` works
+   * as an alternative.
+   */
+  illegalReason?: (payload: DragDropPayload) => string | undefined;
 }
 
 /** Options for {@link createDragDropManager}. */
@@ -159,9 +188,10 @@ export interface DragDropManagerConfig {
   onDragEnd?: (payload: DragDropPayload) => void;
   /**
    * Illegal-feedback hook (shake + `sfx-illegal-move`). Fired on pickup
-   * veto, snap-back (invalid drop), and drop-zone rejection. Defaults to a
-   * container-safe shake via {@link shakeIllegalMove} (or a position shake
-   * for objects without `setTint`).
+   * veto, snap-back (invalid drop), and drop-zone rejection. When
+   * `payload.reason` is set (via the `illegalReason` resolvers or inline), the
+   * default hook also renders it as a toast. Defaults to a container-safe
+   * {@link shakeIllegalMove} that works for both Images and Containers.
    */
   onIllegal?: (payload: DragDropPayload) => void;
 }
@@ -205,25 +235,7 @@ interface DropZoneEntry {
   zone: Phaser.GameObjects.Zone;
   data: unknown;
   canAccept?: (payload: DragDropPayload) => boolean;
-}
-
-/** Container-safe illegal-move shake for objects without `setTint`. */
-function shakeContainer(
-  scene: Phaser.Scene,
-  target: DraggableGameObject,
-): void {
-  const originalX = target.x;
-  scene.tweens.add({
-    targets: target,
-    x: originalX - 5,
-    duration: 50,
-    yoyo: true,
-    repeat: 2,
-    ease: 'Sine.inOut',
-    onComplete: () => {
-      target.x = originalX;
-    },
-  });
+  illegalReason?: (payload: DragDropPayload) => string | undefined;
 }
 
 /**
@@ -279,6 +291,24 @@ function rectangleContains(
 }
 
 /**
+ * Assign `payload.reason` from a resolver when it is not already set.
+ *
+ * Inline mutations inside `canPickUp`/`canAccept` win; the resolvers only
+ * fill the gap. Empty strings never clobber an existing reason.
+ */
+function resolveReason(
+  payload: DragDropPayload,
+  resolver: ((payload: DragDropPayload) => string | undefined) | undefined,
+): void {
+  if (payload.reason === undefined && resolver) {
+    const reason = resolver(payload);
+    if (typeof reason === 'string' && reason.trim() !== '') {
+      payload.reason = reason;
+    }
+  }
+}
+
+/**
  * Create a drag-drop manager on the given scene.
  *
  * Registers the scene-level `dragstart`/`drag`/`dragend`/`drop` input
@@ -314,14 +344,13 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
   }
 
   const defaultIllegal = (payload: DragDropPayload): void => {
-    const target = payload.gameObject as Phaser.GameObjects.Image;
     try {
-      if (typeof target.setTint === 'function') {
-        shakeIllegalMove({ scene, target });
-      } else {
-        safePlaySound(scene as never, COMMON_SFX_KEYS.ILLEGAL_MOVE);
-        shakeContainer(scene, payload.gameObject);
-      }
+      shakeIllegalMove({
+        scene,
+        target: payload.gameObject as IllegalMoveTarget,
+        reason: payload.reason,
+        reducedMotion,
+      });
     } catch {
       // Illegal feedback must never crash the drag lifecycle (e.g. in
       // headless / test environments lacking a rectangle factory).
@@ -358,6 +387,7 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
     gameObject: DraggableGameObject,
     payload: DragDropPayload,
   ): void => {
+    resolveReason(payload, entry.config.illegalReason);
     if (reducedMotion) {
       restoreOrigin(entry, gameObject);
       onIllegal(payload);
@@ -399,6 +429,7 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
     if (entry.config.canPickUp && !entry.config.canPickUp(payload)) {
       entry.vetoed = true;
       gameObject.setDepth(entry.originDepth);
+      resolveReason(payload, entry.config.illegalReason);
       onIllegal(payload);
       return;
     }
@@ -465,8 +496,10 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
     }
 
     // Invalid drop (unregistered zone, rejected by canAccept, or no drop
-    // handler): snap-back + illegal feedback (illegal-move case).
+    // handler): snap-back + illegal feedback (illegal-move case). The zone's
+    // rejection reason (if any) wins over the draggable's own resolver.
     entry.dragging = false;
+    resolveReason(payload, zoneEntry?.illegalReason ?? entry.config.illegalReason);
     // Emit card:drag-ended for invalid drop
     if (config.gameEvents && entry.config.data) {
       const data = entry.config.data as Record<string, unknown>;
@@ -567,6 +600,7 @@ export function createDragDropManager(config: DragDropManagerConfig): DragDropMa
         zone: zoneConfig.zone,
         data: zoneConfig.data,
         canAccept: zoneConfig.canAccept,
+        illegalReason: zoneConfig.illegalReason,
       });
     },
 

@@ -19,11 +19,13 @@ import {
   CORE_REMOTE,
   DEFAULT_CORE_REL,
   DEFAULT_GAME_PRESET,
+  GAME_INITIAL_VERSION,
   defaultScenePath,
   findGameInPreset,
   linkSharedAssets,
   linkSharedPublicAssets,
   pascalCase,
+  readExistingPackageVersion,
   readLayoutGames,
   renderPackageJson,
   renderPreset,
@@ -85,6 +87,48 @@ const MANIFEST: CoreManifest = {
   dependencies: { phaser: '4.0.0-rc.7' },
   devDependencies: { vite: '^6.1.0', vitest: '^3.0.0', typescript: '^5.7.0' },
 };
+
+/**
+ * Extract the balanced `resolve: { … }` body from a rendered/scaffolded Vite
+ * config. Locating the block keeps the dedupe assertions placement-aware: a
+ * bare `toContain` on the whole file would also pass if the guard drifted into
+ * an unrelated option (e.g. `build.dedupe`).
+ */
+function extractResolveBlock(src: string): string {
+  const key = src.indexOf('resolve: {');
+  expect(key, 'resolve block missing from the rendered config').toBeGreaterThanOrEqual(0);
+  const open = src.indexOf('{', key);
+  let depth = 0;
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1;
+    else if (src[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return src.slice(open + 1, i);
+    }
+  }
+  throw new Error('unbalanced resolve block in the rendered config');
+}
+
+/**
+ * Extract the balanced `plugins: [ … ]` body from a rendered/scaffolded Vite
+ * config. Placement-aware like {@link extractResolveBlock}: a bare `toContain`
+ * on the whole file would also pass if the registration drifted into an
+ * unrelated array (e.g. a plugin's own `plugins` option).
+ */
+function extractPluginsBlock(src: string): string {
+  const key = src.indexOf('plugins: [');
+  expect(key, 'plugins array missing from the rendered config').toBeGreaterThanOrEqual(0);
+  const open = src.indexOf('[', key);
+  let depth = 0;
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '[') depth += 1;
+    else if (src[i] === ']') {
+      depth -= 1;
+      if (depth === 0) return src.slice(open + 1, i);
+    }
+  }
+  throw new Error('unbalanced plugins array in the rendered config');
+}
 
 let tmpRoot: string;
 
@@ -292,7 +336,6 @@ describe('renderPackageJson', () => {
   it('names the repo for the game and reuses the core toolchain deps', () => {
     const pkg = JSON.parse(renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL));
     expect(pkg.name).toBe('tce-golf');
-    expect(pkg.version).toBe('9.9.9');
     expect(pkg.type).toBe('module');
     // Game-specific toolchain scripts are inherited from the core manifest…
     expect(pkg.scripts['save-load-smoke']).toContain('src/scripts/save-load-smoke');
@@ -304,6 +347,47 @@ describe('renderPackageJson', () => {
     expect(pkg.scripts.test).toBe('vitest run --project unit');
     expect(pkg.dependencies).toEqual(MANIFEST.dependencies);
     expect(pkg.devDependencies).toEqual(MANIFEST.devDependencies);
+  });
+
+  it('seeds a new game repo with an engine-independent baseline version', () => {
+    // The core manifest deliberately declares a different version: a game repo
+    // owns its own version and must never inherit the engine's
+    // (CG-0MVGF2QE9008NA5R).
+    expect(MANIFEST.version).toBe('9.9.9');
+    const pkg = JSON.parse(renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL));
+    expect(pkg.version).toBe(GAME_INITIAL_VERSION);
+    expect(pkg.version).toBe('0.1.0');
+    expect(pkg.version).not.toBe(MANIFEST.version);
+  });
+
+  it('writes an explicitly supplied version verbatim', () => {
+    const pkg = JSON.parse(
+      renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL, '1.4.2'),
+    );
+    expect(pkg.version).toBe('1.4.2');
+    // An explicit version is the only thing that can diverge from the baseline;
+    // the core manifest version still never leaks through.
+    expect(pkg.version).not.toBe(MANIFEST.version);
+  });
+
+  it('wires engine:sync into dev builds and engine:verify into release builds', () => {
+    const pkg = JSON.parse(renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL));
+    // Dev builds compose the latest engine remote head before compiling
+    // (MS-0MVCRGKZY007DIED AC1).
+    expect(pkg.scripts.build).toBe('npm run engine:sync && tsc --noEmit && vite build');
+    expect(pkg.scripts['build:electron']).toBe(
+      'npm run engine:sync && tsc --noEmit && vite build --mode electron',
+    );
+    // Release builds verify the committed engine pin instead (AC2/AC3).
+    expect(pkg.scripts['build:release']).toBe('npm run engine:verify && tsc --noEmit && vite build');
+    // The engine-sync script lives in the engine repo — game repos have no
+    // root `scripts/` tree (Option C) and invoke it through the submodule.
+    expect(pkg.scripts['engine:sync']).toBe(
+      `node ${DEFAULT_CORE_REL}/scripts/engine-sync.mjs sync`,
+    );
+    expect(pkg.scripts['engine:verify']).toBe(
+      `node ${DEFAULT_CORE_REL}/scripts/engine-sync.mjs verify`,
+    );
   });
 });
 
@@ -317,14 +401,69 @@ describe('renderViteConfig', () => {
     expect(src).toContain("name: 'unit'");
   });
 
+  it('emits the single-copy resolve.dedupe guard inside the resolve block', () => {
+    const src = renderViteConfig('golf', DEFAULT_CORE_REL);
+    const block = extractResolveBlock(src);
+
+    // Shared runtime deps must resolve to exactly one copy: a second `phaser`
+    // (e.g. from an `npm install` inside the core submodule) becomes a distinct
+    // module id, so Node-env unit tests stop mocking it and real Phaser is
+    // evaluated on collection (`window is not defined`, MS-0MVK3SF54006Y6A6).
+    // Mirrors `resolve.dedupe` in core/vite.config.ts.
+    expect(block).toContain("dedupe: ['phaser', 'tone']");
+    // Placement contract: the guard sits after the alias entry, in the same
+    // `resolve` block.
+    expect(block.indexOf("dedupe: ['phaser', 'tone']")).toBeGreaterThan(
+      block.indexOf('resolveCoreAliases(coreRoot)'),
+    );
+    // The list stays exactly the two shared runtime deps.
+    const dedupeLine = block
+      .split('\n')
+      .find((line) => line.trimStart().startsWith('dedupe:'));
+    expect(dedupeLine?.trim()).toBe("dedupe: ['phaser', 'tone'],");
+    // The rationale comment explains why, so a future maintainer does not drop
+    // it as noise.
+    expect(block.toLowerCase()).toContain('one copy');
+    expect(block).toContain('core/vite.config.ts');
+  });
+
+  it('registers the transcript-persist middleware for dev serve only', () => {
+    const src = renderViteConfig('main-street', DEFAULT_CORE_REL);
+    const plugins = extractPluginsBlock(src);
+
+    // A generated game repo must wire the POST /api/transcripts middleware.
+    // Without it every game-over 404s in a normal dev session
+    // (`[TranscriptStore] Disk persistence POST returned HTTP 404`,
+    // MS-0MVREB31W004F48D).
+    expect(src).toContain(
+      "import { transcriptPersistPlugin, DEV_WATCH_IGNORE_PATTERNS } from '../Tableau-Card-Engine/scripts/vite-transcript-plugin'",
+    );
+    // Dev-serve only, and never during a Vitest run: the plugin writes to disk,
+    // so registering it under test would add file-system side effects (see
+    // docs/DEVELOPER.md § Transcript Persistence). Mirrors core/vite.config.ts.
+    expect(plugins).toContain(
+      "...(command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []),",
+    );
+    // Placement contract: after the game-discovery plugin, so discovery still
+    // runs first (the order core/vite.config.ts uses).
+    expect(plugins.indexOf('transcriptPersistPlugin()')).toBeGreaterThan(
+      plugins.indexOf('gameDiscoveryPlugin('),
+    );
+    // The factory must receive `command`, otherwise `command === 'serve'` can
+    // never be true and the middleware is silently never registered.
+    expect(src).toContain('export default defineConfig(({ command, mode }) => ({');
+  });
+
   it('excludes .worklog and dev-output trees from the Vite file watcher (ENOSPC guard)', () => {
     const src = renderViteConfig('golf', DEFAULT_CORE_REL);
     // The generated config must wire the shared ignore list into the watcher so
     // a recursive watch does not follow .worklog/worktrees symlinks into other
     // project checkouts and exhaust fs.inotify.max_user_watches
     // (CG-0MV5SEHHG000ZKUA).
-    expect(src).toContain(
-      "import { DEV_WATCH_IGNORE_PATTERNS } from '../Tableau-Card-Engine/scripts/vite-transcript-plugin'",
+    // Named import (order-tolerant: the transcript-persist plugin is imported
+    // from the same module since MS-0MVREB31W004F48D).
+    expect(src).toMatch(
+      /import \{[^}]*DEV_WATCH_IGNORE_PATTERNS[^}]*\} from '\.\.\/Tableau-Card-Engine\/scripts\/vite-transcript-plugin'/,
     );
     expect(src).toContain('ignored: [...DEV_WATCH_IGNORE_PATTERNS]');
     // ...and the shared list must actually cover .worklog (the failure mode).
@@ -375,6 +514,8 @@ describe('renderTsconfig', () => {
       ['@ai/*', 'src/ai/*'],
       ['@balance-cards', 'src/balance-cards'],
       ['@balance-cards/*', 'src/balance-cards/*'],
+      ['@story-line', 'src/story-line'],
+      ['@story-line/*', 'src/story-line/*'],
       ['@core-scripts/*', 'scripts/*'],
       ['@core-tests/*', 'tests/*'],
       ['@core-gym', 'example-games/gym'],
@@ -428,6 +569,33 @@ describe('findGameInPreset', () => {
 // ── End-to-end scaffold over a fixture ────────────────────────────────────
 
 describe('scaffoldGameRepo', () => {
+  it('writes a vite.config.ts carrying the single-copy dedupe guard', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    // Assert the real on-disk write: a re-scaffold must not drop the guard the
+    // checked-in generated configs (e.g. tce-main-street) rely on.
+    const written = fs.readFileSync(path.join(gameRepo, 'vite.config.ts'), 'utf-8');
+    const block = extractResolveBlock(written);
+    expect(block).toContain("dedupe: ['phaser', 'tone']");
+    expect(block.indexOf("dedupe: ['phaser', 'tone']")).toBeGreaterThan(
+      block.indexOf('resolveCoreAliases(coreRoot)'),
+    );
+  });
+
+  it('writes a vite.config.ts carrying the transcript-persist registration', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    // Assert the real on-disk write: a re-scaffold must not drop the
+    // registration that keeps a dev session's console free of
+    // `/api/transcripts` 404s (MS-0MVREB31W004F48D).
+    const written = fs.readFileSync(path.join(gameRepo, 'vite.config.ts'), 'utf-8');
+    expect(extractPluginsBlock(written)).toContain(
+      "command === 'serve' && !process.env.VITEST ? [transcriptPersistPlugin()] : []",
+    );
+  });
+
   it('writes the root configs, preset and only the core link', () => {
     const { core, gameRepo } = makeLayout('golf');
     const result = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
@@ -474,6 +642,102 @@ describe('scaffoldGameRepo', () => {
     expect(testSrc).toContain("'@core-scripts/validate-transcript'");
     expect(testSrc).not.toContain("'../../scripts/validate-transcript'");
     expect(testSrc).toContain("'../../src/scripts/game-script'");
+  });
+
+  it('seeds a new game repo package.json with the 0.1.0 baseline', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    // Assert the real on-disk write, not just the rendered template.
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(gameRepo, 'package.json'), 'utf-8'),
+    );
+    expect(pkg.version).toBe('0.1.0');
+    expect(result.version).toBe('0.1.0');
+    expect(result.versionSource).toBe('baseline');
+  });
+
+  it('preserves an existing repo version on re-scaffold', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    // Simulate a released game: its own release history owns its version.
+    const pkgPath = path.join(gameRepo, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    pkg.version = '0.1.17';
+    fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    expect(result.version).toBe('0.1.17');
+    expect(result.versionSource).toBe('preserved');
+    expect(readExistingPackageVersion(gameRepo)).toBe('0.1.17');
+    expect(JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version).toBe('0.1.17');
+
+    // A further re-scaffold is version-neutral (no drift toward the core's).
+    const third = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+    expect(third.version).toBe('0.1.17');
+    expect(third.versionSource).toBe('preserved');
+  });
+
+  it('falls back to the baseline when the existing package.json is unusable', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const pkgPath = path.join(gameRepo, 'package.json');
+
+    // Malformed JSON is treated as no existing version.
+    fs.writeFileSync(pkgPath, '{ not json', 'utf-8');
+    expect(readExistingPackageVersion(gameRepo)).toBeUndefined();
+    const malformed = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+    expect(malformed.version).toBe('0.1.0');
+    expect(malformed.versionSource).toBe('baseline');
+
+    // A package.json with no string version is treated the same way.
+    fs.writeFileSync(pkgPath, JSON.stringify({ name: 'tce-golf' }), 'utf-8');
+    expect(readExistingPackageVersion(gameRepo)).toBeUndefined();
+    const missingField = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+    expect(missingField.version).toBe('0.1.0');
+    expect(missingField.versionSource).toBe('baseline');
+  });
+
+  it('honours an explicit version override over the preserved one', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    const pkgPath = path.join(gameRepo, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    pkg.version = '0.1.17';
+    fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      version: '2.0.0',
+    });
+
+    expect(result.version).toBe('2.0.0');
+    expect(result.versionSource).toBe('explicit');
+    expect(JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version).toBe('2.0.0');
   });
 
   it('composes the core root app-icon files into public/ and reports them', () => {
