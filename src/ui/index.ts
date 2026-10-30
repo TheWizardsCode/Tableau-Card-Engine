@@ -45,6 +45,11 @@ export type {
   IllegalMoveToastHandle,
 } from './illegalMoveToastView';
 
+// Renderer-aware container clipping (GeometryMask on Canvas, Mask filter on
+// WebGL — Phaser 4 removed `setMask` support in WebGL). See the module doc.
+export { createContainerClip, isWebGLRenderer } from './ContainerClip';
+export type { ContainerClip, ClipRect, ClipRenderer } from './ContainerClip';
+
 // Canvas-compatible persistent card highlight (selection/target marker)
 export { createCardHighlight } from './cardHighlight';
 export type { CardHighlight, CardHighlightOptions } from './cardHighlight';
