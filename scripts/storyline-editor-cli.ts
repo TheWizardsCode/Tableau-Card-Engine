@@ -50,6 +50,7 @@ import {
   DEFAULT_EDITOR_HOST,
   loadEditorSession,
   type EditorHost,
+  type EditorHostOptions,
 } from './storyline-editor-server';
 
 /** CLI usage text. */
@@ -64,7 +65,12 @@ Options:
                             path/specifier exporting a ContentAdapter as its default,
                             \`adapter\` or \`contentAdapter\` export
   --port <number>           Dev-server port (default: ${EDITOR_SERVER_PORT})
-  --host <host>             Bind host (default: ${DEFAULT_EDITOR_HOST}; loopback only)
+  --host [host]             Bind host (default: ${DEFAULT_EDITOR_HOST}, loopback). A
+                            valueless --host binds all interfaces (0.0.0.0, Vite's
+                            convention). On startup every resolved URL is printed
+                            (local and network); a non-loopback bind warns that the
+                            editor is reachable from the network and can write the
+                            loaded content CSV (it has no authentication)
   --apply <json|@file>      Apply one edit through the write bridge, print the JSON
                             result and exit (no dev server). The JSON is
                             { "edit": { "kind": ..., "spec": { ... } },
@@ -79,6 +85,9 @@ unreadable content, host failure or a refused edit (invalid or stale content).`.
 
 /** Loads a module specifier (a real dynamic `import()` by default). */
 export type AdapterImporter = (specifier: string) => Promise<unknown>;
+
+/** Creates the editor host (defaults to {@link createEditorHost}, the real Vite server). */
+export type EditorHostFactory = (options: EditorHostOptions) => Promise<EditorHost>;
 
 /** Parsed editor CLI options. */
 export interface StorylineEditorCliOptions {
@@ -102,6 +111,8 @@ export interface StorylineEditorCliOptions {
 export interface StorylineEditorCliDeps {
   /** Overrides the dynamic `import()` used to load an adapter module. */
   readonly importer?: AdapterImporter;
+  /** Overrides the host factory (tests inject a stub without binding a port). */
+  readonly createHost?: EditorHostFactory;
 }
 
 /** The default adapter importer (a real dynamic ESM import). */
@@ -126,15 +137,28 @@ export function parseStorylineEditorArgs(argv: readonly string[]): StorylineEdit
     }
   }
 
+  // A valueless `--host` parses as the literal string "true" (parseArgv's flag
+  // sentinel). Follow Vite's own convention instead of handing that to the DNS
+  // resolver: a bare `--host` binds all interfaces (0.0.0.0), omitting `--host`
+  // keeps the loopback default, and an explicit `--host <addr>` passes through
+  // unchanged (CG-0MVSRDOT400777NH).
+  const rawHost = flags.get('host');
+  const host = rawHost === undefined ? DEFAULT_EDITOR_HOST : rawHost === 'true' ? '0.0.0.0' : rawHost;
+
   return {
     help: flags.has('help'),
     port,
-    host: flags.get('host') ?? DEFAULT_EDITOR_HOST,
+    host,
     contentPath: flags.get('content') ?? DEFAULT_CONTENT_PATH,
     adapterRef: flags.get('adapter'),
     apply: flags.get('apply'),
     dryRun: flags.has('dry-run'),
   };
+}
+
+/** True when a bind host is loopback-only (never exposed beyond this machine). */
+export function isLoopbackHost(host: string): boolean {
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1';
 }
 
 /**
@@ -278,7 +302,8 @@ export async function launchEditor(
   }
 
   try {
-    const host = await createEditorHost({
+    const createHost = deps.createHost ?? createEditorHost;
+    const host = await createHost({
       session,
       port: options.port,
       host: options.host,
@@ -505,10 +530,24 @@ export async function runStorylineEditorCli(
   }
 
   const { host } = launched;
-  process.stdout.write(
-    `storyline-editor: serving the story-line graph at ${host.url ?? `http://${options.host}:${options.port}`}\n` +
-      'storyline-editor: press Ctrl+C to stop\n',
-  );
+
+  const localUrls =
+    host.urls.local.length > 0 ? host.urls.local : [host.url ?? `http://${options.host}:${options.port}`];
+  const banner: string[] = ['storyline-editor: serving the story-line graph:'];
+  for (const url of localUrls) banner.push(`storyline-editor:   local:   ${url}`);
+  for (const url of host.urls.network) banner.push(`storyline-editor:   network: ${url}`);
+  banner.push('storyline-editor: press Ctrl+C to stop');
+
+  if (!isLoopbackHost(options.host)) {
+    // The editor has no authentication and can write the loaded content CSV, so
+    // a non-loopback bind must be visible (CG-0MVSRDOT400777NH AC4).
+    banner.push(
+      'storyline-editor: WARNING: bound to a non-loopback interface — the editor is reachable',
+      `storyline-editor: from the network and can write the loaded content CSV (${options.contentPath});`,
+      'storyline-editor: it has no authentication. Stop it when done, or relaunch with --host 127.0.0.1.',
+    );
+  }
+  process.stdout.write(`${banner.join('\n')}\n`);
 
   const shutdown = (): void => {
     void host.close().finally(() => {

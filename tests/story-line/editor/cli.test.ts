@@ -28,6 +28,7 @@ import {
   parseStorylineEditorArgs,
   parseEditorApplyRequest,
   isContentAdapter,
+  isLoopbackHost,
   loadEditorManifest,
   resolveAdapterSpecifier,
   resolveEditorAdapter,
@@ -40,6 +41,7 @@ import {
   serveEditorManifest,
   storylineEditorManifestPlugin,
   EDITOR_MANIFEST_PLUGIN_NAME,
+  type EditorHost,
 } from '../../../scripts/storyline-editor-server';
 import {
   EDITOR_CONTENT_PATH,
@@ -61,6 +63,19 @@ const FIXTURE_ADAPTER = {
   columns: ['id', 'name', 'effect'],
   fields: { id: 'id', name: 'name', effect: 'effect' },
 };
+
+/** A stub {@link EditorHost} that reports the given resolved URLs. */
+function stubHost(
+  urls: { local?: string[]; network?: string[] },
+  url?: string,
+): EditorHost {
+  return {
+    server: {} as never,
+    url: url ?? urls.local?.[0],
+    urls: { local: urls.local ?? [], network: urls.network ?? [] },
+    close: async () => undefined,
+  };
+}
 
 /** Captures everything written to stdout/stderr while an argv is parsed. */
 function captureParseError(argv: readonly string[]): string {
@@ -142,6 +157,15 @@ describe('parseStorylineEditorArgs', () => {
     expect(captureParseError(['--port', 'nope'])).toContain('--port must be an integer');
     expect(captureParseError(['--port', '70000'])).toContain('--port must be an integer');
     expect(captureParseError(['--port'])).toContain('--port must be an integer');
+  });
+
+  it('normalises a valueless --host to 0.0.0.0 (Vite convention), passing explicit hosts through', () => {
+    // A valueless --host must never bind the literal string "true" (CG-0MVSRDOT400777NH).
+    expect(parseStorylineEditorArgs(['--host']).host).toBe('0.0.0.0');
+    expect(parseStorylineEditorArgs(['--host', '0.0.0.0']).host).toBe('0.0.0.0');
+    expect(parseStorylineEditorArgs([]).host).toBe('127.0.0.1');
+    expect(parseStorylineEditorArgs(['--host', '10.1.2.3']).host).toBe('10.1.2.3');
+    expect(parseStorylineEditorArgs(['--host', 'localhost']).host).toBe('localhost');
   });
 });
 
@@ -409,6 +433,79 @@ describe('runStorylineEditorCli', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Usage:');
     expect(result.stdout).toContain('--adapter');
+  });
+});
+
+describe('valueless --host (CG-0MVSRDOT400777NH)', () => {
+  it('never passes the literal "true" to the host factory — a valueless --host binds 0.0.0.0', async () => {
+    const seenHosts: string[] = [];
+    const createHost: StorylineEditorCliDeps['createHost'] = async (options) => {
+      seenHosts.push(options.host ?? '');
+      return stubHost({ local: ['http://0.0.0.0:5174/'] });
+    };
+
+    const { code, stderr } = await captureCli(['--host'], { createHost });
+    expect(code).toBe(0);
+    expect(stderr).toBe('');
+    expect(seenHosts).toEqual(['0.0.0.0']);
+  });
+
+  it('starts the host for a valueless --host (no getaddrinfo … true failure)', async () => {
+    const createHost: StorylineEditorCliDeps['createHost'] = async () =>
+      stubHost({ local: ['http://0.0.0.0:5174/'], network: ['http://192.168.1.5:5174/'] });
+
+    const { code, stdout, stderr } = await captureCli(['--host'], { createHost });
+    expect(code).toBe(0);
+    expect(stderr).not.toContain('getaddrinfo');
+    expect(stderr).not.toContain('true');
+    expect(stdout).toContain('0.0.0.0:5174');
+    expect(stdout).toContain('192.168.1.5:5174');
+  });
+
+  it('prints every resolved URL on startup — at least the local URL, plus each network URL', async () => {
+    const createHost: StorylineEditorCliDeps['createHost'] = async () =>
+      stubHost(
+        { local: ['http://127.0.0.1:5174/'], network: ['http://10.0.0.7:5174/', 'http://192.168.1.5:5174/'] },
+        'http://127.0.0.1:5174/',
+      );
+
+    const { code, stdout } = await captureCli([], { createHost });
+    expect(code).toBe(0);
+    for (const url of ['http://127.0.0.1:5174/', 'http://10.0.0.7:5174/', 'http://192.168.1.5:5174/']) {
+      expect(stdout).toContain(url);
+    }
+  });
+
+  it('warns (naming the content CSV) when the bind host is non-loopback', async () => {
+    const createHost: StorylineEditorCliDeps['createHost'] = async () =>
+      stubHost({ network: ['http://192.168.1.5:5174/'] });
+
+    const { code, stdout } = await captureCli(['--host', '0.0.0.0'], { createHost });
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/WARNING/i);
+    expect(stdout).toContain('no authentication');
+    expect(stdout).toContain(DEFAULT_CONTENT_PATH);
+  });
+
+  it('does not warn when the bind host is loopback', async () => {
+    const createHost: StorylineEditorCliDeps['createHost'] = async () =>
+      stubHost({ local: ['http://127.0.0.1:5174/'] });
+
+    const { code, stdout } = await captureCli(['--host', '127.0.0.1'], { createHost });
+    expect(code).toBe(0);
+    expect(stdout).toContain('127.0.0.1:5174');
+    expect(stdout).not.toMatch(/WARNING/i);
+  });
+});
+
+describe('isLoopbackHost', () => {
+  it('recognises loopback hosts and rejects exposed ones', () => {
+    expect(isLoopbackHost('127.0.0.1')).toBe(true);
+    expect(isLoopbackHost('localhost')).toBe(true);
+    expect(isLoopbackHost('::1')).toBe(true);
+    expect(isLoopbackHost('0.0.0.0')).toBe(false);
+    expect(isLoopbackHost('::')).toBe(false);
+    expect(isLoopbackHost('10.1.2.3')).toBe(false);
   });
 });
 

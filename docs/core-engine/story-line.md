@@ -377,6 +377,7 @@ itself.
 npm run storylines:editor                     # Gym content on http://127.0.0.1:5174
 npm run storylines:editor -- --port 5180
 npm run storylines:editor -- --host 127.0.0.1   # loopback is the default
+npm run storylines:editor -- --host             # bind all interfaces (0.0.0.0)
 npm run storylines:editor -- --content path/to/storylines.csv
 npm run storylines:editor -- --adapter ./my-game-adapter.ts
 npm run storylines:editor -- --apply '{"edit":{"kind":"update-card","spec":{...}}}'
@@ -387,7 +388,7 @@ npm run storylines:editor -- --help
 |---|---|
 | `--content <path>` | The game's content CSV (default: the Gym demo content). |
 | `--adapter <module>` | A shipped adapter id (`gym`) or a module path/specifier exporting a `ContentAdapter` as its default, `adapter` or `contentAdapter` export. |
-| `--port` / `--host` | Dev-server port (default `5174`) and bind host (default `127.0.0.1`). The tool is loopback-only by design. |
+| `--port` / `--host` | Dev-server port (default `5174`) and bind host (default `127.0.0.1`, loopback). A **valueless `--host`** binds all interfaces (`0.0.0.0`, Vite's convention); an explicit `--host <addr>` binds that address. On startup the CLI prints every resolved URL (`server.resolvedUrls`): the local/loopback URL(s) plus each network URL when a non-loopback interface was bound — and, for a non-loopback bind, warns that the editor is reachable from the network and can write the loaded content CSV (the tool has no authentication). |
 | `--apply <json\|@file>` | Apply one edit through the write bridge, print the JSON result and exit (no dev server). `--dry-run` previews/validates while writing nothing. |
 | `--help` | Print usage and exit `0`. |
 

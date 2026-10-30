@@ -34,8 +34,24 @@ npm run storylines:editor
 ```
 
 This serves the Gym demo content
-(`example-games/gym/content/storylines.csv`) on `http://127.0.0.1:5174`. The
-page is loopback-only by design. Stop it with `Ctrl-C`.
+(`example-games/gym/content/storylines.csv`) on `http://127.0.0.1:5174`
+(loopback by default). Stop it with `Ctrl-C`.
+
+To expose the editor beyond this machine, run it with a **valueless** `--host` —
+following Vite's own convention, a bare `--host` binds all interfaces
+(`0.0.0.0`) instead of failing:
+
+```bash
+npm run storylines:editor -- --host
+```
+
+On startup the CLI prints **every resolved URL** (Vite's `server.resolvedUrls`):
+the local/loopback URL(s) always, plus each network URL when a non-loopback
+interface was bound, so an operator who ran `--host` can copy the LAN/Tailscale
+address into their browser. A non-loopback bind also prints a warning that the
+tool is reachable from the network and can write the loaded content CSV (it has
+no authentication) — binding `0.0.0.0` is a deliberate, visible choice, not a
+silent default.
 
 ```bash
 npm run storylines:editor -- --help        # all flags and exit codes
@@ -124,7 +140,11 @@ npm run storylines:editor -- --content path/to/storylines.csv \
   path/specifier whose default (or `adapter` / `contentAdapter`) export is a
   `ContentAdapter` — the same declarative mapping the CLIs use. Relative
   paths resolve against the core repo root.
-- `--port` / `--host` default to `5174` and `127.0.0.1`.
+- `--port` / `--host` default to `5174` and `127.0.0.1` (loopback). A
+  **valueless** `--host` binds all interfaces (`0.0.0.0`, Vite's convention),
+  so LAN/Tailscale users can run `--host` and see the resolved network URL in
+  the startup banner. Start the editor locally first, and keep it loopback
+  (`--host 127.0.0.1`) when you are not deliberately sharing it.
 
 The host builds the deterministic manifest from that CSV + adapter at launch
 and serves it from memory (`GET /manifest.json`), so the graph the designer
@@ -261,7 +281,7 @@ assumed.
 | Apply is refused with `stale-content` | The CSV changed on disk since load (maybe a branch switch or an external edit). Reload the page and retry. |
 | An edit is refused with a validator error | Read the report (and the inline-attributed field). Typical causes: `unknown-successor`, `unreachable-card`, malformed `options` encoding, `missing-storyline-id` on a new choice card. |
 | Port already in use | `npm run storylines:editor -- --port 5180`. |
-| The server won't bind | The host is loopback by default; `--host 0.0.0.0` is allowed but the tool is designed for local authoring. |
+| The server won't bind | Check the port is free (`--port 5180`) and the host resolves. The editor defaults to loopback (`127.0.0.1`); a **valueless `--host`** binds all interfaces (`0.0.0.0`), and an explicit `--host <addr>` binds that address. A non-loopback bind prints a warning: the editor is reachable from the network and can write the loaded content CSV (no authentication). |
 
 ## 10. Testing
 

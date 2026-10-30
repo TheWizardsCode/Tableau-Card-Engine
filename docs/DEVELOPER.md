@@ -1469,9 +1469,12 @@ npm run storylines:editor -- --help
 - `--adapter` is a **shipped adapter id** (`gym`, the default) or a module
   path/specifier whose default (or `adapter` / `contentAdapter`) export is a
   `ContentAdapter` — the same declarative column mapping the CLIs use.
-- `--port` / `--host` default to `5174` and `127.0.0.1`; the tool is loopback-only
-  by design. The command exits `0` on `--help` and `1` on a bad option, an
-  unknown adapter, unreadable content or a host failure.
+- `--port` / `--host` default to `5174` and `127.0.0.1` (loopback); a **valueless**
+  `--host` binds all interfaces (`0.0.0.0`, Vite's convention). On startup every
+  resolved URL is printed (local and network), and a non-loopback bind warns that
+  the editor is reachable from the network and can write the loaded content CSV
+  (it has no authentication). The command exits `0` on `--help` and `1` on a bad
+  option, an unknown adapter, unreadable content or a host failure.
 
 The host reads the CSV **through the content adapter**, builds the deterministic
 manifest and serves it at `/manifest.json` from memory (`scripts/storyline-editor-server.ts`
