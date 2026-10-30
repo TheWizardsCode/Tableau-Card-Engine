@@ -62,14 +62,41 @@ export const DEFAULT_PIN_REL = path.join('configs', 'engine-pin.json');
 export class EngineSyncError extends Error {}
 
 /**
+ * Repository-override variables that must never be inherited by a git command
+ * this module spawns. `runGit` always targets an explicit `cwd`, so an
+ * inherited `GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE` would make it read (or
+ * write) a *different* repository than the one it was given — the same
+ * hermeticity contract the framework's `shared.git_sandbox` enforces for every
+ * production path that spawns git (CG-0MVTVSYQE002JGDN).
+ */
+const REPOSITORY_OVERRIDE_ENV_VARS = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_CONFIG',
+  'GIT_CONFIG_GLOBAL',
+  'GIT_CONFIG_SYSTEM',
+  'GIT_CONFIG_NOSYSTEM',
+  'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+];
+
+/**
  * Run a git command from a given cwd.
+ *
+ * The child environment is the caller's with every repository override removed,
+ * so the command only ever touches the repository at `cwd`. An explicit `env`
+ * entry still wins (a caller setting `GIT_DIR` on purpose is deliberate).
  * @returns {{ ok: boolean, code: number, stdout: string, stderr: string }}
  */
 export function runGit(cwd, args, env = {}) {
+  const inherited = { ...process.env };
+  for (const name of REPOSITORY_OVERRIDE_ENV_VARS) delete inherited[name];
+  const childEnv = { ...inherited, ...env };
   const res = spawnSync('git', args, {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: childEnv,
     windowsHide: true,
   });
   const code = res.status ?? 1;

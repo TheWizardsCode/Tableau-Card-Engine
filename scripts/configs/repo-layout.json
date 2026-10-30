@@ -31,6 +31,7 @@
       "scripts/engine-sync.d.mts",
       "scripts/engine-sync.mjs",
       "scripts/check-browser-test-env.ts",
+      "scripts/check-ui-node-surface.ts",
       "scripts/codemod-src-imports.ts",
       "scripts/game-repo-scaffold.ts",
       "scripts/setup-distribution.ts",
