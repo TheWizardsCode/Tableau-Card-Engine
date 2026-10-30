@@ -1,14 +1,16 @@
 /**
  * GymOverlayUiScene -- Demonstrates overlays, help/settings components,
- * live UI configuration, and GeometryMask clipping using core-engine UI APIs.
+ * live UI configuration, and renderer-aware container clipping using
+ * core-engine UI APIs.
  *
  * Features:
  *   - Open and close help/settings overlays
  *   - Toggle feedback intensity settings
  *   - Verify overlay lifecycle (no state leaks)
- *   - Scrollable content area clipped with GeometryMask
- *   - Mask position updates during overlay animation
- *   - Mask is destroyed on overlay dismiss
+ *   - Scrollable content area clipped by `createContainerClip()` — a Canvas
+ *     `GeometryMask` or a WebGL Mask filter, chosen by the renderer
+ *   - Clip stays fixed in scene space while the content container scrolls
+ *   - Clip and its mask resources are destroyed on overlay dismiss
  *
  * @module example-games/gym/scenes/GymOverlayUiScene
  */
@@ -20,6 +22,8 @@ import { createOverlayBackground, dismissOverlay } from '../../../src/ui/Overlay
 import { createHudText } from '../../../src/ui/Renderer';
 import { createEventLog } from '../../../src/ui/GymSceneUtils';
 import type { EventLogResult } from '../../../src/ui/GymSceneUtils';
+import { createContainerClip } from '../../../src/ui/ContainerClip';
+import type { ContainerClip } from '../../../src/ui/ContainerClip';
 import { anchorPoint } from '../../../src/ui/screen-layout';
 import { parseScreenLayoutDocument } from '../../../src/ui/screen-layout-schema';
 import gymOverlayUiLayoutJson from '../layouts/gym-overlay-ui.layout.json';
@@ -72,20 +76,20 @@ import {
 // ── Scrollable content generation ────────────────────────────
 
 // Line of text repeated to pad content to desired length.
-// Use descriptive content about the overlay/mask rather than lorem ipsum.
+// Use descriptive content about the overlay/clip rather than lorem ipsum.
 const CONTENT_PAD = [
-  'The GeometryMask clips this',
+  'The container clip trims this',
   'content to a fixed rectangle.',
   '',
   'Scroll to see more details',
   'about how the engine works.',
   '',
   'Each line is added as a child',
-  'of the masked container, which',
-  'is positioned at the mask origin.',
+  'of the clipped container, which',
+  'is positioned at the clip origin.',
   '',
   'When the overlay closes, all',
-  'mask resources are freed.',
+  'clip resources are freed.',
   '',
   'This creates a clean lifecycle',
   'with no memory leaks.',
@@ -97,21 +101,21 @@ const CONTENT_PAD = [
  */
 function generateScrollableContent(): string[] {
   const lines: string[] = [];
-  lines.push('Masked Content Area');
+  lines.push('Clipped Content Area');
   lines.push('─────────────────────');
   lines.push('');
   lines.push('This overlay demonstrates a');
-  lines.push('GeometryMask-clipped region');
+  lines.push('renderer-aware clipped region');
   lines.push('that can be scrolled using');
   lines.push('the mouse wheel or touch drag.');
   lines.push('');
-  lines.push('─ Mask Properties ─');
+  lines.push('─ Clip Properties ─');
   lines.push('Size: 300 x 200 px');
   lines.push('Lines: uses 16px spacing');
   lines.push('Scroll: wheel + drag');
   lines.push('');
   lines.push('─ How Scrolling Works ─');
-  lines.push('The masked container moves');
+  lines.push('The clipped container moves');
   lines.push('vertically inside the clip');
   lines.push('region, revealing different');
   lines.push('parts of the text content.');
@@ -121,17 +125,20 @@ function generateScrollableContent(): string[] {
   lines.push('relative to total content.');
   lines.push('');
   lines.push('─ Implementation ─');
-  lines.push('1. A Graphics object defines');
-  lines.push('   the clip region shape.');
-  lines.push('2. A GeometryMask is created');
-  lines.push('   from that graphics shape.');
-  lines.push('3. A Container holds all the');
+  lines.push('1. A clip rect describes the');
+  lines.push('   visible content region.');
+  lines.push('2. createContainerClip() picks');
+  lines.push('   the renderer-appropriate');
+  lines.push('   clipping mechanism for it.');
+  lines.push('3. Canvas uses a GeometryMask;');
+  lines.push('   WebGL uses a Mask filter.');
+  lines.push('4. A Container holds all the');
   lines.push('   scrollable child objects.');
-  lines.push('4. The mask is applied to the');
-  lines.push('   container via setMask().');
   lines.push('5. Adjusting the container Y');
   lines.push('   scrolls content within the');
   lines.push('   fixed clip region.');
+  lines.push('6. The clip is destroyed when');
+  lines.push('   the overlay closes.');
   lines.push('');
   lines.push('─ Scroll Tips ─');
   lines.push('Use mouse wheel to scroll.');
@@ -177,11 +184,12 @@ export class GymOverlayUiScene extends GymSceneBase {
   private eventLogResult!: EventLogResult;
   private overlayIntensityText: Phaser.GameObjects.Text | null = null;
 
-  // Mask references for GeometryMask demo
-  private contentMask: Phaser.Display.Masks.GeometryMask | null = null;
+  // Renderer-aware clip for the scrollable content demo (Canvas
+  // `GeometryMask` / WebGL Mask filter — see `createContainerClip()`).
+  private contentClip: ContainerClip | null = null;
   private maskedContainer: Phaser.GameObjects.Container | null = null;
 
-  // Scroll state for the masked content area
+  // Scroll state for the clipped content area
   private _overlayScroller: {
     scrollY: number;
     maxScrollY: number;
@@ -208,7 +216,7 @@ export class GymOverlayUiScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'Demonstrates overlay creation and dismissal using createOverlayBackground() and dismissOverlay(), along with live UI configuration via feedback intensity controls. Also showcases GeometryMask clipping for scrollable content regions within overlays. In a real card game, overlays are used for confirmation dialogs ("Are you sure you want to quit?"), rule reminders, or modal messages that temporarily block interaction with the game board.'
+        body: 'Demonstrates overlay creation and dismissal using createOverlayBackground() and dismissOverlay(), along with live UI configuration via feedback intensity controls. Also showcases renderer-aware container clipping for scrollable content regions within overlays, via createContainerClip() (Canvas GeometryMask / WebGL Mask filter). In a real card game, overlays are used for confirmation dialogs ("Are you sure you want to quit?"), rule reminders, or modal messages that temporarily block interaction with the game board.'
       },
       {
         heading: 'Controls',
@@ -216,11 +224,11 @@ export class GymOverlayUiScene extends GymSceneBase {
       },
       {
         heading: 'Usage Example',
-        body: 'In a game of Golf, after a player completes a round, an overlay appears showing the final score, statistics, and a confirmation to start a new game. The overlay uses a semi-transparent background to keep the game board visible underneath, and the intensity controls let the player dim or brighten the overlay for comfort. The GeometryMask clips a scrollable rules summary to a fixed-size region.'
+        body: 'In a game of Golf, after a player completes a round, an overlay appears showing the final score, statistics, and a confirmation to start a new game. The overlay uses a semi-transparent background to keep the game board visible underneath, and the intensity controls let the player dim or brighten the overlay for comfort. The renderer-aware clip keeps a scrollable rules summary inside a fixed-size region on both Canvas and WebGL.'
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ Show Overlay ] → overlay appears with semi-transparent background\n2. Verify overlay contains scrollable masked content area with clipped text\n3. Press [ Intensity - ] three times → intensity drops from 1.0 to 0.4, overlay dims\n4. Press [ Intensity + ] twice → intensity returns to 0.8\n5. Click the overlay background → overlay dismisses, event log confirms\n6. Open overlay again, click [ Dismiss Overlay ] button inside overlay → overlay closes\n7. Press outside overlay interaction guard → verify no accidental dismissal'
+        body: '1. Press [ Show Overlay ] → overlay appears with semi-transparent background\n2. Verify overlay contains a scrollable content area clipped to a fixed rect (Canvas GeometryMask / WebGL Mask filter)\n3. Press [ Intensity - ] three times → intensity drops from 1.0 to 0.4, overlay dims\n4. Press [ Intensity + ] twice → intensity returns to 0.8\n5. Click the overlay background → overlay dismisses, event log confirms\n6. Open overlay again, click [ Dismiss Overlay ] button inside overlay → overlay closes\n7. Press outside overlay interaction guard → verify no accidental dismissal'
       }
     ]);
 
@@ -276,7 +284,7 @@ export class GymOverlayUiScene extends GymSceneBase {
     // Apply current intensity to the overlay appearance
     this.updateOverlayAppearance();
 
-    // ── GeometryMask demo: scrollable content ─────────────
+    // ── Renderer-aware clip demo: scrollable content ──────
     try {
       const areaX = GAME_W / 2 - this._maskW / 2;
       const areaY = this._scrollAreaBaseY;
@@ -284,27 +292,23 @@ export class GymOverlayUiScene extends GymSceneBase {
       const areaH = this._maskH;
       const lineH = OVERLAY_TEXT_LINE_HEIGHT;
 
-      // Create a shaped mask for clipping — positioned at the content area
-      const maskShape = this.add.graphics();
-      maskShape.setPosition(areaX, areaY);
-      maskShape.fillStyle(0xffffff, 1);
-      maskShape.fillRect(0, 0, areaW, areaH);
-      this.contentMask = new Phaser.Display.Masks.GeometryMask(this, maskShape);
-      // Hide the mask shape — it provides geometry data for the mask but
-      // should not be rendered as a visible white rectangle at (0,0) behind
-      // the semi-transparent overlay background.
-      maskShape.setVisible(false);
-      this.overlayObjects.push(maskShape);
-
-      // Create a container for content that will be clipped.
-      // Position at same origin as the mask shape so the clip region
-      // aligns with the container's local coordinate space.
+      // Create a container for content that will be clipped, positioned at
+      // the clip origin so the clip rect aligns with its local coordinates.
       this.maskedContainer = this.add.container(areaX, areaY);
-      this.maskedContainer.setMask(this.contentMask);
       this.maskedContainer.setDepth(OVERLAY_MASK_DEPTH);
       this.overlayObjects.push(this.maskedContainer);
 
-      // Generate scrollable content lines (enough to overflow the mask)
+      // Clip the content region with the renderer-appropriate mechanism:
+      // a Canvas `GeometryMask` or a WebGL Mask filter. The clip rect is in
+      // scene space, so it stays fixed while the container scrolls.
+      this.contentClip = createContainerClip(this, this.maskedContainer, {
+        x: areaX,
+        y: areaY,
+        w: areaW,
+        h: areaH,
+      });
+
+      // Generate scrollable content lines (enough to overflow the clip)
       const contentLines = generateScrollableContent();
       const contentH = contentLines.length * lineH;
       const maxScrollY = Math.max(0, contentH - areaH);
@@ -376,11 +380,11 @@ export class GymOverlayUiScene extends GymSceneBase {
       this._wheelHandlerRef = wheelHandler;
 
       this.logEvent(
-        `Overlay opened with GeometryMask scrollable area (${contentLines.length} lines, maxScroll=${maxScrollY})`,
+        `Overlay opened with renderer-aware scroll clip (${contentLines.length} lines, maxScroll=${maxScrollY})`,
       );
     } catch (e) {
-      // GeometryMask may not be available in all environments (e.g., headless)
-      this.logEvent('Overlay opened (GeometryMask unavailable, text fallback)');
+      // Clipping may be unavailable in some environments (e.g., headless)
+      this.logEvent('Overlay opened (scroll clip unavailable, text fallback)');
     }
 
     // Add central content text (above the mask)
@@ -422,7 +426,7 @@ export class GymOverlayUiScene extends GymSceneBase {
     plus.setDepth(OVERLAY_MASK_DEPTH);
     this.overlayObjects.push(plus);
 
-    if (!this.contentMask) {
+    if (!this.contentClip) {
       this.logEvent('Overlay opened');
     }
   }
@@ -442,21 +446,20 @@ export class GymOverlayUiScene extends GymSceneBase {
     // Reset scroll state
     this._overlayScroller = null;
 
-    // Destroy GeometryMask references before dismissing overlay objects
-    if (this.maskedContainer) {
-      try { this.maskedContainer.clearMask(); } catch (_) { /* ignore */ }
-      this.maskedContainer = null;
+    // Destroy the clip (and its mask resources) before dismissing the
+    // overlay objects: the WebGL Mask filter must detach before the masked
+    // container goes away, and no Graphics may be orphaned.
+    if (this.contentClip) {
+      try { this.contentClip.destroy(); } catch (_) { /* ignore */ }
+      this.contentClip = null;
     }
-    if (this.contentMask) {
-      try { (this.contentMask as any).destroy?.(); } catch (_) { /* ignore */ }
-      this.contentMask = null;
-    }
+    this.maskedContainer = null;
 
     dismissOverlay(this.overlayObjects);
     this.overlayObjects = null;
     this.overlayIntensityText = null;
     this.overlayOpen = false;
-    this.logEvent('Overlay dismissed (mask destroyed)');
+    this.logEvent('Overlay dismissed (clip destroyed)');
   }
 
   private adjustIntensity(delta: number): void {
