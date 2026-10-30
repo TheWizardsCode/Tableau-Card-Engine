@@ -23,6 +23,22 @@ import {
 } from '../../src/ui/OverlayButton';
 import { createOverlayMenuButton } from '../../src/ui/MenuButton';
 import { FONT_FAMILY, GAME_W, GAME_H } from '../../src/ui/constants';
+import {
+  createContainerClip,
+  type ContainerClip,
+} from '../../src/ui/ContainerClip';
+
+// `createOverlayDialog` delegates clipping to the shared `createContainerClip`
+// helper. The helper's own renderer branches are covered by
+// `ContainerClip.test.ts` and the real-browser probes in
+// `CorePanelWebglClip.browser.test.ts`; these tests spy on that seam so they
+// assert the dialog's clip *decisions* (when to clip, and to which viewport)
+// instead of GeometryMask internals.
+vi.mock('../../src/ui/ContainerClip', () => ({
+  createContainerClip: vi.fn(),
+}));
+
+const createClip = vi.mocked(createContainerClip);
 
 // ── Mock helpers ────────────────────────────────────────────
 
@@ -333,7 +349,7 @@ describe('createOverlayMenuButton', () => {
 
 /**
  * Create a mock Phaser.GameObjects.Container covering the subset of the
- * container API `createOverlayDialog` uses (position, child list, mask).
+ * container API `createOverlayDialog` uses (position, child list).
  */
 function mockContainer(x = 0, y = 0) {
   const list: unknown[] = [];
@@ -341,7 +357,6 @@ function mockContainer(x = 0, y = 0) {
     x,
     y,
     list,
-    mask: null as unknown,
     setDepth: vi.fn().mockReturnThis(),
     add: vi.fn((child: unknown) => {
       list.push(child);
@@ -351,31 +366,25 @@ function mockContainer(x = 0, y = 0) {
       list.length = 0;
       return container;
     }),
-    setMask: vi.fn((mask: unknown) => {
-      container.mask = mask;
-      return container;
-    }),
-    clearMask: vi.fn(() => {
-      container.mask = null;
-      return container;
-    }),
     destroy: vi.fn(),
   };
   return container;
 }
 
-/** Create a mock Phaser.GameObjects.Graphics (the scroll clip geometry). */
-function mockMaskGraphics() {
-  // The Canvas `ContainerClip` branch keeps a `GeometryMask` and destroys it
-  // with the clip, so the stub needs a `destroy` spy of its own.
-  const mask = { __geometryMask: true, destroy: vi.fn() };
+/** The observable surface of the clip the dialog receives from the helper. */
+type FakeClip = {
+  graphics: { destroy: ReturnType<typeof vi.fn> };
+  setRect: ReturnType<typeof vi.fn>;
+  clear: ReturnType<typeof vi.fn>;
+  destroy: ReturnType<typeof vi.fn>;
+};
+
+/** Create a mock `ContainerClip` and record it for assertions. */
+function mockClip(): FakeClip {
   return {
-    mask,
-    clear: vi.fn().mockReturnThis(),
-    fillStyle: vi.fn().mockReturnThis(),
-    fillRect: vi.fn().mockReturnThis(),
-    setVisible: vi.fn().mockReturnThis(),
-    createGeometryMask: vi.fn(() => mask),
+    graphics: { destroy: vi.fn() },
+    setRect: vi.fn(),
+    clear: vi.fn(),
     destroy: vi.fn(),
   };
 }
@@ -386,16 +395,19 @@ function mockDialogScene() {
     (pointer: { x: number; y: number }, over: unknown[], dx: number, dy: number) => void
   > = [];
 
+  const clips: FakeClip[] = [];
+  createClip.mockReset();
+  createClip.mockImplementation(() => {
+    const clip = mockClip();
+    clips.push(clip);
+    return clip as unknown as ContainerClip;
+  });
+
   const scene = {
-    // The Canvas renderer keeps the long-standing `GeometryMask` clip path
-    // (`createOverlayDialog` clips through the renderer-aware
-    // `createContainerClip` helper when the content overflows).
-    renderer: { type: 1 /* Phaser.CANVAS */ },
     add: {
       rectangle: vi.fn(() => mockRectangle()),
       text: vi.fn(() => mockText()),
       container: vi.fn((x: number, y: number) => mockContainer(x, y)),
-      graphics: vi.fn(() => mockMaskGraphics()),
     },
     input: {
       on: vi.fn((event: string, handler: (typeof wheelHandlers)[number]) => {
@@ -411,6 +423,8 @@ function mockDialogScene() {
 
   return {
     scene: scene as unknown as Phaser.Scene,
+    clips,
+    lastClip: (): FakeClip => clips[clips.length - 1],
     wheelHandlerCount: (): number => wheelHandlers.length,
     /** Dispatch a wheel event to every registered handler (as Phaser does). */
     wheel(x: number, y: number, dx: number, dy: number): void {
@@ -532,27 +546,43 @@ describe('createOverlayDialog', () => {
     expect(dialog.scrollContainer.y).toBe(dialog.contentY);
   });
 
-  it('applies the geometry mask when content overflows vertically and clears it when it fits', () => {
-    const dialog = createOverlayDialog(harness.scene, { title: 'Mask' });
+  it('clips the scroll region to the content viewport when content overflows and clears the clip when it fits', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Clip' });
+    const clip = harness.lastClip();
+    expect(createClip).toHaveBeenCalledWith(harness.scene, dialog.scrollContainer);
+
     addDemoContent(dialog, dialog.contentHeight * 2, dialog.contentWidth);
     dialog.refresh();
-    expect(dialog.scrollContainer.mask).not.toBeNull();
+    expect(clip.setRect).toHaveBeenLastCalledWith({
+      x: dialog.contentX,
+      y: dialog.contentY,
+      w: dialog.contentWidth,
+      h: dialog.contentHeight,
+    });
 
     dialog.refresh(dialog.contentHeight, dialog.contentWidth);
-    expect(dialog.scrollContainer.mask).toBeNull();
+    expect(clip.clear).toHaveBeenCalledTimes(1);
   });
 
-  it('applies the geometry mask for horizontal overflow only when opted in', () => {
-    const defaultDialog = createOverlayDialog(harness.scene, { title: 'No mask' });
+  it('clips for horizontal overflow only when the dialog opts in', () => {
+    const defaultDialog = createOverlayDialog(harness.scene, { title: 'No clip' });
+    const defaultClip = harness.lastClip();
     defaultDialog.refresh(10, defaultDialog.contentWidth * 4);
-    expect(defaultDialog.scrollContainer.mask).toBeNull();
+    expect(defaultClip.setRect).not.toHaveBeenCalled();
+    expect(defaultClip.clear).toHaveBeenCalledTimes(1);
 
     const wideDialog = createOverlayDialog(harness.scene, {
-      title: 'Wide mask',
+      title: 'Wide clip',
       enableHorizontalScroll: true,
     });
+    const wideClip = harness.lastClip();
     wideDialog.refresh(10, wideDialog.contentWidth * 4);
-    expect(wideDialog.scrollContainer.mask).not.toBeNull();
+    expect(wideClip.setRect).toHaveBeenCalledWith({
+      x: wideDialog.contentX,
+      y: wideDialog.contentY,
+      w: wideDialog.contentWidth,
+      h: wideDialog.contentHeight,
+    });
   });
 
   it('keeps the opt-in capability per-dialog (a default dialog still ignores dx)', () => {
@@ -592,13 +622,15 @@ describe('createOverlayDialog', () => {
     expect(dialog.scrollY).toBe(0);
   });
 
-  it('detaches its wheel handler on close', () => {
+  it('detaches its wheel handler and destroys the clip on close', () => {
     const dialog = createOverlayDialog(harness.scene, { title: 'Closable' });
+    const clip = harness.lastClip();
     expect(harness.wheelHandlerCount()).toBe(1);
 
     dialog.close();
 
     expect(harness.wheelHandlerCount()).toBe(0);
+    expect(clip.destroy).toHaveBeenCalledTimes(1);
   });
 });
 
