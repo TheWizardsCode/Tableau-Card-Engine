@@ -2166,6 +2166,28 @@ symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
 
+#### Renderer the scaffold emits: `Phaser.AUTO`
+
+The generated `main.ts` boots `createCardGame({ type: Phaser.AUTO, … })`, and
+the core repo's own `main.ts` does the same (CG-0MVTQ3WPV003ZECA). `AUTO` means
+**WebGL when the browser offers a WebGL context, Canvas otherwise** — so a GPU
+browser keeps Phaser 4's Filter pipeline (including the Mask filter that
+replaces the Canvas-only `GeometryMask`) while a WebGL-less browser still
+renders. Forcing `Phaser.CANVAS` would silently drop that pipeline for every
+player: `GeometryMask` is Canvas-only, so the WebGL clip path never runs, and
+game code that assumes a Filter renderer (shaders, masks, blend passes) would
+quietly no-op. See [Per-game repo scaffold](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
+and `src/ui/createCardGame.ts` (whose `type` option documents the same default).
+
+**Tests are the deliberate exception.** `src/core-engine/TestGamePool.ts`
+pins `TEST_RENDER_TYPE` to `Phaser.CANVAS` (use `withTestRenderer(options)`),
+because headless CI runs WebGL through SwiftShader at ~10x the cost of
+Canvas2D; `tests/core-engine/TestGamePool.test.ts` asserts that pin so a later
+"unification" cannot quietly force WebGL onto the suite. A browser test that
+really needs a GPU renderer opts in explicitly through
+`tests/helpers/bootRendererScene.ts`, which fails loudly if the requested
+renderer is unavailable rather than passing on a Canvas fallback.
+
 ### Engine sync/verify scripts in generated game repos
 
 `renderPackageJson` wires every generated game repo with two engine submodule

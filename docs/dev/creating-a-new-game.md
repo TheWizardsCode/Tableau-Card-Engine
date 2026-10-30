@@ -129,6 +129,17 @@ root app-icon/public assets. Engine imports resolve through the path aliases
 (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`, …)
 against `./core`.
 
+**Renderer:** the generated `main.ts` boots `Phaser.AUTO` — WebGL when the
+browser has a WebGL context, Canvas otherwise (the same default as the core
+launcher's own `main.ts` and `createCardGame()`). Games rely on Phaser 4's
+Filter pipeline (e.g. the Mask filter that replaces the Canvas-only
+`GeometryMask`), so a scaffold that forced `Phaser.CANVAS` would silently cost
+every GPU-browser player that pipeline. Browser tests are the deliberate
+exception: they force `Phaser.CANVAS` via
+`src/core-engine/TestGamePool.ts` (`withTestRenderer()`) because CI renders
+WebGL through SwiftShader, which is ~10x slower. See
+[Scaffolding a game repo](../DEVELOPER.md#scaffolding-a-game-repo).
+
 ### Per-game version policy
 
 **A game repo owns its own version — it is not the engine version.** The

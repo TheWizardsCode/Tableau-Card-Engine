@@ -37,6 +37,8 @@ vi.mock('phaser', () => ({
   default: {
     Game: MockPhaserGame,
     AUTO: 0,
+    CANVAS: 1,
+    WEBGL: 2,
     Scale: {
       FIT: 1,
       CENTER_BOTH: 2,
@@ -123,6 +125,12 @@ describe('createCardGame', () => {
       expect(config.render.roundPixels).toBe(true);
     });
 
+    it('boots Phaser.AUTO by default (WebGL with Canvas fallback)', () => {
+      createCardGame(minimalOptions);
+      const config = MockPhaserGame.mock.calls[0][0];
+      expect(config.type).toBe(0); // Phaser.AUTO
+    });
+
     it('does not disable WebAudio', () => {
       createCardGame(minimalOptions);
       const config = MockPhaserGame.mock.calls[0][0];
@@ -142,6 +150,14 @@ describe('createCardGame', () => {
       const config = MockPhaserGame.mock.calls[0][0];
       expect(config.width).toBe(800);
       expect(config.height).toBe(600);
+    });
+
+    it('honours an explicit Phaser.CANVAS render type (browser-test harnesses)', () => {
+      // Browser tests force Canvas2D for speed under SwiftShader
+      // (CG-0MVTQ3WPV003ZECA). That opt-in must survive the AUTO default.
+      createCardGame({ ...minimalOptions, type: 1 /* Phaser.CANVAS */ });
+      const config = MockPhaserGame.mock.calls[0][0];
+      expect(config.type).toBe(1);
     });
 
     it('merges render overrides with defaults', () => {

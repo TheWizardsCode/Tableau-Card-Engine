@@ -3,18 +3,22 @@
  *
  * Every browser test file needs to boot a Phaser game. This helper:
  *
- * 1. Forces **Canvas2D rendering** (`Phaser.CANVAS`) which is ~10x faster
- *    than WebGL software emulation in headless CI runners.
+ * 1. Pins **Canvas2D rendering** (`TEST_RENDER_TYPE` = `Phaser.CANVAS`), which
+ *    is ~10x faster than WebGL software emulation (SwiftShader) in headless
+ *    CI runners. This is a deliberate, tested exception to the shipped
+ *    launcher default of `Phaser.AUTO` (CG-0MVTQ3WPV003ZECA): a browser test
+ *    asserting GPU behaviour must opt in explicitly via
+ *    `tests/helpers/bootRendererScene.ts`, never by flipping this default.
  * 2. Configures a clean DOM container before each boot.
  * 3. Waits for the specified scene to become active.
  *
  * Usage:
  * ```ts
- * import { bootTestGame } from '../../src/core-engine/TestGamePool';
+ * import { withTestRenderer } from '../../src/core-engine/TestGamePool';
  * import { waitForScene } from '../../tests/helpers/waitForScene';
  *
  * async function bootMyGame(): Promise<Phaser.Game> {
- *   const game = bootTestGame(() => createMyGame({ type: Phaser.CANVAS }));
+ *   const game = createMyGame(withTestRenderer({ backgroundColor: '#2d572c' }));
  *   await waitForScene(game, 'MyScene');
  *   return game;
  * }
@@ -26,6 +30,15 @@
 import Phaser from 'phaser';
 
 const CONTAINER_ID = 'game-container';
+
+/**
+ * The renderer every browser-test boot uses: Canvas2D.
+ *
+ * Pinned by `tests/core-engine/TestGamePool.test.ts` so a later
+ * "unification" with the launcher's `Phaser.AUTO` default cannot quietly
+ * force WebGL (and its SwiftShader slow path) onto the whole CI suite.
+ */
+export const TEST_RENDER_TYPE: number = Phaser.CANVAS;
 
 /**
  * Prepare a fresh DOM container for a new test game, removing any
@@ -80,6 +93,24 @@ export function getOrCreateGame(
   const game = factory();
   gameCache.set(gameId, game);
   return game;
+}
+
+/**
+ * Apply {@link TEST_RENDER_TYPE} to a Phaser game-creation options object.
+ *
+ * Any `type` the caller supplied (`AUTO`, `WEBGL`) is replaced, so a test
+ * harness cannot accidentally opt the suite into WebGL. GPU/renderer-parity
+ * tests that genuinely need WebGL bypass this helper and boot through
+ * `tests/helpers/bootRendererScene.ts`.
+ *
+ * ```ts
+ * const game = createGolfGame(withTestRenderer({ backgroundColor: '#2d572c' }));
+ * ```
+ */
+export function withTestRenderer<T extends object>(
+  options: T,
+): T & { type: number } {
+  return { ...options, type: TEST_RENDER_TYPE } as T & { type: number };
 }
 
 /**

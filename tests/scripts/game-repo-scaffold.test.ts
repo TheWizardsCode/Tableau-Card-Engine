@@ -27,6 +27,7 @@ import {
   pascalCase,
   readExistingPackageVersion,
   readLayoutGames,
+  renderMainTs,
   renderPackageJson,
   renderPreset,
   renderTsconfig,
@@ -548,6 +549,28 @@ describe('renderPreset', () => {
       renderPreset('golf', 'src/scenes/GolfScene.ts', 'src/scripts/adapters/GolfReplayAdapter.ts'),
     );
     expect(preset.games[0].adapterPath).toContain('GolfReplayAdapter');
+  });
+});
+
+describe('renderMainTs', () => {
+  // CG-0MVTQ3WPV003ZECA: a freshly scaffolded launcher must boot
+  // `Phaser.AUTO` (WebGL with Canvas fallback). A generated repo that
+  // silently regressed to `Phaser.CANVAS` would lose Phaser 4's Filter
+  // pipeline (the Mask filter that replaces the Canvas-only `GeometryMask`).
+  it('boots Phaser.AUTO and never Phaser.CANVAS', () => {
+    const mainTs = renderMainTs();
+
+    expect(mainTs).toContain('type: Phaser.AUTO');
+    expect(mainTs).not.toContain('Phaser.CANVAS');
+  });
+
+  it('is written to the scaffolded game repo with the AUTO renderer', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    const written = fs.readFileSync(path.join(gameRepo, 'main.ts'), 'utf-8');
+    expect(written).toContain('type: Phaser.AUTO');
+    expect(written).not.toContain('Phaser.CANVAS');
   });
 });
 
