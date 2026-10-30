@@ -2178,6 +2178,8 @@ player: `GeometryMask` is Canvas-only, so the WebGL clip path never runs, and
 game code that assumes a Filter renderer (shaders, masks, blend passes) would
 quietly no-op. See [Per-game repo scaffold](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and `src/ui/createCardGame.ts` (whose `type` option documents the same default).
+The renderer-dependent clipping contract that follows from this is documented in
+[Renderer-Aware Clipping (`ContainerClip`)](ui/renderer-aware-clipping.md).
 
 **Tests are the deliberate exception.** `src/core-engine/TestGamePool.ts`
 pins `TEST_RENDER_TYPE` to `Phaser.CANVAS` (use `withTestRenderer(options)`),
@@ -4396,6 +4398,23 @@ See CG-0MSTB03U6009J2WV for the original bug report.
 
 The engine provides a collection of reusable HUD (heads-up display) components under `src/ui/` that standardise overlay, sidebar, and button UI across all example games. These components are exported via the core-engine public API (`src/ui/index.ts`) and are consumed through adapter modules in each game.
 
+### Renderer-Aware Clipping (`ContainerClip`)
+
+Scrollable and panned regions are clipped through the shared
+`createContainerClip()` helper from `@ui` (`src/ui/ContainerClip.ts`), **not** a
+bare `GeometryMask`. Phaser 4's WebGL renderer no longer supports
+`GameObject.setMask`: `GeometryMask` is Canvas-only, so a `setMask` call on
+WebGL warns and no-ops, leaving the content unclipped. The helper applies a
+`GeometryMask` on Canvas (unchanged behaviour) and a **Mask filter** on WebGL
+(opaque, off-display-list Graphics), with a screen-space clip that stays fixed
+while the clipped content pans. `HelpPanel`, `SettingsPanel` and the scrolling
+overlay dialog all use it, and each owns its clip's `destroy()`.
+
+See [Renderer-Aware Clipping (`ContainerClip`)](ui/renderer-aware-clipping.md)
+for the full restriction, the helper contract (`setRect`/`clear`/`destroy`),
+teardown ownership, the do-not list, and how it is verified with
+`renderer.snapshotPixel()` probes under a forced `Phaser.WEBGL` boot.
+
 ### Help Panel
 
 The `HelpPanel` class provides a slide-in left sidebar that displays game rules, controls, and tips. It accepts an array of `HelpSection` objects, each with a `heading` and either `body` (plain text) or `render` (custom Phaser renderer) for rich content.
@@ -4427,10 +4446,11 @@ helpPanel.toggle(); // Toggle open/closed
 content is clipped by the renderer-aware `createContainerClip()` helper
 (`@ui/ContainerClip`) — a `GeometryMask` on the Canvas renderer and a Mask
 filter on WebGL, because Phaser 4's `GameObject.setMask` is Canvas-only
-(`src/ui/ContainerClip.ts`). The clip is re-applied on every scroll step and on
-every frame of the slide animation (so it tracks the panel's x position), is
-`clear()`ed rather than shrunk when the content fits, and is torn down by
-`HelpPanel.destroy()`. The Mask filter keeps its Graphics off the display list
+(`src/ui/ContainerClip.ts`; see
+[Renderer-Aware Clipping](ui/renderer-aware-clipping.md)). The clip is
+re-applied on every scroll step and on every frame of the slide animation (so
+it tracks the panel's x position), is `clear()`ed rather than shrunk when the
+content fits, and is torn down by `HelpPanel.destroy()`. The Mask filter keeps its Graphics off the display list
 (so it is not drawn over the scene), which is why `getSceneChildren()` only
 reports that Graphics on Canvas.
 
@@ -4609,7 +4629,8 @@ dialog.refresh(wideText.y + wideText.height, wideText.width);
   rectangle; only the scroll container translates. It is applied when either
   axis overflows and cleared when neither does. Clipping goes through the
   renderer-aware `createContainerClip()` helper (`GeometryMask` on Canvas, Mask
-  filter on WebGL — `GameObject.setMask` is Canvas-only in Phaser 4), and
+  filter on WebGL — `GameObject.setMask` is Canvas-only in Phaser 4; see
+  [Renderer-Aware Clipping](ui/renderer-aware-clipping.md)), and
   `handle.close()` destroys it with the other overlay objects.
 
 ### Overlay Manager

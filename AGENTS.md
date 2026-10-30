@@ -316,14 +316,15 @@ Use `AiStrategyBase` (the strategy interface), `AiPlayer<TStrategy>` (generic pl
 - **When to use:** "In a real game like Lost Cities, an AI strategy implements AiStrategyBase { choosePhase1Action(state, rng): Phase1Action; choosePhase2Action(state, rng): Phase2Action; }. The AiPlayer wraps these strategies and calls them during the game loop." (GymAiStrategyScene Usage Example help text)
 - **Key features:** Same strategy + same seed = same pick (deterministic); `pickBest()` breaks ties randomly using the seeded RNG; strategies can be swapped at runtime.
 
-### 5. Overlay Lifecycle and GeometryMask Clipping
+### 5. Overlay Lifecycle and Renderer-Aware Clipping
 
-Use `createOverlayBackground()` and `dismissOverlay()` from `@ui` for modal overlays. Overlays use a semi-transparent background with depth-ordering conventions (backdrop 199, box 200, interactive elements 201). GeometryMask scrollable content regions are cleaned up on dismiss.
+Use `createOverlayBackground()` and `dismissOverlay()` from `@ui` for modal overlays. Overlays use a semi-transparent background with depth-ordering conventions (backdrop 199, box 200, interactive elements 201). Scrollable content regions are clipped through the renderer-aware `createContainerClip()` helper (never a bare `GeometryMask`) and the clip is destroyed on dismiss.
 
 - **Gym scenes:** `GymOverlayUiScene` — `example-games/gym/scenes/GymOverlayUiScene.ts`, `GymParameterizedOverlayScene` — `example-games/gym/scenes/GymParameterizedOverlayScene.ts`
-- **Key APIs:** `createOverlayBackground()`, `dismissOverlay()`, `createParameterizedOverlay()`, `dismissParameterizedOverlay()`, GeometryMask (Phaser built-in)
+- **Key APIs:** `createOverlayBackground()`, `dismissOverlay()`, `createParameterizedOverlay()`, `dismissParameterizedOverlay()`, `createContainerClip()` (`@ui`)
 - **When to use:** "In a real card game, overlays are used for confirmation dialogs ('Are you sure you want to quit?'), rule reminders, or modal messages that temporarily block interaction with the game board." (GymOverlayUiScene Features help text)
-- **Lifecycle:** Create overlay via `createOverlayBackground`, parent all interactive elements into `hudContainer`, handle dismiss with proper cleanup (GeometryMask destroy, event listener removal, object array reset). The refined depth convention for modal dialogs is documented in the [UI Best Practices section](#ui-best-practices-creating-modal-dialogs) above.
+- **Lifecycle:** Create overlay via `createOverlayBackground`, parent all interactive elements into `hudContainer`, handle dismiss with proper cleanup (clip `destroy()`, event listener removal, object array reset). The refined depth convention for modal dialogs is documented in the [UI Best Practices section](#ui-best-practices-creating-modal-dialogs) above.
+- **Clipping:** Phaser 4's WebGL renderer no longer supports `GameObject.setMask` — `GeometryMask` is Canvas-only, so `setMask` warns and no-ops under WebGL. Always clip through `createContainerClip()` (`src/ui/ContainerClip.ts`): it keeps `GeometryMask` on Canvas and uses an opaque, off-display-list Graphics with a Mask filter on WebGL, in screen space. See [Renderer-Aware Clipping](docs/ui/renderer-aware-clipping.md) for the contract, teardown ownership and the do-not list.
 
 ### 6. Event Sourcing via Transcript Recording
 

@@ -257,8 +257,9 @@ standardises overlay, sidebar, and button UI across all example games.
 Components include HelpPanel, SettingsPanel, OverlayManager, Parameterized
 Overlay, GymButtonBar (reusable button bar with left/center/right zones
 and automatic row wrapping), CardGameScene base class with
-initHelpPanel/initSettingsPanel helpers, and depth conventions for
-consistent layering.
+initHelpPanel/initSettingsPanel helpers, renderer-aware clipping for
+scrollable regions (`createContainerClip()` — a Canvas `GeometryMask` or a
+WebGL Mask filter), and depth conventions for consistent layering.
 
 Every screen also carries a bright-red **ALPHA** badge showing the running
 version (`ALPHA v<version>`), rendered by the shared `createAlphaBadge()`
