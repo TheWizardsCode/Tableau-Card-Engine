@@ -4532,6 +4532,43 @@ const { background, box, objects } = createOverlayBackground(
 dismissOverlay(objects);
 ```
 
+### Overlay Dialog (scrolling)
+
+`createOverlayDialog` builds the standard modal dialog — backdrop, title, close
+button, and a scrollable content area — and is the recommended way to build
+info panels, debug tools, and confirmation dialogs. It is **vertical-only by
+default**; the horizontal axis is **opt-in per dialog**, so the ~10 existing
+callers are unaffected.
+
+```typescript
+import { createOverlayDialog } from '@ui/Overlay';
+
+const dialog = createOverlayDialog(scene, {
+  title: 'Game Events',
+  enableHorizontalScroll: true, // opt in (default: false)
+});
+
+dialog.scrollContainer.add(wideText); // position content relative to (0, 0)
+// Content size drives both clamps: height first, then width.
+dialog.refresh(wideText.y + wideText.height, wideText.width);
+```
+
+**Scroll contract:**
+
+- `refresh(totalContentHeight?, totalContentWidth?)` clamps `scrollY` to
+  `max(0, height - contentHeight)` and — only when opted in — `scrollX` to
+  `max(0, width - contentWidth)`. Omitted arguments are estimated from the
+  children already in `scrollContainer`.
+- The bounds-checked wheel handler scales `dx` and `dy` by 1.5 and ignores
+  `dx` entirely unless the dialog opted in, so a default dialog behaves
+  exactly as before and wheel input never leaks to overlays beneath.
+- `handle.scrollX` and `handle.maxScrollX` expose the horizontal axis;
+  `maxScrollX` is always `0` for a vertical-only dialog. The two axes are
+  independent and each is re-clamped on `refresh()`.
+- The geometry mask stays fixed in scene space over the visible content
+  rectangle; only the scroll container translates. The mask is applied when
+  either axis overflows and cleared when neither does.
+
 ### Overlay Manager
 
 The `OverlayManager` class provides a lifecycle wrapper around the overlay background system.
@@ -4823,18 +4860,34 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
 - **Location:** Debug Tools section of the Settings panel
 - **Function:** Opens a scrollable overlay showing a live feed of events
   emitted by the `GameEventEmitter` during gameplay. Features include:
-  - **Live feed:** Each event displays an ISO timestamp, event name (e.g.,
-    `turn-started`, `turn-completed`, `state-settled`, `card-drawn`), and a
-    truncated view of the event payload.
-  - **Auto-scroll:** Newest events appear at the bottom and are shown
-    automatically.
+  - **Live feed:** Each event renders a one-line
+    `timestamp [eventName]` header followed by the event's **complete**
+    payload as 2-space-indented JSON (`JSON.stringify(payload, null, 2)`).
+    Nothing is truncated, so a full payload is readable without leaving the
+    game or opening the browser devtools.
+  - **No word wrap:** Payload lines are never soft-wrapped — each
+    pretty-printed JSON line stays on exactly one line.
+  - **Horizontal scrolling:** Lines wider than the dialog stay on one line
+    and are reachable by scrolling sideways. This overlay is the only caller
+    that opts into the shared dialog's `enableHorizontalScroll`; vertical
+    scrolling keeps working and the two axes are independent.
+  - **Safe fallbacks:** Non-serialisable payloads never break the feed — a
+    circular reference becomes `[Circular]`, and `undefined`/primitives/failed
+    serialisations fall back to `String(payload)`. One bad payload cannot stop
+    the remaining events rendering.
   - **Clear button:** Removes all entries from the feed.
   - **Pause/Resume:** Toggles whether new events are added to the feed.
 - **Event source:** Subscribes to the `GameEventEmitter` instance exposed on
   `window.__GAME_EVENTS__` (set up automatically by `CardGameScene`).
 - **Use case:** Monitor event flow during gameplay for debugging event-driven
   interactions or replays.
-- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts`
+- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts` renders one text
+  object per event (header + pretty JSON, measured row offsets, no `wordWrap`);
+  the pure, Phaser-free formatting helpers (`formatEventLogEntry`,
+  `stringifyPayloadSafe`, `widestLineLength`) live in
+  `src/ui/debug/formatEventLog.ts` and are re-exported from `@ui/debug`.
+  Horizontal reachability comes from `createOverlayDialog`'s opt-in
+  `enableHorizontalScroll` (see [Overlay Dialog (scrolling)](#overlay-dialog-scrolling)).
 
 #### AI Decisions
 
