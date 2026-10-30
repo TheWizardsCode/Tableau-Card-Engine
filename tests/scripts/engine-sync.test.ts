@@ -38,6 +38,13 @@ import {
   syncEngine,
   verifyEngine,
 } from '../../scripts/engine-sync.mjs';
+import { fixtureGitEnv, clearAmbientGitOverrides } from '../helpers/gitFixtureEnv';
+
+// `scripts/engine-sync.mjs` spawns its own `git` commands with the process
+// environment, so an ambient finish-gate `GIT_INDEX_FILE` would reach them and
+// write into the gate's temporary index (CG-0MVVKUUY50010004). Scrub it (and
+// the other repository overrides) for this file's worker.
+clearAmbientGitOverrides();
 
 const tempRoots: string[] = [];
 
@@ -54,12 +61,21 @@ afterEach(() => {
   }
 });
 
-/** Run git quietly in a fixture (tests only — no network). */
+/** Run git quietly in a fixture (tests only — no network).
+ *
+ * The environment is hermetic: no ambient `GIT_INDEX_FILE` or repository
+ * override may reach the fixture, or the commands write into the finish gate's
+ * temporary index instead of the fixture's own (CG-0MVVKUUY50010004).
+ */
 function git(cwd: string, args: string[]): { ok: boolean; stdout: string; stderr: string } {
   const res = spawnSync('git', args, {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, GIT_ALLOW_PROTOCOL: 'file', GIT_TERMINAL_PROMPT: '0' },
+    env: {
+      ...fixtureGitEnv(),
+      GIT_ALLOW_PROTOCOL: 'file',
+      GIT_TERMINAL_PROMPT: '0',
+    },
     windowsHide: true,
   });
   return {

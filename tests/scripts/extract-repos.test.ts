@@ -23,6 +23,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { fixtureGitEnv } from '../helpers/gitFixtureEnv';
+
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const LAYOUT_PATH = path.join(REPO_ROOT, 'scripts', 'configs', 'repo-layout.json');
 const SCRIPT_PATH = path.join(REPO_ROOT, 'scripts', 'extract-repos.sh');
@@ -93,6 +95,8 @@ function runExtract(args: string[]): { stdout: string; status: number } {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 60_000,
+      // The script runs git; keep it out of any ambient gate index.
+      env: fixtureGitEnv(),
     });
     return { stdout, status: 0 };
   } catch (error) {
@@ -389,7 +393,10 @@ describe('extract-repos.sh — dry-run plan', () => {
  * (with a documented reason) on hosts that lack the tool. */
 const HAS_FILTER_REPO = (() => {
   try {
-    execFileSync('git', ['filter-repo', '--version'], { stdio: 'ignore' });
+    execFileSync('git', ['filter-repo', '--version'], {
+      stdio: 'ignore',
+      env: fixtureGitEnv(),
+    });
     return true;
   } catch {
     return false;
@@ -430,8 +437,15 @@ describe.skipIf(!HAS_FILTER_REPO)('extract-repos.sh — real extraction', () => 
         '// test\n',
       );
       fs.writeFileSync(path.join(source, 'unrelated.txt'), 'nope\n');
+      // Hermetic: no ambient GIT_INDEX_FILE may reach the fixture, or its
+      // git commands would write into the finish gate's temporary index
+      // (CG-0MVVKUUY50010004).
       const git = (args: string[]) =>
-        execFileSync('git', args, { cwd: source, stdio: 'ignore' });
+        execFileSync('git', args, {
+          cwd: source,
+          stdio: 'ignore',
+          env: fixtureGitEnv(),
+        });
       git(['init', '-q']);
       git(['config', 'user.email', 'test@example.com']);
       git(['config', 'user.name', 'Test']);
@@ -446,6 +460,8 @@ describe.skipIf(!HAS_FILTER_REPO)('extract-repos.sh — real extraction', () => 
           encoding: 'utf-8',
           stdio: ['ignore', 'pipe', 'pipe'],
           timeout: 120_000,
+          // The script runs git itself; keep it out of any ambient gate index.
+          env: fixtureGitEnv(),
         },
       );
 

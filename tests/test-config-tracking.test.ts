@@ -4,8 +4,25 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { fixtureGitEnv } from './helpers/gitFixtureEnv';
+
 const repoRoot = join(__dirname, '..');
 const configRelPath = '.pi/test-config.json';
+
+/**
+ * Executes a `git` command hermetically (no inherited `GIT_INDEX_FILE`).
+ *
+ * `git worktree add` writes an index; with an ambient `GIT_INDEX_FILE` it
+ * would reset the finish gate's temporary index to `HEAD`, invalidating the
+ * gate's would-be-commit evidence (CG-0MVVKUUY50010004).
+ */
+function git(args: string, options: { cwd?: string } = {}): void {
+  execSync(`git ${args}`, {
+    stdio: 'ignore',
+    cwd: options.cwd ?? repoRoot,
+    env: fixtureGitEnv(),
+  });
+}
 
 /**
  * Return true when the git *ignore rules* exclude *relativePath*.
@@ -17,10 +34,7 @@ const configRelPath = '.pi/test-config.json';
  */
 function isGitIgnoredByRule(relativePath: string, cwd: string = repoRoot): boolean {
   try {
-    execSync(`git check-ignore --no-index --quiet -- "${relativePath}"`, {
-      stdio: 'ignore',
-      cwd,
-    });
+    git(`check-ignore --no-index --quiet -- "${relativePath}"`, { cwd });
     return true;
   } catch {
     return false;
@@ -46,6 +60,7 @@ describe('.pi/test-config.json tracking', () => {
   it('is tracked by git (listed in ls-files)', () => {
     const output = execSync(`git ls-files --error-unmatch -- ${configRelPath}`, {
       cwd: repoRoot,
+      env: fixtureGitEnv(),
     }).toString('utf8').trim();
     expect(output).toBe(configRelPath);
   });
@@ -59,10 +74,7 @@ describe('.pi/test-config.json tracking', () => {
     const tmpRoot = mkdtempSync(join(tmpdir(), 'tce-test-config-worktree-'));
     const worktreePath = join(tmpRoot, 'wt');
     try {
-      execSync(`git worktree add --detach "${worktreePath}" HEAD`, {
-        cwd: repoRoot,
-        stdio: 'ignore',
-      });
+      git(`worktree add --detach "${worktreePath}" HEAD`, { cwd: repoRoot });
 
       const config = JSON.parse(
         readFileSync(join(worktreePath, configRelPath), 'utf8'),
@@ -71,10 +83,7 @@ describe('.pi/test-config.json tracking', () => {
       expect(isGitIgnoredByRule(configRelPath, worktreePath)).toBe(false);
     } finally {
       try {
-        execSync(`git worktree remove --force "${worktreePath}"`, {
-          cwd: repoRoot,
-          stdio: 'ignore',
-        });
+        git(`worktree remove --force "${worktreePath}"`, { cwd: repoRoot });
       } catch {
         // Best-effort: if add failed there is nothing to remove; the temp
         // directory removal below is authoritative either way.
