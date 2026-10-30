@@ -19,9 +19,10 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-// The helper reads `Phaser.WEBGL` at runtime, and the real Phaser module needs
-// a DOM (`window`) at import time — so this Node test mocks just the renderer
-// type constants it consumes.
+// The real Phaser module needs a DOM (`window`) at import time, so this Node
+// test mocks just the renderer type constants the *stub scenes* use. The helper
+// itself keeps a Phaser-free runtime import graph (it declares its own renderer
+// constant), so nothing here depends on Phaser evaluating.
 vi.mock('phaser', () => ({
   CANVAS: 1,
   WEBGL: 2,

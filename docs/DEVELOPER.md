@@ -4401,6 +4401,17 @@ helpPanel.toggle(); // Toggle open/closed
 
 **Input blocking:** When open, the panel creates a full-screen transparent interactive rectangle that captures pointer events. Closing the panel removes this blocker.
 
+**Scroll clipping:** when the sections overflow the panel, the scrollable
+content is clipped by the renderer-aware `createContainerClip()` helper
+(`@ui/ContainerClip`) — a `GeometryMask` on the Canvas renderer and a Mask
+filter on WebGL, because Phaser 4's `GameObject.setMask` is Canvas-only
+(`src/ui/ContainerClip.ts`). The clip is re-applied on every scroll step and on
+every frame of the slide animation (so it tracks the panel's x position), is
+`clear()`ed rather than shrunk when the content fits, and is torn down by
+`HelpPanel.destroy()`. The Mask filter keeps its Graphics off the display list
+(so it is not drawn over the scene), which is why `getSceneChildren()` only
+reports that Graphics on Canvas.
+
 ### Help Button
 
 The `HelpButton` class renders a circular "?" toggle button that opens/closes the associated `HelpPanel`. It renders at depth 1101 (above all gameplay and HUD content).
@@ -4434,6 +4445,13 @@ settingsPanel.toggle(); // Toggle open/closed
 ```
 
 **Depth conventions:** Same as HelpPanel (blocker 900, background 901, etc.). Settings button at depth 1102.
+
+**Scroll clipping:** when the stacked controls exceed the canvas height, the
+scrollable content is clipped to the panel's visible area through the same
+renderer-aware `createContainerClip()` helper HelpPanel uses (`GeometryMask` on
+Canvas, Mask filter on WebGL). The clip is tracked on the panel and released by
+`SettingsPanel.destroy()`, so neither an orphaned mask Graphics nor an active
+filter outlives the panel.
 
 ### Settings Button
 
@@ -4565,9 +4583,12 @@ dialog.refresh(wideText.y + wideText.height, wideText.width);
 - `handle.scrollX` and `handle.maxScrollX` expose the horizontal axis;
   `maxScrollX` is always `0` for a vertical-only dialog. The two axes are
   independent and each is re-clamped on `refresh()`.
-- The geometry mask stays fixed in scene space over the visible content
-  rectangle; only the scroll container translates. The mask is applied when
-  either axis overflows and cleared when neither does.
+- The scroll clip stays fixed in scene space over the visible content
+  rectangle; only the scroll container translates. It is applied when either
+  axis overflows and cleared when neither does. Clipping goes through the
+  renderer-aware `createContainerClip()` helper (`GeometryMask` on Canvas, Mask
+  filter on WebGL — `GameObject.setMask` is Canvas-only in Phaser 4), and
+  `handle.close()` destroys it with the other overlay objects.
 
 ### Overlay Manager
 

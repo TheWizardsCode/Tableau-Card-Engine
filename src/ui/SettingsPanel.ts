@@ -16,6 +16,8 @@ import { createVersionLabel } from './versionDisplay';
 import { createAlphaBadge } from './AlphaBadge';
 import type { AlphaBadgeResult } from './AlphaBadge';
 import { isDevMode, resolveDebugToolDescription, type DebugToolsEntry } from './debug/DebugToolsRegistry';
+import { createContainerClip } from './ContainerClip';
+import type { ContainerClip } from './ContainerClip';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -244,6 +246,13 @@ export class SettingsPanel {
   private _scrollContent: Phaser.GameObjects.Container;
   private _scrollY = 0;
   private _maxContentY = 0;
+  /**
+   * Renderer-aware clip on the scrollable content, created only when the
+   * content overflows the panel. Phaser 4 removed `setMask` in WebGL, so this
+   * tracks a {@link ContainerClip} (Canvas `GeometryMask` / WebGL Mask
+   * filter) instead of a bare mask Graphics that nothing could destroy.
+   */
+  private _scrollClip: ContainerClip | null = null;
 
   // Live debug-tool descriptions (function-valued descriptions only)
   private _liveDebugDescriptions: Array<{
@@ -894,21 +903,16 @@ export class SettingsPanel {
     }
 
     if (this._maxContentY > this.canvasHeight) {
-      // Mask clips scrollable content to the panel's visible area.
-      // Mask is in SCENE space (not added to container), set invisible,
-      // positioned to cover the panel when fully slid in from the right.
-      const maskGraphics = scene.add.graphics();
-      maskGraphics.fillStyle(0xffffff);
-      maskGraphics.fillRect(
-        this.canvasWidth - this.panelWidth,
-        0,
-        this.panelWidth,
-        this.canvasHeight,
-      );
-      maskGraphics.setVisible(false);
-      this._scrollContent.setMask(
-        new Phaser.Display.Masks.GeometryMask(scene, maskGraphics),
-      );
+      // Clip scrollable content to the panel's visible area. The clip is in
+      // SCENE space (not added to the container) and positioned to cover the
+      // panel when fully slid in from the right; the Canvas branch keeps its
+      // Graphics on the display list while the WebGL Mask filter keeps it off.
+      this._scrollClip = createContainerClip(this.scene, this._scrollContent, {
+        x: this.canvasWidth - this.panelWidth,
+        y: 0,
+        w: this.panelWidth,
+        h: this.canvasHeight,
+      });
 
       // Scroll on wheel — only when pointer is within the panel bounds
       scene.input.on('wheel', (pointer: Phaser.Input.Pointer, _gameObjects: unknown[], _dx: number, dy: number) => {
@@ -1158,6 +1162,13 @@ export class SettingsPanel {
 
     // Remove input blocker
     this.removeInputBlocker();
+
+    // Destroy the scroll clip (mask Graphics / Mask filter) before the
+    // container teardown removes its children.
+    if (this._scrollClip) {
+      this._scrollClip.destroy();
+      this._scrollClip = null;
+    }
 
     // Destroy the integrated button
     if (this._settingsButton) {

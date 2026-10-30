@@ -42,9 +42,23 @@
  * is resolved once at construction.
  *
  * @module
+ *
+ * ## Phaser-free runtime import graph
+ *
+ * This module deliberately has **no runtime import of Phaser** (it uses the
+ * global `Phaser` namespace for *types* only, and the renderer constants
+ * below). `@ui/Overlay` — and every module built on it — therefore stays
+ * importable from a plain Node unit test with a stub scene, which downstream
+ * game suites rely on (see `tests/ui/phaser-free-imports.test.ts`).
  */
 
-import Phaser from 'phaser';
+/**
+ * Phaser's renderer type constants (`Phaser.CANVAS` = 1, `Phaser.WEBGL` = 2).
+ *
+ * Declared locally so this module needs no runtime Phaser import; these are
+ * public, stable Phaser constants (v3 and v4 share the values).
+ */
+const RENDERER_WEBGL = 2;
 
 /** A clip rectangle in scene (camera) space, `w`/`h` from the origin corner. */
 export interface ClipRect {
@@ -95,7 +109,7 @@ export interface ContainerClip {
 
 /** True when the scene is running on the WebGL renderer. */
 export function isWebGLRenderer(scene: Phaser.Scene): boolean {
-  return scene.renderer.type === Phaser.WEBGL;
+  return scene.renderer.type === RENDERER_WEBGL;
 }
 
 /**

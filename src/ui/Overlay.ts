@@ -6,7 +6,7 @@
  *
  * - {@link createOverlayBackground} — basic backdrop + optional centered box
  * - {@link createOverlayDialog} — full dialog with title, close button,
- *   and a scrollable content area (geometry mask + bounds-checked wheel
+ *   and a scrollable content area (renderer-aware container clip + bounds-checked wheel
  *   handler). Vertical scrolling is always available; horizontal scrolling
  *   is **opt-in** per dialog (`enableHorizontalScroll`) so wide, unwrapped
  *   content is reachable instead of clipped.
@@ -18,6 +18,8 @@
  */
 
 import { GAME_W, GAME_H } from './constants';
+import { createContainerClip } from './ContainerClip';
+import type { ClipRect, ContainerClip } from './ContainerClip';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -266,7 +268,7 @@ export interface OverlayDialogOptions {
  *
  * The two axes are independent: a wheel event carrying both `dx` and `dy`
  * moves each by its own delta, and `refresh()` re-clamps each separately.
- * Only the content container translates on either axis — the geometry mask
+ * Only the content container translates on either axis — the scroll clip
  * stays fixed in scene space to the visible content rectangle.
  */
 export interface OverlayDialogHandle {
@@ -342,7 +344,7 @@ export interface OverlayDialogHandle {
    * Call after adding/removing content children in `scrollContainer`.
    * Re-clamps `scrollY` (and `scrollX` when horizontal scrolling is
    * enabled), re-positions the scroll container, and applies or removes
-   * the geometry mask based on whether content overflows on either axis.
+   * the scroll clip based on whether content overflows on either axis.
    *
    * @param totalContentHeight  Total height of content in px. If
    *                            omitted, estimated from children positions.
@@ -362,7 +364,8 @@ export interface OverlayDialogHandle {
  * It builds on {@link createOverlayBackground} and adds:
  *
  * - Title text with close (✕) button
- * - Scrollable content container with invisible geometry mask
+ * - Scrollable content container with an invisible renderer-aware clip
+ *   (Canvas `GeometryMask` / WebGL Mask filter, via `createContainerClip`)
  * - Bounds-checked wheel handler (only scrolls when pointer is
  *   within the overlay box, preventing scroll from leaking to
  *   overlays beneath)
@@ -384,7 +387,7 @@ export interface OverlayDialogHandle {
  *   the vertical estimate, `x` + `width` for the horizontal one).
  * - The wheel handler scales both deltas by 1.5 and ignores `dx` entirely
  *   unless the dialog opted in, so default behaviour is unchanged.
- * - The geometry mask is fixed in scene space at
+ * - The scroll clip is fixed in scene space at
  *   (`contentX`, `contentY`, `contentWidth`, `contentHeight`); only the
  *   scroll container translates. It is applied when either axis overflows
  *   and cleared when neither does.
@@ -498,12 +501,21 @@ export function createOverlayDialog(
   objects.push(scrollContainer);
   parentIntoHud([scrollContainer]);
 
-  // Invisible scroll mask (scene-space)
-  const maskGraphics = scene.add.graphics();
-  maskGraphics.fillStyle(0xffffff);
-  maskGraphics.fillRect(contentX, contentY, contentWidth, contentHeight);
-  maskGraphics.setVisible(false);
-  objects.push(maskGraphics);
+  // Renderer-aware scroll clip (scene-space). Phaser 4 removed `setMask`
+  // support in WebGL, so clipping goes through `createContainerClip`
+  // (Canvas `GeometryMask` / WebGL Mask filter) and the clip is created
+  // cleared — `refresh()` applies or clears it as the content fits.
+  const clipViewport: ClipRect = {
+    x: contentX,
+    y: contentY,
+    w: contentWidth,
+    h: contentHeight,
+  };
+  const clip: ContainerClip = createContainerClip(scene, scrollContainer);
+  // Destroyed with the other overlay objects; `close()` also tears down the
+  // clip explicitly so the WebGL Mask filter is detached before the objects
+  // are dismissed (see below).
+  objects.push(clip.graphics);
 
   // ── Handle (forward-declared so the wheel handler can reference it) ──
   // `maxScrollX` is derived from the measured content width on every
@@ -568,11 +580,12 @@ export function createOverlayDialog(
   /** Close the overlay and remove all event listeners. */
   function close(): void {
     scene.input.off('wheel', wheelHandler);
+    clip.destroy();
     dismissOverlay(objects);
     options.onClose?.();
   }
 
-  /** Re-clamp scroll, reposition container, and apply/remove mask. */
+  /** Re-clamp scroll, reposition container, and apply/clear the scroll clip. */
   function refresh(totalContentHeight?: number, totalContentWidth?: number): void {
     const th = totalContentHeight ?? estimateContentHeight();
     const maxScrollY = Math.max(0, th - contentHeight);
@@ -585,16 +598,18 @@ export function createOverlayDialog(
       : 0;
     handle.scrollX = Math.min(handle.scrollX, maxScrollX);
 
-    // Only the container translates: the geometry mask stays fixed in
-    // scene space at (contentX, contentY) with the visible content size, so
-    // both axes are clipped to the same viewport.
+    // Only the container translates: the clip stays fixed in scene space at
+    // (contentX, contentY) with the visible content size, so both axes are
+    // clipped to the same viewport.
     scrollContainer.y = contentY - handle.scrollY;
     scrollContainer.x = contentX - (enableHorizontalScroll ? handle.scrollX : 0);
 
     if (maxScrollY > 0 || maxScrollX > 0) {
-      scrollContainer.setMask(maskGraphics.createGeometryMask());
+      clip.setRect(clipViewport);
     } else {
-      scrollContainer.clearMask();
+      // Nothing overflows: `clear()` is the real "no clip" (a zero-area rect
+      // would hide the whole container under the WebGL Mask filter).
+      clip.clear();
     }
   }
 

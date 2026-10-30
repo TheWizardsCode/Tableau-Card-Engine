@@ -364,11 +364,14 @@ function mockContainer(x = 0, y = 0) {
   return container;
 }
 
-/** Create a mock Phaser.GameObjects.Graphics (the scroll mask geometry). */
+/** Create a mock Phaser.GameObjects.Graphics (the scroll clip geometry). */
 function mockMaskGraphics() {
-  const mask = { __geometryMask: true };
+  // The Canvas `ContainerClip` branch keeps a `GeometryMask` and destroys it
+  // with the clip, so the stub needs a `destroy` spy of its own.
+  const mask = { __geometryMask: true, destroy: vi.fn() };
   return {
     mask,
+    clear: vi.fn().mockReturnThis(),
     fillStyle: vi.fn().mockReturnThis(),
     fillRect: vi.fn().mockReturnThis(),
     setVisible: vi.fn().mockReturnThis(),
@@ -384,6 +387,10 @@ function mockDialogScene() {
   > = [];
 
   const scene = {
+    // The Canvas renderer keeps the long-standing `GeometryMask` clip path
+    // (`createOverlayDialog` clips through the renderer-aware
+    // `createContainerClip` helper when the content overflows).
+    renderer: { type: 1 /* Phaser.CANVAS */ },
     add: {
       rectangle: vi.fn(() => mockRectangle()),
       text: vi.fn(() => mockText()),
