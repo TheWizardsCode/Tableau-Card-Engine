@@ -11,7 +11,8 @@ npm install          # install dependencies
 npm run dev          # start Vite dev server (http://localhost:3000)
 npm run monte-carlo  # run the Main Street Monte Carlo harness (JSON + CSV outputs)
 npm test             # run Vitest test suite (non-destructive: does not modify tracked assets)
-npm run build        # TypeScript check + production build -> dist/
+npm run build        # static node-surface check + TypeScript check + production build -> dist/
+npm run check:ui-node-surface  # static @ui node-safe import check (also runs as build's prebuild)
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 npm run generate:icons # regenerate app icons from public/favicon.svg (the tableau emblem)
@@ -31,6 +32,12 @@ npx vitest run --project unit tests/scripts/
 ```
 
 Note: Vitest browser runs use an internal Vite server, but the dev-only transcript persistence middleware is disabled in test mode to avoid file-system side effects and reduce harness flakiness.
+
+Note: `npm run build` starts with `npm run check:ui-node-surface` (the `prebuild`
+step), a static import-graph check over the node-safe `@ui` manifest
+(`src/ui/node-safe-modules.ts`). It fails the build when a module promised to be
+importable in a plain Node environment (no `window`) picks up a Phaser **value**
+import. See [Phaser-free `@ui` helper imports for Node tests](docs/DEVELOPER.md#phaser-free-ui-helper-imports-for-node-tests).
 
 ### Which games does a build include?
 
