@@ -84,6 +84,8 @@ npm run package:steam    # Steam build: builds the follow addon + Windows NSIS p
 
 **Before any push to origin:** ensure unit tests pass (`npm test -- --project unit`) and the build succeeds (`npm run build`). Full browser + tutorial E2E suites are not required on every push.
 
+> **`npm run build` starts with a hard gate (`CG-0MVS9HBN3009HIQN`).** `package.json` wires `"prebuild": "npm run check:ui-node-surface"`, so every `npm run build` first runs the static import-graph check over the node-safe `@ui` manifest (`src/ui/node-safe-modules.ts`). A listed module that transitively picks up a Phaser **value** import fails the build before `tsc`/`vite` run, naming the module and the offending chain. If you add a module to the node-safe surface, follow the "adding a module" procedure in [docs/DEVELOPER.md](docs/DEVELOPER.md#phaser-free-ui-helper-imports-for-node-tests); if the check proves a candidate is Phaser-bearing, drop it from the manifest rather than editing that module. `build:*`-style scripts (`build:electron`, `build:game-artifact`, …) are unaffected — npm pre-hooks are script-name-scoped.
+
 Each example game should have its own set of tests to ensure that the game mechanics work as expected and to prevent regressions as the engine evolves. Additionally, the core engine should have comprehensive tests covering all critical functionalities.
 
 **Periodic test-suite review:** the suite is audited for low-value tests via the repo-local [`test-review` skill](.pi/skills/test-review/SKILL.md) (`/skill:test-review`). The audit classifies every `*.test.ts` file against six documented anti-patterns, records the result in [`docs/dev/test-suite-review.md`](docs/dev/test-suite-review.md), and creates a child work item for each removal/clean-up recommendation. The audit itself is analysis-only and never edits tests.
@@ -125,7 +127,7 @@ The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, whic
     - `npm run test:dev` (~3.5 min) — **pre-audit / pre-commit** check. Smoke + key E2E per game.
     - `npm run test` (full suite, ~18–21 min) — **release only**. Full browser + tutorial E2E suites.
   Tutorial E2E parts are excluded from smoke/dev profiles. Full project table in `docs/DEVELOPER.md#smoke-tests` / `#dev-tests`.
-- **Before any push to origin** — run unit tests (`npm test -- --project unit`) and `npm run build`. Full suite (`npm test`) is only required on release.
+- **Before any push to origin** — run unit tests (`npm test -- --project unit`) and `npm run build` (which begins with the `check:ui-node-surface` prebuild gate, see the note under [Quality Gates](#quality-gates)). Full suite (`npm test`) is only required on release.
 
 > **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only (TypeScript compile + Vite bundle). The full test suite is run **locally** before every push only on release (per the quality gates above) and is intentionally NOT re-run in PR CI — the Phaser 4 browser suite has outgrown the single-Chromium-instance context budget in constrained CI environments. `deploy.yml` on `main` also builds only; `package.yml` smoke-tests the packaged Windows binary separately.
 

@@ -15,6 +15,21 @@
  *   provide reusable overlay UI primitives.
  *
  * See docs/HUD-LAYER-MIGRATION.md for migration guide.
+ *
+ * ## Node tests must not import this barrel (`CG-0MVS9HBN3009HIQN`)
+ *
+ * This barrel is **intentionally Phaser-bearing**: it re-exports
+ * `CardGameScene`, which `extends Phaser.Scene`, so importing it evaluates
+ * Phaser and crashes in a plain Node unit test with
+ * `ReferenceError: window is not defined` (`CG-0MVQQ2M8E003FQMZ`).
+ *
+ * Node/unit tests must import the **deep, Phaser-free path** instead. The
+ * authoritative list of modules guaranteed importable without Phaser is the
+ * node-safe manifest `src/ui/node-safe-modules.ts` (`uiNodeSafeModules`) —
+ * look it up there; if a module is not listed, treat it as Phaser-bearing.
+ * The promise is enforced by `scripts/check-ui-node-surface.ts`
+ * (`npm run check:ui-node-surface`, wired as `prebuild`) and by
+ * `tests/ui/phaser-free-imports.test.ts`.
  */
 export const UI_VERSION = '0.1.0';
 

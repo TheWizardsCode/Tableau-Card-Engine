@@ -154,6 +154,9 @@ an explicit path; default `core-only`):
 
 ```bash
 npm run build                       # default preset: core-only (Gym only)
+                                    # (runs `prebuild`: the node-safe `@ui`
+                                    #  import-graph check first — see
+                                    #  "Phaser-free `@ui` helper imports")
 GAMES_CONFIG=solo npm run build     # one game (configs/solo.json)
 GAMES_CONFIG=arcade npm run build   # a small subset (configs/arcade.json)
 GAMES_CONFIG=deluxe npm run build   # a different subset (configs/deluxe.json)
@@ -1827,24 +1830,58 @@ Node, no `window`) must **not** pull Phaser (or a Phaser-bearing module such
 as `@ui/Renderer`) at evaluation time; a reintroduced value import fails every
 downstream game unit suite with `window is not defined` (CG-0MVQQ2M8E003FQMZ).
 
+#### The authoritative list: the node-safe manifest
+
+The machine-readable, single source of truth is
+[`src/ui/node-safe-modules.ts`](../src/ui/node-safe-modules.ts)
+(`uiNodeSafeModules`, `CG-0MVS9HBN3009HIQN`). It is a **curated, opt-in
+promise** — not a completeness snapshot of `src/ui`: every listed module is
+guaranteed importable in a plain Node environment, and *nothing else in
+`src/ui` is promised, even if it happens to be Phaser-free today*.
+
+> **Look it up in the manifest; if it is not listed, treat it as
+> Phaser-bearing.** Do not probe with an ad-hoc `vite-node` import — the list
+> is checkable, and an unlisted module may gain a Phaser value import at any
+> time.
+
+The promise is enforced twice, both consuming the same manifest so they can
+never disagree about *which* modules are promised:
+
+| Mechanism | Command | What it proves |
+|-----------|---------|----------------|
+| Static import-graph check (`scripts/check-ui-node-surface.ts`, `CG-0MVTVT3TX0004PIW`) | `npm run check:ui-node-surface` | For every manifest entry, the *whole* import graph (relative specifiers, `tsconfig.json` path aliases, `export … from`, dynamic `import()`) is walked; a transitive **value** import of `phaser` is a violation naming the module and the full chain (`src/ui/X.ts → src/ui/constants.ts → phaser`). Type-only edges are elided and ignored. Fail-closed on unresolvable specifiers, missing modules and unreadable manifests. |
+| Runtime guard (`tests/ui/phaser-free-imports.test.ts`) | unit profile | Every manifest entry is imported under a **file-scoped** `vi.mock('phaser', …)` whose factory throws, plus a negative control asserting `@ui/Renderer` fails under the same mock — so a reintroduced Phaser import fails loudly at evaluation time. The mock must stay file-scoped (never in a global setup file). |
+
+**Hard gate.** `package.json` wires the static check as
+`"prebuild": "npm run check:ui-node-surface"`, so every `npm run build` — the
+build step the implementation gate, the dev-push path and PR CI execute —
+begins with the static check and cannot build a tree that has broken a
+node-safe module. The check is pure static analysis (no bundler, no network,
+less than a second), so the friction is negligible.
+
+**Adding a module to the surface** (`CG-0MVTVTCT7003KNXP`):
+
+1. Add the module basename (no `src/ui/` prefix, no `.ts`) to
+   `uiNodeSafeModules` in `src/ui/node-safe-modules.ts`, with a one-line
+   rationale comment saying what it is and why it must stay framework-free.
+2. Run `npm run check:ui-node-surface`. If the check reports the module (or a
+   module it reaches) as Phaser-bearing, **drop it from the manifest** — do not
+   edit the module to accommodate the list (that changes a runtime import graph
+   and belongs in its own work item).
+3. Run the unit profile so `tests/ui/phaser-free-imports.test.ts` also imports
+   the new entry under the throwing mock. The guard is manifest-driven: a
+   manifest addition widens it automatically.
+
 Rules of thumb:
 
-- **Import deep, Phaser-free paths in Node tests:** `@ui/shakeIllegalMove`,
-  `@ui/dragDrop`, `@ui/illegalMoveToastView` and `@ui/illegalMoveToast` are
-  explicitly node-safe; other `@ui` modules (e.g. `@ui/screen-layout`,
-  `@ui/constants`) are also Phaser-free. When in doubt, probe with a readonly
-  `vite-node` import before relying on it.
+- **Import deep, Phaser-free paths in Node tests** — an entry that is in the
+  manifest, imported by its deep path (for example `@ui/shakeIllegalMove`,
+  `@ui/dragDrop`, `@ui/illegalMoveToastView`, `@ui/illegalMoveToast`,
+  `@ui/screen-layout`, `@ui/constants`).
 - **Do not add a Phaser value import to a node-safe helper.** Type-only usage
   (`import type Phaser from 'phaser'`) is fine and elided at compile time; a
   value import (or an import of a module like `@ui/Renderer` that evaluates
   Phaser at module scope) is not.
-- **Guard:** `tests/ui/phaser-free-imports.test.ts` imports every
-  framework-free entry point under a **file-scoped** `vi.mock('phaser', …)`
-  whose factory throws, plus a negative control asserting `@ui/Renderer` fails
-  under the same mock — so a reintroduced Phaser import fails loudly. The mock
-  must stay file-scoped (never in a global setup file).
-- **Documented surface:** the broader documented Phaser-free node surface and
-  a static import-graph check are tracked in `CG-0MVS9HBN3009HIQN`.
 
 ## Path Aliases
 

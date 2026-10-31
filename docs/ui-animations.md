@@ -223,10 +223,18 @@ import { shakeIllegalMove } from '@ui';
 > `shakeIllegalMove` — are free of Phaser **value** imports, so they load in a
 > plain Node environment (no `window`, no browser). Downstream game unit suites
 > import these deep paths safely; `tests/ui/phaser-free-imports.test.ts` guards
-> the graph with a throwing `phaser` mock (CG-0MVQQ2M8E003FQMZ). Do **not**
-> add a Phaser value import (or an import of a Phaser-bearing module like
-> `@ui/Renderer`) to these helpers without updating that guard. The broader
-> documented Phaser-free node surface is tracked in CG-0MVS9HBN3009HIQN.
+> the graph at runtime with a throwing `phaser` mock (CG-0MVQQ2M8E003FQMZ).
+> Do **not** add a Phaser value import (or an import of a Phaser-bearing module
+> like `@ui/Renderer`) to these helpers.
+>
+> **Look node-safety up, do not probe it:** the authoritative list is the
+> manifest [`src/ui/node-safe-modules.ts`](../src/ui/node-safe-modules.ts)
+> (`uiNodeSafeModules`). If a `@ui` module is not listed there, treat it as
+> Phaser-bearing and import it only from scene code. The promise is enforced by
+> the static import-graph check `scripts/check-ui-node-surface.ts`
+> (`npm run check:ui-node-surface`, run automatically as `prebuild` before every
+> `npm run build`) and by the manifest-driven runtime guard
+> `tests/ui/phaser-free-imports.test.ts` (CG-0MVS9HBN3009HIQN).
 
 ### Usage
 
