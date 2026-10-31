@@ -12,8 +12,9 @@
  *   (b) a value `import Phaser from 'phaser'` fails, naming the offending
  *       module and the offending specifier;
  *   (c) a transitive failure through a `tsconfig.json` path alias
- *       (`@ui/*`, `@core-engine/*`) fails and reports the full chain — as do
- *       `export * from` and dynamic `import()` edges;
+ *       (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ai/*`,
+ *       `@ui/*`) fails and reports the full chain — as do `export * from`,
+ *       dynamic `import()` and CommonJS `require()` edges;
  *   (d) a **type-only** Phaser edge passes (type-only edges are elided at
  *       compile time), with a negative control proving that rule is not
  *       vacuous;
@@ -59,9 +60,17 @@ const FIXTURE_TSCONFIG = JSON.stringify(
       strict: true,
       resolveJsonModule: true,
       baseUrl: '.',
+      // Every alias family the repository declares, so an alias the check
+      // failed to follow would show up as a silently skipped edge here.
       paths: {
         '@core-engine': ['src/core-engine'],
         '@core-engine/*': ['src/core-engine/*'],
+        '@card-system': ['src/card-system'],
+        '@card-system/*': ['src/card-system/*'],
+        '@rule-engine': ['src/rule-engine'],
+        '@rule-engine/*': ['src/rule-engine/*'],
+        '@ai': ['src/ai'],
+        '@ai/*': ['src/ai/*'],
         '@ui': ['src/ui'],
         '@ui/*': ['src/ui/*'],
       },
@@ -253,6 +262,33 @@ describe('(c) transitive failure through a path alias', () => {
     ]);
   });
 
+  it('follows every alias family declared by tsconfig.json', () => {
+    const families: Array<[alias: string, directory: string]> = [
+      ['@core-engine', 'src/core-engine'],
+      ['@card-system', 'src/card-system'],
+      ['@rule-engine', 'src/rule-engine'],
+      ['@ai', 'src/ai'],
+      ['@ui', 'src/ui'],
+    ];
+
+    for (const [alias, directory] of families) {
+      const root = makeTree({
+        'src/ui/node-safe-modules.ts': manifestOf('entry'),
+        'src/ui/entry.ts': `import { value } from '${alias}/polluted';\nexport const result = value;\n`,
+        [`${directory}/polluted.ts`]:
+          "import Phaser from 'phaser';\nexport const value = Phaser.VERSION;\n",
+      });
+
+      const result = checkFixture(root);
+      expect(result.ok, `${alias}/* edge was not followed`).toBe(false);
+      expect(result.violations[0]?.chain).toEqual([
+        'src/ui/entry.ts',
+        `${directory}/polluted.ts`,
+        'phaser',
+      ]);
+    }
+  });
+
   it('follows `export * from` re-exports', () => {
     const root = makeTree({
       'src/ui/node-safe-modules.ts': manifestOf('entry'),
@@ -286,6 +322,31 @@ describe('(c) transitive failure through a path alias', () => {
       'src/ui/lazy.ts',
       'phaser',
     ]);
+  });
+
+  it('follows CommonJS `require()` edges (value lookups, not elidable)', () => {
+    const root = makeTree({
+      'src/ui/node-safe-modules.ts': manifestOf('entry'),
+      'src/ui/entry.ts':
+        "const { render } = require('./legacy-renderer');\nexport const value = render;\n",
+      'src/ui/legacy-renderer.ts':
+        "const Phaser = require('phaser');\nexport const render = Phaser.VERSION;\n",
+    });
+
+    const result = checkFixture(root);
+    expect(result.ok).toBe(false);
+    expect(result.violations[0]?.reason).toBe('phaser-value-import');
+    expect(result.violations[0]?.chain).toEqual([
+      'src/ui/entry.ts',
+      'src/ui/legacy-renderer.ts',
+      'phaser',
+    ]);
+
+    const { code, output } = runFixture(root);
+    expect(code).not.toBe(0);
+    expect(output).toContain(
+      'src/ui/entry.ts → src/ui/legacy-renderer.ts → phaser',
+    );
   });
 });
 

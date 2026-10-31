@@ -19,7 +19,8 @@
  *     elided at compile time and never followed.
  *   - Value edges are followed for relative specifiers, `tsconfig.json` path
  *     aliases (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ai/*`,
- *     `@ui/*`, …), `export … from` re-exports and dynamic `import()`.
+ *     `@ui/*`, …), `export … from` re-exports, dynamic `import()` and CommonJS
+ *     `require()` calls.
  *   - **Fail closed:** an unresolvable relative or alias specifier, a listed
  *     module that does not exist, and a manifest that cannot be read
  *     statically are violations — never a warning, never a silent skip.
@@ -395,7 +396,27 @@ function isTypeOnlyExportDeclaration(node: ts.ExportDeclaration): boolean {
   );
 }
 
-/** Every module edge in a file: static imports/re-exports plus dynamic `import()`. */
+/**
+ * A CommonJS `require('…')` call with a literal specifier. `require` is a
+ * runtime value lookup — it evaluates the module — so it is a value edge
+ * exactly like `import`, and there is no type-only form of it to elide.
+ * Without this, a listed module reaching Phaser through `require` would slip
+ * past the check and reintroduce the very regression it exists to catch.
+ */
+function isRequireCall(node: ts.Node): node is ts.CallExpression {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === 'require' &&
+    node.arguments.length === 1 &&
+    ts.isStringLiteralLike(node.arguments[0])
+  );
+}
+
+/**
+ * Every module edge in a file: static imports/re-exports, dynamic `import()`
+ * and CommonJS `require()` calls.
+ */
 function collectEdges(sourceFile: ts.SourceFile): ModuleEdge[] {
   const edges: ModuleEdge[] = [];
   const visit = (node: ts.Node): void => {
@@ -435,6 +456,11 @@ function collectEdges(sourceFile: ts.SourceFile): ModuleEdge[] {
       // A computed dynamic specifier cannot be followed statically; it is not
       // reported (there is nothing to resolve), but every literal one is.
       if (specifier && ts.isStringLiteralLike(specifier)) {
+        edges.push({ specifier: specifier.text, typeOnly: false });
+      }
+    } else if (isRequireCall(node)) {
+      const [specifier] = node.arguments;
+      if (ts.isStringLiteralLike(specifier)) {
         edges.push({ specifier: specifier.text, typeOnly: false });
       }
     }
