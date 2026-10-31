@@ -68,6 +68,17 @@ cd "$PROJECT_DIR"
 # `core-only` for production builds). See scripts/vite-game-discovery-plugin.ts.
 export GAMES_CONFIG="${GAMES_CONFIG:-full}"
 
+# Fast-fail pre-check: the terminology guard (one turn = one week). It scans
+# docs/**/*.md and example-games/main-street/**.ts for day-as-turn tokens.
+# Consuming game repos run this same script from their own suite (e.g. Main
+# Street's tests/main-street/terminology-guard.test.ts), so a wording drift
+# here reddens their build as soon as their engine pin follows core `dev` —
+# which is exactly how `docs/DEVELOPER.md`'s "today" reached a release-shaped
+# pin (CG-0MVWFLG8Z005FSH8). Runs in ~1s; keep it ahead of the browser stages.
+echo "=== Terminology Guard ==="
+bash scripts/check-terminology-guards.sh
+echo ""
+
 # Fast-fail pre-check: the browser stages below need Playwright's Chromium.
 # Detect a missing prerequisite up front (launch-free, <2s) and print the
 # exact remediation commands instead of timing out with an opaque Vitest

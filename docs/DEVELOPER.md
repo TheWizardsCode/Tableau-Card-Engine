@@ -1837,7 +1837,7 @@ The machine-readable, single source of truth is
 (`uiNodeSafeModules`, `CG-0MVS9HBN3009HIQN`). It is a **curated, opt-in
 promise** — not a completeness snapshot of `src/ui`: every listed module is
 guaranteed importable in a plain Node environment, and *nothing else in
-`src/ui` is promised, even if it happens to be Phaser-free today*.
+`src/ui` is promised, even if it happens to be Phaser-free right now*.
 
 > **Look it up in the manifest; if it is not listed, treat it as
 > Phaser-bearing.** Do not probe with an ad-hoc `vite-node` import — the list
