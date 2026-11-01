@@ -352,7 +352,7 @@ Thin `tsx` entry points over the seams (no Vite loader, no game import):
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
 | `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `update-card` (`--dry-run`, `--field column=value`). |
-| `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--apply`, `--dry-run`). |
+| `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |
 
 Every CLI supports `--help`, resolves `--game` (the author/validator/graph
 CLIs) or `--adapter` (the editor) through the shipped adapter registry
@@ -380,6 +380,8 @@ npm run storylines:editor -- --host 127.0.0.1   # loopback is the default
 npm run storylines:editor -- --host             # bind all interfaces (0.0.0.0)
 npm run storylines:editor -- --content path/to/storylines.csv
 npm run storylines:editor -- --adapter ./my-game-adapter.ts
+npm run storylines:editor -- --artefact-json my-game/storyline-manifest.json \
+  --artefact-mermaid my-game/storyline-graph.mmd
 npm run storylines:editor -- --apply '{"edit":{"kind":"update-card","spec":{...}}}'
 npm run storylines:editor -- --help
 ```
@@ -389,6 +391,8 @@ npm run storylines:editor -- --help
 | `--content <path>` | The game's content CSV (default: the Gym demo content). |
 | `--adapter <module>` | A shipped adapter id (`gym`) or a module path/specifier exporting a `ContentAdapter` as its default, `adapter` or `contentAdapter` export. |
 | `--port` / `--host` | Dev-server port (default `5174`) and bind host (default `127.0.0.1`, loopback). A **valueless `--host`** binds all interfaces (`0.0.0.0`, Vite's convention); an explicit `--host <addr>` binds that address. On startup the CLI prints every resolved URL (`server.resolvedUrls`): the local/loopback URL(s) plus each network URL when a non-loopback interface was bound — and, for a non-loopback bind, warns that the editor is reachable from the network and can write the loaded content CSV (the tool has no authentication). |
+| `--artefact-json <path>` | Where an accepted edit writes (and then verifies) the generated JSON manifest artefact (default: the committed Gym artefact, `DEFAULT_ARTEFACT_PATHS.json`). A game points this at its own path so it never overwrites the Gym's, in both serving and `--apply` mode (an `artefactPaths` object in the `--apply` payload still wins). |
+| `--artefact-mermaid <path>` | The same for the generated Mermaid flowchart artefact (default: `DEFAULT_ARTEFACT_PATHS.mermaid`). |
 | `--apply <json\|@file>` | Apply one edit through the write bridge, print the JSON result and exit (no dev server). `--dry-run` previews/validates while writing nothing. |
 | `--help` | Print usage and exit `0`. |
 
@@ -472,11 +476,12 @@ required"** result naming the check that now fails. The registry lives in
 the shipped entry is the Gym demo's hand-maintained card catalogue.
 
 Artefact paths default to the committed Gym artefacts (`DEFAULT_ARTEFACT_PATHS`).
-A game supplies its own as a session/bridge option (`loadEditorSession({
-artefactPaths })`, `applyEdit({ artefactPaths })`) or in the `--apply` JSON
-payload; the host has no CLI flag for them yet, so editing non-Gym content from
-the served page targets the default paths — use `--apply`, or that game's own
-`storylines:graph` invocation, when its artefacts live elsewhere.
+A game supplies its own with `--artefact-json <path>` / `--artefact-mermaid
+<path>` (the resolved pair is passed to `loadEditorSession({ artefactPaths })`,
+so the served page and the host API write and verify the game's own files), as
+a session/bridge option (`loadEditorSession({ artefactPaths })`,
+`applyEdit({ artefactPaths })`), or in the `--apply` JSON payload. Omitting both
+flags reproduces the Gym defaults exactly.
 
 ### Story-line management
 

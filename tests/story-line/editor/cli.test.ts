@@ -20,6 +20,7 @@ import {
   DEFAULT_CONTENT_PATH,
   GYM_CONTENT_ADAPTER,
 } from '../../../src/story-line/content/adapters';
+import { DEFAULT_ARTEFACT_PATHS } from '../../../src/story-line/content/artefacts';
 import {
   buildStorylineManifestFromCsv,
   type StorylineManifest,
@@ -123,6 +124,7 @@ describe('parseStorylineEditorArgs', () => {
       adapterRef: undefined,
       apply: undefined,
       dryRun: false,
+      artefactPaths: DEFAULT_ARTEFACT_PATHS,
     });
   });
 
@@ -150,7 +152,32 @@ describe('parseStorylineEditorArgs', () => {
       adapterRef: './my-adapter.ts',
       apply: '{"edit":{"kind":"update-card","spec":{"id":"a","name":"b"}}}',
       dryRun: true,
+      artefactPaths: DEFAULT_ARTEFACT_PATHS,
     });
+  });
+
+  it('parses the artefact-path flags, defaulting each path independently', () => {
+    // Both supplied: the pair is forwarded verbatim (CG-0MVNE47TC0048WZ9).
+    expect(
+      parseStorylineEditorArgs([
+        '--artefact-json',
+        'my-game/docs/storyline-manifest.json',
+        '--artefact-mermaid',
+        'my-game/docs/storyline-graph.mmd',
+      ]).artefactPaths,
+    ).toEqual({
+      json: 'my-game/docs/storyline-manifest.json',
+      mermaid: 'my-game/docs/storyline-graph.mmd',
+    });
+
+    // Only one supplied: the omitted one keeps the committed Gym default.
+    expect(parseStorylineEditorArgs(['--artefact-json', 'only.json']).artefactPaths).toEqual({
+      json: 'only.json',
+      mermaid: DEFAULT_ARTEFACT_PATHS.mermaid,
+    });
+    expect(
+      parseStorylineEditorArgs(['--artefact-mermaid', 'only.mmd']).artefactPaths,
+    ).toEqual({ json: DEFAULT_ARTEFACT_PATHS.json, mermaid: 'only.mmd' });
   });
 
   it('rejects a non-numeric or out-of-range port', () => {
@@ -166,6 +193,69 @@ describe('parseStorylineEditorArgs', () => {
     expect(parseStorylineEditorArgs([]).host).toBe('127.0.0.1');
     expect(parseStorylineEditorArgs(['--host', '10.1.2.3']).host).toBe('10.1.2.3');
     expect(parseStorylineEditorArgs(['--host', 'localhost']).host).toBe('localhost');
+  });
+});
+
+describe('artefact paths (--artefact-json / --artefact-mermaid)', () => {
+  it('forwards the resolved pair to the session the host is given', async () => {
+    const seen: string[] = [];
+    const createHost: StorylineEditorCliDeps['createHost'] = async (options) => {
+      const paths = options.session?.artefactPaths;
+      if (paths) seen.push(`${paths.json}|${paths.mermaid}`);
+      return stubHost({ local: ['http://127.0.0.1:5174/'] });
+    };
+
+    const explicit = await captureCli(
+      ['--artefact-json', 'game/docs/storyline-manifest.json', '--artefact-mermaid', 'game/docs/storyline-graph.mmd'],
+      { createHost },
+    );
+    expect(explicit.code).toBe(0);
+
+    const omitted = await captureCli([], { createHost });
+    expect(omitted.code).toBe(0);
+
+    expect(seen).toEqual([
+      'game/docs/storyline-manifest.json|game/docs/storyline-graph.mmd',
+      `${DEFAULT_ARTEFACT_PATHS.json}|${DEFAULT_ARTEFACT_PATHS.mermaid}`,
+    ]);
+  });
+
+  it('writes an accepted edit to the artefact paths given by the flags (no --apply paths)', async () => {
+    const fixture = copyEditorFixtureFiles();
+    try {
+      const { code, stderr } = await captureCli([
+        '--content',
+        fixture.csvPath,
+        '--artefact-json',
+        fixture.manifestPath,
+        '--artefact-mermaid',
+        fixture.mermaidPath,
+        '--apply',
+        JSON.stringify({
+          edit: { kind: 'update-card', spec: { id: 'gym-story-invest', name: 'Municipal Investment' } },
+        }),
+      ]);
+
+      expect(stderr).toBe('');
+      expect(code).toBe(0);
+      expect(readFileSync(fixture.manifestPath, 'utf-8')).toContain('Municipal Investment');
+      expect(readFileSync(fixture.mermaidPath, 'utf-8')).toContain('Municipal Investment');
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  it('fails closed (exit 1, usage, nothing written) when a flag is given without a value', async () => {
+    for (const flag of ['--artefact-json', '--artefact-mermaid']) {
+      const parsed = captureParseError([flag]);
+      expect(parsed).toContain(flag);
+      expect(parsed).toContain('requires a path value');
+
+      const { code, stderr } = await captureCli([flag]);
+      expect(code).toBe(1);
+      expect(stderr).toContain(`${flag} requires a path value`);
+      expect(stderr).toContain('Usage:');
+    }
   });
 });
 
@@ -390,9 +480,22 @@ describe('runStorylineEditorCli', () => {
 
     // The usage text is the user-facing contract: every documented flag.
     expect(stdout).toContain('Usage:');
-    for (const flag of ['--content', '--adapter', '--port', '--host', '--apply', '--dry-run', '--help']) {
+    for (const flag of [
+      '--content',
+      '--adapter',
+      '--port',
+      '--host',
+      '--artefact-json',
+      '--artefact-mermaid',
+      '--apply',
+      '--dry-run',
+      '--help',
+    ]) {
       expect(stdout).toContain(flag);
     }
+    // The defaults are named, so a game can see what it is overriding.
+    expect(stdout).toContain(DEFAULT_ARTEFACT_PATHS.json);
+    expect(stdout).toContain(DEFAULT_ARTEFACT_PATHS.mermaid);
     expect(stdout).toBe(`${EDITOR_USAGE}\n`);
   });
 

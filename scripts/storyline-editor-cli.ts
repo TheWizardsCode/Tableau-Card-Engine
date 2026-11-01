@@ -7,9 +7,16 @@
  * npm run storylines:editor -- --port 5180
  * npm run storylines:editor -- --content path/to/storylines.csv
  * npm run storylines:editor -- --adapter ./my-game-adapter.ts
+ * npm run storylines:editor -- --artefact-json my-game/storyline-manifest.json \
+ *   --artefact-mermaid my-game/storyline-graph.mmd
  * npm run storylines:editor -- --apply '{"edit":{"kind":"update-card","spec":{...}}}'
  * npm run storylines:editor -- --help
  * ```
+ *
+ * `--artefact-json` / `--artefact-mermaid` pick where an accepted edit writes
+ * (and then verifies) the generated artefacts. They default to the committed
+ * Gym artefacts, so a non-Gym game supplies its own pair and never overwrites
+ * the Gym's.
  *
  * The CLI resolves a game's **content adapter** (a shipped id such as `gym`,
  * or a module exporting one), loads the content CSV into an **editor session**
@@ -37,6 +44,10 @@ import {
   DEFAULT_CONTENT_PATH,
   getContentAdapter,
 } from '../src/story-line/content/adapters';
+import {
+  DEFAULT_ARTEFACT_PATHS,
+  type ArtefactPaths,
+} from '../src/story-line/content/artefacts';
 import { applyEdit, EDITOR_EDIT_KINDS, type EditorEdit } from '../src/story-line/editor/api';
 import {
   buildStorylineManifestFromCsv,
@@ -71,6 +82,12 @@ Options:
                             (local and network); a non-loopback bind warns that the
                             editor is reachable from the network and can write the
                             loaded content CSV (it has no authentication)
+  --artefact-json <path>    Generated JSON manifest artefact written (and verified)
+                            after an accepted edit
+                            (default: ${DEFAULT_ARTEFACT_PATHS.json})
+  --artefact-mermaid <path> Generated Mermaid flowchart artefact written (and
+                            verified) after an accepted edit
+                            (default: ${DEFAULT_ARTEFACT_PATHS.mermaid})
   --apply <json|@file>      Apply one edit through the write bridge, print the JSON
                             result and exit (no dev server). The JSON is
                             { "edit": { "kind": ..., "spec": { ... } },
@@ -105,6 +122,12 @@ export interface StorylineEditorCliOptions {
   readonly apply: string | undefined;
   /** With `--apply`: preview and validate, write nothing. */
   readonly dryRun: boolean;
+  /**
+   * Generated-artefact paths an accepted edit writes and verifies. Defaults to
+   * the committed Gym artefacts ({@link DEFAULT_ARTEFACT_PATHS}), so a game
+   * passes its own pair rather than overwriting the Gym's.
+   */
+  readonly artefactPaths: ArtefactPaths;
 }
 
 /** Optional seams for tests. */
@@ -123,7 +146,8 @@ const defaultImporter: AdapterImporter = (specifier) => import(specifier);
  *
  * @param argv Raw arguments (without the node/script prefix).
  * @returns The parsed options.
- * @throws Error when `--port` is not a valid TCP port.
+ * @throws Error when `--port` is not a valid TCP port, or when
+ *         `--artefact-json` / `--artefact-mermaid` is given without a path.
  */
 export function parseStorylineEditorArgs(argv: readonly string[]): StorylineEditorCliOptions {
   const { flags } = parseArgv(argv);
@@ -153,7 +177,37 @@ export function parseStorylineEditorArgs(argv: readonly string[]): StorylineEdit
     adapterRef: flags.get('adapter'),
     apply: flags.get('apply'),
     dryRun: flags.has('dry-run'),
+    artefactPaths: {
+      json: artefactPathFlag(flags, 'artefact-json', DEFAULT_ARTEFACT_PATHS.json),
+      mermaid: artefactPathFlag(flags, 'artefact-mermaid', DEFAULT_ARTEFACT_PATHS.mermaid),
+    },
   };
+}
+
+/**
+ * Reads one generated-artefact path flag.
+ *
+ * `parseArgv` reads a valueless flag as the `'true'` sentinel, so a flag given
+ * without a path is refused with a message naming the flag and its default —
+ * never silently written as a file called `true`.
+ *
+ * @param flags     The parsed flag map.
+ * @param key       Flag name without the leading `--`.
+ * @param fallback  Default path when the flag is absent.
+ * @returns The supplied path, or the default when the flag is omitted.
+ * @throws Error when the flag is present but has no value.
+ */
+function artefactPathFlag(
+  flags: ReadonlyMap<string, string>,
+  key: string,
+  fallback: string,
+): string {
+  const value = flags.get(key);
+  if (value === undefined) return fallback;
+  if (value === 'true') {
+    throw new Error(`--${key} requires a path value (for example: --${key} ${fallback})`);
+  }
+  return value;
 }
 
 /** True when a bind host is loopback-only (never exposed beyond this machine). */
@@ -296,7 +350,11 @@ export async function launchEditor(
 
   let session;
   try {
-    session = loadEditorSession({ contentPath: options.contentPath, adapter });
+    session = loadEditorSession({
+      contentPath: options.contentPath,
+      adapter,
+      artefactPaths: options.artefactPaths,
+    });
   } catch (error) {
     return { ok: false, code: 1, message: (error as Error).message };
   }
@@ -428,6 +486,9 @@ export interface EditorApplyOutcome {
  * The load-time checksum is the default concurrency token, so an external edit
  * between load and apply is refused rather than clobbered.
  *
+ * `--artefact-json` / `--artefact-mermaid` set the default artefact pair; an
+ * `artefactPaths` object in the `--apply` payload still wins.
+ *
  * @param options Content path and CLI flags.
  * @param adapter The game content adapter.
  * @param request The parsed apply payload.
@@ -440,7 +501,11 @@ export function applyHeadlessEdit(
 ): EditorApplyOutcome {
   let session;
   try {
-    session = loadEditorSession({ contentPath: options.contentPath, adapter });
+    session = loadEditorSession({
+      contentPath: options.contentPath,
+      adapter,
+      artefactPaths: options.artefactPaths,
+    });
   } catch (error) {
     return { ok: false, code: 1, message: (error as Error).message };
   }

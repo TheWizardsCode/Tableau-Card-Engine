@@ -126,7 +126,9 @@ Notes on the contract (`ContentAdapter` in
 
 Core ships one adapter (the Gym demo, `GYM_CONTENT_ADAPTER`) as the default.
 Tests also exercise a differently shaped adapter, proving the seam is not
-shaped around one game.
+shaped around one game. A shipped game-side example is Main Street's
+[`MainStreetStorylineContentAdapter.ts`](../../../tce-main-street/src/MainStreetStorylineContentAdapter.ts)
+— see [the worked example](#worked-example-main-street) below.
 
 ## 4. Running the editor against your game's content
 
@@ -145,28 +147,81 @@ npm run storylines:editor -- --content path/to/storylines.csv \
   so LAN/Tailscale users can run `--host` and see the resolved network URL in
   the startup banner. Start the editor locally first, and keep it loopback
   (`--host 127.0.0.1`) when you are not deliberately sharing it.
+- `--artefact-json` / `--artefact-mermaid` choose where an accepted edit writes
+  and verifies the generated artefacts (default: the committed Gym artefacts).
+  Point them at **your game's** paths so an edit never rewrites the Gym's
+  (see [Artefact paths](#artefact-paths--what-the-editor-writes) below).
 
 The host builds the deterministic manifest from that CSV + adapter at launch
 and serves it from memory (`GET /manifest.json`), so the graph the designer
 sees is exactly the manifest the `storylines:graph` CLI would write.
+
+### Worked example: Main Street
+
+Main Street ships `src/MainStreetStorylineContentAdapter.ts`, a plain-data
+`ContentAdapter` over its single `src/card-data.csv`. Its story-line rows (11
+cards across the 5 arcs `storyline-tax`, `storyline-health`,
+`storyline-economy`, `storyline-labor`, `storyline-restaurant`) form the graph;
+its ~164 business/upgrade/staff/community-space cards appear in the editor's
+**Ungrouped** bucket, so pointing the editor at the whole file neither crashes
+nor drops a row.
+
+```bash
+# from the Tableau-Card-Engine repo root (the tce-main-street sibling checked out at ../tce-main-street)
+npm run storylines:editor -- \
+  --content ../tce-main-street/src/card-data.csv \
+  --adapter ../tce-main-street/src/MainStreetStorylineContentAdapter.ts \
+  --artefact-json ../tce-main-street/docs/dev/assets/storyline-editor-manifest.json \
+  --artefact-mermaid ../tce-main-street/docs/dev/assets/storyline-editor-graph.mmd
+```
+
+The adapter is **plain data** and imports only the core `ContentAdapter` type
+(erased at compile time), so the core CLI can `import()` it by path across the
+repository boundary — the game's `@story-line/*` alias is not needed at runtime.
+
+**Why a separate artefact pair.** Main Street's committed
+`docs/dev/assets/storyline-manifest.json` and `storyline-graph.mmd` are produced
+by the game's own bespoke, schema-validated graph CLI
+(`npm run storylines:graph`) in a different shape, and a drift guard
+(`--check`) owns them. Pointing the core editor at those files would overwrite
+them in the core-editor format and break that guard, so the recipe above targets
+a **separate `storyline-editor-*` pair**: the game's own artefacts stay owned by
+its graph CLI, and the editor pair records what the core editor produced.
 
 ### Artefact paths — what the editor writes
 
 After an **accepted** edit the bridge regenerates the committed Mermaid and
 JSON artefacts, then re-reads them to verify (`writeArtefacts` → `checkArtefacts`
 in `src/story-line/content/artefacts.ts`). The paths default to the committed
-**Gym** artefacts (`DEFAULT_ARTEFACT_PATHS`); the interactive host does not yet
-expose a CLI flag to point them elsewhere (a follow-up work item). So:
+**Gym** artefacts (`DEFAULT_ARTEFACT_PATHS`) and are settable from the CLI:
+
+```bash
+npm run storylines:editor -- --content ../tce-my-game/content/storylines.csv \
+  --adapter ./my-game-adapter.ts \
+  --artefact-json ../tce-my-game/docs/storyline-manifest.json \
+  --artefact-mermaid ../tce-my-game/docs/storyline-graph.mmd
+```
+
+`--artefact-json` / `--artefact-mermaid` are resolved once, default **each path
+independently** when omitted (so supplying one keeps the Gym default for the
+other), and forwarded as `loadEditorSession({ artefactPaths })` — which means the
+**served page's** accepted edits write and verify the game's own files, not the
+Gym's. A game with generated artefacts of its own should always pass both.
+
+The same pair can be set in the headless `--apply` JSON payload (see §7); a
+payload `artefactPaths` wins over the CLI flags.
+
+So:
 
 - For content that lives in the core repo with artefacts at the default paths
   (the Gym demo), the served editor is the complete workflow.
-- For a game whose artefacts live elsewhere, keep the served editor
-  **read-only for inspection** and drive writes headlessly with `--apply` and an
-  explicit `artefactPaths` (below), or regenerate the game's artefacts with its
-  own `storylines:graph` (or `storylines:graph-svg`) invocation afterwards and
-  let its `--check` drift guard gate the result.
+- For a game whose artefacts live elsewhere, pass `--artefact-json` /
+  `--artefact-mermaid` (served **and** headless), or regenerate the game's
+  artefacts with its own `storylines:graph` (or `storylines:graph-svg`)
+  invocation afterwards and let its `--check` drift guard gate the result.
 
-You can pass explicit paths in the headless JSON payload (see §7).
+A flag given without a value fails closed (`exit 1`, usage printed) instead of
+writing a file literally named `true`.
 
 ## 5. Edit workflow, step by step
 
@@ -238,7 +293,16 @@ without writing; `--apply @file.json` reads the payload from a file. The command
 prints the JSON result and exits `0` on success and `1` on a refused edit
 (invalid or **stale** content — see below).
 
-A game's own committed artefacts are passed explicitly:
+A game's own committed artefacts are passed explicitly, either with the CLI
+flags (which also cover the served page) or in the payload:
+
+```bash
+npm run storylines:editor -- --content path/to/storylines.csv \
+  --adapter ./my-game-adapter.ts \
+  --artefact-json docs/dev/assets/storyline-manifest.json \
+  --artefact-mermaid docs/dev/assets/storyline-graph.mmd \
+  --apply '{"edit":{"kind":"update-card","spec":{"id":"evt-x","name":"X"}}}'
+```
 
 ```bash
 npm run storylines:editor -- --content path/to/storylines.csv \
