@@ -139,14 +139,6 @@ function type(container: HTMLElement, field: string, value: string): void {
   element.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-/** Toggles a checkbox field. */
-function toggle(container: HTMLElement, field: string, checked: boolean): void {
-  const element = control(container, field);
-  if (!(element instanceof HTMLInputElement)) throw new Error(`field "${field}" is not a checkbox`);
-  element.checked = checked;
-  element.dispatchEvent(new Event('change', { bubbles: true }));
-}
-
 /** Selects an option in a `<select>` and fires `change`. */
 function select(container: HTMLElement, role: string, value: string): void {
   const element = container.querySelector(`[data-role="${role}"]`);
@@ -181,10 +173,7 @@ describe('story-line editor — curated card edit round-trip', () => {
         'id',
         'name',
         'effect',
-        'hasChoices',
         'options',
-        'acceptNextCardId',
-        'rejectNextCardId',
         'storylineId',
         'storylineTitle',
         'column:trigger',
@@ -193,6 +182,10 @@ describe('story-line editor — curated card edit round-trip', () => {
         'column:reputationDelta',
       ]),
     );
+    // The retired legacy choice/link controls are no longer rendered.
+    expect(renderedFields).not.toContain('hasChoices');
+    expect(renderedFields).not.toContain('acceptNextCardId');
+    expect(renderedFields).not.toContain('rejectNextCardId');
 
     // The id is read-only and prefilled; every other control is editable.
     const idControl = control(container, 'id');
@@ -204,10 +197,7 @@ describe('story-line editor — curated card edit round-trip', () => {
     // Edit every core-generic field and every game column.
     type(container, 'name', 'The Endgame');
     type(container, 'effect', 'Everything changes.');
-    toggle(container, 'hasChoices', true);
     type(container, 'options', 'Reinvest|gym-story-invest;Finish|');
-    type(container, 'acceptNextCardId', 'gym-story-invest');
-    type(container, 'rejectNextCardId', 'gym-story-ignore');
     type(container, 'storylineId', 'edited-arc');
     type(container, 'storylineTitle', 'Edited Arc');
     type(container, 'column:trigger', 'Event');

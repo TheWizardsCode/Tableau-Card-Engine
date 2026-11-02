@@ -1,8 +1,8 @@
 /**
  * A second, deliberately differently shaped content adapter used by the tests.
  *
- * It proves the content seam is game-agnostic: different column names, no
- * legacy `hasChoices` / accept-reject columns at all, a different game column
+ * It proves the content seam is game-agnostic: different column names, an
+ * `options` column under a different name, a different game column
  * (`payoff`) and its own impact wording. Nothing here is shipped by the
  * engine — it exists so the tests exercise two adapters, not one.
  *

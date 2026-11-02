@@ -34,7 +34,7 @@ import { buildStorylineManifestFromCsv } from '../../../src/story-line/content/m
 import { readContentCards } from '../../../src/story-line/content/mutate';
 import type { ContentAdapter } from '../../../src/story-line/content/types';
 import { applyEdit } from '../../../src/story-line/editor/api';
-import { previewEdit } from '../../../src/story-line/editor/edits';
+import { applyEditToCsv, previewEdit } from '../../../src/story-line/editor/edits';
 import {
   attributeEditErrors,
   buildAddSpec,
@@ -86,10 +86,7 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
       'id',
       'name',
       'effect',
-      'hasChoices',
       'options',
-      'acceptNextCardId',
-      'rejectNextCardId',
       'storylineId',
       'storylineTitle',
       'column:trigger',
@@ -106,8 +103,6 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     const fields = new Map(descriptors.map((descriptor) => [descriptor.key, descriptor]));
     expect(fields.get('name')?.value).toBe('Town Meeting');
     expect(fields.get('effect')?.value).toBe('Lose 50 coins');
-    expect(fields.get('hasChoices')?.kind).toBe('boolean');
-    expect(fields.get('hasChoices')?.value).toBe('false');
     expect(fields.get('options')?.value).toBe(
       'Invest|gym-story-invest;Ignore|gym-story-ignore',
     );
@@ -116,14 +111,19 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     // Adapter columns are plain text fields, carrying their raw values.
     expect(fields.get('column:coinDelta')?.group).toBe('adapter');
     expect(fields.get('column:coinDelta')?.value).toBe('-50');
-    // Link fields offer the known card ids as suggestions.
+    // The retired legacy choice/link controls are gone: `options` is the only
+    // way a card is a choice node.
+    expect(fields.has('hasChoices')).toBe(false);
+    expect(fields.has('acceptNextCardId')).toBe(false);
+    expect(fields.has('rejectNextCardId')).toBe(false);
+    // The options field offers the known card ids as suggestions.
     expect(fields.get('options')?.suggestions).toEqual([
       'gym-story-start',
       'gym-story-invest',
     ]);
   });
 
-  it('omits choice/link fields when the adapter does not map them', () => {
+  it('omits the choice field when the adapter does not map options', () => {
     const deal = {
       card_id: 'a',
       card_name: 'Alpha',
@@ -155,7 +155,7 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     expect(byKey.get('id')?.value).toBe('');
     expect(byKey.get('column:trigger')?.value).toBe('Incident');
     expect(byKey.get('column:cost')?.value).toBe('0');
-    expect(byKey.get('hasChoices')?.value).toBe('false');
+    expect(byKey.get('options')?.value).toBe('');
   });
 });
 
@@ -181,10 +181,7 @@ describe('edit round-trip — every core-generic and adapter field', () => {
     const edits: Record<string, string> = {
       name: 'The Endgame',
       effect: 'Everything changes.',
-      hasChoices: 'true',
       options: 'Reinvest|gym-story-invest;Finish|',
-      acceptNextCardId: 'gym-story-invest',
-      rejectNextCardId: 'gym-story-ignore',
       storylineId: 'edited-arc',
       storylineTitle: 'Edited Arc',
       'column:trigger': 'Event',
@@ -221,10 +218,7 @@ describe('edit round-trip — every core-generic and adapter field', () => {
       expect.arrayContaining([
         'name',
         'effect',
-        'hasChoices',
         'options',
-        'acceptNextCardId',
-        'rejectNextCardId',
         'storylineId',
         'storylineTitle',
         'trigger',
@@ -251,10 +245,7 @@ describe('edit round-trip — every core-generic and adapter field', () => {
     const written = card(GYM_CONTENT_ADAPTER, readFileSync(fixture.csvPath, 'utf-8'), 'gym-story-end');
     expect(written.name).toBe('The Endgame');
     expect(written.effect).toBe('Everything changes.');
-    expect(written.hasChoices).toBe(true);
     expect(written.options).toBe('Reinvest|gym-story-invest;Finish|');
-    expect(written.acceptNextCardId).toBe('gym-story-invest');
-    expect(written.rejectNextCardId).toBe('gym-story-ignore');
     expect(written.storylineId).toBe('edited-arc');
     expect(written.storylineTitle).toBe('Edited Arc');
     expect(written.fields.trigger).toBe('Event');
@@ -421,6 +412,22 @@ describe('guided add-and-link — one transactional write', () => {
     });
     expect(after.ok).toBe(true);
   });
+
+  it('refuses to link a card when the adapter maps no options column', () => {
+    // Linking is expressed only through the options encoding, so an adapter
+    // without that column cannot silently write an unlinked card.
+    const csv = 'card_id,card_name,flavour,tone\ncard-a,Card A,Alpha,calm\n';
+    const result = applyEditToCsv(csv, NARROW_ADAPTER, {
+      kind: 'add-linked-card',
+      spec: {
+        card: { id: 'card-linked', name: 'A Linked Card' },
+        linkFrom: { id: 'card-a' },
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.csv).toBe(csv);
+    expect(result.errors.join(' ')).toContain('maps no options column');
+  });
 });
 
 describe('validation errors — attributed inline and the write is blocked', () => {
@@ -500,20 +507,21 @@ describe('validation errors — attributed inline and the write is blocked', () 
     });
     expect(droppedStoryline[0].field).toBe('storylineId');
 
-    const orphan = attributeEditErrors({
+    const unknownTarget = attributeEditErrors({
       descriptors,
-      draft: { ...draftFromDescriptors(descriptors), hasChoices: 'false', options: '' },
+      draft: { ...draftFromDescriptors(descriptors), options: 'Go|gym-story-ghost' },
       cardId: start.id,
       errors: [],
       issues: [
         {
-          code: 'orphan-link',
+          code: 'unknown-successor',
           cardId: start.id,
-          message: 'Card "gym-story-start" declares accept/reject links but is not a choice card.',
+          target: 'gym-story-ghost',
+          message: 'Choice card "gym-story-start" option "Go" links to unknown card "gym-story-ghost".',
         },
       ],
     });
-    expect(orphan[0].field).toBe('hasChoices');
+    expect(unknownTarget[0].field).toBe('options');
   });
 
   it('attributes a duplicate new-card id to the id field', () => {

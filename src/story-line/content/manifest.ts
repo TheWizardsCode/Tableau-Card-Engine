@@ -161,7 +161,9 @@ export function buildStorylineManifest(
     const card = byBase.get(base) as ContentCard;
     if (card.storylineId) storylineIds.add(card.storylineId);
     const compiledOptions = compileContentOptions(card);
-    const hasChoices = card.hasChoices || compiledOptions.length > 0;
+    // A node is a choice node only when its compiled options branch: the
+    // legacy choice/link columns are no longer part of the content model.
+    const hasChoices = compiledOptions.length > 0;
 
     nodes.push({
       id: base,

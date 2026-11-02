@@ -15,8 +15,8 @@
  * {@link cardsFromCsv} projects parsed rows onto the generic
  * {@link ContentCard} model through a game's {@link ContentAdapter};
  * {@link compileContentOptions} reuses the runtime engine's option semantics
- * (CSV `options` encoding first, legacy `hasChoices` fields second) so
- * authored content compiles exactly as the runtime will read it.
+ * (the CSV `options` encoding is the single choice representation) so authored
+ * content compiles exactly as the runtime will read it.
  *
  * This module is Phaser-free and game-import-free.
  *
@@ -174,11 +174,14 @@ export function findMissingColumns(
 /**
  * Projects parsed CSV rows onto the generic content model through an adapter.
  *
- * Identifier-like fields (`id`, `name`, the storyline ids and the successor
- * ids) and the effect text are trimmed; `fields` keeps raw cell text so a
- * game column is never silently rewritten. A column the adapter does not map
- * (or does not exist in the file) reads as absent — `null` for optional
- * identifiers, `''` for text, `false` for the choice flag.
+ * Identifier-like fields (`id`, `name`, the storyline ids) and the effect text
+ * are trimmed; `fields` keeps raw cell text so a game column is never silently
+ * rewritten. A column the adapter does not map (or does not exist in the file)
+ * reads as absent — `null` for optional identifiers, `''` for text.
+ *
+ * Only the generic story-line fields (`id`, `name`, `effect`, `options`, the
+ * storyline metadata) are projected; every other column, including any
+ * game-specific or not-yet-migrated column, lands in {@link ContentCard.fields}.
  *
  * @param parsed  Parsed CSV.
  * @param adapter The game content adapter.
@@ -214,14 +217,10 @@ export function cardsFromCsv(
       fields[column] = row[index] ?? '';
     });
 
-    const flag = text(cell(row, adapter.fields.hasChoices)).toLowerCase();
     return {
       id: text(cell(row, adapter.fields.id)),
       name: text(cell(row, adapter.fields.name)),
       effect: text(cell(row, adapter.fields.effect)),
-      hasChoices: flag === 'true' || flag === '1' || flag === 'yes',
-      acceptNextCardId: optional(cell(row, adapter.fields.acceptNextCardId)),
-      rejectNextCardId: optional(cell(row, adapter.fields.rejectNextCardId)),
       options: text(cell(row, adapter.fields.options)),
       storylineId: optional(cell(row, adapter.fields.storylineId)),
       storylineTitle: optional(cell(row, adapter.fields.storylineTitle)),
@@ -233,14 +232,10 @@ export function cardsFromCsv(
 /**
  * Compiles a content card's options with the runtime engine's semantics.
  *
- * Precedence mirrors the runtime exactly (minus the programmatic registry,
- * which is not content):
- *
- * 1. a non-blank CSV `options` encoding →
- *    {@link parseStorylineOptionsEncoding} (`successorIds`, `apply`);
- * 2. legacy `hasChoices` → `Accept` (`apply`) / `Reject` (`skip`) using
- *    `successorId`;
- * 3. otherwise no options (a plain incident).
+ * A non-blank CSV `options` encoding is parsed through
+ * {@link parseStorylineOptionsEncoding} (`successorIds`, `apply`); otherwise
+ * the card is a plain incident with no options. There is no second
+ * (legacy) representation to fall back to.
  *
  * @param card The content card.
  * @returns The compiled option list (empty for a plain card).
@@ -250,39 +245,27 @@ export function compileContentOptions(card: ContentCard): StorylineOption<unknow
   if (card.options.trim() !== '') {
     return parseStorylineOptionsEncoding<unknown>(card.options);
   }
-  if (!card.hasChoices) return [];
-  return [
-    {
-      label: 'Accept',
-      successorId: card.acceptNextCardId ?? undefined,
-      effectPolicy: 'apply',
-    },
-    {
-      label: 'Reject',
-      successorId: card.rejectNextCardId ?? undefined,
-      effectPolicy: 'skip',
-    },
-  ];
+  return [];
 }
 
 /**
- * True when a content card presents a choice — a non-empty `options` encoding
- * or the legacy `hasChoices` flag. A bare storyline id does **not** make a
- * card a choice (terminal escalation cards carry it for grouping).
+ * True when a content card presents a choice — i.e. carries a non-empty
+ * `options` encoding. A bare storyline id does **not** make a card a choice
+ * (terminal escalation cards carry it for grouping).
  *
  * @param card The content card.
  * @returns Whether the card branches.
  */
 export function contentCardHasChoice(card: ContentCard): boolean {
-  return card.hasChoices || card.options.trim() !== '';
+  return card.options.trim() !== '';
 }
 
 /**
  * The successor ids an option can reach, in declaration order.
  *
- * A non-empty candidate set (`successorIds`) takes precedence over the legacy
- * single `successorId`, mirroring runtime resolution precedence. An empty
- * list is a terminal option.
+ * A non-empty candidate set (`successorIds`) takes precedence over a single
+ * `successorId`, mirroring runtime resolution precedence. An empty list is a
+ * terminal option.
  *
  * @param option The compiled option.
  * @param adapter The game content adapter (for its base-id rule).

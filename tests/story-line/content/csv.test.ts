@@ -16,6 +16,7 @@ import {
   cardsFromCsv,
   compileContentOptions,
   computeContentChecksum,
+  contentCardHasChoice,
   escapeCsvField,
   findMissingColumns,
   optionSuccessorIds,
@@ -31,9 +32,6 @@ function card(overrides: Partial<ContentCard> = {}): ContentCard {
     id: 'card-a',
     name: 'Card A',
     effect: '',
-    hasChoices: false,
-    acceptNextCardId: null,
-    rejectNextCardId: null,
     options: '',
     storylineId: null,
     storylineTitle: null,
@@ -122,8 +120,6 @@ describe('cardsFromCsv', () => {
     expect(start.name).toBe('Town Meeting');
     expect(start.effect).toBe('Lose 50 coins');
     expect(start.options).toBe('Invest|gym-story-invest;Ignore|gym-story-ignore');
-    expect(start.hasChoices).toBe(false);
-    expect(start.acceptNextCardId).toBeNull();
     expect(start.storylineId).toBe('gym-story');
     expect(start.storylineTitle).toBe('Gym Storyline');
     expect(start.fields).toMatchObject({
@@ -145,10 +141,7 @@ describe('cardsFromCsv', () => {
     expect(first.name).toBe('Open the Door');
     expect(first.effect).toBe('A stranger knocks at the tavern door.');
     expect(first.options).toBe('Admit|tav-inn;Turn away|');
-    // No hasChoices / accept / reject columns in this shape.
-    expect(first.hasChoices).toBe(false);
-    expect(first.acceptNextCardId).toBeNull();
-    expect(first.rejectNextCardId).toBeNull();
+    // Only the mapped story-line fields are projected; the rest are game columns.
     expect(first.storylineId).toBe('tav');
     expect(first.storylineTitle).toBe('Tavern Nights');
     expect(first.fields).toEqual({ payoff: '2' });
@@ -165,39 +158,32 @@ describe('cardsFromCsv', () => {
       id: 'k-1',
       name: 'A Card',
       effect: '',
-      hasChoices: false,
       options: '',
       storylineId: null,
     });
   });
+
+  it('keeps an unmapped column in the game fields rather than modelling it', () => {
+    const [parsed] = cardsFromCsv(
+      parseCsv('key,title,legacyFlag\nk-1,A Card,true\n'),
+      {
+        gameId: 'sparse',
+        columns: ['key', 'title'],
+        fields: { id: 'key', name: 'title' },
+      },
+    );
+    expect(parsed.fields).toEqual({ legacyFlag: 'true' });
+  });
 });
 
 describe('compileContentOptions', () => {
-  it('compiles legacy hasChoices fields into Accept/Reject options', () => {
+  it('compiles an options encoding into its successors', () => {
     const options = compileContentOptions(
-      card({
-        hasChoices: true,
-        acceptNextCardId: 'card-b',
-        rejectNextCardId: 'card-c',
-      }),
+      card({ options: 'Invest|card-b;Walk|card-c' }),
     );
     expect(options).toEqual([
-      { label: 'Accept', successorId: 'card-b', effectPolicy: 'apply' },
-      { label: 'Reject', successorId: 'card-c', effectPolicy: 'skip' },
-    ]);
-  });
-
-  it('prefers the options encoding over legacy fields', () => {
-    const options = compileContentOptions(
-      card({
-        hasChoices: true,
-        acceptNextCardId: 'card-b',
-        options: 'Invest|card-c,card-d;Walk|',
-      }),
-    );
-    expect(options).toEqual([
-      { label: 'Invest', successorIds: ['card-c', 'card-d'], effectPolicy: 'apply' },
-      { label: 'Walk', successorIds: [], effectPolicy: 'apply' },
+      { label: 'Invest', successorIds: ['card-b'], effectPolicy: 'apply' },
+      { label: 'Walk', successorIds: ['card-c'], effectPolicy: 'apply' },
     ]);
   });
 
@@ -209,6 +195,17 @@ describe('compileContentOptions', () => {
 
   it('returns no options for a plain incident', () => {
     expect(compileContentOptions(card())).toEqual([]);
+  });
+});
+
+describe('contentCardHasChoice', () => {
+  it('is true only when the card carries an options encoding', () => {
+    expect(contentCardHasChoice(card({ options: 'Go|card-b' }))).toBe(true);
+    expect(contentCardHasChoice(card({ options: '   ' }))).toBe(false);
+  });
+
+  it('does not treat a bare storyline id as a choice', () => {
+    expect(contentCardHasChoice(card({ storylineId: 'arc' }))).toBe(false);
   });
 });
 

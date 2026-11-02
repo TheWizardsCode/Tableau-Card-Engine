@@ -102,7 +102,6 @@ describe('previewEdit — the diff', () => {
         id: 'gym-story-endgame',
         name: 'The Endgame',
         effect: 'Everything ends.',
-        hasChoices: false,
         storylineId: 'gym-story-lone',
         storylineTitle: 'Lone Arc',
       },

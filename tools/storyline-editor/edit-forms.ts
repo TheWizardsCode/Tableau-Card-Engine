@@ -3,8 +3,8 @@
  *
  * The form is built from the adapter's **field descriptors**
  * ({@link buildCardFieldDescriptors}) rather than hard-coded columns: core
- * edits the generic story-line fields (id read-only, name, effect, choice
- * flag, options encoding, legacy accept/reject links, storyline id/title) and
+ * edits the generic story-line fields (id read-only, name, effect, options
+ * encoding, storyline id/title) and
  * every adapter-declared column renders as an additional text field without
  * the editor knowing its semantics.
  *

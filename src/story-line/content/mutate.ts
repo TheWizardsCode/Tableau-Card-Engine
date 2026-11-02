@@ -55,12 +55,6 @@ export interface AddContentCardSpec {
   readonly name: string;
   /** Human-readable effect text. */
   readonly effect?: string;
-  /** Legacy two-way choice flag. */
-  readonly hasChoices?: boolean;
-  /** Legacy accept successor id (`null` clears). */
-  readonly acceptNextCardId?: string | null;
-  /** Legacy reject successor id (`null` clears). */
-  readonly rejectNextCardId?: string | null;
   /** CSV `options` encoding (`label|a,b;label2|c`). */
   readonly options?: string;
   /** Story-line id. */
@@ -83,12 +77,6 @@ export interface UpdateContentCardSpec {
   readonly name?: string;
   /** New effect text. */
   readonly effect?: string;
-  /** New choice flag. */
-  readonly hasChoices?: boolean;
-  /** New accept successor id (`null` clears). */
-  readonly acceptNextCardId?: string | null;
-  /** New reject successor id (`null` clears). */
-  readonly rejectNextCardId?: string | null;
   /** New `options` encoding (`null` or `''` clears). */
   readonly options?: string | null;
   /** New story-line id (`null` clears). */
@@ -253,15 +241,6 @@ export function applyAddContentCardSpec(
   if (fields.effect !== undefined) {
     setColumn(header, rows, row, fields.effect, spec.effect ?? '');
   }
-  if (fields.hasChoices !== undefined) {
-    setColumn(header, rows, row, fields.hasChoices, spec.hasChoices ? 'true' : 'false');
-  }
-  if (fields.acceptNextCardId !== undefined && spec.acceptNextCardId) {
-    setColumn(header, rows, row, fields.acceptNextCardId, spec.acceptNextCardId);
-  }
-  if (fields.rejectNextCardId !== undefined && spec.rejectNextCardId) {
-    setColumn(header, rows, row, fields.rejectNextCardId, spec.rejectNextCardId);
-  }
   if (fields.options !== undefined && spec.options !== undefined) {
     setColumn(header, rows, row, fields.options, spec.options);
   }
@@ -323,23 +302,6 @@ function applyUpdateFields(
   }
   if (fields.effect !== undefined && spec.effect !== undefined) {
     setColumn(header, rows, row, fields.effect, spec.effect);
-  }
-  if (spec.hasChoices !== undefined && fields.hasChoices !== undefined) {
-    setColumn(header, rows, row, fields.hasChoices, spec.hasChoices ? 'true' : 'false');
-  }
-  if (spec.acceptNextCardId !== undefined) {
-    setNullable(fields.acceptNextCardId, spec.acceptNextCardId);
-    // Setting a link implies a choice card (it would otherwise be inert at
-    // runtime); clearing a link leaves the flag alone.
-    if (spec.acceptNextCardId && spec.hasChoices === undefined && fields.hasChoices !== undefined) {
-      setColumn(header, rows, row, fields.hasChoices, 'true');
-    }
-  }
-  if (spec.rejectNextCardId !== undefined) {
-    setNullable(fields.rejectNextCardId, spec.rejectNextCardId);
-    if (spec.rejectNextCardId && spec.hasChoices === undefined && fields.hasChoices !== undefined) {
-      setColumn(header, rows, row, fields.hasChoices, 'true');
-    }
   }
   if (spec.options !== undefined) setNullable(fields.options, spec.options);
   if (spec.storylineId !== undefined) setNullable(fields.storylineId, spec.storylineId);

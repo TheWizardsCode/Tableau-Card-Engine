@@ -9,7 +9,7 @@
  * @module
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -76,17 +76,31 @@ describe('validate-storylines CLI', () => {
   });
 
   it('exits 1 with a JSON report naming the offending card', () => {
-    const { code, stdout } = captureOutput(() =>
-      runValidateStorylinesCli(['--csv', fixturePath('gym-broken-dangling.csv'), '--json']),
-    );
-    expect(code).toBe(1);
-    const report = JSON.parse(stdout);
-    expect(report.valid).toBe(false);
-    expect(report.issues[0]).toMatchObject({
-      code: 'unknown-successor',
-      cardId: 'gym-open',
-      target: 'gym-missing',
-    });
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'dangling.csv');
+      writeFileSync(
+        csvPath,
+        [
+          'id,name,effect,options,storylineId,storylineTitle',
+          'gym-open,Gym Open,A card that links nowhere.,Go|gym-missing,gym-arc,Gym Arc',
+          '',
+        ].join('\n'),
+      );
+      const { code, stdout } = captureOutput(() =>
+        runValidateStorylinesCli(['--csv', csvPath, '--json']),
+      );
+      expect(code).toBe(1);
+      const report = JSON.parse(stdout);
+      expect(report.valid).toBe(false);
+      expect(report.issues[0]).toMatchObject({
+        code: 'unknown-successor',
+        cardId: 'gym-open',
+        target: 'gym-missing',
+      });
+    } finally {
+      temp.cleanup();
+    }
   });
 
   it('fails on a cycle only with --fail-on-cycle', () => {
