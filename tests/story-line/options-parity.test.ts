@@ -19,9 +19,9 @@
  * - **Main Street reference card pack** —
  *   `tests/fixtures/reference-packs/main-street/main-street/main-street-foundations/cards.csv`
  *   through the minimal options-only adapter declared below. The pack CSV uses
- *   Main Street's 54-column schema; this snapshot cares only about the
- *   story-line columns, so the adapter maps exactly those and treats the rest
- *   as game fields.
+ *   Main Street's migrated 52-column schema (the legacy choice columns are
+ *   dropped); this snapshot cares only about the story-line columns, so the
+ *   adapter maps exactly those and treats the rest as game fields.
  *
  * The comparison goes through the public content API only (`cardsFromCsv` then
  * `compileContentOptions`), so a drift fails with a diff of the computed JSON

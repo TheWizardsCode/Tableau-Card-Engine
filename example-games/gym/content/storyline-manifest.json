@@ -17,9 +17,6 @@
       "effect": "Gain 60 reputation",
       "impact": "+60 reputation",
       "fields": {
-        "hasChoices": "false",
-        "acceptNextCardId": "",
-        "rejectNextCardId": "",
         "trigger": "Incident",
         "cost": "0",
         "coinDelta": "0",
@@ -50,9 +47,6 @@
       "effect": "Lose 80 coins",
       "impact": "−80 coins",
       "fields": {
-        "hasChoices": "false",
-        "acceptNextCardId": "",
-        "rejectNextCardId": "",
         "trigger": "Incident",
         "cost": "0",
         "coinDelta": "-80",
@@ -83,9 +77,6 @@
       "effect": "Gain 120 coins",
       "impact": "+120 coins",
       "fields": {
-        "hasChoices": "false",
-        "acceptNextCardId": "",
-        "rejectNextCardId": "",
         "trigger": "Incident",
         "cost": "0",
         "coinDelta": "120",
@@ -118,9 +109,6 @@
       "effect": "Lose 50 coins",
       "impact": "−50 coins",
       "fields": {
-        "hasChoices": "false",
-        "acceptNextCardId": "",
-        "rejectNextCardId": "",
         "trigger": "Incident",
         "cost": "0",
         "coinDelta": "-50",
