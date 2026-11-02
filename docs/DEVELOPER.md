@@ -2200,13 +2200,14 @@ checkout; engine imports resolve through the path aliases
 (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`,
 `@balance-cards/*`, `@core-scripts/*`, `@core-tests/*`, `@core-gym/*`) rather
 than the removed `src`/`scripts`/`example-games/gym`/`tests/helpers`
-symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
-`src/…`, and core-owned CLI/core-layer references to `core/scripts/…` and
-`core/src/…`. See
+symlinks. Game tests that referenced `example-games/<game>/…` can be
+repointed to `src/…`, and core-owned CLI/core-layer references to
+`core/scripts/…` and `core/src/…`, by the **opt-in** game-tree migration
+(`--migrate-game-paths`, below). See
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
 
-#### Write gating: `--dry-run`, `--only` and `--force`
+#### Write gating: `--dry-run`, `--only`, `--force` and `--migrate-game-paths`
 
 Every run classifies each generated file before writing it, and reports the
 classification (`create` / `update` / `unchanged` / `skip-local`) as one line
@@ -2219,6 +2220,7 @@ checkout that owns its own wiring, so the write itself is gated
 | `--dry-run` | Classify only: no file write, no `core` symlink, no asset/app-icon link and no game-tree path rewrite. The report is exactly what the real run would apply. |
 | `--only <file,...>` | Regenerate **only** the named generated paths (`main.ts`, `configs/game.json`, …; comma-separated, literal names, no globs). Every other generated file is left alone (`skip-local`, or `unchanged` when it already matches) and the run performs no non-file side effect. An unknown name fails the run (exit 1) with the valid-path list, writing nothing. |
 | `--force` | Overwrite a **selected** file whose content differs from the template. Without it that file classifies `skip-local` and is left untouched, so a hand edit is never silently lost. |
+| `--migrate-game-paths` | Opt in to the game-tree **migration**: rewrite `example-games/<game>/` → `src/` (and the quoted-`scripts/`, core-`src/` and relative-`scripts/` references) in the game's own `tests/` and `src/` trees. **Off by default** — a routine re-scaffold must never edit a consumer's tests or source, and a fresh repo already has the `src/` layout from `extract-repos.sh --path-rename`. Only a file that genuinely references `example-games/<game>/` is touched, so a drift guard's own `STALE_PREFIX`, a run-tests import or a documented local edit stays byte-identical. Every affected file is reported in `rewritten` and in the `migrations` report (with the rewrites that apply); `--migrate-game-paths --dry-run` writes nothing and reports the files a real migration would rewrite. Cannot be combined with `--only`, which promises "no rewrite" — passing both fails fast (exit 1) before any write (CG-0MVWGJRIO0094Y4Z). |
 
 Back-compatibility: with **no** `--only` a run is a full run and force is
 implied (`effectiveForce = force || only === undefined`) — the eight sibling
@@ -2229,6 +2231,11 @@ tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
   --core-root ../Tableau-Card-Engine --only main.ts,configs/game.json --dry-run
 tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
   --core-root ../Tableau-Card-Engine --only main.ts --force
+# Preview (then apply) a game-tree path migration: no writes on --dry-run.
+tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
+  --core-root ../Tableau-Card-Engine --migrate-game-paths --dry-run
+tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
+  --core-root ../Tableau-Card-Engine --migrate-game-paths
 ```
 
 #### Renderer the scaffold emits: `Phaser.AUTO`

@@ -81,6 +81,24 @@
  * anything is written, listing the valid paths — a typo must never produce a
  * silent no-op scaffold.
  *
+ * ## Game-tree migration (`--migrate-game-paths`)
+ *
+ * The textual rewrite of the game's own `tests/` and `src/` trees
+ * (`example-games/<game>/` → `src/`, plus the quoted-`scripts/`, core-`src/`
+ * and relative-`scripts/` rewrites) is **opt-in** (CG-0MVWGJRIO0094Y4Z): a
+ * routine re-scaffold must never edit a consumer's tests or source. Without
+ * the flag the rewrite is not invoked at all and `rewritten` is empty — a
+ * fresh repo does not need it, because `scripts/extract-repos.sh
+ * --path-rename` already produced the `src/` layout.
+ *
+ * With `--migrate-game-paths` the rewrite runs exactly as before **for files
+ * that genuinely reference `example-games/<game>/`**; a file with no such
+ * reference (a drift guard's own `STALE_PREFIX`, a run-tests import, a
+ * documented local edit) stays byte-identical. `--migrate-game-paths
+ * --dry-run` writes nothing and reports the files a real migration would
+ * rewrite, naming which rewrite applies ({@link ScaffoldMigrationReport}).
+ * `--only` promises "no rewrite", so combining the two flags fails fast.
+ *
  * ## Per-game version policy
  *
  * A scaffolded game repo owns its own `version`, decoupled from the engine's.
@@ -209,6 +227,26 @@ export interface ScaffoldOptions {
    * "regenerate everything" is inherently the overwrite mode.
    */
   force?: boolean;
+  /**
+   * Opt in to the game-tree **migration**: rewrite `example-games/<game>/` →
+   * `src/` and the accompanying quoted-`scripts/`, core-`src/` and
+   * relative-`scripts/` references in the game's own `tests/` and `src/`
+   * trees.
+   *
+   * **Off by default**, deliberately: the rewrite used to run on every
+   * scaffold, so a routine re-scaffold could edit a consumer's tests or
+   * source — and the blanket rewrite also touched files with no genuine
+   * game-tree reference (a drift guard's own `STALE_PREFIX`, run-tests
+   * imports, documented local edits). A fresh repo does not need it either:
+   * `scripts/extract-repos.sh --path-rename` already produces the `src/`
+   * layout (CG-0MVWGJRIO0094Y4Z).
+   *
+   * Only a file that genuinely contains `example-games/<game>/` is migrated.
+   * Combined with a dry run nothing is written and
+   * {@link ScaffoldResult.migrations} previews the affected files. Mutually
+   * exclusive with {@link ScaffoldOptions.only}, which promises "no rewrite".
+   */
+  migrateGamePaths?: boolean;
 }
 
 /** Why the scaffold picked the game version it wrote. */
@@ -238,6 +276,29 @@ export interface ScaffoldFileReport {
   action: ScaffoldFileAction;
 }
 
+/**
+ * One textual rewrite the opt-in game-tree migration can apply to a consumer
+ * file, in application order.
+ *
+ * - `game-tree-prefix` — `example-games/<game>/…` → `src/…`.
+ * - `relative-scripts-import` — `(../)+scripts/<module>` → `@core-scripts/<module>`.
+ * - `quoted-scripts-path` — a quoted `scripts/…` → `core/scripts/…`.
+ * - `core-src-path` — a quoted `src/<core-dir>` → `core/src/<core-dir>`.
+ */
+export type GameTreeRewriteKind =
+  | 'game-tree-prefix'
+  | 'relative-scripts-import'
+  | 'quoted-scripts-path'
+  | 'core-src-path';
+
+/** One entry of the game-tree migration report. */
+export interface ScaffoldMigrationReport {
+  /** File the migration affects, relative to the game repo root (POSIX). */
+  path: string;
+  /** Which of the textual rewrites apply to that file, in application order. */
+  rewrites: GameTreeRewriteKind[];
+}
+
 /** Result of {@link scaffoldGameRepo}. */
 export interface ScaffoldResult {
   gameRepoRoot: string;
@@ -259,6 +320,12 @@ export interface ScaffoldResult {
   symlinks: string[];
   /** Test/source files whose `example-games/<game>/` paths were rewritten. */
   rewritten: string[];
+  /**
+   * The game-tree migration report: one entry per file the opt-in
+   * `--migrate-game-paths` run rewrites — or, in a dry run, would rewrite —
+   * naming which rewrite applies. Empty unless the migration is requested.
+   */
+  migrations: ScaffoldMigrationReport[];
   /** Shared core assets linked into `public/assets` (F1 asset table). */
   assetLinks: string[];
   /** Core root app-icon files linked into `public/` (CG-0MUUFZSE90061KKL). */
@@ -952,6 +1019,114 @@ export function linkSharedPublicAssets(
 }
 
 /**
+ * The textual rewrites the game-tree migration applies, **in order**.
+ *
+ * Each rule takes the current contents and returns the rewritten contents, so
+ * the chain reproduces the original single-expression rewrite verbatim while
+ * letting the planner record *which* rewrite actually fired for a file.
+ */
+const GAME_TREE_REWRITE_RULES: ReadonlyArray<{
+  kind: GameTreeRewriteKind;
+  apply: (contents: string, needle: string) => string;
+}> = [
+  // Rule 1 — `example-games/<game>/…` -> `src/…` (game tree).
+  {
+    kind: 'game-tree-prefix',
+    apply: (contents, needle) => contents.split(needle).join('src/'),
+  },
+  // Rule 2 — a relative `(../)+scripts/<module>` path -> `@core-scripts/<module>`.
+  //    In the Option C layout a game repo has no repository-root `scripts/`
+  //    tree (its own scripts live under `src/scripts/`), so a root-relative
+  //    `scripts/` reference always denotes a core-owned script and the alias
+  //    resolves it against the core checkout.
+  {
+    kind: 'relative-scripts-import',
+    apply: (contents) =>
+      contents.replace(
+        /(['"])((?:\.\.\/)+)scripts\/([A-Za-z0-9_./-]+)\1/g,
+        (_match, quote: string, _dots: string, moduleName: string) =>
+          `${quote}@core-scripts/${moduleName}${quote}`,
+      ),
+  },
+  // Rule 3 — a quoted `scripts/…` path -> `core/scripts/…`: game tests invoke
+  //    core-owned CLIs (e.g. `scripts/replay.ts`) that now live in the core
+  //    checkout, not the game repo. `src/scripts/…` is untouched.
+  {
+    kind: 'quoted-scripts-path',
+    apply: (contents) =>
+      contents
+        .split("'scripts/")
+        .join("'core/scripts/")
+        .split('"scripts/')
+        .join('"core/scripts/'),
+  },
+  // Rule 4 — a quoted `src/<core-dir>…` path -> `core/src/<core-dir>…`: some
+  //    main-street tests scan the core's UI/engine layers directly.
+  {
+    kind: 'core-src-path',
+    apply: (contents) =>
+      contents.replace(
+        /(['"])src\/(core-engine|card-system|rule-engine|ui|ai)(?=[/'"])/g,
+        '$1core/src/$2',
+      ),
+  },
+];
+
+/** A planned (not yet applied) rewrite of one consumer file. */
+interface PlannedGameTreeRewrite {
+  filePath: string;
+  updated: string;
+  rewrites: GameTreeRewriteKind[];
+}
+
+/**
+ * Plan the game-tree path rewrite for one game repo without writing anything.
+ *
+ * A file is a candidate only when it genuinely references this game's tree
+ * (`example-games/<game>/`). That is the `--migrate-game-paths` scoping rule
+ * (CG-0MVWGJRIO0094Y4Z): the rewrite used to touch every test/source file, so
+ * a drift guard's own `STALE_PREFIX`, a run-tests import or a documented local
+ * edit could be edited by a routine re-scaffold. A file with no genuine
+ * game-tree reference is reported as unaffected (absent from the plan) and is
+ * left byte-identical.
+ */
+function planGameTreePathRewrites(
+  gameRepoRoot: string,
+  game: string,
+): PlannedGameTreeRewrite[] {
+  const needle = `example-games/${game}/`;
+  const planned: PlannedGameTreeRewrite[] = [];
+  const consider = (filePath: string): void => {
+    if (!/\.(ts|tsx|mjs|cjs|js)$/.test(filePath)) return;
+    const original = fs.readFileSync(filePath, 'utf-8');
+    if (!original.includes(needle)) return;
+    const rewrites: GameTreeRewriteKind[] = [];
+    let updated = original;
+    for (const rule of GAME_TREE_REWRITE_RULES) {
+      const next = rule.apply(updated, needle);
+      if (next !== updated) {
+        rewrites.push(rule.kind);
+        updated = next;
+      }
+    }
+    if (updated !== original) {
+      planned.push({ filePath, updated, rewrites });
+    }
+  };
+  const walk = (dir: string): void => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else consider(full);
+    }
+  };
+  walk(path.join(gameRepoRoot, 'tests'));
+  walk(path.join(gameRepoRoot, 'src'));
+  return planned;
+}
+
+/**
  * Rewrite intra-test references to the game tree for the `src/` layout.
  *
  * Game tests reach their own source with repository-root-relative specifiers
@@ -961,54 +1136,19 @@ export function linkSharedPublicAssets(
  * (`tests/<game>/…`), replacing the `example-games/<game>/` segment with
  * `src/` is exact — including runtime paths such as fixture file locations.
  *
+ * This is **not** called by a routine scaffold: it is the opt-in
+ * `--migrate-game-paths` migration (CG-0MVWGJRIO0094Y4Z). The signature is
+ * unchanged because other tooling and tests import it directly; only the
+ * files that genuinely reference the game tree are touched.
+ *
  * @returns The rewritten file paths.
  */
 export function rewriteGameTreePaths(gameRepoRoot: string, game: string): string[] {
-  const needle = `example-games/${game}/`;
   const rewritten: string[] = [];
-  const walk = (dir: string): void => {
-    if (!fs.existsSync(dir)) return;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (/\.(ts|tsx|mjs|cjs|js)$/.test(entry.name)) {
-        const original = fs.readFileSync(full, 'utf-8');
-        // 1. `example-games/<game>/…` -> `src/…` (game tree).
-        // 2. A quoted `scripts/…` path -> `core/scripts/…`: game tests invoke
-        //    core-owned CLIs (e.g. `scripts/replay.ts`) that now live in the
-        //    core checkout, not the game repo. `src/scripts/…` is untouched.
-        // 3. A quoted `src/<core-dir>…` path -> `core/src/<core-dir>…`: some
-        //    main-street tests scan the core's UI/engine layers directly.
-        // 4. A relative `(../)+scripts/<module>` path -> `@core-scripts/<module>`.
-        //    In the Option C layout a game repo has no repository-root
-        //    `scripts/` tree (its own scripts live under `src/scripts/`), so a
-        //    root-relative `scripts/` reference always denotes a core-owned
-        //    script and the alias resolves it against the core checkout.
-        const updated = original
-          .split(needle)
-          .join('src/')
-          .replace(
-            /(['"])((?:\.\.\/)+)scripts\/([A-Za-z0-9_./-]+)\1/g,
-            (_match, quote: string, _dots: string, moduleName: string) =>
-              `${quote}@core-scripts/${moduleName}${quote}`,
-          )
-          .split("'scripts/")
-          .join("'core/scripts/")
-          .split('"scripts/')
-          .join('"core/scripts/')
-          .replace(
-            /(['"])src\/(core-engine|card-system|rule-engine|ui|ai)(?=[/'"])/g,
-            '$1core/src/$2',
-          );
-        if (updated !== original) {
-          fs.writeFileSync(full, updated, 'utf-8');
-          rewritten.push(full);
-        }
-      }
-    }
-  };
-  walk(path.join(gameRepoRoot, 'tests'));
-  walk(path.join(gameRepoRoot, 'src'));
+  for (const plan of planGameTreePathRewrites(gameRepoRoot, game)) {
+    fs.writeFileSync(plan.filePath, plan.updated, 'utf-8');
+    rewritten.push(plan.filePath);
+  }
   return rewritten;
 }
 
@@ -1086,6 +1226,23 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   const only = options.only === undefined ? undefined : normalizeOnly(options.only);
   const selectionMode = only !== undefined;
   const effectiveForce = options.force === true || !selectionMode;
+
+  // The game-tree path rewrite is opt-in (CG-0MVWGJRIO0094Y4Z). It used to run
+  // on every scaffold, so a routine re-scaffold could edit a consumer's tests
+  // or source — and the blanket rewrite also touched files with no genuine
+  // game-tree reference (a drift guard's own `STALE_PREFIX`, run-tests imports,
+  // documented local edits). Fresh repos do not need it:
+  // `scripts/extract-repos.sh --path-rename` already produced the `src/`
+  // layout. `--only` promises "no rewrite", so the pair is contradictory:
+  // refuse before anything is written rather than half-migrate a repo.
+  const migrateGamePaths = options.migrateGamePaths === true;
+  if (migrateGamePaths && selectionMode) {
+    throw new Error(
+      '[scaffold] --migrate-game-paths cannot be combined with --only: ' +
+        '--only promises "no rewrite", so a selection run never migrates. ' +
+        'Drop one of the two flags.',
+    );
+  }
 
   // Build the whole plan (path + rendered contents) before writing anything:
   // `--only` validation must fail before a single byte lands, and the valid
@@ -1188,9 +1345,18 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     ? []
     : linkSharedPublicAssets(gameRepoRoot, coreRoot);
 
-  const rewritten = skipSideEffects
-    ? []
-    : rewriteGameTreePaths(gameRepoRoot, options.game);
+  // Opt-in game-tree migration (CG-0MVWGJRIO0094Y4Z). The plan is computed
+  // even in a dry run — that is exactly what a `--migrate-game-paths
+  // --dry-run` preview reports — but nothing is written until a real run.
+  const migrations: ScaffoldMigrationReport[] = migrateGamePaths
+    ? planGameTreePathRewrites(gameRepoRoot, options.game).map((plan) => ({
+        path: reportPathOf(plan.filePath),
+        rewrites: plan.rewrites,
+      }))
+    : [];
+  const rewritten = migrateGamePaths && !dryRun
+    ? rewriteGameTreePaths(gameRepoRoot, options.game)
+    : [];
 
   return {
     gameRepoRoot,
@@ -1205,6 +1371,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     written,
     symlinks,
     rewritten,
+    migrations,
     assetLinks,
     publicLinks,
     version,
@@ -1229,6 +1396,8 @@ interface CliArgs {
   only?: string[];
   /** `--force`: overwrite a selected file whose content differs. */
   force?: boolean;
+  /** `--migrate-game-paths`: opt in to the game-tree path migration. */
+  migrateGamePaths?: boolean;
   json?: boolean;
 }
 
@@ -1296,6 +1465,9 @@ function parseArgs(argv: string[]): CliArgs {
       case '--force':
         args.force = true;
         break;
+      case '--migrate-game-paths':
+        args.migrateGamePaths = true;
+        break;
       case '--json':
         args.json = true;
         break;
@@ -1345,6 +1517,18 @@ function usage(): string {
     '                           differs from the template (default: leave it,',
     '                           reported as skip-local). A full run without',
     '                           --only always implies force.',
+    '  --migrate-game-paths     Rewrite the game-tree references in the game\'s',
+    '                           own tests/source: example-games/<game>/ -> src/',
+    '                           plus the quoted-scripts, core-src and',
+    '                           relative-scripts rewrites. Off by default — a',
+    '                           routine re-scaffold must never edit a',
+    '                           consumer\'s tests or source, and a fresh repo',
+    '                           already has the src/ layout from',
+    '                           extract-repos.sh --path-rename. Only a file that',
+    '                           genuinely references example-games/<game>/ is',
+    '                           touched. With --dry-run the affected files (and',
+    '                           which rewrite applies) are reported, not',
+    '                           written. Cannot be combined with --only.',
     '  --json                   Print one machine-readable JSON document for the',
     '                           run (an object, or an array with --all) carrying',
     '                           the per-file `files` report.',
@@ -1369,6 +1553,17 @@ function main(argv: string[]): number {
   }
   if (!args.game && !args.all) {
     console.error('error: --game or --all is required');
+    console.error(usage());
+    return 1;
+  }
+
+  // `--only` promises "no rewrite", so a migration cannot be combined with a
+  // selection: fail fast before anything is written.
+  if (args.migrateGamePaths && args.only !== undefined) {
+    console.error(
+      'error: --migrate-game-paths cannot be combined with --only ' +
+        '(--only promises "no rewrite").',
+    );
     console.error(usage());
     return 1;
   }
@@ -1407,6 +1602,7 @@ function main(argv: string[]): number {
         dryRun: args.dryRun,
         only: args.only,
         force: args.force,
+        migrateGamePaths: args.migrateGamePaths,
       });
       results.push(result);
       if (args.json) continue;
@@ -1428,6 +1624,16 @@ function main(argv: string[]): number {
       for (const l of result.symlinks) console.log(`  linked ${l}`);
       if (result.rewritten.length) {
         console.log(`  rewrote example-games/${game}/ → src/ in ${result.rewritten.length} file(s)`);
+      }
+      // The opt-in migration report names every affected file and which
+      // rewrite applies, so a `--dry-run` preview is actionable
+      // (CG-0MVWGJRIO0094Y4Z).
+      if (result.migrations.length) {
+        const verb = args.dryRun ? 'would migrate' : 'migrated';
+        console.log(`  ${verb} ${result.migrations.length} game-tree file(s):`);
+        for (const migration of result.migrations) {
+          console.log(`    ${migration.path} (${migration.rewrites.join(', ')})`);
+        }
       }
       if (result.assetLinks.length) {
         console.log(`  linked ${result.assetLinks.length} shared asset(s)`);

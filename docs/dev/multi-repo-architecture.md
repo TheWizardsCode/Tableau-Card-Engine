@@ -316,9 +316,13 @@ example-games/<game>/  ->  src/        (git filter-repo --path-rename)
 
 The game's own `tests/` and `scripts/` trees travel with it, so they live at
 `src/tests/` and `src/scripts/`. The game's **unit/browser tests** stay at
-`tests/<game>/`; the scaffold rewrites the `example-games/<game>/` segment of
-those tests to `src/` (so a test at `tests/<game>/…` reaches the source with
-`../../src/…`), including runtime fixture paths. Only one directory link
+`tests/<game>/`; the **opt-in** game-tree migration
+(`--migrate-game-paths`, CG-0MVWGJRIO0094Y4Z) rewrites the
+`example-games/<game>/` segment of those tests to `src/` (so a test at
+`tests/<game>/…` reaches the source with `../../src/…`), including runtime
+fixture paths, and only for files that genuinely reference the game tree — a
+routine re-scaffold never edits a consumer's tests or source. Only one
+directory link
 remains — `core` (the engine checkout, a git submodule once the remotes exist).
 The old `src`, `scripts`, `example-games/gym` and `tests/helpers` symlinks are
 gone, replaced by aliases:

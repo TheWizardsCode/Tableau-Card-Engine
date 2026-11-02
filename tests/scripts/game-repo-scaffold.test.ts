@@ -674,25 +674,15 @@ describe('scaffoldGameRepo', () => {
     expect(fs.realpathSync(path.join(gameRepo, 'core'))).toBe(fs.realpathSync(core));
     expect(result.symlinks.map((s) => path.basename(s))).toEqual(['core']);
 
-    // The game's own test import is repointed from the monorepo
-    // `example-games/golf/…` tree to the `src/` layout.
+    // The game-tree path rewrite is opt-in (CG-0MVWGJRIO0094Y4Z): a routine
+    // re-scaffold must never edit the consumer's own tests or source.
     const testSrc = fs.readFileSync(
       path.join(gameRepo, 'tests', 'golf', 'Golf.test.ts'),
       'utf-8',
     );
-    expect(testSrc).toContain("'../../src/scenes/GolfScene'");
-    expect(testSrc).not.toContain('example-games/golf/');
-    // A game test invoking a core-owned CLI resolves it through the core link.
-    expect(testSrc).toContain("'core/scripts/replay.ts'");
-    // A game test scanning a core layer resolves it through the core link too.
-    expect(testSrc).toContain("'core/src/ui'");
-    expect(testSrc).toContain("'core/src/core-engine'");
-    // A relative import of a core-owned script (there is no repository-root
-    // `scripts/` tree in a game repo) is repointed at the core-scripts alias;
-    // a game-owned script under `src/scripts/` is left untouched.
-    expect(testSrc).toContain("'@core-scripts/validate-transcript'");
-    expect(testSrc).not.toContain("'../../scripts/validate-transcript'");
-    expect(testSrc).toContain("'../../src/scripts/game-script'");
+    expect(testSrc).toContain("'../../example-games/golf/scenes/GolfScene'");
+    expect(result.rewritten).toEqual([]);
+    expect(result.migrations).toEqual([]);
   });
 
   it('seeds a new game repo package.json with the 0.1.0 baseline', () => {
@@ -1065,8 +1055,8 @@ describe('scaffoldGameRepo write gating (--only / --force / skip-local)', () => 
     seedDivergedGeneratedFiles(gameRepo);
 
     const testFile = path.join(gameRepo, 'tests', 'golf', 'Golf.test.ts');
-    // The earlier full run already rewrote this file; a selection run must not
-    // touch it again (no path rewrite in selection mode).
+    // A selection run never rewrites the game tree (and neither does a plain
+    // full run any more — the migration is opt-in, CG-0MVWGJRIO0094Y4Z).
     const testSrcBefore = fs.readFileSync(testFile, 'utf-8');
     const before = snapshotTree(gameRepo);
 
@@ -1288,6 +1278,170 @@ describe('scaffoldGameRepo write gating (--only / --force / skip-local)', () => 
   });
 });
 
+// ── Opt-in game-tree migration (--migrate-game-paths) ─────────────────────
+
+/** A consumer fixture with no genuine `example-games/<game>/` reference. */
+function writeNoReferenceFixture(gameRepo: string, game: string): string {
+  const file = path.join(gameRepo, 'tests', game, 'DriftGuard.test.ts');
+  fs.writeFileSync(
+    file,
+    [
+      // A drift guard's own literal: it mentions the monorepo shape but never
+      // references this game's tree, so a migration must leave it alone even
+      // though the blanket rewrite used to touch it.
+      "const STALE_PREFIX = 'example-games/';",
+      "const runTests = 'scripts/run-tests';",
+      "const roots = [{ dir: 'src/ui' }];",
+      "import { validate } from '../../scripts/validate-transcript';",
+      '',
+    ].join('\n'),
+    'utf-8',
+  );
+  return file;
+}
+
+/** Snapshot only the game-owned `tests/` and `src/` trees (repo-relative keys). */
+function snapshotConsumerTrees(gameRepo: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const dir of ['tests', 'src']) {
+    for (const [rel, hash] of Object.entries(snapshotTree(path.join(gameRepo, dir)))) {
+      out[`${dir}/${rel}`] = hash;
+    }
+  }
+  return out;
+}
+
+describe('scaffoldGameRepo game-tree migration (--migrate-game-paths)', () => {
+  const testFileOf = (gameRepo: string, game: string): string =>
+    path.join(gameRepo, 'tests', game, `${pascalCase(game)}.test.ts`);
+
+  /** Every rewrite the fixture test file genuinely earns. */
+  const ALL_REWRITES = [
+    'game-tree-prefix',
+    'relative-scripts-import',
+    'quoted-scripts-path',
+    'core-src-path',
+  ];
+
+  it("a default scaffold leaves the game's own tests and source byte-identical", () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const decoy = writeNoReferenceFixture(gameRepo, 'golf');
+    const decoyBefore = fs.readFileSync(decoy, 'utf-8');
+    const before = snapshotConsumerTrees(gameRepo);
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    // Nothing under `tests/` or `src/` changed: not one byte was rewritten.
+    expect(snapshotConsumerTrees(gameRepo)).toEqual(before);
+    expect(fs.readFileSync(testFileOf(gameRepo, 'golf'), 'utf-8')).toContain(
+      'example-games/golf/',
+    );
+    expect(fs.readFileSync(decoy, 'utf-8')).toBe(decoyBefore);
+    expect(result.rewritten).toEqual([]);
+    expect(result.migrations).toEqual([]);
+  });
+
+  it('migrates and reports the genuinely-referencing files only when asked', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const decoy = writeNoReferenceFixture(gameRepo, 'golf');
+    const decoyBefore = fs.readFileSync(decoy, 'utf-8');
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      migrateGamePaths: true,
+    });
+
+    // The affected file is reported both as a written path and as a migration
+    // entry naming which rewrite applies.
+    expect(result.rewritten).toEqual([testFileOf(gameRepo, 'golf')]);
+    expect(result.migrations).toEqual([
+      { path: 'tests/golf/Golf.test.ts', rewrites: ALL_REWRITES },
+    ]);
+
+    const testSrc = fs.readFileSync(testFileOf(gameRepo, 'golf'), 'utf-8');
+    // 1. `example-games/<game>/…` -> `src/…` (game tree).
+    expect(testSrc).toContain("'../../src/scenes/GolfScene'");
+    expect(testSrc).not.toContain('example-games/golf/');
+    // 2. A quoted `scripts/…` path -> `core/scripts/…`.
+    expect(testSrc).toContain("'core/scripts/replay.ts'");
+    // 3. A quoted `src/<core-dir>` path -> `core/src/<core-dir>`.
+    expect(testSrc).toContain("'core/src/ui'");
+    expect(testSrc).toContain("'core/src/core-engine'");
+    // 4. A relative `../../scripts/<module>` -> `@core-scripts/<module>`; a
+    // game-owned script under `src/scripts/` is left untouched.
+    expect(testSrc).toContain("'@core-scripts/validate-transcript'");
+    expect(testSrc).not.toContain("'../../scripts/validate-transcript'");
+    expect(testSrc).toContain("'../../src/scripts/game-script'");
+
+    // A file with no genuine game-tree reference stays byte-identical, even in
+    // migration mode (the blanket rewrite used to touch it).
+    expect(fs.readFileSync(decoy, 'utf-8')).toBe(decoyBefore);
+  });
+
+  it('reports the migration without writing on --migrate-game-paths --dry-run', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    writeNoReferenceFixture(gameRepo, 'golf');
+    const before = snapshotConsumerTrees(gameRepo);
+
+    const dry = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      migrateGamePaths: true,
+      dryRun: true,
+    });
+
+    // Nothing written, but the preview names the files a real migration would
+    // rewrite and which rewrite applies to each.
+    expect(snapshotConsumerTrees(gameRepo)).toEqual(before);
+    expect(dry.rewritten).toEqual([]);
+    expect(dry.migrations).toEqual([
+      { path: 'tests/golf/Golf.test.ts', rewrites: ALL_REWRITES },
+    ]);
+
+    // The preview is trustworthy: a real migration reports exactly the same.
+    const real = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      migrateGamePaths: true,
+    });
+    expect(real.migrations).toEqual(dry.migrations);
+    expect(real.rewritten).toEqual([testFileOf(gameRepo, 'golf')]);
+  });
+
+  it('fails fast when --only and --migrate-game-paths are combined, writing nothing', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const before = snapshotTree(gameRepo);
+
+    let message = '';
+    try {
+      scaffoldGameRepo({
+        game: 'golf',
+        gameRepoRoot: gameRepo,
+        coreRoot: core,
+        only: ['main.ts'],
+        migrateGamePaths: true,
+      });
+    } catch (err) {
+      message = (err as Error).message;
+    }
+
+    // `--only` promises "no rewrite", so the pair is contradictory: refuse
+    // rather than half-migrate the repo.
+    expect(message).toContain('--migrate-game-paths');
+    expect(message).toContain('--only');
+    expect(message).toMatch(/combine|mutually exclusive/i);
+    expect(snapshotTree(gameRepo)).toEqual(before);
+  });
+});
+
 describe('scaffold CLI report contract', () => {
   /** Run the scaffold CLI from the repo root so `tsx` resolves normally. */
   const runCli = (args: string[]): ReturnType<typeof spawnSync> =>
@@ -1411,6 +1565,55 @@ describe('scaffold CLI report contract', () => {
     expect(stderr).toMatch(/valid/i);
     for (const file of GENERATED_FILES) expect(stderr).toContain(file);
     expect(snapshotTree(gameRepo)).toEqual(before);
+  });
+
+  it('--migrate-game-paths --dry-run reports the migration and writes nothing', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    writeNoReferenceFixture(gameRepo, 'golf');
+    const before = snapshotConsumerTrees(gameRepo);
+
+    const result = runCli([
+      ...baseArgs(core, gameRepo),
+      '--migrate-game-paths',
+      '--dry-run',
+      '--json',
+    ]);
+
+    expect(result.status, String(result.stderr)).toBe(0);
+    const doc = JSON.parse(String(result.stdout)) as ScaffoldResult;
+    expect(snapshotConsumerTrees(gameRepo)).toEqual(before);
+    expect(doc.rewritten).toEqual([]);
+    expect(doc.migrations.map((migration) => migration.path)).toEqual([
+      'tests/golf/Golf.test.ts',
+    ]);
+    expect(doc.migrations[0].rewrites).toContain('game-tree-prefix');
+  });
+
+  it('--only with --migrate-game-paths exits 1 and writes nothing', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const before = snapshotTree(gameRepo);
+
+    const result = runCli([
+      ...baseArgs(core, gameRepo),
+      '--only',
+      'main.ts',
+      '--migrate-game-paths',
+    ]);
+
+    expect(result.status).toBe(1);
+    const stderr = String(result.stderr);
+    expect(stderr).toContain('--migrate-game-paths');
+    expect(stderr).toContain('--only');
+    expect(snapshotTree(gameRepo)).toEqual(before);
+  });
+
+  it('--help documents --migrate-game-paths, its default-off status and the --only exclusion', () => {
+    const result = runCli(['--help']);
+    expect(result.status).toBe(0);
+    const help = String(result.stdout);
+    expect(help).toContain('--migrate-game-paths');
+    expect(help).toMatch(/off by default/i);
+    expect(help).toMatch(/cannot be combined with --only/i);
   });
 
   it('rejects a glob in --only (literal generated names only)', () => {
