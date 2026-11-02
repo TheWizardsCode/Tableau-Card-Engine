@@ -8,7 +8,7 @@
   "nodes": [
     {
       "id": "gym-story-end",
-      "name": "New Beginning",
+      "name": "Transport Infrastructure",
       "storylineId": "gym-story",
       "storylineTitle": "Gym Storyline",
       "hasChoices": false,

@@ -599,7 +599,7 @@ describe('the committed Gym content is never mutated', () => {
   it('still holds the original card names after every fixture edit above', () => {
     const csv = readFileSync(CONTENT_CSV_PATH, 'utf-8');
     expect(csv).toContain('Public Investment');
-    expect(csv).toContain('New Beginning');
+    expect(csv).toContain('Transport Infrastructure');
     expect(csv).not.toContain('The Endgame');
     expect(csv).not.toContain('gym-story-detour');
   });

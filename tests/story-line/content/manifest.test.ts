@@ -193,7 +193,7 @@ describe('rendering helpers', () => {
       ? describeChoiceRouting(invest, gymManifest.edges, nameById)
       : '';
     expect(routing).toBe(
-      'Celebrate: effect applies → New Beginning · Double down: effect applies → chain ends',
+      'Celebrate: effect applies → Transport Infrastructure · Double down: effect applies → chain ends',
     );
 
     const end = gymManifest.nodes.find((node) => node.id === 'gym-story-end');

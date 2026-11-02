@@ -198,7 +198,7 @@ describe('story-line editor — curated card edit round-trip', () => {
     const idControl = control(container, 'id');
     expect(idControl.value).toBe('gym-story-end');
     expect(idControl instanceof HTMLInputElement && idControl.readOnly).toBe(true);
-    expect(control(container, 'name').value).toBe('New Beginning');
+    expect(control(container, 'name').value).toBe('Transport Infrastructure');
     expect(control(container, 'column:coinDelta').value).toBe('0');
 
     // Edit every core-generic field and every game column.
@@ -228,7 +228,7 @@ describe('story-line editor — curated card edit round-trip', () => {
       '[data-role="diff-change"][data-column="name"]',
     );
     expect(nameChange?.querySelector('[data-role="diff-before"]')?.textContent).toBe(
-      'New Beginning',
+      'Transport Infrastructure',
     );
     expect(nameChange?.querySelector('[data-role="diff-after"]')?.textContent).toBe('The Endgame');
     const coinChange = container.querySelector(

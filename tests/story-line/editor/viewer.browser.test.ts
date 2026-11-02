@@ -493,7 +493,7 @@ describe('story-line editor viewer — node selection and details', () => {
     // Selecting another card replaces the details and moves the highlight.
     click(container.querySelector('[data-node-id="gym-story-end"]') as Element);
     expect(shell.renderer.selectedNodeId).toBe('gym-story-end');
-    expect(container.querySelector('[data-role="details-name"]')?.textContent).toBe('New Beginning');
+    expect(container.querySelector('[data-role="details-name"]')?.textContent).toBe('Transport Infrastructure');
     expect(container.querySelector('[data-node-id="gym-story-end"]')?.classList.contains('is-selected')).toBe(
       true,
     );
@@ -527,7 +527,7 @@ describe('story-line editor viewer — node selection and details', () => {
     // The legend selects the first card of its story-line group.
     click(container.querySelector('[data-role="storyline-legend-item"]') as Element);
     expect(shell.renderer.selectedNodeId).toBe('gym-story-end');
-    expect(container.querySelector('[data-role="details-name"]')?.textContent).toBe('New Beginning');
+    expect(container.querySelector('[data-role="details-name"]')?.textContent).toBe('Transport Infrastructure');
   });
 });
 
