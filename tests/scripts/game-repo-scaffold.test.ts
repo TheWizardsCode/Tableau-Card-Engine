@@ -1043,6 +1043,251 @@ describe('scaffoldGameRepo dry run', () => {
   });
 });
 
+// ── Write gating: --only / --force / skip-local ───────────────────────────
+
+/** The local content {@link seedDivergedGeneratedFiles} writes for a file. */
+function localEdit(file: string): string {
+  return `// LOCAL EDIT — ${file}\n`;
+}
+
+/** Read one generated file from the scaffolded game repo. */
+function readGenerated(gameRepo: string, file: string): string {
+  return fs.readFileSync(path.join(gameRepo, file), 'utf-8');
+}
+
+describe('scaffoldGameRepo write gating (--only / --force / skip-local)', () => {
+  it('writes only the selected file and classifies every other generated file skip-local', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    writeCoreSharedLayout(core);
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+    // Every generated file now holds local content that differs from the
+    // template, so an unselected file is a clobber risk, not a no-op.
+    seedDivergedGeneratedFiles(gameRepo);
+
+    const testFile = path.join(gameRepo, 'tests', 'golf', 'Golf.test.ts');
+    // The earlier full run already rewrote this file; a selection run must not
+    // touch it again (no path rewrite in selection mode).
+    const testSrcBefore = fs.readFileSync(testFile, 'utf-8');
+    const before = snapshotTree(gameRepo);
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      only: ['main.ts'],
+      force: true,
+    });
+
+    // The report names the selected file as written and every other generated
+    // file as deliberately left alone (CG-0MVWGJPPA000GBE7).
+    expect(result.files).toEqual(
+      GENERATED_FILES.map((file) => ({
+        path: file,
+        action: file === 'main.ts' ? 'update' : 'skip-local',
+      })),
+    );
+    expect(result.written).toEqual([path.join(gameRepo, 'main.ts')]);
+    expect(readGenerated(gameRepo, 'main.ts')).toBe(renderMainTs());
+
+    // Every unselected generated file keeps its local content byte-for-byte.
+    for (const file of GENERATED_FILES) {
+      if (file === 'main.ts') continue;
+      expect(readGenerated(gameRepo, file), `${file} was clobbered`).toBe(localEdit(file));
+    }
+
+    // Selection mode performs none of the non-file side effects.
+    expect(result.symlinks).toEqual([]);
+    expect(result.assetLinks).toEqual([]);
+    expect(result.publicLinks).toEqual([]);
+    expect(result.rewritten).toEqual([]);
+    expect(result.selectionNote).toMatch(/selection mode/i);
+    // The game's own test file is untouched (no path rewrite in this run).
+    expect(fs.readFileSync(testFile, 'utf-8')).toBe(testSrcBefore);
+
+    // On disk, exactly one file changed — nothing was added, linked or removed.
+    const after = snapshotTree(gameRepo);
+    expect(Object.keys(after).sort()).toEqual(Object.keys(before).sort());
+    expect(Object.keys(after).filter((key) => after[key] !== before[key])).toEqual([
+      'main.ts',
+    ]);
+  });
+
+  it('creates only the selected file and no links or rewrites on a fresh checkout', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    // The core has shared assets and root icons available; a selection run must
+    // still compose none of them.
+    writeCoreSharedLayout(core);
+
+    const testFile = path.join(gameRepo, 'tests', 'golf', 'Golf.test.ts');
+    const before = snapshotTree(gameRepo);
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      only: ['main.ts'],
+    });
+
+    expect(result.files).toEqual(
+      GENERATED_FILES.map((file) => ({
+        path: file,
+        action: file === 'main.ts' ? 'create' : 'skip-local',
+      })),
+    );
+    expect(result.written).toEqual([path.join(gameRepo, 'main.ts')]);
+    for (const file of GENERATED_FILES) {
+      const exists = fs.existsSync(path.join(gameRepo, file));
+      expect(exists, `${file} existence`).toBe(file === 'main.ts');
+    }
+
+    // No `core` symlink, no `public/` asset tree, no path rewrite.
+    expect(fs.lstatSync(path.join(gameRepo, 'core'), { throwIfNoEntry: false })).toBeUndefined();
+    expect(fs.existsSync(path.join(gameRepo, 'public'))).toBe(false);
+    expect(result.symlinks).toEqual([]);
+    expect(fs.readFileSync(testFile, 'utf-8')).toContain('example-games/golf/');
+
+    // The only addition is the selected file.
+    const after = snapshotTree(gameRepo);
+    expect(Object.keys(after).sort()).toEqual(['main.ts', ...Object.keys(before)].sort());
+    for (const key of Object.keys(before)) expect(after[key]).toBe(before[key]);
+  });
+
+  it('leaves a diverged selected file untouched (skip-local) unless force is passed', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    fs.writeFileSync(path.join(gameRepo, 'main.ts'), localEdit('main.ts'), 'utf-8');
+
+    // Without --force the selected file is a hand edit the run must not lose.
+    const withoutForce = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      only: ['main.ts'],
+    });
+    expect(
+      withoutForce.files.find((file) => file.path === 'main.ts')?.action,
+    ).toBe('skip-local');
+    expect(withoutForce.written).toEqual([]);
+    expect(readGenerated(gameRepo, 'main.ts')).toBe(localEdit('main.ts'));
+
+    // --force regenerates exactly that file.
+    const withForce = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      only: ['main.ts'],
+      force: true,
+    });
+    expect(withForce.files.find((file) => file.path === 'main.ts')?.action).toBe(
+      'update',
+    );
+    expect(withForce.written).toEqual([path.join(gameRepo, 'main.ts')]);
+    expect(readGenerated(gameRepo, 'main.ts')).toBe(renderMainTs());
+  });
+
+  it('fails fast on an unknown selected name, listing the valid paths and writing nothing', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const before = snapshotTree(gameRepo);
+
+    let message = '';
+    try {
+      scaffoldGameRepo({
+        game: 'golf',
+        gameRepoRoot: gameRepo,
+        coreRoot: core,
+        only: ['main.tx'],
+        force: true,
+      });
+    } catch (err) {
+      message = (err as Error).message;
+    }
+
+    // A typo must never produce a silent no-op scaffold.
+    expect(message).toContain('main.tx');
+    expect(message).toMatch(/valid/i);
+    for (const file of GENERATED_FILES) expect(message).toContain(file);
+    // Nothing was written — not even an empty `configs/` directory.
+    expect(snapshotTree(gameRepo)).toEqual(before);
+  });
+
+  it('keeps full-run behaviour for the sibling repos: a diverged file is rewritten without force', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    seedDivergedGeneratedFiles(gameRepo);
+
+    // Back-compatibility guard: the eight sibling `tce-<game>` repos receive
+    // template updates from a plain full run, so `force` must be implied when
+    // `only` is absent (effectiveForce = force || only === undefined).
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    expect(result.files).toEqual(
+      GENERATED_FILES.map((file) => ({ path: file, action: 'update' })),
+    );
+    expect(result.written.sort()).toEqual(
+      GENERATED_FILES.map((file) => path.join(gameRepo, file)).sort(),
+    );
+    expect(readGenerated(gameRepo, 'main.ts')).toBe(renderMainTs());
+    // A full run still performs the side effects a selection run suppresses.
+    expect(result.symlinks.map((link) => path.basename(link))).toEqual(['core']);
+    expect(result.selectionNote).toBeUndefined();
+  });
+
+  it('reports for --only + --dry-run exactly what the following real run applies', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    writeCoreSharedLayout(core);
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+    fs.writeFileSync(path.join(gameRepo, 'main.ts'), localEdit('main.ts'), 'utf-8');
+    fs.writeFileSync(
+      path.join(gameRepo, 'package.json'),
+      localEdit('package.json'),
+      'utf-8',
+    );
+
+    const before = snapshotTree(gameRepo);
+    const dry = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      only: ['main.ts'],
+      force: true,
+      dryRun: true,
+    });
+
+    // Nothing on disk changed, including the unselected diverged file. An
+    // unselected file that still matches the template is `unchanged`; a
+    // diverged one is `skip-local` — neither is written.
+    expect(snapshotTree(gameRepo)).toEqual(before);
+    expect(dry.files).toEqual(
+      GENERATED_FILES.map((file) => ({
+        path: file,
+        action:
+          file === 'main.ts'
+            ? 'update'
+            : file === 'package.json'
+              ? 'skip-local'
+              : 'unchanged',
+      })),
+    );
+    expect(dry.written).toEqual([]);
+
+    // The preview and the real selection run agree, so a preview is trustworthy.
+    const real = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      only: ['main.ts'],
+      force: true,
+    });
+    expect(real.files).toEqual(dry.files);
+    expect(real.written).toEqual([path.join(gameRepo, 'main.ts')]);
+    expect(readGenerated(gameRepo, 'package.json')).toBe(localEdit('package.json'));
+  });
+});
+
 describe('scaffold CLI report contract', () => {
   /** Run the scaffold CLI from the repo root so `tsx` resolves normally. */
   const runCli = (args: string[]): ReturnType<typeof spawnSync> =>
@@ -1105,11 +1350,78 @@ describe('scaffold CLI report contract', () => {
     expect(doc[0].files).toHaveLength(GENERATED_FILES.length);
   });
 
-  it('--help documents --dry-run and --json', () => {
+  it('--help documents --dry-run, --json, --only and --force', () => {
     const result = runCli(['--help']);
     expect(result.status).toBe(0);
-    expect(String(result.stdout)).toContain('--dry-run');
-    expect(String(result.stdout)).toContain('--json');
+    const help = String(result.stdout);
+    expect(help).toContain('--dry-run');
+    expect(help).toContain('--json');
+    expect(help).toContain('--only');
+    expect(help).toContain('--force');
+    // A full run implies force; the help text must say so, or an operator
+    // cannot know why a re-scaffold overwrites a diverged file.
+    expect(help).toMatch(/full run[^.]*force/i);
+  });
+
+  it('--only applies to exactly the named generated files', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+    fs.writeFileSync(path.join(gameRepo, 'main.ts'), localEdit('main.ts'), 'utf-8');
+    fs.writeFileSync(
+      path.join(gameRepo, 'package.json'),
+      localEdit('package.json'),
+      'utf-8',
+    );
+
+    const result = runCli([
+      ...baseArgs(core, gameRepo),
+      '--only',
+      'main.ts',
+      '--force',
+      '--json',
+    ]);
+
+    expect(result.status, String(result.stderr)).toBe(0);
+    const doc = JSON.parse(String(result.stdout)) as ScaffoldResult;
+    expect(doc.files).toEqual(
+      GENERATED_FILES.map((file) => ({
+        path: file,
+        action:
+          file === 'main.ts'
+            ? 'update'
+            : file === 'package.json'
+              ? 'skip-local'
+              : 'unchanged',
+      })),
+    );
+    expect(doc.written).toEqual([path.join(gameRepo, 'main.ts')]);
+    expect(readGenerated(gameRepo, 'main.ts')).toBe(renderMainTs());
+    expect(readGenerated(gameRepo, 'package.json')).toBe(localEdit('package.json'));
+  });
+
+  it('--only with an unknown name exits 1, lists the valid paths and writes nothing', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const before = snapshotTree(gameRepo);
+
+    const result = runCli([...baseArgs(core, gameRepo), '--only', 'main.tx']);
+
+    expect(result.status).toBe(1);
+    const stderr = String(result.stderr);
+    expect(stderr).toContain('main.tx');
+    expect(stderr).toMatch(/valid/i);
+    for (const file of GENERATED_FILES) expect(stderr).toContain(file);
+    expect(snapshotTree(gameRepo)).toEqual(before);
+  });
+
+  it('rejects a glob in --only (literal generated names only)', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const before = snapshotTree(gameRepo);
+
+    const result = runCli([...baseArgs(core, gameRepo), '--only', '*.ts']);
+
+    expect(result.status).toBe(1);
+    expect(String(result.stderr)).toMatch(/glob|literal/i);
+    expect(snapshotTree(gameRepo)).toEqual(before);
   });
 });
 

@@ -2206,6 +2206,31 @@ symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
 
+#### Write gating: `--dry-run`, `--only` and `--force`
+
+Every run classifies each generated file before writing it, and reports the
+classification (`create` / `update` / `unchanged` / `skip-local`) as one line
+per file, or as the `files` array under `--json`. A generated file lives in a
+checkout that owns its own wiring, so the write itself is gated
+(CG-0MVWGJPPA000GBE7):
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Classify only: no file write, no `core` symlink, no asset/app-icon link and no game-tree path rewrite. The report is exactly what the real run would apply. |
+| `--only <file,...>` | Regenerate **only** the named generated paths (`main.ts`, `configs/game.json`, …; comma-separated, literal names, no globs). Every other generated file is left alone (`skip-local`, or `unchanged` when it already matches) and the run performs no non-file side effect. An unknown name fails the run (exit 1) with the valid-path list, writing nothing. |
+| `--force` | Overwrite a **selected** file whose content differs from the template. Without it that file classifies `skip-local` and is left untouched, so a hand edit is never silently lost. |
+
+Back-compatibility: with **no** `--only` a run is a full run and force is
+implied (`effectiveForce = force || only === undefined`) — the eight sibling
+`tce-<game>` repos rely on a plain full run to receive template updates.
+
+```bash
+tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
+  --core-root ../Tableau-Card-Engine --only main.ts,configs/game.json --dry-run
+tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
+  --core-root ../Tableau-Card-Engine --only main.ts --force
+```
+
 #### Renderer the scaffold emits: `Phaser.AUTO`
 
 The generated `main.ts` boots `createCardGame({ type: Phaser.AUTO, … })`, and

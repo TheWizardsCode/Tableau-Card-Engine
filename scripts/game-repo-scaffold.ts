@@ -52,11 +52,34 @@
  *   --core-root ../Tableau-Card-Engine
  * ```
  *
- * Every run classifies each generated file (`create` / `update` / `unchanged`)
- * and reports it; `--dry-run` reports without writing and `--json` emits the
- * machine-readable report. Run with `--help` for the full option list, and see
- * the rationale above {@link classifyAndApply} for why writes are classified
- * rather than applied blindly.
+ * Every run classifies each generated file (`create` / `update` / `unchanged` /
+ * `skip-local`) and reports it; `--dry-run` reports without writing and
+ * `--json` emits the machine-readable report. Run with `--help` for the full
+ * option list, and see the rationale above {@link classifyAndApply} for why
+ * writes are classified rather than applied blindly.
+ *
+ * ## Write gating (`--only` / `--force` / `skip-local`)
+ *
+ * A generated file is engine-owned but it lives in a consumer checkout that
+ * owns its own wiring, so a run may only touch it when the caller says so
+ * (CG-0MVWGJPPA000GBE7):
+ *
+ * - `--only <file,...>` restricts the run to the named generated paths, and
+ *   suppresses every non-file side effect (the `core` symlink, shared-asset
+ *   and root app-icon links, and the game-tree path rewrite). Unselected
+ *   generated files classify `skip-local` (or `unchanged` when they already
+ *   match the template) and are never written.
+ * - `--force` allows overwriting a **selected** file whose content differs
+ *   from the template; without it such a file classifies `skip-local` and is
+ *   left untouched.
+ * - With **no** `--only` a run is a *full* run: it regenerates everything,
+ *   because the eight sibling `tce-<game>` repos rely on a plain run to
+ *   receive template updates. Force is therefore implied
+ *   (`effectiveForce = force || only === undefined`).
+ *
+ * A `--only` name that is not one of the generated paths fails the run before
+ * anything is written, listing the valid paths — a typo must never produce a
+ * silent no-op scaffold.
  *
  * ## Per-game version policy
  *
@@ -162,6 +185,30 @@ export interface ScaffoldOptions {
    * equivalent real run would do, so a caller can preview before trusting it.
    */
   dryRun?: boolean;
+  /**
+   * Restrict the run to the named generated files, repo-relative with POSIX
+   * separators (`main.ts`, `configs/game.json`, …).
+   *
+   * Selecting a file is the **only** way a run may modify a consumer-owned
+   * file, and a selection run performs none of the non-file side effects (no
+   * `core` symlink, no shared-asset or root app-icon link, no game-tree path
+   * rewrite — a one-line note records that). Names are literal (no globs) and
+   * an unknown name fails the run **before** anything is written.
+   *
+   * When omitted the run is a full run: every generated file is a write
+   * candidate and the side effects apply, which is what the sibling
+   * `tce-<game>` repos rely on to receive template updates.
+   */
+  only?: string[];
+  /**
+   * Allow overwriting a **selected** file whose content differs from the
+   * template. Without it such a file classifies `skip-local` and is left
+   * untouched, so a run cannot silently clobber a hand-edited generated file.
+   *
+   * A full run implies force (`effectiveForce = force || only === undefined`):
+   * "regenerate everything" is inherently the overwrite mode.
+   */
+  force?: boolean;
 }
 
 /** Why the scaffold picked the game version it wrote. */
@@ -220,6 +267,12 @@ export interface ScaffoldResult {
   version: string;
   /** Why {@link version} was chosen. */
   versionSource: ScaffoldVersionSource;
+  /**
+   * One-line note present only for a selection (`--only`) run, recording that
+   * the non-file side effects were skipped (the orthogonal
+   * `symlinks`/`assetLinks`/`publicLinks`/`rewritten` lists come back empty).
+   */
+  selectionNote?: string;
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────
@@ -631,6 +684,18 @@ interface ApplyOptions {
   gameRepoRoot: string;
   /** When true, classify only: no `mkdir`, no write. */
   dryRun?: boolean;
+  /**
+   * Whether the caller selected this repo-relative path for writing. False in
+   * a selection (`--only`) run for every generated file the caller did not
+   * name; such a file is never written.
+   */
+  isSelected: (reportPath: string) => boolean;
+  /**
+   * `force || only === undefined` — whether a **selected** file whose content
+   * differs from the template may be overwritten (see
+   * {@link ScaffoldOptions.force}).
+   */
+  effectiveForce: boolean;
 }
 
 /**
@@ -645,18 +710,30 @@ interface ApplyOptions {
  * on disk **before** anything is written, the classification is returned in
  * {@link ScaffoldResult.files} and printed on every run, and `--dry-run` runs
  * the identical classification while writing nothing. A caller can therefore
- * see exactly which files a run would touch — and later slices gate the write
- * itself (`--only` / `--force` / `skip-local`) on the same classification.
+ * see exactly which files a run would touch — and the write itself is gated on
+ * the same classification (`--only` / `--force` / `skip-local`,
+ * CG-0MVWGJPPA000GBE7).
  */
 
 /**
- * Classify one generated file against the on-disk content and, unless this is
- * a dry run, apply the change.
+ * Classify one generated file against the on-disk content (CG-0MVWFN1HX004B5PN)
+ * and, unless this is a dry run, apply the change.
  *
- * Classification is a byte comparison over a fixed, small file set: absent →
- * `create`, byte-identical → `unchanged`, otherwise → `update` (this slice
- * always writes an `update`; the `--force`/`skip-local` gate is the next
- * slice). A dry run returns the same report without touching the disk.
+ * Precedence is deliberate, and it is the whole write-gating contract
+ * (CG-0MVWGJPPA000GBE7):
+ *
+ * 1. **Unselected** file (selection run, `--only` did not name it) — never
+ *    written: `unchanged` when it already matches the template, `skip-local`
+ *    otherwise (an absent unselected file is `skip-local` too: `create` would
+ *    claim a write that the selection suppressed).
+ * 2. **Selected** file, absent → `create`.
+ * 3. **Selected** file, byte-identical → `unchanged`, no write.
+ * 4. **Selected** file, differs → `update` when `effectiveForce`, else
+ *    `skip-local`: a diverged generated file is local work and is only
+ *    overwritten when the caller explicitly asked for it.
+ *
+ * A dry run returns the same report without touching the disk, so a preview
+ * and the real run always agree.
  */
 function classifyAndApply(
   filePath: string,
@@ -670,14 +747,19 @@ function classifyAndApply(
   const existing = fs.existsSync(filePath)
     ? fs.readFileSync(filePath, 'utf-8')
     : undefined;
-  const action: ScaffoldFileAction =
-    existing === undefined
+  const action: ScaffoldFileAction = !opts.isSelected(reportPath)
+    ? existing === contents
+      ? 'unchanged'
+      : 'skip-local'
+    : existing === undefined
       ? 'create'
       : existing === contents
         ? 'unchanged'
-        : 'update';
+        : opts.effectiveForce
+          ? 'update'
+          : 'skip-local';
 
-  if (action !== 'unchanged' && !opts.dryRun) {
+  if ((action === 'create' || action === 'update') && !opts.dryRun) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, contents, 'utf-8');
   }
@@ -702,9 +784,37 @@ function writeFile(
 ): void {
   const report = classifyAndApply(filePath, contents, ctx);
   ctx.files.push(report);
-  if (!ctx.dryRun && report.action !== 'unchanged') {
+  // `written` is the compatibility projection of what a real run actually
+  // wrote: `skip-local` (and `unchanged`) files are deliberately absent.
+  if (!ctx.dryRun && (report.action === 'create' || report.action === 'update')) {
     ctx.written.push(filePath);
   }
+}
+
+/**
+ * Normalise `--only` names to repo-relative POSIX paths.
+ *
+ * Trims whitespace, converts Windows separators, strips a leading `./` and
+ * de-duplicates, so `./main.ts` and `main.ts` name the same generated file.
+ * Globs are rejected: a selection must name a generated file exactly, or it
+ * would resolve to nothing and produce a silent no-op scaffold.
+ */
+function normalizeOnly(names: string[]): string[] {
+  const normalized: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+    if (name === '') continue;
+    if (/[*?[\]]/.test(name)) {
+      throw new Error(
+        `[scaffold] --only accepts literal generated file names, not globs: ${raw}`,
+      );
+    }
+    if (!normalized.includes(name)) normalized.push(name);
+  }
+  if (normalized.length === 0) {
+    throw new Error('[scaffold] --only requires at least one generated file name.');
+  }
+  return normalized;
 }
 
 /**
@@ -909,11 +1019,15 @@ export function rewriteGameTreePaths(gameRepoRoot: string, game: string): string
  * `tsconfig.json`, `main.ts`, `env.d.ts`, `index.html` (copied from the core)
  * and `configs/<preset>.json`, and creates the `core` symlink into the sibling
  * core checkout. With {@link ScaffoldOptions.dryRun} it classifies only and
- * leaves every file, link and test/source rewrite untouched.
+ * leaves every file, link and test/source rewrite untouched. With
+ * {@link ScaffoldOptions.only} it restricts writing to the named generated
+ * files and performs no non-file side effect at all.
  *
  * @param options See {@link ScaffoldOptions}.
  * @returns The per-file classification, what was written and what was linked.
- * @throws When the game repo root or core root does not exist.
+ * @throws When the game repo root or core root does not exist, or when a
+ *   selected (`only`) name is not one of this run's generated paths — the
+ *   error lists the valid paths and nothing is written.
  */
 export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   const gameRepoRoot = path.resolve(options.gameRepoRoot);
@@ -964,49 +1078,87 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   const symlinks: string[] = [];
   const files: ScaffoldFileReport[] = [];
   const dryRun = options.dryRun === true;
-  const writeCtx = { gameRepoRoot, dryRun, files, written };
 
-  writeFile(
-    path.join(gameRepoRoot, 'package.json'),
-    renderPackageJson(options.game, manifest, coreRel, version),
-    writeCtx,
-  );
-  writeFile(
-    path.join(gameRepoRoot, 'vite.config.ts'),
-    renderViteConfig(options.game, coreRel),
-    writeCtx,
-  );
-  writeFile(
-    path.join(gameRepoRoot, 'tsconfig.json'),
-    renderTsconfig(options.game, coreRel),
-    writeCtx,
-  );
-  writeFile(
-    path.join(gameRepoRoot, 'env.d.ts'),
-    renderEnvDts(),
-    writeCtx,
-  );
-  writeFile(
-    path.join(gameRepoRoot, 'main.ts'),
-    renderMainTs(),
-    writeCtx,
-  );
+  // Write gating (CG-0MVWGJPPA000GBE7). A selection run touches only the named
+  // generated files; a full run (no `only`) regenerates every generated file,
+  // which is what the eight sibling `tce-<game>` repos rely on to receive
+  // template updates — hence `effectiveForce` is implied by a full run.
+  const only = options.only === undefined ? undefined : normalizeOnly(options.only);
+  const selectionMode = only !== undefined;
+  const effectiveForce = options.force === true || !selectionMode;
+
+  // Build the whole plan (path + rendered contents) before writing anything:
+  // `--only` validation must fail before a single byte lands, and the valid
+  // name list is exactly this plan.
+  const plan: Array<{ filePath: string; contents: string }> = [
+    {
+      filePath: path.join(gameRepoRoot, 'package.json'),
+      contents: renderPackageJson(options.game, manifest, coreRel, version),
+    },
+    {
+      filePath: path.join(gameRepoRoot, 'vite.config.ts'),
+      contents: renderViteConfig(options.game, coreRel),
+    },
+    {
+      filePath: path.join(gameRepoRoot, 'tsconfig.json'),
+      contents: renderTsconfig(options.game, coreRel),
+    },
+    {
+      filePath: path.join(gameRepoRoot, 'env.d.ts'),
+      contents: renderEnvDts(),
+    },
+    {
+      filePath: path.join(gameRepoRoot, 'main.ts'),
+      contents: renderMainTs(),
+    },
+  ];
 
   // index.html is copied verbatim from the core so it stays in sync.
   const coreIndex = path.join(coreRoot, 'index.html');
   if (fs.existsSync(coreIndex)) {
-    writeFile(
-      path.join(gameRepoRoot, 'index.html'),
-      fs.readFileSync(coreIndex, 'utf-8'),
-      writeCtx,
-    );
+    plan.push({
+      filePath: path.join(gameRepoRoot, 'index.html'),
+      contents: fs.readFileSync(coreIndex, 'utf-8'),
+    });
   }
 
-  writeFile(
-    path.join(gameRepoRoot, GAME_REPO_CONFIGS_DIR, `${DEFAULT_GAME_PRESET}.json`),
-    renderPreset(options.game, scenePath, adapterPath),
-    writeCtx,
-  );
+  plan.push({
+    filePath: path.join(
+      gameRepoRoot,
+      GAME_REPO_CONFIGS_DIR,
+      `${DEFAULT_GAME_PRESET}.json`,
+    ),
+    contents: renderPreset(options.game, scenePath, adapterPath),
+  });
+
+  const reportPathOf = (filePath: string): string =>
+    path.relative(gameRepoRoot, filePath).split(path.sep).join('/');
+
+  if (only !== undefined) {
+    const valid = plan.map((entry) => reportPathOf(entry.filePath));
+    const unknown = only.filter((name) => !valid.includes(name));
+    if (unknown.length > 0) {
+      // Fail fast: a typo must not produce a silent no-op scaffold.
+      throw new Error(
+        `[scaffold] unknown --only file(s): ${unknown.join(', ')}. ` +
+          `Valid generated paths: ${[...valid].sort().join(', ')}.`,
+      );
+    }
+  }
+
+  const writeCtx = {
+    gameRepoRoot,
+    dryRun,
+    files,
+    written,
+    isSelected: (reportPath: string) =>
+      only === undefined || only.includes(reportPath),
+    effectiveForce,
+  };
+
+  for (const entry of plan) {
+    writeFile(entry.filePath, entry.contents, writeCtx);
+  }
 
   // Option C (C1): the game source occupies repo-root `src/`, so the
   // `src -> core/src` compatibility symlink (and the `scripts`,
@@ -1019,15 +1171,26 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   // Every side effect below is skipped in a dry run: the classification above
   // already reported what a real run would write, so a preview must not create
   // the `core` symlink, link shared assets, or rewrite the consumer's own
-  // tests/source.
-  if (!dryRun && ensureDirSymlink(path.join(gameRepoRoot, 'core'), coreRoot)) {
+  // tests/source. A **selection** run skips them too: `--only main.ts` must
+  // touch nothing but `main.ts`.
+  const selectionNote = only === undefined
+    ? undefined
+    : `selection mode: only the ${only.length} selected generated file(s) may be written; ` +
+      'skipped the core symlink, shared asset links, root app-icon links and game-tree path rewrites';
+
+  if (!selectionMode && !dryRun && ensureDirSymlink(path.join(gameRepoRoot, 'core'), coreRoot)) {
     symlinks.push(path.join(gameRepoRoot, 'core'));
   }
 
-  const assetLinks = dryRun ? [] : linkSharedAssets(gameRepoRoot, coreRoot);
-  const publicLinks = dryRun ? [] : linkSharedPublicAssets(gameRepoRoot, coreRoot);
+  const skipSideEffects = dryRun || selectionMode;
+  const assetLinks = skipSideEffects ? [] : linkSharedAssets(gameRepoRoot, coreRoot);
+  const publicLinks = skipSideEffects
+    ? []
+    : linkSharedPublicAssets(gameRepoRoot, coreRoot);
 
-  const rewritten = dryRun ? [] : rewriteGameTreePaths(gameRepoRoot, options.game);
+  const rewritten = skipSideEffects
+    ? []
+    : rewriteGameTreePaths(gameRepoRoot, options.game);
 
   return {
     gameRepoRoot,
@@ -1046,6 +1209,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     publicLinks,
     version,
     versionSource,
+    selectionNote,
   };
 }
 
@@ -1061,6 +1225,10 @@ interface CliArgs {
   layout?: string;
   version?: string;
   dryRun?: boolean;
+  /** Generated files selected by `--only` (literal, repo-relative names). */
+  only?: string[];
+  /** `--force`: overwrite a selected file whose content differs. */
+  force?: boolean;
   json?: boolean;
 }
 
@@ -1100,6 +1268,34 @@ function parseArgs(argv: string[]): CliArgs {
       case '--dry-run':
         args.dryRun = true;
         break;
+      case '--only': {
+        if (next === undefined || next.startsWith('--')) {
+          throw new Error(
+            '--only requires a comma-separated list of generated file names',
+          );
+        }
+        const names = next
+          .split(',')
+          .map((name) => name.trim())
+          .filter((name) => name !== '');
+        if (names.length === 0) {
+          throw new Error('--only requires at least one generated file name');
+        }
+        for (const name of names) {
+          // Literal names only: a glob would silently select nothing.
+          if (/[*?[\]]/.test(name)) {
+            throw new Error(
+              `--only accepts literal generated file names, not globs: ${name}`,
+            );
+          }
+        }
+        args.only = [...(args.only ?? []), ...names];
+        i += 1;
+        break;
+      }
+      case '--force':
+        args.force = true;
+        break;
       case '--json':
         args.json = true;
         break;
@@ -1134,8 +1330,21 @@ function usage(): string {
     '  --version <semver>       Explicit game package version (default:',
     '                           preserve the repo version, else seed 0.1.0).',
     '  --dry-run                Classify every generated file (create | update |',
-    '                           unchanged) and report it, writing nothing: no',
-    '                           file, no symlink, no link, no path rewrite.',
+    '                           unchanged | skip-local) and report it, writing',
+    '                           nothing: no file, no symlink, no link, no path',
+    '                           rewrite.',
+    '  --only <file,...>        Regenerate only the named generated files',
+    '                           (comma-separated, repo-relative, e.g. main.ts).',
+    '                           Unselected generated files are left alone',
+    '                           (skip-local) and no symlink, asset link or path',
+    '                           rewrite is performed. Names are literal (no',
+    '                           globs); an unknown name fails before any write.',
+    '                           A selected file that differs from the template',
+    '                           is only overwritten with --force.',
+    '  --force                  Overwrite a selected generated file that',
+    '                           differs from the template (default: leave it,',
+    '                           reported as skip-local). A full run without',
+    '                           --only always implies force.',
     '  --json                   Print one machine-readable JSON document for the',
     '                           run (an object, or an array with --all) carrying',
     '                           the per-file `files` report.',
@@ -1196,6 +1405,8 @@ function main(argv: string[]): number {
         coreManifest: manifest,
         version: args.version,
         dryRun: args.dryRun,
+        only: args.only,
+        force: args.force,
       });
       results.push(result);
       if (args.json) continue;
@@ -1213,6 +1424,7 @@ function main(argv: string[]): number {
       for (const file of result.files) {
         console.log(`  ${file.action}  ${file.path}`);
       }
+      if (result.selectionNote) console.log(`  note:      ${result.selectionNote}`);
       for (const l of result.symlinks) console.log(`  linked ${l}`);
       if (result.rewritten.length) {
         console.log(`  rewrote example-games/${game}/ → src/ in ${result.rewritten.length} file(s)`);
