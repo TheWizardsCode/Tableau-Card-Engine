@@ -39,6 +39,11 @@ export interface SyncResult {
   /** True when this run rewrote `configs/engine-pin.json` to the new HEAD. */
   pinWritten: boolean;
   warning?: string;
+  /**
+   * Set only in soft mode when the sync was deliberately skipped
+   * (`'dirty'`: the `core` submodule has uncommitted changes).
+   */
+  skipped?: 'dirty';
 }
 
 /** Result of `verifyEngine`. */
@@ -90,6 +95,12 @@ export declare function syncEngine(opts: {
   repoRoot: string;
   coreRel?: string;
   pinRel?: string;
+  /**
+   * Interactive dev-start mode (CG-0MVZJ35EV00690W5): a dirty `core`
+   * submodule is skipped with a warning instead of throwing. Never use this
+   * from a build or release gate.
+   */
+  soft?: boolean;
   log?: (line: string) => void;
 }): SyncResult;
 

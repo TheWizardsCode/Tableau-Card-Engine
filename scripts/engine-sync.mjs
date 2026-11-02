@@ -22,6 +22,13 @@
  *   current checkout with a warning instead of failing, and the pin is left
  *   untouched (risk note: offline builds keep working). Repos without a pin
  *   file are never given one.
+ *
+ *   **Soft mode (`sync --soft`)** is the interactive dev-start variant
+ *   (CG-0MVZJ35EV00690W5): a dirty `./core` is *skipped with a loud warning*
+ *   (exit 0, `skipped: 'dirty'`) instead of failing, so `npm run dev` still
+ *   boots on a developer's working tree. Only the dirty-guard outcome
+ *   differs — every other step is the strict path. Soft mode is opt-in per
+ *   call site and must never be used by a build or release gate.
  * - **verify** (release builds, `npm run engine:verify`): refuse loudly when
  *   `./core` has local modifications, read `configs/engine-pin.json` (a
  *   single `sha` field), and compare the pinned SHA with the remote-resolved
@@ -37,13 +44,14 @@
  *
  *   "engine:sync":   "node ./core/scripts/engine-sync.mjs sync"
  *   "engine:verify": "node ./core/scripts/engine-sync.mjs verify"
+ *   "engine:dev-sync": "node ./core/scripts/engine-sync.mjs sync --soft"
  *
  * This file is the canonical implementation in the engine repo; the game-repo
  * scaffold (`scripts/game-repo-scaffold.ts`) wires the npm scripts to it, so
  * re-scaffolding a game repo points the scripts here — never edit a copy.
  *
  * Subcommands:
- *   node engine-sync.mjs sync|verify [--core-rel <path>] [--pin <path>]
+ *   node engine-sync.mjs sync|verify [--core-rel <path>] [--pin <path>] [--soft]
  */
 
 import { spawnSync } from 'node:child_process';
@@ -296,16 +304,47 @@ export function resolveShaFull(repoRoot, coreRel, sha) {
  * back to the current checkout (exit 0) per the documented offline-build
  * assumption; the pin is left untouched because nothing moved.
  *
- * @returns {{ updated: boolean, from: string, to: string, pinWritten: boolean, warning?: string }}
+ * With `soft` (interactive dev starts, CG-0MVZJ35EV00690W5) a dirty submodule
+ * is not a failure: the run logs a loud warning, performs no git operation,
+ * writes no pin and returns `{ updated: false, skipped: 'dirty' }` so the
+ * caller (`npm run dev`) can still start. Everything else is unchanged, and
+ * strict mode (the default) keeps its hard failure for build/release gates.
+ *
+ * @returns {{ updated: boolean, from: string, to: string, pinWritten: boolean,
+ *   warning?: string, skipped?: 'dirty' }}
  */
-export function syncEngine({ repoRoot, coreRel = DEFAULT_CORE_REL, pinRel = DEFAULT_PIN_REL, log = console.log }) {
+export function syncEngine({
+  repoRoot,
+  coreRel = DEFAULT_CORE_REL,
+  pinRel = DEFAULT_PIN_REL,
+  soft = false,
+  log = console.log,
+}) {
   ensureSubmoduleInit(repoRoot, coreRel);
   if (submoduleIsDirty(repoRoot, coreRel)) {
-    throw new EngineSyncError(
-      `engine:sync: ${coreRel} has uncommitted changes — refusing to sync ` +
-        `(never clobber).\nCommit, stash or discard the changes in ${coreRel} ` +
-        `and rerun the build, or use engine:verify for a pinned release build.`,
+    if (!soft) {
+      throw new EngineSyncError(
+        `engine:sync: ${coreRel} has uncommitted changes — refusing to sync ` +
+          `(never clobber).\nCommit, stash or discard the changes in ${coreRel} ` +
+          `and rerun the build, or use engine:verify for a pinned release build.`,
+      );
+    }
+    // Soft mode: never clobber, never block — the dev server runs on the
+    // developer's working tree and the warning names why the sync was skipped.
+    const head = resolveShaFull(repoRoot, coreRel, 'HEAD') ?? '';
+    log(
+      `engine:sync: WARNING ${coreRel} has uncommitted changes — skipping the ` +
+        `engine sync (never clobber). Serving the current ${coreRel} checkout ` +
+        `unchanged; commit or stash it to resume following the tracked branch.`,
     );
+    return {
+      updated: false,
+      from: head,
+      to: head,
+      pinWritten: false,
+      skipped: 'dirty',
+      warning: `${coreRel} has uncommitted changes`,
+    };
   }
   const before = resolveShaFull(repoRoot, coreRel, 'HEAD');
   const res = runGit(repoRoot, ['submodule', 'update', '--init', '--recursive', '--remote', coreRel]);
@@ -429,7 +468,7 @@ export function verifyEngine({ repoRoot, coreRel = DEFAULT_CORE_REL, pinRel = DE
   return { sha: pinnedFull };
 }
 
-/** CLI entry: `node engine-sync.mjs sync|verify [--core-rel path] [--pin path]`. */
+/** CLI entry: `node engine-sync.mjs sync|verify [--core-rel path] [--pin path] [--soft]`. */
 export function main(argv, io = { stdout: process.stdout, stderr: process.stderr }) {
   const [mode, ...rest] = argv;
   const flagValue = (name) => {
@@ -438,14 +477,16 @@ export function main(argv, io = { stdout: process.stdout, stderr: process.stderr
   };
   const coreRel = flagValue('core-rel') ?? DEFAULT_CORE_REL;
   const pinRel = flagValue('pin') ?? DEFAULT_PIN_REL;
+  const soft = rest.includes('--soft');
   let result;
   try {
-    if (mode === 'sync') result = syncEngine({ repoRoot: process.cwd(), coreRel, pinRel });
+    if (mode === 'sync') result = syncEngine({ repoRoot: process.cwd(), coreRel, pinRel, soft });
     else if (mode === 'verify') result = verifyEngine({ repoRoot: process.cwd(), coreRel, pinRel });
     else {
       io.stderr.write(
-        `usage: node engine-sync.mjs <sync|verify> [--core-rel <path>] [--pin <path>]\n` +
+        `usage: node engine-sync.mjs <sync|verify> [--core-rel <path>] [--pin <path>] [--soft]\n` +
           `  sync    dev build   — follow latest engine remote head (offline: keep current)\n` +
+          `  --soft  dev start   — same, but a dirty submodule is skipped with a warning\n` +
           `  verify  release     — check out exactly configs/engine-pin.json's sha\n`,
       );
       return 2;

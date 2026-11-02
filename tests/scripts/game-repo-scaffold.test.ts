@@ -418,6 +418,19 @@ describe('renderPackageJson', () => {
       `node ${DEFAULT_CORE_REL}/scripts/engine-sync.mjs verify`,
     );
   });
+
+  it('wires a soft engine sync into the interactive dev start (CG-0MVZJ35EV00690W5)', () => {
+    const pkg = JSON.parse(renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL));
+    // `npm run dev` composes the latest engine, but a dirty `./core` must never
+    // stop the dev server — hence the soft mode, not the strict `engine:sync`.
+    expect(pkg.scripts.dev).toBe('npm run engine:dev-sync && vite --host');
+    expect(pkg.scripts['engine:dev-sync']).toBe(
+      `node ${DEFAULT_CORE_REL}/scripts/engine-sync.mjs sync --soft`,
+    );
+    // The build/release paths keep the strict gate.
+    expect(pkg.scripts.build).toContain('npm run engine:sync &&');
+    expect(pkg.scripts['build:release']).toContain('npm run engine:verify &&');
+  });
 });
 
 describe('renderViteConfig', () => {

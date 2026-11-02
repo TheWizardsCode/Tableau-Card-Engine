@@ -2307,6 +2307,21 @@ scripts (MS-0MVCRGKZY007DIED), under one explicit policy
   the pin. Both are hard failures; only the diagnosis and next steps differ.
 - `build` / `build:electron` run `engine:sync` first; `build:release` runs
   `engine:verify` instead.
+- `engine:dev-sync` — **soft** sync used by the interactive dev start only
+  (`dev: "npm run engine:dev-sync && vite --host"`, CG-0MVZJ35EV00690W5). It is
+  the same code path as `engine:sync` with one difference: a dirty `./core` is
+  **skipped with a loud warning** (`exit 0`, `skipped: 'dirty'`, no git
+  operation, no pin write) instead of failing, so the dev server boots on a
+  developer's working tree. Use it when you want "serve the current engine
+  `dev` tip, but never block or clobber me"; never wire it into a build or
+  release gate — those must fail loudly on a dirty submodule. Note that on a
+  **clean** checkout a dev start behaves exactly like `engine:sync`: it may
+  advance `./core` and stage the pin + gitlink together, which is then
+  committed as a composition bump naming the engine SHA.
+
+Rule of thumb: `engine:sync` for anything that ends in a commit or a build,
+`engine:dev-sync` for an interactive dev server, `engine:verify` for a
+release build.
 
 The script is the engine-owned `scripts/engine-sync.mjs` (+ `.d.mts` types),
 invoked through the submodule — game repos have no root `scripts/` tree

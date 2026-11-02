@@ -460,7 +460,11 @@ export function renderPackageJson(
           cmd.split(`example-games/${game}/`).join('src/'),
         ]),
       ),
-      dev: 'vite --host',
+      // Interactive dev start: the soft variant of `engine:sync` composes the
+      // latest engine but never blocks on a dirty `./core` — it warns and
+      // serves the developer's working tree instead (CG-0MVZJ35EV00690W5).
+      // Build/release paths keep the strict `engine:sync` guard below.
+      dev: 'npm run engine:dev-sync && vite --host',
       build: `npm run engine:sync && tsc --noEmit && vite build`,
       'build:electron': `npm run engine:sync && tsc --noEmit && vite build --mode electron`,
       'build:release': `npm run engine:verify && tsc --noEmit && vite build`,
@@ -471,6 +475,7 @@ export function renderPackageJson(
       // invoke it through the submodule — there is no game-repo `scripts/`
       // tree (Option C).
       'engine:sync': `node ${coreRel}/scripts/engine-sync.mjs sync`,
+      'engine:dev-sync': `node ${coreRel}/scripts/engine-sync.mjs sync --soft`,
       'engine:verify': `node ${coreRel}/scripts/engine-sync.mjs verify`,
       preview: 'vite preview --host',
       test: 'vitest run --project unit',
