@@ -90,6 +90,10 @@ Semantics:
 
 ### Compilation
 
+There is exactly **one** choice model: a card is a choice when it supplies
+options, either through the CSV `options` encoding or through the programmatic
+registry. No separate choice flag or second link-field pair exists.
+
 Precedence: **registered options > CSV `options` encoding**.
 
 - A card with no registered options and no `options` encoding is not a choice
@@ -281,12 +285,10 @@ choiceCardCount, storylineIds, gameId }`.
 | Hard error code | Meaning |
 |---|---|
 | `duplicate-id` | Two cards share the same (base) id. |
-| `missing-required-field` | The id or name is empty. |
+| `missing-required-field` | The id, name or a required adapter column is empty. |
 | `missing-storyline-id` | A choice card declares no storyline id. |
-| `orphan-link` | A card declares accept/reject links but is not a choice card. |
 | `invalid-option` | Malformed `options` encoding, or an empty/duplicate option label. |
-| `unknown-successor` | An option names an unknown card. |
-| `dangling-link` | An inert accept/reject link (on a non-choice card) names an unknown card. |
+| `unknown-successor` | An `options` candidate names a card id that does not exist. |
 | `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
 | `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
 
@@ -339,7 +341,8 @@ const result = applyContentEditToFile({
 game column, and any edit whose result fails validation (for example a new card
 in a story-line that nothing links to — it would be `unreachable-card`).
 `updateContentCard` changes only the supplied fields; a nullable field set to
-`null` is cleared, and setting a legacy link also marks the card as a choice.
+`null` is cleared. A card is a choice exactly when its `options` encoding is
+non-empty — no separate flag or link column exists to set.
 
 ### CLIs
 
@@ -431,8 +434,8 @@ editor can never disagree with the generated artefacts.
 Three surfaces share one workflow — draft, preview, apply, discard:
 
 - **Edit card** — opens the selected node's card form. Core edits the generic
-story-line fields (id read-only, name, effect, choice flag, `options` encoding,
-legacy accept/reject links, story-line id/title); every adapter-declared column
+story-line fields (id read-only, name, effect, `options` encoding, story-line
+id/title); every adapter-declared column
 renders as an additional field without core knowing its semantics. The field
 list comes from the adapter's descriptors
 ([`field-descriptors.ts`](../../src/story-line/editor/field-descriptors.ts)),
@@ -538,6 +541,14 @@ only on the card type — presentation no longer reads game state:
 - `storyUpdateLine` (the narrative line emitted when a choice resolves)
 - `journalTitle` / `storylineSummary`
 
+The contract has **no clarity-label method**: the retired choice-clarity API is
+gone, and nothing replaces it.
+
+`defaultStoryUpdateLine`'s `accept` / `reject` wording is **label-driven** —
+it switches on the chosen option *label* (a legacy Main Street wording
+convention) and has nothing to do with the retired API. Any other label
+renders the generalised `you chose "<label>"` form.
+
 Core ships `createDefaultStorylineUiAdapter()` (and a ready-made
 `defaultStorylineUiAdapter`). Its wording is the shipped Main Street wording, so
 a game that supplies no override is visually identical to Main Street. A game
@@ -578,7 +589,7 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
   (costs, extra effects, conditions, dangling successors).
 - `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state.
 - `tests/story-line/ui-adapter.test.ts` — default adapter wording, the
-  pluggable override seam, and the retired choice-clarity API.
+  pluggable override seam, and the absence of a clarity-label method.
 - `tests/story-line/content/csv.test.ts` — byte-identical round-trip (two
   adapter shapes), checksum determinism, projection and option compilation.
 - `tests/story-line/content/manifest.test.ts` — manifest shape, determinism and

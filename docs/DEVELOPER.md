@@ -1422,9 +1422,9 @@ The core engine ships a game-agnostic story-line **content** toolkit
 (`src/story-line/content/`): CSV parse/serialise + checksum, a deterministic
 manifest/Mermaid generator, a static validator and one transactional author
 API. A game plugs in only data — a content adapter mapping its CSV columns onto
-the generic story-line fields (`id`, `name`, `effect`, choice flag,
-accept/reject or `options`, storyline id/title); every other column is carried
-as a game column. Core ships the Gym adapter as the default.
+the generic story-line fields (`id`, `name`, `effect`, `options`, storyline
+id/title); every other column is carried as a game column. Core ships the Gym
+adapter as the default.
 
 Three `tsx` CLIs expose the seams (no Vite loader, no game import):
 
