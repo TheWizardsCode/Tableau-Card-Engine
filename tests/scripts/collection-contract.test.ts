@@ -23,6 +23,7 @@
  * alone makes this suite fail until the rest of the contract catches up.
  */
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,6 +34,7 @@ import {
   readGameAssetOwnership,
 } from '../../scripts/link-game-assets';
 import { discoverGames, loadGamesConfig } from '../../scripts/vite-game-discovery-plugin';
+import { fixtureGitEnv } from '../helpers/gitFixtureEnv';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const LAYOUT_PATH = path.join(REPO_ROOT, 'scripts', 'configs', 'repo-layout.json');
@@ -132,6 +134,32 @@ describe('collection contract drift guard', () => {
       }
     },
   );
+
+  it('ignores every composed asset destination in git', () => {
+    // The composition pass symlinks each declared asset root into
+    // `public/assets/`. An unignored destination shows up as an untracked path
+    // in every developer's checkout and trips the test skill's live-repo
+    // mutation guard, failing an otherwise-green full suite.
+    const ignored = (candidate: string): boolean => {
+      try {
+        execFileSync('git', ['check-ignore', '-q', candidate], {
+          cwd: REPO_ROOT,
+          env: fixtureGitEnv(),
+          stdio: 'ignore',
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const unignored = readGameAssetOwnership(LAYOUT_PATH).flatMap((owner) =>
+      owner.assets
+        .map((asset) => `public/assets/${asset}`)
+        .filter((dest) => !ignored(dest)),
+    );
+    expect(unignored, 'composed asset destinations not gitignored').toEqual([]);
+  });
 });
 
 // ── The Rising: asset composition proof ───────────────────────────────────
