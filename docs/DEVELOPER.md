@@ -2224,7 +2224,10 @@ checkout that owns its own wiring, so the write itself is gated
 
 Back-compatibility: with **no** `--only` a run is a full run and force is
 implied (`effectiveForce = force || only === undefined`) — the eight sibling
-`tce-<game>` repos rely on a plain full run to receive template updates.
+`tce-<game>` repos rely on a plain full run to receive template updates. A
+full run is therefore *not* safe to fire blindly at a live checkout you have
+hand-edited: use `--only` (plus `--force` when you mean to overwrite) or
+preview with `--dry-run`/`--json` first.
 
 ```bash
 tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
@@ -2237,6 +2240,18 @@ tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
 tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
   --core-root ../Tableau-Card-Engine --migrate-game-paths
 ```
+
+Consumer pattern — from **inside** an existing game repo whose engine is the
+`./core` submodule, refresh one hand-edited generated file:
+
+```bash
+tsx core/scripts/game-repo-scaffold.ts \
+  --game main-street --game-repo-root . --core-root ./core \
+  --only main.ts --force
+```
+
+Run it with `--dry-run --json` first to see the per-file classification
+(`create` / `update` / `unchanged` / `skip-local`) before anything is written.
 
 #### Renderer the scaffold emits: `Phaser.AUTO`
 

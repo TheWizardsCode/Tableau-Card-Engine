@@ -41,7 +41,8 @@
  * `git filter-repo` step owns history preservation (AC5). The game-tree
  * rename to `src/` is a `--path-rename` in `scripts/extract-repos.sh`, so it is
  * history-preserving; scaffolding writes a single commit's worth of root files
- * on top of the extracted history and rewrites intra-test game-tree paths.
+ * on top of the extracted history and, only when `--migrate-game-paths` is
+ * passed, rewrites intra-test game-tree paths.
  *
  * ## CLI
  *
@@ -52,6 +53,10 @@
  *   --core-root ../Tableau-Card-Engine
  * ```
  *
+ * Write-gating flags (README, Developer Guide, and Multi-Repo Architecture §5):
+ * `--only <file,...>`, `--force`, `--dry-run`, `--json` and
+ * `--migrate-game-paths` — `--help` lists them all.
+ *
  * Every run classifies each generated file (`create` / `update` / `unchanged` /
  * `skip-local`) and reports it; `--dry-run` reports without writing and
  * `--json` emits the machine-readable report. Run with `--help` for the full
@@ -59,6 +64,12 @@
  * writes are classified rather than applied blindly.
  *
  * ## Write gating (`--only` / `--force` / `skip-local`)
+ *
+ * The prose contract for this section and the next lives with the docs —
+ * `docs/dev/multi-repo-architecture.md` §5 "Write gating" and
+ * `docs/DEVELOPER.md` "Write gating: `--dry-run`, `--only`, `--force` and
+ * `--migrate-game-paths" — so a reader of this header finds the user-facing
+ * documentation, and a reader of those pages finds the implementation here.
  *
  * A generated file is engine-owned but it lives in a consumer checkout that
  * owns its own wiring, so a run may only touch it when the caller says so

@@ -225,6 +225,35 @@ into the game's `./core` submodule via `CORE_ROOT`. There is no `src` symlink:
 the aliases replace the F4 compatibility symlinks. See the
 [layout decision record](docs/dev/per-game-src-layout-decision.md).
 
+**Write gating.** The scaffold classifies every generated file
+(`create` / `update` / `unchanged` / `skip-local`) and never writes blindly in a
+checkout that owns its own wiring:
+
+- a **full run** (no `--only`) is still the default — it regenerates every
+  generated file and is the supported upgrade path for the sibling game repos;
+- `--only <file,...>` restricts the run to the named generated files (every
+  other file is `skip-local`, and no symlink, asset link or path rewrite runs);
+- `--force` is required to overwrite a selected file whose content differs from
+  the template, so a hand edit is never silently lost;
+- `--dry-run` writes nothing and `--json` emits the machine-readable per-file
+  classification first — for dry and real runs alike;
+- `--migrate-game-paths` is the explicit, opt-in game-tree path migration
+  (mutually exclusive with `--only`); a fresh repo never needs it, because the
+  extraction already renamed the tree.
+
+Worked consumer pattern, from inside an existing game repo:
+
+```bash
+tsx core/scripts/game-repo-scaffold.ts \
+  --game main-street --game-repo-root . --core-root ./core \
+  --only main.ts --force
+```
+
+See
+[Multi-Repo Architecture §5](docs/dev/multi-repo-architecture.md#write-gating-cg-0mvwgjppa000gbe7-cg-0mvwgjrio0094y4z)
+and the [Developer Guide](docs/DEVELOPER.md#write-gating---dry-run---only---force-and---migrate-game-paths)
+for the full flag contract.
+
 #### Per-game version policy
 
 A game repo owns its own version — it is never the engine's version. The

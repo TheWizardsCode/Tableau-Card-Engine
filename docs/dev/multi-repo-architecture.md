@@ -299,6 +299,47 @@ virtual-module types.
 presets as `configs/<game-id>.json`; see
 [Config-Driven Game Catalogue](game-configuration.md).)
 
+The scaffold also links the shared assets and app icon and, when asked, rewrites
+the game tree's own paths; both are write-gated as described next.
+
+### Write gating (CG-0MVWGJPPA000GBE7, CG-0MVWGJRIO0094Y4Z)
+
+A generated file is engine-owned, but it lives in a checkout that owns its own
+wiring, so the scaffold never writes blindly: every file is classified
+(`create` / `update` / `unchanged` / `skip-local`) and the write is gated by
+the flags below. The rationale sits next to the implementation in
+`scripts/game-repo-scaffold.ts` (header comment); this section and the
+[Developer Guide](../DEVELOPER.md#write-gating---dry-run---only---force-and---migrate-game-paths)
+are the prose side of the same contract.
+
+| Flag | Effect |
+|---|---|
+| *(none)* | **Unchanged default.** A *full run* regenerates every generated file and is the supported upgrade path for the eight sibling `tce-<game>` repos. |
+| `--only <file,...>` | A *selected run*: writes only the named generated files. Every other file is `skip-local` (`unchanged` when it already matches the template) and is never written, and **no** side effect runs — no `core` symlink, no shared-asset or app-icon link, and no game-tree path rewrite. An unknown name fails the run before anything is written, listing the valid paths. |
+| `--force` | Overwrite a **selected** file whose content differs from the template. Without it that file stays `skip-local`, so a hand edit is never silently lost. A full run implies force. |
+| `--dry-run` | Classify and report only: writes nothing (no files, no links, no path rewrite). The report is exactly what the real run would apply. |
+| `--json` | Emit the machine-readable per-file classification (`create` / `update` / `unchanged` / `skip-local`) — for dry and real runs alike, so a scripted caller can decide before applying anything. |
+| `--migrate-game-paths` | **Opt-in** game-tree migration (see below). Cannot be combined with `--only` — both fail fast before any write. Off by default, so a routine re-scaffold never edits a consumer's `tests/` or `src/`. |
+
+The game-tree path rewrite (`example-games/<game>/` → `src/`, plus the
+quoted-`scripts/`, core-`src/` and relative-`scripts/` references in the
+game's own `tests/` and `src/` trees) is **never** unconditional: it runs only
+with `--migrate-game-paths`, and then only for files that genuinely reference
+the game tree. A fresh repo does not need it — `scripts/extract-repos.sh
+--path-rename` already produced the `src/` layout.
+
+Worked example — the consumer pattern, run from **inside** an existing game
+repo whose engine is the `./core` submodule, refreshing one hand-edited file:
+
+```bash
+tsx core/scripts/game-repo-scaffold.ts \
+  --game main-street --game-repo-root . --core-root ./core \
+  --only main.ts --force
+```
+
+Preview first with `--dry-run --json`, and drop `--force` to confirm the file
+would be left alone.
+
 ### Option C layout — flat `src/`, no compatibility symlinks (F9)
 
 The F4 layout above (game at `example-games/<game>/`, `src -> <core>/src`)
