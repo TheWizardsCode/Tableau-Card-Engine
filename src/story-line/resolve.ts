@@ -24,13 +24,14 @@
  *    against the post-resolution resources; the first matching rule's
  *    `successorId` is pushed (`null` ends the chain). A matching rule
  *    consumes no RNG draw; when no rule matches, resolution falls through
- *    to the random/legacy steps below.
+ *    to the random/single-id steps below.
  * 3. Candidate set (`successorIds`) — exactly **one** seeded `engine.rng()`
  *    draw selects the successor uniformly at random (one draw per selection,
  *    at resolution time; replay with the same seed yields the same
  *    successor). An **empty** candidate list is a terminal option — the
  *    chain ends without consuming a draw.
- * 4. Legacy single `successorId` — pushed directly, no draw.
+ * 4. Single `successorId` — pushed directly, no draw. It is the
+ *    lowest-precedence successor and the programmatic registry seam.
  *
  * @module
  */
@@ -174,7 +175,7 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
 ): StorylineResolution<TCard> {
   const before = adapter.getResources(state);
 
-  // 1. Apply effect if the option's policy says so (unchanged legacy step).
+  // 1. Apply effect if the option's policy says so.
   if (option.effectPolicy === 'apply') {
     adapter.applyEffect(state, card);
   }
@@ -220,7 +221,7 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
     resolvedSuccessor = option.successorResolver(state);
   } else if (option.conditionalSuccessors != null && option.conditionalSuccessors.length > 0) {
     // First matching rule wins (declaration order, post-resolution resources);
-    // when no rule matches, fall through to the random/legacy resolution.
+    // when no rule matches, fall through to the random/single-id resolution.
     const match = option.conditionalSuccessors.find((rule) =>
       evaluateCondition(rule.when, after),
     );

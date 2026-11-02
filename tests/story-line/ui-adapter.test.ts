@@ -1,22 +1,22 @@
 /**
  * Story-line UI adapter parity tests (MS-0MVFM9HGI004XADO AC4).
  *
- * Ports Main Street's storyline-player-agency / journal choice-clarity cases
- * onto the generic API and pins the pluggable seam:
+ * Ports Main Street's storyline-player-agency / journal cases onto the
+ * generic API and pins the pluggable seam:
  *
  * - the default UI adapter's dialog titles, subtitles, story-update lines,
- *   choice-clarity labels, journal title and summary match today's wording;
- * - choice-clarity labels never reveal the escalation card id;
- * - a game-supplied adapter overrides presentation without touching core.
+ *   journal title and summary match today's wording;
+ * - a game-supplied adapter overrides presentation without touching core;
+ * - the retired choice-clarity API is no longer part of the public surface.
  *
  * @module
  */
 import { describe, expect, it } from 'vitest';
 
+import * as storylineApi from '../../src/story-line';
 import {
   createDefaultStorylineUiAdapter,
   createStorylineSystem,
-  defaultChoiceClarityLabels,
   defaultStorylineName,
 } from '../../src/story-line';
 import { makeAdapter, makeCard, type TestCard } from './helpers';
@@ -66,7 +66,11 @@ describe('choice dialog titles', () => {
   });
 
   it('falls back to the card name for non-storyline choices', () => {
-    const plain = makeCard({ id: 'evt-plain', name: 'Plain Choice', hasChoices: true });
+    const plain = makeCard({
+      id: 'evt-plain',
+      name: 'Plain Choice',
+      options: 'Go|evt-next',
+    });
     expect(system.ui.choiceDialogTitle(plain)).toBe('Plain Choice');
     expect(system.ui.choiceDialogSubtitle(plain)).toBe('');
   });
@@ -98,7 +102,9 @@ describe('storyUpdateLine', () => {
   });
 
   it('returns null for cards without a storyline', () => {
-    expect(system.ui.storyUpdateLine(makeEvent({ id: 'evt-plain', hasChoices: true }), 'accept', -10, 0)).toBeNull();
+    expect(
+      system.ui.storyUpdateLine(makeEvent({ id: 'evt-plain', options: 'Go|evt-next' }), 'accept', -10, 0),
+    ).toBeNull();
   });
 
   it('names a generalised multi-way option label and formats deltas', () => {
@@ -118,59 +124,20 @@ describe('storyUpdateLine', () => {
   });
 });
 
-// ── choiceClarityLabels ─────────────────────────────────────
+// ── retired choice-clarity API ─────────────────────────────
 
-describe('choiceClarityLabels', () => {
-  const system = makeSystem();
-
-  it('explains apply semantics for Accept', () => {
-    const card = makeCard({ id: 'evt-tax-error', effect: 'Lose 200 coins', hasChoices: true });
-    const labels = system.ui.choiceClarityLabels(card, system.getStorylineOptions(card));
-    expect(labels.accept).toContain('apply');
-    expect(labels.accept).toContain('Lose 200 coins');
+describe('retired choice-clarity API', () => {
+  it('is absent from the default UI adapter', () => {
+    const system = makeSystem();
+    expect('choiceClarityLabels' in system.ui).toBe(false);
   });
 
-  it('explains applied-but-branching semantics for CSV multi-way cards', () => {
-    const card = makeCard({ id: 'evt-multi', options: 'One|a;Two|b' });
-    const labels = system.ui.choiceClarityLabels(card, system.getStorylineOptions(card));
-    expect(labels.reject.toLowerCase()).toContain('different incident');
-    expect(labels.reject.toLowerCase()).toContain('applied');
-  });
-
-  it('explains skip semantics for a legacy Reject option', () => {
-    const card = makeCard({ id: 'evt-legacy', effect: 'Lose 100 coins', hasChoices: true });
-    const labels = system.ui.choiceClarityLabels(card, system.getStorylineOptions(card));
-    expect(labels.reject.toLowerCase()).toContain('refuse this consequence');
-  });
-
-  it('does NOT reveal the escalation card id', () => {
-    const card = makeCard({
-      id: 'evt-leak-check',
-      effect: 'Lose 100 coins',
-      options: 'Grind through|evt-secret-escalation;Walk away|',
-    });
-    const labels = system.ui.choiceClarityLabels(card, system.getStorylineOptions(card));
-    const revealed = `${labels.accept} ${labels.reject}`;
-    expect(revealed).not.toContain('evt-secret-escalation');
-  });
-
-  it('falls back gracefully for a generalised multi-way card', () => {
-    const card = makeCard({ id: 'evt-multi', hasChoices: true, effect: 'x' });
-    const labels = system.ui.choiceClarityLabels(card, system.getStorylineOptions(card));
-    expect(labels.accept.length).toBeGreaterThan(0);
-    expect(labels.reject.length).toBeGreaterThan(0);
-  });
-
-  it('is exposed as a pure standalone helper', () => {
-    const card = makeCard({ id: 'evt-help', effect: 'Lose 5 coins', hasChoices: true });
-    const options = system.getStorylineOptions(card);
-    expect(defaultChoiceClarityLabels(card, options)).toEqual(
-      system.ui.choiceClarityLabels(card, options),
-    );
+  it('is absent from the public barrel', () => {
+    expect('defaultChoiceClarityLabels' in storylineApi).toBe(false);
   });
 });
 
-// ── journalTitle / storylineSummary ─────────────────────────
+// ── journalTitle / storylineSummary ──────────────────────────
 
 describe('journal formatting', () => {
   const system = makeSystem();
@@ -208,7 +175,7 @@ describe('pluggable UI adapter', () => {
       choiceDialogTitle: () => 'CUSTOM TITLE',
     });
 
-    const card = makeCard({ id: 'evt-x', hasChoices: true, storylineId: 's1' });
+    const card = makeCard({ id: 'evt-x', options: 'Go|evt-next', storylineId: 's1' });
     expect(system.ui.storyUpdateLine(card, 'accept', 0, 0)).toBe('CUSTOM UPDATE');
     expect(system.ui.choiceDialogTitle(card)).toBe('CUSTOM TITLE');
     // Unoverridden methods still use the default implementation.

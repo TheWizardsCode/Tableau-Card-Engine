@@ -1,9 +1,9 @@
 /**
  * Pluggable story-line UI adapter.
  *
- * Core ships a default implementation covering dialog titles, choice-clarity
- * labels, story-update lines and journal formatting. Games override any
- * subset to change wording without touching core logic. No Phaser dependency.
+ * Core ships a default implementation covering dialog titles, story-update
+ * lines and journal formatting. Games override any subset to change wording
+ * without touching core logic. No Phaser dependency.
  *
  * The default strings are the ones Main Street has shipped since the
  * mechanic was introduced; keeping them here means a game that supplies no
@@ -13,10 +13,8 @@
  */
 
 import type {
-  ChoiceClarityLabels,
   StorylineCard,
   StorylineJournalEntry,
-  StorylineOption,
   StorylineUiAdapter,
 } from './types';
 
@@ -36,8 +34,8 @@ export function defaultChoiceDialogTitle(card: StorylineCard): string {
 
 /**
  * Dialog subtitle: the specific incident within the story-line (empty when
- * the card has no storyline, so the dialog stays unchanged for legacy choice
- * cards).
+ * the card has no storyline, so the dialog stays unchanged for cards outside
+ * a story arc).
  */
 export function defaultChoiceDialogSubtitle(card: StorylineCard): string {
   return card.storylineId ? card.name : '';
@@ -83,38 +81,6 @@ export function defaultStoryUpdateLine(
   return `Story update — ${name}: you chose "${option}"${describeDelta(coinChange, repChange)}.`;
 }
 
-/**
- * Builds the choice-clarity labels for a pending choice card.
- *
- * The labels explain what each option *does* (apply vs skip the incident's
- * effect) without revealing which card the chain escalates to. For the legacy
- * two-option model the labels are Accept/Reject; the text is derived from the
- * compiled options' effect policies.
- */
-export function defaultChoiceClarityLabels<TState>(
-  card: StorylineCard,
-  options: readonly StorylineOption<TState>[],
-): ChoiceClarityLabels {
-  const acceptOption = options[0];
-  const rejectOption = options[1];
-
-  const accept =
-    acceptOption?.effectPolicy === 'apply'
-      ? `Accept: apply “${card.effect ?? ''}”.`
-      : 'Accept: continue without applying an effect.';
-
-  // Never name the escalation: only the semantic (skip + a different
-  // incident). CSV-authored options always apply the event effect, so an
-  // 'apply' Reject still leads to a different incident — say so honestly
-  // instead of implying the effect is waived.
-  const reject =
-    rejectOption?.effectPolicy === 'skip'
-      ? 'Reject: refuse this consequence; a different incident will follow.'
-      : 'Reject: this consequence is applied; a different incident will follow.';
-
-  return { accept, reject };
-}
-
 /** Journal title: names the active story-line(s) when available. */
 export function defaultJournalTitle(
   entries: readonly StorylineJournalEntry[],
@@ -131,29 +97,26 @@ export function defaultStorylineSummary(card: StorylineCard): string {
 }
 
 /**
- * Builds the default UI adapter for a given state/card pair.
+ * Builds the default UI adapter for a given card type.
  *
  * The default adapter is stateless, so a single shared instance would work;
- * this factory exists so games can pass a concrete `TState`/`TCard` without
- * a cast and override individual methods by spreading the result.
+ * this factory exists so games can pass a concrete `TCard` without a cast and
+ * override individual methods by spreading the result.
  */
 export function createDefaultStorylineUiAdapter<
-  TState = unknown,
   TCard extends StorylineCard = StorylineCard,
->(): StorylineUiAdapter<TState, TCard> {
+>(): StorylineUiAdapter<TCard> {
   return {
     storylineName: (card) => defaultStorylineName(card),
     choiceDialogTitle: (card) => defaultChoiceDialogTitle(card),
     choiceDialogSubtitle: (card) => defaultChoiceDialogSubtitle(card),
     storyUpdateLine: (card, option, coinChange, repChange) =>
       defaultStoryUpdateLine(card, option, coinChange, repChange),
-    choiceClarityLabels: (card, options) =>
-      defaultChoiceClarityLabels<TState>(card, options),
     journalTitle: (entries) => defaultJournalTitle(entries),
     storylineSummary: (card) => defaultStorylineSummary(card),
   };
 }
 
 /** The default UI adapter, typed for the generic (unparameterised) case. */
-export const defaultStorylineUiAdapter: StorylineUiAdapter<unknown, StorylineCard> =
-  createDefaultStorylineUiAdapter<unknown, StorylineCard>();
+export const defaultStorylineUiAdapter: StorylineUiAdapter<StorylineCard> =
+  createDefaultStorylineUiAdapter<StorylineCard>();

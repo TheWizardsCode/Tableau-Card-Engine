@@ -4,7 +4,7 @@
  * Ports Main Street's resolution cases onto the generic API:
  *
  * - `apply` / `skip` effect policy;
- * - successor precedence (resolver → seeded candidate draw → legacy id);
+ * - successor precedence (resolver → seeded candidate draw → single id);
  * - exactly one seeded `rng()` draw per candidate selection at resolution
  *   time, terminal options consuming no draw;
  * - deterministic chain-card serial naming across deck locations;
@@ -68,7 +68,7 @@ describe('effect policy', () => {
 // ── AC3: successor precedence ───────────────────────────────
 
 describe('successor precedence', () => {
-  it('resolver wins over candidates and legacy id, consuming no rng', () => {
+  it('resolver wins over candidates and the single successorId, consuming no rng', () => {
     const { system, state } = setup([makeCard({ id: 'evt-resolved' })]);
     const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
       label: 'Go',
@@ -142,7 +142,7 @@ describe('successor precedence', () => {
     expect(state.rngCalls).toBe(0);
   });
 
-  it('a legacy single successorId is pushed directly, consuming no draw', () => {
+  it('a single successorId is pushed directly, consuming no draw', () => {
     const { system, state } = setup([makeCard({ id: 'evt-legacy' })]);
     const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-card' }), {
       label: 'Accept',
@@ -221,7 +221,7 @@ describe('pending-choice lifecycle', () => {
   it('creates a pending choice for a choice card', () => {
     const { system } = setup();
     const pending = system.createPendingStorylineChoice(
-      makeCard({ id: 'evt-choice', hasChoices: true }),
+      makeCard({ id: 'evt-choice', options: 'Go|evt-a' }),
     );
     expect(pending).not.toBeNull();
     expect(pending?.chosenOption).toBeNull();
@@ -266,7 +266,7 @@ describe('pending-choice lifecycle', () => {
   it('markChoiceResolved records the chosen label and resolution flag', () => {
     const { system } = setup();
     const pending = system.createPendingStorylineChoice(
-      makeCard({ id: 'evt-choice', hasChoices: true }),
+      makeCard({ id: 'evt-choice', options: 'Accept|evt-a;Reject|' }),
     )!;
     system.markChoiceResolved(pending, 'Accept');
     expect(pending.chosenOption).toBe('Accept');
@@ -596,7 +596,7 @@ describe('declarative conditional successors', () => {
     expect(state.deck).toHaveLength(0);
   });
 
-  it('falls back to the legacy single successorId when no rule matches', () => {
+  it('falls back to the single successorId when no rule matches', () => {
     const { system, state } = setup([makeCard({ id: 'evt-legacy' })]);
     state.coins = 10;
 

@@ -41,7 +41,7 @@ is a *label/outcome* shorthand and cannot author the extended fields below
 | `label` | `string` | always |
 | `effectPolicy` | `'apply' \| 'skip'` | always — controls the card's intrinsic effect |
 | `condition?` | `(state) => boolean` | draw time — omit the option when `false` |
-| `successorId?` | `string \| null` | resolution — legacy single successor |
+| `successorId?` | `string \| null` | resolution — the lowest-precedence single successor |
 | `successorIds?` | `string[]` | resolution — one seeded random draw picks a candidate |
 | `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence |
 | `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins |
@@ -90,11 +90,11 @@ Semantics:
 
 ### Compilation
 
-Precedence: **registered options > CSV `options` encoding > legacy
-`hasChoices` fields**.
+Precedence: **registered options > CSV `options` encoding**.
 
-- Legacy `hasChoices` cards compile to two options: `Accept` (`apply`) and
-  `Reject` (`skip`).
+- A card with no registered options and no `options` encoding is not a choice
+  and compiles to an empty option list. A bare `storylineId` is descriptive
+  metadata only — it never makes a card a choice.
 - CSV `options` encoding: `label|cardA,cardB;label2|cardC` (`;` separates
   options, `|` separates the label from candidate ids, `,` separates
   candidates). An empty candidate list is a **terminal** option. Every
@@ -112,8 +112,7 @@ Precedence: **registered options > CSV `options` encoding > legacy
 `resolveStorylineOption(state, card, option)` runs the full lifecycle for a
 selected option:
 
-1. **`effectPolicy`** — `apply` runs the card effect, `skip` does not
-   (unchanged legacy step).
+1. **`effectPolicy`** — `apply` runs the card effect, `skip` does not.
 2. **Cost payment** — the option's `cost` is deducted through the engine
    adapter's resource-mutation seam, in addition to the effect.
 3. **Extra effect** — the option's `extraEffect` gains are applied, also
@@ -130,7 +129,8 @@ selected option:
       is pushed (`null` ends the chain). A matching rule consumes no RNG.
    3. `option.successorIds` — exactly **one** seeded `rng()` draw selects a
       candidate. An empty list is terminal and consumes no draw.
-   4. `option.successorId` — a legacy single id, pushed directly (no draw).
+   4. `option.successorId` — a single id, pushed directly (no draw). It is the
+      lowest-precedence successor and the programmatic registry seam.
 
 The pushed card uses deterministic serial naming: `${base}-${maxSerial+1}`,
 scanning every card the engine adapter returns from `getChainScanCards`.
@@ -202,10 +202,8 @@ the whole toolkit also loads under plain `tsx` with no bundler.
 ### Content adapter
 
 An adapter declares the game's columns, the story-line field mapping and the
-new-card defaults. Only `id` and `name` mappings are required: a game without a
-legacy two-way choice model simply omits `hasChoices` /
-`acceptNextCardId` / `rejectNextCardId`, and a game without an `options` column
-omits `options`.
+new-card defaults. Only `id` and `name` mappings are required: an adapter
+without an `options` column simply omits `options`.
 
 ```ts
 import type { ContentAdapter } from '@story-line/content';
@@ -248,8 +246,8 @@ round-trips **byte-identically** (column order preserved).
 change detection — any byte change produces a different checksum.
 
 `cardsFromCsv(parsed, adapter)` projects rows onto `ContentCard`;
-`compileContentOptions(card)` applies the runtime engine's precedence (CSV
-`options` encoding → legacy `hasChoices`), so authored content compiles exactly
+`compileContentOptions(card)` compiles a content card's `options` encoding
+through the runtime engine's semantics, so authored content compiles exactly
 as the runtime reads it.
 
 ### Manifest, Mermaid and the JSON schema
@@ -287,7 +285,7 @@ choiceCardCount, storylineIds, gameId }`.
 | `missing-storyline-id` | A choice card declares no storyline id. |
 | `orphan-link` | A card declares accept/reject links but is not a choice card. |
 | `invalid-option` | Malformed `options` encoding, or an empty/duplicate option label. |
-| `unknown-successor` | An option (including a legacy `Accept`/`Reject` option) names an unknown card. |
+| `unknown-successor` | An option names an unknown card. |
 | `dangling-link` | An inert accept/reject link (on a non-choice card) names an unknown card. |
 | `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
 | `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
@@ -533,12 +531,11 @@ new coupling is introduced.
 
 ## UI adapter
 
-`StorylineUiAdapter<TState, TCard>` is the pluggable presentation seam:
+`StorylineUiAdapter<TCard>` is the pluggable presentation seam. It depends
+only on the card type — presentation no longer reads game state:
 
 - `storylineName` / `choiceDialogTitle` / `choiceDialogSubtitle`
 - `storyUpdateLine` (the narrative line emitted when a choice resolves)
-- `choiceClarityLabels` (must explain apply/skip semantics without revealing
-  the escalation card id)
 - `journalTitle` / `storylineSummary`
 
 Core ships `createDefaultStorylineUiAdapter()` (and a ready-made
@@ -548,7 +545,7 @@ overrides any subset:
 
 ```ts
 const ui = {
-  ...createDefaultStorylineUiAdapter<MyState, MyCard>(),
+  ...createDefaultStorylineUiAdapter<MyCard>(),
   storyUpdateLine: (card, option, coins, rep) =>
     `${card.name}: ${option} (${coins >= 0 ? '+' : ''}${coins} coins)`,
 };
@@ -556,7 +553,7 @@ const ui = {
 
 The Gym demo uses the default adapter, demonstrating that no game code is
 required to present the mechanic. The demo's fixtures are unchanged by the
-cost/extra-effect/conditional-successor extension: it exercises the legacy
+cost/extra-effect/conditional-successor extension: it exercises the base
 experience, and no Gym fixture uses the new fields.
 
 ## Gym demo
@@ -571,16 +568,17 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 
 ## Testing
 
-- `tests/story-line/compile.test.ts` — legacy and CSV compilation, registry
-  precedence, draw-time condition **and cost** filtering, snapshot stability.
+- `tests/story-line/compile.test.ts` — options-only and CSV compilation,
+  registry precedence, draw-time condition **and cost** filtering, snapshot
+  stability.
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
   deterministic serial naming, pending-choice lifecycle.
 - `tests/story-line/validate.test.ts` — declarative metadata validation
   (costs, extra effects, conditions, dangling successors).
 - `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state.
-- `tests/story-line/ui-adapter.test.ts` — default adapter wording and the
-  pluggable override seam.
+- `tests/story-line/ui-adapter.test.ts` — default adapter wording, the
+  pluggable override seam, and the retired choice-clarity API.
 - `tests/story-line/content/csv.test.ts` — byte-identical round-trip (two
   adapter shapes), checksum determinism, projection and option compilation.
 - `tests/story-line/content/manifest.test.ts` — manifest shape, determinism and

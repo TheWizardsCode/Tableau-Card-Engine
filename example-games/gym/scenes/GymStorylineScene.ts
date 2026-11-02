@@ -88,7 +88,7 @@ export class GymStorylineScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: 'Each option button is generated from the current card\'s compiled options. The choice-clarity labels explain what each option does without revealing the next card. [ Reset ] restarts the demo from the first card.',
+        body: 'Each option button is generated from the current card\'s compiled options and labelled with the option\'s own label. [ Reset ] restarts the demo from the first card.',
       },
       {
         heading: 'Test plan',
@@ -164,7 +164,7 @@ export class GymStorylineScene extends GymSceneBase {
     this.cardText.setText(`${card.name} — ${card.effect ?? 'no effect'}`);
 
     if (!draw.finished) {
-      this.renderOptions(card, draw.options);
+      this.renderOptions(draw.options);
     } else {
       this.finished = true;
       this.statusText.setText('Chain complete — press Reset to play again.');
@@ -173,18 +173,16 @@ export class GymStorylineScene extends GymSceneBase {
     this.renderStatus();
   }
 
-  /** Renders one button per compiled option. */
-  private renderOptions(card: StorylineCard, options: StorylineOption<DemoState>[]): void {
-    const labels = this.system.ui.choiceClarityLabels(card, options);
+  /** Renders one button per compiled option, labelled from the option itself. */
+  private renderOptions(options: StorylineOption<DemoState>[]): void {
     const cx = GAME_W / 2;
     options.forEach((option, index) => {
       const y = this.optionStartY + index * 70;
-      const hint = index === 0 ? labels.accept : index === 1 ? labels.reject : '';
       const text = createHudText(
         this,
         cx,
         y,
-        `[ ${option.label} ]${hint ? `  ${hint}` : ''}`,
+        `[ ${option.label} ]`,
         '#aaddff',
         { fontSize: '17px' },
       ).setOrigin(0.5);
