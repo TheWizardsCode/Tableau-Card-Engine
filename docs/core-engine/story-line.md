@@ -409,11 +409,15 @@ The host serves `GET /manifest.json` from memory (built at launch from the
 content CSV + adapter) and the page fetches it **once**, so pan/zoom and node
 selection never round-trip to the host. The rendered graph is manifest-driven:
 
-- one column per story-line group;
+- one block per story-line group (a group taller than ten cards wraps into
+side-by-side sub-columns inside the same block);
 - choice cards drawn as diamonds, plain incidents as rounded rectangles;
 - cycle edges and cycle members highlighted;
 - an option label on every link (a terminal option is a `to: null` link);
-- drag to pan, wheel or toolbar to zoom, fit and reset;
+- the graph opens **fitted** to its pane, which fills the window (the page
+itself never scrolls); drag to pan, wheel to zoom around the pointer, toolbar
+buttons to zoom around the centre, fit and reset (100%, centred); no `viewBox`,
+so graph units are CSS pixels and the pan/zoom transform is the only scale;
 - selecting a node shows its name, effect, adapter `impact`, routing summary,
 successor and incoming links, story-line id/title and every adapter-declared
 game column.

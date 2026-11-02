@@ -67,7 +67,7 @@ discard**:
 
 | Surface | Purpose |
 |---|---|
-| **Viewer** | The manifest-driven graph: one column per story-line group, choice cards as diamonds, plain incidents as rounded rectangles, cycle edges/members highlighted, option labels on every link. Drag to pan, wheel/toolbar to zoom, click a node to inspect its links and metadata. |
+| **Viewer** | The manifest-driven graph: one block per story-line group (a large group wraps into side-by-side sub-columns), choice cards as diamonds, plain incidents as rounded rectangles, cycle edges/members highlighted, option labels on every link. Opens fitted to the pane; drag to pan, wheel/toolbar to zoom, click a node to inspect its links and metadata. |
 | **Card forms** | **Edit card** (the selected node's form) and **Add card** (guided add form). Fields come from the adapter's **field descriptors**, so a game's columns appear as plain fields without core knowing what they mean. |
 | **Story-line management** | **Manage story-lines** lists, creates, renames and reassigns groups. A story-line exists through its member cards, so every operation is one validated **batch** edit of those cards' story-line fields. |
 
@@ -76,6 +76,27 @@ is written, then writes through the single transactional author API
 (`applyContentEditToFile` in `src/story-line/content/author.ts`). The editor
 page never writes the content CSV itself; that property is asserted by the
 write-path guard (`tests/story-line/editor/write-path-guard.test.ts`).
+
+### Viewer navigation
+
+The graph is a fixed-size pane, not a page: the editor shell fills the browser
+window and the graph region takes the remaining space, so the document itself
+never scrolls and the SVG never grows past its pane.
+
+- **Opens fitted.** The whole arc is on screen at launch, whatever its size
+  (fit is computed from the pane's real pixel size, with padding).
+- **One scale only.** The SVG declares no `viewBox`, so graph units and CSS
+  pixels are 1:1 and the pan/zoom transform is the only scaling; a card is
+  never drawn at a second, hidden scale.
+- **Zoom is anchored.** The wheel zooms around the pointer and the toolbar
+  buttons zoom around the pane centre, so the card you are looking at stays
+  put. The toolbar shows the live zoom percentage.
+- **Reset vs fit.** **Reset view** returns to 100% centred on the graph;
+  **Fit view** restores the whole-arc view after panning or zooming away.
+- **Large groups wrap.** A story-line block stacks at most ten cards and then
+  wraps into side-by-side sub-columns inside the same block, so a big group
+  (for example Main Street's 160+ ungrouped cards) stays a fittable block
+  instead of one very tall column.
 
 ## 3. Supplying a content adapter
 

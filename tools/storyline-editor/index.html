@@ -15,22 +15,28 @@
         color-scheme: dark;
         font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       }
+      html,
+      body {
+        height: 100%;
+      }
       body {
         margin: 0;
         background: #0d0d16;
         color: #e8eaf4;
-        min-height: 100vh;
+        /* The graph pane owns the viewport: the page itself never scrolls. */
+        overflow: hidden;
       }
       #storyline-editor-app {
         display: flex;
         flex-direction: column;
-        min-height: 100vh;
+        height: 100%;
       }
       .editor-shell {
         display: flex;
         flex-direction: column;
         gap: 12px;
-        min-height: 100vh;
+        height: 100%;
+        min-height: 0;
         padding: 16px 20px 24px;
         box-sizing: border-box;
       }
@@ -83,18 +89,32 @@
       .editor-main {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 340px;
+        grid-template-rows: minmax(0, 1fr);
         gap: 16px;
         flex: 1 1 auto;
-        min-height: 520px;
+        min-height: 0;
+      }
+      .editor-zoom-level {
+        align-self: center;
+        min-width: 46px;
+        text-align: center;
+        color: #9aa0c0;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
       }
       .editor-graph {
-        min-height: 520px;
+        /* A definite height from the grid row: the SVG fills it and the graph
+           never contributes to page height, so nothing needs scrolling. */
+        position: relative;
+        min-width: 0;
+        min-height: 0;
         border: 1px solid #2b2b44;
         border-radius: 12px;
         overflow: hidden;
         background: #12121c;
       }
       .editor-sidebar {
+        min-height: 0;
         border: 1px solid #2b2b44;
         border-radius: 12px;
         background: #14141f;
@@ -168,6 +188,7 @@
         color: #d7dcf3;
       }
       .editor-legend {
+        flex: 0 0 auto;
         border-top: 1px solid #23233a;
         padding-top: 10px;
       }
@@ -200,6 +221,8 @@
       .editor-message {
         margin: 48px auto;
         max-width: 640px;
+        max-height: calc(100vh - 96px);
+        overflow: auto;
         border: 1px solid #2b2b44;
         border-radius: 12px;
         background: #14141f;
