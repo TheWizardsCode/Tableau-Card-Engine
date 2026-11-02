@@ -52,7 +52,11 @@
  *   --core-root ../Tableau-Card-Engine
  * ```
  *
- * Run with `--help` for the full option list.
+ * Every run classifies each generated file (`create` / `update` / `unchanged`)
+ * and reports it; `--dry-run` reports without writing and `--json` emits the
+ * machine-readable report. Run with `--help` for the full option list, and see
+ * the rationale above {@link classifyAndApply} for why writes are classified
+ * rather than applied blindly.
  *
  * ## Per-game version policy
  *
@@ -151,10 +155,41 @@ export interface ScaffoldOptions {
    * the existing version is preserved, else {@link GAME_INITIAL_VERSION}.
    */
   version?: string;
+  /**
+   * Classify every generated file without touching the checkout: no writes, no
+   * `mkdir`, no symlink, no shared-asset/app-icon link and no path rewrite.
+   * The returned {@link ScaffoldResult.files} report carries exactly what the
+   * equivalent real run would do, so a caller can preview before trusting it.
+   */
+  dryRun?: boolean;
 }
 
 /** Why the scaffold picked the game version it wrote. */
 export type ScaffoldVersionSource = 'explicit' | 'preserved' | 'baseline';
+
+/**
+ * What a scaffold run did (or, in a dry run, would do) to one generated file.
+ *
+ * The vocabulary is fixed by the parent contract (CG-0MVWFN1HX004B5PN):
+ *
+ * - `create` — the target was absent and is written.
+ * - `update` — the target exists and differs from the template, and is written.
+ * - `unchanged` — the target exists and is byte-identical, so nothing is written.
+ * - `skip-local` — the target exists and differs, and is deliberately left
+ *   alone (the write-gating slice, CG-0MVWGJPPA000GBE7).
+ */
+export type ScaffoldFileAction =
+  | 'create'
+  | 'update'
+  | 'unchanged'
+  | 'skip-local';
+
+/** Per-file classification reported by every scaffold run (dry or real). */
+export interface ScaffoldFileReport {
+  /** Generated file path, relative to the game repo root (POSIX separators). */
+  path: string;
+  action: ScaffoldFileAction;
+}
 
 /** Result of {@link scaffoldGameRepo}. */
 export interface ScaffoldResult {
@@ -162,6 +197,17 @@ export interface ScaffoldResult {
   coreRoot: string;
   coreRel: string;
   presetPath: string;
+  /**
+   * The classification of every generated file, repo-relative and in a stable
+   * order. This is the machine-readable report a consumer reads **before**
+   * trusting a run: `--dry-run` classifies without touching the disk, a real
+   * run classifies and applies, and both report the same shape.
+   */
+  files: ScaffoldFileReport[];
+  /**
+   * Compatibility projection of the `create` + `update` entries in
+   * {@link files}; empty for a dry run or a run with nothing to write.
+   */
   written: string[];
   symlinks: string[];
   /** Test/source files whose `example-games/<game>/` paths were rewritten. */
@@ -580,11 +626,85 @@ createCardGame({
 
 // ── Filesystem scaffolding ────────────────────────────────────────────────
 
-/** Write `contents` to `filePath`, creating parent directories as needed. */
-function writeFile(filePath: string, contents: string, written: string[]): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, contents, 'utf-8');
-  written.push(filePath);
+interface ApplyOptions {
+  /** Game repo root the generated paths are reported relative to. */
+  gameRepoRoot: string;
+  /** When true, classify only: no `mkdir`, no write. */
+  dryRun?: boolean;
+}
+
+/**
+ * Why writes are classified before they happen (CG-0MVWFN1HX004B5PN).
+ *
+ * A scaffolded file is **generated**, but the checkout it lands in is a live
+ * consumer repo that owns its own wiring: `main.ts` gains game-specific boot
+ * code, `vite.config.ts` gains documented local edits, and a drift guard lives
+ * in `tests/`. Blindly overwriting every template on a routine re-scaffold
+ * destroys that local work (the MS-0MVVGUYYG004XXOB incident rewrote 11 files
+ * in one run). So every generated file is classified against what is already
+ * on disk **before** anything is written, the classification is returned in
+ * {@link ScaffoldResult.files} and printed on every run, and `--dry-run` runs
+ * the identical classification while writing nothing. A caller can therefore
+ * see exactly which files a run would touch — and later slices gate the write
+ * itself (`--only` / `--force` / `skip-local`) on the same classification.
+ */
+
+/**
+ * Classify one generated file against the on-disk content and, unless this is
+ * a dry run, apply the change.
+ *
+ * Classification is a byte comparison over a fixed, small file set: absent →
+ * `create`, byte-identical → `unchanged`, otherwise → `update` (this slice
+ * always writes an `update`; the `--force`/`skip-local` gate is the next
+ * slice). A dry run returns the same report without touching the disk.
+ */
+function classifyAndApply(
+  filePath: string,
+  contents: string,
+  opts: ApplyOptions,
+): ScaffoldFileReport {
+  const reportPath = path
+    .relative(opts.gameRepoRoot, filePath)
+    .split(path.sep)
+    .join('/');
+  const existing = fs.existsSync(filePath)
+    ? fs.readFileSync(filePath, 'utf-8')
+    : undefined;
+  const action: ScaffoldFileAction =
+    existing === undefined
+      ? 'create'
+      : existing === contents
+        ? 'unchanged'
+        : 'update';
+
+  if (action !== 'unchanged' && !opts.dryRun) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, contents, 'utf-8');
+  }
+  return { path: reportPath, action };
+}
+
+/**
+ * Classify + apply one generated file, recording the report and (only when a
+ * real write happened) the compatibility `written` list.
+ *
+ * A thin wrapper over {@link classifyAndApply} so each call site stays a
+ * single readable line.
+ */
+function writeFile(
+  filePath: string,
+  contents: string,
+  ctx: ApplyOptions & {
+    dryRun: boolean;
+    files: ScaffoldFileReport[];
+    written: string[];
+  },
+): void {
+  const report = classifyAndApply(filePath, contents, ctx);
+  ctx.files.push(report);
+  if (!ctx.dryRun && report.action !== 'unchanged') {
+    ctx.written.push(filePath);
+  }
 }
 
 /**
@@ -785,13 +905,14 @@ export function rewriteGameTreePaths(gameRepoRoot: string, game: string): string
 /**
  * Scaffold a per-game repo in place.
  *
- * Writes `package.json`, `vite.config.ts`, `tsconfig.json`, `main.ts`,
- * `env.d.ts`, `index.html` (copied from the core) and
- * `configs/<preset>.json`, and creates the `src`/`core` symlinks into the
- * sibling core checkout.
+ * Classifies (and, for a real run, writes) `package.json`, `vite.config.ts`,
+ * `tsconfig.json`, `main.ts`, `env.d.ts`, `index.html` (copied from the core)
+ * and `configs/<preset>.json`, and creates the `core` symlink into the sibling
+ * core checkout. With {@link ScaffoldOptions.dryRun} it classifies only and
+ * leaves every file, link and test/source rewrite untouched.
  *
  * @param options See {@link ScaffoldOptions}.
- * @returns What was written and linked.
+ * @returns The per-file classification, what was written and what was linked.
  * @throws When the game repo root or core root does not exist.
  */
 export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
@@ -841,31 +962,34 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
 
   const written: string[] = [];
   const symlinks: string[] = [];
+  const files: ScaffoldFileReport[] = [];
+  const dryRun = options.dryRun === true;
+  const writeCtx = { gameRepoRoot, dryRun, files, written };
 
   writeFile(
     path.join(gameRepoRoot, 'package.json'),
     renderPackageJson(options.game, manifest, coreRel, version),
-    written,
+    writeCtx,
   );
   writeFile(
     path.join(gameRepoRoot, 'vite.config.ts'),
     renderViteConfig(options.game, coreRel),
-    written,
+    writeCtx,
   );
   writeFile(
     path.join(gameRepoRoot, 'tsconfig.json'),
     renderTsconfig(options.game, coreRel),
-    written,
+    writeCtx,
   );
   writeFile(
     path.join(gameRepoRoot, 'env.d.ts'),
     renderEnvDts(),
-    written,
+    writeCtx,
   );
   writeFile(
     path.join(gameRepoRoot, 'main.ts'),
     renderMainTs(),
-    written,
+    writeCtx,
   );
 
   // index.html is copied verbatim from the core so it stays in sync.
@@ -874,14 +998,14 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     writeFile(
       path.join(gameRepoRoot, 'index.html'),
       fs.readFileSync(coreIndex, 'utf-8'),
-      written,
+      writeCtx,
     );
   }
 
   writeFile(
     path.join(gameRepoRoot, GAME_REPO_CONFIGS_DIR, `${DEFAULT_GAME_PRESET}.json`),
     renderPreset(options.game, scenePath, adapterPath),
-    written,
+    writeCtx,
   );
 
   // Option C (C1): the game source occupies repo-root `src/`, so the
@@ -891,14 +1015,19 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   // through the path aliases; intra-test game-tree paths are rewritten to
   // `src/`. The only remaining link is `core` (the engine checkout / a git
   // submodule once remotes exist).
-  if (ensureDirSymlink(path.join(gameRepoRoot, 'core'), coreRoot)) {
+  //
+  // Every side effect below is skipped in a dry run: the classification above
+  // already reported what a real run would write, so a preview must not create
+  // the `core` symlink, link shared assets, or rewrite the consumer's own
+  // tests/source.
+  if (!dryRun && ensureDirSymlink(path.join(gameRepoRoot, 'core'), coreRoot)) {
     symlinks.push(path.join(gameRepoRoot, 'core'));
   }
 
-  const assetLinks = linkSharedAssets(gameRepoRoot, coreRoot);
-  const publicLinks = linkSharedPublicAssets(gameRepoRoot, coreRoot);
+  const assetLinks = dryRun ? [] : linkSharedAssets(gameRepoRoot, coreRoot);
+  const publicLinks = dryRun ? [] : linkSharedPublicAssets(gameRepoRoot, coreRoot);
 
-  const rewritten = rewriteGameTreePaths(gameRepoRoot, options.game);
+  const rewritten = dryRun ? [] : rewriteGameTreePaths(gameRepoRoot, options.game);
 
   return {
     gameRepoRoot,
@@ -909,6 +1038,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
       GAME_REPO_CONFIGS_DIR,
       `${DEFAULT_GAME_PRESET}.json`,
     ),
+    files,
     written,
     symlinks,
     rewritten,
@@ -930,6 +1060,8 @@ interface CliArgs {
   all?: boolean;
   layout?: string;
   version?: string;
+  dryRun?: boolean;
+  json?: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -965,6 +1097,12 @@ function parseArgs(argv: string[]): CliArgs {
       case '--all':
         args.all = true;
         break;
+      case '--dry-run':
+        args.dryRun = true;
+        break;
+      case '--json':
+        args.json = true;
+        break;
       case '--layout':
         args.layout = next;
         i += 1;
@@ -995,6 +1133,12 @@ function usage(): string {
     `                           (default: ${DEFAULT_CORE_REL}).`,
     '  --version <semver>       Explicit game package version (default:',
     '                           preserve the repo version, else seed 0.1.0).',
+    '  --dry-run                Classify every generated file (create | update |',
+    '                           unchanged) and report it, writing nothing: no',
+    '                           file, no symlink, no link, no path rewrite.',
+    '  --json                   Print one machine-readable JSON document for the',
+    '                           run (an object, or an array with --all) carrying',
+    '                           the per-file `files` report.',
     '  --layout <path>          Layout file for --all',
     '                           (default: <core-root>/scripts/configs/repo-layout.json).',
     '  -h, --help               Show this help.',
@@ -1034,6 +1178,7 @@ function main(argv: string[]): number {
   const manifest = readCoreManifest(coreRoot);
   let failures = 0;
   let lastGameRepoRoot = '';
+  const results: ScaffoldResult[] = [];
   for (const game of games) {
     const gameRepoRoot = path.resolve(
       args.gameRepoRoot ?? path.join(reposDir, `tce-${game}`),
@@ -1050,13 +1195,24 @@ function main(argv: string[]): number {
         coreRel,
         coreManifest: manifest,
         version: args.version,
+        dryRun: args.dryRun,
       });
-      console.log(`Scaffolded tce-${game}`);
+      results.push(result);
+      if (args.json) continue;
+      console.log(
+        args.dryRun
+          ? `Scaffolded tce-${game} (dry run — nothing written)`
+          : `Scaffolded tce-${game}`,
+      );
       console.log(`  game repo: ${result.gameRepoRoot}`);
       console.log(`  core:      ${result.coreRoot} (${result.coreRel})`);
       console.log(`  preset:    ${result.presetPath}`);
       console.log(`  version:   ${result.version} (${result.versionSource})`);
-      for (const f of result.written) console.log(`  wrote ${f}`);
+      // One line per generated file: the classification **is** the report, for
+      // both a dry run and a real one (CG-0MVWGJNQM0061W6I).
+      for (const file of result.files) {
+        console.log(`  ${file.action}  ${file.path}`);
+      }
       for (const l of result.symlinks) console.log(`  linked ${l}`);
       if (result.rewritten.length) {
         console.log(`  rewrote example-games/${game}/ → src/ in ${result.rewritten.length} file(s)`);
@@ -1074,6 +1230,15 @@ function main(argv: string[]): number {
   }
 
   if (failures > 0) return 1;
+
+  // `--json` prints exactly one document: an object for a single `--game` run,
+  // an array for `--all`, both carrying the same per-file `files` report.
+  if (args.json) {
+    console.log(JSON.stringify(args.all ? results : results[0], null, 2));
+    return 0;
+  }
+
+  if (args.dryRun) return 0;
   console.log('');
   console.log('Next:');
   console.log(`  cd ${lastGameRepoRoot}`);

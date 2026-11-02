@@ -11,6 +11,8 @@
  * No browser, no npm install, no network.
  */
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,6 +37,7 @@ import {
   scaffoldGameRepo,
   toGameRepoPath,
   type CoreManifest,
+  type ScaffoldResult,
 } from '../../scripts/game-repo-scaffold';
 import {
   discoverGames,
@@ -52,6 +55,30 @@ const GAMES = [
   'main-street',
   'coloretto',
 ] as const;
+
+/**
+ * The generated files a scaffold owns, repo-relative and in report order
+ * (CG-0MVWGJNQM0061W6I). The set is fixed: a later slice adds write gating,
+ * not new generated files.
+ */
+const GENERATED_FILES = [
+  'package.json',
+  'vite.config.ts',
+  'tsconfig.json',
+  'env.d.ts',
+  'main.ts',
+  'index.html',
+  `configs/${DEFAULT_GAME_PRESET}.json`,
+] as const;
+
+/** The scaffold CLI, spawned as a real process by the CLI contract tests. */
+const SCRIPT_PATH = path.resolve(
+  __dirname,
+  '..',
+  '..',
+  'scripts',
+  'game-repo-scaffold.ts',
+);
 
 /** The root app-icon files a game repo composes from the core (CG-0MUUFZSE90061KKL). */
 const ROOT_ICONS = [
@@ -822,6 +849,266 @@ describe('scaffoldGameRepo', () => {
     expect(() =>
       scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: path.join(tmpRoot, 'nope') }),
     ).toThrow(/core checkout/i);
+  });
+});
+
+// ── Write classification, dry run and machine-readable report ─────────────
+
+function sha256(contents: Buffer | string): string {
+  return crypto.createHash('sha256').update(contents).digest('hex');
+}
+
+/**
+ * Snapshot every directory, file and symlink under `root` by relative path, so
+ * a test can assert a run changed nothing at all (not just the generated set).
+ */
+function snapshotTree(root: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      const rel = path.relative(root, full).split(path.sep).join('/');
+      if (entry.isSymbolicLink()) {
+        out[rel] = `link:${fs.readlinkSync(full)}`;
+      } else if (entry.isDirectory()) {
+        out[`${rel}/`] = 'dir';
+        walk(full);
+      } else {
+        out[rel] = sha256(fs.readFileSync(full));
+      }
+    }
+  };
+  walk(root);
+  return out;
+}
+
+/** Pre-seed every generated file with local content that differs from the template. */
+function seedDivergedGeneratedFiles(gameRepo: string): void {
+  for (const file of GENERATED_FILES) {
+    const target = path.join(gameRepo, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, `// LOCAL EDIT — ${file}\n`, 'utf-8');
+  }
+}
+
+/**
+ * Give the fixture core a shared-asset + root-icon layout, so a real run has
+ * side effects a dry run must suppress (and vice versa).
+ */
+function writeCoreSharedLayout(core: string): void {
+  writeCoreIconLayout(core);
+  const audioDir = path.join(core, 'public', 'assets', 'audio', 'default');
+  fs.mkdirSync(audioDir, { recursive: true });
+  fs.writeFileSync(path.join(audioDir, 'game-win.wav'), 'x');
+  fs.writeFileSync(
+    path.join(core, 'scripts', 'configs', 'repo-layout.json'),
+    JSON.stringify({
+      sharedAssets: ['audio/default/'],
+      sharedPublicRoot: [...ROOT_ICONS],
+    }),
+  );
+}
+
+describe('scaffoldGameRepo write classification', () => {
+  it('classifies every absent generated file as create and writes it', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const result = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    // The report covers every generated file, in a stable order, repo-relative.
+    expect(result.files).toEqual(
+      GENERATED_FILES.map((file) => ({ path: file, action: 'create' })),
+    );
+    for (const file of GENERATED_FILES) {
+      expect(fs.existsSync(path.join(gameRepo, file)), `${file} missing`).toBe(true);
+    }
+
+    // `written` stays the compatibility projection: the create/update files,
+    // as absolute paths (callers and the CLI log rely on that shape).
+    expect(result.written.sort()).toEqual(
+      GENERATED_FILES.map((file) => path.join(gameRepo, file)).sort(),
+    );
+  });
+
+  it('classifies a byte-identical file as unchanged and does not rewrite it', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    // An old mtime survives only when the file is left alone, so this proves
+    // `unchanged` means "not written", not merely "same content after write".
+    const sentinel = new Date('2001-01-01T00:00:00Z');
+    for (const file of GENERATED_FILES) {
+      fs.utimesSync(path.join(gameRepo, file), sentinel, sentinel);
+    }
+
+    const result = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    expect(result.files).toEqual(
+      GENERATED_FILES.map((file) => ({ path: file, action: 'unchanged' })),
+    );
+    expect(result.written).toEqual([]);
+    for (const file of GENERATED_FILES) {
+      expect(fs.statSync(path.join(gameRepo, file)).mtimeMs, `${file} rewritten`).toBe(
+        sentinel.getTime(),
+      );
+    }
+  });
+
+  it('classifies a diverged file as update and overwrites it with the template', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    fs.writeFileSync(path.join(gameRepo, 'main.ts'), '// LOCAL EDIT\n', 'utf-8');
+    const result = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    expect(result.files).toEqual(
+      GENERATED_FILES.map((file) => ({
+        path: file,
+        action: file === 'main.ts' ? 'update' : 'unchanged',
+      })),
+    );
+    // Only the diverged file is touched.
+    expect(result.written).toEqual([path.join(gameRepo, 'main.ts')]);
+    expect(fs.readFileSync(path.join(gameRepo, 'main.ts'), 'utf-8')).toBe(renderMainTs());
+  });
+});
+
+describe('scaffoldGameRepo dry run', () => {
+  it('classifies every file but writes nothing, links nothing and rewrites nothing', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    writeCoreSharedLayout(core);
+    seedDivergedGeneratedFiles(gameRepo);
+
+    const testFile = path.join(gameRepo, 'tests', 'golf', 'Golf.test.ts');
+    expect(fs.readFileSync(testFile, 'utf-8')).toContain('example-games/golf/');
+
+    const before = snapshotTree(gameRepo);
+    const dry = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      dryRun: true,
+    });
+
+    // Byte-identical tree: no write, no mkdir, no `core` symlink, no asset or
+    // app-icon link, and no path rewrite of the game's own tests.
+    expect(snapshotTree(gameRepo)).toEqual(before);
+    expect(fs.lstatSync(path.join(gameRepo, 'core'), { throwIfNoEntry: false })).toBeUndefined();
+    expect(fs.readFileSync(testFile, 'utf-8')).toContain('example-games/golf/');
+
+    // ...while the report carries the classification the real run applies.
+    expect(dry.files).toEqual(
+      GENERATED_FILES.map((file) => ({ path: file, action: 'update' })),
+    );
+    expect(dry.written).toEqual([]);
+    expect(dry.symlinks).toEqual([]);
+    expect(dry.assetLinks).toEqual([]);
+    expect(dry.publicLinks).toEqual([]);
+    expect(dry.rewritten).toEqual([]);
+  });
+
+  it('reports exactly what the following real run does (no classification drift)', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    seedDivergedGeneratedFiles(gameRepo);
+
+    const dry = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      dryRun: true,
+    });
+    const real = scaffoldGameRepo({ game: 'golf', gameRepoRoot: gameRepo, coreRoot: core });
+
+    expect(real.files).toEqual(dry.files);
+    expect(real.written.sort()).toEqual(
+      GENERATED_FILES.map((file) => path.join(gameRepo, file)).sort(),
+    );
+  });
+
+  it('classifies a fresh tree as create without creating anything', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const before = snapshotTree(gameRepo);
+
+    const dry = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      dryRun: true,
+    });
+
+    expect(dry.files).toEqual(
+      GENERATED_FILES.map((file) => ({ path: file, action: 'create' })),
+    );
+    expect(snapshotTree(gameRepo)).toEqual(before);
+  });
+});
+
+describe('scaffold CLI report contract', () => {
+  /** Run the scaffold CLI from the repo root so `tsx` resolves normally. */
+  const runCli = (args: string[]): ReturnType<typeof spawnSync> =>
+    spawnSync(process.execPath, ['--import', 'tsx/esm', SCRIPT_PATH, ...args], {
+      cwd: path.resolve(__dirname, '..', '..'),
+      encoding: 'utf-8',
+    });
+
+  const baseArgs = (core: string, gameRepo: string): string[] => [
+    '--game',
+    'golf',
+    '--game-repo-root',
+    gameRepo,
+    '--core-root',
+    core,
+    '--core-rel',
+    DEFAULT_CORE_REL,
+  ];
+
+  it('--dry-run --json writes nothing and emits one parseable JSON document', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const before = snapshotTree(gameRepo);
+
+    const result = runCli([...baseArgs(core, gameRepo), '--dry-run', '--json']);
+
+    expect(result.status, String(result.stderr)).toBe(0);
+    const doc = JSON.parse(String(result.stdout)) as ScaffoldResult;
+    expect(Array.isArray(doc)).toBe(false);
+    expect(doc.files).toEqual(
+      GENERATED_FILES.map((file) => ({ path: file, action: 'create' })),
+    );
+    expect(doc.written).toEqual([]);
+    // Nothing on disk changed — not even an empty configs/ directory.
+    expect(snapshotTree(gameRepo)).toEqual(before);
+  });
+
+  it('--all --json emits a single JSON array', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const layout = path.join(tmpRoot, 'repo-layout.json');
+    fs.writeFileSync(layout, JSON.stringify({ games: [{ name: 'golf' }] }), 'utf-8');
+
+    const result = runCli([
+      '--all',
+      '--layout',
+      layout,
+      '--game-repo-root',
+      gameRepo,
+      '--core-root',
+      core,
+      '--core-rel',
+      DEFAULT_CORE_REL,
+      '--dry-run',
+      '--json',
+    ]);
+
+    expect(result.status, String(result.stderr)).toBe(0);
+    const doc = JSON.parse(String(result.stdout)) as ScaffoldResult[];
+    expect(Array.isArray(doc)).toBe(true);
+    expect(doc).toHaveLength(1);
+    expect(doc[0].files).toHaveLength(GENERATED_FILES.length);
+  });
+
+  it('--help documents --dry-run and --json', () => {
+    const result = runCli(['--help']);
+    expect(result.status).toBe(0);
+    expect(String(result.stdout)).toContain('--dry-run');
+    expect(String(result.stdout)).toContain('--json');
   });
 });
 
