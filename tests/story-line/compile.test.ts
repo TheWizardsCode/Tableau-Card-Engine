@@ -74,16 +74,17 @@ describe('options-only compilation', () => {
     expect(system.storylineOptionCount(card)).toBe(0);
   });
 
-  it('ignores the retired legacy choice fields', () => {
+  it('ignores unknown properties that look like a two-way choice card', () => {
     const { system } = makeSystem();
-    // The runtime model no longer declares these fields. A card that still
-    // carries them (a stale save, an older adapter) must not become a choice:
-    // only registered options or a non-empty `options` encoding do that.
+    // The runtime model no longer declares any two-way choice/link property. A
+    // card that still carries extra properties (a stale save, an older
+    // adapter) must not become a choice: only registered options or a
+    // non-empty `options` encoding do that.
     const card = {
-      ...makeCard({ id: 'evt-legacy' }),
-      hasChoices: true,
-      acceptNextCardId: 'evt-next-a',
-      rejectNextCardId: 'evt-next-b',
+      ...makeCard({ id: 'evt-unknown' }),
+      legacyChoiceFlag: true,
+      legacyAcceptLink: 'evt-next-a',
+      legacyRejectLink: 'evt-next-b',
     } as unknown as TestCard;
 
     expect(system.eventHasStoryline(card)).toBe(false);

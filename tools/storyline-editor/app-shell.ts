@@ -315,7 +315,7 @@ export function mountEditorShell(
 
     detailsName.textContent = node.name;
     detailsId.textContent = node.id;
-    detailsKind.textContent = node.hasChoices
+    detailsKind.textContent = node.isChoice
       ? `Choice card · ${node.optionCount} option${node.optionCount === 1 ? '' : 's'}`
       : 'Plain incident';
     detailsStoryline.textContent = node.storylineId

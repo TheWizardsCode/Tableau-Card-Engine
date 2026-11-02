@@ -397,7 +397,7 @@ export function createGraphRenderer(
   const nodeElements = new Map<string, SVGGElement>();
   for (const position of layout.positions.values()) {
     const { node, x, y } = position;
-    const classes = ['graph-node', node.hasChoices ? 'node--choice' : 'node--incident'];
+    const classes = ['graph-node', node.isChoice ? 'node--choice' : 'node--incident'];
     if (node.inCycle) classes.push('node--cycle');
 
     const group = svgEl('g');
@@ -405,11 +405,11 @@ export function createGraphRenderer(
     group.setAttribute('transform', `translate(${x} ${y})`);
     group.setAttribute('data-node-id', node.id);
     group.setAttribute('data-role', 'graph-node');
-    group.setAttribute('data-has-choices', String(node.hasChoices));
+    group.setAttribute('data-is-choice', String(node.isChoice));
     group.setAttribute('data-in-cycle', String(node.inCycle));
     group.setAttribute('data-storyline-id', node.storylineId ?? '');
 
-    if (node.hasChoices) {
+    if (node.isChoice) {
       const shape = svgEl('polygon');
       shape.setAttribute('class', 'node-shape');
       shape.setAttribute(
@@ -445,9 +445,9 @@ export function createGraphRenderer(
     const kind = svgEl('text');
     kind.setAttribute('class', 'node-kind');
     kind.setAttribute('x', String(NODE_WIDTH / 2));
-    kind.setAttribute('y', String(node.hasChoices ? NODE_HEIGHT - 16 : NODE_HEIGHT - 10));
+    kind.setAttribute('y', String(node.isChoice ? NODE_HEIGHT - 16 : NODE_HEIGHT - 10));
     kind.setAttribute('text-anchor', 'middle');
-    kind.textContent = node.hasChoices ? `CHOICE · ${node.optionCount}` : 'INCIDENT';
+    kind.textContent = node.isChoice ? `CHOICE · ${node.optionCount}` : 'INCIDENT';
     group.append(kind);
 
     group.addEventListener('click', () => {

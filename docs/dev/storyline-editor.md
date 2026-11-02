@@ -131,10 +131,12 @@ Notes on the contract (`ContentAdapter` in
 
 - **Required:** `gameId`, `columns` (the CSV's columns in file order) and the
   `fields` mapping with at least `id` and `name`.
-- **Optional mappings:** `effect`, `hasChoices`, `acceptNextCardId`,
-  `rejectNextCardId`, `options`, `storylineId`, `storylineTitle`. Omit a field
-  mapping when the game has no such column — omitting means "no such column",
-  never an error.
+- **Optional mappings:** `effect`, `options`, `storylineId`, `storylineTitle`.
+  Omit a field mapping when the game has no such column — omitting means "no
+  such column", never an error.
+- **The manifest's `isChoice` node flag is derived, not mapped.** It is `true`
+  exactly when the card has at least one compiled option (`optionCount > 0`),
+  so it can never disagree with the option list; no content column feeds it.
 - **Every column not in `fields`** lands in `ContentCard.fields`, keyed by
   column name. Those game columns are editable/inspectable by default (coin and
   reputation deltas, renown, payoff, …) without core knowing what they mean.

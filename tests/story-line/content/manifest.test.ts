@@ -66,7 +66,7 @@ describe('buildStorylineManifest', () => {
       name: 'Town Meeting',
       storylineId: 'gym-story',
       storylineTitle: 'Gym Storyline',
-      hasChoices: true,
+      isChoice: true,
       optionCount: 2,
       effect: 'Lose 50 coins',
       impact: '−50 coins',
@@ -77,7 +77,7 @@ describe('buildStorylineManifest', () => {
     ]);
 
     const end = gymManifest.nodes.find((node) => node.id === 'gym-story-end');
-    expect(end).toMatchObject({ hasChoices: false, optionCount: 0, impact: '+60 reputation' });
+    expect(end).toMatchObject({ isChoice: false, optionCount: 0, impact: '+60 reputation' });
 
     // One edge per candidate; terminal options become a null-target edge.
     expect(gymManifest.edges).toHaveLength(6);
@@ -94,12 +94,22 @@ describe('buildStorylineManifest', () => {
     ]);
   });
 
+  it('derives the choice flag from the compiled options alone', () => {
+    for (const node of gymManifest.nodes) {
+      expect(node.isChoice, `node ${node.id} choice flag`).toBe(node.options.length > 0);
+      expect(node.isChoice).toBe(node.optionCount > 0);
+    }
+    // The generated shape carries the derived flag, never a content field.
+    expect(gymManifest.nodes.find((node) => node.id === 'gym-story-start')?.isChoice).toBe(true);
+    expect(gymManifest.nodes.find((node) => node.id === 'gym-story-end')?.isChoice).toBe(false);
+  });
+
   it('marks random candidate branches', () => {
     const csv = [
-      'id,name,effect,options,hasChoices,acceptNextCardId,rejectNextCardId,storylineId,storylineTitle,trigger,cost,coinDelta,reputationDelta',
-      'evt-a,Event A,Text,"Gamble|evt-b,evt-c",false,,,arc,Arc,Incident,0,0,0',
-      'evt-b,Event B,Text,,false,,,arc,Arc,Incident,0,0,0',
-      'evt-c,Event C,Text,,false,,,arc,Arc,Incident,0,0,0',
+      'id,name,effect,options,storylineId,storylineTitle,trigger,cost,coinDelta,reputationDelta',
+      'evt-a,Event A,Text,"Gamble|evt-b,evt-c",arc,Arc,Incident,0,0,0',
+      'evt-b,Event B,Text,,arc,Arc,Incident,0,0,0',
+      'evt-c,Event C,Text,,arc,Arc,Incident,0,0,0',
     ].join('\n');
     const manifest = buildStorylineManifestFromCsv(`${csv}\n`, GYM_CONTENT_ADAPTER);
     const branches = manifest.edges.filter((edge) => edge.from === 'evt-a');

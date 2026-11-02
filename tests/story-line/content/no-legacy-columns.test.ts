@@ -1,13 +1,17 @@
 /**
- * Legacy choice-column regression guard (CG-0MVZFW4XD009JSR6).
+ * Content-column shape guard (CG-0MVZFW4XD009JSR6, CG-0MVZFW6FY008RNZH).
  *
- * Story-line choices are represented **only** by the `options` encoding. The
- * retired two-way choice columns (`hasChoices`, `acceptNextCardId`,
- * `rejectNextCardId`) must never come back — not in the shipped Gym content,
- * not in the committed story-line/card-pack fixtures and not in the reference
- * Main Street pack. Any content file that still declares them would land them
- * in `ContentCard.fields` (they are unmapped columns), leaking legacy keys into
- * the generated manifest that authoring surfaces read.
+ * Story-line choices are represented **only** by the `options` encoding. Every
+ * content file the toolchain ships or consumes must declare exactly the
+ * columns its adapter expects: an unmapped column is projected into
+ * `ContentCard.fields`, so a reintroduced two-way choice column would silently
+ * leak into the generated manifest that the authoring surfaces read.
+ *
+ * The guard is an **allow-list**, not a deny-list: the expected column set is
+ * pinned exactly (the adapter's own `columns`, the shared card-pack header, or
+ * the reference pack's documented header plus its two pack-only extras). An
+ * added, removed or renamed column therefore fails this guard no matter what
+ * it is called.
  *
  * The assertions go through the public content API (`parseCsv`,
  * `cardsFromCsv`, `compileContentOptions`) and the committed manifest itself,
@@ -35,12 +39,19 @@ import {
   readText,
 } from './test-support';
 
-/** The retired legacy columns the migration removed from every content file. */
-const LEGACY_COLUMNS = [
-  'hasChoices',
-  'acceptNextCardId',
-  'rejectNextCardId',
-] as const;
+/**
+ * The Gym's unmapped (game) columns, in adapter order.
+ *
+ * Every mapped column is projected onto a generic story-line field; everything
+ * else survives in `ContentCard.fields` and reaches the manifest's node
+ * `fields`. This is the exact expected set.
+ */
+const GYM_GAME_COLUMNS = GYM_CONTENT_ADAPTER.columns.filter(
+  (column) => !Object.values(GYM_CONTENT_ADAPTER.fields).includes(column),
+);
+
+/** The reference pack's two columns that the shared card-pack header lacks. */
+const PACK_ONLY_COLUMNS = ['options', 'piggybackable'] as const;
 
 /** Repository-relative card-pack fixture CSVs (Main Street schema fragments). */
 const CARD_PACK_FIXTURE_CSVS = [
@@ -58,26 +69,31 @@ function readRepoFile(relativePath: string): string {
   return readText(join(REPO_ROOT, relativePath));
 }
 
-/** Asserts that a CSV header declares none of the retired columns. */
-function expectNoLegacyColumns(label: string, header: readonly string[]): void {
-  for (const column of LEGACY_COLUMNS) {
-    expect(header, `${label} still declares the legacy "${column}" column`).not.toContain(
-      column,
-    );
-  }
+/** Asserts that a header is exactly the expected ordered column list. */
+function expectExactColumns(
+  label: string,
+  header: readonly string[],
+  expected: readonly string[],
+): void {
+  expect(header, `${label} column header drifted from the expected set`).toEqual([...expected]);
 }
 
 describe('shipped Gym story-line content', () => {
-  it('no longer declares the legacy choice columns', () => {
+  it('declares exactly the columns the Gym adapter accepts', () => {
     const parsed = parseCsv(readText(GYM_CONTENT_PATH));
-    expectNoLegacyColumns('example-games/gym/content/storylines.csv', parsed.header);
+    expectExactColumns(
+      'example-games/gym/content/storylines.csv',
+      parsed.header,
+      GYM_CONTENT_ADAPTER.columns,
+    );
+    for (const row of parsed.rows) expect(row).toHaveLength(parsed.header.length);
   });
 
-  it('projects no legacy key into any card field set', () => {
+  it('projects exactly the adapter’s game columns onto every card', () => {
     const cards = cardsFromCsv(parseCsv(readText(GYM_CONTENT_PATH)), GYM_CONTENT_ADAPTER);
     expect(cards).toHaveLength(4);
     for (const card of cards) {
-      expectNoLegacyColumns(`card ${card.id}`, Object.keys(card.fields));
+      expectExactColumns(`card ${card.id}`, Object.keys(card.fields), GYM_GAME_COLUMNS);
     }
   });
 
@@ -103,40 +119,49 @@ describe('shipped Gym story-line content', () => {
 });
 
 describe('committed Gym manifest artefact', () => {
-  it('carries no legacy key in any node’s fields', () => {
+  it('carries exactly the adapter’s game columns on every node', () => {
     const manifest = JSON.parse(readText(GYM_MANIFEST_PATH)) as StorylineManifest;
     expect(manifest.nodes.length).toBeGreaterThan(0);
     for (const node of manifest.nodes) {
-      expectNoLegacyColumns(`node ${node.id}`, Object.keys(node.fields));
+      expectExactColumns(`node ${node.id}`, Object.keys(node.fields), GYM_GAME_COLUMNS);
+      // The derived choice flag can never disagree with the compiled options.
+      expect(node.isChoice).toBe(node.optionCount > 0);
     }
   });
 });
 
 describe('story-line and card-pack fixtures', () => {
-  it('migrates the cycle fixture off the legacy columns', () => {
+  it('keeps the cycle fixture on the Gym columns', () => {
     const parsed = parseCsv(readFixture('gym-cycle.csv'));
-    expectNoLegacyColumns('tests/fixtures/story-line/gym-cycle.csv', parsed.header);
+    expectExactColumns('tests/fixtures/story-line/gym-cycle.csv', parsed.header, GYM_CONTENT_ADAPTER.columns);
     expect(parsed.rows).toHaveLength(2);
   });
 
-  it('migrates every card-pack fixture CSV off the legacy columns', () => {
+  it('keeps every card-pack fixture CSV on the shared card-pack header', () => {
     for (const relativePath of CARD_PACK_FIXTURE_CSVS) {
       const parsed = parseCsv(readRepoFile(relativePath));
-      expectNoLegacyColumns(relativePath, parsed.header);
+      expectExactColumns(relativePath, parsed.header, CARD_PACK_CSV_COLUMNS);
       expect(parsed.rows.length).toBeGreaterThan(0);
-      // A migrated fragment keeps one cell per column on every row, so the
-      // pack merge's exact-header check still passes.
+      // Every row keeps one cell per column, so the pack merge's exact-header
+      // check still passes.
       for (const row of parsed.rows) expect(row).toHaveLength(parsed.header.length);
     }
   });
 
-  it('keeps the shared card-pack header constant legacy-free', () => {
-    expectNoLegacyColumns('CARD_PACK_CSV_COLUMNS', CARD_PACK_CSV_COLUMNS);
+  it('declares no duplicate columns in the shared card-pack header', () => {
+    expect(new Set(CARD_PACK_CSV_COLUMNS).size).toBe(CARD_PACK_CSV_COLUMNS.length);
   });
 
-  it('migrates the reference Main Street pack off the legacy columns', () => {
+  it('keeps the reference Main Street pack on the base header plus its two pack-only columns', () => {
     const parsed = parseCsv(readRepoFile(REFERENCE_PACK_CSV));
-    expectNoLegacyColumns(REFERENCE_PACK_CSV, parsed.header);
+    expect(
+      parsed.header.filter(
+        (column) => !(PACK_ONLY_COLUMNS as readonly string[]).includes(column),
+      ),
+    ).toEqual(CARD_PACK_CSV_COLUMNS);
+    expect(parsed.header).toHaveLength(
+      CARD_PACK_CSV_COLUMNS.length + PACK_ONLY_COLUMNS.length,
+    );
     // Story-line choices are carried by `options` alone.
     expect(parsed.header).toContain('options');
     expect(parsed.rows.length).toBeGreaterThan(0);

@@ -56,10 +56,9 @@ describe('shipped adapters', () => {
         'storylineTitle',
       ]),
     );
-    // The retired legacy choice/link columns are no longer part of the adapter.
-    expect(GYM_CONTENT_ADAPTER.columns).not.toContain('hasChoices');
-    expect(GYM_CONTENT_ADAPTER.columns).not.toContain('acceptNextCardId');
-    expect(GYM_CONTENT_ADAPTER.columns).not.toContain('rejectNextCardId');
+    // The exact column / mapping / default key sets are the contract: the
+    // adapter declares, maps and defaults nothing outside them.
+    expect(GYM_CONTENT_ADAPTER.columns).toHaveLength(10);
     expect(Object.keys(GYM_CONTENT_ADAPTER.fields)).toEqual([
       'id',
       'name',
@@ -68,7 +67,15 @@ describe('shipped adapters', () => {
       'storylineId',
       'storylineTitle',
     ]);
-    expect(Object.keys(GYM_CONTENT_ADAPTER.newCardDefaults ?? {})).not.toContain('hasChoices');
+    expect(Object.keys(GYM_CONTENT_ADAPTER.newCardDefaults ?? {})).toEqual([
+      'options',
+      'storylineId',
+      'storylineTitle',
+      'trigger',
+      'cost',
+      'coinDelta',
+      'reputationDelta',
+    ]);
   });
 
   it('describes the Gym impact from its game columns', () => {

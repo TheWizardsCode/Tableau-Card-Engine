@@ -111,11 +111,9 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     // Adapter columns are plain text fields, carrying their raw values.
     expect(fields.get('column:coinDelta')?.group).toBe('adapter');
     expect(fields.get('column:coinDelta')?.value).toBe('-50');
-    // The retired legacy choice/link controls are gone: `options` is the only
-    // way a card is a choice node.
-    expect(fields.has('hasChoices')).toBe(false);
-    expect(fields.has('acceptNextCardId')).toBe(false);
-    expect(fields.has('rejectNextCardId')).toBe(false);
+    // The exact descriptor key list above is the contract: `options` is the
+    // only choice control, and no extra choices-related keys exist.
+    expect(fields.size).toBe(10);
     // The options field offers the known card ids as suggestions.
     expect(fields.get('options')?.suggestions).toEqual([
       'gym-story-start',

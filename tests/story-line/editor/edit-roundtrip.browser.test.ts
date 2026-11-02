@@ -182,10 +182,20 @@ describe('story-line editor — curated card edit round-trip', () => {
         'column:reputationDelta',
       ]),
     );
-    // The retired legacy choice/link controls are no longer rendered.
-    expect(renderedFields).not.toContain('hasChoices');
-    expect(renderedFields).not.toContain('acceptNextCardId');
-    expect(renderedFields).not.toContain('rejectNextCardId');
+    // The form renders exactly the adapter-driven field set: `options` is the
+    // only choice control and no extra choices-related field is rendered.
+    expect([...new Set(renderedFields)].sort()).toEqual([
+      'column:coinDelta',
+      'column:cost',
+      'column:reputationDelta',
+      'column:trigger',
+      'effect',
+      'id',
+      'name',
+      'options',
+      'storylineId',
+      'storylineTitle',
+    ]);
 
     // The id is read-only and prefilled; every other control is editable.
     const idControl = control(container, 'id');

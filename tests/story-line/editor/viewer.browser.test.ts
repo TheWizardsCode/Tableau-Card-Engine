@@ -78,7 +78,7 @@ function syntheticManifest(): StorylineManifest {
         name: 'Alpha',
         storylineId: 'arc-a',
         storylineTitle: 'Arc A',
-        hasChoices: true,
+        isChoice: true,
         optionCount: 3,
         options: [
           { label: 'go', successorIds: ['b'], effectPolicy: 'apply' },
@@ -94,7 +94,7 @@ function syntheticManifest(): StorylineManifest {
         name: 'Beta',
         storylineId: 'arc-a',
         storylineTitle: 'Arc A',
-        hasChoices: true,
+        isChoice: true,
         optionCount: 1,
         options: [{ label: 'back', successorIds: ['a'], effectPolicy: 'apply' }],
         effect: 'Beta follows.',
@@ -106,7 +106,7 @@ function syntheticManifest(): StorylineManifest {
         name: 'Gamma',
         storylineId: 'arc-a',
         storylineTitle: 'Arc A',
-        hasChoices: false,
+        isChoice: false,
         optionCount: 0,
         options: [],
         effect: 'Gamma ends.',
@@ -118,7 +118,7 @@ function syntheticManifest(): StorylineManifest {
         name: 'Loner',
         storylineId: null,
         storylineTitle: null,
-        hasChoices: false,
+        isChoice: false,
         optionCount: 0,
         options: [],
         effect: 'Loner stands alone.',
@@ -150,7 +150,7 @@ function tallManifest(count: number): StorylineManifest {
     name: `Card ${index}`,
     storylineId: 'arc-tall',
     storylineTitle: 'Tall Arc',
-    hasChoices: index < count - 1,
+    isChoice: index < count - 1,
     optionCount: index < count - 1 ? 1 : 0,
     options:
       index < count - 1
@@ -195,7 +195,7 @@ describe('story-line editor viewer — manifest rendering', () => {
     for (const node of gymManifest.nodes) {
       const element = container.querySelector(`[data-node-id="${node.id}"]`);
       expect(element, `node ${node.id} is rendered`).not.toBeNull();
-      expect(element?.getAttribute('data-has-choices')).toBe(String(node.hasChoices));
+      expect(element?.getAttribute('data-is-choice')).toBe(String(node.isChoice));
       expect(element?.getAttribute('data-storyline-id')).toBe(node.storylineId ?? '');
     }
 
@@ -230,8 +230,17 @@ describe('story-line editor viewer — manifest rendering', () => {
     expect(start?.classList.contains('node--choice')).toBe(true);
     expect(end?.classList.contains('node--incident')).toBe(true);
     expect(container.querySelectorAll('.node--choice').length).toBe(
-      gymManifest.nodes.filter((node) => node.hasChoices).length,
+      gymManifest.nodes.filter((node) => node.isChoice).length,
     );
+
+    // A choice node is a diamond labelled `CHOICE · <optionCount>`; an incident
+    // is a rounded box labelled `INCIDENT`.
+    expect(start?.querySelector('polygon.node-shape')).not.toBeNull();
+    expect(end?.querySelector('rect.node-shape')).not.toBeNull();
+    expect(start?.querySelector('.node-kind')?.textContent).toBe(
+      `CHOICE · ${gymManifest.nodes.find((node) => node.id === 'gym-story-start')?.optionCount}`,
+    );
+    expect(end?.querySelector('.node-kind')?.textContent).toBe('INCIDENT');
 
     const column = container.querySelector('[data-role="graph-column"][data-storyline-id="gym-story"]');
     expect(column).not.toBeNull();

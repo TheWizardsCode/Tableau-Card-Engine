@@ -127,13 +127,23 @@ describe('storyUpdateLine', () => {
 // ── retired choice-clarity API ─────────────────────────────
 
 describe('retired choice-clarity API', () => {
-  it('is absent from the default UI adapter', () => {
+  it('leaves the default UI adapter with exactly the documented methods', () => {
     const system = makeSystem();
-    expect('choiceClarityLabels' in system.ui).toBe(false);
+    expect(Object.keys(system.ui).sort()).toEqual([
+      'choiceDialogSubtitle',
+      'choiceDialogTitle',
+      'journalTitle',
+      'storyUpdateLine',
+      'storylineName',
+      'storylineSummary',
+    ]);
   });
 
-  it('is absent from the public barrel', () => {
-    expect('defaultChoiceClarityLabels' in storylineApi).toBe(false);
+  it('exports no clarity-label helper from the public barrel', () => {
+    // The retired API was removed from the barrel. A shape guard keeps a stale
+    // re-export from creeping back without naming the removed symbols.
+    const labelish = Object.keys(storylineApi).filter((key) => /clarity|label/i.test(key));
+    expect(labelish).toEqual([]);
   });
 });
 

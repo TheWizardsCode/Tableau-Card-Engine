@@ -90,11 +90,11 @@ export const FIXTURE_INCOMPATIBLE_RANGE = '^9.0.0';
 /**
  * The migrated header of `../tce-main-street/src/card-data.csv` (50 columns).
  *
- * Main Street's legacy two-way choice columns (`hasChoices`,
- * `acceptNextCardId`, `rejectNextCardId`) are dropped: story-line choices are
- * represented solely by the `options` encoding, so the pack schema no longer
- * carries them (CG-0MVZFW4XD009JSR6; Main Street's own base CSV migrates
- * separately).
+ * Main Street's retired two-way choice columns are dropped: story-line choices
+ * are represented solely by the `options` encoding, so the pack schema no
+ * longer carries them (CG-0MVZFW4XD009JSR6; Main Street's own base CSV
+ * migrates separately). The column set is pinned exactly by
+ * `tests/story-line/content/no-legacy-columns.test.ts`.
  *
  * Committed pack CSV fragments reuse it so tests can concatenate a synthetic
  * base pool and a pack fragment without hand-maintaining two schemas. Kept as
