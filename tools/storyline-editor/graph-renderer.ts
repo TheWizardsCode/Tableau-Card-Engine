@@ -13,7 +13,7 @@
  * interacting with it never round-trips to the host.
  *
  * Everything the browser tests assert is exposed deliberately: `data-node-id`
- * and `data-edge` markers, `data-cycle` / `data-has-choices` flags, a
+ * and `data-edge` markers, `data-cycle` / `data-is-choice` flags, a
  * `getTransform()` accessor and the `zoomBy`/`panBy`/`resetView`/`fitToView`
  * controls that back the toolbar buttons.
  *
