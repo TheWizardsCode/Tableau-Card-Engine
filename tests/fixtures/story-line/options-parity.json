@@ -1,0 +1,96 @@
+{
+  "capturedFrom": "CG-0MVZFVYKD001Q18N",
+  "capturedAt": "2026-11-02",
+  "captureNote": "Compiled option lists of every shipped story-line card, captured from real behaviour before the legacy two-way choice code was removed. Regenerate only when the shipped content is deliberately changed: run the capture in tests/story-line/options-parity.test.ts and review the diff.",
+  "sources": [
+    {
+      "id": "gym",
+      "csv": "example-games/gym/content/storylines.csv",
+      "adapter": "GYM_CONTENT_ADAPTER",
+      "cards": [
+        {
+          "id": "gym-story-start",
+          "name": "Town Meeting",
+          "storylineId": "gym-story",
+          "options": [
+            {
+              "label": "Invest",
+              "successorIds": ["gym-story-invest"],
+              "effectPolicy": "apply"
+            },
+            {
+              "label": "Ignore",
+              "successorIds": ["gym-story-ignore"],
+              "effectPolicy": "apply"
+            }
+          ]
+        },
+        {
+          "id": "gym-story-invest",
+          "name": "Public Investment",
+          "storylineId": "gym-story",
+          "options": [
+            {
+              "label": "Celebrate",
+              "successorIds": ["gym-story-end"],
+              "effectPolicy": "apply"
+            },
+            {
+              "label": "Double down",
+              "successorIds": [],
+              "effectPolicy": "apply"
+            }
+          ]
+        },
+        {
+          "id": "gym-story-ignore",
+          "name": "Neglected Roads",
+          "storylineId": "gym-story",
+          "options": [
+            {
+              "label": "Repair",
+              "successorIds": ["gym-story-end"],
+              "effectPolicy": "apply"
+            },
+            {
+              "label": "Let it be",
+              "successorIds": [],
+              "effectPolicy": "apply"
+            }
+          ]
+        },
+        {
+          "id": "gym-story-end",
+          "name": "Transport Infrastructure",
+          "storylineId": "gym-story",
+          "options": []
+        }
+      ]
+    },
+    {
+      "id": "main-street-reference-pack",
+      "csv": "tests/fixtures/reference-packs/main-street/main-street/main-street-foundations/cards.csv",
+      "adapter": "minimal options-only adapter declared in tests/story-line/options-parity.test.ts",
+      "cards": [
+        {
+          "id": "biz-ms-foundations-teahouse",
+          "name": "Foundations Tea House",
+          "storylineId": null,
+          "options": []
+        },
+        {
+          "id": "evt-ms-foundations-fair",
+          "name": "Founders' Day Fair",
+          "storylineId": null,
+          "options": []
+        },
+        {
+          "id": "upg-ms-foundations-teahouse",
+          "name": "Upgrade to Tea House",
+          "storylineId": null,
+          "options": []
+        }
+      ]
+    }
+  ]
+}
