@@ -54,7 +54,8 @@ documented in full in [Config-Driven Game Catalogue](game-configuration.md).
 ├── tce-feudalism/
 ├── tce-lost-cities/
 ├── tce-main-street/
-└── tce-coloretto/                # … 8 games in total
+├── tce-coloretto/
+└── tce-the-rising/               # … 9 games in total
 ```
 
 Repos are checked out as **siblings**. A game repo pulls the engine in as a git
@@ -168,8 +169,10 @@ and a written rationale. The audit is reproduced here:
 | `audio/golf/` (10) | golf | From `scripts/generate-sfx.mjs`. |
 | `audio/lost-cities/` (12) | lost-cities | From `scripts/generate-lost-cities-sfx.mjs`. |
 | `audio/sushi-go/` (6) | sushi-go | Referenced only by Sushi Go. |
+| `audio/the-rising/` (13) | the-rising | Match SFX (deal, flip, slash, land ticks, win/lost) referenced only by 1916: The Rising. |
 | `games/<game>/thumbnail.png` | `<game>` | Game Selector thumbnails, generated per game. |
 | `games/main-street/` (190) | main-street | Card SVGs, icons and game audio for Main Street. |
+| `games/the-rising/` (135) | the-rising | Selector thumbnail, the player/adversary card backs and 132 AI portraits for 1916: The Rising. |
 | `sushi-go/` (14 icons + `STYLE.md`, `preview.html`) | sushi-go | In-house Sushi Go icons. |
 
 ### Why shared assets are enumerated as files, not directories
@@ -359,6 +362,7 @@ repository is retired. See [`merged-core-decision.md`](./merged-core-decision.md
 | `tce-lost-cities` | public | `dev`, `main` | `main` |
 | `tce-main-street` | public | `dev`, `main` | `main` |
 | `tce-coloretto` | public | `dev`, `main` | `main` |
+| `tce-the-rising` | public | `dev`, `main` | `main` |
 
 > **Historical note.** `tableau-card-engine-core` was the F1 core repository.
 > The merged-core decision retired it (F6 archived it on 2026-09-27; it was

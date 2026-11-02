@@ -54,6 +54,7 @@ const GAMES = [
   'lost-cities',
   'main-street',
   'coloretto',
+  'the-rising',
 ] as const;
 
 /**

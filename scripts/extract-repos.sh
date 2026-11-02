@@ -49,7 +49,8 @@ Options:
   --list               List extractable target names (one per line) and exit.
   --target <name>      Extract only one target: "core" or a game name
                        (golf, beleaguered-castle, blackjack, sushi-go,
-                       feudalism, lost-cities, main-street, coloretto).
+                       feudalism, lost-cities, main-street, coloretto,
+                       the-rising).
   --out-dir <path>     Directory in which to create the extracted repos
                        (default: the monorepo's parent directory).
   --source <path>      Source repository to clone before filtering

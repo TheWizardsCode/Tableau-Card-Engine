@@ -29,7 +29,7 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const LAYOUT_PATH = path.join(REPO_ROOT, 'scripts', 'configs', 'repo-layout.json');
 const SCRIPT_PATH = path.join(REPO_ROOT, 'scripts', 'extract-repos.sh');
 
-/** All eight example games that move to their own repository. */
+/** All nine example games that move to their own repository. */
 const GAME_NAMES = [
   'golf',
   'beleaguered-castle',
@@ -39,6 +39,7 @@ const GAME_NAMES = [
   'lost-cities',
   'main-street',
   'coloretto',
+  'the-rising',
 ] as const;
 
 /** Shared engine modules that stay in the core repository. */
@@ -115,7 +116,7 @@ describe('repo-layout.json — repo partition contract', () => {
     expect(Array.isArray(layout.assetDecisionTable)).toBe(true);
   });
 
-  it('declares exactly the eight example games as separate repos', () => {
+  it('declares exactly the nine example games as separate repos', () => {
     const layout = readLayout();
     expect(layout.games.map((g) => g.name).sort()).toEqual([...GAME_NAMES].sort());
   });
@@ -308,7 +309,7 @@ describe('extract-repos.sh — driver interface', () => {
 });
 
 describe('extract-repos.sh — dry-run plan', () => {
-  it('succeeds and names the core repo plus all eight game repos', () => {
+  it('succeeds and names the core repo plus all nine game repos', () => {
     const { stdout, status } = runExtract(['--dry-run']);
     expect(status).toBe(0);
     expect(stdout).toContain('Tableau-Card-Engine');

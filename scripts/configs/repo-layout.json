@@ -324,6 +324,20 @@
       "assets": [
         "audio/coloretto/"
       ]
+    },
+    {
+      "name": "the-rising",
+      "slug": "tce-the-rising",
+      "remote": "git@github.com:TheWizardsCode/tce-the-rising.git",
+      "paths": [
+        "example-games/the-rising",
+        "tests/the-rising",
+        "docs/the-rising"
+      ],
+      "assets": [
+        "audio/the-rising/",
+        "games/the-rising/"
+      ]
     }
   ],
   "sharedAssets": [
@@ -454,6 +468,13 @@
       "game": "coloretto",
       "assets": [
         "audio/coloretto/"
+      ]
+    },
+    {
+      "game": "the-rising",
+      "assets": [
+        "audio/the-rising/",
+        "games/the-rising/"
       ]
     }
   ],
