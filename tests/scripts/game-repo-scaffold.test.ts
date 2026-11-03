@@ -1218,7 +1218,7 @@ describe('scaffoldGameRepo write gating (--only / --force / skip-local)', () => 
     const { core, gameRepo } = makeLayout('golf');
     seedDivergedGeneratedFiles(gameRepo);
 
-    // Back-compatibility guard: the eight sibling `tce-<game>` repos receive
+    // Back-compatibility guard: the nine sibling `tce-<game>` repos receive
     // template updates from a plain full run, so `force` must be implied when
     // `only` is absent (effectiveForce = force || only === undefined).
     const result = scaffoldGameRepo({

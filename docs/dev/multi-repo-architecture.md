@@ -314,7 +314,7 @@ are the prose side of the same contract.
 
 | Flag | Effect |
 |---|---|
-| *(none)* | **Unchanged default.** A *full run* regenerates every generated file and is the supported upgrade path for the eight sibling `tce-<game>` repos. |
+| *(none)* | **Unchanged default.** A *full run* regenerates every generated file and is the supported upgrade path for the nine sibling `tce-<game>` repos. |
 | `--only <file,...>` | A *selected run*: writes only the named generated files. Every other file is `skip-local` (`unchanged` when it already matches the template) and is never written, and **no** side effect runs — no `core` symlink, no shared-asset or app-icon link, and no game-tree path rewrite. An unknown name fails the run before anything is written, listing the valid paths. |
 | `--force` | Overwrite a **selected** file whose content differs from the template. Without it that file stays `skip-local`, so a hand edit is never silently lost. A full run implies force. |
 | `--dry-run` | Classify and report only: writes nothing (no files, no links, no path rewrite). The report is exactly what the real run would apply. |
