@@ -2296,7 +2296,10 @@ game code that assumes a Filter renderer (shaders, masks, blend passes) would
 quietly no-op. See [Per-game repo scaffold](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and `src/ui/createCardGame.ts` (whose `type` option documents the same default).
 The renderer-dependent clipping contract that follows from this is documented in
-[Renderer-Aware Clipping (`ContainerClip`)](ui/renderer-aware-clipping.md).
+[Renderer-Aware Clipping (`ContainerClip`)](ui/renderer-aware-clipping.md) —
+including the downstream switch-over (Main Street item `MS-0MVTMJ2GA008GRZ7`,
+now completed) that re-pinned a game repo to the core commits delivering the
+helper.
 
 **Tests are the deliberate exception.** `src/core-engine/TestGamePool.ts`
 pins `TEST_RENDER_TYPE` to `Phaser.CANVAS` (use `withTestRenderer(options)`),

@@ -236,6 +236,41 @@ npx vitest run --project unit tests/ui/ContainerClip.test.ts
 
 ---
 
+## Downstream switch-over (Main Street hand-off)
+
+The migration was raised from the Main Street repo (`MS-0MV1HJ9ES009Y8GK`,
+commit `73cfba6c`) and delivered here as `CG-0MVTMITW7002VF0I`. The
+cross-repo switch-over is tracked by **`MS-0MVTMJ2GA008GRZ7`** ("Re-scaffold
+Main Street launcher to `Phaser.AUTO` and verify a clean WebGL boot once core
+masks land") in the Main Street store — reused rather than duplicated, per the
+hand-off child `CG-0MVTQ3XVJ00785W4`.
+
+**Delivering core commits:** `da834259` (`ContainerClip` helper),
+`5f96911d` (HelpPanel / Overlay / SettingsPanel), `45a19738`
+(`GymOverlayUiScene`), `cb7e09c6` (scaffold + core `main.ts` emit
+`Phaser.AUTO`), `0b536c53` (this document and its cross-links) and `57f82067`
+(prune the tests the migration obsoleted).
+
+**Steps recorded on `MS-0MVTMJ2GA008GRZ7`** (one comment naming the commits
+above): re-pin the core commit in the game repo's `configs/engine-pin.json`,
+run `npm run scaffold` to regenerate `main.ts` as `Phaser.AUTO`, replace any
+local `src/ContainerClip.ts` with the `@ui/ContainerClip` import and delete the
+local copy, then re-run
+`tests/main-street/webgl-renderer-clipping.browser.test.ts` with the
+core-originated warnings **no longer excluded**.
+
+**Acceptance signal:** the launcher boots WebGL, **no**
+`setMask … not supported in WebGL` warning is logged from any source (core
+included, so no `/core/` exclusion), and no core overlay renders unclipped.
+
+**Outcome (recorded 2026-11-03):** the downstream item reached
+`completed`/`done` and shipped; Main Street's `src/ContainerClip.ts` is
+deleted, every consumer imports `@ui/ContainerClip`, the WebGL clipping test
+carries no `/core/` exclusion, and its `configs/engine-pin.json` names a core
+commit at or after `57f82067`.
+
+---
+
 ## Related documentation
 
 - [Gym scene index](../gym/GYM_INDEX.md) — `GymOverlayUiScene` demonstrates
