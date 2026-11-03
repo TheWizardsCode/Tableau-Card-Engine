@@ -367,6 +367,26 @@ tsx core/scripts/game-repo-scaffold.ts \
 Preview first with `--dry-run --json`, and drop `--force` to confirm the file
 would be left alone.
 
+#### Consumer verification (`tce-main-street`, recorded 2026-11-03)
+
+The write gating above is verified against the live consumer as well as in the
+engine suite (CG-0MVWFN1HX004B5PN AC6). The checks were run read-only from the
+engine side; nothing in the consumer checkout was modified, and its working
+tree was clean before and after each step.
+
+- **Idempotent re-scaffold.** In `tce-main-street` (at `a5c8ccc1`)
+  `npm run scaffold` was run **twice**; `git status --porcelain` was empty after
+  both runs. The consumer's script opts in to a single generated file
+  (`--only main.ts --force`), so no wiring file, symlink or game-tree path was
+  rewritten.
+- **Pin and gitlink travel together.** Commit `11f42978` changes exactly
+  `core` (gitlink) and `configs/engine-pin.json`, and that pin's SHA
+  (`d46eb242…`) equalled the engine `dev` HEAD at verification time.
+- **Consumer build.** `npm run build` (strict `engine:sync`, then
+  `tsc --noEmit` and `vite build`) exited 0, leaving the tree clean.
+- **Consumer suite.** The consumer's cached full-scope run at `a5c8ccc1` is
+  green: 422 test files, 6678 tests passed (3 skipped).
+
 ### Option C layout — flat `src/`, no compatibility symlinks (F9)
 
 The F4 layout above (game at `example-games/<game>/`, `src -> <core>/src`)

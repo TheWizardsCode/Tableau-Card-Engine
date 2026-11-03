@@ -2356,6 +2356,24 @@ Rule of thumb: `engine:sync` for anything that ends in a commit or a build,
 `engine:dev-sync` for an interactive dev server, `engine:verify` for a
 release build.
 
+**Consumer wiring (rendered == committed).** The scaffold renders these two
+entries (`scripts/game-repo-scaffold.ts`), and the live consumer commits exactly
+those values, so the contract is checkable from this repository without reading
+the game repo (CG-0MVZJ35EV00690W5 AC6):
+
+```json
+"dev": "npm run engine:dev-sync && vite --host",
+"engine:dev-sync": "node ./core/scripts/engine-sync.mjs sync --soft"
+```
+
+`dev` renders as `npm run engine:dev-sync && vite --host` and
+`engine:dev-sync` as `node ${coreRel}/scripts/engine-sync.mjs sync --soft`, which
+is `./core` for a `./core`-submodule checkout — byte-identical to
+`tce-main-street/package.json` at `a5c8ccc1`. The engine-side declaration of the
+same contract is verified by `npm run build`
+(`check:ui-node-surface` → `tsc --noEmit` → `vite build`) exiting 0 on the
+engine tree at `d46eb242`.
+
 The script is the engine-owned `scripts/engine-sync.mjs` (+ `.d.mts` types),
 invoked through the submodule — game repos have no root `scripts/` tree
 (Option C). Game repos must declare the tracked branch in `.gitmodules`
