@@ -117,6 +117,7 @@ const git = (
 
 interface Fixture {
   root: string;
+  core: string;
   repo: string;
   worktree: string;
   remote: string;
@@ -191,7 +192,7 @@ function makeFixture(): Fixture {
   const worktreeGitDir = git(worktree, 'rev-parse', '--absolute-git-dir').stdout;
   expect(fs.existsSync(worktreeGitDir)).toBe(true);
 
-  return { root, repo, worktree, remote, worktreeGitDir, home };
+  return { root, core, repo, worktree, remote, worktreeGitDir, home };
 }
 
 /** Write the stub runner into the worktree's local runner location. */
@@ -273,6 +274,23 @@ describe('committed pre-push gate from a linked worktree', () => {
     // The failure is actionable: what went wrong and how to bypass it.
     expect(result.stderr).toContain('Full test suite failed');
     expect(result.stderr).toContain('TEST_SCOPE_SKIP=1');
+  }, 60_000);
+
+  it('copies self-contained hooks that never point back at the core checkout', () => {
+    // A copied hook must keep working in a clone at any path, so no hook may
+    // embed the core checkout it came from. The delegating wrappers resolve
+    // their sibling script from the hook's own directory.
+    const fixture = makeFixture();
+    for (const name of ['post-merge', 'post-rewrite']) {
+      const hook = fs.readFileSync(
+        path.join(fixture.repo, GITHOOKS_DIR, name),
+        'utf-8',
+      );
+      expect(hook, `${name} embeds the core path`).not.toContain(fixture.core);
+      expect(hook, `${name} does not resolve its sibling`).toContain(
+        'dirname -- "$0"',
+      );
+    }
   }, 60_000);
 
   it('treats the linked worktree as the repository under test, not an export', () => {

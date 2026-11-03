@@ -1,4 +1,8 @@
 #!/bin/sh
 # worklog:post-pull-hook:v1
-# Wrapper that delegates to central Worklog post-pull script (committed hooks).
-exec "/home/rgardler/projects/Tableau-Card-Engine/.githooks/worklog-post-pull" "$@"
+# Wrapper that delegates to the sibling central Worklog post-pull script
+# (committed hooks). The path is resolved relative to this hook so a copied
+# .githooks/ directory keeps working in any checkout (a game repo, a clone at
+# a different path) instead of pointing at the core checkout that produced it.
+hook_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+exec "$hook_dir/worklog-post-pull" "$@"
