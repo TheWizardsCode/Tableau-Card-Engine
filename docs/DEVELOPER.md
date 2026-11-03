@@ -2207,6 +2207,36 @@ repointed to `src/…`, and core-owned CLI/core-layer references to
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
 
+#### Committed hooks and the context budget
+
+A real scaffold run also makes the generated repo's committed git hooks
+**active** and gives it a measured startup-context budget
+(CG-0MW0KURL8002XOV9):
+
+- `.githooks/` is copied **verbatim** from the core checkout — the core is the
+  single source of truth, so the unified `pre-push` hook (branch policy,
+  context budget, the full-suite gate for `dev`/`main`, worklog sync) reaches
+  every game repo with no forked copy to drift;
+- the generated repo's **local** `core.hooksPath` is set to `.githooks`, and the
+  run reports the outcome (`hooksPath` in `--json`, a `hooks:` line otherwise);
+- `docs/dev/context-budget.thresholds.json` is measured from the **game repo's**
+  own surface (`measure_context.py --generate-thresholds`), with
+  `scripts/refresh-context-thresholds.sh` and a short
+  `docs/dev/context-budget.md` note written beside it;
+- the new entries ride the same write gating as every other generated file
+  (`create` / `unchanged` / `skip-local`, `--only`, `--force`, `--dry-run`).
+
+When the measurement tooling is unavailable the run **fails open**: no
+thresholds file is written (never a zeroed guess) and the report names the
+remedy. A `--dry-run` or `--only` run classifies the files without configuring
+`core.hooksPath`.
+
+`core.hooksPath` is **local** config, so a **fresh clone still needs one
+activation step** — `git config core.hooksPath .githooks` (or the framework's
+`scripts/install_pi.sh`). Without it git silently uses `.git/hooks/` and none of
+the committed gates run. See
+[Startup Context Budget](dev/context-budget.md#scaffolded-game-repos).
+
 #### Write gating: `--dry-run`, `--only`, `--force` and `--migrate-game-paths`
 
 Every run classifies each generated file before writing it, and reports the

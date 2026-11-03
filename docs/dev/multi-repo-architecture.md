@@ -302,6 +302,33 @@ presets as `configs/<game-id>.json`; see
 The scaffold also links the shared assets and app icon and, when asked, rewrites
 the game tree's own paths; both are write-gated as described next.
 
+### Committed hooks and the context budget (CG-0MW0KURL8002XOV9)
+
+A real scaffold run also makes the generated repo's git hooks **active** and
+gives it a measured startup-context budget:
+
+- `.githooks/` is copied **verbatim** from the core checkout — the core is the
+  single source of truth, so the unified `pre-push` hook (branch policy,
+  context budget, the **full-suite gate for `dev`/`main`**, worklog sync)
+  reaches every game repo with no forked copy to drift;
+- the generated repo's **local** `core.hooksPath` is set to `.githooks`, and the
+  run reports the outcome (`hooksPath` under `--json`, a `hooks:` line
+  otherwise);
+- `docs/dev/context-budget.thresholds.json` is measured from the **game repo's**
+  own surface, with `scripts/refresh-context-thresholds.sh` and a short
+  `docs/dev/context-budget.md` note written beside it (the core copy of the
+  refresh script would resolve `REPO_ROOT` to the `core/` submodule and refresh
+  the engine budget instead).
+
+The new entries ride the same write gating as every other generated file. When
+the measurement tooling is unavailable the run **fails open** — no thresholds
+file is written and the report names the remedy.
+
+`core.hooksPath` is **local** config, so a fresh clone still needs one
+activation step (`git config core.hooksPath .githooks`, or the framework's
+`scripts/install_pi.sh`) before the committed gates run. See
+[Startup Context Budget](context-budget.md#scaffolded-game-repos).
+
 ### Write gating (CG-0MVWGJPPA000GBE7, CG-0MVWGJRIO0094Y4Z)
 
 A generated file is engine-owned, but it lives in a checkout that owns its own
@@ -317,7 +344,7 @@ are the prose side of the same contract.
 | *(none)* | **Unchanged default.** A *full run* regenerates every generated file and is the supported upgrade path for the nine sibling `tce-<game>` repos. |
 | `--only <file,...>` | A *selected run*: writes only the named generated files. Every other file is `skip-local` (`unchanged` when it already matches the template) and is never written, and **no** side effect runs — no `core` symlink, no shared-asset or app-icon link, and no game-tree path rewrite. An unknown name fails the run before anything is written, listing the valid paths. |
 | `--force` | Overwrite a **selected** file whose content differs from the template. Without it that file stays `skip-local`, so a hand edit is never silently lost. A full run implies force. |
-| `--dry-run` | Classify and report only: writes nothing (no files, no links, no path rewrite). The report is exactly what the real run would apply. |
+| `--dry-run` | Classify and report only: writes nothing (no files, no links, no path rewrite) and does not configure `core.hooksPath`. The report is exactly what the real run would apply. |
 | `--json` | Emit the machine-readable per-file classification (`create` / `update` / `unchanged` / `skip-local`) — for dry and real runs alike, so a scripted caller can decide before applying anything. |
 | `--migrate-game-paths` | **Opt-in** game-tree migration (see below). Cannot be combined with `--only` — both fail fast before any write. Off by default, so a routine re-scaffold never edits a consumer's `tests/` or `src/`. |
 

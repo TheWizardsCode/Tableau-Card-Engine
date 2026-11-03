@@ -241,6 +241,16 @@ checkout that owns its own wiring:
   (mutually exclusive with `--only`); a fresh repo never needs it, because the
   extraction already renamed the tree.
 
+**Hooks and the context budget.** A scaffold run also copies the core's
+committed `.githooks/` (including the full-suite `pre-push` gate for
+`dev`/`main`), points the repo's local `core.hooksPath` at it, and generates
+`docs/dev/context-budget.thresholds.json` from the game repo's own measured
+surface. `core.hooksPath` is local config, so a **fresh clone needs one
+activation step** (`git config core.hooksPath .githooks`, or the framework's
+`scripts/install_pi.sh`) before the committed gates run. See
+[Startup Context Budget](docs/dev/context-budget.md#scaffolded-game-repos) and
+the [Developer Guide](docs/DEVELOPER.md#committed-hooks-and-the-context-budget).
+
 Worked consumer pattern, from inside an existing game repo:
 
 ```bash
