@@ -346,11 +346,19 @@ export interface OverlayDialogHandle {
    * enabled), re-positions the scroll container, and applies or removes
    * the scroll clip based on whether content overflows on either axis.
    *
-   * @param totalContentHeight  Total height of content in px. If
-   *                            omitted, estimated from children positions.
-   * @param totalContentWidth   Total width of content in px. If omitted,
-   *                            estimated from children positions. Ignored
-   *                            unless `enableHorizontalScroll` is set.
+   * An explicit measurement is remembered: a later call with no arguments
+   * (e.g. the one the wheel handler makes after every scroll step) re-uses
+   * it instead of falling back to the child-position estimate, so scrolling
+   * never shrinks the clamp back towards the top. Supplying a new value
+   * replaces the remembered one.
+   *
+   * @param totalContentHeight  Total height of content in px. If omitted, the
+   *                            last supplied measurement is reused, else the
+   *                            value is estimated from children positions.
+   * @param totalContentWidth   Total width of content in px. If omitted, the
+   *                            last supplied measurement is reused, else the
+   *                            value is estimated from children positions.
+   *                            Ignored unless `enableHorizontalScroll` is set.
    */
   refresh(totalContentHeight?: number, totalContentWidth?: number): void;
 }
@@ -382,9 +390,14 @@ export interface OverlayDialogHandle {
  *
  * - `refresh(totalContentHeight?, totalContentWidth?)` clamps `scrollY` to
  *   `max(0, height - contentHeight)` and — only when opted in — `scrollX`
- *   to `max(0, width - contentWidth)`. Omitted arguments are estimated from
- *   the children already in `scrollContainer` (each child's `y` + 22 px for
- *   the vertical estimate, `x` + `width` for the horizontal one).
+ *   to `max(0, width - contentWidth)`. Omitted arguments reuse the last
+ *   supplied measurement, so the no-argument refresh the wheel handler runs
+ *   after each scroll step never collapses a measured clamp back to the
+ *   single-row estimate. Before any measurement is supplied the size is
+ *   estimated from the children already in `scrollContainer` (each child's
+ *   `y` + its own height — a text object's full multi-line height — or a
+ *   22 px row pitch when the child reports no height; `x` + `width` for the
+ *   horizontal one).
  * - The wheel handler scales both deltas by 1.5 and ignores `dx` entirely
  *   unless the dialog opted in, so default behaviour is unchanged.
  * - The scroll clip is fixed in scene space at
@@ -521,6 +534,14 @@ export function createOverlayDialog(
   // `maxScrollX` is derived from the measured content width on every
   // `refresh()`; it stays 0 unless horizontal scrolling is opted into.
   let maxScrollX = 0;
+  // Last explicitly supplied content size. The wheel handler refreshes with no
+  // arguments after every scroll step; re-deriving the size from child
+  // positions (a 22 px row pitch, the single-line assumption) under-reports
+  // multi-line content and would clamp the offset back towards the top mid
+  // scroll. A caller-supplied measurement therefore wins over the estimate
+  // until the caller supplies a new one.
+  let measuredContentHeight: number | null = null;
+  let measuredContentWidth: number | null = null;
   const handle: OverlayDialogHandle = {
     scene,
     objects,
@@ -587,14 +608,17 @@ export function createOverlayDialog(
 
   /** Re-clamp scroll, reposition container, and apply/clear the scroll clip. */
   function refresh(totalContentHeight?: number, totalContentWidth?: number): void {
-    const th = totalContentHeight ?? estimateContentHeight();
+    if (totalContentHeight !== undefined) measuredContentHeight = totalContentHeight;
+    if (totalContentWidth !== undefined) measuredContentWidth = totalContentWidth;
+
+    const th = measuredContentHeight ?? estimateContentHeight();
     const maxScrollY = Math.max(0, th - contentHeight);
     handle.scrollY = Math.min(handle.scrollY, maxScrollY);
 
     // The horizontal clamp only exists for opted-in dialogs; the vertical
     // axis is unaffected either way.
     maxScrollX = enableHorizontalScroll
-      ? Math.max(0, (totalContentWidth ?? estimateContentWidth()) - contentWidth)
+      ? Math.max(0, (measuredContentWidth ?? estimateContentWidth()) - contentWidth)
       : 0;
     handle.scrollX = Math.min(handle.scrollX, maxScrollX);
 
@@ -613,11 +637,19 @@ export function createOverlayDialog(
     }
   }
 
-  /** Rough estimate of content height from child positions. */
+  /**
+   * Rough estimate of content height from child positions.
+   *
+   * A child that reports a height (text objects render many lines) uses it;
+   * children without a measurable box fall back to the 22 px single-row pitch.
+   */
   function estimateContentHeight(): number {
     let maxY = 0;
     for (const child of scrollContainer.list) {
-      maxY = Math.max(maxY, (child as any).y + 22);
+      const childHeight = (child as any).height;
+      const rowHeight =
+        typeof childHeight === 'number' && childHeight > 0 ? childHeight : 22;
+      maxY = Math.max(maxY, (child as any).y + rowHeight);
     }
     return maxY;
   }

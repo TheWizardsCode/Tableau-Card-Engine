@@ -32,6 +32,15 @@ const LINE_SPACING = 2;
 interface EventLogState {
   entries: EventLogEntry[];
   paused: boolean;
+  /**
+   * Number of `GlobalEventBuffer` entries already reflected in `entries`.
+   *
+   * The buffer is the source of truth and the 500 ms poll appends only the
+   * entries recorded since this watermark, so a **cleared** feed stays
+   * cleared (the poll does not repopulate it from the buffer) and a
+   * **paused** feed does not advance the watermark.
+   */
+  consumed: number;
 }
 
 let activeOverlay: OverlayDialogHandle | null = null;
@@ -113,10 +122,44 @@ function renderLog(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: Eve
 
 // ── Refresh entries from buffer ────────────────────────────
 
+/**
+ * Re-render the whole feed from the buffer, resetting the consumed watermark.
+ *
+ * Used once when the overlay opens; the poll appends from the watermark
+ * instead (see {@link syncFromBuffer}).
+ */
 function refreshFromBuffer(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: EventLogState): void {
   const buf = GlobalEventBuffer.getInstance();
-  state.entries = buf.getEntries().slice();
+  const all = buf.getEntries();
+  state.entries = all.slice();
+  state.consumed = all.length;
   renderLog(scene, overlay, state);
+}
+
+/**
+ * Append the entries buffered since the last sync and re-render.
+ *
+ * Only new events are appended, so the feed honours an earlier **Clear**
+ * (a cleared feed is not repopulated) and nothing already on screen is
+ * rebuilt. A buffer that shrank underneath the feed (e.g. the whole buffer
+ * was cleared by a session reset) is resynced from scratch.
+ *
+ * @returns `true` when the feed changed and the caller should refresh its
+ *          status/count labels.
+ */
+function syncFromBuffer(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: EventLogState): boolean {
+  const all = GlobalEventBuffer.getInstance().getEntries();
+
+  if (all.length < state.consumed) {
+    refreshFromBuffer(scene, overlay, state);
+    return true;
+  }
+  if (all.length === state.consumed) return false;
+
+  state.entries = state.entries.concat(all.slice(state.consumed));
+  state.consumed = all.length;
+  renderLog(scene, overlay, state);
+  return true;
 }
 
 // ── Factory ─────────────────────────────────────────────────
@@ -145,6 +188,7 @@ export function createGameEventLogTool(): DebugToolsEntry {
       const state: EventLogState = {
         entries: [],
         paused: false,
+        consumed: 0,
       };
       activeState = state;
 
@@ -183,6 +227,7 @@ export function createGameEventLogTool(): DebugToolsEntry {
       } catch { /* ignore */ }
 
       // ── Control buttons ────────────────────────────────────
+      const buf = GlobalEventBuffer.getInstance();
       const btnY = overlay.boxY + 65;
       const btnStyle = {
         fontSize: '13px',
@@ -195,7 +240,11 @@ export function createGameEventLogTool(): DebugToolsEntry {
       clearBtn.setDepth(overlay.depthBase + 2);
       clearBtn.setInteractive({ useHandCursor: true });
       clearBtn.on('pointerdown', () => {
+        // Clear the *feed*, not the buffer: advancing the consumed watermark
+        // past everything already recorded is what keeps the next poll tick
+        // from repopulating the list (the pre-pretty-print Clear behaviour).
         state.entries = [];
+        state.consumed = buf.getEntries().length;
         renderLog(scene, overlay, state);
       });
       clearBtn.on('pointerover', () => clearBtn.setColor('#aaddff'));
@@ -223,8 +272,6 @@ export function createGameEventLogTool(): DebugToolsEntry {
         if (hud && typeof hud.add === 'function') hud.add(pauseBtn);
       } catch { /* ignore */ }
 
-      const buf = GlobalEventBuffer.getInstance();
-
       // Event count
       const countText = scene.add.text(overlay.boxX + overlay.boxWidth - 60, btnY, `${buf.getEntries().length} events`, {
         fontSize: '12px',
@@ -250,12 +297,14 @@ export function createGameEventLogTool(): DebugToolsEntry {
             if (pollInterval) pollInterval.destroy();
             return;
           }
-          const newCount = buf.getEntries().length;
-          if (activeState.entries.length !== newCount) {
-            refreshFromBuffer(scene, activeOverlay, activeState);
-            statusText.setText('Status: ' + getBufferStatus() + HORIZONTAL_SCROLL_HINT);
-            countText.setText(newCount + ' events');
-          }
+          // Pause freezes the feed: nothing is appended and the status line
+          // keeps showing PAUSED. The watermark does not advance either, so
+          // resuming appends everything recorded while paused (the buffer is
+          // the source of truth — a pause never loses events).
+          if (activeState.paused) return;
+          if (!syncFromBuffer(scene, activeOverlay, activeState)) return;
+          statusText.setText('Status: ' + getBufferStatus() + HORIZONTAL_SCROLL_HINT);
+          countText.setText(buf.getEntries().length + ' events');
         },
       });
 

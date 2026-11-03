@@ -634,6 +634,65 @@ describe('createOverlayDialog', () => {
   });
 });
 
+describe('createOverlayDialog measured-clamp memory', () => {
+  let harness: ReturnType<typeof mockDialogScene>;
+
+  beforeEach(() => {
+    harness = mockDialogScene();
+  });
+
+  it('re-clamps with the last supplied measurement when refresh() gets no arguments', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Measured',
+      enableHorizontalScroll: true,
+    });
+    // The child-position estimate would report ~10 px of content on both axes,
+    // i.e. "nothing to scroll"; the measured size must keep winning so a
+    // wheel-driven no-argument refresh cannot collapse the scroll offset.
+    addDemoContent(dialog, 10, 10);
+    dialog.refresh(dialog.contentHeight * 4, dialog.contentWidth * 4);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 40, 100);
+
+    expect(dialog.scrollY).toBeCloseTo(150);
+    expect(dialog.scrollX).toBeCloseTo(60);
+    expect(dialog.scrollContainer.y).toBeCloseTo(dialog.contentY - 150);
+    expect(dialog.scrollContainer.x).toBeCloseTo(dialog.contentX - 60);
+  });
+
+  it('accepts a replacement measurement and re-clamps against it', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Remeasured' });
+    addDemoContent(dialog, 10, 10);
+    dialog.refresh(dialog.contentHeight * 4);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 0, 200);
+    expect(dialog.scrollY).toBeGreaterThan(0);
+
+    // The content shrank back to the visible height: the new measurement wins
+    // over both the estimate and the previous measurement.
+    dialog.refresh(dialog.contentHeight);
+    expect(dialog.scrollY).toBe(0);
+    expect(dialog.scrollContainer.y).toBe(dialog.contentY);
+  });
+
+  it('estimates multi-line children from their own height, not a 22 px pitch', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Multi-line' });
+    dialog.scrollContainer.add({
+      x: 0,
+      y: 0,
+      width: 100,
+      // A pretty-printed payload row: ten 20 px lines.
+      height: dialog.contentHeight * 3,
+    } as unknown as Phaser.GameObjects.GameObject);
+
+    dialog.refresh();
+
+    expect(dialog.scrollY).toBe(0);
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 0, 100);
+    expect(dialog.scrollY).toBeCloseTo(150);
+  });
+});
+
 describe('createOverlayDialog content-width measurement', () => {
   let harness: ReturnType<typeof mockDialogScene>;
 

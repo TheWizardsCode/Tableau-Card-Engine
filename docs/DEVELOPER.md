@@ -4749,8 +4749,14 @@ dialog.refresh(wideText.y + wideText.height, wideText.width);
 
 - `refresh(totalContentHeight?, totalContentWidth?)` clamps `scrollY` to
   `max(0, height - contentHeight)` and — only when opted in — `scrollX` to
-  `max(0, width - contentWidth)`. Omitted arguments are estimated from the
-  children already in `scrollContainer`.
+  `max(0, width - contentWidth)`. A caller-supplied measurement is
+  **remembered**: a later no-argument `refresh()` (the one the wheel handler
+  runs after every scroll step) re-uses it instead of falling back to the
+  child-position estimate, so a measured clamp never collapses mid-scroll.
+  Before any measurement is supplied the size is estimated from the children
+  already in `scrollContainer` (each child's `y` + its own height — a text
+  object's full multi-line height — or a 22 px row pitch when the child
+  reports no height).
 - The bounds-checked wheel handler scales `dx` and `dy` by 1.5 and ignores
   `dx` entirely unless the dialog opted in, so a default dialog behaves
   exactly as before and wheel input never leaks to overlays beneath.
@@ -5071,8 +5077,14 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
     circular reference becomes `[Circular]`, and `undefined`/primitives/failed
     serialisations fall back to `String(payload)`. One bad payload cannot stop
     the remaining events rendering.
-  - **Clear button:** Removes all entries from the feed.
-  - **Pause/Resume:** Toggles whether new events are added to the feed.
+  - **Clear button:** Empties the **feed** (not the buffer). The cleared feed
+    stays empty across the 500 ms poll tick — the overlay only appends events
+    recorded *after* the clear — so a clear is never undone half a second
+    later.
+  - **Pause/Resume:** Freezes the feed while paused: no rows are appended and
+    the `Status: PAUSED` line is not overwritten by a poll tick. Resuming
+    appends everything recorded while paused (the buffer is the source of
+    truth, so a pause never loses events).
 - **Event source:** Subscribes to the `GameEventEmitter` instance exposed on
   `window.__GAME_EVENTS__` (set up automatically by `CardGameScene`).
 - **Use case:** Monitor event flow during gameplay for debugging event-driven
