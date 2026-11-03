@@ -35,6 +35,14 @@
  * game's own tests reach the game source through the rewritten `src/` prefix
  * (`../../src/…`), so no `example-games/` tree or symlink is needed.
  *
+ * A real run also copies the core's committed `.githooks/` verbatim (including
+ * the unified full-suite pre-push gate), points the generated repo's **local**
+ * `core.hooksPath` at it, and generates
+ * `docs/dev/context-budget.thresholds.json` from that repo's own measured
+ * surface (CG-0MW0KURL8002XOV9). Because `core.hooksPath` is local config, a
+ * fresh clone still needs one activation step (`install_pi.sh` or
+ * `git config core.hooksPath .githooks`).
+ *
  * ## History
  *
  * Scaffolding is deliberately separate from extraction so the F1
@@ -120,7 +128,9 @@
  * game's version; the ship `bump-version.js` resolves the invoking repo root.
  */
 
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 // ── Public constants ──────────────────────────────────────────────────────
@@ -141,6 +151,33 @@ export const GAME_REPO_CONFIGS_DIR = 'configs';
 
 /** The preset filename a game repo builds with by default. */
 export const DEFAULT_GAME_PRESET = 'game';
+
+/**
+ * Directory (relative to a game repo root) holding the committed git hooks.
+ *
+ * The scaffold copies every file from `<coreRoot>/.githooks/` into this
+ * directory **verbatim** and then points the repo's local
+ * `core.hooksPath` at it (CG-0MW0KURL8002XOV9). Copying the core's directory —
+ * rather than rendering hook text here — keeps the single source of truth in
+ * TCE: a hook fix reaches every scaffolded game repo with no second copy to
+ * drift.
+ */
+export const GITHOOKS_DIR = '.githooks';
+
+/** The committed startup-context budget a scaffold generates for a game repo. */
+export const CONTEXT_THRESHOLDS_PATH = 'docs/dev/context-budget.thresholds.json';
+
+/** The per-repo guidance note shipped beside the generated thresholds. */
+export const CONTEXT_BUDGET_DOC_PATH = 'docs/dev/context-budget.md';
+
+/**
+ * Threshold-refresh entry point copied from the core into every game repo.
+ *
+ * A game repo needs its **own** copy: the core's script resolves `REPO_ROOT`
+ * from its own location, which inside a game repo is the `core/` submodule —
+ * running it there would refresh the engine budget, not the game's.
+ */
+export const REFRESH_THRESHOLDS_PATH = 'scripts/refresh-context-thresholds.sh';
 
 /**
  * Version a freshly scaffolded game repo is seeded with.
@@ -258,6 +295,13 @@ export interface ScaffoldOptions {
    * exclusive with {@link ScaffoldOptions.only}, which promises "no rewrite".
    */
   migrateGamePaths?: boolean;
+  /**
+   * Override the resolved `measure_context.py` path (tests inject a stub so the
+   * thresholds contract is provable without the framework install). When
+   * omitted the local-then-global resolution in
+   * {@link resolveMeasureContext} is used.
+   */
+  measureContextPath?: string;
 }
 
 /** Why the scaffold picked the game version it wrote. */
@@ -310,6 +354,38 @@ export interface ScaffoldMigrationReport {
   rewrites: GameTreeRewriteKind[];
 }
 
+/**
+ * Outcome of wiring `core.hooksPath` in the generated repo
+ * (CG-0MW0KURL8002XOV9).
+ *
+ * `applied` is true only for a real (non-dry, non-selection) run in a git
+ * repository; every other case carries a `reason` and never throws.
+ */
+export interface ScaffoldHooksPathReport {
+  applied: boolean;
+  /** The configured value when applied. */
+  value?: string;
+  /** Why the wiring was skipped (not a git repo, dry run, selection run). */
+  reason?: string;
+}
+
+/**
+ * Outcome of generating `docs/dev/context-budget.thresholds.json`
+ * (CG-0MW0KURL8002XOV9).
+ *
+ * Fail-open by design: when the measurement tooling is unavailable no file is
+ * written (never a zeroed guess) and `reason` names the remedy.
+ */
+export interface ScaffoldThresholdsReport {
+  generated: boolean;
+  /** Repo-relative thresholds path. */
+  path: string;
+  /** The measurement script that produced the values. */
+  measureScript?: string;
+  /** Why no thresholds file was generated. */
+  reason?: string;
+}
+
 /** Result of {@link scaffoldGameRepo}. */
 export interface ScaffoldResult {
   gameRepoRoot: string;
@@ -351,6 +427,14 @@ export interface ScaffoldResult {
    * `symlinks`/`assetLinks`/`publicLinks`/`rewritten` lists come back empty).
    */
   selectionNote?: string;
+  /**
+   * The `core.hooksPath` wiring outcome (CG-0MW0KURL8002XOV9). Local git
+   * config, so a **fresh clone still needs one activation step**
+   * (`install_pi.sh` or `git config core.hooksPath .githooks`).
+   */
+  hooksPath: ScaffoldHooksPathReport;
+  /** The generated context-budget thresholds outcome. */
+  thresholds: ScaffoldThresholdsReport;
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────
@@ -1035,6 +1119,217 @@ export function linkSharedPublicAssets(
 }
 
 /**
+ * Read every committed hook from the core checkout, sorted by filename.
+ *
+ * The core `.githooks/` directory is the single source of truth: the scaffold
+ * copies these files byte-for-byte rather than rendering hook text, so a hook
+ * fix in TCE reaches every generated game repo with no forked copy to drift
+ * (CG-0MW0KURL8002XOV9). Absence of the directory is a no-op, not an error —
+ * an older core checkout must not fail a scaffold.
+ */
+export function readCoreHooks(
+  coreRoot: string,
+): Array<{ name: string; contents: string; executable: boolean }> {
+  const hooksDir = path.join(coreRoot, GITHOOKS_DIR);
+  if (!fs.existsSync(hooksDir) || !fs.statSync(hooksDir).isDirectory()) {
+    return [];
+  }
+  return fs
+    .readdirSync(hooksDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((entry) => {
+      const filePath = path.join(hooksDir, entry.name);
+      const stat = fs.statSync(filePath);
+      return {
+        name: entry.name,
+        contents: fs.readFileSync(filePath, 'utf-8'),
+        executable: (stat.mode & 0o111) !== 0,
+      };
+    });
+}
+
+/**
+ * Resolve `measure_context.py` local-then-global — the same order
+ * `.githooks/pre-push` and `scripts/refresh-context-thresholds.sh` use
+ * (CG-0MW0KURL8002XOV9).
+ *
+ * Returns `undefined` when neither location exists; the caller then records a
+ * fail-open report entry instead of writing guessed thresholds.
+ */
+export function resolveMeasureContext(
+  coreRoot: string,
+  homeDir: string = os.homedir(),
+): string | undefined {
+  const local = path.join(
+    coreRoot,
+    'skill',
+    'context-audit',
+    'scripts',
+    'measure_context.py',
+  );
+  if (fs.existsSync(local)) return local;
+  const global = path.join(
+    homeDir,
+    '.pi',
+    'agent',
+    'skills',
+    'context-audit',
+    'scripts',
+    'measure_context.py',
+  );
+  return fs.existsSync(global) ? global : undefined;
+}
+
+/** The four components a measured thresholds file carries. */
+export interface ContextThresholds {
+  global_agents: number;
+  project_agents: number;
+  skills_prose: number;
+  total: number;
+}
+
+/**
+ * Measure a game repo's startup context surface.
+ *
+ * Shells out to `measure_context.py --generate-thresholds` with the repo root
+ * passed explicitly (the global script's default root is its own checkout,
+ * not the game repo). Read-only and never throws: any failure comes back as a
+ * `reason` so the scaffold can stay fail-open with an actionable report.
+ */
+export function measureContextThresholds(
+  measureScript: string,
+  gameRepoRoot: string,
+): { thresholds?: ContextThresholds; reason?: string } {
+  const run = spawnSync(
+    'python3',
+    [
+      measureScript,
+      '--repo-root',
+      gameRepoRoot,
+      '--include-hidden',
+      '--generate-thresholds',
+    ],
+    { encoding: 'utf-8' },
+  );
+  if (run.error) {
+    return {
+      reason:
+        `python3/measure_context.py could not run (${run.error.message}); ` +
+        'install the framework skills with scripts/install_pi.sh',
+    };
+  }
+  if (run.status !== 0) {
+    return {
+      reason:
+        `measure_context.py exited ${run.status ?? 'unknown'}: ` +
+        `${(run.stderr || '').trim() || 'no diagnostic'}`,
+    };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(run.stdout);
+  } catch {
+    return { reason: 'measure_context.py did not emit a JSON thresholds object' };
+  }
+  if (typeof parsed !== 'object' || parsed === null) {
+    return { reason: 'measure_context.py did not emit a JSON thresholds object' };
+  }
+  const record = parsed as Record<string, unknown>;
+  const keys = ['global_agents', 'project_agents', 'skills_prose', 'total'] as const;
+  for (const key of keys) {
+    if (typeof record[key] !== 'number') {
+      return { reason: `measured thresholds are missing numeric '${key}'` };
+    }
+  }
+  return { thresholds: record as unknown as ContextThresholds };
+}
+
+/**
+ * The short guidance note shipped in a generated game repo beside its
+ * thresholds file (CG-0MW0KURL8002XOV9).
+ *
+ * It is generated rather than copied because the core's
+ * `docs/dev/context-budget.md` documents TCE's own budget history; a game repo
+ * needs the activation/refresh/scope contract, not that history.
+ */
+export function renderContextBudgetDoc(game: string): string {
+  return [
+    `# Startup Context Budget — tce-${game}`,
+    '',
+    'This repository commits a startup-context budget in',
+    `\`${CONTEXT_THRESHOLDS_PATH}\` and enforces it at push time through the`,
+    'committed `.githooks/pre-push` gate (copied from the engine core).',
+    '',
+    '## What the gate measures',
+    '',
+    '| Component | What it counts |',
+    '|-----------|----------------|',
+    '| `global_agents` | the global `AGENTS_GLOBAL.md` ruleset |',
+    '| `project_agents` | this repository\'s `AGENTS.md` |',
+    '| `skills_prose` | the frontmatter `description` prose of `skill/*/SKILL.md` (with `--include-hidden`) |',
+    '| `total` | the sum of the components above |',
+    '',
+    '## Activating the hooks in a fresh clone',
+    '',
+    '`core.hooksPath` is **local git config**, so a fresh clone still needs one',
+    'activation step before the committed hooks run:',
+    '',
+    '```bash',
+    'git config core.hooksPath .githooks   # or run the framework install_pi.sh',
+    '```',
+    '',
+    '## Refreshing the budget',
+    '',
+    'Any commit that changes `AGENTS.md` (or skills prose) must refresh the',
+    'thresholds in the same commit:',
+    '',
+    '```bash',
+    './scripts/refresh-context-thresholds.sh          # write refreshed thresholds',
+    './scripts/refresh-context-thresholds.sh --check  # verify only',
+    '```',
+    '',
+    'The gate is fail-open only when the measurement tooling or the thresholds',
+    'file is absent; with both present a regression fails the push.',
+    '',
+  ].join('\n');
+}
+
+/**
+ * Wire `core.hooksPath` for a real scaffold run.
+ *
+ * Skipped (with an explicit reason, never a throw) when the target is not a git
+ * repository, so the existing pre-`git init` scaffold use case keeps working.
+ * Only the repo-local config is touched; the committed `.githooks/` directory
+ * is what a fresh clone activates.
+ */
+export function applyHooksPath(gameRepoRoot: string): ScaffoldHooksPathReport {
+  const probe = spawnSync('git', ['-C', gameRepoRoot, 'rev-parse', '--git-dir'], {
+    encoding: 'utf-8',
+  });
+  if (probe.error || probe.status !== 0) {
+    return {
+      applied: false,
+      reason: 'target is not a git repository (run git init first)',
+    };
+  }
+  const set = spawnSync(
+    'git',
+    ['-C', gameRepoRoot, 'config', 'core.hooksPath', GITHOOKS_DIR],
+    { encoding: 'utf-8' },
+  );
+  if (set.error || set.status !== 0) {
+    return {
+      applied: false,
+      reason:
+        `git config core.hooksPath failed: ` +
+        `${(set.error?.message ?? set.stderr ?? '').toString().trim() || 'unknown error'}`,
+    };
+  }
+  return { applied: true, value: GITHOOKS_DIR };
+}
+
+/**
  * The textual rewrites the game-tree migration applies, **in order**.
  *
  * Each rule takes the current contents and returns the rewritten contents, so
@@ -1263,7 +1558,7 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   // Build the whole plan (path + rendered contents) before writing anything:
   // `--only` validation must fail before a single byte lands, and the valid
   // name list is exactly this plan.
-  const plan: Array<{ filePath: string; contents: string }> = [
+  const plan: Array<{ filePath: string; contents: string; executable?: boolean }> = [
     {
       filePath: path.join(gameRepoRoot, 'package.json'),
       contents: renderPackageJson(options.game, manifest, coreRel, version),
@@ -1304,6 +1599,55 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     contents: renderPreset(options.game, scenePath, adapterPath),
   });
 
+  // ── Committed git hooks + context budget (CG-0MW0KURL8002XOV9) ──────────
+  // Hooks are copied verbatim from the core checkout (single source of truth),
+  // so a scaffolded repo ships the unified full-suite pre-push gate instead of
+  // a forked, gate-less copy. The thresholds file is measured from the
+  // generated repo's own surface; when the measurement tooling is unavailable
+  // nothing is written and the report names the remedy (fail-open).
+  const coreHooks = readCoreHooks(coreRoot);
+  for (const hook of coreHooks) {
+    plan.push({
+      filePath: path.join(gameRepoRoot, GITHOOKS_DIR, hook.name),
+      contents: hook.contents,
+      executable: hook.executable,
+    });
+  }
+
+  const measureScript =
+    options.measureContextPath ?? resolveMeasureContext(coreRoot);
+  const measured = measureScript
+    ? measureContextThresholds(measureScript, gameRepoRoot)
+    : {
+        reason:
+          'measure_context.py not found; install the framework skills with ' +
+          'scripts/install_pi.sh (thresholds gate stays fail-open)',
+      };
+  const thresholdsReport: ScaffoldThresholdsReport = {
+    generated: measured.thresholds !== undefined,
+    path: CONTEXT_THRESHOLDS_PATH,
+    ...(measureScript === undefined ? {} : { measureScript }),
+    ...(measured.thresholds === undefined ? { reason: measured.reason } : {}),
+  };
+  if (measured.thresholds !== undefined) {
+    plan.push({
+      filePath: path.join(gameRepoRoot, CONTEXT_THRESHOLDS_PATH),
+      contents: `${JSON.stringify(measured.thresholds, null, 2)}\n`,
+    });
+    const refreshScript = path.join(coreRoot, REFRESH_THRESHOLDS_PATH);
+    if (fs.existsSync(refreshScript)) {
+      plan.push({
+        filePath: path.join(gameRepoRoot, REFRESH_THRESHOLDS_PATH),
+        contents: fs.readFileSync(refreshScript, 'utf-8'),
+        executable: true,
+      });
+    }
+    plan.push({
+      filePath: path.join(gameRepoRoot, CONTEXT_BUDGET_DOC_PATH),
+      contents: renderContextBudgetDoc(options.game),
+    });
+  }
+
   const reportPathOf = (filePath: string): string =>
     path.relative(gameRepoRoot, filePath).split(path.sep).join('/');
 
@@ -1331,7 +1675,39 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
 
   for (const entry of plan) {
     writeFile(entry.filePath, entry.contents, writeCtx);
+    // Hooks and the refresh entry point must stay executable. The apply step
+    // above writes 0644, so restore the bit for a file this run may write
+    // (a selection run only touches its selected files).
+    if (entry.executable === true && !dryRun) {
+      const reportPath = reportPathOf(entry.filePath);
+      if (writeCtx.isSelected(reportPath)) {
+        try {
+          fs.chmodSync(entry.filePath, 0o755);
+        } catch {
+          // A mode we cannot set must not fail an otherwise valid scaffold.
+        }
+      }
+    }
   }
+
+  // Point the repo's *local* config at the copied hooks only after the plan
+  // has been written. `core.hooksPath` is local config, so a fresh clone still
+  // needs the documented one activation step (install_pi.sh or
+  // `git config core.hooksPath .githooks`).
+  const hooksPath: ScaffoldHooksPathReport =
+    dryRun || selectionMode
+      ? {
+          applied: false,
+          reason: dryRun
+            ? 'dry run — nothing configured'
+            : 'selection run — no side effects',
+        }
+      : coreHooks.length === 0
+        ? {
+            applied: false,
+            reason: `core ${GITHOOKS_DIR}/ has no hook files`,
+          }
+        : applyHooksPath(gameRepoRoot);
 
   // Option C (C1): the game source occupies repo-root `src/`, so the
   // `src -> core/src` compatibility symlink (and the `scripts`,
@@ -1393,6 +1769,8 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
     version,
     versionSource,
     selectionNote,
+    hooksPath,
+    thresholds: thresholdsReport,
   };
 }
 
@@ -1505,6 +1883,10 @@ function usage(): string {
     '',
     'Turn an extracted game checkout into a runnable single-game launcher',
     'that composes the core engine checkout as a sibling.',
+    '',
+    'A real run also copies the core\'s committed .githooks/ (including the',
+    'full-suite pre-push gate), points core.hooksPath at it, and generates',
+    'docs/dev/context-budget.thresholds.json from the game repo\'s own surface.',
     '',
     'Options:',
     '  --game <id>              Game id (golf, main-street, …). Required unless --all.',
@@ -1631,6 +2013,19 @@ function main(argv: string[]): number {
       console.log(`  core:      ${result.coreRoot} (${result.coreRel})`);
       console.log(`  preset:    ${result.presetPath}`);
       console.log(`  version:   ${result.version} (${result.versionSource})`);
+      // Hook activation and the context budget are part of the contract, so
+      // name both outcomes on every run (CG-0MW0KURL8002XOV9). A skipped
+      // wiring is reported with its reason, never silently omitted.
+      console.log(
+        result.hooksPath.applied
+          ? `  hooks:     ${result.hooksPath.value} (core.hooksPath) — a fresh clone needs one activation step`
+          : `  hooks:     not wired (${result.hooksPath.reason})`,
+      );
+      console.log(
+        result.thresholds.generated
+          ? `  budget:    ${result.thresholds.path} (measured)`
+          : `  budget:    not generated (${result.thresholds.reason})`,
+      );
       // One line per generated file: the classification **is** the report, for
       // both a dry run and a real one (CG-0MVWGJNQM0061W6I).
       for (const file of result.files) {

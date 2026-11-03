@@ -27,6 +27,12 @@ import {
   linkSharedAssets,
   linkSharedPublicAssets,
   pascalCase,
+  CONTEXT_BUDGET_DOC_PATH,
+  CONTEXT_THRESHOLDS_PATH,
+  GITHOOKS_DIR,
+  REFRESH_THRESHOLDS_PATH,
+  measureContextThresholds,
+  readCoreHooks,
   readExistingPackageVersion,
   readLayoutGames,
   renderMainTs,
@@ -34,6 +40,7 @@ import {
   renderPreset,
   renderTsconfig,
   renderViteConfig,
+  resolveMeasureContext,
   scaffoldGameRepo,
   toGameRepoPath,
   type CoreManifest,
@@ -59,8 +66,10 @@ const GAMES = [
 
 /**
  * The generated files a scaffold owns, repo-relative and in report order
- * (CG-0MVWGJNQM0061W6I). The set is fixed: a later slice adds write gating,
- * not new generated files.
+ * (CG-0MVWGJNQM0061W6I). Hook wiring and context-budget generation
+ * (CG-0MW0KURL8002XOV9) extended the set: the committed hooks are copied from
+ * the core, then the measured thresholds, the refresh entry point and the
+ * generated guidance note follow.
  */
 const GENERATED_FILES = [
   'package.json',
@@ -70,7 +79,45 @@ const GENERATED_FILES = [
   'main.ts',
   'index.html',
   `configs/${DEFAULT_GAME_PRESET}.json`,
+  `${GITHOOKS_DIR}/post-checkout`,
+  `${GITHOOKS_DIR}/pre-push`,
+  CONTEXT_THRESHOLDS_PATH,
+  REFRESH_THRESHOLDS_PATH,
+  CONTEXT_BUDGET_DOC_PATH,
 ] as const;
+
+/**
+ * A hermetic stand-in for the framework's `measure_context.py`, written into
+ * the fixture core so the scaffold's local-then-global resolution finds it
+ * first and the thresholds assertion never depends on the developer's global
+ * skill install. It measures the project `AGENTS.md` byte count, matching the
+ * component the real script reports for a game repo.
+ */
+const MEASURE_CONTEXT_STUB = [
+  '#!/usr/bin/env python3',
+  'import json, os, sys',
+  'args = sys.argv[1:]',
+  "root = args[args.index('--repo-root') + 1]",
+  "agents = os.path.join(root, 'AGENTS.md')",
+  'size = os.path.getsize(agents) if os.path.exists(agents) else 0',
+  "values = {'global_agents': 0, 'project_agents': size, 'skills_prose': 0, 'total': size}",
+  "if '--generate-thresholds' in args:",
+  '    print(json.dumps(values))',
+  "elif '--thresholds' in args:",
+  "    path = args[args.index('--thresholds') + 1]",
+  '    try:',
+  '        committed = json.load(open(path, encoding="utf-8"))',
+  '    except Exception:',
+  '        sys.exit(2)',
+  '    sys.exit(0 if committed == values else 1)',
+  'else:',
+  '    print(json.dumps(values))',
+  '',
+].join('\n');
+
+/** Marker the unified v3 hook carries and the gate-less v2 hook does not. */
+const V3_HOOK_MARKER = 'worklog:pre-push-hook:v3';
+const FULL_SUITE_MARKER = '--scope full --strict-git-env';
 
 /** The scaffold CLI, spawned as a real process by the CLI contract tests. */
 const SCRIPT_PATH = path.resolve(
@@ -182,6 +229,53 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
   fs.mkdirSync(path.join(core, 'example-games', 'gym'), { recursive: true });
   fs.writeFileSync(path.join(core, 'package.json'), JSON.stringify(MANIFEST));
   fs.writeFileSync(path.join(core, 'index.html'), '<html><body></body></html>\n');
+  // Committed hooks + the context-budget tooling the scaffold consumes
+  // (CG-0MW0KURL8002XOV9). The hooks mirror the core's single source of truth;
+  // the measurement stub keeps the thresholds assertion hermetic.
+  fs.mkdirSync(path.join(core, GITHOOKS_DIR), { recursive: true });
+  fs.writeFileSync(
+    path.join(core, GITHOOKS_DIR, 'post-checkout'),
+    '#!/bin/sh\nexit 0\n',
+  );
+  fs.writeFileSync(
+    path.join(core, GITHOOKS_DIR, 'pre-push'),
+    [
+      '#!/bin/sh',
+      `# ${V3_HOOK_MARKER}`,
+      'set -e',
+      'need_full_suite=0',
+      'while read local_ref local_sha remote_ref remote_sha; do',
+      '  case "$remote_ref" in',
+      '    refs/heads/dev|refs/heads/main) need_full_suite=1 ;;',
+      '  esac',
+      'done',
+      'if [ "$need_full_suite" = "1" ]; then',
+      '  runner="$HOME/.pi/agent/skills/test/scripts/run_tests.py"',
+      `  python3 "$runner" ${FULL_SUITE_MARKER} --json >/dev/null`,
+      'fi',
+      '',
+    ].join('\n'),
+  );
+  for (const hook of ['post-checkout', 'pre-push']) {
+    fs.chmodSync(path.join(core, GITHOOKS_DIR, hook), 0o755);
+  }
+  fs.mkdirSync(
+    path.join(core, 'skill', 'context-audit', 'scripts'),
+    { recursive: true },
+  );
+  const measureStub = path.join(
+    core,
+    'skill',
+    'context-audit',
+    'scripts',
+    'measure_context.py',
+  );
+  fs.writeFileSync(measureStub, MEASURE_CONTEXT_STUB);
+  fs.chmodSync(measureStub, 0o755);
+  fs.writeFileSync(
+    path.join(core, 'scripts', 'refresh-context-thresholds.sh'),
+    '#!/usr/bin/env bash\nset -euo pipefail\necho refresh\n',
+  );
   fs.writeFileSync(
     path.join(core, 'configs', 'full.json'),
     JSON.stringify({
@@ -198,6 +292,11 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
   const gameRepo = path.join(root, `tce-${game}`);
   const sceneDir = path.join(gameRepo, 'src', 'scenes');
   fs.mkdirSync(sceneDir, { recursive: true });
+  // A project context surface so the measured thresholds are non-zero.
+  fs.writeFileSync(
+    path.join(gameRepo, 'AGENTS.md'),
+    '# tce-<game> AGENTS\n\nA deterministic project context surface.\n',
+  );
   fs.writeFileSync(
     path.join(sceneDir, `${pascalCase(game)}Scene.ts`),
     [
@@ -234,6 +333,20 @@ function makeLayout(game: string): { core: string; gameRepo: string } {
     ].join('\n'),
   );
   return { core, gameRepo };
+}
+
+/** Run git in a fixture repo and return its trimmed stdout/status. */
+function git(repo: string, ...args: string[]): {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+} {
+  const run = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf-8' });
+  return {
+    status: run.status,
+    stdout: String(run.stdout ?? '').trim(),
+    stderr: String(run.stderr ?? '').trim(),
+  };
 }
 
 // ── Shared asset linking ──────────────────────────────────────────────────
@@ -682,7 +795,12 @@ describe('scaffoldGameRepo', () => {
     // are gone. `src` is a real directory, not a link.
     expect(fs.lstatSync(path.join(gameRepo, 'src')).isSymbolicLink()).toBe(false);
     expect(fs.existsSync(path.join(gameRepo, 'src', 'scenes', 'GolfScene.ts'))).toBe(true);
-    expect(fs.lstatSync(path.join(gameRepo, 'scripts'), { throwIfNoEntry: false }) ?? null).toBeNull();
+    // A real `scripts/` directory now holds the copied threshold-refresh entry
+    // point (CG-0MW0KURL8002XOV9) — it is a directory, never the legacy link.
+    expect(fs.lstatSync(path.join(gameRepo, 'scripts')).isSymbolicLink()).toBe(false);
+    expect(fs.readdirSync(path.join(gameRepo, 'scripts'))).toEqual([
+      'refresh-context-thresholds.sh',
+    ]);
     expect(fs.lstatSync(path.join(gameRepo, 'example-games'), { throwIfNoEntry: false }) ?? null).toBeNull();
     expect(fs.realpathSync(path.join(gameRepo, 'core'))).toBe(fs.realpathSync(core));
     expect(result.symlinks.map((s) => path.basename(s))).toEqual(['core']);
@@ -1642,6 +1760,214 @@ describe('scaffold CLI report contract', () => {
 });
 
 // ── Every shipped game scaffolds ──────────────────────────────────────────
+
+// ── Hook wiring and context budget (CG-0MW0KURL8002XOV9) ─────────────────
+
+describe('scaffold hook wiring and context budget', () => {
+  it('wires core.hooksPath so the committed hooks are active', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    expect(git(gameRepo, 'init', '-q').status).toBe(0);
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    // The repo-local config points at the committed directory...
+    expect(result.hooksPath).toEqual({ applied: true, value: GITHOOKS_DIR });
+    expect(git(gameRepo, 'config', '--get', 'core.hooksPath').stdout).toBe(
+      GITHOOKS_DIR,
+    );
+    // ...and git resolves its hooks directory inside it.
+    const hooksDir = path.resolve(
+      gameRepo,
+      git(gameRepo, 'rev-parse', '--git-path', 'hooks').stdout,
+    );
+    const insideHooks = path.relative(path.join(gameRepo, GITHOOKS_DIR), hooksDir);
+    expect(insideHooks === '' || !insideHooks.startsWith('..')).toBe(true);
+
+    // Every core hook is copied byte-for-byte, executable bit preserved, so
+    // the core stays the single source of truth (no forked hook text).
+    for (const hook of readCoreHooks(core)) {
+      const copied = path.join(gameRepo, GITHOOKS_DIR, hook.name);
+      expect(fs.readFileSync(copied, 'utf-8')).toBe(hook.contents);
+      expect(fs.statSync(copied).mode & 0o111, `${hook.name} not executable`).not.toBe(0);
+    }
+  });
+
+  it('ships the unified full-suite v3 hook, not the gate-less v2', () => {
+    // The committed hook is the artifact generated repos receive, so assert
+    // its gate markers rather than comparing whole files.
+    const repoRoot = path.resolve(__dirname, '..', '..');
+    const hook = fs.readFileSync(
+      path.join(repoRoot, GITHOOKS_DIR, 'pre-push'),
+      'utf-8',
+    );
+    expect(hook).toContain(V3_HOOK_MARKER);
+    expect(hook).toContain(FULL_SUITE_MARKER);
+    // Runner resolved local-then-global, failing closed when neither exists.
+    expect(hook).toContain('$repo_root/skill/test/scripts/run_tests.py');
+    expect(hook).toContain('$HOME/.pi/agent/skills/test/scripts/run_tests.py');
+    expect(hook).toContain('TEST_SCOPE_SKIP=1');
+    // The existing gates and their bypass variables are untouched.
+    for (const bypass of [
+      'BRANCH_POLICY_SKIP',
+      'CONTEXT_BUDGET_SKIP',
+      'WORKLOG_SKIP_PRE_PUSH',
+    ]) {
+      expect(hook).toContain(bypass);
+    }
+    expect(hook).not.toContain('worklog:pre-push-hook:v2');
+  });
+
+  it('generates measured thresholds, the refresh entry point and guidance', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    const thresholdsPath = path.join(gameRepo, CONTEXT_THRESHOLDS_PATH);
+    const thresholds = JSON.parse(
+      fs.readFileSync(thresholdsPath, 'utf-8'),
+    ) as Record<string, number>;
+    expect(Object.keys(thresholds).sort()).toEqual(
+      ['global_agents', 'project_agents', 'skills_prose', 'total'].sort(),
+    );
+    for (const value of Object.values(thresholds)) {
+      expect(typeof value).toBe('number');
+    }
+    expect(thresholds.total).toBe(
+      thresholds.global_agents + thresholds.project_agents + thresholds.skills_prose,
+    );
+    expect(thresholds.project_agents).toBeGreaterThan(0);
+
+    // The committed budget is exactly the measured surface of the generated
+    // repo, produced by the local-then-global-resolved measurement script.
+    const measure = resolveMeasureContext(core);
+    expect(measure).toBe(
+      path.join(core, 'skill', 'context-audit', 'scripts', 'measure_context.py'),
+    );
+    expect(measureContextThresholds(measure as string, gameRepo).thresholds).toEqual(
+      thresholds,
+    );
+    expect(result.thresholds).toEqual({
+      generated: true,
+      path: CONTEXT_THRESHOLDS_PATH,
+      measureScript: measure,
+    });
+
+    // The refresh entry point ships with it (executable), plus the note.
+    const refresh = path.join(gameRepo, REFRESH_THRESHOLDS_PATH);
+    expect(fs.existsSync(refresh)).toBe(true);
+    expect(fs.statSync(refresh).mode & 0o111).not.toBe(0);
+    expect(
+      fs.readFileSync(path.join(gameRepo, CONTEXT_BUDGET_DOC_PATH), 'utf-8'),
+    ).toContain('core.hooksPath');
+  });
+
+  it('skips hook wiring with a reason when the target is not a git repository', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+    });
+
+    expect(result.hooksPath.applied).toBe(false);
+    expect(result.hooksPath.reason).toMatch(/not a git repository/);
+    // The committed hooks are still copied (activation is a clone-time step).
+    expect(fs.existsSync(path.join(gameRepo, GITHOOKS_DIR, 'pre-push'))).toBe(true);
+  });
+
+  it('fails open with a reported remedy when measurement tooling is unavailable', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    expect(git(gameRepo, 'init', '-q').status).toBe(0);
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      // A path that does not exist: python fails, the scaffold must not guess.
+      measureContextPath: path.join(tmpRoot, 'missing-measure_context.py'),
+    });
+
+    expect(result.thresholds.generated).toBe(false);
+    expect(result.thresholds.reason).toMatch(/measure_context\.py/);
+    expect(fs.existsSync(path.join(gameRepo, CONTEXT_THRESHOLDS_PATH))).toBe(false);
+    expect(fs.existsSync(path.join(gameRepo, CONTEXT_BUDGET_DOC_PATH))).toBe(false);
+    // Hooks are independent of measurement and still land.
+    expect(result.hooksPath.applied).toBe(true);
+    expect(fs.existsSync(path.join(gameRepo, GITHOOKS_DIR, 'pre-push'))).toBe(true);
+  });
+
+  it('writes and configures nothing on a dry run but classifies both files', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    expect(git(gameRepo, 'init', '-q').status).toBe(0);
+
+    const dry = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      dryRun: true,
+    });
+
+    expect(dry.hooksPath).toEqual({
+      applied: false,
+      reason: 'dry run — nothing configured',
+    });
+    expect(dry.thresholds.generated).toBe(true);
+    expect(dry.files).toContainEqual({
+      path: `${GITHOOKS_DIR}/pre-push`,
+      action: 'create',
+    });
+    expect(dry.files).toContainEqual({
+      path: CONTEXT_THRESHOLDS_PATH,
+      action: 'create',
+    });
+    expect(git(gameRepo, 'config', '--get', 'core.hooksPath').status).not.toBe(0);
+    expect(fs.existsSync(path.join(gameRepo, GITHOOKS_DIR))).toBe(false);
+    expect(fs.existsSync(path.join(gameRepo, CONTEXT_THRESHOLDS_PATH))).toBe(false);
+  });
+
+  it('treats a --only selection run as side-effect free', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    expect(git(gameRepo, 'init', '-q').status).toBe(0);
+
+    const result = scaffoldGameRepo({
+      game: 'golf',
+      gameRepoRoot: gameRepo,
+      coreRoot: core,
+      only: ['main.ts'],
+    });
+
+    expect(result.hooksPath).toEqual({
+      applied: false,
+      reason: 'selection run — no side effects',
+    });
+    expect(git(gameRepo, 'config', '--get', 'core.hooksPath').status).not.toBe(0);
+    expect(fs.existsSync(path.join(gameRepo, GITHOOKS_DIR))).toBe(false);
+    expect(result.files).toContainEqual({
+      path: CONTEXT_THRESHOLDS_PATH,
+      action: 'skip-local',
+    });
+  });
+
+  it('is idempotent: a re-scaffold leaves hooks and thresholds unchanged', () => {
+    const { core, gameRepo } = makeLayout('golf');
+    expect(git(gameRepo, 'init', '-q').status).toBe(0);
+    const options = { game: 'golf', gameRepoRoot: gameRepo, coreRoot: core };
+    const first = scaffoldGameRepo(options);
+    expect(first.files.every((file) => file.action === 'create')).toBe(true);
+
+    const second = scaffoldGameRepo(options);
+    expect(second.files.every((file) => file.action === 'unchanged')).toBe(true);
+    expect(second.written).toEqual([]);
+    expect(second.hooksPath).toEqual({ applied: true, value: GITHOOKS_DIR });
+  });
+});
 
 describe('readLayoutGames', () => {
   it('lists every game from the F1 repo-layout contract', () => {
