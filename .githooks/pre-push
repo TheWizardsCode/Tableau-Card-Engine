@@ -6,6 +6,9 @@
 #    when the startup context surface exceeds committed thresholds.
 # 4. Full-suite gate (SA-0MVECQUGF0064U81): run the canonical suite when a
 #    pushed remote ref is refs/heads/dev or refs/heads/main.
+# 5. Test-cache mirroring (SA-0MVTFMB7K002Y1F3): copy the cache entries a
+#    worktree gate run wrote into the main checkout, so post-push
+#    verification and audits can read the pushed commit's green entry.
 #
 # Set WORKLOG_SKIP_PRE_PUSH=1 to bypass worklog sync.
 # Set BRANCH_POLICY_SKIP=1 to bypass branch policy check (not recommended).
@@ -74,6 +77,48 @@ if [ "$CONTEXT_BUDGET_SKIP" != "1" ]; then
   fi
 fi
 
+# ── Test-cache mirroring (dev/main pushes) ──────────────────────────────────
+# Copy the cache entries the gate run wrote into the main checkout's cache.
+# ``implement.py finish`` pushes from the linked worktree holding the pushed
+# commit, so run_tests.py caches per git state under the worktree's cache
+# (``<worktree>/.worklog/cache``, else ``<git-dir>/test-cache``) — invisible
+# to the main checkout's post-push verification and to the audit skill (F3),
+# which read ``<main>/.worklog/cache``. Keys are content-addressed (command
+# plus git state), so copying an entry the main cache lacks is always safe:
+# an identical key is an identical run. Fail-soft — cache plumbing must never
+# decide a push.
+mirror_suite_cache() {
+  wt_root="$1"
+  git_dir="$(git rev-parse --absolute-git-dir 2>/dev/null || true)"
+  [ -n "$git_dir" ] && [ -d "$git_dir" ] || return 0
+  if [ -d "$wt_root/.worklog" ]; then
+    wt_cache="$wt_root/.worklog/cache"
+  else
+    wt_cache="$git_dir/test-cache"
+  fi
+  [ -d "$wt_cache" ] && [ -n "$(ls -A "$wt_cache" 2>/dev/null)" ] || return 0
+  common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  case "$common_dir" in
+    /*) main_git_dir="$common_dir" ;;
+    *) main_git_dir="$(cd "$wt_root" && pwd)/$common_dir" ;;
+  esac
+  main_root="$(dirname "$main_git_dir")"
+  [ "$main_root" != "$wt_root" ] || return 0
+  main_cache="$main_root/.worklog/cache"
+  [ -d "$main_cache" ] || return 0
+  for entry in "$wt_cache"/*; do
+    [ -d "$entry" ] || continue
+    name="$(basename "$entry")"
+    [ -e "$main_cache/$name" ] && continue
+    if cp -a "$entry" "$main_cache/$name" 2>/dev/null; then
+      echo "push gate: mirrored cache entry $name into $main_root/.worklog/cache" >&2
+    else
+      echo "push gate: warning: could not mirror cache entry $name into $main_root/.worklog/cache" >&2
+    fi
+  done
+  return 0
+}
+
 # ── Full-suite gate (dev/main pushes) ────────────────────────────────────────
 # Enforce the full canonical suite whenever a pushed remote ref is refs/heads/dev
 # or refs/heads/main (SA-0MVECQUGF0064U81). Feature-branch, tag and
@@ -102,6 +147,7 @@ if [ "$TEST_SCOPE_SKIP" != "1" ] && [ "$push_dev_main" = "1" ]; then
   echo "push gate: running the full canonical suite (--scope full --strict-git-env)..." >&2
   if python3 "$test_runner" --scope full --strict-git-env 2>&1; then
     echo "push gate: full suite green." >&2
+    mirror_suite_cache "$test_repo_root"
   else
     echo "ERROR: Full test suite failed - the push to dev/main is blocked." >&2
     echo "  Fix the failures and retry. Set TEST_SCOPE_SKIP=1 to bypass (not recommended)." >&2

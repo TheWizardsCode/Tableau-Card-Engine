@@ -837,6 +837,33 @@ mid-run. By committing the file and adding a negation entry (`!.pi/test-config.j
 This file is deliberately tracked as the simplest, most robust fix — no cross-repository
 change to the implement skill is needed.
 
+### Dev-push gate and test-cache mirroring
+
+A push to `dev` (or `main`) runs the **full canonical suite** in the committed
+`pre-push` hook, and the run is recorded in the per-repo test cache that audits
+read (`.worklog/cache/`, 2-hour TTL).
+
+`implement.py finish` pushes from the **linked worktree** holding the pushed
+commit. A worktree has no `.worklog/`, so the runner caches its run under the
+worktree's git dir (`<worktree git dir>/test-cache`) — invisible to the main
+checkout's post-push verification and to the audit skill's execution-dependent
+AC auto-verification, which both read `<main checkout>/.worklog/cache`.
+
+After a green gate run the hook's `mirror_suite_cache` copies every cache entry
+the main checkout lacks into `<main checkout>/.worklog/cache`, so
+`run_tests.py --summary --suite all --json` reports the pushed commit's green
+entry instead of `missing`. Cache keys are content-addressed (command + git
+state), so copying a missing entry is always safe — an identical key is an
+identical run — and mirroring never overwrites an entry the main cache already
+holds. The copy is **fail-soft**: a failure logs a warning and never blocks the
+push.
+
+> This behaviour ships in the **canonical pre-push hook template** owned by the
+> `worklog` package (`PRE_PUSH_HOOK_CONTENT`, emitted by `wl init` and kept
+> current by `wl doctor upgrade`). Do **not** patch `.githooks/pre-push`
+> locally: `wl doctor upgrade --dry-run` reports any divergence as pending, and
+> `--confirm` would overwrite the local edit.
+
 ### Monte Carlo environment variables
 
 The Main Street balance guardrail (`tests/main-street/monte-carlo-balance.test.ts`) and harness
