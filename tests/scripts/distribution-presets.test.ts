@@ -7,7 +7,7 @@
  *
  *  - the canonical named presets exist and ship the exact game set they
  *    claim (AC1),
- *  - the boundary cases — exactly 1 game and all 8 games — are represented
+ *  - the boundary cases — exactly 1 game and all 9 games — are represented
  *    (AC4),
  *  - different presets produce genuinely different selector catalogues (AC5),
  *  - every configured game resolves to a real scene module and the generated

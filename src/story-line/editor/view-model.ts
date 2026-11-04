@@ -91,8 +91,11 @@ export interface EditorNode {
   readonly storylineId: string | null;
   /** Story-line title, or null. */
   readonly storylineTitle: string | null;
-  /** True when the card presents a choice. */
-  readonly hasChoices: boolean;
+  /**
+   * Derived: `true` when the card presents a choice (at least one compiled
+   * option). Mirrors the manifest node flag.
+   */
+  readonly isChoice: boolean;
   /** Number of options (0 for plain incidents). */
   readonly optionCount: number;
   /** Human-readable effect text. */
@@ -231,7 +234,7 @@ export function buildEditorViewModel(manifest: StorylineManifest): EditorViewMod
       name: node.name,
       storylineId: node.storylineId,
       storylineTitle: node.storylineTitle,
-      hasChoices: node.hasChoices,
+      isChoice: node.isChoice,
       optionCount: node.optionCount,
       effect: node.effect,
       impact,

@@ -7,6 +7,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "check:ui-node-surface": "tsx scripts/check-ui-node-surface.ts",
+    "prebuild": "npm run check:ui-node-surface",
     "build": "tsc --noEmit && vite build",
     "build:electron": "tsc --noEmit && vite build --mode electron",
     "build:game-artifact": "tsx scripts/build-game-artifact.mjs",

@@ -4,10 +4,11 @@
  * Ports Main Street's storyline-model / storyline-csv-options compilation
  * cases onto the generic story-line API:
  *
- * - legacy `hasChoices` → Accept(apply)/Reject(skip) compilation;
+ * - options-only compilation (a bare `storylineId`, or a stale object still
+ *   carrying the retired legacy fields, is NOT a choice);
  * - CSV `options` encoding parsing (whitespace trimming, terminal options,
  *   malformed/rejected encodings, `apply` policy);
- * - registered-option precedence over legacy/CSV compilation;
+ * - registered-option precedence over CSV compilation;
  * - draw-time condition filtering (evaluated once, at compile time);
  * - `eventHasStoryline` semantics (a bare `storylineId` is NOT a choice).
  *
@@ -21,6 +22,7 @@ import {
   makeCard,
   makeState,
   type TemplateMap,
+  type TestCard,
 } from './helpers';
 
 /** A system instance bound to an empty template catalogue + adapter. */
@@ -31,32 +33,31 @@ function makeSystem() {
   return { system, templates, engine, state: makeState() };
 }
 
-// ── AC1: legacy hasChoices compilation ──────────────────────
+// ── AC1: options-only compilation ──────────────────────────
 
-describe('legacy `hasChoices` compilation', () => {
-  it('compiles a two-way choice to Accept(apply) / Reject(skip)', () => {
+describe('options-only compilation', () => {
+  it('compiles a CSV options card with candidate successor sets', () => {
     const { system } = makeSystem();
     const card = makeCard({
-      id: 'evt-legacy',
-      hasChoices: true,
-      acceptNextCardId: 'evt-next-a',
-      rejectNextCardId: 'evt-next-b',
+      id: 'evt-two-way',
+      options: 'Accept|evt-next-a;Reject|evt-next-b',
     });
 
     const compiled = system.compileStorylineFromEvent(card);
     expect(compiled.storylineId).toBeNull();
     expect(compiled.compiledOptions).toEqual([
-      { label: 'Accept', successorId: 'evt-next-a', effectPolicy: 'apply' },
-      { label: 'Reject', successorId: 'evt-next-b', effectPolicy: 'skip' },
+      { label: 'Accept', successorIds: ['evt-next-a'], effectPolicy: 'apply' },
+      { label: 'Reject', successorIds: ['evt-next-b'], effectPolicy: 'apply' },
     ]);
   });
 
-  it('null successor ids compile to terminal options', () => {
+  it('a terminal option compiles with an empty successor list', () => {
     const { system } = makeSystem();
-    const card = makeCard({ id: 'evt-legacy', hasChoices: true });
+    const card = makeCard({ id: 'evt-terminal-option', options: 'Go|' });
     const compiled = system.compileStorylineFromEvent(card);
-    expect(compiled.compiledOptions[0]?.successorId).toBeUndefined();
-    expect(compiled.compiledOptions[1]?.successorId).toBeUndefined();
+    expect(compiled.compiledOptions).toEqual([
+      { label: 'Go', successorIds: [], effectPolicy: 'apply' },
+    ]);
   });
 
   it('a non-choice card compiles to an empty option list', () => {
@@ -73,17 +74,36 @@ describe('legacy `hasChoices` compilation', () => {
     expect(system.storylineOptionCount(card)).toBe(0);
   });
 
+  it('ignores unknown properties that look like a two-way choice card', () => {
+    const { system } = makeSystem();
+    // The runtime model no longer declares any two-way choice/link property. A
+    // card that still carries extra properties (a stale save, an older
+    // adapter) must not become a choice: only registered options or a
+    // non-empty `options` encoding do that.
+    const card = {
+      ...makeCard({ id: 'evt-unknown' }),
+      legacyChoiceFlag: true,
+      legacyAcceptLink: 'evt-next-a',
+      legacyRejectLink: 'evt-next-b',
+    } as unknown as TestCard;
+
+    expect(system.eventHasStoryline(card)).toBe(false);
+    expect(system.compileStorylineFromEvent(card).compiledOptions).toEqual([]);
+    expect(system.storylineOptionCount(card)).toBe(0);
+    expect(system.createPendingStorylineChoice(card)).toBeNull();
+  });
+
   it('carries storyline metadata through compilation', () => {
     const { system } = makeSystem();
     const card = makeCard({
       id: 'evt-story',
       storylineId: 'storyline-alpha',
       storylineTitle: 'Alpha Arc',
-      hasChoices: true,
+      options: 'Go|evt-story-next',
     });
     const compiled = system.compileStorylineFromEvent(card);
     expect(compiled.storylineId).toBe('storyline-alpha');
-    expect(compiled.compiledOptions).toHaveLength(2);
+    expect(compiled.compiledOptions.map((o) => o.label)).toEqual(['Go']);
   });
 });
 
@@ -146,7 +166,7 @@ describe('CSV `options` encoding compilation', () => {
     expect(system.compileStorylineFromEvent(makeCard({ id: 'evt-spaces', options: '  ' })).compiledOptions).toEqual([]);
   });
 
-  it('hasChoices is derived from a non-empty options encoding', () => {
+  it('a non-empty options encoding makes the card a choice', () => {
     const { system } = makeSystem();
     const card = makeCard({ id: 'evt-derived', options: 'Go|' });
     expect(system.eventHasStoryline(card)).toBe(true);
@@ -193,14 +213,9 @@ describe('malformed `options` encodings are rejected', () => {
 // ── AC2: registered-option precedence ───────────────────────
 
 describe('registered-option precedence', () => {
-  it('registered options take precedence over legacy compilation', () => {
+  it('registered options fill in a card with no CSV options', () => {
     const { system } = makeSystem();
-    const card = makeCard({
-      id: 'evt-reg',
-      hasChoices: true,
-      acceptNextCardId: 'evt-a',
-      rejectNextCardId: 'evt-b',
-    });
+    const card = makeCard({ id: 'evt-reg' });
 
     system.registerStorylineOptions('evt-reg', [
       { label: 'Investigate', successorIds: ['evt-c'], effectPolicy: 'apply' },
@@ -283,7 +298,7 @@ describe('draw-time condition filtering', () => {
     ).toEqual(['No cond', 'True cond']);
   });
 
-  it('includes every option when no state is provided (legacy behaviour)', () => {
+  it('includes every option when no state is provided (no-state behaviour)', () => {
     const { system } = makeSystem();
     system.registerStorylineOptions('evt-cond3', [
       { label: 'Yes', effectPolicy: 'apply', condition: () => false },
@@ -417,7 +432,7 @@ describe('draw-time cost filtering', () => {
     ]);
   });
 
-  it('re-applies the cost filter when a legacy pending choice has no snapshot', () => {
+  it('re-applies the cost filter when a pending choice created without state has no snapshot', () => {
     const { system, state } = makeSystem();
     state.coins = 100;
     system.registerStorylineOptions('evt-cost-legacy', [
@@ -454,8 +469,7 @@ describe('draw-time cost filtering', () => {
 describe('eventHasStoryline', () => {
   const { system } = makeSystem();
 
-  it('is true for legacy hasChoices, CSV options and registered options', () => {
-    expect(system.eventHasStoryline(makeCard({ id: 'evt-h', hasChoices: true }))).toBe(true);
+  it('is true for CSV options and registered options', () => {
     expect(system.eventHasStoryline(makeCard({ id: 'evt-o', options: 'Go|a' }))).toBe(true);
   });
 

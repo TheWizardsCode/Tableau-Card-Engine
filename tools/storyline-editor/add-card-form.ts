@@ -258,11 +258,9 @@ export function createAddCardForm(options: AddCardFormOptions): AddCardFormHandl
       'Adds an option leading from the chosen card to this new card, in the same validated write.',
     ),
   );
-  // Only offer an incoming link when the adapter has a column to carry it.
-  const canLink =
-    adapter.fields.options !== undefined ||
-    adapter.fields.acceptNextCardId !== undefined ||
-    adapter.fields.rejectNextCardId !== undefined;
+  // Only offer an incoming link when the adapter has a column to carry it
+  // (linking is expressed solely through the `options` encoding).
+  const canLink = adapter.fields.options !== undefined;
   if (canLink) form.append(linkGroup);
 
   const status = el('p', 'editor-form-status', 'Fill in the card fields, then preview.');

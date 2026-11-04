@@ -34,8 +34,24 @@ npm run storylines:editor
 ```
 
 This serves the Gym demo content
-(`example-games/gym/content/storylines.csv`) on `http://127.0.0.1:5174`. The
-page is loopback-only by design. Stop it with `Ctrl-C`.
+(`example-games/gym/content/storylines.csv`) on `http://127.0.0.1:5174`
+(loopback by default). Stop it with `Ctrl-C`.
+
+To expose the editor beyond this machine, run it with a **valueless** `--host` —
+following Vite's own convention, a bare `--host` binds all interfaces
+(`0.0.0.0`) instead of failing:
+
+```bash
+npm run storylines:editor -- --host
+```
+
+On startup the CLI prints **every resolved URL** (Vite's `server.resolvedUrls`):
+the local/loopback URL(s) always, plus each network URL when a non-loopback
+interface was bound, so an operator who ran `--host` can copy the LAN/Tailscale
+address into their browser. A non-loopback bind also prints a warning that the
+tool is reachable from the network and can write the loaded content CSV (it has
+no authentication) — binding `0.0.0.0` is a deliberate, visible choice, not a
+silent default.
 
 ```bash
 npm run storylines:editor -- --help        # all flags and exit codes
@@ -51,7 +67,7 @@ discard**:
 
 | Surface | Purpose |
 |---|---|
-| **Viewer** | The manifest-driven graph: one column per story-line group, choice cards as diamonds, plain incidents as rounded rectangles, cycle edges/members highlighted, option labels on every link. Drag to pan, wheel/toolbar to zoom, click a node to inspect its links and metadata. |
+| **Viewer** | The manifest-driven graph: one block per story-line group (a large group wraps into side-by-side sub-columns), choice cards as diamonds, plain incidents as rounded rectangles, cycle edges/members highlighted, option labels on every link. Opens fitted to the pane; drag to pan, wheel/toolbar to zoom, click a node to inspect its links and metadata. |
 | **Card forms** | **Edit card** (the selected node's form) and **Add card** (guided add form). Fields come from the adapter's **field descriptors**, so a game's columns appear as plain fields without core knowing what they mean. |
 | **Story-line management** | **Manage story-lines** lists, creates, renames and reassigns groups. A story-line exists through its member cards, so every operation is one validated **batch** edit of those cards' story-line fields. |
 
@@ -60,6 +76,27 @@ is written, then writes through the single transactional author API
 (`applyContentEditToFile` in `src/story-line/content/author.ts`). The editor
 page never writes the content CSV itself; that property is asserted by the
 write-path guard (`tests/story-line/editor/write-path-guard.test.ts`).
+
+### Viewer navigation
+
+The graph is a fixed-size pane, not a page: the editor shell fills the browser
+window and the graph region takes the remaining space, so the document itself
+never scrolls and the SVG never grows past its pane.
+
+- **Opens fitted.** The whole arc is on screen at launch, whatever its size
+  (fit is computed from the pane's real pixel size, with padding).
+- **One scale only.** The SVG declares no `viewBox`, so graph units and CSS
+  pixels are 1:1 and the pan/zoom transform is the only scaling; a card is
+  never drawn at a second, hidden scale.
+- **Zoom is anchored.** The wheel zooms around the pointer and the toolbar
+  buttons zoom around the pane centre, so the card you are looking at stays
+  put. The toolbar shows the live zoom percentage.
+- **Reset vs fit.** **Reset view** returns to 100% centred on the graph;
+  **Fit view** restores the whole-arc view after panning or zooming away.
+- **Large groups wrap.** A story-line block stacks at most ten cards and then
+  wraps into side-by-side sub-columns inside the same block, so a big group
+  (for example Main Street's 160+ ungrouped cards) stays a fittable block
+  instead of one very tall column.
 
 ## 3. Supplying a content adapter
 
@@ -94,10 +131,12 @@ Notes on the contract (`ContentAdapter` in
 
 - **Required:** `gameId`, `columns` (the CSV's columns in file order) and the
   `fields` mapping with at least `id` and `name`.
-- **Optional mappings:** `effect`, `hasChoices`, `acceptNextCardId`,
-  `rejectNextCardId`, `options`, `storylineId`, `storylineTitle`. Omit a field
-  mapping when the game has no such column — omitting means "no such column",
-  never an error.
+- **Optional mappings:** `effect`, `options`, `storylineId`, `storylineTitle`.
+  Omit a field mapping when the game has no such column — omitting means "no
+  such column", never an error.
+- **The manifest's `isChoice` node flag is derived, not mapped.** It is `true`
+  exactly when the card has at least one compiled option (`optionCount > 0`),
+  so it can never disagree with the option list; no content column feeds it.
 - **Every column not in `fields`** lands in `ContentCard.fields`, keyed by
   column name. Those game columns are editable/inspectable by default (coin and
   reputation deltas, renown, payoff, …) without core knowing what they mean.
@@ -110,7 +149,9 @@ Notes on the contract (`ContentAdapter` in
 
 Core ships one adapter (the Gym demo, `GYM_CONTENT_ADAPTER`) as the default.
 Tests also exercise a differently shaped adapter, proving the seam is not
-shaped around one game.
+shaped around one game. A shipped game-side example is Main Street's
+[`MainStreetStorylineContentAdapter.ts`](../../../tce-main-street/src/MainStreetStorylineContentAdapter.ts)
+— see [the worked example](#worked-example-main-street) below.
 
 ## 4. Running the editor against your game's content
 
@@ -124,29 +165,86 @@ npm run storylines:editor -- --content path/to/storylines.csv \
   path/specifier whose default (or `adapter` / `contentAdapter`) export is a
   `ContentAdapter` — the same declarative mapping the CLIs use. Relative
   paths resolve against the core repo root.
-- `--port` / `--host` default to `5174` and `127.0.0.1`.
+- `--port` / `--host` default to `5174` and `127.0.0.1` (loopback). A
+  **valueless** `--host` binds all interfaces (`0.0.0.0`, Vite's convention),
+  so LAN/Tailscale users can run `--host` and see the resolved network URL in
+  the startup banner. Start the editor locally first, and keep it loopback
+  (`--host 127.0.0.1`) when you are not deliberately sharing it.
+- `--artefact-json` / `--artefact-mermaid` choose where an accepted edit writes
+  and verifies the generated artefacts (default: the committed Gym artefacts).
+  Point them at **your game's** paths so an edit never rewrites the Gym's
+  (see [Artefact paths](#artefact-paths--what-the-editor-writes) below).
 
 The host builds the deterministic manifest from that CSV + adapter at launch
 and serves it from memory (`GET /manifest.json`), so the graph the designer
 sees is exactly the manifest the `storylines:graph` CLI would write.
+
+### Worked example: Main Street
+
+Main Street ships `src/MainStreetStorylineContentAdapter.ts`, a plain-data
+`ContentAdapter` over its single `src/card-data.csv`. Its story-line rows (11
+cards across the 5 arcs `storyline-tax`, `storyline-health`,
+`storyline-economy`, `storyline-labor`, `storyline-restaurant`) form the graph;
+its ~164 business/upgrade/staff/community-space cards appear in the editor's
+**Ungrouped** bucket, so pointing the editor at the whole file neither crashes
+nor drops a row.
+
+```bash
+# from the Tableau-Card-Engine repo root (the tce-main-street sibling checked out at ../tce-main-street)
+npm run storylines:editor -- \
+  --content ../tce-main-street/src/card-data.csv \
+  --adapter ../tce-main-street/src/MainStreetStorylineContentAdapter.ts \
+  --artefact-json ../tce-main-street/docs/dev/assets/storyline-editor-manifest.json \
+  --artefact-mermaid ../tce-main-street/docs/dev/assets/storyline-editor-graph.mmd
+```
+
+The adapter is **plain data** and imports only the core `ContentAdapter` type
+(erased at compile time), so the core CLI can `import()` it by path across the
+repository boundary — the game's `@story-line/*` alias is not needed at runtime.
+
+**Why a separate artefact pair.** Main Street's committed
+`docs/dev/assets/storyline-manifest.json` and `storyline-graph.mmd` are produced
+by the game's own bespoke, schema-validated graph CLI
+(`npm run storylines:graph`) in a different shape, and a drift guard
+(`--check`) owns them. Pointing the core editor at those files would overwrite
+them in the core-editor format and break that guard, so the recipe above targets
+a **separate `storyline-editor-*` pair**: the game's own artefacts stay owned by
+its graph CLI, and the editor pair records what the core editor produced.
 
 ### Artefact paths — what the editor writes
 
 After an **accepted** edit the bridge regenerates the committed Mermaid and
 JSON artefacts, then re-reads them to verify (`writeArtefacts` → `checkArtefacts`
 in `src/story-line/content/artefacts.ts`). The paths default to the committed
-**Gym** artefacts (`DEFAULT_ARTEFACT_PATHS`); the interactive host does not yet
-expose a CLI flag to point them elsewhere (a follow-up work item). So:
+**Gym** artefacts (`DEFAULT_ARTEFACT_PATHS`) and are settable from the CLI:
+
+```bash
+npm run storylines:editor -- --content ../tce-my-game/content/storylines.csv \
+  --adapter ./my-game-adapter.ts \
+  --artefact-json ../tce-my-game/docs/storyline-manifest.json \
+  --artefact-mermaid ../tce-my-game/docs/storyline-graph.mmd
+```
+
+`--artefact-json` / `--artefact-mermaid` are resolved once, default **each path
+independently** when omitted (so supplying one keeps the Gym default for the
+other), and forwarded as `loadEditorSession({ artefactPaths })` — which means the
+**served page's** accepted edits write and verify the game's own files, not the
+Gym's. A game with generated artefacts of its own should always pass both.
+
+The same pair can be set in the headless `--apply` JSON payload (see §7); a
+payload `artefactPaths` wins over the CLI flags.
+
+So:
 
 - For content that lives in the core repo with artefacts at the default paths
   (the Gym demo), the served editor is the complete workflow.
-- For a game whose artefacts live elsewhere, keep the served editor
-  **read-only for inspection** and drive writes headlessly with `--apply` and an
-  explicit `artefactPaths` (below), or regenerate the game's artefacts with its
-  own `storylines:graph` (or `storylines:graph-svg`) invocation afterwards and
-  let its `--check` drift guard gate the result.
+- For a game whose artefacts live elsewhere, pass `--artefact-json` /
+  `--artefact-mermaid` (served **and** headless), or regenerate the game's
+  artefacts with its own `storylines:graph` (or `storylines:graph-svg`)
+  invocation afterwards and let its `--check` drift guard gate the result.
 
-You can pass explicit paths in the headless JSON payload (see §7).
+A flag given without a value fails closed (`exit 1`, usage printed) instead of
+writing a file literally named `true`.
 
 ## 5. Edit workflow, step by step
 
@@ -218,7 +316,16 @@ without writing; `--apply @file.json` reads the payload from a file. The command
 prints the JSON result and exits `0` on success and `1` on a refused edit
 (invalid or **stale** content — see below).
 
-A game's own committed artefacts are passed explicitly:
+A game's own committed artefacts are passed explicitly, either with the CLI
+flags (which also cover the served page) or in the payload:
+
+```bash
+npm run storylines:editor -- --content path/to/storylines.csv \
+  --adapter ./my-game-adapter.ts \
+  --artefact-json docs/dev/assets/storyline-manifest.json \
+  --artefact-mermaid docs/dev/assets/storyline-graph.mmd \
+  --apply '{"edit":{"kind":"update-card","spec":{"id":"evt-x","name":"X"}}}'
+```
 
 ```bash
 npm run storylines:editor -- --content path/to/storylines.csv \
@@ -261,7 +368,7 @@ assumed.
 | Apply is refused with `stale-content` | The CSV changed on disk since load (maybe a branch switch or an external edit). Reload the page and retry. |
 | An edit is refused with a validator error | Read the report (and the inline-attributed field). Typical causes: `unknown-successor`, `unreachable-card`, malformed `options` encoding, `missing-storyline-id` on a new choice card. |
 | Port already in use | `npm run storylines:editor -- --port 5180`. |
-| The server won't bind | The host is loopback by default; `--host 0.0.0.0` is allowed but the tool is designed for local authoring. |
+| The server won't bind | Check the port is free (`--port 5180`) and the host resolves. The editor defaults to loopback (`127.0.0.1`); a **valueless `--host`** binds all interfaces (`0.0.0.0`), and an explicit `--host <addr>` binds that address. A non-loopback bind prints a warning: the editor is reachable from the network and can write the loaded content CSV (no authentication). |
 
 ## 10. Testing
 

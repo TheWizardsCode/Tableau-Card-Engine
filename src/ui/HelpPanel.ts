@@ -11,6 +11,8 @@ import { HelpButton } from './HelpButton';
 import { ListenerRegistry } from '../core-engine/ListenerRegistry';
 import { createAlphaBadge, ALPHA_BADGE_CHAR_WIDTH, ALPHA_BADGE_PADDING_X, ALPHA_BADGE_LABEL } from './AlphaBadge';
 import type { AlphaBadgeResult } from './AlphaBadge';
+import { createContainerClip } from './ContainerClip';
+import type { ContainerClip } from './ContainerClip';
 
 // ── Public types ────────────────────────────────────────────
 
@@ -126,8 +128,16 @@ export class HelpPanel {
   private container: Phaser.GameObjects.Container;
   private background: Phaser.GameObjects.Rectangle;
   private contentContainer: Phaser.GameObjects.Container;
-  private contentMask: Phaser.Display.Masks.GeometryMask | null = null;
-  private maskGraphics: Phaser.GameObjects.Graphics | null = null;
+  /**
+   * Renderer-aware clip on the scrollable content.
+   *
+   * Phaser 4 removed `setMask` support in WebGL, so clipping goes through
+   * {@link createContainerClip} (Canvas `GeometryMask`, WebGL Mask filter).
+   * Created in `setupScrollMask()` and cleared (not destroyed) when the
+   * content fits, because a zero-area clip would hide everything under the
+   * WebGL Mask filter.
+   */
+  private contentClip: ContainerClip | null = null;
   private trackBar: Phaser.GameObjects.Rectangle | null = null;
   private closeButton: Phaser.GameObjects.Text;
   private inputBlocker: Phaser.GameObjects.Rectangle | null = null;
@@ -183,17 +193,22 @@ export class HelpPanel {
    * the internal container.
    *
    * The panel Container holds the background, close button, content,
-   * track bar, and scroll-masked children. The maskGraphics (a white,
-   * invisible Geometry Mask rectangle) and the inputBlocker (a
-   * full-screen transparent input barrier) are added directly to the
-   * scene, so they must also be included here for correct exclusion.
+   * track bar, and scroll-clipped children. The inputBlocker (a
+   * full-screen transparent input barrier) is added directly to the
+   * scene, so it must also be included here for correct exclusion. Under
+   * Canvas the clip's mask Graphics is a scene display object as well, so it
+   * is included only when the renderer actually put it on the display list
+   * (the WebGL Mask filter keeps its Graphics off the display list).
    *
    * @returns An array of Phaser GameObjects that are direct children
    *          of the scene's display list.
    */
   getSceneChildren(): Phaser.GameObjects.GameObject[] {
     const children: Phaser.GameObjects.GameObject[] = [this.container];
-    if (this.maskGraphics) children.push(this.maskGraphics);
+    const clipGraphics = this.contentClip?.graphics;
+    if (clipGraphics && this.contentClip?.renderer === 'canvas') {
+      children.push(clipGraphics);
+    }
     if (this.inputBlocker) children.push(this.inputBlocker);
     return children;
   }
@@ -447,14 +462,10 @@ export class HelpPanel {
     // Remove input blocker
     this.removeInputBlocker();
 
-    // Destroy mask resources
-    if (this.contentMask) {
-      this.contentContainer.clearMask(true);
-      this.contentMask = null;
-    }
-    if (this.maskGraphics) {
-      this.maskGraphics.destroy();
-      this.maskGraphics = null;
+    // Destroy clip resources (mask Graphics / Mask filter)
+    if (this.contentClip) {
+      this.contentClip.destroy();
+      this.contentClip = null;
     }
 
     // Destroy the integrated button
@@ -509,19 +520,23 @@ export class HelpPanel {
     const visibleHeight = this.canvasHeight - contentTopY - PADDING;
     this.maxScroll = Math.max(0, this.totalContentHeight - visibleHeight);
 
-    if (this.maxScroll <= 0) return; // No scrolling needed
+    // Store visible height for scroll calculations
+    (this as unknown as Record<string, number>)._visibleHeight = visibleHeight;
+    (this as unknown as Record<string, number>)._contentTopY = contentTopY;
 
-    // Create a geometry mask to clip content
-    this.maskGraphics = this.scene.add.graphics();
-    this.maskGraphics.fillStyle(0xffffff);
-    // The mask position needs to account for the container's transform.
-    // We draw relative to world coordinates; we'll update on scroll.
-    this.maskGraphics.fillRect(0, contentTopY, this.panelWidth, visibleHeight);
-    this.maskGraphics.setVisible(false);
+    // Renderer-aware clip (Canvas `GeometryMask` / WebGL Mask filter). The
+    // region is drawn in scene space and re-applied on scroll and on every
+    // slide-animation frame (see `updateClip`).
+    this.contentClip = createContainerClip(this.scene, this.contentContainer);
 
+    if (this.maxScroll <= 0) {
+      // Content fits: a zero-area clip means "hide everything" under the
+      // WebGL Mask filter, so clear the clip instead of shrinking it.
+      this.contentClip.clear();
+      return; // No scrolling needed
+    }
 
-    this.contentMask = new Phaser.Display.Masks.GeometryMask(this.scene, this.maskGraphics);
-    this.contentContainer.setMask(this.contentMask);
+    this.updateClip();
 
     // Track bar
     const trackBarHeight = Math.max(
@@ -541,10 +556,6 @@ export class HelpPanel {
 
     // Scroll listeners (tracked for automatic cleanup)
     this.registry.on(this.scene.input, 'wheel', this.handleWheel, this);
-
-    // Store visible height for scroll calculations
-    (this as unknown as Record<string, number>)._visibleHeight = visibleHeight;
-    (this as unknown as Record<string, number>)._contentTopY = contentTopY;
   }
 
   private handleWheel = (
@@ -596,21 +607,35 @@ export class HelpPanel {
   }
 
   /**
-   * Redraw the geometry mask at the container's current world-x position.
-   * Must be called on every frame during the slide animation so the mask
-   * tracks the panel and content remains visible.
+   * Re-apply the clip at the container's current world-x position.
+   * Must be called on every frame during the slide animation so the clip
+   * tracks the panel and content remains visible, and on every scroll step.
    */
   private updateMask(): void {
-    if (!this.maskGraphics) return;
+    if (!this.contentClip) return;
+    this.updateClip();
+  }
+
+  /** Apply the current clip geometry (panel x, content top, visible height). */
+  private updateClip(): void {
+    if (!this.contentClip) return;
 
     const contentTopY = (this as unknown as Record<string, number>)._contentTopY ?? PADDING + 10;
     const visibleHeight =
       (this as unknown as Record<string, number>)._visibleHeight ??
       this.canvasHeight - contentTopY - PADDING;
 
-    this.maskGraphics.clear();
-    this.maskGraphics.fillStyle(0xffffff);
-    this.maskGraphics.fillRect(this.container.x, contentTopY, this.panelWidth, visibleHeight);
+    if (this.maxScroll <= 0) {
+      this.contentClip.clear();
+      return;
+    }
+
+    this.contentClip.setRect({
+      x: this.container.x,
+      y: contentTopY,
+      w: this.panelWidth,
+      h: visibleHeight,
+    });
   }
 
   // ── Private: Input blocking ───────────────────────────────

@@ -82,7 +82,7 @@ function fakeRunner(
 // ── Data-only: the publication targets come from the layout contract ───────
 
 describe('repo-layout.json — publication targets', () => {
-  it('declares the core repo plus exactly the eight tce-<game> repos', () => {
+  it('declares the core repo plus exactly the nine tce-<game> repos', () => {
     const layout = readLayout();
     expect(layout.core.slug).toBe('Tableau-Card-Engine');
     expect(layout.games.map((g) => g.slug).sort()).toEqual(
@@ -95,6 +95,7 @@ describe('repo-layout.json — publication targets', () => {
         'tce-lost-cities',
         'tce-main-street',
         'tce-sushi-go',
+        'tce-the-rising',
       ].sort(),
     );
   });
@@ -120,10 +121,10 @@ describe('repo-layout.json — publication targets', () => {
 // ── Contract (helper): authored as skips, unskipped by CG-0MUIND4FD000OQB5 ─
 
 describe('publish-repos — target resolution', () => {
-  it('resolves the nine targets from repo-layout.json (no hard-coded names)', async () => {
+  it('resolves the ten targets from repo-layout.json (no hard-coded names)', async () => {
     const { loadPublishTargets } = await loadHelper();
     const targets = loadPublishTargets(LAYOUT_PATH);
-    expect(targets).toHaveLength(9);
+    expect(targets).toHaveLength(10);
     expect(targets.find((t: any) => t.kind === 'core')?.slug).toBe(
       'Tableau-Card-Engine',
     );
@@ -137,6 +138,7 @@ describe('publish-repos — target resolution', () => {
         'tce-lost-cities',
         'tce-main-street',
         'tce-coloretto',
+        'tce-the-rising',
       ]),
     );
   });

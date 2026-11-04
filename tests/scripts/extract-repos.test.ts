@@ -23,11 +23,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { fixtureGitEnv } from '../helpers/gitFixtureEnv';
+
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const LAYOUT_PATH = path.join(REPO_ROOT, 'scripts', 'configs', 'repo-layout.json');
 const SCRIPT_PATH = path.join(REPO_ROOT, 'scripts', 'extract-repos.sh');
 
-/** All eight example games that move to their own repository. */
+/** All nine example games that move to their own repository. */
 const GAME_NAMES = [
   'golf',
   'beleaguered-castle',
@@ -37,6 +39,7 @@ const GAME_NAMES = [
   'lost-cities',
   'main-street',
   'coloretto',
+  'the-rising',
 ] as const;
 
 /** Shared engine modules that stay in the core repository. */
@@ -93,6 +96,8 @@ function runExtract(args: string[]): { stdout: string; status: number } {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 60_000,
+      // The script runs git; keep it out of any ambient gate index.
+      env: fixtureGitEnv(),
     });
     return { stdout, status: 0 };
   } catch (error) {
@@ -111,7 +116,7 @@ describe('repo-layout.json — repo partition contract', () => {
     expect(Array.isArray(layout.assetDecisionTable)).toBe(true);
   });
 
-  it('declares exactly the eight example games as separate repos', () => {
+  it('declares exactly the nine example games as separate repos', () => {
     const layout = readLayout();
     expect(layout.games.map((g) => g.name).sort()).toEqual([...GAME_NAMES].sort());
   });
@@ -304,7 +309,7 @@ describe('extract-repos.sh — driver interface', () => {
 });
 
 describe('extract-repos.sh — dry-run plan', () => {
-  it('succeeds and names the core repo plus all eight game repos', () => {
+  it('succeeds and names the core repo plus all nine game repos', () => {
     const { stdout, status } = runExtract(['--dry-run']);
     expect(status).toBe(0);
     expect(stdout).toContain('Tableau-Card-Engine');
@@ -389,7 +394,10 @@ describe('extract-repos.sh — dry-run plan', () => {
  * (with a documented reason) on hosts that lack the tool. */
 const HAS_FILTER_REPO = (() => {
   try {
-    execFileSync('git', ['filter-repo', '--version'], { stdio: 'ignore' });
+    execFileSync('git', ['filter-repo', '--version'], {
+      stdio: 'ignore',
+      env: fixtureGitEnv(),
+    });
     return true;
   } catch {
     return false;
@@ -430,8 +438,15 @@ describe.skipIf(!HAS_FILTER_REPO)('extract-repos.sh — real extraction', () => 
         '// test\n',
       );
       fs.writeFileSync(path.join(source, 'unrelated.txt'), 'nope\n');
+      // Hermetic: no ambient GIT_INDEX_FILE may reach the fixture, or its
+      // git commands would write into the finish gate's temporary index
+      // (CG-0MVVKUUY50010004).
       const git = (args: string[]) =>
-        execFileSync('git', args, { cwd: source, stdio: 'ignore' });
+        execFileSync('git', args, {
+          cwd: source,
+          stdio: 'ignore',
+          env: fixtureGitEnv(),
+        });
       git(['init', '-q']);
       git(['config', 'user.email', 'test@example.com']);
       git(['config', 'user.name', 'Test']);
@@ -446,6 +461,8 @@ describe.skipIf(!HAS_FILTER_REPO)('extract-repos.sh — real extraction', () => 
           encoding: 'utf-8',
           stdio: ['ignore', 'pipe', 'pipe'],
           timeout: 120_000,
+          // The script runs git itself; keep it out of any ambient gate index.
+          env: fixtureGitEnv(),
         },
       );
 

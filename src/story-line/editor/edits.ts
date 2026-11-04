@@ -72,9 +72,13 @@ export interface SetStorylineBatchSpec {
 /**
  * A spec for adding a card **and** linking it in from an existing card in one
  * transaction: the new card is appended with its own fields, then the chosen
- * predecessor gains an option (or legacy accept/reject link) pointing at it.
- * This is what makes a guided add into an existing multi-member story-line
- * valid (`unreachable-card` never fires because the new card is reachable).
+ * predecessor gains an option pointing at it. This is what makes a guided add
+ * into an existing multi-member story-line valid (`unreachable-card` never
+ * fires because the new card is reachable).
+ *
+ * Linking is expressed **only** through the `options` encoding, so an adapter
+ * that maps no `options` column cannot link a card in (the edit is refused
+ * rather than silently written without the link).
  */
 export interface AddLinkedCardSpec {
   /** The new card (the same spec {@link addContentCard} accepts). */
@@ -84,15 +88,9 @@ export interface AddLinkedCardSpec {
     /** The predecessor's card id. */
     readonly id: string;
     /**
-     * Option label shown to the player. Required when the adapter maps an
-     * `options` column; defaults to the new card's name.
+     * Option label shown to the player. Defaults to the new card's name.
      */
     readonly label?: string;
-    /**
-     * Which legacy link column to set when the adapter maps no `options`
-     * column (`accept` default). Ignored when `options` is mapped.
-     */
-    readonly linkKind?: 'accept' | 'reject';
   };
 }
 
@@ -173,30 +171,20 @@ export function setStorylineBatch(
 }
 
 /**
- * Appends an option (or legacy link) to `options`/`accept`/`reject` on the
- * predecessor card, pointing at the new card's id. Returns the update spec.
+ * Appends an option to the predecessor card's `options` encoding, pointing at
+ * the new card's id. Returns the update spec.
  */
 function linkUpdateFrom(
-  adapter: ContentAdapter,
   predecessor: { readonly id: string; readonly options: string },
   newId: string,
   link: AddLinkedCardSpec['linkFrom'],
 ): UpdateContentCardSpec {
   const label = (link.label ?? '').trim();
-  if (adapter.fields.options !== undefined) {
-    const existing = predecessor.options.trim();
-    return {
-      id: predecessor.id,
-      options: existing === '' ? `${label}|${newId}` : `${existing};${label}|${newId}`,
-      // Appending an options encoding makes the predecessor a choice card;
-      // keep the raw flag in step so the column is not a stale `false`.
-      ...(adapter.fields.hasChoices !== undefined ? { hasChoices: true } : {}),
-    };
-  }
-  if (adapter.fields.acceptNextCardId !== undefined && (link.linkKind ?? 'accept') === 'accept') {
-    return { id: predecessor.id, acceptNextCardId: newId };
-  }
-  return { id: predecessor.id, rejectNextCardId: newId };
+  const existing = predecessor.options.trim();
+  return {
+    id: predecessor.id,
+    options: existing === '' ? `${label}|${newId}` : `${existing};${label}|${newId}`,
+  };
 }
 
 /** Folds a candidate CSV's validation outcome into an edit result. */
@@ -223,10 +211,10 @@ function finaliseCandidate(
  *
  * The new card is applied through the pure add step; then the chosen
  * predecessor gains an option (`label|newId` appended to its `options`
- * encoding) or a legacy accept/reject link pointing at the new card, applied
- * through the pure update step. Validating only the combined candidate is
- * deliberate: validating the intermediate candidate (the new card alone) would
- * reject it as unreachable from its story-line before the link existed. The
+ * encoding) pointing at the new card, applied through the pure update step.
+ * Validating only the combined candidate is deliberate: validating the
+ * intermediate candidate (the new card alone) would reject it as unreachable
+ * from its story-line before the link existed. The
  * returned `csv` is the unchanged input whenever either step fails — so the
  * write path stays single, transactional and validator-gated.
  *
@@ -240,6 +228,19 @@ export function addLinkedContentCard(
   adapter: ContentAdapter,
   spec: AddLinkedCardSpec,
 ): ContentEditResult {
+  const optionsColumn = adapter.fields.options;
+  if (optionsColumn === undefined) {
+    // Linking is expressed solely through the options encoding: refuse rather
+    // than write the card without the link the caller asked for.
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [
+        `add-linked-card: adapter "${adapter.gameId}" maps no options column, so a card cannot be linked in`,
+      ],
+    };
+  }
+
   const added = applyAddContentCardSpec(csvText, adapter, spec.card);
   if (!added.ok) return added;
 
@@ -258,7 +259,7 @@ export function addLinkedContentCard(
   const linked = applyUpdateContentCardSpec(
     added.csv,
     adapter,
-    linkUpdateFrom(adapter, predecessor, newId, spec.linkFrom),
+    linkUpdateFrom(predecessor, newId, spec.linkFrom),
   );
   if (!linked.ok) {
     // Never hand a partially-applied candidate to the writer.

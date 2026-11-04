@@ -101,7 +101,11 @@ async function boot(): Promise<void> {
     // Register all discovered scenes; GameSelectorScene is first so it
     // auto-starts.
     scenes: [GameSelectorScene, ...payload.scenes],
-    type: Phaser.CANVAS,
+    // `Phaser.AUTO` = WebGL with a Canvas fallback (CG-0MVTQ3WPV003ZECA).
+    // Games rely on Phaser 4's Filter pipeline (e.g. the Mask filter that
+    // replaces the Canvas-only `GeometryMask`); forcing Canvas here would
+    // silently drop that pipeline on every desktop/GPU browser.
+    type: Phaser.AUTO,
     render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
     callbacks: {
       preBoot: (game: Phaser.Game) => {

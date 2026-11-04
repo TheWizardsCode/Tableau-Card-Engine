@@ -139,14 +139,6 @@ function type(container: HTMLElement, field: string, value: string): void {
   element.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-/** Toggles a checkbox field. */
-function toggle(container: HTMLElement, field: string, checked: boolean): void {
-  const element = control(container, field);
-  if (!(element instanceof HTMLInputElement)) throw new Error(`field "${field}" is not a checkbox`);
-  element.checked = checked;
-  element.dispatchEvent(new Event('change', { bubbles: true }));
-}
-
 /** Selects an option in a `<select>` and fires `change`. */
 function select(container: HTMLElement, role: string, value: string): void {
   const element = container.querySelector(`[data-role="${role}"]`);
@@ -181,10 +173,7 @@ describe('story-line editor — curated card edit round-trip', () => {
         'id',
         'name',
         'effect',
-        'hasChoices',
         'options',
-        'acceptNextCardId',
-        'rejectNextCardId',
         'storylineId',
         'storylineTitle',
         'column:trigger',
@@ -193,21 +182,32 @@ describe('story-line editor — curated card edit round-trip', () => {
         'column:reputationDelta',
       ]),
     );
+    // The form renders exactly the adapter-driven field set: `options` is the
+    // only choice control and no extra choices-related field is rendered.
+    expect([...new Set(renderedFields)].sort()).toEqual([
+      'column:coinDelta',
+      'column:cost',
+      'column:reputationDelta',
+      'column:trigger',
+      'effect',
+      'id',
+      'name',
+      'options',
+      'storylineId',
+      'storylineTitle',
+    ]);
 
     // The id is read-only and prefilled; every other control is editable.
     const idControl = control(container, 'id');
     expect(idControl.value).toBe('gym-story-end');
     expect(idControl instanceof HTMLInputElement && idControl.readOnly).toBe(true);
-    expect(control(container, 'name').value).toBe('New Beginning');
+    expect(control(container, 'name').value).toBe('Transport Infrastructure');
     expect(control(container, 'column:coinDelta').value).toBe('0');
 
     // Edit every core-generic field and every game column.
     type(container, 'name', 'The Endgame');
     type(container, 'effect', 'Everything changes.');
-    toggle(container, 'hasChoices', true);
     type(container, 'options', 'Reinvest|gym-story-invest;Finish|');
-    type(container, 'acceptNextCardId', 'gym-story-invest');
-    type(container, 'rejectNextCardId', 'gym-story-ignore');
     type(container, 'storylineId', 'edited-arc');
     type(container, 'storylineTitle', 'Edited Arc');
     type(container, 'column:trigger', 'Event');
@@ -228,7 +228,7 @@ describe('story-line editor — curated card edit round-trip', () => {
       '[data-role="diff-change"][data-column="name"]',
     );
     expect(nameChange?.querySelector('[data-role="diff-before"]')?.textContent).toBe(
-      'New Beginning',
+      'Transport Infrastructure',
     );
     expect(nameChange?.querySelector('[data-role="diff-after"]')?.textContent).toBe('The Endgame');
     const coinChange = container.querySelector(

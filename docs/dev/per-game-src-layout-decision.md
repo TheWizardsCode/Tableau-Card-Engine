@@ -191,7 +191,7 @@ the two layouts genuinely differ (`example-games/golf/scenes/GolfScene.ts` vs
 
 **Concrete values (AC3).**
 
-Launcher `configs/full.json` entry for golf (the full preset spans all eight
+Launcher `configs/full.json` entry for golf (the full preset spans all nine
 games; each entry follows the same shape):
 
 ```jsonc

@@ -124,12 +124,19 @@ describe('readGameAssetOwnership', () => {
         'lost-cities',
         'main-street',
         'sushi-go',
+        'the-rising',
       ].sort(),
     );
     // Trailing slashes are stripped so the paths join cleanly.
     expect(byGame.get('golf')).toContain('games/golf');
     expect(byGame.get('lost-cities')).toContain('cards/lost-cities');
     expect(byGame.get('blackjack')).toContain('audio/blackjack');
+    // The Rising ships both its own SFX and its selector art (thumbnail,
+    // card backs, portraits).
+    expect(byGame.get('the-rising')).toEqual([
+      'audio/the-rising',
+      'games/the-rising',
+    ]);
   });
 
   it('tolerates malformed entries and a missing layout file', () => {

@@ -152,6 +152,10 @@ export function mountEditorShell(
   const fitView = el('button', 'editor-button', 'Fit view');
   fitView.type = 'button';
   fitView.dataset.action = 'fit-view';
+  // Visible zoom level: the graph opens fitted, so the readout also makes the
+  // starting scale (and every zoom step) obvious at a glance.
+  const zoomLevel = el('span', 'editor-zoom-level', '100%');
+  zoomLevel.dataset.role = 'zoom-level';
   const addCardButton = el('button', 'editor-button editor-button--primary', 'Add card');
   addCardButton.type = 'button';
   addCardButton.dataset.action = 'add-card';
@@ -163,8 +167,9 @@ export function mountEditorShell(
   manageStorylinesButton.type = 'button';
   manageStorylinesButton.dataset.action = 'manage-storylines';
   actions.append(
-    zoomIn,
     zoomOut,
+    zoomLevel,
+    zoomIn,
     resetView,
     fitView,
     ...(editing ? [manageStorylinesButton, addCardButton] : []),
@@ -295,6 +300,9 @@ export function mountEditorShell(
       selectedNodeId = nodeId;
       renderDetails(nodeId);
     },
+    onTransformChange: (transform) => {
+      zoomLevel.textContent = `${Math.round(transform.scale * 100)}%`;
+    },
   });
 
   const nodeById = new Map(viewModel.nodes.map((node) => [node.id, node]));
@@ -307,7 +315,7 @@ export function mountEditorShell(
 
     detailsName.textContent = node.name;
     detailsId.textContent = node.id;
-    detailsKind.textContent = node.hasChoices
+    detailsKind.textContent = node.isChoice
       ? `Choice card · ${node.optionCount} option${node.optionCount === 1 ? '' : 's'}`
       : 'Plain incident';
     detailsStoryline.textContent = node.storylineId

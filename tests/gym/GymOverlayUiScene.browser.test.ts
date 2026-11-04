@@ -6,48 +6,59 @@
  *  - The overlay background rectangle is centered (not in top-left corner)
  *  - Overlay positioning is correct relative to the game viewport
  *  - Visual regression via screenshot comparison
- *  - Scrollable masked content area with wheel-based scrolling
+ *  - Scrollable clipped content area with wheel-based scrolling
  *  - Scrollbar indicator visible when content overflows
+ *  - The scroll region genuinely clips on **both** renderers: the scene
+ *    builds its clip through the core `createContainerClip()` helper, so
+ *    Canvas applies a `GeometryMask` and WebGL applies a Mask filter. The
+ *    WebGL case probes the framebuffer (content inside the clip rect is
+ *    painted, identical content below it is not) and asserts no core-
+ *    originated `setMask … not supported in WebGL` warning is emitted.
+ *    Canvas parity is asserted too, so the migration cannot silently change
+ *    the Canvas path.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { page } from 'vitest/browser';
 import { GymOverlayUiScene } from '../../example-games/gym/scenes/GymOverlayUiScene';
 import { GYM_OVERLAY_UI_KEY } from '../../example-games/gym/GymRegistry';
 import { GAME_W, GAME_H } from '../../src/ui/constants';
-import { waitForScene } from '../helpers/waitForScene';
+import type { ContainerClip } from '../../src/ui/ContainerClip';
+import {
+  OVERLAY_MASK_HEIGHT,
+  OVERLAY_MASK_WIDTH,
+  OVERLAY_SCROLL_BASE_Y,
+} from '../../example-games/gym/scenes/GymConstants';
+import {
+  bootRendererScene,
+  captureConsoleWarnings,
+  clearRendererSkipReasons,
+  detectRendererSupport,
+  getRendererSkipReasons,
+  type PixelColour,
+  type RendererSceneHandle,
+} from '../helpers/bootRendererScene';
 
 describe('GymOverlayUiScene browser integration', () => {
-  let game: Phaser.Game | null = null;
-
-  afterEach(() => {
-    if (game) game.destroy(true, false);
-    game = null;
-    const container = document.getElementById('game-container');
-    if (container) container.remove();
-  });
-
   /**
    * Bootstrap the scene for each test.
    */
   async function bootScene(): Promise<Phaser.Scene> {
-    const container = document.createElement('div');
-    container.id = 'game-container';
-    document.body.appendChild(container);
+    return (await bootRenderer(Phaser.CANVAS)).scene;
+  }
 
-    game = new Phaser.Game({ type: Phaser.CANVAS,
+  /**
+   * Boot the scene on a **forced** renderer. The harness fails loudly rather
+   * than silently falling back to the other renderer.
+   */
+  async function bootRenderer(renderType: number): Promise<RendererSceneHandle> {
+    return bootRendererScene(renderType, {
+      scene: GymOverlayUiScene,
+      sceneKey: GYM_OVERLAY_UI_KEY,
       width: GAME_W,
       height: GAME_H,
-      parent: 'game-container',
       backgroundColor: '#1a2a1a',
-      scene: [GymOverlayUiScene],
     });
-
-    await waitForScene(game, GYM_OVERLAY_UI_KEY);
-    const scene = game.scene.getScene(GYM_OVERLAY_UI_KEY);
-    expect(scene).toBeTruthy();
-    expect(scene.sys.isActive()).toBe(true);
-    return scene;
   }
 
   /**
@@ -105,6 +116,32 @@ describe('GymOverlayUiScene browser integration', () => {
     for (let i = 0; i < count; i++) {
       await new Promise((r) => requestAnimationFrame(r));
     }
+  }
+
+  /** Let the clip's render pass (and any deferred scene work) settle. */
+  async function settle(handle: RendererSceneHandle): Promise<void> {
+    for (let i = 0; i < 4; i += 1) {
+      await handle.awaitRenderTick();
+    }
+  }
+
+  /** Open the overlay through its button. */
+  function openOverlay(scene: Phaser.Scene): void {
+    const showBtn = findText(scene, '[ Show Overlay ]');
+    expect(showBtn).toBeTruthy();
+    showBtn!.emit('pointerdown');
+  }
+
+  /** Dismiss the open overlay through its in-overlay dismiss link. */
+  function dismissOverlayViaLink(scene: Phaser.Scene): void {
+    const dismissTexts = scene.children.list.filter(
+      (child): child is Phaser.GameObjects.Text =>
+        child instanceof Phaser.GameObjects.Text &&
+        child.text === '[ Dismiss Overlay ]',
+    );
+    const overlayDismiss = dismissTexts.find((t) => (t as any).depth >= 11);
+    expect(overlayDismiss).toBeTruthy();
+    overlayDismiss!.emit('pointerdown');
   }
 
   // ── AC 1: Scene boots correctly ──────────────────────────
@@ -487,6 +524,238 @@ describe('GymOverlayUiScene browser integration', () => {
     // But to be more robust, just check there are some small rectangles
     // which would be the scrollbar elements
     expect(smallRects.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ── Renderer-aware clip: WebGL + Canvas parity ───────────
+
+  /** Unmistakable injected content colour: no clipped-away pixel matches it. */
+  const CONTENT_COLOUR = 0xff00ff;
+  const CONTENT_RGB = { r: 0xff, g: 0x00, b: 0xff };
+
+  /** Snapshot backends and mask edges may differ by a rounding step. */
+  const COLOUR_TOLERANCE = 8;
+
+  /**
+   * Margin for "this pixel is not content". Deliberately much larger than
+   * {@link COLOUR_TOLERANCE} so a partially-clipped edge can never pass.
+   */
+  const NOT_CONTENT_MARGIN = 40;
+
+  function expectColourClose(
+    actual: PixelColour,
+    expected: { r: number; g: number; b: number },
+    label: string,
+  ): void {
+    expect(
+      Math.abs(actual.r - expected.r),
+      `${label}: red ${actual.r} vs expected ${expected.r}`,
+    ).toBeLessThanOrEqual(COLOUR_TOLERANCE);
+    expect(
+      Math.abs(actual.g - expected.g),
+      `${label}: green ${actual.g} vs expected ${expected.g}`,
+    ).toBeLessThanOrEqual(COLOUR_TOLERANCE);
+    expect(
+      Math.abs(actual.b - expected.b),
+      `${label}: blue ${actual.b} vs expected ${expected.b}`,
+    ).toBeLessThanOrEqual(COLOUR_TOLERANCE);
+  }
+
+  function expectNotContent(actual: PixelColour, label: string): void {
+    const distance =
+      Math.abs(actual.r - CONTENT_RGB.r) +
+      Math.abs(actual.g - CONTENT_RGB.g) +
+      Math.abs(actual.b - CONTENT_RGB.b);
+    expect(
+      distance,
+      `${label}: expected clipped-away content but the pixel is content-coloured (${actual.r},${actual.g},${actual.b})`,
+    ).toBeGreaterThan(NOT_CONTENT_MARGIN);
+  }
+
+  /** Every container in the scene whose mask filter is currently active. */
+  function containersWithActiveMaskFilter(
+    scene: Phaser.Scene,
+  ): Phaser.GameObjects.Container[] {
+    const found: Phaser.GameObjects.Container[] = [];
+    const visit = (node: unknown): void => {
+      if (!node) return;
+      const candidate = node as {
+        filters?: { internal?: { getActive?: () => unknown[] } } | null;
+        list?: unknown[];
+      };
+      const active = candidate.filters?.internal?.getActive?.() ?? [];
+      if (active.length > 0 && node instanceof Phaser.GameObjects.Container) {
+        found.push(node);
+      }
+      candidate.list?.forEach(visit);
+    };
+    scene.children.list.forEach(visit);
+    return found;
+  }
+
+  /**
+   * Inject a magenta rectangle into the scene's clipped content container.
+   *
+   * It spans the whole clip rect and continues well below it, so a renderer
+   * that ignores the clip paints magenta outside the clip region as well.
+   */
+  function injectOverflowingContent(scene: Phaser.Scene): {
+    clip: ContainerClip;
+    insideProbe: { x: number; y: number };
+    belowProbe: { x: number; y: number };
+  } {
+    const clip = (scene as any).contentClip as ContainerClip | null;
+    expect(clip, 'the overlay must build its scroll clip').not.toBeNull();
+    const container = (scene as any).maskedContainer as
+      | Phaser.GameObjects.Container
+      | null;
+    expect(container, 'the overlay must create its clipped container').not.toBeNull();
+
+    // Local (0, 0) is the clip's top-left corner: the rect covers the clip
+    // and reaches twice the clip height, i.e. far past its bottom edge.
+    container!.add(
+      scene.add
+        .rectangle(clip!.rect.w / 2, clip!.rect.h, clip!.rect.w, clip!.rect.h * 2, CONTENT_COLOUR)
+        .setOrigin(0.5),
+    );
+
+    return {
+      clip: clip!,
+      // Left of centre: clear of the scrollbar and of the overlay's status
+      // labels, so only the injected rectangle can colour these pixels.
+      insideProbe: { x: clip!.rect.x + 40, y: clip!.rect.y + 60 },
+      belowProbe: { x: clip!.rect.x + 40, y: clip!.rect.y + clip!.rect.h + 20 },
+    };
+  }
+
+  beforeEach(() => {
+    clearRendererSkipReasons();
+  });
+
+  it(
+    'clips the scroll region under WebGL and destroys the clip on dismiss',
+    async (ctx) => {
+      const support = detectRendererSupport(Phaser.WEBGL);
+      if (!support.supported) {
+        ctx.skip(`WebGL unavailable in this browser: ${support.reason}`);
+        return;
+      }
+
+      const warnings = captureConsoleWarnings();
+      const handle = await bootRenderer(Phaser.WEBGL);
+      const scene = handle.scene;
+      expect(
+        handle.rendererName,
+        'the clip probe must really run on WebGL',
+      ).toBe('webgl');
+      expect(getRendererSkipReasons()).toEqual([]);
+
+      openOverlay(scene);
+      await settle(handle);
+
+      const clip = (scene as any).contentClip as ContainerClip | null;
+      expect(clip, 'the overlay must build its scroll clip').not.toBeNull();
+      expect(clip!.renderer, 'WebGL must drive a Mask filter').toBe('webgl');
+      expect(clip!.active).toBe(true);
+      expect(clip!.rect).toEqual({
+        x: GAME_W / 2 - OVERLAY_MASK_WIDTH / 2,
+        y: OVERLAY_SCROLL_BASE_Y,
+        w: OVERLAY_MASK_WIDTH,
+        h: OVERLAY_MASK_HEIGHT,
+      });
+      expect(clip!.geometryMask, 'WebGL must never use a GeometryMask').toBeNull();
+      expect(clip!.maskFilter).not.toBeNull();
+
+      const maskedContainer = (scene as any).maskedContainer;
+      const masked = containersWithActiveMaskFilter(scene);
+      expect(
+        masked,
+        'the scroll container must be clipped by an active Mask filter',
+      ).toContain(maskedContainer);
+
+      const probes = injectOverflowingContent(scene);
+      await settle(handle);
+
+      // Content is painted inside the clip rect …
+      const inside = await handle.probePixel(probes.insideProbe.x, probes.insideProbe.y);
+      expectColourClose(inside, CONTENT_RGB, 'inside the WebGL clip rect');
+
+      // … and absent below it, although the rectangle extends past the clip.
+      const below = await handle.probePixel(probes.belowProbe.x, probes.belowProbe.y);
+      expectNotContent(below, 'below the WebGL clip rect');
+
+      expect(
+        warnings.matching('not supported in WebGL'),
+        'no core-originated setMask warning may be emitted under WebGL',
+      ).toEqual([]);
+
+      // Teardown: dismissing the overlay destroys the clip — the Mask filter
+      // detaches and no mask Graphics is orphaned.
+      dismissOverlayViaLink(scene);
+      await settle(handle);
+
+      expect((scene as any).contentClip, 'dismiss must clear the clip reference').toBeNull();
+      expect(clip!.active, 'dismiss must deactivate the clip').toBe(false);
+      expect(
+        clip!.graphics.isDestroyed,
+        'dismiss must destroy the clip mask Graphics',
+      ).toBe(true);
+      expect(
+        containersWithActiveMaskFilter(scene),
+        'dismiss must not leave an active Mask filter on the scroll container',
+      ).not.toContain(maskedContainer);
+      expect(warnings.matching('not supported in WebGL')).toEqual([]);
+
+      warnings.stop();
+    },
+  );
+
+  it('clips the scroll region with a GeometryMask under Canvas (parity)', async () => {
+    const warnings = captureConsoleWarnings();
+    const handle = await bootRenderer(Phaser.CANVAS);
+    const scene = handle.scene;
+    expect(handle.rendererName, 'the Canvas parity probe must run on Canvas').toBe(
+      'canvas',
+    );
+
+    openOverlay(scene);
+    await settle(handle);
+
+    const clip = (scene as any).contentClip as ContainerClip | null;
+    expect(clip, 'the overlay must build its scroll clip').not.toBeNull();
+    expect(clip!.renderer, 'Canvas must keep the GeometryMask path').toBe('canvas');
+    expect(clip!.geometryMask).toBeInstanceOf(Phaser.Display.Masks.GeometryMask);
+    expect(clip!.maskFilter, 'Canvas must never use a Mask filter').toBeNull();
+    expect(
+      (scene as any).maskedContainer.mask,
+      'the scroll container must carry the GeometryMask',
+    ).toBe(clip!.geometryMask);
+    expect(
+      scene.children.list,
+      'Canvas keeps the long-standing display-list mask Graphics',
+    ).toContain(clip!.graphics);
+
+    const probes = injectOverflowingContent(scene);
+    await settle(handle);
+
+    const inside = await handle.probePixel(probes.insideProbe.x, probes.insideProbe.y);
+    expectColourClose(inside, CONTENT_RGB, 'inside the Canvas clip rect');
+    const below = await handle.probePixel(probes.belowProbe.x, probes.belowProbe.y);
+    expectNotContent(below, 'below the Canvas clip rect');
+
+    // Teardown destroys the clip resources on the Canvas path too.
+    dismissOverlayViaLink(scene);
+    await settle(handle);
+
+    expect((scene as any).contentClip).toBeNull();
+    expect(clip!.active).toBe(false);
+    expect(clip!.graphics.isDestroyed).toBe(true);
+    expect(
+      scene.children.list,
+      'no orphaned mask Graphics after dismiss',
+    ).not.toContain(clip!.graphics);
+    expect(warnings.matching('not supported in WebGL')).toEqual([]);
+
+    warnings.stop();
   });
 
   // ── Visual screenshot test ─────────────────────────────

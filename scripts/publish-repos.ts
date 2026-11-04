@@ -1,5 +1,5 @@
 /**
- * publish-repos.ts — create and publish the nine TCE repositories on GitHub.
+ * publish-repos.ts — create and publish the ten TCE repositories on GitHub.
  *
  * Contract: `docs/dev/repo-publication-decision.md` (CG-0MUIND2NE009GPHJ). This
  * helper implements that decision; the executable contract lives in
@@ -113,7 +113,7 @@ interface RawLayout {
   games: Array<{ name: string; slug: string; remote: string }>;
 }
 
-/** Resolve the nine publication targets from the layout contract. */
+/** Resolve the ten publication targets from the layout contract. */
 export function loadPublishTargets(
   layoutPath: string = DEFAULT_LAYOUT_PATH,
 ): PublishTarget[] {
@@ -407,7 +407,7 @@ function printUsage(): void {
     [
       'Usage: npm run publish:repos -- [options]',
       '',
-      'Create the nine TCE GitHub repositories and push dev + seeded main.',
+      'Create the ten TCE GitHub repositories and push dev + seeded main.',
       '',
       'Options:',
       '  --dry-run            Print the plan; invoke no gh/git commands.',

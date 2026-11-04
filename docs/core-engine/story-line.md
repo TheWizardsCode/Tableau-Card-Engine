@@ -41,7 +41,7 @@ is a *label/outcome* shorthand and cannot author the extended fields below
 | `label` | `string` | always |
 | `effectPolicy` | `'apply' \| 'skip'` | always — controls the card's intrinsic effect |
 | `condition?` | `(state) => boolean` | draw time — omit the option when `false` |
-| `successorId?` | `string \| null` | resolution — legacy single successor |
+| `successorId?` | `string \| null` | resolution — the lowest-precedence single successor |
 | `successorIds?` | `string[]` | resolution — one seeded random draw picks a candidate |
 | `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence |
 | `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins |
@@ -90,11 +90,15 @@ Semantics:
 
 ### Compilation
 
-Precedence: **registered options > CSV `options` encoding > legacy
-`hasChoices` fields**.
+There is exactly **one** choice model: a card is a choice when it supplies
+options, either through the CSV `options` encoding or through the programmatic
+registry. No separate choice flag or second link-field pair exists.
 
-- Legacy `hasChoices` cards compile to two options: `Accept` (`apply`) and
-  `Reject` (`skip`).
+Precedence: **registered options > CSV `options` encoding**.
+
+- A card with no registered options and no `options` encoding is not a choice
+  and compiles to an empty option list. A bare `storylineId` is descriptive
+  metadata only — it never makes a card a choice.
 - CSV `options` encoding: `label|cardA,cardB;label2|cardC` (`;` separates
   options, `|` separates the label from candidate ids, `,` separates
   candidates). An empty candidate list is a **terminal** option. Every
@@ -112,8 +116,7 @@ Precedence: **registered options > CSV `options` encoding > legacy
 `resolveStorylineOption(state, card, option)` runs the full lifecycle for a
 selected option:
 
-1. **`effectPolicy`** — `apply` runs the card effect, `skip` does not
-   (unchanged legacy step).
+1. **`effectPolicy`** — `apply` runs the card effect, `skip` does not.
 2. **Cost payment** — the option's `cost` is deducted through the engine
    adapter's resource-mutation seam, in addition to the effect.
 3. **Extra effect** — the option's `extraEffect` gains are applied, also
@@ -130,7 +133,8 @@ selected option:
       is pushed (`null` ends the chain). A matching rule consumes no RNG.
    3. `option.successorIds` — exactly **one** seeded `rng()` draw selects a
       candidate. An empty list is terminal and consumes no draw.
-   4. `option.successorId` — a legacy single id, pushed directly (no draw).
+   4. `option.successorId` — a single id, pushed directly (no draw). It is the
+      lowest-precedence successor and the programmatic registry seam.
 
 The pushed card uses deterministic serial naming: `${base}-${maxSerial+1}`,
 scanning every card the engine adapter returns from `getChainScanCards`.
@@ -202,10 +206,8 @@ the whole toolkit also loads under plain `tsx` with no bundler.
 ### Content adapter
 
 An adapter declares the game's columns, the story-line field mapping and the
-new-card defaults. Only `id` and `name` mappings are required: a game without a
-legacy two-way choice model simply omits `hasChoices` /
-`acceptNextCardId` / `rejectNextCardId`, and a game without an `options` column
-omits `options`.
+new-card defaults. Only `id` and `name` mappings are required: an adapter
+without an `options` column simply omits `options`.
 
 ```ts
 import type { ContentAdapter } from '@story-line/content';
@@ -248,8 +250,8 @@ round-trips **byte-identically** (column order preserved).
 change detection — any byte change produces a different checksum.
 
 `cardsFromCsv(parsed, adapter)` projects rows onto `ContentCard`;
-`compileContentOptions(card)` applies the runtime engine's precedence (CSV
-`options` encoding → legacy `hasChoices`), so authored content compiles exactly
+`compileContentOptions(card)` compiles a content card's `options` encoding
+through the runtime engine's semantics, so authored content compiles exactly
 as the runtime reads it.
 
 ### Manifest, Mermaid and the JSON schema
@@ -283,12 +285,10 @@ choiceCardCount, storylineIds, gameId }`.
 | Hard error code | Meaning |
 |---|---|
 | `duplicate-id` | Two cards share the same (base) id. |
-| `missing-required-field` | The id or name is empty. |
+| `missing-required-field` | The id, name or a required adapter column is empty. |
 | `missing-storyline-id` | A choice card declares no storyline id. |
-| `orphan-link` | A card declares accept/reject links but is not a choice card. |
 | `invalid-option` | Malformed `options` encoding, or an empty/duplicate option label. |
-| `unknown-successor` | An option (including a legacy `Accept`/`Reject` option) names an unknown card. |
-| `dangling-link` | An inert accept/reject link (on a non-choice card) names an unknown card. |
+| `unknown-successor` | An `options` candidate names a card id that does not exist. |
 | `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
 | `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
 
@@ -341,7 +341,8 @@ const result = applyContentEditToFile({
 game column, and any edit whose result fails validation (for example a new card
 in a story-line that nothing links to — it would be `unreachable-card`).
 `updateContentCard` changes only the supplied fields; a nullable field set to
-`null` is cleared, and setting a legacy link also marks the card as a choice.
+`null` is cleared. A card is a choice exactly when its `options` encoding is
+non-empty — no separate flag or link column exists to set.
 
 ### CLIs
 
@@ -352,7 +353,7 @@ Thin `tsx` entry points over the seams (no Vite loader, no game import):
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
 | `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `update-card` (`--dry-run`, `--field column=value`). |
-| `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--apply`, `--dry-run`). |
+| `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |
 
 Every CLI supports `--help`, resolves `--game` (the author/validator/graph
 CLIs) or `--adapter` (the editor) through the shipped adapter registry
@@ -377,8 +378,11 @@ itself.
 npm run storylines:editor                     # Gym content on http://127.0.0.1:5174
 npm run storylines:editor -- --port 5180
 npm run storylines:editor -- --host 127.0.0.1   # loopback is the default
+npm run storylines:editor -- --host             # bind all interfaces (0.0.0.0)
 npm run storylines:editor -- --content path/to/storylines.csv
 npm run storylines:editor -- --adapter ./my-game-adapter.ts
+npm run storylines:editor -- --artefact-json my-game/storyline-manifest.json \
+  --artefact-mermaid my-game/storyline-graph.mmd
 npm run storylines:editor -- --apply '{"edit":{"kind":"update-card","spec":{...}}}'
 npm run storylines:editor -- --help
 ```
@@ -387,7 +391,9 @@ npm run storylines:editor -- --help
 |---|---|
 | `--content <path>` | The game's content CSV (default: the Gym demo content). |
 | `--adapter <module>` | A shipped adapter id (`gym`) or a module path/specifier exporting a `ContentAdapter` as its default, `adapter` or `contentAdapter` export. |
-| `--port` / `--host` | Dev-server port (default `5174`) and bind host (default `127.0.0.1`). The tool is loopback-only by design. |
+| `--port` / `--host` | Dev-server port (default `5174`) and bind host (default `127.0.0.1`, loopback). A **valueless `--host`** binds all interfaces (`0.0.0.0`, Vite's convention); an explicit `--host <addr>` binds that address. On startup the CLI prints every resolved URL (`server.resolvedUrls`): the local/loopback URL(s) plus each network URL when a non-loopback interface was bound — and, for a non-loopback bind, warns that the editor is reachable from the network and can write the loaded content CSV (the tool has no authentication). |
+| `--artefact-json <path>` | Where an accepted edit writes (and then verifies) the generated JSON manifest artefact (default: the committed Gym artefact, `DEFAULT_ARTEFACT_PATHS.json`). A game points this at its own path so it never overwrites the Gym's, in both serving and `--apply` mode (an `artefactPaths` object in the `--apply` payload still wins). |
+| `--artefact-mermaid <path>` | The same for the generated Mermaid flowchart artefact (default: `DEFAULT_ARTEFACT_PATHS.mermaid`). |
 | `--apply <json\|@file>` | Apply one edit through the write bridge, print the JSON result and exit (no dev server). `--dry-run` previews/validates while writing nothing. |
 | `--help` | Print usage and exit `0`. |
 
@@ -404,11 +410,15 @@ The host serves `GET /manifest.json` from memory (built at launch from the
 content CSV + adapter) and the page fetches it **once**, so pan/zoom and node
 selection never round-trip to the host. The rendered graph is manifest-driven:
 
-- one column per story-line group;
+- one block per story-line group (a group taller than ten cards wraps into
+side-by-side sub-columns inside the same block);
 - choice cards drawn as diamonds, plain incidents as rounded rectangles;
 - cycle edges and cycle members highlighted;
 - an option label on every link (a terminal option is a `to: null` link);
-- drag to pan, wheel or toolbar to zoom, fit and reset;
+- the graph opens **fitted** to its pane, which fills the window (the page
+itself never scrolls); drag to pan, wheel to zoom around the pointer, toolbar
+buttons to zoom around the centre, fit and reset (100%, centred); no `viewBox`,
+so graph units are CSS pixels and the pan/zoom transform is the only scale;
 - selecting a node shows its name, effect, adapter `impact`, routing summary,
 successor and incoming links, story-line id/title and every adapter-declared
 game column.
@@ -424,8 +434,8 @@ editor can never disagree with the generated artefacts.
 Three surfaces share one workflow — draft, preview, apply, discard:
 
 - **Edit card** — opens the selected node's card form. Core edits the generic
-story-line fields (id read-only, name, effect, choice flag, `options` encoding,
-legacy accept/reject links, story-line id/title); every adapter-declared column
+story-line fields (id read-only, name, effect, `options` encoding, story-line
+id/title); every adapter-declared column
 renders as an additional field without core knowing its semantics. The field
 list comes from the adapter's descriptors
 ([`field-descriptors.ts`](../../src/story-line/editor/field-descriptors.ts)),
@@ -471,11 +481,12 @@ required"** result naming the check that now fails. The registry lives in
 the shipped entry is the Gym demo's hand-maintained card catalogue.
 
 Artefact paths default to the committed Gym artefacts (`DEFAULT_ARTEFACT_PATHS`).
-A game supplies its own as a session/bridge option (`loadEditorSession({
-artefactPaths })`, `applyEdit({ artefactPaths })`) or in the `--apply` JSON
-payload; the host has no CLI flag for them yet, so editing non-Gym content from
-the served page targets the default paths — use `--apply`, or that game's own
-`storylines:graph` invocation, when its artefacts live elsewhere.
+A game supplies its own with `--artefact-json <path>` / `--artefact-mermaid
+<path>` (the resolved pair is passed to `loadEditorSession({ artefactPaths })`,
+so the served page and the host API write and verify the game's own files), as
+a session/bridge option (`loadEditorSession({ artefactPaths })`,
+`applyEdit({ artefactPaths })`), or in the `--apply` JSON payload. Omitting both
+flags reproduces the Gym defaults exactly.
 
 ### Story-line management
 
@@ -523,13 +534,20 @@ new coupling is introduced.
 
 ## UI adapter
 
-`StorylineUiAdapter<TState, TCard>` is the pluggable presentation seam:
+`StorylineUiAdapter<TCard>` is the pluggable presentation seam. It depends
+only on the card type — presentation no longer reads game state:
 
 - `storylineName` / `choiceDialogTitle` / `choiceDialogSubtitle`
 - `storyUpdateLine` (the narrative line emitted when a choice resolves)
-- `choiceClarityLabels` (must explain apply/skip semantics without revealing
-  the escalation card id)
 - `journalTitle` / `storylineSummary`
+
+The contract has **no clarity-label method**: the retired choice-clarity API is
+gone, and nothing replaces it.
+
+`defaultStoryUpdateLine`'s `accept` / `reject` wording is **label-driven** —
+it switches on the chosen option *label* (a legacy Main Street wording
+convention) and has nothing to do with the retired API. Any other label
+renders the generalised `you chose "<label>"` form.
 
 Core ships `createDefaultStorylineUiAdapter()` (and a ready-made
 `defaultStorylineUiAdapter`). Its wording is the shipped Main Street wording, so
@@ -538,7 +556,7 @@ overrides any subset:
 
 ```ts
 const ui = {
-  ...createDefaultStorylineUiAdapter<MyState, MyCard>(),
+  ...createDefaultStorylineUiAdapter<MyCard>(),
   storyUpdateLine: (card, option, coins, rep) =>
     `${card.name}: ${option} (${coins >= 0 ? '+' : ''}${coins} coins)`,
 };
@@ -546,7 +564,7 @@ const ui = {
 
 The Gym demo uses the default adapter, demonstrating that no game code is
 required to present the mechanic. The demo's fixtures are unchanged by the
-cost/extra-effect/conditional-successor extension: it exercises the legacy
+cost/extra-effect/conditional-successor extension: it exercises the base
 experience, and no Gym fixture uses the new fields.
 
 ## Gym demo
@@ -561,16 +579,17 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 
 ## Testing
 
-- `tests/story-line/compile.test.ts` — legacy and CSV compilation, registry
-  precedence, draw-time condition **and cost** filtering, snapshot stability.
+- `tests/story-line/compile.test.ts` — options-only and CSV compilation,
+  registry precedence, draw-time condition **and cost** filtering, snapshot
+  stability.
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
   deterministic serial naming, pending-choice lifecycle.
 - `tests/story-line/validate.test.ts` — declarative metadata validation
   (costs, extra effects, conditions, dangling successors).
 - `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state.
-- `tests/story-line/ui-adapter.test.ts` — default adapter wording and the
-  pluggable override seam.
+- `tests/story-line/ui-adapter.test.ts` — default adapter wording, the
+  pluggable override seam, and the absence of a clarity-label method.
 - `tests/story-line/content/csv.test.ts` — byte-identical round-trip (two
   adapter shapes), checksum determinism, projection and option compilation.
 - `tests/story-line/content/manifest.test.ts` — manifest shape, determinism and

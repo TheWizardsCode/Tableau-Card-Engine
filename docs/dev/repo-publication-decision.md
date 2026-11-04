@@ -52,7 +52,7 @@ re-runnable safely, and cannot be covered by the unit suite.
 
 The helper must support:
 
-- **no target flag** — publish all nine targets from `repo-layout.json`;
+- **no target flag** — publish all ten targets from `repo-layout.json`;
 - **`--target <name>`** — publish one target (`core` for the core repo —
 `Tableau-Card-Engine` under the merged-core decision, the game name
 otherwise), repeatable;
@@ -205,7 +205,7 @@ npm run publish:repos -- [--dry-run] [--target <name>]... [--repos-dir <path>]
    `dev` SHA.
 2. `npm run publish:repos -- --dry-run` — review the plan against
    `repo-layout.json` and the C3 evidence.
-3. `npm run publish:repos` — create the nine public repositories, push `dev`,
+3. `npm run publish:repos` — create the ten public repositories, push `dev`,
    seed `main`, set `main` as default.
 4. Audit each remote (`gh api`, `git ls-remote`) and record the evidence on the
    parent work item.
@@ -239,7 +239,7 @@ Launcher presets against fresh sibling clones (run from the launcher
 git clone --recurse-submodules git@github.com:TheWizardsCode/tce-golf.git ../tce-golf
 GAMES_CONFIG=solo npm run build
 
-for g in golf beleaguered-castle blackjack sushi-go feudalism lost-cities main-street coloretto; do
+for g in golf beleaguered-castle blackjack sushi-go feudalism lost-cities main-street coloretto the-rising; do
   [ -d "../tce-$g" ] || git clone --recurse-submodules "git@github.com:TheWizardsCode/tce-$g.git" "../tce-$g"
 done
 GAMES_CONFIG=full npm run build

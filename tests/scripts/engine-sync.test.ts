@@ -38,6 +38,13 @@ import {
   syncEngine,
   verifyEngine,
 } from '../../scripts/engine-sync.mjs';
+import { fixtureGitEnv, clearAmbientGitOverrides } from '../helpers/gitFixtureEnv';
+
+// `scripts/engine-sync.mjs` spawns its own `git` commands with the process
+// environment, so an ambient finish-gate `GIT_INDEX_FILE` would reach them and
+// write into the gate's temporary index (CG-0MVVKUUY50010004). Scrub it (and
+// the other repository overrides) for this file's worker.
+clearAmbientGitOverrides();
 
 const tempRoots: string[] = [];
 
@@ -54,12 +61,21 @@ afterEach(() => {
   }
 });
 
-/** Run git quietly in a fixture (tests only — no network). */
+/** Run git quietly in a fixture (tests only — no network).
+ *
+ * The environment is hermetic: no ambient `GIT_INDEX_FILE` or repository
+ * override may reach the fixture, or the commands write into the finish gate's
+ * temporary index instead of the fixture's own (CG-0MVVKUUY50010004).
+ */
 function git(cwd: string, args: string[]): { ok: boolean; stdout: string; stderr: string } {
   const res = spawnSync('git', args, {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, GIT_ALLOW_PROTOCOL: 'file', GIT_TERMINAL_PROMPT: '0' },
+    env: {
+      ...fixtureGitEnv(),
+      GIT_ALLOW_PROTOCOL: 'file',
+      GIT_TERMINAL_PROMPT: '0',
+    },
     windowsHide: true,
   });
   return {
@@ -217,6 +233,122 @@ describe('syncEngine — dirty-state guard (AC1)', () => {
     // Offline fallback never clobbers: the checkout and the pin are untouched.
     expect(git(path.join(f.game, 'core'), ['rev-parse', 'HEAD']).stdout).toBe(before);
     expect(fs.readFileSync(f.pinPath, 'utf-8')).toBe(pinBefore);
+  });
+});
+
+describe('syncEngine — soft mode for interactive dev starts (CG-0MVZJ35EV00690W5)', () => {
+  it('skips a dirty submodule with a loud warning instead of throwing', () => {
+    const f = makeFixture();
+    // The remote is ahead as well, so a soft run must not be tempted to write
+    // the pin or move the checkout.
+    const tip = f.advanceEngine();
+    f.pinTo(f.devTip());
+    const before = git(path.join(f.game, 'core'), ['rev-parse', 'HEAD']).stdout;
+    const pinBefore = fs.readFileSync(f.pinPath, 'utf-8');
+    fs.appendFileSync(path.join(f.game, 'core', 'version.txt'), 'wip\n');
+    const logged: string[] = [];
+
+    const res = syncEngine({ repoRoot: f.game, soft: true, log: (l) => logged.push(l) });
+
+    expect(res.updated).toBe(false);
+    expect(res.pinWritten).toBe(false);
+    expect(res.skipped).toBe('dirty');
+    expect(res.warning).toMatch(/uncommitted changes|dirty/i);
+    // Loud: the operator is told the sync was skipped and why.
+    expect(logged.join('\n')).toMatch(/WARNING[\s\S]*uncommitted changes/);
+    // Skipped, never clobbered: checkout, WIP file and pin are untouched.
+    expect(git(path.join(f.game, 'core'), ['rev-parse', 'HEAD']).stdout).toBe(before);
+    expect(fs.readFileSync(path.join(f.game, 'core', 'version.txt'), 'utf-8')).toContain('wip');
+    expect(fs.readFileSync(f.pinPath, 'utf-8')).toBe(pinBefore);
+    expect(before).not.toBe(tip);
+  });
+
+  it('matches strict mode exactly on a clean submodule', () => {
+    const f = makeFixture();
+    f.pinTo(f.devTip());
+    const tip = f.advanceEngine();
+
+    const res = syncEngine({ repoRoot: f.game, soft: true });
+
+    expect(res.updated).toBe(true);
+    expect(res.to).toBe(tip);
+    expect(res.pinWritten).toBe(true);
+    expect(res.skipped).toBeUndefined();
+    expect(readPin(f.game)).toBe(tip);
+    // The pin and the gitlink still travel together in the index.
+    const staged = git(f.game, ['diff', '--cached', '--name-only']).stdout.split('\n');
+    expect(staged).toContain(DEFAULT_PIN_REL.split(path.sep).join('/'));
+    expect(staged).toContain(DEFAULT_CORE_REL);
+  });
+
+  it('is a no-op in soft mode when the submodule is already at the tip', () => {
+    const f = makeFixture();
+    const res = syncEngine({ repoRoot: f.game, soft: true });
+    expect(res.updated).toBe(false);
+    expect(res.pinWritten).toBe(false);
+    expect(res.skipped).toBeUndefined();
+  });
+
+  it('leaves strict mode a hard failure on the same dirty fixture', () => {
+    const f = makeFixture();
+    fs.appendFileSync(path.join(f.game, 'core', 'version.txt'), 'wip\n');
+    // Soft mode is opt-in per call site: omitting `soft` keeps the guard that
+    // build/release gates rely on.
+    expect(() => syncEngine({ repoRoot: f.game })).toThrow(EngineSyncError);
+    expect(() => syncEngine({ repoRoot: f.game, soft: false })).toThrow(/uncommitted changes/);
+  });
+});
+
+describe('engine-sync CLI (CG-0MVZJ35EV00690W5)', () => {
+  const SCRIPT = path.resolve(__dirname, '../../scripts/engine-sync.mjs');
+
+  /** Run the real CLI entry point in a fixture (no network). */
+  function runCli(
+    cwd: string,
+    args: string[],
+  ): { code: number; stdout: string; stderr: string } {
+    const res = spawnSync(process.execPath, [SCRIPT, ...args], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...fixtureGitEnv(), GIT_ALLOW_PROTOCOL: 'file', GIT_TERMINAL_PROMPT: '0' },
+      windowsHide: true,
+    });
+    return { code: res.status ?? -1, stdout: res.stdout ?? '', stderr: res.stderr ?? '' };
+  }
+
+  /**
+   * The CLI writes its human log lines to stdout before the machine-readable
+   * JSON result, so callers read the last line as the result.
+   */
+  function resultLine(stdout: string): Record<string, unknown> {
+    const lines = stdout.trim().split('\n');
+    return JSON.parse(lines[lines.length - 1] ?? '{}') as Record<string, unknown>;
+  }
+
+  it('exits 0 on a dirty submodule with --soft and 1 without it', () => {
+    const f = makeFixture();
+    fs.appendFileSync(path.join(f.game, 'core', 'version.txt'), 'wip\n');
+
+    const soft = runCli(f.game, ['sync', '--soft']);
+    expect(soft.code).toBe(0);
+    expect(resultLine(soft.stdout)).toMatchObject({ ok: true, skipped: 'dirty' });
+    expect(soft.stdout + soft.stderr).toMatch(/uncommitted changes/);
+
+    const strict = runCli(f.game, ['sync']);
+    expect(strict.code).toBe(1);
+    expect(resultLine(strict.stdout)).toMatchObject({ ok: false });
+    expect(strict.stderr).toMatch(/uncommitted changes/);
+  });
+
+  it('still advances a clean submodule with --soft', () => {
+    const f = makeFixture();
+    const tip = f.advanceEngine();
+
+    const res = runCli(f.game, ['sync', '--soft']);
+
+    expect(res.code).toBe(0);
+    expect(resultLine(res.stdout)).toMatchObject({ ok: true, updated: true, to: tip });
+    expect(git(path.join(f.game, 'core'), ['rev-parse', 'HEAD']).stdout).toBe(tip);
   });
 });
 

@@ -49,7 +49,6 @@ import type {
 
 // ── Public types ────────────────────────────────────────────
 export type {
-  ChoiceClarityLabels,
   CompiledStoryline,
   Condition,
   ConditionalSuccessorRule,
@@ -76,7 +75,6 @@ export {
   defaultChoiceDialogTitle,
   defaultChoiceDialogSubtitle,
   defaultStoryUpdateLine,
-  defaultChoiceClarityLabels,
   defaultJournalTitle,
   defaultStorylineSummary,
 } from './ui-adapter';
@@ -114,9 +112,9 @@ export interface StorylineSystemConfig<
   engine: StorylineEngineAdapter<TState, TCard>;
   /**
    * Optional presentation adapter. Defaults to core's default UI adapter
-   * (dialog titles, choice-clarity labels, story-update lines, journal).
+   * (dialog titles, story-update lines, journal).
    */
-  ui?: StorylineUiAdapter<TState, TCard>;
+  ui?: StorylineUiAdapter<TCard>;
 }
 
 /**
@@ -134,7 +132,7 @@ export function createStorylineSystem<
 ): StorylineSystem<TState, TCard> {
   const engine = config.engine;
   const ui =
-    config.ui ?? createDefaultStorylineUiAdapter<TState, TCard>();
+    config.ui ?? createDefaultStorylineUiAdapter<TCard>();
   const registry = createStorylineOptionRegistry<TState>((id) =>
     engine.getBaseTypeId(id),
   );

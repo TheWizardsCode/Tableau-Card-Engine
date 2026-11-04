@@ -21,8 +21,8 @@ export const EDITOR_MANIFEST_URL = './manifest.json';
  *
  * The manifest is the graph view model; the content response adds what the
  * curated forms need to prefill themselves — the content adapter's field
- * mapping/defaults (declarative data only) and the raw cards (including the
- * legacy successor-link columns the manifest deliberately does not expose).
+ * mapping/defaults (declarative data only) and the raw cards (including any
+ * game columns the manifest does not expose).
  */
 export const EDITOR_CONTENT_URL = './content.json';
 

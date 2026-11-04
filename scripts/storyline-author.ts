@@ -7,8 +7,13 @@
  *
  * - `add-card`     appends a new card row (correct column count, no duplicate
  *                  id) and validates the resulting content.
- * - `update-card`  edits an existing card (name, effect, choice links, options
- *                  encoding, story-line id/title and game columns).
+ * - `update-card`  edits an existing card (name, effect, options encoding,
+ *                  story-line id/title and game columns).
+ *
+ * A card's choice-ness is authored **only** through `--options`; the removed
+ * legacy choice/link flags (`--has-choices`, `--accept-next`,
+ * `--clear-accept-next`, `--reject-next`, `--clear-reject-next`) are rejected
+ * with an explicit usage error rather than being silently ignored.
  *
  * Every edit is built and validated **in memory** first; an invalid result
  * leaves the content file byte-identical and exits non-zero. `--dry-run`
@@ -43,7 +48,6 @@ import {
   type UpdateContentCardSpec,
 } from '../src/story-line/content/author';
 import {
-  booleanFlag,
   nullableFlag,
   parseArgv,
 } from './storyline-cli-support';
@@ -64,18 +68,17 @@ Common options:
 
 add-card options:
   --id <id> --name <name> [--effect <text>] [--options <encoding>]
-  [--has-choices] [--accept-next <id>] [--reject-next <id>]
   [--storyline-id <id>] [--storyline-title <title>]
 
 update-card options:
-  --id <id> [--name <name>] [--effect <text>] [--options <encoding>]
-  [--clear-options] [--has-choices true|false]
-  [--accept-next <id> | --clear-accept-next]
-  [--reject-next <id> | --clear-reject-next]
+  --id <id> [--name <name>] [--effect <text>]
+  [--options <encoding> | --clear-options]
   [--storyline-id <id> | --clear-storyline]
   [--storyline-title <title>]
 
-Exit codes: 0 = applied (or dry-run valid), 1 = refused (invalid content).`;
+Choice nodes are authored only through --options (label|target;label2|target2).
+
+Exit codes: 0 = applied (or dry-run valid), 1 = refused (invalid usage/content).`;
 
 /** Parsed author CLI invocation. */
 export type AuthorCliOptions =
@@ -83,6 +86,20 @@ export type AuthorCliOptions =
   | { readonly command: 'update-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: UpdateContentCardSpec }
   | { readonly command: 'help' }
   | { readonly error: string };
+
+/**
+ * Legacy choice/link flags that no longer exist.
+ *
+ * Rejecting them explicitly keeps a stale invocation from becoming a silent
+ * no-op: the caller learns that choice nodes are authored through `--options`.
+ */
+const REMOVED_CHOICE_FLAGS = [
+  'has-choices',
+  'accept-next',
+  'clear-accept-next',
+  'reject-next',
+  'clear-reject-next',
+] as const;
 
 /**
  * Parses author argv into an invocation, a help request, or an error.
@@ -95,6 +112,12 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
   if (flags.has('help')) return { command: 'help' };
   if (flags.has('field-error')) {
     return { error: `--field expects <column=value>, got "${flags.get('field-error')}"` };
+  }
+  const removedFlag = REMOVED_CHOICE_FLAGS.find((flag) => flags.has(flag));
+  if (removedFlag !== undefined) {
+    return {
+      error: `--${removedFlag} is no longer supported: author a choice node with --options "<label>|<target>;…"`,
+    };
   }
   const command = positionals[0];
   if (command !== 'add-card' && command !== 'update-card') {
@@ -115,9 +138,6 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
       id: flags.get('id') ?? '',
       name: flags.get('name') ?? '',
       effect: optionalText('effect'),
-      hasChoices: booleanFlag(flags, 'has-choices'),
-      acceptNextCardId: nullableFlag(flags, 'accept-next', 'clear-accept-next'),
-      rejectNextCardId: nullableFlag(flags, 'reject-next', 'clear-reject-next'),
       options: optionalText('options'),
       storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
       storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),
@@ -130,9 +150,6 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
     id: flags.get('id') ?? '',
     name: optionalText('name'),
     effect: optionalText('effect'),
-    hasChoices: booleanFlag(flags, 'has-choices'),
-    acceptNextCardId: nullableFlag(flags, 'accept-next', 'clear-accept-next'),
-    rejectNextCardId: nullableFlag(flags, 'reject-next', 'clear-reject-next'),
     options: nullableFlag(flags, 'options', 'clear-options'),
     storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
     storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),

@@ -52,13 +52,30 @@ describe('shipped adapters', () => {
         'name',
         'effect',
         'options',
-        'hasChoices',
-        'acceptNextCardId',
-        'rejectNextCardId',
         'storylineId',
         'storylineTitle',
       ]),
     );
+    // The exact column / mapping / default key sets are the contract: the
+    // adapter declares, maps and defaults nothing outside them.
+    expect(GYM_CONTENT_ADAPTER.columns).toHaveLength(10);
+    expect(Object.keys(GYM_CONTENT_ADAPTER.fields)).toEqual([
+      'id',
+      'name',
+      'effect',
+      'options',
+      'storylineId',
+      'storylineTitle',
+    ]);
+    expect(Object.keys(GYM_CONTENT_ADAPTER.newCardDefaults ?? {})).toEqual([
+      'options',
+      'storylineId',
+      'storylineTitle',
+      'trigger',
+      'cost',
+      'coinDelta',
+      'reputationDelta',
+    ]);
   });
 
   it('describes the Gym impact from its game columns', () => {
@@ -83,14 +100,11 @@ describe('adapter seam with two differently shaped adapters', () => {
     const keys = (card: object): string[] => Object.keys(card).sort();
     expect(keys(gymCards[0])).toEqual(keys(tavernCards[0]));
     expect(keys(gymCards[0])).toEqual([
-      'acceptNextCardId',
       'effect',
       'fields',
-      'hasChoices',
       'id',
       'name',
       'options',
-      'rejectNextCardId',
       'storylineId',
       'storylineTitle',
     ]);

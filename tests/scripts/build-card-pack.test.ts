@@ -205,8 +205,9 @@ describe('buildCardPack — reference Main Street pack', () => {
     expect(written.packs[0].title).toBe('Main Street Foundations');
 
     // CSV fragment copied, retaining the committed reference schema header
-    // (the reference pack uses the 55-column schema: base 53 + options +
-    // piggybackable — see MS-0MV8BFOVB000HM0W / MS-0MV8KQQQ90044CM5).
+    // (the reference pack uses the migrated 52-column schema: base 50 + options
+    // + piggybackable — the legacy choice columns are dropped,
+    // CG-0MVZFW4XD009JSR6; see MS-0MV8BFOVB000HM0W / MS-0MV8KQQQ90044CM5).
     const referencePackCsvPath = path.join(
       REFERENCE_PACK_INPUT,
       REFERENCE_GAME_ID,

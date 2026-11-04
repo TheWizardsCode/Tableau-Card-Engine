@@ -6,7 +6,10 @@
  *
  * - {@link createOverlayBackground} — basic backdrop + optional centered box
  * - {@link createOverlayDialog} — full dialog with title, close button,
- *   and scrollable content area (geometry mask + bounds-checked wheel handler)
+ *   and a scrollable content area (renderer-aware container clip + bounds-checked wheel
+ *   handler). Vertical scrolling is always available; horizontal scrolling
+ *   is **opt-in** per dialog (`enableHorizontalScroll`) so wide, unwrapped
+ *   content is reachable instead of clipped.
  * - {@link dismissOverlay} — destroy all overlay game objects
  *
  * All overlays parent their objects into `scene.hudContainer` so they
@@ -15,6 +18,8 @@
  */
 
 import { GAME_W, GAME_H } from './constants';
+import { createContainerClip } from './ContainerClip';
+import type { ClipRect, ContainerClip } from './ContainerClip';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -218,6 +223,17 @@ export interface OverlayDialogOptions {
   /** Enable built-in scrolling (default: true). */
   scrollable?: boolean;
 
+  /**
+   * Enable **opt-in horizontal scrolling** for content wider than the
+   * dialog's content area (default: `false`).
+   *
+   * When `false` (the default) the dialog is vertical-only: `scrollX`
+   * never moves and wide content is clipped at the content edge exactly
+   * as before. When `true`, a horizontal wheel delta (`dx`) scrolls the
+   * content box left/right, clamped to the supplied content width.
+   */
+  enableHorizontalScroll?: boolean;
+
   /** Depth for the backdrop layer (default: 200). */
   depthBase?: number;
 
@@ -237,6 +253,23 @@ export interface OverlayDialogOptions {
 /**
  * Handle returned by {@link createOverlayDialog} for managing the
  * overlay lifecycle and content.
+ *
+ * # Scroll axes
+ *
+ * The vertical axis is always available. The horizontal axis is opt-in and
+ * off by default, so every pre-existing caller keeps its exact behaviour:
+ *
+ * - `scrollY` — vertical offset, clamped to `max(0, contentHeight - visibleHeight)`.
+ * - `scrollX` — horizontal offset, clamped to
+ *   `max(0, totalContentWidth - contentWidth)`; permanently `0` unless the
+ *   dialog was created with `enableHorizontalScroll: true`.
+ * - `maxScrollX` — the current horizontal clamp (`0` when horizontal
+ *   scrolling is off).
+ *
+ * The two axes are independent: a wheel event carrying both `dx` and `dy`
+ * moves each by its own delta, and `refresh()` re-clamps each separately.
+ * Only the content container translates on either axis — the scroll clip
+ * stays fixed in scene space to the visible content rectangle.
  */
 export interface OverlayDialogHandle {
   /** The Phaser scene. */
@@ -280,6 +313,22 @@ export interface OverlayDialogHandle {
   scrollY: number;
 
   /**
+   * Current horizontal scroll offset in pixels (0 = left).
+   *
+   * Only moves when the dialog was created with
+   * `enableHorizontalScroll: true`; otherwise it is permanently `0`.
+   * Modify this before calling `refresh()` to change the scroll position.
+   */
+  scrollX: number;
+
+  /**
+   * Maximum horizontal scroll offset in pixels: the measured content
+   * width minus the visible content width, never below 0. Always `0`
+   * unless `enableHorizontalScroll` was requested.
+   */
+  readonly maxScrollX: number;
+
+  /**
    * The depth base used for this overlay (backdrop). Layers are at:
    * backdrop = depthBase, box = depthBase + 1, content = depthBase + 2.
    */
@@ -293,13 +342,25 @@ export interface OverlayDialogHandle {
 
   /**
    * Call after adding/removing content children in `scrollContainer`.
-   * Re-clamps `scrollY`, re-positions the scroll container, and applies
-   * or removes the geometry mask based on whether content overflows.
+   * Re-clamps `scrollY` (and `scrollX` when horizontal scrolling is
+   * enabled), re-positions the scroll container, and applies or removes
+   * the scroll clip based on whether content overflows on either axis.
    *
-   * @param totalContentHeight  Total height of content in px. If
-   *                            omitted, estimated from children positions.
+   * An explicit measurement is remembered: a later call with no arguments
+   * (e.g. the one the wheel handler makes after every scroll step) re-uses
+   * it instead of falling back to the child-position estimate, so scrolling
+   * never shrinks the clamp back towards the top. Supplying a new value
+   * replaces the remembered one.
+   *
+   * @param totalContentHeight  Total height of content in px. If omitted, the
+   *                            last supplied measurement is reused, else the
+   *                            value is estimated from children positions.
+   * @param totalContentWidth   Total width of content in px. If omitted, the
+   *                            last supplied measurement is reused, else the
+   *                            value is estimated from children positions.
+   *                            Ignored unless `enableHorizontalScroll` is set.
    */
-  refresh(totalContentHeight?: number): void;
+  refresh(totalContentHeight?: number, totalContentWidth?: number): void;
 }
 
 /**
@@ -311,13 +372,38 @@ export interface OverlayDialogHandle {
  * It builds on {@link createOverlayBackground} and adds:
  *
  * - Title text with close (✕) button
- * - Scrollable content container with invisible geometry mask
+ * - Scrollable content container with an invisible renderer-aware clip
+ *   (Canvas `GeometryMask` / WebGL Mask filter, via `createContainerClip`)
  * - Bounds-checked wheel handler (only scrolls when pointer is
  *   within the overlay box, preventing scroll from leaking to
  *   overlays beneath)
  * - hudContainer parenting for correct z-ordering
  * - Cleanup via `close()` (removes wheel listeners, destroys
  *   objects, calls optional `onClose` callback)
+ *
+ * # Scroll contract
+ *
+ * The dialog is **vertical-only by default**. Pass
+ * `enableHorizontalScroll: true` to opt a single dialog into horizontal
+ * scrolling (the Game Events debug overlay does, because pretty-printed
+ * payload lines must never wrap). The contract is:
+ *
+ * - `refresh(totalContentHeight?, totalContentWidth?)` clamps `scrollY` to
+ *   `max(0, height - contentHeight)` and — only when opted in — `scrollX`
+ *   to `max(0, width - contentWidth)`. Omitted arguments reuse the last
+ *   supplied measurement, so the no-argument refresh the wheel handler runs
+ *   after each scroll step never collapses a measured clamp back to the
+ *   single-row estimate. Before any measurement is supplied the size is
+ *   estimated from the children already in `scrollContainer` (each child's
+ *   `y` + its own height — a text object's full multi-line height — or a
+ *   22 px row pitch when the child reports no height; `x` + `width` for the
+ *   horizontal one).
+ * - The wheel handler scales both deltas by 1.5 and ignores `dx` entirely
+ *   unless the dialog opted in, so default behaviour is unchanged.
+ * - The scroll clip is fixed in scene space at
+ *   (`contentX`, `contentY`, `contentWidth`, `contentHeight`); only the
+ *   scroll container translates. It is applied when either axis overflows
+ *   and cleared when neither does.
  *
  * @example
  * ```ts
@@ -337,6 +423,17 @@ export interface OverlayDialogHandle {
  * overlay.refresh(50);
  * ```
  *
+ * @example
+ * ```ts
+ * // Opt in to horizontal scrolling for wide, unwrapped content.
+ * const log = createOverlayDialog(scene, {
+ *   title: 'Game Events',
+ *   enableHorizontalScroll: true,
+ * });
+ * log.scrollContainer.add(wideText);
+ * log.refresh(wideText.y + wideText.height, wideText.width);
+ * ```
+ *
  * @param scene   - The active Phaser scene.
  * @param options - Overlay configuration.
  * @returns A {@link OverlayDialogHandle} for managing the overlay.
@@ -354,6 +451,7 @@ export function createOverlayDialog(
   const titleColor = options.titleColor ?? '#f0c040';
   const headerH = options.headerHeight ?? 80;
   const bottomPad = options.bottomPadding ?? 10;
+  const enableHorizontalScroll = options.enableHorizontalScroll ?? false;
 
   const objects: Phaser.GameObjects.GameObject[] = [];
 
@@ -416,14 +514,34 @@ export function createOverlayDialog(
   objects.push(scrollContainer);
   parentIntoHud([scrollContainer]);
 
-  // Invisible scroll mask (scene-space)
-  const maskGraphics = scene.add.graphics();
-  maskGraphics.fillStyle(0xffffff);
-  maskGraphics.fillRect(contentX, contentY, contentWidth, contentHeight);
-  maskGraphics.setVisible(false);
-  objects.push(maskGraphics);
+  // Renderer-aware scroll clip (scene-space). Phaser 4 removed `setMask`
+  // support in WebGL, so clipping goes through `createContainerClip`
+  // (Canvas `GeometryMask` / WebGL Mask filter) and the clip is created
+  // cleared — `refresh()` applies or clears it as the content fits.
+  const clipViewport: ClipRect = {
+    x: contentX,
+    y: contentY,
+    w: contentWidth,
+    h: contentHeight,
+  };
+  const clip: ContainerClip = createContainerClip(scene, scrollContainer);
+  // Destroyed with the other overlay objects; `close()` also tears down the
+  // clip explicitly so the WebGL Mask filter is detached before the objects
+  // are dismissed (see below).
+  objects.push(clip.graphics);
 
   // ── Handle (forward-declared so the wheel handler can reference it) ──
+  // `maxScrollX` is derived from the measured content width on every
+  // `refresh()`; it stays 0 unless horizontal scrolling is opted into.
+  let maxScrollX = 0;
+  // Last explicitly supplied content size. The wheel handler refreshes with no
+  // arguments after every scroll step; re-deriving the size from child
+  // positions (a 22 px row pitch, the single-line assumption) under-reports
+  // multi-line content and would clamp the offset back towards the top mid
+  // scroll. A caller-supplied measurement therefore wins over the estimate
+  // until the caller supplies a new one.
+  let measuredContentHeight: number | null = null;
+  let measuredContentWidth: number | null = null;
   const handle: OverlayDialogHandle = {
     scene,
     objects,
@@ -438,6 +556,10 @@ export function createOverlayDialog(
     scrollContainer,
     monoFont: DIALOG_MONO_FONT,
     scrollY: 0,
+    scrollX: 0,
+    get maxScrollX(): number {
+      return maxScrollX;
+    },
     depthBase,
     close,
     refresh,
@@ -447,7 +569,7 @@ export function createOverlayDialog(
   const wheelHandler = (
     pointer: Phaser.Input.Pointer,
     _gameObjects: unknown[],
-    _dx: number,
+    dx: number,
     dy: number,
   ): void => {
     if (
@@ -458,7 +580,17 @@ export function createOverlayDialog(
     }
     const oldY = handle.scrollY;
     handle.scrollY = Math.max(0, handle.scrollY + dy * 1.5);
-    if (handle.scrollY !== oldY) {
+    let moved = handle.scrollY !== oldY;
+
+    // The horizontal axis is opt-in: default dialogs ignore `dx` entirely so
+    // their behaviour (and any wheel input they consume) is unchanged.
+    if (enableHorizontalScroll) {
+      const oldX = handle.scrollX;
+      handle.scrollX = Math.max(0, handle.scrollX + dx * 1.5);
+      moved = moved || handle.scrollX !== oldX;
+    }
+
+    if (moved) {
       refresh();
     }
   };
@@ -469,31 +601,68 @@ export function createOverlayDialog(
   /** Close the overlay and remove all event listeners. */
   function close(): void {
     scene.input.off('wheel', wheelHandler);
+    clip.destroy();
     dismissOverlay(objects);
     options.onClose?.();
   }
 
-  /** Re-clamp scroll, reposition container, and apply/remove mask. */
-  function refresh(totalContentHeight?: number): void {
-    const th = totalContentHeight ?? estimateContentHeight();
-    const maxScroll = Math.max(0, th - contentHeight);
-    handle.scrollY = Math.min(handle.scrollY, maxScroll);
-    scrollContainer.y = contentY - handle.scrollY;
+  /** Re-clamp scroll, reposition container, and apply/clear the scroll clip. */
+  function refresh(totalContentHeight?: number, totalContentWidth?: number): void {
+    if (totalContentHeight !== undefined) measuredContentHeight = totalContentHeight;
+    if (totalContentWidth !== undefined) measuredContentWidth = totalContentWidth;
 
-    if (maxScroll > 0) {
-      scrollContainer.setMask(maskGraphics.createGeometryMask());
+    const th = measuredContentHeight ?? estimateContentHeight();
+    const maxScrollY = Math.max(0, th - contentHeight);
+    handle.scrollY = Math.min(handle.scrollY, maxScrollY);
+
+    // The horizontal clamp only exists for opted-in dialogs; the vertical
+    // axis is unaffected either way.
+    maxScrollX = enableHorizontalScroll
+      ? Math.max(0, (measuredContentWidth ?? estimateContentWidth()) - contentWidth)
+      : 0;
+    handle.scrollX = Math.min(handle.scrollX, maxScrollX);
+
+    // Only the container translates: the clip stays fixed in scene space at
+    // (contentX, contentY) with the visible content size, so both axes are
+    // clipped to the same viewport.
+    scrollContainer.y = contentY - handle.scrollY;
+    scrollContainer.x = contentX - (enableHorizontalScroll ? handle.scrollX : 0);
+
+    if (maxScrollY > 0 || maxScrollX > 0) {
+      clip.setRect(clipViewport);
     } else {
-      scrollContainer.clearMask();
+      // Nothing overflows: `clear()` is the real "no clip" (a zero-area rect
+      // would hide the whole container under the WebGL Mask filter).
+      clip.clear();
     }
   }
 
-  /** Rough estimate of content height from child positions. */
+  /**
+   * Rough estimate of content height from child positions.
+   *
+   * A child that reports a height (text objects render many lines) uses it;
+   * children without a measurable box fall back to the 22 px single-row pitch.
+   */
   function estimateContentHeight(): number {
     let maxY = 0;
     for (const child of scrollContainer.list) {
-      maxY = Math.max(maxY, (child as any).y + 22);
+      const childHeight = (child as any).height;
+      const rowHeight =
+        typeof childHeight === 'number' && childHeight > 0 ? childHeight : 22;
+      maxY = Math.max(maxY, (child as any).y + rowHeight);
     }
     return maxY;
+  }
+
+  /** Rough estimate of content width from child positions and widths. */
+  function estimateContentWidth(): number {
+    let maxX = 0;
+    for (const child of scrollContainer.list) {
+      const childX = (child as any).x ?? 0;
+      const childWidth = (child as any).width ?? 0;
+      maxX = Math.max(maxX, childX + childWidth);
+    }
+    return maxX;
   }
 
   // Hook close button

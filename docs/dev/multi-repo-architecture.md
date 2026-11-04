@@ -54,7 +54,8 @@ documented in full in [Config-Driven Game Catalogue](game-configuration.md).
 ├── tce-feudalism/
 ├── tce-lost-cities/
 ├── tce-main-street/
-└── tce-coloretto/                # … 8 games in total
+├── tce-coloretto/
+└── tce-the-rising/               # … 9 games in total
 ```
 
 Repos are checked out as **siblings**. A game repo pulls the engine in as a git
@@ -168,8 +169,10 @@ and a written rationale. The audit is reproduced here:
 | `audio/golf/` (10) | golf | From `scripts/generate-sfx.mjs`. |
 | `audio/lost-cities/` (12) | lost-cities | From `scripts/generate-lost-cities-sfx.mjs`. |
 | `audio/sushi-go/` (6) | sushi-go | Referenced only by Sushi Go. |
+| `audio/the-rising/` (13) | the-rising | Match SFX (deal, flip, slash, land ticks, win/lost) referenced only by 1916: The Rising. |
 | `games/<game>/thumbnail.png` | `<game>` | Game Selector thumbnails, generated per game. |
 | `games/main-street/` (190) | main-street | Card SVGs, icons and game audio for Main Street. |
+| `games/the-rising/` (135) | the-rising | Selector thumbnail, the player/adversary card backs and 132 AI portraits for 1916: The Rising. |
 | `sushi-go/` (14 icons + `STYLE.md`, `preview.html`) | sushi-go | In-house Sushi Go icons. |
 
 ### Why shared assets are enumerated as files, not directories
@@ -296,6 +299,94 @@ virtual-module types.
 presets as `configs/<game-id>.json`; see
 [Config-Driven Game Catalogue](game-configuration.md).)
 
+The scaffold also links the shared assets and app icon and, when asked, rewrites
+the game tree's own paths; both are write-gated as described next.
+
+### Committed hooks and the context budget (CG-0MW0KURL8002XOV9)
+
+A real scaffold run also makes the generated repo's git hooks **active** and
+gives it a measured startup-context budget:
+
+- `.githooks/` is copied **verbatim** from the core checkout — the core is the
+  single source of truth, so the unified `pre-push` hook (branch policy,
+  context budget, the **full-suite gate for `dev`/`main`**, worklog sync)
+  reaches every game repo with no forked copy to drift;
+- the generated repo's **local** `core.hooksPath` is set to `.githooks`, and the
+  run reports the outcome (`hooksPath` under `--json`, a `hooks:` line
+  otherwise);
+- `docs/dev/context-budget.thresholds.json` is measured from the **game repo's**
+  own surface, with `scripts/refresh-context-thresholds.sh` and a short
+  `docs/dev/context-budget.md` note written beside it (the core copy of the
+  refresh script would resolve `REPO_ROOT` to the `core/` submodule and refresh
+  the engine budget instead).
+
+The new entries ride the same write gating as every other generated file. When
+the measurement tooling is unavailable the run **fails open** — no thresholds
+file is written and the report names the remedy.
+
+`core.hooksPath` is **local** config, so a fresh clone still needs one
+activation step (`git config core.hooksPath .githooks`, or the framework's
+`scripts/install_pi.sh`) before the committed gates run. See
+[Startup Context Budget](context-budget.md#scaffolded-game-repos).
+
+### Write gating (CG-0MVWGJPPA000GBE7, CG-0MVWGJRIO0094Y4Z)
+
+A generated file is engine-owned, but it lives in a checkout that owns its own
+wiring, so the scaffold never writes blindly: every file is classified
+(`create` / `update` / `unchanged` / `skip-local`) and the write is gated by
+the flags below. The rationale sits next to the implementation in
+`scripts/game-repo-scaffold.ts` (header comment); this section and the
+[Developer Guide](../DEVELOPER.md#write-gating---dry-run---only---force-and---migrate-game-paths)
+are the prose side of the same contract.
+
+| Flag | Effect |
+|---|---|
+| *(none)* | **Unchanged default.** A *full run* regenerates every generated file and is the supported upgrade path for the nine sibling `tce-<game>` repos. |
+| `--only <file,...>` | A *selected run*: writes only the named generated files. Every other file is `skip-local` (`unchanged` when it already matches the template) and is never written, and **no** side effect runs — no `core` symlink, no shared-asset or app-icon link, and no game-tree path rewrite. An unknown name fails the run before anything is written, listing the valid paths. |
+| `--force` | Overwrite a **selected** file whose content differs from the template. Without it that file stays `skip-local`, so a hand edit is never silently lost. A full run implies force. |
+| `--dry-run` | Classify and report only: writes nothing (no files, no links, no path rewrite) and does not configure `core.hooksPath`. The report is exactly what the real run would apply. |
+| `--json` | Emit the machine-readable per-file classification (`create` / `update` / `unchanged` / `skip-local`) — for dry and real runs alike, so a scripted caller can decide before applying anything. |
+| `--migrate-game-paths` | **Opt-in** game-tree migration (see below). Cannot be combined with `--only` — both fail fast before any write. Off by default, so a routine re-scaffold never edits a consumer's `tests/` or `src/`. |
+
+The game-tree path rewrite (`example-games/<game>/` → `src/`, plus the
+quoted-`scripts/`, core-`src/` and relative-`scripts/` references in the
+game's own `tests/` and `src/` trees) is **never** unconditional: it runs only
+with `--migrate-game-paths`, and then only for files that genuinely reference
+the game tree. A fresh repo does not need it — `scripts/extract-repos.sh
+--path-rename` already produced the `src/` layout.
+
+Worked example — the consumer pattern, run from **inside** an existing game
+repo whose engine is the `./core` submodule, refreshing one hand-edited file:
+
+```bash
+tsx core/scripts/game-repo-scaffold.ts \
+  --game main-street --game-repo-root . --core-root ./core \
+  --only main.ts --force
+```
+
+Preview first with `--dry-run --json`, and drop `--force` to confirm the file
+would be left alone.
+
+#### Consumer verification (`tce-main-street`, recorded 2026-11-03)
+
+The write gating above is verified against the live consumer as well as in the
+engine suite (CG-0MVWFN1HX004B5PN AC6). The checks were run read-only from the
+engine side; nothing in the consumer checkout was modified, and its working
+tree was clean before and after each step.
+
+- **Idempotent re-scaffold.** In `tce-main-street` (at `a5c8ccc1`)
+  `npm run scaffold` was run **twice**; `git status --porcelain` was empty after
+  both runs. The consumer's script opts in to a single generated file
+  (`--only main.ts --force`), so no wiring file, symlink or game-tree path was
+  rewritten.
+- **Pin and gitlink travel together.** Commit `11f42978` changes exactly
+  `core` (gitlink) and `configs/engine-pin.json`, and that pin's SHA
+  (`d46eb242…`) equalled the engine `dev` HEAD at verification time.
+- **Consumer build.** `npm run build` (strict `engine:sync`, then
+  `tsc --noEmit` and `vite build`) exited 0, leaving the tree clean.
+- **Consumer suite.** The consumer's cached full-scope run at `a5c8ccc1` is
+  green: 422 test files, 6678 tests passed (3 skipped).
+
 ### Option C layout — flat `src/`, no compatibility symlinks (F9)
 
 The F4 layout above (game at `example-games/<game>/`, `src -> <core>/src`)
@@ -313,9 +404,13 @@ example-games/<game>/  ->  src/        (git filter-repo --path-rename)
 
 The game's own `tests/` and `scripts/` trees travel with it, so they live at
 `src/tests/` and `src/scripts/`. The game's **unit/browser tests** stay at
-`tests/<game>/`; the scaffold rewrites the `example-games/<game>/` segment of
-those tests to `src/` (so a test at `tests/<game>/…` reaches the source with
-`../../src/…`), including runtime fixture paths. Only one directory link
+`tests/<game>/`; the **opt-in** game-tree migration
+(`--migrate-game-paths`, CG-0MVWGJRIO0094Y4Z) rewrites the
+`example-games/<game>/` segment of those tests to `src/` (so a test at
+`tests/<game>/…` reaches the source with `../../src/…`), including runtime
+fixture paths, and only for files that genuinely reference the game tree — a
+routine re-scaffold never edits a consumer's tests or source. Only one
+directory link
 remains — `core` (the engine checkout, a git submodule once the remotes exist).
 The old `src`, `scripts`, `example-games/gym` and `tests/helpers` symlinks are
 gone, replaced by aliases:
@@ -359,6 +454,7 @@ repository is retired. See [`merged-core-decision.md`](./merged-core-decision.md
 | `tce-lost-cities` | public | `dev`, `main` | `main` |
 | `tce-main-street` | public | `dev`, `main` | `main` |
 | `tce-coloretto` | public | `dev`, `main` | `main` |
+| `tce-the-rising` | public | `dev`, `main` | `main` |
 
 > **Historical note.** `tableau-card-engine-core` was the F1 core repository.
 > The merged-core decision retired it (F6 archived it on 2026-09-27; it was

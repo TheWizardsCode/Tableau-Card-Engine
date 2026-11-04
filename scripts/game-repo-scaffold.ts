@@ -35,13 +35,22 @@
  * game's own tests reach the game source through the rewritten `src/` prefix
  * (`../../src/…`), so no `example-games/` tree or symlink is needed.
  *
+ * A real run also copies the core's committed `.githooks/` verbatim (including
+ * the unified full-suite pre-push gate), points the generated repo's **local**
+ * `core.hooksPath` at it, and generates
+ * `docs/dev/context-budget.thresholds.json` from that repo's own measured
+ * surface (CG-0MW0KURL8002XOV9). Because `core.hooksPath` is local config, a
+ * fresh clone still needs one activation step (`install_pi.sh` or
+ * `git config core.hooksPath .githooks`).
+ *
  * ## History
  *
  * Scaffolding is deliberately separate from extraction so the F1
  * `git filter-repo` step owns history preservation (AC5). The game-tree
  * rename to `src/` is a `--path-rename` in `scripts/extract-repos.sh`, so it is
  * history-preserving; scaffolding writes a single commit's worth of root files
- * on top of the extracted history and rewrites intra-test game-tree paths.
+ * on top of the extracted history and, only when `--migrate-game-paths` is
+ * passed, rewrites intra-test game-tree paths.
  *
  * ## CLI
  *
@@ -52,7 +61,62 @@
  *   --core-root ../Tableau-Card-Engine
  * ```
  *
- * Run with `--help` for the full option list.
+ * Write-gating flags (README, Developer Guide, and Multi-Repo Architecture §5):
+ * `--only <file,...>`, `--force`, `--dry-run`, `--json` and
+ * `--migrate-game-paths` — `--help` lists them all.
+ *
+ * Every run classifies each generated file (`create` / `update` / `unchanged` /
+ * `skip-local`) and reports it; `--dry-run` reports without writing and
+ * `--json` emits the machine-readable report. Run with `--help` for the full
+ * option list, and see the rationale above {@link classifyAndApply} for why
+ * writes are classified rather than applied blindly.
+ *
+ * ## Write gating (`--only` / `--force` / `skip-local`)
+ *
+ * The prose contract for this section and the next lives with the docs —
+ * `docs/dev/multi-repo-architecture.md` §5 "Write gating" and
+ * `docs/DEVELOPER.md` "Write gating: `--dry-run`, `--only`, `--force` and
+ * `--migrate-game-paths" — so a reader of this header finds the user-facing
+ * documentation, and a reader of those pages finds the implementation here.
+ *
+ * A generated file is engine-owned but it lives in a consumer checkout that
+ * owns its own wiring, so a run may only touch it when the caller says so
+ * (CG-0MVWGJPPA000GBE7):
+ *
+ * - `--only <file,...>` restricts the run to the named generated paths, and
+ *   suppresses every non-file side effect (the `core` symlink, shared-asset
+ *   and root app-icon links, and the game-tree path rewrite). Unselected
+ *   generated files classify `skip-local` (or `unchanged` when they already
+ *   match the template) and are never written.
+ * - `--force` allows overwriting a **selected** file whose content differs
+ *   from the template; without it such a file classifies `skip-local` and is
+ *   left untouched.
+ * - With **no** `--only` a run is a *full* run: it regenerates everything,
+ *   because the eight sibling `tce-<game>` repos rely on a plain run to
+ *   receive template updates. Force is therefore implied
+ *   (`effectiveForce = force || only === undefined`).
+ *
+ * A `--only` name that is not one of the generated paths fails the run before
+ * anything is written, listing the valid paths — a typo must never produce a
+ * silent no-op scaffold.
+ *
+ * ## Game-tree migration (`--migrate-game-paths`)
+ *
+ * The textual rewrite of the game's own `tests/` and `src/` trees
+ * (`example-games/<game>/` → `src/`, plus the quoted-`scripts/`, core-`src/`
+ * and relative-`scripts/` rewrites) is **opt-in** (CG-0MVWGJRIO0094Y4Z): a
+ * routine re-scaffold must never edit a consumer's tests or source. Without
+ * the flag the rewrite is not invoked at all and `rewritten` is empty — a
+ * fresh repo does not need it, because `scripts/extract-repos.sh
+ * --path-rename` already produced the `src/` layout.
+ *
+ * With `--migrate-game-paths` the rewrite runs exactly as before **for files
+ * that genuinely reference `example-games/<game>/`**; a file with no such
+ * reference (a drift guard's own `STALE_PREFIX`, a run-tests import, a
+ * documented local edit) stays byte-identical. `--migrate-game-paths
+ * --dry-run` writes nothing and reports the files a real migration would
+ * rewrite, naming which rewrite applies ({@link ScaffoldMigrationReport}).
+ * `--only` promises "no rewrite", so combining the two flags fails fast.
  *
  * ## Per-game version policy
  *
@@ -64,7 +128,9 @@
  * game's version; the ship `bump-version.js` resolves the invoking repo root.
  */
 
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 // ── Public constants ──────────────────────────────────────────────────────
@@ -85,6 +151,33 @@ export const GAME_REPO_CONFIGS_DIR = 'configs';
 
 /** The preset filename a game repo builds with by default. */
 export const DEFAULT_GAME_PRESET = 'game';
+
+/**
+ * Directory (relative to a game repo root) holding the committed git hooks.
+ *
+ * The scaffold copies every file from `<coreRoot>/.githooks/` into this
+ * directory **verbatim** and then points the repo's local
+ * `core.hooksPath` at it (CG-0MW0KURL8002XOV9). Copying the core's directory —
+ * rather than rendering hook text here — keeps the single source of truth in
+ * TCE: a hook fix reaches every scaffolded game repo with no second copy to
+ * drift.
+ */
+export const GITHOOKS_DIR = '.githooks';
+
+/** The committed startup-context budget a scaffold generates for a game repo. */
+export const CONTEXT_THRESHOLDS_PATH = 'docs/dev/context-budget.thresholds.json';
+
+/** The per-repo guidance note shipped beside the generated thresholds. */
+export const CONTEXT_BUDGET_DOC_PATH = 'docs/dev/context-budget.md';
+
+/**
+ * Threshold-refresh entry point copied from the core into every game repo.
+ *
+ * A game repo needs its **own** copy: the core's script resolves `REPO_ROOT`
+ * from its own location, which inside a game repo is the `core/` submodule —
+ * running it there would refresh the engine budget, not the game's.
+ */
+export const REFRESH_THRESHOLDS_PATH = 'scripts/refresh-context-thresholds.sh';
 
 /**
  * Version a freshly scaffolded game repo is seeded with.
@@ -151,10 +244,147 @@ export interface ScaffoldOptions {
    * the existing version is preserved, else {@link GAME_INITIAL_VERSION}.
    */
   version?: string;
+  /**
+   * Classify every generated file without touching the checkout: no writes, no
+   * `mkdir`, no symlink, no shared-asset/app-icon link and no path rewrite.
+   * The returned {@link ScaffoldResult.files} report carries exactly what the
+   * equivalent real run would do, so a caller can preview before trusting it.
+   */
+  dryRun?: boolean;
+  /**
+   * Restrict the run to the named generated files, repo-relative with POSIX
+   * separators (`main.ts`, `configs/game.json`, …).
+   *
+   * Selecting a file is the **only** way a run may modify a consumer-owned
+   * file, and a selection run performs none of the non-file side effects (no
+   * `core` symlink, no shared-asset or root app-icon link, no game-tree path
+   * rewrite — a one-line note records that). Names are literal (no globs) and
+   * an unknown name fails the run **before** anything is written.
+   *
+   * When omitted the run is a full run: every generated file is a write
+   * candidate and the side effects apply, which is what the sibling
+   * `tce-<game>` repos rely on to receive template updates.
+   */
+  only?: string[];
+  /**
+   * Allow overwriting a **selected** file whose content differs from the
+   * template. Without it such a file classifies `skip-local` and is left
+   * untouched, so a run cannot silently clobber a hand-edited generated file.
+   *
+   * A full run implies force (`effectiveForce = force || only === undefined`):
+   * "regenerate everything" is inherently the overwrite mode.
+   */
+  force?: boolean;
+  /**
+   * Opt in to the game-tree **migration**: rewrite `example-games/<game>/` →
+   * `src/` and the accompanying quoted-`scripts/`, core-`src/` and
+   * relative-`scripts/` references in the game's own `tests/` and `src/`
+   * trees.
+   *
+   * **Off by default**, deliberately: the rewrite used to run on every
+   * scaffold, so a routine re-scaffold could edit a consumer's tests or
+   * source — and the blanket rewrite also touched files with no genuine
+   * game-tree reference (a drift guard's own `STALE_PREFIX`, run-tests
+   * imports, documented local edits). A fresh repo does not need it either:
+   * `scripts/extract-repos.sh --path-rename` already produces the `src/`
+   * layout (CG-0MVWGJRIO0094Y4Z).
+   *
+   * Only a file that genuinely contains `example-games/<game>/` is migrated.
+   * Combined with a dry run nothing is written and
+   * {@link ScaffoldResult.migrations} previews the affected files. Mutually
+   * exclusive with {@link ScaffoldOptions.only}, which promises "no rewrite".
+   */
+  migrateGamePaths?: boolean;
+  /**
+   * Override the resolved `measure_context.py` path (tests inject a stub so the
+   * thresholds contract is provable without the framework install). When
+   * omitted the local-then-global resolution in
+   * {@link resolveMeasureContext} is used.
+   */
+  measureContextPath?: string;
 }
 
 /** Why the scaffold picked the game version it wrote. */
 export type ScaffoldVersionSource = 'explicit' | 'preserved' | 'baseline';
+
+/**
+ * What a scaffold run did (or, in a dry run, would do) to one generated file.
+ *
+ * The vocabulary is fixed by the parent contract (CG-0MVWFN1HX004B5PN):
+ *
+ * - `create` — the target was absent and is written.
+ * - `update` — the target exists and differs from the template, and is written.
+ * - `unchanged` — the target exists and is byte-identical, so nothing is written.
+ * - `skip-local` — the target exists and differs, and is deliberately left
+ *   alone (the write-gating slice, CG-0MVWGJPPA000GBE7).
+ */
+export type ScaffoldFileAction =
+  | 'create'
+  | 'update'
+  | 'unchanged'
+  | 'skip-local';
+
+/** Per-file classification reported by every scaffold run (dry or real). */
+export interface ScaffoldFileReport {
+  /** Generated file path, relative to the game repo root (POSIX separators). */
+  path: string;
+  action: ScaffoldFileAction;
+}
+
+/**
+ * One textual rewrite the opt-in game-tree migration can apply to a consumer
+ * file, in application order.
+ *
+ * - `game-tree-prefix` — `example-games/<game>/…` → `src/…`.
+ * - `relative-scripts-import` — `(../)+scripts/<module>` → `@core-scripts/<module>`.
+ * - `quoted-scripts-path` — a quoted `scripts/…` → `core/scripts/…`.
+ * - `core-src-path` — a quoted `src/<core-dir>` → `core/src/<core-dir>`.
+ */
+export type GameTreeRewriteKind =
+  | 'game-tree-prefix'
+  | 'relative-scripts-import'
+  | 'quoted-scripts-path'
+  | 'core-src-path';
+
+/** One entry of the game-tree migration report. */
+export interface ScaffoldMigrationReport {
+  /** File the migration affects, relative to the game repo root (POSIX). */
+  path: string;
+  /** Which of the textual rewrites apply to that file, in application order. */
+  rewrites: GameTreeRewriteKind[];
+}
+
+/**
+ * Outcome of wiring `core.hooksPath` in the generated repo
+ * (CG-0MW0KURL8002XOV9).
+ *
+ * `applied` is true only for a real (non-dry, non-selection) run in a git
+ * repository; every other case carries a `reason` and never throws.
+ */
+export interface ScaffoldHooksPathReport {
+  applied: boolean;
+  /** The configured value when applied. */
+  value?: string;
+  /** Why the wiring was skipped (not a git repo, dry run, selection run). */
+  reason?: string;
+}
+
+/**
+ * Outcome of generating `docs/dev/context-budget.thresholds.json`
+ * (CG-0MW0KURL8002XOV9).
+ *
+ * Fail-open by design: when the measurement tooling is unavailable no file is
+ * written (never a zeroed guess) and `reason` names the remedy.
+ */
+export interface ScaffoldThresholdsReport {
+  generated: boolean;
+  /** Repo-relative thresholds path. */
+  path: string;
+  /** The measurement script that produced the values. */
+  measureScript?: string;
+  /** Why no thresholds file was generated. */
+  reason?: string;
+}
 
 /** Result of {@link scaffoldGameRepo}. */
 export interface ScaffoldResult {
@@ -162,10 +392,27 @@ export interface ScaffoldResult {
   coreRoot: string;
   coreRel: string;
   presetPath: string;
+  /**
+   * The classification of every generated file, repo-relative and in a stable
+   * order. This is the machine-readable report a consumer reads **before**
+   * trusting a run: `--dry-run` classifies without touching the disk, a real
+   * run classifies and applies, and both report the same shape.
+   */
+  files: ScaffoldFileReport[];
+  /**
+   * Compatibility projection of the `create` + `update` entries in
+   * {@link files}; empty for a dry run or a run with nothing to write.
+   */
   written: string[];
   symlinks: string[];
   /** Test/source files whose `example-games/<game>/` paths were rewritten. */
   rewritten: string[];
+  /**
+   * The game-tree migration report: one entry per file the opt-in
+   * `--migrate-game-paths` run rewrites — or, in a dry run, would rewrite —
+   * naming which rewrite applies. Empty unless the migration is requested.
+   */
+  migrations: ScaffoldMigrationReport[];
   /** Shared core assets linked into `public/assets` (F1 asset table). */
   assetLinks: string[];
   /** Core root app-icon files linked into `public/` (CG-0MUUFZSE90061KKL). */
@@ -174,6 +421,20 @@ export interface ScaffoldResult {
   version: string;
   /** Why {@link version} was chosen. */
   versionSource: ScaffoldVersionSource;
+  /**
+   * One-line note present only for a selection (`--only`) run, recording that
+   * the non-file side effects were skipped (the orthogonal
+   * `symlinks`/`assetLinks`/`publicLinks`/`rewritten` lists come back empty).
+   */
+  selectionNote?: string;
+  /**
+   * The `core.hooksPath` wiring outcome (CG-0MW0KURL8002XOV9). Local git
+   * config, so a **fresh clone still needs one activation step**
+   * (`install_pi.sh` or `git config core.hooksPath .githooks`).
+   */
+  hooksPath: ScaffoldHooksPathReport;
+  /** The generated context-budget thresholds outcome. */
+  thresholds: ScaffoldThresholdsReport;
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────
@@ -283,7 +544,11 @@ export function renderPackageJson(
           cmd.split(`example-games/${game}/`).join('src/'),
         ]),
       ),
-      dev: 'vite --host',
+      // Interactive dev start: the soft variant of `engine:sync` composes the
+      // latest engine but never blocks on a dirty `./core` — it warns and
+      // serves the developer's working tree instead (CG-0MVZJ35EV00690W5).
+      // Build/release paths keep the strict `engine:sync` guard below.
+      dev: 'npm run engine:dev-sync && vite --host',
       build: `npm run engine:sync && tsc --noEmit && vite build`,
       'build:electron': `npm run engine:sync && tsc --noEmit && vite build --mode electron`,
       'build:release': `npm run engine:verify && tsc --noEmit && vite build`,
@@ -294,6 +559,7 @@ export function renderPackageJson(
       // invoke it through the submodule — there is no game-repo `scripts/`
       // tree (Option C).
       'engine:sync': `node ${coreRel}/scripts/engine-sync.mjs sync`,
+      'engine:dev-sync': `node ${coreRel}/scripts/engine-sync.mjs sync --soft`,
       'engine:verify': `node ${coreRel}/scripts/engine-sync.mjs verify`,
       preview: 'vite preview --host',
       test: 'vitest run --project unit',
@@ -562,7 +828,11 @@ const isReplayMode =
 createCardGame({
   backgroundColor: '#1a2a1a',
   scenes: [GameSelectorScene, ...SCENES],
-  type: Phaser.CANVAS,
+  // \`Phaser.AUTO\` = WebGL with a Canvas fallback (CG-0MVTQ3WPV003ZECA).
+  // Games rely on Phaser 4's Filter pipeline (e.g. the Mask filter that
+  // replaces the Canvas-only \`GeometryMask\`); forcing Canvas here would
+  // silently drop that pipeline on every desktop/GPU browser.
+  type: Phaser.AUTO,
   render: isReplayMode ? { preserveDrawingBuffer: true } : undefined,
   callbacks: {
     preBoot: (game: Phaser.Game) => {
@@ -576,11 +846,142 @@ createCardGame({
 
 // ── Filesystem scaffolding ────────────────────────────────────────────────
 
-/** Write `contents` to `filePath`, creating parent directories as needed. */
-function writeFile(filePath: string, contents: string, written: string[]): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, contents, 'utf-8');
-  written.push(filePath);
+interface ApplyOptions {
+  /** Game repo root the generated paths are reported relative to. */
+  gameRepoRoot: string;
+  /** When true, classify only: no `mkdir`, no write. */
+  dryRun?: boolean;
+  /**
+   * Whether the caller selected this repo-relative path for writing. False in
+   * a selection (`--only`) run for every generated file the caller did not
+   * name; such a file is never written.
+   */
+  isSelected: (reportPath: string) => boolean;
+  /**
+   * `force || only === undefined` — whether a **selected** file whose content
+   * differs from the template may be overwritten (see
+   * {@link ScaffoldOptions.force}).
+   */
+  effectiveForce: boolean;
+}
+
+/**
+ * Why writes are classified before they happen (CG-0MVWFN1HX004B5PN).
+ *
+ * A scaffolded file is **generated**, but the checkout it lands in is a live
+ * consumer repo that owns its own wiring: `main.ts` gains game-specific boot
+ * code, `vite.config.ts` gains documented local edits, and a drift guard lives
+ * in `tests/`. Blindly overwriting every template on a routine re-scaffold
+ * destroys that local work (the MS-0MVVGUYYG004XXOB incident rewrote 11 files
+ * in one run). So every generated file is classified against what is already
+ * on disk **before** anything is written, the classification is returned in
+ * {@link ScaffoldResult.files} and printed on every run, and `--dry-run` runs
+ * the identical classification while writing nothing. A caller can therefore
+ * see exactly which files a run would touch — and the write itself is gated on
+ * the same classification (`--only` / `--force` / `skip-local`,
+ * CG-0MVWGJPPA000GBE7).
+ */
+
+/**
+ * Classify one generated file against the on-disk content (CG-0MVWFN1HX004B5PN)
+ * and, unless this is a dry run, apply the change.
+ *
+ * Precedence is deliberate, and it is the whole write-gating contract
+ * (CG-0MVWGJPPA000GBE7):
+ *
+ * 1. **Unselected** file (selection run, `--only` did not name it) — never
+ *    written: `unchanged` when it already matches the template, `skip-local`
+ *    otherwise (an absent unselected file is `skip-local` too: `create` would
+ *    claim a write that the selection suppressed).
+ * 2. **Selected** file, absent → `create`.
+ * 3. **Selected** file, byte-identical → `unchanged`, no write.
+ * 4. **Selected** file, differs → `update` when `effectiveForce`, else
+ *    `skip-local`: a diverged generated file is local work and is only
+ *    overwritten when the caller explicitly asked for it.
+ *
+ * A dry run returns the same report without touching the disk, so a preview
+ * and the real run always agree.
+ */
+function classifyAndApply(
+  filePath: string,
+  contents: string,
+  opts: ApplyOptions,
+): ScaffoldFileReport {
+  const reportPath = path
+    .relative(opts.gameRepoRoot, filePath)
+    .split(path.sep)
+    .join('/');
+  const existing = fs.existsSync(filePath)
+    ? fs.readFileSync(filePath, 'utf-8')
+    : undefined;
+  const action: ScaffoldFileAction = !opts.isSelected(reportPath)
+    ? existing === contents
+      ? 'unchanged'
+      : 'skip-local'
+    : existing === undefined
+      ? 'create'
+      : existing === contents
+        ? 'unchanged'
+        : opts.effectiveForce
+          ? 'update'
+          : 'skip-local';
+
+  if ((action === 'create' || action === 'update') && !opts.dryRun) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, contents, 'utf-8');
+  }
+  return { path: reportPath, action };
+}
+
+/**
+ * Classify + apply one generated file, recording the report and (only when a
+ * real write happened) the compatibility `written` list.
+ *
+ * A thin wrapper over {@link classifyAndApply} so each call site stays a
+ * single readable line.
+ */
+function writeFile(
+  filePath: string,
+  contents: string,
+  ctx: ApplyOptions & {
+    dryRun: boolean;
+    files: ScaffoldFileReport[];
+    written: string[];
+  },
+): void {
+  const report = classifyAndApply(filePath, contents, ctx);
+  ctx.files.push(report);
+  // `written` is the compatibility projection of what a real run actually
+  // wrote: `skip-local` (and `unchanged`) files are deliberately absent.
+  if (!ctx.dryRun && (report.action === 'create' || report.action === 'update')) {
+    ctx.written.push(filePath);
+  }
+}
+
+/**
+ * Normalise `--only` names to repo-relative POSIX paths.
+ *
+ * Trims whitespace, converts Windows separators, strips a leading `./` and
+ * de-duplicates, so `./main.ts` and `main.ts` name the same generated file.
+ * Globs are rejected: a selection must name a generated file exactly, or it
+ * would resolve to nothing and produce a silent no-op scaffold.
+ */
+function normalizeOnly(names: string[]): string[] {
+  const normalized: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+    if (name === '') continue;
+    if (/[*?[\]]/.test(name)) {
+      throw new Error(
+        `[scaffold] --only accepts literal generated file names, not globs: ${raw}`,
+      );
+    }
+    if (!normalized.includes(name)) normalized.push(name);
+  }
+  if (normalized.length === 0) {
+    throw new Error('[scaffold] --only requires at least one generated file name.');
+  }
+  return normalized;
 }
 
 /**
@@ -718,6 +1119,325 @@ export function linkSharedPublicAssets(
 }
 
 /**
+ * Read every committed hook from the core checkout, sorted by filename.
+ *
+ * The core `.githooks/` directory is the single source of truth: the scaffold
+ * copies these files byte-for-byte rather than rendering hook text, so a hook
+ * fix in TCE reaches every generated game repo with no forked copy to drift
+ * (CG-0MW0KURL8002XOV9). Absence of the directory is a no-op, not an error —
+ * an older core checkout must not fail a scaffold.
+ */
+export function readCoreHooks(
+  coreRoot: string,
+): Array<{ name: string; contents: string; executable: boolean }> {
+  const hooksDir = path.join(coreRoot, GITHOOKS_DIR);
+  if (!fs.existsSync(hooksDir) || !fs.statSync(hooksDir).isDirectory()) {
+    return [];
+  }
+  return fs
+    .readdirSync(hooksDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((entry) => {
+      const filePath = path.join(hooksDir, entry.name);
+      const stat = fs.statSync(filePath);
+      return {
+        name: entry.name,
+        contents: fs.readFileSync(filePath, 'utf-8'),
+        executable: (stat.mode & 0o111) !== 0,
+      };
+    });
+}
+
+/**
+ * Resolve `measure_context.py` local-then-global — the same order
+ * `.githooks/pre-push` and `scripts/refresh-context-thresholds.sh` use
+ * (CG-0MW0KURL8002XOV9).
+ *
+ * Returns `undefined` when neither location exists; the caller then records a
+ * fail-open report entry instead of writing guessed thresholds.
+ */
+export function resolveMeasureContext(
+  coreRoot: string,
+  homeDir: string = os.homedir(),
+): string | undefined {
+  const local = path.join(
+    coreRoot,
+    'skill',
+    'context-audit',
+    'scripts',
+    'measure_context.py',
+  );
+  if (fs.existsSync(local)) return local;
+  const global = path.join(
+    homeDir,
+    '.pi',
+    'agent',
+    'skills',
+    'context-audit',
+    'scripts',
+    'measure_context.py',
+  );
+  return fs.existsSync(global) ? global : undefined;
+}
+
+/** The four components a measured thresholds file carries. */
+export interface ContextThresholds {
+  global_agents: number;
+  project_agents: number;
+  skills_prose: number;
+  total: number;
+}
+
+/**
+ * Measure a game repo's startup context surface.
+ *
+ * Shells out to `measure_context.py --generate-thresholds` with the repo root
+ * passed explicitly (the global script's default root is its own checkout,
+ * not the game repo). Read-only and never throws: any failure comes back as a
+ * `reason` so the scaffold can stay fail-open with an actionable report.
+ */
+export function measureContextThresholds(
+  measureScript: string,
+  gameRepoRoot: string,
+): { thresholds?: ContextThresholds; reason?: string } {
+  const run = spawnSync(
+    'python3',
+    [
+      measureScript,
+      '--repo-root',
+      gameRepoRoot,
+      '--include-hidden',
+      '--generate-thresholds',
+    ],
+    { encoding: 'utf-8' },
+  );
+  if (run.error) {
+    return {
+      reason:
+        `python3/measure_context.py could not run (${run.error.message}); ` +
+        'install the framework skills with scripts/install_pi.sh',
+    };
+  }
+  if (run.status !== 0) {
+    return {
+      reason:
+        `measure_context.py exited ${run.status ?? 'unknown'}: ` +
+        `${(run.stderr || '').trim() || 'no diagnostic'}`,
+    };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(run.stdout);
+  } catch {
+    return { reason: 'measure_context.py did not emit a JSON thresholds object' };
+  }
+  if (typeof parsed !== 'object' || parsed === null) {
+    return { reason: 'measure_context.py did not emit a JSON thresholds object' };
+  }
+  const record = parsed as Record<string, unknown>;
+  const keys = ['global_agents', 'project_agents', 'skills_prose', 'total'] as const;
+  for (const key of keys) {
+    if (typeof record[key] !== 'number') {
+      return { reason: `measured thresholds are missing numeric '${key}'` };
+    }
+  }
+  return { thresholds: record as unknown as ContextThresholds };
+}
+
+/**
+ * The short guidance note shipped in a generated game repo beside its
+ * thresholds file (CG-0MW0KURL8002XOV9).
+ *
+ * It is generated rather than copied because the core's
+ * `docs/dev/context-budget.md` documents TCE's own budget history; a game repo
+ * needs the activation/refresh/scope contract, not that history.
+ */
+export function renderContextBudgetDoc(game: string): string {
+  return [
+    `# Startup Context Budget — tce-${game}`,
+    '',
+    'This repository commits a startup-context budget in',
+    `\`${CONTEXT_THRESHOLDS_PATH}\` and enforces it at push time through the`,
+    'committed `.githooks/pre-push` gate (copied from the engine core).',
+    '',
+    '## What the gate measures',
+    '',
+    '| Component | What it counts |',
+    '|-----------|----------------|',
+    '| `global_agents` | the global `AGENTS_GLOBAL.md` ruleset |',
+    '| `project_agents` | this repository\'s `AGENTS.md` |',
+    '| `skills_prose` | the frontmatter `description` prose of `skill/*/SKILL.md` (with `--include-hidden`) |',
+    '| `total` | the sum of the components above |',
+    '',
+    '## Activating the hooks in a fresh clone',
+    '',
+    '`core.hooksPath` is **local git config**, so a fresh clone still needs one',
+    'activation step before the committed hooks run:',
+    '',
+    '```bash',
+    'git config core.hooksPath .githooks   # or run the framework install_pi.sh',
+    '```',
+    '',
+    '## Refreshing the budget',
+    '',
+    'Any commit that changes `AGENTS.md` (or skills prose) must refresh the',
+    'thresholds in the same commit:',
+    '',
+    '```bash',
+    './scripts/refresh-context-thresholds.sh          # write refreshed thresholds',
+    './scripts/refresh-context-thresholds.sh --check  # verify only',
+    '```',
+    '',
+    'The gate is fail-open only when the measurement tooling or the thresholds',
+    'file is absent; with both present a regression fails the push.',
+    '',
+  ].join('\n');
+}
+
+/**
+ * Wire `core.hooksPath` for a real scaffold run.
+ *
+ * Skipped (with an explicit reason, never a throw) when the target is not a git
+ * repository, so the existing pre-`git init` scaffold use case keeps working.
+ * Only the repo-local config is touched; the committed `.githooks/` directory
+ * is what a fresh clone activates.
+ */
+export function applyHooksPath(gameRepoRoot: string): ScaffoldHooksPathReport {
+  const probe = spawnSync('git', ['-C', gameRepoRoot, 'rev-parse', '--git-dir'], {
+    encoding: 'utf-8',
+  });
+  if (probe.error || probe.status !== 0) {
+    return {
+      applied: false,
+      reason: 'target is not a git repository (run git init first)',
+    };
+  }
+  const set = spawnSync(
+    'git',
+    ['-C', gameRepoRoot, 'config', 'core.hooksPath', GITHOOKS_DIR],
+    { encoding: 'utf-8' },
+  );
+  if (set.error || set.status !== 0) {
+    return {
+      applied: false,
+      reason:
+        `git config core.hooksPath failed: ` +
+        `${(set.error?.message ?? set.stderr ?? '').toString().trim() || 'unknown error'}`,
+    };
+  }
+  return { applied: true, value: GITHOOKS_DIR };
+}
+
+/**
+ * The textual rewrites the game-tree migration applies, **in order**.
+ *
+ * Each rule takes the current contents and returns the rewritten contents, so
+ * the chain reproduces the original single-expression rewrite verbatim while
+ * letting the planner record *which* rewrite actually fired for a file.
+ */
+const GAME_TREE_REWRITE_RULES: ReadonlyArray<{
+  kind: GameTreeRewriteKind;
+  apply: (contents: string, needle: string) => string;
+}> = [
+  // Rule 1 — `example-games/<game>/…` -> `src/…` (game tree).
+  {
+    kind: 'game-tree-prefix',
+    apply: (contents, needle) => contents.split(needle).join('src/'),
+  },
+  // Rule 2 — a relative `(../)+scripts/<module>` path -> `@core-scripts/<module>`.
+  //    In the Option C layout a game repo has no repository-root `scripts/`
+  //    tree (its own scripts live under `src/scripts/`), so a root-relative
+  //    `scripts/` reference always denotes a core-owned script and the alias
+  //    resolves it against the core checkout.
+  {
+    kind: 'relative-scripts-import',
+    apply: (contents) =>
+      contents.replace(
+        /(['"])((?:\.\.\/)+)scripts\/([A-Za-z0-9_./-]+)\1/g,
+        (_match, quote: string, _dots: string, moduleName: string) =>
+          `${quote}@core-scripts/${moduleName}${quote}`,
+      ),
+  },
+  // Rule 3 — a quoted `scripts/…` path -> `core/scripts/…`: game tests invoke
+  //    core-owned CLIs (e.g. `scripts/replay.ts`) that now live in the core
+  //    checkout, not the game repo. `src/scripts/…` is untouched.
+  {
+    kind: 'quoted-scripts-path',
+    apply: (contents) =>
+      contents
+        .split("'scripts/")
+        .join("'core/scripts/")
+        .split('"scripts/')
+        .join('"core/scripts/'),
+  },
+  // Rule 4 — a quoted `src/<core-dir>…` path -> `core/src/<core-dir>…`: some
+  //    main-street tests scan the core's UI/engine layers directly.
+  {
+    kind: 'core-src-path',
+    apply: (contents) =>
+      contents.replace(
+        /(['"])src\/(core-engine|card-system|rule-engine|ui|ai)(?=[/'"])/g,
+        '$1core/src/$2',
+      ),
+  },
+];
+
+/** A planned (not yet applied) rewrite of one consumer file. */
+interface PlannedGameTreeRewrite {
+  filePath: string;
+  updated: string;
+  rewrites: GameTreeRewriteKind[];
+}
+
+/**
+ * Plan the game-tree path rewrite for one game repo without writing anything.
+ *
+ * A file is a candidate only when it genuinely references this game's tree
+ * (`example-games/<game>/`). That is the `--migrate-game-paths` scoping rule
+ * (CG-0MVWGJRIO0094Y4Z): the rewrite used to touch every test/source file, so
+ * a drift guard's own `STALE_PREFIX`, a run-tests import or a documented local
+ * edit could be edited by a routine re-scaffold. A file with no genuine
+ * game-tree reference is reported as unaffected (absent from the plan) and is
+ * left byte-identical.
+ */
+function planGameTreePathRewrites(
+  gameRepoRoot: string,
+  game: string,
+): PlannedGameTreeRewrite[] {
+  const needle = `example-games/${game}/`;
+  const planned: PlannedGameTreeRewrite[] = [];
+  const consider = (filePath: string): void => {
+    if (!/\.(ts|tsx|mjs|cjs|js)$/.test(filePath)) return;
+    const original = fs.readFileSync(filePath, 'utf-8');
+    if (!original.includes(needle)) return;
+    const rewrites: GameTreeRewriteKind[] = [];
+    let updated = original;
+    for (const rule of GAME_TREE_REWRITE_RULES) {
+      const next = rule.apply(updated, needle);
+      if (next !== updated) {
+        rewrites.push(rule.kind);
+        updated = next;
+      }
+    }
+    if (updated !== original) {
+      planned.push({ filePath, updated, rewrites });
+    }
+  };
+  const walk = (dir: string): void => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else consider(full);
+    }
+  };
+  walk(path.join(gameRepoRoot, 'tests'));
+  walk(path.join(gameRepoRoot, 'src'));
+  return planned;
+}
+
+/**
  * Rewrite intra-test references to the game tree for the `src/` layout.
  *
  * Game tests reach their own source with repository-root-relative specifiers
@@ -727,68 +1447,38 @@ export function linkSharedPublicAssets(
  * (`tests/<game>/…`), replacing the `example-games/<game>/` segment with
  * `src/` is exact — including runtime paths such as fixture file locations.
  *
+ * This is **not** called by a routine scaffold: it is the opt-in
+ * `--migrate-game-paths` migration (CG-0MVWGJRIO0094Y4Z). The signature is
+ * unchanged because other tooling and tests import it directly; only the
+ * files that genuinely reference the game tree are touched.
+ *
  * @returns The rewritten file paths.
  */
 export function rewriteGameTreePaths(gameRepoRoot: string, game: string): string[] {
-  const needle = `example-games/${game}/`;
   const rewritten: string[] = [];
-  const walk = (dir: string): void => {
-    if (!fs.existsSync(dir)) return;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (/\.(ts|tsx|mjs|cjs|js)$/.test(entry.name)) {
-        const original = fs.readFileSync(full, 'utf-8');
-        // 1. `example-games/<game>/…` -> `src/…` (game tree).
-        // 2. A quoted `scripts/…` path -> `core/scripts/…`: game tests invoke
-        //    core-owned CLIs (e.g. `scripts/replay.ts`) that now live in the
-        //    core checkout, not the game repo. `src/scripts/…` is untouched.
-        // 3. A quoted `src/<core-dir>…` path -> `core/src/<core-dir>…`: some
-        //    main-street tests scan the core's UI/engine layers directly.
-        // 4. A relative `(../)+scripts/<module>` path -> `@core-scripts/<module>`.
-        //    In the Option C layout a game repo has no repository-root
-        //    `scripts/` tree (its own scripts live under `src/scripts/`), so a
-        //    root-relative `scripts/` reference always denotes a core-owned
-        //    script and the alias resolves it against the core checkout.
-        const updated = original
-          .split(needle)
-          .join('src/')
-          .replace(
-            /(['"])((?:\.\.\/)+)scripts\/([A-Za-z0-9_./-]+)\1/g,
-            (_match, quote: string, _dots: string, moduleName: string) =>
-              `${quote}@core-scripts/${moduleName}${quote}`,
-          )
-          .split("'scripts/")
-          .join("'core/scripts/")
-          .split('"scripts/')
-          .join('"core/scripts/')
-          .replace(
-            /(['"])src\/(core-engine|card-system|rule-engine|ui|ai)(?=[/'"])/g,
-            '$1core/src/$2',
-          );
-        if (updated !== original) {
-          fs.writeFileSync(full, updated, 'utf-8');
-          rewritten.push(full);
-        }
-      }
-    }
-  };
-  walk(path.join(gameRepoRoot, 'tests'));
-  walk(path.join(gameRepoRoot, 'src'));
+  for (const plan of planGameTreePathRewrites(gameRepoRoot, game)) {
+    fs.writeFileSync(plan.filePath, plan.updated, 'utf-8');
+    rewritten.push(plan.filePath);
+  }
   return rewritten;
 }
 
 /**
  * Scaffold a per-game repo in place.
  *
- * Writes `package.json`, `vite.config.ts`, `tsconfig.json`, `main.ts`,
- * `env.d.ts`, `index.html` (copied from the core) and
- * `configs/<preset>.json`, and creates the `src`/`core` symlinks into the
- * sibling core checkout.
+ * Classifies (and, for a real run, writes) `package.json`, `vite.config.ts`,
+ * `tsconfig.json`, `main.ts`, `env.d.ts`, `index.html` (copied from the core)
+ * and `configs/<preset>.json`, and creates the `core` symlink into the sibling
+ * core checkout. With {@link ScaffoldOptions.dryRun} it classifies only and
+ * leaves every file, link and test/source rewrite untouched. With
+ * {@link ScaffoldOptions.only} it restricts writing to the named generated
+ * files and performs no non-file side effect at all.
  *
  * @param options See {@link ScaffoldOptions}.
- * @returns What was written and linked.
- * @throws When the game repo root or core root does not exist.
+ * @returns The per-file classification, what was written and what was linked.
+ * @throws When the game repo root or core root does not exist, or when a
+ *   selected (`only`) name is not one of this run's generated paths — the
+ *   error lists the valid paths and nothing is written.
  */
 export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   const gameRepoRoot = path.resolve(options.gameRepoRoot);
@@ -837,48 +1527,187 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
 
   const written: string[] = [];
   const symlinks: string[] = [];
+  const files: ScaffoldFileReport[] = [];
+  const dryRun = options.dryRun === true;
 
-  writeFile(
-    path.join(gameRepoRoot, 'package.json'),
-    renderPackageJson(options.game, manifest, coreRel, version),
-    written,
-  );
-  writeFile(
-    path.join(gameRepoRoot, 'vite.config.ts'),
-    renderViteConfig(options.game, coreRel),
-    written,
-  );
-  writeFile(
-    path.join(gameRepoRoot, 'tsconfig.json'),
-    renderTsconfig(options.game, coreRel),
-    written,
-  );
-  writeFile(
-    path.join(gameRepoRoot, 'env.d.ts'),
-    renderEnvDts(),
-    written,
-  );
-  writeFile(
-    path.join(gameRepoRoot, 'main.ts'),
-    renderMainTs(),
-    written,
-  );
+  // Write gating (CG-0MVWGJPPA000GBE7). A selection run touches only the named
+  // generated files; a full run (no `only`) regenerates every generated file,
+  // which is what the eight sibling `tce-<game>` repos rely on to receive
+  // template updates — hence `effectiveForce` is implied by a full run.
+  const only = options.only === undefined ? undefined : normalizeOnly(options.only);
+  const selectionMode = only !== undefined;
+  const effectiveForce = options.force === true || !selectionMode;
+
+  // The game-tree path rewrite is opt-in (CG-0MVWGJRIO0094Y4Z). It used to run
+  // on every scaffold, so a routine re-scaffold could edit a consumer's tests
+  // or source — and the blanket rewrite also touched files with no genuine
+  // game-tree reference (a drift guard's own `STALE_PREFIX`, run-tests imports,
+  // documented local edits). Fresh repos do not need it:
+  // `scripts/extract-repos.sh --path-rename` already produced the `src/`
+  // layout. `--only` promises "no rewrite", so the pair is contradictory:
+  // refuse before anything is written rather than half-migrate a repo.
+  const migrateGamePaths = options.migrateGamePaths === true;
+  if (migrateGamePaths && selectionMode) {
+    throw new Error(
+      '[scaffold] --migrate-game-paths cannot be combined with --only: ' +
+        '--only promises "no rewrite", so a selection run never migrates. ' +
+        'Drop one of the two flags.',
+    );
+  }
+
+  // Build the whole plan (path + rendered contents) before writing anything:
+  // `--only` validation must fail before a single byte lands, and the valid
+  // name list is exactly this plan.
+  const plan: Array<{ filePath: string; contents: string; executable?: boolean }> = [
+    {
+      filePath: path.join(gameRepoRoot, 'package.json'),
+      contents: renderPackageJson(options.game, manifest, coreRel, version),
+    },
+    {
+      filePath: path.join(gameRepoRoot, 'vite.config.ts'),
+      contents: renderViteConfig(options.game, coreRel),
+    },
+    {
+      filePath: path.join(gameRepoRoot, 'tsconfig.json'),
+      contents: renderTsconfig(options.game, coreRel),
+    },
+    {
+      filePath: path.join(gameRepoRoot, 'env.d.ts'),
+      contents: renderEnvDts(),
+    },
+    {
+      filePath: path.join(gameRepoRoot, 'main.ts'),
+      contents: renderMainTs(),
+    },
+  ];
 
   // index.html is copied verbatim from the core so it stays in sync.
   const coreIndex = path.join(coreRoot, 'index.html');
   if (fs.existsSync(coreIndex)) {
-    writeFile(
-      path.join(gameRepoRoot, 'index.html'),
-      fs.readFileSync(coreIndex, 'utf-8'),
-      written,
-    );
+    plan.push({
+      filePath: path.join(gameRepoRoot, 'index.html'),
+      contents: fs.readFileSync(coreIndex, 'utf-8'),
+    });
   }
 
-  writeFile(
-    path.join(gameRepoRoot, GAME_REPO_CONFIGS_DIR, `${DEFAULT_GAME_PRESET}.json`),
-    renderPreset(options.game, scenePath, adapterPath),
+  plan.push({
+    filePath: path.join(
+      gameRepoRoot,
+      GAME_REPO_CONFIGS_DIR,
+      `${DEFAULT_GAME_PRESET}.json`,
+    ),
+    contents: renderPreset(options.game, scenePath, adapterPath),
+  });
+
+  // ── Committed git hooks + context budget (CG-0MW0KURL8002XOV9) ──────────
+  // Hooks are copied verbatim from the core checkout (single source of truth),
+  // so a scaffolded repo ships the unified full-suite pre-push gate instead of
+  // a forked, gate-less copy. The thresholds file is measured from the
+  // generated repo's own surface; when the measurement tooling is unavailable
+  // nothing is written and the report names the remedy (fail-open).
+  const coreHooks = readCoreHooks(coreRoot);
+  for (const hook of coreHooks) {
+    plan.push({
+      filePath: path.join(gameRepoRoot, GITHOOKS_DIR, hook.name),
+      contents: hook.contents,
+      executable: hook.executable,
+    });
+  }
+
+  const measureScript =
+    options.measureContextPath ?? resolveMeasureContext(coreRoot);
+  const measured = measureScript
+    ? measureContextThresholds(measureScript, gameRepoRoot)
+    : {
+        reason:
+          'measure_context.py not found; install the framework skills with ' +
+          'scripts/install_pi.sh (thresholds gate stays fail-open)',
+      };
+  const thresholdsReport: ScaffoldThresholdsReport = {
+    generated: measured.thresholds !== undefined,
+    path: CONTEXT_THRESHOLDS_PATH,
+    ...(measureScript === undefined ? {} : { measureScript }),
+    ...(measured.thresholds === undefined ? { reason: measured.reason } : {}),
+  };
+  if (measured.thresholds !== undefined) {
+    plan.push({
+      filePath: path.join(gameRepoRoot, CONTEXT_THRESHOLDS_PATH),
+      contents: `${JSON.stringify(measured.thresholds, null, 2)}\n`,
+    });
+    const refreshScript = path.join(coreRoot, REFRESH_THRESHOLDS_PATH);
+    if (fs.existsSync(refreshScript)) {
+      plan.push({
+        filePath: path.join(gameRepoRoot, REFRESH_THRESHOLDS_PATH),
+        contents: fs.readFileSync(refreshScript, 'utf-8'),
+        executable: true,
+      });
+    }
+    plan.push({
+      filePath: path.join(gameRepoRoot, CONTEXT_BUDGET_DOC_PATH),
+      contents: renderContextBudgetDoc(options.game),
+    });
+  }
+
+  const reportPathOf = (filePath: string): string =>
+    path.relative(gameRepoRoot, filePath).split(path.sep).join('/');
+
+  if (only !== undefined) {
+    const valid = plan.map((entry) => reportPathOf(entry.filePath));
+    const unknown = only.filter((name) => !valid.includes(name));
+    if (unknown.length > 0) {
+      // Fail fast: a typo must not produce a silent no-op scaffold.
+      throw new Error(
+        `[scaffold] unknown --only file(s): ${unknown.join(', ')}. ` +
+          `Valid generated paths: ${[...valid].sort().join(', ')}.`,
+      );
+    }
+  }
+
+  const writeCtx = {
+    gameRepoRoot,
+    dryRun,
+    files,
     written,
-  );
+    isSelected: (reportPath: string) =>
+      only === undefined || only.includes(reportPath),
+    effectiveForce,
+  };
+
+  for (const entry of plan) {
+    writeFile(entry.filePath, entry.contents, writeCtx);
+    // Hooks and the refresh entry point must stay executable. The apply step
+    // above writes 0644, so restore the bit for a file this run may write
+    // (a selection run only touches its selected files).
+    if (entry.executable === true && !dryRun) {
+      const reportPath = reportPathOf(entry.filePath);
+      if (writeCtx.isSelected(reportPath)) {
+        try {
+          fs.chmodSync(entry.filePath, 0o755);
+        } catch {
+          // A mode we cannot set must not fail an otherwise valid scaffold.
+        }
+      }
+    }
+  }
+
+  // Point the repo's *local* config at the copied hooks only after the plan
+  // has been written. `core.hooksPath` is local config, so a fresh clone still
+  // needs the documented one activation step (install_pi.sh or
+  // `git config core.hooksPath .githooks`).
+  const hooksPath: ScaffoldHooksPathReport =
+    dryRun || selectionMode
+      ? {
+          applied: false,
+          reason: dryRun
+            ? 'dry run — nothing configured'
+            : 'selection run — no side effects',
+        }
+      : coreHooks.length === 0
+        ? {
+            applied: false,
+            reason: `core ${GITHOOKS_DIR}/ has no hook files`,
+          }
+        : applyHooksPath(gameRepoRoot);
 
   // Option C (C1): the game source occupies repo-root `src/`, so the
   // `src -> core/src` compatibility symlink (and the `scripts`,
@@ -887,14 +1716,39 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
   // through the path aliases; intra-test game-tree paths are rewritten to
   // `src/`. The only remaining link is `core` (the engine checkout / a git
   // submodule once remotes exist).
-  if (ensureDirSymlink(path.join(gameRepoRoot, 'core'), coreRoot)) {
+  //
+  // Every side effect below is skipped in a dry run: the classification above
+  // already reported what a real run would write, so a preview must not create
+  // the `core` symlink, link shared assets, or rewrite the consumer's own
+  // tests/source. A **selection** run skips them too: `--only main.ts` must
+  // touch nothing but `main.ts`.
+  const selectionNote = only === undefined
+    ? undefined
+    : `selection mode: only the ${only.length} selected generated file(s) may be written; ` +
+      'skipped the core symlink, shared asset links, root app-icon links and game-tree path rewrites';
+
+  if (!selectionMode && !dryRun && ensureDirSymlink(path.join(gameRepoRoot, 'core'), coreRoot)) {
     symlinks.push(path.join(gameRepoRoot, 'core'));
   }
 
-  const assetLinks = linkSharedAssets(gameRepoRoot, coreRoot);
-  const publicLinks = linkSharedPublicAssets(gameRepoRoot, coreRoot);
+  const skipSideEffects = dryRun || selectionMode;
+  const assetLinks = skipSideEffects ? [] : linkSharedAssets(gameRepoRoot, coreRoot);
+  const publicLinks = skipSideEffects
+    ? []
+    : linkSharedPublicAssets(gameRepoRoot, coreRoot);
 
-  const rewritten = rewriteGameTreePaths(gameRepoRoot, options.game);
+  // Opt-in game-tree migration (CG-0MVWGJRIO0094Y4Z). The plan is computed
+  // even in a dry run — that is exactly what a `--migrate-game-paths
+  // --dry-run` preview reports — but nothing is written until a real run.
+  const migrations: ScaffoldMigrationReport[] = migrateGamePaths
+    ? planGameTreePathRewrites(gameRepoRoot, options.game).map((plan) => ({
+        path: reportPathOf(plan.filePath),
+        rewrites: plan.rewrites,
+      }))
+    : [];
+  const rewritten = migrateGamePaths && !dryRun
+    ? rewriteGameTreePaths(gameRepoRoot, options.game)
+    : [];
 
   return {
     gameRepoRoot,
@@ -905,13 +1759,18 @@ export function scaffoldGameRepo(options: ScaffoldOptions): ScaffoldResult {
       GAME_REPO_CONFIGS_DIR,
       `${DEFAULT_GAME_PRESET}.json`,
     ),
+    files,
     written,
     symlinks,
     rewritten,
+    migrations,
     assetLinks,
     publicLinks,
     version,
     versionSource,
+    selectionNote,
+    hooksPath,
+    thresholds: thresholdsReport,
   };
 }
 
@@ -926,6 +1785,14 @@ interface CliArgs {
   all?: boolean;
   layout?: string;
   version?: string;
+  dryRun?: boolean;
+  /** Generated files selected by `--only` (literal, repo-relative names). */
+  only?: string[];
+  /** `--force`: overwrite a selected file whose content differs. */
+  force?: boolean;
+  /** `--migrate-game-paths`: opt in to the game-tree path migration. */
+  migrateGamePaths?: boolean;
+  json?: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -961,6 +1828,43 @@ function parseArgs(argv: string[]): CliArgs {
       case '--all':
         args.all = true;
         break;
+      case '--dry-run':
+        args.dryRun = true;
+        break;
+      case '--only': {
+        if (next === undefined || next.startsWith('--')) {
+          throw new Error(
+            '--only requires a comma-separated list of generated file names',
+          );
+        }
+        const names = next
+          .split(',')
+          .map((name) => name.trim())
+          .filter((name) => name !== '');
+        if (names.length === 0) {
+          throw new Error('--only requires at least one generated file name');
+        }
+        for (const name of names) {
+          // Literal names only: a glob would silently select nothing.
+          if (/[*?[\]]/.test(name)) {
+            throw new Error(
+              `--only accepts literal generated file names, not globs: ${name}`,
+            );
+          }
+        }
+        args.only = [...(args.only ?? []), ...names];
+        i += 1;
+        break;
+      }
+      case '--force':
+        args.force = true;
+        break;
+      case '--migrate-game-paths':
+        args.migrateGamePaths = true;
+        break;
+      case '--json':
+        args.json = true;
+        break;
       case '--layout':
         args.layout = next;
         i += 1;
@@ -980,6 +1884,10 @@ function usage(): string {
     'Turn an extracted game checkout into a runnable single-game launcher',
     'that composes the core engine checkout as a sibling.',
     '',
+    'A real run also copies the core\'s committed .githooks/ (including the',
+    'full-suite pre-push gate), points core.hooksPath at it, and generates',
+    'docs/dev/context-budget.thresholds.json from the game repo\'s own surface.',
+    '',
     'Options:',
     '  --game <id>              Game id (golf, main-street, …). Required unless --all.',
     '  --all                    Scaffold every game in scripts/configs/repo-layout.json.',
@@ -991,6 +1899,37 @@ function usage(): string {
     `                           (default: ${DEFAULT_CORE_REL}).`,
     '  --version <semver>       Explicit game package version (default:',
     '                           preserve the repo version, else seed 0.1.0).',
+    '  --dry-run                Classify every generated file (create | update |',
+    '                           unchanged | skip-local) and report it, writing',
+    '                           nothing: no file, no symlink, no link, no path',
+    '                           rewrite.',
+    '  --only <file,...>        Regenerate only the named generated files',
+    '                           (comma-separated, repo-relative, e.g. main.ts).',
+    '                           Unselected generated files are left alone',
+    '                           (skip-local) and no symlink, asset link or path',
+    '                           rewrite is performed. Names are literal (no',
+    '                           globs); an unknown name fails before any write.',
+    '                           A selected file that differs from the template',
+    '                           is only overwritten with --force.',
+    '  --force                  Overwrite a selected generated file that',
+    '                           differs from the template (default: leave it,',
+    '                           reported as skip-local). A full run without',
+    '                           --only always implies force.',
+    '  --migrate-game-paths     Rewrite the game-tree references in the game\'s',
+    '                           own tests/source: example-games/<game>/ -> src/',
+    '                           plus the quoted-scripts, core-src and',
+    '                           relative-scripts rewrites. Off by default — a',
+    '                           routine re-scaffold must never edit a',
+    '                           consumer\'s tests or source, and a fresh repo',
+    '                           already has the src/ layout from',
+    '                           extract-repos.sh --path-rename. Only a file that',
+    '                           genuinely references example-games/<game>/ is',
+    '                           touched. With --dry-run the affected files (and',
+    '                           which rewrite applies) are reported, not',
+    '                           written. Cannot be combined with --only.',
+    '  --json                   Print one machine-readable JSON document for the',
+    '                           run (an object, or an array with --all) carrying',
+    '                           the per-file `files` report.',
     '  --layout <path>          Layout file for --all',
     '                           (default: <core-root>/scripts/configs/repo-layout.json).',
     '  -h, --help               Show this help.',
@@ -1016,6 +1955,17 @@ function main(argv: string[]): number {
     return 1;
   }
 
+  // `--only` promises "no rewrite", so a migration cannot be combined with a
+  // selection: fail fast before anything is written.
+  if (args.migrateGamePaths && args.only !== undefined) {
+    console.error(
+      'error: --migrate-game-paths cannot be combined with --only ' +
+        '(--only promises "no rewrite").',
+    );
+    console.error(usage());
+    return 1;
+  }
+
   const reposDir = path.resolve(args.reposDir ?? path.join(process.cwd(), '..'));
   const coreRoot = path.resolve(
     args.coreRoot ?? path.join(reposDir, 'Tableau-Card-Engine'),
@@ -1030,6 +1980,7 @@ function main(argv: string[]): number {
   const manifest = readCoreManifest(coreRoot);
   let failures = 0;
   let lastGameRepoRoot = '';
+  const results: ScaffoldResult[] = [];
   for (const game of games) {
     const gameRepoRoot = path.resolve(
       args.gameRepoRoot ?? path.join(reposDir, `tce-${game}`),
@@ -1046,16 +1997,54 @@ function main(argv: string[]): number {
         coreRel,
         coreManifest: manifest,
         version: args.version,
+        dryRun: args.dryRun,
+        only: args.only,
+        force: args.force,
+        migrateGamePaths: args.migrateGamePaths,
       });
-      console.log(`Scaffolded tce-${game}`);
+      results.push(result);
+      if (args.json) continue;
+      console.log(
+        args.dryRun
+          ? `Scaffolded tce-${game} (dry run — nothing written)`
+          : `Scaffolded tce-${game}`,
+      );
       console.log(`  game repo: ${result.gameRepoRoot}`);
       console.log(`  core:      ${result.coreRoot} (${result.coreRel})`);
       console.log(`  preset:    ${result.presetPath}`);
       console.log(`  version:   ${result.version} (${result.versionSource})`);
-      for (const f of result.written) console.log(`  wrote ${f}`);
+      // Hook activation and the context budget are part of the contract, so
+      // name both outcomes on every run (CG-0MW0KURL8002XOV9). A skipped
+      // wiring is reported with its reason, never silently omitted.
+      console.log(
+        result.hooksPath.applied
+          ? `  hooks:     ${result.hooksPath.value} (core.hooksPath) — a fresh clone needs one activation step`
+          : `  hooks:     not wired (${result.hooksPath.reason})`,
+      );
+      console.log(
+        result.thresholds.generated
+          ? `  budget:    ${result.thresholds.path} (measured)`
+          : `  budget:    not generated (${result.thresholds.reason})`,
+      );
+      // One line per generated file: the classification **is** the report, for
+      // both a dry run and a real one (CG-0MVWGJNQM0061W6I).
+      for (const file of result.files) {
+        console.log(`  ${file.action}  ${file.path}`);
+      }
+      if (result.selectionNote) console.log(`  note:      ${result.selectionNote}`);
       for (const l of result.symlinks) console.log(`  linked ${l}`);
       if (result.rewritten.length) {
         console.log(`  rewrote example-games/${game}/ → src/ in ${result.rewritten.length} file(s)`);
+      }
+      // The opt-in migration report names every affected file and which
+      // rewrite applies, so a `--dry-run` preview is actionable
+      // (CG-0MVWGJRIO0094Y4Z).
+      if (result.migrations.length) {
+        const verb = args.dryRun ? 'would migrate' : 'migrated';
+        console.log(`  ${verb} ${result.migrations.length} game-tree file(s):`);
+        for (const migration of result.migrations) {
+          console.log(`    ${migration.path} (${migration.rewrites.join(', ')})`);
+        }
       }
       if (result.assetLinks.length) {
         console.log(`  linked ${result.assetLinks.length} shared asset(s)`);
@@ -1070,6 +2059,15 @@ function main(argv: string[]): number {
   }
 
   if (failures > 0) return 1;
+
+  // `--json` prints exactly one document: an object for a single `--game` run,
+  // an array for `--all`, both carrying the same per-file `files` report.
+  if (args.json) {
+    console.log(JSON.stringify(args.all ? results : results[0], null, 2));
+    return 0;
+  }
+
+  if (args.dryRun) return 0;
   console.log('');
   console.log('Next:');
   console.log(`  cd ${lastGameRepoRoot}`);

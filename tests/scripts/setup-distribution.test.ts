@@ -38,6 +38,7 @@ const GAME_SLUGS = [
   'tce-lost-cities',
   'tce-main-street',
   'tce-sushi-go',
+  'tce-the-rising',
 ];
 
 /** Records the commands a fake runner is asked to execute. */
@@ -227,11 +228,11 @@ describe('setupDistribution — orchestration', () => {
     });
 
     expect(report.exitCode).toBe(0);
-    // A clone + a submodule update for each of the nine targets.
-    expect(runner.calls.filter((c) => c[0] === 'git' && c[1] === 'clone')).toHaveLength(9);
+    // A clone + a submodule update for each of the ten targets.
+    expect(runner.calls.filter((c) => c[0] === 'git' && c[1] === 'clone')).toHaveLength(10);
     expect(
       runner.calls.filter((c) => c.includes('submodule')),
-    ).toHaveLength(9);
+    ).toHaveLength(10);
     expect(report.checkouts['tce-golf']).toBe(path.join('/parent', 'tce-golf'));
   });
 

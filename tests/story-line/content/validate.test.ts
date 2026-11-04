@@ -27,9 +27,6 @@ function card(overrides: Partial<ContentCard> = {}): ContentCard {
     id: 'card-a',
     name: 'Card A',
     effect: 'An effect',
-    hasChoices: false,
-    acceptNextCardId: null,
-    rejectNextCardId: null,
     options: '',
     storylineId: 'arc',
     storylineTitle: 'Arc',
@@ -140,12 +137,9 @@ describe('hard errors', () => {
     expect(codes([card({ name: '  ' })])).toEqual(['missing-required-field']);
   });
 
-  it('catches an unknown legacy link target on a choice card', () => {
+  it('catches an unknown option target on a choice card', () => {
     const result = validateContentCards(
-      [
-        card({ hasChoices: true, acceptNextCardId: 'gone' }),
-        card({ id: 'card-b', storylineId: null }),
-      ],
+      [card({ options: 'Go|gone' }), card({ id: 'card-b', storylineId: null })],
       TAVERN_CONTENT_ADAPTER,
     );
     expect(result.issues).toEqual([
@@ -153,22 +147,12 @@ describe('hard errors', () => {
     ]);
   });
 
-  it('catches links declared on a card that is not a choice card', () => {
-    expect(
-      codes([
-        card({ acceptNextCardId: 'card-b' }),
-        card({ id: 'card-b', storylineId: null }),
-      ]),
-    ).toEqual(['orphan-link']);
-  });
-
-  it('reports an orphan link and its unknown target together', () => {
-    expect(
-      codes([
-        card({ acceptNextCardId: 'gone' }),
-        card({ id: 'card-b', storylineId: null }),
-      ]),
-    ).toEqual(['orphan-link', 'dangling-link']);
+  it('does not treat a bare storyline id as a choice card', () => {
+    // A terminal escalation card carries a storyline id for grouping but no
+    // options, so it must not require (or imply) a choice.
+    const result = validateContentCards([card({ storylineId: 'arc' })], TAVERN_CONTENT_ADAPTER);
+    expect(result.issues).toEqual([]);
+    expect(result.choiceCardCount).toBe(0);
   });
 
   it('catches an empty and a duplicate option label', () => {

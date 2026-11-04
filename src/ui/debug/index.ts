@@ -13,6 +13,13 @@ export { createStateInspectorTool } from './StateInspectorOverlay';
 export { createGameEventLogTool } from './GameEventLogOverlay';
 export { createAiDecisionViewerTool } from './AiDecisionOverlay';
 export {
+  formatEventLogEntry,
+  stringifyPayloadSafe,
+  widestLineLength,
+  CIRCULAR_PAYLOAD_PLACEHOLDER,
+} from './formatEventLog';
+export type { EventLogEntry } from './formatEventLog';
+export {
   createToneForgeStatusTool,
   withToneForgeStatusTool,
   resolveEffectiveDebugTools,
