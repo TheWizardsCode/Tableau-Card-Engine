@@ -84,6 +84,8 @@ npm run package:steam    # Steam build: builds the follow addon + Windows NSIS p
 
 **Before any push to origin:** ensure unit tests pass (`npm test -- --project unit`) and the build succeeds (`npm run build`). Full browser + tutorial E2E suites are not required on every push.
 
+> **`npm run build` starts with a hard gate (`CG-0MVS9HBN3009HIQN`).** `package.json` wires `"prebuild": "npm run check:ui-node-surface"`, so every `npm run build` first runs the static import-graph check over the node-safe `@ui` manifest (`src/ui/node-safe-modules.ts`). A listed module that transitively picks up a Phaser **value** import fails the build before `tsc`/`vite` run, naming the module and the offending chain. If you add a module to the node-safe surface, follow the "adding a module" procedure in [docs/DEVELOPER.md](docs/DEVELOPER.md#phaser-free-ui-helper-imports-for-node-tests); if the check proves a candidate is Phaser-bearing, drop it from the manifest rather than editing that module. `build:*`-style scripts (`build:electron`, `build:game-artifact`, …) are unaffected — npm pre-hooks are script-name-scoped.
+
 Each example game should have its own set of tests to ensure that the game mechanics work as expected and to prevent regressions as the engine evolves. Additionally, the core engine should have comprehensive tests covering all critical functionalities.
 
 **Periodic test-suite review:** the suite is audited for low-value tests via the repo-local [`test-review` skill](.pi/skills/test-review/SKILL.md) (`/skill:test-review`). The audit classifies every `*.test.ts` file against six documented anti-patterns, records the result in [`docs/dev/test-suite-review.md`](docs/dev/test-suite-review.md), and creates a child work item for each removal/clean-up recommendation. The audit itself is analysis-only and never edits tests.
@@ -125,7 +127,7 @@ The unit and browser stages run through `scripts/vitest-run-with-retry.ts`, whic
     - `npm run test:dev` (~3.5 min) — **pre-audit / pre-commit** check. Smoke + key E2E per game.
     - `npm run test` (full suite, ~18–21 min) — **release only**. Full browser + tutorial E2E suites.
   Tutorial E2E parts are excluded from smoke/dev profiles. Full project table in `docs/DEVELOPER.md#smoke-tests` / `#dev-tests`.
-- **Before any push to origin** — run unit tests (`npm test -- --project unit`) and `npm run build`. Full suite (`npm test`) is only required on release.
+- **Before any push to origin** — run unit tests (`npm test -- --project unit`) and `npm run build` (which begins with the `check:ui-node-surface` prebuild gate, see the note under [Quality Gates](#quality-gates)). Full suite (`npm test`) is only required on release.
 
 > **PR CI is build-only (CG-0MT022826006EM0D):** GitHub Actions `pr-checks.yml` gates on `npm run build` only (TypeScript compile + Vite bundle). The full test suite is run **locally** before every push only on release (per the quality gates above) and is intentionally NOT re-run in PR CI — the Phaser 4 browser suite has outgrown the single-Chromium-instance context budget in constrained CI environments. `deploy.yml` on `main` also builds only; `package.yml` smoke-tests the packaged Windows binary separately.
 
@@ -316,14 +318,15 @@ Use `AiStrategyBase` (the strategy interface), `AiPlayer<TStrategy>` (generic pl
 - **When to use:** "In a real game like Lost Cities, an AI strategy implements AiStrategyBase { choosePhase1Action(state, rng): Phase1Action; choosePhase2Action(state, rng): Phase2Action; }. The AiPlayer wraps these strategies and calls them during the game loop." (GymAiStrategyScene Usage Example help text)
 - **Key features:** Same strategy + same seed = same pick (deterministic); `pickBest()` breaks ties randomly using the seeded RNG; strategies can be swapped at runtime.
 
-### 5. Overlay Lifecycle and GeometryMask Clipping
+### 5. Overlay Lifecycle and Renderer-Aware Clipping
 
-Use `createOverlayBackground()` and `dismissOverlay()` from `@ui` for modal overlays. Overlays use a semi-transparent background with depth-ordering conventions (backdrop 199, box 200, interactive elements 201). GeometryMask scrollable content regions are cleaned up on dismiss.
+Use `createOverlayBackground()` and `dismissOverlay()` from `@ui` for modal overlays. Overlays use a semi-transparent background with depth-ordering conventions (backdrop 199, box 200, interactive elements 201). Scrollable content regions are clipped through the renderer-aware `createContainerClip()` helper (never a bare `GeometryMask`) and the clip is destroyed on dismiss.
 
 - **Gym scenes:** `GymOverlayUiScene` — `example-games/gym/scenes/GymOverlayUiScene.ts`, `GymParameterizedOverlayScene` — `example-games/gym/scenes/GymParameterizedOverlayScene.ts`
-- **Key APIs:** `createOverlayBackground()`, `dismissOverlay()`, `createParameterizedOverlay()`, `dismissParameterizedOverlay()`, GeometryMask (Phaser built-in)
+- **Key APIs:** `createOverlayBackground()`, `dismissOverlay()`, `createParameterizedOverlay()`, `dismissParameterizedOverlay()`, `createContainerClip()` (`@ui`)
 - **When to use:** "In a real card game, overlays are used for confirmation dialogs ('Are you sure you want to quit?'), rule reminders, or modal messages that temporarily block interaction with the game board." (GymOverlayUiScene Features help text)
-- **Lifecycle:** Create overlay via `createOverlayBackground`, parent all interactive elements into `hudContainer`, handle dismiss with proper cleanup (GeometryMask destroy, event listener removal, object array reset). The refined depth convention for modal dialogs is documented in the [UI Best Practices section](#ui-best-practices-creating-modal-dialogs) above.
+- **Lifecycle:** Create overlay via `createOverlayBackground`, parent all interactive elements into `hudContainer`, handle dismiss with proper cleanup (clip `destroy()`, event listener removal, object array reset). The refined depth convention for modal dialogs is documented in the [UI Best Practices section](#ui-best-practices-creating-modal-dialogs) above.
+- **Clipping:** Phaser 4's WebGL renderer no longer supports `GameObject.setMask` — `GeometryMask` is Canvas-only, so `setMask` warns and no-ops under WebGL. Always clip through `createContainerClip()` (`src/ui/ContainerClip.ts`): it keeps `GeometryMask` on Canvas and uses an opaque, off-display-list Graphics with a Mask filter on WebGL, in screen space. See [Renderer-Aware Clipping](docs/ui/renderer-aware-clipping.md) for the contract, teardown ownership and the do-not list.
 
 ### 6. Event Sourcing via Transcript Recording
 

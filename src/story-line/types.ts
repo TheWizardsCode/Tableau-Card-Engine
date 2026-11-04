@@ -38,15 +38,6 @@ export interface StorylineCard {
   /** Reputation delta applied when the card's effect resolves. */
   readonly reputationDelta?: number;
   /**
-   * Legacy two-way choice flag. When true the card compiles to
-   * Accept (apply) / Reject (skip) options.
-   */
-  readonly hasChoices?: boolean;
-  /** Legacy accept successor card id (null / absent ends the chain). */
-  readonly acceptNextCardId?: string | null;
-  /** Legacy reject successor card id (null / absent ends the chain). */
-  readonly rejectNextCardId?: string | null;
-  /**
    * Raw CSV options encoding for an arbitrary multi-outcome choice node.
    * Format: `label|cardA,cardB;label2|cardC`.
    */
@@ -75,12 +66,6 @@ export interface StorylineJournalEntry {
   readonly outcome: string;
   /** The original log line. */
   readonly text: string;
-}
-
-/** The explanatory labels for the choice buttons. */
-export interface ChoiceClarityLabels {
-  readonly accept: string;
-  readonly reject: string;
 }
 
 /**
@@ -154,9 +139,8 @@ export interface StorylineOption<TState = unknown> {
   readonly label: string;
   /**
    * The single card id to push when this option is chosen. Null / absent
-   * ends the chain. Retained for the programmatic registry seam and
-   * transitional legacy compilation; CSV-authored options use
-   * {@link successorIds}.
+   * ends the chain. Retained for the programmatic registry seam;
+   * CSV-authored options use {@link successorIds}.
    */
   readonly successorId?: string | null | undefined;
   /**
@@ -219,7 +203,7 @@ export interface StorylineOption<TState = unknown> {
    * 1. {@link successorResolver} callback, when present;
    * 2. the first matching {@link conditionalSuccessors} rule;
    * 3. {@link successorIds} — a single seeded random draw;
-   * 4. legacy {@link successorId}.
+   * 4. {@link successorId} — the lowest-precedence single successor.
    */
   readonly conditionalSuccessors?: readonly ConditionalSuccessorRule[];
 }
@@ -318,7 +302,6 @@ export interface StorylineEngineAdapter<TState, TCard extends StorylineCard> {
  * change wording without touching core logic.
  */
 export interface StorylineUiAdapter<
-  TState = unknown,
   TCard extends StorylineCard = StorylineCard,
 > {
   /** Human-readable story-line name: explicit title, else the id, else null. */
@@ -334,14 +317,6 @@ export interface StorylineUiAdapter<
     coinChange: number,
     repChange: number,
   ): string | null;
-  /**
-   * Explanatory labels for the choice buttons. Must not reveal the
-   * escalation card id.
-   */
-  choiceClarityLabels(
-    card: TCard,
-    options: readonly StorylineOption<TState>[],
-  ): ChoiceClarityLabels;
   /** Journal title for a list of journal entries. */
   journalTitle(entries: readonly StorylineJournalEntry[]): string;
   /** A one-line summary of a story-line card for a tooltip/intro. */
@@ -354,7 +329,7 @@ export interface StorylineUiAdapter<
  */
 export interface StorylineSystem<TState, TCard extends StorylineCard> {
   readonly engine: StorylineEngineAdapter<TState, TCard>;
-  readonly ui: StorylineUiAdapter<TState, TCard>;
+  readonly ui: StorylineUiAdapter<TCard>;
 
   // ── Compilation ─────────────────────────────────────────────
   /** Compile a card's story-line into the generalised option model. */

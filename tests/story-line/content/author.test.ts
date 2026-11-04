@@ -22,6 +22,7 @@ import {
   updateContentCard,
 } from '../../../src/story-line/content/author';
 import { validateContentCsv } from '../../../src/story-line/content/validate';
+import { contentCardHasChoice } from '../../../src/story-line/content/csv';
 import { runStorylineAuthorCli } from '../../../scripts/storyline-author';
 import { TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
 import {
@@ -67,6 +68,24 @@ describe('addContentCard', () => {
     expect(result.ok).toBe(false);
     expect(result.csv).toBe(tavernCsv);
     expect(result.errors.join(' ')).toContain('unreachable');
+  });
+
+  it('round-trips options-authored content byte-identically', () => {
+    const spec = {
+      id: 'tav-extra',
+      name: 'An Extra Card',
+      effect: 'Nothing much happens.',
+      options: 'Leave|tav-inn',
+      storylineId: 'tav-extra-arc',
+      fields: { payoff: '4' },
+    };
+    const added = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, spec);
+    expect(added.ok).toBe(true);
+
+    // Re-applying the same authored values must not change a single byte.
+    const rewritten = updateContentCard(added.csv, TAVERN_CONTENT_ADAPTER, spec);
+    expect(rewritten.ok).toBe(true);
+    expect(rewritten.csv).toBe(added.csv);
   });
 
   it('refuses a duplicate id', () => {
@@ -181,17 +200,18 @@ describe('updateContentCard', () => {
     expect(dangling.csv).toBe(tavernCsv);
   });
 
-  it('marks a card as a choice when a legacy link is set', () => {
+  it('makes a card a choice through its options encoding', () => {
     const gymCsv = readText(GYM_CONTENT_PATH);
     const result = updateContentCard(gymCsv, GYM_CONTENT_ADAPTER, {
       id: 'gym-story-end',
-      acceptNextCardId: 'gym-story-start',
+      options: 'Revisit|gym-story-start',
     });
     expect(result.ok).toBe(true);
     const end = readContentCards(result.csv, GYM_CONTENT_ADAPTER).find(
       (entry) => entry.id === 'gym-story-end',
     );
-    expect(end).toMatchObject({ hasChoices: true, acceptNextCardId: 'gym-story-start' });
+    expect(end?.options).toBe('Revisit|gym-story-start');
+    expect(end && contentCardHasChoice(end)).toBe(true);
   });
 });
 
@@ -360,6 +380,40 @@ describe('storyline-author CLI', () => {
     expect(stderr).toContain('refusing to write');
     expect(stderr).toContain('gym-gone');
     expect(readText(contentPath)).toBe(before);
+  });
+
+  it('rejects the removed legacy choice/link flags with a usage error', () => {
+    const before = readText(contentPath);
+    for (const flag of [
+      '--has-choices',
+      '--accept-next',
+      '--clear-accept-next',
+      '--reject-next',
+      '--clear-reject-next',
+    ]) {
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'update-card',
+          '--csv',
+          contentPath,
+          '--id',
+          'gym-story-start',
+          flag,
+        ]),
+      );
+      expect(code, `${flag} is refused`).toBe(1);
+      expect(stderr).toContain('no longer supported');
+    }
+    expect(readText(contentPath)).toBe(before);
+  });
+
+  it('documents only --options and never the removed flags in its help', () => {
+    const { code, stdout } = captureOutput(() => runStorylineAuthorCli(['--help']));
+    expect(code).toBe(0);
+    expect(stdout).toContain('--options');
+    expect(stdout).not.toContain('--has-choices');
+    expect(stdout).not.toContain('--accept-next');
+    expect(stdout).not.toContain('--reject-next');
   });
 
   it('rejects an unknown command, a bad --field and an unknown adapter', () => {

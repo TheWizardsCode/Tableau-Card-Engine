@@ -13,10 +13,8 @@
  * | `duplicate-id` | Two cards share the same (base) id. |
  * | `missing-required-field` | The id, name or a required adapter column is empty. |
  * | `missing-storyline-id` | A choice card declares no storyline id. |
- * | `orphan-link` | A card declares accept/reject links but is not a choice card. |
  * | `invalid-option` | Malformed `options` encoding, or an empty/duplicate option label. |
  * | `unknown-successor` | An `options` candidate names a card id that does not exist. |
- * | `dangling-link` | A legacy accept/reject link names a card id that does not exist. |
  * | `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
  * | `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
  *
@@ -47,10 +45,8 @@ export type ContentIssueCode =
   | 'duplicate-id'
   | 'missing-required-field'
   | 'missing-storyline-id'
-  | 'orphan-link'
   | 'invalid-option'
   | 'unknown-successor'
-  | 'dangling-link'
   | 'unreachable-card'
   | 'cycle-error';
 
@@ -164,7 +160,7 @@ export function validateContentCards(
 
   const knownIds = new Set(cards.map((card) => base(card.id)));
 
-  // ── Per-card option/link validation ──
+  // ── Per-card option validation ──
   const optionsByCard = new Map<ContentCard, StorylineOption<unknown>[]>();
   const choiceCards: ContentCard[] = [];
   const storylineIds = new Set<string>();
@@ -195,29 +191,6 @@ export function validateContentCards(
           cardId: id,
           message: `Choice card "${id}" declares no storyline id.`,
         });
-      }
-    } else if (card.acceptNextCardId || card.rejectNextCardId) {
-      // Legacy links on a non-choice card are inert at runtime AND invisible
-      // to option compilation, so they are reported explicitly instead.
-      issues.push({
-        code: 'orphan-link',
-        cardId: id,
-        message: `Card "${id}" declares accept/reject links but is not marked as a choice card (no hasChoices flag and no options).`,
-      });
-      for (const [field, target] of [
-        ['acceptNextCardId', card.acceptNextCardId],
-        ['rejectNextCardId', card.rejectNextCardId],
-      ] as const) {
-        if (!target) continue;
-        const targetBase = base(target);
-        if (!knownIds.has(targetBase)) {
-          issues.push({
-            code: 'dangling-link',
-            cardId: id,
-            target: targetBase,
-            message: `Card "${id}" ${field} links to unknown card "${targetBase}".`,
-          });
-        }
       }
     }
 

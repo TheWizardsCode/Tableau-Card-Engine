@@ -12,6 +12,7 @@ import {
   type OverlayDialogHandle,
 } from '../Overlay';
 import type { DebugToolsEntry } from './DebugToolsRegistry';
+import { formatEventLogEntry, type EventLogEntry } from './formatEventLog';
 import { GlobalEventBuffer } from './GlobalEventBuffer';
 
 // ── Constants ───────────────────────────────────────────────
@@ -20,11 +21,26 @@ const BOX_WIDTH = Math.min(GAME_W - 80, 680);
 const BOX_HEIGHT = Math.min(GAME_H - 80, 500);
 const HEADER_HEIGHT = 90;
 
+/** Vertical gap between two event rows, in px. */
+const ROW_GAP = 6;
+
+/** Extra leading between the pretty-printed lines of one payload, in px. */
+const LINE_SPACING = 2;
+
 // ── State ───────────────────────────────────────────────────
 
 interface EventLogState {
-  entries: Array<{ timestamp: string; eventName: string; payload: unknown }>;
+  entries: EventLogEntry[];
   paused: boolean;
+  /**
+   * Number of `GlobalEventBuffer` entries already reflected in `entries`.
+   *
+   * The buffer is the source of truth and the 500 ms poll appends only the
+   * entries recorded since this watermark, so a **cleared** feed stays
+   * cleared (the poll does not repopulate it from the buffer) and a
+   * **paused** feed does not advance the watermark.
+   */
+  consumed: number;
 }
 
 let activeOverlay: OverlayDialogHandle | null = null;
@@ -44,36 +60,46 @@ function getBufferStatus(): string {
     : `Buffer active — ${count} events recorded`;
 }
 
-// ── Formatting helpers ──────────────────────────────────────
-
-function truncatePayload(payload: unknown, maxLen = 80): string {
-  try {
-    const json = JSON.stringify(payload);
-    if (json.length <= maxLen) return json;
-    return json.slice(0, maxLen) + '...';
-  } catch {
-    return String(payload).slice(0, maxLen);
-  }
-}
+/** Hint appended to the status line: wide payload lines scroll horizontally. */
+const HORIZONTAL_SCROLL_HINT = ' — scroll sideways for wide payloads';
 
 // ── Overlay rendering ───────────────────────────────────────
 
+/**
+ * Render every buffered event into the dialog's scroll container.
+ *
+ * Layout: **one text object per event** (not per JSON line) holding the
+ * one-line `timestamp [eventName]` header plus the pretty-printed payload
+ * (`JSON.stringify(payload, null, 2)`). Objects are placed at a measured y
+ * offset — the previous row's full rendered height plus {@link ROW_GAP} — so
+ * the content height grows with each payload's line count while the object
+ * count stays proportional to the event count.
+ *
+ * No `wordWrap` is configured on the rows: payload lines are never
+ * soft-wrapped. The dialog is created with `enableHorizontalScroll: true`, so
+ * lines wider than the content area stay on one line and are reached by
+ * scrolling sideways.
+ */
 function renderLog(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: EventLogState): void {
   overlay.scrollContainer.removeAll(true);
 
   const visible = state.entries.slice();
 
-  visible.forEach((entry, i) => {
-    const y = i * 22;
-    const displayText = `${entry.timestamp} [${entry.eventName}] ${truncatePayload(entry.payload)}`;
+  let y = 0;
+  let totalWidth = 0;
 
-    const textObj = scene.add.text(0, y, displayText, {
+  visible.forEach((entry) => {
+    const textObj = scene.add.text(0, y, formatEventLogEntry(entry), {
       fontSize: '13px',
       color: '#cccccc',
       fontFamily: overlay.monoFont,
+      lineSpacing: LINE_SPACING,
     });
     textObj.setDepth(overlay.depthBase + 2);
     overlay.scrollContainer.add(textObj);
+
+    totalWidth = Math.max(totalWidth, textObj.width);
+    y += textObj.height + ROW_GAP;
   });
 
   if (state.entries.length === 0) {
@@ -84,18 +110,56 @@ function renderLog(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: Eve
     });
     emptyText.setDepth(overlay.depthBase + 2);
     overlay.scrollContainer.add(emptyText);
+    totalWidth = Math.max(totalWidth, emptyText.width);
+    y = 10 + emptyText.height + ROW_GAP;
   }
 
-  const totalHeight = Math.max(visible.length * 22 + 20, overlay.contentHeight + 1);
-  overlay.refresh(totalHeight);
+  // The dialog clamps vertical scrolling to this height and, because it opts
+  // into horizontal scrolling, clamps sideways scrolling to `totalWidth`.
+  const totalHeight = Math.max(y, overlay.contentHeight + 1);
+  overlay.refresh(totalHeight, totalWidth);
 }
 
 // ── Refresh entries from buffer ────────────────────────────
 
+/**
+ * Re-render the whole feed from the buffer, resetting the consumed watermark.
+ *
+ * Used once when the overlay opens; the poll appends from the watermark
+ * instead (see {@link syncFromBuffer}).
+ */
 function refreshFromBuffer(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: EventLogState): void {
   const buf = GlobalEventBuffer.getInstance();
-  state.entries = buf.getEntries().slice() as EventLogState['entries'];
+  const all = buf.getEntries();
+  state.entries = all.slice();
+  state.consumed = all.length;
   renderLog(scene, overlay, state);
+}
+
+/**
+ * Append the entries buffered since the last sync and re-render.
+ *
+ * Only new events are appended, so the feed honours an earlier **Clear**
+ * (a cleared feed is not repopulated) and nothing already on screen is
+ * rebuilt. A buffer that shrank underneath the feed (e.g. the whole buffer
+ * was cleared by a session reset) is resynced from scratch.
+ *
+ * @returns `true` when the feed changed and the caller should refresh its
+ *          status/count labels.
+ */
+function syncFromBuffer(scene: Phaser.Scene, overlay: OverlayDialogHandle, state: EventLogState): boolean {
+  const all = GlobalEventBuffer.getInstance().getEntries();
+
+  if (all.length < state.consumed) {
+    refreshFromBuffer(scene, overlay, state);
+    return true;
+  }
+  if (all.length === state.consumed) return false;
+
+  state.entries = state.entries.concat(all.slice(state.consumed));
+  state.consumed = all.length;
+  renderLog(scene, overlay, state);
+  return true;
 }
 
 // ── Factory ─────────────────────────────────────────────────
@@ -124,6 +188,7 @@ export function createGameEventLogTool(): DebugToolsEntry {
       const state: EventLogState = {
         entries: [],
         paused: false,
+        consumed: 0,
       };
       activeState = state;
 
@@ -134,6 +199,9 @@ export function createGameEventLogTool(): DebugToolsEntry {
         height: BOX_HEIGHT,
         headerHeight: HEADER_HEIGHT,
         boxColor: 0x1a1a2e,
+        // Opt-in horizontal scrolling: pretty-printed payload lines are never
+        // wrapped, so they must be reachable by scrolling sideways.
+        enableHorizontalScroll: true,
         onClose: () => {
           if (pollInterval) {
             pollInterval.destroy();
@@ -159,6 +227,7 @@ export function createGameEventLogTool(): DebugToolsEntry {
       } catch { /* ignore */ }
 
       // ── Control buttons ────────────────────────────────────
+      const buf = GlobalEventBuffer.getInstance();
       const btnY = overlay.boxY + 65;
       const btnStyle = {
         fontSize: '13px',
@@ -171,7 +240,11 @@ export function createGameEventLogTool(): DebugToolsEntry {
       clearBtn.setDepth(overlay.depthBase + 2);
       clearBtn.setInteractive({ useHandCursor: true });
       clearBtn.on('pointerdown', () => {
+        // Clear the *feed*, not the buffer: advancing the consumed watermark
+        // past everything already recorded is what keeps the next poll tick
+        // from repopulating the list (the pre-pretty-print Clear behaviour).
         state.entries = [];
+        state.consumed = buf.getEntries().length;
         renderLog(scene, overlay, state);
       });
       clearBtn.on('pointerover', () => clearBtn.setColor('#aaddff'));
@@ -199,8 +272,6 @@ export function createGameEventLogTool(): DebugToolsEntry {
         if (hud && typeof hud.add === 'function') hud.add(pauseBtn);
       } catch { /* ignore */ }
 
-      const buf = GlobalEventBuffer.getInstance();
-
       // Event count
       const countText = scene.add.text(overlay.boxX + overlay.boxWidth - 60, btnY, `${buf.getEntries().length} events`, {
         fontSize: '12px',
@@ -226,17 +297,19 @@ export function createGameEventLogTool(): DebugToolsEntry {
             if (pollInterval) pollInterval.destroy();
             return;
           }
-          const newCount = buf.getEntries().length;
-          if (activeState.entries.length !== newCount) {
-            refreshFromBuffer(scene, activeOverlay, activeState);
-            statusText.setText('Status: ' + getBufferStatus());
-            countText.setText(newCount + ' events');
-          }
+          // Pause freezes the feed: nothing is appended and the status line
+          // keeps showing PAUSED. The watermark does not advance either, so
+          // resuming appends everything recorded while paused (the buffer is
+          // the source of truth — a pause never loses events).
+          if (activeState.paused) return;
+          if (!syncFromBuffer(scene, activeOverlay, activeState)) return;
+          statusText.setText('Status: ' + getBufferStatus() + HORIZONTAL_SCROLL_HINT);
+          countText.setText(buf.getEntries().length + ' events');
         },
       });
 
       // Update count and status
-      statusText.setText('Status: ' + getBufferStatus());
+      statusText.setText('Status: ' + getBufferStatus() + HORIZONTAL_SCROLL_HINT);
       countText.setText(buf.getEntries().length + ' events');
     },
   };

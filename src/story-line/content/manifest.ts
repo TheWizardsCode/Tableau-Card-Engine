@@ -61,8 +61,12 @@ export interface ManifestNode {
   readonly storylineId: string | null;
   /** Story-line title, or null. */
   readonly storylineTitle: string | null;
-  /** True when the card presents a choice. */
-  readonly hasChoices: boolean;
+  /**
+   * Derived: `true` when the card presents a choice, i.e. when it has at least
+   * one compiled option. Computed purely from the card's compiled options —
+   * never read from a content field.
+   */
+  readonly isChoice: boolean;
   /** Number of options (0 for plain incidents). */
   readonly optionCount: number;
   /** Ordered option list (empty for plain incidents). */
@@ -161,14 +165,17 @@ export function buildStorylineManifest(
     const card = byBase.get(base) as ContentCard;
     if (card.storylineId) storylineIds.add(card.storylineId);
     const compiledOptions = compileContentOptions(card);
-    const hasChoices = card.hasChoices || compiledOptions.length > 0;
+    // A node is a choice node only when its compiled options branch. The flag
+    // is derived from the compiled options alone, so it can never disagree
+    // with `optionCount`.
+    const isChoice = compiledOptions.length > 0;
 
     nodes.push({
       id: base,
       name: card.name,
       storylineId: card.storylineId,
       storylineTitle: card.storylineTitle,
-      hasChoices,
+      isChoice,
       optionCount: compiledOptions.length,
       options: compiledOptions.map((option) => ({
         label: option.label,
@@ -360,7 +367,7 @@ export function renderMermaid(manifest: StorylineManifest): string {
   for (const node of manifest.nodes) {
     const id = mermaidId(node.id);
     const label = nodeLabel(node);
-    if (node.hasChoices) {
+    if (node.isChoice) {
       lines.push(`  ${id}{"${label}"}`);
     } else {
       lines.push(`  ${id}("${label}")`);

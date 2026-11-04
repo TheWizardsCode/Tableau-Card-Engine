@@ -4,8 +4,8 @@
  * The declarative `cost`, `extraEffect` and `conditionalSuccessors` fields are
  * authored programmatically through `registerStorylineOptions` and must be
  * carried verbatim by the compilation seam, which future draw-time filtering
- * and resolution work builds on. CSV-authored and legacy options keep their
- * current shape (no shipped content uses the new fields).
+ * and resolution work builds on. CSV-authored options keep their current
+ * shape (no shipped content uses the new fields).
  *
  * @module
  */

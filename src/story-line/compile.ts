@@ -1,12 +1,11 @@
 /**
  * Story-line option compilation and the registered-option registry.
  *
- * Compilation turns a card's legacy `hasChoices` fields, its CSV `options`
- * encoding, or a programmatically registered option list into the
- * generalised {@link StorylineOption} model used by resolution.
+ * Compilation turns a card's CSV `options` encoding or a programmatically
+ * registered option list into the generalised {@link StorylineOption} model
+ * used by resolution.
  *
- * Precedence: registered options > CSV `options` encoding > legacy two-way
- * choice fields.
+ * Precedence: registered options > CSV `options` encoding.
  *
  * @module
  */
@@ -146,21 +145,18 @@ export function isOptionAffordable(
 /**
  * Compiles a card's story-line into the generalised option model.
  *
- * Precedence: explicit registry options > CSV `options` encoding > legacy
- * two-way choice fields.
+ * Precedence: explicit registry options > CSV `options` encoding.
  *
  * - A card with a non-empty `options` encoding compiles to the ordered option
  *   list it declares (candidate successor sets, always `effectPolicy: 'apply'`).
- * - Registered options take precedence over both CSV and legacy compilation.
- * - Non-choice cards (no `options`, no registered list, no `hasChoices`) →
- *   empty option list.
- * - Legacy choice cards → two options [Accept(apply), Reject(skip)].
+ * - Registered options take precedence over CSV compilation.
+ * - Non-choice cards (no `options`, no registered list) → empty option list.
  *
  * When `state` **and** a resources oracle are provided, registry options are
  * filtered at draw time: an option is omitted when its `condition` callback
  * returns `false` **or** its declarative `cost` exceeds the current
  * resources ({@link isOptionAffordable}). Without a resources oracle (or
- * without state) no cost filtering happens — legacy behaviour is preserved.
+ * without state) no cost filtering happens.
  *
  * @param event        The story-line card.
  * @param registry     The option registry to consult (base-type-id keyed).
@@ -168,7 +164,7 @@ export function isOptionAffordable(
  * @param getResources Optional resources oracle for draw-time cost
  *                     affordability filtering. Reads the current spendable
  *                     resources from `state`; when absent, cost-gated options
- *                     are never filtered (legacy behaviour).
+ *                     are never filtered.
  */
 export function compileStorylineFromEvent<TState, TCard extends StorylineCard>(
   event: TCard,
@@ -208,44 +204,25 @@ export function compileStorylineFromEvent<TState, TCard extends StorylineCard>(
     };
   }
 
-  if (!event.hasChoices) {
-    return { storylineId, compiledOptions: [] };
-  }
-
-  return {
-    storylineId,
-    compiledOptions: [
-      {
-        label: 'Accept',
-        successorId: event.acceptNextCardId ?? undefined,
-        effectPolicy: 'apply',
-      },
-      {
-        label: 'Reject',
-        successorId: event.rejectNextCardId ?? undefined,
-        effectPolicy: 'skip',
-      },
-    ] as StorylineOption<TState>[],
-  };
+  return { storylineId, compiledOptions: [] };
 }
 
 /**
  * Returns true if the event presents a story-driven choice at resolution
- * time — i.e. it has legacy `hasChoices`, or a non-empty `options` encoding,
- * or an explicit registered option list.
+ * time — i.e. it has a non-empty `options` encoding or an explicit registered
+ * option list.
  *
  * NOTE: a bare `storylineId` is descriptive metadata (grouping cards into a
  * named arc) and does NOT by itself make a card a choice. Terminal escalation
  * cards carry a `storylineId` for grouping/journal purposes but must still
- * resolve as plain incidents. Only `hasChoices` / `options` / registered
- * options intercept resolution.
+ * resolve as plain incidents. Only `options` / registered options intercept
+ * resolution.
  */
 export function eventHasStoryline<TState, TCard extends StorylineCard>(
   event: TCard,
   registry: StorylineOptionRegistry<TState>,
 ): boolean {
   return (
-    Boolean(event.hasChoices) ||
     Boolean(event.options && event.options.trim() !== '') ||
     registry.has(event.id)
   );

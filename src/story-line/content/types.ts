@@ -39,9 +39,10 @@
  * game's own columns, keyed by their CSV column name.
  *
  * Structurally assignable to the runtime {@link StorylineCard} (it carries
- * `id`, `name`, `effect`, `hasChoices`, the legacy link fields, `options` and
- * the storyline metadata), so a compiled content card can be fed straight to
- * the runtime system.
+ * `id`, `name`, `effect`, `options` and the storyline metadata), so a compiled
+ * content card can be fed straight to the runtime system. A choice is
+ * represented **only** by the `options` encoding — there is no second,
+ * legacy choice/link representation in the content model.
  */
 export interface ContentCard {
   /** Stable card template id (the adapter's `id` column). */
@@ -50,12 +51,6 @@ export interface ContentCard {
   readonly name: string;
   /** Human-readable effect text (`''` when the adapter maps no effect column). */
   readonly effect: string;
-  /** Legacy two-way choice flag (false when the adapter maps no such column). */
-  readonly hasChoices: boolean;
-  /** Legacy accept successor card id (`null` when absent). */
-  readonly acceptNextCardId: string | null;
-  /** Legacy reject successor card id (`null` when absent). */
-  readonly rejectNextCardId: string | null;
   /** Raw CSV `options` encoding (`''` when absent). */
   readonly options: string;
   /** Story-arc identifier (`null` when the card belongs to no arc). */
@@ -72,10 +67,10 @@ export interface ContentCard {
 /**
  * Maps a game's CSV column names onto the generic story-line fields.
  *
- * Only `id` and `name` are required. A game without a legacy two-way choice
- * model simply omits `hasChoices` / `acceptNextCardId` / `rejectNextCardId`;
- * a game without an `options` column omits `options`. An omitted mapping means
- * "this content file has no such column" — never an error.
+ * Only `id` and `name` are required. A game without a choice model simply
+ * omits `options`; a game without a storyline omits the storyline mappings.
+ * An omitted mapping means "this content file has no such column" — never an
+ * error.
  */
 export interface ContentFieldMapping {
   /** Column carrying the card id. **Required.** */
@@ -84,12 +79,6 @@ export interface ContentFieldMapping {
   readonly name: string;
   /** Column carrying the human-readable effect text. */
   readonly effect?: string;
-  /** Column carrying the legacy `hasChoices` flag. */
-  readonly hasChoices?: string;
-  /** Column carrying the legacy accept successor id. */
-  readonly acceptNextCardId?: string;
-  /** Column carrying the legacy reject successor id. */
-  readonly rejectNextCardId?: string;
   /** Column carrying the CSV `options` encoding. */
   readonly options?: string;
   /** Column carrying the storyline id. */
@@ -172,13 +161,6 @@ export function mappedFieldColumns(
     ['name', fields.name],
   ];
   if (fields.effect !== undefined) pairs.push(['effect', fields.effect]);
-  if (fields.hasChoices !== undefined) pairs.push(['hasChoices', fields.hasChoices]);
-  if (fields.acceptNextCardId !== undefined) {
-    pairs.push(['acceptNextCardId', fields.acceptNextCardId]);
-  }
-  if (fields.rejectNextCardId !== undefined) {
-    pairs.push(['rejectNextCardId', fields.rejectNextCardId]);
-  }
   if (fields.options !== undefined) pairs.push(['options', fields.options]);
   if (fields.storylineId !== undefined) pairs.push(['storylineId', fields.storylineId]);
   if (fields.storylineTitle !== undefined) {

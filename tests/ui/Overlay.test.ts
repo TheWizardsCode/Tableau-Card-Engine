@@ -9,7 +9,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createOverlayBackground, dismissOverlay } from '../../src/ui/Overlay';
+import {
+  createOverlayBackground,
+  createOverlayDialog,
+  dismissOverlay,
+  type OverlayDialogHandle,
+} from '../../src/ui/Overlay';
 import {
   createOverlayButton,
   OVERLAY_BUTTON_COLOR,
@@ -18,6 +23,22 @@ import {
 } from '../../src/ui/OverlayButton';
 import { createOverlayMenuButton } from '../../src/ui/MenuButton';
 import { FONT_FAMILY, GAME_W, GAME_H } from '../../src/ui/constants';
+import {
+  createContainerClip,
+  type ContainerClip,
+} from '../../src/ui/ContainerClip';
+
+// `createOverlayDialog` delegates clipping to the shared `createContainerClip`
+// helper. The helper's own renderer branches are covered by
+// `ContainerClip.test.ts` and the real-browser probes in
+// `CorePanelWebglClip.browser.test.ts`; these tests spy on that seam so they
+// assert the dialog's clip *decisions* (when to clip, and to which viewport)
+// instead of GeometryMask internals.
+vi.mock('../../src/ui/ContainerClip', () => ({
+  createContainerClip: vi.fn(),
+}));
+
+const createClip = vi.mocked(createContainerClip);
 
 // ── Mock helpers ────────────────────────────────────────────
 
@@ -321,5 +342,409 @@ describe('createOverlayMenuButton', () => {
 
     expect(btn.on).toHaveBeenCalledWith('pointerover', expect.any(Function));
     expect(btn.on).toHaveBeenCalledWith('pointerout', expect.any(Function));
+  });
+});
+
+// ── createOverlayDialog ─────────────────────────────────────
+
+/**
+ * Create a mock Phaser.GameObjects.Container covering the subset of the
+ * container API `createOverlayDialog` uses (position, child list).
+ */
+function mockContainer(x = 0, y = 0) {
+  const list: unknown[] = [];
+  const container: Record<string, unknown> = {
+    x,
+    y,
+    list,
+    setDepth: vi.fn().mockReturnThis(),
+    add: vi.fn((child: unknown) => {
+      list.push(child);
+      return container;
+    }),
+    removeAll: vi.fn(() => {
+      list.length = 0;
+      return container;
+    }),
+    destroy: vi.fn(),
+  };
+  return container;
+}
+
+/** The observable surface of the clip the dialog receives from the helper. */
+type FakeClip = {
+  graphics: { destroy: ReturnType<typeof vi.fn> };
+  setRect: ReturnType<typeof vi.fn>;
+  clear: ReturnType<typeof vi.fn>;
+  destroy: ReturnType<typeof vi.fn>;
+};
+
+/** Create a mock `ContainerClip` and record it for assertions. */
+function mockClip(): FakeClip {
+  return {
+    graphics: { destroy: vi.fn() },
+    setRect: vi.fn(),
+    clear: vi.fn(),
+    destroy: vi.fn(),
+  };
+}
+
+/** Minimal mock scene that captures the registered `wheel` handlers. */
+function mockDialogScene() {
+  const wheelHandlers: Array<
+    (pointer: { x: number; y: number }, over: unknown[], dx: number, dy: number) => void
+  > = [];
+
+  const clips: FakeClip[] = [];
+  createClip.mockReset();
+  createClip.mockImplementation(() => {
+    const clip = mockClip();
+    clips.push(clip);
+    return clip as unknown as ContainerClip;
+  });
+
+  const scene = {
+    add: {
+      rectangle: vi.fn(() => mockRectangle()),
+      text: vi.fn(() => mockText()),
+      container: vi.fn((x: number, y: number) => mockContainer(x, y)),
+    },
+    input: {
+      on: vi.fn((event: string, handler: (typeof wheelHandlers)[number]) => {
+        if (event === 'wheel') wheelHandlers.push(handler);
+      }),
+      off: vi.fn((event: string, handler: (typeof wheelHandlers)[number]) => {
+        if (event !== 'wheel') return;
+        const index = wheelHandlers.indexOf(handler);
+        if (index >= 0) wheelHandlers.splice(index, 1);
+      }),
+    },
+  };
+
+  return {
+    scene: scene as unknown as Phaser.Scene,
+    clips,
+    lastClip: (): FakeClip => clips[clips.length - 1],
+    wheelHandlerCount: (): number => wheelHandlers.length,
+    /** Dispatch a wheel event to every registered handler (as Phaser does). */
+    wheel(x: number, y: number, dx: number, dy: number): void {
+      for (const handler of [...wheelHandlers]) handler({ x, y }, [], dx, dy);
+    },
+  };
+}
+
+/**
+ * Add one mock content object to the dialog's scroll container so the
+ * dialog's fallback content measurements (`estimateContentHeight`,
+ * `estimateContentWidth`) report the requested size.
+ */
+function addDemoContent(
+  dialog: OverlayDialogHandle,
+  height: number,
+  width: number,
+): void {
+  dialog.scrollContainer.add({
+    x: 0,
+    y: height - 22,
+    width,
+  } as unknown as Phaser.GameObjects.GameObject);
+}
+
+describe('createOverlayDialog', () => {
+  let harness: ReturnType<typeof mockDialogScene>;
+
+  beforeEach(() => {
+    harness = mockDialogScene();
+  });
+
+  it('is vertical-only by default: dx never moves content and maxScrollX stays 0', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Defaults' });
+    addDemoContent(dialog, dialog.contentHeight * 3, dialog.contentWidth * 5);
+    dialog.refresh();
+
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.maxScrollX).toBe(0);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 40, 0);
+
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.maxScrollX).toBe(0);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
+  });
+
+  it('keeps vertical scrolling working on a default dialog', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Vertical' });
+    addDemoContent(dialog, dialog.contentHeight * 3, dialog.contentWidth);
+    dialog.refresh();
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 0, 10);
+
+    expect(dialog.scrollY).toBeCloseTo(15);
+    expect(dialog.scrollContainer.y).toBeCloseTo(dialog.contentY - 15);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
+  });
+
+  it('scrolls horizontally when enableHorizontalScroll is opt-in', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Wide',
+      enableHorizontalScroll: true,
+    });
+    const wideContent = dialog.contentWidth * 4;
+    addDemoContent(dialog, dialog.contentHeight, wideContent);
+    dialog.refresh();
+
+    expect(dialog.maxScrollX).toBe(wideContent - dialog.contentWidth);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 10, 0);
+
+    expect(dialog.scrollX).toBeCloseTo(15);
+    expect(dialog.scrollContainer.x).toBeCloseTo(dialog.contentX - 15);
+  });
+
+  it('clamps horizontal scrolling between 0 and the measured content width', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Clamped',
+      enableHorizontalScroll: true,
+    });
+    const wideContent = dialog.contentWidth * 4;
+    addDemoContent(dialog, dialog.contentHeight, wideContent);
+    dialog.refresh();
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 1_000_000, 0);
+    expect(dialog.scrollX).toBe(dialog.maxScrollX);
+    expect(dialog.scrollContainer.x).toBeCloseTo(dialog.contentX - dialog.maxScrollX);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, -1_000_000, 0);
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
+  });
+
+  it('scrolls both axes independently and re-clamps them on refresh', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Both axes',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(dialog, dialog.contentHeight * 3, dialog.contentWidth * 4);
+    dialog.refresh();
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 10, 20);
+
+    expect(dialog.scrollX).toBeCloseTo(15);
+    expect(dialog.scrollY).toBeCloseTo(30);
+    expect(dialog.scrollContainer.x).toBeCloseTo(dialog.contentX - 15);
+    expect(dialog.scrollContainer.y).toBeCloseTo(dialog.contentY - 30);
+
+    dialog.refresh();
+    expect(dialog.scrollX).toBeCloseTo(15);
+    expect(dialog.scrollY).toBeCloseTo(30);
+
+    dialog.refresh(0, 0);
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.scrollY).toBe(0);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
+    expect(dialog.scrollContainer.y).toBe(dialog.contentY);
+  });
+
+  it('clips the scroll region to the content viewport when content overflows and clears the clip when it fits', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Clip' });
+    const clip = harness.lastClip();
+    expect(createClip).toHaveBeenCalledWith(harness.scene, dialog.scrollContainer);
+
+    addDemoContent(dialog, dialog.contentHeight * 2, dialog.contentWidth);
+    dialog.refresh();
+    expect(clip.setRect).toHaveBeenLastCalledWith({
+      x: dialog.contentX,
+      y: dialog.contentY,
+      w: dialog.contentWidth,
+      h: dialog.contentHeight,
+    });
+
+    dialog.refresh(dialog.contentHeight, dialog.contentWidth);
+    expect(clip.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('clips for horizontal overflow only when the dialog opts in', () => {
+    const defaultDialog = createOverlayDialog(harness.scene, { title: 'No clip' });
+    const defaultClip = harness.lastClip();
+    defaultDialog.refresh(10, defaultDialog.contentWidth * 4);
+    expect(defaultClip.setRect).not.toHaveBeenCalled();
+    expect(defaultClip.clear).toHaveBeenCalledTimes(1);
+
+    const wideDialog = createOverlayDialog(harness.scene, {
+      title: 'Wide clip',
+      enableHorizontalScroll: true,
+    });
+    const wideClip = harness.lastClip();
+    wideDialog.refresh(10, wideDialog.contentWidth * 4);
+    expect(wideClip.setRect).toHaveBeenCalledWith({
+      x: wideDialog.contentX,
+      y: wideDialog.contentY,
+      w: wideDialog.contentWidth,
+      h: wideDialog.contentHeight,
+    });
+  });
+
+  it('keeps the opt-in capability per-dialog (a default dialog still ignores dx)', () => {
+    const optIn = createOverlayDialog(harness.scene, {
+      title: 'Opted in',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(optIn, 10, optIn.contentWidth * 3);
+    optIn.refresh();
+
+    const defaulted = createOverlayDialog(harness.scene, { title: 'Defaulted' });
+    addDemoContent(defaulted, 10, defaulted.contentWidth * 3);
+    defaulted.refresh();
+
+    harness.wheel(defaulted.boxX + 5, defaulted.boxY + 5, 10, 0);
+
+    expect(defaulted.scrollX).toBe(0);
+    expect(defaulted.maxScrollX).toBe(0);
+    // The same wheel event did reach the opt-in dialog.
+    expect(optIn.scrollX).toBeCloseTo(15);
+  });
+
+  it('ignores wheel events outside the dialog box', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Bounds',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(dialog, dialog.contentHeight * 3, dialog.contentWidth * 4);
+    dialog.refresh();
+
+    harness.wheel(dialog.boxX - 20, dialog.boxY + 5, 10, 10);
+    harness.wheel(dialog.boxX + dialog.boxWidth + 20, dialog.boxY + 5, 10, 10);
+    harness.wheel(dialog.boxX + 5, dialog.boxY - 20, 10, 10);
+    harness.wheel(dialog.boxX + 5, dialog.boxY + dialog.boxHeight + 20, 10, 10);
+
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.scrollY).toBe(0);
+  });
+
+  it('detaches its wheel handler and destroys the clip on close', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Closable' });
+    const clip = harness.lastClip();
+    expect(harness.wheelHandlerCount()).toBe(1);
+
+    dialog.close();
+
+    expect(harness.wheelHandlerCount()).toBe(0);
+    expect(clip.destroy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createOverlayDialog measured-clamp memory', () => {
+  let harness: ReturnType<typeof mockDialogScene>;
+
+  beforeEach(() => {
+    harness = mockDialogScene();
+  });
+
+  it('re-clamps with the last supplied measurement when refresh() gets no arguments', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Measured',
+      enableHorizontalScroll: true,
+    });
+    // The child-position estimate would report ~10 px of content on both axes,
+    // i.e. "nothing to scroll"; the measured size must keep winning so a
+    // wheel-driven no-argument refresh cannot collapse the scroll offset.
+    addDemoContent(dialog, 10, 10);
+    dialog.refresh(dialog.contentHeight * 4, dialog.contentWidth * 4);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 40, 100);
+
+    expect(dialog.scrollY).toBeCloseTo(150);
+    expect(dialog.scrollX).toBeCloseTo(60);
+    expect(dialog.scrollContainer.y).toBeCloseTo(dialog.contentY - 150);
+    expect(dialog.scrollContainer.x).toBeCloseTo(dialog.contentX - 60);
+  });
+
+  it('accepts a replacement measurement and re-clamps against it', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Remeasured' });
+    addDemoContent(dialog, 10, 10);
+    dialog.refresh(dialog.contentHeight * 4);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 0, 200);
+    expect(dialog.scrollY).toBeGreaterThan(0);
+
+    // The content shrank back to the visible height: the new measurement wins
+    // over both the estimate and the previous measurement.
+    dialog.refresh(dialog.contentHeight);
+    expect(dialog.scrollY).toBe(0);
+    expect(dialog.scrollContainer.y).toBe(dialog.contentY);
+  });
+
+  it('estimates multi-line children from their own height, not a 22 px pitch', () => {
+    const dialog = createOverlayDialog(harness.scene, { title: 'Multi-line' });
+    dialog.scrollContainer.add({
+      x: 0,
+      y: 0,
+      width: 100,
+      // A pretty-printed payload row: ten 20 px lines.
+      height: dialog.contentHeight * 3,
+    } as unknown as Phaser.GameObjects.GameObject);
+
+    dialog.refresh();
+
+    expect(dialog.scrollY).toBe(0);
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 0, 100);
+    expect(dialog.scrollY).toBeCloseTo(150);
+  });
+});
+
+describe('createOverlayDialog content-width measurement', () => {
+  let harness: ReturnType<typeof mockDialogScene>;
+
+  beforeEach(() => {
+    harness = mockDialogScene();
+  });
+
+  it('derives maxScrollX from the content children when no width is supplied', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Estimated',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(dialog, 10, dialog.contentWidth * 2);
+
+    dialog.refresh();
+
+    expect(dialog.maxScrollX).toBe(dialog.contentWidth);
+  });
+
+  it('keeps maxScrollX at 0 when the content fits the visible width', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Fits',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(dialog, 10, dialog.contentWidth - 1);
+    dialog.refresh();
+
+    expect(dialog.maxScrollX).toBe(0);
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 50, 0);
+
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
+  });
+
+  it('re-clamps the horizontal offset when the content shrinks', () => {
+    const dialog = createOverlayDialog(harness.scene, {
+      title: 'Shrinks',
+      enableHorizontalScroll: true,
+    });
+    addDemoContent(dialog, 10, dialog.contentWidth * 3);
+    dialog.refresh();
+
+    harness.wheel(dialog.boxX + 5, dialog.boxY + 5, 100, 0);
+    expect(dialog.scrollX).toBeGreaterThan(0);
+
+    dialog.scrollContainer.removeAll(false);
+    addDemoContent(dialog, 10, dialog.contentWidth);
+    dialog.refresh();
+
+    expect(dialog.maxScrollX).toBe(0);
+    expect(dialog.scrollX).toBe(0);
+    expect(dialog.scrollContainer.x).toBe(dialog.contentX);
   });
 });

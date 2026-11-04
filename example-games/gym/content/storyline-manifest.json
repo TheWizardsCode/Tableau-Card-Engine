@@ -8,10 +8,10 @@
   "nodes": [
     {
       "id": "gym-story-end",
-      "name": "New Beginning",
+      "name": "Transport Infrastructure",
       "storylineId": "gym-story",
       "storylineTitle": "Gym Storyline",
-      "hasChoices": false,
+      "isChoice": false,
       "optionCount": 0,
       "options": [],
       "effect": "Gain 60 reputation",
@@ -28,7 +28,7 @@
       "name": "Neglected Roads",
       "storylineId": "gym-story",
       "storylineTitle": "Gym Storyline",
-      "hasChoices": true,
+      "isChoice": true,
       "optionCount": 2,
       "options": [
         {
@@ -58,7 +58,7 @@
       "name": "Public Investment",
       "storylineId": "gym-story",
       "storylineTitle": "Gym Storyline",
-      "hasChoices": true,
+      "isChoice": true,
       "optionCount": 2,
       "options": [
         {
@@ -88,7 +88,7 @@
       "name": "Town Meeting",
       "storylineId": "gym-story",
       "storylineTitle": "Gym Storyline",
-      "hasChoices": true,
+      "isChoice": true,
       "optionCount": 2,
       "options": [
         {

@@ -154,6 +154,9 @@ an explicit path; default `core-only`):
 
 ```bash
 npm run build                       # default preset: core-only (Gym only)
+                                    # (runs `prebuild`: the node-safe `@ui`
+                                    #  import-graph check first — see
+                                    #  "Phaser-free `@ui` helper imports")
 GAMES_CONFIG=solo npm run build     # one game (configs/solo.json)
 GAMES_CONFIG=arcade npm run build   # a small subset (configs/arcade.json)
 GAMES_CONFIG=deluxe npm run build   # a different subset (configs/deluxe.json)
@@ -1419,9 +1422,9 @@ The core engine ships a game-agnostic story-line **content** toolkit
 (`src/story-line/content/`): CSV parse/serialise + checksum, a deterministic
 manifest/Mermaid generator, a static validator and one transactional author
 API. A game plugs in only data — a content adapter mapping its CSV columns onto
-the generic story-line fields (`id`, `name`, `effect`, choice flag,
-accept/reject or `options`, storyline id/title); every other column is carried
-as a game column. Core ships the Gym adapter as the default.
+the generic story-line fields (`id`, `name`, `effect`, `options`, storyline
+id/title); every other column is carried as a game column. Core ships the Gym
+adapter as the default.
 
 Three `tsx` CLIs expose the seams (no Vite loader, no game import):
 
@@ -1469,9 +1472,12 @@ npm run storylines:editor -- --help
 - `--adapter` is a **shipped adapter id** (`gym`, the default) or a module
   path/specifier whose default (or `adapter` / `contentAdapter`) export is a
   `ContentAdapter` — the same declarative column mapping the CLIs use.
-- `--port` / `--host` default to `5174` and `127.0.0.1`; the tool is loopback-only
-  by design. The command exits `0` on `--help` and `1` on a bad option, an
-  unknown adapter, unreadable content or a host failure.
+- `--port` / `--host` default to `5174` and `127.0.0.1` (loopback); a **valueless**
+  `--host` binds all interfaces (`0.0.0.0`, Vite's convention). On startup every
+  resolved URL is printed (local and network), and a non-loopback bind warns that
+  the editor is reachable from the network and can write the loaded content CSV
+  (it has no authentication). The command exits `0` on `--help` and `1` on a bad
+  option, an unknown adapter, unreadable content or a host failure.
 
 The host reads the CSV **through the content adapter**, builds the deterministic
 manifest and serves it at `/manifest.json` from memory (`scripts/storyline-editor-server.ts`
@@ -1824,24 +1830,58 @@ Node, no `window`) must **not** pull Phaser (or a Phaser-bearing module such
 as `@ui/Renderer`) at evaluation time; a reintroduced value import fails every
 downstream game unit suite with `window is not defined` (CG-0MVQQ2M8E003FQMZ).
 
+#### The authoritative list: the node-safe manifest
+
+The machine-readable, single source of truth is
+[`src/ui/node-safe-modules.ts`](../src/ui/node-safe-modules.ts)
+(`uiNodeSafeModules`, `CG-0MVS9HBN3009HIQN`). It is a **curated, opt-in
+promise** — not a completeness snapshot of `src/ui`: every listed module is
+guaranteed importable in a plain Node environment, and *nothing else in
+`src/ui` is promised, even if it happens to be Phaser-free right now*.
+
+> **Look it up in the manifest; if it is not listed, treat it as
+> Phaser-bearing.** Do not probe with an ad-hoc `vite-node` import — the list
+> is checkable, and an unlisted module may gain a Phaser value import at any
+> time.
+
+The promise is enforced twice, both consuming the same manifest so they can
+never disagree about *which* modules are promised:
+
+| Mechanism | Command | What it proves |
+|-----------|---------|----------------|
+| Static import-graph check (`scripts/check-ui-node-surface.ts`, `CG-0MVTVT3TX0004PIW`) | `npm run check:ui-node-surface` | For every manifest entry, the *whole* import graph (relative specifiers, `tsconfig.json` path aliases, `export … from`, dynamic `import()`) is walked; a transitive **value** import of `phaser` is a violation naming the module and the full chain (`src/ui/X.ts → src/ui/constants.ts → phaser`). Type-only edges are elided and ignored. Fail-closed on unresolvable specifiers, missing modules and unreadable manifests. |
+| Runtime guard (`tests/ui/phaser-free-imports.test.ts`) | unit profile | Every manifest entry is imported under a **file-scoped** `vi.mock('phaser', …)` whose factory throws, plus a negative control asserting `@ui/Renderer` fails under the same mock — so a reintroduced Phaser import fails loudly at evaluation time. The mock must stay file-scoped (never in a global setup file). |
+
+**Hard gate.** `package.json` wires the static check as
+`"prebuild": "npm run check:ui-node-surface"`, so every `npm run build` — the
+build step the implementation gate, the dev-push path and PR CI execute —
+begins with the static check and cannot build a tree that has broken a
+node-safe module. The check is pure static analysis (no bundler, no network,
+less than a second), so the friction is negligible.
+
+**Adding a module to the surface** (`CG-0MVTVTCT7003KNXP`):
+
+1. Add the module basename (no `src/ui/` prefix, no `.ts`) to
+   `uiNodeSafeModules` in `src/ui/node-safe-modules.ts`, with a one-line
+   rationale comment saying what it is and why it must stay framework-free.
+2. Run `npm run check:ui-node-surface`. If the check reports the module (or a
+   module it reaches) as Phaser-bearing, **drop it from the manifest** — do not
+   edit the module to accommodate the list (that changes a runtime import graph
+   and belongs in its own work item).
+3. Run the unit profile so `tests/ui/phaser-free-imports.test.ts` also imports
+   the new entry under the throwing mock. The guard is manifest-driven: a
+   manifest addition widens it automatically.
+
 Rules of thumb:
 
-- **Import deep, Phaser-free paths in Node tests:** `@ui/shakeIllegalMove`,
-  `@ui/dragDrop`, `@ui/illegalMoveToastView` and `@ui/illegalMoveToast` are
-  explicitly node-safe; other `@ui` modules (e.g. `@ui/screen-layout`,
-  `@ui/constants`) are also Phaser-free. When in doubt, probe with a readonly
-  `vite-node` import before relying on it.
+- **Import deep, Phaser-free paths in Node tests** — an entry that is in the
+  manifest, imported by its deep path (for example `@ui/shakeIllegalMove`,
+  `@ui/dragDrop`, `@ui/illegalMoveToastView`, `@ui/illegalMoveToast`,
+  `@ui/screen-layout`, `@ui/constants`).
 - **Do not add a Phaser value import to a node-safe helper.** Type-only usage
   (`import type Phaser from 'phaser'`) is fine and elided at compile time; a
   value import (or an import of a module like `@ui/Renderer` that evaluates
   Phaser at module scope) is not.
-- **Guard:** `tests/ui/phaser-free-imports.test.ts` imports every
-  framework-free entry point under a **file-scoped** `vi.mock('phaser', …)`
-  whose factory throws, plus a negative control asserting `@ui/Renderer` fails
-  under the same mock — so a reintroduced Phaser import fails loudly. The mock
-  must stay file-scoped (never in a global setup file).
-- **Documented surface:** the broader documented Phaser-free node surface and
-  a static import-graph check are tracked in `CG-0MVS9HBN3009HIQN`.
 
 ## Path Aliases
 
@@ -2160,11 +2200,115 @@ checkout; engine imports resolve through the path aliases
 (`@core-engine/*`, `@card-system/*`, `@rule-engine/*`, `@ui/*`, `@ai/*`,
 `@balance-cards/*`, `@core-scripts/*`, `@core-tests/*`, `@core-gym/*`) rather
 than the removed `src`/`scripts`/`example-games/gym`/`tests/helpers`
-symlinks. Game tests that referenced `example-games/<game>/…` are repointed to
-`src/…`, and core-owned CLI/core-layer references to `core/scripts/…` and
-`core/src/…`. See
+symlinks. Game tests that referenced `example-games/<game>/…` can be
+repointed to `src/…`, and core-owned CLI/core-layer references to
+`core/scripts/…` and `core/src/…`, by the **opt-in** game-tree migration
+(`--migrate-game-paths`, below). See
 [Multi-Repo Architecture](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
 and the [layout decision record](dev/per-game-src-layout-decision.md).
+
+#### Committed hooks and the context budget
+
+A real scaffold run also makes the generated repo's committed git hooks
+**active** and gives it a measured startup-context budget
+(CG-0MW0KURL8002XOV9):
+
+- `.githooks/` is copied **verbatim** from the core checkout — the core is the
+  single source of truth, so the unified `pre-push` hook (branch policy,
+  context budget, the full-suite gate for `dev`/`main`, worklog sync) reaches
+  every game repo with no forked copy to drift;
+- the generated repo's **local** `core.hooksPath` is set to `.githooks`, and the
+  run reports the outcome (`hooksPath` in `--json`, a `hooks:` line otherwise);
+- `docs/dev/context-budget.thresholds.json` is measured from the **game repo's**
+  own surface (`measure_context.py --generate-thresholds`), with
+  `scripts/refresh-context-thresholds.sh` and a short
+  `docs/dev/context-budget.md` note written beside it;
+- the new entries ride the same write gating as every other generated file
+  (`create` / `unchanged` / `skip-local`, `--only`, `--force`, `--dry-run`).
+
+When the measurement tooling is unavailable the run **fails open**: no
+thresholds file is written (never a zeroed guess) and the report names the
+remedy. A `--dry-run` or `--only` run classifies the files without configuring
+`core.hooksPath`.
+
+`core.hooksPath` is **local** config, so a **fresh clone still needs one
+activation step** — `git config core.hooksPath .githooks` (or the framework's
+`scripts/install_pi.sh`). Without it git silently uses `.git/hooks/` and none of
+the committed gates run. See
+[Startup Context Budget](dev/context-budget.md#scaffolded-game-repos).
+
+#### Write gating: `--dry-run`, `--only`, `--force` and `--migrate-game-paths`
+
+Every run classifies each generated file before writing it, and reports the
+classification (`create` / `update` / `unchanged` / `skip-local`) as one line
+per file, or as the `files` array under `--json`. A generated file lives in a
+checkout that owns its own wiring, so the write itself is gated
+(CG-0MVWGJPPA000GBE7):
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Classify only: no file write, no `core` symlink, no asset/app-icon link and no game-tree path rewrite. The report is exactly what the real run would apply. |
+| `--only <file,...>` | Regenerate **only** the named generated paths (`main.ts`, `configs/game.json`, …; comma-separated, literal names, no globs). Every other generated file is left alone (`skip-local`, or `unchanged` when it already matches) and the run performs no non-file side effect. An unknown name fails the run (exit 1) with the valid-path list, writing nothing. |
+| `--force` | Overwrite a **selected** file whose content differs from the template. Without it that file classifies `skip-local` and is left untouched, so a hand edit is never silently lost. |
+| `--migrate-game-paths` | Opt in to the game-tree **migration**: rewrite `example-games/<game>/` → `src/` (and the quoted-`scripts/`, core-`src/` and relative-`scripts/` references) in the game's own `tests/` and `src/` trees. **Off by default** — a routine re-scaffold must never edit a consumer's tests or source, and a fresh repo already has the `src/` layout from `extract-repos.sh --path-rename`. Only a file that genuinely references `example-games/<game>/` is touched, so a drift guard's own `STALE_PREFIX`, a run-tests import or a documented local edit stays byte-identical. Every affected file is reported in `rewritten` and in the `migrations` report (with the rewrites that apply); `--migrate-game-paths --dry-run` writes nothing and reports the files a real migration would rewrite. Cannot be combined with `--only`, which promises "no rewrite" — passing both fails fast (exit 1) before any write (CG-0MVWGJRIO0094Y4Z). |
+
+Back-compatibility: with **no** `--only` a run is a full run and force is
+implied (`effectiveForce = force || only === undefined`) — the eight sibling
+`tce-<game>` repos rely on a plain full run to receive template updates. A
+full run is therefore *not* safe to fire blindly at a live checkout you have
+hand-edited: use `--only` (plus `--force` when you mean to overwrite) or
+preview with `--dry-run`/`--json` first.
+
+```bash
+tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
+  --core-root ../Tableau-Card-Engine --only main.ts,configs/game.json --dry-run
+tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
+  --core-root ../Tableau-Card-Engine --only main.ts --force
+# Preview (then apply) a game-tree path migration: no writes on --dry-run.
+tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
+  --core-root ../Tableau-Card-Engine --migrate-game-paths --dry-run
+tsx scripts/game-repo-scaffold.ts --game golf --game-repo-root ../tce-golf \
+  --core-root ../Tableau-Card-Engine --migrate-game-paths
+```
+
+Consumer pattern — from **inside** an existing game repo whose engine is the
+`./core` submodule, refresh one hand-edited generated file:
+
+```bash
+tsx core/scripts/game-repo-scaffold.ts \
+  --game main-street --game-repo-root . --core-root ./core \
+  --only main.ts --force
+```
+
+Run it with `--dry-run --json` first to see the per-file classification
+(`create` / `update` / `unchanged` / `skip-local`) before anything is written.
+
+#### Renderer the scaffold emits: `Phaser.AUTO`
+
+The generated `main.ts` boots `createCardGame({ type: Phaser.AUTO, … })`, and
+the core repo's own `main.ts` does the same (CG-0MVTQ3WPV003ZECA). `AUTO` means
+**WebGL when the browser offers a WebGL context, Canvas otherwise** — so a GPU
+browser keeps Phaser 4's Filter pipeline (including the Mask filter that
+replaces the Canvas-only `GeometryMask`) while a WebGL-less browser still
+renders. Forcing `Phaser.CANVAS` would silently drop that pipeline for every
+player: `GeometryMask` is Canvas-only, so the WebGL clip path never runs, and
+game code that assumes a Filter renderer (shaders, masks, blend passes) would
+quietly no-op. See [Per-game repo scaffold](dev/multi-repo-architecture.md#5-per-game-repo-scaffold-f4)
+and `src/ui/createCardGame.ts` (whose `type` option documents the same default).
+The renderer-dependent clipping contract that follows from this is documented in
+[Renderer-Aware Clipping (`ContainerClip`)](ui/renderer-aware-clipping.md) —
+including the downstream switch-over (Main Street item `MS-0MVTMJ2GA008GRZ7`,
+now completed) that re-pinned a game repo to the core commits delivering the
+helper.
+
+**Tests are the deliberate exception.** `src/core-engine/TestGamePool.ts`
+pins `TEST_RENDER_TYPE` to `Phaser.CANVAS` (use `withTestRenderer(options)`),
+because headless CI runs WebGL through SwiftShader at ~10x the cost of
+Canvas2D; `tests/core-engine/TestGamePool.test.ts` asserts that pin so a later
+"unification" cannot quietly force WebGL onto the suite. A browser test that
+really needs a GPU renderer opts in explicitly through
+`tests/helpers/bootRendererScene.ts`, which fails loudly if the requested
+renderer is unavailable rather than passing on a Canvas fallback.
 
 ### Engine sync/verify scripts in generated game repos
 
@@ -2196,6 +2340,39 @@ scripts (MS-0MVCRGKZY007DIED), under one explicit policy
   the pin. Both are hard failures; only the diagnosis and next steps differ.
 - `build` / `build:electron` run `engine:sync` first; `build:release` runs
   `engine:verify` instead.
+- `engine:dev-sync` — **soft** sync used by the interactive dev start only
+  (`dev: "npm run engine:dev-sync && vite --host"`, CG-0MVZJ35EV00690W5). It is
+  the same code path as `engine:sync` with one difference: a dirty `./core` is
+  **skipped with a loud warning** (`exit 0`, `skipped: 'dirty'`, no git
+  operation, no pin write) instead of failing, so the dev server boots on a
+  developer's working tree. Use it when you want "serve the current engine
+  `dev` tip, but never block or clobber me"; never wire it into a build or
+  release gate — those must fail loudly on a dirty submodule. Note that on a
+  **clean** checkout a dev start behaves exactly like `engine:sync`: it may
+  advance `./core` and stage the pin + gitlink together, which is then
+  committed as a composition bump naming the engine SHA.
+
+Rule of thumb: `engine:sync` for anything that ends in a commit or a build,
+`engine:dev-sync` for an interactive dev server, `engine:verify` for a
+release build.
+
+**Consumer wiring (rendered == committed).** The scaffold renders these two
+entries (`scripts/game-repo-scaffold.ts`), and the live consumer commits exactly
+those values, so the contract is checkable from this repository without reading
+the game repo (CG-0MVZJ35EV00690W5 AC6):
+
+```json
+"dev": "npm run engine:dev-sync && vite --host",
+"engine:dev-sync": "node ./core/scripts/engine-sync.mjs sync --soft"
+```
+
+`dev` renders as `npm run engine:dev-sync && vite --host` and
+`engine:dev-sync` as `node ${coreRel}/scripts/engine-sync.mjs sync --soft`, which
+is `./core` for a `./core`-submodule checkout — byte-identical to
+`tce-main-street/package.json` at `a5c8ccc1`. The engine-side declaration of the
+same contract is verified by `npm run build`
+(`check:ui-node-surface` → `tsc --noEmit` → `vite build`) exiting 0 on the
+engine tree at `d46eb242`.
 
 The script is the engine-owned `scripts/engine-sync.mjs` (+ `.d.mts` types),
 invoked through the submodule — game repos have no root `scripts/` tree
@@ -4374,6 +4551,23 @@ See CG-0MSTB03U6009J2WV for the original bug report.
 
 The engine provides a collection of reusable HUD (heads-up display) components under `src/ui/` that standardise overlay, sidebar, and button UI across all example games. These components are exported via the core-engine public API (`src/ui/index.ts`) and are consumed through adapter modules in each game.
 
+### Renderer-Aware Clipping (`ContainerClip`)
+
+Scrollable and panned regions are clipped through the shared
+`createContainerClip()` helper from `@ui` (`src/ui/ContainerClip.ts`), **not** a
+bare `GeometryMask`. Phaser 4's WebGL renderer no longer supports
+`GameObject.setMask`: `GeometryMask` is Canvas-only, so a `setMask` call on
+WebGL warns and no-ops, leaving the content unclipped. The helper applies a
+`GeometryMask` on Canvas (unchanged behaviour) and a **Mask filter** on WebGL
+(opaque, off-display-list Graphics), with a screen-space clip that stays fixed
+while the clipped content pans. `HelpPanel`, `SettingsPanel` and the scrolling
+overlay dialog all use it, and each owns its clip's `destroy()`.
+
+See [Renderer-Aware Clipping (`ContainerClip`)](ui/renderer-aware-clipping.md)
+for the full restriction, the helper contract (`setRect`/`clear`/`destroy`),
+teardown ownership, the do-not list, and how it is verified with
+`renderer.snapshotPixel()` probes under a forced `Phaser.WEBGL` boot.
+
 ### Help Panel
 
 The `HelpPanel` class provides a slide-in left sidebar that displays game rules, controls, and tips. It accepts an array of `HelpSection` objects, each with a `heading` and either `body` (plain text) or `render` (custom Phaser renderer) for rich content.
@@ -4400,6 +4594,18 @@ helpPanel.toggle(); // Toggle open/closed
 - Help button: 1101
 
 **Input blocking:** When open, the panel creates a full-screen transparent interactive rectangle that captures pointer events. Closing the panel removes this blocker.
+
+**Scroll clipping:** when the sections overflow the panel, the scrollable
+content is clipped by the renderer-aware `createContainerClip()` helper
+(`@ui/ContainerClip`) — a `GeometryMask` on the Canvas renderer and a Mask
+filter on WebGL, because Phaser 4's `GameObject.setMask` is Canvas-only
+(`src/ui/ContainerClip.ts`; see
+[Renderer-Aware Clipping](ui/renderer-aware-clipping.md)). The clip is
+re-applied on every scroll step and on every frame of the slide animation (so
+it tracks the panel's x position), is `clear()`ed rather than shrunk when the
+content fits, and is torn down by `HelpPanel.destroy()`. The Mask filter keeps its Graphics off the display list
+(so it is not drawn over the scene), which is why `getSceneChildren()` only
+reports that Graphics on Canvas.
 
 ### Help Button
 
@@ -4434,6 +4640,13 @@ settingsPanel.toggle(); // Toggle open/closed
 ```
 
 **Depth conventions:** Same as HelpPanel (blocker 900, background 901, etc.). Settings button at depth 1102.
+
+**Scroll clipping:** when the stacked controls exceed the canvas height, the
+scrollable content is clipped to the panel's visible area through the same
+renderer-aware `createContainerClip()` helper HelpPanel uses (`GeometryMask` on
+Canvas, Mask filter on WebGL). The clip is tracked on the panel and released by
+`SettingsPanel.destroy()`, so neither an orphaned mask Graphics nor an active
+filter outlives the panel.
 
 ### Settings Button
 
@@ -4531,6 +4744,53 @@ const { background, box, objects } = createOverlayBackground(
 // Later, dismiss the overlay
 dismissOverlay(objects);
 ```
+
+### Overlay Dialog (scrolling)
+
+`createOverlayDialog` builds the standard modal dialog — backdrop, title, close
+button, and a scrollable content area — and is the recommended way to build
+info panels, debug tools, and confirmation dialogs. It is **vertical-only by
+default**; the horizontal axis is **opt-in per dialog**, so the ~10 existing
+callers are unaffected.
+
+```typescript
+import { createOverlayDialog } from '@ui/Overlay';
+
+const dialog = createOverlayDialog(scene, {
+  title: 'Game Events',
+  enableHorizontalScroll: true, // opt in (default: false)
+});
+
+dialog.scrollContainer.add(wideText); // position content relative to (0, 0)
+// Content size drives both clamps: height first, then width.
+dialog.refresh(wideText.y + wideText.height, wideText.width);
+```
+
+**Scroll contract:**
+
+- `refresh(totalContentHeight?, totalContentWidth?)` clamps `scrollY` to
+  `max(0, height - contentHeight)` and — only when opted in — `scrollX` to
+  `max(0, width - contentWidth)`. A caller-supplied measurement is
+  **remembered**: a later no-argument `refresh()` (the one the wheel handler
+  runs after every scroll step) re-uses it instead of falling back to the
+  child-position estimate, so a measured clamp never collapses mid-scroll.
+  Before any measurement is supplied the size is estimated from the children
+  already in `scrollContainer` (each child's `y` + its own height — a text
+  object's full multi-line height — or a 22 px row pitch when the child
+  reports no height).
+- The bounds-checked wheel handler scales `dx` and `dy` by 1.5 and ignores
+  `dx` entirely unless the dialog opted in, so a default dialog behaves
+  exactly as before and wheel input never leaks to overlays beneath.
+- `handle.scrollX` and `handle.maxScrollX` expose the horizontal axis;
+  `maxScrollX` is always `0` for a vertical-only dialog. The two axes are
+  independent and each is re-clamped on `refresh()`.
+- The scroll clip stays fixed in scene space over the visible content
+  rectangle; only the scroll container translates. It is applied when either
+  axis overflows and cleared when neither does. Clipping goes through the
+  renderer-aware `createContainerClip()` helper (`GeometryMask` on Canvas, Mask
+  filter on WebGL — `GameObject.setMask` is Canvas-only in Phaser 4; see
+  [Renderer-Aware Clipping](ui/renderer-aware-clipping.md)), and
+  `handle.close()` destroys it with the other overlay objects.
 
 ### Overlay Manager
 
@@ -4823,18 +5083,40 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
 - **Location:** Debug Tools section of the Settings panel
 - **Function:** Opens a scrollable overlay showing a live feed of events
   emitted by the `GameEventEmitter` during gameplay. Features include:
-  - **Live feed:** Each event displays an ISO timestamp, event name (e.g.,
-    `turn-started`, `turn-completed`, `state-settled`, `card-drawn`), and a
-    truncated view of the event payload.
-  - **Auto-scroll:** Newest events appear at the bottom and are shown
-    automatically.
-  - **Clear button:** Removes all entries from the feed.
-  - **Pause/Resume:** Toggles whether new events are added to the feed.
+  - **Live feed:** Each event renders a one-line
+    `timestamp [eventName]` header followed by the event's **complete**
+    payload as 2-space-indented JSON (`JSON.stringify(payload, null, 2)`).
+    Nothing is truncated, so a full payload is readable without leaving the
+    game or opening the browser devtools.
+  - **No word wrap:** Payload lines are never soft-wrapped — each
+    pretty-printed JSON line stays on exactly one line.
+  - **Horizontal scrolling:** Lines wider than the dialog stay on one line
+    and are reachable by scrolling sideways. This overlay is the only caller
+    that opts into the shared dialog's `enableHorizontalScroll`; vertical
+    scrolling keeps working and the two axes are independent.
+  - **Safe fallbacks:** Non-serialisable payloads never break the feed — a
+    circular reference becomes `[Circular]`, and `undefined`/primitives/failed
+    serialisations fall back to `String(payload)`. One bad payload cannot stop
+    the remaining events rendering.
+  - **Clear button:** Empties the **feed** (not the buffer). The cleared feed
+    stays empty across the 500 ms poll tick — the overlay only appends events
+    recorded *after* the clear — so a clear is never undone half a second
+    later.
+  - **Pause/Resume:** Freezes the feed while paused: no rows are appended and
+    the `Status: PAUSED` line is not overwritten by a poll tick. Resuming
+    appends everything recorded while paused (the buffer is the source of
+    truth, so a pause never loses events).
 - **Event source:** Subscribes to the `GameEventEmitter` instance exposed on
   `window.__GAME_EVENTS__` (set up automatically by `CardGameScene`).
 - **Use case:** Monitor event flow during gameplay for debugging event-driven
   interactions or replays.
-- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts`
+- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts` renders one text
+  object per event (header + pretty JSON, measured row offsets, no `wordWrap`);
+  the pure, Phaser-free formatting helpers (`formatEventLogEntry`,
+  `stringifyPayloadSafe`, `widestLineLength`) live in
+  `src/ui/debug/formatEventLog.ts` and are re-exported from `@ui/debug`.
+  Horizontal reachability comes from `createOverlayDialog`'s opt-in
+  `enableHorizontalScroll` (see [Overlay Dialog (scrolling)](#overlay-dialog-scrolling)).
 
 #### AI Decisions
 

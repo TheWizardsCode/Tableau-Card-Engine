@@ -13,9 +13,21 @@
  * interacting with it never round-trips to the host.
  *
  * Everything the browser tests assert is exposed deliberately: `data-node-id`
- * and `data-edge` markers, `data-cycle` / `data-has-choices` flags, a
+ * and `data-edge` markers, `data-cycle` / `data-is-choice` flags, a
  * `getTransform()` accessor and the `zoomBy`/`panBy`/`resetView`/`fitToView`
  * controls that back the toolbar buttons.
+ *
+ * **One coordinate system.** The SVG deliberately declares **no `viewBox`**:
+ * SVG user units are then 1:1 with CSS pixels, so the pan/zoom transform is the
+ * only scaling in play. An earlier revision set `viewBox` to the graph's own
+ * bounding box and left the transform on top of it, which produced two
+ * independent scales: `preserveAspectRatio` grew the element to its intrinsic
+ * aspect-ratio height (making the graph huge and the page scroll for screens),
+ * fit-to-view then multiplied that scale again (nothing visible), and zoom
+ * origins were computed in CSS pixels but applied in graph units (the view
+ * jumped away from the pointer). Geometry helpers below therefore work in one
+ * space — CSS pixels — and {@link EditorGraphTransform} is that space's
+ * translate/scale.
  *
  * @module
  */
@@ -27,7 +39,7 @@ import type {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-/** Rendered node width in graph units. */
+/** Rendered node width in graph units (CSS pixels — see the module note). */
 export const NODE_WIDTH = 190;
 /** Rendered node height in graph units. */
 export const NODE_HEIGHT = 72;
@@ -35,12 +47,24 @@ export const NODE_HEIGHT = 72;
 export const COLUMN_GAP = 120;
 /** Vertical gap between rows within a column. */
 export const ROW_GAP = 38;
+/**
+ * Rows a story-line group may stack before it wraps into another sub-column.
+ *
+ * One uncapped column per group makes a large "ungrouped" bucket (Main Street
+ * has ~164 non-storyline cards) a single enormously tall column that cannot be
+ * fitted usefully. Wrapping keeps every group a readable block.
+ */
+export const MAX_ROWS_PER_COLUMN = 10;
+/** Horizontal gap between the wrapped sub-columns of one story-line group. */
+export const SUB_COLUMN_GAP = 76;
 /** Outer padding around the graph. */
 export const GRAPH_PADDING = 56;
 /** Length of the stub drawn for an option whose chain ends. */
 export const TERMINAL_STUB = 72;
+/** Padding kept between the graph and the viewport edge by `fitToView()`. */
+export const FIT_PADDING = 24;
 /** Smallest zoom factor the renderer allows. */
-export const MIN_SCALE = 0.2;
+export const MIN_SCALE = 0.05;
 /** Largest zoom factor the renderer allows. */
 export const MAX_SCALE = 4;
 
@@ -79,6 +103,8 @@ export interface EditorGraphTransform {
 export interface EditorGraphRendererOptions {
   /** Called whenever the selected node changes (`null` when cleared). */
   readonly onSelect?: (nodeId: string | null) => void;
+  /** Called on mount and whenever the pan/zoom transform changes. */
+  readonly onTransformChange?: (transform: EditorGraphTransform) => void;
 }
 
 /** The mounted renderer's handle. */
@@ -95,11 +121,11 @@ export interface EditorGraphRenderer {
   selectNode(nodeId: string | null): void;
   /** Zooms around the viewport centre. */
   zoomBy(factor: number): void;
-  /** Translates the viewport by graph units. */
+  /** Translates the viewport by CSS pixels. */
   panBy(dx: number, dy: number): void;
-  /** Restores the identity transform. */
+  /** Restores 100% zoom, centred on the graph. */
   resetView(): void;
-  /** Fits the whole graph into the viewport width. */
+  /** Fits the whole graph into the viewport, with padding. */
   fitToView(): void;
   /** Returns the current translate/scale transform. */
   getTransform(): EditorGraphTransform;
@@ -118,8 +144,11 @@ function svgEl<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameM
 }
 
 /**
- * Lays the view model out deterministically: one column per story-line group
- * (group order preserved), one row per card within the group.
+ * Lays the view model out deterministically: one block per story-line group
+ * (group order preserved), one row per card within the block. A block stacks at
+ * most {@link MAX_ROWS_PER_COLUMN} rows and then wraps into another sub-column,
+ * so a large group stays a readable, fittable block instead of one very tall
+ * column.
  *
  * @param viewModel The editor view model.
  * @returns Node positions, column metadata and the graph's bounding size.
@@ -128,26 +157,36 @@ export function layoutEditorGraph(viewModel: EditorViewModel): EditorGraphLayout
   const positions = new Map<string, EditorGraphNodePosition>();
   const columns: EditorGraphColumn[] = [];
   let maxRows = 0;
+  let cursorX = GRAPH_PADDING;
 
-  viewModel.storylines.forEach((group, columnIndex) => {
-    const x = GRAPH_PADDING + columnIndex * (NODE_WIDTH + COLUMN_GAP);
-    maxRows = Math.max(maxRows, group.nodes.length);
-    group.nodes.forEach((node, rowIndex) => {
-      positions.set(node.id, { node, x, y: GRAPH_PADDING + rowIndex * (NODE_HEIGHT + ROW_GAP) });
+  viewModel.storylines.forEach((group) => {
+    const subColumns = Math.max(1, Math.ceil(group.nodes.length / MAX_ROWS_PER_COLUMN));
+    const groupWidth = subColumns * NODE_WIDTH + (subColumns - 1) * SUB_COLUMN_GAP;
+    maxRows = Math.max(maxRows, Math.min(MAX_ROWS_PER_COLUMN, group.nodes.length));
+
+    group.nodes.forEach((node, index) => {
+      const subColumn = Math.floor(index / MAX_ROWS_PER_COLUMN);
+      const rowIndex = index % MAX_ROWS_PER_COLUMN;
+      positions.set(node.id, {
+        node,
+        x: cursorX + subColumn * (NODE_WIDTH + SUB_COLUMN_GAP),
+        y: GRAPH_PADDING + rowIndex * (NODE_HEIGHT + ROW_GAP),
+      });
     });
+
     columns.push({
       storylineId: group.storylineId,
       title: group.title,
-      x,
-      width: NODE_WIDTH,
+      x: cursorX,
+      width: groupWidth,
       nodeIds: group.nodeIds,
     });
+
+    cursorX += groupWidth + COLUMN_GAP;
   });
 
-  const columnCount = Math.max(1, columns.length);
   const rowCount = Math.max(1, maxRows);
-  const width =
-    GRAPH_PADDING * 2 + columnCount * NODE_WIDTH + (columnCount - 1) * COLUMN_GAP + TERMINAL_STUB;
+  const width = cursorX - COLUMN_GAP + GRAPH_PADDING + TERMINAL_STUB;
   const height = GRAPH_PADDING * 2 + rowCount * NODE_HEIGHT + (rowCount - 1) * ROW_GAP;
 
   return { positions, columns, width, height };
@@ -238,8 +277,8 @@ export function createGraphRenderer(
   const svg = svgEl('svg');
   svg.setAttribute('class', 'editor-graph-svg');
   svg.setAttribute('data-role', 'graph-svg');
-  svg.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  // No `viewBox`: user units are CSS pixels, one coordinate system (see the
+  // module note). The element fills its container via RENDERER_STYLES.
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', `Story-line graph for ${viewModel.gameId}`);
 
@@ -252,12 +291,16 @@ export function createGraphRenderer(
   viewport.setAttribute('data-role', 'graph-viewport');
   svg.append(viewport);
 
+  // In the document before measuring: `fitToView()` needs the real size.
+  container.append(svg);
+
   let transform: EditorGraphTransform = { scale: 1, x: 0, y: 0 };
   const applyTransform = (): void => {
     viewport.setAttribute(
       'transform',
       `translate(${round(transform.x)} ${round(transform.y)}) scale(${round(transform.scale)})`,
     );
+    options.onTransformChange?.({ ...transform });
   };
   applyTransform();
 
@@ -354,7 +397,7 @@ export function createGraphRenderer(
   const nodeElements = new Map<string, SVGGElement>();
   for (const position of layout.positions.values()) {
     const { node, x, y } = position;
-    const classes = ['graph-node', node.hasChoices ? 'node--choice' : 'node--incident'];
+    const classes = ['graph-node', node.isChoice ? 'node--choice' : 'node--incident'];
     if (node.inCycle) classes.push('node--cycle');
 
     const group = svgEl('g');
@@ -362,11 +405,11 @@ export function createGraphRenderer(
     group.setAttribute('transform', `translate(${x} ${y})`);
     group.setAttribute('data-node-id', node.id);
     group.setAttribute('data-role', 'graph-node');
-    group.setAttribute('data-has-choices', String(node.hasChoices));
+    group.setAttribute('data-is-choice', String(node.isChoice));
     group.setAttribute('data-in-cycle', String(node.inCycle));
     group.setAttribute('data-storyline-id', node.storylineId ?? '');
 
-    if (node.hasChoices) {
+    if (node.isChoice) {
       const shape = svgEl('polygon');
       shape.setAttribute('class', 'node-shape');
       shape.setAttribute(
@@ -402,9 +445,9 @@ export function createGraphRenderer(
     const kind = svgEl('text');
     kind.setAttribute('class', 'node-kind');
     kind.setAttribute('x', String(NODE_WIDTH / 2));
-    kind.setAttribute('y', String(node.hasChoices ? NODE_HEIGHT - 16 : NODE_HEIGHT - 10));
+    kind.setAttribute('y', String(node.isChoice ? NODE_HEIGHT - 16 : NODE_HEIGHT - 10));
     kind.setAttribute('text-anchor', 'middle');
-    kind.textContent = node.hasChoices ? `CHOICE · ${node.optionCount}` : 'INCIDENT';
+    kind.textContent = node.isChoice ? `CHOICE · ${node.optionCount}` : 'INCIDENT';
     group.append(kind);
 
     group.addEventListener('click', () => {
@@ -414,8 +457,6 @@ export function createGraphRenderer(
     nodeLayer.append(group);
     nodeElements.set(node.id, group);
   }
-
-  container.append(svg);
 
   // ── Selection ──────────────────────────────────────────────
   let selectedNodeId: string | null = null;
@@ -431,19 +472,43 @@ export function createGraphRenderer(
   }
 
   // ── Pan / zoom ─────────────────────────────────────────────
-  function zoomAt(factor: number, originX: number, originY: number): void {
-    const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, transform.scale * factor));
-    const ratio = nextScale / transform.scale;
-    transform = {
-      scale: nextScale,
-      x: originX - (originX - transform.x) * ratio,
-      y: originY - (originY - transform.y) * ratio,
+  //
+  // Every value here is in CSS pixels (the same space as the layout), so a
+  // cursor position, a viewport centre and a transform offset are directly
+  // comparable — the source of the earlier "zoom runs away from the pointer"
+  // behaviour was mixing client pixels with viewBox units.
+
+  /** The SVG's current on-screen size, with the layout as a safe fallback. */
+  function viewportSize(): { width: number; height: number } {
+    const rect = svg.getBoundingClientRect();
+    return {
+      width: svg.clientWidth || rect.width || layout.width,
+      height: svg.clientHeight || rect.height || layout.height,
     };
+  }
+
+  function clampScale(scale: number): number {
+    return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+  }
+
+  function setTransform(scale: number, x: number, y: number): void {
+    transform = { scale, x, y };
     applyTransform();
   }
 
+  function zoomAt(factor: number, originX: number, originY: number): void {
+    const nextScale = clampScale(transform.scale * factor);
+    const ratio = nextScale / transform.scale;
+    setTransform(
+      nextScale,
+      originX - (originX - transform.x) * ratio,
+      originY - (originY - transform.y) * ratio,
+    );
+  }
+
   function viewportCentre(): { x: number; y: number } {
-    return { x: svg.clientWidth / 2 || layout.width / 2, y: svg.clientHeight / 2 || layout.height / 2 };
+    const { width, height } = viewportSize();
+    return { x: width / 2, y: height / 2 };
   }
 
   function zoomBy(factor: number): void {
@@ -452,29 +517,29 @@ export function createGraphRenderer(
   }
 
   function panBy(dx: number, dy: number): void {
-    transform = { ...transform, x: transform.x + dx, y: transform.y + dy };
-    applyTransform();
+    setTransform(transform.scale, transform.x + dx, transform.y + dy);
   }
 
+  /** Restores 100% zoom with the graph centred in the viewport. */
   function resetView(): void {
-    transform = { scale: 1, x: 0, y: 0 };
-    applyTransform();
+    const { width, height } = viewportSize();
+    setTransform(1, (width - layout.width) / 2, (height - layout.height) / 2);
   }
 
+  /** Scales the whole graph into the viewport (with padding) and centres it. */
   function fitToView(): void {
-    const width = svg.clientWidth || layout.width;
-    const height = svg.clientHeight || layout.height;
-    const scale = Math.min(
-      MAX_SCALE,
-      Math.max(MIN_SCALE, Math.min(width / layout.width, height / layout.height) * 0.94),
+    const { width, height } = viewportSize();
+    const usableWidth = Math.max(1, width - FIT_PADDING * 2);
+    const usableHeight = Math.max(1, height - FIT_PADDING * 2);
+    const scale = clampScale(
+      Math.min(usableWidth / layout.width, usableHeight / layout.height),
     );
-    transform = {
-      scale,
-      x: (width - layout.width * scale) / 2,
-      y: (height - layout.height * scale) / 2,
-    };
-    applyTransform();
+    setTransform(scale, (width - layout.width * scale) / 2, (height - layout.height * scale) / 2);
   }
+
+  // Open on the whole arc: the page is a viewer first, and a fitted view means
+  // something is always on screen regardless of content size.
+  fitToView();
 
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();

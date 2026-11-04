@@ -69,7 +69,7 @@ export function journalIsEmpty<TState, TCard extends import('./types').Storyline
 export function journalTitle<TState, TCard extends import('./types').StorylineCard>(
   state: TState,
   adapter: StorylineEngineAdapter<TState, TCard>,
-  ui: StorylineUiAdapter<TState, TCard>,
+  ui: StorylineUiAdapter<TCard>,
 ): string {
   return ui.journalTitle(buildJournal(state, adapter));
 }

@@ -11,7 +11,8 @@ npm install          # install dependencies
 npm run dev          # start Vite dev server (http://localhost:3000)
 npm run monte-carlo  # run the Main Street Monte Carlo harness (JSON + CSV outputs)
 npm test             # run Vitest test suite (non-destructive: does not modify tracked assets)
-npm run build        # TypeScript check + production build -> dist/
+npm run build        # static node-surface check + TypeScript check + production build -> dist/
+npm run check:ui-node-surface  # static @ui node-safe import check (also runs as build's prebuild)
 npm run preview      # serve production build locally
 npm run tf:generate  # generate ToneForge artifacts to build/tf-synths/
 npm run generate:icons # regenerate app icons from public/favicon.svg (the tableau emblem)
@@ -31,6 +32,12 @@ npx vitest run --project unit tests/scripts/
 ```
 
 Note: Vitest browser runs use an internal Vite server, but the dev-only transcript persistence middleware is disabled in test mode to avoid file-system side effects and reduce harness flakiness.
+
+Note: `npm run build` starts with `npm run check:ui-node-surface` (the `prebuild`
+step), a static import-graph check over the node-safe `@ui` manifest
+(`src/ui/node-safe-modules.ts`). It fails the build when a module promised to be
+importable in a plain Node environment (no `window`) picks up a Phaser **value**
+import. See [Phaser-free `@ui` helper imports for Node tests](docs/DEVELOPER.md#phaser-free-ui-helper-imports-for-node-tests).
 
 ### Which games does a build include?
 
@@ -218,6 +225,45 @@ into the game's `./core` submodule via `CORE_ROOT`. There is no `src` symlink:
 the aliases replace the F4 compatibility symlinks. See the
 [layout decision record](docs/dev/per-game-src-layout-decision.md).
 
+**Write gating.** The scaffold classifies every generated file
+(`create` / `update` / `unchanged` / `skip-local`) and never writes blindly in a
+checkout that owns its own wiring:
+
+- a **full run** (no `--only`) is still the default — it regenerates every
+  generated file and is the supported upgrade path for the sibling game repos;
+- `--only <file,...>` restricts the run to the named generated files (every
+  other file is `skip-local`, and no symlink, asset link or path rewrite runs);
+- `--force` is required to overwrite a selected file whose content differs from
+  the template, so a hand edit is never silently lost;
+- `--dry-run` writes nothing and `--json` emits the machine-readable per-file
+  classification first — for dry and real runs alike;
+- `--migrate-game-paths` is the explicit, opt-in game-tree path migration
+  (mutually exclusive with `--only`); a fresh repo never needs it, because the
+  extraction already renamed the tree.
+
+**Hooks and the context budget.** A scaffold run also copies the core's
+committed `.githooks/` (including the full-suite `pre-push` gate for
+`dev`/`main`), points the repo's local `core.hooksPath` at it, and generates
+`docs/dev/context-budget.thresholds.json` from the game repo's own measured
+surface. `core.hooksPath` is local config, so a **fresh clone needs one
+activation step** (`git config core.hooksPath .githooks`, or the framework's
+`scripts/install_pi.sh`) before the committed gates run. See
+[Startup Context Budget](docs/dev/context-budget.md#scaffolded-game-repos) and
+the [Developer Guide](docs/DEVELOPER.md#committed-hooks-and-the-context-budget).
+
+Worked consumer pattern, from inside an existing game repo:
+
+```bash
+tsx core/scripts/game-repo-scaffold.ts \
+  --game main-street --game-repo-root . --core-root ./core \
+  --only main.ts --force
+```
+
+See
+[Multi-Repo Architecture §5](docs/dev/multi-repo-architecture.md#write-gating-cg-0mvwgjppa000gbe7-cg-0mvwgjrio0094y4z)
+and the [Developer Guide](docs/DEVELOPER.md#write-gating---dry-run---only---force-and---migrate-game-paths)
+for the full flag contract.
+
 #### Per-game version policy
 
 A game repo owns its own version — it is never the engine's version. The
@@ -257,8 +303,9 @@ standardises overlay, sidebar, and button UI across all example games.
 Components include HelpPanel, SettingsPanel, OverlayManager, Parameterized
 Overlay, GymButtonBar (reusable button bar with left/center/right zones
 and automatic row wrapping), CardGameScene base class with
-initHelpPanel/initSettingsPanel helpers, and depth conventions for
-consistent layering.
+initHelpPanel/initSettingsPanel helpers, renderer-aware clipping for
+scrollable regions (`createContainerClip()` — a Canvas `GeometryMask` or a
+WebGL Mask filter), and depth conventions for consistent layering.
 
 Every screen also carries a bright-red **ALPHA** badge showing the running
 version (`ALPHA v<version>`), rendered by the shared `createAlphaBadge()`

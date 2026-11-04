@@ -565,6 +565,16 @@ export interface EditorHost {
   readonly server: ViteDevServer;
   /** The first local URL, when the server is listening. */
   readonly url: string | undefined;
+  /**
+   * Every resolved URL the host actually bound to, grouped the way Vite
+   * reports them (`server.resolvedUrls`): loopback URLs in `local`, LAN and
+   * other interface URLs in `network`. Both lists are empty when not
+   * listening.
+   */
+  readonly urls: {
+    readonly local: readonly string[];
+    readonly network: readonly string[];
+  };
   /** Shuts the dev server down. */
   close(): Promise<void>;
 }
@@ -617,11 +627,17 @@ export async function createEditorHost(options: EditorHostOptions): Promise<Edit
     await server.listen();
   }
 
-  const url = server.resolvedUrls?.local[0] ?? (listen ? `http://${host}:${port}` : undefined);
+  const resolved = server.resolvedUrls;
+  const urls = {
+    local: resolved?.local ?? [],
+    network: resolved?.network ?? [],
+  };
+  const url = resolved?.local[0] ?? (listen ? `http://${host}:${port}` : undefined);
 
   return {
     server,
     url,
+    urls,
     close: () => server.close(),
   };
 }

@@ -57,7 +57,7 @@
         "name",
         "storylineId",
         "storylineTitle",
-        "hasChoices",
+        "isChoice",
         "optionCount",
         "options",
         "effect",
@@ -70,7 +70,10 @@
         "name": { "type": "string", "minLength": 1 },
         "storylineId": { "type": ["string", "null"] },
         "storylineTitle": { "type": ["string", "null"] },
-        "hasChoices": { "type": "boolean" },
+        "isChoice": {
+          "type": "boolean",
+          "description": "Derived: true when the card presents a choice (it has at least one compiled option). Computed from the compiled options only — never read from a content column."
+        },
         "optionCount": { "type": "integer", "minimum": 0 },
         "options": {
           "type": "array",

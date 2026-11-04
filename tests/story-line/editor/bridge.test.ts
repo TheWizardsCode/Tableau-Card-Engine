@@ -181,7 +181,6 @@ describe('manual documentation updates (hand-written rows are never claimed in s
           id: 'gym-story-unique',
           name: 'A Unique New Card',
           effect: 'Nothing else references it.',
-          hasChoices: false,
           // A single-member storyline of its own: an unlinked card inside an
           // existing storyline would be unreachable and refused.
           storylineId: 'gym-story-lone',

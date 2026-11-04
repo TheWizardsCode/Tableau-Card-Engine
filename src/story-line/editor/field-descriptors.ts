@@ -75,39 +75,19 @@ interface CoreFieldSpec {
 /**
  * The core-generic (story-line) fields, in the order the forms render them.
  *
- * `options` sits between the choice flag and the legacy links on purpose: it
- * is the modern successor-link encoding and takes precedence at compile time,
- * while accept/reject are the legacy two-way links. The hint says so, so an
- * author is never surprised that editing the legacy links has no effect on a
- * card that already carries an `options` encoding.
+ * `options` is the **only** way a card becomes a choice node: it encodes the
+ * successor links, so a card can no longer be flagged as a choice or linked
+ * through a second, legacy field pair.
  */
 const CORE_FIELDS: readonly CoreFieldSpec[] = [
   { key: 'id', label: 'Card id', kind: 'read-only', hint: 'The card id is the chain link target; it cannot be renamed here.' },
   { key: 'name', label: 'Name', kind: 'text' },
   { key: 'effect', label: 'Effect', kind: 'long-text' },
   {
-    key: 'hasChoices',
-    label: 'Choice card',
-    kind: 'boolean',
-    hint: 'A choice card presents the legacy two-way accept/reject links.',
-  },
-  {
     key: 'options',
     label: 'Options',
     kind: 'long-text',
     hint: 'Options encoding: label|target;label2|target2 — a comma separates random candidates.',
-  },
-  {
-    key: 'acceptNextCardId',
-    label: 'Accept link',
-    kind: 'text',
-    hint: 'Legacy two-way link — ignored when Options is set.',
-  },
-  {
-    key: 'rejectNextCardId',
-    label: 'Reject link',
-    kind: 'text',
-    hint: 'Legacy two-way link — ignored when Options is set.',
   },
   { key: 'storylineId', label: 'Story-line id', kind: 'text' },
   { key: 'storylineTitle', label: 'Story-line title', kind: 'text' },
@@ -128,12 +108,6 @@ function coreValue(card: ContentCard, key: CoreFieldSpec['key']): string {
       return card.name;
     case 'effect':
       return card.effect;
-    case 'hasChoices':
-      return String(card.hasChoices);
-    case 'acceptNextCardId':
-      return card.acceptNextCardId ?? '';
-    case 'rejectNextCardId':
-      return card.rejectNextCardId ?? '';
     case 'options':
       return card.options;
     case 'storylineId':
@@ -150,9 +124,7 @@ function isMapped(adapter: ContentAdapter, key: CoreFieldSpec['key']): boolean {
 
 /** Whether a core field offers card-id suggestions. */
 function suggestsCards(key: CoreFieldSpec['key']): boolean {
-  return (
-    key === 'acceptNextCardId' || key === 'rejectNextCardId' || key === 'options'
-  );
+  return key === 'options';
 }
 
 /** Appends the adapter-declared (non-mapped) columns as text descriptors. */
@@ -179,8 +151,8 @@ function adapterFields(
 /**
  * Derives the field descriptors for editing an existing card.
  *
- * Only fields the adapter actually maps are included (a game without a legacy
- * choice model simply has no choice/link fields), followed by every
+ * Only fields the adapter actually maps are included (a game without an
+ * `options` column simply has no choice field), followed by every
  * adapter-declared column the file carries.
  *
  * @param adapter The game content adapter.
@@ -237,7 +209,6 @@ export function buildNewCardFieldDescriptors(
     if (key === 'id' || key === 'name' || key === 'effect') return '';
     if (key === 'storylineId') return options.storylineId ?? '';
     if (key === 'storylineTitle') return options.storylineTitle ?? '';
-    if (key === 'hasChoices') return 'false';
     return defaults[adapter.fields[key] ?? ''] ?? '';
   };
 
@@ -312,17 +283,8 @@ function applyCoreValue(
     case 'effect':
       spec.effect = value;
       break;
-    case 'hasChoices':
-      spec.hasChoices = value === 'true';
-      break;
     case 'options':
       spec.options = value;
-      break;
-    case 'acceptNextCardId':
-      spec.acceptNextCardId = trimmed === '' ? null : trimmed;
-      break;
-    case 'rejectNextCardId':
-      spec.rejectNextCardId = trimmed === '' ? null : trimmed;
       break;
     case 'storylineId':
       spec.storylineId = trimmed === '' ? null : trimmed;
@@ -404,14 +366,7 @@ export function buildAddSpec(
     id: value('id').trim(),
     name: value('name').trim(),
     ...(has('effect') ? { effect: value('effect') } : {}),
-    ...(has('hasChoices') ? { hasChoices: value('hasChoices') === 'true' } : {}),
     ...(has('options') ? { options: value('options') } : {}),
-    ...(has('acceptNextCardId')
-      ? { acceptNextCardId: optional('acceptNextCardId') }
-      : {}),
-    ...(has('rejectNextCardId')
-      ? { rejectNextCardId: optional('rejectNextCardId') }
-      : {}),
     ...(has('storylineId') ? { storylineId: optional('storylineId') } : {}),
     ...(has('storylineTitle') ? { storylineTitle: optional('storylineTitle') } : {}),
     ...(Object.keys(fields).length > 0 ? { fields } : {}),
@@ -453,7 +408,7 @@ function fieldForTarget(
   draft: Readonly<Record<string, string>>,
   target: string,
 ): string | null {
-  const preference = ['options', 'acceptNextCardId', 'rejectNextCardId'];
+  const preference = ['options'];
   for (const key of preference) {
     const descriptor = descriptors.find((candidate) => candidate.key === key);
     if (!descriptor) continue;
@@ -486,12 +441,9 @@ function attributeIssue(
     }
     case 'missing-storyline-id':
       return hasField(descriptors, 'storylineId') ? 'storylineId' : null;
-    case 'orphan-link':
-      return hasField(descriptors, 'hasChoices') ? 'hasChoices' : null;
     case 'invalid-option':
       return hasField(descriptors, 'options') ? 'options' : null;
     case 'unknown-successor':
-    case 'dangling-link':
       return issue.target ? fieldForTarget(descriptors, draft, issue.target) : null;
     case 'unreachable-card':
     case 'cycle-error':
