@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.1.23 (2026-11-04)
+> **Release focus:** This release focuses on strengthening the storyline editing experience, with new visual editing tools, live previews, validation, and a unified choice system for reliable decisions. It also improves developer workflow through working git hooks, safer re-scaffolding, and better test and build reliability.
+### Features
+- The Game Events debug view now shows complete, readable event details instead of cut-off text. (CG-0MVTTR0OC006PWDK)
+- New game projects now have working git hooks and full test checks on push, so broken builds are caught before they reach the team. (CG-0MW0KURL8002XOV9)
+- Help, Settings, and Overlay dialogs now stay properly clipped when scrolling in WebGL builds. (CG-0MVTMITW7002VF0I)
+- Re-scaffolding can no longer overwrite your game's custom build and test setup. (CG-0MVWFN1HX004B5PN)
+- UI helpers can now be safely imported in Node tests without Phaser errors. (CG-0MVS9HBN3009HIQN)
+- Storyline choices now use one consistent system, so your decisions work reliably everywhere. (CG-0MVZBUWPH003PWUI)
+- 1916: The Rising now shows its thumbnail and plays its own sound effects in the full game collection. (CG-0MVXUFJKE000V0MJ)
+- `npm run dev` now starts even with uncommitted engine changes, warning instead of blocking. (CG-0MVZJ35EV00690W5)
+- Edit story-lines for your own game's content and save them where your game keeps them. (CG-0MVNE47TC0048WZ9)
+- Designers can now visually edit storylines with live previews and validation, keeping arcs error-free. (CG-0MVHZ1P1I000PVQ1)
+### Bug Fixes
+- Fixes a test issue that blocked all work from being pushed to dev. (CG-0MVVKUUY50010004)
+- Fixed a docs wording issue that was breaking builds for games using the engine. (CG-0MVWFLG8Z005FSH8)
+- Running the storyline editor with --host now works and shows all URLs you can open. (CG-0MVSRDOT400777NH)
+### Other
+- Release v0.1.23 can now ship on verified evidence instead of a manual override. (CG-0MW1AHY0A00697AI)
+- The Gym storyline's final chapter is now correctly named Transport Infrastructure. (CG-0MVZIMCDT002S14C)
+> [Play the alpha release](https://thewizardscode.github.io/Tableau-Card-Engine/). Provide feedback in [Discord](https://discord.gg/gUKQTFkzQ4)
+
 ## v0.1.22 (2026-10-29)
 > **Release focus:** This release focuses on strengthening the shared engine and tooling behind the games, with more reliable CI testing, automatic engine syncing, consistent card actions, and custom event logging. It also expands branching story choices with coin and reputation requirements, adds on-screen reasons for rejected moves, and gives each game its own version number.
 ### Features
