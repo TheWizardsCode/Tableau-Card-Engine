@@ -1807,7 +1807,11 @@ describe('scaffold hook wiring and context budget', () => {
     expect(hook).toContain(V3_HOOK_MARKER);
     expect(hook).toContain(FULL_SUITE_MARKER);
     // Runner resolved local-then-global, failing closed when neither exists.
-    expect(hook).toContain('$repo_root/skill/test/scripts/run_tests.py');
+    // The local path is built from whichever repository-root variable the hook
+    // resolves (`$repo_root` in this repo's earlier revision, `$test_repo_root`
+    // in the canonical Worklog template), so assert the path shape rather than
+    // the variable name (CG-0MW1VJRY6001FOPT).
+    expect(hook).toMatch(/\$\w*repo_root\/skill\/test\/scripts\/run_tests\.py/);
     expect(hook).toContain('$HOME/.pi/agent/skills/test/scripts/run_tests.py');
     expect(hook).toContain('TEST_SCOPE_SKIP=1');
     // The existing gates and their bypass variables are untouched.

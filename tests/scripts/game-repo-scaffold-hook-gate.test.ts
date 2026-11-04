@@ -287,8 +287,14 @@ describe('committed pre-push gate from a linked worktree', () => {
         'utf-8',
       );
       expect(hook, `${name} embeds the core path`).not.toContain(fixture.core);
-      expect(hook, `${name} does not resolve its sibling`).toContain(
-        'dirname -- "$0"',
+      // The canonical Worklog hook template resolves the sibling from the
+      // hook's own directory; the assertion is behavioural (a `$0`-relative
+      // `dirname`) rather than pinned to one spelling, so a defensive
+      // `dirname -- "$0"` hardening and the canonical `dirname "$0"` both
+      // satisfy it (CG-0MW1VJRY6001FOPT — the hooks are now the canonical
+      // template, which `wl doctor upgrade` compares byte-wise).
+      expect(hook, `${name} does not resolve its sibling`).toMatch(
+        /dirname (?:-- )?"\$0"/,
       );
     }
   }, 60_000);

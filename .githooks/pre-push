@@ -1,25 +1,30 @@
 #!/bin/sh
 # worklog:pre-push-hook:v3
-# 1. Enforce branch naming policy: block pushes to protected branches.
-# 2. Context-budget regression gate (F6, SA-0MSLK7XNZ00366YY): fail the push
+# 1. Auto-sync Worklog data before pushing (committed hooks).
+# 2. Enforce branch naming policy: block pushes to protected branches.
+# 3. Context-budget regression gate (F6, SA-0MSLK7XNZ00366YY): fail the push
 #    when the startup context surface exceeds committed thresholds.
-# 3. Scope-aware test gate: run the FULL suite when pushing to
-#    refs/heads/dev|main; feature-branch pushes skip tests (implementation
-#    validated changed-scope only; the full suite first runs at this dev-push
-#    integration gate — SA-0MVECQUGF0064U81).
-# 4. Auto-sync Worklog data before pushing (committed hooks).
-#
-# The test runner is resolved local-then-global (the same order the
-# context-budget gate uses): a repository that ships its own
-# skill/test/scripts/run_tests.py uses it, every other repository (game repos,
-# consumer checkouts) uses the globally installed runner that install_pi.sh
-# provides. When neither exists the gate fails CLOSED and names the remedy.
+# 4. Full-suite gate (SA-0MVECQUGF0064U81): run the canonical suite when a
+#    pushed remote ref is refs/heads/dev or refs/heads/main.
 #
 # Set WORKLOG_SKIP_PRE_PUSH=1 to bypass worklog sync.
 # Set BRANCH_POLICY_SKIP=1 to bypass branch policy check (not recommended).
 # Set CONTEXT_BUDGET_SKIP=1 to bypass the context-budget gate (not recommended).
-# Set TEST_SCOPE_SKIP=1 to bypass the full-suite gate (not recommended).
+# Set TEST_SCOPE_SKIP=1 to bypass the full-suite gate on a dev/main push (not recommended).
 set -e
+
+# ── Pushed refs ──────────────────────────────────────────────────────────────
+# Read the pre-push stdin once: it lists the refs being pushed and is needed by
+# both the full-suite gate and the worklog-sync skip below. A second read would
+# see EOF, so capture flags here and reuse them.
+push_dev_main=0
+push_worklog_data=0
+while read local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/dev|refs/heads/main) push_dev_main=1 ;;
+    refs/worklog/data) push_worklog_data=1 ;;
+  esac
+done
 
 # ── Branch policy enforcement ────────────────────────────────────────────────
 # Check that the current branch is not a protected branch.
@@ -58,128 +63,79 @@ if [ "$CONTEXT_BUDGET_SKIP" != "1" ]; then
   fi
   thresholds="$repo_root/docs/dev/context-budget.thresholds.json"
   if [ -n "$repo_root" ] && [ -n "$measure" ] && [ -f "$measure" ] && [ -f "$thresholds" ]; then
-    # Pass --repo-root explicitly: when the global symlink is used, the
-    # script's default repo-root resolves to the symlink target (SorraAgents)
-    # instead of the project being pushed.
     if python3 "$measure" --repo-root "$repo_root" --include-hidden --thresholds "$thresholds" >/dev/null 2>&1; then
       :
     else
       echo "ERROR: Context budget exceeded committed thresholds." >&2
-      if [ -x "$repo_root/scripts/refresh-context-thresholds.sh" ]; then
-        echo "  Refresh and commit the thresholds with your change:" >&2
-        echo "    $repo_root/scripts/refresh-context-thresholds.sh" >&2
-      else
-        echo "  Run: python3 $measure --repo-root $repo_root --include-hidden --thresholds $thresholds" >&2
-      fi
+      echo "  Run: python3 $measure --repo-root $repo_root --include-hidden --thresholds $thresholds" >&2
       echo "  See docs/dev/context-budget.md. Set CONTEXT_BUDGET_SKIP=1 to bypass." >&2
       exit 1
     fi
   fi
 fi
 
-# ── Scope-aware test gate + stdin capture (SA-0MT6CEN8D0073F61) ───────────
-# git feeds one line per pushed ref on stdin:
-#   <local_ref> <local_sha> <remote_ref> <remote_sha>
-# Read every line ONCE (stdin is consumed by the first reader) and capture
-# the push targets used by both the test gate and the worklog sync below.
-need_full_suite=0
-skip_worklog_sync=0
-while read local_ref local_sha remote_ref remote_sha; do
-  [ -n "$remote_ref" ] || continue
-  case "$remote_ref" in
-    refs/heads/dev|refs/heads/main) need_full_suite=1 ;;
-    refs/worklog/data) skip_worklog_sync=1 ;;
-  esac
-done
-
-# Mirror the test-runner cache entries a worktree gate run wrote into the main
-# checkout's cache (SA-0MVTFMB7K002Y1F3 cache-compatibility constraint).
-# ``implement.py finish`` pushes from the linked worktree holding the pushed
-# commit, so ``run_tests.py`` caches per git state under the worktree's cache
-# (``<worktree>/.worklog/cache``, else ``<git-dir>/test-cache``) — invisible to
-# the main checkout's post-push verification and the audit skill (F3), which
-# read ``<main>/.worklog/cache``. Keys are content-addressed (command + git
-# state), so copying an entry the main cache lacks is always safe: an identical
-# key is an identical run. Fail-soft — cache plumbing must never decide a push.
-mirror_suite_cache() {
-  wt_root="$1"
-  git_dir="$(git rev-parse --absolute-git-dir 2>/dev/null || true)"
-  [ -n "$git_dir" ] && [ -d "$git_dir" ] || return 0
-  if [ -d "$wt_root/.worklog" ]; then
-    wt_cache="$wt_root/.worklog/cache"
-  else
-    wt_cache="$git_dir/test-cache"
-  fi
-  [ -d "$wt_cache" ] && [ -n "$(ls -A "$wt_cache" 2>/dev/null)" ] || return 0
-  common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
-  case "$common_dir" in
-    /*) main_git_dir="$common_dir" ;;
-    *) main_git_dir="$(cd "$wt_root" && pwd)/$common_dir" ;;
-  esac
-  main_root="$(dirname "$main_git_dir")"
-  [ "$main_root" != "$wt_root" ] || return 0
-  main_cache="$main_root/.worklog/cache"
-  [ -d "$main_cache" ] || return 0
-  for entry in "$wt_cache"/*; do
-    [ -d "$entry" ] || continue
-    name="$(basename "$entry")"
-    [ -e "$main_cache/$name" ] && continue
-    if cp -a "$entry" "$main_cache/$name" 2>/dev/null; then
-      echo "pre-push: mirrored gate cache entry $name into $main_root/.worklog/cache" >&2
-    else
-      echo "pre-push: warning: could not mirror cache entry $name into $main_root/.worklog/cache" >&2
-    fi
-  done
-  return 0
-}
-
-# Full-suite gate for pushes targeting dev/main (release gates). Partial runs
-# are never full-suite evidence, so the gate always runs scope=full. The
-# runner is resolved local-then-global so a game repo (which carries no
-# repo-local skill tree) still gets the full-suite guarantee.
-if [ "$need_full_suite" = "1" ] && [ "$TEST_SCOPE_SKIP" != "1" ]; then
-  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-  runner=""
-  if [ -n "$repo_root" ] && [ -f "$repo_root/skill/test/scripts/run_tests.py" ]; then
-    runner="$repo_root/skill/test/scripts/run_tests.py"
+# ── Full-suite gate (dev/main pushes) ────────────────────────────────────────
+# Enforce the full canonical suite whenever a pushed remote ref is refs/heads/dev
+# or refs/heads/main (SA-0MVECQUGF0064U81). Feature-branch, tag and
+# refs/worklog/data pushes run no tests. The invocation mirrors the ship
+# release gate (`--scope full --strict-git-env`) and records the run in the
+# per-repo test cache consumed by audits. run_tests.py is resolved first from
+# the local skill/test/ path, then from the installed global symlink
+# (~/.pi/agent/skills/test/scripts/run_tests.py) installed by install_pi.sh.
+# A missing runner hard-fails (parity with the ship release gate): silently
+# skipping would reproduce the unenforced-gate gap this hook closes.
+if [ "$TEST_SCOPE_SKIP" != "1" ] && [ "$push_dev_main" = "1" ]; then
+  test_repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -f "$test_repo_root/skill/test/scripts/run_tests.py" ]; then
+    test_runner="$test_repo_root/skill/test/scripts/run_tests.py"
   elif [ -f "$HOME/.pi/agent/skills/test/scripts/run_tests.py" ]; then
-    runner="$HOME/.pi/agent/skills/test/scripts/run_tests.py"
-  fi
-  if [ -n "$runner" ]; then
-    echo "pre-push: full-suite gate for dev/main push — running run_tests.py --scope full --strict-git-env" >&2
-    if python3 "$runner" --scope full --strict-git-env --json >/dev/null 2>&1; then
-      echo "pre-push: full suite green (cached runs make repeat pushes cheap)" >&2
-      [ -n "$repo_root" ] && mirror_suite_cache "$repo_root"
-    else
-      echo "ERROR: Full test suite failed — pushes to dev/main require a green suite." >&2
-      echo "  Run: python3 \"$runner\" --scope full  (or implement.py finish) and fix failures." >&2
-      echo "  Set TEST_SCOPE_SKIP=1 to bypass (not recommended)." >&2
-      exit 1
-    fi
+    test_runner="$HOME/.pi/agent/skills/test/scripts/run_tests.py"
   else
-    echo "ERROR: run_tests.py not found — cannot run the full-suite gate for a dev/main push." >&2
-    echo "  Looked in:" >&2
-    echo "    $repo_root/skill/test/scripts/run_tests.py" >&2
-    echo "    $HOME/.pi/agent/skills/test/scripts/run_tests.py" >&2
-    echo "  Install the framework skills (scripts/install_pi.sh) and re-push." >&2
-    echo "  Set TEST_SCOPE_SKIP=1 to bypass (not recommended)." >&2
+    test_runner=""
+  fi
+  if [ -z "$test_runner" ]; then
+    echo "ERROR: Full-suite gate cannot run - run_tests.py not found." >&2
+    echo "  Refusing to push to dev/main without a full-suite assertion." >&2
+    echo "  Install the framework skills (install_pi.sh) or set TEST_SCOPE_SKIP=1 to bypass." >&2
+    exit 1
+  fi
+  echo "push gate: running the full canonical suite (--scope full --strict-git-env)..." >&2
+  if python3 "$test_runner" --scope full --strict-git-env 2>&1; then
+    echo "push gate: full suite green." >&2
+  else
+    echo "ERROR: Full test suite failed - the push to dev/main is blocked." >&2
+    echo "  Fix the failures and retry. Set TEST_SCOPE_SKIP=1 to bypass (not recommended)." >&2
     exit 1
   fi
 fi
 
-# Feature-branch pushes skip test execution entirely (the worktree already ran
-# changed-scope validation) and exit before the worklog sync.
-if [ "$need_full_suite" = "0" ]; then
+# ── Worklog sync ─────────────────────────────────────────────────────────────
+if [ "$WORKLOG_SKIP_PRE_PUSH" = "1" ]; then
+  echo "worklog: pre-push sync skipped (WORKLOG_SKIP_PRE_PUSH=1)"
   exit 0
 fi
 
-# ── Worklog sync ─────────────────────────────────────────────────────────────
-if [ "$WORKLOG_SKIP_PRE_PUSH" = "1" ]; then
+# Skip when running inside a temp worktree created by withTempWorktree
+# for internal sync operations. These worktrees don't have worklog
+# initialized and the push is already done with --no-verify as defense.
+case "$PWD" in
+  *tmp-worktree-*)
+    exit 0
+    ;;
+esac
+
+# Skip when inside a git worktree (not the main checkout).
+# Worktrees are for feature development and typically don't have worklog
+# initialized. The sync should run from the main checkout.
+if [ "$(git rev-parse --git-dir 2>/dev/null)" != "$(git rev-parse --git-common-dir 2>/dev/null)" ]; then
   exit 0
 fi
-if [ "$skip_worklog_sync" = "1" ]; then
+
+# Skip the sync when pushing to refs/worklog/data to avoid infinite loops.
+if [ "$push_worklog_data" = "1" ]; then
   exit 0
 fi
+
 if command -v wl >/dev/null 2>&1; then
   WL=wl
 elif command -v worklog >/dev/null 2>&1; then
@@ -188,10 +144,11 @@ else
   echo "worklog: wl/worklog not found; skipping pre-push sync" >&2
   exit 0
 fi
-# A failed sync must never block the code push: the worklog data lives in the
-# main checkout, and a push from a linked worktree cannot sync it from here
-# (the main checkout syncs on its own pushes). Report and continue.
-"$WL" sync || {
+
+# Force the data branch to refs/worklog/data regardless of config.
+# This prevents the sync from accidentally pushing to a standard branch
+# if the user has overridden syncBranch in their worklog config.
+"$WL" sync --git-branch refs/worklog/data || {
   echo "worklog: pre-push sync failed (pushing anyway)" >&2
   exit 0
 }
