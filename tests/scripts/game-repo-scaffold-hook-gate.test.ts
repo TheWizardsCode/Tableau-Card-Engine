@@ -19,6 +19,10 @@
  * 4. The worktree-managed `GIT_DIR` git exports for hook runs is not treated as
  *    a repository override (no `--strict-git-env` refusal), mirroring
  *    `docs/dev/test-isolation.md` §9 (`git_sandbox.is_worktree_git_dir`).
+ * 5. A green worktree gate run mirrors its cache entries into the main
+ *    checkout's `.worklog/cache` (never overwriting an existing entry) and a
+ *    mirror that cannot be performed only warns — the push still succeeds
+ *    (CG-0MW2KEFMA000YY66, parent AC4(b)).
  *
  * Everything is temp-dir / `file://` / stub based: no network, no `npm install`,
  * no browser, no developer config touched.
@@ -48,14 +52,27 @@ const MANIFEST: CoreManifest = {
  * Stub `run_tests.py`: records its invocation (argv + the exported `GIT_DIR`)
  * and exits with `STUB_EXIT`. The hook always passes `--scope full
  * --strict-git-env`, so the recorded argv proves which runner ran.
+ *
+ * With `STUB_CACHE_ENTRY` set it also writes a gate cache entry the way
+ * `run_tests.py` does — under the git dir the hook exported. A linked worktree
+ * has no `.worklog`, so that is `<git-dir>/test-cache/<name>/result.json`: the
+ * exact seam the hook's cache mirroring copies from.
  */
 const STUB_RUNNER = [
   '#!/usr/bin/env python3',
-  'import json, os, sys',
+  'import json, os, pathlib, subprocess, sys',
   'marker = os.environ.get("STUB_MARKER")',
   'if marker:',
   '    with open(marker, "w", encoding="utf-8") as fh:',
   '        json.dump({"argv": sys.argv[1:], "git_dir": os.environ.get("GIT_DIR")}, fh)',
+  'cache_name = os.environ.get("STUB_CACHE_ENTRY")',
+  'if cache_name:',
+  '    git_dir = subprocess.check_output(',
+  '        ["git", "rev-parse", "--absolute-git-dir"], text=True',
+  '    ).strip()',
+  '    entry = pathlib.Path(git_dir) / "test-cache" / cache_name',
+  '    entry.mkdir(parents=True, exist_ok=True)',
+  `    (entry / "result.json").write_text('{"status": "green"}', encoding="utf-8")`,
   'sys.exit(int(os.environ.get("STUB_EXIT", "0")))',
   '',
 ].join('\n');
@@ -207,11 +224,13 @@ function installStubRunner(fixture: Fixture): string {
 /**
  * Push `HEAD` from the linked worktree onto the remote `dev` branch, with the
  * worktree's git-dir exported as `GIT_DIR` exactly as git does for a hook run
- * from a linked worktree.
+ * from a linked worktree. `extraEnv` carries per-case stub controls (e.g. the
+ * cache entry name); it is applied last.
  */
 function pushFromWorktree(
   fixture: Fixture,
   stubExit: 0 | 1,
+  extraEnv: NodeJS.ProcessEnv = {},
 ): { result: GitResult; marker: string } {
   installStubRunner(fixture);
   const marker = path.join(fixture.root, `stub-${stubExit}.json`);
@@ -229,11 +248,31 @@ function pushFromWorktree(
         WORKLOG_SKIP_PRE_PUSH: '1',
         CONTEXT_BUDGET_SKIP: '1',
         TEST_SCOPE_SKIP: '0',
+        ...extraEnv,
       }),
     },
   );
   return { result, marker };
 }
+
+/** The main checkout's mirror target (`<main>/.worklog/cache`). */
+function createMainCache(fixture: Fixture): string {
+  const cache = path.join(fixture.repo, '.worklog', 'cache');
+  fs.mkdirSync(cache, { recursive: true });
+  return cache;
+}
+
+/**
+ * Where a worktree gate run caches: the linked worktree has no `.worklog`, so
+ * `run_tests.py` uses `<git-dir>/test-cache` (the production `implement.py
+ * finish` shape).
+ */
+function worktreeCache(fixture: Fixture): string {
+  return path.join(fixture.worktreeGitDir, 'test-cache');
+}
+
+/** Permissions cannot deny a copy when running as root. */
+const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
 
 describe('committed pre-push gate from a linked worktree', () => {
   it('runs the full-suite gate and lets a green suite through', () => {
@@ -317,3 +356,93 @@ describe('committed pre-push gate from a linked worktree', () => {
     );
   }, 60_000);
 });
+
+/**
+ * The committed hook must mirror the cache entries a worktree gate run wrote
+ * into the main checkout (CG-0MW2KEFMA000YY66, parent AC4(b)). These cases
+ * assert against the **committed** `.githooks/pre-push` the scaffold copies, so
+ * a replaced or hand-edited hook fails here. Skipped on Windows, where POSIX
+ * permissions cannot express the fail-soft case.
+ */
+describe.skipIf(process.platform === 'win32')(
+  'committed pre-push test-cache mirroring',
+  () => {
+    it('mirrors a worktree gate cache entry into the main checkout cache', () => {
+      const fixture = makeFixture();
+      const mainCache = createMainCache(fixture);
+      const { result } = pushFromWorktree(fixture, 0, {
+        STUB_CACHE_ENTRY: 'entry-abc',
+      });
+
+      expect(result.status, `push failed: ${result.stderr}`).toBe(0);
+      // The stub cached under the worktree's git dir (no `.worklog` there),
+      // exactly as the real runner does for a worktree push.
+      const worktreeEntry = path.join(
+        worktreeCache(fixture),
+        'entry-abc',
+        'result.json',
+      );
+      expect(
+        fs.existsSync(worktreeEntry),
+        'stub runner wrote no worktree cache entry',
+      ).toBe(true);
+
+      const mirrored = path.join(mainCache, 'entry-abc', 'result.json');
+      expect(
+        fs.existsSync(mirrored),
+        `entry was not mirrored into ${mainCache}`,
+      ).toBe(true);
+      expect(fs.readFileSync(mirrored, 'utf-8')).toBe(
+        fs.readFileSync(worktreeEntry, 'utf-8'),
+      );
+      expect(result.stderr).toContain('push gate: mirrored cache entry entry-abc');
+    }, 60_000);
+
+    it('never overwrites a cache entry the main checkout already holds', () => {
+      const fixture = makeFixture();
+      const mainCache = createMainCache(fixture);
+      const existing = path.join(mainCache, 'entry-abc', 'result.json');
+      fs.mkdirSync(path.dirname(existing), { recursive: true });
+      fs.writeFileSync(existing, '{"status": "already-cached"}');
+
+      const { result } = pushFromWorktree(fixture, 0, {
+        STUB_CACHE_ENTRY: 'entry-abc',
+      });
+
+      expect(result.status, `push failed: ${result.stderr}`).toBe(0);
+      expect(fs.readFileSync(existing, 'utf-8')).toBe(
+        '{"status": "already-cached"}',
+      );
+      expect(result.stderr).not.toContain('mirrored cache entry entry-abc');
+    }, 60_000);
+
+    // Skipped as root, where directory permissions cannot deny the copy.
+    it.skipIf(isRoot)(
+      'warns but never fails the push when an entry cannot be mirrored',
+      () => {
+        const fixture = makeFixture();
+        const mainCache = createMainCache(fixture);
+        fs.chmodSync(mainCache, 0o500);
+        let result: GitResult;
+        try {
+          result = pushFromWorktree(fixture, 0, {
+            STUB_CACHE_ENTRY: 'entry-abc',
+          }).result;
+        } finally {
+          fs.chmodSync(mainCache, 0o700);
+        }
+
+        // Fail-soft: cache plumbing must never decide a push.
+        expect(
+          result.status,
+          `fail-soft violated, the push was blocked: ${result.stderr}`,
+        ).toBe(0);
+        expect(result.stderr).toContain(
+          'push gate: warning: could not mirror cache entry entry-abc',
+        );
+        expect(fs.existsSync(path.join(mainCache, 'entry-abc'))).toBe(false);
+      },
+      60_000,
+    );
+  },
+);
