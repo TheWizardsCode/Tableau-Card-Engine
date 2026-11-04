@@ -864,6 +864,35 @@ push.
 > locally: `wl doctor upgrade --dry-run` reports any divergence as pending, and
 > `--confirm` would overwrite the local edit.
 
+The mirroring is pinned on two layers: the upstream template test
+(`../ContextHub/tests/pre-push-hook-gate.test.ts`), and — in this repository —
+`tests/scripts/game-repo-scaffold-hook-gate.test.ts`
+(`describe('committed pre-push test-cache mirroring')`). The TCE-side cases push
+from a fixture's **linked worktree** against the committed `.githooks/pre-push`
+and assert that the gate entry lands in the main checkout's cache, that an entry
+the main cache already holds is never overwritten, and that an unwritable cache
+directory only warns and never fails the push.
+
+Re-verify end-to-end with:
+
+```bash
+# 1. The canonical template owns the capability (no repository-local patch).
+git -C ../ContextHub merge-base --is-ancestor 9771d9c9 dev
+grep -c mirror_suite_cache ../ContextHub/src/doctor/hook-upgrade.ts   # >= 2
+diff .githooks/pre-push ../ContextHub/.githooks/pre-push               # empty
+
+# 2. No divergence against the rebuilt package (npm-linked, dist gitignored).
+(cd ../ContextHub && npm run build)
+wl doctor upgrade --dry-run --json   # pending: [], all five hooks up-to-date
+
+# 3. After a dev push from a linked worktree, the main checkout can read the run.
+python3 <test-skill>/run_tests.py --summary --suite all --json
+```
+
+A `dev` push from a linked worktree logs one
+`push gate: mirrored cache entry <key> into <main checkout>/.worklog/cache` line
+per entry it copies.
+
 ### Monte Carlo environment variables
 
 The Main Street balance guardrail (`tests/main-street/monte-carlo-balance.test.ts`) and harness
