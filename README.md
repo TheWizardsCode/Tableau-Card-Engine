@@ -243,7 +243,8 @@ checkout that owns its own wiring:
 
 **Hooks and the context budget.** A scaffold run also copies the core's
 committed `.githooks/` (including the full-suite `pre-push` gate for
-`dev`/`main`), points the repo's local `core.hooksPath` at it, and generates
+`dev`/`main`, bound to the pushed commit via `--gate-commit`), points the repo's
+local `core.hooksPath` at it, and generates
 `docs/dev/context-budget.thresholds.json` from the game repo's own measured
 surface. `core.hooksPath` is local config, so a **fresh clone needs one
 activation step** (`git config core.hooksPath .githooks`, or the framework's

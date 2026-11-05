@@ -23,6 +23,12 @@
  *    checkout's `.worklog/cache` (never overwriting an existing entry) and a
  *    mirror that cannot be performed only warns — the push still succeeds
  *    (CG-0MW2KEFMA000YY66, parent AC4(b)).
+ * 6. The gate is bound to the pushed commit (CG-0MW2151GL003SV5E): the hook
+ *    forwards `--gate-commit <pushed sha>` and `--project-root <root>`; a
+ *    non-gated ref runs no suite; a multi-commit dev/main push is refused
+ *    before any suite runs; a ref deletion is not gated; and the cache mirror
+ *    sources from the gate-resolved root (`run_tests: gate-root`), not the
+ *    push cwd.
  *
  * Everything is temp-dir / `file://` / stub based: no network, no `npm install`,
  * no browser, no developer config touched.
@@ -51,7 +57,13 @@ const MANIFEST: CoreManifest = {
 /**
  * Stub `run_tests.py`: records its invocation (argv + the exported `GIT_DIR`)
  * and exits with `STUB_EXIT`. The hook always passes `--scope full
- * --strict-git-env`, so the recorded argv proves which runner ran.
+ * --strict-git-env --json --project-root <root> --gate-commit <sha>`, so the
+ * recorded argv proves which runner ran and which commit it was bound to.
+ *
+ * The literal `--gate-commit` in this source satisfies the hook's capability
+ * pre-check. With `STUB_GATE_ROOT` set it echoes `run_tests: gate-root <path>`
+ * on stderr, exactly as the real runner does, so the hook's mirror source is
+ * observable.
  *
  * With `STUB_CACHE_ENTRY` set it also writes a gate cache entry the way
  * `run_tests.py` does — under the git dir the hook exported. A linked worktree
@@ -60,11 +72,15 @@ const MANIFEST: CoreManifest = {
  */
 const STUB_RUNNER = [
   '#!/usr/bin/env python3',
+  '# Stub run_tests.py: supports --gate-commit (capability pre-check marker).',
   'import json, os, pathlib, subprocess, sys',
   'marker = os.environ.get("STUB_MARKER")',
   'if marker:',
   '    with open(marker, "w", encoding="utf-8") as fh:',
   '        json.dump({"argv": sys.argv[1:], "git_dir": os.environ.get("GIT_DIR")}, fh)',
+  'gate_root = os.environ.get("STUB_GATE_ROOT")',
+  'if gate_root:',
+  '    sys.stderr.write("run_tests: gate-root " + gate_root + "\\n")',
   'cache_name = os.environ.get("STUB_CACHE_ENTRY")',
   'if cache_name:',
   '    git_dir = subprocess.check_output(',
@@ -255,6 +271,37 @@ function pushFromWorktree(
   return { result, marker };
 }
 
+/**
+ * Push arbitrary refspecs from the linked worktree with the stub runner
+ * installed — for multi-commit and ref-deletion cases that `pushFromWorktree`
+ * (single `HEAD:refs/heads/dev`) cannot express.
+ */
+function pushRefspecs(
+  fixture: Fixture,
+  refspecs: string[],
+  extraEnv: NodeJS.ProcessEnv = {},
+): { result: GitResult; marker: string } {
+  installStubRunner(fixture);
+  const marker = path.join(fixture.root, 'stub-refspecs.json');
+  const result = run(
+    'git',
+    ['-C', fixture.worktree, 'push', 'origin', ...refspecs],
+    {
+      env: cleanEnv({
+        HOME: fixture.home,
+        GIT_DIR: fixture.worktreeGitDir,
+        STUB_EXIT: '0',
+        STUB_MARKER: marker,
+        WORKLOG_SKIP_PRE_PUSH: '1',
+        CONTEXT_BUDGET_SKIP: '1',
+        TEST_SCOPE_SKIP: '0',
+        ...extraEnv,
+      }),
+    },
+  );
+  return { result, marker };
+}
+
 /** The main checkout's mirror target (`<main>/.worklog/cache`). */
 function createMainCache(fixture: Fixture): string {
   const cache = path.join(fixture.repo, '.worklog', 'cache');
@@ -292,7 +339,15 @@ describe('committed pre-push gate from a linked worktree', () => {
       git_dir: string | null;
     };
     expect(invocation.argv).toEqual(
-      expect.arrayContaining(['--scope', 'full', '--strict-git-env']),
+      expect.arrayContaining([
+        '--scope',
+        'full',
+        '--strict-git-env',
+        '--project-root',
+        fixture.worktree,
+        '--gate-commit',
+        git(fixture.worktree, 'rev-parse', 'HEAD').stdout,
+      ]),
     );
     // No release-gate refusal: a worktree-managed GIT_DIR is legitimate.
     expect(result.stderr).not.toMatch(/refusing to run the release gate/i);
@@ -336,6 +391,58 @@ describe('committed pre-push gate from a linked worktree', () => {
         /dirname (?:-- )?"\$0"/,
       );
     }
+  }, 60_000);
+
+  it('runs no suite for a non-gated ref (no --gate-commit)', () => {
+    const fixture = makeFixture();
+    const { result, marker } = pushRefspecs(fixture, [
+      'HEAD:refs/heads/feature/x',
+    ]);
+
+    expect(result.status, `push failed: ${result.stderr}`).toBe(0);
+    // The stub marker proves the runner never ran for a feature branch.
+    expect(fs.existsSync(marker)).toBe(false);
+  }, 60_000);
+
+  it('refuses a push carrying two different dev/main commits', () => {
+    const fixture = makeFixture();
+    // A second commit gives the two gated refs different shas.
+    expect(
+      git(fixture.worktree, 'commit', '--allow-empty', '-qm', 'second').status,
+    ).toBe(0);
+    const { result, marker } = pushRefspecs(fixture, [
+      'HEAD~1:refs/heads/dev',
+      'HEAD:refs/heads/main',
+    ]);
+
+    expect(result.status, 'a multi-commit push must be refused').not.toBe(0);
+    // Refused before any suite runs.
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(result.stderr).toContain(
+      'cannot evidence one suite for several pushed commits',
+    );
+    expect(result.stderr).toContain('refs/heads/dev');
+    expect(result.stderr).toContain('refs/heads/main');
+    expect(result.stderr).toContain('TEST_SCOPE_SKIP=1');
+    expect(result.stderr).toContain('git push --no-verify');
+    // The remote refs stay unadvanced.
+    const remoteRefs = run('git', ['-C', fixture.remote, 'show-ref']);
+    expect(remoteRefs.stdout).not.toContain('refs/heads/dev');
+    expect(remoteRefs.stdout).not.toContain('refs/heads/main');
+  }, 60_000);
+
+  it('does not gate a ref deletion (all-zero local sha)', () => {
+    const fixture = makeFixture();
+    // Create dev first so the deletion below is a real ref deletion.
+    expect(pushFromWorktree(fixture, 0).result.status).toBe(0);
+
+    const { result, marker } = pushRefspecs(fixture, [':refs/heads/dev']);
+
+    expect(result.status, `delete push failed: ${result.stderr}`).toBe(0);
+    // A deletion has no tree to test: the suite is never invoked.
+    expect(fs.existsSync(marker)).toBe(false);
+    const remoteRefs = run('git', ['-C', fixture.remote, 'show-ref']);
+    expect(remoteRefs.stdout).not.toContain('refs/heads/dev');
   }, 60_000);
 
   it('treats the linked worktree as the repository under test, not an export', () => {
@@ -395,7 +502,37 @@ describe.skipIf(process.platform === 'win32')(
       expect(fs.readFileSync(mirrored, 'utf-8')).toBe(
         fs.readFileSync(worktreeEntry, 'utf-8'),
       );
-      expect(result.stderr).toContain('push gate: mirrored cache entry entry-abc');
+      expect(result.stderr).toContain('pre-push: mirrored gate cache entry entry-abc');
+    }, 60_000);
+
+    it('mirrors from the gate-resolved root, not the push cwd', () => {
+      const fixture = makeFixture();
+      const mainCache = createMainCache(fixture);
+      // The runner resolved a different checkout than the push cwd: that
+      // checkout's cache entry is what must be mirrored.
+      const otherRoot = path.join(fixture.root, 'other-checkout');
+      const otherEntry = path.join(
+        otherRoot,
+        '.worklog',
+        'cache',
+        'entry-gate',
+        'result.json',
+      );
+      fs.mkdirSync(path.dirname(otherEntry), { recursive: true });
+      fs.writeFileSync(otherEntry, '{"status": "green"}');
+
+      const { result } = pushFromWorktree(fixture, 0, {
+        STUB_GATE_ROOT: otherRoot,
+      });
+
+      expect(result.status, `push failed: ${result.stderr}`).toBe(0);
+      const mirrored = path.join(mainCache, 'entry-gate', 'result.json');
+      expect(
+        fs.existsSync(mirrored),
+        `gate-root entry was not mirrored into ${mainCache}`,
+      ).toBe(true);
+      expect(fs.readFileSync(mirrored, 'utf-8')).toBe('{"status": "green"}');
+      expect(result.stderr).toContain('pre-push: mirrored gate cache entry entry-gate');
     }, 60_000);
 
     it('never overwrites a cache entry the main checkout already holds', () => {
@@ -413,7 +550,7 @@ describe.skipIf(process.platform === 'win32')(
       expect(fs.readFileSync(existing, 'utf-8')).toBe(
         '{"status": "already-cached"}',
       );
-      expect(result.stderr).not.toContain('mirrored cache entry entry-abc');
+      expect(result.stderr).not.toContain('mirrored gate cache entry entry-abc');
     }, 60_000);
 
     // Skipped as root, where directory permissions cannot deny the copy.
@@ -438,7 +575,7 @@ describe.skipIf(process.platform === 'win32')(
           `fail-soft violated, the push was blocked: ${result.stderr}`,
         ).toBe(0);
         expect(result.stderr).toContain(
-          'push gate: warning: could not mirror cache entry entry-abc',
+          'pre-push: warning: could not mirror cache entry entry-abc',
         );
         expect(fs.existsSync(path.join(mainCache, 'entry-abc'))).toBe(false);
       },

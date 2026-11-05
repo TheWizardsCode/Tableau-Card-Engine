@@ -36,8 +36,9 @@
  * (`../../src/…`), so no `example-games/` tree or symlink is needed.
  *
  * A real run also copies the core's committed `.githooks/` verbatim (including
- * the unified full-suite pre-push gate), points the generated repo's **local**
- * `core.hooksPath` at it, and generates
+ * the unified full-suite pre-push gate, which is bound to the pushed commit via
+ * `--gate-commit`), points the generated repo's **local** `core.hooksPath` at
+ * it, and generates
  * `docs/dev/context-budget.thresholds.json` from that repo's own measured
  * surface (CG-0MW0KURL8002XOV9). Because `core.hooksPath` is local config, a
  * fresh clone still needs one activation step (`install_pi.sh` or

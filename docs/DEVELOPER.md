@@ -843,6 +843,39 @@ A push to `dev` (or `main`) runs the **full canonical suite** in the committed
 `pre-push` hook, and the run is recorded in the per-repo test cache that audits
 read (`.worklog/cache/`, 2-hour TTL).
 
+#### The gate is bound to the pushed commit (`--gate-commit`)
+
+The hook captures the pushed `<ref>=<sha>` pairs while reading pre-push stdin
+once, and invokes the resolved runner as
+`run_tests.py --scope full --strict-git-env --json --project-root <pushed tree>
+--gate-commit <sha>`. The runner resolves a **clean** checkout whose `HEAD` is
+exactly that commit — the push cwd when it qualifies, else any clean
+`git worktree list` checkout — runs/caches the full suite there, and **refuses
+(exit 2)** when no clean checkout holds it. So a green dev push means the suite
+ran against the commit that landed, not against whatever tree the hook
+happened to run in. The runner's provenance lines are echoed to the pusher:
+`run_tests: gate-subject …`, `gate-root …`, `gate-verdict …`, and
+`gate-refused …` on a refusal.
+
+Refusal semantics (all fail-closed):
+
+- **Several different dev/main commits in one push** are refused **before any
+  suite runs**, listing each `ref=sha` and the recovery (one commit per push).
+  Escape hatches: `TEST_SCOPE_SKIP=1` or `git push --no-verify` (explicit, not
+  recommended).
+- **A resolved runner that predates `--gate-commit`** is refused with a named
+  upgrade message ("the resolved run_tests.py predates --gate-commit…"), never
+  an argparse error.
+- **A ref deletion** (all-zero `local_sha`) carries no commit and is not gated.
+
+**Dirty-checkout impact.** The gate refuses when **no clean checkout holds the
+pushed commit**. In TCE the normal agent path is `implement.py finish`, which
+pushes from a clean linked worktree and resolves the gate **in place**; a clean
+main-checkout push also resolves in place. `.worklog/` is gitignored, so worklog
+churn never dirties a checkout. A genuinely dirty tracked tree therefore now
+fails closed (the intended contract) instead of producing a verdict about the
+dirty tree.
+
 `implement.py finish` pushes from the **linked worktree** holding the pushed
 commit. A worktree has no `.worklog/`, so the runner caches its run under the
 worktree's git dir (`<worktree git dir>/test-cache`) — invisible to the main
@@ -852,11 +885,13 @@ AC auto-verification, which both read `<main checkout>/.worklog/cache`.
 After a green gate run the hook's `mirror_suite_cache` copies every cache entry
 the main checkout lacks into `<main checkout>/.worklog/cache`, so
 `run_tests.py --summary --suite all --json` reports the pushed commit's green
-entry instead of `missing`. Cache keys are content-addressed (command + git
-state), so copying a missing entry is always safe — an identical key is an
-identical run — and mirroring never overwrites an entry the main cache already
-holds. The copy is **fail-soft**: a failure logs a warning and never blocks the
-push.
+entry instead of `missing`. The mirror sources from the **gate-resolved root**
+(the runner's `run_tests: gate-root` provenance), not merely the push cwd, so
+the entry lands for the commit that was actually validated. Cache keys are
+content-addressed (command + git state), so copying a missing entry is always
+safe — an identical key is an identical run — and mirroring never overwrites an
+entry the main cache already holds. The copy is **fail-soft**: a failure logs a
+warning and never blocks the push.
 
 > This behaviour ships in the **canonical pre-push hook template** owned by the
 > `worklog` package (`PRE_PUSH_HOOK_CONTENT`, emitted by `wl init` and kept
@@ -864,20 +899,31 @@ push.
 > locally: `wl doctor upgrade --dry-run` reports any divergence as pending, and
 > `--confirm` would overwrite the local edit.
 
-The mirroring is pinned on two layers: the upstream template test
-(`../ContextHub/tests/pre-push-hook-gate.test.ts`), and — in this repository —
-`tests/scripts/game-repo-scaffold-hook-gate.test.ts`
-(`describe('committed pre-push test-cache mirroring')`). The TCE-side cases push
+The mirroring and commit binding are pinned on two layers: the upstream
+template tests (`../ContextHub/tests/pre-push-hook-gate.test.ts`,
+`../ContextHub/tests/doctor-hook-upgrade.test.ts`), and — in this repository —
+`tests/scripts/game-repo-scaffold-hook-gate.test.ts`. The TCE-side cases push
 from a fixture's **linked worktree** against the committed `.githooks/pre-push`
-and assert that the gate entry lands in the main checkout's cache, that an entry
-the main cache already holds is never overwritten, and that an unwritable cache
-directory only warns and never fails the push.
+and assert that:
+
+- the hook forwards `--gate-commit <pushed sha>` and `--project-root <root>`;
+- a non-gated ref runs no suite, and a ref deletion is not gated;
+- a multi-commit dev/main push is refused before any suite runs;
+- the gate entry is mirrored from the gate-resolved root (`run_tests:
+  gate-root`), not the push cwd;
+- an entry the main cache already holds is never overwritten, and an
+  unwritable cache directory only warns and never fails the push.
+
+The same behaviour is documented upstream in
+`../ContextHub/docs/migrations.md` (the pre-push hook section) and in the
+implement skill (`../SorraAgents/skill/implement/SKILL.md`); this section
+covers the **consumer** contract.
 
 Re-verify end-to-end with:
 
 ```bash
 # 1. The canonical template owns the capability (no repository-local patch).
-git -C ../ContextHub merge-base --is-ancestor 9771d9c9 dev
+grep -c 'gate-commit' ../ContextHub/src/doctor/hook-upgrade.ts   # >= 4
 grep -c mirror_suite_cache ../ContextHub/src/doctor/hook-upgrade.ts   # >= 2
 diff .githooks/pre-push ../ContextHub/.githooks/pre-push               # empty
 
