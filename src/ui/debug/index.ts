@@ -9,6 +9,14 @@
 
 export { isDevMode, resolveDebugToolDescription, type DebugToolsEntry } from './DebugToolsRegistry';
 export { createSessionExportTool } from './SessionExportTool';
+export {
+  SUPPORTED_RECORDER_PROPERTIES,
+  NO_TRANSCRIPT_REASON,
+  resolveTranscript,
+  serializeTranscript,
+  type TranscriptExportResult,
+  type TranscriptRecorderLike,
+} from './transcriptExport';
 export { createStateInspectorTool } from './StateInspectorOverlay';
 export { createGameEventLogTool } from './GameEventLogOverlay';
 export { createAiDecisionViewerTool } from './AiDecisionOverlay';

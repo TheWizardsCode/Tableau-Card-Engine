@@ -5206,12 +5206,28 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
 
 - **Label:** "Export Session"
 - **Location:** Debug Tools section of the Settings panel
-- **Function:** Downloads the current game transcript as a JSON file. If the
-  active scene has a `recorder` with a `getTranscript()` method, it serializes
-  the full transcript. Otherwise, it produces an empty transcript with metadata.
+- **Function:** Downloads the current game transcript as a JSON file. The tool
+  discovers the transcript recorder on the active scene by probing (in order)
+  the property names `recorder`, `transcriptRecorder` and `transcript`,
+  accepting only objects that expose a callable `getTranscript()` method
+  (mirroring `StateInspectorOverlay`'s multi-name probing). When a recorder is
+  found, its `getTranscript()` output is serialised losslessly with
+  `JSON.stringify(..., null, 2)` and downloaded as
+  `session-export-<timestamp>.json` with MIME type `application/json`.
+- **No-data behaviour:** when the active scene exposes no conforming recorder
+  (or `getTranscript()` throws), **no file is downloaded** and the tool's live
+  description in the Debug Tools section shows a visible reason (e.g. "No
+  transcript recorder found on this scene"), refreshed within the panel's
+  500 ms description poll. A later successful export clears and replaces the
+  status, so it always reflects only the most recent attempt. The supported
+  property names are part of the engine's documented scene shapes; a scene
+  that uses a different name should rename its field accordingly or extend the
+  probe list in `src/ui/debug/transcriptExport.ts`.
 - **Use case:** Developers can export session data for debugging, regression
   testing, or replay without needing to finish the game or use CLI tools.
-- **Implementation:** `src/ui/debug/SessionExportTool.ts`
+- **Implementation:** `src/ui/debug/SessionExportTool.ts` (download + live
+  status) and `src/ui/debug/transcriptExport.ts` (Phaser-free recorder
+  discovery + serialisation).
 
 #### State Inspector
 
@@ -5486,7 +5502,8 @@ To verify production safety:
 | File | Purpose |
 |------|---------|
 | `src/ui/debug/DebugToolsRegistry.ts` | `isDevMode()` function and `DebugToolsEntry` type |
-| `src/ui/debug/SessionExportTool.ts` | Session export debug tool |
+| `src/ui/debug/SessionExportTool.ts` | Session export debug tool (download + live status) |
+| `src/ui/debug/transcriptExport.ts` | Phaser-free transcript recorder discovery + serialisation for the session export tool |
 | `src/ui/debug/StateInspectorOverlay.ts` | State inspector overlay |
 | `src/ui/debug/GameEventLogOverlay.ts` | Game event log overlay |
 | `src/ui/debug/AiDecisionRecorder.ts` | AI decision recording singleton |
