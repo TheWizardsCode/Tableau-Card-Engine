@@ -32,7 +32,7 @@ import { HelpPanel } from './HelpPanel';
 import { HelpButton } from './HelpButton';
 import { resolveActiveGameAssetUrl } from './game-asset-url';
 import { SettingsPanel } from './SettingsPanel';
-import type { SkillRatingConfig } from './SettingsPanel';
+import type { ExtraToggleConfig, SkillRatingConfig } from './SettingsPanel';
 import type { DebugToolsEntry } from './debug/DebugToolsRegistry';
 import { createSessionExportTool } from './debug/SessionExportTool';
 import { createStateInspectorTool } from './debug/StateInspectorOverlay';
@@ -301,6 +301,10 @@ export abstract class CardGameScene extends Phaser.Scene {
    * @param settingsToggleVeto  Optional veto for the settings toggle key
    *                     (e.g. to let the game cancel an in-progress
    *                     targeting phase on Escape first).
+   * @param extraToggles  Optional game-supplied boolean toggles rendered in the
+   *                     panel below the built-in toggles. Keep engine concepts
+   *                     out of it: each entry carries its own label and
+   *                     `get`/`set` pair. Default: none.
    */
   protected initSettingsPanel(
     difficultyNames?: readonly string[],
@@ -309,6 +313,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     skillRating?: SkillRatingConfig,
     debugTools?: DebugToolsEntry[],
     settingsToggleVeto?: () => boolean,
+    extraToggles?: readonly ExtraToggleConfig[],
   ): void {
     if (!this.soundManager) return;
     // Provide default debug tools when none are explicitly specified.
@@ -338,6 +343,7 @@ export abstract class CardGameScene extends Phaser.Scene {
       skillRating,
       debugTools: resolvedDebugTools,
       canToggle: settingsToggleVeto,
+      extraToggles,
     });
     this.settingsButton = this.settingsPanel.settingsButton!;
   }

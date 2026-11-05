@@ -4746,6 +4746,7 @@ The `SettingsPanel` class provides a slide-in right sidebar with controls for:
 - Reduced motion toggle
 - Configurable End Turn keybind
 - Difficulty selector (when `difficultyNames` provided)
+- Game-supplied toggles (when `extraToggles` provided)
 
 ```typescript
 import { SettingsPanel } from '@ui';
@@ -4758,6 +4759,39 @@ settingsPanel.open();   // Slide in from the right
 settingsPanel.close();  // Slide out
 settingsPanel.toggle(); // Toggle open/closed
 ```
+
+#### Game-supplied toggles (`extraToggles`)
+
+The panel is engine-owned and stays game-agnostic, so game-specific settings
+reach it through the optional `extraToggles` list. Each entry carries its own
+label and a `get`/`set` pair; the panel renders one toggle per entry in the
+Display section (below Tooltips and Reduced Motion) with the built-in styling:
+
+```typescript
+const settingsPanel = new SettingsPanel(this, {
+  soundManager: this.soundManager,
+  extraToggles: [
+    {
+      label: 'Auto advance turn',
+      get: () => isAutoAdvanceTurnEnabled(),
+      set: (value) => setAutoAdvanceTurnEnabled(value),
+    },
+  ],
+});
+```
+
+- **`get()`** is read when the panel is built, on every `open()`, after each
+  flip and by `refreshExtraToggles()`. It is wrapped, so a throwing callback
+  renders as `OFF` instead of breaking the panel.
+- **`set(value)`** receives the flipped value. The panel then re-reads `get()`,
+  so a game may veto or normalise a change and the rendered state always
+  reflects the stored preference rather than the request.
+- **`refreshExtraToggles()`** re-reads every entry and repaints it — call it
+  when the preference changed elsewhere (e.g. a game dialog's checkbox) while
+  the panel may be showing.
+- **Optional.** Omit `extraToggles` and the panel renders exactly the built-in
+  controls, so existing callers are unaffected. `CardGameScene.initSettingsPanel`
+  forwards it as its last parameter.
 
 **Depth conventions:** Same as HelpPanel (blocker 900, background 901, etc.). Settings button at depth 1102.
 

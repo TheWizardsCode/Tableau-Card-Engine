@@ -212,7 +212,11 @@ export type {
   TooltipPosition,
   ViewportTooltipPositionOptions,
 } from './Tooltip';
-export type { SettingsPanelConfig, SettingsButtonPosition } from './SettingsPanel';
+export type {
+  ExtraToggleConfig,
+  SettingsPanelConfig,
+  SettingsButtonPosition,
+} from './SettingsPanel';
 
 export { SettingsButton } from './SettingsButton';
 export type { SettingsButtonConfig } from './SettingsButton';

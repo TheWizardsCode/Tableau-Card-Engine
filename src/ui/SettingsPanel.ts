@@ -41,6 +41,33 @@ export interface SettingsButtonPosition {
   y?: number;
 }
 
+/**
+ * A game-supplied boolean toggle rendered in the settings panel.
+ *
+ * The panel is engine-owned and stays game-agnostic, so a game injects its own
+ * preferences (e.g. Main Street's *Auto advance turn*) through the optional
+ * {@link SettingsPanelConfig.extraToggles} list: the game owns the label, the
+ * way the current value is read, and the way a new value is applied (typically
+ * a persisted preference). The panel owns only the presentation.
+ */
+export interface ExtraToggleConfig {
+  /** Label rendered to the left of the toggle (e.g. "Auto advance turn"). */
+  label: string;
+  /**
+   * Current value. Read when the panel is built, when it opens, after each
+   * flip and by {@link SettingsPanel.refreshExtraToggles}.
+   */
+  get: () => boolean;
+  /**
+   * Apply a new value when the player activates the toggle.
+   *
+   * Called with the flipped value. The panel re-reads {@link get} afterwards,
+   * so a game may veto or normalise a change and the rendered state always
+   * reflects the stored preference rather than the request.
+   */
+  set: (value: boolean) => void;
+}
+
 /** Configuration for the SettingsPanel constructor. */
 export interface SettingsPanelConfig {
   /** The SoundManager instance to control. */
@@ -97,6 +124,15 @@ export interface SettingsPanelConfig {
    * In production builds, the entire debug section is tree-shaken.
    */
   debugTools?: DebugToolsEntry[];
+
+  /**
+   * Optional game-supplied boolean toggles, rendered in the Display section
+   * below the engine's own toggles (Tooltips, Reduced Motion) with identical
+   * styling. Each entry supplies its own label and `get`/`set` pair, keeping
+   * game-specific preferences out of the engine. Strictly optional: omit it
+   * and the panel renders exactly the built-in toggles only.
+   */
+  extraToggles?: readonly ExtraToggleConfig[];
 }
 
 // ── Style constants ─────────────────────────────────────────
@@ -162,6 +198,16 @@ export const DEPTH_SETTINGS_BUTTON = 1102;
 /** Depth used for the version label shown when settings panel is open. */
 const DEPTH_VERSION_LABEL = 899;
 
+/** Rendered game objects for one {@link SettingsPanelConfig.extraToggles} entry. */
+interface ExtraToggleView {
+  config: ExtraToggleConfig;
+  label: Phaser.GameObjects.Text;
+  toggleBg: Phaser.GameObjects.Rectangle;
+  toggleKnob: Phaser.GameObjects.Graphics;
+  statusText: Phaser.GameObjects.Text;
+  hitArea: Phaser.GameObjects.Zone;
+}
+
 // ── SettingsPanel class ─────────────────────────────────────
 
 export class SettingsPanel {
@@ -178,6 +224,7 @@ export class SettingsPanel {
     debugTools?: DebugToolsEntry[];
     hasTooltips: boolean;
     skillRating?: SkillRatingConfig;
+    extraToggles: readonly ExtraToggleConfig[];
   };
   private readonly panelWidth: number;
   private readonly canvasWidth: number;
@@ -302,6 +349,9 @@ export class SettingsPanel {
   private _awaitingEndTurnKey = false;
   private _endTurnCaptureListener: ((event: KeyboardEvent) => void) | null = null;
 
+  // Game-supplied toggles (only populated when config.extraToggles is given)
+  private readonly _extraToggleViews: ExtraToggleView[] = [];
+
 
   constructor(scene: Phaser.Scene, config: SettingsPanelConfig) {
     this.scene = scene;
@@ -318,6 +368,7 @@ export class SettingsPanel {
       debugTools: config.debugTools,
       hasTooltips: config.hasTooltips ?? true,
       skillRating: config.skillRating,
+      extraToggles: config.extraToggles ?? [],
     };
 
     this.canvasWidth = scene.scale.width;
@@ -644,8 +695,73 @@ export class SettingsPanel {
     reducedMotionHitArea.on('pointerdown', () => this.handleReducedMotionToggle());
     this._scrollContent.add(reducedMotionHitArea);
 
+    // ── Game-supplied extra toggles ─────────────────────
+    // The engine is game-agnostic: every entry supplies its own label and
+    // get/set pair, and is rendered exactly like the built-in toggles above.
+    let extraToggleY = reducedMotionY + 46;
+    for (const extraToggle of this.config.extraToggles) {
+      const extraToggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
+      const extraToggleValue = this.readExtraToggleValue(extraToggle);
+
+      const extraToggleLabel = scene.add.text(PADDING, extraToggleY, extraToggle.label, LABEL_STYLE);
+      extraToggleLabel.setOrigin(0, 0.5);
+      extraToggleLabel.setDepth(DEPTH_PANEL_CONTENT);
+      this._scrollContent.add(extraToggleLabel);
+
+      const extraToggleBg = scene.add.rectangle(
+        extraToggleX,
+        extraToggleY,
+        TOGGLE_SIZE * 1.8,
+        TOGGLE_SIZE,
+        extraToggleValue ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR,
+      );
+      extraToggleBg.setOrigin(0, 0.5);
+      extraToggleBg.setDepth(DEPTH_PANEL_CONTENT);
+      this._scrollContent.add(extraToggleBg);
+
+      const extraToggleKnob = scene.add.graphics();
+      extraToggleKnob.setDepth(DEPTH_PANEL_CONTENT);
+      this._scrollContent.add(extraToggleKnob);
+
+      const extraToggleStatusText = scene.add.text(
+        extraToggleX + TOGGLE_SIZE * 1.8 + 8,
+        extraToggleY,
+        extraToggleValue ? 'ON' : 'OFF',
+        VALUE_STYLE,
+      );
+      extraToggleStatusText.setOrigin(0, 0.5);
+      extraToggleStatusText.setDepth(DEPTH_PANEL_CONTENT);
+      this._scrollContent.add(extraToggleStatusText);
+
+      const extraToggleHitArea = scene.add.zone(
+        extraToggleX + TOGGLE_SIZE * 0.9,
+        extraToggleY,
+        TOGGLE_SIZE * 2.5,
+        TOGGLE_SIZE + 10,
+      );
+      extraToggleHitArea.setDepth(DEPTH_PANEL_CONTENT);
+      extraToggleHitArea.setInteractive({ useHandCursor: true });
+      this._scrollContent.add(extraToggleHitArea);
+
+      const view: ExtraToggleView = {
+        config: extraToggle,
+        label: extraToggleLabel,
+        toggleBg: extraToggleBg,
+        toggleKnob: extraToggleKnob,
+        statusText: extraToggleStatusText,
+        hitArea: extraToggleHitArea,
+      };
+      // Draw the knob only once the view exists (it positions itself from the
+      // label's rendered y).
+      this.drawExtraToggleKnob(view, extraToggleValue);
+      extraToggleHitArea.on('pointerdown', () => this.handleExtraToggle(view));
+      this._extraToggleViews.push(view);
+
+      extraToggleY += 46;
+    }
+
     // ── Card Design selector ─────────────────────────────
-    const cardDesignY = reducedMotionY + 46;
+    const cardDesignY = extraToggleY;
 
     this.cardDesignLabel = scene.add.text(PADDING, cardDesignY, 'Card Design', LABEL_STYLE);
     this.cardDesignLabel.setOrigin(0, 0.5);
@@ -1052,6 +1168,9 @@ export class SettingsPanel {
     // Show version label on the canvas
     this._versionLabel.setVisible(true);
     this.syncControlsToSoundManager();
+    // A game-supplied preference may have changed while the panel was closed
+    // (e.g. from a game dialog), so re-read them on every open.
+    this.refreshExtraToggles();
     this.createInputBlocker();
 
     // Ensure settings panel sits at top of overlay root ordering when opened.
@@ -1555,6 +1674,65 @@ export class SettingsPanel {
     // Border
     this.skillSliderHandle.lineStyle(2, SLIDER_FILL_COLOR, 1);
     this.skillSliderHandle.strokeCircle(x, y, SLIDER_HANDLE_RADIUS);
+  }
+
+  // ── Private: Game-supplied extra toggles ─────────────────
+
+  /**
+   * Re-read every game-supplied extra toggle's value and refresh its rendered
+   * state.
+   *
+   * Call this when the underlying preference changed outside the panel (for
+   * example a game dialog's checkbox) so the panel never shows a stale value.
+   * The panel also calls it whenever it opens. No-op when no extra toggles are
+   * configured or the panel has been destroyed.
+   */
+  refreshExtraToggles(): void {
+    if (this.destroyed) return;
+    for (const view of this._extraToggleViews) {
+      this.updateExtraToggleVisuals(view, this.readExtraToggleValue(view.config));
+    }
+  }
+
+  /** Read an entry's current value, tolerating a throwing game callback. */
+  private readExtraToggleValue(toggle: ExtraToggleConfig): boolean {
+    try {
+      return toggle.get() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Flip a game-supplied toggle and render the value the game actually stored. */
+  private handleExtraToggle(view: ExtraToggleView): void {
+    if (this.destroyed) return;
+    const requested = !this.readExtraToggleValue(view.config);
+    try {
+      view.config.set(requested);
+    } catch {
+      // A game callback must never break the panel; fall through to the
+      // re-read below, which renders whatever the game actually holds.
+    }
+    this.updateExtraToggleVisuals(view, this.readExtraToggleValue(view.config));
+  }
+
+  private updateExtraToggleVisuals(view: ExtraToggleView, enabled: boolean): void {
+    view.toggleBg.setFillStyle(enabled ? TOGGLE_ON_COLOR : TOGGLE_OFF_COLOR);
+    this.drawExtraToggleKnob(view, enabled);
+    view.statusText.setText(enabled ? 'ON' : 'OFF');
+  }
+
+  private drawExtraToggleKnob(view: ExtraToggleView, enabled: boolean): void {
+    view.toggleKnob.clear();
+
+    const toggleX = this.panelWidth - PADDING - TOGGLE_SIZE * 1.8;
+    const knobRadius = TOGGLE_SIZE / 2 - 3;
+    const knobX = enabled
+      ? toggleX + TOGGLE_SIZE * 1.8 - knobRadius - 3
+      : toggleX + knobRadius + 3;
+
+    view.toggleKnob.fillStyle(0xffffff, 1);
+    view.toggleKnob.fillCircle(knobX, view.label.y, knobRadius);
   }
 
   // ── Private: Sync controls ───────────────────────────────
