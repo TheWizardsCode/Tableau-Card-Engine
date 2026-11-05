@@ -919,9 +919,27 @@ The same behaviour is documented upstream in
 implement skill (`../SorraAgents/skill/implement/SKILL.md`); this section
 covers the **consumer** contract.
 
+**The installed template must be current.** `wl doctor upgrade` can only emit
+the commit-bound block when the **installed** `wl` ships it, because the hook
+comes from the packaged `PRE_PUSH_HOOK_CONTENT`
+(`<install>/dist/doctor/hook-upgrade.js`), not from this repository. Refresh
+the install from the framework repo (`scripts/install_pi.sh`) whenever the
+installed template predates the flag; a stale install reports the committed
+hook as `outdated` (`pending` non-empty) instead of `up-to-date`. That
+installer currently does not refresh a globally resolved `wl` on every setup —
+the gap is tracked upstream as `SA-0MW2QAEQ0005MTYN` — so verify the installed
+template directly (step 0 below) rather than assuming a fresh install.
+
 Re-verify end-to-end with:
 
 ```bash
+# 0. The INSTALLED wl must emit the commit-bound template. Refresh the install
+#    from the framework repo, then confirm the packaged template carries the
+#    flag (>= 4 occurrences: pre-check, invocation, comments).
+(cd ../SorraAgents && scripts/install_pi.sh)
+grep -c -- '--gate-commit' \
+  "$(dirname "$(readlink -f "$(command -v wl)")")/doctor/hook-upgrade.js"   # >= 4
+
 # 1. The canonical template owns the capability (no repository-local patch).
 grep -c 'gate-commit' ../ContextHub/src/doctor/hook-upgrade.ts   # >= 4
 grep -c mirror_suite_cache ../ContextHub/src/doctor/hook-upgrade.ts   # >= 2
