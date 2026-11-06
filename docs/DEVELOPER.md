@@ -5276,16 +5276,36 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
     the `Status: PAUSED` line is not overwritten by a poll tick. Resuming
     appends everything recorded while paused (the buffer is the source of
     truth, so a pause never loses events).
+  - **Colour coding (game-supplied):** `createGameEventLogTool(options)`
+    accepts `{ palettes?, paletteIndex?, onPaletteChange? }`. Each row is
+    rendered as three measured text objects — a dim, palette-independent
+    timestamp; the `[eventName]` token in the active palette's colour followed
+    by its short ASCII category tag (also palette-independent); and the
+    neutral pretty-printed payload. Only the event-name token carries
+    category colour.
+  - **Neutral default:** with no `palettes`, the overlay uses one internal
+    neutral palette (every name `#cccccc`, no tags) and renders **no**
+    `[ Palette: … ]` cycler, so the Gym, Main Street and a bare
+    `createGameEventLogTool()` keep the pre-colour feed.
+  - **Palette cycler:** when a game supplies two or more palettes, a
+    `[ Palette: <label> ]` control beside Clear/Pause cycles them, re-renders
+    the feed immediately and calls `onPaletteChange(index)` so the game can
+    persist the choice (e.g. The Rising's `SettingsStore` preference).
 - **Event source:** Subscribes to the `GameEventEmitter` instance exposed on
   `window.__GAME_EVENTS__` (set up automatically by `CardGameScene`).
 - **Use case:** Monitor event flow during gameplay for debugging event-driven
   interactions or replays.
-- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts` renders one text
-  object per event (header + pretty JSON, measured row offsets, no `wordWrap`);
-  the pure, Phaser-free formatting helpers (`formatEventLogEntry`,
-  `stringifyPayloadSafe`, `widestLineLength`) live in
-  `src/ui/debug/formatEventLog.ts` and are re-exported from `@ui/debug`.
-  Horizontal reachability comes from `createOverlayDialog`'s opt-in
+- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts` renders three text
+  objects per event (dim timestamp, coloured name + ASCII tag, neutral pretty
+  JSON, measured row offsets, no `wordWrap`); the pure, Phaser-free formatting
+  and palette helpers (`formatEventLogEntry`, `formatEventLogTimestamp`,
+  `formatEventLogName`, `formatEventLogPayload`, `stringifyPayloadSafe`,
+  `widestLineLength`, `resolveEventStyle`, `EventLogPalette`,
+  `EventLogStyle`, `NEUTRAL_EVENT_LOG_PALETTE`) live in
+  `src/ui/debug/formatEventLog.ts` and are re-exported from `@ui/debug` /
+  `@ui`. A game declares its palettes as a generic
+  `eventName → colour` + `eventName → tag` record; core carries no game
+  vocabulary. Horizontal reachability comes from `createOverlayDialog`'s opt-in
   `enableHorizontalScroll` (see [Overlay Dialog (scrolling)](#overlay-dialog-scrolling)).
 
 #### AI Decisions

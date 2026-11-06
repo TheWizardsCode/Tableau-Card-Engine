@@ -19,14 +19,23 @@ export {
 } from './transcriptExport';
 export { createStateInspectorTool } from './StateInspectorOverlay';
 export { createGameEventLogTool } from './GameEventLogOverlay';
-export { createAiDecisionViewerTool } from './AiDecisionOverlay';
+export type { GameEventLogToolOptions } from './GameEventLogOverlay';
 export {
+  CIRCULAR_PAYLOAD_PLACEHOLDER,
+  EVENT_LOG_PAYLOAD_COLOUR,
+  EVENT_LOG_TAG_COLOUR,
+  EVENT_LOG_TIMESTAMP_COLOUR,
+  NEUTRAL_EVENT_LOG_PALETTE,
   formatEventLogEntry,
+  formatEventLogName,
+  formatEventLogPayload,
+  formatEventLogTimestamp,
+  resolveEventStyle,
   stringifyPayloadSafe,
   widestLineLength,
-  CIRCULAR_PAYLOAD_PLACEHOLDER,
 } from './formatEventLog';
-export type { EventLogEntry } from './formatEventLog';
+export type { EventLogEntry, EventLogPalette, EventLogStyle } from './formatEventLog';
+export { createAiDecisionViewerTool } from './AiDecisionOverlay';
 export {
   createToneForgeStatusTool,
   withToneForgeStatusTool,
