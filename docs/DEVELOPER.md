@@ -2302,7 +2302,10 @@ CORE_ROOT=./core npm run build:electron    # desktop build
 
 An extracted game checkout (F1) has no root project files. Generate them with
 `scripts/game-repo-scaffold.ts`, which turns the checkout into a runnable
-single-game launcher against a sibling core (`../Tableau-Card-Engine`):
+single-game launcher against a sibling core (`../Tableau-Card-Engine`).
+Run both of the following from the **core checkout** — `tsx
+scripts/game-repo-scaffold.ts` and `npm run scaffold:games` exist only in the
+core, never in a game repo:
 
 ```bash
 tsx scripts/game-repo-scaffold.ts \

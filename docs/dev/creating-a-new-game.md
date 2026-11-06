@@ -109,7 +109,9 @@ The authoritative references are:
 - [Merged-core decision](merged-core-decision.md) — why the engine + Gym +
   launcher share one repo.
 
-Bootstrap the checkout and scaffold the game repo:
+Bootstrap the checkout and scaffold the game repo. All of the following run
+from the **core checkout** — `scaffold:game` and `scaffold:games` are
+core-only npm scripts that a game repo never declares:
 
 ```bash
 # Full distribution: sibling clones of the core + every game repo
