@@ -159,6 +159,13 @@ const MANIFEST: CoreManifest = {
   scripts: {
     'save-load-smoke': 'vite-node example-games/golf/scripts/save-load-smoke.ts',
     build: 'core-build',
+    // Core-only scaffold entry points: `core/package.json` declares them for
+    // use from the core checkout, where `scripts/game-repo-scaffold.ts`
+    // exists. A game repo has no root `scripts/` tree (Option C), so they must
+    // never be inherited into a generated game repo (MS-0MVO30VXS002A1Z0).
+    'scaffold:game': 'tsx scripts/game-repo-scaffold.ts',
+    'scaffold:games':
+      'tsx scripts/game-repo-scaffold.ts --all --core-root . --repos-dir ..',
   },
   dependencies: { phaser: '4.0.0-rc.7' },
   devDependencies: { vite: '^6.1.0', vitest: '^3.0.0', typescript: '^5.7.0' },
@@ -489,6 +496,30 @@ describe('renderPackageJson', () => {
     expect(pkg.scripts.test).toBe('vitest run --project unit');
     expect(pkg.dependencies).toEqual(MANIFEST.dependencies);
     expect(pkg.devDependencies).toEqual(MANIFEST.devDependencies);
+  });
+
+  it('omits the core-only scaffold:game(s) scripts from the rendered package.json', () => {
+    // Guard the template filter (MS-0MVO30VXS002A1Z0): the core manifest
+    // legitimately declares both keys for core-checkout use, but every
+    // generated game repo inherits the whole scripts map. Without the filter a
+    // game repo advertises `tsx scripts/game-repo-scaffold.ts`, a file that
+    // only exists in the core — invoking it fails with module-not-found.
+    expect(MANIFEST.scripts?.['scaffold:game']).toBe('tsx scripts/game-repo-scaffold.ts');
+    expect(MANIFEST.scripts?.['scaffold:games']).toContain('scripts/game-repo-scaffold.ts');
+
+    const pkg = JSON.parse(renderPackageJson('golf', MANIFEST, DEFAULT_CORE_REL));
+
+    expect(pkg.scripts).not.toHaveProperty('scaffold:game');
+    expect(pkg.scripts).not.toHaveProperty('scaffold:games');
+    // …while the rest of the inherited scripts still pass through, so the
+    // filter drops exactly the core-only entry points and nothing else.
+    expect(pkg.scripts['save-load-smoke']).toContain('src/scripts/save-load-smoke');
+    expect(pkg.scripts.build).toContain('tsc --noEmit');
+    // A game repo scaffolds through its own entry point, which targets the
+    // sibling core checkout rather than a (non-existent) local script.
+    expect(pkg.scripts.scaffold).toContain(
+      `${DEFAULT_CORE_REL}/scripts/game-repo-scaffold.ts`,
+    );
   });
 
   it('seeds a new game repo with an engine-independent baseline version', () => {

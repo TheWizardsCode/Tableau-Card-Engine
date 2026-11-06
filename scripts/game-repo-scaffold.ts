@@ -192,6 +192,25 @@ export const REFRESH_THRESHOLDS_PATH = 'scripts/refresh-context-thresholds.sh';
  */
 export const GAME_INITIAL_VERSION = '0.1.0';
 
+/**
+ * Core-only npm scripts that must never be inherited into a game repo
+ * (MS-0MVO30VXS002A1Z0).
+ *
+ * The core legitimately declares both for use **from the core checkout**, where
+ * `scripts/game-repo-scaffold.ts` exists. Option C (F9/C1) gives a game repo
+ * `src/`-layout sources and no root `scripts/` tree, so an inherited
+ * `tsx scripts/game-repo-scaffold.ts` entry point is dead on arrival — invoking
+ * it in a generated repo fails with module-not-found. A game repo scaffolds
+ * through its own `scaffold` entry point, which targets the sibling core
+ * checkout (`<coreRel>/scripts/game-repo-scaffold.ts`) instead.
+ *
+ * Deliberately an explicitly-named drop-list rather than a rule inferred from
+ * the command: the wider class of core-only inherited scripts (`test:smoke`,
+ * `context:check`, `build:electron-main`, …) is tracked separately on
+ * MS-0MVO30VXS002A1Z0 and should be generalised there, not guessed at here.
+ */
+export const CORE_ONLY_SCRIPTS = ['scaffold:game', 'scaffold:games'] as const;
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 /** The subset of the core `package.json` the scaffold reuses. */
@@ -538,12 +557,18 @@ export function renderPackageJson(
       // balance, replay, …) so a game's tests can invoke them, then override
       // the repo-specific entry points below. Option C (F9/C1) moves the game
       // tree to `src/`, so any inherited script that references
-      // `example-games/<game>/…` is repointed accordingly.
+      // `example-games/<game>/…` is repointed accordingly. Scripts that only
+      // work from the core checkout are dropped first — a game repo has no
+      // root `scripts/` tree ({@link CORE_ONLY_SCRIPTS}, MS-0MVO30VXS002A1Z0).
       ...Object.fromEntries(
-        Object.entries(manifest.scripts ?? {}).map(([name, cmd]) => [
-          name,
-          cmd.split(`example-games/${game}/`).join('src/'),
-        ]),
+        Object.entries(manifest.scripts ?? {})
+          .filter(
+            ([name]) => !(CORE_ONLY_SCRIPTS as readonly string[]).includes(name),
+          )
+          .map(([name, cmd]) => [
+            name,
+            cmd.split(`example-games/${game}/`).join('src/'),
+          ]),
       ),
       // Interactive dev start: the soft variant of `engine:sync` composes the
       // latest engine but never blocks on a dirty `./core` — it warns and
