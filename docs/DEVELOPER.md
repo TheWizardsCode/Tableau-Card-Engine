@@ -3357,8 +3357,7 @@ finishes) and the game-over banner never appears mid-animation.
   in `TurnResult.pendingCoinDelta` / `pendingRepDelta` / `pendingScoreDelta`
   and sets `TurnResult.requiresDeferredClosing`; `state.resourceBank` and
   `state.finalScore` are NOT mutated and the closing tail (EndCheck → next
-  week) is deferred. Tutorial, reduced-motion and replay paths omit the flag
-  (legacy immediate behaviour, no regression — AC5).
+  week) is deferred. Tutorial and replay paths omit the flag (legacy immediate behaviour, no regression — AC5). The reduced-motion path takes the deferred closing (`deferResourceApplication: true`), gated by `requiresDeferredClosing` so the Turn Summary dialog can present its summary under reduced motion (MS-0MW20KSEG001DH1X).
 - **Apply at animation end.** The scene (`MainStreetTurnController` +
   `MainStreetAnimator`) applies the deltas exactly once via
   `applyEndOfTurnDeltas` when the last animation completes (guarded by the
