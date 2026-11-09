@@ -1695,7 +1695,7 @@ smoke/dev lists always keep it.
 
 ## Startup Context Budget
 
-The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:
+The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. The thresholds file also carries `skill_implement_md` (`skill/implement/SKILL.md` body size), measured as a **separate gate** outside `total`; the refresh script reports every component the measurement emits. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:
 
 ```bash
 npm run context:refresh   # regenerate the thresholds, print the delta

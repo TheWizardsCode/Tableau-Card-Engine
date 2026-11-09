@@ -1207,12 +1207,21 @@ export function resolveMeasureContext(
   return fs.existsSync(global) ? global : undefined;
 }
 
-/** The four components a measured thresholds file carries. */
+/**
+ * The startup-surface components whose thresholds a measured file must carry.
+ *
+ * `measure_context.py` may also emit further components — `skill_implement_md`
+ * is measured as a separate gate and is **not** part of `total`. Those extra
+ * keys pass through unvalidated (and optional here) so an older or newer
+ * measurement tool never trips the scaffold's fail-open path.
+ */
 export interface ContextThresholds {
   global_agents: number;
   project_agents: number;
   skills_prose: number;
   total: number;
+  /** `skill/implement/SKILL.md` body size — a separate gate, never in `total`. */
+  skill_implement_md?: number;
 }
 
 /**
@@ -1295,6 +1304,12 @@ export function renderContextBudgetDoc(game: string): string {
     '| `project_agents` | this repository\'s `AGENTS.md` |',
     '| `skills_prose` | the frontmatter `description` prose of `skill/*/SKILL.md` (with `--include-hidden`) |',
     '| `total` | the sum of the components above |',
+    '',
+    '`measure_context.py` may also emit `skill_implement_md`',
+    '(`skill/implement/SKILL.md` body size) into the same file. It is a',
+    '**separate gate**: it is not part of `total`, and it measures `0` in a',
+    'repository with no local `skill/` tree. The refresh script reports every',
+    'component it measures.',
     '',
     '## Activating the hooks in a fresh clone',
     '',
