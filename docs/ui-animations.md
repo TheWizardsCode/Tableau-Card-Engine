@@ -6,7 +6,7 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 
 | Animation | Description | Default Duration |
 |------------|-------------|-------------------|
-| `dealCard` | Card dealing animation with arc motion | 400ms |
+| `dealCard` | Card dealing animation: one continuous arc (no mid-flight stall) | 400ms |
 | `placeCard` | Card placement animation with "snap" effect | 350ms |
 | `discardCard` | Card discard animation with fade/shrink | 400ms |
 | `flipCard` | Two-phase card flip (scaleX → 0 → texture swap → scaleX → 1) | 300ms |
@@ -17,7 +17,27 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 
 ## dealCard
 
-Animates a card being dealt from a source position into a player's hand. Uses smooth arc motion with a slight rotation for a natural card-dealing feel.
+Animates a card being dealt from a source position into a player's hand as
+**one continuous motion**: a single tween drives a normalised progress value
+from `0` to `1` across the whole `duration`, and the card's position and
+rotation are evaluated from that progress on a single quadratic arc joining the
+source to the destination.
+
+There is no phase boundary to tune, so the card never decelerates to a halt
+part-way through the flight and never restarts its easing — a deal reads as one
+fluid gesture rather than two halves with a hiccup in the middle
+(CG-0MWC07OBB004YD5E). The symmetric sine ease-in-out default accelerates from
+rest, whips through the arc peak at its fastest and settles into the hand; the
+rotation follows the same curve, so it eases out of `0`, peaks at the arc peak
+and eases back to `0` with no abrupt reversal.
+
+> **Upgrading note:** earlier releases chained two tweens (a 40 % rise easing
+> out into a zero-velocity apex, then a 60 % drop easing in), so the caller's
+> `ease` shaped only the first 40 % and phase 2 was hardcoded. The `ease` option
+> now shapes the **whole** flight, and the returned tween drives the **whole**
+> flight (cancelling it stops the card wherever it is). Endpoints, `duration`
+> semantics, the `card:dealt` event, the SFX beats and the reduced-motion branch
+> are unchanged.
 
 ### Import
 
@@ -51,14 +71,35 @@ dealCard({
 | `destY` | `number` | required | Destination Y coordinate |
 | `sourceX` | `number` | target.x | Starting X coordinate |
 | `sourceY` | `number` | target.y | Starting Y coordinate |
-| `duration` | `number` | 400 | Duration in ms |
-| `arcHeight` | `number` | -50 | Arc height (negative = upward) |
-| `ease` | `string` | 'Quad.easeOut' | Easing function |
-| `rotation` | `number` | 0.05 | Rotation during flight (radians) |
+| `duration` | `number` | 400 | Duration in ms; bounds the **whole** flight |
+| `arcHeight` | `number` | -50 | Peak displacement from the source→destination chord (negative = upward; `0` = straight line) |
+| `ease` | `string \| (progress) => number` | `DEFAULT_DEAL_EASE` | Easing applied **once across the whole flight** |
+| `rotation` | `number` | 0.05 | Peak rotation during flight (radians), reached at the arc peak |
 | `gameEvents` | `GameEventEmitter` | undefined | Event emitter |
 | `cardId` | `string` | undefined | Card ID for event payload |
 | `playerIndex` | `number` | undefined | Player index for event payload |
 | `reducedMotion` | `boolean` | undefined | When true, animation is skipped and snaps to destination instantly |
+
+### Pacing constants and the motion contract
+
+The motion is exposed as exported constants and pure helpers, so re-pacing a
+deal is a one-constant change and no caller has to wait on a hardcoded
+millisecond window:
+
+| Export | Purpose |
+|--------|---------|
+| `DEFAULT_DEAL_DURATION` | Whole-flight duration (400 ms) |
+| `DEFAULT_DEAL_ARC_HEIGHT` | Peak displacement from the chord (-50 px) |
+| `DEFAULT_DEAL_EASE` | Default easing function (symmetric sine ease-in-out) |
+| `DEAL_ARC_PEAK_PROGRESS` | Flight progress at which the arc peaks (0.5) |
+| `DEAL_MIN_INTERIOR_SPEED_RATIO` | Documented epsilon for the no-stall guarantee: the minimum fraction of peak travel speed kept at every interior sample of the flight |
+| `dealArcProfile(progress)` | The arc's bulge profile: `0` at both ends, `1` at the arc peak |
+| `evaluateDealPath(geometry, progress)` | Pure evaluation of position + rotation at a normalised progress (the same code the tween drives, usable in tests and headless checks) |
+
+Guaranteed by that shape: the flight has **no zero-velocity stall** inside the
+flight (speed stays above `DEAL_MIN_INTERIOR_SPEED_RATIO` of its peak between
+launch and landing), it crosses its arc peak exactly once with no dwell or
+reversal, and consecutive path steps stay within the arc's Lipschitz bound.
 
 ### Events
 

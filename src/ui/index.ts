@@ -93,8 +93,17 @@ export { moveGameObject } from './moveGameObject';
 export type { MoveGameObjectOptions } from './moveGameObject';
 
 // Card deal animation
-export { dealCard, DEFAULT_DEAL_DURATION, DEFAULT_DEAL_ARC_HEIGHT } from './dealCard';
-export type { DealCardOptions } from './dealCard';
+export {
+  dealCard,
+  DEFAULT_DEAL_DURATION,
+  DEFAULT_DEAL_ARC_HEIGHT,
+  DEFAULT_DEAL_EASE,
+  DEAL_ARC_PEAK_PROGRESS,
+  DEAL_MIN_INTERIOR_SPEED_RATIO,
+  dealArcProfile,
+  evaluateDealPath,
+} from './dealCard';
+export type { DealCardOptions, DealCardEase, DealPathGeometry, DealPathPoint } from './dealCard';
 
 // Card place animation
 export { placeCard, DEFAULT_PLACE_DURATION } from './placeCard';

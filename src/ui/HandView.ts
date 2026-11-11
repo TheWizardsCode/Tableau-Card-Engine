@@ -313,7 +313,10 @@ export interface AnimateAddCardOptions {
    */
   arcHeight?: number;
 
-  /** Easing function for the movement. @default 'Quad.easeOut' */
+  /**
+   * Easing for the whole deal flight (a Phaser easing name or function).
+   * @default the `dealCard` default easing (`DEFAULT_DEAL_EASE`)
+   */
   ease?: string;
 
   /**
