@@ -41,6 +41,8 @@ export const COMMON_SFX_KEYS = {
   SCORE_REVEAL: 'sfx-score-reveal',
   /** Illegal / invalid action feedback. */
   ILLEGAL_MOVE: 'sfx-illegal-move',
+  /** A card changed position — e.g. a hand reorder. */
+  CARD_SWAP: 'sfx-card-swap',
 } as const;
 
 export type CommonSfxKey = (typeof COMMON_SFX_KEYS)[keyof typeof COMMON_SFX_KEYS];

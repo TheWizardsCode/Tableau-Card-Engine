@@ -385,6 +385,10 @@ export type {
   RemoveCardOptions,
   AnimatedSortOptions,
   HandViewEvents,
+  CardReorderPayload,
+  DragSourceRange,
+  DragMovePayload,
+  DragEndPayload,
   CardTextureResolver,
   RenderCardFn,
 } from './HandView';

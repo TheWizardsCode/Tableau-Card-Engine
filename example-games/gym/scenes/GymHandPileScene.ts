@@ -25,8 +25,10 @@ import { createStandardDeck, shuffleArray } from '../../../src/card-system/Deck'
 import { rankValue } from '../../../src/card-system/rankValue';
 import { Pile } from '../../../src/card-system/Pile';
 import { createSeededRng } from '../../../src/core-engine/SeededRng';
-import { GameEventEmitter } from '../../../src/core-engine';
+import { GameEventEmitter, SoundManager, COMMON_SFX_KEYS } from '../../../src/core-engine';
+import type { SoundPlayer } from '../../../src/core-engine';
 import { HandView } from '../../../src/ui/HandView';
+import type { CardReorderPayload } from '../../../src/ui/HandView';
 import { PileView } from '../../../src/ui/PileView';
 import { flipCard } from '../../../src/ui/flipCard';
 import { discardCard } from '../../../src/ui/discardCard';
@@ -178,6 +180,12 @@ export class GymHandPileScene extends GymSceneBase {
   private outlinesButton!: Phaser.GameObjects.Text;
   private outlinesEnabled: boolean = true;
 
+  // Reorder demo state — ON by default so the capability is discoverable;
+  // dragging a card within the hand row reorders it instead of snapping back.
+  private reorderEnabled: boolean = true;
+  private reorderButton!: Phaser.GameObjects.Text;
+  private soundManager: SoundManager | null = null;
+
   constructor() {
     super({ key: GYM_HAND_PILE_KEY });
   }
@@ -186,6 +194,8 @@ export class GymHandPileScene extends GymSceneBase {
     preloadCardAssets(this);
     // Load the illegal-move sound used by shakeIllegalMove
     this.load.audio('sfx-illegal-move', 'assets/audio/default/illegal-move.wav');
+    // Card-move sound used by HandView when a drag-to-reorder commits
+    this.load.audio(COMMON_SFX_KEYS.CARD_SWAP, 'assets/audio/default/card-swap.wav');
   }
 
   create(): void {
@@ -195,6 +205,10 @@ export class GymHandPileScene extends GymSceneBase {
     this.initReducedMotion();
 
     ensureCardTextureFallbacks(this);
+
+    // Sound manager for the reorder SFX. HandView plays
+    // COMMON_SFX_KEYS.CARD_SWAP through it, so mute/volume are honoured.
+    this.soundManager = this.createSoundManager();
 
     // Create HandView for the player's hand
     this.handView = new HandView(this, {
@@ -208,6 +222,8 @@ export class GymHandPileScene extends GymSceneBase {
       reducedMotion: this.reducedMotion,
       showPositionOutlines: true,
       maxSlots: MAX_HAND_SIZE,
+      reorderEnabled: this.reorderEnabled,
+      soundManager: this.soundManager,
     });
 
     // Wire selection click handler
@@ -217,6 +233,25 @@ export class GymHandPileScene extends GymSceneBase {
         this.logEvent(`Selected card ${idx}: ${this.hand[idx].rank}${this.hand[idx].suit}`);
         this.showDiscardZoneHighlight();
       }
+    });
+
+    // HandView has already reordered its own view — keep the scene's hand
+    // array (the model) in sync, otherwise the next setCards() reverts it.
+    this.handView.on('cardreorder', (payload: CardReorderPayload) => {
+      const moved = this.hand.splice(payload.from, 1)[0];
+      this.hand.splice(payload.to, 0, moved);
+
+      if (this.selectedIdx === payload.from) {
+        this.selectedIdx = payload.to;
+      } else if (payload.from < this.selectedIdx && this.selectedIdx <= payload.to) {
+        this.selectedIdx--;
+      } else if (payload.to <= this.selectedIdx && this.selectedIdx < payload.from) {
+        this.selectedIdx++;
+      }
+
+      this.logEvent(
+        `Reordered ${moved.rank}${moved.suit}: ${payload.from} → ${payload.to} (hand model synced)`,
+      );
     });
 
     // Wire drag-and-drop event handlers
@@ -233,8 +268,15 @@ export class GymHandPileScene extends GymSceneBase {
       sourceRange: { from: number; to: number };
       targetPileIndex: number | null;
       accepted: boolean;
+      reordered?: boolean;
     }) => {
       this.clearHighlights();
+      if (payload.reordered) {
+        // Inside-hand reorder: the `cardreorder` handler already synced the
+        // model and logged it; the view is in its new order, so never snap
+        // the hand back here.
+        return;
+      }
       if (payload.accepted && payload.targetPileIndex !== null) {
         this.acceptDragDrop(payload);
       } else {
@@ -276,19 +318,19 @@ export class GymHandPileScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'Demonstrates HandView and PileView reusable UI components for card movement, selection, and animation. These components provide draggable hands, arc layouts, pile management, and a rich set of card animations (deal, discard, flip, move tween, illegal-move shake). Ghost position outlines (stroke-only rectangles, depth index−0.5) render behind every card and empty slot so players always see hand capacity — the slots sit at exactly the same position and rotation as the cards, with the same spacing, so an outline always ghosts the card it stands for. Because the row is laid out from capacity (maxSlots) rather than the current card count, drawing a card fills the next slot to the right and neither the existing cards nor the outlines move until the capacity changes. The hand holds at most MAX_HAND_SIZE (7) cards; drawing or recalling beyond that is rejected. In a real game like Golf or Lost Cities, HandView renders the player hand and PileView shows draw/discard piles with click-to-interact support.'
+        body: 'Demonstrates HandView and PileView reusable UI components for card movement, selection, and animation. These components provide draggable hands, arc layouts, pile management, and a rich set of card animations (deal, discard, flip, move tween, illegal-move shake). The hand also demonstrates opt-in drag-to-reorder: with reorder ON, dragging a single card left/right inside the hand row and releasing it over another slot moves it to that slot — the row re-lays out with an animation (instant under reduced motion), sfx-card-swap plays through the scene SoundManager, and the scene reorders its own hand array from the cardreorder event so the model stays authoritative. A pile drop always wins: while the pointer is over the discard zone the existing dragend/validator path runs and nothing is reordered. Ghost position outlines (stroke-only rectangles, depth index−0.5) render behind every card and empty slot so players always see hand capacity — the slots sit at exactly the same position and rotation as the cards, with the same spacing, so an outline always ghosts the card it stands for. Because the row is laid out from capacity (maxSlots) rather than the current card count, drawing a card fills the next slot to the right and neither the existing cards nor the outlines move until the capacity changes. The hand holds at most MAX_HAND_SIZE (7) cards; drawing or recalling beyond that is rejected. In a real game like Golf or Lost Cities, HandView renders the player hand and PileView shows draw/discard piles with click-to-interact support.'
       },
       {
         heading: 'Controls',
-        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile (animates based on mode).\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Disable Drag ] / [ Enable Drag ]: Toggle drag-and-drop mode (ON by default). When enabled, drag a card from hand to the discard pile. When disabled, click a card to select it, then click the discard pile to discard it.\n[ Toggle Discard Mode ]: Switch between animate (move+flip to discard pile, default) and shrink (fade+shrink in place).\n[ Toggle Face Up ]: Toggle the discard pile between face-up and face-down display. The order of cards is preserved — only the visible face changes.\n[ Outlines ON/OFF ]: Toggle the ghost card-position outlines. When ON, semi-transparent stroke-only outlines render behind every card and empty slot (maxSlots=MAX_HAND_SIZE=7). Each outline is positioned and rotated exactly like the card slot it ghosts. Press again to hide.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\nRaise slider: Adjust how far the selected card lifts out of the hand (default 60px, max 180px; 0 = off). The raise follows the card rotation in arc layout (straight up at 0°); in vertical cascade the selected card shifts right by the slider amount.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
+        body: '[ Draw ]: Deal a card from the deck to the hand with an arc animation. Demonstrates animateAddCard().\n[ Discard ]: Discard the selected card to the discard pile (animates based on mode).\n[ Recall ]: Move the top card of the discard pile back to the hand.\n[ Flip ]: Flip the selected card (two-phase scale animation).\n[ Move ]: Tween the selected card to a display area. Demonstrates moveGameObject().\n[ Cancel Move ]: Cancel an active move tween and return the card to the hand.\n[ Show Valid ]: Highlight deck and discard zones as valid drop targets using HighlightManager.\n[ Show Illegal ]: Trigger an illegal-move shake animation on the selected card.\n[ Select Next ]: Cycle forward through cards in the hand.\n[ Sort Hand ]: Sort hand by suit then rank.\n[ Shuffle Hand ]: Randomly shuffle the hand.\n[ Reset ]: Shuffle a fresh deck and deal a new starting hand.\n[ Disable Drag ] / [ Enable Drag ]: Toggle drag-and-drop mode (ON by default). When enabled, drag a card from hand to the discard pile. When disabled, click a card to select it, then click the discard pile to discard it.\n[ Disable Reorder ] / [ Enable Reorder ]: Toggle drag-to-reorder inside the hand row (ON by default). With reorder ON, drag a single card left/right within the hand row band and release it over another slot — the card moves there with an animated re-layout and the sfx-card-swap sound; releasing over the card’s own slot does nothing. With reorder OFF, dragging inside the hand snaps back. Vertical cascade layout never reorders (cascade drag picks up a multi-card range).\n[ Toggle Discard Mode ]: Switch between animate (move+flip to discard pile, default) and shrink (fade+shrink in place).\n[ Toggle Face Up ]: Toggle the discard pile between face-up and face-down display. The order of cards is preserved — only the visible face changes.\n[ Outlines ON/OFF ]: Toggle the ghost card-position outlines. When ON, semi-transparent stroke-only outlines render behind every card and empty slot (maxSlots=MAX_HAND_SIZE=7). Each outline is positioned and rotated exactly like the card slot it ghosts. Press again to hide.\nArc slider: Adjust hand curvature live (0 = straight, 200 = maximum arc).\nSpacing slider: Adjust gap between cards in the hand.\nRotation slider: Adjust maximum rotation angle for cards at the edges of an arc layout.\nRaise slider: Adjust how far the selected card lifts out of the hand (default 60px, max 180px; 0 = off). The raise follows the card rotation in arc layout (straight up at 0°); in vertical cascade the selected card shifts right by the slider amount.\n[ Toggle Layout ]: Switch between horizontal row and vertical cascade layout.'
       },
       {
         heading: 'Usage Example',
-        body: 'In a game of Golf, the player needs to draw from a deck, discard unwanted cards, and flip face-down cards. The animated draw and discard demonstrated here show how cards arc-visually move between piles, while the flip animation reveals hidden cards. The illegal-move shake provides instant feedback when the player tries an invalid action like drawing from an empty pile. Ghost position outlines show every slot in the tableau even before cards are dealt, so the player can always see hand capacity.'
+        body: 'In a game of Golf, the player needs to draw from a deck, discard unwanted cards, and flip face-down cards. The animated draw and discard demonstrated here show how cards arc-visually move between piles, while the flip animation reveals hidden cards. The illegal-move shake provides instant feedback when the player tries an invalid action like drawing from an empty pile. Ghost position outlines show every slot in the tableau even before cards are dealt, so the player can always see hand capacity. Drag-to-reorder is how a player arranges the hand in the order they plan to play it — HandView reports the move with a cardreorder event and the game reorders its own model array, so the view never becomes the source of truth.'
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card animates to discard pile (animate mode by default)\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Toggle Discard Mode ] → switches to shrink mode\n9. Press [ Discard ] → card fades+shrinks in place (shrink mode)\n10. Press [ Toggle Discard Mode ] → switches back to animate mode\n11. Verify drag is ON by default → drag a card from hand to discard pile, verify log shows acceptance\n12. Press [ Disable Drag ] → drag off; click a card then the discard pile to discard it\n13. Adjust Arc slider → hand curvature changes live\n14. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n15. Press [ Toggle Face Up ] → discard pile shows face-down; press again → face-up\n16. Adjust Raise slider → selected card lifts out of the hand (horizontal: straight up at 0° rotation); select an edge card and verify the raise follows the rotation; switch to vertical cascade and verify the selected card shifts right\n17. Press [ Reset ] → new hand dealt, all state cleared, raise resets to the 60px default, face-up state resets to face-up\n18. Verify outlines ON by default → semi-transparent 2px outlines render behind every card slot, each aligned with (and rotated like) its card (5 cards + 2 empty slots, max hand size 7); draw a card and confirm the existing cards and all 7 slots stay in place while the new card fills the next slot to the right\n19. Press [ Outlines OFF ] → outlines disappear; drag label shows Outlines: OFF\n20. Press [ Outlines ON ] → outlines re-appear at current layout positions\n21. Toggle layout to vertical cascade → outlines cascade vertically and reposition correctly\n22. Draw until the hand holds 7 cards → further Draw/Recall attempts are rejected with illegal-move feedback (hand full)'
+        body: '1. Press [ Draw ] → card animates from deck to hand, event log confirms\n2. Press [ Select Next ] twice → second card selected, log shows selection\n3. Press [ Discard ] → selected card animates to discard pile (animate mode by default)\n4. Press [ Recall ] → card returns from discard to hand\n5. Press [ Flip ] → selected card flips face-down then face-up\n6. Press [ Show Valid ] → green highlights appear on deck and discard zones\n7. Press [ Show Illegal ] → selected card shakes if one is selected\n8. Press [ Toggle Discard Mode ] → switches to shrink mode\n9. Press [ Discard ] → card fades+shrinks in place (shrink mode)\n10. Press [ Toggle Discard Mode ] → switches back to animate mode\n11. Verify drag is ON by default → drag a card from hand to discard pile, verify log shows acceptance\n12. Press [ Disable Drag ] → drag off; click a card then the discard pile to discard it\n13. Adjust Arc slider → hand curvature changes live\n14. Press [ Toggle Layout ] → layout switches between horizontal and vertical cascade\n15. Press [ Toggle Face Up ] → discard pile shows face-down; press again → face-up\n16. Adjust Raise slider → selected card lifts out of the hand (horizontal: straight up at 0° rotation); select an edge card and verify the raise follows the rotation; switch to vertical cascade and verify the selected card shifts right\n17. Press [ Reset ] → new hand dealt, all state cleared, raise resets to the 60px default, face-up state resets to face-up\n18. Verify outlines ON by default → semi-transparent 2px outlines render behind every card slot, each aligned with (and rotated like) its card (5 cards + 2 empty slots, max hand size 7); draw a card and confirm the existing cards and all 7 slots stay in place while the new card fills the next slot to the right\n19. Press [ Outlines OFF ] → outlines disappear; drag label shows Outlines: OFF\n20. Press [ Outlines ON ] → outlines re-appear at current layout positions\n21. Toggle layout to vertical cascade → outlines cascade vertically and reposition correctly\n22. Draw until the hand holds 7 cards → further Draw/Recall attempts are rejected with illegal-move feedback (hand full)\n23. With reorder ON (default), drag a card left/right inside the hand row and release it over another slot → the card moves there with an animated re-layout, sfx-card-swap plays, and the event log reports the new position with “hand model synced”\n24. Drag a card and release it back over its own slot → nothing moves (no event, no sound)\n25. Press [ Disable Reorder ] → the same inside-hand drag snaps back and the status line shows Reorder: OFF; press [ Enable Reorder ] to restore it\n26. With reorder ON, drag a card onto the discard pile → the drop is accepted as before (reorder never pre-empts a pile target)'
       }
     ]);
 
@@ -315,6 +357,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.initButtonBar(row2Y);
     this.dragButton = this.buttonBar!.addButton('[ Disable Drag ]', () => this.toggleDrag(), { zone: 'left' });
     this.buttonBar!.addButton('[ Toggle Discard Mode ]', () => this.toggleDiscardMode(), { zone: 'center' });
+    this.reorderButton = this.buttonBar!.addButton('[ Disable Reorder ]', () => this.toggleReorder(), { zone: 'center' });
     this.buttonBar!.addButton('[ Toggle Face Up ]', () => this.toggleDiscardFaceUp(), { zone: 'right' });
     this.buttonBar!.addButton('[ Toggle Layout ]', () => this.toggleLayoutDirection(), { zone: 'right' });
     this.outlinesButton = this.buttonBar!.addButton('[ Outlines ON ]', () => this.toggleOutlines(), { zone: 'right' });
@@ -324,7 +367,7 @@ export class GymHandPileScene extends GymSceneBase {
     this.dragLabel = createHudText(this, HAND_DRAG_LABEL_X, infoY, 'Drag: ON  (drag card to the discard pile)  |  Outlines: ON', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
     this.discardModeLabel = createHudText(this, HAND_DISCARD_MODE_LABEL_X, infoY, 'Discard: animate', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
     this.faceUpLabel = createHudText(this, HAND_FACE_UP_LABEL_X, infoY, 'Face: up', '#88ff88', { fontSize: HAND_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
-    this.layoutLabel = createHudText(this, HAND_LAYOUT_LABEL_X, infoY, 'Layout: horizontal', '#88ff88', { fontSize: HAND_LAYOUT_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
+    this.layoutLabel = createHudText(this, HAND_LAYOUT_LABEL_X, infoY, this.layoutStatusString(), '#88ff88', { fontSize: HAND_LAYOUT_LABEL_FONT_SIZE }).setOrigin(0, 0.5);
 
     // Apply the default drag state (ON) so HandView is configured before use
     this.applyDragState();
@@ -457,7 +500,7 @@ export class GymHandPileScene extends GymSceneBase {
       this.setSliderVisible(this.arcSlider, false);
       this.setSliderVisible(this.rotationSlider, false);
 
-      this.layoutLabel.setText('Layout: vertical cascade');
+      this.layoutLabel.setText(this.layoutStatusString());
       this.logEvent('Switched to vertical cascade layout — cards stack top-to-bottom');
     } else {
       // Restore horizontal layout
@@ -479,7 +522,7 @@ export class GymHandPileScene extends GymSceneBase {
       this.setSliderVisible(this.arcSlider, true);
       this.setSliderVisible(this.rotationSlider, true);
 
-      this.layoutLabel.setText('Layout: horizontal');
+      this.layoutLabel.setText(this.layoutStatusString());
       this.logEvent('Switched to horizontal layout — cards spread in a row');
     }
   }
@@ -911,7 +954,7 @@ export class GymHandPileScene extends GymSceneBase {
       this.handView.setLayoutDirection('horizontal');
       this.setSliderVisible(this.arcSlider, true);
       this.setSliderVisible(this.rotationSlider, true);
-      this.layoutLabel.setText('Layout: horizontal');
+      this.layoutLabel.setText(this.layoutStatusString());
     }
 
     // Reset sliders to defaults
@@ -1010,6 +1053,68 @@ export class GymHandPileScene extends GymSceneBase {
   private toggleDrag(): void {
     this.dragEnabled = !this.dragEnabled;
     this.applyDragState();
+  }
+
+  /**
+   * Toggle drag-to-reorder inside the hand row.
+   *
+   * Reorder is opt-in on `HandView` (`reorderEnabled`, default off), so the
+   * scene flips it at runtime to show both behaviours: ON → dragging a card
+   * within the hand row moves it to a new slot (animated, with the
+   * card-swap SFX); OFF → the same gesture snaps back, and a drag onto the
+   * discard pile is the only drop.
+   */
+  private toggleReorder(): void {
+    this.reorderEnabled = !this.reorderEnabled;
+    this.applyReorderState();
+  }
+
+  /** Apply the current reorder state to HandView and the demo UI. */
+  private applyReorderState(): void {
+    this.handView.setReorderEnabled(this.reorderEnabled);
+    this.reorderButton.setText(this.reorderEnabled ? '[ Disable Reorder ]' : '[ Enable Reorder ]');
+    this.layoutLabel.setText(this.layoutStatusString());
+    this.logEvent(
+      this.reorderEnabled
+        ? 'Hand reorder ON — drag a card within the hand row to move it'
+        : 'Hand reorder OFF — dragging inside the hand row snaps back',
+    );
+  }
+
+  /** Status string for the layout/reorder line. */
+  private layoutStatusString(): string {
+    const layout = this.isVerticalLayout ? 'Layout: vertical cascade' : 'Layout: horizontal';
+    const reorderNote = this.isVerticalLayout ? 'n/a (cascade)' : this.reorderEnabled ? 'ON' : 'OFF';
+    return `${layout}  |  Reorder: ${reorderNote}`;
+  }
+
+  /**
+   * Build the scene's SoundManager for the reorder SFX.
+   *
+   * Returns `null` when the scene has no audio backend (headless tests), in
+   * which case `HandView` silently plays nothing.
+   */
+  private createSoundManager(): SoundManager | null {
+    if (!this.sound || typeof this.sound.play !== 'function') return null;
+    const phaserSound = this.sound;
+    const player: SoundPlayer = {
+      play: (key: string) => {
+        try { phaserSound.play(key); } catch (_) { /* ignore */ }
+      },
+      stop: (key: string) => {
+        try { (phaserSound as any).stopByKey?.(key); } catch (_) { /* ignore */ }
+      },
+      setVolume: (v: number) => {
+        try { (phaserSound as any).volume = v; } catch (_) { /* ignore */ }
+      },
+      setMute: (m: boolean) => {
+        try { (phaserSound as any).mute = m; } catch (_) { /* ignore */ }
+      },
+    };
+    const manager = new SoundManager(player, { storage: null });
+    // Loaded in preload(); registering makes `play()` resolve the asset key.
+    manager.register(COMMON_SFX_KEYS.CARD_SWAP);
+    return manager;
   }
 
   private toggleOutlines(): void {
@@ -1188,11 +1293,14 @@ export class GymHandPileScene extends GymSceneBase {
     try { this.handView?.destroy(); } catch (_) { /* ignore */ }
     try { this.deckView?.destroy(); } catch (_) { /* ignore */ }
     try { this.discardView?.destroy(); } catch (_) { /* ignore */ }
+    try { this.soundManager?.destroy(); } catch (_) { /* ignore */ }
+    this.soundManager = null;
 
     // Destroy layout, drag, and discard mode UI text labels
     try { this.layoutLabel?.destroy(); } catch (_) { /* ignore */ }
     try { this.dragLabel?.destroy(); } catch (_) { /* ignore */ }
     try { this.dragButton?.destroy(); } catch (_) { /* ignore */ }
+    try { this.reorderButton?.destroy(); } catch (_) { /* ignore */ }
     try { this.outlinesButton?.destroy(); } catch (_) { /* ignore */ }
     try { this.discardModeLabel?.destroy(); } catch (_) { /* ignore */ }
     try { this.faceUpLabel?.destroy(); } catch (_) { /* ignore */ }

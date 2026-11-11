@@ -3072,6 +3072,37 @@ For non-standard card models (tokens, resource icons, expedition cards), use the
 
 Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max hand size 7, toggle button) and `../tce-main-street/src/scenes/MainStreetRenderer.ts`. Tests: `tests/ui/handView.outlines.test.ts`, `tests/handView/gym-handpile-outlines.browser.test.ts`, `tests/main-street/hand-outlines.browser.test.ts`.
 
+### Hand reordering (drag-to-reorder)
+
+`HandView` can move a card to a new position **inside** the same hand row (CG-0MWBX4GJK007ZAOX), so a hand can be arranged in the order the player plans to play it instead of staying frozen in deal order. Reordering is **opt-in and default off**: `reorderEnabled: true` in the constructor or `setReorderEnabled(true)` / `getReorderEnabled()` at runtime. While it is off, every existing gesture (drag-to-pile with `setDragTargetPileIndex()` + `setDragValidator()`, cascade multi-card pickup, click-to-select) is unchanged.
+
+**Gesture and commit.** With reorder on, a single-card drag in horizontal layout that is released inside the hand row band — and **not** over a registered drop target — commits a move:
+
+- The insertion index comes from `computeReorderInsertionIndex(pointerX, sourceIndex)`: the dragged card is treated as removed and the index is the number of remaining slot centres the pointer has passed. A pointer left of slot 0 inserts at the front; a pointer right of the last centre appends; a pointer over the card's own slot is a **no-op** (no visual change, no event, no SFX).
+- Slot centres come from the same capacity row template as the layout, so a fixed `maxSlots` template is honoured — every other card and every outline slot keeps its exact slot, and the row never re-centres.
+- A transient insertion marker (a plain 3 px rectangle, never a mask) previews the target slot during the drag; `getReorderInsertionIndex()` exposes the same preview. No marker is shown for a no-op target.
+- On commit the view splices its own `cards` order, re-indexes the sprites it manages (z-order, labels, tint overlays), re-lays the row with a 240 ms tween to the new slot positions (instant under reduced motion), updates outline alignment, and returns the selection to the moved card.
+- The move is **audible**: `COMMON_SFX_KEYS.CARD_SWAP` (`sfx-card-swap`, [SFX convention](SFX_CONVENTION.md)) plays through the `soundManager` passed to the constructor, so mute and volume are respected. Nothing plays when the reorder is a no-op or when no manager is wired. The manager must already have the key registered — the owning scene owns asset loading (`scene.load.audio(COMMON_SFX_KEYS.CARD_SWAP, 'assets/audio/default/card-swap.wav')`).
+
+**Model stays authoritative.** `HandView` is a view. It reorders its own `cards` / sprites and then emits `cardreorder` with `{ from, to, card }`; the game **must** apply the same move to its own array, otherwise its next `setCards()` refresh re-renders the old order:
+
+```ts
+handView.on('cardreorder', ({ from, to }) => {
+  const [card] = myHand.splice(from, 1);
+  myHand.splice(to, 0, card);
+});
+```
+
+The gesture also still emits `dragend` — with `targetPileIndex: null`, `accepted: false` and `reordered: true`. That flag is the discriminator: a `dragend` handler must not treat a reorder as a rejected pile drop (do not snap the hand back to the model order or log a rejection). Normal (non-reorder) drags keep the original `dragend` payload shape.
+
+**Pile precedence.** A non-null `setDragTargetPileIndex()` value always wins: while the pointer is over a pile the existing `dragend`/validator path runs and nothing is reordered. Releasing outside the hand row band likewise leaves the drag to the legacy path. Vertical (cascade) layout never reorders — a cascade drag picks up a multi-card range (`[0..index]`), so range reordering is deferred.
+
+**Custom renderers.** The default Image path and the `renderCard` callback path are both reorderable — HandView attaches the drag lifecycle to whatever display object the renderer returned, so no game-side bespoke drag code is needed. Because reordering changes card **indices**, a custom renderer must not cache index-derived state across a reorder (rebuild it from the card in the `cardreorder` handler instead); see the [UI Adapter Guide](ui/ADAPTER-GUIDE.md#reordering-and-index-derived-state).
+
+**No undo coupling.** `HandView` does not own undo. A game using `UndoRedoManager` decides for itself whether to wrap the `cardreorder` handler in a `Command`.
+
+Reference implementation: `example-games/gym/scenes/GymHandPileScene.ts` (runtime `[ Disable Reorder ]` toggle, event-log entry, model sync). Tests: `tests/ui/handView.reorder.test.ts` (insertion index, commit order, no-op, reduced motion, SFX, pile precedence, custom renderer, `maxSlots` template), `tests/handView/gym-handpile-reorder.browser.test.ts` (real drag gesture + drag-to-discard still working).
+
 ## Animation & Sound Feedback for Player and AI Actions
 
 **Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. `shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; pass its `reason` option (the rules-layer `LegalityResult.reason`) and it also renders the transient reason toast, so a rejected move is explained as well as animated — see [shakeIllegalMove](ui-animations.md#shakeillegalmove-illegal-move-feedback--reason-toast). `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops and renders the reason toast when an `illegalReason` resolver supplies `payload.reason`.)

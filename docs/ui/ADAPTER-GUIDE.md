@@ -48,6 +48,20 @@ const handView = new HandView(scene, {
 
 Custom-rendered cards are responsible for their own selection/hover visuals. HandView skips default `setTint` selection feedback when `renderCard` is provided. Use `customHoverFn` to apply custom selection behaviour. See the Sushi Go and Main Street integration examples in `example-games/`.
 
+### Reordering and index-derived state
+
+Drag-to-reorder (`reorderEnabled: true`) works for custom-rendered hands too: HandView attaches its drag lifecycle to whatever display object the renderer returned, re-indexes those objects on commit and re-lays them out — no game-side drag code is needed. Because a reorder **changes card indices**, a `renderCard` implementation must not cache index-derived state (positions, depths, labels keyed by index) across a reorder. Treat the renderer as a pure function of `(card, index, isSelected)` and rebuild index-keyed state from the `cardreorder` payload if the game keeps any:
+
+```ts
+handView.on('cardreorder', ({ from, to }) => {
+  const [card] = myHand.splice(from, 1);
+  myHand.splice(to, 0, card);
+  // rebuild any index-keyed visuals from myHand here
+});
+```
+
+The owning array stays authoritative — HandView reports the move, it never owns the model. See [Hand & Pile Rendering — Hand reordering](../DEVELOPER.md#hand-reordering-drag-to-reorder).
+
 ### HandView
 
 ```ts

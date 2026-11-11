@@ -13,6 +13,7 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 | `moveGameObject` | Positional movement tween | 700ms |
 | `shakeIllegalMove` | Illegal-move feedback: tint + shake, plus an optional transient reason toast | n/a (50ms × repeats) |
 | `createDragDropManager` | Reusable drag-and-drop lifecycle (dragstart/drag/dragend/drop, snap-back, drop-zone hit-testing) | n/a |
+| `HandView` reorder | Opt-in drag-to-reorder inside the hand row: animated re-layout + `sfx-card-swap` | 240ms |
 
 ## dealCard
 
@@ -430,6 +431,55 @@ draggable on every board render (`makeDraggable`).
 `registerDraggable`, `unregisterDraggable`, `registerDropZone`,
 `unregisterDropZone`, `clearDropZones`, `getDropZoneData`, `setEnabled`,
 `setReducedMotion`, `destroy` — see `src/ui/dragDrop.ts` for signatures.
+
+## HandView drag-to-reorder (animation + SFX)
+
+`HandView` is not a standalone animation helper, but it owns one animation that
+follows the same conventions: opt-in drag-to-reorder inside the hand row
+(CG-0MWBX4GJK007ZAOX).
+
+```ts
+const handView = new HandView(scene, {
+  baseX, baseY, spacing: 56, maxSlots: 7,
+  reorderEnabled: true,        // default false
+  soundManager,                // must have COMMON_SFX_KEYS.CARD_SWAP registered
+  reducedMotion,
+});
+handView.setDragEnabled(true);
+handView.on('cardreorder', ({ from, to }) => {
+  const [card] = myHand.splice(from, 1);
+  myHand.splice(to, 0, card);
+});
+```
+
+**Animation.** The dragged card follows the pointer; a plain 3 px insertion
+marker previews the target slot (no `setMask` / `GeometryMask`). On commit the
+row tweens every displaced card (240 ms, `Quad.easeOut`) to its new slot,
+keeping the tint overlay and rank/suit label glued to it, then updates depth
+and outline alignment.
+
+**Reduced motion.** The re-layout snaps to the new positions instantly — no
+tween is created and the insertion marker still previews the target slot. The
+SFX still plays (only the animation is shortened).
+
+**SFX.** `COMMON_SFX_KEYS.CARD_SWAP` (`sfx-card-swap`, backed by
+`public/assets/audio/default/card-swap.wav`) plays once per committed reorder
+through the injected `SoundManager`, so the settings-panel mute/volume apply.
+Nothing plays for a no-op release (card returned to its own slot) or when no
+manager is wired. The scene must load and register the key:
+
+```ts
+preload() { this.load.audio(COMMON_SFX_KEYS.CARD_SWAP, 'assets/audio/default/card-swap.wav'); }
+
+const manager = new SoundManager(player, { storage: null });
+manager.register(COMMON_SFX_KEYS.CARD_SWAP);
+```
+
+**Precedence.** A pile target (`setDragTargetPileIndex()`) always wins over
+reordering, and vertical cascade drags are never reordered (they pick up a
+multi-card range). See
+[Hand reordering](../DEVELOPER.md#hand-reordering-drag-to-reorder) for the full
+contract and the model-sync rule.
 
 ## createCardHighlight (Canvas-compatible card highlight)
 
