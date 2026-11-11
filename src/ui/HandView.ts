@@ -7,6 +7,53 @@
  * deal/discard/flip are delegated to the caller via callbacks so the
  * component stays decoupled from specific animation implementations.
  *
+ * ## Inside-hand reordering — two supported integrations
+ *
+ * Opt-in drag-to-reorder has exactly one insertion-geometry implementation
+ * ({@link computeReorderInsertionIndex}) and two ways to drive it. Both share
+ * the same commit ({@link commitReorder}) and preview
+ * ({@link previewReorder}) behaviour: same marker, same animation (instant
+ * under reduced motion), same `sfx-card-swap`, same `cardreorder` event.
+ *
+ * **(a) `HandView` owns the drag.** Enable `setDragEnabled(true)` and
+ * `setReorderEnabled(true)` (`reorderEnabled: true` in the constructor).
+ * HandView attaches its own pointer lifecycle, previews the marker during
+ * the drag and commits on release. Nothing else is required.
+ *
+ * **(b) the game owns the drag.** Enable only `setReorderEnabled(true)` — do
+ * **not** enable `setDragEnabled(true)`, which would put a second drag
+ * lifecycle on the same pointer. The game's own drag manager (e.g.
+ * `createDragDropManager`) then calls {@link previewReorder} from its move
+ * handler and {@link commitReorder} from its end handler, using
+ * {@link computeReorderInsertionIndex} / {@link isPointerInHandRowBand} for
+ * the geometry:
+ *
+ * ```ts
+ * handView.setReorderEnabled(true); // no setDragEnabled(true)
+ *
+ * manager.onMove(({ pointer, sourceIndex }) => {
+ *   handView.previewReorder(pointer.x, pointer.y, sourceIndex);
+ * });
+ *
+ * manager.onEnd(({ pointer, sourceIndex, pileIndex }) => {
+ *   if (pileIndex !== null) return; // a pile drop always wins
+ *   if (!handView.isPointerInHandRowBand(pointer.y)) return;
+ *   const to = handView.computeReorderInsertionIndex(pointer.x, sourceIndex);
+ *   handView.commitReorder(sourceIndex, to);
+ * });
+ *
+ * // The game owns its model: apply the same move when the view reports it.
+ * handView.on('cardreorder', ({ from, to }) => {
+ *   const [card] = myHand.splice(from, 1);
+ *   myHand.splice(to, 0, card);
+ * });
+ * ```
+ *
+ * Both integrations are gated on `getReorderEnabled()` and a horizontal
+ * layout; vertical (cascade) layout never reorders. `HandView` never inspects
+ * pile targets for an external commit — drop-target precedence is the calling
+ * manager's responsibility.
+ *
  * @module ui/HandView
  */
 
@@ -1160,6 +1207,11 @@ export class HandView {
    * never re-centre on the current card count, and moving a card leaves every
    * other card (and every outline slot) in its slot.
    *
+   * This is the **single insertion-geometry source**. It is public so a game
+   * that drives its own drag manager can call it from its end handler and
+   * pass the result to {@link commitReorder} — see integration (b) in the
+   * class docs — instead of re-deriving the slot maths.
+   *
    * @param pointerX    - Pointer X in scene coordinates.
    * @param sourceIndex - Index of the card being dragged.
    * @returns The insertion index for the move, in `[0, cards.length - 1]`.
@@ -1176,6 +1228,197 @@ export class HandView {
       if (centre < pointerX) index += 1;
     }
     return Math.max(0, Math.min(index, count - 1));
+  }
+
+  /**
+   * Whether `pointerY` lies inside the vertical band occupied by the hand row.
+   *
+   * The band spans the card centres (the row may arc) plus half a card height
+   * and a small tolerance, so a release a little above or below the row still
+   * reorders while a release over a pile does not. Public so a game that owns
+   * its own drag manager can reuse the engine's tolerance instead of
+   * duplicating it — see the class-level integration (b).
+   *
+   * @param pointerY - Pointer Y in scene coordinates.
+   * @returns `true` when the pointer is within the hand row band.
+   */
+  public isPointerInHandRowBand(pointerY: number): boolean {
+    if (this.cards.length === 0) return false;
+    const positions = this.computeCardPositions();
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of positions) {
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const pad = this.cardHeight / 2 + REORDER_ROW_BAND_PADDING;
+    return pointerY >= minY - pad && pointerY <= maxY + pad;
+  }
+
+  /**
+   * Preview an **externally driven** inside-hand reorder.
+   *
+   * The external-manager counterpart of the internal `pointermove` preview
+   * (integration (b) in the class docs): shows the transient insertion marker
+   * at the slot the move would land in, records the index for
+   * {@link getReorderInsertionIndex}, and returns it. Calling it again with a
+   * different pointer moves the marker; calling it outside the row band, over
+   * the card's own slot, or with reorder mode off clears the marker and
+   * returns `null`.
+   *
+   * Does not require `setDragEnabled(true)` — the calling manager owns the
+   * gesture — but does require `setReorderEnabled(true)` and a horizontal
+   * layout, exactly like {@link commitReorder}.
+   *
+   * @param pointerX    - Pointer X in scene coordinates.
+   * @param pointerY    - Pointer Y in scene coordinates.
+   * @param sourceIndex - Index of the card being dragged.
+   * @returns The previewed insertion index, or `null` when nothing will move.
+   */
+  public previewReorder(pointerX: number, pointerY: number, sourceIndex: number): number | null {
+    const candidate = this._reorderTargetFor(pointerX, pointerY, sourceIndex);
+    return this._applyReorderAffordance(candidate, this._clampSourceIndex(sourceIndex));
+  }
+
+  /**
+   * Commit an inside-hand reorder by index — the entry point for a game that
+   * drives its own drag manager (integration (b) in the class docs).
+   *
+   * Performs exactly what the internal `pointerup` reorder path performs:
+   * splices `cards`, re-indexes the sprites, labels and tint overlays it
+   * manages, re-lays the row with the reorder tween (instant under reduced
+   * motion), plays {@link COMMON_SFX_KEYS.CARD_SWAP} through the injected
+   * `soundManager` and emits `cardreorder` with `{ from, to, card }`.
+   *
+   * Safe no-ops (no splice, no tween, no SFX, no event): `from === to`, an
+   * out-of-range or non-integer `from`, reorder mode off, and any non-
+   * horizontal (cascade) layout. An out-of-range `to` is clamped to the last
+   * index, matching {@link computeReorderInsertionIndex}.
+   *
+   * **Pile precedence is the caller's.** This method never inspects the drop
+   * target: a manager must not call it when its release resolved to a
+   * registered pile drop (`setDragTargetPileIndex()` / its own hit test).
+   *
+   * **The game owns its model.** The view reorders its own display and
+   * reports the move; the owning array must apply the same splice in the
+   * `cardreorder` handler, otherwise the next `setCards()` refresh renders
+   * the old order.
+   *
+   * @param from - Current index of the card being moved.
+   * @param to   - Target index for the card.
+   */
+  public commitReorder(from: number, to: number): void {
+    // An external commit clears any marker its move handler left behind.
+    this._hideReorderAffordance();
+    if (!this._reorderEnabled) return;
+    if (this.layoutDirection !== 'horizontal') return;
+
+    const count = this.cards.length;
+    if (!Number.isInteger(from) || from < 0 || from >= count) return;
+    if (!Number.isFinite(to)) return;
+    const target = Math.max(0, Math.min(Math.trunc(to), count - 1));
+    if (target === from) return;
+
+    // card → current display-object index (captured before the splice)
+    const oldIndexForCard = new Map<Card, number>();
+    for (let i = 0; i < count; i++) oldIndexForCard.set(this.cards[i], i);
+
+    const card = this.cards[from];
+    this.cards.splice(from, 1);
+    this.cards.splice(target, 0, card);
+
+    this._reorderManagedDisplay(oldIndexForCard);
+    this._shiftSelectionForReorder(from, target);
+
+    const positions = this.computeCardPositions();
+    this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
+
+    const animate = !this._reducedMotion;
+    const { arcCenterX, halfSpan } = this._rowArcSpan();
+
+    for (let i = 0; i < this.sprites.length && i < positions.length; i++) {
+      const sprite = this.sprites[i];
+      const pos = positions[i];
+
+      // z-order follows the new index: card i, its label just above it and
+      // its tint overlay just above the label (same scheme as rebuildDisplay).
+      if (typeof (sprite as any).setDepth === 'function') {
+        (sprite as any).setDepth(i);
+      }
+      const label = this.labels[i];
+      if (label && typeof (label as any).setDepth === 'function') {
+        (label as any).setDepth(i + 0.005);
+      }
+      const overlay = this._tintOverlays[i];
+      if (overlay && overlay.active) {
+        overlay.setDepth(i + 0.01);
+      }
+
+      let rotation = 0;
+      if (this.maxRotationDegrees !== 0) {
+        const normalized = (pos.x - arcCenterX) / halfSpan;
+        rotation = (this.maxRotationDegrees * normalized * Math.PI) / 180;
+      }
+
+      // Keep the selection raise on the moved card: target the raised resting
+      // position (computed from the TARGET rotation, since the sprite's own
+      // rotation is still the pre-tween one), so the commit never drops the
+      // selected card back to its unraised slot.
+      let raiseX = 0;
+      let raiseY = 0;
+      if (this.selectionLift > 0 && this._isCardSelected(i)) {
+        raiseX = this.selectionLift * Math.sin(rotation);
+        raiseY = -this.selectionLift * Math.cos(rotation);
+      }
+      const targetX = pos.x + raiseX;
+      const targetY = pos.y + raiseY;
+
+      // The tint overlay shares the card's x/y/rotation, so one tween can move
+      // both and the highlight stays glued to the card for the whole animation.
+      const targets: any[] = [sprite];
+      if (overlay && overlay.active) targets.push(overlay);
+      this.scene.tweens.killTweensOf(targets);
+
+      if (animate) {
+        this.scene.tweens.add({
+          targets,
+          x: targetX,
+          y: targetY,
+          rotation,
+          duration: REORDER_ANIMATION_MS,
+          ease: 'Quad.easeOut',
+        });
+        if (label) {
+          this.scene.tweens.add({
+            targets: label as any,
+            x: targetX,
+            y: targetY + LABEL_OFFSET_Y,
+            duration: REORDER_ANIMATION_MS,
+            ease: 'Quad.easeOut',
+          });
+        }
+      } else {
+        for (const t of targets) {
+          t.x = targetX;
+          t.y = targetY;
+          if (typeof t.rotation === 'number') t.rotation = rotation;
+        }
+        if (label) {
+          (label as any).x = targetX;
+          (label as any).y = targetY + LABEL_OFFSET_Y;
+        }
+      }
+    }
+
+    if (!animate) {
+      this._updateTintOverlayPositions();
+    }
+    this._updateOutlinePositions();
+
+    // Audible feedback for the committed move (mute / volume via SoundManager).
+    this._soundManager?.play(COMMON_SFX_KEYS.CARD_SWAP);
+
+    this.emit('cardreorder', { from, to: target, card });
   }
 
   /**
@@ -2280,24 +2523,35 @@ export class HandView {
     return from === to && from >= 0 && from < this.cards.length;
   }
 
+  /** Clamp an externally supplied source index into the current hand. */
+  private _clampSourceIndex(sourceIndex: number): number {
+    const count = this.cards.length;
+    if (count === 0 || !Number.isFinite(sourceIndex)) return -1;
+    return Math.max(0, Math.min(Math.trunc(sourceIndex), count - 1));
+  }
+
   /**
-   * Whether `pointerY` is inside the vertical band occupied by the hand row.
+   * Insertion index a reorder of `sourceIndex` would commit for the given
+   * pointer, or `null` when the gesture is not a reorder.
    *
-   * The band spans the union of the card centres (the row may arc) plus half
-   * a card and a small tolerance, so releasing a little above or below the
-   * row still reorders while releasing over a pile does not.
+   * The single source of the reorder **geometry**: reorder mode on, horizontal
+   * layout, a pointer inside the hand row band, and
+   * {@link computeReorderInsertionIndex} for the target slot. Drag-only guards
+   * (single-card source range, pile precedence) live in the internal wrapper
+   * {@link _reorderCandidateFor}; an external drag manager supplies its own
+   * source index — see {@link previewReorder}.
    */
-  private _isInHandRowBand(pointerY: number): boolean {
-    if (this.cards.length === 0) return false;
-    const positions = this.computeCardPositions();
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (const p of positions) {
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    const pad = this.cardHeight / 2 + REORDER_ROW_BAND_PADDING;
-    return pointerY >= minY - pad && pointerY <= maxY + pad;
+  private _reorderTargetFor(
+    pointerX: number,
+    pointerY: number,
+    sourceIndex: number,
+  ): number | null {
+    if (!this._reorderEnabled) return null;
+    if (this.layoutDirection !== 'horizontal') return null;
+    const from = this._clampSourceIndex(sourceIndex);
+    if (from < 0) return null;
+    if (!this.isPointerInHandRowBand(pointerY)) return null;
+    return this.computeReorderInsertionIndex(pointerX, from);
   }
 
   /**
@@ -2310,25 +2564,36 @@ export class HandView {
   private _reorderCandidateFor(pointerX: number, pointerY: number): number | null {
     if (!this._canReorderDuringDrag()) return null;
     if (this._currentTargetPileIndex !== null) return null;
-    if (!this._isInHandRowBand(pointerY)) return null;
-    return this.computeReorderInsertionIndex(pointerX, this._dragSourceRange!.from);
+    return this._reorderTargetFor(pointerX, pointerY, this._dragSourceRange!.from);
   }
 
   /**
    * Update the transient insertion affordance for the current drag.
-   *
-   * The marker is a plain rectangle (no mask / GeometryMask) drawn at the
-   * target slot's centre and above the cards. It is hidden when the gesture
-   * is not a reorder, and when the target equals the source index (a no-op
-   * release), so "nothing will move" is visible before release.
    */
   private _updateReorderAffordance(pointerX: number, pointerY: number): void {
     const candidate = this._reorderCandidateFor(pointerX, pointerY);
-    this._reorderInsertionIndex = candidate;
-    if (candidate === null || !this._dragSourceRange || candidate === this._dragSourceRange.from) {
+    this._applyReorderAffordance(candidate, this._dragSourceRange?.from ?? -1);
+  }
+
+  /**
+   * Show (or clear) the transient insertion marker for `candidate` — the
+   * internal drag path and the external {@link previewReorder} path share this
+   * one affordance implementation.
+   *
+   * The marker is a plain rectangle (no mask / GeometryMask) drawn at the
+   * target slot's centre and above the cards. It is hidden when the gesture
+   * is not a reorder (`candidate === null`), and when the target equals the
+   * source index (a no-op release), so "nothing will move" is visible before
+   * release.
+   *
+   * @returns The previewed insertion index, or `null` when nothing will move.
+   */
+  private _applyReorderAffordance(candidate: number | null, sourceIndex: number): number | null {
+    if (candidate === null || candidate === sourceIndex) {
       this._hideReorderAffordance();
-      return;
+      return null;
     }
+    this._reorderInsertionIndex = candidate;
 
     const row = this._computeRowPositions(this.cards.length);
     const slot = row[candidate] ?? { x: this._centerX ?? this.baseX, y: this.baseY };
@@ -2350,6 +2615,7 @@ export class HandView {
     if (typeof (this._reorderMarker as any).setVisible === 'function') {
       (this._reorderMarker as any).setVisible(true);
     }
+    return candidate;
   }
 
   /** Destroy the transient insertion marker, if any. */
@@ -2392,7 +2658,13 @@ export class HandView {
     }
 
     const hasLabels = this.labels.length === n;
-    const hasOverlays = this._tintOverlays.length === n;
+    // Overlay slots are sparse: `_setCardTint` only assigns the indices it
+    // touched, so a hand with one selected card has `_tintOverlays.length`
+    // of 1 while holding three cards. Test for presence, not length, so a
+    // highlight travels with its card instead of staying on the old index.
+    const hasOverlays =
+      this._tintOverlays.length <= n &&
+      this._tintOverlays.some((o) => o !== null && o !== undefined);
     const sprites: Phaser.GameObjects.GameObject[] = new Array(n);
     const labels: Phaser.GameObjects.Text[] = hasLabels ? new Array(n) : this.labels;
     const overlays: (Phaser.GameObjects.Rectangle | null)[] = hasOverlays ? new Array(n) : this._tintOverlays;
@@ -2411,123 +2683,6 @@ export class HandView {
     this.sprites = sprites;
     if (hasLabels) this.labels = labels;
     if (hasOverlays) this._tintOverlays = overlays;
-  }
-
-  /**
-   * Commit an inside-hand reorder: splice `cards` from → to, reorder the
-   * managed display objects with it, re-lay the row, play the card-swap SFX
-   * and emit `cardreorder`.
-   *
-   * The view is not the source of truth: the owning scene must apply the same
-   * move to its own model in the `cardreorder` handler, otherwise its next
-   * `setCards()` refresh re-renders the old order.
-   */
-  private _commitReorder(from: number, to: number): void {
-    const count = this.cards.length;
-    if (from < 0 || from >= count) return;
-    const target = Math.max(0, Math.min(to, count - 1));
-    if (target === from) return;
-
-    // card → current display-object index (captured before the splice)
-    const oldIndexForCard = new Map<Card, number>();
-    for (let i = 0; i < count; i++) oldIndexForCard.set(this.cards[i], i);
-
-    const card = this.cards[from];
-    this.cards.splice(from, 1);
-    this.cards.splice(target, 0, card);
-
-    this._reorderManagedDisplay(oldIndexForCard);
-    this._shiftSelectionForReorder(from, target);
-
-    const positions = this.computeCardPositions();
-    this._basePositions = positions.map((p) => ({ x: p.x, y: p.y }));
-
-    const animate = !this._reducedMotion;
-    const { arcCenterX, halfSpan } = this._rowArcSpan();
-
-    for (let i = 0; i < this.sprites.length && i < positions.length; i++) {
-      const sprite = this.sprites[i];
-      const pos = positions[i];
-
-      // z-order follows the new index: card i, its label just above it and
-      // its tint overlay just above the label (same scheme as rebuildDisplay).
-      if (typeof (sprite as any).setDepth === 'function') {
-        (sprite as any).setDepth(i);
-      }
-      const label = this.labels[i];
-      if (label && typeof (label as any).setDepth === 'function') {
-        (label as any).setDepth(i + 0.005);
-      }
-      const overlay = this._tintOverlays[i];
-      if (overlay && overlay.active) {
-        overlay.setDepth(i + 0.01);
-      }
-
-      let rotation = 0;
-      if (this.maxRotationDegrees !== 0) {
-        const normalized = (pos.x - arcCenterX) / halfSpan;
-        rotation = (this.maxRotationDegrees * normalized * Math.PI) / 180;
-      }
-
-      // Keep the selection raise on the moved card: target the raised resting
-      // position (computed from the TARGET rotation, since the sprite's own
-      // rotation is still the pre-tween one), so the commit never drops the
-      // selected card back to its unraised slot.
-      let raiseX = 0;
-      let raiseY = 0;
-      if (this.selectionLift > 0 && this._isCardSelected(i)) {
-        raiseX = this.selectionLift * Math.sin(rotation);
-        raiseY = -this.selectionLift * Math.cos(rotation);
-      }
-      const targetX = pos.x + raiseX;
-      const targetY = pos.y + raiseY;
-
-      // The tint overlay shares the card's x/y/rotation, so one tween can move
-      // both and the highlight stays glued to the card for the whole animation.
-      const targets: any[] = [sprite];
-      if (overlay && overlay.active) targets.push(overlay);
-      this.scene.tweens.killTweensOf(targets);
-
-      if (animate) {
-        this.scene.tweens.add({
-          targets,
-          x: targetX,
-          y: targetY,
-          rotation,
-          duration: REORDER_ANIMATION_MS,
-          ease: 'Quad.easeOut',
-        });
-        if (label) {
-          this.scene.tweens.add({
-            targets: label as any,
-            x: targetX,
-            y: targetY + LABEL_OFFSET_Y,
-            duration: REORDER_ANIMATION_MS,
-            ease: 'Quad.easeOut',
-          });
-        }
-      } else {
-        for (const t of targets) {
-          t.x = targetX;
-          t.y = targetY;
-          if (typeof t.rotation === 'number') t.rotation = rotation;
-        }
-        if (label) {
-          (label as any).x = targetX;
-          (label as any).y = targetY + LABEL_OFFSET_Y;
-        }
-      }
-    }
-
-    if (!animate) {
-      this._updateTintOverlayPositions();
-    }
-    this._updateOutlinePositions();
-
-    // Audible feedback for the committed move (mute / volume via SoundManager).
-    this._soundManager?.play(COMMON_SFX_KEYS.CARD_SWAP);
-
-    this.emit('cardreorder', { from, to: target, card });
   }
 
   /** Store current sprite positions before drag visuals are applied. */
@@ -2708,7 +2863,7 @@ export class HandView {
         // via `cardreorder`. No pile drop happened, so `accepted` is false and
         // `reordered` is true — a dragend handler must not snap the hand back.
         const sourceRange = this._dragSourceRange;
-        this._commitReorder(sourceRange.from, reorderTo);
+        this.commitReorder(sourceRange.from, reorderTo);
         this.emit('dragend', {
           sourceRange,
           targetPileIndex: null,

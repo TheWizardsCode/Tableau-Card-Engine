@@ -3076,6 +3076,15 @@ Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max h
 
 `HandView` can move a card to a new position **inside** the same hand row (CG-0MWBX4GJK007ZAOX), so a hand can be arranged in the order the player plans to play it instead of staying frozen in deal order. Reordering is **opt-in and default off**: `reorderEnabled: true` in the constructor or `setReorderEnabled(true)` / `getReorderEnabled()` at runtime. While it is off, every existing gesture (drag-to-pile with `setDragTargetPileIndex()` + `setDragValidator()`, cascade multi-card pickup, click-to-select) is unchanged.
 
+**Two supported integrations (CG-0MWCPEHZ5004ZP54).** There is one insertion-geometry implementation and one commit implementation; only the gesture owner differs:
+
+| | Who owns the drag | Enable with | Who commits |
+|---|---|---|---|
+| **(a) HandView owns the drag** | `HandView`'s own pointer lifecycle | `setDragEnabled(true)` **and** `setReorderEnabled(true)` | `HandView`, on `pointerup` |
+| **(b) The game owns the drag** | The game's drag manager (`createDragDropManager`, a bespoke manager, …) | `setReorderEnabled(true)` **only** | The game, calling `commitReorder(from, to)` from its end handler |
+
+Do **not** combine `setDragEnabled(true)` with an external manager: that puts a second drag lifecycle on the same pointer. Integration (b) is the one to use when the hand is rendered through `renderCard` and the game needs multi-card fan drags to board slots or a discard pile — dragging inside the hand row then resolves through the game's own manager, reusing the engine's insertion geometry instead of re-implementing slot maths.
+
 **Gesture and commit.** With reorder on, a single-card drag in horizontal layout that is released inside the hand row band — and **not** over a registered drop target — commits a move:
 
 - The insertion index comes from `computeReorderInsertionIndex(pointerX, sourceIndex)`: the dragged card is treated as removed and the index is the number of remaining slot centres the pointer has passed. A pointer left of slot 0 inserts at the front; a pointer right of the last centre appends; a pointer over the card's own slot is a **no-op** (no visual change, no event, no SFX).
@@ -3097,11 +3106,47 @@ The gesture also still emits `dragend` — with `targetPileIndex: null`, `accept
 
 **Pile precedence.** A non-null `setDragTargetPileIndex()` value always wins: while the pointer is over a pile the existing `dragend`/validator path runs and nothing is reordered. Releasing outside the hand row band likewise leaves the drag to the legacy path. Vertical (cascade) layout never reorders — a cascade drag picks up a multi-card range (`[0..index]`), so range reordering is deferred.
 
+**Integration (b) — worked example.** A game that owns the drag calls the public surface from its own manager's move and end handlers:
+
+```ts
+// Enable reorder mode only — no setDragEnabled(true).
+handView.setReorderEnabled(true);
+
+const manager = createDragDropManager(scene, {
+  onMove: ({ pointer, sourceIndex }) => {
+    // Marker preview using the engine's own band + insertion geometry.
+    handView.previewReorder(pointer.x, pointer.y, sourceIndex);
+  },
+  onEnd: ({ pointer, sourceIndex, pileIndex }) => {
+    // A release over a registered pile target must never reorder.
+    if (pileIndex !== null) return;
+    if (!handView.isPointerInHandRowBand(pointer.y)) return;
+    const to = handView.computeReorderInsertionIndex(pointer.x, sourceIndex);
+    handView.commitReorder(sourceIndex, to); // no-op for own slot / out of range
+  },
+});
+
+// The game still owns its model (same contract as integration (a)).
+handView.on('cardreorder', ({ from, to }) => {
+  const [card] = myHand.splice(from, 1);
+  myHand.splice(to, 0, card);
+});
+```
+
+Public surface for external managers (all inert unless `getReorderEnabled()` is true and the layout is horizontal):
+
+- `commitReorder(from, to)` — the same commit the internal `pointerup` path performs: splice, display re-index, re-layout tween (instant under reduced motion), `sfx-card-swap` through the injected `SoundManager`, `cardreorder` with `{ from, to, card }`. No-op for `from === to`, an out-of-range/non-integer `from`, reorder mode off, and vertical layout; an out-of-range `to` is clamped.
+- `previewReorder(pointerX, pointerY, sourceIndex)` — shows/moves the insertion marker, records it for `getReorderInsertionIndex()`, and returns the index (or `null` when nothing would move: outside the band, over the card's own slot, or reorder mode off). Clears the marker on a subsequent no-op preview.
+- `isPointerInHandRowBand(pointerY)` — the row-band tolerance the internal path uses, so the caller does not duplicate it.
+- `computeReorderInsertionIndex(pointerX, sourceIndex)` — the single insertion-geometry source (public since the parent item).
+
+**The caller owns precedence.** `commitReorder()` never inspects pile targets: the release decision (pile drop vs hand reorder) belongs to the manager that did the hit-testing. Calling it unconditionally after a pile release would reorder a card the player dropped on a pile.
+
 **Custom renderers.** The default Image path and the `renderCard` callback path are both reorderable — HandView attaches the drag lifecycle to whatever display object the renderer returned, so no game-side bespoke drag code is needed. Because reordering changes card **indices**, a custom renderer must not cache index-derived state across a reorder (rebuild it from the card in the `cardreorder` handler instead); see the [UI Adapter Guide](ui/ADAPTER-GUIDE.md#reordering-and-index-derived-state).
 
 **No undo coupling.** `HandView` does not own undo. A game using `UndoRedoManager` decides for itself whether to wrap the `cardreorder` handler in a `Command`.
 
-Reference implementation: `example-games/gym/scenes/GymHandPileScene.ts` (runtime `[ Disable Reorder ]` toggle, event-log entry, model sync). Tests: `tests/ui/handView.reorder.test.ts` (insertion index, commit order, no-op, reduced motion, SFX, pile precedence, custom renderer, `maxSlots` template), `tests/handView/gym-handpile-reorder.browser.test.ts` (real drag gesture + drag-to-discard still working).
+Reference implementation: `example-games/gym/scenes/GymHandPileScene.ts` (runtime `[ Disable Reorder ]` toggle, event-log entry, model sync — integration (a)). `../tce-the-rising` uses integration (b). Tests: `tests/ui/handView.reorder.test.ts` (insertion index, commit order, no-op, reduced motion, SFX, pile precedence, custom renderer, `maxSlots` template, and the public `commitReorder` / `previewReorder` / `isPointerInHandRowBand` external-manager surface), `tests/handView/gym-handpile-reorder.browser.test.ts` (real drag gesture + drag-to-discard still working).
 
 ## Animation & Sound Feedback for Player and AI Actions
 

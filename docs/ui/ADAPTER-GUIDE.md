@@ -62,6 +62,33 @@ handView.on('cardreorder', ({ from, to }) => {
 
 The owning array stays authoritative — HandView reports the move, it never owns the model. See [Hand & Pile Rendering — Hand reordering](../DEVELOPER.md#hand-reordering-drag-to-reorder).
 
+**If the game drives its own drag manager** (a custom-rendered hand that also drags cards to board slots or a discard pile), do **not** enable `setDragEnabled(true)` — that would put a second drag lifecycle on the same pointer, and an external manager's release inside the hand row would resolve to no hand drop zone and snap back. Enable reorder mode only and commit through the public API from your manager's handlers:
+
+```ts
+handView.setReorderEnabled(true); // no setDragEnabled(true)
+
+manager.onMove(({ pointer, sourceIndex }) =>
+  handView.previewReorder(pointer.x, pointer.y, sourceIndex),
+);
+
+manager.onEnd(({ pointer, sourceIndex, pileIndex }) => {
+  if (pileIndex !== null) return;                  // a pile drop always wins
+  if (!handView.isPointerInHandRowBand(pointer.y)) return;
+  handView.commitReorder(
+    sourceIndex,
+    handView.computeReorderInsertionIndex(pointer.x, sourceIndex),
+  );
+});
+
+handView.on('cardreorder', ({ from, to }) => {
+  const [card] = myHand.splice(from, 1);
+  myHand.splice(to, 0, card);
+  // rebuild any index-keyed visuals from myHand here
+});
+```
+
+`commitReorder()` performs the full commit (splice, re-index, re-layout, `sfx-card-swap`, `cardreorder`) and is a no-op for a same-slot, out-of-range or vertical-layout move. `previewReorder()` drives the same insertion marker the built-in gesture uses and returns the index (or `null`). Precedence is yours: `HandView` never inspects drop targets, so skip the commit when the release resolved to a pile. Both helpers are inert until `setReorderEnabled(true)`; nothing changes for a game that never opts in.
+
 ### HandView
 
 ```ts

@@ -749,3 +749,423 @@ describe('HandView reorder — insertion affordance', () => {
     view.destroy();
   });
 });
+
+// ── External drag-manager integration (CG-0MWCPEHZ5004ZP54) ──
+//
+// A game that drives drags through the shared DragDropManager cannot use
+// HandView's own pointer lifecycle without putting a second drag lifecycle on
+// the same pointer. These tests exercise the public surface such a caller
+// uses: `previewReorder()` from its move handler and `commitReorder()` from
+// its end handler, plus the public row-band helper. Nothing here enables
+// `setDragEnabled(true)` — the external path must work without it.
+
+/** Tint overlays are the non-outline, full-card (48×130) filled rectangles. */
+function tintOverlays(scene: any): any[] {
+  return scene._rectangles.filter(
+    (r: any) => r.active && !r.isOutline && r.width === ROW.cardWidth && r.height === CARD_HEIGHT,
+  );
+}
+
+describe('HandView reorder — public commit surface', () => {
+  let scene: any;
+
+  beforeEach(() => {
+    scene = createMockScene();
+  });
+
+  it('moves a card to the front of the hand (2 → 0)', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    const cards = hand();
+    const [a, k, q] = cards;
+    view.setCards(cards);
+
+    view.commitReorder(2, 0);
+
+    expect(labels(view.getCards())).toEqual(labels([q, a, k]));
+    expect(view.getCardCenters().map((p) => Math.round(p.x))).toEqual([344, 400, 456]);
+    view.destroy();
+  });
+
+  it('inserts a card between two cards (0 → 1)', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    const cards = hand();
+    view.setCards(cards);
+
+    view.commitReorder(0, 1);
+
+    expect(labels(view.getCards())).toEqual(labels([cards[1], cards[0], cards[2]]));
+    view.destroy();
+  });
+
+  it('appends a card at the end (0 → 2)', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    const cards = hand();
+    view.setCards(cards);
+
+    view.commitReorder(0, 2);
+
+    expect(labels(view.getCards())).toEqual(labels([cards[1], cards[2], cards[0]]));
+    view.destroy();
+  });
+
+  it('is a no-op when from === to (no splice, tween, SFX or event)', () => {
+    const soundManager = { play: vi.fn() } as any;
+    const view = makeView(scene, { reorderEnabled: true, soundManager });
+    const cards = hand();
+    view.setCards(cards);
+    const reordered = vi.fn();
+    view.on('cardreorder', reordered);
+    const tweensBefore = scene._tweens.length;
+
+    view.commitReorder(1, 1);
+
+    expect(labels(view.getCards())).toEqual(labels(cards));
+    expect(soundManager.play).not.toHaveBeenCalled();
+    expect(reordered).not.toHaveBeenCalled();
+    expect(scene._tweens.length).toBe(tweensBefore);
+    view.destroy();
+  });
+
+  it('is a no-op for an out-of-range from and clamps an out-of-range to', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    const cards = hand();
+    view.setCards(cards);
+    const payloads: any[] = [];
+    view.on('cardreorder', (p: any) => payloads.push(p));
+
+    view.commitReorder(-1, 2);
+    view.commitReorder(3, 0);
+    expect(labels(view.getCards())).toEqual(labels(cards));
+    expect(payloads).toHaveLength(0);
+
+    // `to` is clamped to the last index, exactly like the internal path.
+    view.commitReorder(0, 99);
+    expect(labels(view.getCards())).toEqual(labels([cards[1], cards[2], cards[0]]));
+    expect(payloads[0]).toMatchObject({ from: 0, to: 2 });
+    view.destroy();
+  });
+
+  it('is a no-op in vertical (cascade) layout', () => {
+    const view = makeView(scene, {
+      reorderEnabled: true,
+      layoutDirection: 'vertical',
+      baseX: 300,
+      baseY: 200,
+      spacing: 42,
+    });
+    const cards = hand();
+    view.setCards(cards);
+    const reordered = vi.fn();
+    view.on('cardreorder', reordered);
+
+    view.commitReorder(0, 2);
+
+    expect(reordered).not.toHaveBeenCalled();
+    expect(labels(view.getCards())).toEqual(labels(cards));
+    view.destroy();
+  });
+
+  it('is a no-op while reorder mode is disabled (documented enablement gate)', () => {
+    const view = makeView(scene);
+    const cards = hand();
+    view.setCards(cards);
+    const reordered = vi.fn();
+    view.on('cardreorder', reordered);
+
+    view.commitReorder(0, 2);
+
+    expect(reordered).not.toHaveBeenCalled();
+    expect(labels(view.getCards())).toEqual(labels(cards));
+
+    // Turning reorder on is all the enablement an external manager needs.
+    view.setReorderEnabled(true);
+    view.commitReorder(0, 2);
+    expect(labels(view.getCards())).toEqual(labels([cards[1], cards[2], cards[0]]));
+    view.destroy();
+  });
+
+  it('works without setDragEnabled(true) (no second drag lifecycle)', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    const cards = hand();
+    view.setCards(cards);
+    expect(view.getDragEnabled()).toBe(false);
+
+    view.commitReorder(0, 2);
+
+    expect(labels(view.getCards())).toEqual(labels([cards[1], cards[2], cards[0]]));
+    view.destroy();
+  });
+
+  it('re-lays the row instantly under reduced motion (no reorder tween)', () => {
+    const view = makeView(scene, { reorderEnabled: true, reducedMotion: true });
+    const cards = hand();
+    view.setCards(cards);
+
+    view.commitReorder(0, 2);
+
+    expect(labels(view.getCards())).toEqual(labels([cards[1], cards[2], cards[0]]));
+    const reorderTweens = scene._tweens.filter((t: any) => t.duration === 240 && t.x !== undefined);
+    expect(reorderTweens).toHaveLength(0);
+    // Sprites land on their new slots immediately.
+    expect(Math.round((view.getSpriteAt(2) as any).x)).toBe(456);
+    view.destroy();
+  });
+
+  it('animates the re-layout when motion is allowed', () => {
+    const view = makeView(scene, { reorderEnabled: true, showLabels: false });
+    view.setCards(hand());
+
+    view.commitReorder(0, 2);
+
+    const reorderTweens = scene._tweens.filter((t: any) => t.duration === 240 && t.x !== undefined);
+    expect(reorderTweens).toHaveLength(3);
+    expect(reorderTweens[0].ease).toBe('Quad.easeOut');
+    view.destroy();
+  });
+
+  it('plays the card-swap SFX through the injected SoundManager', () => {
+    const soundManager = { play: vi.fn() } as any;
+    const view = makeView(scene, { reorderEnabled: true, soundManager });
+    view.setCards(hand());
+
+    view.commitReorder(0, 2);
+
+    expect(soundManager.play).toHaveBeenCalledTimes(1);
+    expect(soundManager.play).toHaveBeenCalledWith(COMMON_SFX_KEYS.CARD_SWAP);
+    view.destroy();
+  });
+
+  it('re-indexes sprites, labels and tint overlays with per-index depth', () => {
+    const view = makeView(scene, {
+      reorderEnabled: true,
+      showLabels: true,
+      maxRotationDegrees: 0,
+      selectionLift: 60,
+    });
+    const cards = hand();
+    view.setCards(cards);
+    const spritesBefore = view.getSprites();
+    view.setSelected(0);
+    const overlayBefore = tintOverlays(scene)[0];
+    expect(overlayBefore).toBeDefined();
+
+    view.commitReorder(0, 2);
+
+    // Same display objects, re-indexed to follow their cards.
+    expect(view.getSprites()[0]).toBe(spritesBefore[1]);
+    expect(view.getSprites()[1]).toBe(spritesBefore[2]);
+    expect(view.getSprites()[2]).toBe(spritesBefore[0]);
+    view.getSprites().forEach((s: any, i: number) => expect(s.depth).toBe(i));
+
+    // The selected card's tint overlay travelled with it and was re-indexed.
+    const overlays = tintOverlays(scene).filter((o: any) => o.active);
+    const movedOverlay = overlays.find((o: any) => o.depth === 2.01);
+    expect(movedOverlay).toBe(overlayBefore);
+    expect(Math.round(movedOverlay.x)).toBe(456);
+    // Selection follows the card too.
+    expect(view.getSelected()).toBe(2);
+    view.destroy();
+  });
+
+  it('clears a preview marker when it commits', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    view.setCards(hand());
+
+    view.previewReorder(600, 500, 0);
+    expect(reorderMarkers(scene)).toHaveLength(1);
+    expect(view.getReorderInsertionIndex()).toBe(2);
+
+    view.commitReorder(0, 2);
+
+    expect(reorderMarkers(scene)).toHaveLength(0);
+    expect(view.getReorderInsertionIndex()).toBeNull();
+    view.destroy();
+  });
+
+  it('emits cardreorder with the documented payload', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    const cards = hand();
+    const [a, k, q] = cards;
+    view.setCards(cards);
+    const payloads: any[] = [];
+    view.on('cardreorder', (p: any) => payloads.push(p));
+
+    view.commitReorder(1, 0);
+
+    expect(payloads).toEqual([{ from: 1, to: 0, card: k }]);
+    expect(view.getCards()).toEqual([k, a, q]);
+    view.destroy();
+  });
+
+  it('does not consult a registered pile target (precedence is the caller`s)', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    const cards = hand();
+    view.setCards(cards);
+    view.setDragTargetPileIndex(1);
+
+    // Documented contract: an explicit commit is unconditional — the owning
+    // manager must not call it when its release resolved to a pile drop.
+    view.commitReorder(0, 2);
+
+    expect(labels(view.getCards())).toEqual(labels([cards[1], cards[2], cards[0]]));
+    view.destroy();
+  });
+});
+
+describe('HandView reorder — public preview and band helpers', () => {
+  let scene: any;
+
+  beforeEach(() => {
+    scene = createMockScene();
+  });
+
+  it('shows the insertion marker at the target slot centre, without drag enabled', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    view.setCards(hand());
+
+    const target = view.previewReorder(600, 500, 0);
+
+    expect(target).toBe(2);
+    expect(view.getReorderInsertionIndex()).toBe(2);
+    expect(view.getDragEnabled()).toBe(false);
+    const markers = reorderMarkers(scene);
+    expect(markers).toHaveLength(1);
+    expect(Math.round(markers[0].x)).toBe(456);
+    expect(markers[0].height).toBe(CARD_HEIGHT);
+    view.destroy();
+  });
+
+  it('hides the marker and returns null for the card`s own slot', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    view.setCards(hand());
+
+    const target = view.previewReorder(400, 500, 1);
+
+    expect(target).toBeNull();
+    expect(view.getReorderInsertionIndex()).toBeNull();
+    expect(reorderMarkers(scene)).toHaveLength(0);
+    view.destroy();
+  });
+
+  it('hides the marker and returns null outside the row band', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    view.setCards(hand());
+
+    expect(view.previewReorder(600, 200, 0)).toBeNull();
+    expect(view.getReorderInsertionIndex()).toBeNull();
+    expect(reorderMarkers(scene)).toHaveLength(0);
+    view.destroy();
+  });
+
+  it('clears a previously shown marker on a subsequent out-of-band preview', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    view.setCards(hand());
+
+    view.previewReorder(600, 500, 0);
+    expect(reorderMarkers(scene)).toHaveLength(1);
+
+    view.previewReorder(600, 200, 0);
+    expect(reorderMarkers(scene)).toHaveLength(0);
+    view.destroy();
+  });
+
+  it('is inert while reorder mode is disabled or in vertical layout', () => {
+    const disabled = makeView(scene);
+    disabled.setCards(hand());
+    expect(disabled.previewReorder(600, 500, 0)).toBeNull();
+    expect(reorderMarkers(scene)).toHaveLength(0);
+    disabled.destroy();
+
+    const vertical = makeView(scene, {
+      reorderEnabled: true,
+      layoutDirection: 'vertical',
+      baseX: 300,
+      baseY: 200,
+      spacing: 42,
+    });
+    vertical.setCards(hand());
+    expect(vertical.previewReorder(400, 200, 0)).toBeNull();
+    expect(reorderMarkers(scene)).toHaveLength(0);
+    vertical.destroy();
+  });
+
+  it('reports whether a pointer Y is inside the hand row band', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    view.setCards(hand());
+
+    // Row centres sit at y = 500; the band is half a card (65) + 24 tolerance.
+    expect(view.isPointerInHandRowBand(500)).toBe(true);
+    expect(view.isPointerInHandRowBand(411)).toBe(true);
+    expect(view.isPointerInHandRowBand(589)).toBe(true);
+    expect(view.isPointerInHandRowBand(410)).toBe(false);
+    expect(view.isPointerInHandRowBand(590)).toBe(false);
+    expect(view.isPointerInHandRowBand(200)).toBe(false);
+    view.destroy();
+  });
+
+  it('reports an empty hand as outside the row band', () => {
+    const view = makeView(scene, { reorderEnabled: true });
+    view.setCards([]);
+
+    expect(view.isPointerInHandRowBand(500)).toBe(false);
+    view.destroy();
+  });
+});
+
+describe('HandView reorder — external manager regression', () => {
+  let scene: any;
+  let view: HandView;
+
+  beforeEach(() => {
+    scene = createMockScene();
+    view = makeView(scene, { reorderEnabled: true });
+  });
+
+  it('previews on pointermove and commits on pointerup with no drag lifecycle', () => {
+    const cards = hand();
+    const [a, k, q] = cards;
+    view.setCards(cards);
+    const spritesBefore = view.getSprites();
+    const payloads: any[] = [];
+    view.on('cardreorder', (p: any) => payloads.push(p));
+
+    // External drag manager: move handler → previewReorder, end handler →
+    // commitReorder using the engine's own insertion geometry.
+    const sourceIndex = 0;
+    const moveTo = { x: 600, y: 500 };
+    const preview = view.previewReorder(moveTo.x, moveTo.y, sourceIndex);
+    const onRelease = view.computeReorderInsertionIndex(moveTo.x, sourceIndex);
+    view.commitReorder(sourceIndex, onRelease);
+
+    expect(preview).toBe(2);
+    expect(labels(view.getCards())).toEqual(labels([k, q, a]));
+    expect(payloads).toEqual([{ from: 0, to: 2, card: a }]);
+    expect(view.getSprites()[0]).toBe(spritesBefore[1]);
+    expect(view.getSprites()[2]).toBe(spritesBefore[0]);
+    expect(view.getSprites().map((s: any) => Math.round(s.x))).toEqual([344, 400, 456]);
+    expect(view.getDragEnabled()).toBe(false);
+    // No drag events were synthesised — the external manager owns the gesture.
+    expect(scene.input._handlers.pointermove ?? []).toHaveLength(0);
+    expect(scene.input._handlers.pointerup ?? []).toHaveLength(0);
+    view.destroy();
+  });
+
+  it('a release over a pile reorders nothing when the caller skips the commit', () => {
+    const cards = hand();
+    view.setCards(cards);
+    const reordered = vi.fn();
+    view.on('cardreorder', reordered);
+
+    // The manager hit-tests the release against its pile zones first; a pile
+    // win means it never calls commitReorder.
+    const targetPileIndex: number | null = 0;
+    view.previewReorder(600, 500, 0);
+    if (targetPileIndex === null) {
+      view.commitReorder(0, view.computeReorderInsertionIndex(600, 0));
+    }
+
+    expect(reordered).not.toHaveBeenCalled();
+    expect(labels(view.getCards())).toEqual(labels(cards));
+    view.destroy();
+  });
+});
