@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.1.24 (2026-11-13)
+> **Release focus:** This release focuses on tightening development workflow reliability, ensuring pushes only pass with a full test run against the exact commit and fixing stale checks and worktree cache issues. It also improves the card game experience with draggable hand reordering and smoother deck-to-hand animations, alongside documentation and export fixes.
+### Features
+- Dev pushes now only pass if the full test suite ran against the exact commit being pushed. (CG-0MW2151GL003SV5E)
+- Pushes from linked worktrees now reliably leave a green test-cache entry for the main checkout. (CG-0MW1ZBKP0006U1YU)
+- You can now drag cards within your hand to arrange them in the order you plan to play. (CG-0MWBX4GJK007ZAOX)
+- Hand reordering now works in games with custom drag controls, so cards no longer snap back. (CG-0MWCPEHZ5004ZP54)
+### Bug Fixes
+- Pushes to dev are no longer blocked by a stale context-budget check. (CG-0MW940SUV002GQCN)
+- Export Session now finds your transcript whatever it's called, and tells you why if it can't. (CG-0MW3KV4D7004KCF0)
+- Newly generated game projects no longer include broken scaffold commands that failed to run. (CG-0MW4JOKE900302UD)
+- Cards now fly from deck to hand in one smooth arc instead of pausing mid-air. (CG-0MWC07OBB004YD5E)
+### Other
+- Your worklog data is now fully up to date, so tools stop patching it on every run. (CG-0MW1VJRY6001FOPT)
+- Updated art credits to accurately reflect Main Street upgrade artwork sources. (CG-0MW917K7V009LMLE)
+- Clarified setup docs so developers know which scaffold commands to run from the core checkout. (CG-0MW4TOF7Z007726R)
+> [Play the alpha release](https://thewizardscode.github.io/Tableau-Card-Engine/). Provide feedback in [Discord](https://discord.gg/gUKQTFkzQ4)
+
 ## v0.1.23 (2026-11-04)
 > **Release focus:** This release focuses on strengthening the storyline editing experience, with new visual editing tools, live previews, validation, and a unified choice system for reliable decisions. It also improves developer workflow through working git hooks, safer re-scaffolding, and better test and build reliability.
 ### Features
