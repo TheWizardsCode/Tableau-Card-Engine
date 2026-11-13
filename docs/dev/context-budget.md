@@ -1,7 +1,7 @@
 # Startup Context Budget
 
 **Audience:** Engine maintainers and agents editing `AGENTS.md` (or the global ruleset)
-**Related work:** CG-0MUFCL5N50023PHJ — *AGENTS.md exceeds context-budget threshold, blocking all pushes to dev*
+**Related work:** CG-0MUFCL5N50023PHJ — *AGENTS.md exceeds context-budget threshold, blocking all pushes to dev*; CG-0MW940SUV002GQCN — *context-budget thresholds guard fails: committed thresholds missing `skill_implement_md`*
 **Gate:** `.githooks/pre-push` → *Context-budget regression gate (F6, SA-0MSLK7XNZ00366YY)*
 
 Every pi session loads a fixed **startup context surface** before the agent sees
@@ -22,7 +22,15 @@ The gate measures the same surface reported at session startup, using the
 | `global_agents` | `AGENTS_GLOBAL.md` at the repo root |
 | `project_agents` | the project `AGENTS.md` at the repo root |
 | `skills_prose` | the frontmatter `description` prose of `skill/*/SKILL.md` (with `--include-hidden`, matching the hook) |
-| `total` | the sum of the components above |
+| `total` | the sum of `global_agents` + `project_agents` + `skills_prose` |
+| `skill_implement_md` | `skill/implement/SKILL.md` body size — a **separate gate**, **not** part of `total` (measured as `0` in this repo, which carries no local `skill/` tree) |
+
+The `total` component is the startup surface proper: it deliberately excludes
+`skill_implement_md`, which measures the implement-skill instructions loaded on
+demand rather than at session startup. The refresh script prints every
+component the measurement emits (canonical keys first, any other measured key
+appended and flagged `non-canonical`), so a component added by
+`measure_context.py` shows up in the delta table instead of drifting silently.
 
 The committed budget lives in
 [`docs/dev/context-budget.thresholds.json`](context-budget.thresholds.json):
@@ -30,17 +38,25 @@ The committed budget lives in
 ```json
 {
   "global_agents": 0,
-  "project_agents": 45470,
+  "project_agents": 67912,
+  "skill_implement_md": 0,
   "skills_prose": 0,
-  "total": 45470
+  "total": 67912
 }
 ```
 
-TCE uses an **exact-match** convention: each threshold equals the measured byte
-count, so any growth of the surface is a visible, deliberate commit rather than
-silent creep. The gate fails a push when the measured surface **exceeds** a
-committed threshold; the guard test additionally fails when the committed and
-measured values differ at all.
+The values above are a snapshot of one refresh (commit that last regenerated
+the file); the committed file is authoritative. TCE uses an **exact-match**
+convention: each threshold equals the measured byte count, so any growth of the
+surface is a visible, deliberate commit rather than silent creep. The gate
+fails a push when the measured surface **exceeds** a committed threshold; the
+guard test additionally fails when the committed and measured values differ at
+all, including a missing key.
+
+Only the **guard test** requires the full measured key set. The pre-push hook
+runs `measure_context.py` in `--thresholds` *comparison* mode, which tolerates a
+missing key — so a scaffolded game repo whose file carries just the four startup
+keys stays green.
 
 ## Why an `AGENTS.md` edit needs a threshold refresh in the same commit
 
@@ -48,10 +64,13 @@ measured values differ at all.
 compares against the **committed** thresholds, so if a commit grows `AGENTS.md`
 without refreshing the threshold, the next push from *any* agent is rejected —
 the breach is now committed at `dev` HEAD and blocks the whole team, not just
-the author. That drift class has recurred five times
-(`39555 → 41692 → 41706 → 43564 → 45898 → 45470`), which is why the refresh is
-a required part of any `AGENTS.md` change and a guard test now catches it
-locally.
+the author. That drift class has recurred six times
+(`39555 → 41692 → 41706 → 43564 → 45898 → 45470 → 67912`), which is why the
+refresh is a required part of any `AGENTS.md` change and a guard test now
+catches it locally. A *tool-side* variant — `measure_context.py` gaining a
+component that the committed file did not carry — is the same failure mode; the
+refresh script's derived component list now surfaces it in the delta table
+instead of dropping it silently.
 
 The gate is intentionally **not** auto-ratcheting: refreshing stays a
 deliberate, reviewed, committed act so the budget remains a meaningful signal.
@@ -70,7 +89,7 @@ deliberate, reviewed, committed act so the budget remains a meaningful signal.
    global `~/.pi/agent/skills/context-audit/scripts/measure_context.py` — and
    writes the freshly measured byte counts to
    `docs/dev/context-budget.thresholds.json`, printing the before/after/delta
-   table.
+   table for **every** measured component.
 3. Commit the updated `AGENTS.md` **and**
    `docs/dev/context-budget.thresholds.json` together.
 4. Optionally verify without writing:

@@ -9,9 +9,18 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  EVENT_LOG_PAYLOAD_COLOUR,
+  EVENT_LOG_TAG_COLOUR,
+  EVENT_LOG_TIMESTAMP_COLOUR,
+  NEUTRAL_EVENT_LOG_PALETTE,
   formatEventLogEntry,
+  formatEventLogName,
+  formatEventLogPayload,
+  formatEventLogTimestamp,
+  resolveEventStyle,
   stringifyPayloadSafe,
   widestLineLength,
+  type EventLogPalette,
 } from '../../../src/ui/debug/formatEventLog';
 
 describe('stringifyPayloadSafe', () => {
@@ -183,5 +192,102 @@ describe('widestLineLength', () => {
     });
 
     expect(widestLineLength(rendered)).toBe('  "longKey": "'.length + 50 + 1);
+  });
+});
+
+// ── Split header/payload formatters ────────────────────────
+
+describe('split header/payload formatters', () => {
+  const entry = {
+    timestamp: '2026-11-06T00:00:00.000Z',
+    eventName: 'placement-attempted',
+    payload: { turn: 3, side: 'player' },
+  };
+
+  it('exposes the timestamp, bracketed name and payload separately', () => {
+    expect(formatEventLogTimestamp(entry)).toBe(entry.timestamp);
+    expect(formatEventLogName(entry)).toBe('[placement-attempted]');
+    expect(formatEventLogPayload(entry)).toBe(stringifyPayloadSafe(entry.payload));
+  });
+
+  it('recomposes to the pre-palette display string', () => {
+    expect(formatEventLogEntry(entry)).toBe(
+      `${formatEventLogTimestamp(entry)} ${formatEventLogName(entry)}\n${formatEventLogPayload(entry)}`,
+    );
+    expect(formatEventLogEntry(entry)).toBe(
+      '2026-11-06T00:00:00.000Z [placement-attempted]\n{\n  "turn": 3,\n  "side": "player"\n}',
+    );
+  });
+});
+
+// ── Palette resolution ─────────────────────────────────────
+
+describe('resolveEventStyle', () => {
+  const palette: EventLogPalette = {
+    id: 'test',
+    label: 'Test',
+    fallback: '#abcdef',
+    colours: {
+      'placement-attempted': '#169B62',
+      draw: '#FFB347',
+    },
+    tags: {
+      'placement-attempted': 'PLACE',
+      draw: 'DRAW',
+      // An empty tag must be treated as "no tag".
+      discard: '',
+    },
+  };
+
+  const entryFor = (eventName: string) => ({
+    timestamp: 't',
+    eventName,
+    payload: {},
+  });
+
+  it('resolves the name colour from the palette for a mapped event', () => {
+    expect(resolveEventStyle(entryFor('placement-attempted'), palette).nameColour).toBe('#169B62');
+    expect(resolveEventStyle(entryFor('draw'), palette).nameColour).toBe('#FFB347');
+  });
+
+  it('falls back to the palette fallback for an unmapped event name', () => {
+    expect(resolveEventStyle(entryFor('some-new-event'), palette).nameColour).toBe('#abcdef');
+  });
+
+  it('resolves the ASCII tag for a mapped event and an empty string otherwise', () => {
+    expect(resolveEventStyle(entryFor('placement-attempted'), palette).tag).toBe('PLACE');
+    expect(resolveEventStyle(entryFor('draw'), palette).tag).toBe('DRAW');
+    expect(resolveEventStyle(entryFor('some-new-event'), palette).tag).toBe('');
+  });
+
+  it('treats an empty tag string as no tag', () => {
+    expect(resolveEventStyle(entryFor('discard'), palette).tag).toBe('');
+  });
+
+  it('keeps the timestamp and payload colours palette-independent', () => {
+    const otherPalette: EventLogPalette = {
+      id: 'other',
+      label: 'Other',
+      fallback: '#000000',
+      colours: { 'placement-attempted': '#ff0000' },
+      tags: { 'placement-attempted': 'X' },
+    };
+
+    const a = resolveEventStyle(entryFor('placement-attempted'), palette);
+    const b = resolveEventStyle(entryFor('placement-attempted'), otherPalette);
+
+    expect(a.nameColour).not.toBe(b.nameColour);
+    expect(a.timestampColour).toBe(EVENT_LOG_TIMESTAMP_COLOUR);
+    expect(b.timestampColour).toBe(EVENT_LOG_TIMESTAMP_COLOUR);
+    expect(a.payloadColour).toBe(EVENT_LOG_PAYLOAD_COLOUR);
+    expect(b.payloadColour).toBe(EVENT_LOG_PAYLOAD_COLOUR);
+  });
+
+  it('uses the neutral palette for every name and supplies no tag', () => {
+    const style = resolveEventStyle(entryFor('anything-at-all'), NEUTRAL_EVENT_LOG_PALETTE);
+    expect(style.nameColour).toBe(EVENT_LOG_PAYLOAD_COLOUR);
+    expect(style.tag).toBe('');
+    expect(style.timestampColour).toBe(EVENT_LOG_TIMESTAMP_COLOUR);
+    expect(EVENT_LOG_TAG_COLOUR).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 });

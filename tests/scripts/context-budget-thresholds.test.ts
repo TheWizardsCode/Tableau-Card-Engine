@@ -69,6 +69,43 @@ const skipReason = !pythonAvailable()
     ? 'measure_context.py not found (context-audit skill absent); skipping context-budget threshold guard (fail-open)'
     : null;
 
+/**
+ * Write a stub `measure_context.py` into a throwaway repo.
+ *
+ * The refresh script resolves the measurement tool **local-first**
+ * (`<repo>/skill/context-audit/scripts/measure_context.py`), so a stub makes
+ * the refresh-output assertions deterministic and independent of whichever
+ * `context-audit` release happens to be installed globally.
+ */
+function writeStubMeasure(
+  repoRoot: string,
+  values: Record<string, number>,
+): void {
+  const stubPath = path.join(
+    repoRoot,
+    'skill',
+    'context-audit',
+    'scripts',
+    'measure_context.py',
+  );
+  fs.mkdirSync(path.dirname(stubPath), { recursive: true });
+  fs.writeFileSync(
+    stubPath,
+    [
+      'import json, sys',
+      `VALUES = ${JSON.stringify(values)}`,
+      'args = sys.argv[1:]',
+      'if "--write-thresholds" in args:',
+      '    out = args[args.index("--write-thresholds") + 1]',
+      '    open(out, "w", encoding="utf-8").write(',
+      '        json.dumps(VALUES, indent=2, sort_keys=True) + "\\n")',
+      'else:',
+      '    print(json.dumps(VALUES, sort_keys=True))',
+      '',
+    ].join('\n'),
+  );
+}
+
 /** Measure the current startup context surface as a thresholds map. */
 function measureSurface(): Record<string, number> {
   const generated = execFileSync(
@@ -142,6 +179,91 @@ describe('context-budget thresholds guard', () => {
       expect(stderr).toContain('STALE');
       // `--check` must never rewrite the committed file.
       expect(fs.readFileSync(stalePath, 'utf-8')).toBe(staleContent);
+    } finally {
+      fs.rmSync(tmpRepo, { recursive: true, force: true });
+    }
+  });
+
+  it('refresh helper names every measured component in its delta table', (ctx) => {
+    if (skipReason) {
+      ctx.skip(skipReason);
+      return;
+    }
+
+    // The component list is derived from the measured/committed JSON rather
+    // than a hardcoded four-key list, so a component added by
+    // `measure_context.py` (e.g. `skill_implement_md`, CG-0MW940SUV002GQCN)
+    // shows up in the delta table instead of drifting silently — and an
+    // unknown extra key is printed rather than dropped.
+    const measured: Record<string, number> = {
+      global_agents: 11,
+      project_agents: 22,
+      skills_prose: 33,
+      skill_implement_md: 44,
+      total: 66,
+      brand_new_component: 77,
+    };
+    const canonicalOrder = [
+      'global_agents',
+      'project_agents',
+      'skills_prose',
+      'total',
+    ];
+
+    const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-budget-refresh-'));
+    try {
+      const scriptsDir = path.join(tmpRepo, 'scripts');
+      const docsDir = path.join(tmpRepo, 'docs', 'dev');
+      fs.mkdirSync(scriptsDir, { recursive: true });
+      fs.mkdirSync(docsDir, { recursive: true });
+      const scriptCopy = path.join(scriptsDir, 'refresh-context-thresholds.sh');
+      fs.copyFileSync(REFRESH_SCRIPT, scriptCopy);
+      const thresholdsPath = path.join(
+        docsDir,
+        'context-budget.thresholds.json',
+      );
+      // Committed file predates the new component, mirroring real drift.
+      fs.writeFileSync(
+        thresholdsPath,
+        JSON.stringify(
+          { global_agents: 0, project_agents: 22, skills_prose: 0, total: 22 },
+          null,
+          2,
+        ),
+      );
+      writeStubMeasure(tmpRepo, measured);
+
+      const stdout = execFileSync('bash', [scriptCopy], {
+        cwd: tmpRepo,
+        encoding: 'utf-8',
+      });
+
+      for (const key of Object.keys(measured)) {
+        expect(stdout).toContain(key);
+      }
+      // Canonical components first, then any non-canonical key appended.
+      const extraKey = 'brand_new_component';
+      const positions = canonicalOrder.map((key) => stdout.indexOf(key));
+      for (const [index, position] of positions.entries()) {
+        expect(position).toBeGreaterThanOrEqual(0);
+        if (index > 0) expect(position).toBeGreaterThan(positions[index - 1]);
+      }
+      expect(stdout.indexOf(extraKey)).toBeGreaterThan(
+        positions[positions.length - 1],
+      );
+
+      // The refresh writes the full measured map...
+      expect(
+        JSON.parse(fs.readFileSync(thresholdsPath, 'utf-8')),
+      ).toEqual(measured);
+      // ...and `--check` then passes, so both branches share one component set.
+      expect(() =>
+        execFileSync('bash', [scriptCopy, '--check'], {
+          cwd: tmpRepo,
+          encoding: 'utf-8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }),
+      ).not.toThrow();
     } finally {
       fs.rmSync(tmpRepo, { recursive: true, force: true });
     }

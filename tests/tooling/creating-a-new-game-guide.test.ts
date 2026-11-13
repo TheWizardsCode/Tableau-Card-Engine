@@ -244,6 +244,20 @@ describe('canonical creating-a-new-game guide', () => {
     ).toContain(SKILL_REL);
   });
 
+  it('runs the scaffold commands from the core checkout (MS-0MVSB5Y83001XSU2)', () => {
+    // `scaffold:game` / `scaffold:games` exist only in the core checkout;
+    // a game repo's entry point is `npm run scaffold` (with --core-root ./core).
+    // The guide's bootstrap block must keep that invocation context explicit so
+    // the dead game-repo scripts cannot silently come back into the docs.
+    const guide = readGuide();
+    expect(guide, 'guide must scope the scaffold commands to the core checkout')
+      .toMatch(/from the \*\*core checkout\*\*/);
+    expect(
+      guide,
+      'guide must say scaffold:game(s) are core-only scripts',
+    ).toMatch(/scaffold:game(?:` and `)?scaffold:games?[\s\S]{0,80}?core-only/);
+  });
+
   it('does not reintroduce the retired monorepo guidance', () => {
     const targets: Array<[string, string]> = [
       ['guide', GUIDE_PATH],

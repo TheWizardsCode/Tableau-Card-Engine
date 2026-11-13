@@ -278,7 +278,10 @@ export function writePin(repoRoot, pinRel, sha) {
  * invariant.
  */
 export function stageEngineState(repoRoot, coreRel, pinRel) {
-  const paths = pinRel ? [coreRel, pinRel] : [coreRel];
+  const paths = [coreRel];
+  if (pinRel && fs.existsSync(path.join(repoRoot, pinRel))) {
+    paths.push(pinRel);
+  }
   const res = runGit(repoRoot, ['add', '--', ...paths]);
   if (!res.ok) {
     throw new EngineSyncError(
@@ -378,8 +381,12 @@ export function syncEngine({
 
   // Pin travels with the gitlink. Repos with no pin file stay unpinned — sync
   // must never invent one (a spurious file would be committed by accident).
+  // The gitlink is still staged so the advanced checkout is ready to commit.
   const pinPath = path.join(repoRoot, pinRel);
   if (!fs.existsSync(pinPath)) {
+    if (updated) {
+      stageEngineState(repoRoot, coreRel, pinRel);
+    }
     log(`engine:sync: no engine pin at ${pinRel} — leaving the repo unpinned.`);
     return { updated, from: before ?? '', to: after, pinWritten: false };
   }

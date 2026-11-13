@@ -22,6 +22,11 @@
 # unavailable, and --check additionally exits non-zero when the committed
 # thresholds are stale.
 #
+# The refresh delta table reports EVERY component present in the measured or
+# committed JSON (canonical keys first, any extra key appended), so a component
+# added by measure_context.py surfaces in the table instead of drifting
+# silently — CG-0MW940SUV002GQCN added `skill_implement_md`.
+#
 # Related work item: CG-0MUFCL5N50023PHJ
 
 set -euo pipefail
@@ -96,15 +101,30 @@ import json, sys
 
 before = json.loads(sys.argv[1] or "{}")
 after = json.loads(sys.argv[2] or "{}")
-order = ["global_agents", "project_agents", "skills_prose", "total"]
+
+# Derive the reported component list from the measured/committed JSON instead
+# of a hardcoded key list: canonical components first, then any other key the
+# measurement (or the committed file) carries. A component added by
+# measure_context.py therefore appears in the delta table — CG-0MW940SUV002GQCN
+# added `skill_implement_md`, which a fixed four-key list silently dropped —
+# and an unknown/extra key is shown rather than discarded.
+CANONICAL_ORDER = ["global_agents", "project_agents", "skills_prose", "total"]
+order = [key for key in CANONICAL_ORDER if key in before or key in after]
+extras = sorted(
+    key for key in set(before) | set(after) if key not in CANONICAL_ORDER
+)
+order.extend(extras)
+
 print("Refreshed docs/dev/context-budget.thresholds.json")
-print(f"  {'component':<15} {'before':>8} {'after':>8} {'delta':>8}")
+print(f"  {'component':<20} {'before':>8} {'after':>8} {'delta':>8}")
 for key in order:
-    if key not in before and key not in after:
-        continue
     b = before.get(key, 0)
     a = after.get(key, 0)
     d = a - b
     sign = "+" if d > 0 else ""
-    print(f"  {key:<15} {b:>8} {a:>8} {sign}{d:>7}")
+    print(f"  {key:<20} {b:>8} {a:>8} {sign}{d:>7}")
+if extras:
+    print(
+        "  note: non-canonical component(s) reported: " + ", ".join(extras)
+    )
 PY

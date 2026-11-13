@@ -5,6 +5,7 @@ const STORAGE_KEY_REDUCED_MOTION = 'tce-ui-reduced-motion';
 const STORAGE_KEY_END_TURN_KEYBIND = 'tce-endturn-keybind';
 const STORAGE_KEY_TOOLTIPS = 'tce-show-tooltips';
 const STORAGE_KEY_CARD_DESIGN = 'tce-card-design';
+const STORAGE_KEY_EVENT_LOG_PALETTE = 'tce-ui-event-log-palette';
 
 // ── Card Design system ─────────────────────────────────
 
@@ -252,6 +253,64 @@ export function setEndTurnKeybind(keyName: string, storage?: StorageLike | null)
 
   try {
     backend.setItem(STORAGE_KEY_END_TURN_KEYBIND, keyName);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+// ── Event-log palette preference ────────────────────────
+
+/**
+ * Read the persisted Game Events palette choice.
+ *
+ * The palette list is game-supplied, so core stores an opaque **index** (as a
+ * string) and never interprets the colours. Returns `null` when nothing is
+ * stored, storage is unavailable, the stored value is not a non-negative
+ * integer, or it is outside the supplied palette count — so the caller falls
+ * back to palette index 0.
+ *
+ * @param storage      Optional storage backend. When omitted (undefined), falls
+ *                     back to `globalThis.localStorage`. Pass `null` to
+ *                     explicitly disable storage access.
+ * @param paletteCount Optional palette count for range validation. When
+ *                     omitted, any non-negative integer is returned.
+ */
+export function getEventLogPalette(
+  storage?: StorageLike | null,
+  paletteCount?: number,
+): number | null {
+  const backend = resolveStorage(storage);
+  if (!backend) return null;
+
+  try {
+    const raw = backend.getItem(STORAGE_KEY_EVENT_LOG_PALETTE);
+    if (raw === null || raw.trim() === '') return null;
+    const index = Number(raw);
+    if (!Number.isInteger(index) || index < 0) return null;
+    if (paletteCount !== undefined && index >= paletteCount) return null;
+    return index;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist the Game Events palette choice as its index.
+ *
+ * The index is stored as a string, mirroring the existing `SettingsStore`
+ * per-preference pair shape. A later palette list that no longer contains the
+ * index is rejected on read by {@link getEventLogPalette} and the caller falls
+ * back to palette index 0.
+ */
+export function setEventLogPalette(
+  index: number,
+  storage?: StorageLike | null,
+): void {
+  const backend = resolveStorage(storage);
+  if (!backend) return;
+
+  try {
+    backend.setItem(STORAGE_KEY_EVENT_LOG_PALETTE, String(index));
   } catch {
     // ignore storage failures
   }

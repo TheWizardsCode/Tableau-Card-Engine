@@ -6,9 +6,11 @@
 // -->
 import { describe, it, expect, vi } from 'vitest';
 import {
+  getEventLogPalette,
   getReducedMotion,
   getSelectedDifficulty,
   getTooltips,
+  setEventLogPalette,
   setReducedMotion,
   setSelectedDifficulty,
   setTooltips,
@@ -147,5 +149,63 @@ describe('SettingsStore configuration validation', () => {
     expect(() => setReducedMotion(true, throwingStorage)).not.toThrow();
     expect(() => setTooltips(false, throwingStorage)).not.toThrow();
     expect(() => setSelectedDifficulty('Hard', throwingStorage)).not.toThrow();
+  });
+});
+
+// ── Event-log palette preference ────────────────────────────
+
+describe('SettingsStore event-log palette', () => {
+  it('returns null when storage is null', () => {
+    expect(getEventLogPalette(null)).toBeNull();
+  });
+
+  it('returns null when nothing is stored', () => {
+    const storage = createMockStorage();
+    expect(getEventLogPalette(storage)).toBeNull();
+  });
+
+  it('round-trips a palette index through an injected storage', () => {
+    const storage = createMockStorage();
+    setEventLogPalette(1, storage);
+    expect(storage.setItem).toHaveBeenCalledWith('tce-ui-event-log-palette', '1');
+    expect(getEventLogPalette(storage)).toBe(1);
+    expect(getEventLogPalette(storage, 2)).toBe(1);
+  });
+
+  it('returns index 0 after storing it', () => {
+    const storage = createMockStorage();
+    setEventLogPalette(0, storage);
+    expect(getEventLogPalette(storage, 2)).toBe(0);
+  });
+
+  it('rejects an out-of-range stored index against the palette count', () => {
+    const storage = createMockStorage();
+    setEventLogPalette(3, storage);
+
+    expect(getEventLogPalette(storage, 2)).toBeNull();
+    expect(getEventLogPalette(storage)).toBe(3);
+  });
+
+  it.each(['', '  ', 'not-a-number', '1.5', '-1'])(
+    'returns null for the invalid stored value %j',
+    (raw) => {
+      const storage = createMockStorage();
+      (storage as any).setItem('tce-ui-event-log-palette', raw);
+      expect(getEventLogPalette(storage)).toBeNull();
+    },
+  );
+
+  it('a throwing storage backend falls back to null and does not crash writes', () => {
+    const throwingStorage: StorageLike = {
+      getItem: vi.fn(() => {
+        throw new Error('storage unavailable');
+      }),
+      setItem: vi.fn(() => {
+        throw new Error('quota exceeded');
+      }),
+    };
+
+    expect(getEventLogPalette(throwingStorage)).toBeNull();
+    expect(() => setEventLogPalette(0, throwingStorage)).not.toThrow();
   });
 });

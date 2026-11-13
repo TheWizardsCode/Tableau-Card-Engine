@@ -279,6 +279,11 @@ class TestScene extends CardGameScene {
   ) {
     this.initSettingsPanel(undefined, undefined, undefined, undefined, tools as never);
   }
+  public callInitSettingsPanelWithExtraToggles(
+    extraToggles: Array<{ label: string; get: () => boolean; set: (value: boolean) => void }>,
+  ) {
+    this.initSettingsPanel(undefined, undefined, undefined, undefined, undefined, undefined, extraToggles);
+  }
   public callEmitStateSettled(turnNumber: number, phase: 'setup' | 'playing' | 'ended') {
     this.emitStateSettled(turnNumber, phase);
   }
@@ -572,6 +577,27 @@ describe('CardGameScene', () => {
       scene.callInitSettingsPanel();
       expect(MockSettingsButton).toHaveBeenCalledOnce();
       expect(scene._settingsPanel.settingsButton).toBeDefined();
+    });
+
+    it('forwards game-supplied extraToggles to SettingsPanel', () => {
+      const extraToggles = [
+        { label: 'Auto advance turn', get: () => false, set: vi.fn() },
+      ];
+      scene.callInitEventSystem();
+      scene.callInitSoundSystem(['sfx-test'], {});
+      scene.callInitSettingsPanelWithExtraToggles(extraToggles);
+
+      const config = MockSettingsPanel.mock.calls[0]![1] as { extraToggles?: unknown };
+      expect(config.extraToggles).toBe(extraToggles);
+    });
+
+    it('omits extraToggles when the game supplies none', () => {
+      scene.callInitEventSystem();
+      scene.callInitSoundSystem(['sfx-test'], {});
+      scene.callInitSettingsPanel();
+
+      const config = MockSettingsPanel.mock.calls[0]![1] as { extraToggles?: unknown };
+      expect(config.extraToggles).toBeUndefined();
     });
   });
 

@@ -262,7 +262,10 @@ files / 1840 tests) and the Gym smoke profile boots (2 files / 20 tests).
 leaves it unbuildable: a game repo has no `package.json`, `vite.config.ts`,
 `tsconfig.json`, `main.ts` or `index.html`. `scripts/game-repo-scaffold.ts`
 adds them, turning an extracted checkout into a runnable **single-game
-launcher** that composes the sibling core (`../Tableau-Card-Engine`).
+launcher** that composes the sibling core (`../Tableau-Card-Engine`). Both of
+the following run from the **core checkout** — `tsx
+scripts/game-repo-scaffold.ts` and `npm run scaffold:games` exist only in the
+core, never in a game repo:
 
 ```bash
 # One game, next to an extracted checkout:

@@ -37,6 +37,7 @@ const MY_SFX_KEYS = {
 | `COMMON_SFX_KEYS.ROUND_END` | `sfx-round-end` | A round has ended |
 | `COMMON_SFX_KEYS.SCORE_REVEAL` | `sfx-score-reveal` | Scores are being revealed |
 | `COMMON_SFX_KEYS.ILLEGAL_MOVE` | `sfx-illegal-move` | Illegal / invalid action feedback (played automatically by {@link shakeIllegalMove}) |
+| `COMMON_SFX_KEYS.CARD_SWAP` | `sfx-card-swap` | A card changed position — played automatically by `HandView` when a hand reorder commits |
 
 ## Audio Asset Organization
 

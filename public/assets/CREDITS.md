@@ -63,22 +63,40 @@ Files (in `audio/`):
 
 ## Card Art Sprites — Main Street
 
-63 card-art sprites (plus a `Fallback`) used inside each Main Street card's
-64×64 art zone (a layout dimension — the embedded bitmap is 256×256):
+Main Street's card art comes from **73 non-upgrade base source sprites**
+(1024×1024 PNGs, including the `Fallback` art) and **32 per-upgrade copies**
+(of 39 upgrade cards). The base card-art map embeds **63 distinct bitmaps**
+(256×256, including `Fallback`) that fill each card's 64×64 art zone (a layout
+dimension — the embedded bitmap is 256×256):
 
 - **Source**: Project-generated art (per-card `art_notes` descriptions in
-  `example-games/main-street/card-data.csv`). Source files:
-  `example-games/main-street/sprites/<Name>_1024_x_1024.png`
+  `src/card-data.csv`). Source files:
+  `src/sprites/<Name>_1024_x_1024.png` (73 non-upgrade files at the time of
+  writing).
 - **License**: CC0 / Public Domain (project-owned, permissive)
+- **Per-upgrade copies**: each of the 39 upgrade cards owns its own
+  `<newDisplayName>_upgrade_level<#>` source sprite — a byte-identical copy of
+  its `targetBusiness` business art (the `#` is the upgrade's `requiredLevel`).
+  These are duplicates of project-owned art and introduce **no new licensed
+  material** (CC0, same as their targets). 32 of the 39 copies exist at the
+  time of writing; the remaining 7 keep falling back to their target business
+  art until an artist supplies them: `Garden` → Park, `Dry Cleaners` →
+  Laundromat, `Roastery` → Cafe, `Community Hub` → Library, `Adventure Park` →
+  Playground, `Grand Fountain` → Town Fountain, `Health Center` → Health
+  Kiosk.
 - **Derived (CG-0MTORJ5FS006B0UN, CG-0MUCM36EQ008YP4R)**:
-  `example-games/main-street/scripts/generate-main-street-card-art.mjs` downscales each 1024×1024 source
+  `src/scripts/generate-main-street-card-art.mjs` downscales each 1024×1024 source
   to 256×256 and re-encodes it as lossy WebP (quality 90), then writes
-  `example-games/main-street/card-art-map.json` (base64 data URIs) that both
+  `src/card-art-map.json` (base64 data URIs) that both
   the runtime TS generator and the static SVG generator embed inline in the
-  card art zone. WebP keeps the map small (~0.6 MB) while filling the 4×
-  rasterised art zone at 1:1; the old 64×64 PNG map (~0.34 MB) was stretched 4×
-  and looked pixelated. Cards without a dedicated sprite use the `Fallback` art.
-  The `_64_x_64.png` files are superseded legacy thumbnails.
+  card art zone. Each shared bitmap is embedded **once**: a per-upgrade copy is
+  recorded in `src/card-art-map.json` `spriteAliases` as an alias of its
+  `targetBusiness` bitmap, so 105 source sprites resolve to 63 distinct
+  embedded bitmaps and the map stays small (≈ 0.62 MB at the time of writing)
+  while filling the 4× rasterised art zone at 1:1. The old 64×64 PNG map
+  (~0.34 MB) was stretched 4× and looked pixelated. Cards without a dedicated
+  sprite use the `Fallback` art. The `_64_x_64.png` files are superseded
+  legacy thumbnails.
 
 ## Audio Sound Effects — Main Street
 
