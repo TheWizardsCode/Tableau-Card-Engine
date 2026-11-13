@@ -395,8 +395,10 @@ describe('syncEngine — the pin travels with the gitlink (AC2)', () => {
     expect(res.updated).toBe(true);
     expect(res.pinWritten).toBe(false);
     expect(fs.existsSync(f.pinPath)).toBe(false);
-    const staged = git(f.game, ['diff', '--cached', '--name-only']).stdout;
+    // The gitlink is staged (the pin is not — never invent one).
+    const staged = git(f.game, ['diff', '--cached', '--name-only']).stdout.split('\n');
     expect(staged).not.toContain('engine-pin.json');
+    expect(staged).toContain(DEFAULT_CORE_REL);
     expect(tip).toMatch(/^[0-9a-f]{40}$/);
   });
 });

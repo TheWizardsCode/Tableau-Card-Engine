@@ -1,27 +1,27 @@
 /**
- * Browser tests for the pretty-printed Game Events debug overlay
- * (CG-0MVTTR0OC006PWDK).
+ * Browser tests for the pretty-printed, colour-coded Game Events debug overlay.
+ *
+ * The pre-palette pretty-printing contract (CG-0MVTTR0OC006PWDK) still holds —
+ * payloads are multi-line, unwrapped, untruncated JSON, Clear empties the feed
+ * (not the buffer) and Pause freezes it. The colour-coding change
+ * (RISE-0MW0V2CQ2006JDQV) splits each row into three measured text objects
+ * (dim timestamp, coloured `[eventName]` + ASCII tag, neutral payload), so the
+ * layout/presence assertions locate the relevant object rather than assuming
+ * one text object per event.
  *
  * Boots a real Phaser CANVAS scene, emits events through a real
- * `GameEventEmitter` into the `GlobalEventBuffer`, activates the tool, and
- * asserts on the rendered text objects:
- *   - payloads are pretty-printed across multiple unwrapped lines,
- *   - nothing is truncated,
- *   - the row layout grows with the payload's line count,
- *   - a circular payload renders (`[Circular]`) without blocking later events,
- *   - the overlay opts into horizontal scrolling so wide lines are reachable,
- *   - Clear empties the feed and the 500 ms poll does not repopulate it,
- *   - Pause freezes the feed (the PAUSED status survives poll ticks) and
- *     Resume appends everything recorded meanwhile,
- *   - the measured content height survives a wheel-driven re-clamp, so the
- *     final row is reachable by scrolling to the bottom.
+ * `GameEventEmitter` into the `GlobalEventBuffer`, and activates the tool.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Phaser from 'phaser';
 import { GameEventEmitter } from '../../../src/core-engine/GameEventEmitter';
 import { GlobalEventBuffer } from '../../../src/ui/debug/GlobalEventBuffer';
-import { createGameEventLogTool } from '../../../src/ui/debug/GameEventLogOverlay';
+import {
+  createGameEventLogTool,
+  type GameEventLogToolOptions,
+} from '../../../src/ui/debug/GameEventLogOverlay';
+import type { EventLogPalette } from '../../../src/ui/debug/formatEventLog';
 import { waitForScene } from '../../helpers/waitForScene';
 
 const SCENE_KEY = 'TestGameEventLogOverlay';
@@ -70,15 +70,6 @@ function findScrollContainer(scene: Phaser.Scene): Phaser.GameObjects.Container 
   return found;
 }
 
-/** Find the rendered row for a specific event name. */
-function findEventText(scene: Phaser.Scene, eventName: string): Phaser.GameObjects.Text | undefined {
-  const sceneRef = scene as Phaser.Scene & { hudContainer?: Phaser.GameObjects.Container };
-  if (!sceneRef.hudContainer) return undefined;
-  return collectTexts(sceneRef.hudContainer).find((text) =>
-    text.text.includes(`[${eventName}]`),
-  );
-}
-
 /** Find the first rendered text object matching `predicate`. */
 function findText(
   scene: Phaser.Scene,
@@ -87,6 +78,28 @@ function findText(
   const sceneRef = scene as Phaser.Scene & { hudContainer?: Phaser.GameObjects.Container };
   if (!sceneRef.hudContainer) return undefined;
   return collectTexts(sceneRef.hudContainer).find(predicate);
+}
+
+/** Find the rendered `[eventName]` token for a specific event. */
+function findNameText(scene: Phaser.Scene, eventName: string): Phaser.GameObjects.Text | undefined {
+  return findText(scene, (text) => text.text === `[${eventName}]`);
+}
+
+/** Find the rendered payload object that contains `marker`. */
+function findPayloadText(
+  scene: Phaser.Scene,
+  marker: string,
+): Phaser.GameObjects.Text | undefined {
+  return findText(scene, (text) => text.text.includes(marker));
+}
+
+/** All rendered payload objects, in row order (top to bottom). */
+function payloadTexts(scene: Phaser.Scene): Phaser.GameObjects.Text[] {
+  const sceneRef = scene as Phaser.Scene & { hudContainer?: Phaser.GameObjects.Container };
+  if (!sceneRef.hudContainer) return [];
+  return collectTexts(sceneRef.hudContainer)
+    .filter((text) => text.y > 0 && text.text.trimStart().startsWith('{'))
+    .sort((a, b) => a.y - b.y);
 }
 
 /**
@@ -106,7 +119,36 @@ function waitForPoll(): Promise<void> {
  */
 const CONTENT_HEIGHT = 500 - 90 - 46 - 10;
 
-describe('Game Events overlay pretty-printing', () => {
+/** Two palettes with distinct event-name colours but identical tags. */
+const PALETTE_ALPHA: EventLogPalette = {
+  id: 'alpha',
+  label: 'Alpha',
+  fallback: '#aaaaaa',
+  colours: {
+    'placement-attempted': '#169B62',
+    draw: '#FFB347',
+  },
+  tags: {
+    'placement-attempted': 'PLACE',
+    draw: 'DRAW',
+  },
+};
+
+const PALETTE_BETA: EventLogPalette = {
+  id: 'beta',
+  label: 'Beta',
+  fallback: '#bbbbbb',
+  colours: {
+    'placement-attempted': '#009E73',
+    draw: '#E69F00',
+  },
+  tags: {
+    'placement-attempted': 'PLACE',
+    draw: 'DRAW',
+  },
+};
+
+describe('Game Events overlay', () => {
   let game: Phaser.Game | null = null;
   let scene: Phaser.Scene;
   let emitter: GameEventEmitter;
@@ -114,7 +156,10 @@ describe('Game Events overlay pretty-printing', () => {
   const emit = (eventName: string, payload: unknown): void => {
     (emitter.emit as unknown as (name: string, data: unknown) => void)(eventName, payload);
   };
-  const tool = createGameEventLogTool();
+
+  const activate = (options?: GameEventLogToolOptions): void => {
+    createGameEventLogTool(options).activate(scene);
+  };
 
   beforeEach(async () => {
     let container = document.getElementById('game-container');
@@ -161,25 +206,27 @@ describe('Game Events overlay pretty-printing', () => {
     });
     emit('state-settled', { longValue });
 
-    tool.activate(scene);
+    activate();
 
-    const dealt = findEventText(scene, 'card:dealt');
-    expect(dealt).toBeDefined();
-    const lines = dealt!.text.split('\n');
-    expect(lines[0]).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3} \[card:dealt\]$/);
+    // The header is split: the name token is its own object.
+    expect(findNameText(scene, 'card:dealt')).toBeDefined();
+
+    const dealtPayload = findPayloadText(scene, '"cardId": "copper-1"');
+    expect(dealtPayload).toBeDefined();
+    const lines = dealtPayload!.text.split('\n');
     expect(lines.length).toBeGreaterThan(4);
-    expect(dealt!.text).toContain('\n  "cardId": "copper-1"');
-    expect(dealt!.text).toContain('\n  "metadata": {');
-    expect(dealt!.text).toContain('\n    "tags": [');
+    expect(dealtPayload!.text).toContain('\n  "cardId": "copper-1"');
+    expect(dealtPayload!.text).toContain('\n  "metadata": {');
+    expect(dealtPayload!.text).toContain('\n    "tags": [');
 
     // No word wrap configured on any rendered row (null = never wrap).
-    expect(dealt!.style.wordWrapWidth).toBeNull();
-    expect(dealt!.style.wordWrapCallback).toBeNull();
+    expect(dealtPayload!.style.wordWrapWidth).toBeNull();
+    expect(dealtPayload!.style.wordWrapCallback).toBeNull();
 
-    const settled = findEventText(scene, 'state-settled');
-    expect(settled).toBeDefined();
-    expect(settled!.text).toContain(longValue);
-    expect(settled!.text).not.toContain('...');
+    const settledPayload = findPayloadText(scene, longValue);
+    expect(settledPayload).toBeDefined();
+    expect(settledPayload!.text).toContain(longValue);
+    expect(settledPayload!.text).not.toContain('...');
   });
 
   it('grows the row layout with the payload line count', () => {
@@ -190,17 +237,21 @@ describe('Game Events overlay pretty-printing', () => {
       incidents: [{ id: 'a' }, { id: 'b' }],
     });
 
-    tool.activate(scene);
+    activate();
 
-    const first = findEventText(scene, 'turn-started');
-    const second = findEventText(scene, 'state-settled');
-    expect(first).toBeDefined();
-    expect(second).toBeDefined();
+    const firstPayload = findPayloadText(scene, '"turnNumber": 1');
+    const secondName = findNameText(scene, 'state-settled');
+    const secondPayload = findPayloadText(scene, '"resourceBank"');
+    expect(firstPayload).toBeDefined();
+    expect(secondName).toBeDefined();
+    expect(secondPayload).toBeDefined();
 
-    // The second row starts below the first row's full rendered height,
-    // so total content height grows with the payload line count.
-    expect(second!.y).toBeGreaterThan(first!.y + first!.height);
-    expect(second!.height).toBeGreaterThan(first!.height);
+    // The second row starts below the first row's full rendered height
+    // (header + payload), so total content height grows with the payload's
+    // line count.
+    const firstRowBottom = firstPayload!.y + firstPayload!.height;
+    expect(secondName!.y).toBeGreaterThan(firstRowBottom);
+    expect(secondPayload!.height).toBeGreaterThan(firstPayload!.height);
   });
 
   it('renders a circular payload without blocking the remaining events', () => {
@@ -210,22 +261,22 @@ describe('Game Events overlay pretty-printing', () => {
     emit('card:dealt', circular);
     emit('turn-completed', { turnNumber: 2 });
 
-    expect(() => tool.activate(scene)).not.toThrow();
+    expect(() => activate()).not.toThrow();
 
-    const circularRow = findEventText(scene, 'card:dealt');
+    const circularRow = findPayloadText(scene, '[Circular]');
     expect(circularRow).toBeDefined();
-    expect(circularRow!.text).toContain('[Circular]');
+    expect(findNameText(scene, 'card:dealt')).toBeDefined();
 
-    const followingRow = findEventText(scene, 'turn-completed');
+    const followingRow = findPayloadText(scene, '"turnNumber": 2');
     expect(followingRow).toBeDefined();
-    expect(followingRow!.text).toContain('"turnNumber": 2');
+    expect(findNameText(scene, 'turn-completed')).toBeDefined();
   });
 
   it('makes wide payload lines reachable by scrolling horizontally', () => {
     const longValue = 'y'.repeat(600);
     emit('state-settled', { longValue });
 
-    tool.activate(scene);
+    activate();
 
     const scrollContainer = findScrollContainer(scene);
     expect(scrollContainer).toBeDefined();
@@ -247,31 +298,31 @@ describe('Game Events overlay pretty-printing', () => {
     emit('card:dealt', { cardId: 'copper-1' });
     emit('turn-started', { turnNumber: 1 });
 
-    tool.activate(scene);
-    expect(findEventText(scene, 'card:dealt')).toBeDefined();
+    activate();
+    expect(findNameText(scene, 'card:dealt')).toBeDefined();
 
     findText(scene, (text) => text.text === '[ Clear ]')?.emit('pointerdown');
-    expect(findEventText(scene, 'card:dealt')).toBeUndefined();
+    expect(findNameText(scene, 'card:dealt')).toBeUndefined();
 
     // A poll tick must not repopulate the feed from the buffer: Clear empties
     // the feed, not the buffer, and the cleared state sticks until new events
     // are emitted.
     await waitForPoll();
-    expect(findEventText(scene, 'card:dealt')).toBeUndefined();
-    expect(findEventText(scene, 'turn-started')).toBeUndefined();
+    expect(findNameText(scene, 'card:dealt')).toBeUndefined();
+    expect(findNameText(scene, 'turn-started')).toBeUndefined();
     expect(findText(scene, (text) => text.text.includes('(no events yet'))).toBeDefined();
 
     // Events emitted after the clear are shown again.
     emit('turn-completed', { turnNumber: 1 });
     await waitForPoll();
-    expect(findEventText(scene, 'turn-completed')).toBeDefined();
-    expect(findEventText(scene, 'card:dealt')).toBeUndefined();
+    expect(findNameText(scene, 'turn-completed')).toBeDefined();
+    expect(findNameText(scene, 'card:dealt')).toBeUndefined();
   });
 
   it('freezes the feed while paused and appends buffered events on resume', async () => {
     emit('card:dealt', { cardId: 'copper-1' });
 
-    tool.activate(scene);
+    activate();
     findText(scene, (text) => text.text === '[ Pause ]')?.emit('pointerdown');
 
     emit('turn-started', { turnNumber: 2 });
@@ -279,7 +330,7 @@ describe('Game Events overlay pretty-printing', () => {
 
     // Paused: the new event is not rendered and the PAUSED status survives the
     // poll tick instead of being overwritten by the buffer status line.
-    expect(findEventText(scene, 'turn-started')).toBeUndefined();
+    expect(findNameText(scene, 'turn-started')).toBeUndefined();
     expect(findText(scene, (text) => text.text.includes('PAUSED'))).toBeDefined();
 
     findText(scene, (text) => text.text === '[ Resume ]')?.emit('pointerdown');
@@ -287,7 +338,7 @@ describe('Game Events overlay pretty-printing', () => {
 
     // Resuming shows everything recorded while paused (the buffer is the
     // source of truth) and restores the live status line.
-    expect(findEventText(scene, 'turn-started')).toBeDefined();
+    expect(findNameText(scene, 'turn-started')).toBeDefined();
     expect(findText(scene, (text) => text.text.includes('PAUSED'))).toBeUndefined();
     expect(findText(scene, (text) => text.text.startsWith('Status: Buffer active'))).toBeDefined();
   });
@@ -300,13 +351,13 @@ describe('Game Events overlay pretty-printing', () => {
       });
     }
 
-    tool.activate(scene);
+    activate();
 
     const scrollContainer = findScrollContainer(scene);
     expect(scrollContainer).toBeDefined();
     const contentTop = scrollContainer!.y; // scroll offset 0
 
-    const rows = collectTexts(scrollContainer!).sort((a, b) => a.y - b.y);
+    const rows = payloadTexts(scene);
     expect(rows.length).toBe(4);
     const lastRow = rows[rows.length - 1];
 
@@ -328,5 +379,94 @@ describe('Game Events overlay pretty-printing', () => {
     const lastRowBottom = scrollContainer!.y + lastRow.y + lastRow.height;
     expect(lastRowBottom).toBeLessThanOrEqual(contentTop + CONTENT_HEIGHT + 1);
     expect(scrollContainer!.y + lastRow.y).toBeGreaterThanOrEqual(contentTop - 1);
+  });
+
+  // ── Colour coding (RISE-0MW0V2CQ2006JDQV) ─────────────────
+
+  it('colours each event name from the active palette and keeps timestamp/payload neutral', () => {
+    emit('placement-attempted', { turn: 1, side: 'player' });
+    emit('draw', { turn: 1, spiritId: 's1' });
+
+    activate({ palettes: [PALETTE_ALPHA], paletteIndex: 0 });
+
+    expect(findNameText(scene, 'placement-attempted')?.style.color).toBe('#169B62');
+    expect(findNameText(scene, 'draw')?.style.color).toBe('#FFB347');
+
+    // Timestamp and payload stay palette-independent.
+    const dimTexts = collectTexts(
+      (scene as Phaser.Scene & { hudContainer: Phaser.GameObjects.Container }).hudContainer,
+    ).filter((text) => text.style.color === '#888888');
+    expect(dimTexts.length).toBeGreaterThanOrEqual(2); // one dim timestamp per row
+
+    const payload = findPayloadText(scene, '"turn": 1');
+    expect(payload?.style.color).toBe('#cccccc');
+  });
+
+  it('renders an ASCII category tag beside the name, identical in both palettes', () => {
+    emit('placement-attempted', { turn: 1 });
+    emit('draw', { turn: 1 });
+
+    activate({ palettes: [PALETTE_ALPHA, PALETTE_BETA], paletteIndex: 0 });
+
+    const alphaTag = findText(scene, (text) => text.text === 'PLACE');
+    expect(alphaTag).toBeDefined();
+    expect(alphaTag!.style.color).toBe('#999999');
+    expect(findText(scene, (text) => text.text === 'DRAW')).toBeDefined();
+
+    // Cycle to the second palette: same tag text and colour, different name colour.
+    findText(scene, (text) => text.text === '[ Palette: Alpha ]')?.emit('pointerdown');
+
+    expect(findNameText(scene, 'placement-attempted')?.style.color).toBe('#009E73');
+    const betaTag = findText(scene, (text) => text.text === 'PLACE');
+    expect(betaTag).toBeDefined();
+    expect(betaTag!.style.color).toBe('#999999');
+    expect(betaTag!.text).toBe(alphaTag!.text);
+  });
+
+  it('cycles palettes, re-renders the feed immediately and notifies the caller', () => {
+    emit('placement-attempted', { turn: 1 });
+    const onPaletteChange = vi.fn();
+
+    activate({
+      palettes: [PALETTE_ALPHA, PALETTE_BETA],
+      paletteIndex: 0,
+      onPaletteChange,
+    });
+
+    expect(findNameText(scene, 'placement-attempted')?.style.color).toBe('#169B62');
+    expect(findText(scene, (text) => text.text === '[ Palette: Alpha ]')).toBeDefined();
+
+    findText(scene, (text) => text.text === '[ Palette: Alpha ]')?.emit('pointerdown');
+
+    expect(findNameText(scene, 'placement-attempted')?.style.color).toBe('#009E73');
+    expect(findText(scene, (text) => text.text === '[ Palette: Beta ]')).toBeDefined();
+    expect(onPaletteChange).toHaveBeenCalledWith(1);
+
+    // Cycling wraps around.
+    findText(scene, (text) => text.text === '[ Palette: Beta ]')?.emit('pointerdown');
+    expect(findNameText(scene, 'placement-attempted')?.style.color).toBe('#169B62');
+    expect(onPaletteChange).toHaveBeenLastCalledWith(0);
+  });
+
+  it('clamps an out-of-range palette index to the first palette', () => {
+    emit('draw', { turn: 1 });
+
+    activate({ palettes: [PALETTE_ALPHA, PALETTE_BETA], paletteIndex: 99 });
+
+    expect(findNameText(scene, 'draw')?.style.color).toBe('#FFB347');
+    expect(findText(scene, (text) => text.text === '[ Palette: Alpha ]')).toBeDefined();
+  });
+
+  it('renders the neutral, uncategorised feed when no palette is supplied', () => {
+    emit('draw', { turn: 1, spiritId: 's1' });
+
+    activate();
+
+    // Default-path colour is the historical neutral grey.
+    expect(findNameText(scene, 'draw')?.style.color).toBe('#cccccc');
+    // No tag for an unmapped/absent palette.
+    expect(findText(scene, (text) => text.text === 'DRAW')).toBeUndefined();
+    // No cycler when there is only one palette.
+    expect(findText(scene, (text) => text.text.startsWith('[ Palette:'))).toBeUndefined();
   });
 });

@@ -93,8 +93,17 @@ export { moveGameObject } from './moveGameObject';
 export type { MoveGameObjectOptions } from './moveGameObject';
 
 // Card deal animation
-export { dealCard, DEFAULT_DEAL_DURATION, DEFAULT_DEAL_ARC_HEIGHT } from './dealCard';
-export type { DealCardOptions } from './dealCard';
+export {
+  dealCard,
+  DEFAULT_DEAL_DURATION,
+  DEFAULT_DEAL_ARC_HEIGHT,
+  DEFAULT_DEAL_EASE,
+  DEAL_ARC_PEAK_PROGRESS,
+  DEAL_MIN_INTERIOR_SPEED_RATIO,
+  dealArcProfile,
+  evaluateDealPath,
+} from './dealCard';
+export type { DealCardOptions, DealCardEase, DealPathGeometry, DealPathPoint } from './dealCard';
 
 // Card place animation
 export { placeCard, DEFAULT_PLACE_DURATION } from './placeCard';
@@ -212,7 +221,11 @@ export type {
   TooltipPosition,
   ViewportTooltipPositionOptions,
 } from './Tooltip';
-export type { SettingsPanelConfig, SettingsButtonPosition } from './SettingsPanel';
+export type {
+  ExtraToggleConfig,
+  SettingsPanelConfig,
+  SettingsButtonPosition,
+} from './SettingsPanel';
 
 export { SettingsButton } from './SettingsButton';
 export type { SettingsButtonConfig } from './SettingsButton';
@@ -381,6 +394,10 @@ export type {
   RemoveCardOptions,
   AnimatedSortOptions,
   HandViewEvents,
+  CardReorderPayload,
+  DragSourceRange,
+  DragMovePayload,
+  DragEndPayload,
   CardTextureResolver,
   RenderCardFn,
 } from './HandView';
@@ -479,6 +496,31 @@ export type {
   SynthIntegrationLoader,
   ToneForgeStatusToolOptions,
 } from './debug/ToneForgeStatusTool';
+
+// Game Events overlay + its pure, game-agnostic colour-styling helpers.
+// A game declares its own palettes and passes them to
+// `createGameEventLogTool`; core owns only these generic types/helpers.
+export { createGameEventLogTool } from './debug/GameEventLogOverlay';
+export type { GameEventLogToolOptions } from './debug/GameEventLogOverlay';
+export {
+  CIRCULAR_PAYLOAD_PLACEHOLDER,
+  EVENT_LOG_PAYLOAD_COLOUR,
+  EVENT_LOG_TAG_COLOUR,
+  EVENT_LOG_TIMESTAMP_COLOUR,
+  NEUTRAL_EVENT_LOG_PALETTE,
+  formatEventLogEntry,
+  formatEventLogName,
+  formatEventLogPayload,
+  formatEventLogTimestamp,
+  resolveEventStyle,
+  stringifyPayloadSafe,
+  widestLineLength,
+} from './debug/formatEventLog';
+export type {
+  EventLogEntry,
+  EventLogPalette,
+  EventLogStyle,
+} from './debug/formatEventLog';
 
 // Slider – reusable horizontal slider widget
 export { Slider } from './Slider';

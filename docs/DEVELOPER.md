@@ -837,6 +837,126 @@ mid-run. By committing the file and adding a negation entry (`!.pi/test-config.j
 This file is deliberately tracked as the simplest, most robust fix — no cross-repository
 change to the implement skill is needed.
 
+### Dev-push gate and test-cache mirroring
+
+A push to `dev` (or `main`) runs the **full canonical suite** in the committed
+`pre-push` hook, and the run is recorded in the per-repo test cache that audits
+read (`.worklog/cache/`, 2-hour TTL).
+
+#### The gate is bound to the pushed commit (`--gate-commit`)
+
+The hook captures the pushed `<ref>=<sha>` pairs while reading pre-push stdin
+once, and invokes the resolved runner as
+`run_tests.py --scope full --strict-git-env --json --project-root <pushed tree>
+--gate-commit <sha>`. The runner resolves a **clean** checkout whose `HEAD` is
+exactly that commit — the push cwd when it qualifies, else any clean
+`git worktree list` checkout — runs/caches the full suite there, and **refuses
+(exit 2)** when no clean checkout holds it. So a green dev push means the suite
+ran against the commit that landed, not against whatever tree the hook
+happened to run in. The runner's provenance lines are echoed to the pusher:
+`run_tests: gate-subject …`, `gate-root …`, `gate-verdict …`, and
+`gate-refused …` on a refusal.
+
+Refusal semantics (all fail-closed):
+
+- **Several different dev/main commits in one push** are refused **before any
+  suite runs**, listing each `ref=sha` and the recovery (one commit per push).
+  Escape hatches: `TEST_SCOPE_SKIP=1` or `git push --no-verify` (explicit, not
+  recommended).
+- **A resolved runner that predates `--gate-commit`** is refused with a named
+  upgrade message ("the resolved run_tests.py predates --gate-commit…"), never
+  an argparse error.
+- **A ref deletion** (all-zero `local_sha`) carries no commit and is not gated.
+
+**Dirty-checkout impact.** The gate refuses when **no clean checkout holds the
+pushed commit**. In TCE the normal agent path is `implement.py finish`, which
+pushes from a clean linked worktree and resolves the gate **in place**; a clean
+main-checkout push also resolves in place. `.worklog/` is gitignored, so worklog
+churn never dirties a checkout. A genuinely dirty tracked tree therefore now
+fails closed (the intended contract) instead of producing a verdict about the
+dirty tree.
+
+`implement.py finish` pushes from the **linked worktree** holding the pushed
+commit. A worktree has no `.worklog/`, so the runner caches its run under the
+worktree's git dir (`<worktree git dir>/test-cache`) — invisible to the main
+checkout's post-push verification and to the audit skill's execution-dependent
+AC auto-verification, which both read `<main checkout>/.worklog/cache`.
+
+After a green gate run the hook's `mirror_suite_cache` copies every cache entry
+the main checkout lacks into `<main checkout>/.worklog/cache`, so
+`run_tests.py --summary --suite all --json` reports the pushed commit's green
+entry instead of `missing`. The mirror sources from the **gate-resolved root**
+(the runner's `run_tests: gate-root` provenance), not merely the push cwd, so
+the entry lands for the commit that was actually validated. Cache keys are
+content-addressed (command + git state), so copying a missing entry is always
+safe — an identical key is an identical run — and mirroring never overwrites an
+entry the main cache already holds. The copy is **fail-soft**: a failure logs a
+warning and never blocks the push.
+
+> This behaviour ships in the **canonical pre-push hook template** owned by the
+> `worklog` package (`PRE_PUSH_HOOK_CONTENT`, emitted by `wl init` and kept
+> current by `wl doctor upgrade`). Do **not** patch `.githooks/pre-push`
+> locally: `wl doctor upgrade --dry-run` reports any divergence as pending, and
+> `--confirm` would overwrite the local edit.
+
+The mirroring and commit binding are pinned on two layers: the upstream
+template tests (`../ContextHub/tests/pre-push-hook-gate.test.ts`,
+`../ContextHub/tests/doctor-hook-upgrade.test.ts`), and — in this repository —
+`tests/scripts/game-repo-scaffold-hook-gate.test.ts`. The TCE-side cases push
+from a fixture's **linked worktree** against the committed `.githooks/pre-push`
+and assert that:
+
+- the hook forwards `--gate-commit <pushed sha>` and `--project-root <root>`;
+- a non-gated ref runs no suite, and a ref deletion is not gated;
+- a multi-commit dev/main push is refused before any suite runs;
+- the gate entry is mirrored from the gate-resolved root (`run_tests:
+  gate-root`), not the push cwd;
+- an entry the main cache already holds is never overwritten, and an
+  unwritable cache directory only warns and never fails the push.
+
+The same behaviour is documented upstream in
+`../ContextHub/docs/migrations.md` (the pre-push hook section) and in the
+implement skill (`../SorraAgents/skill/implement/SKILL.md`); this section
+covers the **consumer** contract.
+
+**The installed template must be current.** `wl doctor upgrade` can only emit
+the commit-bound block when the **installed** `wl` ships it, because the hook
+comes from the packaged `PRE_PUSH_HOOK_CONTENT`
+(`<install>/dist/doctor/hook-upgrade.js`), not from this repository. Refresh
+the install from the framework repo (`scripts/install_pi.sh`) whenever the
+installed template predates the flag; a stale install reports the committed
+hook as `outdated` (`pending` non-empty) instead of `up-to-date`. That
+installer currently does not refresh a globally resolved `wl` on every setup —
+the gap is tracked upstream as `SA-0MW2QAEQ0005MTYN` — so verify the installed
+template directly (step 0 below) rather than assuming a fresh install.
+
+Re-verify end-to-end with:
+
+```bash
+# 0. The INSTALLED wl must emit the commit-bound template. Refresh the install
+#    from the framework repo, then confirm the packaged template carries the
+#    flag (>= 4 occurrences: pre-check, invocation, comments).
+(cd ../SorraAgents && scripts/install_pi.sh)
+grep -c -- '--gate-commit' \
+  "$(dirname "$(readlink -f "$(command -v wl)")")/doctor/hook-upgrade.js"   # >= 4
+
+# 1. The canonical template owns the capability (no repository-local patch).
+grep -c 'gate-commit' ../ContextHub/src/doctor/hook-upgrade.ts   # >= 4
+grep -c mirror_suite_cache ../ContextHub/src/doctor/hook-upgrade.ts   # >= 2
+diff .githooks/pre-push ../ContextHub/.githooks/pre-push               # empty
+
+# 2. No divergence against the rebuilt package (npm-linked, dist gitignored).
+(cd ../ContextHub && npm run build)
+wl doctor upgrade --dry-run --json   # pending: [], all five hooks up-to-date
+
+# 3. After a dev push from a linked worktree, the main checkout can read the run.
+python3 <test-skill>/run_tests.py --summary --suite all --json
+```
+
+A `dev` push from a linked worktree logs one
+`push gate: mirrored cache entry <key> into <main checkout>/.worklog/cache` line
+per entry it copies.
+
 ### Monte Carlo environment variables
 
 The Main Street balance guardrail (`tests/main-street/monte-carlo-balance.test.ts`) and harness
@@ -1575,7 +1695,7 @@ smoke/dev lists always keep it.
 
 ## Startup Context Budget
 
-The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:
+The pre-push hook enforces a committed byte budget for the pi **startup context surface** (`AGENTS.md`, the global ruleset, and skills prose) so it does not silently grow session startup cost. The thresholds file also carries `skill_implement_md` (`skill/implement/SKILL.md` body size), measured as a **separate gate** outside `total`; the refresh script reports every component the measurement emits. Any commit that changes `AGENTS.md` must refresh `docs/dev/context-budget.thresholds.json` in the same commit:
 
 ```bash
 npm run context:refresh   # regenerate the thresholds, print the delta
@@ -2182,7 +2302,10 @@ CORE_ROOT=./core npm run build:electron    # desktop build
 
 An extracted game checkout (F1) has no root project files. Generate them with
 `scripts/game-repo-scaffold.ts`, which turns the checkout into a runnable
-single-game launcher against a sibling core (`../Tableau-Card-Engine`):
+single-game launcher against a sibling core (`../Tableau-Card-Engine`).
+Run both of the following from the **core checkout** — `tsx
+scripts/game-repo-scaffold.ts` and `npm run scaffold:games` exist only in the
+core, never in a game repo:
 
 ```bash
 tsx scripts/game-repo-scaffold.ts \
@@ -2949,6 +3072,82 @@ For non-standard card models (tokens, resource icons, expedition cards), use the
 
 Reference implementations: `example-games/gym/scenes/GymHandPileScene.ts` (max hand size 7, toggle button) and `../tce-main-street/src/scenes/MainStreetRenderer.ts`. Tests: `tests/ui/handView.outlines.test.ts`, `tests/handView/gym-handpile-outlines.browser.test.ts`, `tests/main-street/hand-outlines.browser.test.ts`.
 
+### Hand reordering (drag-to-reorder)
+
+`HandView` can move a card to a new position **inside** the same hand row (CG-0MWBX4GJK007ZAOX), so a hand can be arranged in the order the player plans to play it instead of staying frozen in deal order. Reordering is **opt-in and default off**: `reorderEnabled: true` in the constructor or `setReorderEnabled(true)` / `getReorderEnabled()` at runtime. While it is off, every existing gesture (drag-to-pile with `setDragTargetPileIndex()` + `setDragValidator()`, cascade multi-card pickup, click-to-select) is unchanged.
+
+**Two supported integrations (CG-0MWCPEHZ5004ZP54).** There is one insertion-geometry implementation and one commit implementation; only the gesture owner differs:
+
+| | Who owns the drag | Enable with | Who commits |
+|---|---|---|---|
+| **(a) HandView owns the drag** | `HandView`'s own pointer lifecycle | `setDragEnabled(true)` **and** `setReorderEnabled(true)` | `HandView`, on `pointerup` |
+| **(b) The game owns the drag** | The game's drag manager (`createDragDropManager`, a bespoke manager, …) | `setReorderEnabled(true)` **only** | The game, calling `commitReorder(from, to)` from its end handler |
+
+Do **not** combine `setDragEnabled(true)` with an external manager: that puts a second drag lifecycle on the same pointer. Integration (b) is the one to use when the hand is rendered through `renderCard` and the game needs multi-card fan drags to board slots or a discard pile — dragging inside the hand row then resolves through the game's own manager, reusing the engine's insertion geometry instead of re-implementing slot maths.
+
+**Gesture and commit.** With reorder on, a single-card drag in horizontal layout that is released inside the hand row band — and **not** over a registered drop target — commits a move:
+
+- The insertion index comes from `computeReorderInsertionIndex(pointerX, sourceIndex)`: the dragged card is treated as removed and the index is the number of remaining slot centres the pointer has passed. A pointer left of slot 0 inserts at the front; a pointer right of the last centre appends; a pointer over the card's own slot is a **no-op** (no visual change, no event, no SFX).
+- Slot centres come from the same capacity row template as the layout, so a fixed `maxSlots` template is honoured — every other card and every outline slot keeps its exact slot, and the row never re-centres.
+- A transient insertion marker (a plain 3 px rectangle, never a mask) previews the target slot during the drag; `getReorderInsertionIndex()` exposes the same preview. No marker is shown for a no-op target.
+- On commit the view splices its own `cards` order, re-indexes the sprites it manages (z-order, labels, tint overlays), re-lays the row with a 240 ms tween to the new slot positions (instant under reduced motion), updates outline alignment, and returns the selection to the moved card.
+- The move is **audible**: `COMMON_SFX_KEYS.CARD_SWAP` (`sfx-card-swap`, [SFX convention](SFX_CONVENTION.md)) plays through the `soundManager` passed to the constructor, so mute and volume are respected. Nothing plays when the reorder is a no-op or when no manager is wired. The manager must already have the key registered — the owning scene owns asset loading (`scene.load.audio(COMMON_SFX_KEYS.CARD_SWAP, 'assets/audio/default/card-swap.wav')`).
+
+**Model stays authoritative.** `HandView` is a view. It reorders its own `cards` / sprites and then emits `cardreorder` with `{ from, to, card }`; the game **must** apply the same move to its own array, otherwise its next `setCards()` refresh re-renders the old order:
+
+```ts
+handView.on('cardreorder', ({ from, to }) => {
+  const [card] = myHand.splice(from, 1);
+  myHand.splice(to, 0, card);
+});
+```
+
+The gesture also still emits `dragend` — with `targetPileIndex: null`, `accepted: false` and `reordered: true`. That flag is the discriminator: a `dragend` handler must not treat a reorder as a rejected pile drop (do not snap the hand back to the model order or log a rejection). Normal (non-reorder) drags keep the original `dragend` payload shape.
+
+**Pile precedence.** A non-null `setDragTargetPileIndex()` value always wins: while the pointer is over a pile the existing `dragend`/validator path runs and nothing is reordered. Releasing outside the hand row band likewise leaves the drag to the legacy path. Vertical (cascade) layout never reorders — a cascade drag picks up a multi-card range (`[0..index]`), so range reordering is deferred.
+
+**Integration (b) — worked example.** A game that owns the drag calls the public surface from its own manager's move and end handlers:
+
+```ts
+// Enable reorder mode only — no setDragEnabled(true).
+handView.setReorderEnabled(true);
+
+const manager = createDragDropManager(scene, {
+  onMove: ({ pointer, sourceIndex }) => {
+    // Marker preview using the engine's own band + insertion geometry.
+    handView.previewReorder(pointer.x, pointer.y, sourceIndex);
+  },
+  onEnd: ({ pointer, sourceIndex, pileIndex }) => {
+    // A release over a registered pile target must never reorder.
+    if (pileIndex !== null) return;
+    if (!handView.isPointerInHandRowBand(pointer.y)) return;
+    const to = handView.computeReorderInsertionIndex(pointer.x, sourceIndex);
+    handView.commitReorder(sourceIndex, to); // no-op for own slot / out of range
+  },
+});
+
+// The game still owns its model (same contract as integration (a)).
+handView.on('cardreorder', ({ from, to }) => {
+  const [card] = myHand.splice(from, 1);
+  myHand.splice(to, 0, card);
+});
+```
+
+Public surface for external managers (all inert unless `getReorderEnabled()` is true and the layout is horizontal):
+
+- `commitReorder(from, to)` — the same commit the internal `pointerup` path performs: splice, display re-index, re-layout tween (instant under reduced motion), `sfx-card-swap` through the injected `SoundManager`, `cardreorder` with `{ from, to, card }`. No-op for `from === to`, an out-of-range/non-integer `from`, reorder mode off, and vertical layout; an out-of-range `to` is clamped.
+- `previewReorder(pointerX, pointerY, sourceIndex)` — shows/moves the insertion marker, records it for `getReorderInsertionIndex()`, and returns the index (or `null` when nothing would move: outside the band, over the card's own slot, or reorder mode off). Clears the marker on a subsequent no-op preview.
+- `isPointerInHandRowBand(pointerY)` — the row-band tolerance the internal path uses, so the caller does not duplicate it.
+- `computeReorderInsertionIndex(pointerX, sourceIndex)` — the single insertion-geometry source (public since the parent item).
+
+**The caller owns precedence.** `commitReorder()` never inspects pile targets: the release decision (pile drop vs hand reorder) belongs to the manager that did the hit-testing. Calling it unconditionally after a pile release would reorder a card the player dropped on a pile.
+
+**Custom renderers.** The default Image path and the `renderCard` callback path are both reorderable — HandView attaches the drag lifecycle to whatever display object the renderer returned, so no game-side bespoke drag code is needed. Because reordering changes card **indices**, a custom renderer must not cache index-derived state across a reorder (rebuild it from the card in the `cardreorder` handler instead); see the [UI Adapter Guide](ui/ADAPTER-GUIDE.md#reordering-and-index-derived-state).
+
+**No undo coupling.** `HandView` does not own undo. A game using `UndoRedoManager` decides for itself whether to wrap the `cardreorder` handler in a `Command`.
+
+Reference implementation: `example-games/gym/scenes/GymHandPileScene.ts` (runtime `[ Disable Reorder ]` toggle, event-log entry, model sync — integration (a)). `../tce-the-rising` uses integration (b). Tests: `tests/ui/handView.reorder.test.ts` (insertion index, commit order, no-op, reduced motion, SFX, pile precedence, custom renderer, `maxSlots` template, and the public `commitReorder` / `previewReorder` / `isPointerInHandRowBand` external-manager surface), `tests/handView/gym-handpile-reorder.browser.test.ts` (real drag gesture + drag-to-discard still working).
+
 ## Animation & Sound Feedback for Player and AI Actions
 
 **Requirement:** Every player **and** AI action that uses a core engine animation/feedback helper — `dealCard`, `discardCard`, `flipCard`, `placeCard`, `moveGameObject`, `shakeIllegalMove`, `popTextOrIcon`, `createDragDropManager`, and any future helpers — must be rendered with the corresponding animation and wired with a sound effect (SFX), so the action is both animated and audible. Each helper accepts a `soundManager` + `sfx` (`start`/`move`/`end`) options map (see [UI Animation Helpers](ui-animations.md)); pass both so the action is never silent or instant by default. SFX keys must follow the shared `sfx-` prefix convention — `COMMON_SFX_KEYS` from `src/core-engine/SoundManager.ts`, detailed in [docs/SFX_CONVENTION.md](SFX_CONVENTION.md); no game-scoped string literals. `shakeIllegalMove` plays `COMMON_SFX_KEYS.ILLEGAL_MOVE` automatically; pass its `reason` option (the rules-layer `LegalityResult.reason`) and it also renders the transient reason toast, so a rejected move is explained as well as animated — see [shakeIllegalMove](ui-animations.md#shakeillegalmove-illegal-move-feedback--reason-toast). `popTextOrIcon()` is the lightweight score/notification popup; `createDragDropManager` — the reusable drag-and-drop lifecycle in `src/ui/dragDrop.ts`, see [drag-and-drop lifecycle](ui-animations.md#createdragdropmanager-drag-and-drop-lifecycle) — plays the illegal feedback sound on pickup veto and invalid drops and renders the reason toast when an `illegalReason` resolver supplies `payload.reason`.)
@@ -3234,8 +3433,7 @@ finishes) and the game-over banner never appears mid-animation.
   in `TurnResult.pendingCoinDelta` / `pendingRepDelta` / `pendingScoreDelta`
   and sets `TurnResult.requiresDeferredClosing`; `state.resourceBank` and
   `state.finalScore` are NOT mutated and the closing tail (EndCheck → next
-  week) is deferred. Tutorial, reduced-motion and replay paths omit the flag
-  (legacy immediate behaviour, no regression — AC5).
+  week) is deferred. Tutorial and replay paths omit the flag (legacy immediate behaviour, no regression — AC5). The reduced-motion path takes the deferred closing (`deferResourceApplication: true`), gated by `requiresDeferredClosing` so the Turn Summary dialog can present its summary under reduced motion (MS-0MW20KSEG001DH1X).
 - **Apply at animation end.** The scene (`MainStreetTurnController` +
   `MainStreetAnimator`) applies the deltas exactly once via
   `applyEndOfTurnDeltas` when the last animation completes (guarded by the
@@ -4626,6 +4824,7 @@ The `SettingsPanel` class provides a slide-in right sidebar with controls for:
 - Reduced motion toggle
 - Configurable End Turn keybind
 - Difficulty selector (when `difficultyNames` provided)
+- Game-supplied toggles (when `extraToggles` provided)
 
 ```typescript
 import { SettingsPanel } from '@ui';
@@ -4638,6 +4837,39 @@ settingsPanel.open();   // Slide in from the right
 settingsPanel.close();  // Slide out
 settingsPanel.toggle(); // Toggle open/closed
 ```
+
+#### Game-supplied toggles (`extraToggles`)
+
+The panel is engine-owned and stays game-agnostic, so game-specific settings
+reach it through the optional `extraToggles` list. Each entry carries its own
+label and a `get`/`set` pair; the panel renders one toggle per entry in the
+Display section (below Tooltips and Reduced Motion) with the built-in styling:
+
+```typescript
+const settingsPanel = new SettingsPanel(this, {
+  soundManager: this.soundManager,
+  extraToggles: [
+    {
+      label: 'Auto advance turn',
+      get: () => isAutoAdvanceTurnEnabled(),
+      set: (value) => setAutoAdvanceTurnEnabled(value),
+    },
+  ],
+});
+```
+
+- **`get()`** is read when the panel is built, on every `open()`, after each
+  flip and by `refreshExtraToggles()`. It is wrapped, so a throwing callback
+  renders as `OFF` instead of breaking the panel.
+- **`set(value)`** receives the flipped value. The panel then re-reads `get()`,
+  so a game may veto or normalise a change and the rendered state always
+  reflects the stored preference rather than the request.
+- **`refreshExtraToggles()`** re-reads every entry and repaints it — call it
+  when the preference changed elsewhere (e.g. a game dialog's checkbox) while
+  the panel may be showing.
+- **Optional.** Omit `extraToggles` and the panel renders exactly the built-in
+  controls, so existing callers are unaffected. `CardGameScene.initSettingsPanel`
+  forwards it as its last parameter.
 
 **Depth conventions:** Same as HelpPanel (blocker 900, background 901, etc.). Settings button at depth 1102.
 
@@ -5052,12 +5284,28 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
 
 - **Label:** "Export Session"
 - **Location:** Debug Tools section of the Settings panel
-- **Function:** Downloads the current game transcript as a JSON file. If the
-  active scene has a `recorder` with a `getTranscript()` method, it serializes
-  the full transcript. Otherwise, it produces an empty transcript with metadata.
+- **Function:** Downloads the current game transcript as a JSON file. The tool
+  discovers the transcript recorder on the active scene by probing (in order)
+  the property names `recorder`, `transcriptRecorder` and `transcript`,
+  accepting only objects that expose a callable `getTranscript()` method
+  (mirroring `StateInspectorOverlay`'s multi-name probing). When a recorder is
+  found, its `getTranscript()` output is serialised losslessly with
+  `JSON.stringify(..., null, 2)` and downloaded as
+  `session-export-<timestamp>.json` with MIME type `application/json`.
+- **No-data behaviour:** when the active scene exposes no conforming recorder
+  (or `getTranscript()` throws), **no file is downloaded** and the tool's live
+  description in the Debug Tools section shows a visible reason (e.g. "No
+  transcript recorder found on this scene"), refreshed within the panel's
+  500 ms description poll. A later successful export clears and replaces the
+  status, so it always reflects only the most recent attempt. The supported
+  property names are part of the engine's documented scene shapes; a scene
+  that uses a different name should rename its field accordingly or extend the
+  probe list in `src/ui/debug/transcriptExport.ts`.
 - **Use case:** Developers can export session data for debugging, regression
   testing, or replay without needing to finish the game or use CLI tools.
-- **Implementation:** `src/ui/debug/SessionExportTool.ts`
+- **Implementation:** `src/ui/debug/SessionExportTool.ts` (download + live
+  status) and `src/ui/debug/transcriptExport.ts` (Phaser-free recorder
+  discovery + serialisation).
 
 #### State Inspector
 
@@ -5106,16 +5354,36 @@ the entire debug infrastructure is tree-shaken from the bundle using Vite's
     the `Status: PAUSED` line is not overwritten by a poll tick. Resuming
     appends everything recorded while paused (the buffer is the source of
     truth, so a pause never loses events).
+  - **Colour coding (game-supplied):** `createGameEventLogTool(options)`
+    accepts `{ palettes?, paletteIndex?, onPaletteChange? }`. Each row is
+    rendered as three measured text objects — a dim, palette-independent
+    timestamp; the `[eventName]` token in the active palette's colour followed
+    by its short ASCII category tag (also palette-independent); and the
+    neutral pretty-printed payload. Only the event-name token carries
+    category colour.
+  - **Neutral default:** with no `palettes`, the overlay uses one internal
+    neutral palette (every name `#cccccc`, no tags) and renders **no**
+    `[ Palette: … ]` cycler, so the Gym, Main Street and a bare
+    `createGameEventLogTool()` keep the pre-colour feed.
+  - **Palette cycler:** when a game supplies two or more palettes, a
+    `[ Palette: <label> ]` control beside Clear/Pause cycles them, re-renders
+    the feed immediately and calls `onPaletteChange(index)` so the game can
+    persist the choice (e.g. The Rising's `SettingsStore` preference).
 - **Event source:** Subscribes to the `GameEventEmitter` instance exposed on
   `window.__GAME_EVENTS__` (set up automatically by `CardGameScene`).
 - **Use case:** Monitor event flow during gameplay for debugging event-driven
   interactions or replays.
-- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts` renders one text
-  object per event (header + pretty JSON, measured row offsets, no `wordWrap`);
-  the pure, Phaser-free formatting helpers (`formatEventLogEntry`,
-  `stringifyPayloadSafe`, `widestLineLength`) live in
-  `src/ui/debug/formatEventLog.ts` and are re-exported from `@ui/debug`.
-  Horizontal reachability comes from `createOverlayDialog`'s opt-in
+- **Implementation:** `src/ui/debug/GameEventLogOverlay.ts` renders three text
+  objects per event (dim timestamp, coloured name + ASCII tag, neutral pretty
+  JSON, measured row offsets, no `wordWrap`); the pure, Phaser-free formatting
+  and palette helpers (`formatEventLogEntry`, `formatEventLogTimestamp`,
+  `formatEventLogName`, `formatEventLogPayload`, `stringifyPayloadSafe`,
+  `widestLineLength`, `resolveEventStyle`, `EventLogPalette`,
+  `EventLogStyle`, `NEUTRAL_EVENT_LOG_PALETTE`) live in
+  `src/ui/debug/formatEventLog.ts` and are re-exported from `@ui/debug` /
+  `@ui`. A game declares its palettes as a generic
+  `eventName → colour` + `eventName → tag` record; core carries no game
+  vocabulary. Horizontal reachability comes from `createOverlayDialog`'s opt-in
   `enableHorizontalScroll` (see [Overlay Dialog (scrolling)](#overlay-dialog-scrolling)).
 
 #### AI Decisions
@@ -5332,7 +5600,8 @@ To verify production safety:
 | File | Purpose |
 |------|---------|
 | `src/ui/debug/DebugToolsRegistry.ts` | `isDevMode()` function and `DebugToolsEntry` type |
-| `src/ui/debug/SessionExportTool.ts` | Session export debug tool |
+| `src/ui/debug/SessionExportTool.ts` | Session export debug tool (download + live status) |
+| `src/ui/debug/transcriptExport.ts` | Phaser-free transcript recorder discovery + serialisation for the session export tool |
 | `src/ui/debug/StateInspectorOverlay.ts` | State inspector overlay |
 | `src/ui/debug/GameEventLogOverlay.ts` | Game event log overlay |
 | `src/ui/debug/AiDecisionRecorder.ts` | AI decision recording singleton |

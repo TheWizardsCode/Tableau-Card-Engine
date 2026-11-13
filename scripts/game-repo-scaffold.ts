@@ -36,8 +36,9 @@
  * (`../../src/…`), so no `example-games/` tree or symlink is needed.
  *
  * A real run also copies the core's committed `.githooks/` verbatim (including
- * the unified full-suite pre-push gate), points the generated repo's **local**
- * `core.hooksPath` at it, and generates
+ * the unified full-suite pre-push gate, which is bound to the pushed commit via
+ * `--gate-commit`), points the generated repo's **local** `core.hooksPath` at
+ * it, and generates
  * `docs/dev/context-budget.thresholds.json` from that repo's own measured
  * surface (CG-0MW0KURL8002XOV9). Because `core.hooksPath` is local config, a
  * fresh clone still needs one activation step (`install_pi.sh` or
@@ -190,6 +191,25 @@ export const REFRESH_THRESHOLDS_PATH = 'scripts/refresh-context-thresholds.sh';
  * `package.json` (the ship `bump-version.js` resolves the invoking repo root).
  */
 export const GAME_INITIAL_VERSION = '0.1.0';
+
+/**
+ * Core-only npm scripts that must never be inherited into a game repo
+ * (MS-0MVO30VXS002A1Z0).
+ *
+ * The core legitimately declares both for use **from the core checkout**, where
+ * `scripts/game-repo-scaffold.ts` exists. Option C (F9/C1) gives a game repo
+ * `src/`-layout sources and no root `scripts/` tree, so an inherited
+ * `tsx scripts/game-repo-scaffold.ts` entry point is dead on arrival — invoking
+ * it in a generated repo fails with module-not-found. A game repo scaffolds
+ * through its own `scaffold` entry point, which targets the sibling core
+ * checkout (`<coreRel>/scripts/game-repo-scaffold.ts`) instead.
+ *
+ * Deliberately an explicitly-named drop-list rather than a rule inferred from
+ * the command: the wider class of core-only inherited scripts (`test:smoke`,
+ * `context:check`, `build:electron-main`, …) is tracked separately on
+ * MS-0MVO30VXS002A1Z0 and should be generalised there, not guessed at here.
+ */
+export const CORE_ONLY_SCRIPTS = ['scaffold:game', 'scaffold:games'] as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -537,12 +557,18 @@ export function renderPackageJson(
       // balance, replay, …) so a game's tests can invoke them, then override
       // the repo-specific entry points below. Option C (F9/C1) moves the game
       // tree to `src/`, so any inherited script that references
-      // `example-games/<game>/…` is repointed accordingly.
+      // `example-games/<game>/…` is repointed accordingly. Scripts that only
+      // work from the core checkout are dropped first — a game repo has no
+      // root `scripts/` tree ({@link CORE_ONLY_SCRIPTS}, MS-0MVO30VXS002A1Z0).
       ...Object.fromEntries(
-        Object.entries(manifest.scripts ?? {}).map(([name, cmd]) => [
-          name,
-          cmd.split(`example-games/${game}/`).join('src/'),
-        ]),
+        Object.entries(manifest.scripts ?? {})
+          .filter(
+            ([name]) => !(CORE_ONLY_SCRIPTS as readonly string[]).includes(name),
+          )
+          .map(([name, cmd]) => [
+            name,
+            cmd.split(`example-games/${game}/`).join('src/'),
+          ]),
       ),
       // Interactive dev start: the soft variant of `engine:sync` composes the
       // latest engine but never blocks on a dirty `./core` — it warns and
@@ -1181,12 +1207,21 @@ export function resolveMeasureContext(
   return fs.existsSync(global) ? global : undefined;
 }
 
-/** The four components a measured thresholds file carries. */
+/**
+ * The startup-surface components whose thresholds a measured file must carry.
+ *
+ * `measure_context.py` may also emit further components — `skill_implement_md`
+ * is measured as a separate gate and is **not** part of `total`. Those extra
+ * keys pass through unvalidated (and optional here) so an older or newer
+ * measurement tool never trips the scaffold's fail-open path.
+ */
 export interface ContextThresholds {
   global_agents: number;
   project_agents: number;
   skills_prose: number;
   total: number;
+  /** `skill/implement/SKILL.md` body size — a separate gate, never in `total`. */
+  skill_implement_md?: number;
 }
 
 /**
@@ -1269,6 +1304,12 @@ export function renderContextBudgetDoc(game: string): string {
     '| `project_agents` | this repository\'s `AGENTS.md` |',
     '| `skills_prose` | the frontmatter `description` prose of `skill/*/SKILL.md` (with `--include-hidden`) |',
     '| `total` | the sum of the components above |',
+    '',
+    '`measure_context.py` may also emit `skill_implement_md`',
+    '(`skill/implement/SKILL.md` body size) into the same file. It is a',
+    '**separate gate**: it is not part of `total`, and it measures `0` in a',
+    'repository with no local `skill/` tree. The refresh script reports every',
+    'component it measures.',
     '',
     '## Activating the hooks in a fresh clone',
     '',
