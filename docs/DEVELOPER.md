@@ -1549,23 +1549,38 @@ adapter as the default.
 Three `tsx` CLIs expose the seams (no Vite loader, no game import):
 
 ```bash
-npm run storylines:validate                     # validate the Gym content
+npm run storylines:validate                     # validate every shipped content file
 npm run storylines:validate -- --csv path.csv --json --fail-on-cycle
-npm run storylines:graph                        # rewrite the Gym artefacts
-npm run storylines:graph -- --format json --check   # drift guard
+npm run storylines:graph                        # rewrite every shipped content artefact
+npm run storylines:graph -- --format json --check   # drift guard over every artefact
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
 npm run storylines:author -- update-card --id evt-x --storyline-id storyline-x
 npm run storylines:editor                       # open the local graph editor
 npm run storylines:editor -- --help             # editor flags
 ```
 
-Every CLI supports `--help` and `--game <adapter-id>` (default `gym`), and exits
-`0` on success/valid content and `1` on invalid content, unreadable input or
-artefact drift. The author API validates before writing and writes atomically;
-`--dry-run` prints the candidate and writes nothing. The committed Gym
-artefacts (`example-games/gym/content/storyline-manifest.json` and
-`storyline-graph.mmd`) are validated against
+Every CLI supports `--help` and `--game <adapter-id>` (default `gym`). With no
+`--csv`, `storylines:validate` and `storylines:graph` walk the shipped content
+registry (`DEFAULT_CONTENT_FILES` in `src/story-line/content/adapters.ts`) and
+process **every** file through the adapter it declares — each content file owns
+its own JSON manifest and Mermaid graph — so a second content file cannot escape
+validation or the artefact drift guard. Passing `--csv` selects one file (an
+unregistered file falls back to the format's default artefact path); `--out`
+requires `--csv`. Every CLI exits `0` on success/valid content and `1` on invalid
+content, unreadable input or artefact drift. The author API validates before
+writing and writes atomically; `--dry-run` prints the candidate and writes
+nothing. The committed Gym artefacts (`example-games/gym/content/storyline-manifest.json`
++ `storyline-graph.mmd` for `storylines.csv`, and
+`example-games/gym/content/long-erasure-manifest.json` +
+`long-erasure-graph.mmd` for the *Long Erasure* content) are validated against
 `schemas/story-line-manifest.schema.json` and kept in sync by `--check`.
+
+The Gym ships two content files: the original demo (`storylines.csv`, the
+`gym` adapter) and `long-erasure.csv` (the `long-erasure` adapter — the
+three-act story-line spike, with `act` / `clockCost` game columns and the
+`hull,morale,stores,goodwill,charge` declared resource set). The two files are
+independent: `long-erasure.csv` uses its own storyline id, so the shipped demo
+rows and their committed options-parity goldens are untouched.
 
 See [Core: Generic Story-Line System](core-engine/story-line.md#authoring-seams-content-manifest-validator-author)
 for the adapter contract, validator codes, manifest shape and API examples.

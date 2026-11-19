@@ -14,8 +14,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_CONTENT_PATH } from '../../../src/story-line/content/adapters';
-import { DEFAULT_GRAPH_OUTPUTS } from '../../../scripts/storyline-graph';
+import { DEFAULT_CONTENT_PATH, DEFAULT_CONTENT_FILES } from '../../../src/story-line/content/adapters';
+import { DEFAULT_GRAPH_OUTPUTS, runStorylineGraphCli } from '../../../scripts/storyline-graph';
 import {
   parseValidateStorylinesArgs,
   runValidateStorylinesCli,
@@ -168,6 +168,52 @@ describe('shipped content location', () => {
         cwd: REPO_ROOT,
       });
       expect(ignored.status, `${path} must not be git-ignored`).toBe(1);
+    }
+  });
+});
+
+describe('shipped content registry (no --csv)', () => {
+  it('validates every shipped content file with its own adapter', () => {
+    const { code, stdout } = captureOutput(() => runValidateStorylinesCli([]));
+    expect(code).toBe(0);
+    for (const spec of DEFAULT_CONTENT_FILES) {
+      expect(stdout).toContain(`${spec.csv} (adapter ${spec.adapterId})`);
+    }
+    expect(stdout.match(/RESULT: VALID/g)).toHaveLength(DEFAULT_CONTENT_FILES.length);
+  });
+
+  it('reports every shipped content file in the JSON report', () => {
+    const { code, stdout } = captureOutput(() => runValidateStorylinesCli(['--json']));
+    expect(code).toBe(0);
+    const report = JSON.parse(stdout);
+    expect(report.valid).toBe(true);
+    expect(report.files.map((file: { csv: string }) => file.csv)).toEqual(
+      DEFAULT_CONTENT_FILES.map((spec) => spec.csv),
+    );
+    for (const file of report.files) expect(file.valid).toBe(true);
+  });
+
+  it('drift-checks every shipped artefact when --csv is omitted', () => {
+    const { code, stdout } = captureOutput(() =>
+      runStorylineGraphCli(['--format', 'json', '--check']),
+    );
+    expect(code).toBe(0);
+    for (const spec of DEFAULT_CONTENT_FILES) {
+      expect(stdout).toContain(spec.artefacts.json);
+    }
+    expect(stdout.match(/is up to date/g)).toHaveLength(DEFAULT_CONTENT_FILES.length);
+  });
+
+  it('refuses --out without --csv (one content file at a time)', () => {
+    const temp = makeTempDir();
+    try {
+      const { code, stderr } = captureOutput(() =>
+        runStorylineGraphCli(['--format', 'json', '--out', join(temp.path, 'x.json')]),
+      );
+      expect(code).toBe(1);
+      expect(stderr).toContain('--out requires --csv');
+    } finally {
+      temp.cleanup();
     }
   });
 });

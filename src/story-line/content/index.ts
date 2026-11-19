@@ -113,11 +113,16 @@ export {
   writeArtefacts,
 } from './artefacts';
 
+export type { ContentFileSpec } from './adapters';
 export {
   CONTENT_ADAPTERS,
   DEFAULT_CONTENT_ADAPTER,
+  DEFAULT_CONTENT_FILES,
   DEFAULT_CONTENT_PATH,
   GYM_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_PATH,
+  findContentFileSpec,
   getContentAdapter,
   resolveContentAdapter,
 } from './adapters';

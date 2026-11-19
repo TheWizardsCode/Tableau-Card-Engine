@@ -30,7 +30,10 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import {
+  DEFAULT_CONTENT_FILES,
   DEFAULT_CONTENT_PATH,
+  findContentFileSpec,
+  getContentAdapter,
   resolveContentAdapter,
 } from '../src/story-line/content/adapters';
 import {
@@ -42,6 +45,7 @@ import {
   renderArtefacts,
 } from '../src/story-line/content/artefacts';
 import { parseArgv } from './storyline-cli-support';
+import type { ContentAdapter } from '../src/story-line/content/types';
 
 /**
  * Default committed artefact paths, relative to the repository root.
@@ -60,11 +64,15 @@ Usage:
 
 Options:
   --format <mermaid|json>  Output format (default: mermaid)
-  --csv <path>             Content CSV to read (default: ${DEFAULT_CONTENT_PATH})
-  --game <id>              Content adapter id (default: gym)
-  --out <path>             Output path (default: the committed Gym artefact)
+  --csv <path>             Content CSV to read (default: every shipped content file)
+  --game <id>              Content adapter id (default: the file's own adapter)
+  --out <path>             Output path (default: the content file's committed artefact)
   --check                  Compare with the committed artefact; exit 1 on drift
   --help                   Show this help
+
+With no --csv, every file in the shipped content registry is exported with the
+adapter it declares and compared against its own committed artefact, so the
+drift guard covers the whole content set.
 
 Exit codes: 0 = written / no drift, 1 = drift, missing artefact or bad input.`;
 
@@ -72,8 +80,11 @@ Exit codes: 0 = written / no drift, 1 = drift, missing artefact or bad input.`;
 export interface StorylineGraphCliOptions {
   readonly format: 'mermaid' | 'json';
   readonly csvPath: string;
+  /** True when `--csv` was supplied (single-file mode). */
+  readonly csvProvided: boolean;
   readonly gameId?: string;
   readonly outPath: string;
+  readonly outProvided: boolean;
   readonly check: boolean;
   readonly help: boolean;
 }
@@ -89,11 +100,15 @@ export function parseStorylineGraphArgs(
 ): StorylineGraphCliOptions {
   const { flags } = parseArgv(argv);
   const format = flags.get('format') === 'json' ? 'json' : 'mermaid';
+  const csv = flags.get('csv');
+  const out = flags.get('out');
   return {
     format,
-    csvPath: flags.get('csv') ?? DEFAULT_CONTENT_PATH,
+    csvPath: csv ?? DEFAULT_CONTENT_PATH,
+    csvProvided: csv !== undefined,
     gameId: flags.get('game'),
-    outPath: flags.get('out') ?? DEFAULT_GRAPH_OUTPUTS[format],
+    outPath: out ?? DEFAULT_GRAPH_OUTPUTS[format],
+    outProvided: out !== undefined,
     check: flags.has('check'),
     help: flags.has('help'),
   };
@@ -114,6 +129,96 @@ export function renderGraphArtefact(
 }
 
 /**
+ * Renders one content file's artefact text.
+ *
+ * @param format Artefact format.
+ * @param csv    Raw content CSV.
+ * @param adapter The adapter the file is read through.
+ * @returns The artefact text.
+ * @throws Error when the adapter is unknown or the content cannot be compiled.
+ */
+function renderContentArtefact(
+  format: 'mermaid' | 'json',
+  csv: string,
+  adapter: ContentAdapter,
+): string {
+  return renderGraphArtefact(format, buildStorylineManifestFromCsv(csv, adapter));
+}
+
+/**
+ * Exports (writes or drift-checks) one content file's artefact.
+ *
+ * @param format    Artefact format.
+ * @param csvPath   Content CSV path (as supplied, resolved for reading).
+ * @param outPath   Artefact path (as supplied, resolved for writing).
+ * @param check     `true` compares with the committed artefact instead of writing.
+ * @param gameId    Optional adapter override (defaults to the file's own adapter).
+ * @param ownAdapterId The adapter the content registry declares for this file.
+ * @returns `true` on success, `false` on a read/build/drift failure.
+ */
+function exportContentArtefact(
+  format: 'mermaid' | 'json',
+  csvPath: string,
+  outPath: string,
+  check: boolean,
+  gameId: string | undefined,
+  ownAdapterId: string | undefined,
+): boolean {
+  const adapterId = gameId ?? ownAdapterId;
+  const adapter =
+    adapterId === undefined ? resolveContentAdapter() : getContentAdapter(adapterId);
+  if (!adapter) {
+    process.stderr.write(
+      `storyline-graph: unknown --game "${adapterId ?? ''}" (shipped adapters: gym, long-erasure)\n`,
+    );
+    return false;
+  }
+
+  const absoluteCsv = resolve(process.cwd(), csvPath);
+  const absoluteOut = resolve(process.cwd(), outPath);
+
+  let csv: string;
+  try {
+    csv = readFileSync(absoluteCsv, 'utf-8');
+  } catch (err) {
+    process.stderr.write(
+      `storyline-graph: cannot read ${absoluteCsv}: ${(err as Error).message}\n`,
+    );
+    return false;
+  }
+
+  let content: string;
+  try {
+    content = renderContentArtefact(format, csv, adapter);
+  } catch (err) {
+    process.stderr.write(
+      `storyline-graph: cannot build the manifest from ${absoluteCsv}: ${(err as Error).message}\n`,
+    );
+    return false;
+  }
+
+  if (check) {
+    if (!existsSync(absoluteOut)) {
+      process.stderr.write(`storyline-graph: missing committed artefact ${absoluteOut}\n`);
+      return false;
+    }
+    if (readFileSync(absoluteOut, 'utf-8') !== content) {
+      process.stderr.write(
+        `storyline-graph: drift detected in ${absoluteOut} — regenerate with ` +
+          `\`npm run storylines:graph -- --format ${format}\`\n`,
+      );
+      return false;
+    }
+    process.stdout.write(`storyline-graph: ${absoluteOut} is up to date\n`);
+    return true;
+  }
+
+  writeFileSync(absoluteOut, content, 'utf-8');
+  process.stdout.write(`storyline-graph: wrote ${absoluteOut}\n`);
+  return true;
+}
+
+/**
  * Runs the graph-export CLI.
  *
  * @param argv Raw arguments (defaults to `process.argv.slice(2)`).
@@ -128,59 +233,48 @@ export function runStorylineGraphCli(
     return 0;
   }
 
-  const adapter = resolveContentAdapter(opts.gameId);
-  if (!adapter) {
-    process.stderr.write(
-      `storyline-graph: unknown --game "${opts.gameId ?? ''}" (shipped adapters: gym)\n`,
-    );
-    return 1;
-  }
-
-  const csvPath = resolve(process.cwd(), opts.csvPath);
-  const outPath = resolve(process.cwd(), opts.outPath);
-
-  let csv: string;
-  try {
-    csv = readFileSync(csvPath, 'utf-8');
-  } catch (err) {
-    process.stderr.write(
-      `storyline-graph: cannot read ${csvPath}: ${(err as Error).message}\n`,
-    );
-    return 1;
-  }
-
-  let content: string;
-  try {
-    content = renderGraphArtefact(
-      opts.format,
-      buildStorylineManifestFromCsv(csv, adapter),
-    );
-  } catch (err) {
-    process.stderr.write(
-      `storyline-graph: cannot build the manifest from ${csvPath}: ${(err as Error).message}\n`,
-    );
-    return 1;
-  }
-
-  if (opts.check) {
-    if (!existsSync(outPath)) {
-      process.stderr.write(`storyline-graph: missing committed artefact ${outPath}\n`);
-      return 1;
-    }
-    if (readFileSync(outPath, 'utf-8') !== content) {
+  // No `--csv`: export every shipped content file against its own artefact.
+  if (!opts.csvProvided) {
+    if (opts.outProvided) {
       process.stderr.write(
-        `storyline-graph: drift detected in ${outPath} — regenerate with ` +
-          `\`npm run storylines:graph -- --format ${opts.format}\`\n`,
+        'storyline-graph: --out requires --csv (one content file at a time)\n',
       );
       return 1;
     }
-    process.stdout.write(`storyline-graph: ${outPath} is up to date\n`);
-    return 0;
+    let ok = true;
+    for (const spec of DEFAULT_CONTENT_FILES) {
+      if (
+        !exportContentArtefact(
+          opts.format,
+          spec.csv,
+          spec.artefacts[opts.format],
+          opts.check,
+          opts.gameId,
+          spec.adapterId,
+        )
+      ) {
+        ok = false;
+      }
+    }
+    return ok ? 0 : 1;
   }
 
-  writeFileSync(outPath, content, 'utf-8');
-  process.stdout.write(`storyline-graph: wrote ${outPath}\n`);
-  return 0;
+  // Single-file mode: an ad-hoc file keeps the format default; a registered
+  // file uses its own paired artefact unless --out overrides it.
+  const spec = findContentFileSpec(opts.csvPath);
+  const outPath = opts.outProvided
+    ? opts.outPath
+    : (spec?.artefacts[opts.format] ?? DEFAULT_GRAPH_OUTPUTS[opts.format]);
+  return exportContentArtefact(
+    opts.format,
+    opts.csvPath,
+    outPath,
+    opts.check,
+    opts.gameId,
+    spec?.adapterId,
+  )
+    ? 0
+    : 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
