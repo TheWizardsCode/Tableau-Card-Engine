@@ -375,7 +375,14 @@ describe('attachHudTooltipZone', () => {
       .find((call: any[]) => call[0] === 'pointerover');
     expect(pointeroverHandler).toBeDefined();
     pointeroverHandler![1]();
-    expect(tooltipManager.show).toHaveBeenCalledWith('hovered!', textObj.x, textObj.y - 10);
+    // The hover path states its input type so a manager's hover delay applies.
+    expect(tooltipManager.show).toHaveBeenCalledWith(
+      'hovered!',
+      textObj.x,
+      textObj.y - 10,
+      undefined,
+      'hover',
+    );
   });
 
   it('hides tooltip on pointerout', () => {
@@ -398,9 +405,15 @@ describe('attachHudTooltipZone', () => {
     const pointerdownHandler = (textObj.on as ReturnType<typeof vi.fn>).mock.calls
       .find((call: any[]) => call[0] === 'pointerdown');
     expect(pointerdownHandler).toBeDefined();
-    // First tap: show
+    // First tap: show (the tap/press path uses the manager's touch delay)
     pointerdownHandler![1]();
-    expect(tooltipManager.show).toHaveBeenCalledWith('tapped!', textObj.x, textObj.y - 10);
+    expect(tooltipManager.show).toHaveBeenCalledWith(
+      'tapped!',
+      textObj.x,
+      textObj.y - 10,
+      undefined,
+      'touch',
+    );
     // Second tap: hide
     pointerdownHandler![1]();
     expect(tooltipManager.hide).toHaveBeenCalledTimes(1);

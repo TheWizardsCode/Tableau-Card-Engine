@@ -413,8 +413,9 @@ Main Street's business card placement uses a **two-step click pattern** (CG-0MSX
 Use `TooltipManager` from `@ui` for contextual information on hover. Supports two rendering modes: **DOM mode** (HTML overlay over the canvas) and **Phaser mode** (game-object containers rendered within the scene).
 
 - **Gym scene:** `GymTooltipScene` — `example-games/gym/scenes/GymTooltipScene.ts`
-- **Key APIs:** `TooltipManager`, `setTooltips()`/`getTooltips()` from SettingsStore
+- **Key APIs:** `TooltipManager` (`delayMs` / `touchDelayMs` hover-intent delays, `inputType` on `show()`), `setTooltips()`/`getTooltips()` from SettingsStore
 - **When to use:** Add tooltips to interactive elements (cards, buttons, zones) to explain their function without cluttering the UI. Toggle between modes at runtime via the settings store.
+- **Hover intent:** opt into `delayMs` (plus a shorter `touchDelayMs` for press-and-hold) so a pointer sweep no longer flashes overlay text; `0` keeps today's immediate show, and `hide()`/`destroy()`/the tooltips-off toggle cancel a pending show.
 
 ### 12. Grid and Pathfinding with SpatialRules
 

@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import Phaser from 'phaser';
 import { SoundManager } from '../../src/core-engine/SoundManager';
 import { SettingsPanel } from '../../src/ui/SettingsPanel';
+import { TooltipManager } from '../../src/ui/Tooltip';
 import { waitForScene } from '../helpers/waitForScene';
 
 // ── Boot helper ────────────────────────────────────────────
@@ -260,4 +261,96 @@ describe('SettingsPanel tooltips toggle conditional display', () => {
       });
     }, 30_000);
   });
+});
+
+// ── Delayed tooltip suppression (hover intent × Settings toggle) ─────
+
+/**
+ * Advance the scene's real Phaser clock deterministically so a
+ * hover-intent delay elapses without any real-time sleep.
+ */
+function advanceSceneClock(scene: Phaser.Scene, byMs: number): void {
+  const clock = scene.time;
+  clock.preUpdate(clock.now, 0);
+  clock.update(clock.now + byMs, byMs);
+}
+
+/** Find the shared DOM tooltip node by its stable attributes. */
+function findTooltipDiv(): HTMLElement | null {
+  for (const el of Array.from(document.querySelectorAll('body > div'))) {
+    const div = el as HTMLElement;
+    if (div.style.pointerEvents === 'none' && div.style.zIndex === '2147483647') {
+      return div;
+    }
+  }
+  return null;
+}
+
+class TestSettingsDelayedTooltipScene extends Phaser.Scene {
+  settingsPanel!: SettingsPanel;
+  tooltipManager!: TooltipManager;
+
+  constructor() {
+    super({ key: 'TestSettingsDelayedTooltip' });
+  }
+
+  create(): void {
+    const soundManager = new SoundManager(
+      { play: () => {}, stop: () => {}, setVolume: () => {}, setMute: () => {} },
+      { storage: null },
+    );
+    this.settingsPanel = new SettingsPanel(this, {
+      soundManager,
+      showButton: false,
+      hasTooltips: true,
+    } as any);
+    this.tooltipManager = new TooltipManager(this, this.settingsPanel, {
+      delayMs: 5000,
+    });
+  }
+}
+
+describe('delayed tooltip suppression via the Settings toggle', () => {
+  let game: Phaser.Game | null = null;
+
+  afterAll(() => {
+    destroyGame(game);
+    game = null;
+  });
+
+  it('never shows a scheduled tooltip once tooltips are switched off', async () => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem('tce-show-tooltips');
+    }
+
+    game = await createTestGame(
+      'TestSettingsDelayedTooltip',
+      TestSettingsDelayedTooltipScene,
+    );
+    const scene = game.scene.getScene('TestSettingsDelayedTooltip') as any;
+    const manager: TooltipManager = scene.tooltipManager;
+    const panel: SettingsPanel = scene.settingsPanel;
+
+    const tooltipDiv = findTooltipDiv();
+    expect(tooltipDiv).not.toBeNull();
+    expect(panel.showTooltips).toBe(true);
+
+    // Schedule a show, then switch tooltips off while it is pending.
+    manager.show('Pending tooltip', 100, 100);
+    expect(tooltipDiv!.style.display).toBe('none');
+
+    // Drive the panel's real toggle handler (no public setter exists).
+    (panel as any).handleTooltipToggle();
+    expect(panel.showTooltips).toBe(false);
+
+    advanceSceneClock(scene, 5000);
+
+    expect(tooltipDiv!.style.display).toBe('none');
+    expect(tooltipDiv!.textContent).toBe('');
+
+    manager.destroy();
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem('tce-show-tooltips');
+    }
+  }, 30_000);
 });

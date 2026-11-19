@@ -218,6 +218,7 @@ export type {
   TooltipRenderContext,
   PhaserTooltipRenderFn,
   TooltipManagerConfig,
+  TooltipInputType,
   TooltipPosition,
   ViewportTooltipPositionOptions,
 } from './Tooltip';

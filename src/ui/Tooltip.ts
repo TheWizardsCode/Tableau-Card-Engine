@@ -83,10 +83,57 @@ export type PhaserTooltipRenderFn = (
   ctx: TooltipRenderContext,
 ) => Phaser.GameObjects.Container;
 
+/**
+ * Which input source asked for a tooltip.
+ *
+ * The manager does not infer this from global pointer state (that is
+ * unreliable in mixed-input scenes) — the caller states it explicitly on
+ * {@link TooltipManager.show}.
+ */
+export type TooltipInputType = 'hover' | 'touch';
+
 /** Configuration supplied when creating a Phaser-mode TooltipManager. */
 export interface TooltipManagerConfig {
   /** When provided the manager uses Phaser rendering instead of DOM. */
   phaserRender?: PhaserTooltipRenderFn;
+  /**
+   * Hover-intent delay for mouse hover, in milliseconds (default `0`).
+   *
+   * `0` (or an absent value) renders the tooltip synchronously on
+   * `show()` and schedules no timer at all, so an existing caller's frame
+   * timing is unchanged. A non-zero value schedules the show and only
+   * renders once the delay has elapsed.
+   */
+  delayMs?: number;
+  /**
+   * Hover-intent delay for a touch press-and-hold, in milliseconds
+   * (default `0`, independent of {@link TooltipManagerConfig.delayMs}).
+   *
+   * A press-and-hold has no "pointer sweep" problem, so it normally wants
+   * a shorter dwell than mouse hover; a host that opts into `delayMs`
+   * should set this too. Left unset, touch shows immediately.
+   */
+  touchDelayMs?: number;
+}
+
+/** A show scheduled by a non-zero delay that has not rendered yet. */
+interface PendingTooltipShow {
+  content: string;
+  x: number;
+  y: number;
+  ctx?: TooltipRenderContext;
+  timer: Phaser.Time.TimerEvent | null;
+}
+
+/** The subset of `Phaser.Time.Clock` the manager relies on. */
+interface TooltipTimeManager {
+  delayedCall?: (delay: number, callback: () => void) => Phaser.Time.TimerEvent;
+}
+
+/** Coerce a configured delay to a finite, non-negative millisecond count. */
+function normalizeTooltipDelay(delayMs: number | undefined): number {
+  if (typeof delayMs !== 'number' || !Number.isFinite(delayMs) || delayMs <= 0) return 0;
+  return delayMs;
 }
 
 /** A tooltip box's top-left position. */
@@ -209,7 +256,10 @@ export class TooltipManager {
   private readonly node: HTMLElement | null;
   private readonly scene: Phaser.Scene;
   private readonly phaserRender?: PhaserTooltipRenderFn;
+  private readonly delayMs: number;
+  private readonly touchDelayMs: number;
   private phaserContainer: Phaser.GameObjects.Container | null = null;
+  private pendingShow: PendingTooltipShow | null = null;
 
   constructor(
     scene: Phaser.Scene,
@@ -219,6 +269,8 @@ export class TooltipManager {
     this.settingsPanel = settingsPanel;
     this.scene = scene;
     this.phaserRender = config?.phaserRender;
+    this.delayMs = normalizeTooltipDelay(config?.delayMs);
+    this.touchDelayMs = normalizeTooltipDelay(config?.touchDelayMs);
 
     // DOM node – only needed when NOT in Phaser mode
     if (this.phaserRender || typeof document === 'undefined') {
@@ -254,22 +306,79 @@ export class TooltipManager {
    * `x` and `y` are passed through the context object so the callback
    * can use them (or ignore them if the game prefers its own layout).
    *
-   * @param content – text for DOM mode; arbitrary string for Phaser mode.
-   * @param x       – world X for DOM mode; passed to context for Phaser.
-   * @param y       – world Y for DOM mode; passed to context for Phaser.
-   * @param ctx     – extra context forwarded to the Phaser render callback.
+   * **Hover intent.** When the configured delay for `inputType` is non-zero
+   * the overlay is *scheduled* rather than rendered: nothing appears until
+   * the delay elapses. A repeated `show()` while a show is pending refreshes
+   * the pending content, context and anchor (so a 1.5 s dwell still lands at
+   * the live pointer) without restarting the delay — continuous pointer
+   * movement inside one target cannot postpone the tooltip indefinitely.
+   * `hide()` and `destroy()` cancel a pending show.
+   *
+   * A delay of `0` (the default) renders synchronously on this call and
+   * schedules no timer, so callers that pass no timing config behave exactly
+   * as before. Scenes without a time manager (headless/bare mocks) fall back
+   * to the same immediate render.
+   *
+   * @param content   – text for DOM mode; arbitrary string for Phaser mode.
+   * @param x         – world X for DOM mode; passed to context for Phaser.
+   * @param y         – world Y for DOM mode; passed to context for Phaser.
+   * @param ctx       – extra context forwarded to the Phaser render callback.
+   * @param inputType – which delay applies: `'hover'` (default) or `'touch'`.
    */
   show(
     content: string,
     x: number,
     y: number,
     ctx?: TooltipRenderContext,
+    inputType: TooltipInputType = 'hover',
   ): void {
     if (this.settingsPanel && !this.settingsPanel.showTooltips) {
+      this.cancelPendingShow();
       this.hide();
       return;
     }
 
+    const delayMs = inputType === 'touch' ? this.touchDelayMs : this.delayMs;
+
+    // Delay 0 keeps the historical synchronous render (no timer at all).
+    if (delayMs <= 0) {
+      this.cancelPendingShow();
+      this.renderNow(content, x, y, ctx);
+      return;
+    }
+
+    // Already waiting: refresh content/anchor but keep the running dwell.
+    if (this.pendingShow) {
+      this.pendingShow.content = content;
+      this.pendingShow.x = x;
+      this.pendingShow.y = y;
+      this.pendingShow.ctx = ctx;
+      return;
+    }
+
+    const time = (this.scene as unknown as { time?: TooltipTimeManager } | undefined)
+      ?.time;
+    if (!time || typeof time.delayedCall !== 'function') {
+      // No time manager (headless / bare mocks): degrade to an immediate show.
+      this.renderNow(content, x, y, ctx);
+      return;
+    }
+
+    const pending: PendingTooltipShow = { content, x, y, ctx, timer: null };
+    this.pendingShow = pending;
+    pending.timer = time.delayedCall(delayMs, () => this.firePendingShow(pending));
+  }
+
+  /**
+   * Render a tooltip immediately (both render paths) — the pre-delay
+   * behaviour, shared by the zero-delay path and the delayed timer callback.
+   */
+  private renderNow(
+    content: string,
+    x: number,
+    y: number,
+    ctx?: TooltipRenderContext,
+  ): void {
     // ── Phaser mode ────────────────────────────────────────
     if (this.phaserRender) {
       // Destroy previous container if any
@@ -353,7 +462,36 @@ export class TooltipManager {
     }
   }
 
+  /**
+   * Cancel the pending show and render its content.
+   *
+   * Guarded twice: the pending record must still be the current one (a
+   * `hide()`/`destroy()` in between clears it) and the Settings suppression
+   * is re-checked, because the player can toggle tooltips off during the
+   * dwell.
+   */
+  private firePendingShow(pending: PendingTooltipShow): void {
+    if (this.pendingShow !== pending) return;
+    this.pendingShow = null;
+    if (this.settingsPanel && !this.settingsPanel.showTooltips) return;
+    this.renderNow(pending.content, pending.x, pending.y, pending.ctx);
+  }
+
+  /** Cancel a scheduled show, if any, so no tooltip appears after it. */
+  private cancelPendingShow(): void {
+    const pending = this.pendingShow;
+    this.pendingShow = null;
+    if (!pending?.timer) return;
+    try {
+      pending.timer.remove(false);
+    } catch {
+      // A timer already torn down with its scene cannot be removed again.
+    }
+  }
+
   hide(): void {
+    // A pending show must never appear after hide().
+    this.cancelPendingShow();
     // Hide Phaser tooltip
     this.hidePhaserTooltip();
     // Hide DOM tooltip
@@ -370,6 +508,8 @@ export class TooltipManager {
   }
 
   destroy(): void {
+    // No timer may survive teardown.
+    this.cancelPendingShow();
     // Clean up Phaser container
     this.hidePhaserTooltip();
     // Clean up DOM node

@@ -4386,6 +4386,8 @@ const label = createHudText(this, 200, 50, 'Turn 1', '#ffffff', { fontSize: '18p
 
 Attaches an interactive tooltip zone to a HUD text element. On desktop, tooltip shows on hover; on mobile, toggles on tap. Sets ARIA labels for accessibility.
 
+The helper holds no timing of its own — it inherits the timing of the scene's `tooltipManager` (`TooltipManagerConfig.delayMs` / `touchDelayMs`), and a caller that does not opt into a delay keeps the immediate show. Its hover handlers pass the `'hover'` input type and the tap-toggle handler passes `'touch'`, so a manager configured with a shorter `touchDelayMs` responds faster to a press (a desktop click on a tap-toggle HUD element also uses the touch delay — `inputType` names the interaction, not the device).
+
 ```typescript
 attachHudTooltipZone(
   this,
@@ -4969,6 +4971,36 @@ cardSprite.setInteractive({ useHandCursor: true });
 cardSprite.on('pointerover', () => tooltip.show('Card info', cardSprite.x, cardSprite.y));
 cardSprite.on('pointerout', () => tooltip.hide());
 ```
+
+**Hover intent (opt-in delay).** By default the overlay appears the instant `show()` is called. A game that shows tooltips on `pointerover`/`pointermove` can require a deliberate **dwell** instead, so sweeping the pointer across a busy board no longer flashes overlay text:
+
+```typescript
+const tooltip = new TooltipManager(this, settingsPanel, {
+  delayMs: 1500,      // mouse hover dwell
+  touchDelayMs: 500,  // press-and-hold dwell (independent, default 0)
+});
+
+tooltip.show('Card info', x, y);                        // hover path → 1500 ms
+cardSprite.on('pointerdown', () =>
+  tooltip.show('Card info', x, y, undefined, 'touch'),  // press path → 500 ms
+);
+```
+
+- Both delays default to **0 ms**, and `0`/absent renders synchronously on the same code path as before — **no timer is scheduled at all**, so existing callers (The Rising, Gym demos, `attachHudTooltipZone`) keep their exact frame timing and both render modes.
+- `show(content, x, y, ctx?, inputType = 'hover')`: `inputType` states which delay applies. It is an explicit trailing argument (never inferred from global pointer state) so every existing 1–4 argument call keeps its signature and its immediate behaviour. `'touch'` describes the *interaction* (a press), not the device.
+- With a non-zero delay the show is **pending**: nothing renders until the delay elapses, then the overlay appears once.
+- A repeated `show()` **while a show is pending** refreshes the pending content, context and anchor (so the overlay lands at the live pointer) but **does not restart the delay** — a continuous sweep inside one target cannot postpone the tooltip forever. A different target inside the window therefore reuses the elapsed dwell; `pointerout` → `hide()` is what cancels it in practice.
+- `hide()` and `destroy()` cancel a pending show, and `destroy()` leaves no timer behind (no leak across scene teardown).
+- The Settings "Tooltips" suppression is checked on entry **and** re-checked when the timer fires, so switching tooltips off during a dwell cancels the show.
+- Scenes with no time manager (headless runs, bare unit-test mocks) fall back to an immediate render, mirroring the guarded `time?.delayedCall` precedent in `illegalMoveToastView.ts`.
+
+```typescript
+// The pending show is cancellable and never lands after teardown.
+tooltip.show('Card info', x, y);   // scheduled (delayMs > 0)
+tooltip.hide();                    // cancelled — nothing will appear
+```
+
+Tests advance a fake clock (unit) or the real Phaser clock via `scene.time.preUpdate()` + `scene.time.update(now + delay, delay)` (browser) — the delay is never exercised with a real-time sleep.
 
 **Bounds guarantee.** A tooltip must never render (partially) outside its visible bounds — an off-screen DOM tooltip used to extend the page's scrollable area and make the page "resize to make space". Both modes are now clamped:
 

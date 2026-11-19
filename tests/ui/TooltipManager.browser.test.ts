@@ -1,7 +1,21 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { TooltipManager } from '../../src/ui/Tooltip';
+import type { TooltipManagerConfig } from '../../src/ui/Tooltip';
 
+/**
+ * Advance the scene's *real* Phaser clock deterministically so the
+ * hover-intent delay can be exercised without any real-time sleep.
+ *
+ * `preUpdate()` promotes a freshly scheduled timer into the active list
+ * (normally done at the start of the next frame); `update()` then advances
+ * the clock by `byMs` and fires the due timer.
+ */
+function advanceSceneClock(scene: Phaser.Scene, byMs: number): void {
+  const clock = scene.time;
+  clock.preUpdate(clock.now, 0);
+  clock.update(clock.now + byMs, byMs);
+}
 /**
  * Find the shared DOM tooltip node by its stable attributes rather than
  * by `position` — the node uses `position: fixed` so it can never extend
@@ -60,6 +74,38 @@ describe('TooltipManager (browser integration)', () => {
         height: 200,
         parent: 'game-container',
         scene: [TooltipTestScene],
+      });
+    });
+  }
+
+  /** Boot a scene whose manager takes an explicit (delay) config. */
+  async function bootConfiguredTooltipScene(
+    config: TooltipManagerConfig,
+  ): Promise<{ scene: Phaser.Scene; manager: TooltipManager }> {
+    const container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    return new Promise((resolve) => {
+      class TooltipDelayScene extends Phaser.Scene {
+        constructor() {
+          super('TooltipDelayBrowserScene');
+        }
+
+        create() {
+          resolve({
+            scene: this,
+            manager: new TooltipManager(this, undefined, config),
+          });
+        }
+      }
+
+      game = new Phaser.Game({
+        type: Phaser.CANVAS,
+        width: 200,
+        height: 200,
+        parent: 'game-container',
+        scene: [TooltipDelayScene],
       });
     });
   }
@@ -220,6 +266,86 @@ describe('TooltipManager (browser integration)', () => {
 
     expect(root.scrollWidth).toBe(beforeScrollWidth);
     expect(root.scrollHeight).toBe(beforeScrollHeight);
+
+    manager.destroy();
+  }, 10000);
+
+  // ── Hover-intent delay (advanced clock, no real-time sleeps) ───────
+
+  it('does not render a delayed DOM tooltip until the clock advances', async () => {
+    const { scene, manager } = await bootConfiguredTooltipScene({ delayMs: 5000 });
+    const tooltipDiv = findTooltipDiv();
+    expect(tooltipDiv).not.toBeNull();
+
+    manager.show('Delayed tooltip', 100, 100);
+
+    expect(tooltipDiv!.style.display).toBe('none');
+
+    advanceSceneClock(scene, 5000);
+
+    expect(tooltipDiv!.style.display).toBe('block');
+    expect(tooltipDiv!.textContent).toBe('Delayed tooltip');
+
+    manager.destroy();
+  }, 10000);
+
+  it('shows the latest content at the latest anchor when the delayed show fires', async () => {
+    const { scene, manager } = await bootConfiguredTooltipScene({ delayMs: 5000 });
+    const tooltipDiv = findTooltipDiv();
+    expect(tooltipDiv).not.toBeNull();
+
+    manager.show('first anchor', 10, 10);
+    manager.show('second anchor', 100, 100);
+
+    expect(tooltipDiv!.style.display).toBe('none');
+
+    advanceSceneClock(scene, 5000);
+
+    expect(tooltipDiv!.textContent).toBe('second anchor');
+    expect(tooltipDiv!.style.display).toBe('block');
+
+    // The overlay landed at the second anchor (canvas offset + 10 px hover gap).
+    const firstAnchorLeft = parseFloat(tooltipDiv!.style.left);
+    manager.hide();
+    manager.show('first anchor', 10, 10);
+    advanceSceneClock(scene, 5000);
+    expect(parseFloat(tooltipDiv!.style.left)).toBeLessThan(firstAnchorLeft);
+
+    manager.destroy();
+  }, 10000);
+
+  it('cancels a delayed DOM tooltip on hide() and on destroy()', async () => {
+    const { scene, manager } = await bootConfiguredTooltipScene({ delayMs: 5000 });
+    const tooltipDiv = findTooltipDiv();
+    expect(tooltipDiv).not.toBeNull();
+
+    manager.show('never shown', 50, 50);
+    manager.hide();
+    advanceSceneClock(scene, 5000);
+    expect(tooltipDiv!.style.display).toBe('none');
+
+    manager.show('never shown either', 50, 50);
+    manager.destroy();
+    advanceSceneClock(scene, 5000);
+    expect(tooltipDiv!.style.display).toBe('none');
+  }, 10000);
+
+  it('gates the Phaser render mode behind the delay', async () => {
+    const renders: number[] = [];
+    const { scene, manager } = await bootConfiguredTooltipScene({
+      delayMs: 5000,
+      phaserRender: (container) => {
+        renders.push(scene.time.now);
+        container.setDepth(800);
+        return container;
+      },
+    });
+
+    manager.show('', 50, 50, { cardName: 'Delayed phaser tooltip' });
+    expect(renders).toHaveLength(0);
+
+    advanceSceneClock(scene, 5000);
+    expect(renders).toHaveLength(1);
 
     manager.destroy();
   }, 10000);

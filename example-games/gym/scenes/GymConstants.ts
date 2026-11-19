@@ -601,6 +601,20 @@ export const TOOLTIP_CARD_X_OFFSET = 200;
 /** Tooltip card background alpha. */
 export const TOOLTIP_CARD_BG_ALPHA = 0.8;
 
+/**
+ * Demo hover-intent delay (ms) for the Tooltip scene's managers.
+ *
+ * The demo opts into a deliberate dwell so sweeping the pointer across the
+ * cards no longer flashes tooltip text (the engine default is 0 = immediate).
+ */
+export const TOOLTIP_DEMO_HOVER_DELAY_MS = 1500;
+
+/**
+ * Demo touch press-and-hold delay (ms) — deliberately shorter than the
+ * hover dwell, matching the The Rising consumer's 1500 / 500 pairing.
+ */
+export const TOOLTIP_DEMO_TOUCH_DELAY_MS = 500;
+
 // ── Hand/Pile Scene ────────────────────────────────────────────────────
 
 /** Delay before re-building the hand after a rejected drop (ms). */
