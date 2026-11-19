@@ -14,7 +14,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { createStorylineSystem, evaluateCondition } from '../../src/story-line';
+import {
+  createStorylineSystem,
+  evaluateCondition,
+  type StorylineEngineAdapter,
+} from '../../src/story-line';
 import {
   addTemplate,
   makeAdapter,
@@ -22,6 +26,7 @@ import {
   makeState,
   type TemplateMap,
   type TestCard,
+  type TestState,
 } from './helpers';
 
 /** Builds a system plus its template catalogue. */
@@ -429,6 +434,68 @@ describe('cost payment and extra effects', () => {
         e.text.includes('applyResourceDelta'),
       ),
     ).toBe(true);
+  });
+});
+
+// ── C3b: game-declared resources ────────────────────────────
+
+describe('cost payment and extra effects over game-declared resources', () => {
+  /** A test state extended with the declared `hull` resource. */
+  type HullState = TestState & { hull: number };
+
+  /** Adapter declaring `hull` alongside the shipped pair. */
+  function makeHullEngine(): StorylineEngineAdapter<TestState, TestCard> {
+    return {
+      ...makeAdapter(new Map()),
+      resources: ['coins', 'reputation', 'hull'],
+      getResources: (state) => ({
+        coins: state.coins,
+        reputation: state.reputation,
+        hull: (state as HullState).hull,
+      }),
+      applyResourceDelta: (state, delta) => {
+        const hullState = state as HullState;
+        if (delta.coins !== undefined) hullState.coins += delta.coins;
+        if (delta.reputation !== undefined) hullState.reputation += delta.reputation;
+        if (delta.hull !== undefined) hullState.hull += delta.hull;
+      },
+    };
+  }
+
+  it('pays and grants a declared key, naming it in the log', () => {
+    const system = createStorylineSystem({ engine: makeHullEngine() });
+    const state = Object.assign(makeState(), { hull: 5 }) as HullState;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-hull' }), {
+      label: 'Repair',
+      effectPolicy: 'skip',
+      cost: { hull: 2 },
+      extraEffect: { hull: 1, coins: 5 },
+    });
+
+    expect(state.hull).toBe(4);
+    expect(state.coins).toBe(1005);
+    expect(res.coinChange).toBe(5);
+    expect(res.repChange).toBe(0);
+    expect(state.activityLog.map((entry) => entry.text)).toEqual([
+      'Cost paid: -2 hull.',
+      'Extra effect: +1 hull, +5 coins.',
+    ]);
+  });
+
+  it('never applies an undeclared key and reports it instead', () => {
+    const { system, state } = setup();
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-undeclared' }), {
+      label: 'Improvise',
+      effectPolicy: 'skip',
+      extraEffect: { hull: 3 },
+    });
+
+    expect('hull' in state).toBe(false);
+    expect(res.coinChange).toBe(0);
+    expect(state.activityLog.map((entry) => entry.text)).toEqual([
+      'Extra effect ignored undeclared resource(s): hull.',
+    ]);
   });
 });
 

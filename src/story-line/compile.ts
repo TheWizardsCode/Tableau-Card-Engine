@@ -10,6 +10,12 @@
  * @module
  */
 
+import {
+  DEFAULT_RESOURCE_KEYS,
+  readResource,
+  resolveResourceKeys,
+} from './resources';
+import type { StorylineResourceKey, StorylineResources } from './resources';
 import type {
   CompiledStoryline,
   OptionCost,
@@ -123,23 +129,36 @@ export function parseStorylineOptionsEncoding<TState>(
  * True when the player's current resources cover the option's declarative
  * `cost`.
  *
- * An option with no `cost` is always affordable. Every specified cost
- * component is a required gate: the option is affordable only when the
- * player has at least `cost.coins` coins **and** at least `cost.reputation`
- * reputation. An unspecified component is unconstrained (never defaulted to
- * zero). A cost exactly equal to the current balance is affordable.
+ * An option with no `cost` is always affordable. Every specified cost key is
+ * a required gate: the option is affordable only when the player has at least
+ * that much of *each* named resource. An unspecified key is unconstrained
+ * (never defaulted to zero). A cost exactly equal to the current balance is
+ * affordable.
  *
- * @param option    The option to check (its `cost` may be absent).
- * @param resources Current spendable resources.
+ * A cost key outside the declared set reads as `0` (an absent key reads as
+ * zero), so a resource the game never declared can never be paid — the option
+ * is then unaffordable whenever that cost is positive. Declaring the key (or
+ * fixing the typo) is the authoring-time remedy reported by
+ * `validateStorylineOptions`.
+ *
+ * @param option           The option to check (its `cost` may be absent).
+ * @param resources        Current resource values, keyed by resource key.
+ * @param declaredResources Declared resource keys (defaults to `coins` /
+ *                          `reputation`).
  */
 export function isOptionAffordable(
   option: { cost?: OptionCost },
-  resources: { coins: number; reputation: number },
+  resources: StorylineResources,
+  declaredResources: readonly StorylineResourceKey[] = DEFAULT_RESOURCE_KEYS,
 ): boolean {
   if (!option.cost) return true;
-  const coins = option.cost.coins ?? 0;
-  const reputation = option.cost.reputation ?? 0;
-  return resources.coins >= coins && resources.reputation >= reputation;
+  const declared = new Set(resolveResourceKeys(declaredResources));
+  for (const [key, required] of Object.entries(option.cost)) {
+    if (required === undefined) continue; // unconstrained
+    const available = declared.has(key) ? readResource(resources, key) : 0;
+    if (available < required) return false;
+  }
+  return true;
 }
 
 /**
@@ -158,19 +177,24 @@ export function isOptionAffordable(
  * resources ({@link isOptionAffordable}). Without a resources oracle (or
  * without state) no cost filtering happens.
  *
- * @param event        The story-line card.
- * @param registry     The option registry to consult (base-type-id keyed).
- * @param state        Optional game state for draw-time condition filtering.
- * @param getResources Optional resources oracle for draw-time cost
- *                     affordability filtering. Reads the current spendable
- *                     resources from `state`; when absent, cost-gated options
- *                     are never filtered.
+ * @param event             The story-line card.
+ * @param registry          The option registry to consult (base-type-id keyed).
+ * @param state             Optional game state for draw-time condition
+ *                          filtering.
+ * @param getResources      Optional resources oracle for draw-time cost
+ *                          affordability filtering. Reads the current
+ *                          resources from `state`; when absent, cost-gated
+ *                          options are never filtered.
+ * @param declaredResources Declared resource keys the affordability gate
+ *                          operates over (defaults to `coins` /
+ *                          `reputation`).
  */
 export function compileStorylineFromEvent<TState, TCard extends StorylineCard>(
   event: TCard,
   registry: StorylineOptionRegistry<TState>,
   state?: TState,
-  getResources?: (state: TState) => { coins: number; reputation: number },
+  getResources?: (state: TState) => StorylineResources,
+  declaredResources: readonly StorylineResourceKey[] = DEFAULT_RESOURCE_KEYS,
 ): CompiledStoryline<TState> {
   const storylineId = event.storylineId ?? null;
   const registered = registry.get(event.id);
@@ -187,7 +211,8 @@ export function compileStorylineFromEvent<TState, TCard extends StorylineCard>(
         compiledOptions: options.filter(
           (o) =>
             (o.condition == null || o.condition(state)) &&
-            (resources == null || isOptionAffordable(o, resources)),
+            (resources == null ||
+              isOptionAffordable(o, resources, declaredResources)),
         ),
       };
     }

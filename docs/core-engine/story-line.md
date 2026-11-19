@@ -9,6 +9,12 @@ Module root: [`src/story-line/`](../../src/story-line/) — import via the
 `@story-line` alias. The module has **no game imports and no Phaser
 dependency**; a game plugs its state and presentation in through two adapters.
 
+Resources are **game-declared data**, not a fixed pair: a game advertises the
+keys it threads through conditions, costs and extra effects (see
+[Declared resources](#declared-resources)). `coins` / `reputation` remain the
+**default projection**, so a game that declares nothing behaves exactly as it
+did before.
+
 ## API
 
 ```ts
@@ -45,8 +51,8 @@ is a *label/outcome* shorthand and cannot author the extended fields below
 | `successorIds?` | `string[]` | resolution — one seeded random draw picks a candidate |
 | `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence |
 | `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins |
-| `cost?` | `{ coins?; reputation? }` | draw time **and** resolution — affordability gate + real payment |
-| `extraEffect?` | `{ coins?; reputation? }` | resolution — additional resource gain |
+| `cost?` | `Record<resourceKey, number>` | draw time **and** resolution — affordability gate + real payment |
+| `extraEffect?` | `Record<resourceKey, number>` | resolution — additional resource gain |
 
 ```ts
 import { createStorylineSystem, validateStorylineOptions } from '@story-line';
@@ -88,6 +94,76 @@ Semantics:
   the pushed card; `null` ends the chain. Rules are evaluated before any
   random draw and consume no RNG.
 
+### Declared resources
+
+The resource *name set* is supplied by the game, not baked into the engine. A
+game declares its keys on the engine adapter — or, equivalently, builds the
+resource half of that adapter from a declarative projection — and every
+declared key is then usable in a `Condition.field`, a `cost` and an
+`extraEffect`:
+
+```ts
+import { createResourceProjection, createStorylineSystem } from '@story-line';
+
+const resources = createResourceProjection<VoyageState>({
+  hull: { read: (s) => s.hull, apply: (s, d) => { s.hull += d; } },
+  morale: { read: (s) => s.morale, apply: (s, d) => { s.morale += d; } },
+  stores: { read: (s) => s.stores, apply: (s, d) => { s.stores += d; } },
+  goodwill: { read: (s) => s.goodwill, apply: (s, d) => { s.goodwill += d; } },
+});
+
+const storyline = createStorylineSystem({
+  engine: { ...resources, rng, applyEffect, appendLog, /* … */ },
+});
+
+storyline.registerStorylineOptions('evt-storm', [
+  {
+    label: 'Ride it out',
+    effectPolicy: 'skip',
+    cost: { stores: 4 },
+    extraEffect: { morale: 1, goodwill: 2 },
+    conditionalSuccessors: [
+      { when: { field: 'hull', op: '>=', value: 4 }, successorId: 'evt-hold' },
+      { when: { field: 'morale', op: '<', value: 1 }, successorId: null },
+    ],
+  },
+]);
+```
+
+`createResourceProjection` makes the field map **the** declaration — the keys
+and the accessors cannot drift apart — and it is spread straight into the
+adapter (`resources`, `getResources`, `applyResourceDelta`).
+
+The declared set is threaded through the whole lifecycle:
+
+- `StorylineSystem.resources` reports the keys in force (the adapter's
+  declaration, else `DEFAULT_RESOURCE_KEYS` — `['coins', 'reputation']`).
+- **Draw-time affordability** gates option-by-option over the declared keys.
+- **Cost payment** and **extra effects** are applied per declared key, and
+  each activity-log line names the key (`Cost paid: -4 stores.`,
+  `Extra effect: +1 morale, +2 goodwill.`).
+- **`validateStorylineOptions(options, { resources, cardId })`** checks costs,
+  extra effects and condition fields against the same set.
+
+Three rules keep the set honest:
+
+1. **An absent key reads as `0`** — a declared key the state does not
+   currently carry is zero (never `undefined`/`NaN`), both in condition
+   evaluation and in the reported deltas.
+2. **An unspecified cost key is unconstrained** — only the keys a cost names
+   are required; everything else is left alone.
+3. **No resource is ever invented** — the engine only ever forwards declared
+   keys to `applyResourceDelta`. An undeclared key in a cost or extra effect
+   is not applied (it reads as `0`, so a positive cost on it is unaffordable)
+   and resolution appends a warning line naming the ignored key(s).
+   `validateStorylineOptions` reports the same fault ahead of time.
+
+`coins` / `reputation` stay the **default projection**: omit `resources` (or
+declare the pair) and the shipped behaviour is byte-identical. A game with a
+non-monetary vocabulary can override the default UI adapter's
+`storyUpdateLine` to describe its own currencies — the resolution result
+reports the `coins` / `reputation` projections only.
+
 ### Compilation
 
 There is exactly **one** choice model: a card is a choice when it supplies
@@ -105,8 +181,8 @@ Precedence: **registered options > CSV `options` encoding**.
   CSV-authored option carries `effectPolicy: 'apply'`.
 - Draw-time filtering is **combined**: a registered option is omitted when its
   `condition(state)` callback returns `false` **or** its declarative `cost`
-  exceeds the player's current coins/reputation. Options without a cost are
-  always included; a cost exactly equal to the balance is affordable.
+  exceeds the player's current value of a declared resource. Options without a
+  cost are always included; a cost exactly equal to the balance is affordable.
   Filtering happens once, when the option list is compiled at draw time, and
   the result is frozen into `PendingStorylineChoice.options`, where consumers
   (including AI scoring) read the stable presented list.
@@ -121,9 +197,12 @@ selected option:
    adapter's resource-mutation seam, in addition to the effect.
 3. **Extra effect** — the option's `extraEffect` gains are applied, also
    through the resource-mutation seam.
-4. **Deltas** — `coinChange` / `repChange` account for all three steps; each
-   applied cost/extra effect appends an activity-log line (`Cost paid: -100
-   coins.`, `Extra effect: +10 coins.`).
+4. **Deltas** — `coinChange` / `repChange` are *projections*: the change in
+   the `coins` / `reputation` keys across all three steps (`0` when the game
+   does not declare that key), which keeps every existing consumer — scene,
+   AI, tests — source-compatible. Each applied cost/extra effect appends an
+   activity-log line naming the declared key (`Cost paid: -100 coins.`,
+   `Extra effect: +10 coins.`, `Cost paid: -4 stores.`).
 5. **Successor** — resolved with this precedence:
 
    1. `option.successorResolver(state)` — a callback; `null`/`undefined` ends
@@ -166,9 +245,10 @@ Rules:
 
 | Code | Rejects |
 |---|---|
-| `non-positive-cost` | `cost.coins` / `cost.reputation` equal to zero or negative. |
-| `negative-extra-effect` | `extraEffect.coins` / `extraEffect.reputation` below zero (extra effects are gains). |
-| `unknown-condition-field` | A condition field other than `coins` / `reputation`. |
+| `non-positive-cost` | A declared `cost.<key>` equal to zero or negative. |
+| `negative-extra-effect` | A declared `extraEffect.<key>` below zero (extra effects are gains). |
+| `unknown-resource-key` | A `cost.<key>` / `extraEffect.<key>` outside the declared resource set. |
+| `unknown-condition-field` | A condition field outside the declared resource set (the default projection is `coins` / `reputation`). |
 | `unknown-condition-op` | An operator other than `>=`, `<=`, `>`, `<`, `==`. |
 | `non-numeric-value` | A non-finite (or non-numeric) cost, extra-effect or condition value. |
 | `dangling-conditional-successor` | A rule targeting an id outside `knownTemplateIds` (checked only when the catalogue is supplied). |
@@ -176,10 +256,26 @@ Rules:
 | `invalid-conditional-successors` | A `conditionalSuccessors` value that is not an array of rule objects. |
 | `invalid-condition` | A rule without a `when` condition object. |
 
+Every resource-scoped issue also carries the offending `resource` key, and
+passing `cardId` stamps it onto every issue — so a content author sees the
+**card id, field path, resource key and reason** at once:
+
+```ts
+const { valid, issues } = validateStorylineOptions(options, {
+  resources: storyline.resources, // the same set the runtime uses
+  cardId: card.id,
+  knownTemplateIds: allCardTemplateIds,
+});
+// e.g. { path: 'options[0].cost.hull', code: 'unknown-resource-key',
+//        cardId: 'evt-storm', resource: 'hull',
+//        message: 'cost.hull is not a declared resource (declared: coins, reputation).' }
+```
+
 Validation is authoring-time only: runtime resolution remains permissive, so a
-list that fails validation still resolves exactly as declared. No shipped CSV
+list that fails validation still resolves exactly as declared (an undeclared
+key is not applied and is reported in the activity log). No shipped CSV
 content uses `cost`, `extraEffect` or `conditionalSuccessors`, so all shipped
-content validates cleanly.
+content validates cleanly against the default projection.
 
 ## Authoring seams (content, manifest, validator, author)
 
@@ -517,8 +613,9 @@ clobber a concurrent edit.
 |---|---|
 | `rng(state)` | Returns the next seeded value in `[0, 1)`. |
 | `applyEffect(state, card)` | Applies the card's intrinsic effect. |
-| `applyResourceDelta?(state, { coins?, reputation? })` | **Optional** resource-mutation seam core uses to deduct costs and apply extra effects. A legacy adapter that omits it compiles and runs unchanged; core then leaves resources untouched and appends a warning line instead. |
-| `getResources(state)` | Current `{ coins, reputation }` for delta reporting and condition evaluation. |
+| `applyResourceDelta?(state, delta)` | **Optional** resource-mutation seam core uses to deduct costs and apply extra effects. `delta` is a sparse record keyed by declared resource key (`{ hull: -2 }`); core never names an undeclared key, so an adapter cannot be asked to invent a resource. A legacy adapter that omits the seam compiles and runs unchanged; core then leaves resources untouched and appends a warning line instead. |
+| `getResources(state)` | Current resource values keyed by declared resource key (`{ coins, reputation }` by default) for delta reporting and condition evaluation. An omitted key reads as `0`. |
+| `resources?` | **Optional** declared resource keys. Omitted/empty means the default `coins` / `reputation` projection, so a pre-declaration adapter is unchanged. The declared set is what `StorylineSystem.resources` reports and what affordability, cost payment, extra effects, condition evaluation and validation operate over. `createResourceProjection({ … })` builds this member plus the two above from one declarative field map. |
 | `appendLog(state, text, kind?)` | Appends to the game activity log. |
 | `getActivityLog(state)` | The game's append-only log (`{ turn, text }`). |
 | `getTemplate(id)` | Template lookup for chain-card creation. |
@@ -586,7 +683,13 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
   effects, conditional successors, successor precedence, the one-draw rule,
   deterministic serial naming, pending-choice lifecycle.
 - `tests/story-line/validate.test.ts` — declarative metadata validation
-  (costs, extra effects, conditions, dangling successors).
+  (costs, extra effects, conditions, dangling successors, declared-resource
+  vocabulary and the `cardId` / `resource` issue fields).
+- `tests/story-line/resource-declaration.test.ts` — the declared-resource
+  contract: a five-resource fixture game authoring conditions, costs and extra
+  effects on any key, draw-time affordability over declared keys, the
+  absent-key/unspecified-key/no-invention rules, the `coins` / `reputation`
+  default projection and `createResourceProjection` itself.
 - `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state.
 - `tests/story-line/ui-adapter.test.ts` — default adapter wording, the
   pluggable override seam, and the absence of a clarity-label method.

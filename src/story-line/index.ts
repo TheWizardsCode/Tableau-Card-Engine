@@ -34,6 +34,7 @@ import {
   parseStoryUpdate,
 } from './journal';
 import { pushChainCard, resolveStorylineOption } from './resolve';
+import { resolveResourceKeys } from './resources';
 import { createDefaultStorylineUiAdapter } from './ui-adapter';
 import type {
   CompiledStoryline,
@@ -68,6 +69,22 @@ export type {
 // ── Public runtime helpers ───────────────────────────────────
 export { STORY_UPDATE_PREFIX, parseStoryUpdate } from './journal';
 export { parseStorylineOptionsEncoding } from './compile';
+export {
+  COIN_PROJECTION_KEY,
+  DEFAULT_RESOURCE_KEYS,
+  REPUTATION_PROJECTION_KEY,
+  createResourceProjection,
+  readResource,
+  resolveResourceKeys,
+  selectDeclaredDelta,
+} from './resources';
+export type {
+  StorylineResourceField,
+  StorylineResourceKey,
+  StorylineResourceProjection,
+  StorylineResources,
+  StorylineResourcesDelta,
+} from './resources';
 export {
   createDefaultStorylineUiAdapter,
   defaultStorylineUiAdapter,
@@ -133,6 +150,7 @@ export function createStorylineSystem<
   const engine = config.engine;
   const ui =
     config.ui ?? createDefaultStorylineUiAdapter<TCard>();
+  const declaredResources = resolveResourceKeys(engine.resources);
   const registry = createStorylineOptionRegistry<TState>((id) =>
     engine.getBaseTypeId(id),
   );
@@ -141,8 +159,12 @@ export function createStorylineSystem<
     card: TCard,
     state?: TState,
   ): CompiledStoryline<TState> =>
-    compileStorylineFromEvent(card, registry, state, (s) =>
-      engine.getResources(s),
+    compileStorylineFromEvent(
+      card,
+      registry,
+      state,
+      (s) => engine.getResources(s),
+      declaredResources,
     );
 
   const getStorylineOptions = (
@@ -153,6 +175,7 @@ export function createStorylineSystem<
   return {
     engine,
     ui,
+    resources: declaredResources,
 
     // ── Compilation ───────────────────────────────────────────
     compileStorylineFromEvent: compile,

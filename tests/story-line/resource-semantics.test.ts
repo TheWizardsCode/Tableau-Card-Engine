@@ -22,10 +22,11 @@
  * 4. **Validation versus runtime permissiveness** — `validateStorylineOptions`
  *    rejects a negative `extraEffect` and a non-positive `cost`, while
  *    resolution stays permissive and applies whatever is declared.
- * 5. **The declared resource boundary** — today only `coins` and `reputation`
- *    are accepted condition fields. When the resource generalisation lands,
- *    the assertions in this section must be **deliberately rewritten**; that
- *    is the point of the pin.
+ * 5. **The declared resource boundary** — originally only `coins` and
+ *    `reputation` were accepted condition fields. The resource
+ *    generalisation (CG-0MWNHZ67Q005BWE0) **deliberately rewrote** this
+ *    section: the default projection still accepts exactly `coins` and
+ *    `reputation`, and a game-declared key is accepted once it is declared.
  *
  * Companion per-behaviour suites (`compile.test.ts`, `resolve.test.ts`,
  * `validate.test.ts`) cover the individual helpers in depth; this file is the
@@ -485,30 +486,11 @@ describe('validation versus runtime permissiveness (baseline)', () => {
     ]);
   });
 
-  it('accepts only coins/reputation as condition fields today (declared-resource boundary)', () => {
-    const result = validateStorylineOptions<TestState>([
-      {
-        label: 'Declared resource',
-        effectPolicy: 'skip',
-        conditionalSuccessors: [
-          // A generalised, game-declared resource is NOT accepted by the
-          // current engine. The resource-generalisation child
-          // (CG-0MWNHZ67Q005BWE0) must deliberately rewrite this assertion.
-          {
-            when: { field: 'hull', op: '>=', value: 1 } as unknown as Condition,
-            successorId: 'evt-resolver',
-          },
-        ],
-      },
-    ]);
-    expect(result.issues.map((issue) => [issue.path, issue.code])).toEqual([
-      ['options[0].conditionalSuccessors[0].when.field', 'unknown-condition-field'],
-    ]);
-
+  it('accepts coins/reputation as the default projection', () => {
     expect(
       validateStorylineOptions<TestState>([
         {
-          label: 'Known resources',
+          label: 'Default projection',
           effectPolicy: 'skip',
           conditionalSuccessors: [
             { when: { field: 'coins', op: '>=', value: 1 }, successorId: null },
@@ -516,6 +498,35 @@ describe('validation versus runtime permissiveness (baseline)', () => {
           ],
         },
       ]).valid,
+    ).toBe(true);
+  });
+
+  it('rejects an undeclared resource key and accepts it once the game declares it', () => {
+    const declaredOptions: StorylineOption<TestState>[] = [
+      {
+        label: 'Declared resource',
+        effectPolicy: 'skip',
+        conditionalSuccessors: [
+          { when: { field: 'hull', op: '>=', value: 1 }, successorId: 'evt-resolver' },
+        ],
+      },
+    ];
+
+    // Without a declaration the default projection applies: `hull` is unknown.
+    expect(
+      validateStorylineOptions<TestState>(declaredOptions).issues.map((issue) => [
+        issue.path,
+        issue.code,
+      ]),
+    ).toEqual([
+      ['options[0].conditionalSuccessors[0].when.field', 'unknown-condition-field'],
+    ]);
+
+    // Once declared, the same options validate cleanly.
+    expect(
+      validateStorylineOptions<TestState>(declaredOptions, {
+        resources: ['coins', 'reputation', 'hull'],
+      }).valid,
     ).toBe(true);
   });
 });

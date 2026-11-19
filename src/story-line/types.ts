@@ -16,8 +16,18 @@
  * their own state and presentation in without core importing any game types.
  * Nothing here depends on Phaser.
  *
+ * The resource *name set* is game-declared data (see
+ * [`./resources.ts`](./resources.ts)): a game advertises the keys it uses and
+ * `coins` / `reputation` remain the default projection.
+ *
  * @module
  */
+
+import type {
+  StorylineResourceKey,
+  StorylineResources,
+  StorylineResourcesDelta,
+} from './resources';
 
 /**
  * The minimal card shape the story-line system operates on. A game's own card
@@ -71,34 +81,30 @@ export interface StorylineJournalEntry {
 /**
  * Declarative affordability cost for a story-line option.
  *
- * Every specified component is a required payment: an option is only
- * affordable when the player has at least `coins` coins **and** at least
- * `reputation` reputation. An unspecified component is unconstrained (it is
- * never defaulted to zero).
+ * Keyed by the game's **declared resource keys** (see
+ * `StorylineEngineAdapter.resources`). Every specified key is a required
+ * payment: an option is only affordable when the player has at least that
+ * many of *each* named resource. An unspecified key is unconstrained (it is
+ * never defaulted to zero), and a key outside the declared set reads as `0`
+ * and is never paid. The default projection is `coins` / `reputation`, so
+ * `cost: { coins: 100 }` keeps its shipped meaning.
  */
-export interface OptionCost {
-  /** Coins the player must pay to select the option. */
-  readonly coins?: number;
-  /** Reputation the player must pay to select the option. */
-  readonly reputation?: number;
-}
+export type OptionCost = StorylineResourcesDelta;
 
 /**
  * Declarative resource delta applied when a story-line option resolves.
  *
- * Each specified component is a signed delta (`-5` deducts, `5` grants). An
- * unspecified component leaves that resource unchanged.
+ * Keyed by the game's declared resource keys, each a signed delta (`-5`
+ * deducts, `5` grants). An unspecified key leaves that resource unchanged,
+ * and a key outside the declared set is never applied (no resource is
+ * invented).
  *
- * Authoring rule: extra effects are **gains**, so a negative component is
- * rejected by {@link validateStorylineOptions} (`negative-extra-effect`).
- * Resolution itself stays permissive and applies whatever is declared.
+ * Authoring rule: extra effects are **gains**, so a negative delta is
+ * rejected per declared key by {@link validateStorylineOptions}
+ * (`negative-extra-effect`). Resolution itself stays permissive and applies
+ * whatever is declared.
  */
-export interface OptionExtraEffect {
-  /** Coin delta applied on resolution. */
-  readonly coins?: number;
-  /** Reputation delta applied on resolution. */
-  readonly reputation?: number;
-}
+export type OptionExtraEffect = StorylineResourcesDelta;
 
 /**
  * A single declarative threshold condition on one resource.
@@ -107,8 +113,12 @@ export interface OptionExtraEffect {
  * authored, serialised and validated without executable callbacks.
  */
 export interface Condition {
-  /** The resource the condition tests. */
-  readonly field: 'coins' | 'reputation';
+  /**
+   * The declared resource the condition tests. A key the player's state does
+   * not carry reads as `0`; a key outside the declared set is an authoring
+   * error (`unknown-condition-field`) and also reads as `0` at runtime.
+   */
+  readonly field: StorylineResourceKey;
   /** Comparison applied between the current resource and {@link value}. */
   readonly op: '>=' | '<=' | '>' | '<' | '==';
   /** Numeric threshold the current resource is compared against. */
@@ -263,21 +273,26 @@ export interface StorylineEngineAdapter<TState, TCard extends StorylineCard> {
    * game state.
    *
    * Core uses this to deduct an option's declarative `cost` and to apply its
-   * `extraEffect` without importing game types. Each specified component is a
-   * signed delta (`-5` deducts, `5` grants); an unspecified component leaves
-   * that resource unchanged.
+   * `extraEffect` without importing game types. Core only ever names keys from
+   * the adapter's declared resource set
+   * (the default projection when it declares none), so a delta can never
+   * invent a resource; each named key is a signed delta (`-5` deducts, `5`
+   * grants) and an absent key leaves that resource unchanged.
    *
    * Optional for backwards compatibility: an adapter that predates the seam
    * (or deliberately does not expose resources for mutation) omits it. In
    * that case core leaves the state untouched and appends a warning line to
    * the activity log whenever a cost or extra effect needs applying.
    */
-  applyResourceDelta?(
-    state: TState,
-    delta: { coins?: number; reputation?: number },
-  ): void;
-  /** Current spendable resources, for delta calculation. */
-  getResources(state: TState): { coins: number; reputation: number };
+  applyResourceDelta?(state: TState, delta: StorylineResourcesDelta): void;
+  /**
+   * Current resource values for the state, keyed by declared resource key.
+   *
+   * A declared key the state does not currently carry may be omitted (it
+   * reads as `0`). The shipped `coins` / `reputation` pair is the default
+   * projection.
+   */
+  getResources(state: TState): StorylineResources;
   /** Append a line to the game's activity log. */
   appendLog(state: TState, text: string, kind?: string): void;
   /** Read the game's activity log (append-only, oldest first). */
@@ -294,6 +309,17 @@ export interface StorylineEngineAdapter<TState, TCard extends StorylineCard> {
   getChainScanCards(state: TState): readonly TCard[];
   /** Push a newly created chain card onto the game's active deck. */
   pushChainCard(state: TState, card: TCard): void;
+  /**
+   * The resource keys this game declares.
+   *
+   * Optional: omit it (or leave it empty) and the engine uses the default
+   * `coins` / `reputation` projection (`DEFAULT_RESOURCE_KEYS`), so an
+   * adapter written before resource declaration existed is unchanged. A
+   * declared set is threaded through draw-time affordability, cost payment,
+   * extra effects, condition evaluation and validation — keys outside it are
+   * never read, paid or applied.
+   */
+  readonly resources?: readonly StorylineResourceKey[];
 }
 
 /**
@@ -330,6 +356,13 @@ export interface StorylineUiAdapter<
 export interface StorylineSystem<TState, TCard extends StorylineCard> {
   readonly engine: StorylineEngineAdapter<TState, TCard>;
   readonly ui: StorylineUiAdapter<TCard>;
+  /**
+   * The resource keys in force for this system — the adapter's declaration,
+   * or the default `coins` / `reputation` projection when it declares none.
+   * Pass it to `validateStorylineOptions(options, { resources })` so unknown
+   * keys are reported against the same set the runtime uses.
+   */
+  readonly resources: readonly StorylineResourceKey[];
 
   // ── Compilation ─────────────────────────────────────────────
   /** Compile a card's story-line into the generalised option model. */

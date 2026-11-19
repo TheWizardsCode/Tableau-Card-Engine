@@ -2,11 +2,15 @@
  * Story-line resolution semantics: effect policy, cost payment, extra
  * effects, successor precedence and deterministic chain-card naming.
  *
+ * Resources are game-declared (see [`./resources.ts`](./resources.ts)): the
+ * adapter's declared key set governs which resources a cost or extra effect
+ * may name. `coins` / `reputation` remain the default projection.
+ *
  * Resolution order for a selected option:
  *
  * 1. `effectPolicy` — `'apply'` runs the event's intrinsic effect, `'skip'`
  *    ignores it. Unchanged from before cost/extra-effect support.
- * 2. Declarative `cost` — a real payment: the specified coins/reputation are
+ * 2. Declarative `cost` — a real payment: the specified resource keys are
  *    deducted through the adapter's `applyResourceDelta` seam. Cost is
  *    **independent of `effectPolicy`** (it is paid for a `'skip'` option too).
  *    Draw-time filtering guarantees the player can afford it; resolution
@@ -14,7 +18,9 @@
  * 3. Declarative `extraEffect` — a signed resource delta applied through the
  *    same seam, also **independent of `effectPolicy`**.
  *
- * `coinChange` / `repChange` in the result account for all three steps.
+ * `coinChange` / `repChange` in the result are *projections*: the `coins` and
+ * `reputation` keys' change across all three steps, and `0` when those keys
+ * are not declared. This keeps every existing consumer source-compatible.
  *
  * Successor precedence at resolution time:
  *
@@ -36,6 +42,18 @@
  * @module
  */
 
+import {
+  COIN_PROJECTION_KEY,
+  REPUTATION_PROJECTION_KEY,
+  readResource,
+  resolveResourceKeys,
+  selectDeclaredDelta,
+} from './resources';
+import type {
+  StorylineResourceKey,
+  StorylineResources,
+  StorylineResourcesDelta,
+} from './resources';
 import type {
   Condition,
   StorylineCard,
@@ -49,16 +67,17 @@ import type {
  *
  * Pure: no RNG, no state mutation, no logging. The `==` operator compares
  * numerically (`5 == 5.0`); equality boundaries follow the usual numeric
- * semantics for the ordered operators.
+ * semantics for the ordered operators. A field the resource bag does not
+ * carry reads as `0`.
  *
  * @param condition The field/op/value rule to evaluate.
- * @param resources Current spendable resources.
+ * @param resources Current resource values, keyed by resource key.
  */
 export function evaluateCondition(
   condition: Condition,
-  resources: { coins: number; reputation: number },
+  resources: StorylineResources,
 ): boolean {
-  const current = resources[condition.field];
+  const current = readResource(resources, condition.field);
   switch (condition.op) {
     case '>=':
       return current >= condition.value;
@@ -79,12 +98,15 @@ export function evaluateCondition(
 
 /**
  * Formats a signed resource delta for the activity log, omitting zero
- * components (`-5 coins`, `+1 reputation`, both joined by `, `).
+ * components and naming each declared resource key
+ * (`-5 coins`, `+1 reputation`, `-2 hull`; joined by `, `).
  */
-function formatDelta(coins: number, reputation: number): string {
+function formatDelta(delta: StorylineResourcesDelta): string {
   const parts: string[] = [];
-  if (coins !== 0) parts.push(`${coins > 0 ? '+' : ''}${coins} coins`);
-  if (reputation !== 0) parts.push(`${reputation > 0 ? '+' : ''}${reputation} reputation`);
+  for (const [key, value] of Object.entries(delta)) {
+    if (typeof value !== 'number' || value === 0) continue;
+    parts.push(`${value > 0 ? '+' : ''}${value} ${key}`);
+  }
   return parts.join(', ');
 }
 
@@ -98,7 +120,7 @@ function formatDelta(coins: number, reputation: number): string {
 function applyDelta<TState, TCard extends StorylineCard>(
   state: TState,
   adapter: StorylineEngineAdapter<TState, TCard>,
-  delta: { coins?: number; reputation?: number },
+  delta: StorylineResourcesDelta,
 ): void {
   if (adapter.applyResourceDelta) {
     adapter.applyResourceDelta(state, delta);
@@ -109,6 +131,37 @@ function applyDelta<TState, TCard extends StorylineCard>(
     'Story-line cost/extra-effect not applied: the engine adapter does not implement applyResourceDelta.',
     'neutral',
   );
+}
+
+/**
+ * Applies one authored delta (cost or extra effect) over the declared keys.
+ *
+ * Only declared, non-zero keys are forwarded — the engine never invents a
+ * resource. An undeclared key that carries a non-zero value is reported in
+ * the activity log instead of being applied, naming the offending key(s) so a
+ * content author can act on it (validation reports the same fault ahead of
+ * time with a card id and path).
+ */
+function applyDeclaredDelta<TState, TCard extends StorylineCard>(
+  state: TState,
+  adapter: StorylineEngineAdapter<TState, TCard>,
+  source: StorylineResourcesDelta,
+  sign: 1 | -1,
+  declared: readonly StorylineResourceKey[],
+  logLabel: 'Cost paid' | 'Extra effect',
+): void {
+  const { delta, ignored } = selectDeclaredDelta(source, sign, declared);
+  if (Object.keys(delta).length > 0) {
+    applyDelta(state, adapter, delta);
+    adapter.appendLog(state, `${logLabel}: ${formatDelta(delta)}.`, 'neutral');
+  }
+  if (ignored.length > 0) {
+    adapter.appendLog(
+      state,
+      `${logLabel} ignored undeclared resource(s): ${ignored.join(', ')}.`,
+      'neutral',
+    );
+  }
 }
 
 /**
@@ -173,6 +226,7 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
   card: TCard,
   option: StorylineOption<TState>,
 ): StorylineResolution<TCard> {
+  const declared = resolveResourceKeys(adapter.resources);
   const before = adapter.getResources(state);
 
   // 1. Apply effect if the option's policy says so.
@@ -182,36 +236,32 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
 
   // 2. Pay the declarative cost — a real payment, independent of policy.
   if (option.cost) {
-    const coins = option.cost.coins ?? 0;
-    const reputation = option.cost.reputation ?? 0;
-    if (coins !== 0 || reputation !== 0) {
-      applyDelta(state, adapter, { coins: -coins, reputation: -reputation });
-      adapter.appendLog(
-        state,
-        `Cost paid: ${formatDelta(-coins, -reputation)}.`,
-        'neutral',
-      );
-    }
+    applyDeclaredDelta(state, adapter, option.cost, -1, declared, 'Cost paid');
   }
 
   // 3. Apply the declarative extra effect — independent of policy and of the
   //    cost payment.
   if (option.extraEffect) {
-    const coins = option.extraEffect.coins ?? 0;
-    const reputation = option.extraEffect.reputation ?? 0;
-    if (coins !== 0 || reputation !== 0) {
-      applyDelta(state, adapter, { coins, reputation });
-      adapter.appendLog(
-        state,
-        `Extra effect: ${formatDelta(coins, reputation)}.`,
-        'neutral',
-      );
-    }
+    applyDeclaredDelta(
+      state,
+      adapter,
+      option.extraEffect,
+      1,
+      declared,
+      'Extra effect',
+    );
   }
 
   const after = adapter.getResources(state);
-  const coinChange = after.coins - before.coins;
-  const repChange = after.reputation - before.reputation;
+  // Projections: the `coins` / `reputation` keys' change across all three
+  // steps, and 0 for a key the game does not declare.
+  const coinChange = declared.includes(COIN_PROJECTION_KEY)
+    ? readResource(after, COIN_PROJECTION_KEY) - readResource(before, COIN_PROJECTION_KEY)
+    : 0;
+  const repChange = declared.includes(REPUTATION_PROJECTION_KEY)
+    ? readResource(after, REPUTATION_PROJECTION_KEY) -
+      readResource(before, REPUTATION_PROJECTION_KEY)
+    : 0;
 
   // Determine the successor id (precedence per the module doc): a matching
   // declarative rule consumes no rng(); the uniform candidate draw consumes

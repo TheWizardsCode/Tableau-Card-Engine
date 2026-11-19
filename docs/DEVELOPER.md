@@ -2045,10 +2045,14 @@ it with `registerStorylineOptions(eventId, options)` and validate the list with
 `validateStorylineOptions(...)`. The CSV `options` column
 (`label|cardA,cardB;label2|cardC`) stays a label/outcome shorthand and cannot
 author the extended fields, so existing CSV content is unaffected. The engine
-adapter's optional `applyResourceDelta(state, { coins?, reputation? })` method
-is the seam core uses to deduct costs and apply extra effects; an adapter that
-omits it keeps compiling and running unchanged (core warns in the activity log
-instead of mutating resources).
+adapter's optional `applyResourceDelta(state, delta)` method is the seam core
+uses to deduct costs and apply extra effects; an adapter that omits it keeps
+compiling and running unchanged (core warns in the activity log instead of
+mutating resources). Resources are **game-declared** — declare the keys on the
+adapter's optional `resources` member (or build the resource seam from
+`createResourceProjection({ … })`), and `coins` / `reputation` stay the default
+projection when nothing is declared. See
+[Declared resources](core-engine/story-line.md#declared-resources).
 
 ## Build-Time Version Injection
 

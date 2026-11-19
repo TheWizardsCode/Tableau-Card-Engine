@@ -26,6 +26,7 @@
  */
 
 import {
+  createResourceProjection,
   createStorylineSystem,
   type PendingStorylineChoice,
   type StorylineCard,
@@ -132,19 +133,39 @@ export function createDemoState(): DemoState {
   };
 }
 
+/**
+ * The demo's resource declaration, expressed as a projection of its own state
+ * fields.
+ *
+ * The demo uses exactly the engine's **default projection** (`coins` /
+ * `reputation`) — declaring it explicitly is behaviour-neutral and shows the
+ * seam a multi-resource game would use (`createResourceProjection` over
+ * `hull`, `morale`, … instead of `coins` / `reputation`).
+ */
+const demoResources = createResourceProjection<DemoState>({
+  coins: {
+    read: (state) => state.coins,
+    apply: (state, delta) => {
+      state.coins += delta;
+    },
+  },
+  reputation: {
+    read: (state) => state.reputation,
+    apply: (state, delta) => {
+      state.reputation += delta;
+    },
+  },
+});
+
 /** Engine adapter mapping the generic seams onto the demo state. */
 export function createDemoEngine(): StorylineEngineAdapter<DemoState, StorylineCard> {
   return {
+    ...demoResources,
     rng: (state) => nextRandom(state),
     applyEffect: (state, card) => {
       state.coins += card.coinDelta ?? 0;
       state.reputation += card.reputationDelta ?? 0;
     },
-    applyResourceDelta: (state, delta) => {
-      state.coins += delta.coins ?? 0;
-      state.reputation += delta.reputation ?? 0;
-    },
-    getResources: (state) => ({ coins: state.coins, reputation: state.reputation }),
     appendLog: (state, text) => {
       state.activityLog.push({ turn: state.turn, text });
     },

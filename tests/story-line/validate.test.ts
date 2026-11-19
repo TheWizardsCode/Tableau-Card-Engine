@@ -285,6 +285,87 @@ describe('validateStorylineOptions — reported scope', () => {
   });
 });
 
+describe('validateStorylineOptions — declared resources', () => {
+  it('reports an undeclared cost key with the card id, the key and a reason', () => {
+    const result = validateStorylineOptions(
+      [{ label: 'Pay', effectPolicy: 'apply', cost: { hull: 5 } }],
+      { cardId: 'evt-toll' },
+    );
+
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]).toMatchObject({
+      path: 'options[0].cost.hull',
+      code: 'unknown-resource-key',
+      cardId: 'evt-toll',
+      resource: 'hull',
+    });
+    expect(result.issues[0].message).toContain('hull');
+    expect(result.issues[0].message).toContain('coins, reputation');
+  });
+
+  it('reports an undeclared extra-effect key', () => {
+    const result = validateStorylineOptions([
+      { label: 'Gain', effectPolicy: 'apply', extraEffect: { morale: 2 } },
+    ]);
+    expect(result.issues.map((issue) => [issue.path, issue.code, issue.resource])).toEqual([
+      ['options[0].extraEffect.morale', 'unknown-resource-key', 'morale'],
+    ]);
+  });
+
+  it('accepts declared keys in costs, extra effects and conditions', () => {
+    const declared = ['coins', 'reputation', 'hull', 'morale'];
+    const result = validateStorylineOptions(
+      [
+        {
+          label: 'All declared',
+          effectPolicy: 'apply',
+          cost: { hull: 2 },
+          extraEffect: { morale: 3 },
+          conditionalSuccessors: [
+            { when: { field: 'hull', op: '<=', value: 1 }, successorId: null },
+          ],
+        },
+      ],
+      { resources: declared },
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a negative extra effect on any declared key, naming the key', () => {
+    const result = validateStorylineOptions(
+      [{ label: 'Bleed', effectPolicy: 'apply', extraEffect: { morale: -2 } }],
+      { resources: ['coins', 'reputation', 'morale'] },
+    );
+    expect(result.issues.map((issue) => [issue.path, issue.code, issue.resource])).toEqual([
+      ['options[0].extraEffect.morale', 'negative-extra-effect', 'morale'],
+    ]);
+  });
+
+  it('defaults the vocabulary to the coins/reputation projection', () => {
+    expect(
+      validateStorylineOptions([
+        { label: 'Coins', effectPolicy: 'apply', cost: { coins: 1 } },
+      ]).valid,
+    ).toBe(true);
+    expect(
+      validateStorylineOptions([
+        { label: 'Rep', effectPolicy: 'apply', extraEffect: { reputation: 1 } },
+      ]).valid,
+    ).toBe(true);
+    expect(
+      validateStorylineOptions([
+        {
+          label: 'Unknown field',
+          effectPolicy: 'skip',
+          conditionalSuccessors: [
+            { when: { field: 'stores', op: '>=', value: 1 }, successorId: null },
+          ],
+        },
+      ]).issues.map((issue) => issue.code),
+    ).toEqual(['unknown-condition-field']);
+  });
+});
+
 /** A system instance bound to an empty template catalogue + adapter. */
 function makeSystem() {
   const system = createStorylineSystem({ engine: makeAdapter(new Map()) });
