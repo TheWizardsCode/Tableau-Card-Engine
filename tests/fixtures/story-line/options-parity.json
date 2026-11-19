@@ -2,6 +2,7 @@
   "capturedFrom": "CG-0MVZFVYKD001Q18N",
   "capturedAt": "2026-11-02",
   "captureNote": "Compiled option lists of every shipped story-line card, captured from real behaviour before the legacy two-way choice code was removed. Regenerate only when the shipped content is deliberately changed: run the capture in tests/story-line/options-parity.test.ts and review the diff.",
+  "baselineNote": "Story-line spike baseline (CG-0MWNHZ51N007STI3): the resource-generalisation and CSV-extension children must leave every captured option list unchanged. A diff is a finding, not a regeneration trigger.",
   "sources": [
     {
       "id": "gym",
@@ -88,6 +89,73 @@
           "id": "upg-ms-foundations-teahouse",
           "name": "Upgrade to Tea House",
           "storylineId": null,
+          "options": []
+        }
+      ]
+    }
+  ],
+  "programmaticSources": [
+    {
+      "id": "gym-demo",
+      "module": "example-games/gym/GymStorylineDemo.ts",
+      "exportName": "DEMO_CARDS",
+      "adapter": "compileStorylineFromEvent with a fresh (empty) option registry",
+      "cards": [
+        {
+          "id": "gym-story-start",
+          "name": "Town Meeting",
+          "storylineId": "gym-story",
+          "options": [
+            {
+              "label": "Invest",
+              "successorIds": ["gym-story-invest"],
+              "effectPolicy": "apply"
+            },
+            {
+              "label": "Ignore",
+              "successorIds": ["gym-story-ignore"],
+              "effectPolicy": "apply"
+            }
+          ]
+        },
+        {
+          "id": "gym-story-invest",
+          "name": "Public Investment",
+          "storylineId": "gym-story",
+          "options": [
+            {
+              "label": "Celebrate",
+              "successorIds": ["gym-story-end"],
+              "effectPolicy": "apply"
+            },
+            {
+              "label": "Double down",
+              "successorIds": [],
+              "effectPolicy": "apply"
+            }
+          ]
+        },
+        {
+          "id": "gym-story-ignore",
+          "name": "Neglected Roads",
+          "storylineId": "gym-story",
+          "options": [
+            {
+              "label": "Repair",
+              "successorIds": ["gym-story-end"],
+              "effectPolicy": "apply"
+            },
+            {
+              "label": "Let it be",
+              "successorIds": [],
+              "effectPolicy": "apply"
+            }
+          ]
+        },
+        {
+          "id": "gym-story-end",
+          "name": "New Beginning",
+          "storylineId": "gym-story",
           "options": []
         }
       ]

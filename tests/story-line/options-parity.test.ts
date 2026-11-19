@@ -9,6 +9,11 @@
  * before the removal started; it must stay green after every removal phase of
  * the parent epic (`CG-0MVZBUWPH003PWUI`).
  *
+ * It is also the baseline guard for the story-line spike
+ * (`CG-0MWNFV6VU003O3PC`): the resource-generalisation and CSV-extension
+ * children must leave every captured option list byte-identical. A diff here is
+ * a **finding**, not an invitation to regenerate the fixture.
+ *
  * What it pins, per shipped card id: the card name, its story-line id and the
  * ordered compiled options (label, ordered successor ids, `effectPolicy`).
  *
@@ -16,6 +21,11 @@
  *
  * - **Gym demo content** — `example-games/gym/content/storylines.csv` through
  *   the shipped `GYM_CONTENT_ADAPTER`.
+ * - **Gym demo catalogue** — the `DEMO_CARDS` TypeScript fixture in
+ *   `example-games/gym/GymStorylineDemo.ts` (what `GymStorylineScene` actually
+ *   draws), compiled through `compileStorylineFromEvent` with a fresh, empty
+ *   option registry. It is captured separately from the CSV source because the
+ *   scene ships a programmatic catalogue, not the CSV.
  * - **Main Street reference card pack** —
  *   `tests/fixtures/reference-packs/main-street/main-street/main-street-foundations/cards.csv`
  *   through the minimal options-only adapter declared below. The pack CSV uses
@@ -37,6 +47,11 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { DEMO_CARDS } from '../../example-games/gym/GymStorylineDemo';
+import {
+  compileStorylineFromEvent,
+  createStorylineOptionRegistry,
+} from '../../src/story-line/compile';
 import { GYM_CONTENT_ADAPTER } from '../../src/story-line/content/adapters';
 import {
   cardsFromCsv,
@@ -98,12 +113,23 @@ interface GoldenSource {
   readonly cards: readonly GoldenCard[];
 }
 
+/** One TypeScript-authored (programmatic) card catalogue recorded in the fixture. */
+interface GoldenProgrammaticSource {
+  readonly id: string;
+  readonly module: string;
+  readonly exportName: string;
+  readonly adapter: string;
+  readonly cards: readonly GoldenCard[];
+}
+
 /** The committed golden fixture. */
 interface GoldenFixture {
   readonly capturedFrom: string;
   readonly capturedAt: string;
   readonly captureNote: string;
   readonly sources: readonly GoldenSource[];
+  /** Programmatic catalogues (scenes that ship cards in TypeScript, not CSV). */
+  readonly programmaticSources?: readonly GoldenProgrammaticSource[];
 }
 
 /** A content source the snapshot covers. */
@@ -135,18 +161,57 @@ function readText(path: string): string {
   return readFileSync(join(REPO_ROOT, path), 'utf-8');
 }
 
+/** Projects one compiled option into its fixture record. */
+function captureOption(option: {
+  label: string;
+  successorIds?: readonly string[];
+  successorId?: string | null;
+  effectPolicy: string;
+}): GoldenOption {
+  return {
+    label: option.label,
+    // CSV-authored options only ever declare `successorIds`; a programmatic
+    // `successorId` is normalised into the same ordered list so the fixture has
+    // one successor representation.
+    successorIds: [...(option.successorIds ?? (option.successorId ? [option.successorId] : []))],
+    effectPolicy: option.effectPolicy,
+  };
+}
+
 /** Compiles one CSV through the public content API into fixture records. */
 function captureCards(csvPath: string, adapter: ContentAdapter): GoldenCard[] {
   return cardsFromCsv(parseCsv(readText(csvPath)), adapter).map((card) => ({
     id: card.id,
     name: card.name,
     storylineId: card.storylineId,
-    options: compileContentOptions(card).map((option) => ({
-      label: option.label,
-      successorIds: [...(option.successorIds ?? [])],
-      effectPolicy: option.effectPolicy,
-    })),
+    options: compileContentOptions(card).map(captureOption),
   }));
+}
+
+/**
+ * Compiles a programmatic card catalogue into fixture records.
+ *
+ * Uses the runtime compile path (`compileStorylineFromEvent`) with a **fresh,
+ * empty** registry and **no state**: no registered options and no draw-time
+ * cost/condition filtering, so the capture is the catalogue's declared option
+ * topology rather than a snapshot of one player's affordability.
+ */
+function captureProgrammaticCards(cards: readonly {
+  id: string;
+  name: string;
+  storylineId?: string | null;
+  options?: string;
+}[]): GoldenCard[] {
+  const registry = createStorylineOptionRegistry<unknown>((id) => id.replace(/-\d+$/, ''));
+  return cards.map((card) => {
+    const compiled = compileStorylineFromEvent(card, registry);
+    return {
+      id: card.id,
+      name: card.name,
+      storylineId: compiled.storylineId,
+      options: compiled.compiledOptions.map(captureOption),
+    };
+  });
 }
 
 /** The snapshot recomputed from the shipped content. */
@@ -156,6 +221,17 @@ const ACTUAL_SOURCES: GoldenSource[] = SOURCES.map((source) => ({
   adapter: source.adapter,
   cards: captureCards(source.csv, source.contentAdapter),
 }));
+
+/** The programmatic sources the snapshot covers. */
+const PROGRAMMATIC_SOURCES: readonly GoldenProgrammaticSource[] = [
+  {
+    id: 'gym-demo',
+    module: 'example-games/gym/GymStorylineDemo.ts',
+    exportName: 'DEMO_CARDS',
+    adapter: 'compileStorylineFromEvent with a fresh (empty) option registry',
+    cards: captureProgrammaticCards(DEMO_CARDS),
+  },
+];
 
 /** The committed golden snapshot. */
 const GOLDEN: GoldenFixture = JSON.parse(readText(GOLDEN_FIXTURE)) as GoldenFixture;
@@ -200,5 +276,44 @@ describe('shipped story-line options parity', () => {
   it('records plain incidents with an empty option list', () => {
     expect(optionsOf('gym', 'gym-story-end')).toEqual([]);
     expect(optionsOf('main-street-reference-pack', 'evt-ms-foundations-fair')).toEqual([]);
+  });
+});
+
+describe('GymStorylineScene programmatic catalogue parity', () => {
+  it('recompiles DEMO_CARDS to exactly the golden fixture', () => {
+    expect(
+      PROGRAMMATIC_SOURCES,
+      'The GymStorylineScene catalogue (DEMO_CARDS) drifted from tests/fixtures/story-line/options-parity.json. ' +
+        'The scene must keep drawing the same option lists; only regenerate the fixture if the ' +
+        'demo content change is deliberate.',
+    ).toEqual(GOLDEN.programmaticSources);
+  });
+
+  it('draws the same branch topology as the Gym CSV demo content', () => {
+    const csvCards = ACTUAL_SOURCES.find((source) => source.id === 'gym')?.cards ?? [];
+    const demoCards = PROGRAMMATIC_SOURCES[0].cards;
+
+    // The scene catalogue and the CSV describe the same four-card demo arc, so
+    // their ids and compiled option topology must stay aligned; the fixture
+    // records each independently, this assertion catches a one-sided edit.
+    expect(demoCards.map((card) => card.id)).toEqual(csvCards.map((card) => card.id));
+    for (const demoCard of demoCards) {
+      const csvCard = csvCards.find((candidate) => candidate.id === demoCard.id);
+      expect(csvCard, `CSV demo content is missing "${demoCard.id}"`).toBeDefined();
+      expect(demoCard.options, `${demoCard.id} option topology`).toEqual(csvCard?.options);
+    }
+  });
+
+  it('pins the one deliberate name divergence between the scene and the CSV', () => {
+    // The scene calls its terminal card "New Beginning"; the CSV calls the same
+    // id "Transport Infrastructure". The divergence is deliberate (both are
+    // fixtures, not shipped content) and is recorded here so a silent rename on
+    // either side is a test failure rather than a surprise.
+    const demoTerminal = PROGRAMMATIC_SOURCES[0].cards.find((c) => c.id === 'gym-story-end');
+    const csvTerminal = ACTUAL_SOURCES.find((s) => s.id === 'gym')?.cards.find(
+      (c) => c.id === 'gym-story-end',
+    );
+    expect(demoTerminal?.name).toBe('New Beginning');
+    expect(csvTerminal?.name).toBe('Transport Infrastructure');
   });
 });

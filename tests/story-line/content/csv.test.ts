@@ -6,8 +6,18 @@
  * checksum — plus projection of rows onto the generic content model through
  * two differently shaped adapters.
  *
+ * The round-trip half is the CSV baseline for the story-line spike
+ * (`CG-0MWNHZ51N007STI3`): identity is asserted for the shipped Gym CSV, the
+ * Main Street reference card pack and **every** committed story-line fixture
+ * (quoted cells, empty cells, embedded commas and embedded newlines), and the
+ * accepted-but-normalised inputs are pinned explicitly so the CSV-extension
+ * child cannot change them unnoticed.
+ *
  * @module
  */
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { GYM_CONTENT_ADAPTER } from '../../../src/story-line/content/adapters';
@@ -24,7 +34,21 @@ import {
   serialiseCsv,
 } from '../../../src/story-line/content/csv';
 import { TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
-import { GYM_CONTENT_PATH, readFixture, readText } from './test-support';
+import {
+  FIXTURES_DIR,
+  GYM_CONTENT_PATH,
+  readFixture,
+  readText,
+} from './test-support';
+
+/**
+ * The Main Street reference card pack, used as a real-world CSV source with
+ * quoted cells containing commas and `""` escapes.
+ */
+const MAIN_STREET_REFERENCE_CSV = join(
+  FIXTURES_DIR,
+  '../reference-packs/main-street/main-street/main-street-foundations/cards.csv',
+);
 
 /** A content card with only the fields a test needs. */
 function card(overrides: Partial<ContentCard> = {}): ContentCard {
@@ -44,6 +68,63 @@ describe('parseCsv / serialiseCsv', () => {
   it('round-trips the shipped Gym content byte-identically', () => {
     const text = readText(GYM_CONTENT_PATH);
     expect(serialiseCsv(parseCsv(text))).toBe(text);
+  });
+
+  it('round-trips the Main Street reference card pack byte-identically', () => {
+    const text = readText(MAIN_STREET_REFERENCE_CSV);
+    expect(serialiseCsv(parseCsv(text))).toBe(text);
+  });
+
+  it('round-trips every story-line fixture byte-identically', () => {
+    const fixtures = readdirSync(FIXTURES_DIR)
+      .filter((name) => name.endsWith('.csv'))
+      .sort();
+    // Guards the assertion below from silently covering nothing.
+    expect(fixtures.length).toBeGreaterThan(0);
+    for (const name of fixtures) {
+      const text = readFixture(name);
+      expect(serialiseCsv(parseCsv(text)), name).toBe(text);
+    }
+  });
+
+  it('preserves quoted cells, empty cells, embedded commas and newlines cell-for-cell', () => {
+    const text = readFixture('round-trip-quoting.csv');
+    const parsed = parseCsv(text);
+    expect(parsed.rows).toEqual([
+      [
+        'tav-quote',
+        'A name, with a comma',
+        'He said "the road is long", then left.',
+        'tav',
+        'Tavern Nights',
+        'Go|tav-quote-end',
+        '2',
+      ],
+      [
+        'tav-quote-end',
+        'Two\nlines',
+        'Empty choice cell and an empty payoff below',
+        'tav',
+        'Tavern Nights',
+        '',
+        '',
+      ],
+    ]);
+    expect(serialiseCsv(parsed)).toBe(text);
+  });
+
+  it('normalises non-canonical quoting to the minimal quoting the serialiser emits', () => {
+    // Characterisation: byte identity requires a *canonically* quoted file. An
+    // explicitly quoted empty cell and an unnecessary pair of quotes are both
+    // accepted on input but normalised on output.
+    expect(serialiseCsv(parseCsv('a,b\n"",x\n'))).toBe('a,b\n,x\n');
+    expect(serialiseCsv(parseCsv('a,b\n"plain",x\n'))).toBe('a,b\nplain,x\n');
+  });
+
+  it('drops a trailing all-empty record (terminal blank line)', () => {
+    // Characterisation: the parser never emits an all-empty final record, so a
+    // file ending in a blank data line loses it on round-trip.
+    expect(serialiseCsv(parseCsv('a,b\n1,2\n,\n'))).toBe('a,b\n1,2\n');
   });
 
   it('round-trips a differently shaped fixture byte-identically', () => {
