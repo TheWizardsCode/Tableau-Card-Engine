@@ -20,6 +20,7 @@
  *     effect: 'flavour',
  *     options: 'choices',
  *     storylineId: 'arc',
+ *     resources: 'resource_keys',
  *   },
  * };
  * ```
@@ -62,6 +63,17 @@ export interface ContentCard {
    * keyed by CSV column name, with the raw cell text (untrimmed).
    */
   readonly fields: Readonly<Record<string, string>>;
+  /**
+   * The resource keys this card declares for its option attributes, parsed
+   * from the adapter's `resources` column (`"coins, hull, morale"` →
+   * `['coins', 'hull', 'morale']`). Empty when the adapter maps no resource
+   * column or the cell is blank.
+   *
+   * The declared set is the validation vocabulary for the card's `#cost`,
+   * `#extra` and `#when` option attributes; when it is empty the engine's
+   * default `coins` / `reputation` projection is checked instead.
+   */
+  readonly resourceKeys: readonly string[];
 }
 
 /**
@@ -85,6 +97,13 @@ export interface ContentFieldMapping {
   readonly storylineId?: string;
   /** Column carrying the storyline title. */
   readonly storylineTitle?: string;
+  /**
+   * Column declaring the resource keys the card's option attributes may use
+   * (e.g. `resources` → `"hull,morale,stores,goodwill"`). Optional: when the
+   * adapter declares no such column (or a cell is blank), validation falls
+   * back to the engine's default `coins` / `reputation` projection.
+   */
+  readonly resources?: string;
 }
 
 /**
@@ -166,6 +185,7 @@ export function mappedFieldColumns(
   if (fields.storylineTitle !== undefined) {
     pairs.push(['storylineTitle', fields.storylineTitle]);
   }
+  if (fields.resources !== undefined) pairs.push(['resources', fields.resources]);
   return pairs;
 }
 

@@ -23,8 +23,8 @@ export const DEFAULT_CONTENT_PATH = 'example-games/gym/content/storylines.csv';
  * The Gym demo content adapter.
  *
  * Columns mirror the Gym story fixture (`GymStorylineDemo`): the generic
- * story-line fields plus `trigger`, `cost`, `coinDelta` and
- * `reputationDelta` as game columns.
+ * story-line fields (including the declared `resources` keys) plus `trigger`,
+ * `cost`, `coinDelta` and `reputationDelta` as game columns.
  */
 export const GYM_CONTENT_ADAPTER: ContentAdapter = {
   gameId: 'gym',
@@ -35,6 +35,7 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
     'options',
     'storylineId',
     'storylineTitle',
+    'resources',
     'trigger',
     'cost',
     'coinDelta',
@@ -47,6 +48,7 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
     options: 'options',
     storylineId: 'storylineId',
     storylineTitle: 'storylineTitle',
+    resources: 'resources',
   },
   editableColumns: ['trigger', 'cost', 'coinDelta', 'reputationDelta'],
   newCardDefaults: {

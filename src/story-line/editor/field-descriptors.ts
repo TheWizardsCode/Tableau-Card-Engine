@@ -87,10 +87,21 @@ const CORE_FIELDS: readonly CoreFieldSpec[] = [
     key: 'options',
     label: 'Options',
     kind: 'long-text',
-    hint: 'Options encoding: label|target;label2|target2 — a comma separates random candidates.',
+    hint:
+      'Options encoding: label|target;label2|target2 — a comma separates random candidates. ' +
+      'Append #cost=coins:5#extra=reputation:+2#when=coins>=3>cardX to declare a cost, ' +
+      'an extra effect and a conditional successor (repeat #when for an ordered rule list).',
   },
   { key: 'storylineId', label: 'Story-line id', kind: 'text' },
   { key: 'storylineTitle', label: 'Story-line title', kind: 'text' },
+  {
+    key: 'resources',
+    label: 'Declared resources',
+    kind: 'text',
+    hint:
+      'Comma-separated resource keys this card declares (e.g. coins,reputation,hull). ' +
+      'The options #cost/#extra/#when attributes may only name a declared key.',
+  },
 ];
 
 /** Options for {@link buildCardFieldDescriptors}. */
@@ -114,6 +125,8 @@ function coreValue(card: ContentCard, key: CoreFieldSpec['key']): string {
       return card.storylineId ?? '';
     case 'storylineTitle':
       return card.storylineTitle ?? '';
+    case 'resources':
+      return card.resourceKeys.join(',');
   }
 }
 
@@ -292,6 +305,9 @@ function applyCoreValue(
     case 'storylineTitle':
       spec.storylineTitle = trimmed === '' ? null : trimmed;
       break;
+    case 'resources':
+      spec.resources = trimmed === '' ? null : value;
+      break;
     case 'id':
       // The id is the row selector, not an editable field.
       break;
@@ -369,6 +385,7 @@ export function buildAddSpec(
     ...(has('options') ? { options: value('options') } : {}),
     ...(has('storylineId') ? { storylineId: optional('storylineId') } : {}),
     ...(has('storylineTitle') ? { storylineTitle: optional('storylineTitle') } : {}),
+    ...(has('resources') ? { resources: optional('resources') } : {}),
     ...(Object.keys(fields).length > 0 ? { fields } : {}),
   };
 }
@@ -443,6 +460,11 @@ function attributeIssue(
       return hasField(descriptors, 'storylineId') ? 'storylineId' : null;
     case 'invalid-option':
       return hasField(descriptors, 'options') ? 'options' : null;
+    case 'unknown-resource-key':
+      // The offending key is authored inside the options cell; fall back to the
+      // declared-resources control when the adapter maps no options column.
+      if (hasField(descriptors, 'options')) return 'options';
+      return hasField(descriptors, 'resources') ? 'resources' : null;
     case 'unknown-successor':
       return issue.target ? fieldForTarget(descriptors, draft, issue.target) : null;
     case 'unreachable-card':

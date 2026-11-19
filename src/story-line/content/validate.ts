@@ -14,7 +14,8 @@
  * | `missing-required-field` | The id, name or a required adapter column is empty. |
  * | `missing-storyline-id` | A choice card declares no storyline id. |
  * | `invalid-option` | Malformed `options` encoding, or an empty/duplicate option label. |
- * | `unknown-successor` | An `options` candidate names a card id that does not exist. |
+ * | `unknown-resource-key` | A `#cost` / `#extra` / `#when` attribute names a key outside the card's declared resources. |
+ * | `unknown-successor` | An `options` candidate (or conditional successor) names a card id that does not exist. |
  * | `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
  * | `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
  *
@@ -35,7 +36,10 @@ import {
   optionSuccessorIds,
   parseCsv,
 } from './csv';
+import { StorylineOptionsEncodingError } from '../compile';
+import { DEFAULT_RESOURCE_KEYS } from '../resources';
 import type { StorylineOption } from '../types';
+import { validateStorylineOptions } from '../validate';
 import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
 
 // ── Result types ────────────────────────────────────────────
@@ -46,6 +50,7 @@ export type ContentIssueCode =
   | 'missing-required-field'
   | 'missing-storyline-id'
   | 'invalid-option'
+  | 'unknown-resource-key'
   | 'unknown-successor'
   | 'unreachable-card'
   | 'cycle-error';
@@ -58,6 +63,30 @@ export interface ContentIssue {
   readonly cardId: string;
   /** The offending successor/link target, when applicable. */
   readonly target?: string;
+  /**
+   * 1-based content record number (the header is row 1, the first data record
+   * row 2). Embedded newlines inside a quoted cell do not add rows — this is
+   * the logical CSV record, so it matches the row an editor shows.
+   */
+  readonly row?: number;
+  /**
+   * The offending CSV **column name** (e.g. `options` for an option attribute
+   * fault, `resources` for a declaration fault).
+   */
+  readonly column?: string;
+  /**
+   * Stable reason code (`unknown-attribute`, `malformed-cost-pair`,
+   * `unknown-resource-key`, `unparseable-condition`, …) so a tool can match
+   * the fault without parsing the message.
+   */
+  readonly reason?: string;
+  /**
+   * Dotted path to the offending value within the compiled option model
+   * (e.g. `options[1].cost.coins`), when the fault is scoped to one field.
+   */
+  readonly path?: string;
+  /** The resource key the fault concerns, when applicable. */
+  readonly resource?: string;
   /** Human-readable explanation naming the offending card/link. */
   readonly message: string;
 }
@@ -140,12 +169,14 @@ export function validateContentCards(
   }
 
   // ── Required fields ──
-  for (const card of cards) {
+  cards.forEach((card, index) => {
     const id = base(card.id);
+    const row = index + 2;
     if (card.id.trim() === '') {
       issues.push({
         code: 'missing-required-field',
         cardId: id,
+        row,
         message: 'A card row has an empty id.',
       });
     }
@@ -153,10 +184,11 @@ export function validateContentCards(
       issues.push({
         code: 'missing-required-field',
         cardId: id,
+        row,
         message: `Card "${id}" has an empty name.`,
       });
     }
-  }
+  });
 
   const knownIds = new Set(cards.map((card) => base(card.id)));
 
@@ -164,21 +196,32 @@ export function validateContentCards(
   const optionsByCard = new Map<ContentCard, StorylineOption<unknown>[]>();
   const choiceCards: ContentCard[] = [];
   const storylineIds = new Set<string>();
+  const optionsColumn = adapter.fields.options;
 
-  for (const card of cards) {
+  cards.forEach((card, index) => {
     const id = base(card.id);
+    const row = index + 2;
     if (card.storylineId) storylineIds.add(card.storylineId);
 
     let options: StorylineOption<unknown>[] = [];
     try {
       options = compileContentOptions(card);
     } catch (err) {
+      const isEncodingError = err instanceof StorylineOptionsEncodingError;
       issues.push({
         code: 'invalid-option',
         cardId: id,
+        row,
+        ...(optionsColumn !== undefined ? { column: optionsColumn } : {}),
+        ...(isEncodingError
+          ? {
+              reason: err.reason,
+              ...(err.attribute !== undefined ? { path: `#${err.attribute}` } : {}),
+            }
+          : { reason: 'malformed-options' }),
         message: `Choice card "${id}" has a malformed options column: ${(err as Error).message}`,
       });
-      continue;
+      return;
     }
     optionsByCard.set(card, options);
 
@@ -189,28 +232,39 @@ export function validateContentCards(
         issues.push({
           code: 'missing-storyline-id',
           cardId: id,
+          row,
+          ...(optionsColumn !== undefined ? { column: optionsColumn } : {}),
           message: `Choice card "${id}" declares no storyline id.`,
         });
       }
     }
 
-    if (!isChoice) continue;
+    if (!isChoice) return;
+
+    const optionContext = {
+      row,
+      ...(optionsColumn !== undefined ? { column: optionsColumn } : {}),
+    };
 
     // Duplicate labels make the label unusable as a stable choice token.
     const seenLabels = new Set<string>();
-    for (const option of options) {
+    options.forEach((option, optionIndex) => {
       const label = option.label.trim();
       const labelKey = label.toLowerCase();
       if (label === '') {
         issues.push({
           code: 'invalid-option',
           cardId: id,
+          ...optionContext,
+          path: `options[${optionIndex}].label`,
           message: `Choice card "${id}" has an option with an empty label.`,
         });
       } else if (seenLabels.has(labelKey)) {
         issues.push({
           code: 'invalid-option',
           cardId: id,
+          ...optionContext,
+          path: `options[${optionIndex}].label`,
           message: `Choice card "${id}" declares the option label "${option.label}" more than once.`,
         });
       }
@@ -220,6 +274,8 @@ export function validateContentCards(
         issues.push({
           code: 'invalid-option',
           cardId: id,
+          ...optionContext,
+          path: `options[${optionIndex}].effectPolicy`,
           message: `Choice card "${id}" option "${option.label}" has invalid effect policy "${String(option.effectPolicy)}".`,
         });
       }
@@ -230,12 +286,54 @@ export function validateContentCards(
             code: 'unknown-successor',
             cardId: id,
             target,
+            ...optionContext,
+            path: `options[${optionIndex}].successorIds`,
             message: `Choice card "${id}" option "${option.label}" links to unknown card "${target}".`,
           });
         }
       }
+
+      // Conditional successors are authored in the same cell, so an unknown
+      // target is reported like any other dangling link.
+      (option.conditionalSuccessors ?? []).forEach((rule, ruleIndex) => {
+        if (rule.successorId === null) return;
+        const target = base(rule.successorId);
+        if (knownIds.has(target)) return;
+        issues.push({
+          code: 'unknown-successor',
+          cardId: id,
+          target,
+          ...optionContext,
+          path: `options[${optionIndex}].conditionalSuccessors[${ruleIndex}].successorId`,
+          message: `Choice card "${id}" option "${option.label}" conditional successor links to unknown card "${target}".`,
+        });
+      });
+    });
+
+    // Declarative option metadata (cost / extra effect / condition keys) is
+    // validated against the card's declared resource set — the resources
+    // column when it declares any, otherwise the engine's default projection.
+    const declared =
+      card.resourceKeys.length > 0 ? card.resourceKeys : DEFAULT_RESOURCE_KEYS;
+    const metadata = validateStorylineOptions(options, {
+      resources: declared,
+      cardId: id,
+    });
+    for (const issue of metadata.issues) {
+      const isResourceKey =
+        issue.code === 'unknown-resource-key' ||
+        issue.code === 'unknown-condition-field';
+      issues.push({
+        code: isResourceKey ? 'unknown-resource-key' : 'invalid-option',
+        cardId: id,
+        ...optionContext,
+        reason: issue.code,
+        path: issue.path,
+        ...(issue.resource !== undefined ? { resource: issue.resource } : {}),
+        message: issue.message,
+      });
     }
-  }
+  });
 
   // ── Adjacency over the choice graph (base ids, known targets only) ──
   const adjacency = new Map<string, string[]>();
@@ -440,7 +538,12 @@ export function formatContentValidationReport(
   if (result.issues.length > 0) {
     lines.push(`ERRORS (${result.issues.length}):`);
     for (const issue of result.issues) {
-      lines.push(`  ✗ [${issue.code}] ${issue.message}`);
+      const location = issue.row === undefined ? '' : ` row ${issue.row}`;
+      const column = issue.column === undefined ? '' : `, column "${issue.column}"`;
+      const reason = issue.reason === undefined ? '' : ` (${issue.reason})`;
+      lines.push(
+        `  ✗ [${issue.code}]${location}${column}${reason}: ${issue.message}`,
+      );
     }
   } else {
     lines.push('ERRORS (0): none');

@@ -31,6 +31,7 @@ function card(overrides: Partial<ContentCard> = {}): ContentCard {
     storylineId: 'arc',
     storylineTitle: 'Arc',
     fields: {},
+    resourceKeys: [],
     ...overrides,
   };
 }

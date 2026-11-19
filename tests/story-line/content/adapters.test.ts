@@ -58,7 +58,7 @@ describe('shipped adapters', () => {
     );
     // The exact column / mapping / default key sets are the contract: the
     // adapter declares, maps and defaults nothing outside them.
-    expect(GYM_CONTENT_ADAPTER.columns).toHaveLength(10);
+    expect(GYM_CONTENT_ADAPTER.columns).toHaveLength(11);
     expect(Object.keys(GYM_CONTENT_ADAPTER.fields)).toEqual([
       'id',
       'name',
@@ -66,6 +66,7 @@ describe('shipped adapters', () => {
       'options',
       'storylineId',
       'storylineTitle',
+      'resources',
     ]);
     expect(Object.keys(GYM_CONTENT_ADAPTER.newCardDefaults ?? {})).toEqual([
       'options',
@@ -105,6 +106,7 @@ describe('adapter seam with two differently shaped adapters', () => {
       'id',
       'name',
       'options',
+      'resourceKeys',
       'storylineId',
       'storylineTitle',
     ]);

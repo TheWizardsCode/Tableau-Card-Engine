@@ -70,10 +70,15 @@ export type {
 export { STORY_UPDATE_PREFIX, parseStoryUpdate } from './journal';
 export { parseStorylineOptionsEncoding } from './compile';
 export {
+  StorylineOptionsEncodingError,
+  type StorylineOptionsEncodingErrorReason,
+} from './compile';
+export {
   COIN_PROJECTION_KEY,
   DEFAULT_RESOURCE_KEYS,
   REPUTATION_PROJECTION_KEY,
   createResourceProjection,
+  parseResourceKeys,
   readResource,
   resolveResourceKeys,
   selectDeclaredDelta,

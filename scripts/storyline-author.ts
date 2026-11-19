@@ -68,15 +68,18 @@ Common options:
 
 add-card options:
   --id <id> --name <name> [--effect <text>] [--options <encoding>]
-  [--storyline-id <id>] [--storyline-title <title>]
+  [--storyline-id <id>] [--storyline-title <title>] [--resources <keys>]
 
 update-card options:
   --id <id> [--name <name>] [--effect <text>]
   [--options <encoding> | --clear-options]
   [--storyline-id <id> | --clear-storyline]
   [--storyline-title <title>]
+  [--resources <keys> | --clear-resources]
 
 Choice nodes are authored only through --options (label|target;label2|target2).
+Declared resources (--resources "coins,hull") are the keys the option
+#cost/#extra/#when attributes may name.
 
 Exit codes: 0 = applied (or dry-run valid), 1 = refused (invalid usage/content).`;
 
@@ -141,6 +144,7 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
       options: optionalText('options'),
       storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
       storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),
+      resources: optionalText('resources'),
       fields,
     };
     return { command, csvPath, gameId, dryRun, spec };
@@ -153,6 +157,7 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
     options: nullableFlag(flags, 'options', 'clear-options'),
     storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
     storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),
+    resources: nullableFlag(flags, 'resources', 'clear-resources'),
     fields,
   };
   return { command, csvPath, gameId, dryRun, spec };

@@ -176,6 +176,7 @@ describe('story-line editor — curated card edit round-trip', () => {
         'options',
         'storylineId',
         'storylineTitle',
+        'resources',
         'column:trigger',
         'column:cost',
         'column:coinDelta',
@@ -193,6 +194,7 @@ describe('story-line editor — curated card edit round-trip', () => {
       'id',
       'name',
       'options',
+      'resources',
       'storylineId',
       'storylineTitle',
     ]);
@@ -210,6 +212,7 @@ describe('story-line editor — curated card edit round-trip', () => {
     type(container, 'options', 'Reinvest|gym-story-invest;Finish|');
     type(container, 'storylineId', 'edited-arc');
     type(container, 'storylineTitle', 'Edited Arc');
+    type(container, 'resources', 'coins,reputation,hull');
     type(container, 'column:trigger', 'Event');
     type(container, 'column:cost', '3');
     type(container, 'column:coinDelta', '-25');

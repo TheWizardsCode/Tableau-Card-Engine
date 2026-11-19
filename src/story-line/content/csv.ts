@@ -24,6 +24,7 @@
  */
 
 import { parseStorylineOptionsEncoding } from '../compile';
+import { parseResourceKeys } from '../resources';
 import type { StorylineOption } from '../types';
 import {
   baseIdOf,
@@ -180,8 +181,9 @@ export function findMissingColumns(
  * reads as absent — `null` for optional identifiers, `''` for text.
  *
  * Only the generic story-line fields (`id`, `name`, `effect`, `options`, the
- * storyline metadata) are projected; every other column, including any
- * game-specific or not-yet-migrated column, lands in {@link ContentCard.fields}.
+ * storyline metadata and the declared `resources` keys) are projected; every
+ * other column, including any game-specific or not-yet-migrated column, lands
+ * in {@link ContentCard.fields}.
  *
  * @param parsed  Parsed CSV.
  * @param adapter The game content adapter.
@@ -225,6 +227,7 @@ export function cardsFromCsv(
       storylineId: optional(cell(row, adapter.fields.storylineId)),
       storylineTitle: optional(cell(row, adapter.fields.storylineTitle)),
       fields,
+      resourceKeys: parseResourceKeys(cell(row, adapter.fields.resources)),
     };
   });
 }

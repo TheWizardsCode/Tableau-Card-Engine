@@ -91,6 +91,22 @@ function normaliseKeys(
 }
 
 /**
+ * Parses a comma-separated resource-key declaration (`"coins, hull, morale"`).
+ *
+ * Used for the story-line content model's declared-resource column: keys are
+ * trimmed, blank entries dropped and duplicates collapsed, preserving
+ * declaration order. An empty / blank text declares no keys (`[]`).
+ *
+ * @param text Raw comma-separated resource-key text.
+ * @returns The declared keys, in declaration order.
+ */
+export function parseResourceKeys(
+  text: string,
+): readonly StorylineResourceKey[] {
+  return normaliseKeys(text.split(','));
+}
+
+/**
  * Normalises a game's resource declaration.
  *
  * A missing (or blank/empty) declaration means "no declaration": the engine

@@ -89,6 +89,7 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
       'options',
       'storylineId',
       'storylineTitle',
+      'resources',
       'column:trigger',
       'column:cost',
       'column:coinDelta',
@@ -104,16 +105,23 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     expect(fields.get('name')?.value).toBe('Town Meeting');
     expect(fields.get('effect')?.value).toBe('Lose 50 coins');
     expect(fields.get('options')?.value).toBe(
-      'Invest|gym-story-invest;Ignore|gym-story-ignore',
+      'Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end;Ignore|gym-story-ignore',
     );
+    // The extended grammar is discoverable from the field hint itself.
+    expect(fields.get('options')?.hint).toContain('#cost=coins:5');
+    expect(fields.get('options')?.hint).toContain('#extra=reputation:+2');
+    expect(fields.get('options')?.hint).toContain('#when=coins>=3>cardX');
     expect(fields.get('storylineId')?.value).toBe('gym-story');
     expect(fields.get('storylineTitle')?.value).toBe('Gym Storyline');
+    // The declared-resource column is a first-class descriptor with its own hint.
+    expect(fields.get('resources')?.value).toBe('coins,reputation');
+    expect(fields.get('resources')?.hint).toContain('resource keys');
     // Adapter columns are plain text fields, carrying their raw values.
     expect(fields.get('column:coinDelta')?.group).toBe('adapter');
     expect(fields.get('column:coinDelta')?.value).toBe('-50');
     // The exact descriptor key list above is the contract: `options` is the
     // only choice control, and no extra choices-related keys exist.
-    expect(fields.size).toBe(10);
+    expect(fields.size).toBe(11);
     // The options field offers the known card ids as suggestions.
     expect(fields.get('options')?.suggestions).toEqual([
       'gym-story-start',
@@ -179,9 +187,11 @@ describe('edit round-trip — every core-generic and adapter field', () => {
     const edits: Record<string, string> = {
       name: 'The Endgame',
       effect: 'Everything changes.',
-      options: 'Reinvest|gym-story-invest;Finish|',
+      options:
+        'Reinvest|gym-story-invest#cost=coins:2#extra=reputation:+1#when=coins>=50>gym-story-end;Finish|',
       storylineId: 'edited-arc',
       storylineTitle: 'Edited Arc',
+      resources: 'coins,reputation,hull',
       'column:trigger': 'Event',
       'column:cost': '3',
       'column:coinDelta': '-25',
@@ -219,6 +229,7 @@ describe('edit round-trip — every core-generic and adapter field', () => {
         'options',
         'storylineId',
         'storylineTitle',
+        'resources',
         'trigger',
         'cost',
         'coinDelta',
@@ -243,9 +254,12 @@ describe('edit round-trip — every core-generic and adapter field', () => {
     const written = card(GYM_CONTENT_ADAPTER, readFileSync(fixture.csvPath, 'utf-8'), 'gym-story-end');
     expect(written.name).toBe('The Endgame');
     expect(written.effect).toBe('Everything changes.');
-    expect(written.options).toBe('Reinvest|gym-story-invest;Finish|');
+    expect(written.options).toBe(
+      'Reinvest|gym-story-invest#cost=coins:2#extra=reputation:+1#when=coins>=50>gym-story-end;Finish|',
+    );
     expect(written.storylineId).toBe('edited-arc');
     expect(written.storylineTitle).toBe('Edited Arc');
+    expect(written.resourceKeys).toEqual(['coins', 'reputation', 'hull']);
     expect(written.fields.trigger).toBe('Event');
     expect(written.fields.cost).toBe('3');
     expect(written.fields.coinDelta).toBe('-25');

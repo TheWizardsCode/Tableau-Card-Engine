@@ -60,6 +60,7 @@ function card(overrides: Partial<ContentCard> = {}): ContentCard {
     storylineId: null,
     storylineTitle: null,
     fields: {},
+    resourceKeys: [],
     ...overrides,
   };
 }
@@ -200,9 +201,12 @@ describe('cardsFromCsv', () => {
     const start = cards[0];
     expect(start.name).toBe('Town Meeting');
     expect(start.effect).toBe('Lose 50 coins');
-    expect(start.options).toBe('Invest|gym-story-invest;Ignore|gym-story-ignore');
+    expect(start.options).toBe(
+      'Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end;Ignore|gym-story-ignore',
+    );
     expect(start.storylineId).toBe('gym-story');
     expect(start.storylineTitle).toBe('Gym Storyline');
+    expect(start.resourceKeys).toEqual(['coins', 'reputation']);
     expect(start.fields).toMatchObject({
       trigger: 'Incident',
       cost: '0',

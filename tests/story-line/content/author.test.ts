@@ -22,7 +22,10 @@ import {
   updateContentCard,
 } from '../../../src/story-line/content/author';
 import { validateContentCsv } from '../../../src/story-line/content/validate';
-import { contentCardHasChoice } from '../../../src/story-line/content/csv';
+import {
+  compileContentOptions,
+  contentCardHasChoice,
+} from '../../../src/story-line/content/csv';
 import { runStorylineAuthorCli } from '../../../scripts/storyline-author';
 import { TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
 import {
@@ -341,6 +344,37 @@ describe('storyline-author CLI', () => {
     );
     expect(updated.code).toBe(0);
     expect(readText(contentPath)).toContain('A New Beginning');
+  });
+
+  it('authors declared resources and extended option attributes from the CLI', () => {
+    const { code } = captureOutput(() =>
+      runStorylineAuthorCli([
+        'update-card',
+        '--csv',
+        contentPath,
+        '--id',
+        'gym-story-invest',
+        '--resources',
+        'coins,reputation,hull',
+        '--options',
+        'Celebrate|gym-story-end#cost=coins:2#extra=reputation:+1#when=hull>=1>gym-story-end;Double down|',
+      ]),
+    );
+    expect(code).toBe(0);
+
+    const card = readContentCards(readText(contentPath), GYM_CONTENT_ADAPTER).find(
+      (candidate) => candidate.id === 'gym-story-invest',
+    );
+    expect(card?.resourceKeys).toEqual(['coins', 'reputation', 'hull']);
+    expect(compileContentOptions(card!)[0]).toMatchObject({
+      label: 'Celebrate',
+      successorIds: ['gym-story-end'],
+      cost: { coins: 2 },
+      extraEffect: { reputation: 1 },
+      conditionalSuccessors: [
+        { when: { field: 'hull', op: '>=', value: 1 }, successorId: 'gym-story-end' },
+      ],
+    });
   });
 
   it('prints the candidate and writes nothing on --dry-run', () => {

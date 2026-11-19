@@ -61,6 +61,8 @@ export interface AddContentCardSpec {
   readonly storylineId?: string | null;
   /** Story-line title. */
   readonly storylineTitle?: string | null;
+  /** Declared resource keys for this card's option attributes. */
+  readonly resources?: string | null;
   /** Game-specific column values, keyed by CSV column name. */
   readonly fields?: Readonly<Record<string, string>>;
 }
@@ -83,6 +85,8 @@ export interface UpdateContentCardSpec {
   readonly storylineId?: string | null;
   /** New story-line title (`null` clears). */
   readonly storylineTitle?: string | null;
+  /** New declared resource keys (`null` or `''` clears). */
+  readonly resources?: string | null;
   /** Game-specific column values, keyed by CSV column name. */
   readonly fields?: Readonly<Record<string, string>>;
 }
@@ -250,6 +254,9 @@ export function applyAddContentCardSpec(
   if (fields.storylineTitle !== undefined && spec.storylineTitle) {
     setColumn(header, rows, row, fields.storylineTitle, spec.storylineTitle);
   }
+  if (fields.resources !== undefined && spec.resources !== undefined) {
+    setColumn(header, rows, row, fields.resources, spec.resources ?? '');
+  }
   for (const [column, value] of Object.entries(spec.fields ?? {})) {
     setColumn(header, rows, row, column, value);
   }
@@ -308,6 +315,7 @@ function applyUpdateFields(
   if (spec.storylineTitle !== undefined) {
     setNullable(fields.storylineTitle, spec.storylineTitle);
   }
+  if (spec.resources !== undefined) setNullable(fields.resources, spec.resources);
   for (const [column, value] of Object.entries(spec.fields ?? {})) {
     setColumn(header, rows, row, column, value);
   }
