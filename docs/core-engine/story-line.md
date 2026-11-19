@@ -3,7 +3,9 @@
 A game-agnostic branching narrative engine for tableau card games. A drawn
 card presents an ordered set of options; the player's choice selects the next
 card until the chain ends. The mechanic is used by Main Street and demonstrated
-by the Gym `GymStorylineScene`.
+by the Gym `GymStorylineScene` (the base experience) and the Gym *Long Erasure*
+spike scene (a three-act authored narrative with costed, effect-bearing and
+state-gated branches).
 
 Module root: [`src/story-line/`](../../src/story-line/) — import via the
 `@story-line` alias. The module has **no game imports and no Phaser
@@ -37,22 +39,45 @@ and returns a {@link StorylineSystem} with:
 
 ### Story-line options
 
-A `StorylineOption` is the unit a player chooses from. Core describes options
-**programmatically** via `registerStorylineOptions` — the CSV `options` column
-is a *label/outcome* shorthand and cannot author the extended fields below
-(producer decision: programmatic only).
+A `StorylineOption` is the unit a player chooses from. Options come from one of
+two sources, and both produce the same model:
 
-| Field | Type | When it applies |
-|---|---|---|
-| `label` | `string` | always |
-| `effectPolicy` | `'apply' \| 'skip'` | always — controls the card's intrinsic effect |
-| `condition?` | `(state) => boolean` | draw time — omit the option when `false` |
-| `successorId?` | `string \| null` | resolution — the lowest-precedence single successor |
-| `successorIds?` | `string[]` | resolution — one seeded random draw picks a candidate |
-| `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence |
-| `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins |
-| `cost?` | `Record<resourceKey, number>` | draw time **and** resolution — affordability gate + real payment |
-| `extraEffect?` | `Record<resourceKey, number>` | resolution — additional resource gain |
+- **Content** — a card's CSV `options` cell authors the label/outcome shorthand
+  *and* the extended declarative fields through `#`-prefixed attributes
+  (`#cost`, `#extra`, `#when`). See
+  [Authoring options in CSV](#authoring-options-in-csv).
+- **Programmatically** — `registerStorylineOptions` supplies the whole model,
+  including the two callbacks (`condition`, `successorResolver`) that content
+  cannot express. Registered options take precedence over the CSV cell.
+
+> **Decision reversal — 2026-11-19.** An earlier revision of this document
+> recorded **"producer decision: programmatic only"** for `cost`,
+> `extraEffect` and `conditionalSuccessors`, i.e. *every costed or state-gated
+> branch required an engineering ticket*. That decision is **reversed**, and
+> this paragraph replaces it rather than sitting beside it: writers author
+> costed, effect-bearing and state-gated branches entirely in content, with no
+> TypeScript registration (CG-0MWNHZCWJ002XUQI, for the spike
+> CG-0MWNFV6VU003O3PC).
+>
+> **Rationale.** The three fields are plain declarative data — a number map or
+> an ordered condition list — so they serialise without loss; the guard rails
+> that were missing now exist (byte-stable round-trip, row + column + reason
+> diagnostics, an ordered repeatable `#when` rule list); and a ticket per
+> branch was the main obstacle to iterating on a story. The two callbacks
+> (`condition`, `successorResolver`) stay programmatic because a function is
+> not serialisable.
+
+| Field | Type | When it applies | Authored from CSV as |
+|---|---|---|---|
+| `label` | `string` | always | the `label` head of `label\|successors` |
+| `effectPolicy` | `'apply' \| 'skip'` | always — controls the card's intrinsic effect | always `'apply'` for CSV options |
+| `condition?` | `(state) => boolean` | draw time — omit the option when `false` | — (callback; programmatic) |
+| `successorId?` | `string \| null` | resolution — the lowest-precedence single successor | — (registry seam) |
+| `successorIds?` | `string[]` | resolution — one seeded random draw picks a candidate | the `cardA,cardB` candidate list |
+| `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence | — (callback; programmatic) |
+| `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins | `#when=field<op>number>successor` (repeatable) |
+| `cost?` | `Record<resourceKey, number>` | affordability gate + real payment at resolution | `#cost=key:number,…` |
+| `extraEffect?` | `Record<resourceKey, number>` | resolution — additional resource gain | `#extra=key:number,…` |
 
 ```ts
 import { createStorylineSystem, validateStorylineOptions } from '@story-line';
@@ -139,6 +164,9 @@ The declared set is threaded through the whole lifecycle:
 - `StorylineSystem.resources` reports the keys in force (the adapter's
   declaration, else `DEFAULT_RESOURCE_KEYS` — `['coins', 'reputation']`).
 - **Draw-time affordability** gates option-by-option over the declared keys.
+  `compileStorylineFromEvent` applies it to registered options; a presenting
+  layer applies it to content-authored options (see
+  [Authoring options in CSV](#authoring-options-in-csv)).
 - **Cost payment** and **extra effects** are applied per declared key, and
   each activity-log line names the key (`Cost paid: -4 stores.`,
   `Extra effect: +1 morale, +2 goodwill.`).
@@ -164,6 +192,120 @@ non-monetary vocabulary can override the default UI adapter's
 `storyUpdateLine` to describe its own currencies — the resolution result
 reports the `coins` / `reputation` projections only.
 
+### Authoring options in CSV
+
+A writer authors the whole option model in the `options` cell. Each option is a
+`label|successors` head followed by zero or more `#name=value` attributes:
+
+```text
+encoding   := option (";" option)*
+option     := label "|" candidates attribute*
+attribute  := "#" ("cost" | "extra" | "when") "=" value
+candidates := candidate ("," candidate)*        // empty = terminal option
+cost       := key ":" number ("," key ":" number)*
+extra      := key ":" number ("," key ":" number)*
+when       := field op number ">" successor     // empty successor = chain end
+op         := ">=" | "<=" | "==" | ">" | "<"
+```
+
+| Attribute | Authored example | Compiles to |
+|---|---|---|
+| head label | `Log the erasure\|le-i-log` | `label` |
+| head candidates | `Transmit\|le-i-transmit,le-i-silent` | `successorIds` — one seeded draw picks a candidate |
+| `#cost` | `#cost=stores:1,goodwill:1` | `cost` — a real payment at resolution |
+| `#extra` | `#extra=morale:+2` | `extraEffect` — a resolution gain |
+| `#when` | `#when=charge>=2>le-iii-ahead` | one `conditionalSuccessors` rule (repeat for an ordered list) |
+
+Rules the parser and validator enforce:
+
+- **The shorthand stays valid.** `label|cardA,cardB;label2|cardC` compiles to
+  exactly the options it always did; attributes are additive and may appear in
+  the same cell.
+- **Reserved delimiters.** `;` separates options, `|` separates the label from
+  its candidates, `,` separates candidates and `cost`/`extra` pairs, and `#`
+  starts an attribute — none may appear inside a label or a candidate card id.
+- **`#cost` / `#extra` pairs are `key:number`.** Each key is checked against the
+  card's declared resources (the `resources` column, below); an undeclared key
+  is an authoring error, never a silently invented resource.
+- **`#cost` is a resolution payment, gated by the presenter.**
+  `compileStorylineFromEvent` applies the draw-time affordability filter to
+  *registered* options only, so a content-compiled list is returned as
+  authored. A scene that presents CSV-authored options filters with
+  `isOptionAffordable(option, resources, declared)` before offering them — the
+  Long Erasure run's `availableOptions` is the reference implementation, so an
+  unaffordable branch is never shown.
+- **`#when` rules keep authored order, first match wins,** and an empty
+  successor ends the chain (`#when=morale<1>`). A matching rule consumes no RNG
+  draw.
+- **Trimming and round-trip.** Whitespace around every component is trimmed and
+  the cell round-trips byte-identically through `parseCsv` → `serialiseCsv`,
+  including quoted and empty values.
+- **Callbacks are not authorable.** `condition` and `successorResolver` are
+  functions; use `registerStorylineOptions` for those (registered options also
+  win over the cell).
+
+**Declaring the resource keys.** The adapter's `resources` mapping
+(`fields.resources`) points at a column carrying the card's declared keys —
+`"hull,morale,stores,goodwill,charge"` in the Long Erasure content. That set is
+the vocabulary for the card's `#cost` / `#extra` / `#when` keys and the set the
+validator checks; a blank cell (or an adapter without the mapping) falls back
+to the default `coins` / `reputation` projection.
+
+**Worked example.** One row from
+[`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv):
+
+```csv
+le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,Log the erasure|le-i-log#cost=stores:1;Rally the survey crew|le-i-rally#extra=morale:1,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1
+```
+
+Its `options` cell compiles to:
+
+```json
+[
+  {
+    "label": "Log the erasure",
+    "successorIds": ["le-i-log"],
+    "effectPolicy": "apply",
+    "cost": { "stores": 1 }
+  },
+  {
+    "label": "Rally the survey crew",
+    "successorIds": ["le-i-rally"],
+    "effectPolicy": "apply",
+    "extraEffect": { "morale": 1 }
+  }
+]
+```
+
+A state-gated branch from the same file, where a random candidate list and a
+conditional gate share one option:
+
+```csv
+le-ii-sabotage,...,"Break for the core|le-iii-approach,le-iii-ahead#when=charge>=2>le-iii-ahead;Follow the unravelling|le-iii-approach#extra=charge:1",...
+```
+
+`Break for the core` resolves to `le-iii-ahead` only while `charge >= 2`;
+otherwise its candidate draw picks between `le-iii-approach` and
+`le-iii-ahead` as usual.
+
+**Diagnostics.** `npm run storylines:validate` names the record, the column and
+a stable reason, so a writer fixes content without reading engine code:
+
+```text
+✗ [invalid-option] row 2, column "options" (unknown-attribute): Choice card "bad-a" has a malformed options column: Invalid storyline options encoding "Go|bad-b#bogus=1": unknown option attribute "bogus" (expected cost, extra or when).
+✗ [unknown-resource-key] row 2, column "options" (unknown-resource-key): cost.gold is not a declared resource (declared: coins, hull).
+```
+
+Cell-level reason codes are `missing-separator`, `empty-label`,
+`malformed-attribute`, `unknown-attribute`, `malformed-cost-pair`,
+`malformed-extra-pair`, `unparseable-condition` and `no-valid-option`; the
+semantic codes (`unknown-resource-key`, `non-positive-cost`,
+`negative-extra-effect`, `unknown-condition-op`, `non-numeric-value`,
+`dangling-conditional-successor`) come from
+[`validateStorylineOptions`](#validation) and are reported on the same row and
+column. The fixture tests live in
+[`tests/story-line/content/extended-options.test.ts`](../../tests/story-line/content/extended-options.test.ts).
+
 ### Compilation
 
 There is exactly **one** choice model: a card is a choice when it supplies
@@ -177,8 +319,10 @@ Precedence: **registered options > CSV `options` encoding**.
   metadata only — it never makes a card a choice.
 - CSV `options` encoding: `label|cardA,cardB;label2|cardC` (`;` separates
   options, `|` separates the label from candidate ids, `,` separates
-  candidates). An empty candidate list is a **terminal** option. Every
-  CSV-authored option carries `effectPolicy: 'apply'`.
+  candidates), optionally followed by `#cost` / `#extra` / `#when` attributes
+  ([grammar](#authoring-options-in-csv)). An empty candidate list is a
+  **terminal** option. Every CSV-authored option carries `effectPolicy:
+  'apply'`.
 - Draw-time filtering is **combined**: a registered option is omitted when its
   `condition(state)` callback returns `false` **or** its declarative `cost`
   exceeds the player's current value of a declared resource. Options without a
@@ -186,6 +330,10 @@ Precedence: **registered options > CSV `options` encoding**.
   Filtering happens once, when the option list is compiled at draw time, and
   the result is frozen into `PendingStorylineChoice.options`, where consumers
   (including AI scoring) read the stable presented list.
+- Cost filtering applies to **registered** options; a content-compiled list is
+  returned as authored, and the presenting layer gates it with
+  `isOptionAffordable` over the declared keys (see
+  [Authoring options in CSV](#authoring-options-in-csv)).
 
 ### Resolution
 
@@ -273,9 +421,15 @@ const { valid, issues } = validateStorylineOptions(options, {
 
 Validation is authoring-time only: runtime resolution remains permissive, so a
 list that fails validation still resolves exactly as declared (an undeclared
-key is not applied and is reported in the activity log). No shipped CSV
-content uses `cost`, `extraEffect` or `conditionalSuccessors`, so all shipped
-content validates cleanly against the default projection.
+key is not applied and is reported in the activity log).
+
+Both shipped Gym content files author these fields from CSV:
+[`storylines.csv`](../../example-games/gym/content/storylines.csv) (default
+`coins` / `reputation` projection) and
+[`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv) (the
+five-key declared set), and both validate cleanly. `storylines:validate`
+passes each card's own declared resource keys to this helper, so the vocabulary
+the runtime uses is the one the author is checked against.
 
 ## Authoring seams (content, manifest, validator, author)
 
@@ -310,7 +464,7 @@ import type { ContentAdapter } from '@story-line/content';
 
 export const TAVERN_ADAPTER: ContentAdapter = {
   gameId: 'tavern',
-  columns: ['card_key', 'card_name', 'flavour', 'arc', 'arc_name', 'choices', 'payoff'],
+  columns: ['card_key', 'card_name', 'flavour', 'arc', 'arc_name', 'choices', 'resource_keys', 'payoff'],
   fields: {
     id: 'card_key',
     name: 'card_name',
@@ -318,6 +472,7 @@ export const TAVERN_ADAPTER: ContentAdapter = {
     options: 'choices',
     storylineId: 'arc',
     storylineTitle: 'arc_name',
+    resources: 'resource_keys',
   },
   editableColumns: ['payoff'],
   newCardDefaults: { flavour: '', choices: '', payoff: '0' },
@@ -326,16 +481,25 @@ export const TAVERN_ADAPTER: ContentAdapter = {
 };
 ```
 
+An adapter may also map `resources` — the column declaring the card's resource
+keys, which is the vocabulary its `#cost` / `#extra` / `#when` attributes are
+validated against (blank or unmapped falls back to the default projection).
+
 Every column **not** in `fields` lands in `ContentCard.fields`, keyed by column
 name, so game columns (coin/reputation deltas, renown, payoff, …) are editable
 and inspectable without core knowing what they mean. Two optional hooks keep
 game semantics out of core: `baseId` (chain-serial stripping; identity by
 default) and `describeImpact` (manifest impact text).
 
-Core ships `GYM_CONTENT_ADAPTER` as the default, backed by the committed
-[`example-games/gym/content/storylines.csv`](../../example-games/gym/content/storylines.csv)
-of the Gym demo content. Tests additionally exercise a differently shaped
-fixture adapter, proving the seam is not shaped around one game.
+Core ships two adapters: `GYM_CONTENT_ADAPTER` (the default, backed by the
+committed
+[`storylines.csv`](../../example-games/gym/content/storylines.csv)) and
+`LONG_ERASURE_CONTENT_ADAPTER` (backed by
+[`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv), whose
+`act` / `clockCost` columns drive the spike scene). `DEFAULT_CONTENT_FILES`
+registers both, so the CLIs validate and drift-check every shipped content
+file, not only the default one. Tests additionally exercise a differently
+shaped fixture adapter, proving the seam is not shaped around one game.
 
 ### CSV and change detection
 
@@ -660,9 +824,11 @@ const ui = {
 ```
 
 The Gym demo uses the default adapter, demonstrating that no game code is
-required to present the mechanic. The demo's fixtures are unchanged by the
-cost/extra-effect/conditional-successor extension: it exercises the base
-experience, and no Gym fixture uses the new fields.
+required to present the mechanic. Its in-code fixture (`DEMO_CARDS`)
+exercises the base experience and uses none of the new option fields; the
+shipped Gym content CSV does use them (a `#cost`, a `#extra` and a `#when` in
+one cell), so the authoring path is covered by real content as well as by the
+fixture tests.
 
 ## Gym demo
 
@@ -673,6 +839,27 @@ compiled options with the default UI adapter, resolves the choice, and deals
 the successor until the chain ends. It is covered by the Gym individual-scene
 smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 [Gym index](../gym/GYM_INDEX.md).
+
+### Long Erasure (the authored-narrative spike)
+
+[`GymLongErasureScene`](../../example-games/gym/scenes/GymLongErasureScene.ts)
+plays *The Long Erasure*: an original-setting, IP-safe three-act story-line
+built entirely from the content path above. Its rules — act gating, the
+pressure clock, availability filtering, branch resolution and the
+journal-derived epilogue score — live in the Phaser-free
+[`GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts)
+(unit-tested by `tests/gym/GymLongErasureGame.test.ts`), so the narrative is
+verified headlessly and the scene only renders state and forwards the choice.
+
+Its content is
+[`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)
+with the `long-erasure` adapter: a five-key declared set
+(`hull,morale,stores,goodwill,charge`) plus `act` / `clockCost` game columns.
+Every cost, extra effect and conditional successor in that file is authored in
+CSV with no TypeScript registration — the worked example above is a row from
+it. The run ends with a timeline reset and a scored epilogue, which is the
+manifest `cycles` shape used as designed rather than a loop the runtime
+follows.
 
 ## Testing
 
@@ -685,6 +872,10 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 - `tests/story-line/validate.test.ts` — declarative metadata validation
   (costs, extra effects, conditions, dangling successors, declared-resource
   vocabulary and the `cardId` / `resource` issue fields).
+- `tests/story-line/content/extended-options.test.ts` — the CSV attribute
+  grammar (`#cost` / `#extra` / `#when`), shorthand compatibility, the
+  malformed-cell fixtures (row/column/reason diagnostics) and conditional
+  successor resolution.
 - `tests/story-line/resource-declaration.test.ts` — the declared-resource
   contract: a five-resource fixture game authoring conditions, costs and extra
   effects on any key, draw-time affordability over declared keys, the
@@ -730,6 +921,10 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 - `tests/story-line/editor/build-exclusion.test.ts` / `vite-editor-config.test.ts`
   — the editor entry is not referenced from the game/Electron build, and its
   config is distinct from the game config.
+- `tests/gym/LongErasureContent.test.ts` / `LongErasureEpilogue.test.ts` — the
+  authored content's structure (acts, branch points, the state gate, the
+  terminal option), the prohibited-IP-term scan over content and artefacts,
+  and the epilogue scoring.
 
 Run the unit project with `npx vitest run --project unit` (or
 `/skill:test --type unit`). The Gym scene runs in the `smoke` project.

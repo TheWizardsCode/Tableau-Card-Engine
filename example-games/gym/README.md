@@ -38,6 +38,8 @@ Open `http://localhost:3000` and select **Gym** from the game selector. From the
 | Rule Engine: LegalityResult + EconomyLedger | `GymRuleEngineScene` | Interactively explore the LegalityResult discriminated union pattern (legal/illegal actions with multiple reason types) and EconomyLedger resource tracking (coins, reputation, score) with constraint enforcement. |
 | Card Type Index & Synergy Groups | `GymCardIndexScene` | Browse the full Main Street card pool grouped by type (family) or by synergy (multi-synergy cards listed in every matching group). Filter by name/id, hover for player-facing tooltips, click for a raw-data detail dialog. |
 | In-game DLC Gate | `GymDlcUnlockScene` | Gate a DLC content item on the unified action-reward unlock state with the pure `DlcGate` helper (`createDlcGate`). The content stays locked until the action is verified, then becomes reachable (locked → verified → reachable), with a documented locked-state presentation. |
+| Storyline | `GymStorylineScene` | Draw a branching story-line card, choose among its options and follow the chain to its end, using the generic `@story-line` system with the default UI adapter. |
+| The Long Erasure | `GymLongErasureScene` | Play a complete three-act authored story-line: a pressure clock, costed and state-gated branches (authored in `content/long-erasure.csv` with `#cost` / `#extra` / `#when` option attributes), and a journal-derived journey score on the reset epilogue. Rules live in the Phaser-free `GymLongErasureGame.ts`. |
 
 ## SLL Demo
 

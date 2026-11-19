@@ -54,7 +54,12 @@ epilogue. Its content lives in
 its rules in the Phaser-free
 [`example-games/gym/GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts)
 (unit-tested by `tests/gym/GymLongErasureGame.test.ts`), and the scene only
-renders that state and forwards the player's choice. The setting is original
+renders that state and forwards the player's choice. Every cost, extra effect
+and conditional successor in that file is authored in the CSV itself
+(`#cost` / `#extra` / `#when` option attributes) with no TypeScript
+registration — the authoring workflow is documented in
+[Authoring options in CSV](../core-engine/story-line.md#authoring-options-in-csv).
+The setting is original
 and carries no third-party IP; the prohibited-term constraint is checked
 mechanically by `tests/gym/LongErasureContent.test.ts`.
 

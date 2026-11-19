@@ -1582,6 +1582,44 @@ three-act story-line spike, with `act` / `clockCost` game columns and the
 independent: `long-erasure.csv` uses its own storyline id, so the shipped demo
 rows and their committed options-parity goldens are untouched.
 
+### Authoring branches, costs and gates in CSV
+
+Writers author the whole option model in the `options` cell — no TypeScript
+registration per branch. Each option is `label|successors` followed by optional
+`#name=value` attributes; `#cost` / `#extra` / `#when` may all appear in the same
+cell, and `#when` repeats for an ordered rule list:
+
+| Attribute | Authored example | Meaning |
+|---|---|---|
+| `#cost` | `#cost=stores:1,goodwill:1` | Affordability gate + real payment at resolution (the presenting layer filters with `isOptionAffordable`; the Long Erasure run does). |
+| `#extra` | `#extra=morale:+2` | Resource gain applied on resolution. |
+| `#when` | `#when=charge>=2>le-iii-ahead` | Ordered conditional successor rule (first match wins; empty successor ends the chain). |
+
+A real row from `long-erasure.csv`:
+
+```csv
+le-i-open,The First Unwriting,A volume of space stops having happened...,Log the erasure|le-i-log#cost=stores:1;Rally the survey crew|le-i-rally#extra=morale:1,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1
+```
+
+The `resources` column declares the keys a card's attributes may name
+(`"hull,morale,stores,goodwill,charge"`); a blank cell falls back to the
+default `coins` / `reputation` projection. `npm run storylines:validate`
+reports a malformed cell or an undeclared key against its **row, column and a
+stable reason** (e.g. `unknown-attribute`, `malformed-cost-pair`,
+`unparseable-condition`, `unknown-resource-key`), so a writer iterates without
+reading engine code. The author CLI accepts the same field
+(`storylines:author -- add-card … --resources "coins,hull"`), and the editor's
+`Options` / `Declared resources` fields carry the syntax in their hints.
+
+All of it is documented in
+[Core: Generic Story-Line System → Authoring options in CSV](core-engine/story-line.md#authoring-options-in-csv)
+(grammar, worked example, diagnostics).
+
+The Gym *Long Erasure* spike is the end-to-end reference: its content is
+authored entirely this way, and its Phaser-free rules module
+(`example-games/gym/GymLongErasureGame.ts`) is what presents and resolves the
+options.
+
 See [Core: Generic Story-Line System](core-engine/story-line.md#authoring-seams-content-manifest-validator-author)
 for the adapter contract, validator codes, manifest shape and API examples.
 
@@ -2055,12 +2093,19 @@ The generic branching story-line system (`@story-line`) is documented in
 [`docs/core-engine/story-line.md`](core-engine/story-line.md).
 
 **Authoring seam.** The extended option model — declarative `cost`,
-`extraEffect` and `conditionalSuccessors` — is **programmatic** only: register
-it with `registerStorylineOptions(eventId, options)` and validate the list with
-`validateStorylineOptions(...)`. The CSV `options` column
-(`label|cardA,cardB;label2|cardC`) stays a label/outcome shorthand and cannot
-author the extended fields, so existing CSV content is unaffected. The engine
-adapter's optional `applyResourceDelta(state, delta)` method is the seam core
+`extraEffect` and `conditionalSuccessors` — is authored **in content**: the CSV
+`options` cell carries `#cost=key:number`, `#extra=key:number` and
+`#when=field<op>number>successor` attributes alongside the
+`label|cardA,cardB` shorthand (grammar, worked example and diagnostics:
+[Authoring options in CSV](core-engine/story-line.md#authoring-options-in-csv)).
+`registerStorylineOptions(eventId, options)` remains the seam for what content
+cannot express — the `condition` and `successorResolver` callbacks — and a
+registered list takes precedence over the cell. **Decision reversal
+(2026-11-19):** this replaces the earlier producer decision that the extended
+fields be programmatic only. The shorthand stays valid, so existing CSV content
+is unaffected and the extended attributes are additive; validate either source
+with `validateStorylineOptions(...)`. The engine adapter's optional
+`applyResourceDelta(state, delta)` method is the seam core
 uses to deduct costs and apply extra effects; an adapter that omits it keeps
 compiling and running unchanged (core warns in the activity log instead of
 mutating resources). Resources are **game-declared** — declare the keys on the

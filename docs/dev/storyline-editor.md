@@ -131,9 +131,12 @@ Notes on the contract (`ContentAdapter` in
 
 - **Required:** `gameId`, `columns` (the CSV's columns in file order) and the
   `fields` mapping with at least `id` and `name`.
-- **Optional mappings:** `effect`, `options`, `storylineId`, `storylineTitle`.
-  Omit a field mapping when the game has no such column — omitting means "no
-  such column", never an error.
+- **Optional mappings:** `effect`, `options`, `storylineId`, `storylineTitle`,
+  `resources`. Omit a field mapping when the game has no such column — omitting
+  means "no such column", never an error. The `resources` mapping declares the
+  card's resource keys; it is the vocabulary the editor validates an option's
+  `#cost` / `#extra` / `#when` attributes against (blank → the default
+  `coins` / `reputation` projection).
 - **The manifest's `isChoice` node flag is derived, not mapped.** It is `true`
   exactly when the card has at least one compiled option (`optionCount > 0`),
   so it can never disagree with the option list; no content column feeds it.
@@ -251,7 +254,12 @@ writing a file literally named `true`.
 1. **Select a card** in the graph, then open **Edit card** (or **Add card**).
    The form is built from the adapter's field descriptors: core fields first
    (id read-only when editing), then every adapter column.
-2. **Change fields.** The change is a *pending draft*; nothing is written.
+2. **Change fields.** The change is a *pending draft*; nothing is written. The
+   **Options** field authors the whole option model — `label|target;label2|target2`
+   plus `#cost=…`, `#extra=…` and `#when=…` attributes — and **Declared
+   resources** declares the keys those attributes may name (both carry the
+   syntax in their field hints). See
+   [Authoring options in CSV](../core-engine/story-line.md#authoring-options-in-csv).
 3. **Preview** — post the derived edit to the bridge; it applies the edit **in
    memory**, validates it and diffs the affected rows (column by column,
    before → after). The preview panel renders the diff **and** the validator's

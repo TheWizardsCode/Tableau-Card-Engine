@@ -49,7 +49,18 @@ export interface StorylineCard {
   readonly reputationDelta?: number;
   /**
    * Raw CSV options encoding for an arbitrary multi-outcome choice node.
-   * Format: `label|cardA,cardB;label2|cardC`.
+   *
+   * Format: `label|cardA,cardB;label2|cardC`, optionally followed by the
+   * extended declarative attributes `#cost=key:number,…`,
+   * `#extra=key:number,…` and `#when=field<op>number>successor` (repeat
+   * `#when` for an ordered rule list). The attributes are the content-side
+   * authoring path for {@link StorylineOption.cost},
+   * {@link StorylineOption.extraEffect} and
+   * {@link StorylineOption.conditionalSuccessors}; `cost` / `extra` keys must
+   * be declared by the game's resource set. Parsed by
+   * {@link parseStorylineOptionsEncoding}; the documented grammar, worked
+   * example and diagnostics are in `docs/core-engine/story-line.md`
+   * ("Authoring options in CSV").
    */
   readonly options?: string;
   /** Optional story-arc identifier; `null`/absent means "no storyline". */
@@ -242,9 +253,12 @@ export interface PendingStorylineChoice<
    * reads this frozen list (condition callbacks are never re-evaluated).
    *
    * The snapshot is **cost-filtered** as well: an option whose declarative
-   * `cost` exceeded the player's coins/reputation at draw time is absent from
-   * this list. Consumers (e.g. AI scoring) must read this snapshot — it is the
-   * presented list, computed once at draw time and stable thereafter.
+   * `cost` exceeded the player's resources for the declared keys at draw time
+   * is absent from this list (registered options are filtered by
+   * compilation; CSV-authored options are gated by the presenting layer with
+   * `isOptionAffordable`). Consumers (e.g. AI scoring) must read this snapshot
+   * — it is the presented list, computed once at draw time and stable
+   * thereafter.
    */
   options?: readonly StorylineOption<TState>[];
 }
