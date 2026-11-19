@@ -25,6 +25,8 @@ import {
   GYM_AI_STRATEGY_KEY,
   GYM_TOKEN_PILE_VIEW_KEY,
   GYM_RULE_ENGINE_KEY,
+  GYM_STORYLINE_KEY,
+  GYM_LONG_ERASURE_KEY,
   GYM_SCENE_CATALOGUE,
 } from '../../example-games/gym/GymRegistry';
 import type { GymSceneEntry } from '../../example-games/gym/GymRegistry';
@@ -45,6 +47,8 @@ describe('GymRegistry', () => {
     expect(GYM_SVG_HELPERS_KEY).toBe('GymSvgHelpersScene');
     expect(GYM_DPR_RESOLUTION_KEY).toBe('GymDprResolutionScene');
     expect(GYM_AI_STRATEGY_KEY).toBe('GymAiStrategyScene');
+    expect(GYM_STORYLINE_KEY).toBe('GymStorylineScene');
+    expect(GYM_LONG_ERASURE_KEY).toBe('GymLongErasureScene');
   });
 
   it('catalogue contains all demo scene entries', () => {
@@ -64,6 +68,17 @@ describe('GymRegistry', () => {
     expect(catalogueKeys).toContain(GYM_AI_STRATEGY_KEY);
     expect(catalogueKeys).toContain(GYM_TOKEN_PILE_VIEW_KEY);
     expect(catalogueKeys).toContain(GYM_RULE_ENGINE_KEY);
+    expect(catalogueKeys).toContain(GYM_STORYLINE_KEY);
+    expect(catalogueKeys).toContain(GYM_LONG_ERASURE_KEY);
+  });
+
+  it('catalogue entry for The Long Erasure describes the full story-line spike', () => {
+    const entry = GYM_SCENE_CATALOGUE.find(
+      (e: GymSceneEntry) => e.sceneKey === GYM_LONG_ERASURE_KEY,
+    );
+    expect(entry).toBeDefined();
+    expect(entry?.title).toBe('The Long Erasure');
+    expect(entry?.description.length).toBeGreaterThan(40);
   });
 
   it('every catalogue entry has a non-empty title and description', () => {

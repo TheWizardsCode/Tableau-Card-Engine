@@ -43,7 +43,20 @@ npx vitest run --project browser tests/gym/*.browser.test.ts
 | Card Type Index & Synergy Groups | `GymCardIndexScene` | Main Street template getters (`getBusinessTemplates`, `getCommunitySpaceTemplates`, `getEventTemplates`, `getUpgradeTemplates`, `getStaffCardTemplates`), `buildCardTooltipInfo`, `TooltipManager`, `createOverlayDialog`, SLL `anchorPoint` | [`scenes/GymCardIndexScene.ts`](../../example-games/gym/scenes/GymCardIndexScene.ts), [`GymCardIndex.ts`](../../example-games/gym/GymCardIndex.ts) | [`GymCardIndex.test.ts`](../../tests/gym/GymCardIndex.test.ts), [`GymCardIndexScene.browser.test.ts`](../../tests/gym/GymCardIndexScene.browser.test.ts), [`GymRegistry.test.ts`](../../tests/gym/GymRegistry.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 | In-game DLC Gate | `GymDlcUnlockScene` | `createDlcGate` (`DlcGate`, `DlcUnlockReader`), `contentUnlockClientFromWindow` (F5 total read client), SLL `anchorPoint` | [`scenes/GymDlcUnlockScene.ts`](../../example-games/gym/scenes/GymDlcUnlockScene.ts) | [`DlcGate.test.ts`](../../tests/core-engine/DlcGate.test.ts), [`GymDlcUnlock.browser.test.ts`](../../tests/gym/GymDlcUnlock.browser.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 | Storyline | `GymStorylineScene` | `createStorylineSystem`, `compileStorylineFromEvent`, `resolveStorylineOption`, `createPendingStorylineChoice`, `defaultStorylineUiAdapter`; demo fixture + transitions (`DEMO_CARDS`, `createDemoState`, `createDemoEngine`, `createDemoRuntime`, `startDemo`, `drawDemoCard`, `applyDemoChoice`) in [`GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts) | [`scenes/GymStorylineScene.ts`](../../example-games/gym/scenes/GymStorylineScene.ts), [`GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts) | [`GymStorylineDemo.test.ts`](../../tests/gym/GymStorylineDemo.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
+| The Long Erasure | `GymLongErasureScene` | Full story-line spike: `createLongErasureRun`, `availableOptions`, `chooseOption`, `advanceClock`, `isComplete`, `runJournal`, `scoreRun` / `buildEpilogue` (all in [`GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts)); SLL `anchorPoint` over [`gym-long-erasure.layout.json`](../../example-games/gym/layouts/gym-long-erasure.layout.json); `SoundManager` + `COMMON_SFX_KEYS`; `shakeIllegalMove` reason toast; `popTextOrIcon` score pop | [`scenes/GymLongErasureScene.ts`](../../example-games/gym/scenes/GymLongErasureScene.ts), [`GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts) | [`GymLongErasureGame.test.ts`](../../tests/gym/GymLongErasureGame.test.ts), [`GymLongErasureScene.browser.test.ts`](../../tests/gym/GymLongErasureScene.browser.test.ts), [`GymLongErasureLayout.test.ts`](../../tests/gym/GymLongErasureLayout.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 
+
+The Long Erasure is the full story-line spike: a three-act authored narrative
+with a pressure clock, resource-gated branches, a deliberate terminal
+"abandon the voyage" option and a journal-derived journey score on the reset
+epilogue. Its content lives in
+[`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv),
+its rules in the Phaser-free
+[`example-games/gym/GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts)
+(unit-tested by `tests/gym/GymLongErasureGame.test.ts`), and the scene only
+renders that state and forwards the player's choice. The setting is original
+and carries no third-party IP; the prohibited-term constraint is checked
+mechanically by `tests/gym/LongErasureContent.test.ts`.
 
 The Storyline demo's generic engine is documented in
 [`docs/core-engine/story-line.md`](../core-engine/story-line.md) (module API,

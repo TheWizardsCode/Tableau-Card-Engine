@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "id": "gym-long-erasure-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "statusBar",
+    "narrative",
+    "options",
+    "feedback",
+    "journal",
+    "controls"
+  ],
+  "zones": {
+    "statusBar": {
+      "rect": {
+        "x": 0.03,
+        "y": 0.13
+      },
+      "anchors": {
+        "act": { "x": 0.05, "y": 0.135 },
+        "clock": { "x": 0.36, "y": 0.135 },
+        "resources": { "x": 0.95, "y": 0.135 }
+      }
+    },
+    "narrative": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.25
+      },
+      "anchors": {
+        "beat": { "x": 0.5, "y": 0.2 },
+        "title": { "x": 0.5, "y": 0.25 },
+        "effect": { "x": 0.5, "y": 0.31 }
+      }
+    },
+    "options": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "anchors": {
+        "option1": { "x": 0.5, "y": 0.44 },
+        "option2": { "x": 0.5, "y": 0.49 },
+        "option3": { "x": 0.5, "y": 0.54 },
+        "option4": { "x": 0.5, "y": 0.59 }
+      }
+    },
+    "feedback": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.645
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.645 }
+      }
+    },
+    "journal": {
+      "rect": {
+        "x": 0.03,
+        "y": 0.7
+      },
+      "anchors": {
+        "heading": { "x": 0.05, "y": 0.7 },
+        "body": { "x": 0.05, "y": 0.72 }
+      }
+    },
+    "controls": {
+      "rect": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.94 }
+      }
+    }
+  }
+}

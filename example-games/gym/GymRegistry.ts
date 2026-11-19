@@ -94,6 +94,9 @@ export const GYM_DLC_UNLOCK_KEY = 'GymDlcUnlockScene';
 /** Generic story-line (branching narrative) demo scene key. */
 export const GYM_STORYLINE_KEY = 'GymStorylineScene';
 
+/** The Long Erasure (full story-line spike) scene key. */
+export const GYM_LONG_ERASURE_KEY = 'GymLongErasureScene';
+
 // ── Registry ──────────────────────────────────────────────
 
 /**
@@ -126,6 +129,12 @@ export const GYM_SCENE_CATALOGUE: GymSceneEntry[] = [
     title: 'Storyline',
     description:
       'Deal a branching narrative from the generic @story-line module: draw a card, pick an option, and watch the choice determine the next card until the chain ends.',
+  },
+  {
+    sceneKey: GYM_LONG_ERASURE_KEY,
+    title: 'The Long Erasure',
+    description:
+      'Play a complete three-act branching narrative with a pressure clock, a resource-gated branch, a terminal abandon option and a scored reset epilogue — the full story-line spike, rendered with SLL and wired to the shared SFX stack.',
   },
   {
     sceneKey: GYM_UNDO_REDO_KEY,
