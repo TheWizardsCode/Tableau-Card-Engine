@@ -89,6 +89,7 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
       'id',
       'name',
       'effect',
+      'context',
       'options',
       'storylineId',
       'storylineTitle',
@@ -107,8 +108,9 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     const fields = new Map(descriptors.map((descriptor) => [descriptor.key, descriptor]));
     expect(fields.get('name')?.value).toBe('Town Meeting');
     expect(fields.get('effect')?.value).toBe('Lose 50 coins');
+    expect(fields.get('context')?.value).toContain('The town meets in the hall above the market');
     expect(fields.get('options')?.value).toBe(
-      'Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end;Ignore|gym-story-ignore',
+      'Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.',
     );
     // The extended grammar is discoverable from the field hint itself.
     expect(fields.get('options')?.hint).toContain('#cost=coins:5');
@@ -124,7 +126,7 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     expect(fields.get('column:coinDelta')?.value).toBe('-50');
     // The exact descriptor key list above is the contract: `options` is the
     // only choice control, and no extra choices-related keys exist.
-    expect(fields.size).toBe(11);
+    expect(fields.size).toBe(12);
     // The options field offers the known card ids as suggestions.
     expect(fields.get('options')?.suggestions).toEqual([
       'gym-story-start',
@@ -663,11 +665,12 @@ describe('authored prose fields (context / epilogue)', () => {
     expect(descriptors.some((descriptor) => descriptor.key === 'column:context')).toBe(false);
     expect(descriptors.some((descriptor) => descriptor.key === 'column:epilogue')).toBe(false);
 
-    // The Gym adapter maps neither prose column, so neither control renders.
+    // The Gym adapter maps `context` (the demo authors it) but not `epilogue`,
+    // so only the context control renders on its new-card form.
     const gymKeys = buildNewCardFieldDescriptors(GYM_CONTENT_ADAPTER).map(
       (descriptor) => descriptor.key,
     );
-    expect(gymKeys).not.toContain('context');
+    expect(gymKeys).toContain('context');
     expect(gymKeys).not.toContain('epilogue');
   });
 

@@ -15,6 +15,7 @@
       "optionCount": 0,
       "options": [],
       "effect": "Gain 60 reputation",
+      "context": "The new road opens, and the town begins to feel less like a place the world forgot. Whatever comes next will come by this road.",
       "impact": "+60 reputation",
       "fields": {
         "trigger": "Incident",
@@ -45,6 +46,7 @@
         }
       ],
       "effect": "Lose 80 coins",
+      "context": "The roads are left to the weather, and the first complaints arrive with the first frost. The town begins to feel smaller than it did in spring.",
       "impact": "−80 coins",
       "fields": {
         "trigger": "Incident",
@@ -75,6 +77,7 @@
         }
       ],
       "effect": "Gain 120 coins",
+      "context": "The investment carries, and the road crews move out under a thin winter sun. For the first time in years, the town can see past its own gate.",
       "impact": "+120 coins",
       "fields": {
         "trigger": "Incident",
@@ -107,6 +110,7 @@
         }
       ],
       "effect": "Lose 50 coins",
+      "context": "The town meets in the hall above the market, with the road budget on the table and rain coming in off the hills. Everyone is waiting to see who will pay for the roads this year.",
       "impact": "−50 coins",
       "fields": {
         "trigger": "Incident",

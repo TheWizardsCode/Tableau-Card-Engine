@@ -570,10 +570,11 @@ describe('authored prose authoring', () => {
   });
 
   it('refuses prose on an adapter that maps no prose column', () => {
-    // Gym maps neither prose column, so an authored context has nowhere to go:
-    // the spec is accepted structurally but the column is never invented.
-    const result = addContentCard(readText(GYM_CONTENT_PATH), GYM_CONTENT_ADAPTER, {
-      id: 'gym-story-extra',
+    // The Tavern adapter maps neither prose column, so an authored context has
+    // nowhere to go: the spec is accepted structurally but the column is never
+    // invented.
+    const result = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-extra',
       name: 'An Extra Beat',
       context: 'Nowhere to put this.',
     });

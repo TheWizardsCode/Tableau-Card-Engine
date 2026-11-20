@@ -53,14 +53,31 @@ export const DEMO_START_CARD_ID = 'gym-story-start';
 export const DEMO_RNG_SEED = 0x5eed;
 
 /**
+ * A demo card template.
+ *
+ * `context` is the beat's authored situation paragraph, mirroring the CSV
+ * `context` column (`example-games/gym/content/storylines.csv`). It is
+ * optional, exactly like the content model's prose field: a card without one
+ * renders no context block. `#says` outcome prose rides on the card's
+ * `options` encoding and compiles onto {@link StorylineOption.says}.
+ */
+export interface DemoCard extends StorylineCard {
+  /** The beat's situation paragraph, or `null`/absent when none is authored. */
+  readonly context?: string | null;
+}
+
+/**
  * The demo's card catalogue (templates, no instance serials).
  *
  * Shape: `Town Meeting` (Invest / Ignore) → `Public Investment` (Celebrate /
  * Double down) or `Neglected Roads` (Repair / Let it be) → terminal
  * `New Beginning`. `Double down` and `Let it be` carry an empty successor, so
- * they end the chain immediately.
+ * they end the chain immediately. Every card authors `context`, and the two
+ * first-beat options author a `#says` outcome — the same prose the CSV
+ * carries, so the demo exercises the present path while a card without prose
+ * exercises the absent path.
  */
-export const DEMO_CARDS: readonly StorylineCard[] = [
+export const DEMO_CARDS: readonly DemoCard[] = [
   {
     id: 'gym-story-start',
     name: 'Town Meeting',
@@ -68,7 +85,10 @@ export const DEMO_CARDS: readonly StorylineCard[] = [
     storylineTitle: 'Gym Storyline',
     effect: 'Lose 50 coins',
     coinDelta: -50,
-    options: 'Invest|gym-story-invest;Ignore|gym-story-ignore',
+    context:
+      'The town meets in the hall above the market, with the road budget on the table and rain coming in off the hills. Everyone is waiting to see who will pay for the roads this year.',
+    options:
+      'Invest|gym-story-invest#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.',
   },
   {
     id: 'gym-story-invest',
@@ -77,6 +97,8 @@ export const DEMO_CARDS: readonly StorylineCard[] = [
     storylineTitle: 'Gym Storyline',
     effect: 'Gain 120 coins',
     coinDelta: 120,
+    context:
+      'The investment carries, and the road crews move out under a thin winter sun. For the first time in years, the town can see past its own gate.',
     options: 'Celebrate|gym-story-end;Double down|',
   },
   {
@@ -86,6 +108,8 @@ export const DEMO_CARDS: readonly StorylineCard[] = [
     storylineTitle: 'Gym Storyline',
     effect: 'Lose 80 coins',
     coinDelta: -80,
+    context:
+      'The roads are left to the weather, and the first complaints arrive with the first frost. The town begins to feel smaller than it did in spring.',
     options: 'Repair|gym-story-end;Let it be|',
   },
   {
@@ -95,16 +119,59 @@ export const DEMO_CARDS: readonly StorylineCard[] = [
     storylineTitle: 'Gym Storyline',
     effect: 'Gain 60 reputation',
     reputationDelta: 60,
+    context:
+      'The new road opens, and the town begins to feel less like a place the world forgot. Whatever comes next will come by this road.',
   },
 ];
 
-const TEMPLATES = new Map<string, StorylineCard>(
+const TEMPLATES = new Map<string, DemoCard>(
   DEMO_CARDS.map((card) => [card.id, card]),
 );
 
 /** Looks up a demo card template by id (undefined when unknown). */
-export function getDemoTemplate(id: string): StorylineCard | undefined {
+export function getDemoTemplate(id: string): DemoCard | undefined {
   return TEMPLATES.get(id);
+}
+
+/** One option as the scene renders it: its label plus its authored outcome. */
+export interface DemoOptionView {
+  /** The compiled option's label. */
+  readonly label: string;
+  /** The chosen path's authored `#says` prose, or `null` when none is authored. */
+  readonly outcome: string | null;
+}
+
+/**
+ * The beat's presentation view model.
+ *
+ * The scene renders exactly this: a `context` paragraph above the options when
+ * the card authors one (`null` otherwise, so the layout can close up) and the
+ * authored outcome prose per option so a choice can narrate its consequence.
+ */
+export interface DemoCardView {
+  /** The beat's authored situation paragraph, or `null` when absent. */
+  readonly context: string | null;
+  /** One entry per compiled option, in declaration order. */
+  readonly options: readonly DemoOptionView[];
+}
+
+/** Normalises optional prose: blank or non-string reads as "not authored". */
+function authoredProse(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+/** Builds the scene's view model for a drawn card and its compiled options. */
+export function buildDemoCardView(
+  card: StorylineCard,
+  options: readonly StorylineOption<DemoState>[],
+): DemoCardView {
+  return {
+    context: authoredProse((card as DemoCard).context),
+    options: options.map((option) => ({
+      label: option.label,
+      outcome: authoredProse(option.says),
+    })),
+  };
 }
 
 /**
@@ -158,7 +225,10 @@ const demoResources = createResourceProjection<DemoState>({
 });
 
 /** Engine adapter mapping the generic seams onto the demo state. */
-export function createDemoEngine(): StorylineEngineAdapter<DemoState, StorylineCard> {
+export function createDemoEngine(
+  cards: readonly DemoCard[] = DEMO_CARDS,
+): StorylineEngineAdapter<DemoState, StorylineCard> {
+  const templates = new Map<string, DemoCard>(cards.map((card) => [card.id, card]));
   return {
     ...demoResources,
     rng: (state) => nextRandom(state),
@@ -170,7 +240,7 @@ export function createDemoEngine(): StorylineEngineAdapter<DemoState, StorylineC
       state.activityLog.push({ turn: state.turn, text });
     },
     getActivityLog: (state) => state.activityLog,
-    getTemplate: (id) => TEMPLATES.get(id) ?? null,
+    getTemplate: (id) => templates.get(id) ?? null,
     getBaseTypeId: (id) => getBaseTypeId(id),
     getChainScanCards: (state) => state.deck,
     pushChainCard: (state, card) => {
@@ -183,13 +253,25 @@ export function createDemoEngine(): StorylineEngineAdapter<DemoState, StorylineC
 export interface DemoRuntime {
   system: StorylineSystem<DemoState, StorylineCard>;
   state: DemoState;
+  /** The card catalogue this runtime resolves successors from. */
+  cards: readonly DemoCard[];
 }
 
-/** Builds a fresh demo runtime (default UI adapter, deterministic seed). */
-export function createDemoRuntime(): DemoRuntime {
+/**
+ * Builds a fresh demo runtime (default UI adapter, deterministic seed).
+ *
+ * `cards` defaults to the shipped {@link DEMO_CARDS}; the seam exists so a
+ * scene (and its tests) can play a fixture without prose to prove the
+ * "context absent" layout, and so an alternate demo catalogue needs no code
+ * change.
+ */
+export function createDemoRuntime(
+  cards: readonly DemoCard[] = DEMO_CARDS,
+): DemoRuntime {
   return {
-    system: createStorylineSystem({ engine: createDemoEngine() }),
+    system: createStorylineSystem({ engine: createDemoEngine(cards) }),
     state: createDemoState(),
+    cards,
   };
 }
 
@@ -267,6 +349,8 @@ export interface DemoChoice {
   pushedCard: StorylineCard | null;
   /** Story-update line to journal (null when the adapter produced none). */
   storyUpdate: string | null;
+  /** The chosen option's authored `#says` outcome prose (null when none). */
+  outcomeProse: string | null;
 }
 
 /**
@@ -296,12 +380,13 @@ export function applyDemoChoice(
     reputationChange: result.repChange,
     pushedCard: result.pushedCard ?? null,
     storyUpdate,
+    outcomeProse: result.outcomeProse ?? null,
   };
 }
 
 /** Draws the demo's first card onto a fresh runtime. */
 export function startDemo(runtime: DemoRuntime): DemoDraw & { card: StorylineCard } {
-  const card = TEMPLATES.get(DEMO_START_CARD_ID);
+  const card = runtime.cards.find((entry) => entry.id === DEMO_START_CARD_ID);
   if (!card) throw new Error(`Demo start card ${DEMO_START_CARD_ID} is missing`);
   return { ...drawDemoCard(runtime.system, runtime.state, card), card };
 }

@@ -48,7 +48,6 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { GYM_CONTENT_ADAPTER } from '../../../src/story-line/content/adapters';
 import {
   cardsFromCsv,
   compileContentOptions,
@@ -71,10 +70,11 @@ import type {
 } from '../../../src/story-line/types';
 import { runValidateStorylinesCli } from '../../../scripts/validate-storylines';
 import { addTemplate, makeAdapter, makeCard, makeState } from '../helpers';
-import { PROSE_CONTENT_ADAPTER } from './fixture-adapter';
+import { PROSE_CONTENT_ADAPTER, TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
 import {
   captureOutput,
   proseFixturePath,
+  readFixture,
   readProseFixture,
 } from './test-support';
 
@@ -235,14 +235,14 @@ describe('prose columns — context and epilogue (CG-0MWO7CSH9000JYWH)', () => {
   });
 
   it('[green] needs no adapter key for a file without prose columns (opt-in)', () => {
-    // The Gym adapter maps no prose column; the Gym demo content must parse
-    // exactly as it does today, reporting no prose at all.
-    const gymCards = cardsFromCsv(
-      parseCsv(readProseFixture('parity-gym-baseline.csv')),
-      GYM_CONTENT_ADAPTER,
+    // The Tavern adapter maps no prose column, so its content parses exactly
+    // as it does today, reporting no prose at all.
+    const tavernCards = cardsFromCsv(
+      parseCsv(readFixture('tavern-storylines.csv')),
+      TAVERN_CONTENT_ADAPTER,
     );
-    expect(asProse(gymCards[0]!).context ?? null).toBeNull();
-    expect(asProse(gymCards[0]!).epilogue ?? null).toBeNull();
+    expect(asProse(tavernCards[0]!).context ?? null).toBeNull();
+    expect(asProse(tavernCards[0]!).epilogue ?? null).toBeNull();
   });
 
   it('[green] round-trips every prose fixture through CSV byte-identically', () => {

@@ -28,8 +28,10 @@ export const LONG_ERASURE_CONTENT_PATH =
  * The Gym demo content adapter.
  *
  * Columns mirror the Gym story fixture (`GymStorylineDemo`): the generic
- * story-line fields (including the declared `resources` keys) plus `trigger`,
- * `cost`, `coinDelta` and `reputationDelta` as game columns.
+ * story-line fields (including the declared `resources` keys and the optional
+ * `context` prose) plus `trigger`, `cost`, `coinDelta` and `reputationDelta`
+ * as game columns. The demo authors `context` on every card so the shipped
+ * demo exercises the prose surface alongside the Long Erasure content.
  */
 export const GYM_CONTENT_ADAPTER: ContentAdapter = {
   gameId: 'gym',
@@ -45,6 +47,7 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
     'cost',
     'coinDelta',
     'reputationDelta',
+    'context',
   ],
   fields: {
     id: 'id',
@@ -54,6 +57,7 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
     storylineId: 'storylineId',
     storylineTitle: 'storylineTitle',
     resources: 'resources',
+    context: 'context',
   },
   editableColumns: ['trigger', 'cost', 'coinDelta', 'reputationDelta'],
   newCardDefaults: {
@@ -64,6 +68,7 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
     cost: '0',
     coinDelta: '0',
     reputationDelta: '0',
+    context: '',
   },
   describeImpact: (card) => {
     const parts: string[] = [];

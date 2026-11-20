@@ -203,7 +203,7 @@ describe('cardsFromCsv', () => {
     expect(start.name).toBe('Town Meeting');
     expect(start.effect).toBe('Lose 50 coins');
     expect(start.options).toBe(
-      'Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end;Ignore|gym-story-ignore',
+      'Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.',
     );
     expect(start.storylineId).toBe('gym-story');
     expect(start.storylineTitle).toBe('Gym Storyline');
@@ -354,10 +354,14 @@ describe('authored prose columns (context / epilogue)', () => {
 
   it('carries no prose keys when the adapter maps no prose column', () => {
     // An unmapped optional column is not an error: the card keeps exactly the
-    // pre-prose shape, so existing content (Gym, Main Street) is untouched.
-    const [gym] = cardsFromCsv(parseCsv(readText(GYM_CONTENT_PATH)), GYM_CONTENT_ADAPTER);
-    expect('context' in (gym as object)).toBe(false);
-    expect('epilogue' in (gym as object)).toBe(false);
+    // pre-prose shape. The Tavern adapter maps no prose column, so its content
+    // (and Main Street's) is untouched by the prose slice.
+    const [tavern] = cardsFromCsv(
+      parseCsv(readFixture('tavern-storylines.csv')),
+      TAVERN_CONTENT_ADAPTER,
+    );
+    expect('context' in (tavern as object)).toBe(false);
+    expect('epilogue' in (tavern as object)).toBe(false);
   });
 
   it('round-trips multi-sentence prose with commas, quotes, semicolons, pipes and hashes', () => {

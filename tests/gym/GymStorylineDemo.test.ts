@@ -25,11 +25,13 @@ import {
   DEMO_RNG_SEED,
   DEMO_START_CARD_ID,
   applyDemoChoice,
+  buildDemoCardView,
   createDemoRuntime,
   createDemoState,
   drawDemoCard,
   getDemoTemplate,
   startDemo,
+  type DemoCard,
   type DemoState,
   type DemoRuntime,
 } from '../../example-games/gym/GymStorylineDemo';
@@ -80,7 +82,7 @@ describe('GymStorylineDemo — fixture', () => {
     for (const card of DEMO_CARDS) {
       if (!card.options) continue;
       for (const segment of card.options.split(';')) {
-        const successor = segment.split('|')[1];
+        const successor = segment.split('|')[1]?.split('#')[0];
         if (!successor) continue;
         expect(getDemoTemplate(successor), `${card.id} → ${successor}`).toBeDefined();
       }
@@ -224,5 +226,65 @@ describe('GymStorylineDemo — determinism', () => {
     const second = optionLabels(createDemoRuntime(), getDemoTemplate('gym-story-start')!);
     expect(first).toEqual(second);
     expect(first).toEqual(['Invest', 'Ignore']);
+  });
+});
+
+describe('GymStorylineDemo — authored prose view model', () => {
+  /** The `#says` prose the demo's first-beat options author. */
+  const INVEST_OUTCOME =
+    'The vote passes, and the road crews are working before the week is out.';
+  const IGNORE_OUTCOME =
+    'The question is set aside, and the ruts deepen with every cart that passes.';
+
+  it('surfaces the beat context and the authored option outcomes', () => {
+    const runtime = createDemoRuntime();
+    const draw = startDemo(runtime);
+
+    const view = buildDemoCardView(draw.card, draw.options);
+
+    expect(view.context).toContain('The town meets in the hall above the market');
+    expect(view.options.map((option) => option.label)).toEqual(['Invest', 'Ignore']);
+    expect(view.options.map((option) => option.outcome)).toEqual([
+      INVEST_OUTCOME,
+      IGNORE_OUTCOME,
+    ]);
+  });
+
+  it('authors context on every shipped demo card', () => {
+    for (const card of DEMO_CARDS) {
+      const view = buildDemoCardView(card, []);
+      expect(view.context, card.id).not.toBeNull();
+      expect(view.context?.length ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it('reports a null context and null outcomes for a fixture that authors none', () => {
+    const bare: readonly DemoCard[] = [
+      {
+        id: DEMO_START_CARD_ID,
+        name: 'Bare Meeting',
+        effect: 'No prose here',
+        options: 'Go|nowhere',
+      },
+    ];
+    const runtime = createDemoRuntime(bare);
+    const draw = startDemo(runtime);
+
+    const view = buildDemoCardView(draw.card, draw.options);
+
+    expect(view.context).toBeNull();
+    expect(view.options.map((option) => option.outcome)).toEqual([null]);
+  });
+
+  it('surfaces the chosen option’s authored outcome on the resolution result', () => {
+    const runtime = createDemoRuntime();
+    const start = getDemoTemplate('gym-story-start')!;
+
+    const { result } = pick(runtime, start, 'Invest');
+
+    expect(result.outcomeProse).toBe(INVEST_OUTCOME);
+    // A card without `#says` resolves with no invented prose.
+    const invest = result.pushedCard!;
+    expect(pick(runtime, invest, 'Celebrate').result.outcomeProse).toBeNull();
   });
 });

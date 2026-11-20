@@ -82,8 +82,8 @@ describe('validate-storylines CLI', () => {
       writeFileSync(
         csvPath,
         [
-          'id,name,effect,options,storylineId,storylineTitle',
-          'gym-open,Gym Open,A card that links nowhere.,Go|gym-missing,gym-arc,Gym Arc',
+          'id,name,effect,options,storylineId,storylineTitle,context',
+          'gym-open,Gym Open,A card that links nowhere.,Go|gym-missing,gym-arc,Gym Arc,',
           '',
         ].join('\n'),
       );

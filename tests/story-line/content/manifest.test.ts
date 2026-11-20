@@ -180,10 +180,19 @@ describe('authored prose in the manifest', () => {
   });
 
   it('adds no prose keys when the adapter maps no prose column', () => {
-    for (const node of gymManifest.nodes) {
+    const tavernManifest = buildStorylineManifestFromCsv(
+      readFixture('tavern-storylines.csv'),
+      TAVERN_CONTENT_ADAPTER,
+    );
+    for (const node of tavernManifest.nodes) {
       expect('context' in node, `node ${node.id}`).toBe(false);
       expect('epilogue' in node, `node ${node.id}`).toBe(false);
     }
+  });
+
+  it('carries the Gym demo’s authored context, since that adapter opted in', () => {
+    const start = gymManifest.nodes.find((node) => node.id === 'gym-story-start');
+    expect(start?.context).toContain('The town meets in the hall above the market');
   });
 
   it('validates a prose-bearing manifest against the schema', () => {

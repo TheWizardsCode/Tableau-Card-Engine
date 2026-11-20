@@ -295,9 +295,9 @@ describe('content validation diagnostics', () => {
   it('reports an unknown conditional-successor target', () => {
     const result = validateContentCsv(
       [
-        'id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta',
-        'bad-a,Bad A,X,Go|bad-b#when=coins>=1>missing,bad,Bad,"coins,reputation",Incident,0,0,0',
-        'bad-b,Bad B,X,,bad,Bad,"coins,reputation",Incident,0,0,0',
+        'id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta,context',
+        'bad-a,Bad A,X,Go|bad-b#when=coins>=1>missing,bad,Bad,"coins,reputation",Incident,0,0,0,',
+        'bad-b,Bad B,X,,bad,Bad,"coins,reputation",Incident,0,0,0,',
       ].join('\n') + '\n',
       GYM_CONTENT_ADAPTER,
     );
@@ -492,9 +492,9 @@ describe('option-outcome prose diagnostics', () => {
   function idiomsCsv(asCell: string): string {
     return (
       [
-        'id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta',
-        `bad-a,Bad A,X,${asCell},bad,Bad,"coins,reputation",Incident,0,0,0`,
-        'bad-b,Bad B,X,,bad,Bad,"coins,reputation",Incident,0,0,0',
+        'id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta,context',
+        `bad-a,Bad A,X,${asCell},bad,Bad,"coins,reputation",Incident,0,0,0,`,
+        'bad-b,Bad B,X,,bad,Bad,"coins,reputation",Incident,0,0,0,',
       ].join('\n') + '\n'
     );
   }
