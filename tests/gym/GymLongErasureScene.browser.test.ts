@@ -22,10 +22,66 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 
-import { GymLongErasureScene, OPTION_ANCHORS } from '../../example-games/gym/scenes/GymLongErasureScene';
+import {
+  GymLongErasureScene,
+  NARRATIVE_PANEL_PAGE_CHARS,
+  OPTION_ANCHORS,
+  setLongErasureSceneContent,
+} from '../../example-games/gym/scenes/GymLongErasureScene';
+import { longErasureContentFromCsv } from '../../example-games/gym/GymLongErasureGame';
 import { GYM_LONG_ERASURE_KEY } from '../../example-games/gym/GymRegistry';
 import { COMMON_SFX_KEYS } from '../../src/core-engine';
 import { waitForScene } from '../helpers/waitForScene';
+
+/** The prose the injected fixture authors, used by the panel/outcome tests. */
+const AUTHORED_CONTEXT =
+  'The Ashlight holds station at the edge of an Unwriting, and the crew wait for your word.';
+const AUTHORED_OUTCOME = 'You log it, and the charts go blank with it.';
+const AUTHORED_EPILOGUE =
+  'The timeline closes over the erasure like water. You are the only thing that remembers the room.';
+
+/** Column shape of the Long Erasure content, with prose authored. */
+const PROSE_HEADER =
+  'id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue';
+
+/**
+ * Builds a small playable Long Erasure content file.
+ *
+ * Two choices reach the ending, so the prose surfaces (beat context, option
+ * outcome, ending epilogue) are all reachable in one screen-flow test. The
+ * shipped content authors no prose yet (that is a sibling content item), hence
+ * the injected fixture through `setLongErasureSceneContent()`.
+ */
+function proseCsv(options: {
+  readonly context?: string;
+  readonly outcome?: string;
+  readonly epilogue?: string;
+} = {}): string {
+  const context = options.context ?? AUTHORED_CONTEXT;
+  const outcome = options.outcome ?? AUTHORED_OUTCOME;
+  const epilogue = options.epilogue ?? AUTHORED_EPILOGUE;
+  const resources = '"hull,morale,stores,goodwill,charge"';
+
+  return [
+    PROSE_HEADER,
+    `le-t-open,The First Unwriting,An opening happens.,"Log the erasure|le-t-log#says=${outcome};Rally the crew|le-t-rally#says=You raise your voice.",long-erasure,The Long Erasure,${resources},I,1,"${context}",`,
+    `le-t-log,The Gauge,The gauge reads zero.,"Seal the hatch|le-t-end#says=The hatch seals behind you.",long-erasure,The Long Erasure,${resources},II,1,,"${epilogue}"`,
+    `le-t-rally,The Rally,Voices in the dark.,"Follow them|le-t-end",long-erasure,The Long Erasure,${resources},II,1,,`,
+    `le-t-end,Morning,The loom stops.,,long-erasure,The Long Erasure,${resources},Ending,1,,"${epilogue}"`,
+  ].join('\n');
+}
+
+/** The same playable shape with **no** prose authored (the parity path). */
+function bareCsv(): string {
+  const resources = '"hull,morale,stores,goodwill,charge"';
+  return [
+    PROSE_HEADER,
+    `le-t-open,The First Unwriting,An opening happens.,"Log the erasure|le-t-log;Rally the crew|le-t-rally",long-erasure,The Long Erasure,${resources},I,1,,`,
+    `le-t-log,The Gauge,The gauge reads zero.,"Seal the hatch|le-t-end",long-erasure,The Long Erasure,${resources},II,1,,`,
+    `le-t-rally,The Rally,Voices in the dark.,"Follow them|le-t-end",long-erasure,The Long Erasure,${resources},II,1,,`,
+    `le-t-end,Morning,The loom stops.,,long-erasure,The Long Erasure,${resources},Ending,1,,`,
+  ].join('\n');
+}
 
 /** The cheapest authored route: it reaches the Loom's core and resets. */
 const RESET_ROUTE = [
@@ -74,9 +130,14 @@ describe('GymLongErasureScene browser test', () => {
     game = null;
     const container = document.getElementById('game-container');
     if (container) container.remove();
+    setLongErasureSceneContent(null);
   });
 
-  async function bootScene(): Promise<GymLongErasureScene> {
+  async function bootScene(csv?: string): Promise<GymLongErasureScene> {
+    setLongErasureSceneContent(
+      csv === undefined ? null : longErasureContentFromCsv(csv),
+    );
+
     const container = document.createElement('div');
     container.id = 'game-container';
     document.body.appendChild(container);
@@ -254,5 +315,105 @@ describe('GymLongErasureScene browser test', () => {
 
   it('exposes the four SLL option anchors the layout provides', () => {
     expect(OPTION_ANCHORS).toEqual(['option1', 'option2', 'option3', 'option4']);
+  });
+
+  // ── Authored prose on screen (AC2, AC3, AC4, AC5, AC6) ──
+
+  it('renders the authored context paragraph above the option list (AC2)', async () => {
+    const scene = await bootScene(proseCsv());
+
+    expect(scene.getNarrativePanelText()).toBe(AUTHORED_CONTEXT);
+    expect(scene.getMoreAffordanceText()).toBe('');
+    // The situation does not replace the beat chrome.
+    expect(scene.getEffectText()).toBe('An opening happens.');
+    expect(scene.getAvailableOptionLabels()).toEqual([
+      'Log the erasure',
+      'Rally the crew',
+    ]);
+  });
+
+  it('narrates the chosen option’s authored outcome (AC3, AC6)', async () => {
+    const scene = await bootScene(proseCsv());
+    scene.setReducedMotionProperty(false);
+
+    scene.chooseByLabel('Log the erasure');
+
+    // The reveal starts progressively: the full prose is not on screen yet…
+    expect(scene.getNarrativePanelText()).not.toBe(AUTHORED_OUTCOME);
+
+    // …and the first pointer input skips it, leaving the full prose present.
+    scene.input.emit('pointerdown');
+    expect(scene.getNarrativePanelText()).toBe(AUTHORED_OUTCOME);
+    expect(scene.getPlayedSfxKeys()).toContain(COMMON_SFX_KEYS.CARD_SWAP);
+
+    // AC7: the journal row is the authored consequence, not a label paraphrase.
+    expect(scene.getJournalLines()[0]).toContain(AUTHORED_OUTCOME);
+    expect(scene.getJournalLines()[0]).not.toContain('You chose');
+  });
+
+  it('skips straight to the full outcome under reduced motion (AC3, AC8)', async () => {
+    const scene = await bootScene(proseCsv());
+    scene.setReducedMotionProperty(true);
+
+    scene.chooseByLabel('Log the erasure');
+
+    // Instant, textual, and silent: the prose never depends on animation/audio.
+    expect(scene.getNarrativePanelText()).toBe(AUTHORED_OUTCOME);
+    expect(scene.getPlayedSfxKeys()).toEqual([]);
+  });
+
+  it('shows the authored epilogue on the closing screen (AC4, AC6)', async () => {
+    const scene = await bootScene(proseCsv());
+    scene.setReducedMotionProperty(true);
+
+    playRoute(scene, ['Log the erasure', 'Seal the hatch']);
+
+    expect(scene.getEpilogue()?.epilogueProse).toBe(AUTHORED_EPILOGUE);
+    expect(scene.getNarrativePanelText()).toContain(AUTHORED_EPILOGUE);
+    const rendered = scene.getOptionAreaTexts().join('\n');
+    expect(rendered).toContain(
+      `Journey score: ${scene.getEpilogue()!.score.total} / 100`,
+    );
+  });
+
+  it('falls back to today’s effect/framing when no epilogue is authored (AC4)', async () => {
+    const scene = await bootScene(bareCsv());
+    scene.setReducedMotionProperty(true);
+
+    playRoute(scene, ['Log the erasure', 'Seal the hatch']);
+
+    // Byte-for-byte parity with the pre-prose closing screen: the framing line
+    // in the effect slot, no prose panel, no prose affordance.
+    expect(scene.getEpilogue()?.epilogueProse ?? null).toBeNull();
+    expect(scene.getEffectText()).toBe(
+      'The voyage ended where you left it.',
+    );
+    expect(scene.getNarrativePanelText()).toBe('');
+    expect(scene.getMoreAffordanceText()).toBe('');
+  });
+
+  it('pages over-long prose behind a visible [ more… ] affordance (AC5)', async () => {
+    const longContext = `${'The crew wait in silence at the edge of the Unwriting. '.repeat(
+      12,
+    )}THE LAST WORD.`;
+    expect(longContext.length).toBeGreaterThan(NARRATIVE_PANEL_PAGE_CHARS);
+
+    const scene = await bootScene(proseCsv({ context: longContext }));
+
+    // Page one is shown, nothing is clipped silently: the affordance names the
+    // remaining pages and the tail of the prose is not on screen yet.
+    expect(scene.getMoreAffordanceText()).toMatch(/more…/);
+    expect(scene.getMoreAffordanceText()).toMatch(/1\/\d+/);
+    expect(scene.getNarrativePanelText()).not.toContain('THE LAST WORD.');
+
+    const firstPage = scene.getNarrativePanelText();
+    scene.showNextPanelPage();
+    const secondPage = scene.getNarrativePanelText();
+
+    expect(secondPage).toContain('THE LAST WORD.');
+    // Every character survives across the pages.
+    expect(`${firstPage} ${secondPage}`.replace(/\s+/g, ' ')).toContain(
+      longContext.replace(/\s+/g, ' '),
+    );
   });
 });

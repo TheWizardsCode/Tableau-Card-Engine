@@ -39,6 +39,17 @@ const ZONES = [
   'controls',
 ] as const;
 
+/**
+ * The narrative panel's visible budget, mirroring the scene's panel text
+ * style: three wrapped lines of 14 px text with 4 px line spacing.
+ *
+ * Declared here (rather than imported from the scene) so this stays a
+ * Phaser-free unit test; the panel must fit its SLL window without ever
+ * reaching the `[ more… ]` control or the option column.
+ */
+const PANEL_LINES = 3;
+const PANEL_LINE_HEIGHT = 22;
+
 describe('GymLongErasureScene SLL layout', () => {
   it('validates against the SLL schema', () => {
     const validation = validateScreenLayoutDocument(longErasureLayoutJson);
@@ -89,6 +100,25 @@ describe('GymLongErasureScene SLL layout', () => {
       expect(point.y).toBeGreaterThan(0);
       expect(point.y).toBeLessThan(VIEWPORT.height);
     }
+  });
+
+  it('positions the narrative panel between the effect line and the options', () => {
+    const parsed = parseScreenLayoutDocument(longErasureLayoutJson);
+    expect(parsed.valid).toBe(true);
+    if (!parsed.valid) return;
+
+    const effect = anchorPoint(parsed.layout, 'narrative', 'effect', VIEWPORT, 1);
+    const context = anchorPoint(parsed.layout, 'narrative', 'context', VIEWPORT, 1);
+    const more = anchorPoint(parsed.layout, 'narrative', 'contextMore', VIEWPORT, 1);
+    const firstOption = anchorPoint(parsed.layout, 'options', 'option1', VIEWPORT, 1);
+
+    // The panel hangs below the beat's effect line and above its continuation
+    // control, which in turn sits above the option column: prose and options
+    // cannot collide at the design resolution.
+    expect(context.y).toBeGreaterThan(effect.y);
+    expect(context.y + PANEL_LINES * PANEL_LINE_HEIGHT).toBeLessThan(more.y);
+    expect(more.y).toBeLessThan(firstOption.y);
+    expect(context.x).toBeCloseTo(VIEWPORT.width / 2, 6);
   });
 
   it('resolves the status bar, journal and controls anchors at 1280x720', () => {

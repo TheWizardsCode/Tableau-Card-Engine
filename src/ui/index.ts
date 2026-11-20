@@ -152,6 +152,11 @@ export type {
   NarrationTextWriter,
   RevealNarrationOptions,
 } from './narration-reveal';
+export {
+  paginateProse,
+  DEFAULT_PROSE_PAGE_CHARS,
+} from './prose-pagination';
+export type { ProsePagination } from './prose-pagination';
 export { runSceneTransition } from './sceneTransition';
 export type { SceneTransitionOptions, SceneTransitionMode, SceneTransitionType } from './sceneTransition';
 

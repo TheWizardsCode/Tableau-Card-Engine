@@ -18,8 +18,20 @@
  *
  * Every state change is textual **and** animated/audible where appropriate:
  *
+ * - The narrative panel shows the beat's authored `context` above the options,
+ *   wrapped and positioned from SLL anchors only. Prose longer than the panel's
+ *   display budget is **paged**, never clipped: a visible `[ more… ]`
+ *   affordance reveals the remainder (`paginateProse()`).
+ * - A resolved choice narrates the chosen option's authored outcome prose
+ *   (`#says=`) through the shared `revealNarration()` helper, which plays a
+ *   `COMMON_SFX_KEYS` sound and respects reduced motion; the full text is on
+ *   screen when the reveal completes or the player skips it.
+ * - The closing screen shows the ending card's authored `epilogue`; when the
+ *   content authors none, the screen falls back to the pre-prose rendering
+ *   (the outcome framing line) byte-for-byte.
  * - A resolved choice rewrites the act/clock/resource/beat panels, appends the
- *   journal row and writes a "you chose …" feedback line, plays
+ *   journal row (the authored outcome prose, truncated to one display line by
+ *   the shared helper) and writes a "you chose …" feedback line, plays
  *   `COMMON_SFX_KEYS.CARD_SWAP` and (when the act turns over)
  *   `COMMON_SFX_KEYS.TURN_CHANGE`.
  * - Reaching an ending reveals the scored epilogue, plays
@@ -31,8 +43,10 @@
  * - `[ Begin a new survey ]` resets and plays `COMMON_SFX_KEYS.UI_CLICK`.
  *
  * Reduced motion is honoured throughout: SFX are suppressed (the project-wide
- * reduced-motion contract), the score pop is instant, and no tween is created.
- * The textual channel is never suppressed, so nothing is feedback-free.
+ * reduced-motion contract), the score pop is instant, the narration reveal is
+ * applied synchronously and no tween is created. The textual channel is never
+ * suppressed, so nothing is feedback-free — and with audio muted the prose is
+ * still on screen.
  *
  * ## IP
  *
@@ -60,6 +74,12 @@ import {
 } from '../../../src/ui/screen-layout-schema';
 import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
+import {
+  paginateProse,
+  revealNarration,
+  DEFAULT_PROSE_PAGE_CHARS,
+  type NarrationRevealHandle,
+} from '../../../src/ui';
 import { COMMON_SFX_KEYS, SoundManager } from '../../../src/core-engine';
 import type { CommonSfxKey, SoundPlayer } from '../../../src/core-engine';
 import gymLongErasureLayoutJson from '../layouts/gym-long-erasure.layout.json';
@@ -100,6 +120,15 @@ export const LONG_ERASURE_SFX_KEYS: readonly CommonSfxKey[] = [
 const JOURNAL_PLAY_ROWS = 5;
 const JOURNAL_CLOSING_ROWS = 6;
 
+/**
+ * Characters one narrative-panel page may show.
+ *
+ * Derived from the panel's SLL window (about three wrapped lines at 14 px over
+ * `GAME_W - 160` px). Prose beyond it is paged behind the `[ more… ]`
+ * affordance rather than clipped.
+ */
+export const NARRATIVE_PANEL_PAGE_CHARS = DEFAULT_PROSE_PAGE_CHARS;
+
 /** Parsed SLL document for this scene's layout (parsed once at module load). */
 const LONG_ERASURE_LAYOUT: ScreenLayoutDocument | null = (() => {
   const parsed = parseScreenLayoutDocument(gymLongErasureLayoutJson);
@@ -121,11 +150,30 @@ function resolveAnchor(zone: string, anchor: string): PixelPoint {
 /** The authored content, parsed once from the committed CSV. */
 let cachedContent: LongErasureContent | null = null;
 
+/** Optional content override (tests / alternate authored content). */
+let contentOverride: LongErasureContent | null = null;
+
+/**
+ * Override the content this scene plays (`null` restores the shipped CSV).
+ *
+ * The shipped content authors no prose yet (that is a sibling content item), so
+ * the browser suite injects a prose-bearing fixture through this seam. It is
+ * also the seam a content pack or an alternate authored file would use.
+ *
+ * @internal
+ */
+export function setLongErasureSceneContent(
+  content: LongErasureContent | null,
+): void {
+  contentOverride = content;
+}
+
 /**
  * The content this scene plays (parsed from `content/long-erasure.csv`, the
  * same file the content toolchain validates).
  */
 export function longErasureSceneContent(): LongErasureContent {
+  if (contentOverride !== null) return contentOverride;
   if (cachedContent === null) {
     cachedContent = longErasureContentFromCsv(longErasureCsv);
   }
@@ -181,6 +229,24 @@ export class GymLongErasureScene extends GymSceneBase {
   /** Option / epilogue line objects for the current beat (rebuilt each render). */
   private optionTexts: Phaser.GameObjects.Text[] = [];
 
+  /** The narrative panel: the beat's context / the choice's consequence. */
+  private proseText!: Phaser.GameObjects.Text;
+
+  /** The visible `[ more… ]` continuation control for over-long prose. */
+  private moreText!: Phaser.GameObjects.Text;
+
+  /** The paged prose of the current panel (empty when nothing is authored). */
+  private panelPages: string[] = [];
+
+  /** Index of the page currently shown in the panel. */
+  private panelPageIndex = 0;
+
+  /** The in-flight narration reveal, released before the panel is rewritten. */
+  private revealHandle: NarrationRevealHandle | null = null;
+
+  /** The outcome prose of the choice just taken, narrated on this render only. */
+  private pendingOutcomeProse: string | null = null;
+
   // ── Rendered chrome (all positioned through SLL anchors) ──
   private actText!: Phaser.GameObjects.Text;
   private clockText!: Phaser.GameObjects.Text;
@@ -213,7 +279,7 @@ export class GymLongErasureScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'A complete three-act branching narrative played through the generic @story-line engine. Every rule — the pressure clock, act gating, affordability filtering, successor drawing, the journal and the journey score — lives in the Phaser-free GymLongErasureGame module; this scene only renders that state and forwards your choice back to it.',
+        body: 'A complete three-act branching narrative played through the generic @story-line engine. Every rule — the pressure clock, act gating, affordability filtering, successor drawing, the journal and the journey score — lives in the Phaser-free GymLongErasureGame module; this scene only renders that state and forwards your choice back to it. The narrative panel above the options shows the beat’s authored context paragraph; the consequence of your choice is narrated into that panel (a shared reveal helper with a common sound, instant under reduced motion), and the closing screen carries the ending’s authored epilogue. Prose longer than the panel is never cut silently: a [ more… ] control reveals the remainder.',
       },
       {
         heading: 'The story',
@@ -225,7 +291,7 @@ export class GymLongErasureScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: 'Click an option label to take it. The act, clock, resources, beat and journal panels update on every choice, and a feedback line names what you just did. [ Begin a new survey ] starts the same deterministic run again from the first beat. The help panel (this slide-out) documents the rules and the IP statement.',
+        body: 'Click an option label to take it. The act, clock, resources, beat, narrative and journal panels update on every choice, and a feedback line names what you just did. [ more… ] pages over-long prose (first pointer input also skips the reveal). [ Begin a new survey ] starts the same deterministic run again from the first beat. The help panel (this slide-out) documents the rules and the IP statement.',
       },
       {
         heading: 'Original setting — no third-party IP',
@@ -233,13 +299,17 @@ export class GymLongErasureScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Beat 1 offers Log the erasure / Rally the survey crew; either choice advances the clock and writes a journal row.\n2. The Act I warning choice adds goodwill; at The Archivist\'s Offer the goodwill-gated Sabotage the Loom option appears only once goodwill reaches 3.\n3. Abandon the voyage ends the run terminally with the voyage-ended framing.\n4. A cheap route reaches the Loom\'s core and the reset ending, where the closing screen shows the journey score, the band label and the surviving journal.\n5. Begin a new survey returns to beat 1 with the starting resources and clock.',
+        body: '1. Beat 1 shows its context paragraph above Log the erasure / Rally the survey crew; either choice narrates the option’s authored outcome and writes a journal row carrying that prose.\n2. The Act I warning choice adds goodwill; at The Archivist\'s Offer the goodwill-gated Sabotage the Loom option appears only once goodwill reaches 3.\n3. Abandon the voyage ends the run terminally with the voyage-ended framing.\n4. A cheap route reaches the Loom\'s core and the reset ending, where the closing screen shows the authored epilogue, the journey score, the band label and the surviving journal.\n5. Begin a new survey returns to beat 1 with the starting resources and clock.\n6. Prose beyond the panel budget shows [ more… ]; activating it reveals the remainder (nothing is clipped).',
       },
     ]);
 
     this.soundManager = this.createSoundManager();
     this.buildChrome();
     this.startRun();
+
+    // A reveal in flight owns a timer and input listeners; release both when
+    // the scene shuts down so nothing writes into a destroyed scene.
+    this.events.once('shutdown', () => this.destroyReveal());
   }
 
   // ── Public testing helpers ───────────────────────────────────
@@ -262,6 +332,26 @@ export class GymLongErasureScene extends GymSceneBase {
   /** The feedback line currently on screen. @internal */
   getFeedbackText(): string {
     return this.feedbackText.text;
+  }
+
+  /** The narrative panel's current page (the visible prose). @internal */
+  getNarrativePanelText(): string {
+    return this.proseText.text;
+  }
+
+  /** The beat/outcome effect line currently on screen. @internal */
+  getEffectText(): string {
+    return this.effectText.text;
+  }
+
+  /** The `[ more… ]` affordance text, or `''` when the panel fits. @internal */
+  getMoreAffordanceText(): string {
+    return this.moreText.visible ? this.moreText.text : '';
+  }
+
+  /** Reveal the panel's next page, exactly as clicking `[ more… ]` would. @internal */
+  showNextPanelPage(): void {
+    this.advancePanelPage();
   }
 
   /** The journal rows currently on screen, newest first. @internal */
@@ -301,6 +391,8 @@ export class GymLongErasureScene extends GymSceneBase {
     const beat = resolveAnchor('narrative', 'beat');
     const title = resolveAnchor('narrative', 'title');
     const effect = resolveAnchor('narrative', 'effect');
+    const context = resolveAnchor('narrative', 'context');
+    const contextMore = resolveAnchor('narrative', 'contextMore');
     const feedback = resolveAnchor('feedback', 'center');
     const journalHeading = resolveAnchor('journal', 'heading');
     const journalBody = resolveAnchor('journal', 'body');
@@ -332,6 +424,31 @@ export class GymLongErasureScene extends GymSceneBase {
       .setOrigin(0.5, 0)
       .setAlign('center')
       .setWordWrapWidth(GAME_W - 160);
+
+    this.proseText = createHudText(this, context.x, context.y, '', '#b9c8da', {
+      fontSize: '14px',
+      lineSpacing: 4,
+      align: 'center',
+    })
+      .setOrigin(0.5, 0)
+      .setWordWrapWidth(GAME_W - 160);
+
+    this.moreText = createHudText(
+      this,
+      contextMore.x,
+      contextMore.y,
+      '',
+      '#88bbdd',
+      { fontSize: '13px' },
+    ).setOrigin(0.5);
+    this.moreText.setInteractive({ useHandCursor: true });
+    this.moreText.on('pointerdown', () => {
+      this.playSfx(COMMON_SFX_KEYS.UI_CLICK);
+      this.advancePanelPage();
+    });
+    this.moreText.on('pointerover', () => this.moreText.setColor('#ddffff'));
+    this.moreText.on('pointerout', () => this.moreText.setColor('#88bbdd'));
+    this.moreText.setVisible(false);
 
     this.feedbackText = createHudText(this, feedback.x, feedback.y, '', '#ffff99', {
       fontSize: '14px',
@@ -398,6 +515,8 @@ export class GymLongErasureScene extends GymSceneBase {
 
   /** Start a fresh deterministic run and render it. */
   private startRun(): void {
+    this.destroyReveal();
+    this.pendingOutcomeProse = null;
     this.run = createLongErasureRun(LONG_ERASURE_SCENE_SEED, longErasureSceneContent());
     this.feedbackText.setColor('#ffff99');
     this.feedbackText.setText('A survey begins beyond the charted volume.');
@@ -421,6 +540,15 @@ export class GymLongErasureScene extends GymSceneBase {
       const next = chooseOption(before, label);
       this.run = next;
       this.playSfx(COMMON_SFX_KEYS.CARD_SWAP);
+
+      // The consequence, as authored for the option the player took. It is
+      // composed with the successor beat's context and narrated on this render;
+      // the next choice replaces it with that choice's own consequence.
+      const lastEntry = next.history[next.history.length - 1];
+      this.pendingOutcomeProse =
+        next.history.length > before.history.length
+          ? lastEntry?.outcomeProse ?? null
+          : null;
 
       const actTurned = next.act !== before.act;
       if (actTurned && next.act !== 'Ending') {
@@ -506,6 +634,7 @@ export class GymLongErasureScene extends GymSceneBase {
     } else {
       this.renderBeat();
     }
+    this.renderPanel();
     this.renderJournal();
   }
 
@@ -533,6 +662,93 @@ export class GymLongErasureScene extends GymSceneBase {
       button.on('pointerout', () => button.setColor('#aaddff'));
       this.optionTexts.push(button);
     });
+  }
+
+  /**
+   * Render the narrative panel: the situation, or the choice's consequence.
+   *
+   * The panel holds the beat's authored `context`; a choice adds the chosen
+   * option's authored outcome prose above it, so the consequence reads as a
+   * story beat followed by the new situation. The prose is paged when it
+   * exceeds the panel's budget (`[ more… ]` reveals the remainder) — it is
+   * never silently clipped, and the reveal is released before any rewrite.
+   */
+  private renderPanel(): void {
+    this.destroyReveal();
+
+    const narrate = this.pendingOutcomeProse !== null;
+    const prose = this.composePanelProse();
+    const pagination = paginateProse(prose ?? '', NARRATIVE_PANEL_PAGE_CHARS);
+
+    this.panelPages = [...pagination.pages];
+    this.panelPageIndex = 0;
+
+    if (pagination.pageCount === 0) {
+      this.proseText.setText('');
+      this.moreText.setText('');
+      this.moreText.setVisible(false);
+    } else {
+      this.showPanelPage(0, narrate);
+    }
+
+    this.pendingOutcomeProse = null;
+  }
+
+  /** The prose the panel shows for the current state (or `null`). */
+  private composePanelProse(): string | null {
+    const paragraphs: string[] = [];
+    if (this.pendingOutcomeProse !== null) {
+      paragraphs.push(this.pendingOutcomeProse);
+    }
+    if (isComplete(this.run)) {
+      const epilogue = buildEpilogue(this.run);
+      if (epilogue.epilogueProse !== null) paragraphs.push(epilogue.epilogueProse);
+    } else if (this.run.currentCard.context !== null) {
+      paragraphs.push(this.run.currentCard.context);
+    }
+    return paragraphs.length > 0 ? paragraphs.join('\n\n') : null;
+  }
+
+  /** Show one page of the panel, narrating it when a choice just resolved. */
+  private showPanelPage(index: number, narrate: boolean): void {
+    const page = this.panelPages[index] ?? '';
+    const hasMorePages = index < this.panelPages.length - 1;
+
+    this.moreText.setText(
+      hasMorePages ? `[ more… ] (${index + 1}/${this.panelPages.length})` : '',
+    );
+    this.moreText.setVisible(hasMorePages);
+
+    if (!narrate) {
+      this.proseText.setText(page);
+      return;
+    }
+
+    // The shared helper owns the pacing, the `COMMON_SFX_KEYS` sound and the
+    // reduced-motion instant path; the textual channel never waits on audio.
+    this.revealHandle = revealNarration({
+      scene: this,
+      target: this.proseText,
+      prose: page,
+      reducedMotion: this.reducedMotion,
+      soundManager: this.soundManager,
+      onComplete: () => {
+        this.revealHandle = null;
+      },
+    });
+  }
+
+  /** Advance to the panel's next page (the `[ more… ]` action). */
+  private advancePanelPage(): void {
+    if (this.panelPageIndex >= this.panelPages.length - 1) return;
+    this.panelPageIndex += 1;
+    this.showPanelPage(this.panelPageIndex, false);
+  }
+
+  /** Release the in-flight reveal (idempotent; leaves the text as it stands). */
+  private destroyReveal(): void {
+    this.revealHandle?.destroy();
+    this.revealHandle = null;
   }
 
   /** Render the scored closing screen (the voyage the player made). */

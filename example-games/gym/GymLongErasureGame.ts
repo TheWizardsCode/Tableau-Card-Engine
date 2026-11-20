@@ -151,6 +151,22 @@ export interface LongErasureCard extends StorylineCard {
   readonly act: LongErasureAct;
   /** Clock consumed when the beat is entered. */
   readonly clockCost: number;
+  /**
+   * The beat's situation paragraph — the authored `context` column, verbatim
+   * (`null` when the content authors none).
+   *
+   * This is the prose the narrative panel shows above the option list: the
+   * writer's setting for the decision, not a paraphrase of `effect`.
+   */
+  readonly context: string | null;
+  /**
+   * The terminal card's closing prose — the authored `epilogue` column,
+   * verbatim (`null` when the content authors none).
+   *
+   * Only meaningful on an ending card; the closing screen reads it through
+   * {@link LongErasureEpilogue.epilogueProse}.
+   */
+  readonly epilogue: string | null;
 }
 
 /** The authored content a run is driven from. */
@@ -177,6 +193,14 @@ export interface LongErasureHistoryEntry {
   readonly cardName: string;
   /** The chosen option label. */
   readonly option: string;
+  /**
+   * The chosen option's authored outcome prose (its `#says=` attribute),
+   * verbatim, or `null` when the option authors none.
+   *
+   * This is what the choice *caused*, in the writer's words — the scene
+   * narrates it instead of paraphrasing the label the player clicked.
+   */
+  readonly outcomeProse: string | null;
   /** The option's declarative cost (the irreversible loss it paid). */
   readonly cost: Readonly<Record<string, number>>;
   /** The resource bag immediately after the choice resolved. */
@@ -340,6 +364,10 @@ export function longErasureContentFromCsv(csvText: string): LongErasureContent {
       storylineTitle: card.storylineTitle,
       act: parseAct(card.id, card.fields.act),
       clockCost: parseClockCost(card.id, card.fields.clockCost),
+      // Authored prose is optional: a blank cell (or an adapter with no prose
+      // column) reads as `null`, never `''`, so "no prose" is one shape.
+      context: card.context ?? null,
+      epilogue: card.epilogue ?? null,
     });
   }
 
@@ -458,6 +486,14 @@ export interface LongErasureEpilogue {
   readonly endingId: string | null;
   /** Display name of the ending card, when reached. */
   readonly endingName: string | null;
+  /**
+   * The ending card's authored closing prose (its `epilogue` column),
+   * verbatim, or `null` when the content authors none.
+   *
+   * When it is `null` the closing screen falls back to the pre-prose rendering
+   * (the outcome framing line), so content without an epilogue is unchanged.
+   */
+  readonly epilogueProse: string | null;
   /** Acts the run advanced beyond. */
   readonly actsCompleted: readonly LongErasureAct[];
   /** The journey score. */
@@ -581,10 +617,16 @@ export function scoreRun(state: LongErasureState): JourneyScore {
 /** Long Erasure's story-line presentation overlay. */
 const LONG_ERASURE_UI: StorylineUiAdapter<LongErasureCard> = {
   ...createDefaultStorylineUiAdapter<LongErasureCard>(),
-  storyUpdateLine: (card, option) => {
+  storyUpdateLine: (card, option, _coinChange, _repChange, outcomeProse) => {
     const title = card.storylineTitle ?? card.storylineId ?? 'The Long Erasure';
     // Must keep the shared `Story update — ` prefix: the journal derives its
-    // rows from these lines (`parseStoryUpdate`).
+    // rows from these lines (`parseStoryUpdate`). Authored outcome prose is the
+    // row's outcome verbatim (the journal truncates it for display via the
+    // shared `truncateOutcome` helper); authored-less content keeps the
+    // pre-prose wording exactly.
+    if (typeof outcomeProse === 'string' && outcomeProse.trim().length > 0) {
+      return `Story update — ${title}: ${outcomeProse}`;
+    }
     return `Story update — ${title}: "${card.name}" → ${option}.`;
   },
 };
@@ -889,6 +931,7 @@ export function chooseOption(
     option.label,
     result.coinChange,
     result.repChange,
+    result.outcomeProse ?? null,
   );
   if (storyUpdate) system.engine.appendLog(working, storyUpdate);
 
@@ -905,6 +948,8 @@ export function chooseOption(
     cardId: card.id,
     cardName: card.name,
     option: option.label,
+    // The consequence as authored (`#says=`), not a paraphrase of the label.
+    outcomeProse: result.outcomeProse ?? null,
     cost,
     resourcesAfter: { ...working.resources },
   });
@@ -1023,6 +1068,7 @@ export function buildEpilogue(
     reset: state.outcome === 'reset',
     endingId: state.endingId,
     endingName: ending?.name ?? null,
+    epilogueProse: ending?.epilogue ?? null,
     actsCompleted: [...state.completedActs],
     score: scoreRun(state),
     journal: runJournal(state),

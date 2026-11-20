@@ -52,10 +52,10 @@ import {
   longErasureContentFromCsv,
   runJournal,
   scoreRun,
-  type LongErasureCard,
   type LongErasureContent,
   type LongErasureState,
 } from '../../example-games/gym/GymLongErasureGame';
+import { DEFAULT_OUTCOME_MAX_LENGTH } from '../../src/story-line/journal';
 
 /** Repository root, resolved from this file rather than `process.cwd()`. */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -559,27 +559,12 @@ describe('The Long Erasure: purity of the transition surface', () => {
  * | resolved outcome | `LongErasureHistoryEntry.outcomeProse: string \| null` |
  * | closing screen | `LongErasureEpilogue.epilogueProse: string \| null` |
  *
- * Cases are red today and are encoded with `it.fails` (see
- * `tests/story-line/content/prose-contract.test.ts` for the convention): the
- * body genuinely fails now, and the case turns the suite red once implemented
- * so the marker cannot be forgotten.
+ * Cases were red under `it.fails` while the slice was in progress (see
+ * `tests/story-line/content/prose-contract.test.ts` for the convention). They
+ * are enabled now that this item implements the shape; the marker must not
+ * come back.
  */
 describe('The Long Erasure: narrative view model (prose contract)', () => {
-  /** A card carrying the (optional) authored context. */
-  interface ProseCard extends LongErasureCard {
-    readonly context?: string | null;
-  }
-
-  /** A history entry carrying the (optional) authored outcome prose. */
-  interface ProseHistoryEntry {
-    readonly outcomeProse?: string | null;
-  }
-
-  /** The closing view model carrying the (optional) authored epilogue. */
-  interface ProseEpilogue {
-    readonly epilogueProse?: string | null;
-  }
-
   /** Reads a compiled option's authored outcome prose, or `null`. */
   function saysOf(option: unknown): string | null {
     return (option as { says?: string | null }).says ?? null;
@@ -606,9 +591,9 @@ describe('The Long Erasure: narrative view model (prose contract)', () => {
     return chooseOption(logged, 'Seal the hatch');
   }
 
-  it.fails('[red] exposes the current beat’s context headlessly', () => {
+  it('[red] exposes the current beat’s context headlessly', () => {
     const content = proseContent();
-    expect((content.cards[0] as ProseCard).context).toBe(
+    expect(content.cards[0].context).toBe(
       'The Ashlight holds station at the edge of an Unwriting. Archivist Vane has been here before; the crew have not.',
     );
   });
@@ -628,19 +613,19 @@ describe('The Long Erasure: narrative view model (prose contract)', () => {
     );
   });
 
-  it.fails('[red] exposes the resolved outcome prose on the journey history', () => {
+  it('[red] exposes the resolved outcome prose on the journey history', () => {
     const finished = playToEnding();
-    expect((finished.history[0] as ProseHistoryEntry).outcomeProse).toBe(
+    expect(finished.history[0].outcomeProse).toBe(
       'You log it, and the charts go blank with it.',
     );
-    expect((finished.history[1] as ProseHistoryEntry).outcomeProse).toBe(
+    expect(finished.history[1].outcomeProse).toBe(
       'The hatch seals behind you, and the reading stops mattering.',
     );
   });
 
-  it.fails('[red] exposes the terminal card’s authored epilogue', () => {
+  it('[red] exposes the terminal card’s authored epilogue', () => {
     const finished = playToEnding();
-    expect((buildEpilogue(finished) as ProseEpilogue).epilogueProse).toBe(
+    expect(buildEpilogue(finished).epilogueProse).toBe(
       'The timeline closes over the erasure like water. You are the only thing that remembers the room.',
     );
   });
@@ -649,14 +634,51 @@ describe('The Long Erasure: narrative view model (prose contract)', () => {
     // The absent-prose path must stay total: `null` (never `''`, never a
     // throw) on every prose surface.
     const content = bareContent();
-    expect((content.cards[0] as ProseCard).context ?? null).toBeNull();
+    expect(content.cards[0].context ?? null).toBeNull();
 
     const started = createLongErasureRun(1, content);
     expect(saysOf(availableOptions(started)[0]!)).toBeNull();
 
     const finished = chooseOption(started, 'Walk on');
-    expect((finished.history[0] as ProseHistoryEntry).outcomeProse ?? null).toBeNull();
-    expect((buildEpilogue(finished) as ProseEpilogue).epilogueProse ?? null).toBeNull();
+    expect(finished.history[0].outcomeProse ?? null).toBeNull();
+    expect(buildEpilogue(finished).epilogueProse ?? null).toBeNull();
+  });
+
+  it('journals the authored outcome prose, truncated to one display line', () => {
+    const finished = playToEnding();
+    const journal = runJournal(finished);
+
+    // AC7: the journal carries the writer's consequence, not
+    // `You chose "…"` / the old label paraphrase.
+    expect(journal[0].outcome).toBe('The hatch seals behind you, and the reading stops mattering.');
+    expect(journal[1].outcome).toBe('You log it, and the charts go blank with it.');
+    expect(journal[0].outcome).not.toContain('You chose');
+    expect(journal[0].outcomeFull).toBe(
+      'The hatch seals behind you, and the reading stops mattering.',
+    );
+  });
+
+  it('truncates an over-long authored outcome in the journal without losing it', () => {
+    // A long authored consequence is ellipsised to one display line by the
+    // shared helper; the untruncated copy survives on the same journal entry.
+    const longOutcome = `${'word '.repeat(60).trim()}`;
+    const csv = [
+      'id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue',
+      `le-x-open,Open,An opening.,"Wait|le-x-end#says=${longOutcome}",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,,`,
+      'le-x-end,End,It ends.,,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",Ending,1,,A closing line.',
+    ].join('\n');
+
+    const finished = chooseOption(
+      createLongErasureRun(1, longErasureContentFromCsv(csv)),
+      'Wait',
+    );
+    const row = runJournal(finished)[0];
+
+    expect(row.outcome.length).toBeLessThanOrEqual(DEFAULT_OUTCOME_MAX_LENGTH);
+    expect(row.outcome.endsWith('…')).toBe(true);
+    expect(row.outcome.includes('\n')).toBe(false);
+    expect(row.outcomeFull).toBe(longOutcome);
+    expect(finished.history[0].outcomeProse).toBe(longOutcome);
   });
 });
 

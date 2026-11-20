@@ -15,6 +15,7 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 | `createDragDropManager` | Reusable drag-and-drop lifecycle (dragstart/drag/dragend/drop, snap-back, drop-zone hit-testing) | n/a |
 | `HandView` reorder | Opt-in drag-to-reorder inside the hand row: animated re-layout + `sfx-card-swap` | 240ms |
 | `revealNarration` | Progressive prose reveal (story beat) with a shared SFX | prose length × 28ms (400–9000ms) |
+| `paginateProse` | Word-boundary prose pagination for a fixed display budget (no silent clipping) | n/a (pure) |
 
 ## dealCard
 
@@ -689,6 +690,48 @@ Audio is best-effort: a missing/unplayable key, a throwing backend or no
 `soundManager` at all is swallowed, and the **textual channel is
 unconditional** — a scene without a time plugin degrades to an instant reveal
 rather than leaving the prose half-written.
+
+## paginateProse (prose panels)
+
+Splits an authored prose block into word-boundary **pages** sized to a panel's
+character budget, so a narrative panel can show one page plus a visible
+`[ more… ]` affordance instead of silently clipping the writer's text
+(CG-0MWO7CVDI004J3JX). Pure and Phaser-free — the panel owns the budget (derived
+from its width and line count), this module owns the deterministic split.
+
+### Import
+
+```ts
+import { paginateProse, DEFAULT_PROSE_PAGE_CHARS } from '@ui';
+```
+
+### Usage
+
+```ts
+const { pages, pageCount, overflow } = paginateProse(prose, DEFAULT_PROSE_PAGE_CHARS);
+
+panelText.setText(pages[0] ?? '');
+moreText
+  .setText(overflow ? `[ more… ] (1/${pageCount})` : '')
+  .setVisible(overflow);
+// On click: panelText.setText(pages[1] ?? ''); …
+```
+
+### Contract
+
+- **Nothing is dropped.** Whitespace is normalised (runs collapse to one space,
+  as word wrap renders them); joining the pages with a single space reproduces
+  the normalised prose exactly.
+- **Word boundaries.** A page break falls between words unless one word alone
+  exceeds the budget — that word gets its own over-budget page, never a
+  mid-word cut.
+- **Total.** Blank prose returns `pages: []` (`pageCount: 0`, `overflow: false`)
+  so the caller renders nothing; a non-positive budget degrades to one
+  character per page rather than throwing.
+
+The Gym's *The Long Erasure* scene is the reference consumer: the `context`
+paragraph, the choice's narrated outcome and the closing `epilogue` all flow
+through one paged panel, with `[ more… ]` revealing the remainder.
 
 ## runSceneTransition
 

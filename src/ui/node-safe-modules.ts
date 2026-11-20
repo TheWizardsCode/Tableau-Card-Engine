@@ -57,6 +57,8 @@ export const uiNodeSafeModules = [
   'content-unlock-client',
   // Progressive narration reveal; Phaser appears only as an elided type.
   'narration-reveal',
+  // Word-boundary prose pagination for a fixed display budget; pure string work.
+  'prose-pagination',
 ] as const;
 
 /** Union of the `src/ui` module basenames promised by {@link uiNodeSafeModules}. */
