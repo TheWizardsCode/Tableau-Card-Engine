@@ -502,13 +502,19 @@ describe('The Long Erasure: terminals and journal', () => {
     expect(labelsOf(state)).toEqual([]);
   });
 
-  it('journals exactly one row per choice, most recent first', () => {
+  it('journals exactly one row per choice, most recent first, in the authored prose', () => {
     const state = play(RESET_PATH);
     const journal = runJournal(state);
 
     expect(journal).toHaveLength(state.history.length);
-    expect(journal[0].outcome).toContain('Finish the weave');
-    expect(journal[journal.length - 1].outcome).toContain('Rally the survey crew');
+    // One row per choice, newest first, and each row is the **authored**
+    // consequence of that choice (never a paraphrase of the option label).
+    const newest = state.history[state.history.length - 1];
+    const oldest = state.history[0];
+    expect(newest.outcomeProse).toBeTruthy();
+    expect(oldest.outcomeProse).toBeTruthy();
+    expect(journal[0].outcomeFull).toBe(newest.outcomeProse);
+    expect(journal[journal.length - 1].outcomeFull).toBe(oldest.outcomeProse);
     for (const entry of journal) {
       expect(entry.turn).toBeGreaterThan(0);
       expect(entry.storyline).toBe('The Long Erasure');

@@ -26,6 +26,7 @@ import {
   GymLongErasureScene,
   NARRATIVE_PANEL_PAGE_CHARS,
   OPTION_ANCHORS,
+  longErasureSceneContent,
   setLongErasureSceneContent,
 } from '../../example-games/gym/scenes/GymLongErasureScene';
 import { longErasureContentFromCsv } from '../../example-games/gym/GymLongErasureGame';
@@ -49,8 +50,8 @@ const PROSE_HEADER =
  *
  * Two choices reach the ending, so the prose surfaces (beat context, option
  * outcome, ending epilogue) are all reachable in one screen-flow test. The
- * shipped content authors no prose yet (that is a sibling content item), hence
- * the injected fixture through `setLongErasureSceneContent()`.
+ * fixture isolates the prose **surfaces**; the shipped content's own prose is
+ * played for real in the full-voyage tests at the end of this suite.
  */
 function proseCsv(options: {
   readonly context?: string;
@@ -93,6 +94,12 @@ const RESET_ROUTE = [
   'Side with the captain',
   'Finish the weave',
 ] as const;
+
+/** The reset route with its last choice swapped for the quiet ending. */
+const QUIET_ROUTE = [...RESET_ROUTE.slice(0, -1), 'Unwrite the Loom'] as const;
+
+/** The reset route with its last choice swapped for the ramming ending. */
+const RAM_ROUTE = [...RESET_ROUTE.slice(0, -1), 'Ram the core'] as const;
 
 /** A route that arrives at The Archivist's Offer's successor with goodwill 2. */
 const GOODWILL_TWO_ROUTE = [
@@ -285,7 +292,9 @@ describe('GymLongErasureScene browser test', () => {
     scene.chooseByLabel('Log the erasure');
     expect(scene.getFeedbackText()).toBe('You chose "Log the erasure".');
     expect(scene.getJournalLines().length).toBe(1);
-    expect(scene.getJournalLines()[0]).toMatch(/The First Unwriting/);
+    expect(scene.getJournalLines()[0]).toMatch(/^• /);
+    expect(scene.getJournalLines()[0]).not.toContain('You chose');
+    expect(scene.getJournalLines()[0]).toContain('You spend a store of paper');
 
     scene.chooseByLabel('Stay silent');
     expect(scene.getFeedbackText()).toBe('You chose "Stay silent".');
@@ -415,5 +424,173 @@ describe('GymLongErasureScene browser test', () => {
     expect(`${firstPage} ${secondPage}`.replace(/\s+/g, ' ')).toContain(
       longContext.replace(/\s+/g, ' '),
     );
+  });
+});
+
+/**
+ * The shipped prose, played for real (CG-0MWO7CX0V000PR5K, AC7).
+ *
+ * These tests boot the scene on the **committed** content (no fixture) and walk
+ * every ending, so the record of the playthrough is the suite itself: each
+ * beat's authored context reaches the panel, every chosen option's consequence
+ * is narrated, and each of the four endings shows its own epilogue. Paging is
+ * exercised rather than bypassed — the helper reads every page, which is how a
+ * player reaches prose longer than the panel.
+ */
+describe('GymLongErasureScene shipped prose: full playthrough (AC7)', () => {
+  let game: Phaser.Game | null = null;
+
+  afterEach(() => {
+    if (game) game.destroy(true, false);
+    game = null;
+    const container = document.getElementById('game-container');
+    if (container) container.remove();
+    setLongErasureSceneContent(null);
+  });
+
+  /** Collapses whitespace exactly as the panel's paginator does. */
+  function normaliseProse(text: string): string {
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
+  /** Every page of the current narrative panel, in reading order. */
+  function panelPages(scene: GymLongErasureScene): string[] {
+    const pages = [scene.getNarrativePanelText()];
+    for (let guard = 0; guard < 20; guard += 1) {
+      if (scene.getMoreAffordanceText() === '') break;
+      scene.showNextPanelPage();
+      pages.push(scene.getNarrativePanelText());
+    }
+    return pages;
+  }
+
+  /** The whole panel prose, across every revealed page. */
+  function panelProse(scene: GymLongErasureScene): string {
+    return normaliseProse(panelPages(scene).join(' '));
+  }
+
+  /** Boots the scene on the committed content, with prose applied instantly. */
+  async function bootShippedContent(): Promise<GymLongErasureScene> {
+    // No content override: the scene reads `content/long-erasure.csv` itself.
+    setLongErasureSceneContent(null);
+    const container = document.createElement('div');
+    container.id = 'game-container';
+    document.body.appendChild(container);
+
+    game = new Phaser.Game({
+      type: Phaser.CANVAS,
+      width: 1280,
+      height: 720,
+      parent: 'game-container',
+      backgroundColor: '#141a24',
+      scene: [GymLongErasureScene],
+    });
+
+    await waitForScene(game, GYM_LONG_ERASURE_KEY);
+    const scene = game.scene.getScene(GYM_LONG_ERASURE_KEY) as GymLongErasureScene;
+    scene.setReducedMotionProperty(true);
+    return scene;
+  }
+
+  /** The authored card behind the run's current beat. */
+  function currentCard(scene: GymLongErasureScene) {
+    const content = longErasureSceneContent();
+    const card = content.cards.find(
+      (entry) => entry.id === scene.getRunState().currentCard.id,
+    );
+    expect(card, `authored card "${scene.getRunState().currentCard.id}"`).toBeDefined();
+    return card!;
+  }
+
+  it('narrates every beat and every choice of a full voyage without losing prose', async () => {
+    const scene = await bootShippedContent();
+
+    // Beat 1: the shipped context is on screen, complete across its pages.
+    const entry = currentCard(scene);
+    expect(entry.context).toBeTruthy();
+    expect(panelProse(scene)).toBe(normaliseProse(entry.context!));
+
+    for (const label of RESET_ROUTE) {
+      const before = scene.getRunState();
+      expect(scene.getAvailableOptionLabels()).toContain(label);
+
+      scene.chooseByLabel(label);
+
+      const after = scene.getRunState();
+      const chosen = after.history[after.history.length - 1];
+      expect(chosen.outcomeProse, `"${label}" narrates no consequence`).toBeTruthy();
+
+      // Consequence first, then the new situation (or the ending's epilogue
+      // once the voyage closes), exactly as composed — and nothing clipped:
+      // the page budget is respected, never a silent cut.
+      const closing = after.status === 'complete';
+      const situation = closing
+        ? scene.getEpilogue()?.epilogueProse
+        : currentCard(scene).context;
+      const expected = [chosen.outcomeProse, situation]
+        .filter((part): part is string => typeof part === 'string')
+        .join(' ');
+      expect(panelProse(scene)).toBe(normaliseProse(expected));
+
+      // No panel collision: the options remain rendered and offered after the
+      // prose is read, on every beat.
+      if (after.status === 'playing') {
+        expect(scene.getOptionAreaTexts().length).toBe(
+          scene.getAvailableOptionLabels().length,
+        );
+      }
+      expect(before.beat).toBeLessThanOrEqual(after.beat);
+    }
+
+    // The voyage actually ended on the reset ending.
+    expect(scene.getEpilogue()?.outcome).toBe('reset');
+  });
+
+  it('shows each ending its own authored epilogue', async () => {
+    const routes: readonly {
+      readonly name: string;
+      readonly route: readonly string[];
+      readonly endingId: string;
+    }[] = [
+      { name: 'abandon', route: ABANDON_ROUTE, endingId: 'le-end-abandon' },
+      { name: 'reset', route: RESET_ROUTE, endingId: 'le-end-reset' },
+      { name: 'quiet', route: QUIET_ROUTE, endingId: 'le-end-quiet' },
+      { name: 'ram', route: RAM_ROUTE, endingId: 'le-end-ram' },
+    ];
+    const content = longErasureSceneContent();
+    const seen = new Map<string, string>();
+
+    for (const { name, route, endingId } of routes) {
+      const scene = await bootShippedContent();
+      for (const label of route) {
+        expect(
+          scene.getAvailableOptionLabels(),
+          `${name} route: "${label}" was not offered`,
+        ).toContain(label);
+        scene.chooseByLabel(label);
+      }
+
+      const run = scene.getRunState();
+      expect(run.currentCard.id, `${name} route reached the wrong ending`).toBe(endingId);
+      expect(run.status, `${name} route did not end the run`).toBe('complete');
+
+      const authored = content.cards.find((card) => card.id === endingId);
+      expect(authored?.epilogue, `${endingId} authors no epilogue`).toBeTruthy();
+
+      // The closing screen carries this ending's own prose, in full.
+      expect(scene.getEpilogue()?.epilogueProse).toBe(authored!.epilogue);
+      expect(panelProse(scene)).toContain(normaliseProse(authored!.epilogue!));
+
+      // Distinct: no ending closes on another ending's words.
+      const epilogue = normaliseProse(authored!.epilogue!);
+      for (const [otherId, otherEpilogue] of seen) {
+        expect(epilogue, `${endingId} reuses ${otherId}'s epilogue`).not.toBe(
+          otherEpilogue,
+        );
+      }
+      seen.set(endingId, epilogue);
+    }
+
+    expect(seen.size).toBe(4);
   });
 });
