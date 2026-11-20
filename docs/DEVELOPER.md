@@ -5063,6 +5063,18 @@ tooltip.show('Card info', x, y);   // scheduled (delayMs > 0)
 tooltip.hide();                    // cancelled — nothing will appear
 ```
 
+**Following a moving target (re-anchor).** The delay gates *appearance*, not *following*. Once the overlay is up, `reanchor(x, y)` keeps it with its target instead of freezing it where it first landed:
+
+```typescript
+cardSprite.on('pointermove', () => tooltip.reanchor(cardSprite.x, cardSprite.y));
+```
+
+- While a show is **pending**, `reanchor()` moves the pending anchor exactly as a repeated `show()` does: the dwell keeps running, so following a moving pointer can never postpone the appearance.
+- Once the overlay is **visible**, `reanchor()` repositions it immediately with the same placement rules the first render used (DOM: the canvas/camera mapping plus the viewport flip and clamp; Phaser: the container's position) and leaves its content alone — no re-render, no destroy/re-create, so there is no flicker.
+- With **nothing** pending and nothing visible it is a no-op: a re-anchor never shows a tooltip the host has not asked for.
+- A further `show()` is *not* the way to follow: with the overlay already rendered it arms a **second dwell** and leaves the visible overlay frozen at its old anchor. `hide()` + `show()` instead flickers and waits out a fresh delay.
+- Settings suppression still wins: with tooltips switched off, a re-anchor cancels the pending show and hides any visible overlay, exactly as `show()` does.
+
 Tests advance a fake clock (unit) or the real Phaser clock via `scene.time.preUpdate()` + `scene.time.update(now + delay, delay)` (browser) — the delay is never exercised with a real-time sleep.
 
 **Bounds guarantee.** A tooltip must never render (partially) outside its visible bounds — an off-screen DOM tooltip used to extend the page's scrollable area and make the page "resize to make space". Both modes are now clamped:

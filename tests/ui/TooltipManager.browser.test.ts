@@ -330,6 +330,56 @@ describe('TooltipManager (browser integration)', () => {
     expect(tooltipDiv!.style.display).toBe('none');
   }, 10000);
 
+  it('keeps a shown delayed tooltip visible and following the pointer on re-anchor', async () => {
+    const { scene, manager } = await bootConfiguredTooltipScene({ delayMs: 5000 });
+    const tooltipDiv = findTooltipDiv();
+    expect(tooltipDiv).not.toBeNull();
+
+    manager.show('following the pointer', 10, 10);
+    advanceSceneClock(scene, 5000);
+
+    expect(tooltipDiv!.style.display).toBe('block');
+    expect(tooltipDiv!.textContent).toBe('following the pointer');
+
+    const startLeft = parseFloat(tooltipDiv!.style.left);
+    const startTop = parseFloat(tooltipDiv!.style.top);
+
+    manager.reanchor(120, 90);
+
+    // Still the same visible overlay — no hide/re-show, no content reset.
+    expect(tooltipDiv!.style.display).toBe('block');
+    expect(tooltipDiv!.textContent).toBe('following the pointer');
+    const firstLeft = parseFloat(tooltipDiv!.style.left);
+    const firstTop = parseFloat(tooltipDiv!.style.top);
+    expect(firstLeft).toBeGreaterThan(startLeft);
+    expect(firstTop).toBeGreaterThan(startTop);
+
+    manager.reanchor(150, 110);
+
+    expect(tooltipDiv!.style.display).toBe('block');
+    expect(parseFloat(tooltipDiv!.style.left)).toBeGreaterThan(firstLeft);
+    expect(parseFloat(tooltipDiv!.style.top)).toBeGreaterThan(firstTop);
+
+    // Advancing the clock cannot fire a second dwell: none was armed.
+    advanceSceneClock(scene, 5000);
+    expect(tooltipDiv!.style.display).toBe('block');
+
+    manager.destroy();
+  }, 10000);
+
+  it('does not reveal a tooltip when re-anchored with nothing shown', async () => {
+    const { manager } = await bootConfiguredTooltipScene({ delayMs: 5000 });
+    const tooltipDiv = findTooltipDiv();
+    expect(tooltipDiv).not.toBeNull();
+
+    manager.reanchor(80, 60);
+
+    expect(tooltipDiv!.style.display).toBe('none');
+    expect(tooltipDiv!.textContent).toBe('');
+
+    manager.destroy();
+  }, 10000);
+
   it('gates the Phaser render mode behind the delay', async () => {
     const renders: number[] = [];
     const { scene, manager } = await bootConfiguredTooltipScene({

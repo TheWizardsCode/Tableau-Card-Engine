@@ -564,6 +564,131 @@ describe('TooltipManager', () => {
 
     expect(containerFactory).not.toHaveBeenCalled();
   });
+
+  // ── Re-anchoring a pending or visible tooltip ───────────────────────
+
+  it('re-anchors a pending show without restarting the dwell', () => {
+    const clock = installFakeClock(mockScene);
+    const tooltip = new TooltipManager(mockScene, undefined, { delayMs: 1500 });
+    const div = createdDivs[0] as any;
+
+    tooltip.show('pending', 10, 10);
+    tooltip.reanchor(40, 60);
+
+    // Still exactly one timer: a re-anchor must never arm a second dwell.
+    expect(clock.delayedCall).toHaveBeenCalledTimes(1);
+    expect(div.style.display).toBe('none');
+
+    clock.advance();
+
+    // screenX = 100 + 40, screenY = 50 + 60, + hover offset (10, 10).
+    expect(div.textContent).toBe('pending');
+    expect(div.style.left).toBe('150px');
+    expect(div.style.top).toBe('120px');
+    expect(div.style.display).toBe('block');
+  });
+
+  it('re-anchors a visible DOM overlay without re-rendering its content', () => {
+    const clock = installFakeClock(mockScene);
+    const tooltip = new TooltipManager(mockScene, undefined, { delayMs: 1500 });
+    const div = createdDivs[0] as any;
+
+    tooltip.show('visible', 10, 10);
+    clock.advance();
+
+    expect(div.style.left).toBe('120px');
+    expect(div.style.top).toBe('70px');
+
+    tooltip.reanchor(200, 150);
+
+    // Moved to the live anchor, same node, same text, no extra timer.
+    expect(div.style.left).toBe('310px');
+    expect(div.style.top).toBe('210px');
+    expect(div.textContent).toBe('visible');
+    expect(div.style.display).toBe('block');
+    expect(clock.delayedCall).toHaveBeenCalledTimes(1);
+    expect(createdDivs).toHaveLength(1);
+  });
+
+  it('keeps the viewport clamp when re-anchoring a visible overlay', () => {
+    (globalThis as any).window = { innerWidth: 900, innerHeight: 700 };
+    const clock = installFakeClock(mockScene);
+    const tooltip = new TooltipManager(mockScene, undefined, { delayMs: 1500 });
+    const div = createdDivs[0] as any;
+    div.offsetWidth = 240;
+    div.offsetHeight = 100;
+
+    tooltip.show('clamped', 10, 10);
+    clock.advance();
+    tooltip.reanchor(5000, 5000);
+
+    // Flipped left/above and clamped to the 4 px margin, exactly as show() does.
+    expect(div.style.left).toBe('656px');
+    expect(div.style.top).toBe('596px');
+  });
+
+  it('is a no-op when nothing is pending and nothing is visible', () => {
+    const clock = installFakeClock(mockScene);
+    const tooltip = new TooltipManager(mockScene, undefined, { delayMs: 1500 });
+    const div = createdDivs[0] as any;
+
+    tooltip.reanchor(120, 80);
+
+    expect(div.style.display).toBe('none');
+    expect(div.textContent).toBe('');
+    expect(clock.delayedCall).not.toHaveBeenCalled();
+  });
+
+  it('never reveals a tooltip that is suppressed on re-anchor', () => {
+    const mockSettingsPanel = { showTooltips: true };
+    const tooltip = new TooltipManager(
+      mockScene,
+      mockSettingsPanel as unknown as SettingsPanel,
+    );
+    const div = createdDivs[0] as any;
+
+    tooltip.show('suppressed later', 10, 10);
+    expect(div.style.display).toBe('block');
+
+    // The player turns tooltips off while the overlay is up: a re-anchor must
+    // remove it rather than move it.
+    mockSettingsPanel.showTooltips = false;
+    tooltip.reanchor(200, 150);
+
+    expect(div.style.display).toBe('none');
+    expect(div.style.left).not.toBe('310px');
+  });
+
+  it('re-anchors a visible Phaser overlay by moving its container', () => {
+    const clock = installFakeClock(mockScene);
+    const mockContainer = {
+      add: vi.fn(),
+      setPosition: vi.fn(),
+      setDepth: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const containerFactory = vi.fn(() => mockContainer);
+    (mockScene.add as any) = { container: containerFactory };
+    const renderFn = vi.fn((container: unknown) => container);
+
+    const tooltip = new TooltipManager(mockScene, undefined, {
+      phaserRender: renderFn as any,
+      delayMs: 1500,
+    });
+
+    tooltip.show('phaser', 10, 20);
+    clock.advance();
+
+    expect(containerFactory).toHaveBeenCalledTimes(1);
+
+    tooltip.reanchor(300, 400);
+
+    expect(mockContainer.setPosition).toHaveBeenCalledWith(300, 400);
+    // No second container and no second render: following must not flicker.
+    expect(containerFactory).toHaveBeenCalledTimes(1);
+    expect(renderFn).toHaveBeenCalledTimes(1);
+    expect(clock.delayedCall).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('clampTooltipToBounds', () => {

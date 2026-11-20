@@ -260,6 +260,12 @@ export class TooltipManager {
   private readonly touchDelayMs: number;
   private phaserContainer: Phaser.GameObjects.Container | null = null;
   private pendingShow: PendingTooltipShow | null = null;
+  /**
+   * Whether an overlay is currently on screen. Tracked explicitly so
+   * {@link reanchor} can tell "visible, move it" from "nothing on screen, do
+   * not show anything" without inferring it from the renderer's DOM state.
+   */
+  private rendered = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -313,6 +319,11 @@ export class TooltipManager {
    * the live pointer) without restarting the delay — continuous pointer
    * movement inside one target cannot postpone the tooltip indefinitely.
    * `hide()` and `destroy()` cancel a pending show.
+   *
+   * The delay gates **appearance**, not **following**: once the overlay is up,
+   * moving it with the pointer is {@link reanchor}'s job — a further `show()`
+   * would arm a second dwell and leave the visible overlay frozen at its old
+   * anchor.
    *
    * A delay of `0` (the default) renders synchronously on this call and
    * schedules no timer, so callers that pass no timing config behave exactly
@@ -370,6 +381,59 @@ export class TooltipManager {
   }
 
   /**
+   * Move the tooltip's anchor to (x, y) **without** arming a new dwell.
+   *
+   * The delay gates *appearance*, not *following*: once a host has shown a
+   * delayed tooltip it normally wants the overlay to stay with its target while
+   * the pointer moves inside it. Re-issuing `show()` cannot express that — with
+   * the overlay already rendered it schedules a second dwell and leaves the
+   * overlay frozen at the old anchor — and `hide()` + `show()` flickers and
+   * waits out a whole fresh delay. This method is the third anchor state:
+   *
+   * - a show is **pending**: the pending anchor moves and the dwell keeps
+   *   running (identical to a repeated `show()` while pending);
+   * - the overlay is **visible**: it is repositioned immediately with the same
+   *   placement rules `show()` uses (DOM: canvas/camera mapping plus the
+   *   viewport clamp/flip; Phaser: the container's position) and its content is
+   *   left alone, so there is no re-render and no flicker;
+   * - **nothing** is pending or visible: a no-op — a re-anchor never shows a
+   *   tooltip the host has not asked for.
+   *
+   * Suppression still wins: with `SettingsPanel.showTooltips === false` a
+   * pending show is cancelled and any visible overlay is hidden, exactly as
+   * `show()` does.
+   *
+   * @param x – world X of the tooltip's target.
+   * @param y – world Y of the tooltip's target.
+   */
+  reanchor(x: number, y: number): void {
+    if (this.settingsPanel && !this.settingsPanel.showTooltips) {
+      this.cancelPendingShow();
+      this.hide();
+      return;
+    }
+
+    // Still waiting out a dwell: move the anchor, keep the running timer so
+    // continuous movement can never postpone the show.
+    const pending = this.pendingShow;
+    if (pending) {
+      pending.x = x;
+      pending.y = y;
+      return;
+    }
+
+    // Nothing pending and nothing on screen: never render, never schedule.
+    if (!this.rendered) return;
+
+    if (this.phaserContainer) {
+      this.phaserContainer.setPosition(x, y);
+      return;
+    }
+
+    this.positionDomNode(x, y);
+  }
+
+  /**
    * Render a tooltip immediately (both render paths) — the pre-delay
    * behaviour, shared by the zero-delay path and the delayed timer callback.
    */
@@ -395,6 +459,7 @@ export class TooltipManager {
         ...ctx,
       };
       this.phaserRender(this.phaserContainer, this.scene, () => this.hide(), mergedCtx);
+      this.rendered = true;
       return;
     }
 
@@ -405,6 +470,19 @@ export class TooltipManager {
     // browser does not paint until this task completes, so there is no
     // visible flash between the measure and the final position.
     this.node.textContent = content;
+    this.positionDomNode(x, y);
+  }
+
+  /**
+   * Position the DOM overlay for an anchor: canvas/camera mapping plus the
+   * viewport clamp/flip. Shared by the first render and by {@link reanchor}, so
+   * a following tooltip can never jump or leave the viewport.
+   */
+  private positionDomNode(x: number, y: number): void {
+    if (!this.node) return;
+
+    // Display first: the clamp/flip below measures the node's rendered size.
+    this.node.style.display = 'block';
 
     // Convert game/world coordinates to client coordinates relative to the canvas
     try {
@@ -419,8 +497,6 @@ export class TooltipManager {
       const scaleY = rect.height / this.scene.scale.height;
       const screenX = rect.left + (x - cam.scrollX) * scaleX;
       const screenY = rect.top + (y - cam.scrollY) * scaleY;
-
-      this.node.style.display = 'block';
 
       const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
       const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
@@ -456,6 +532,7 @@ export class TooltipManager {
 
       this.node.style.left = `${Math.round(left)}px`;
       this.node.style.top = `${Math.round(top)}px`;
+      this.rendered = true;
     } catch (e) {
       // If anything fails, hide tooltip
       this.hide();
@@ -495,8 +572,12 @@ export class TooltipManager {
     // Hide Phaser tooltip
     this.hidePhaserTooltip();
     // Hide DOM tooltip
-    if (!this.node) return;
+    if (!this.node) {
+      this.rendered = false;
+      return;
+    }
     this.node.style.display = 'none';
+    this.rendered = false;
   }
 
   /** Destroy the active Phaser container (internal). */
@@ -505,6 +586,7 @@ export class TooltipManager {
       this.phaserContainer.destroy();
       this.phaserContainer = null;
     }
+    this.rendered = false;
   }
 
   destroy(): void {
