@@ -14,6 +14,7 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 | `shakeIllegalMove` | Illegal-move feedback: tint + shake, plus an optional transient reason toast | n/a (50ms × repeats) |
 | `createDragDropManager` | Reusable drag-and-drop lifecycle (dragstart/drag/dragend/drop, snap-back, drop-zone hit-testing) | n/a |
 | `HandView` reorder | Opt-in drag-to-reorder inside the hand row: animated re-layout + `sfx-card-swap` | 240ms |
+| `revealNarration` | Progressive prose reveal (story beat) with a shared SFX | prose length × 28ms (400–9000ms) |
 
 ## dealCard
 
@@ -603,6 +604,91 @@ import { popTextOrIcon } from '@ui/popTextOrIcon';
 | `target` | `GameObject` | undefined | Existing text/icon object |
 | `label` | `string` | undefined | Text label (created if no target provided) |
 | `reducedMotion` | `boolean` | undefined | When true, destroys target immediately without animation |
+
+## revealNarration (animated narration reveal)
+
+Progressively reveals a prose block — the consequence of a choice — into an
+**existing** text object (or a container holding one), with a shared
+`COMMON_SFX_KEYS` sound. Turns an outcome into a story beat instead of a silent
+text swap (CG-0MWO7CULE001IWU1).
+
+### Import
+
+```ts
+import { revealNarration } from '@ui';
+import { COMMON_SFX_KEYS } from '@core-engine/SoundManager';
+```
+
+`@ui/narration-reveal` is listed in the node-safe manifest
+(`src/ui/node-safe-modules.ts`): Phaser is referenced only through
+`import type`, so unit suites can import it in a plain Node environment.
+
+### Usage
+
+```ts
+const reveal = revealNarration({
+  scene: this,
+  target: this.narrationText,        // Phaser.GameObjects.Text or a Container
+  prose: option.says,                // authored outcome prose, shown verbatim
+  soundManager: this.soundManager,   // optional; injected audio backend
+  sfx: COMMON_SFX_KEYS.SCORE_REVEAL, // any COMMON_SFX_KEYS value
+});
+
+// Later, e.g. when the overlay closes or the player skips ahead:
+reveal.complete(); // full prose now, timer/listeners released
+// or
+reveal.destroy();  // abort: keep the text revealed so far, release resources
+```
+
+### Options (`RevealNarrationOptions`)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scene` | `Phaser.Scene` | required | Owns the reveal timer and input listeners |
+| `target` | `Text \| Container` | required | Text object to write into, or a container whose first text child is used. Never destroyed by the helper |
+| `prose` | `string` | required | Prose to reveal, verbatim (the content/rules layer owns the copy) |
+| `reducedMotion` | `boolean` | `getEffectiveReducedMotion()` | Instant reveal, no timer and no SFX |
+| `soundManager` | `{ play(key): void }` | undefined | Injected audio backend (typically `SoundManager`) |
+| `sfx` | `CommonSfxKey \| null` | `COMMON_SFX_KEYS.SCORE_REVEAL` | Shared SFX key; `null` silences the reveal |
+| `skipOnInput` | `boolean` | `true` | First pointer/key input completes the reveal instantly |
+| `msPerCharacter` | `number` | `28` | Reveal speed override (clamped to a readable 16–60 ms step) |
+| `scheduler` | `NarrationRevealScheduler` | Phaser time plugin | Timer seam — unit tests inject a fake |
+| `onComplete` | `function` | undefined | Called at most once when the full prose is on screen |
+
+### Handle (`NarrationRevealHandle`)
+
+| Member | Description |
+|--------|-------------|
+| `prose` / `plan` / `text` | Immutable prose, the deterministic schedule, and the text currently applied |
+| `done` / `destroyed` | Whether the full prose is on screen / the handle has been torn down |
+| `complete()` | Finish instantly: full prose, timer cancelled, listeners detached. Idempotent |
+| `destroy()` | Abort: cancel the timer and detach every listener, leaving the text as it stands. Idempotent; `complete()` afterwards is a no-op |
+
+### Pacing and scheduling
+
+`planNarrationReveal(prose, opts)` is pure and exported, so pacing is testable
+without a scene. The total duration is `prose.length × 28ms`, clamped to
+400–9000 ms; the step interval is the per-character duration clamped to
+16–60 ms; step *i* reveals the first `ceil(length × i / stepCount)` characters,
+and the final step is always the exact prose. Empty prose is an instant plan.
+
+### Reduced-motion contract
+
+With `reducedMotion: true` (or the effective preference — explicit SettingsStore
+toggle, then `prefers-reduced-motion`) the helper applies the **full prose
+synchronously**, creates no timer, registers no input listeners and plays no
+SFX, matching the shared reduced-motion contract below. `onComplete` fires
+synchronously.
+
+### SFX contract
+
+The sound is always a `COMMON_SFX_KEYS` value played through the injected
+`SoundManager`; `resolveNarrationSfxKey()` never returns a game-scoped literal
+(an unknown key falls back to the shared default, and `null` means silent).
+Audio is best-effort: a missing/unplayable key, a throwing backend or no
+`soundManager` at all is swallowed, and the **textual channel is
+unconditional** — a scene without a time plugin degrades to an instant reveal
+rather than leaving the prose half-written.
 
 ## runSceneTransition
 

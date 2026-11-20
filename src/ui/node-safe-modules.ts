@@ -55,6 +55,8 @@ export const uiNodeSafeModules = [
   'game-plugin-boot',
   // Total reader for the optional content-unlock bridge; guards `window`, no Phaser.
   'content-unlock-client',
+  // Progressive narration reveal; Phaser appears only as an elided type.
+  'narration-reveal',
 ] as const;
 
 /** Union of the `src/ui` module basenames promised by {@link uiNodeSafeModules}. */
