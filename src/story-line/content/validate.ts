@@ -271,7 +271,11 @@ export function validateContentCards(
         ...(isEncodingError
           ? {
               reason: err.reason,
-              ...(err.attribute !== undefined ? { path: `#${err.attribute}` } : {}),
+              ...(err.reason === 'unescaped-says-delimiter'
+                ? { path: `options[${err.optionIndex ?? 0}].says` }
+                : err.attribute !== undefined
+                  ? { path: `#${err.attribute}` }
+                  : {}),
             }
           : { reason: 'malformed-options' }),
         message: `Choice card "${id}" has a malformed options column: ${(err as Error).message}`,

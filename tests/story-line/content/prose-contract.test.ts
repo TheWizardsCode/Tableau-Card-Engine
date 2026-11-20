@@ -87,9 +87,7 @@ interface ProseCard extends ContentCard {
 }
 
 /** A compiled option with the authored outcome prose the grammar adds. */
-interface ProseOption<TState = unknown> extends StorylineOption<TState> {
-  readonly says?: string | null;
-}
+type ProseOption<TState = unknown> = StorylineOption<TState>;
 
 /** A resolution result carrying the chosen option's authored prose. */
 interface ProseResolution extends StorylineResolution {
@@ -277,7 +275,7 @@ describe('#says= option prose (red: CG-0MWO7CT6X004J2EU)', () => {
     return asProseOptions(compileContentOptions(entry));
   }
 
-  it.fails('[red] parses `#says=` in any attribute position', () => {
+  it('[green] parses `#says=` in any attribute position', () => {
     const options = entryOptions();
     expect(options.map((option) => option.label)).toEqual([
       'Open it',
@@ -291,7 +289,7 @@ describe('#says= option prose (red: CG-0MWO7CT6X004J2EU)', () => {
     expect(options[3]!.says).toBe(SAYS_BOOK);
   });
 
-  it.fails('[red] decodes `\\#` and `\\\\` but leaves `: `, commas, quotes and apostrophes alone', () => {
+  it('[green] decodes `\\#` and `\\\\` but leaves `: `, commas, quotes and apostrophes alone', () => {
     const options = entryOptions();
     expect(options[0]!.says).toContain('"1 # 2"');
     expect(options[1]!.says).toContain('says: "stop"');
@@ -300,7 +298,7 @@ describe('#says= option prose (red: CG-0MWO7CT6X004J2EU)', () => {
     expect(options[3]!.says).not.toContain('\\\\');
   });
 
-  it.fails('[red] keeps the mechanical attributes parsed alongside `#says=`', () => {
+  it('[green] keeps the mechanical attributes parsed alongside `#says=`', () => {
     const options = entryOptions();
     expect(options[0]!.cost).toEqual({ coins: 5 });
     expect(options[0]!.conditionalSuccessors?.[0]?.successorId).toBe('p-c');
@@ -308,7 +306,7 @@ describe('#says= option prose (red: CG-0MWO7CT6X004J2EU)', () => {
     expect(options[3]!.extraEffect).toEqual({ reputation: 1 });
   });
 
-  it.fails('[red] re-encodes the escaped cell byte-identically (parse → serialise identity)', async () => {
+  it('[green] re-encodes the escaped cell byte-identically (parse → serialise identity)', async () => {
     const serialise = (await loadCompile())
       .serialiseStorylineOptionsEncoding as SerialiseOptions | undefined;
     expect(typeof serialise).toBe('function');
@@ -318,7 +316,7 @@ describe('#says= option prose (red: CG-0MWO7CT6X004J2EU)', () => {
     expect(serialise!(parsed)).toBe(cell);
   });
 
-  it.fails('[red] re-encodes every authored option cell to a stable, re-parseable model', async () => {
+  it('[green] re-encodes every authored option cell to a stable, re-parseable model', async () => {
     const serialise = (await loadCompile())
       .serialiseStorylineOptionsEncoding as SerialiseOptions | undefined;
     expect(typeof serialise).toBe('function');
@@ -365,7 +363,7 @@ describe('#says= option prose (red: CG-0MWO7CT6X004J2EU)', () => {
 // ── Validation diagnostics (row + column + reason) ──────────────────
 
 describe('prose validation diagnostics (red: CG-0MWO7CT6X004J2EU)', () => {
-  it.fails('[red] reports an unescaped `;` or `#` inside a says value', () => {
+  it('[green] reports an unescaped `;` or `#` inside a says value', () => {
     const report = validateFixture('prose-says-unescaped.csv');
     expect(report.code).toBe(1);
     expect(report.valid).toBe(false);
@@ -380,7 +378,7 @@ describe('prose validation diagnostics (red: CG-0MWO7CT6X004J2EU)', () => {
     }
   });
 
-  it.fails('[red] reports a says value that decodes to more than one prose segment', () => {
+  it('[green] reports a says value that decodes to more than one prose segment', () => {
     const report = validateFixture('prose-says-parallel.csv');
     expect(report.code).toBe(1);
 

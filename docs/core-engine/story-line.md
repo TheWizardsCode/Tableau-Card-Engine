@@ -44,7 +44,7 @@ two sources, and both produce the same model:
 
 - **Content** — a card's CSV `options` cell authors the label/outcome shorthand
   *and* the extended declarative fields through `#`-prefixed attributes
-  (`#cost`, `#extra`, `#when`). See
+  (`#cost`, `#extra`, `#when`, `#says`). See
   [Authoring options in CSV](#authoring-options-in-csv).
 - **Programmatically** — `registerStorylineOptions` supplies the whole model,
   including the two callbacks (`condition`, `successorResolver`) that content
@@ -78,6 +78,7 @@ two sources, and both produce the same model:
 | `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins | `#when=field<op>number>successor` (repeatable) |
 | `cost?` | `Record<resourceKey, number>` | affordability gate + real payment at resolution | `#cost=key:number,…` |
 | `extraEffect?` | `Record<resourceKey, number>` | resolution — additional resource gain | `#extra=key:number,…` |
+| `says?` | `string` | presentation — the authored outcome prose for the option | `#says=<escaped prose>` |
 
 ```ts
 import { createStorylineSystem, validateStorylineOptions } from '@story-line';
@@ -200,11 +201,12 @@ A writer authors the whole option model in the `options` cell. Each option is a
 ```text
 encoding   := option (";" option)*
 option     := label "|" candidates attribute*
-attribute  := "#" ("cost" | "extra" | "when") "=" value
+attribute  := "#" ("cost" | "extra" | "when" | "says") "=" value
 candidates := candidate ("," candidate)*        // empty = terminal option
 cost       := key ":" number ("," key ":" number)*
 extra      := key ":" number ("," key ":" number)*
 when       := field op number ">" successor     // empty successor = chain end
+says       := prose                             // one segment; escapes below
 op         := ">=" | "<=" | "==" | ">" | "<"
 ```
 
@@ -215,6 +217,7 @@ op         := ">=" | "<=" | "==" | ">" | "<"
 | `#cost` | `#cost=stores:1,goodwill:1` | `cost` — a real payment at resolution |
 | `#extra` | `#extra=morale:+2` | `extraEffect` — a resolution gain |
 | `#when` | `#when=charge>=2>le-iii-ahead` | one `conditionalSuccessors` rule (repeat for an ordered list) |
+| `#says` | `#says=You log it, and the charts go blank with it.` | `says` — the option's authored outcome prose |
 
 Rules the parser and validator enforce:
 
@@ -224,6 +227,19 @@ Rules the parser and validator enforce:
 - **Reserved delimiters.** `;` separates options, `|` separates the label from
   its candidates, `,` separates candidates and `cost`/`extra` pairs, and `#`
   starts an attribute — none may appear inside a label or a candidate card id.
+- **`#says` is escaped prose, and escapes are recognised only there.** Inside a
+  `#says` value, `\;` → `;`, `\#` → `#` and `\\` → `\`. Every other backslash
+  (in a label, a candidate id, or a `#cost` / `#extra` / `#when` value) stays a
+  literal character, so no existing cell changes meaning. `|`, `,`, `=`, `:`,
+  quotes and apostrophes are not reserved in prose and need no escaping.
+  `parse → serialise` is byte-identical for a canonically ordered cell
+  (`#cost`, `#extra`, `#when`*, `#says` last), via
+  `serialiseStorylineOptionsEncoding`.
+- **A `#says` value is exactly one prose segment.** `;` delimits options, so a
+  value that decodes to more than one segment (an author-written parallel list,
+  `#says=One\; two`) is rejected by validation as `says-segment-count`, and an
+  unescaped `;` or `#` inside the value is rejected by the parser as
+  `unescaped-says-delimiter`, both with row + column + `options[N].says`.
 - **`#cost` / `#extra` pairs are `key:number`.** Each key is checked against the
   card's declared resources (the `resources` column, below); an undeclared key
   is an authoring error, never a silently invented resource.

@@ -42,7 +42,8 @@ export type StorylineValidationCode =
   | 'dangling-conditional-successor'
   | 'invalid-successor-id'
   | 'invalid-conditional-successors'
-  | 'invalid-condition';
+  | 'invalid-condition'
+  | 'says-segment-count';
 
 /** A single validation issue: where, what, and why. */
 export interface StorylineValidationIssue {
@@ -129,6 +130,11 @@ function isFiniteNumber(value: unknown): value is number {
  * - A conditional rule's `successorId` must be a string or `null`; when
  *   `knownTemplateIds` is supplied, a string successor id outside that set is
  *   reported as dangling.
+ * - `says`, when present, must be a **single** prose segment: a decoded value
+ *   containing a `;` is an author-written parallel list and is reported as
+ *   `says-segment-count` (a `;` delimits options). An unescaped `;` or `#`
+ *   inside the cell never reaches here — the parser rejects it
+ *   (`unescaped-says-delimiter`).
  *
  * Every issue is reported (the result is not short-circuited), so content
  * authors see the full problem list at once.
@@ -322,6 +328,31 @@ export function validateStorylineOptions<TState = unknown>(
             );
           }
         });
+      }
+    }
+
+    // ── says (option-outcome prose) ─────────────────────────
+    // A prose segment is delimited by `;`, so an authored says value must be
+    // exactly one segment. `#says=One\; two` parses (and round-trips) but
+    // reads as a parallel list, which is rejected here.
+    const says: unknown = option.says;
+    if (says !== undefined && says !== null) {
+      if (typeof says !== 'string') {
+        push(
+          `${base}.says`,
+          'says-segment-count',
+          'says must be a single prose segment string.',
+        );
+      } else {
+        const segments = says.split(';').length;
+        if (segments > 1) {
+          push(
+            `${base}.says`,
+            'says-segment-count',
+            `says must be a single prose segment (expected 1, actual ${segments}); ` +
+              'a ";" delimits options, so write an escaped "\\;" only for a literal character.',
+          );
+        }
       }
     }
   });

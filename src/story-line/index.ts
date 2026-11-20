@@ -68,7 +68,7 @@ export type {
 
 // ── Public runtime helpers ───────────────────────────────────
 export { STORY_UPDATE_PREFIX, parseStoryUpdate } from './journal';
-export { parseStorylineOptionsEncoding } from './compile';
+export { parseStorylineOptionsEncoding, serialiseStorylineOptionsEncoding } from './compile';
 export {
   StorylineOptionsEncodingError,
   type StorylineOptionsEncodingErrorReason,

@@ -613,7 +613,7 @@ describe('The Long Erasure: narrative view model (prose contract)', () => {
     );
   });
 
-  it.fails('[red] exposes each option’s authored outcome prose', () => {
+  it('[green] exposes each option’s authored outcome prose', () => {
     const started = createLongErasureRun(1, proseContent());
     const options = availableOptions(started);
     expect(options.map((option) => option.label)).toEqual([

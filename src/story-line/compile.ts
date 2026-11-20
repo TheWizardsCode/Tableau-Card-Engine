@@ -80,6 +80,7 @@ export type StorylineOptionsEncodingErrorReason =
   | 'malformed-cost-pair'
   | 'malformed-extra-pair'
   | 'unparseable-condition'
+  | 'unescaped-says-delimiter'
   | 'no-valid-option';
 
 /**
@@ -87,34 +88,183 @@ export type StorylineOptionsEncodingErrorReason =
  * `options` cell.
  *
  * Carries a stable {@link StorylineOptionsEncodingErrorReason | reason} and the
- * offending attribute name (when the fault is scoped to one), so content-level
- * tooling can report a row + column + reason diagnostic instead of only a
- * free-form message.
+ * offending attribute name / option index (when the fault is scoped to one),
+ * so content-level tooling can report a row + column + reason diagnostic
+ * instead of only a free-form message.
  */
 export class StorylineOptionsEncodingError extends Error {
   /** Stable machine-readable failure reason. */
   readonly reason: StorylineOptionsEncodingErrorReason;
   /** The `#attribute` the fault belongs to, when applicable. */
   readonly attribute?: string;
+  /**
+   * 0-based index of the option the fault belongs to, when applicable.
+   *
+   * Lets content tooling report `options[N].says` for a `#says` fault instead
+   * of only the raw attribute name.
+   */
+  readonly optionIndex?: number;
 
   constructor(
     message: string,
     reason: StorylineOptionsEncodingErrorReason,
     attribute?: string,
+    optionIndex?: number,
   ) {
     super(message);
     this.name = 'StorylineOptionsEncodingError';
     this.reason = reason;
     if (attribute !== undefined) this.attribute = attribute;
+    if (optionIndex !== undefined) this.optionIndex = optionIndex;
   }
 }
 
-/** Splits an option segment into its `label|successors` head and attributes. */
-function splitOptionSegment(
-  segment: string,
-): { head: string; attributes: readonly string[] } {
-  const parts = segment.split('#');
-  return { head: (parts[0] ?? '').trim(), attributes: parts.slice(1) };
+/**
+ * One scanned `#name=value` attribute.
+ *
+ * `raw` is the unparsed attribute text (`name=value`, or the bare text when
+ * the `=` is missing) so the existing malformed-attribute diagnostics keep
+ * their exact wording. `says` is present only for a `#says` attribute, with
+ * its escapes already decoded.
+ */
+interface ScannedAttribute {
+  readonly raw: string;
+  readonly says?: string;
+}
+
+/** One scanned option segment: its raw head and its attributes. */
+interface ScannedOption {
+  readonly head: string;
+  readonly attributes: readonly ScannedAttribute[];
+}
+
+/**
+ * True when the text after a `#` inside a says value begins a known attribute.
+ * An unescaped `#` is only a delimiter when it introduces `cost`, `extra`,
+ * `when` or `says`; anything else is a reserved character inside the prose.
+ */
+const KNOWN_ATTRIBUTE_START = /^\s*(?:cost|extra|when|says)\s*=/;
+
+/**
+ * True when the text after a `;` inside a says value begins another option.
+ *
+ * Options start with a `label|successors` head, so the text up to the next `#`
+ * must carry a `|`. Text without one is prose that leaked past an unescaped
+ * `;`, not a new option.
+ */
+function startsOptionSegment(rest: string): boolean {
+  const hash = rest.indexOf('#');
+  const head = hash < 0 ? rest : rest.slice(0, hash);
+  return head.includes('|');
+}
+
+/**
+ * Scans an `options` encoding into option segments.
+ *
+ * The scan is escape-aware **only inside a `#says` value**: `\;`, `\#` and
+ * `\\` are decoded there, while every other backslash stays literal and every
+ * backslash outside a says value is an ordinary character. Every malformed
+ * attribute is left for the main parse loop, so its diagnostics are unchanged;
+ * the one fault the scan itself raises is an unescaped `;`/`#` inside prose
+ * (`unescaped-says-delimiter`, tagged with the option index).
+ */
+function scanOptionEncoding(encoding: string): ScannedOption[] {
+  const options: ScannedOption[] = [];
+  let head = '';
+  let attributes: ScannedAttribute[] = [];
+  let optionIndex = 0;
+  let i = 0;
+  const n = encoding.length;
+
+  while (i < n) {
+    const ch = encoding[i];
+    if (ch === ';') {
+      options.push({ head, attributes });
+      head = '';
+      attributes = [];
+      optionIndex += 1;
+      i += 1;
+      continue;
+    }
+    if (ch !== '#') {
+      head += ch;
+      i += 1;
+      continue;
+    }
+
+    // A `#` starts an attribute (it always has, even inside a head).
+    i += 1;
+    let name = '';
+    while (i < n) {
+      const c = encoding[i];
+      if (c === '=' || c === '#' || c === ';') break;
+      name += c;
+      i += 1;
+    }
+    if (i >= n || encoding[i] !== '=') {
+      // No `=`: the main loop reports it as a malformed attribute.
+      attributes.push({ raw: name });
+      continue;
+    }
+    i += 1; // consume `=`
+
+    if (name.trim() !== 'says') {
+      let rawValue = '';
+      while (i < n && encoding[i] !== '#' && encoding[i] !== ';') {
+        rawValue += encoding[i];
+        i += 1;
+      }
+      attributes.push({ raw: `${name}=${rawValue}` });
+      continue;
+    }
+
+    // A `#says` value: decode the three recognised escapes, and reject an
+    // unescaped reserved character rather than letting it split the cell.
+    let value = '';
+    let raw = `${name}=`;
+    while (i < n) {
+      const c = encoding[i];
+      if (c === '\\') {
+        const next = encoding[i + 1];
+        if (next === ';' || next === '#' || next === '\\') {
+          value += next;
+          raw += c + next;
+          i += 2;
+          continue;
+        }
+        value += c;
+        raw += c;
+        i += 1;
+        continue;
+      }
+      if (c === ';') {
+        const rest = encoding.slice(i + 1);
+        if (rest.trim() === '' || startsOptionSegment(rest)) break;
+        throw new StorylineOptionsEncodingError(
+          `Invalid storyline options encoding "${encoding}": option ${optionIndex + 1} has an unescaped ";" in its #says value (a literal ";" must be written "\\;").`,
+          'unescaped-says-delimiter',
+          'says',
+          optionIndex,
+        );
+      }
+      if (c === '#') {
+        if (KNOWN_ATTRIBUTE_START.test(encoding.slice(i + 1))) break;
+        throw new StorylineOptionsEncodingError(
+          `Invalid storyline options encoding "${encoding}": option ${optionIndex + 1} has an unescaped "#" in its #says value (a literal "#" must be written "\\#").`,
+          'unescaped-says-delimiter',
+          'says',
+          optionIndex,
+        );
+      }
+      value += c;
+      raw += c;
+      i += 1;
+    }
+    attributes.push({ raw, says: value });
+  }
+
+  options.push({ head, attributes });
+  return options;
 }
 
 /** Parses a finite number, rejecting blank/non-numeric text. */
@@ -220,11 +370,12 @@ function parseConditionalSuccessor(
  * ```text
  * encoding  := option (";" option)*
  * option    := label "|" candidates attribute*
- * attribute := "#" (cost | extra | when) "=" value
+ * attribute := "#" (cost | extra | when | says) "=" value
  * candidates:= candidate ("," candidate)*          // empty = terminal
  * cost      := key ":" number ("," key ":" number)*
  * extra     := key ":" number ("," key ":" number)*
  * when      := field op number ">" successor      // empty successor = chain end
+ * says      := prose                              // single segment, escaped
  * op        := ">=" | "<=" | "==" | ">" | "<"
  * ```
  *
@@ -243,9 +394,33 @@ function parseConditionalSuccessor(
  *   an ordered rule list; rules are evaluated first-match-wins at resolution
  *   time ({@link StorylineOption.conditionalSuccessors}). An empty successor
  *   (`#when=coins>0>`) ends the chain.
+ * - `#says=The door opens on a room you remember.` — the outcome prose for
+ *   taking the option ({@link StorylineOption.says}). It may contain any
+ *   character except the reserved delimiters below, and it is attached to its
+ *   own option so reordering the options never moves prose.
  *
- * `;`, `|` and `#` are reserved delimiters and may not appear in a label or a
- * candidate card id. Whitespace around every component is trimmed.
+ * ## Escape policy (`#says` only)
+ *
+ * `;` and `#` are reserved delimiters and may not appear raw in **any** value;
+ * `|` and `,` are reserved in a label / candidate list only. Escapes are
+ * recognised **only inside a `#says` value**, so no existing cell can change
+ * meaning:
+ *
+ * - `\;` → `;`, `\#` → `#`, `\\` → `\` inside a says value only.
+ * - Every other backslash (including in a label, a candidate id, or a `#cost` /
+ *   `#extra` / `#when` value) stays a literal character.
+ * - `|`, `,`, `=`, `:`, quotes and apostrophes are **not** reserved in prose and
+ *   need no escaping.
+ *
+ * A says value is a **single prose segment**: `;` delimits options, so an
+ * author-written parallel list (`#says=One\; two`) round-trips byte-stably but
+ * is rejected by validation (`says-segment-count`), as is an unescaped `;` or
+ * `#` inside the prose (`unescaped-says-delimiter`).
+ *
+ * Whitespace around every component is trimmed. `parse → serialise` is
+ * byte-identical for a canonically ordered cell (`#cost`, `#extra`, `#when`*,
+ * `#says` last); any other order round-trips stably through
+ * {@link serialiseStorylineOptionsEncoding}.
  *
  * ## Failure behaviour
  *
@@ -270,11 +445,11 @@ export function parseStorylineOptionsEncoding<TState>(
   if (trimmed === '') return [];
 
   const options: StorylineOption<TState>[] = [];
-  for (const rawSegment of trimmed.split(';')) {
-    const segment = rawSegment.trim();
-    if (segment === '') continue;
+  for (const scanned of scanOptionEncoding(trimmed)) {
+    const head = scanned.head.trim();
+    const attributes = scanned.attributes;
+    if (head === '' && attributes.length === 0) continue;
 
-    const { head, attributes } = splitOptionSegment(segment);
     const separator = head.indexOf('|');
     if (separator < 0) {
       throw new StorylineOptionsEncodingError(
@@ -301,11 +476,16 @@ export function parseStorylineOptionsEncoding<TState>(
       cost?: OptionCost;
       extraEffect?: OptionExtraEffect;
       conditionalSuccessors?: ConditionalSuccessorRule[];
+      says?: string;
     } = {};
     const rules: ConditionalSuccessorRule[] = [];
 
-    for (const rawAttribute of attributes) {
-      const attribute = rawAttribute.trim();
+    for (const scannedAttribute of attributes) {
+      if (scannedAttribute.says !== undefined) {
+        extra.says = scannedAttribute.says.trim();
+        continue;
+      }
+      const attribute = scannedAttribute.raw.trim();
       if (attribute === '') {
         throw new StorylineOptionsEncodingError(
           `Invalid storyline options encoding "${encoding}": option "${label}" has an empty attribute after "#".`,
@@ -333,7 +513,7 @@ export function parseStorylineOptionsEncoding<TState>(
           break;
         default:
           throw new StorylineOptionsEncodingError(
-            `Invalid storyline options encoding "${encoding}": unknown option attribute "${name}" (expected cost, extra or when).`,
+            `Invalid storyline options encoding "${encoding}": unknown option attribute "${name}" (expected cost, extra, when or says).`,
             'unknown-attribute',
             name,
           );
@@ -352,6 +532,75 @@ export function parseStorylineOptionsEncoding<TState>(
     );
   }
   return options;
+}
+
+/** Serialises a `key:number,key:number` resource delta. */
+function serialiseResourceDelta(
+  delta: Readonly<Record<string, number | undefined>>,
+): string {
+  return Object.entries(delta)
+    .filter((entry): entry is [string, number] => entry[1] !== undefined)
+    .map(([key, value]) => `${key}:${value}`)
+    .join(',');
+}
+
+/** Escapes the reserved characters of a `#says` value. */
+function encodeSaysProse(value: string): string {
+  let encoded = '';
+  for (const ch of value) {
+    if (ch === '\\') encoded += '\\\\';
+    else if (ch === ';') encoded += '\\;';
+    else if (ch === '#') encoded += '\\#';
+    else encoded += ch;
+  }
+  return encoded;
+}
+
+/**
+ * Re-encodes a compiled option list back to its `options` cell.
+ *
+ * The inverse of {@link parseStorylineOptionsEncoding}. Attributes are written
+ * in the **canonical order** `#cost`, `#extra`, `#when`* (authored order),
+ * `#says` last, so a cell authored in that order round-trips
+ * byte-identically; any other authored order round-trips `parse → serialise →
+ * parse` to the same model and then serialises stably.
+ *
+ * `;`, `#` and `\` inside a `says` value are re-escaped (`\;`, `\#`, `\\`);
+ * no other character is touched, matching the parser's escape policy (escapes
+ * are recognised only inside a says value). Programmatic-only fields
+ * (`condition`, `successorResolver`) have no CSV representation and are not
+ * serialised.
+ *
+ * @param options Compiled option list (e.g. from the parser or a registry).
+ * @returns The `options` cell text (empty string for an empty list).
+ */
+export function serialiseStorylineOptionsEncoding(
+  options: readonly StorylineOption<unknown>[],
+): string {
+  return options
+    .map((option) => {
+      const successors =
+        option.successorIds !== undefined && option.successorIds.length > 0
+          ? option.successorIds
+          : option.successorId
+            ? [option.successorId]
+            : [];
+      let cell = `${option.label}|${successors.join(',')}`;
+      if (option.cost) cell += `#cost=${serialiseResourceDelta(option.cost)}`;
+      if (option.extraEffect) {
+        cell += `#extra=${serialiseResourceDelta(option.extraEffect)}`;
+      }
+      for (const rule of option.conditionalSuccessors ?? []) {
+        cell +=
+          `#when=${rule.when.field}${rule.when.op}${rule.when.value}` +
+          `>${rule.successorId ?? ''}`;
+      }
+      if (option.says !== undefined && option.says !== null) {
+        cell += `#says=${encodeSaysProse(option.says)}`;
+      }
+      return cell;
+    })
+    .join(';');
 }
 
 /**

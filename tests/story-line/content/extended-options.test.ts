@@ -42,6 +42,7 @@ import {
   compileStorylineFromEvent,
   createStorylineOptionRegistry,
   parseStorylineOptionsEncoding,
+  serialiseStorylineOptionsEncoding,
   StorylineOptionsEncodingError,
 } from '../../../src/story-line/compile';
 import type { StorylineOptionsEncodingErrorReason } from '../../../src/story-line/compile';
@@ -367,5 +368,179 @@ describe('shorthand-only content is unchanged', () => {
       { label: 'Go', successorIds: ['sh-b'], effectPolicy: 'apply' },
       { label: 'Stop', successorIds: [], effectPolicy: 'apply' },
     ]);
+  });
+});
+
+describe('option-outcome prose (#says)', () => {
+  it('parses #says in any attribute position alongside the mechanical attributes', () => {
+    const options = parseStorylineOptionsEncoding(
+      'Open|ext-a#says=The door opens on a room you remember.#cost=coins:5#when=reputation>=2>ext-b',
+    );
+    expect(options[0]).toMatchObject({
+      label: 'Open',
+      successorIds: ['ext-a'],
+      says: 'The door opens on a room you remember.',
+      cost: { coins: 5 },
+      conditionalSuccessors: [
+        { when: { field: 'reputation', op: '>=', value: 2 }, successorId: 'ext-b' },
+      ],
+    });
+  });
+
+  it('decodes \\; \\# and \\\\ only inside a says value', () => {
+    const [option] = parseStorylineOptionsEncoding(
+      'Read|ext-a#says=One\\; two \\# three C:\\\\ledger',
+    );
+    expect(option?.says).toBe('One; two # three C:\\ledger');
+
+    // Outside prose a backslash is an ordinary character, not an escape.
+    expect(parseStorylineOptionsEncoding('C:\\ledger|ext-a')[0]?.label).toBe(
+      'C:\\ledger',
+    );
+    expect(
+      reasonOf(() => parseStorylineOptionsEncoding('Pay|ext-a#cost=coins:\\5')),
+    ).toBe('malformed-cost-pair');
+  });
+
+  it('rejects an unescaped ";" in prose, naming the option index', () => {
+    let caught: unknown;
+    try {
+      parseStorylineOptionsEncoding('Ok|ext-a;Bad|ext-b#says=Two things happened; and more');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(StorylineOptionsEncodingError);
+    expect(caught).toMatchObject({
+      reason: 'unescaped-says-delimiter',
+      attribute: 'says',
+      optionIndex: 1,
+    });
+  });
+
+  it('rejects an unescaped "#" in prose, naming the option index', () => {
+    let caught: unknown;
+    try {
+      parseStorylineOptionsEncoding('Ok|ext-a;Bad|ext-b#says=One thing # and more');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(StorylineOptionsEncodingError);
+    expect(caught).toMatchObject({
+      reason: 'unescaped-says-delimiter',
+      attribute: 'says',
+      optionIndex: 1,
+    });
+  });
+
+  it('still understands an escaped ";" as content, not a segment boundary', () => {
+    const options = parseStorylineOptionsEncoding(
+      'Recall|q-end#says=One thing happened\\; then another was forgotten',
+    );
+    expect(options).toEqual([
+      {
+        label: 'Recall',
+        successorIds: ['q-end'],
+        effectPolicy: 'apply',
+        says: 'One thing happened; then another was forgotten',
+      },
+    ]);
+  });
+
+  it('serialises a canonical cell byte-identically (parse → serialise identity)', () => {
+    const cell =
+      'Recall|q-end#cost=coins:2#when=coins>=1>q-mid#says=One thing happened\\; then another was forgotten';
+    expect(serialiseStorylineOptionsEncoding(parseStorylineOptionsEncoding(cell))).toBe(
+      cell,
+    );
+  });
+
+  it('re-encodes any authored attribute order to a stable, re-parseable model', () => {
+    const parsed = parseStorylineOptionsEncoding(
+      'Wait|q-d#says=You wait. A note reads "1 \\# 2".#when=coins>=1>q-c#cost=coins:1',
+    );
+    const encoded = serialiseStorylineOptionsEncoding(parsed);
+    expect(parseStorylineOptionsEncoding(encoded)).toEqual(parsed);
+    expect(serialiseStorylineOptionsEncoding(parseStorylineOptionsEncoding(encoded))).toBe(
+      encoded,
+    );
+  });
+
+  it('re-encodes an empty option list as an empty cell', () => {
+    expect(serialiseStorylineOptionsEncoding([])).toBe('');
+  });
+
+  it('carries says into the compiled storyline', () => {
+    const registry = createStorylineOptionRegistry<unknown>((id) => id);
+    const compiled = compileStorylineFromEvent(
+      {
+        id: 'ext-a',
+        name: 'A',
+        options: 'Open|ext-b#says=The door opens.',
+      } as StorylineCard,
+      registry,
+    );
+    expect(compiled.compiledOptions[0]).toMatchObject({
+      label: 'Open',
+      successorIds: ['ext-b'],
+      says: 'The door opens.',
+    });
+  });
+});
+
+describe('option-outcome prose diagnostics', () => {
+  /** A Gym-shaped header with the choice card first and its successor second. */
+  function idiomsCsv(asCell: string): string {
+    return (
+      [
+        'id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta',
+        `bad-a,Bad A,X,${asCell},bad,Bad,"coins,reputation",Incident,0,0,0`,
+        'bad-b,Bad B,X,,bad,Bad,"coins,reputation",Incident,0,0,0',
+      ].join('\n') + '\n'
+    );
+  }
+
+  it('reports an unescaped reserved character at options[N].says', () => {
+    const result = validateContentCsv(
+      idiomsCsv('Go|bad-b#says=Two things happened; and more'),
+      GYM_CONTENT_ADAPTER,
+    );
+    expect(result.valid).toBe(false);
+    // The malformed cell also leaves `bad-b` unreachable; the says fault is
+    // reported first, on the card that authored it.
+    expect(result.issues[0]).toMatchObject({
+      code: 'invalid-option',
+      cardId: 'bad-a',
+      row: 2,
+      column: 'options',
+      reason: 'unescaped-says-delimiter',
+      path: 'options[0].says',
+    });
+  });
+
+  it('reports a says value that decodes to more than one prose segment', () => {
+    const result = validateContentCsv(
+      idiomsCsv('Recall|bad-b#says=One thing happened\\; then another was forgotten'),
+      GYM_CONTENT_ADAPTER,
+    );
+    expect(result.valid).toBe(false);
+    const issue = result.issues[0]!;
+    expect(issue).toMatchObject({
+      code: 'invalid-option',
+      reason: 'says-segment-count',
+      path: 'options[0].says',
+      column: 'options',
+      row: 2,
+    });
+    expect(issue.message).toContain('expected 1');
+    expect(issue.message).toContain('actual 2');
+  });
+
+  it('accepts a single-segment says value', () => {
+    const result = validateContentCsv(
+      idiomsCsv('Go|bad-b#says=One thing happened, and then nothing did.'),
+      GYM_CONTENT_ADAPTER,
+    );
+    expect(result.issues).toEqual([]);
+    expect(result.valid).toBe(true);
   });
 });

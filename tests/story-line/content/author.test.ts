@@ -92,6 +92,61 @@ describe('addContentCard', () => {
     expect(rewritten.csv).toBe(added.csv);
   });
 
+  it('accepts and round-trips #says outcome prose through add and update', () => {
+    const options =
+      'Leave|tav-inn#says=You step out into the rain, and the door shuts behind you.';
+    const spec = {
+      id: 'tav-extra',
+      name: 'An Extra Card',
+      effect: 'Nothing much happens.',
+      options,
+      storylineId: 'tav-extra-arc',
+      fields: { payoff: '4' },
+    };
+    const added = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, spec);
+    expect(added.ok).toBe(true);
+    expect(added.errors).toEqual([]);
+
+    const card = readContentCards(added.csv, TAVERN_CONTENT_ADAPTER).find(
+      (entry) => entry.id === 'tav-extra',
+    );
+    expect(card?.options).toBe(options);
+    expect(compileContentOptions(card!)[0]).toMatchObject({
+      label: 'Leave',
+      says: 'You step out into the rain, and the door shuts behind you.',
+    });
+
+    // Re-applying the same authored values must not change a single byte.
+    const rewritten = updateContentCard(added.csv, TAVERN_CONTENT_ADAPTER, spec);
+    expect(rewritten.ok).toBe(true);
+    expect(rewritten.csv).toBe(added.csv);
+
+    // A prose edit lands as authored, escapes and all.
+    const edited = updateContentCard(added.csv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-extra',
+      options: 'Leave|tav-inn#says=You leave, and the note says \\# 4.',
+    });
+    expect(edited.ok).toBe(true);
+    const recompiled = compileContentOptions(
+      readContentCards(edited.csv, TAVERN_CONTENT_ADAPTER).find(
+        (entry) => entry.id === 'tav-extra',
+      )!,
+    );
+    expect(recompiled[0]?.says).toBe('You leave, and the note says # 4.');
+  });
+
+  it('refuses a #says value with an unescaped reserved character', () => {
+    const result = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-extra',
+      name: 'An Extra Card',
+      options: 'Leave|tav-inn#says=Two things happened; and more',
+      storylineId: 'tav-extra-arc',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join(' ')).toContain('unescaped');
+    expect(result.csv).toBe(tavernCsv);
+  });
+
   it('refuses a duplicate id', () => {
     const result = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
       id: 'tav-open',

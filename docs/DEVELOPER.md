@@ -2093,11 +2093,14 @@ The generic branching story-line system (`@story-line`) is documented in
 [`docs/core-engine/story-line.md`](core-engine/story-line.md).
 
 **Authoring seam.** The extended option model — declarative `cost`,
-`extraEffect` and `conditionalSuccessors` — is authored **in content**: the CSV
-`options` cell carries `#cost=key:number`, `#extra=key:number` and
-`#when=field<op>number>successor` attributes alongside the
+`extraEffect`, `conditionalSuccessors` and `says` (option-outcome prose) — is
+authored **in content**: the CSV `options` cell carries `#cost=key:number`,
+`#extra=key:number`, `#when=field<op>number>successor` and
+`#says=<escaped prose>` attributes alongside the
 `label|cardA,cardB` shorthand (grammar, worked example and diagnostics:
 [Authoring options in CSV](core-engine/story-line.md#authoring-options-in-csv)).
+Escapes (``\;``, ``\#``, ``\\``) are recognised only inside a `#says` value, and
+`serialiseStorylineOptionsEncoding` re-encodes a parsed list to the same cell.
 `registerStorylineOptions(eventId, options)` remains the seam for what content
 cannot express — the `condition` and `successorResolver` callbacks — and a
 registered list takes precedence over the cell. **Decision reversal

@@ -52,12 +52,13 @@ export interface StorylineCard {
    *
    * Format: `label|cardA,cardB;label2|cardC`, optionally followed by the
    * extended declarative attributes `#cost=key:number,…`,
-   * `#extra=key:number,…` and `#when=field<op>number>successor` (repeat
-   * `#when` for an ordered rule list). The attributes are the content-side
-   * authoring path for {@link StorylineOption.cost},
-   * {@link StorylineOption.extraEffect} and
-   * {@link StorylineOption.conditionalSuccessors}; `cost` / `extra` keys must
-   * be declared by the game's resource set. Parsed by
+   * `#extra=key:number,…`, `#when=field<op>number>successor` (repeat
+   * `#when` for an ordered rule list) and `#says=<escaped prose>`. The
+   * attributes are the content-side authoring path for
+   * {@link StorylineOption.cost}, {@link StorylineOption.extraEffect},
+   * {@link StorylineOption.conditionalSuccessors} and
+   * {@link StorylineOption.says}; `cost` / `extra` keys must be declared by
+   * the game's resource set. Parsed by
    * {@link parseStorylineOptionsEncoding}; the documented grammar, worked
    * example and diagnostics are in `docs/core-engine/story-line.md`
    * ("Authoring options in CSV").
@@ -227,6 +228,21 @@ export interface StorylineOption<TState = unknown> {
    * 4. {@link successorId} — the lowest-precedence single successor.
    */
   readonly conditionalSuccessors?: readonly ConditionalSuccessorRule[];
+  /**
+   * Optional authored outcome prose: what taking this option *does*, in the
+   * writer's own words.
+   *
+   * Authored from CSV as `#says=<escaped prose>`
+   * ({@link parseStorylineOptionsEncoding}); it is carried verbatim into the
+   * compiled option so a presenter can show the consequence instead of a
+   * paraphrase of the label. Prose stays attached to its own option, so
+   * reordering the option list never moves text between choices.
+   *
+   * A `says` value is a **single** prose segment: `;` and `#` are reserved and
+   * must be escaped as `\;` / `\#` (`\\` for a literal backslash). Absent when
+   * the content authors no prose.
+   */
+  readonly says?: string;
 }
 
 /** A card's compiled story-line option list. */
