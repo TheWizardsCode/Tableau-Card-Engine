@@ -54,6 +54,19 @@ export interface ContentCard {
   readonly effect: string;
   /** Raw CSV `options` encoding (`''` when absent). */
   readonly options: string;
+  /**
+   * The beat's situation paragraph, verbatim from the adapter's `context`
+   * column (`null` when the cell is blank). The value is only present when the
+   * adapter **maps** the column — an unmapped prose column means "this file
+   * has no such column", so the card carries no prose key at all.
+   */
+  readonly context?: string | null;
+  /**
+   * The terminal card's closing prose, verbatim from the adapter's `epilogue`
+   * column (`null` when the cell is blank). Present only when the adapter maps
+   * the column, like {@link ContentCard.context}.
+   */
+  readonly epilogue?: string | null;
   /** Story-arc identifier (`null` when the card belongs to no arc). */
   readonly storylineId: string | null;
   /** Human-readable story-arc title (`null` when absent). */
@@ -91,6 +104,16 @@ export interface ContentFieldMapping {
   readonly name: string;
   /** Column carrying the human-readable effect text. */
   readonly effect?: string;
+  /**
+   * Column carrying the beat's situation paragraph. Optional: omitting it
+   * means the content file has no prose column, which is always valid.
+   */
+  readonly context?: string;
+  /**
+   * Column carrying a terminal card's closing prose. Optional for the same
+   * reason as {@link ContentFieldMapping.context}.
+   */
+  readonly epilogue?: string;
   /** Column carrying the CSV `options` encoding. */
   readonly options?: string;
   /** Column carrying the storyline id. */
@@ -181,6 +204,8 @@ export function mappedFieldColumns(
   ];
   if (fields.effect !== undefined) pairs.push(['effect', fields.effect]);
   if (fields.options !== undefined) pairs.push(['options', fields.options]);
+  if (fields.context !== undefined) pairs.push(['context', fields.context]);
+  if (fields.epilogue !== undefined) pairs.push(['epilogue', fields.epilogue]);
   if (fields.storylineId !== undefined) pairs.push(['storylineId', fields.storylineId]);
   if (fields.storylineTitle !== undefined) {
     pairs.push(['storylineTitle', fields.storylineTitle]);

@@ -25,9 +25,10 @@ import { validateContentCsv } from '../../../src/story-line/content/validate';
 import {
   compileContentOptions,
   contentCardHasChoice,
+  parseCsv,
 } from '../../../src/story-line/content/csv';
 import { runStorylineAuthorCli } from '../../../scripts/storyline-author';
-import { TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
+import { PROSE_CONTENT_ADAPTER, TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
 import {
   GYM_CONTENT_PATH,
   captureOutput,
@@ -463,5 +464,66 @@ describe('storyline-author CLI', () => {
     expect(captureOutput(() => runStorylineAuthorCli(['--help'])).stdout).toContain(
       'add-card',
     );
+  });
+});
+
+describe('authored prose authoring', () => {
+  const proseCsv = readFixture('prose/prose-basic.csv');
+
+  it('adds a card with authored context and epilogue', () => {
+    const result = addContentCard(proseCsv, PROSE_CONTENT_ADAPTER, {
+      id: 'prose-extra',
+      name: 'The Last Lamp',
+      effect: 'It goes out.',
+      context: 'The quay is empty; a single lamp still burns.',
+      epilogue: 'The lamp goes out, and the harbour is only a sound.',
+      resources: 'coins,reputation',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+
+    const added = readContentCards(result.csv, PROSE_CONTENT_ADAPTER).find(
+      (card) => card.id === 'prose-extra',
+    );
+    expect(added?.context).toBe('The quay is empty; a single lamp still burns.');
+    expect(added?.epilogue).toBe('The lamp goes out, and the harbour is only a sound.');
+  });
+
+  it('updates and clears authored prose without touching untouched columns', () => {
+    const updated = updateContentCard(proseCsv, PROSE_CONTENT_ADAPTER, {
+      id: 'prose-pier',
+      context: 'The pier is longer than yesterday.',
+    });
+    expect(updated.ok).toBe(true);
+    const card = readContentCards(updated.csv, PROSE_CONTENT_ADAPTER).find(
+      (entry) => entry.id === 'prose-pier',
+    );
+    expect(card?.context).toBe('The pier is longer than yesterday.');
+    expect(card?.epilogue).toBeNull();
+    expect(card?.effect).toBe('The pier creaks.');
+
+    const cleared = updateContentCard(updated.csv, PROSE_CONTENT_ADAPTER, {
+      id: 'prose-pier',
+      context: null,
+    });
+    expect(cleared.ok).toBe(true);
+    expect(
+      readContentCards(cleared.csv, PROSE_CONTENT_ADAPTER).find(
+        (entry) => entry.id === 'prose-pier',
+      )?.context,
+    ).toBeNull();
+  });
+
+  it('refuses prose on an adapter that maps no prose column', () => {
+    // Gym maps neither prose column, so an authored context has nowhere to go:
+    // the spec is accepted structurally but the column is never invented.
+    const result = addContentCard(readText(GYM_CONTENT_PATH), GYM_CONTENT_ADAPTER, {
+      id: 'gym-story-extra',
+      name: 'An Extra Beat',
+      context: 'Nowhere to put this.',
+    });
+    expect(result.ok).toBe(true);
+    const parsed = parseCsv(result.csv);
+    expect(parsed.header).not.toContain('context');
   });
 });

@@ -29,12 +29,13 @@ import {
   serialiseManifest,
 } from '../../../src/story-line/content/manifest';
 import { runStorylineGraphCli } from '../../../scripts/storyline-graph';
-import { TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
+import { TAVERN_CONTENT_ADAPTER, PROSE_CONTENT_ADAPTER } from './fixture-adapter';
 import {
   GYM_CONTENT_PATH,
   MANIFEST_SCHEMA_PATH,
   makeTempDir,
   readFixture,
+  readProseFixture,
   readText,
   captureOutput,
 } from './test-support';
@@ -155,6 +156,41 @@ describe('filterManifestByStoryline', () => {
     expect(filtered.nodes).toEqual([]);
     expect(filtered.edges).toEqual([]);
     expect(filtered.storylineIds).toEqual(['no-such-arc']);
+  });
+});
+
+describe('authored prose in the manifest', () => {
+  const manifest = buildStorylineManifestFromCsv(
+    readProseFixture('prose-basic.csv'),
+    PROSE_CONTENT_ADAPTER,
+  );
+
+  it('carries the authored context and epilogue verbatim on the node', () => {
+    const open = manifest.nodes.find((node) => node.id === 'prose-open');
+    expect(open?.context).toBe(
+      'You step off the last coach of the evening. The harbour is quiet, but the lamps are lit, and someone has left a note under your door: "Do not take the morning boat."',
+    );
+    expect(open?.epilogue).toBeUndefined();
+
+    const end = manifest.nodes.find((node) => node.id === 'prose-end');
+    expect(end?.epilogue).toBe(
+      'The boat slips its mooring before you have found a seat. Behind you the lamps go out one by one; by the time you look again, the town is not there.',
+    );
+    expect(end?.context).toBeUndefined();
+  });
+
+  it('adds no prose keys when the adapter maps no prose column', () => {
+    for (const node of gymManifest.nodes) {
+      expect('context' in node, `node ${node.id}`).toBe(false);
+      expect('epilogue' in node, `node ${node.id}`).toBe(false);
+    }
+  });
+
+  it('validates a prose-bearing manifest against the schema', () => {
+    const ajv = new Ajv({ allErrors: true, strict: false });
+    const validate = ajv.compile(JSON.parse(readText(MANIFEST_SCHEMA_PATH)));
+    expect(validate(JSON.parse(serialiseManifest(manifest)))).toBe(true);
+    expect(validate.errors).toBeNull();
   });
 });
 

@@ -81,6 +81,16 @@
           "items": { "$ref": "#/definitions/option" }
         },
         "effect": { "type": "string", "description": "Human-readable effect text shown to the player." },
+        "context": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The beat's authored situation paragraph (optional; absent when the content authors none or maps no context column)."
+        },
+        "epilogue": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The terminal card's authored closing prose (optional; absent when the content authors none or maps no epilogue column)."
+        },
         "impact": {
           "type": "string",
           "description": "Adapter-provided game impact description (e.g. '-50 coins'); empty when the adapter supplies none."

@@ -72,6 +72,8 @@ export type {
   ContentIssueCode,
   ContentValidationOptions,
   ContentValidationResult,
+  ContentWarning,
+  ContentWarningCode,
 } from './validate';
 export {
   contentValidationToJson,
@@ -80,6 +82,9 @@ export {
   validateContentCards,
   validateContentCsv,
 } from './validate';
+
+export type { ProseField, ProseFieldSpec } from './prose';
+export { PROSE_FIELD_SPECS, mappedProseColumns } from './prose';
 
 export type {
   AddContentCardSpec,

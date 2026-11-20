@@ -200,29 +200,29 @@ function validateFixture(name: string): {
 
 // ── Content columns: context and epilogue ───────────────────────────
 
-describe('prose columns — context and epilogue (red: CG-0MWO7CSH9000JYWH)', () => {
+describe('prose columns — context and epilogue (CG-0MWO7CSH9000JYWH)', () => {
   const text = readProseFixture('prose-basic.csv');
   const cards = cardsFromCsv(parseCsv(text), PROSE_CONTENT_ADAPTER);
 
-  it.fails('[red] maps the context column onto the content card', () => {
+  it('[green] maps the context column onto the content card', () => {
     expect(asProse(cards[0]!).context).toBe(
       'You step off the last coach of the evening. The harbour is quiet, but the lamps are lit, and someone has left a note under your door: "Do not take the morning boat."',
     );
   });
 
-  it.fails('[red] keeps multi-sentence context verbatim (commas, quotes, `;`, `|`, `#`)', () => {
+  it('[green] keeps multi-sentence context verbatim (commas, quotes, `;`, `|`, `#`)', () => {
     expect(asProse(cards[1]!).context).toBe(
       "The ferryman does not look up. 'I have been expecting you,' he says; his oar rests, dripping, on the stones, and the word | on the sign above him has been freshly repainted. A hand has added # 4 in chalk.",
     );
   });
 
-  it.fails('[red] maps the epilogue column onto a terminal card', () => {
+  it('[green] maps the epilogue column onto a terminal card', () => {
     expect(asProse(cards[3]!).epilogue).toBe(
       'The boat slips its mooring before you have found a seat. Behind you the lamps go out one by one; by the time you look again, the town is not there.',
     );
   });
 
-  it.fails('[red] reads an empty prose cell as null (absent), never as ""', () => {
+  it('[green] reads an empty prose cell as null (absent), never as ""', () => {
     // `prose-pier` has neither prose; `prose-open` has no epilogue.
     expect(asProse(cards[2]!).context).toBeNull();
     expect(asProse(cards[2]!).epilogue).toBeNull();

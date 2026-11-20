@@ -15,6 +15,7 @@ import {
   CONTENT_ADAPTERS,
   DEFAULT_CONTENT_ADAPTER,
   GYM_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_ADAPTER,
   getContentAdapter,
   resolveContentAdapter,
 } from '../../../src/story-line/content/adapters';
@@ -77,6 +78,23 @@ describe('shipped adapters', () => {
       'coinDelta',
       'reputationDelta',
     ]);
+  });
+
+  it('maps the two prose columns for the adapter that opts in', () => {
+    // The Gym demo opts out: no prose column, so no prose on its cards.
+    expect(GYM_CONTENT_ADAPTER.fields.context).toBeUndefined();
+    expect(GYM_CONTENT_ADAPTER.fields.epilogue).toBeUndefined();
+
+    // The Long Erasure content declares (and may blank) both prose columns.
+    expect(LONG_ERASURE_CONTENT_ADAPTER.columns).toEqual(
+      expect.arrayContaining(['context', 'epilogue']),
+    );
+    expect(mappedFieldColumns(LONG_ERASURE_CONTENT_ADAPTER)).toEqual(
+      expect.arrayContaining([
+        ['context', 'context'],
+        ['epilogue', 'epilogue'],
+      ]),
+    );
   });
 
   it('describes the Gym impact from its game columns', () => {

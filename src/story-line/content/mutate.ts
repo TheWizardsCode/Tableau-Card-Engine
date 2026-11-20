@@ -55,6 +55,13 @@ export interface AddContentCardSpec {
   readonly name: string;
   /** Human-readable effect text. */
   readonly effect?: string;
+  /**
+   * The beat's authored situation paragraph. Prose is copied into the mapped
+   * `context` column only when the adapter declares that mapping.
+   */
+  readonly context?: string | null;
+  /** The terminal card's authored closing prose (same rule as `context`). */
+  readonly epilogue?: string | null;
   /** CSV `options` encoding (`label|a,b;label2|c`). */
   readonly options?: string;
   /** Story-line id. */
@@ -79,6 +86,10 @@ export interface UpdateContentCardSpec {
   readonly name?: string;
   /** New effect text. */
   readonly effect?: string;
+  /** New `context` prose (`null` or `''` clears it). */
+  readonly context?: string | null;
+  /** New `epilogue` prose (`null` or `''` clears it). */
+  readonly epilogue?: string | null;
   /** New `options` encoding (`null` or `''` clears). */
   readonly options?: string | null;
   /** New story-line id (`null` clears). */
@@ -245,6 +256,12 @@ export function applyAddContentCardSpec(
   if (fields.effect !== undefined) {
     setColumn(header, rows, row, fields.effect, spec.effect ?? '');
   }
+  if (fields.context !== undefined && spec.context !== undefined) {
+    setColumn(header, rows, row, fields.context, spec.context ?? '');
+  }
+  if (fields.epilogue !== undefined && spec.epilogue !== undefined) {
+    setColumn(header, rows, row, fields.epilogue, spec.epilogue ?? '');
+  }
   if (fields.options !== undefined && spec.options !== undefined) {
     setColumn(header, rows, row, fields.options, spec.options);
   }
@@ -310,6 +327,8 @@ function applyUpdateFields(
   if (fields.effect !== undefined && spec.effect !== undefined) {
     setColumn(header, rows, row, fields.effect, spec.effect);
   }
+  if (spec.context !== undefined) setNullable(fields.context, spec.context);
+  if (spec.epilogue !== undefined) setNullable(fields.epilogue, spec.epilogue);
   if (spec.options !== undefined) setNullable(fields.options, spec.options);
   if (spec.storylineId !== undefined) setNullable(fields.storylineId, spec.storylineId);
   if (spec.storylineTitle !== undefined) {

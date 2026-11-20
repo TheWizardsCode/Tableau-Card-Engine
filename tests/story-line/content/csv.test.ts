@@ -33,11 +33,12 @@ import {
   parseCsv,
   serialiseCsv,
 } from '../../../src/story-line/content/csv';
-import { TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
+import { TAVERN_CONTENT_ADAPTER, PROSE_CONTENT_ADAPTER } from './fixture-adapter';
 import {
   FIXTURES_DIR,
   GYM_CONTENT_PATH,
   readFixture,
+  readProseFixture,
   readText,
 } from './test-support';
 
@@ -318,5 +319,54 @@ describe('optionSuccessorIds', () => {
     expect(optionSuccessorIds({ label: 'End', effectPolicy: 'apply' }, TAVERN_CONTENT_ADAPTER)).toEqual(
       [],
     );
+  });
+});
+
+describe('authored prose columns (context / epilogue)', () => {
+  const cards = cardsFromCsv(
+    parseCsv(readProseFixture('prose-basic.csv')),
+    PROSE_CONTENT_ADAPTER,
+  );
+
+  it('lifts both prose columns onto the card verbatim', () => {
+    expect(cards[0]?.context).toBe(
+      'You step off the last coach of the evening. The harbour is quiet, but the lamps are lit, and someone has left a note under your door: "Do not take the morning boat."',
+    );
+    expect(cards[3]?.epilogue).toBe(
+      'The boat slips its mooring before you have found a seat. Behind you the lamps go out one by one; by the time you look again, the town is not there.',
+    );
+    // A beat without an ending has no epilogue; an ending without a situation
+    // has no context.
+    expect(cards[0]?.epilogue).toBeNull();
+    expect(cards[3]?.context).toBeNull();
+  });
+
+  it('reads a blank prose cell as null (absent), never as an empty string', () => {
+    expect(cards[2]?.context).toBeNull();
+    expect(cards[2]?.epilogue).toBeNull();
+  });
+
+  it('keeps mapped prose out of the game-specific fields bag', () => {
+    expect(cards[0]?.fields.context).toBeUndefined();
+    expect(cards[0]?.fields.epilogue).toBeUndefined();
+    expect(cards[0]?.fields).toEqual({});
+  });
+
+  it('carries no prose keys when the adapter maps no prose column', () => {
+    // An unmapped optional column is not an error: the card keeps exactly the
+    // pre-prose shape, so existing content (Gym, Main Street) is untouched.
+    const [gym] = cardsFromCsv(parseCsv(readText(GYM_CONTENT_PATH)), GYM_CONTENT_ADAPTER);
+    expect('context' in (gym as object)).toBe(false);
+    expect('epilogue' in (gym as object)).toBe(false);
+  });
+
+  it('round-trips multi-sentence prose with commas, quotes, semicolons, pipes and hashes', () => {
+    const text = readProseFixture('prose-basic.csv');
+    const parsed = parseCsv(text);
+    const context = cards[1]?.context;
+    expect(context).toContain("'I have been expecting you,' he says;");
+    expect(context).toContain('the word | on the sign');
+    expect(context).toContain('A hand has added # 4 in chalk.');
+    expect(serialiseCsv(parsed)).toBe(text);
   });
 });

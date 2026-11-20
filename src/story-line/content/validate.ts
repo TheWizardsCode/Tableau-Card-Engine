@@ -18,6 +18,7 @@
  * | `unknown-successor` | An `options` candidate (or conditional successor) names a card id that does not exist. |
  * | `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
  * | `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
+ * | `missing-column` | The adapter maps a prose column the file's header does not contain. |
  *
  * Informational findings (never fail validation by default):
  *
@@ -25,6 +26,12 @@
  * |---|---|
  * | `cycle` | A cycle in the choice graph (a first-class, intentional shape). |
  * | `self-link` | A card whose successor is itself (still a cycle). |
+ *
+ * Non-fatal **warnings** (reported, never invalidating):
+ *
+ * | Code | Meaning |
+ * |---|---|
+ * | `prose-budget` | Authored `context` / `epilogue` prose exceeds its adopted budget. |
  *
  * @module
  */
@@ -38,6 +45,7 @@ import {
 } from './csv';
 import { StorylineOptionsEncodingError } from '../compile';
 import { DEFAULT_RESOURCE_KEYS } from '../resources';
+import { PROSE_FIELD_SPECS } from './prose';
 import type { StorylineOption } from '../types';
 import { validateStorylineOptions } from '../validate';
 import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
@@ -53,7 +61,8 @@ export type ContentIssueCode =
   | 'unknown-resource-key'
   | 'unknown-successor'
   | 'unreachable-card'
-  | 'cycle-error';
+  | 'cycle-error'
+  | 'missing-column';
 
 /** A single hard validation issue. */
 export interface ContentIssue {
@@ -94,6 +103,28 @@ export interface ContentIssue {
 /** Machine-readable category of an informational finding. */
 export type ContentFindingKind = 'cycle' | 'self-link';
 
+/** Machine-readable category of a non-fatal warning. */
+export type ContentWarningCode = 'prose-budget';
+
+/**
+ * A single **non-fatal** warning: something the author should look at that
+ * does not make the content invalid.
+ */
+export interface ContentWarning {
+  /** Stable machine-readable category. */
+  readonly code: ContentWarningCode;
+  /** The (base) card id the warning was found on. */
+  readonly cardId: string;
+  /** 1-based logical CSV record number (see {@link ContentIssue.row}). */
+  readonly row?: number;
+  /** The offending CSV column name (e.g. `context`). */
+  readonly column?: string;
+  /** Stable reason code (`prose-over-budget`) for tooling. */
+  readonly reason?: string;
+  /** Human-readable explanation quoting the length and the budget. */
+  readonly message: string;
+}
+
 /** A single informational finding (cycles etc.). */
 export interface ContentFinding {
   /** Stable machine-readable category. */
@@ -124,6 +155,8 @@ export interface ContentValidationResult {
   readonly issues: readonly ContentIssue[];
   /** Informational findings (cycles) — never fail validation by default. */
   readonly findings: readonly ContentFinding[];
+  /** Non-fatal warnings (prose budgets, …) — never affect {@link valid}. */
+  readonly warnings: readonly ContentWarning[];
   /** True when there are no hard errors. */
   readonly valid: boolean;
 }
@@ -149,6 +182,7 @@ export function validateContentCards(
 ): ContentValidationResult {
   const issues: ContentIssue[] = [];
   const findings: ContentFinding[] = [];
+  const warnings: ContentWarning[] = [];
 
   const base = (id: string): string => baseIdOf(adapter, id);
 
@@ -191,6 +225,27 @@ export function validateContentCards(
   });
 
   const knownIds = new Set(cards.map((card) => base(card.id)));
+
+  // ── Authored prose budgets (non-fatal, so never an `issue`) ──
+  cards.forEach((card, index) => {
+    for (const spec of PROSE_FIELD_SPECS) {
+      const column = adapter.fields[spec.field];
+      if (column === undefined) continue;
+      const value = card[spec.field] ?? null;
+      if (value === null || value.length <= spec.budget) continue;
+      const id = base(card.id);
+      warnings.push({
+        code: 'prose-budget',
+        cardId: id,
+        row: index + 2,
+        column,
+        reason: 'prose-over-budget',
+        message:
+          `Card "${id}" ${column} prose is ${value.length} characters, ` +
+          `over the ${spec.budget}-character budget.`,
+      });
+    }
+  });
 
   // ── Per-card option validation ──
   const optionsByCard = new Map<ContentCard, StorylineOption<unknown>[]>();
@@ -384,6 +439,7 @@ export function validateContentCards(
     storylineIds: [...storylineIds].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
     issues,
     findings,
+    warnings,
     valid: issues.length === 0,
   };
 }
@@ -549,6 +605,18 @@ export function formatContentValidationReport(
     lines.push('ERRORS (0): none');
   }
   lines.push('');
+  lines.push(`Warnings (${result.warnings.length}):`);
+  if (result.warnings.length === 0) {
+    lines.push('  (none)');
+  } else {
+    for (const warning of result.warnings) {
+      const location = warning.row === undefined ? '' : ` row ${warning.row}`;
+      const column = warning.column === undefined ? '' : `, column "${warning.column}"`;
+      const reason = warning.reason === undefined ? '' : ` (${warning.reason})`;
+      lines.push(`  ! [${warning.code}]${location}${column}${reason}: ${warning.message}`);
+    }
+  }
+  lines.push('');
   lines.push(`Informational findings (${result.findings.length}):`);
   if (result.findings.length === 0) {
     lines.push('  (none)');
@@ -583,6 +651,7 @@ export function contentValidationToJson(
       storylineIds: result.storylineIds,
       issues: result.issues,
       findings: result.findings,
+      warnings: result.warnings,
     },
     null,
     2,
@@ -590,7 +659,44 @@ export function contentValidationToJson(
 }
 
 /**
+ * Reports prose columns the adapter maps but the file's header lacks.
+ *
+ * A mapped column is a contract: the adapter says "this file has prose here",
+ * so an absent header column means the file and its adapter disagree — a hard
+ * (fatal) authoring error rather than a silently empty card list.
+ *
+ * @param header  Parsed CSV header.
+ * @param adapter The game content adapter.
+ * @returns One `missing-column` issue per mapped-but-absent prose column.
+ */
+function missingProseColumnIssues(
+  header: readonly string[],
+  adapter: ContentAdapter,
+): ContentIssue[] {
+  const present = new Set(header);
+  const issues: ContentIssue[] = [];
+  for (const spec of PROSE_FIELD_SPECS) {
+    const column = adapter.fields[spec.field];
+    if (column === undefined || present.has(column)) continue;
+    issues.push({
+      code: 'missing-column',
+      cardId: '',
+      column,
+      reason: 'missing-mapped-column',
+      message:
+        `Mapped prose column "${column}" is missing from the content header ` +
+        `(columns: ${header.join(', ') || '(none)'}).`,
+    });
+  }
+  return issues;
+}
+
+/**
  * Validates raw content CSV text through an adapter.
+ *
+ * The header is checked first: an adapter that maps a prose column the file
+ * does not declare is a fatal `missing-column` issue. Card-level validation
+ * (including the non-fatal prose-budget warnings) then runs as usual.
  *
  * @param csvText Raw CSV text.
  * @param adapter The game content adapter.
@@ -602,5 +708,10 @@ export function validateContentCsv(
   adapter: ContentAdapter,
   opts: ContentValidationOptions = {},
 ): ContentValidationResult {
-  return validateContentCards(cardsFromCsv(parseCsv(csvText), adapter), adapter, opts);
+  const parsed = parseCsv(csvText);
+  const result = validateContentCards(cardsFromCsv(parsed, adapter), adapter, opts);
+  const headerIssues = missingProseColumnIssues(parsed.header, adapter);
+  if (headerIssues.length === 0) return result;
+  const issues = [...headerIssues, ...result.issues];
+  return { ...result, issues, valid: issues.length === 0 };
 }

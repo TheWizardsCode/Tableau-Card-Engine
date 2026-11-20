@@ -29,7 +29,10 @@ import { readFileSync } from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { GYM_CONTENT_ADAPTER } from '../../../src/story-line/content/adapters';
+import {
+  GYM_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_ADAPTER,
+} from '../../../src/story-line/content/adapters';
 import { buildStorylineManifestFromCsv } from '../../../src/story-line/content/manifest';
 import { readContentCards } from '../../../src/story-line/content/mutate';
 import type { ContentAdapter } from '../../../src/story-line/content/types';
@@ -622,5 +625,74 @@ describe('the committed Gym content is never mutated', () => {
     expect(csv).toContain('Transport Infrastructure');
     expect(csv).not.toContain('The Endgame');
     expect(csv).not.toContain('gym-story-detour');
+  });
+});
+
+describe('authored prose fields (context / epilogue)', () => {
+  const PROSE_CSV = [
+    'id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue',
+    'le-x-open,The Opening,Nothing happens.,,q,Q,"hull",I,1,"A ship at anchor; nothing moves.","The anchor holds."',
+    '',
+  ].join('\n');
+
+  /** The prose-bearing card read through the Long Erasure adapter. */
+  function proseCard() {
+    const [card] = readContentCards(PROSE_CSV, LONG_ERASURE_CONTENT_ADAPTER);
+    return card!;
+  }
+
+  it('renders both prose fields as long-text only when the adapter maps them', () => {
+    const descriptors = buildCardFieldDescriptors(LONG_ERASURE_CONTENT_ADAPTER, proseCard());
+    const byKey = new Map(descriptors.map((descriptor) => [descriptor.key, descriptor]));
+
+    expect(byKey.get('context')).toMatchObject({
+      kind: 'long-text',
+      group: 'core',
+      column: 'context',
+      value: 'A ship at anchor; nothing moves.',
+      editable: true,
+    });
+    expect(byKey.get('epilogue')).toMatchObject({
+      kind: 'long-text',
+      group: 'core',
+      column: 'epilogue',
+      value: 'The anchor holds.',
+      editable: true,
+    });
+    // The mapped prose columns are core fields, never duplicated as game columns.
+    expect(descriptors.some((descriptor) => descriptor.key === 'column:context')).toBe(false);
+    expect(descriptors.some((descriptor) => descriptor.key === 'column:epilogue')).toBe(false);
+
+    // The Gym adapter maps neither prose column, so neither control renders.
+    const gymKeys = buildNewCardFieldDescriptors(GYM_CONTENT_ADAPTER).map(
+      (descriptor) => descriptor.key,
+    );
+    expect(gymKeys).not.toContain('context');
+    expect(gymKeys).not.toContain('epilogue');
+  });
+
+  it('starts both prose controls empty on the new-card form', () => {
+    const byKey = new Map(
+      buildNewCardFieldDescriptors(LONG_ERASURE_CONTENT_ADAPTER).map((descriptor) => [
+        descriptor.key,
+        descriptor,
+      ]),
+    );
+    expect(byKey.get('context')?.value).toBe('');
+    expect(byKey.get('epilogue')?.value).toBe('');
+  });
+
+  it('builds an update spec carrying edited prose and clears it when blank', () => {
+    const descriptors = buildCardFieldDescriptors(LONG_ERASURE_CONTENT_ADAPTER, proseCard());
+    const draft = draftFromDescriptors(descriptors);
+    draft.context = 'A ship at anchor; the crew have gone quiet.';
+    draft.epilogue = '';
+
+    const spec = buildUpdateSpec(descriptors, draft);
+    expect(spec).not.toBeNull();
+    expect(spec?.context).toBe('A ship at anchor; the crew have gone quiet.');
+    expect(spec?.epilogue).toBeNull();
+    // Prose is a core field, not a game-field bag entry.
+    expect(spec?.fields).toBeUndefined();
   });
 });

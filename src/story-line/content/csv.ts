@@ -181,9 +181,16 @@ export function findMissingColumns(
  * reads as absent — `null` for optional identifiers, `''` for text.
  *
  * Only the generic story-line fields (`id`, `name`, `effect`, `options`, the
- * storyline metadata and the declared `resources` keys) are projected; every
- * other column, including any game-specific or not-yet-migrated column, lands
- * in {@link ContentCard.fields}.
+ * storyline metadata, the declared `resources` keys and the optional authored
+ * `context` / `epilogue` prose) are projected; every other column, including
+ * any game-specific or not-yet-migrated column, lands in
+ * {@link ContentCard.fields}.
+ *
+ * Authored prose is kept **verbatim** (commas, quotes, apostrophes, `;`, `|`
+ * and `#` all survive) and a blank cell reads as `null` (absent), never `''`.
+ * The prose keys exist only when the adapter maps their column, so content
+ * without prose columns keeps exactly the shape it had before the prose
+ * fields existed.
  *
  * @param parsed  Parsed CSV.
  * @param adapter The game content adapter.
@@ -207,6 +214,10 @@ export function cardsFromCsv(
     const trimmed = value.trim();
     return trimmed === '' ? null : trimmed;
   };
+  // Prose is preserved verbatim (only blankness is normalised), so an author's
+  // punctuation and spacing survive the projection.
+  const prose = (value: string): string | null =>
+    value.trim() === '' ? null : value;
 
   const mappedColumns = new Set(
     Object.values(adapter.fields).filter((column): column is string => column !== undefined),
@@ -224,6 +235,12 @@ export function cardsFromCsv(
       name: text(cell(row, adapter.fields.name)),
       effect: text(cell(row, adapter.fields.effect)),
       options: text(cell(row, adapter.fields.options)),
+      ...(adapter.fields.context !== undefined
+        ? { context: prose(cell(row, adapter.fields.context)) }
+        : {}),
+      ...(adapter.fields.epilogue !== undefined
+        ? { epilogue: prose(cell(row, adapter.fields.epilogue)) }
+        : {}),
       storylineId: optional(cell(row, adapter.fields.storylineId)),
       storylineTitle: optional(cell(row, adapter.fields.storylineTitle)),
       fields,

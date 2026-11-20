@@ -88,7 +88,10 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
  * Phaser-free run module reads:
  *
  * - `act` — the act the card belongs to (`I`, `II`, `III` or `Ending`);
- * - `clockCost` — pressure-clock beats consumed when the card is drawn.
+ * - `clockCost` — pressure-clock beats consumed when the card is drawn;
+ * - `context` / `epilogue` — the optional authored prose the narrative panel and
+ *   the closing screen read. The columns are part of the file's schema and may
+ *   be blank: a blank cell reads as "no prose authored" (`null`).
  *
  * Mechanics ride on the **option** attributes (`#cost` / `#extra` / `#when`),
  * so no bespoke resource column exists: the declared set is the mapped
@@ -106,6 +109,8 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
     'resources',
     'act',
     'clockCost',
+    'context',
+    'epilogue',
   ],
   fields: {
     id: 'id',
@@ -115,6 +120,8 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
     storylineId: 'storylineId',
     storylineTitle: 'storylineTitle',
     resources: 'resources',
+    context: 'context',
+    epilogue: 'epilogue',
   },
   editableColumns: ['act', 'clockCost'],
   newCardDefaults: {
@@ -124,6 +131,8 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
     resources: 'hull,morale,stores,goodwill,charge',
     act: 'I',
     clockCost: '1',
+    context: '',
+    epilogue: '',
   },
 };
 
