@@ -1,0 +1,6 @@
+id,name,effect,options,storylineId,storylineTitle,resources,context,epilogue
+p-a,The Door,A door in a wall where the map says there is none.,"Open it|p-b#says=The door opens on a room you remember. A note reads ""1 \# 2"" and the ink is still wet.#cost=coins:5#when=reputation>=2>p-c;Read it|p-c#cost=coins:2#says=You read a page you have not written yet, and your own handwriting says: ""stop"". You don't remember buying the ink.;Wait|p-d#when=coins>=1>p-c#says=You wait. The lamps burn down to stubs, and nothing comes.;Close the book|p-e#cost=coins:1#extra=reputation:1#says=You close the book. The log reads C:\\ledger, and the room behind you is empty when you turn around.",prose-quay,The Lamplit Quay,"coins,reputation",A corridor where the map says there is none.,
+p-b,The Room,Dust and a lamp.,,prose-quay,The Lamplit Quay,"coins,reputation",,
+p-c,The Page,Your own handwriting.,,prose-quay,The Lamplit Quay,"coins,reputation",,
+p-d,The Wait,Stubs in the sockets.,,prose-quay,The Lamplit Quay,"coins,reputation",,
+p-e,The Closing,The lock turns.,,prose-quay,The Lamplit Quay,"coins,reputation",,"The book shuts itself, and the corridor is a wall again."

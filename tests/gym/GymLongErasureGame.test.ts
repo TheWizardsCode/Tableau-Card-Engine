@@ -52,6 +52,7 @@ import {
   longErasureContentFromCsv,
   runJournal,
   scoreRun,
+  type LongErasureCard,
   type LongErasureContent,
   type LongErasureState,
 } from '../../example-games/gym/GymLongErasureGame';
@@ -541,6 +542,121 @@ describe('The Long Erasure: purity of the transition surface', () => {
     expect(labelsOf(state)).toEqual(labelsOf(state));
     expect(scoreRun(state)).toEqual(scoreRun(state));
     expect(buildEpilogue(state)).toEqual(buildEpilogue(state));
+  });
+});
+
+// ── Narrative view model (prose contract) ───────────────────────────
+
+/**
+ * The prose fields the narrative slice adds to the Phaser-free view model
+ * (`CG-0MWO7CRT9001BLNL` pins this shape; sibling `CG-0MWO7CVDI004J3JX`
+ * implements it).
+ *
+ * | Surface | Agreed shape |
+ * |---|---|
+ * | current beat | `LongErasureCard.context: string \| null` |
+ * | options | `StorylineOption.says?: string` (via `availableOptions`) |
+ * | resolved outcome | `LongErasureHistoryEntry.outcomeProse: string \| null` |
+ * | closing screen | `LongErasureEpilogue.epilogueProse: string \| null` |
+ *
+ * Cases are red today and are encoded with `it.fails` (see
+ * `tests/story-line/content/prose-contract.test.ts` for the convention): the
+ * body genuinely fails now, and the case turns the suite red once implemented
+ * so the marker cannot be forgotten.
+ */
+describe('The Long Erasure: narrative view model (prose contract)', () => {
+  /** A card carrying the (optional) authored context. */
+  interface ProseCard extends LongErasureCard {
+    readonly context?: string | null;
+  }
+
+  /** A history entry carrying the (optional) authored outcome prose. */
+  interface ProseHistoryEntry {
+    readonly outcomeProse?: string | null;
+  }
+
+  /** The closing view model carrying the (optional) authored epilogue. */
+  interface ProseEpilogue {
+    readonly epilogueProse?: string | null;
+  }
+
+  /** Reads a compiled option's authored outcome prose, or `null`. */
+  function saysOf(option: unknown): string | null {
+    return (option as { says?: string | null }).says ?? null;
+  }
+
+  /** The prose fixture, loaded through the module's own CSV loader. */
+  function proseContent(): LongErasureContent {
+    return longErasureContentFromCsv(
+      readRepoFile('tests/fixtures/story-line/prose/long-erasure-prose.csv'),
+    );
+  }
+
+  /** The no-prose fixture (the fallback path). */
+  function bareContent(): LongErasureContent {
+    return longErasureContentFromCsv(
+      readRepoFile('tests/fixtures/story-line/prose/long-erasure-bare.csv'),
+    );
+  }
+
+  /** Plays the prose fixture to its ending (`Log` then `Seal`). */
+  function playToEnding(): LongErasureState {
+    const started = createLongErasureRun(1, proseContent());
+    const logged = chooseOption(started, 'Log the erasure');
+    return chooseOption(logged, 'Seal the hatch');
+  }
+
+  it.fails('[red] exposes the current beat’s context headlessly', () => {
+    const content = proseContent();
+    expect((content.cards[0] as ProseCard).context).toBe(
+      'The Ashlight holds station at the edge of an Unwriting. Archivist Vane has been here before; the crew have not.',
+    );
+  });
+
+  it.fails('[red] exposes each option’s authored outcome prose', () => {
+    const started = createLongErasureRun(1, proseContent());
+    const options = availableOptions(started);
+    expect(options.map((option) => option.label)).toEqual([
+      'Log the erasure',
+      'Rally the crew',
+    ]);
+    expect(saysOf(options[0]!)).toBe(
+      'You log it, and the charts go blank with it.',
+    );
+    expect(saysOf(options[1]!)).toBe(
+      'You raise your voice in a corridor that no longer ends.',
+    );
+  });
+
+  it.fails('[red] exposes the resolved outcome prose on the journey history', () => {
+    const finished = playToEnding();
+    expect((finished.history[0] as ProseHistoryEntry).outcomeProse).toBe(
+      'You log it, and the charts go blank with it.',
+    );
+    expect((finished.history[1] as ProseHistoryEntry).outcomeProse).toBe(
+      'The hatch seals behind you, and the reading stops mattering.',
+    );
+  });
+
+  it.fails('[red] exposes the terminal card’s authored epilogue', () => {
+    const finished = playToEnding();
+    expect((buildEpilogue(finished) as ProseEpilogue).epilogueProse).toBe(
+      'The timeline closes over the erasure like water. You are the only thing that remembers the room.',
+    );
+  });
+
+  it('[green] falls back to no prose when the content authors none', () => {
+    // The absent-prose path must stay total: `null` (never `''`, never a
+    // throw) on every prose surface.
+    const content = bareContent();
+    expect((content.cards[0] as ProseCard).context ?? null).toBeNull();
+
+    const started = createLongErasureRun(1, content);
+    expect(saysOf(availableOptions(started)[0]!)).toBeNull();
+
+    const finished = chooseOption(started, 'Walk on');
+    expect((finished.history[0] as ProseHistoryEntry).outcomeProse ?? null).toBeNull();
+    expect((buildEpilogue(finished) as ProseEpilogue).epilogueProse ?? null).toBeNull();
   });
 });
 

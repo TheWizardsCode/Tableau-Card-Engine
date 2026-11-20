@@ -1,0 +1,5 @@
+id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta
+gym-story-start,Town Meeting,Lose 50 coins,Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end;Ignore|gym-story-ignore,gym-story,Gym Storyline,"coins,reputation",Incident,0,-50,0
+gym-story-invest,Public Investment,Gain 120 coins,Celebrate|gym-story-end;Double down|,gym-story,Gym Storyline,"coins,reputation",Incident,0,120,0
+gym-story-ignore,Neglected Roads,Lose 80 coins,Repair|gym-story-end;Let it be|,gym-story,Gym Storyline,"coins,reputation",Incident,0,-80,0
+gym-story-end,Transport Infrastructure,Gain 60 reputation,,gym-story,Gym Storyline,"coins,reputation",Incident,0,0,60

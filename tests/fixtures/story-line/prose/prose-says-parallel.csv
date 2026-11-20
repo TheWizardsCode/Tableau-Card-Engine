@@ -1,0 +1,4 @@
+id,name,effect,options,storylineId,storylineTitle,resources
+q-open,Warning,The loom turns.,Warn the crew|q-mid;Stay silent|q-end,q,Q,"coins,reputation"
+q-mid,The Loom,Choose.,Recall|q-end#says=One thing happened\; then another was forgotten,q,Q,"coins,reputation"
+q-end,Fade,It ends.,,q,Q,"coins,reputation"

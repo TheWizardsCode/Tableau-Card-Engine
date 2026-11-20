@@ -1,0 +1,5 @@
+id,name,effect,options,storylineId,storylineTitle,resources
+u-open,Warning,The loom turns.,Warn the crew|u-mid;Look at the chalk|u-third;Stay silent|u-end,u,U,"coins,reputation"
+u-mid,The Loom,Choose.,Recall|u-end#says=Two things happened; and one of them will be forgotten,u,U,"coins,reputation"
+u-third,Chalk,Look.,Wait|u-end#says=One thing # and then another,u,U,"coins,reputation"
+u-end,Fade,It ends.,,u,U,"coins,reputation"
