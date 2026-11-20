@@ -103,7 +103,8 @@ const CORE_FIELDS: readonly CoreFieldSpec[] = [
       'Append #cost=coins:5#extra=reputation:+2#when=coins>=3>cardX to declare a cost, ' +
       'an extra effect and a conditional successor (repeat #when for an ordered rule list). ' +
       'Append #says=… for the outcome prose of taking the option (escape a literal ";" as \\; ' +
-      'and a literal "#" as \\#).',
+      'and a literal "#" as \\#; the full policy and examples are in ' +
+      'docs/core-engine/story-line.md, Authored prose → Escape policy).',
   },
   { key: 'storylineId', label: 'Story-line id', kind: 'text' },
   { key: 'storylineTitle', label: 'Story-line title', kind: 'text' },

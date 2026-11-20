@@ -613,6 +613,10 @@ Progressively reveals a prose block — the consequence of a choice — into an
 `COMMON_SFX_KEYS` sound. Turns an outcome into a story beat instead of a silent
 text swap (CG-0MWO7CULE001IWU1).
 
+**Signature.** `revealNarration(options: RevealNarrationOptions): NarrationRevealHandle`
+(`src/ui/narration-reveal.ts`) — the module imports Phaser only as a type, so
+the pacing plan is unit-testable without a scene.
+
 ### Import
 
 ```ts

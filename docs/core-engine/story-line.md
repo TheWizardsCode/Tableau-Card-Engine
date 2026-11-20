@@ -268,10 +268,11 @@ validator checks; a blank cell (or an adapter without the mapping) falls back
 to the default `coins` / `reputation` projection.
 
 **Worked example.** One row from
-[`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv):
+[`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)
+(record 2, quoted verbatim):
 
 ```csv
-le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,Log the erasure|le-i-log#cost=stores:1;Rally the survey crew|le-i-rally#extra=morale:1,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1
+le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,"Log the erasure|le-i-log#cost=stores:1#says=You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be.;Rally the survey crew|le-i-rally#extra=morale:1#says=You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them.",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,"The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
 ```
 
 Its `options` cell compiles to:
@@ -282,22 +283,24 @@ Its `options` cell compiles to:
     "label": "Log the erasure",
     "successorIds": ["le-i-log"],
     "effectPolicy": "apply",
-    "cost": { "stores": 1 }
+    "cost": { "stores": 1 },
+    "says": "You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be."
   },
   {
     "label": "Rally the survey crew",
     "successorIds": ["le-i-rally"],
     "effectPolicy": "apply",
-    "extraEffect": { "morale": 1 }
+    "extraEffect": { "morale": 1 },
+    "says": "You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them."
   }
 ]
 ```
 
-A state-gated branch from the same file, where a random candidate list and a
-conditional gate share one option:
+A state-gated branch from the same file (the `options` cell of record 12),
+where a random candidate list and a conditional gate share one option:
 
 ```csv
-le-ii-sabotage,...,"Break for the core|le-iii-approach,le-iii-ahead#when=charge>=2>le-iii-ahead;Follow the unravelling|le-iii-approach#extra=charge:1",...
+Break for the core|le-iii-approach,le-iii-ahead#when=charge>=2>le-iii-ahead#says=You drive straight for the Loom's core while the tear is still open. The Ashlight arrives close enough to touch it, and the clock starts again.;Follow the unravelling|le-iii-approach#extra=charge:1#says=You follow the unravelling instead of racing it and harvest its charge as it comes apart. The core will still be there, and you will arrive with more to spend.
 ```
 
 `Break for the core` resolves to `le-iii-ahead` only while `charge >= 2`;
@@ -321,6 +324,145 @@ semantic codes (`unknown-resource-key`, `non-positive-cost`,
 [`validateStorylineOptions`](#validation) and are reported on the same row and
 column. The fixture tests live in
 [`tests/story-line/content/extended-options.test.ts`](../../tests/story-line/content/extended-options.test.ts).
+
+### Authored prose: `context`, `#says` and `epilogue`
+
+Three prose surfaces let a writer tell the story in their own words. All three
+are **optional and additive**: content that authors none behaves exactly as it
+did before the prose slice, and a game opts in by mapping the columns in its
+content adapter.
+
+| Surface | Authored as | Scope | Budget | Presented as |
+|---|---|---|---|---|
+| `context` | the `context` CSV column | every beat | 400 characters | the narrative panel above the options, paged with `paginateProse()` |
+| outcome prose | the `#says=<escaped prose>` option attribute | one option | — | `StorylineResolution.outcomeProse` → the story-update line, the journal row, the narration reveal |
+| `epilogue` | the `epilogue` CSV column | a terminal card | 600 characters | the closing screen (`buildEpilogue().epilogueProse`) |
+
+**The columns are opt-in per adapter.** `ContentFieldMapping` gains two
+optional keys, `context` and `epilogue`, which point at the game's own column
+names:
+
+```ts
+export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
+  gameId: 'long-erasure',
+  columns: [
+    'id', 'name', 'effect', 'options', 'storylineId', 'storylineTitle',
+    'resources', 'act', 'clockCost', 'context', 'epilogue',
+  ],
+  fields: {
+    id: 'id',
+    name: 'name',
+    effect: 'effect',
+    options: 'options',
+    storylineId: 'storylineId',
+    storylineTitle: 'storylineTitle',
+    resources: 'resources',
+    context: 'context',
+    epilogue: 'epilogue',
+  },
+  // …
+};
+```
+
+**An omitted mapping means "this file has no such column".** An adapter that
+does not map `context` / `epilogue` is never an error, and its cards carry no
+prose key at all (`ContentCard.context` / `ContentCard.epilogue` are absent,
+not empty strings). When the columns **are** mapped, a blank cell reads as "no
+prose authored" (`null`) and is always valid. An adapter that maps a prose
+column the file's header does not contain is a hard `missing-column` error, so
+a renamed column is caught rather than silently dropping the prose. The
+no-prose parity promise is pinned by
+[`tests/story-line/content/prose-parity.test.ts`](../../tests/story-line/content/prose-parity.test.ts).
+
+**Shipped CSV examples.** Both Gym content files author these fields. The *Long
+Erasure* header:
+
+```csv
+id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue
+```
+
+A beat with its `context` and both of its options' `#says` values (record 2 of
+[`storylines.csv`](../../example-games/gym/content/storylines.csv)):
+
+```csv
+gym-story-start,Town Meeting,Lose 50 coins,"Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.",gym-story,Gym Storyline,"coins,reputation",Incident,0,-50,0,"The town meets in the hall above the market, with the road budget on the table and rain coming in off the hills. Everyone is waiting to see who will pay for the roads this year."
+```
+
+A terminal card carrying its `epilogue` (record 17 of
+[`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)):
+
+```csv
+le-end-abandon,The Voyage Abandoned,You turn for home and the erasure follows you there.,,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",Ending,0,"You give the order to turn for home and the Ashlight comes about slowly, as though the hull has an opinion. The Unwriting does not pursue, which is worse, because it does not need to. Behind you the volume is still going out, edge first, and ahead of you is every berth you promised to come back for.","The Ashlight reaches home berth with every certificate in order and no survey to show for it. The port authority thanks you for the quiet and asks you not to file the log until it has been reviewed. You wake some nights with the volume in your head exactly as it was, and then watch it go out edge first, taking the harbour with it. Home is still there in the morning. It is just not the home that was there when you left."
+```
+
+#### Escape policy (`#says` only)
+
+`;` and `#` are reserved delimiters in a `#says` value; a literal one must be
+escaped. Escapes are recognised **only inside a says value**, so no existing
+cell can change meaning:
+
+| Written inside `#says` | Decodes to | Shipped / fixture quote |
+|---|---|---|
+| `\;` | `;` | `#says=One thing happened\; then another was forgotten` ([`prose-says-parallel.csv`](../../tests/fixtures/story-line/prose/prose-says-parallel.csv)) |
+| `\#` | `#` | `#says=… A note reads ""1 \# 2"" and the ink is still wet.` ([`prose-option-attributes.csv`](../../tests/fixtures/story-line/prose/prose-option-attributes.csv); `""` is the CSV-escaped double quote) |
+| `\\` | `\` | `#says=… The log reads C:\\ledger, and the room behind you is empty when you turn around.` (same fixture) |
+| any other `\` | `\` (literal) | A backslash in a label, a candidate id, or a `#cost` / `#extra` / `#when` value is an ordinary character |
+
+**Not reserved in prose (no escaping needed):** `,`, `|`, `=`, `:`, double
+quotes and apostrophes. The linked fixture's says values contain all of them
+unescaped (in the `Read it` option) and parse verbatim.
+
+**Reserved and rejected:** an unescaped `;` or `#` inside a says value is
+rejected by the parser (`unescaped-says-delimiter`) instead of silently
+splitting the cell, and a says value that **decodes** to more than one segment
+(an author-written parallel list, `#says=One\; two`) is rejected by validation
+as `says-segment-count`. A says value is exactly **one** prose segment.
+
+**Round-trip.** `serialiseStorylineOptionsEncoding(options)` is the inverse of
+the parser and re-escapes `;`, `#` and `\` in a says value (and touches nothing
+else). Attributes are written in the canonical order `#cost`, `#extra`,
+`#when`*, `#says` last, so a cell authored in that order round-trips
+byte-identically; any other authored order round-trips stably to the same
+model. The fixtures in
+[`tests/fixtures/story-line/prose/prose-option-attributes.csv`](../../tests/fixtures/story-line/prose/prose-option-attributes.csv)
+are pinned by [`prose-contract.test.ts`](../../tests/story-line/content/prose-contract.test.ts).
+
+#### Prose budgets
+
+Authored prose has an adopted length budget. Exceeding it is a **non-fatal
+warning**, never a hard error — an author can deliberately exceed it.
+
+| Field | Budget (characters) | Diagnostic |
+|---|---|---|
+| `context` | 400 | `prose-budget`, reason `prose-over-budget` — reported, never invalidating |
+| `epilogue` | 600 | the same |
+
+The table lives in `PROSE_FIELD_SPECS`
+([`src/story-line/content/prose.ts`](../../src/story-line/content/prose.ts)) so
+the validator, the editor's field hints and this document quote one source of
+truth. `storylines:validate` prints the warning on the offending record and
+column, e.g. `! [prose-budget] row 2, column "context" (prose-over-budget):
+Card "p-a" context prose is 401 characters, over the 400-character budget.`
+(the shape pinned by `tests/story-line/content/validate.test.ts`).
+
+#### Journal and closing behaviour
+
+- **Resolution** — `resolveStorylineOption()` returns the chosen option's
+  `says` verbatim as `StorylineResolution.outcomeProse` (`null` when the option
+  authors none). It never changes the resolved deltas or successor.
+- **Story-update line** — `defaultStoryUpdateLine(card, label, coins, rep,
+  outcomeProse?)` renders `Story update — <story-line name>: <prose>` when
+  prose is present, byte-identically to the pre-prose wording when it is not.
+- **Journal** — `buildJournal()` derives one row per resolved choice;
+  `StorylineJournalEntry.outcome` is cut to a single display line by
+  `truncateOutcome(text, 80)`, while `outcomeFull` keeps the full prose and
+  `text` the original log line, so a transcript never loses what the journal
+  ellipsised.
+- **Closing** — a terminal card's `epilogue` is surfaced by
+  `buildEpilogue()` as `epilogueProse` (or `null`); the scene falls back to its
+  pre-prose framing line when none is authored, so an ending without an
+  epilogue is unchanged. The epilogue is presentation only: the journey score
+  still comes from the journal.
 
 ### Compilation
 

@@ -16,8 +16,9 @@
  * The Gym ships one such section: the Gym storyline demo's card catalogue
  * (`example-games/gym/GymStorylineDemo.ts`) hand-maintains the four content
  * cards, and the Gym suite pins that fixture — an edit to a documented row
- * (a renamed id, a changed effect, a dropped card) silently breaks it unless
- * the demo is updated by hand.
+ * (a renamed id, a changed effect, a changed `context` paragraph or `#says`
+ * outcome, a dropped card) silently breaks it unless the demo is updated by
+ * hand.
  *
  * Pure data; Phaser-free, game-import-free and Node-free (browser-safe).
  *

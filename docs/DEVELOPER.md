@@ -1595,10 +1595,10 @@ cell, and `#when` repeats for an ordered rule list:
 | `#extra` | `#extra=morale:+2` | Resource gain applied on resolution. |
 | `#when` | `#when=charge>=2>le-iii-ahead` | Ordered conditional successor rule (first match wins; empty successor ends the chain). |
 
-A real row from `long-erasure.csv`:
+A real row from `long-erasure.csv` (record 2, quoted verbatim):
 
 ```csv
-le-i-open,The First Unwriting,A volume of space stops having happened...,Log the erasure|le-i-log#cost=stores:1;Rally the survey crew|le-i-rally#extra=morale:1,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1
+le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,"Log the erasure|le-i-log#cost=stores:1#says=You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be.;Rally the survey crew|le-i-rally#extra=morale:1#says=You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them.",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,"The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
 ```
 
 The `resources` column declares the keys a card's attributes may name
@@ -1614,6 +1614,66 @@ reading engine code. The author CLI accepts the same field
 All of it is documented in
 [Core: Generic Story-Line System → Authoring options in CSV](core-engine/story-line.md#authoring-options-in-csv)
 (grammar, worked example, diagnostics).
+
+### Authoring prose in CSV
+
+Narrative prose is authored entirely in the content CSV — **no TypeScript
+registration** per beat, option or ending. A writer fills three optional
+surfaces, and existing content that authors none is unchanged:
+
+| Surface | Where it is authored | Scope | Budget |
+|---|---|---|---|
+| `context` | the adapter-mapped `context` column | every beat | 400 characters |
+| outcome prose | `#says=<prose>` in the `options` cell | one option | — |
+| `epilogue` | the adapter-mapped `epilogue` column | a terminal card | 600 characters |
+
+Both Gym content files are the reference: `storylines.csv` authors `context`
+and `#says`, and `long-erasure.csv` authors all three. The columns are shown in
+the editor only when the adapter maps them, and a blank cell means "no prose
+authored" — never an error. The full field contract, escape policy table and
+shipped examples are in
+[Core: Generic Story-Line System → Authored prose](core-engine/story-line.md#authored-prose-context-says-and-epilogue).
+
+**Escapes are only needed inside `#says`.** `;` and `#` are reserved delimiters
+there (`\;`, `\#`; `\\` for a literal backslash); `,`, `|`, `=`, `:` and
+quotes/apostrophes need no escaping. Every backslash outside a says value — in a
+label, a candidate id or a `#cost` value — stays literal, so adding prose cannot
+change the meaning of an existing cell. A says value is one prose segment; a
+decoded `;` (an author-written parallel list) is rejected rather than shown as
+two sentences.
+
+#### Fixing `storylines:validate` diagnostics
+
+Every diagnostic names the **record**, the **column** and a stable **reason**:
+
+```text
+✗ [invalid-option] row 3, column "options" (unescaped-says-delimiter): Choice card "u-mid" has a malformed options column: Invalid storyline options encoding "Recall|u-end#says=Two things happened; and one of them will be forgotten": option 1 has an unescaped ";" in its #says value (a literal ";" must be written "\;").
+✗ [missing-column], column "context" (missing-mapped-column): Mapped prose column "context" is missing from the content header (columns: id, name, effect, options, storylineId, storylineTitle, resources).
+! [prose-budget] row 2, column "context" (prose-over-budget): Card "p-a" context prose is 401 characters, over the 400-character budget.
+```
+
+The first two lines are the shipped `storylines:validate` output for
+[`prose-says-unescaped.csv`](../../tests/fixtures/story-line/prose/prose-says-unescaped.csv);
+the warning line is the shape pinned by `tests/story-line/content/validate.test.ts`.
+`✗` lines are hard errors (validation fails, the author API refuses to write);
+`!` lines are non-fatal warnings (the content is still valid).
+
+| Code / reason | What it means | How to fix it |
+|---|---|---|
+| `prose-budget` / `prose-over-budget` | `context` exceeds 400 characters or `epilogue` exceeds 600 | Shorten the paragraph, or accept the warning deliberately. Never blocks a write. |
+| `invalid-option` / `unescaped-says-delimiter` | A raw `;` or `#` inside a `#says` value | Escape it: `\;` for `;`, `\#` for `#` (and `\\` for `\`). |
+| `invalid-option` / `says-segment-count` | The decoded says value contains a `;`, so it reads as a parallel list | Keep one prose segment per option — rephrase, or split the consequence into a second option. |
+| `invalid-option` / `unknown-attribute` | An unknown `#name=` attribute in `options` | Use one of `#cost`, `#extra`, `#when`, `#says`. |
+| `invalid-option` / `no-valid-option` | The `options` cell decodes to no option | Fill in the option head (a label, then the separator and successor list; an empty successor list is a valid terminal option). |
+| `missing-column` / `missing-mapped-column` | The adapter maps `context` / `epilogue` but the file's header lacks the column | Add the column (blank cells are valid) or remove the mapping from the adapter. |
+
+**Editor fields.** When the adapter maps prose, **Edit card** / **Add card**
+render `Context` and `Epilogue` as long-text controls whose hints quote the
+400- and 600-character budgets (from `PROSE_FIELD_SPECS`, the same source the
+validator uses). The `Options` field's hint documents the `#says=` attribute
+and its `\;` / `\#` escapes, so the escape policy is discoverable where the
+writer types it, and the field set is derived from the adapter descriptors
+(`src/story-line/editor/field-descriptors.ts`) rather than hard-coded.
 
 The Gym *Long Erasure* spike is the end-to-end reference: its content is
 authored entirely this way, and its Phaser-free rules module

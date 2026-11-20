@@ -401,6 +401,11 @@ function parseConditionalSuccessor(
  *
  * ## Escape policy (`#says` only)
  *
+ * The author-facing table — with shipped-content examples, the not-reserved
+ * characters and the diagnostics — is the single source of truth:
+ * `docs/core-engine/story-line.md` → "Authored prose → Escape policy". The
+ * rules below are the implementation contract it documents.
+ *
  * `;` and `#` are reserved delimiters and may not appear raw in **any** value;
  * `|` and `,` are reserved in a label / candidate list only. Escapes are
  * recognised **only inside a `#says` value**, so no existing cell can change
