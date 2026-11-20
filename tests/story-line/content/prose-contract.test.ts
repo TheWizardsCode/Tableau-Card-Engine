@@ -432,7 +432,7 @@ describe('authored outcome prose (red: CG-0MWO7CTVP004DQC6)', () => {
     )[0]!;
   }
 
-  it.fails('[red] carries the chosen option\'s prose on the resolution', () => {
+  it('[green] carries the chosen option\'s prose on the resolution', () => {
     const { state, adapter, card } = engine();
     const result = resolveStorylineOption(
       state,
@@ -445,7 +445,7 @@ describe('authored outcome prose (red: CG-0MWO7CTVP004DQC6)', () => {
     );
   });
 
-  it.fails('[red] uses the authored prose as the story-update outcome', () => {
+  it('[green] uses the authored prose as the story-update outcome', () => {
     const { card } = engine();
     const storyUpdateLine = defaultStoryUpdateLine as unknown as StoryUpdateLine;
     expect(
@@ -481,7 +481,7 @@ describe('authored outcome prose (red: CG-0MWO7CTVP004DQC6)', () => {
     });
   });
 
-  it.fails('[red] truncates a journal outcome to one display-safe line', async () => {
+  it('[green] truncates a journal outcome to one display-safe line', async () => {
     const truncateOutcome = (await loadJournal()).truncateOutcome as
       | TruncateOutcome
       | undefined;

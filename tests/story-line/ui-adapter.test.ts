@@ -18,6 +18,7 @@ import {
   createDefaultStorylineUiAdapter,
   createStorylineSystem,
   defaultStorylineName,
+  defaultStoryUpdateLine,
 } from '../../src/story-line';
 import { makeAdapter, makeCard, type TestCard } from './helpers';
 
@@ -121,6 +122,47 @@ describe('storyUpdateLine', () => {
   it('formats reputation deltas too', () => {
     const line = system.ui.storyUpdateLine(tax, 'accept', 0, 3);
     expect(line).toContain('+3 rep');
+  });
+
+  it('uses the authored outcome prose verbatim, with no paraphrase or delta summary', () => {
+    const prose = 'He does not look up, and the oar drips on the stones.';
+    expect(defaultStoryUpdateLine(tax, 'accept', -200, 5, prose)).toBe(
+      'Story update — Tax Troubles: He does not look up, and the oar drips on the stones.',
+    );
+  });
+
+  it('exposes the prose through the adapter seam', () => {
+    const prose = 'The thread closes; the ledger stays open.';
+    expect(system.ui.storyUpdateLine(tax, 'Investigate', 50, 0, prose)).toBe(
+      'Story update — Tax Troubles: The thread closes; the ledger stays open.',
+    );
+  });
+
+  it('falls back to today’s wording when the prose is absent or blank (parity)', () => {
+    expect(defaultStoryUpdateLine(tax, 'accept', -200, 0, null)).toBe(
+      'Story update — Tax Troubles: you accepted the consequence (-200 coins).',
+    );
+    expect(defaultStoryUpdateLine(tax, 'accept', -200, 0, undefined)).toBe(
+      'Story update — Tax Troubles: you accepted the consequence (-200 coins).',
+    );
+    expect(defaultStoryUpdateLine(tax, 'accept', -200, 0, '')).toBe(
+      'Story update — Tax Troubles: you accepted the consequence (-200 coins).',
+    );
+    expect(defaultStoryUpdateLine(tax, 'accept', -200, 0, '   ')).toBe(
+      'Story update — Tax Troubles: you accepted the consequence (-200 coins).',
+    );
+  });
+
+  it('still returns null for a card without a storyline, prose or not', () => {
+    expect(
+      defaultStoryUpdateLine(
+        makeEvent({ id: 'evt-plain', options: 'Go|evt-next' }),
+        'Go',
+        0,
+        0,
+        'Some authored prose.',
+      ),
+    ).toBeNull();
   });
 });
 

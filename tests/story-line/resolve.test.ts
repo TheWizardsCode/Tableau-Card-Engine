@@ -712,6 +712,74 @@ describe('declarative conditional successors', () => {
   });
 });
 
+// ── Authored outcome prose ─────────────────────────────────
+
+describe('authored outcome prose', () => {
+  it("carries the chosen option's authored prose on the resolution", () => {
+    const { system, state } = setup();
+    const res = system.resolveStorylineOption(
+      state,
+      makeCard({ id: 'evt-prose', storylineId: 'arc', storylineTitle: 'Arc' }),
+      {
+        label: 'Speak',
+        effectPolicy: 'skip',
+        says: 'He does not look up, and the oar drips on the stones.',
+      },
+    );
+
+    expect(res.outcomeProse).toBe(
+      'He does not look up, and the oar drips on the stones.',
+    );
+  });
+
+  it('reports no prose for an option that authors none (parity)', () => {
+    const { system, state } = setup();
+    const res = system.resolveStorylineOption(
+      state,
+      makeCard({ id: 'evt-no-prose' }),
+      { label: 'Accept', effectPolicy: 'apply' },
+    );
+
+    expect(res.outcomeProse ?? null).toBeNull();
+  });
+
+  it('carries prose verbatim, including reserved characters and separators', () => {
+    const { system, state } = setup();
+    const prose = 'He says: "no"; the ink is # 2, and the log reads C:\\ledger.';
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-verbatim' }), {
+      label: 'Read',
+      effectPolicy: 'skip',
+      says: prose,
+    });
+
+    expect(res.outcomeProse).toBe(prose);
+  });
+
+  it('does not let prose change the resolved deltas or successor', () => {
+    const { system, state } = setup([makeCard({ id: 'evt-next' })]);
+    const base = {
+      label: 'Accept',
+      effectPolicy: 'apply' as const,
+      successorId: 'evt-next',
+    };
+
+    const withoutProse = system.resolveStorylineOption(
+      makeState(),
+      makeCard({ id: 'evt-effect', coinDelta: -20, reputationDelta: 3 }),
+      base,
+    );
+    const withProse = system.resolveStorylineOption(
+      state,
+      makeCard({ id: 'evt-effect', coinDelta: -20, reputationDelta: 3 }),
+      { ...base, says: 'The consequence, in the writer\'s own words.' },
+    );
+
+    expect(withProse.coinChange).toBe(withoutProse.coinChange);
+    expect(withProse.repChange).toBe(withoutProse.repChange);
+    expect(withProse.pushedCard?.id).toBe(withoutProse.pushedCard?.id);
+  });
+});
+
 // ── C4: pure condition helper ───────────────────────────────
 
 describe('evaluateCondition', () => {

@@ -84,8 +84,22 @@ export interface StorylineJournalEntry {
   readonly turn: number;
   /** Story-line display name. */
   readonly storyline: string;
-  /** The outcome summary (text after the story-line name). */
+  /**
+   * The outcome summary (text after the story-line name), cut to one
+   * display-safe line by {@link truncateOutcome}.
+   *
+   * Only the **display** copy is shortened: the untruncated outcome stays in
+   * {@link outcomeFull} and the original log line in {@link text}, so a
+   * transcript artefact never loses prose the journal had to ellipsise.
+   */
   readonly outcome: string;
+  /**
+   * The outcome summary before display truncation.
+   *
+   * Equals {@link outcome} whenever no truncation was needed. Optional so a
+   * hand-built entry (and every pre-existing consumer) keeps compiling.
+   */
+  readonly outcomeFull?: string;
   /** The original log line. */
   readonly text: string;
 }
@@ -287,6 +301,16 @@ export interface StorylineResolution<TCard extends StorylineCard = StorylineCard
   readonly coinChange: number;
   /** The reputation change from applying the effect (0 for skip). */
   readonly repChange: number;
+  /**
+   * The chosen option's authored outcome prose ({@link StorylineOption.says}),
+   * verbatim, or `null` when the option authors none.
+   *
+   * This is what the choice *caused*, in the writer's words — presentation
+   * (the story-update log line, the journal, the scene) reads it here instead
+   * of paraphrasing the option label. Absent prose keeps today's wording
+   * exactly.
+   */
+  readonly outcomeProse?: string | null;
 }
 
 /**
@@ -366,12 +390,23 @@ export interface StorylineUiAdapter<
   choiceDialogTitle(card: TCard): string;
   /** Dialog subtitle (the specific incident within the story-line). */
   choiceDialogSubtitle(card: TCard): string;
-  /** The narrative "story update" line emitted when a choice resolves. */
+  /**
+   * The narrative "story update" line emitted when a choice resolves.
+   *
+   * `outcomeProse` is the chosen option's authored prose
+   * ({@link StorylineOption.says}, surfaced on
+   * {@link StorylineResolution.outcomeProse}). When it is present the line
+   * carries that prose **verbatim** as its outcome; when it is absent the
+   * implementation keeps its existing wording, so a game that authors no
+   * prose is unchanged. Optional for source compatibility with adapters
+   * written before outcome prose existed.
+   */
   storyUpdateLine(
     card: TCard,
     option: string,
     coinChange: number,
     repChange: number,
+    outcomeProse?: string | null,
   ): string | null;
   /** Journal title for a list of journal entries. */
   journalTitle(entries: readonly StorylineJournalEntry[]): string;

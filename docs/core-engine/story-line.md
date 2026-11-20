@@ -34,7 +34,7 @@ and returns a {@link StorylineSystem} with:
 | Registry | `registerStorylineOptions`, `resetStorylineRegistry`, `hasRegisteredStorylineOptions` |
 | Resolution | `resolveStorylineOption`, `pushChainCard` |
 | Pending choice | `createPendingStorylineChoice`, `getPendingStorylineOptions`, `markChoiceResolved` |
-| Journal | `parseStoryUpdate`, `buildJournal`, `journalIsEmpty`, `journalTitle` |
+| Journal | `parseStoryUpdate`, `buildJournal`, `journalIsEmpty`, `journalTitle` (`truncateOutcome` is exported for display truncation) |
 | Validation | `validateStorylineOptions` (declarative metadata guard) |
 
 ### Story-line options
@@ -826,6 +826,36 @@ it switches on the chosen option *label* (a legacy Main Street wording
 convention) and has nothing to do with the retired API. Any other label
 renders the generalised `you chose "<label>"` form.
 
+### Authored outcome prose
+
+An option may author its consequence in the writer's own words (`#says=`,
+see [Authoring options in CSV](#authoring-options-in-csv)). That prose is
+threaded from content to every presentation surface — the engine never
+paraphrases a label the player has just clicked when real prose exists:
+
+1. **Resolution** — `resolveStorylineOption()` returns the chosen option's
+   `says` verbatim as `StorylineResolution.outcomeProse`, or `null` when the
+   option authors none. It never changes the resolved deltas or successor.
+2. **Story-update line** — pass it as the optional fifth argument to
+   `defaultStoryUpdateLine(card, label, coins, rep, outcomeProse?)` (or through
+   `ui.storyUpdateLine`, which takes the same optional argument). With prose,
+   the line is exactly `Story update — <story-line name>: <prose>` — no
+   paraphrase and no appended delta summary. Without prose (absent, `null` or
+   blank) the line is byte-identical to the pre-prose wording, so content that
+   authors none is unchanged. A game that overrides `storyUpdateLine` should
+   forward the argument and prefer the prose when present.
+3. **Journal** — `buildJournal()` derives its rows from those log lines.
+   `parseStoryUpdate()` splits the envelope on the **first** `: `, so authored
+   prose may itself contain `: `, `;`, `#`, quotes and apostrophes.
+
+Journal rows are display copies, so they are short by design:
+`StorylineJournalEntry.outcome` is cut to one line by
+`truncateOutcome(text, maxLength = 80)` — ellipsis, never mid-word, no
+trailing space, no embedded newline, and a space-less string hard-cut to
+`maxLength - 1` + `…`. The untruncated outcome stays on `outcomeFull` and the
+original line on `text`, so the transcript artefact never loses prose the
+journal overlay had to ellipsise.
+
 Core ships `createDefaultStorylineUiAdapter()` (and a ready-made
 `defaultStorylineUiAdapter`). Its wording is the shipped Main Street wording, so
 a game that supplies no override is visually identical to Main Street. A game
@@ -884,7 +914,8 @@ follows.
   stability.
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
-  deterministic serial naming, pending-choice lifecycle.
+  deterministic serial naming, pending-choice lifecycle, and carrying the
+  chosen option's authored outcome prose (`outcomeProse`).
 - `tests/story-line/validate.test.ts` — declarative metadata validation
   (costs, extra effects, conditions, dangling successors, declared-resource
   vocabulary and the `cardId` / `resource` issue fields).
@@ -897,7 +928,10 @@ follows.
   effects on any key, draw-time affordability over declared keys, the
   absent-key/unspecified-key/no-invention rules, the `coins` / `reputation`
   default projection and `createResourceProjection` itself.
-- `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state.
+- `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state,
+  and the display-safe `truncateOutcome()` boundaries (word boundary,
+  space-less hard cut, default 80-character budget) that keep the full prose
+  on `outcomeFull`.
 - `tests/story-line/ui-adapter.test.ts` — default adapter wording, the
   pluggable override seam, and the absence of a clarity-label method.
 - `tests/story-line/content/csv.test.ts` — byte-identical round-trip (two

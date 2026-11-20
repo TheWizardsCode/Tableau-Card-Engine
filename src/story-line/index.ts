@@ -116,6 +116,8 @@ export {
   buildJournal,
   journalIsEmpty,
   journalTitle,
+  truncateOutcome,
+  DEFAULT_OUTCOME_MAX_LENGTH,
 } from './journal';
 export {
   compileStorylineFromEvent,

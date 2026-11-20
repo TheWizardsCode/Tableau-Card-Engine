@@ -218,7 +218,8 @@ export function pushChainCard<TState, TCard extends StorylineCard>(
  *                resource-delta seam, resources, chain-card sink).
  * @param card   The story-line card.
  * @param option The chosen story-line option.
- * @returns The resolution result (pushed card, deltas across all three steps).
+ * @returns The resolution result (pushed card, deltas across all three steps,
+ *          and the option's authored outcome prose when it has any).
  */
 export function resolveStorylineOption<TState, TCard extends StorylineCard>(
   state: TState,
@@ -285,7 +286,9 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
   // Push successor card if one exists.
   const pushedCard = pushChainCard(state, adapter, resolvedSuccessor);
 
-  return { pushedCard, coinChange, repChange };
+  // Carry the chosen option's authored consequence prose verbatim; absent
+  // prose stays `null` so every pre-prose consumer keeps today's wording.
+  return { pushedCard, coinChange, repChange, outcomeProse: option.says ?? null };
 }
 
 /**
