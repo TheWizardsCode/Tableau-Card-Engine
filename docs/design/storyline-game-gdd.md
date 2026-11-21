@@ -49,7 +49,9 @@ Why this shape and not the alternatives is decided on measured evidence, not
 taste ([§1.5](#15-approach-decision-a-vs-c)): under a pure card chain, 9 of 12
 forks in the spike rejoin one beat later, Act III is entered on 0.63 beats per
 run, the pressure clock silently deleted 12 of 138 routes instead of creating a
-trade, and abandoning the voyage scored 79 against 83 for finishing. The GDD
+trade, and abandoning the voyage scored 79 against 83 for finishing — a defect
+this GDD corrects by crediting the acts actually played, so the same abandon
+re-scores 54 ([§2.10.5](#2105-the-reset-ending-scoring-model)). The GDD
 keeps what the spike proved works — CSV authoring with row/column/reason
 diagnostics, game-declared resources, seeded determinism, the journal-derived
 epilogue and a Phaser-free logic module — and adds only the layer the evidence
@@ -81,6 +83,7 @@ layer described here.
    - [2.7 Sections owned by downstream work items](#27-sections-owned-by-downstream-work-items)
    - [2.8 Resource model and economy](#28-resource-model-and-economy)
    - [2.9 Writer content pipeline](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)
+   - [2.10 Tension, pacing, failure and reset-ending scoring](#210-tension-pacing-failure-and-reset-ending-scoring)
 3. [UX, Visual Design and Audio Direction](#3-ux-visual-design-and-audio-direction)
 4. [Glossary](#4-glossary)
 5. [Test Plan](#5-test-plan)
@@ -281,7 +284,9 @@ resource arithmetic ([§2.1](#21-composition-contract-who-owns-what)).
 - The pressure clock prunes rather than trades: **12 of 138 routes expire**, all
   on entry to an Act III beat, and the affordability gate hides **10.6%** of
   authored options — the weakest player sees the fewest endings.
-- Abandoning the voyage scores **79**, against **83** for finishing the arc.
+- Abandoning the voyage scores **79**, against **83** for finishing the arc;
+  the reset-ending scoring model corrects the arc rule so the same measured run
+  scores **54** ([§2.10.5](#2105-the-reset-ending-scoring-model)).
 
 **Why C alone is rejected.** A scene layer built from scratch would discard the
 part of the spike that already works: a writer added a complete branch — a new
@@ -836,8 +841,8 @@ because the beat-sheet layer has no implementation at this commit.
 | # | Hypothesis | Status | Validation method | Owner |
 |---|---|---|---|---|
 | H1 | Scene outcomes read as consequence rather than as an arbitrary override | **unproven** | vertical slice: enumerate every scene exit per route; measure how often an exit is overridden and whether the banner makes it predictable; falsification trigger (a) in [§1.5](#15-approach-decision-a-vs-c) | build epic (`CG-0MWPY2ECE002P2NH`) |
-| H2 | Per-scene budgets create a visible trade instead of a silent branch filter | **unproven**; the spike measured the *failure* of the containerless clock (12/138 routes expired, all on one boundary) | extend the route-space enumeration over the manifest: no beat refusal may lead to a state with no ending; every refusal must route; measure refusals per run and happy-path clock slack | tension design (`CG-0MWPY2AZX001UI2A`) |
-| H3 | Irreversible loss (hull) + the ledger make loss visible and unrefunded | **unproven**; the spike measured the opposite (loss refunded by the loop; depleted players saw *fewer* options) | replay two runs with different hull outcomes and diff the epilogue; assert the ledger is never restored and the epilogue names each ledger line; scoring bands must separate abandon from finish | tension design (`CG-0MWPY2AZX001UI2A`) |
+| H2 | Per-scene budgets create a visible trade instead of a silent branch filter | **unproven**; the spike measured the *failure* of the containerless clock (12/138 routes expired, all on one boundary). The rules are now specified in [§2.10.1](#2101-the-clock-a-visible-per-scene-budget); the measurement is still outstanding. | extend the route-space enumeration over the manifest: no beat refusal may lead to a state with no ending; every refusal must route; measure refusals per run and happy-path clock slack | tension design (`CG-0MWPY2AZX001UI2A`, rules delivered; validation pending) |
+| H3 | Irreversible loss (hull) + the ledger make loss visible and unrefunded | **unproven**; the spike measured the opposite (loss refunded by the loop; depleted players saw *fewer* options). The mechanism is specified in [§2.10.2](#2102-irreversible-loss-hull-as-the-dial) and the score penalty in [§2.10.5](#2105-the-reset-ending-scoring-model); the diff test is still outstanding. | replay two runs with different hull outcomes and diff the epilogue; assert the ledger is never restored and the epilogue names each ledger line; scoring bands must separate abandon from finish | tension design (`CG-0MWPY2AZX001UI2A`, rules delivered; validation pending) |
 | H4 | The composition contract holds — no second choice model, condition language, prose store or RNG | **unproven** (no implementation) | import-boundary test: the beat-sheet module imports only `@story-line` public surface; a content-column test asserts the CSV gains no beat-sheet column; a manifest test asserts `resources.declared` equals the content set | build epic |
 | H5 | Five scenes / fifteen beats / five to seven exits is enough structure to fill a v1 act-shaped game without authoring a hub-and-spoke fan | **unproven** | scope the content volume from this shape and compare with the spike's 19-beat file; measure designer hours per scene against the writer's ≈ 8 s branch | scope (`CG-0MWPY2HJU006LJMU`) |
 | H6 | The scene boundary is the right line between designer and writer work | **unproven** | author one new scene and one new in-scene branch end to end during the vertical slice; record which file each needed | content pipeline (`CG-0MWPY29730011FJ4`) |
@@ -862,7 +867,7 @@ written; the rest remain stubs.
 |---|---|---|
 | Resource model and economy | **Written — [§2.8](#28-resource-model-and-economy)**: named key set, ranges, starting values, sources/sinks, each key's failure state and recovery, one worked trade per act, named engine gaps | `CG-0MWPY27EU008QPHN` |
 | Writer content pipeline | **Written — [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)**: column table, three verbatim worked rows (validated), option-cell grammar, the end-to-end review gate with sign-off roles, the real malformed-entry diagnostics and the five spike frictions with owners | `CG-0MWPY29730011FJ4` |
-| Tension, pacing, failure and reset-ending scoring | clock as a visible budget with a recovery path, irreversible-loss mechanism, numeric pacing rules, failure/recovery per type, scoring inputs/weights/bands, earned-vs-punitive justification | `CG-0MWPY2AZX001UI2A` |
+| Tension, pacing, failure and reset-ending scoring | **Written — [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring)**: the clock as a per-scene budget with two recovery paths, hull as the irreversible dial, numeric pacing rules, the failure/recovery table per type, the scoring inputs/weights/bands with a worked score per band and the earned-not-punitive proof | `CG-0MWPY2AZX001UI2A` |
 | Presentation contract | SLL zone names, overlay behaviour, audio/SFX mapping, accessibility, determinism/save-load/transcript/replay expectations | `CG-0MWPY2CHF003AHE1` |
 | Glossary proper nouns and prohibited-term gate | final names with rationale, prohibited-term scan of this document, trademark sanity read | `CG-0MWPY2FV30041M48` |
 | Engine-gap backlog | every missing capability with unlock, module reference, effort band, issue type | `CG-0MWPY2ECE002P2NH` |
@@ -876,8 +881,11 @@ written; the rest remain stubs.
 > **Written by `CG-0MWPY27EU008QPHN`.** This section replaces the stub listed in
 > [§2.7](#27-sections-owned-by-downstream-work-items). The **shape** of the model
 > is fixed here; the **numbers** are the spike's measured values carried as the v1
-> baseline, and re-tuning them is the tension design's job
-> (`CG-0MWPY2AZX001UI2A`). Any re-tune must keep the rules in
+> baseline, and the tension design
+> (`CG-0MWPY2AZX001UI2A`) confirms them rather than re-tuning them: what changes
+> is the **container** — per-scene budgets replace the run-wide clock
+> ([§2.10.1](#2101-the-clock-a-visible-per-scene-budget)) — not the key values,
+> sources or sinks. Any future re-tune must keep the rules in
 > [§2.8.2](#282-per-key-contract) and [§2.8.3](#283-the-economy-by-act), and must
 > not need a vocabulary this section marks as a gap.
 
@@ -1569,6 +1577,436 @@ consequential, or cut it.
 
 ---
 
+### 2.10 Tension, pacing, failure and reset-ending scoring
+
+> **Written by `CG-0MWPY2AZX001UI2A`.** This section replaces the stub listed in
+> [§2.7](#27-sections-owned-by-downstream-work-items). It fixes the tension
+> mechanism, the numeric pacing rules, the failure and recovery contract and the
+> reset-ending scoring model. It adds **no data field** (the vocabulary is
+> [§2.2](#22-the-scene-beat-sheet-data-model)), adjusts **no resource bound**
+> ([§2.8](#28-resource-model-and-economy)), and specifies **no screen position**
+> — zone placement, audio and accessibility belong to
+> `CG-0MWPY2CHF003AHE1`.
+
+**The design in one paragraph.** Tension has exactly two sources, and both are
+visible to the player. The **clock** is a per-scene budget, paid beat by beat,
+shown before every commitment, and it can never delete content from the run: a
+refusal is a classified scene outcome with an authored door. The **irreversible
+dial** is hull, spent only by a named choice or a named failure, recorded in a
+ledger, and never refunded. Pacing is counted in beats, decisions, rejoin
+distance and act length — not in minutes. Failure is a route, not a cut. The
+score is the journal read back: the acts actually played, the choices made, the
+resources kept and the costs paid. Every one of those four numbers is printed on
+the closing screen, so the player can check the arithmetic that produced the
+band.
+
+#### 2.10.1 The clock: a visible per-scene budget
+
+**What changes from the spike.** The spike ran one **run-wide** 17-tick clock.
+The evaluation measured what that container does: 12 of 138 routes expire, all
+on one boundary (entering `le-iii-approach`), and every expiry ends the run with
+no ending card at all — the clock's only outcome was *deletion*. The v1 model
+replaces the run clock with a **budget per scene**, declared in the manifest
+([§2.2.3](#223-scene)), reset on scene entry and never carried between scenes.
+The run-wide clock is retired; act-wide budgets are explicitly rejected in
+[§2.2.2](#222-act) because they reintroduce a silent branch filter.
+
+| # | Rule | Mechanism | Measured baseline | Guard |
+|---|---|---|---|---|
+| T1 | **The clock is per scene, and the scene shows it** | `budget.clock` per scene; the banner shows `clock remaining / budget` and the **next beat's `clockCost` before it is committed** | R2 enters Act III on **1 clock** and still finishes with 1 left — the one recorded run where the boundary is tight enough to feel (the gated route spends 16 of 17 ticks) | the presentation contract must render the cost before commitment (owned by `CG-0MWPY2CHF003AHE1`); the runner refuses a beat whose cost exceeds the remainder and records the refusal |
+| T2 | **A refusal is a classified outcome, never a cut** | A beat that cannot be paid is not entered; the scene closes, an outcome rule keyed on `{budget: "exhausted"}` classifies it `failure`, and a `failure` route opens a door | the spike's 12 expiring routes become **12 routed scene failures**, not 12 runs with no ending; `s-iii-core` authors the cliff deliberately (`ahead` 3 of 5, then *Set the charge* 3 more → refused) | the manifest must contain a `{budget: "exhausted"}` outcome rule and a route for it; totality is a manifest validation rule ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)) |
+| T3 | **A refusal never deletes content** | the refused beat is recorded in the transcript and the journal as *unreached*, the scene's remaining beats stay unplayed (not skipped silently), and the failure route leads to authored content — a recovery scene or an ending | the refused `le-iii-approach` is followed by the `watch-spent` failure, the `hull-sacrificed` loss and the `quiet-core` ending, so the player still gets a closing screen | the scene-space guard must prove no refusal leads to a state with no ending (named engine gap 5, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)) |
+| T4 | **A scene failure always leaves a playable budget** | every recovery route opens a **scene**, and every scene entry resets its own budget; a deficit is never carried forward | the model has no run-wide counter to overspend, so the spike's structural failure (Act III unreachable because Act II was slow) cannot recur | the route target must be a `beat`/`ending`, not a clock refund; there is no retry target in v1 ([§2.2.7](#227-routes-and-route-targets)) |
+| T5 | **Hidden affordability is not tension** | gates are surfaced as a requirement (`2 charge needed`), not removed; the clock is the only thing that can refuse a *legal* choice | the affordability gate hid **32 of 302 option instances (10.6%)**; **107 of 197** dead turns were gate-collapsed, so the depleted player was shown fewer options, silently | engine gap 3 (surfaced affordability, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)); a scene with a hidden gate fails pacing review |
+
+**The budget numbers are fixed here.** [Appendix A](#appendix-a-the-episode-manifest-complete-worked-example)
+marked its budgets as illustrative and owned by this item; they are adopted as
+the v1 baseline: **2 / 2 / 6 / 7 / 5** ticks across the five scenes (22 authored
+ticks). A complete run spends **18–20** ticks across the five scenes — 18 on
+the cheap shelter walk (2 + 2 + 4 + 7 + 3), 20 on the long one
+(2 + 2 + 6 + 7 + 3) — so the budget is not a scarce run-wide resource; it is a
+per-scene shape whose size is set by the walk the scene has to afford. The
+point of retiring the run clock is that a slow Act II no longer deletes Act III:
+the third act's budget is already waiting.
+
+**Sizing rule (reviewed per scene, then pinned by the scene-space guard):**
+
+- An **interior walk** is a path of beats from the scene's entry beat to the
+  beat whose choice pushes a card outside the scene. Let `L` be the longest such
+  walk's summed `clockCost` and `S` the shortest.
+- A **normal scene** sets `budget = L` (no slack, the last tick is the climax)
+  or `L + 1` (one spare tick, for a scene that must offer a real choice at the
+  exit). `budget < S` is invalid — no complete walk would fit.
+- A **deliberate cliff scene** may set `budget = L − 1`, but only if (a) it is
+  the only such scene in its act, (b) it authors a `{budget: "exhausted"}`
+  outcome rule, (c) it authors a loss rule, and (d) its failure route opens a
+  recovery scene or an ending. `s-iii-core` is the worked example.
+
+| Scene | Shortest walk | Longest walk | Budget | Verdict |
+|---|---|---|---|---|
+| `s-i-open` | 1 (`open` → leave) | 2 (`open` + `log`/`rally`) | 2 | normal, no slack; the last tick is the first decision's consequence |
+| `s-i-answer` | 2 | 2 | 2 | normal; transmit-or-silent is the whole scene |
+| `s-ii-shelter` | 4 (`shelter` + `salvage`) | 6 (`shelter` + `derelict` + `salvage`) | 6 | normal, **2 slack** on the cheap walk — the act's breathing room |
+| `s-ii-offer` | 4 (`offer` + `refuse`) | 7 (`offer` + `bargain` + `keep`) | 7 | normal; the cheap walk keeps 3 slack, the bargain walk spends the last tick |
+| `s-iii-core` | 3 (`approach` → ending) | 6 (`ahead` + *Set the charge* → `approach`) | 5 | **deliberate cliff**: the longest walk is refused, and the failure is authored ([§1.4](#14-worked-walkthrough-act-entry-to-scene-outcome)) |
+
+**Recovery paths.** The clock cannot be bought — it is not a declared resource,
+and no option can add a tick ([§2.2.3](#223-scene)). Recovery is therefore
+structural and authored, never a mid-run refund:
+
+- **C1 — a fresh budget ahead (mandatory).** Every scene entry resets the
+  budget, so a refusable scene is always followed by a scene the player can
+  play. This is the primary recovery path and it is a property of the data
+  model, not of any one route.
+- **C2 — an authored recovery door per act (mandatory).** Each act must route
+  at least one failure into a scene whose objective is achievable with the
+  resources the failure leaves behind. This is the same survivability rule the
+  content guard already enforces for gated branches (`gated-branch-survivable`,
+  [§2.9.5](#295-the-review-gate)): a failure door that leaves the
+  player with no affordable objective is a content bug, not tension.
+- **C3 — the reset is the run-level recovery.** The timeline reset starts a
+  fresh run at `start` with the starting bag; it is not a refund of the failed
+  run's clock or hull ([§2.10.2](#2102-irreversible-loss-hull-as-the-dial)).
+
+**No clock outcome may silently delete content — four guarantees.**
+
+1. A refused beat is *recorded as unreached* in the transcript and the journal;
+   it is never simply absent.
+2. The scene closes through an authored outcome rule, so the failure has a name
+   (`watch-spent`, not “the run ended”).
+3. The failure route is authored and total, so the next beat is a door, not a
+   stop.
+4. The guard enumerates every refusal and asserts that each one reaches an
+   ending, the same way the route-space guard asserts every gated branch
+   survives.
+
+**What the player sees (content contract, not placement).** The scene banner
+carries the scene title and the objective statement; the beat clock reads
+`clock remaining / budget` and names the next beat's cost before the choice;
+the scene-exit banner names the objective result, the ticks spent, the outcome
+word and the door that opened. The spike measured the cost of *not* doing this:
+the clock was a silent branch filter, and 64% of policy runs hit at least one
+dead turn. Placement and rendering are owned by
+`CG-0MWPY2CHF003AHE1`.
+
+#### 2.10.2 Irreversible loss: hull as the dial
+
+**Mechanism.** `hull` is the one key in `resources.irreversible`
+([§2.8.1](#281-the-v1-declared-set-and-what-is-deliberately-not-in-it)). It has
+**no source, ever**: no option grants it, no scene restores it, no reset refunds
+it into the next run. Two loss paths exist, and both use the engine's own
+resource seam rather than arithmetic of their own ([§2.2.8](#228-loss-rules)):
+
+1. **Chain loss** — the player pays a `#cost=hull:n` option. The beat sheet diffs
+   the resource projection before and after and records a ledger line.
+2. **Rule loss** — a scene's `losses[]` rule fires at close, on a named outcome,
+   with a player-facing `statement`. The ledger records the rule id, the field
+   and the amount.
+
+The ledger is never written to except by those two paths, is never cleared, and
+survives the reset ending as part of the record. The score reads the ledger; it
+does not re-derive losses from the log ([§2.10.5](#2105-the-reset-ending-scoring-model)).
+
+**What it costs and what it buys.** Hull is the only currency in the game that
+can buy *time-adjacent* goods without touching the clock: the derelict locker
+trades **1 hull for 2 stores**, and the terminal ram trades **3 hull** for the
+destructive ending. In score terms every hull point paid costs **2 points**
+(capped at −20), so the same voyage that buys stores is the voyage that scores
+lower for prudence — the trade is real on both sides. Measured: R2 spends 8
+cost points in total (16 score points, the largest penalty of any recorded run)
+and drops `hull 5 → 2`; R4 spends 5 points (10 score points) for `hull 5 → 2`.
+
+**Interaction with the scene budget.** The two dials are deliberately wired:
+
+- The **only involuntary hull loss** is a `losses` rule fired by a scene
+  outcome. In v1 those rules may only fire on `partial` or `failure` — a
+  `losses` rule on `success` is a validation failure — and `failure` includes a
+  budget refusal. The clock can therefore *cause* hull loss, but only through a
+  named rule with a printed line.
+- **Hull never buys clock.** There is no “pay a hull to buy a tick” option; the
+  budget is not a resource. This keeps the failure mode honest: a slow run is
+  paid for in permanent damage, never in a convertible currency.
+- The **deliberate cliff scene must carry the act's rule loss**. That is what
+  makes the arithmetic felt: `s-iii-core`'s refusal applies `hull-sacrificed`
+  (−1) and prints *“Breaking for the core on the last of the watch costs the
+  hull.”* The loss is the reason the cliff is a decision rather than a bug.
+
+| Hull spend | Trigger | Clock interaction | What it buys | What the score charges |
+|---|---|---|---|---|
+| `hull:1` (derelict locker) | player choice | none directly; the beat costs clock as usual | `stores:2`, which keeps the Act II objective met | −2 points via the cost ledger |
+| `hull:3` (ram the core) | player choice | the ending beat still costs clock | the destructive ending | −6 points via the cost ledger |
+| `hull-sacrificed` (−1) | `{budget: "exhausted"}` failure at `s-iii-core` | **caused by** the refusal | the `quiet-core` ending and a continued run | −2 points via the cost ledger, plus the lost objective |
+
+**Why this is a dial and not a second resource.** A second resource would be
+bought, banked and spent; hull is none of those. The spike measured exactly why
+the difference matters: the run loop refunded every loss at reset, so loss was
+*computed* but never *felt*. The rule for v1 content is therefore absolute — an
+`#extra=hull` is a validation failure, not a balance decision — and it is
+recorded as engine gap 6 ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)).
+
+#### 2.10.3 Pacing rules, stated numerically
+
+Pacing is counted in units the harness can reproduce deterministically — beats,
+decisions, rejoin distance and act length — not in wall-clock minutes. Every
+number below is a rule a writer or designer can author against and a reviewer
+can measure.
+
+| # | Rule | Number | Measured baseline (what it proves) | Where it is checked |
+|---|---|---|---|---|
+| P1 | **Beats per scene** | 2–5, target 3 | the five worked scenes hold 3 / 2 / 3 / 5 / 2 beats (mean 3.0); a 6-beat scene is the point at which the middle beats stop being decisions | manifest review; the beat assignment table in [Appendix A](#appendix-a-the-episode-manifest-complete-worked-example) |
+| P2 | **Decisions per scene** | every beat after the entry asks a real decision; decision density **≥ 0.90** per act; at most **one** authored single-option transit beat per act, labelled as a transit in the CSV | Act I measured **1.00**, Act II **0.69**, Act III **0.63**; `le-ii-keep` is the authored one-button transit that cost 3 clock | route-space harness (`pacing.decisionDensity`); the content guard's `consequential-rejoin` check |
+| P3 | **Minimum rejoin distance for consequential choices** | **3 beats** (fork → distinct beats → different scene outcome); flavour choices may rejoin after 1 beat and must be labelled flavour | **9 of 12** authored forks rejoin one beat later; depth-1 visibility looked healthy (98.1%) while the run read as a menu. `minimum rejoin distance of 3` is the log's measured recommendation | content guard `consequential-rejoin` (positive control: `guard-unwinnable-branch.csv` fails it) |
+| P4 | **Act length** | 3 acts; Act I **5–6 beats / 2 scenes**, Act II **8–10 beats / 3 scenes**, Act III **5–6 beats / 2 scenes** | the spike authored **5 / 8 / 2** and Act III ran on 0.63 beats per run — an ending selector, not an act. v1 doubles Act III and adds its second scene | the v1 scope statement (`CG-0MWPY2HJU006LJMU`) fixes final counts inside these bands |
+| P5 | **Run length** | 12–16 beats and 10–14 decisions on a single run (5–6 of the 7 authored scenes) | the spike's 160 policy runs: 6 / 7.95 / 10 beats and 5 / 6.98 / 9 decisions (min / mean / max) — short, because thirds of the content converged | harness `beats` / `choices` per run; the scope statement's playtime target |
+| P6 | **Dead turns** | **0** authored; **0** gate-collapsed | the spike measured **1.23 dead turns per run** (64% of runs had at least one), of which **107 of 197 were gate-collapsed** — written choices the resource bag removed | route-space harness (`pacing.deadBeats`); surfaced affordability (T5) is the fix |
+| P7 | **Scene budget shape** | 2–7 ticks; the budget is the scene's longest interior walk (0 slack), that walk +1 (one spare tick), or −1 for the single deliberate cliff per act; the cheapest walk may keep 2–3 ticks as its reward | the five worked scenes: 2 / 2 / 6 / 7 / 5, each equal to its longest walk except the cliff; the spike's single 17-tick clock had no per-scene shape at all | the sizing rule in [§2.10.1](#2101-the-clock-a-visible-per-scene-budget) and the scene-space guard |
+| P8 | **Ending length** | 1 beat; the ending card carries no options except the post-ending restart | every recorded run ends on one card (R1–R4); the spike's endings are terminal cards, not scenes | content review; the `endings[]` manifest list |
+
+**The measured examples behind the rules.**
+
+- **P1/P2 — the empty dramatic beat.** The `first` policy spends 3 clock on
+  `le-ii-keep` *The Weave Advances*, a beat with one button (*Follow the
+  thread*), then enters Act III with 1 clock. The joint-largest clock spend of
+  the run buys a turn that asks nothing. A 5-beat scene with one authored
+  transit is the rule's answer; two would make the scene a corridor.
+- **P3 — the slideshow.** Nine forks rejoin one beat later, so the choice is
+  visible (98.1% of decisions reach a different next card) but not
+  *consequential* (the run reconverges before the scene closes). A 3-beat
+  rejoin distance is the smallest distance at which the fork can change a scene
+  outcome rather than a line of prose.
+- **P4 — Act III is not an act.** 0.63 beats per run means most players see one
+  beat and an ending. Doubling Act III to two scenes of 5–6 beats is the
+  structural fix; the score's Act III weight (25 of 60 arc points) is the
+  reason it is worth playing.
+- **P6 — the gate, not the writer, made the dead turn.** `le-ii-bargain` and
+  `le-ii-salvage` are authored as real choices; `107 of 197` dead turns exist
+  because the resource bag removed those options on that visit. Surfacing
+  affordability (T5) converts them back into decisions.
+
+#### 2.10.4 Failure and recovery, per failure type
+
+Failure is a **classified outcome with a route**, not an end state. The table
+below is the contract; the prose after it is the rule a designer applies when
+authoring the scene.
+
+| Failure type | Trigger | Immediate effect | What the player keeps | What it costs | How the run continues | Recorded in |
+|---|---|---|---|---|---|---|
+| **Scene failure (objective unmet)** | the scene closes with `{objective: "unmet"}` and a matching outcome rule | outcome `failure`; matching `losses` rules fire through the engine seam; the scene-exit banner names the objective, the ticks spent and the outcome word | every resource not spent, the journal, the loss ledger, and **act credit for every act in which a choice was made** | the success door (and whatever it carried); any authored loss rule (e.g. `hull-sacrificed`); the objective's benefit for the rest of the act | the `failure` route opens a recovery scene or an ending; the clock is fresh on entry (T4) | transcript `scene-exit`, journal, loss ledger |
+| **Budget exhaustion (a beat refused)** | a beat's `clockCost` exceeds `clock remaining` at entry | the beat is **not entered** and nothing is charged; the scene closes; `{budget: "exhausted"}` classifies it (`failure` by convention); the refused beat is journaled as unreached | everything earned before the refusal — resources, ledger lines, act credit, journal — **and an ending is still reachable** by the authored failure route | the ticks already spent, the beat that could not be played, and the loss rule attached to the refusal (e.g. −1 hull) | the failure route opens the act's recovery scene or ending (the worked example: `watch-spent` → `hull-sacrificed` → `quiet-core` → *A Quiet Chart*) | transcript refusal record, journal, loss ledger |
+| **Resource at zero (a gate closes)** | a `#when` or `#cost` requirement exceeds the remaining key | the option is **shown as unaffordable with its requirement**, not removed (T5); no state changes | every other key, the journal, the ledger, and the free doors — every scene's routes are total, so zero is never a dead end | the gated door and its outcome; no hull loss unless a rule says so | the player chooses among the affordable doors; each key's zero-state recovery is the *Recovery path* column of [§2.8.2](#282-per-key-contract) (e.g. hull zero has no refund; morale recovers from an authored Act I source) | the option list + the scene-exit record |
+| **Not a failure: the run ending** | the run reaches an ending card (reset, quiet, ram, abandon) | the closing screen renders the ending prose, the score, the band and the surviving journal | everything: the record is the run's only permanent output ([§2.10.5](#2105-the-reset-ending-scoring-model)) | nothing — the ending is not scored as a punishment; the ending card's own act contributes 0 arc points | `[ Begin a new survey ]` restarts at `start` with the starting bag; the hull is not refunded | epilogue screen + transcript |
+
+**Rule for designers.** A failure route must satisfy the same test as a gated
+branch: it must be reachable *and* survivable. A failure door that lands the
+player in a scene whose objective cannot be met with the resources the failure
+leaves behind is a content bug, and the guard must report it (C2 above). The
+spike measured the failure mode the rule prevents: the goodwill-gated branch was
+reachable and **unwinnable** (4 routes entered, 0 finished), and the lowest band
+was reserved for the player who earned the secret path.
+
+**What the player keeps, in one sentence.** They keep the record — every
+journal line, every ledger line, every unspent resource, and the act credit they
+earned — and they always keep a door: no failure type in the table can leave a
+run without a route to an ending.
+
+#### 2.10.5 The reset-ending scoring model
+
+**Principle.** The score is **journal-derived**: it is computed from the voyage
+the player actually made, never from a win/loss flag and never from which
+ending card they stopped on. The closing screen shows the four ingredients, so
+the player can check the arithmetic that produced the band. The weights and
+bands below are the `JOURNEY_SCORE_TABLE` / `JOURNEY_BANDS` constants the Gym
+already exports ([`GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts));
+this section fixes the **arc rule** they are read through.
+
+**Inputs.**
+
+| Component | What it reads | Bounds | Why it is in the score |
+|---|---|---|---|
+| **Arc** | the declared acts in which the journal records **at least one choice made**; the `Ending` act is never credited | 0–60 | depth of the voyage: how much of the story was actually played |
+| **Choices** | `history.length` × `perChoice` | 0–12 | breadth: the player kept making decisions rather than riding one corridor |
+| **Resources** | each remaining declared key, capped per key | 0–20 | prudence: what survived the voyage (capped so an unspent stock cannot dominate) |
+| **Losses** | resource points paid as option costs (the loss ledger) × `perCostPoint`, capped | −20–0 | the irreversible dial: what the voyage cost, charged once and visibly |
+| **Total** | the four components, clamped | 0–100 | a stable, printable number with a stable band label |
+
+**Weights (unchanged from the spike).**
+
+| Weight | Value |
+|---|---|
+| Arc: Act I / II / III / Ending | 15 / 20 / 25 / **0** |
+| Per choice / choice cap | 2 / 12 |
+| Per remaining resource point / cap per key | 1 / 4 |
+| Per cost point paid / loss cap | −2 / 20 |
+| Total clamp | 0–100 |
+| Bands (inclusive lower bound) | 80 *A chart worth keeping*; 60 *A voyage that left a mark*; 40 *A voyage the erasure nearly kept*; 20 *A voyage remembered only as a gap*; 0 *A voyage the timeline never noticed* |
+
+**The arc rule, and the reconciliation with `CG-0MWNSR376002QBY9`.** The spike
+currently credits **every act before the entered ending card**
+(`recordActsBefore(working, ACT_RANK.Ending)` in `GymLongErasureGame.ts`), so
+entering `Abandon the voyage` — a terminal card reachable from Act II — awards
+the full **60** arc points. That is the defect the open item filed: the measured
+`abandon` route scores **79** (*A voyage that left a mark*, 4 points below
+finishing at 83). The v1 rule this document adopts is content-agnostic and
+journal-derived:
+
+> **An act is credited when the journal records at least one choice made in that
+> act. The `Ending` act is never credited.**
+
+The history already carries the act of every choice
+(`LongErasureHistoryEntry.act` in `GymLongErasureGame.ts`), so the rule is a
+derivation over `state.history` and needs no new bookkeeping in `enterCard`:
+the scored act set is `new Set(history.map((entry) => entry.act))` minus
+`'Ending'`. That is what makes the rule auditable: the arc cannot disagree with
+the journal, because the journal is the input.
+
+The consequences, which the implementing item must pin:
+
+| Run | Spike arc (acts before the ending) | v1 arc (acts played) | Current total | v1 total | v1 band |
+|---|---|---|---|---|---|
+| R1 `reset-cheap` (Acts I–III played) | 60 | 60 | 83 | **83** | *A chart worth keeping* |
+| R2 `gated-sabotage-core` (I–III) | 60 | 60 | 67 | **67** | *A voyage that left a mark* |
+| R4 `ram-chip` (I–III) | 60 | 60 | 75 | **75** | *A voyage that left a mark* |
+| R3 `abandon` (I–II played, ending entered from Act II) | 60 | **35** | 79 | **54** | *A voyage the erasure nearly kept* |
+| Act II expiry at the Act III door (8 beats, `le-iii-approach` refused) | 15 (the failed Act III entry records nothing) | **35** | 31 | **51** | *A voyage the erasure nearly kept* |
+
+The expiry row is the **one place this document corrects the open item's
+plan**. `CG-0MWNSR376002QBY9`'s plan predicts “expiry unchanged” on the reading
+that an unplayed beat earns no act credit; that is true of the *unpayable* Act
+III beat, but the run played eight beats and five choices in Act II, and the
+rule above credits the act that was played. Leaving that run at 15 arc points
+would punish the player for the clock rather than the voyage — the exact
+“punitive, not earned” failure the item exists to fix. The implementing item
+should either credit the Act II played beats (31 → 51) or record a deliberate,
+documented second clause; this section chooses the former. The correction is
+recorded as a comment on `CG-0MWNSR376002QBY9`.
+
+**Alternative considered and rejected: strict “acts advanced beyond”.**
+Crediting only acts the run advanced *beyond* would give the abandon 15 arc
+points (total 34) and the Act II expiry 15 (total 31). It is rejected because
+the same reading strips Act II credit from a run that played five Act II beats
+and makes abandoning *less* informative than an expiry it outlasted; and the
+parent AC's primary clause is “the acts *played*”, with “acts advanced beyond”
+offered only as an example. The chosen rule is the primary clause read
+literally.
+
+**Worked score per band (a reviewer can check every line).**
+
+| Band | Worked run | Arithmetic | Total | Source |
+|---|---|---|---|---|
+| **80–100** *A chart worth keeping* | R1 `reset-cheap`, default content, 7 choices | arc 60 (I + II + III) + choices 12 (7 × 2, capped) + resources 15 (hull 5 capped at 4, morale 6 capped at 4, stores 3, goodwill 2, charge 2) − losses 4 (2 cost points × 2) | **83** | evaluation §1; reproduced by `npx tsx scripts/long-erasure-playtest.ts --seeds 12` |
+| **60–79** *A voyage that left a mark* | R2 `gated-sabotage-core`, 9 choices | arc 60 + choices 12 + resources 11 (hull 2, morale 5 capped at 4, stores 4, goodwill 0, charge 1) − losses 16 (8 cost points × 2) | **67** | evaluation §1 |
+| **40–59** *A voyage the erasure nearly kept* | R3 `abandon`, corrected arc rule | arc 35 (I + II) + choices 10 (5 × 2) + resources 13 (hull 5 capped at 4, morale 5 capped at 4, stores 3, goodwill 0, charge 2) − losses 4 (2 cost points × 2) | **54** | evaluation §1 + the v1 arc rule above |
+| **20–39** *A voyage remembered only as a gap* | `first` policy, `clockMax: 10`, expired in Act I | arc 15 (Act I) + choices 12 (6 × 2, capped) + resources 15 (hull 5 capped at 4, morale 7 capped at 4, stores 6 capped at 4, goodwill 0, charge 3) − losses 4 (2 cost points × 2) | **38** | terminal band probe (explicit `clockMax`, like the pinned worst run in `tests/gym/LongErasureEpilogue.test.ts`) |
+| **0–19** *A voyage the timeline never noticed* | `first` policy, `clockMax: 5`, expired before Act II | arc 0 + choices 6 (3 × 2) + resources 14 (hull 4, morale 4, stores 4, goodwill 0, charge 2) − losses 4 (2 cost points × 2) | **16** | terminal band probe (explicit `clockMax`) |
+
+**One honest consequence of the corrected rule.** On the default spike content
+the lowest scoring terminal route becomes **50** (an abandon that paid every
+cost), because Act II is now credited whenever it was played. The two lowest
+bands are therefore reachable in the shipped content only through an explicit
+clock override — the test's `clockMax` probe — or through a no-choice failure.
+That is a **content** observation, not a scoring defect: v1 must author at least
+one early terminal (an Act I hatch or a failure route that ends the run) so the
+bottom two bands are reachable in play, and the scope statement
+(`CG-0MWPY2HJU006LJMU`) carries that as a content requirement.
+
+**The exact summary the player sees.** The content contract, in render order;
+zone placement and typography are the presentation contract's job:
+
+```text
+The voyage ends — 3 of 3 acts reached
+The Long Erasure
+The timeline was unwound. This record is the voyage that survives.
+Journey score: 83 / 100 — A chart worth keeping
+Arc 60 · Choice breadth 12 · Resources 15 · Losses −4
+Acts: I · II · III    Choices: 7    Cost paid: 2
+Left when the timeline closed: hull 5, morale 6, stores 3, goodwill 2, charge 2
+── The record that survives ──
+• <journal line> — <outcome line>
+[ Begin a new survey ]
+```
+
+The ending card's authored `epilogue` prose renders in the narrative panel above
+the score; when the content authors none, the outcome framing line (the third
+line above) is the fallback. The component line (`Arc … · Choice breadth … · Resources
+… · Losses …`) is the v1 addition: it is the arithmetic proof that the band is
+earned, and every number on it is one the player can map to the run.
+
+**The “earned, not punitive” test.** The model passes it on arithmetic, not
+intent:
+
+1. **Traceable.** Every point has a visible source: an act reached, a journal
+   line, a resource left, a cost paid. Nothing is scored from a hidden flag.
+2. **No ending penalty.** The ending card's act carries **0** arc points, so
+   choosing *A Quiet Chart* over *The Long Erasure* is never itself a
+   deduction; only the voyage before it is scored.
+3. **No hidden deduction.** The only subtraction is the cost ledger, which
+   records only resource points the player paid, plus named failure loss rules
+   that print a `statement` at the moment they fire.
+4. **Bounded.** Every component is capped (choices 12, resources 20, losses
+   20), so one expensive scene cannot erase an otherwise earned voyage.
+5. **The top band is earned, with headroom.** 80 requires all three acts (60)
+   plus at least 20 of the remaining 40 points, and there are two ways to earn
+   them (choice breadth or resource prudence). The authored content's maximum
+   is 92 (60 + 12 + 20), so the clamp at 100 is a guard, not a treadmill.
+6. **Abandoning cannot land in the top band — arithmetically.** A run that ends
+   in Act II can score at most **35 + 12 + 20 − 0 = 67**, which is **13 points
+   below** the top threshold. The old 79 was a defect of the arc rule, not a
+   property of the weights.
+7. **Finishing beats abandoning by a clear margin.** For two runs sharing a
+   prefix and diverging only on the Act II hatch, the finisher gains Act III's
+   **25** arc points and the abandoner gains none, so the margin is at least
+   **25 ≥ 15** before resources and costs are counted.
+8. **The low bands are honest, not punitive.** They describe a voyage that ended
+   early, and the closing screen still gives the player the record, the ending
+   prose and `[ Begin a new survey ]`. A low score is a description of the
+   voyage, never a verdict on the player.
+
+The one thing the model deliberately does **not** reward is *reaching an
+ending*. An ending is the run's conclusion, not a win condition; the voyage is
+the score.
+
+#### 2.10.6 What this section does not prove
+
+- **H2 and H3 remain unproven.** The rules are written; no vertical slice has
+  yet played them. The falsification tests are in
+  [§2.6](#26-hypotheses-and-how-they-will-be-validated).
+- **The arc rule is not yet implemented.** The Gym still scores the old rule
+  (abandon 79; Act II expiry 31). The deltas in
+  [§2.10.5](#2105-the-reset-ending-scoring-model) are the contract for
+  `CG-0MWNSR376002QBY9`, not a measurement of the shipped spike.
+- **No human playtest.** All numbers are agent-driven structural measurements;
+  the recommendation to run one human browser playtest before the act structure
+  is frozen still stands.
+- **The scene-space guard does not exist.** Proving that no refusal strands a
+  run requires the guard named as engine gap 5; until then, the GDD game keeps
+  its own harness.
+- **The bottom two bands are unreachable on the default spike content** after
+  the arc correction (minimum 50). The v1 scope statement must require an early
+  terminal so the bands are reachable in play.
+
+#### 2.10.7 How this section is verified
+
+| # | Claim | Command | Expected |
+|---|---|---|---|
+| T9 | The documented weights, caps, bands and the best/mid/worst worked scores are the ones the module exports and scores | `npx vitest run --project unit tests/gym/LongErasureEpilogue.test.ts` | pass — the table, the five band boundaries and the 87 / 42 / 0 pins (the abandon re-score is pinned by `CG-0MWNSR376002QBY9`) |
+| T10 | The measured abandon route lands below the finishing routes after the arc correction | `npx tsx scripts/long-erasure-playtest.ts --seeds 12 --route "abandon=Log the erasure>Stay silent>Shelter in the dead zone>Ration the stores>Abandon the voyage"` | **pending on `CG-0MWNSR376002QBY9`**: currently 79 (*A voyage that left a mark*), contract 54 (*A voyage the erasure nearly kept*) against R1 83 / R2 67 |
+| T11 | Every consequential choice meets the minimum rejoin distance, and the guard fails on the known-bad branch | `npm run storylines:guard -- --csv tests/fixtures/story-line/gdd-worked-examples.csv --game gym` and the positive control in [§2.9.5](#295-the-review-gate) | `PASS` on the worked content; `FAIL` on `guard-unwinnable-branch.csv` |
+| T12 | The scene budgets satisfy the sizing rule (no scene without a complete walk; one deliberate cliff per act, with a `budget: exhausted` rule, a loss rule and a failure route) | review check against [Appendix A](#appendix-a-the-episode-manifest-complete-worked-example), then the scene-space guard when it exists | every scene in the table passes; `s-iii-core` is the only cliff and carries all four preconditions |
+
+**Review checks (manual).**
+
+1. **Earned, not punitive.** Walk any worked score in
+   [§2.10.5](#2105-the-reset-ending-scoring-model) from the summary lines; if a
+   point cannot be traced to a line, the model is wrong.
+2. **No silent deletion.** Every refusal has a transcript entry, a journal line
+   and a route; every scene's outcome table includes `{budget: "exhausted"}`.
+3. **The dial is unrefunded.** `#extra=hull` appears nowhere; every hull loss
+   has a ledger line and a printed statement.
+4. **Pacing.** Apply P1–P8 to the manifest and to one written scene; a scene
+   that fails P2 or P7 goes back to the designer before the writer sees it.
+
+---
+
 ## 3. UX, Visual Design and Audio Direction
 
 > **TODO — owned by `CG-0MWPY2CHF003AHE1` (GDD presentation contract: UI, audio,
@@ -1654,6 +2092,11 @@ profiles; the commands below verify *this document* and the model it specifies.
 | T6 | The document builds and the changed scope is green | `npm run build` then the test skill's unit profile | green |
 | T7 | The resource model's working fixture declares the GDD key set, carries one trade per act, never grants the irreversible key and keeps the state-gated branch survivable | `npm run storylines:validate -- --csv tests/fixtures/story-line/gdd-resource-trades.csv --game long-erasure`, then `npx vitest run --project unit tests/story-line/content/gdd-resource-model.test.ts` | `RESULT: VALID`; 12 tests pass ([§2.8.7](#287-how-the-economy-is-verified)) |
 | T8 | The rows quoted in [§2.9.4](#294-worked-example-rows-verbatim-validated) are byte-identical to the rows `storylines:validate` accepts, and the document still names every row's target | `npx vitest run --project unit tests/story-line/content/gdd-content-pipeline.test.ts` | pass — the document's rows are the fixture's rows, and the fixture validates |
+| T9–T12 | The scoring weights, bands and worked scores; the abandon band after the arc correction; the rejoin distance; the scene-budget sizing rule | see [§2.10.7](#2107-how-this-section-is-verified) | pass, or the named pending item (`CG-0MWNSR376002QBY9`) |
+
+> T9–T12 live with the rules they verify ([§2.10.7](#2107-how-this-section-is-verified))
+> rather than here, so a re-tune cannot leave a stale command behind; the
+> numbering is kept in this table so the plan remains one list.
 
 ### 5.2 Verification the build epic must add (named gaps)
 
@@ -2006,7 +2449,7 @@ through the Phaser-free logic module, not human playtests.
 | The clock prunes rather than trades | 12 of 138 routes expire, all on entry to an Act III beat | per-scene budgets, a refused beat becomes an explicit scene failure with a route, and the beat's cost is visible before commitment |
 | The affordability gate hides options | 10.6% of authored option instances hidden; at the final beat 12 of 38 states hide two of three endings | gates must be surfaced ("2 charge needed") and the resource/presentation sections own the change; the beat sheet adds no new hiding |
 | The earned branch was reachable and unwinnable | 4 routes entered, 0 finished, clock 2 on entry against cost 3 | the same arithmetic is now a scene failure with a named consequence ([§1.4](#14-worked-walkthrough-act-entry-to-scene-outcome)) and a route to an ending; the guard requires every gated branch to survive |
-| Abandoning is over-rewarded | 79 for abandoning vs 83 for finishing | the loss ledger and the reset-ending scoring model (`CG-0MWPY2AZX001UI2A`) must separate the bands |
+| Abandoning is over-rewarded | 79 for abandoning vs 83 for finishing | the loss ledger and the act-played arc rule of [§2.10.5](#2105-the-reset-ending-scoring-model) separate the bands: the measured abandon re-scores 79 → 54, any Act II exit caps at 67, and finishing keeps its 83 |
 | Authoring is cheap and diagnostic | a complete branch in ≈ 8 s of tool time, no TypeScript, row/column/reason diagnostics | the CSV authoring path is kept verbatim; the content pipeline documents it unchanged |
 
 Reproduction commands for the measurements live in the evaluation note's §6 and
@@ -2025,7 +2468,7 @@ is worse than a link.
 | **`CG-0MWPY25W4002UNKB`** | **This foundation: setting and tone, core loop, data model, outcome routing, composition contract, A-vs-C recommendation** |
 | `CG-0MWPY27EU008QPHN` | Resource model and economy (delivered: [§2.8](#28-resource-model-and-economy), one worked trade per act) |
 | `CG-0MWPY29730011FJ4` | Writer content pipeline (CSV authoring gate) — delivered: [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), T8; authored the frictions follow-up `CG-0MWQYDC7D003G4ON` |
-| `CG-0MWPY2AZX001UI2A` | Tension, pacing, failure and reset-ending scoring |
+| `CG-0MWPY2AZX001UI2A` | Tension, pacing, failure and reset-ending scoring — delivered: [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), T9–T12; reconciled the open arc-credit item `CG-0MWNSR376002QBY9` |
 | `CG-0MWPY2CHF003AHE1` | Presentation contract: UI, audio, accessibility, determinism |
 | `CG-0MWPY2ECE002P2NH` | Engine-gap backlog |
 | `CG-0MWPY2FV30041M48` | IP-safe naming pass and prohibited-term gate |
