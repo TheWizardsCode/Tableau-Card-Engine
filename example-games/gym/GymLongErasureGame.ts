@@ -133,9 +133,9 @@ export const DEFAULT_RESOURCES: Readonly<Record<string, number>> = {
 /**
  * The default pressure clock (`clockMax`).
  *
- * The cheapest authored route costs 13 clock and the slowest costs 19; 17
- * leaves every route playable in principle while making the two slowest
- * routes expire. That is the intended tension: safety and speed trade off.
+ * The cheapest authored route costs 13 clock and the slowest costs 18; 17
+ * keeps every route but the slowest playable, so only the slowest still
+ * expires. That is the intended tension: safety and speed trade off.
  */
 export const DEFAULT_CLOCK_MAX = 17;
 

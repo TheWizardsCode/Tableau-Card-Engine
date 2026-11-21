@@ -133,8 +133,10 @@ const ACT_II_PATH = [
 ] as const;
 
 /**
- * The cheapest full route to the reset ending, priced at exactly the default
- * clock (17): it exercises the soft zero-clock boundary.
+ * The cheap keep-the-bargain route to the reset ending, priced at 16 clock
+ * after the survivability nudge (17 before it). The default clock (17) now
+ * leaves one tick spare on it, so the soft zero-clock boundary is exercised
+ * with an explicit `clockMax` instead.
  */
 const RESET_PATH = [
   'Rally the survey crew',
@@ -148,7 +150,7 @@ const RESET_PATH = [
 ] as const;
 
 /**
- * A slow route (19 clock) that runs out of time on its final beat: the clock
+ * A slow route (18 clock) that runs out of time on its final beat: the clock
  * is hard-terminal, so the run expires instead of entering the act III beat.
  */
 const EXPIRY_PATH = [
@@ -179,6 +181,31 @@ const GOODWILL_THREE_PATH = [
   'Strip the locker',
   'Share the berth',
   'Bargain in bad faith',
+] as const;
+
+/**
+ * The documented gated sabotage route, walked end to end: it accumulates the
+ * full three goodwill (`Share the berth`), pays `Sabotage the Loom` in full and
+ * takes the charge-gated short-cut (`Break for the core` → `le-iii-ahead`) to
+ * ram the core.
+ *
+ * CG-0MWPVYTSU0065BXC — this is the survivability guard for the goodwill-gated
+ * branch. On the pre-fix content the route expired on `le-iii-ahead` with 2
+ * clock left (`scripts/long-erasure-playtest.ts --seeds 40` reported
+ * `gated beat: routes=4 completed=0`); after the content-only nudge
+ * (`le-ii-bargain` clockCost 3 → 2 and `le-ii-sabotage` 2 → 1) it closes on
+ * `le-end-ram` with 1 clock unspent (`gated beat: routes=10 completed=8`).
+ */
+const GATED_SURVIVAL_PATH = [
+  'Log the erasure',
+  'Transmit the warning',
+  'Shelter in the dead zone',
+  'Strip the derelict',
+  'Share the berth',
+  'Bargain in bad faith',
+  'Sabotage the Loom',
+  'Break for the core',
+  'Hit the core now',
 ] as const;
 
 /** Route to the Act II negotiation beat, from which the run can be abandoned. */
@@ -398,7 +425,10 @@ describe('The Long Erasure: pressure clock', () => {
   });
 
   it('is soft at the boundary: reaching zero leaves the run playable', () => {
-    const beforeEnding = play(RESET_PATH.slice(0, -1));
+    // CG-0MWPVYTSU0065BXC freed a tick on `le-ii-bargain`, so this route now
+    // costs 16 of the default 17 clock; the exact-zero boundary is exercised
+    // with an explicit budget of 16.
+    const beforeEnding = play(RESET_PATH.slice(0, -1), { clockMax: 16 });
     expect(beforeEnding.currentCard.id).toBe('le-iii-approach');
     expect(beforeEnding.clock).toBe(0);
     expect(isComplete(beforeEnding)).toBe(false);
@@ -407,6 +437,10 @@ describe('The Long Erasure: pressure clock', () => {
     expect(state.clock).toBe(0);
     expect(isComplete(state)).toBe(true);
     expect(state.outcome).toBe('reset');
+
+    // Under the default clock the same route reaches the core with one tick
+    // to spare — the survivability nudge's intended (and recorded) effect.
+    expect(play(RESET_PATH.slice(0, -1)).clock).toBe(1);
   });
 
   it('is hard beyond the boundary: an unpayable beat expires the run terminally', () => {
@@ -422,7 +456,8 @@ describe('The Long Erasure: pressure clock', () => {
     expect(state.completedActs).toEqual(['I']);
     expect(state.beat).toBe(8);
     // …no clock was deducted, no options are offered and no choice is possible.
-    expect(state.clock).toBe(1);
+    // (2 post-nudge: `le-ii-bargain` now costs 2, not 3 — CG-0MWPVYTSU0065BXC.)
+    expect(state.clock).toBe(2);
     expect(availableOptions(state)).toEqual([]);
     expect(caughtError(() => chooseOption(state, 'Finish the weave'))).toMatchObject({
       code: 'complete',
@@ -476,6 +511,23 @@ describe('The Long Erasure: state-gated branch', () => {
       option: 'Sabotage the Loom',
       cost: { goodwill: 3 },
     });
+  });
+
+  it('lets the gated sabotage branch survive to an ending with clock to spare', () => {
+    const state = play(GATED_SURVIVAL_PATH);
+
+    // The whole gated branch is walkable: the gate opened, the sabotage was
+    // paid for, and the charge-gated short-cut led to the core.
+    expect(state.currentCard.id).toBe('le-end-ram');
+    expect(state.status).toBe('complete');
+    expect(state.outcome).not.toBe('expired');
+    expect(state.outcome).toBe('closed');
+    expect(state.endingId).toBe('le-end-ram');
+    expect(state.endingId).not.toBeNull();
+    // The nudge buys exactly one unspent tick on this route (measured: 1;
+    // pre-fix the run expired while entering `le-iii-ahead` with 2 left).
+    expect(state.clock).toBe(1);
+    expect(state.clock).toBeGreaterThanOrEqual(1);
   });
 });
 

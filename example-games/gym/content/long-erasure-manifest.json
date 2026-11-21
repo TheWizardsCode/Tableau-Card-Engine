@@ -265,7 +265,7 @@
       "impact": "",
       "fields": {
         "act": "II",
-        "clockCost": "3"
+        "clockCost": "2"
       }
     },
     {
@@ -421,7 +421,7 @@
       "impact": "",
       "fields": {
         "act": "II",
-        "clockCost": "2"
+        "clockCost": "1"
       }
     },
     {

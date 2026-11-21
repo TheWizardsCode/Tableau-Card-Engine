@@ -1,5 +1,5 @@
 {
-  "note": "Pre-rewrite mechanics of The Long Erasure (CG-0MWO7CX0V000PR5K). Captured from HEAD before any prose was authored; the rewrite must not change any of it.",
+  "note": "Pre-rewrite mechanics of The Long Erasure (CG-0MWO7CX0V000PR5K). Captured from HEAD before any prose was authored; the rewrite must not change any of it. Re-frozen for the authorised goodwill-gated survivability nudge (CG-0MWPVYTSU0065BXC): `le-ii-bargain` clockCost 3 -> 2 and `le-ii-sabotage` clockCost 2 -> 1, so the gated `Sabotage the Loom` route survives to an ending with 1 clock unspent instead of expiring on `le-iii-ahead`. No other mechanics value, edge or cycle changed.",
   "cards": [
     {
       "id": "le-i-open",
@@ -305,7 +305,7 @@
       "id": "le-ii-bargain",
       "storylineId": "long-erasure",
       "act": "II",
-      "clockCost": 3,
+      "clockCost": 2,
       "resourceKeys": [
         "hull",
         "morale",
@@ -335,7 +335,7 @@
       "id": "le-ii-sabotage",
       "storylineId": "long-erasure",
       "act": "II",
-      "clockCost": 2,
+      "clockCost": 1,
       "resourceKeys": [
         "hull",
         "morale",
