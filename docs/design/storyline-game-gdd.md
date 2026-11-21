@@ -79,6 +79,7 @@ layer described here.
    - [2.5 A worked manifest excerpt](#25-a-worked-manifest-excerpt)
    - [2.6 Hypotheses and how they will be validated](#26-hypotheses-and-how-they-will-be-validated)
    - [2.7 Sections owned by downstream work items](#27-sections-owned-by-downstream-work-items)
+   - [2.8 Resource model and economy](#28-resource-model-and-economy)
 3. [UX, Visual Design and Audio Direction](#3-ux-visual-design-and-audio-direction)
 4. [Glossary](#4-glossary)
 5. [Test Plan](#5-test-plan)
@@ -848,13 +849,14 @@ claims would be strengthened by it.
 
 ### 2.7 Sections owned by downstream work items
 
-The following sections of this GDD are stubs by design. Each names the work item
-that fills it, so a reviewer can see the whole document's shape and no section
-is silently forgotten.
+The following sections of this GDD were stubs by design. Each names the work item
+that owns it, so a reviewer can see the whole document's shape and no section is
+silently forgotten. The resource model is now written
+([§2.8](#28-resource-model-and-economy)); the rest remain stubs.
 
 | Section | Contents it must add | Owner |
 |---|---|---|
-| Resource model and economy | named key set, ranges, starting values, sources/sinks, each key's failure state and recovery, worked trade per act | `CG-0MWPY27EU008QPHN` |
+| Resource model and economy | **Written — [§2.8](#28-resource-model-and-economy)**: named key set, ranges, starting values, sources/sinks, each key's failure state and recovery, one worked trade per act, named engine gaps | `CG-0MWPY27EU008QPHN` |
 | Writer content pipeline | exact CSV columns, two worked rows, validator/editor/review gate, malformed-entry behaviour, the spike's five frictions | `CG-0MWPY29730011FJ4` |
 | Tension, pacing, failure and reset-ending scoring | clock as a visible budget with a recovery path, irreversible-loss mechanism, numeric pacing rules, failure/recovery per type, scoring inputs/weights/bands, earned-vs-punitive justification | `CG-0MWPY2AZX001UI2A` |
 | Presentation contract | SLL zone names, overlay behaviour, audio/SFX mapping, accessibility, determinism/save-load/transcript/replay expectations | `CG-0MWPY2CHF003AHE1` |
@@ -862,6 +864,308 @@ is silently forgotten.
 | Engine-gap backlog | every missing capability with unlock, module reference, effort band, issue type | `CG-0MWPY2ECE002P2NH` |
 | V1 scope and deferred list | act/scene/beat/branch counts, playtime, word budget, replayability, deferrals | `CG-0MWPY2HJU006LJMU` |
 | Integration and review close-out | developer-guide link, reciprocal links, re-run verification at the final commit | `CG-0MWPY2JEU006DYUL` |
+
+---
+
+### 2.8 Resource model and economy
+
+> **Written by `CG-0MWPY27EU008QPHN`.** This section replaces the stub listed in
+> [§2.7](#27-sections-owned-by-downstream-work-items). The **shape** of the model
+> is fixed here; the **numbers** are the spike's measured values carried as the v1
+> baseline, and re-tuning them is the tension design's job
+> (`CG-0MWPY2AZX001UI2A`). Any re-tune must keep the rules in
+> [§2.8.2](#282-per-key-contract) and [§2.8.3](#283-the-economy-by-act), and must
+> not need a vocabulary this section marks as a gap.
+
+The economy has one governing rule: **a resource exists only if it has a sink, a
+source and a gate that reads it.** A key with no sink is a score; a key with no
+source is a countdown; a key no gate reads is decoration. The spike's own
+measurement of the failure mode is the reason for the rule — of 302 authored
+option instances, the affordability gate silently removed **32 (10.6 %)** across
+the playable state space, and `107 of 197` dead turns in the 160-run sample were
+*written choices the bag removed*
+([evaluation §3–4](./storyline-playtest-evaluation.md#4-pacing-measured-numerically)).
+That is an economy that computes without being felt. v1 spends its five keys so
+that each act's best choice and its objective are in conflict.
+
+**Every statement below is expressed in the vocabulary the engine supports
+at this commit**: a `createResourceProjection` field map is the declaration (`hull`,
+`morale`, `stores`, `goodwill`, `charge` in that order), the content's `#cost` /
+`#extra` / `#when` option attributes are the only place a number is authored, and
+the beat-sheet manifest's `objective.check` reuses the same single-field
+`Condition` shape. Where the engine has no carrier for part of the model, the gap
+is named in [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) and
+points at the backlog, never assumed away.
+
+#### 2.8.1 The v1 declared set, and what is deliberately not in it
+
+| Key | Role in one phrase | Why it is in the v1 set (evidence, not taste) |
+|---|---|---|
+| `hull` | **The irreversible dial** — what the voyage permanently costs | The only key the shipped content never grants, and the only one the evaluation measured visibly degrading (R2 and R4: `5 → 2`, "the largest loss of any recorded run"). It exists to make loss *unrefunded*, which the spike showed the loop otherwise refunds ([evaluation §3](./storyline-playtest-evaluation.md#was-irreversibility-missed)). |
+| `morale` | **The crew's consent** — whether they are still with you | Read by the Act III worked objective (`morale >= 4`); granted by four authored options and spent by two. The spike's Act III is entered on 0.63 beats per run, so the one thing that must be legible on entry is who is still aboard. |
+| `stores` | **The consumable that the record costs** | The Act I objective reads `stores` and the story's own "Log the erasure" costs exactly that store; spending it leaves the Act II objective met with zero slack. This is the clearest case of the objective and the story fighting over one key. |
+| `goodwill` | **Earned external help** — the key the secret branch is bought with | Gates the one authored "earned" branch (`Sabotage the Loom`, `cost=goodwill:3`) and is granted only by giving something up (charge, or a berth). The spike's sharpest balance finding was that this branch was reachable and **unwinnable**; keeping the key forces v1 to keep the reachable-*and*-survivable rule ([§2.8.3](#283-the-economy-by-act)). |
+| `charge` | **Tempo** — the plot currency, spendable and refillable | Read by the content's only `#when` rule (`charge>=2`) and by the quiet ending (`cost=charge:2`); at `le-iii-approach` it hid two of three endings on 12 of 38 visits. It is what turns Act III from a menu into a decision. |
+
+**Not in the set — and why** (each was considered and rejected in writing so the
+next designer does not re-open it):
+
+- **`coins` / `reputation`** — the engine's *default projection*
+  (`DEFAULT_RESOURCE_KEYS`) is **overridden**, not extended: the setting is a
+  survey service, not a market, and has no public standing to model. The rule is
+  the engine's own — a game that declares a field map gets exactly that set, and
+  the default pair only appears when a game declares nothing
+  ([`docs/core-engine/story-line.md` §Declared resources](../core-engine/story-line.md#declared-resources)).
+- **`clock` / `time` / `pressure`** — the clock is **scene bookkeeping, not a
+  resource** ([§2.1](#21-composition-contract-who-owns-what): pacing belongs to the
+  scene budget, and the spike's `clockCost` column retires into `beat.clockCost`).
+  Declaring it as a resource would let content in one scene spend another scene's
+  budget and would blur the act/scene boundary the beat sheet exists to draw. It
+  is a **named gap** that the current content guard cannot see it
+  ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5).
+- **`insight` / `revelation`** (considered as a "knowledge" track) — rejected: a
+  knowledge resource is monotonic, cannot be reasonably sunk, and would therefore
+  be a progress flag wearing a resource's clothes. Progress is the route table's
+  job ([§2.3](#23-how-a-scene-outcome-selects-the-next-beat)).
+- **A sixth "reputation with the survey service"** — rejected: it would read the
+  same choices as `goodwill` and be spent in the same beat, so it is the same key
+  under another name (the rule below).
+
+**Rules for adding or removing a key later** (the model's own change control, so
+"the five-key spike set may not be the right v1 set" is decided on evidence):
+a key is **added** only when (a) the shipped acts give it at least one sink and
+one source, (b) at least one objective, `#when` rule or `#cost` reads it,
+(c) a player can say in one sentence what it protects, and (d) the human playtest
+shows players tracking it; a key is **removed** when (b) stops being true, or
+when two keys are always spent in the same choice — then they are one key.
+
+#### 2.8.2 Per-key contract
+
+Every key below states the four things a writer needs: where it starts, what it
+can reach, what reads it, and what happens at each bound. Values are the spike's
+starting bag (`DEFAULT_RESOURCES` in
+`example-games/gym/GymLongErasureGame.ts`); bounds are the v1 design bounds the
+engine cannot enforce yet (gap 1 below).
+
+| Key | Start | Bounds | Sources (authored gains) | Sinks (authored costs) | Gates that read it | At zero | At maximum | Recovery path |
+|---|---|---|---|---|---|---|---|---|
+| `hull` | 5 | 0–5 | **none, ever** (irreversible) | `hull:1` (shelter strip, derelict locker), `hull:2` (hit the core now), `hull:3` (ram the core), plus the beat sheet's `losses` | `hull >= 5` (Act II objective); every hull `#cost` is an affordability gate | Every hull-costing door is **unaffordable** and shown as unaffordable ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) gap 3), not deleted. The run continues on hull-free doors (a design invariant the scene-space guard must prove — [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5); a scene `losses` entry is designed to clamp to 0 with the ledger recording the unapplied remainder. | Nothing — 5 **is** full hull. A loss at full hull is still a loss, so the maximum and the start are the same value. | **No recovery within a run**, by design. The recovery is structural: the reset ending restarts at `start` ([Appendix A](#appendix-a-the-episode-manifest-complete-worked-example)) while the journal and the loss ledger survive as the record. |
+| `morale` | 5 | 0–8 | `morale:1` (rally the crew, hold the survey line, ration the stores, refuse him) | `morale:1` (shelter in the dead zone, side with the crew) | `morale >= 4` (Act III objective); `morale < 1` as a `#when` guard is available in the vocabulary | The crew door closes: the Act III objective cannot be met, the scene classifies `partial`/`failure` and routes to a non-crew door. **Not a dead end** — every scene's routes are total ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)). | Surplus is **spilled** (not banked): a morale gain at 8 is wasted, which is the designer's signal that the content is granting morale faster than a gate reads it. | Authored `#extra=morale` choices; at least one per act, and the Act I source is reachable **without spending any other key** (rally the crew), so a depleted player can always climb back. |
+| `stores` | 4 | 0–6 | `stores:1` (push deeper, take the ally's berth, side with the crew, bargain in bad faith), `stores:2` (strip the locker) | `stores:1` (log the erasure, turn for the muster) | `stores >= 3` (Act I and Act II objectives); every store `#cost` | No detour and no record can be bought: the store-cost doors close and the objectives that read `stores` cannot be met. The run survives on the free doors. | Hold full: a salvage gain at 6 **spills**, so a choice taken at a full hold is a real waste rather than a free bank. | Salvage: the derelict locker (`+2`, paid in hull) and the ally's berth (`+1`, paid in goodwill). Recovery is deliberately priced in another key. |
+| `goodwill` | 0 | 0–5 | `goodwill:2` (transmit the warning, side with the captain), `goodwill:1` (share the berth) | `goodwill:2` (take the ally's berth), `goodwill:3` (sabotage the Loom) | `goodwill >= 1` (Act I second-scene objective); `goodwill:3` affordability gate on the earned branch | The earned door closes; the player routes to refuse or keep. This is exactly the spike's unwinnable branch, and the rule that fixes it is in [§2.8.3](#283-the-economy-by-act). | Every ally already banked: a further goodwill grant spills, so social capital cannot be hoarded past five. | One-shot per act, and never purchasable: Act I's sources are the transmit warning (spends charge) and the crew's decision; Act II's is sharing the berth. A player who spends goodwill in Act II cannot re-earn it before Act III. |
+| `charge` | 2 | 0–4 | `charge:1` (follow the unravelling, follow the thread), `charge:2` (set the charge) | `charge:1` (transmit the warning), `charge:2` (unwrite the Loom) | `charge >= 2` as the content's only `#when` rule; `charge:2` affordability on the quiet ending | The quiet ending and the conditional core route close. The player still holds the free reset door and, if hull allows, the ram — so zero charge is a *sharper* choice, not a dead end. | Core saturated: a refill at 4 spills, so the player must spend before refilling. | Tempo refills, each behind a clock cost: `+1` for following the unravelling or the thread, `+2` for setting the charge properly. Charge is the one key whose recovery is always one beat away — and that beat is what the clock sells. |
+
+**The irreversibility rule, stated once.** `hull` is the sole member of
+`manifest.resources.irreversible`, and the model's promise is exactly one
+sentence: **nothing in the content, the beat sheet or the reset loop ever grants
+`hull` back within a run.** That promise is currently enforced by authoring
+discipline and by the fixture test in [§2.8.7](#287-how-the-economy-is-verified),
+because the engine has no notion of an irreversible key (gap 6). The manifest
+validator's `loss-not-irreversible` rule keeps *loss rules* pointed at the right
+key; it cannot stop a writer typing `#extra=hull:1`.
+
+**Bounds are design bounds, not engine bounds.** A cost is only authored up to a
+value the starting bag plus that key's own authored sources can supply; a gain is
+authored so that the recorded route's peak stays under the cap. Until the engine
+clamps (gap 1), a fixture test asserts those inequalities
+([§2.8.7](#287-how-the-economy-is-verified)) — the model is checked at authoring
+time because it cannot be enforced at runtime. Where the columns above say a surplus *spills* or a loss *clamps*, read "is designed to spill / clamp": the engine applies every delta unclamped until gap 1 closes, so the bound is authoring discipline plus the fixture test, not a runtime guarantee.
+
+#### 2.8.3 The economy by act
+
+The design principle that turns economy into tension is one sentence: **each
+scene's objective is measured in the key that the scene's best choice spends.**
+If the objective reads a key the scene never touches, the objective is a
+checklist; if it reads the key the story most wants to spend, the player is
+choosing which of two goods to keep.
+
+| Act | The objective reads | What the story's best choice spends | The act's deliberate trade |
+|---|---|---|---|
+| I — The First Unwriting | `stores >= 3` | `stores:1` (log the erasure) or `stores:1` (turn for the muster) | **Keep the record or keep the hold.** At most one store is spent in Act I, so a player who spends it exits on exactly the Act II objective's minimum with *zero slack*: only salvage keeps the check met, and salvage costs hull. |
+| II — The Dead Zone | `hull >= 5` | `hull:1` (strip the locker) for `stores:2` | **Spend the irreversible key to buy the consumable.** Hull is the only key that never comes back; the stores it buys are what keeps the later objectives met. Leaving the locker sealed is the choice that protects the objective and starves the hold. |
+| III — The Core | `morale >= 4` | `charge:2` (unwrite the Loom), `hull:3` (ram the core), or nothing (finish the weave) | **What the crew's morale earns you the right to spend.** The three doors are priced in three different currencies — tempo, the hull itself, and the timeline — and the objective decides whether the crew ending is still a door at all. |
+
+**Audited sources and sinks per act** (counted from the shipped content; this is
+the housekeeping check the principle above has to pass). A key that has no sink
+in an act is a resource only the *other* acts spend, which is deliberate: you
+earn in one act and pay in the next.
+
+| Key | Act I source / sink | Act II source / sink | Act III source / sink | Reads as |
+|---|---|---|---|---|
+| `hull` | 0 / 0 | 0 / 2 | 0 / 2 | a pure sink — irreversible by construction |
+| `morale` | 2 / 1 | 3 / 2 | 0 / 0 | recoverable, and the Act III objective's subject |
+| `stores` | 1 / 2 | 4 / 0 | 0 / 0 | earned in Act II, spent in Act I: the debt is paid forward |
+| `goodwill` | 1 / 0 | 2 / 2 | 0 / 0 | earned by giving something up, spent on the earned branch |
+| `charge` | 0 / 1 | 2 / 0 | 1 / 1 | tempo: spent in Act I, refilled in Act II, spent again in Act III |
+
+**The arithmetic that produces tension rather than housekeeping** (worst-case
+spend on a played route, from the four recorded runs and the exhaustive route
+space):
+
+| Key | Start | Recorded range across the four named runs | Worst designed spend | Why the number is this number |
+|---|---|---|---|---|
+| `hull` | 5 | 2–5 | 4 (`hull:1` salvage + `hull:3` ram), plus a scene `losses` entry | The most destructive *non-terminal* path leaves 1 hull; the terminal ram may take the last one. Hull 5 makes "one hull left" the designed cliff, and the Act III loss rule is what pushes a hull-1 player to the clamp. |
+| `morale` | 5 | 4–6 | 2 spent (`-1` shelter, `-1` side with the crew) | The Act III objective needs 4. Two sinks with no source fail it; one source turns failure into success. The crew is never unreachable — only unreachable *if you spent it twice*. |
+| `stores` | 4 | 3–4 | 1 before the Act II check, 4 granted in Act II | 4 − 1 = 3 meets the Act II objective exactly. There is no slack, which is why Act II's salvage is not optional for a player who spent in Act I. |
+| `goodwill` | 0 | 0–2 | 3 (`sabotage`) | 0 at start is deliberate: the earned branch is reachable only by earning it — transmit (`+2`, paid in charge) then share the berth (`+1`), or share then side with the captain. Two authored routes reach 3, so the branch is reachable from the start bag plus one source per act. |
+| `charge` | 2 | 1–2 | 3 (`transmit` `-1` + `unwrite` `-2`) | A player who transmits in Act I cannot pay for the quiet ending without an Act II refill; skipping the transmit keeps the ending and forfeits the `goodwill` it buys. That is the act-to-act trade, in one key. |
+
+**The reachable-and-survivable rule** (the spike's measured failure, absorbed as
+a gate on content rather than a hope). A state-gated branch must be
+(i) reachable from the starting bag plus the sources the acts can guarantee
+*before* the gate, and (ii) survivable: taking it must still leave an affordable
+ending. Content enforces this through `npm run storylines:guard`'s
+`gated-branch-survivable` and `ending-reachable` invariants; the worked trade
+fixture in [§2.8.4](#284-worked-trade-per-act-one-csv-row-each) is guarded in the
+unit suite ([§2.8.7](#287-how-the-economy-is-verified)). The `charge>=2` gate at
+`gxr-iii-core` is the model's positive case: charge starts at 2, nothing on that
+route spends charge before the gate, and both doors behind it end the run.
+
+**The affordability rule.** A `#cost` gate must be **surfaced, not hidden**: the
+player sees the option and its requirement ("2 charge needed"), because the spike
+measured that hiding it made the game go quiet exactly when it should speak
+(`107 of 197` dead turns were gate-collapsed). The engine's `#cost` currently
+*omits* the option (`isOptionAffordable` → boolean; gap 3), so v1 states the rule
+here and the presentation/UI item consumes it; no content may be authored on the
+assumption that a hidden option is a design.
+
+#### 2.8.4 Worked trade per act (one CSV row each)
+
+Three rows from the working fixture
+[`tests/fixtures/story-line/gdd-resource-trades.csv`](../../tests/fixtures/story-line/gdd-resource-trades.csv),
+verbatim. They use the Long Erasure adapter (so the declared set is the five-key
+one), the same `#cost` / `#extra` / `#when` vocabulary as the shipped content,
+and each one is a trade the objective fights. They validate through
+`npm run storylines:validate` and guard clean
+([§2.8.7](#287-how-the-economy-is-verified)).
+
+**Act I — stores against the record.**
+
+```csv
+gxr-i-record,The Record or the Crew,The log spends a store; the crew costs nothing.,"Log the erasure|gxr-ii-locker#cost=stores:1#says=You write the volume down and spend a store of paper and power doing it. The record is exact and the hold is one lighter.;Rally the crew|gxr-ii-locker#extra=morale:1#says=You gather the crew on the observation deck instead. Nobody writes anything down, and the watch ends steadier.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge",I,1,"Act I trade: the scene objective reads stores, and the story's record costs exactly that store. Keeping the objective and keeping the record are the same currency.",
+```
+
+Read it as arithmetic: the scene objective is `stores >= 3` and the starting hold
+is 4, so "Log the erasure" lands the player exactly on the bound. The
+alternative grants `morale` — the Act III objective's key — so the choice is
+"pay the future check now" or "buy crew consent that only pays off two acts
+later". Neither option is a no-op, and neither is a clear win.
+
+**Act II — hull against stores.**
+
+```csv
+gxr-ii-locker,The Locker,The locker is full and the hull is not.,"Strip the locker|gxr-iii-core#cost=hull:1#extra=stores:2#says=You cut the locker open and take the stores aboard, and the sound the hull makes doing it stays with the crew.;Leave it sealed|gxr-iii-core#says=You log the position and hold your course. The locker stays full behind you and the hull stays whole.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge",II,2,"Act II trade: stores are bought with the one key the scene objective is measuring, and the objective reads hull.",
+```
+
+The scene objective is `hull >= 5`, and stripping the locker is the only way to
+buy stores in Act II. **The best choice fails the objective**, which is the whole
+point: the objective is not a checklist, it is the price tag on the menu. Because
+the scene's routes are total, failing it is a consequence, not a dead end —
+either door leaves the scene.
+
+**Act III — three currencies and one free door.**
+
+```csv
+gxr-iii-core,The Core Door,Three doors and only some of them are affordable.,"Unwrite the Loom|gxr-end-quiet#cost=charge:2#says=You empty the core's charge into the Loom and the mechanism stops remembering.;Break for the core|gxr-end-quiet,gxr-end-ram#when=charge>=2>gxr-end-ram#says=You drive for the core while the tear is still open, and the hull pays for the approach.;Finish the weave|gxr-end-reset#says=You let the weave finish and the timeline closes over the room.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge",III,3,"Act III trade: the quiet ending spends charge (recoverable), the ram spends hull (irreversible), and the reset spends nothing. The #when rule reads charge before the door is offered.",
+```
+
+Here the objective (`morale >= 4`) is read *before* the doors, so the player
+knows whether the crew ending is still theirs. `charge:2` is recoverable and
+buys the honest chart; `hull:3` is irreversible and buys the argument; the free
+door ends the timeline. `#when=charge>=2>gxr-end-ram` is the only state gate, and
+it is readable: two charge converts "break for the core" from a coin-flip into
+the ram. The reset's `Begin again` option closes the loop back to Act I, which is
+why the reset ending is the model's structural recovery path for `hull`.
+
+#### 2.8.5 How the model is expressed in the current engine vocabulary
+
+Every element of the model has exactly one carrier at this commit; nothing in this table
+is a proposal.
+
+| Model element | Carrier | Where it is written |
+|---|---|---|
+| The declared key set | `createResourceProjection` field map — the map **is** the declaration | game module, e.g. `DEFAULT_RESOURCES` / `LONG_ERASURE_RESOURCES` in `example-games/gym/GymLongErasureGame.ts` |
+| Starting values | the game's starting state (proposed `resources.start` manifest data is a gap — item 2) | `DEFAULT_RESOURCES` |
+| Costs and sinks | `#cost=key:number` on an option, paid at resolution, gated by `isOptionAffordable` at draw time | content CSV `options` cell |
+| Sources and gains | `#extra=key:number` on an option, applied at resolution | content CSV `options` cell |
+| State-gated branch | `#when=field<op>number>successor`, first matching rule wins, evaluated on **post-resolution** resources | content CSV `options` cell |
+| Objective check | the manifest's `objective.check`, the same `{field, op, value}` `Condition` shape over declared keys | episode manifest |
+| Irreversibility | `resources.irreversible` in the manifest, checked by the `loss-not-irreversible` rule | episode manifest |
+| Losses | `losses[]` rules applied at scene close through `engine.applyResourceDelta` | episode manifest |
+| Bounds | **nothing** — design bounds, asserted by the fixture test | — (gap 1) |
+
+The declaration is a five-line projection, and the keys cannot drift from the
+accessors because the same object supplies both:
+
+```ts
+const resources = createResourceProjection<VoyageState>({
+  hull:     { read: (s) => s.hull,     apply: (s, d) => { s.hull += d; } },
+  morale:   { read: (s) => s.morale,   apply: (s, d) => { s.morale += d; } },
+  stores:   { read: (s) => s.stores,   apply: (s, d) => { s.stores += d; } },
+  goodwill: { read: (s) => s.goodwill, apply: (s, d) => { s.goodwill += d; } },
+  charge:   { read: (s) => s.charge,   apply: (s, d) => { s.charge += d; } },
+});
+```
+
+Two consequences worth stating because they constrain the content pipeline
+(`CG-0MWPY29730011FJ4`):
+
+- **The declaration order is the delta-application order** and the set is
+  normalised (trimmed, de-duplicated), so a writer cannot change behaviour by
+  reordering the `resources` column.
+- **An absent key reads as `0`**, so a card that forgets to declare `hull` makes
+  every hull cost unaffordable (and a positive hull cost reads as unaffordable,
+  not free). The validator reports that as `unknown-resource-key`, not as a
+  silent balance change.
+
+#### 2.8.6 What the engine cannot express at this commit (named gaps)
+
+Each gap is a pointer to the backlog (`CG-0MWPY2ECE002P2NH`, [§6](#6-engine-gap-backlog-todo)),
+not an assumption that it will be fixed. The module named is the one a reviewer
+can open at this commit. The **backlog pointer** column names the proposed
+backlog entry this section needs; [§6](#6-engine-gap-backlog-todo) is still that
+item's stub, so these are its inputs, not entries it has already filed.
+
+| # | The model needs | Why the engine cannot do it at this commit | Backlog pointer |
+|---|---|---|---|
+| 1 | **Bounds and clamping** — min/max per key, spill at maximum, clamped loss at minimum | `applyResourceDelta` is unbounded and unvalidated (`src/story-line/resources.ts`); a delta is applied as given, so a gain past the cap silently banks and a loss below zero silently goes negative. No spill or clamp is reported anywhere. | `CG-0MWPY2ECE002P2NH` — *resource bounds and clamping* |
+| 2 | **The start bag and bounds as manifest data** — `resources.start` / `resources.bounds`, so a validator can prove gate reachability from the start | The manifest's `resources` block carries `declared` and `irreversible` only ([§2.2.1](#221-episode-manifest)); the start bag is a game constant (`DEFAULT_RESOURCES`), and the manifest validator has no way to see it. | `CG-0MWPY2ECE002P2NH` — *manifest validator* (`resources.start` / `resources.bounds` rules) |
+| 3 | **Surfaced affordability** — present the option with its requirement ("2 charge needed") | `#cost` is a draw-time **omission** gate: `isOptionAffordable` returns a boolean (`src/story-line/compile.ts`), and the presenting layer deletes the option. There is no requirement object for a UI to render. Measured cost: 32 of 302 instances hidden, 107 of 197 dead turns gate-collapsed. | `CG-0MWPY2ECE002P2NH` — *resource HUD + affordability presentation* (§6 item 4) |
+| 4 | **Condition expressiveness** — conjunction ("hull ≥ 5 **and** stores ≥ 3"), "at maximum", or a range | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`); the beat sheet adds only `{budget: "exhausted"}`. Any compound objective must be authored as data the runner cannot evaluate, or as two scenes. | `CG-0MWPY2ECE002P2NH` — *objective / condition expressiveness* |
+| 5 | **The scene clock inside the resource guard** — prove no scene exit strands the player | The clock is not a declared resource, so `src/story-line/content/guard.ts` enumerates the chain only; the scene-space guard is a named gap ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)). | `CG-0MWPY2ECE002P2NH` — *scene-space guard* (§6 item 3) |
+| 6 | **Irreversibility as an engine guarantee** — refuse any grant to an irreversible key | `resources.irreversible` is manifest data read only by the manifest validator's `loss-not-irreversible` rule; nothing in `@story-line` knows the concept, so `#extra=hull:1` is legal content. At this commit the rule is enforced by authoring discipline and the fixture test. | `CG-0MWPY2ECE002P2NH` — *irreversible-key policy* (with the bounds entry) |
+| 7 | **The resource HUD and the act-boundary presentation** — where the trade is *seen* | No SLL zone or component renders the declared keys or marks the loss-bearing subset; the presentation contract is owned by `CG-0MWPY2CHF003AHE1` and the surface does not exist (`src/ui/screen-layout.ts`). | `CG-0MWPY2ECE002P2NH` — *resource HUD* (§6 item 4) |
+
+#### 2.8.7 How the economy is verified
+
+The model's claims that can be machine-checked are checked; the rest are review
+checks. The fixture is
+[`tests/fixtures/story-line/gdd-resource-trades.csv`](../../tests/fixtures/story-line/gdd-resource-trades.csv)
+and the enforcement is
+[`tests/story-line/content/gdd-resource-model.test.ts`](../../tests/story-line/content/gdd-resource-model.test.ts).
+
+| Claim | Command | Expected |
+|---|---|---|
+| The worked trade rows are valid authored content against the five-key set | `npm run storylines:validate -- --csv tests/fixtures/story-line/gdd-resource-trades.csv --game long-erasure` | `RESULT: VALID` |
+| Each act carries a real cost/gain trade, with the numbers this section prints | `npx vitest run --project unit tests/story-line/content/gdd-resource-model.test.ts` | 12 tests pass; the three trade rows assert `stores:1`/`morale:1`, `hull:1`+`stores:2`, `charge:2`/`#when=charge>=2` |
+| The irreversible key is never granted, and no cost exceeds the start bag plus authored gains | same test file | zero `extraEffect.hull`; every cost ≤ supply |
+| The state-gated branch is reachable **and** survivable, and every ending is reachable | same test file (guard with the start bag) | `gated-branch-survivable` and `ending-reachable` green |
+| Bounds hold on the authored content | same test file (authoring-time inequalities) | every cost/gain within the bounds of [§2.8.2](#282-per-key-contract) |
+
+What the checks cannot prove — and a reviewer must judge — is the part that
+makes the numbers *felt*: that the Act I store and the Act III crew door are
+recognisably the same decision two acts apart, and that the hull loss reads as a
+record rather than a counter. Those are hypotheses H7–H8 in
+[§2.8.8](#288-hypotheses-and-what-would-falsify-them), and they need the human
+playtest the evaluation recommends before the act structure freezes.
+
+#### 2.8.8 Hypotheses and what would falsify them
+
+| # | Hypothesis | Status | Validation | Owner |
+|---|---|---|---|---|
+| H7 | Five keys are legible in play — a player can name what each protects without the HUD telling them | **unproven**; the spike measured tracking of two (`charge`, `hull`) and no tracking of the other three | human browser playtest: after one run, ask the player what `goodwill` and `morale` bought; a blank answer fails the key | tension design (`CG-0MWPY2AZX001UI2A`) |
+| H8 | "The objective is measured in the key the best choice spends" produces a felt trade rather than a visible checklist | **unproven**; it is a design rule applied to the worked manifest, not yet played | vertical slice: record how often a player names the trade in the scene-exit review; a player who never mentions the objective fails the rule | build epic (`CG-0MWPY2ECE002P2NH`) |
+| H9 | The bounds (0–5 hull, 0–8 morale, 0–6 stores, 0–5 goodwill, 0–4 charge) are never hit by authored content, so a spill is always a writer error | **unproven**; the caps are set one "hold" above the recorded peaks | the fixture test's inequality check fails loudly if a re-tune authors a cost/gain past a bound; a spill observed in the vertical slice means the cap is wrong, not the content | tension design |
 
 ---
 
@@ -948,6 +1252,7 @@ profiles; the commands below verify *this document* and the model it specifies.
 | T4 | Every card id in the worked manifest resolves in the bound content file, and every content card is assigned to exactly one scene or to `endings` | the script in [§5.3](#53-self-check-for-the-worked-manifest) | `PASS: every manifest card id resolves and every content card is assigned` |
 | T5 | No second choice model, no re-implementation of the chain | review check: `createEpisodeRunner` calls only public `@story-line` surface ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)); no module outside `src/story-line/` parses the `options` cell | reviewer sign-off at the build epic |
 | T6 | The document builds and the changed scope is green | `npm run build` then the test skill's unit profile | green |
+| T7 | The resource model's working fixture declares the GDD key set, carries one trade per act, never grants the irreversible key and keeps the state-gated branch survivable | `npm run storylines:validate -- --csv tests/fixtures/story-line/gdd-resource-trades.csv --game long-erasure`, then `npx vitest run --project unit tests/story-line/content/gdd-resource-model.test.ts` | `RESULT: VALID`; 12 tests pass ([§2.8.7](#287-how-the-economy-is-verified)) |
 
 ### 5.2 Verification the build epic must add (named gaps)
 
@@ -1317,7 +1622,7 @@ is worse than a link.
 | `CG-0MWPY22YG003PDY8` | Authored-content validation harness + route-space CI guard (delivered: T1–T3) |
 | `CG-0MWPY24IX00719NH` | Playtest evaluation: three recorded runs + slideshow test (delivered: evidence) |
 | **`CG-0MWPY25W4002UNKB`** | **This foundation: setting and tone, core loop, data model, outcome routing, composition contract, A-vs-C recommendation** |
-| `CG-0MWPY27EU008QPHN` | Resource model and economy |
+| `CG-0MWPY27EU008QPHN` | Resource model and economy (delivered: [§2.8](#28-resource-model-and-economy), one worked trade per act) |
 | `CG-0MWPY29730011FJ4` | Writer content pipeline (CSV authoring gate) |
 | `CG-0MWPY2AZX001UI2A` | Tension, pacing, failure and reset-ending scoring |
 | `CG-0MWPY2CHF003AHE1` | Presentation contract: UI, audio, accessibility, determinism |
