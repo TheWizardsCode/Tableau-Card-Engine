@@ -719,6 +719,86 @@ first member), so a disconnected fragment is reported as `unreachable-card`.
 `contentValidationToJson(result)` render the same issue/finding data, so the
 text and JSON reports cannot disagree.
 
+### Route-space guard
+
+The static validator proves a content file is **well formed**; it cannot tell a
+writer whether an authored branch is **playable to an ending**. A cost gate can
+leave an option reachable but unwinnable, and a cosmetic choice can undo its own
+consequence one beat later. The route-space guard
+([`src/story-line/content/guard.ts`](../../src/story-line/content/guard.ts))
+answers that question by enumerating the **playable route space** — the same
+affordability-aware walk the Long Erasure playtest harness
+(`scripts/long-erasure-playtest.ts`) uses, generalised over any
+[`ContentAdapter`](#content-adapter).
+
+`evaluateContentGuard(cards, adapter, options)` is pure (never mutates, never
+throws) and returns `{ valid, gatedBranches, endings, consequentialChoices,
+violations, warnings, errors, exploration }`. It asserts three invariants:
+
+| Invariant | Meaning |
+|---|---|
+| `gated-branch-survivable` | Every **state-gated** option — a `#cost` affordability gate, a `#when` successor rule, or both — can be taken on at least one route that reaches an ending. |
+| `ending-reachable` | Every ending is reachable on the playable route space. |
+| `consequential-rejoin` | Every choice **marked consequential** stays distinct from its alternatives for at least the minimum rejoin distance, in beats entered after the fork (`1` = every branch shares the very next beat). |
+
+**Marking choices and endings.** Both are ordinary content data, read from the
+card's own extra columns — the runtime ignores them and the static validator
+does not require them:
+
+| Column | Value | Meaning |
+|---|---|---|
+| `consequential` | option label(s), `\|`/`;`/`,` separated, or `*` | The choice(s) whose consequences must persist. An absent/blank cell marks nothing. |
+| `ending` | `1`, `true`, `yes` or `ending` | A card that ends a route. When **no** card is marked, endings default to the structural terminals (cards with no outgoing successor). |
+
+A typo in a `consequential` cell (a label the card does not offer) is a
+`consequential-rejoin` violation, so a mark cannot silently drift from the
+content. A card that marks a choice but offers no alternative gets a warning.
+
+**Rejoin distance** is measured over the declared successor graph ignoring
+conditions and affordability (a `#when` target counts as reachable). Branches
+that never rejoin pass any minimum — a terminal branch keeps its consequence.
+
+**Bounds.** The enumeration is bounded (`maxDepth` beats per route, `maxStates`
+explored states) because a cycle that also grows a resource has no finite state
+space. Hitting a bound is reported (`exploration.truncated`) and makes the
+report **invalid**: the guard fails closed rather than claiming an invariant it
+could not check, and an unproven invariant is never reported as a violation.
+Resource-neutral cycles (including a reset ending that loops back to the entry)
+terminate through state revisits, so they are an ordinary shape.
+
+**Invocation.** `npm run storylines:guard` guards every target declared in
+[`configs/storyline-guard.json`](../../configs/storyline-guard.json) — the CI
+form. A single file can be guarded ad hoc:
+
+```bash
+npm run storylines:guard
+npm run storylines:guard -- --csv tests/fixtures/story-line/gdd-worked-examples.csv \
+  --game gym --initial coins=3,reputation=1
+npm run storylines:guard -- --csv some/content.csv --game gym \
+  --endings end-a,end-b --min-rejoin 3 --json
+```
+
+| Flag | Purpose |
+|---|---|
+| `--csv <path>` | Guard one file (default: every configured target). |
+| `--game <id>` | Content adapter id (default `gym`). |
+| `--entry <ids>` | Explicit entry card ids (default: every root; a pure cycle falls back to each story-line's first card). |
+| `--initial <k=v,…>` | Starting resource bag (default: every declared key = `0`). |
+| `--endings <ids>` | Explicit ending ids (precedence: this flag > the `ending` column > structural terminals). |
+| `--min-rejoin <n>` | Minimum rejoin distance for marked choices (default `2`). |
+| `--max-depth <n>` / `--max-states <n>` | Search bounds (default `48` / `20000`). |
+| `--consequential-column` / `--ending-column` | Override the annotation column names. |
+| `--json` | Machine-readable report. |
+
+Exit codes: `0` when every invariant holds, `1` on a violation, a content
+error, an exhausted bound, or an unreadable/misconfigured target.
+
+The guard models **declared resources only**. A game-specific mechanic that is
+not a declared resource (Long Erasure's pressure clock, for example) is outside
+it and keeps its own harness; that is why the committed config passes
+explicit `endings` for the Long Erasure content (its reset ending loops back and
+its clock is not a declared resource).
+
 ### Transactional author API
 
 Every edit is: parse → mutate in memory → validate → write atomically (temp file
@@ -769,6 +849,7 @@ Thin `tsx` entry points over the seams (no Vite loader, no game import):
 | npm script | Script | Purpose |
 |---|---|---|
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
+| `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space: gated-branch survival, ending reachability, consequential rejoin distance (`--csv`, `--initial`, `--endings`, `--min-rejoin`, `--json`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
 | `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `update-card` (`--dry-run`, `--field column=value`). |
 | `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |

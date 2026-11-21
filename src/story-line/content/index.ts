@@ -46,6 +46,28 @@ export {
 } from './csv';
 
 export type {
+  ContentGuardConsequentialChoice,
+  ContentGuardEnding,
+  ContentGuardGatedBranch,
+  ContentGuardGateKind,
+  ContentGuardInvariant,
+  ContentGuardOptions,
+  ContentGuardReport,
+  ContentGuardViolation,
+} from './guard';
+export {
+  CONSEQUENTIAL_COLUMN,
+  DEFAULT_GUARD_MAX_DEPTH,
+  DEFAULT_GUARD_MAX_STATES,
+  DEFAULT_MIN_REJOIN_DISTANCE,
+  ENDING_COLUMN,
+  contentGuardToJson,
+  evaluateContentGuard,
+  evaluateContentGuardCsv,
+  formatContentGuardReport,
+} from './guard';
+
+export type {
   ManifestBuildOptions,
   ManifestEdge,
   ManifestNode,

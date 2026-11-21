@@ -1546,11 +1546,13 @@ the generic story-line fields (`id`, `name`, `effect`, `options`, storyline
 id/title); every other column is carried as a game column. Core ships the Gym
 adapter as the default.
 
-Three `tsx` CLIs expose the seams (no Vite loader, no game import):
+The `tsx` CLIs expose the seams (no Vite loader, no game import):
 
 ```bash
 npm run storylines:validate                     # validate every shipped content file
 npm run storylines:validate -- --csv path.csv --json --fail-on-cycle
+npm run storylines:guard                        # guard every configured route-space target
+npm run storylines:guard -- --csv path.csv --game gym --initial coins=3 --json
 npm run storylines:graph                        # rewrite every shipped content artefact
 npm run storylines:graph -- --format json --check   # drift guard over every artefact
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
@@ -1564,7 +1566,14 @@ Every CLI supports `--help` and `--game <adapter-id>` (default `gym`). With no
 registry (`DEFAULT_CONTENT_FILES` in `src/story-line/content/adapters.ts`) and
 process **every** file through the adapter it declares — each content file owns
 its own JSON manifest and Mermaid graph — so a second content file cannot escape
-validation or the artefact drift guard. Passing `--csv` selects one file (an
+validation or the artefact drift guard. `storylines:guard` instead walks the
+committed target list (`configs/storyline-guard.json`: content path, adapter,
+starting resource bag and ending ids per target) and asserts the three
+route-space invariants — every state-gated branch reaches an ending, every
+ending is reachable, and every choice marked `consequential` keeps its branches
+apart for the minimum rejoin distance. It bounds its search and fails closed
+when a bound is hit; a game-specific mechanic that is not a declared resource
+(e.g. the Long Erasure pressure clock) is outside it. Passing `--csv` selects one file (an
 unregistered file falls back to the format's default artefact path); `--out`
 requires `--csv`. Every CLI exits `0` on success/valid content and `1` on invalid
 content, unreadable input or artefact drift. The author API validates before

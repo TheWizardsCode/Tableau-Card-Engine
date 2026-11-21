@@ -366,7 +366,56 @@ After an accepted edit the artefacts are regenerated and **verified** (the
 post-write drift check re-reads them), so a "regenerated" claim is never
 assumed.
 
-## 9. Troubleshooting
+## 9. Route-space guard (is the branch actually playable?)
+
+The editor and `storylines:validate` both prove an edit is **well formed**. A
+branch can still be *unplayable*: a cost gate can leave it reachable but
+unwinnable, an ending can be orphaned behind a gate, and a "consequential"
+choice can quietly rejoin its alternative one beat later (the slideshow shape).
+The route-space guard checks exactly those three things:
+
+```bash
+npm run storylines:guard                 # every CI target (configs/storyline-guard.json)
+npm run storylines:guard -- --csv path/to/storylines.csv --game gym \
+  --initial coins=3 --json
+```
+
+| Invariant | What a writer needs to do |
+|---|---|
+| `gated-branch-survivable` | Give every `#cost` / `#when`-gated option at least one affordable route to an ending. |
+| `ending-reachable` | Make every ending reachable on a playable route. |
+| `consequential-rejoin` | Either let a marked choice's branches stay apart for the minimum number of beats, or stop marking it. |
+
+**Tell the guard what matters.** Two ordinary content columns carry the
+authoring intent (the runtime ignores them, and `storylines:validate` does not
+require them):
+
+- `consequential` — the option label(s) whose consequence must persist, e.g.
+  `Chart the reef` or `Chart the reef|Take the helm`, or `*` for every option on
+  the card. Leave it blank on cosmetic choices: the guard only checks what is
+  marked.
+- `ending` — `yes` on a card that ends a route (needed when an ending loops back
+  to the start, as a reset ending does). With no marked cards, endings default
+  to the cards that have no outgoing successor.
+
+An ad-hoc file can also name its entries/endings on the command line
+(`--entry`, `--endings`) and set the threshold (`--min-rejoin`, default `2`
+beats). A mark naming an option the card does not offer is itself reported, so
+a `consequential` cell cannot drift from the content.
+
+**Bounds and honesty.** The guard bounds its search (`--max-depth`,
+`--max-states`) and **fails closed**: if a bound is hit it says so and exits
+non-zero rather than claiming an invariant it could not check. A cycle that
+grows a resource forever is unbounded — keep such cycles resource-neutral or
+mark their endings.
+
+The guard models declared resources only. A game-specific budget that is not a
+declared resource (Long Erasure's pressure clock, for example) is outside it;
+that game keeps its own playtest harness. See
+[Core: Generic Story-Line System → Route-space guard](../core-engine/story-line.md#route-space-guard)
+for the full contract.
+
+## 10. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
@@ -378,7 +427,7 @@ assumed.
 | Port already in use | `npm run storylines:editor -- --port 5180`. |
 | The server won't bind | Check the port is free (`--port 5180`) and the host resolves. The editor defaults to loopback (`127.0.0.1`); a **valueless `--host`** binds all interfaces (`0.0.0.0`), and an explicit `--host <addr>` binds that address. A non-loopback bind prints a warning: the editor is reachable from the network and can write the loaded content CSV (no authentication). |
 
-## 10. Testing
+## 11. Testing
 
 The editor's renderers are plain-DOM modules, so the core `browser` project
 drives them **directly** in Vitest's real Chromium document — no second dev
