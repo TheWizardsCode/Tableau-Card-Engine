@@ -844,7 +844,10 @@ non-empty — no separate flag or link column exists to set.
 
 ### CLIs
 
-Thin `tsx` entry points over the seams (no Vite loader, no game import):
+Thin `tsx` entry points over the seams (no Vite loader, no game import). The
+writer-facing workflow built on them — column table, worked rows, the review
+gate and the malformed-entry behaviour — is documented in the GDD's
+[writer content pipeline](../../docs/design/storyline-game-gdd.md#29-writer-content-pipeline-csv-authoring-and-the-review-gate).
 
 | npm script | Script | Purpose |
 |---|---|---|

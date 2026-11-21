@@ -80,6 +80,7 @@ layer described here.
    - [2.6 Hypotheses and how they will be validated](#26-hypotheses-and-how-they-will-be-validated)
    - [2.7 Sections owned by downstream work items](#27-sections-owned-by-downstream-work-items)
    - [2.8 Resource model and economy](#28-resource-model-and-economy)
+   - [2.9 Writer content pipeline](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)
 3. [UX, Visual Design and Audio Direction](#3-ux-visual-design-and-audio-direction)
 4. [Glossary](#4-glossary)
 5. [Test Plan](#5-test-plan)
@@ -353,8 +354,9 @@ per card in the CSV `resources` column (an engine friction the spike measured �
 every row repeats the full set) and once in `manifest.resources.declared`
 (the beat sheet needs it to validate conditions and loss rules statically). The
 manifest validator enforces equality (`resource-set-mismatch`), and the
-one-declaration-per-file fix is the content pipeline's known limit, owned by
-`CG-0MWPY29730011FJ4`.
+one-declaration-per-file fix is a tooling known limit, stated in
+[§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) and
+owned by `CG-0MWQYDC7D003G4ON`.
 
 ### 2.2 The scene beat-sheet data model
 
@@ -851,13 +853,15 @@ claims would be strengthened by it.
 
 The following sections of this GDD were stubs by design. Each names the work item
 that owns it, so a reviewer can see the whole document's shape and no section is
-silently forgotten. The resource model is now written
-([§2.8](#28-resource-model-and-economy)); the rest remain stubs.
+silently forgotten. The resource model ([§2.8](#28-resource-model-and-economy))
+and the writer content pipeline
+([§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)) are now
+written; the rest remain stubs.
 
 | Section | Contents it must add | Owner |
 |---|---|---|
 | Resource model and economy | **Written — [§2.8](#28-resource-model-and-economy)**: named key set, ranges, starting values, sources/sinks, each key's failure state and recovery, one worked trade per act, named engine gaps | `CG-0MWPY27EU008QPHN` |
-| Writer content pipeline | exact CSV columns, two worked rows, validator/editor/review gate, malformed-entry behaviour, the spike's five frictions | `CG-0MWPY29730011FJ4` |
+| Writer content pipeline | **Written — [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)**: column table, three verbatim worked rows (validated), option-cell grammar, the end-to-end review gate with sign-off roles, the real malformed-entry diagnostics and the five spike frictions with owners | `CG-0MWPY29730011FJ4` |
 | Tension, pacing, failure and reset-ending scoring | clock as a visible budget with a recovery path, irreversible-loss mechanism, numeric pacing rules, failure/recovery per type, scoring inputs/weights/bands, earned-vs-punitive justification | `CG-0MWPY2AZX001UI2A` |
 | Presentation contract | SLL zone names, overlay behaviour, audio/SFX mapping, accessibility, determinism/save-load/transcript/replay expectations | `CG-0MWPY2CHF003AHE1` |
 | Glossary proper nouns and prohibited-term gate | final names with rationale, prohibited-term scan of this document, trademark sanity read | `CG-0MWPY2FV30041M48` |
@@ -1167,6 +1171,402 @@ playtest the evaluation recommends before the act structure freezes.
 | H8 | "The objective is measured in the key the best choice spends" produces a felt trade rather than a visible checklist | **unproven**; it is a design rule applied to the worked manifest, not yet played | vertical slice: record how often a player names the trade in the scene-exit review; a player who never mentions the objective fails the rule | build epic (`CG-0MWPY2ECE002P2NH`) |
 | H9 | The bounds (0–5 hull, 0–8 morale, 0–6 stores, 0–5 goodwill, 0–4 charge) are never hit by authored content, so a spill is always a writer error | **unproven**; the caps are set one "hold" above the recorded peaks | the fixture test's inequality check fails loudly if a re-tune authors a cost/gain past a bound; a spill observed in the vertical slice means the cap is wrong, not the content | tension design |
 
+### 2.9 Writer content pipeline: CSV authoring and the review gate
+
+> **Written by `CG-0MWPY29730011FJ4`.** This section replaces the stub listed in
+> [§2.7](#27-sections-owned-by-downstream-work-items). It is written for the
+> person who writes the story, not for the person who writes the engine: every
+> command below is one a writer runs, every diagnostic quoted is a real one
+> produced at this commit, and every limitation is named with the work item that
+> owns it. The engine contract behind it is
+> [`docs/core-engine/story-line.md`](../core-engine/story-line.md); the visual
+> editor is [`docs/dev/storyline-editor.md`](../dev/storyline-editor.md).
+
+The governing rule: **a writer owns rows; a designer owns structure.** A writer
+adds, edits and prose story beats in one CSV file and runs the validator. A
+writer never edits TypeScript, never edits the episode manifest, and never
+hand-edits a generated artefact. The scene, its objective, its clock budget and
+its exit routes belong to the beat sheet ([§2.2](#22-the-scene-beat-sheet-data-model))
+and to the designer; the beat, its prose and its options belong to the writer.
+If a change needs a new column, a new route or a new objective, that is the
+designer's row in the manifest and the writer raises it — it is not a CSV edit.
+
+#### 2.9.1 The file
+
+One content CSV per story-line content set, UTF-8, comma-separated, one header
+row and one **row per beat**. A row is a *beat*; a beat is a *choice* exactly
+when its `options` cell is non-empty (there is no separate "is choice" flag). A
+blank optional cell means "nothing authored" — never an empty quoted string with
+meaning.
+
+The file is bound to the game by a **content adapter**
+([`src/story-line/content/adapters.ts`](../../src/story-line/content/adapters.ts)),
+which declares the file's columns and says which of them carry the engine's
+generic fields. The adapter is the only place the column set is decided: a
+column that is not declared is refused by name rather than ignored, and a
+declared column a row omits simply reads as blank (a hard
+`missing-required-field` error only for `id` and `name`).
+
+#### 2.9.2 The columns
+
+The **generic columns** exist for every game; the **game columns** below are the
+ones this document's worked fixture and the spike declare, and each game's
+adapter names its own.
+
+| Column | Required | What it holds | Worked value |
+|---|---|---|---|
+| `id` | yes (enforced) | Stable beat id, unique in the file. Prefix by act/beat (`le-i-open`) so reading order survives a diff. | `gx-crossing` |
+| `name` | yes (enforced) | The beat's title, shown on the card. Sentence case, no full stop. | `The Reef Line` |
+| `effect` | yes (GDD rule) | One line describing the beat's event, in the incident-log register ([§1.1](#11-setting-and-tone)). | `The reef shows itself in the swell a heartbeat before the hull does.` |
+| `options` | choice rows | The whole option model for the beat — labels, targets, costs, gains, gates and outcome prose. Grammar in [§2.9.3](#293-the-options-cell). Blank on an ending or a non-choice beat. | `Chart the reef\|gx-reef#cost=coins:2#says=…` |
+| `storylineId` | yes on a choice row (enforced) | The story-line group id; a choice row with no group is `missing-storyline-id`. | `gdd-worked` |
+| `storylineTitle` | yes (GDD rule) | The group's display title, written by every member so the group survives a row being moved. Display-only; not validated. | `The GDD Worked Example` |
+| `resources` | choice rows | The **declared resource keys** the row's `#cost` / `#extra` / `#when` attributes may name. A blank cell falls back to `coins`/`reputation`, which would reject every GDD key. Must match the game's declared set ([§2.8.1](#281-the-v1-declared-set-and-what-is-deliberately-not-in-it)). | `"coins,reputation"` |
+| `context` | no | The beat's situation paragraph, ≤ 400 characters (`context` budget, [§1.1](#11-setting-and-tone)). A longer one is a **warning**, not an error. | quoted prose |
+| `epilogue` | no | The closing paragraph on a terminal beat, ≤ 600 characters. | quoted prose |
+| `consequential` | no | The option label(s) whose consequence must persist, `\|`/`;`/`,`-separated, or `*` for all. Drives the guard's rejoin check ([§2.9.5](#295-the-review-gate)). Leave blank on cosmetic choices. | `Chart the reef` |
+| `ending` | no | `yes` on a beat that ends a route. Needed when the ending loops back to the first beat (a reset ending); with none marked, endings default to the beats with no outgoing target. | `yes` |
+| `trigger` | game column | What causes the beat in the game's own rules. | `Incident` |
+| `cost`, `coinDelta`, `reputationDelta` | game column | The spike/Gym adapter's legacy incident columns. A GDD-game adapter declares its own game columns; these are examples, not a requirement. | `0` |
+
+**The two retired columns.** `act` and `clockCost` are beat-sheet data written in
+the wrong place ([§2.1](#21-composition-contract-who-owns-what)): act membership
+is `scene.id` under `act.scenes`, and pacing is `beat.clockCost` in the manifest.
+They stay in the spike file only while the spike's own rule module reads them;
+a writer on the GDD game never authors either, and the manifest validator must
+reject a disagreeing pair while both exist (engine gap 6, [§6](#6-engine-gap-backlog-todo)).
+
+**"Enforced" means a hard error; "GDD rule" is a reviewer's check.** The
+validator refuses a row on the enforced cells and the option attributes; the
+writing conventions (a title, an `effect` line, a group title on every member)
+are what the designer checks in [§2.9.5](#295-the-review-gate), because they are
+about how the beat reads, not whether the file is well formed.
+
+#### 2.9.3 The `options` cell
+
+One cell holds the entire option model. The head is `label|successor`, followed
+by zero or more `#`-attributes; `;` separates options:
+
+```text
+Cell      := Option (";" Option)*
+Option    := Label "|" Successor? Attribute*
+Attribute := "#cost=" ResourceList | "#extra=" ResourceList
+           | "#when=" Condition ">" Successor | "#says=" Prose
+ResourceList := key ":" number ("," key ":" number)*
+Condition    := field (">=" | "<=" | "==" | ">" | "<") number
+Successor    := card id, or a comma-separated candidate list for a random draw
+```
+
+| Attribute | What it does | Example | Read by |
+|---|---|---|---|
+| head `label` | The button the player reads. Unique per card. | `Chart the reef` | presenter |
+| head successor | The card the choice pushes; several candidates = one seeded random draw | `gx-crossing` / `gx-crossing,gx-wait` | `@story-line` resolution |
+| `#cost` | An affordability gate **and** a real payment on resolution | `#cost=coins:2` | runtime gate + payment |
+| `#extra` | A resource gain on resolution; negative values are rejected | `#extra=reputation:1` | resolution |
+| `#when` | One conditional successor (repeatable, authored order, first match wins); empty successor ends the chain | `#when=reputation>=2>gx-end-bold` | resolution, consumes no RNG |
+| `#says` | The outcome paragraph the journal and the narration show for this choice | `#says=You buy the pilot's chart…` | presenter + journal |
+
+Rules a writer can be caught by, and cannot be caught by:
+
+- **Reserved delimiters.** `;` separates options, `|` label from successor, `,`
+  separates targets and cost/extra pairs, `#` starts an attribute. None may
+  appear inside a label or a card id.
+- **Prose escaping is `#says`-only.** Inside a `#says` value, `\;` → `;`,
+  `\#` → `#`, `\\` → `\`. A `#says` value is exactly one segment: an unescaped
+  `;` or `#` is `unescaped-says-delimiter`, and a decoded second segment is
+  `says-segment-count`. Everywhere else a backslash is literal, so no existing
+  cell changes meaning.
+- **An unaffordable option is not shown.** A cost the player cannot pay removes
+  the option at draw time; the presentation contract must say *why* rather than
+  let it vanish ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps),
+  presentation `CG-0MWPY2CHF003AHE1`). A writer must therefore treat a gate as a
+  statement about the *player's bag*, not as a conditional branch that will
+  always be reachable.
+- **`#when` is checked against post-resolution resources**, which is why
+  `#when=charge>=2>…` after a `#cost=charge:2` means "if you still have two after
+  paying".
+
+#### 2.9.4 Worked example rows (verbatim, validated)
+
+The three rows below are copied without editing from
+[`tests/fixtures/story-line/gdd-worked-examples.csv`](../../tests/fixtures/story-line/gdd-worked-examples.csv).
+The header is row 1 (blank lines and wrapped cells do not change the row
+number); these are rows 3, 5 and 7.
+
+<!-- gdd-worked-rows -->
+```csv
+id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta,context,consequential,ending
+gx-crossing,The Reef Line,The reef shows itself in the swell a heartbeat before the hull does.,Chart the reef|gx-reef#cost=coins:2#says=You buy the pilot's chart and the soundings are honest.;Cut the line|gx-wait#says=You cut the tow line and let the current carry the barge clear.,gdd-worked,The GDD Worked Example,"coins,reputation",Incident,0,0,0,"The reef line runs across the channel mouth and the swell shows it a heartbeat before the hull does. The pilot's chart is for sale, and the barge is still on the tow.",Chart the reef,
+gx-signal,The Shore Answers,The watch answers and the water opens.,Anchor for the night|gx-end-quiet#says=You anchor inside the harbour wall and the crew sleep.;Run the strait|gx-end-quiet#when=reputation>=2>gx-end-bold#says=You run the strait on the watch's word and the town will remember it.,gdd-worked,The GDD Worked Example,"coins,reputation",Incident,0,0,0,"The watch answers and the channel opens ahead of you. The crew will follow a captain the town trusts, and they are asking which way to run.",
+gx-end-quiet,Quiet Harbour,The night ends in a quiet harbour.,,,,,Incident,0,0,0,The night ends in a quiet harbour and the town wakes to a full quay.,,yes
+```
+
+What each row is teaching:
+
+- **`gx-crossing`** — a **costed** choice with authored outcome prose and a
+  consequential mark. `#cost=coins:2` is both the gate and the payment; the
+  label in the `consequential` cell must match an option on this card exactly or
+  the guard reports it (that is how a mark is stopped from drifting).
+- **`gx-signal`** — a **gated** successor. `Run the strait` falls through to
+  `gx-end-quiet` normally, but when the resolving bag has `reputation >= 2` it
+  pushes `gx-end-bold` instead. The rule consumes no RNG, so a replay that
+  reaches this beat with the same bag takes the same door.
+- **`gx-end-quiet`** — a **terminal** beat: no `options`, no `storylineId`, and
+  `ending=yes`. The `ending` mark is what makes the route-space guard check the
+  ending even though nothing has to link to it.
+
+**Prove the rows yourself** (run from the repository root):
+
+```bash
+npm run storylines:validate -- --csv tests/fixtures/story-line/gdd-worked-examples.csv --game gym
+```
+
+Expected tail of the report:
+
+```text
+ERRORS (0): none
+Warnings (0):
+  (none)
+RESULT: VALID
+```
+
+A unit test pins the document to the fixture: the rows in the fenced block above
+are compared byte-for-byte with the fixture's rows on every run
+([`tests/story-line/content/gdd-content-pipeline.test.ts`](../../tests/story-line/content/gdd-content-pipeline.test.ts)),
+so a corrected row cannot leave a stale copy in this document. This is T8 in
+[§5.1](#51-verification-available-at-this-commit).
+
+#### 2.9.5 The review gate
+
+The gate is a sequence, and every step is a command a writer can run. Steps 1–3
+are the writer's own pre-flight before anything is committed; steps 4–6 bring in
+the reviewer.
+
+| # | Step | Command | Passes when | Owner |
+|---|---|---|---|---|
+| 1 | **Draft** | the editor (`npm run storylines:editor`) or the `storylines:author` CLI | a pending draft exists and nothing is written yet | writer |
+| 2 | **Validate** | `npm run storylines:validate -- --csv <file> --game <adapter>` | `RESULT: VALID`, and every warning read and either fixed or accepted in the change note | writer |
+| 3 | **Guard the route space** | `npm run storylines:guard -- --csv <file> --game <adapter> --initial <bag>` (or `npm run storylines:guard` for every configured target) | `PASS` — all three invariants green, no bound hit | writer |
+| 4 | **Preview and apply** | editor preview → apply (or `--apply` headless) | the preview diff shows only the intended rows, the validator report inside it is clean, and apply returns `written: true` | writer + designer |
+| 5 | **Regenerate artefacts** | automatic on apply; verify with `npm run storylines:graph -- --format json --check` and `--format mermaid --check` | "no drift" — the committed manifest and Mermaid graph match the CSV | writer |
+| 6 | **Sign off** | a comment on the content work item carrying steps 2–5's output | designer approval + producer approval where required (below) | designer / producer |
+
+**Hard errors versus warnings.** A hard error refuses the write and must be
+fixed; a warning is reported and never invalidates the content.
+
+| Class | Codes | Meaning and writer action |
+|---|---|---|
+| Hard error | `duplicate-id`, `missing-required-field`, `missing-storyline-id`, `invalid-option`, `unknown-successor`, `unreachable-card`, `missing-column` | The file will not be written and cannot be committed. Fix the named row/column; `unknown-successor` usually means a typo in a target or a branch authored before its target ([§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits)). |
+| Hard error (opt-in) | `cycle-error` | Only with `--fail-on-cycle`. A cycle is otherwise an informational finding — a reset ending is meant to loop. |
+| Warning | `prose-budget` (`prose-over-budget`) | `context` over 400 or `epilogue` over 600 characters. Shorten it, or record why in the change note. |
+| Guard warning | no `ending` mark; guard bound hit | Mark at least one ending when a route loops back; a bound hit is a **failure**, not a pass — the guard says it cannot prove the invariants and exits non-zero. |
+
+**Artefact regeneration is not optional.** The committed JSON manifest and
+Mermaid graph are the review surface for the designer and the drift guard for
+CI. An accepted editor edit regenerates both and re-reads them to verify, and
+reports `regenerated and verified 2 artefact(s) — no drift`. A CLI-authored edit
+does not write them, so the artefact step is always run before commit:
+`npm run storylines:graph -- --format json` and `--format mermaid` write them,
+`--check` proves it. Hand-written documentation is never rewritten: an edit that
+invalidates a hand-maintained page returns a **"manual documentation update
+required"** result naming the failing check.
+
+**Sign-off is three roles, and only three.**
+
+| Role | Signs off | Evidence recorded |
+|---|---|---|
+| **Writer** | the row: prose, labels, targets, costs, the `consequential` and `ending` marks | the validator and guard output pasted into the work-item comment |
+| **Designer / balance reviewer** | the branch's *consequence*: it changes the scene, it fits the act's economy, and the cost/gain is affordable from the starting bag ([§2.8.3](#283-the-economy-by-act)) | approval comment quoting the preview diff's `options` cell |
+| **Producer** | a new act or scene, a change to a resource's source/sink set, a new proper noun (IP gate), or a change to the declared resource set | approval comment naming the section of this document that authorises it |
+
+The writer's own checks (steps 2–5) are necessary but not a sign-off: the
+designer's whole question is *would a player feel this choice?*, which no
+validator can answer.
+
+#### 2.9.6 What happens on a malformed entry
+
+Three surfaces report the same fault in three shapes. All three name the card
+and the fault; the validator and the write bridge also give the **row, column,
+reason code and dotted path**. None of them writes.
+
+**The validator** (what step 2 prints). A typo'd resource key, produced by
+changing one attribute in a copy of the worked fixture:
+
+```text
+✗ [unknown-resource-key] row 3, column "options" (unknown-resource-key):
+  cost.chrono is not a declared resource (declared: coins, reputation).
+```
+
+**The editor / write bridge** (what step 4 returns as JSON, `HTTP 422`). The same
+fault through `--apply`:
+
+```json
+{
+  "status": "invalid",
+  "ok": false,
+  "code": 422,
+  "written": false,
+  "preview": {
+    "validation": {
+      "valid": false,
+      "issues": [
+        {
+          "code": "unknown-resource-key",
+          "cardId": "gx-signal",
+          "row": 5,
+          "column": "options",
+          "reason": "unknown-resource-key",
+          "path": "options[0].cost.chrono",
+          "resource": "chrono",
+          "message": "cost.chrono is not a declared resource (declared: coins, reputation)."
+        }
+      ]
+    }
+  }
+}
+```
+
+**The author CLI** (what `storylines:author` prints and refuses). A forward
+reference, which is a validity fault rather than a shape fault:
+
+```text
+storyline-author: refusing to write — validation failed:
+  - Choice card "gx-open" option "Send word ahead" links to unknown card "gx-ghost".
+```
+
+**The consequence is always the same: the write is refused and the file is
+unchanged, byte for byte.** Only `content/author.ts` writes the CSV, and it
+writes atomically (temp file + rename) *after* validation passes, so a refused
+edit cannot leave a partial row. The writer can prove this themselves:
+
+```bash
+cp tests/fixtures/story-line/gdd-worked-examples.csv /tmp/scratch.csv
+md5sum /tmp/scratch.csv     # note the checksum
+npx tsx scripts/storyline-author.ts update-card --csv /tmp/scratch.csv --game gym \
+  --id gx-signal --options 'Anchor for the night|gx-end-quiet#cost=chrono:1'
+md5sum /tmp/scratch.csv     # unchanged: same checksum, exit code 1
+```
+
+The editor adds one more refusal a writer should recognise: **`stale-content`
+(HTTP 409)**. If the CSV changed on disk since the editor loaded it — someone
+else's commit, a branch switch — the write is refused rather than clobbering it,
+and the page asks for a reload.
+
+| What you will see | Reason code | The fix |
+|---|---|---|
+| `option "Take the helm gx-crossing" is missing the "\|" separator` | `missing-separator` | add `\|` between label and target |
+| `cost.chrono is not a declared resource` | `unknown-resource-key` | use a declared key, or raise the `resources` cell with the designer |
+| `links to unknown card "gx-ghost"` | `unknown-successor` (author API) | author the target card first, or add both in one `add-linked-card` edit |
+| `option … attribute "bogus"` | `unknown-attribute` | attributes are exactly `cost`, `extra`, `when`, `says` |
+| `Card "gx-open" … is unreachable` | `unreachable-card` | link the new card from an existing card ([§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) friction 1) |
+| `field "context" is a mapped story-line column` | — (author CLI) | author prose through the editor form or `--apply`, not `--field` |
+| `unknown content column "acts"` | — (author seam) | use the file's real column names; they are listed in the error |
+
+#### 2.9.7 The spike's five authoring frictions: resolved or known limits
+
+The spike timed a complete branch end to end at **≈ 8 s of tool time with no
+TypeScript and no engineering help**, and recorded five frictions in the way
+([observation log §5](../gym/long-erasure-observation-log.md#5-authoring-ergonomics-timed)).
+Re-verified at this commit, with the owning work item for each one that is still
+open:
+
+| # | Friction (as recorded) | Status at this commit | What a writer does in its place | Owner |
+|---|---|---|---|---|
+| 1 | **Forward references are refused**, so a branch must be authored backwards from its target | **Known limit** — the refusal is deliberate (a dangling target must not be writable), and `add-card` alone into an existing story-line can also re-point the entry card and fail every other member as `unreachable-card` | author the branch in a single linked edit — the editor's **Add card → Incoming link**, or `--apply` with `kind: "add-linked-card"` — so the card and its predecessor's option are written in one validated transaction | `CG-0MWQYDC7D003G4ON` |
+| 2 | **`update-card` replaces the whole `options` cell**, so one new option means retyping the rest | **Known limit** on the CLI; **mitigated** in the editor, whose guided forms emit a single edit for the changed card | use the editor's **Edit card** form (it hands you the current cell to extend and previews the diff), or paste the cell carefully and let validation catch a dropped `;` | `CG-0MWQYDC7D003G4ON` |
+| 3 | **Every row repeats the full declared resource set** in `resources` | **Known limit** — the declared set exists twice by design at this commit (per-row and once in the manifest; [§2.1](#21-composition-contract-who-owns-what)) | copy the key list exactly from the row above; a mismatch is caught by `unknown-resource-key`, not silently | `CG-0MWQYDC7D003G4ON` (with the manifest gap `CG-0MWPY2ECE002P2NH`) |
+| 4 | **No positional insert** — a new card is appended, so reading order drifts from narrative order | **Known limit** | append, and keep narrative order recoverable from the ids (`le-ii-…` sorts by act); a sorted view is the manifest's job, not the file's | `CG-0MWQYDC7D003G4ON` |
+| 5 | **Act and clock are generic `--field` writes**, and a typo'd field name was a silent no-op | **Resolved** — an unknown column is now a hard error naming the file's columns (`unknown content column "acts" (file columns: …)`); the legacy columns themselves retire into the manifest ([§2.1](#21-composition-contract-who-owns-what), engine gap 6) | nothing: authoring an `act`/`clockCost` column the adapter does not declare fails loudly | `CG-0MWPY2ECE002P2NH` (column retirement) |
+
+**One friction found while writing this section.** `storylines:author` cannot
+author prose: `--field context=…` is refused ("field \"context\" is a mapped
+story-line column") and the CLI has no `--context` / `--epilogue` flag even
+though the author API and `--apply` both carry them. Until that lands, prose is
+authored through the editor form or a headless `--apply` payload
+(`{"edit":{"kind":"update-card","spec":{"id":"…","context":"…"}}}`). Owned by
+`CG-0MWQYDC7D003G4ON`.
+
+**The diagnostics are the part to keep.** The spike's verdict — "row, column,
+reason and the declared set — a writer can fix that without asking anyone" —
+still holds, and is why the gate above is written as commands rather than a
+process.
+
+#### 2.9.8 Authoring a branch, start to finish (the recipe this section promises)
+
+With the tooling at this commit, a new branch is one linked edit, one validate,
+one guard run and one artefact check. Worked on a scratch copy of the fixture:
+
+```bash
+# 0. Work on a copy; the tracked content is never touched until the edit is accepted.
+cp tests/fixtures/story-line/gdd-worked-examples.csv /tmp/walk.csv
+
+# 1. Add the beat AND its link, in one validated transaction.
+npx tsx scripts/storyline-editor-cli.ts --content /tmp/walk.csv \
+  --artefact-json /tmp/walk-manifest.json --artefact-mermaid /tmp/walk-graph.mmd \
+  --apply '{"edit":{"kind":"add-linked-card","spec":{
+    "card":{"id":"gx-gale","name":"The Gale",
+            "effect":"A gale drives the barge onto the reef line.",
+            "context":"The wind backs into the north and the barge begins to set down onto the reef.",
+            "options":"Run before it|gx-signal#cost=coins:1#says=You spend the last harbour coin on a tow and beat the gale to the channel.",
+            "storylineId":"gdd-worked","storylineTitle":"The GDD Worked Example",
+            "resources":"coins,reputation"},
+    "linkFrom":{"id":"gx-reef","label":"Run before the gale"}}}}'
+# → status "applied", written true, artefacts "regenerated and verified … no drift"
+
+# 2. Validate the result.
+npm run storylines:validate -- --csv /tmp/walk.csv --game gym      # RESULT: VALID
+
+# 3. Prove the branch is playable, not just well formed.
+npm run storylines:guard -- --csv /tmp/walk.csv --game gym --initial coins=3,reputation=1
+# → ✓ gated-branch-survivable: 4 checked, 4 survivable
+#   ✓ ending-reachable: 2 checked, 2 reachable
+#   ✓ consequential-rejoin: 2 checked, 2 meet the minimum of 2
+#   PASS
+
+# 4. Prove the game's committed artefacts match its CSV (the scratch walk's own
+#    artefacts were already regenerated and verified by the apply in step 1).
+npm run storylines:graph -- --format json --check
+npm run storylines:graph -- --format mermaid --check
+```
+
+Two failures are the interesting ones, and both were reproduced for this
+section:
+
+- **The branch is unreachable.** Validating a copy with a malformed option
+  (`|` replaced by a space) reports `invalid-option` **and** two
+  `unreachable-card` errors. The first is the typo; the second is its
+  consequence. Fix the typo, not the reachability.
+- **The branch is unwinnable.** The known-bad fixture
+  [`guard-unwinnable-branch.csv`](../../tests/fixtures/story-line/guard-unwinnable-branch.csv)
+  validates structurally and still fails the guard on all three invariants —
+  which is the guard's positive control:
+
+```text
+✗ gated-branch-survivable: 2 checked, 0 survivable
+✗ ending-reachable: 2 checked, 1 reachable
+✗ consequential-rejoin: 1 checked, 0 meet the minimum of 2
+FAIL   (exit code 1)
+```
+
+A writer who sees the second shape has a *design* decision, not a typo: make the
+gated branch affordable on at least one route to an ending, unmark it as
+consequential, or cut it.
+
+#### 2.9.9 What this section deliberately does not promise
+
+- **No scene authoring here.** Objectives, budgets, outcome tables and routes are
+  the manifest's job ([§2.2](#22-the-scene-beat-sheet-data-model)–[§2.3](#23-how-a-scene-outcome-selects-the-next-beat)),
+  and the manifest has no validator at this commit (engine gap 2,
+  `CG-0MWPY2ECE002P2NH`). A writer cannot yet create a scene from CSV, and this
+  section does not describe one.
+- **No scene-space guarantee.** The route-space guard models declared resources
+  only; the pressure clock is not one, so a clock-expiry failure is outside it
+  (engine gap 3). The GDD game keeps its own harness until the scene-space guard
+  exists.
+- **No second choice model.** If a branch cannot be expressed in the `options`
+  cell, the answer is a `@story-line` gap filed on
+  `CG-0MWPY2ECE002P2NH`, never a parallel format or a hand-edited load path.
+
 ---
 
 ## 3. UX, Visual Design and Audio Direction
@@ -1253,6 +1653,7 @@ profiles; the commands below verify *this document* and the model it specifies.
 | T5 | No second choice model, no re-implementation of the chain | review check: `createEpisodeRunner` calls only public `@story-line` surface ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)); no module outside `src/story-line/` parses the `options` cell | reviewer sign-off at the build epic |
 | T6 | The document builds and the changed scope is green | `npm run build` then the test skill's unit profile | green |
 | T7 | The resource model's working fixture declares the GDD key set, carries one trade per act, never grants the irreversible key and keeps the state-gated branch survivable | `npm run storylines:validate -- --csv tests/fixtures/story-line/gdd-resource-trades.csv --game long-erasure`, then `npx vitest run --project unit tests/story-line/content/gdd-resource-model.test.ts` | `RESULT: VALID`; 12 tests pass ([§2.8.7](#287-how-the-economy-is-verified)) |
+| T8 | The rows quoted in [§2.9.4](#294-worked-example-rows-verbatim-validated) are byte-identical to the rows `storylines:validate` accepts, and the document still names every row's target | `npx vitest run --project unit tests/story-line/content/gdd-content-pipeline.test.ts` | pass — the document's rows are the fixture's rows, and the fixture validates |
 
 ### 5.2 Verification the build epic must add (named gaps)
 
@@ -1623,7 +2024,7 @@ is worse than a link.
 | `CG-0MWPY24IX00719NH` | Playtest evaluation: three recorded runs + slideshow test (delivered: evidence) |
 | **`CG-0MWPY25W4002UNKB`** | **This foundation: setting and tone, core loop, data model, outcome routing, composition contract, A-vs-C recommendation** |
 | `CG-0MWPY27EU008QPHN` | Resource model and economy (delivered: [§2.8](#28-resource-model-and-economy), one worked trade per act) |
-| `CG-0MWPY29730011FJ4` | Writer content pipeline (CSV authoring gate) |
+| `CG-0MWPY29730011FJ4` | Writer content pipeline (CSV authoring gate) — delivered: [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), T8; authored the frictions follow-up `CG-0MWQYDC7D003G4ON` |
 | `CG-0MWPY2AZX001UI2A` | Tension, pacing, failure and reset-ending scoring |
 | `CG-0MWPY2CHF003AHE1` | Presentation contract: UI, audio, accessibility, determinism |
 | `CG-0MWPY2ECE002P2NH` | Engine-gap backlog |

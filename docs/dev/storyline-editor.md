@@ -20,6 +20,9 @@ See also:
 - [Core: Generic Story-Line System](../core-engine/story-line.md) — the runtime
   and authoring seams this tool drives (adapter contract, validator codes,
   manifest shape, author API).
+- [The Long Erasure GDD — writer content pipeline](../design/storyline-game-gdd.md#29-writer-content-pipeline-csv-authoring-and-the-review-gate)
+  — the writer-facing gate this tool sits inside: the column table, the worked
+  rows, the validator/guard/artefact sequence and who signs off.
 - `tests/story-line/editor/` — the viewer and round-trip browser tests that pin
   everything documented below.
 
