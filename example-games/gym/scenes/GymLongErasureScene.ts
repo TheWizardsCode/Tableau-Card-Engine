@@ -287,7 +287,7 @@ export class GymLongErasureScene extends GymSceneBase {
       },
       {
         heading: 'Pressure clock and state gates',
-        body: 'Every beat costs clock. A beat that exactly equals the remaining clock is playable (the last tick); a beat that exceeds it expires the run immediately, so slow routes are genuinely punished. Some options are gated on accumulated resources — for example, Sabotage the Loom only appears once goodwill has reached 3, which can only be earned by earlier choices. Options you cannot afford are not offered; the gated branch shows up when your journey has earned it.',
+        body: 'Every beat costs clock. A beat that exactly equals the remaining clock is playable (the last tick); a beat that exceeds it expires the run immediately, so slow routes are genuinely punished. Some options are gated on accumulated resources — for example, Sabotage the Loom only appears once goodwill has reached 3, which can only be earned by earlier choices. Options you cannot afford are not offered; the gated branch shows up when your journey has earned it. The bargain branch’s clock is tuned so an earned run still reaches the Loom with clock in hand: the secret path is slow, but it can be finished.',
       },
       {
         heading: 'Controls',
@@ -299,7 +299,7 @@ export class GymLongErasureScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Beat 1 shows its context paragraph above Log the erasure / Rally the survey crew; either choice narrates the option’s authored outcome and writes a journal row carrying that prose.\n2. The Act I warning choice adds goodwill; at The Archivist\'s Offer the goodwill-gated Sabotage the Loom option appears only once goodwill reaches 3.\n3. Abandon the voyage ends the run terminally with the voyage-ended framing.\n4. A cheap route reaches the Loom\'s core and the reset ending, where the closing screen shows the authored epilogue, the journey score, the band label and the surviving journal.\n5. Begin a new survey returns to beat 1 with the starting resources and clock.\n6. Prose beyond the panel budget shows [ more… ]; activating it reveals the remainder (nothing is clipped).',
+        body: '1. Beat 1 shows its context paragraph above Log the erasure / Rally the survey crew; either choice narrates the option’s authored outcome and writes a journal row carrying that prose.\n2. The Act I warning choice adds goodwill; at The Archivist\'s Offer the goodwill-gated Sabotage the Loom option appears only once goodwill reaches 3. Taking it, then Break for the core and Hit the core now, reaches the ram ending with a clock still in hand — the earned branch is slow, but it is completable.\n3. Abandon the voyage ends the run terminally with the voyage-ended framing.\n4. A cheap route reaches the Loom\'s core and the reset ending, where the closing screen shows the authored epilogue, the journey score, the band label and the surviving journal.\n5. Begin a new survey returns to beat 1 with the starting resources and clock.\n6. Prose beyond the panel budget shows [ more… ]; activating it reveals the remainder (nothing is clipped).',
       },
     ]);
 

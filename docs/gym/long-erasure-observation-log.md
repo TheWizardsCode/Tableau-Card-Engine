@@ -224,6 +224,36 @@ the `#when=charge>=2` conditional successor fires), so this is a **content-balan
 defect**, not an engine defect: the goodwill route is the slowest route, and the clock
 was tuned without it. Two follow-up items are filed for this (§7).
 
+**Resolution note (2026-11-21, `CG-0MWPVYXG6003ZIOV`).** The finding above is
+historical — it records the shipped content at the time of the spike. The branch is
+now completable: `CG-0MWPVYTSU0065BXC` lowered two `clockCost` values in
+`example-games/gym/content/long-erasure.csv`, `le-ii-bargain` 3 → 2 and
+`le-ii-sabotage` 2 → 1, with no option, gate, `#when`, prose or `DEFAULT_CLOCK_MAX`
+change and no `src/story-line/**` change. Both edits were needed: the bargain nudge
+buys the branch its entry clock, and the sabotage nudge buys the documented route one
+spare tick. Re-measured with the same harness on the fixed content
+(`npx tsx scripts/long-erasure-playtest.ts --seeds 5`):
+
+| Metric | Before (§4.4) | After |
+|---|---|---|
+| Playable routes | 132 | **138** |
+| Expired routes | 14 | **12** |
+| `gated beat:` routes / completed | 4 / 0 | **10 / 8** |
+
+The documented gated route (now named `gated-sabotage-core`: … → Sabotage the Loom →
+Break for the core → Hit the core now) ends `closed` on `le-end-ram` with score **67**
+and **`clockLeft=1`**; before the nudge the same walk expired entering `le-iii-ahead`
+with 2 clock left. All four endings remain reachable (`le-end-reset`, `le-end-quiet`,
+`le-end-ram`, `le-end-abandon`).
+
+**Accepted trade-off.** §4.1 records the `first` policy finishing on exactly **zero**
+clock in 40 of 40 runs — the "last tick" moment. Lowering the bargain branch's clock
+also shortens the cheap `first` route to 16 of the 17 default clock, so that run now
+finishes with **clock 1**: the exact-zero finish is no longer reachable at the default
+clock (the soft-boundary scenario test exercises it only at an explicit
+`clockMax: 16`). The scene help panel's "Pressure clock and state gates" slide and its
+Test Plan step 2 now describe the gated branch as earned *and* completable.
+
 ### 4.5 Pacing shape
 
 - **Act I (5 beats)**: the strongest act. Loss is concrete (a named berth), and
@@ -362,7 +392,8 @@ Filed as follow-ups from this log (not absorbed into the spike):
 
 - `discovered-from` this item — **make the goodwill-gated branch survivable** (or stop
   promising an earned path in the scene help text). Content balance: 4 routes enter
-  it, 0 finish.
+  it, 0 finish. **Resolved** by `CG-0MWPVYTSU0065BXC` (content) and
+  `CG-0MWPVYXG6003ZIOV` (docs) — see the §4.4 resolution note.
 - `discovered-from` this item — **epilogue: stop awarding full arc credit for
   abandoning the voyage**. Abandoning in Act II scores 79–81 in the top band against 83
   for finishing, so the closing screen cannot tell the two apart.
