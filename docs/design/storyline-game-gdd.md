@@ -95,7 +95,7 @@ layer described here.
    - [3.8 What this section does not prove](#38-what-this-section-does-not-prove)
 4. [Glossary](#4-glossary)
 5. [Test Plan](#5-test-plan)
-6. [Engine-Gap Backlog](#6-engine-gap-backlog-todo)
+6. [Engine-Gap Backlog](#6-engine-gap-backlog)
 7. [V1 Scope Statement and Deferred List](#7-v1-scope-statement-and-deferred-list-todo)
 - [Appendix A: The episode manifest (complete worked example)](#appendix-a-the-episode-manifest-complete-worked-example)
 - [Appendix B: Evidence base](#appendix-b-evidence-base)
@@ -337,8 +337,8 @@ responsibility.** The table below is the audit of that sentence.
 | Intra-scene successor selection and its precedence | **`@story-line`** | `resolveStorylineOption` | the beat sheet reads `StorylineResolution.pushedCard`; it never resolves a successor itself |
 | Cross-scene routing | **Beat sheet** | `scene.routes` | the only authority on which scene opens next |
 | Determinism | **both, disjointly** | seeded `rng()` in `@story-line` | a scene close consumes no RNG; every draw is a `@story-line` candidate draw |
-| Content validation and the route-space guard | **`@story-line` content** | `storylines:validate`, `storylines:guard` | the manifest is validated by the new `validateEpisodeManifest` (gap), not by a second content validator |
-| Manifest validation | **Beat sheet** | *(gap)* | the backlog entry; rules listed in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) |
+| Content validation and the route-space guard | **`@story-line` content** | `storylines:validate`, `storylines:guard` | the manifest is validated by the new `validateEpisodeManifest` (gap [G2](#g2)), not by a second content validator |
+| Manifest validation | **Beat sheet** | [G2](#g2) (proposed) | the backlog entry; rules listed in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) |
 
 **What moves out of the CSV.** Two columns in the spike's content file are
 beat-sheet data written in the wrong place, and v1 retires them:
@@ -735,7 +735,7 @@ the gap this design creates:
 |---|---|---|
 | Content validator | well-formedness of the CSV: ids, options encoding, unknown successors, prose budgets, declared resource keys | `npm run storylines:validate` |
 | Route-space guard | playability of the chain: every gated branch survivable, every ending reachable, every consequential choice meets the minimum rejoin distance | `npm run storylines:guard` |
-| Manifest validator *(gap, build epic)* | totality and consistency of the beat sheet (below) | `npm run storylines:manifest` *(proposed)* |
+| Manifest validator *(gap [G2](#g2), build epic)* | totality and consistency of the beat sheet (below) | `npm run storylines:manifest` *(proposed)* |
 
 The rejoin-distance *number* is pacing design, not structure: the evidence
 recommends **3** for choices marked consequential (the current committed guard
@@ -765,7 +765,7 @@ The beat sheet needs a **third** check the content guard cannot perform, because
 the clock is not a declared resource: a **scene-space guard** that enumerates
 scene exits and beat refusals and asserts two invariants — *no exhausted close
 classifies as `success`*, and *no refusal leads to a state with no reachable
-ending*. It is a gap ([§6](#6-engine-gap-backlog-todo) item 3); until it exists,
+ending*. It is a gap ([G3](#g3)); until it exists,
 the worked manifest's clock arithmetic is checked by hand
 ([Appendix A](#appendix-a-the-episode-manifest-complete-worked-example)).
 
@@ -869,9 +869,10 @@ The following sections of this GDD were stubs by design. Each names the work ite
 that owns it, so a reviewer can see the whole document's shape and no section is
 silently forgotten. The resource model ([§2.8](#28-resource-model-and-economy)),
 the writer content pipeline
-([§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)) and the
-presentation contract ([§3](#3-ux-visual-design-and-audio-direction)) are now
-written; the rest remain stubs.
+([§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)), the
+presentation contract ([§3](#3-ux-visual-design-and-audio-direction)) and the
+engine-gap backlog ([§6](#6-engine-gap-backlog)) are now written; the rest
+remain stubs.
 
 | Section | Contents it must add | Owner |
 |---|---|---|
@@ -880,7 +881,7 @@ written; the rest remain stubs.
 | Tension, pacing, failure and reset-ending scoring | **Written — [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring)**: the clock as a per-scene budget with two recovery paths, hull as the irreversible dial, numeric pacing rules, the failure/recovery table per type, the scoring inputs/weights/bands with a worked score per band and the earned-not-punitive proof | `CG-0MWPY2AZX001UI2A` |
 | Presentation contract | **Written — [§3](#3-ux-visual-design-and-audio-direction)**: the SLL zone table (including three new game zones), overlay behaviour and depth ordering, the `COMMON_SFX_KEYS` map with a reduced-motion alternative per event, accessibility (reduced motion, verbosity/tooltips, colour independence, keyboard/touch), and determinism/save-load/transcript/replay expectations | `CG-0MWPY2CHF003AHE1` |
 | Glossary proper nouns and prohibited-term gate | final names with rationale, prohibited-term scan of this document, trademark sanity read | `CG-0MWPY2FV30041M48` |
-| Engine-gap backlog | every missing capability with unlock, module reference, effort band, issue type | `CG-0MWPY2ECE002P2NH` |
+| Engine-gap backlog | **Written — [§6](#6-engine-gap-backlog)**: every missing capability with unlock, module reference, effort band (with nearest precedent), issue type and disposition; filed items recorded in [§6.6](#66-disposition-record) | `CG-0MWPY2ECE002P2NH` |
 | V1 scope and deferred list | act/scene/beat/branch counts, playtime, word budget, replayability, deferrals | `CG-0MWPY2HJU006LJMU` |
 | Integration and review close-out | developer-guide link, reciprocal links, re-run verification at the final commit | `CG-0MWPY2JEU006DYUL` |
 
@@ -1142,21 +1143,21 @@ Two consequences worth stating because they constrain the content pipeline
 
 #### 2.8.6 What the engine cannot express at this commit (named gaps)
 
-Each gap is a pointer to the backlog (`CG-0MWPY2ECE002P2NH`, [§6](#6-engine-gap-backlog-todo)),
-not an assumption that it will be fixed. The module named is the one a reviewer
-can open at this commit. The **backlog pointer** column names the proposed
-backlog entry this section needs; [§6](#6-engine-gap-backlog-todo) is still that
-item's stub, so these are its inputs, not entries it has already filed.
+Each gap is an entry in the engine-gap backlog ([§6](#6-engine-gap-backlog)), not
+an assumption that it will be fixed. The module named is the one a reviewer can
+open at this commit. The **backlog pointer** column names the entry this section
+needs and its disposition; [§6](#6-engine-gap-backlog) carries the effort band,
+the nearest precedent and the filed work item.
 
 | # | The model needs | Why the engine cannot do it at this commit | Backlog pointer |
 |---|---|---|---|
-| 1 | **Bounds and clamping** — min/max per key, spill at maximum, clamped loss at minimum | `applyResourceDelta` is unbounded and unvalidated (`src/story-line/resources.ts`); a delta is applied as given, so a gain past the cap silently banks and a loss below zero silently goes negative. No spill or clamp is reported anywhere. | `CG-0MWPY2ECE002P2NH` — *resource bounds and clamping* |
-| 2 | **The start bag and bounds as manifest data** — `resources.start` / `resources.bounds`, so a validator can prove gate reachability from the start | The manifest's `resources` block carries `declared` and `irreversible` only ([§2.2.1](#221-episode-manifest)); the start bag is a game constant (`DEFAULT_RESOURCES`), and the manifest validator has no way to see it. | `CG-0MWPY2ECE002P2NH` — *manifest validator* (`resources.start` / `resources.bounds` rules) |
-| 3 | **Surfaced affordability** — present the option with its requirement ("2 charge needed") | `#cost` is a draw-time **omission** gate: `isOptionAffordable` returns a boolean (`src/story-line/compile.ts`), and the presenting layer deletes the option. There is no requirement object for a UI to render. Measured cost: 32 of 302 instances hidden, 107 of 197 dead turns gate-collapsed. | `CG-0MWPY2ECE002P2NH` — *resource HUD + affordability presentation* (§6 item 4) |
-| 4 | **Condition expressiveness** — conjunction ("hull ≥ 5 **and** stores ≥ 3"), "at maximum", or a range | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`); the beat sheet adds only `{budget: "exhausted"}`. Any compound objective must be authored as data the runner cannot evaluate, or as two scenes. | `CG-0MWPY2ECE002P2NH` — *objective / condition expressiveness* |
-| 5 | **The scene clock inside the resource guard** — prove no scene exit strands the player | The clock is not a declared resource, so `src/story-line/content/guard.ts` enumerates the chain only; the scene-space guard is a named gap ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)). | `CG-0MWPY2ECE002P2NH` — *scene-space guard* (§6 item 3) |
-| 6 | **Irreversibility as an engine guarantee** — refuse any grant to an irreversible key | `resources.irreversible` is manifest data read only by the manifest validator's `loss-not-irreversible` rule; nothing in `@story-line` knows the concept, so `#extra=hull:1` is legal content. At this commit the rule is enforced by authoring discipline and the fixture test. | `CG-0MWPY2ECE002P2NH` — *irreversible-key policy* (with the bounds entry) |
-| 7 | **The resource HUD and the act-boundary presentation** — where the trade is *seen* | No SLL zone or component renders the declared keys or marks the loss-bearing subset; the presentation contract is owned by `CG-0MWPY2CHF003AHE1` and the surface does not exist (`src/ui/screen-layout.ts`). | `CG-0MWPY2ECE002P2NH` — *resource HUD* (§6 item 4) |
+| 1 | **Bounds and clamping** — min/max per key, spill at maximum, clamped loss at minimum | `applyResourceDelta` is unbounded and unvalidated (`src/story-line/resources.ts`); a delta is applied as given, so a gain past the cap silently banks and a loss below zero silently goes negative. No spill or clamp is reported anywhere. | [G4](#g4) — filed (`CG-0MWR0BGVG004UE7X`) |
+| 2 | **The start bag and bounds as manifest data** — `resources.start` / `resources.bounds`, so a validator can prove gate reachability from the start | The manifest's `resources` block carries `declared` and `irreversible` only ([§2.2.1](#221-episode-manifest)); the start bag is a game constant (`DEFAULT_RESOURCES`), and the manifest validator has no way to see it. | [G2](#g2) — filed (`CG-0MWR0BFMW003856N`) |
+| 3 | **Surfaced affordability** — present the option with its requirement ("2 charge needed") | `#cost` is a draw-time **omission** gate: `isOptionAffordable` returns a boolean (`src/story-line/compile.ts`), and the presenting layer deletes the option. There is no requirement object for a UI to render. Measured cost: 32 of 302 instances hidden, 107 of 197 dead turns gate-collapsed. | [G7](#g7) — filed (`CG-0MWR0BI3S008K9Y6`) |
+| 4 | **Condition expressiveness** — conjunction ("hull ≥ 5 **and** stores ≥ 3"), "at maximum", or a range | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`); the beat sheet adds only `{budget: "exhausted"}`. Any compound objective must be authored as data the runner cannot evaluate, or as two scenes. | [G6](#g6) — deferred to the build epic |
+| 5 | **The scene clock inside the resource guard** — prove no scene exit strands the player | The clock is not a declared resource, so `src/story-line/content/guard.ts` enumerates the chain only; the scene-space guard is a named gap ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)). | [G3](#g3) — filed (`CG-0MWR0BG9H007AFNU`) |
+| 6 | **Irreversibility as an engine guarantee** — refuse any grant to an irreversible key | `resources.irreversible` is manifest data read only by the manifest validator's `loss-not-irreversible` rule; nothing in `@story-line` knows the concept, so `#extra=hull:1` is legal content. At this commit the rule is enforced by authoring discipline and the fixture test. | [G5](#g5) — filed (`CG-0MWR0BHH9002OQUZ`) |
+| 7 | **The resource HUD and the act-boundary presentation** — where the trade is *seen* | No SLL zone or component renders the declared keys or marks the loss-bearing subset; the presentation contract is owned by `CG-0MWPY2CHF003AHE1` and the surface does not exist (`src/ui/screen-layout.ts`). | [G8](#g8) — filed (`CG-0MWR0BIPV0074WLM`); the act-boundary half is [G9](#g9) |
 
 #### 2.8.7 How the economy is verified
 
@@ -1252,7 +1253,7 @@ the wrong place ([§2.1](#21-composition-contract-who-owns-what)): act membershi
 is `scene.id` under `act.scenes`, and pacing is `beat.clockCost` in the manifest.
 They stay in the spike file only while the spike's own rule module reads them;
 a writer on the GDD game never authors either, and the manifest validator must
-reject a disagreeing pair while both exist (engine gap 6, [§6](#6-engine-gap-backlog-todo)).
+reject a disagreeing pair while both exist (engine gap [G10](#g10)).
 
 **"Enforced" means a hard error; "GDD rule" is a reviewer's check.** The
 validator refuses a row on the enforced cells and the option attributes; the
@@ -1494,7 +1495,7 @@ open:
 | 2 | **`update-card` replaces the whole `options` cell**, so one new option means retyping the rest | **Known limit** on the CLI; **mitigated** in the editor, whose guided forms emit a single edit for the changed card | use the editor's **Edit card** form (it hands you the current cell to extend and previews the diff), or paste the cell carefully and let validation catch a dropped `;` | `CG-0MWQYDC7D003G4ON` |
 | 3 | **Every row repeats the full declared resource set** in `resources` | **Known limit** — the declared set exists twice by design at this commit (per-row and once in the manifest; [§2.1](#21-composition-contract-who-owns-what)) | copy the key list exactly from the row above; a mismatch is caught by `unknown-resource-key`, not silently | `CG-0MWQYDC7D003G4ON` (with the manifest gap `CG-0MWPY2ECE002P2NH`) |
 | 4 | **No positional insert** — a new card is appended, so reading order drifts from narrative order | **Known limit** | append, and keep narrative order recoverable from the ids (`le-ii-…` sorts by act); a sorted view is the manifest's job, not the file's | `CG-0MWQYDC7D003G4ON` |
-| 5 | **Act and clock are generic `--field` writes**, and a typo'd field name was a silent no-op | **Resolved** — an unknown column is now a hard error naming the file's columns (`unknown content column "acts" (file columns: …)`); the legacy columns themselves retire into the manifest ([§2.1](#21-composition-contract-who-owns-what), engine gap 6) | nothing: authoring an `act`/`clockCost` column the adapter does not declare fails loudly | `CG-0MWPY2ECE002P2NH` (column retirement) |
+| 5 | **Act and clock are generic `--field` writes**, and a typo'd field name was a silent no-op | **Resolved** — an unknown column is now a hard error naming the file's columns (`unknown content column "acts" (file columns: …)`); the legacy columns themselves retire into the manifest ([§2.1](#21-composition-contract-who-owns-what), engine gap [G10](#g10)) | nothing: authoring an `act`/`clockCost` column the adapter does not declare fails loudly | [G10](#g10) — filed (`CG-0MWR0BJXI007UINE`) |
 
 **One friction found while writing this section.** `storylines:author` cannot
 author prose: `--field context=…` is refused ("field \"context\" is a mapped
@@ -1574,13 +1575,13 @@ consequential, or cut it.
 
 - **No scene authoring here.** Objectives, budgets, outcome tables and routes are
   the manifest's job ([§2.2](#22-the-scene-beat-sheet-data-model)–[§2.3](#23-how-a-scene-outcome-selects-the-next-beat)),
-  and the manifest has no validator at this commit (engine gap 2,
-  `CG-0MWPY2ECE002P2NH`). A writer cannot yet create a scene from CSV, and this
+  and the manifest has no validator at this commit (engine gap [G2](#g2),
+  `CG-0MWR0BFMW003856N`). A writer cannot yet create a scene from CSV, and this
   section does not describe one.
 - **No scene-space guarantee.** The route-space guard models declared resources
   only; the pressure clock is not one, so a clock-expiry failure is outside it
-  (engine gap 3). The GDD game keeps its own harness until the scene-space guard
-  exists.
+  (engine gap [G3](#g3)). The GDD game keeps its own harness until the scene-space
+  guard exists.
 - **No second choice model.** If a branch cannot be expressed in the `options`
   cell, the answer is a `@story-line` gap filed on
   `CG-0MWPY2ECE002P2NH`, never a parallel format or a hand-edited load path.
@@ -1625,9 +1626,9 @@ The run-wide clock is retired; act-wide budgets are explicitly rejected in
 |---|---|---|---|---|
 | T1 | **The clock is per scene, and the scene shows it** | `budget.clock` per scene; the banner shows `clock remaining / budget` and the **next beat's `clockCost` before it is committed** | R2 enters Act III on **1 clock** and still finishes with 1 left — the one recorded run where the boundary is tight enough to feel (the gated route spends 16 of 17 ticks) | the presentation contract must render the cost before commitment (owned by `CG-0MWPY2CHF003AHE1`); the runner refuses a beat whose cost exceeds the remainder and records the refusal |
 | T2 | **A refusal is a classified outcome, never a cut** | A beat that cannot be paid is not entered; the scene closes, an outcome rule keyed on `{budget: "exhausted"}` classifies it `failure`, and a `failure` route opens a door | the spike's 12 expiring routes become **12 routed scene failures**, not 12 runs with no ending; `s-iii-core` authors the cliff deliberately (`ahead` 3 of 5, then *Set the charge* 3 more → refused) | the manifest must contain a `{budget: "exhausted"}` outcome rule and a route for it; totality is a manifest validation rule ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)) |
-| T3 | **A refusal never deletes content** | the refused beat is recorded in the transcript and the journal as *unreached*, the scene's remaining beats stay unplayed (not skipped silently), and the failure route leads to authored content — a recovery scene or an ending | the refused `le-iii-approach` is followed by the `watch-spent` failure, the `hull-sacrificed` loss and the `quiet-core` ending, so the player still gets a closing screen | the scene-space guard must prove no refusal leads to a state with no ending (named engine gap 5, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)) |
+| T3 | **A refusal never deletes content** | the refused beat is recorded in the transcript and the journal as *unreached*, the scene's remaining beats stay unplayed (not skipped silently), and the failure route leads to authored content — a recovery scene or an ending | the refused `le-iii-approach` is followed by the `watch-spent` failure, the `hull-sacrificed` loss and the `quiet-core` ending, so the player still gets a closing screen | the scene-space guard must prove no refusal leads to a state with no ending ([G3](#g3), [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)) |
 | T4 | **A scene failure always leaves a playable budget** | every recovery route opens a **scene**, and every scene entry resets its own budget; a deficit is never carried forward | the model has no run-wide counter to overspend, so the spike's structural failure (Act III unreachable because Act II was slow) cannot recur | the route target must be a `beat`/`ending`, not a clock refund; there is no retry target in v1 ([§2.2.7](#227-routes-and-route-targets)) |
-| T5 | **Hidden affordability is not tension** | gates are surfaced as a requirement (`2 charge needed`), not removed; the clock is the only thing that can refuse a *legal* choice | the affordability gate hid **32 of 302 option instances (10.6%)**; **107 of 197** dead turns were gate-collapsed, so the depleted player was shown fewer options, silently | engine gap 3 (surfaced affordability, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)); a scene with a hidden gate fails pacing review |
+| T5 | **Hidden affordability is not tension** | gates are surfaced as a requirement (`2 charge needed`), not removed; the clock is the only thing that can refuse a *legal* choice | the affordability gate hid **32 of 302 option instances (10.6%)**; **107 of 197** dead turns were gate-collapsed, so the depleted player was shown fewer options, silently | engine gap [G7](#g7) (surfaced affordability, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)); a scene with a hidden gate fails pacing review |
 
 **The budget numbers are fixed here.** [Appendix A](#appendix-a-the-episode-manifest-complete-worked-example)
 marked its budgets as illustrative and owned by this item; they are adopted as
@@ -1752,7 +1753,7 @@ bought, banked and spent; hull is none of those. The spike measured exactly why
 the difference matters: the run loop refunded every loss at reset, so loss was
 *computed* but never *felt*. The rule for v1 content is therefore absolute — an
 `#extra=hull` is a validation failure, not a balance decision — and it is
-recorded as engine gap 6 ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)).
+recorded as engine gap [G5](#g5) ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)).
 
 #### 2.10.3 Pacing rules, stated numerically
 
@@ -1988,8 +1989,8 @@ the score.
   the recommendation to run one human browser playtest before the act structure
   is frozen still stands.
 - **The scene-space guard does not exist.** Proving that no refusal strands a
-  run requires the guard named as engine gap 5; until then, the GDD game keeps
-  its own harness.
+  run requires the guard named as engine gap [G3](#g3); until then, the GDD game
+  keeps its own harness.
 - **The bottom two bands are unreachable on the default spike content** after
   the arc correction (minimum 50). The v1 scope statement must require an early
   terminal so the bands are reachable in play.
@@ -2025,7 +2026,7 @@ the score.
 > every surface below renders a field sections 1–2 already define, every sound is
 > an existing `COMMON_SFX_KEYS` value, and every capability the engine cannot
 > supply is a pointer to the engine-gap backlog
-> ([§6](#6-engine-gap-backlog-todo)), not a promise.
+> ([§6](#6-engine-gap-backlog)), not a promise.
 >
 > The baseline is the spike's rendered surface. `GymLongErasureScene` plus
 > `example-games/gym/layouts/gym-long-erasure.layout.json` prove, at this commit,
@@ -2368,7 +2369,7 @@ journal may ellipsise a display row, the transcript never does
 
 The replay tool (`scripts/replay.ts` plus a per-game `ReplayAdapter`) drives the
 scene from a fixture transcript. The build epic adds the adapter (a named gap in
-[§5.2](#52-verification-the-build-epic-must-add-named-gaps), backlog item 9);
+[§5.2](#52-verification-the-build-epic-must-add-named-gaps), [G13](#g13));
 this contract states what it must prove:
 
 1. **Idempotence.** Replaying one fixture twice produces identical ordered
@@ -2386,17 +2387,17 @@ this contract states what it must prove:
 ### 3.6 Named presentation gaps
 
 Every capability this section names is either already in the engine or listed
-here and carried into the engine-gap backlog ([§6](#6-engine-gap-backlog-todo)).
+here and carried into the engine-gap backlog ([§6](#6-engine-gap-backlog)).
 No gap is described as though it already works.
 
 | Gap | What it unlocks here | Why the engine cannot do it at this commit | Provisional effort | Type | Backlog entry |
 |---|---|---|---|---|---|
-| B1 Beat-sheet / objective layer | the banner, objective, clock, ledger and restart data all read from it | no scene, objective or budget concept exists (`src/story-line/compile.ts`; the spike's act/clock live in `example-games/gym/GymLongErasureGame.ts`) | large (the build epic's core) | epic | [§6](#6-engine-gap-backlog-todo) item 1 |
-| B4 Affordability presentation | showing an unaffordable option with its shortfall instead of removing it | content gating omits options rather than explaining them (`src/story-line/compile.ts`; `isOptionAffordable` is a predicate, not a presenter) | small | task | [§6](#6-engine-gap-backlog-todo) item 4 |
-| B5 Act/scene transition presentation | the `sceneBanner` and act transition motion | no shared transition surface or SLL zone ships; the spike has no scene boundary (`src/ui/screen-layout.ts`, `example-games/gym/layouts/gym-long-erasure.layout.json`) | small–medium | feature | [§6](#6-engine-gap-backlog-todo) item 5 |
-| B7 Keyboard choice navigation and overlay focus | the keyboard path in [§3.4.4](#344-keyboard-and-touch-input-paths) | only the panels' own toggle keys are bound (`?` for Help, Escape for Settings — `src/ui/HelpPanel.ts`, `src/ui/SettingsPanel.ts`, `src/ui/SettingsStore.ts`); no choice-list or overlay-focus helper exists | small | task | [§6](#6-engine-gap-backlog-todo) item 7 |
-| B8 Shared verbosity preference | the Full/Concise toggle in [§3.4.2](#342-verbosity-and-tooltips) | `SettingsStore` has tooltips and reduced motion but no verbosity key; `SettingsPanel.extraToggles` gives a game-local toggle without shared persistence | extra-small | task | [§6](#6-engine-gap-backlog-todo) item 8 |
-| B9 Deterministic replay adapter | the replay guarantees in [§3.5.4](#354-replay) | the replay tool is engine code but a game's adapter is a build-epic deliverable; no adapter exists for this game | small | task | [§6](#6-engine-gap-backlog-todo) item 9 |
+| B1 Beat-sheet / objective layer | the banner, objective, clock, ledger and restart data all read from it | no scene, objective or budget concept exists (`src/story-line/compile.ts`; the spike's act/clock live in `example-games/gym/GymLongErasureGame.ts`) | large (the build epic's core) | epic | [G1](#g1) — filed (`CG-0MWR0BAT30015DPQ`) |
+| B4 Affordability presentation | showing an unaffordable option with its shortfall instead of removing it | content gating omits options rather than explaining them (`src/story-line/compile.ts`; `isOptionAffordable` is a predicate, not a presenter) | small | task | [G7](#g7) — filed (`CG-0MWR0BI3S008K9Y6`) |
+| B5 Act/scene transition presentation | the `sceneBanner` and act transition motion | the camera transition ships (`runSceneTransition` in `src/ui/sceneTransition.ts`); no banner surface or outcome→route sequence exists, and the spike has no scene boundary (`example-games/gym/layouts/gym-long-erasure.layout.json`) | small–medium | feature | [G9](#g9) — filed (`CG-0MWR0BJBU005TDTT`) |
+| B7 Keyboard choice navigation and overlay focus | the keyboard path in [§3.4.4](#344-keyboard-and-touch-input-paths) | only the panels' own toggle keys are bound (`?` for Help, Escape for Settings — `src/ui/HelpPanel.ts`, `src/ui/SettingsPanel.ts`, `src/ui/SettingsStore.ts`); no choice-list or overlay-focus helper exists | small | task | [G11](#g11) — filed (`CG-0MWR0BKIT0084ZID`) |
+| B8 Shared verbosity preference | the Full/Concise toggle in [§3.4.2](#342-verbosity-and-tooltips) | `SettingsStore` has tooltips and reduced motion but no verbosity key; `SettingsPanel.extraToggles` gives a game-local toggle without shared persistence | extra-small | task | [G12](#g12) — filed (`CG-0MWR0BL4Q000OYG6`) |
+| B9 Deterministic replay adapter | the replay guarantees in [§3.5.4](#354-replay) | the replay tool is engine code but a game's adapter is a build-epic deliverable; no adapter exists for this game | small | task | [G13](#g13) — deferred to the build epic |
 
 Deliberately **not** gaps: SLL zones (a per-game layout document admits any
 zone name), tooltips and their delays (`TooltipManager`), reduced motion
@@ -2517,12 +2518,12 @@ profiles; the commands below verify *this document* and the model it specifies.
 
 ### 5.2 Verification the build epic must add (named gaps)
 
-| Gap | Command the build epic must provide | Why it is not here |
-|---|---|---|
-| Manifest validator | `npm run storylines:manifest -- --manifest <file> --json` | no beat-sheet layer exists yet; the rules are the table in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) |
-| Manifest JSON schema | `schemas/episode-manifest.schema.json` validated with ajv in the unit suite | same |
-| Scene-space guard | a `storylines:guard --manifest <file>` mode that enumerates scene exits and refusals | the current guard enumerates the chain only; the clock is not a declared resource, which is why the model adds scene bookkeeping |
-| Deterministic replay | a transcript replay test asserting identical scene-exit records and score at the same seed | depends on the runner |
+| Gap | Command the build epic must provide | Why it is not here | Backlog |
+|---|---|---|---|
+| Manifest validator | `npm run storylines:manifest -- --manifest <file> --json` | no beat-sheet layer exists yet; the rules are the table in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | [G2](#g2) |
+| Manifest JSON schema | `schemas/episode-manifest.schema.json` validated with ajv in the unit suite | same | [G2](#g2) |
+| Scene-space guard | a `storylines:guard --manifest <file>` mode that enumerates scene exits and refusals | the current guard enumerates the chain only; the clock is not a declared resource, which is why the model adds scene bookkeeping | [G3](#g3) |
+| Deterministic replay | a transcript replay test asserting identical scene-exit records and score at the same seed | depends on the runner | [G13](#g13) |
 
 ### 5.3 Self-check for the worked manifest
 
@@ -2573,65 +2574,481 @@ console.log("PASS: every manifest card id resolves and every content card is ass
 
 ---
 
-## 6. Engine-Gap Backlog (TODO)
+## 6. Engine-Gap Backlog
 
-> **TODO — owned by `CG-0MWPY2ECE002P2NH`.** This section is a stub. The gaps
-> named in this document are pointers for that item, not a backlog in their own
-> right.
+> **Written by `CG-0MWPY2ECE002P2NH`.** This section replaces the stub that
+> [§2.7](#27-sections-owned-by-downstream-work-items) listed. It is the complete
+> answer to one question: *which capability this GDD needs does the engine not
+> provide at this commit?* Every entry names the GDD section it unlocks, the
+> module that proves the gap, an effort band whose nearest precedent makes the
+> band auditable, a proposed issue type and a disposition.
+>
+> The engine follow-through already delivered — the declared resource set, the
+> CSV option attributes (`#cost` / `#extra` / `#when` / `#says`), the prose
+> columns, the content validator and the route-space guard — is **not** restated
+> as a gap. What remains is listed below. Where a section of this document
+> previously said "gap N" or "item N", the entry id (`G1` … `G14`) is now the
+> stable reference, and the backlog item id is the work item that carries it.
 
-The beat-sheet work this document needs, as named here so no gap is lost between
-documents:
+**Verified at the commit this section was written against.** Each "why the
+engine cannot do it at this commit" names a file a reviewer can open and states what that
+file does *not* contain; no gap is claimed from memory. The structural contract is
+unit-tested by `tests/story-line/content/gdd-engine-gap-backlog.test.ts`, which
+fails if a cited path disappears or an entry loses its required fields.
 
-1. **Beat-sheet / objective layer** — scene budgets, outcome classification,
-   routing and the loss ledger ([§2.2](#22-the-scene-beat-sheet-data-model),
-   [§2.3](#23-how-a-scene-outcome-selects-the-next-beat)). At this commit the engine has
-   no scene, objective or budget concept (`src/story-line/compile.ts`; the spike's
-   act/clock live in a game rule module, `example-games/gym/GymLongErasureGame.ts`).
-2. **Manifest validator** — the rule table in
-   [§2.4](#24-how-the-beat-sheet-composes-with-story-line) over a new episode
-   manifest schema; at this commit only content is validated
-   (`src/story-line/content/validate.ts`), and no manifest exists.
-3. **Scene-space guard** — route-space enumeration extended over scenes and
-   refusals; the current guard models declared resources only and cannot see the
-   clock (`src/story-line/content/guard.ts`).
-4. **Resource HUD + affordability presentation** — surface what a gate would
-   hide ([§2.3](#23-how-a-scene-outcome-selects-the-next-beat), option gating);
-   options are currently omitted, not explained.
-5. **Act/scene transition presentation** — the scene-exit banner and act
-   transition surfaces ([§2.3 step D](#23-how-a-scene-outcome-selects-the-next-beat)).
-   The zone set itself is layout data ([§3.1](#31-presentation-surfaces-and-sll-zone-names))
-   and needs no engine change; what does not exist is a shared transition
-   presentation (timing and a reduced-motion fallback) or any rendered precedent
-   (`src/ui/screen-layout.ts`,
-   `example-games/gym/layouts/gym-long-erasure.layout.json`).
-6. **Retirement of the legacy `act` / `clockCost` columns** — a content-format
-   change with a migration check ([§2.1](#21-composition-contract-who-owns-what));
-   the spike's game module currently reads them.
-7. **Keyboard choice navigation and overlay focus order** — the keyboard path of
-   [§3.4.4](#344-keyboard-and-touch-input-paths) (`1`–`6` or arrows + Enter to
-   choose, focus traversal and Enter/Space activation inside overlays). At this
-   commit only the panels' own toggle keys are bound (`?` for Help, Escape for
-   Settings — `src/ui/HelpPanel.ts`, `src/ui/SettingsPanel.ts`), and
-   `getEndTurnKeybind()` binds one game action
-   (`src/ui/SettingsStore.ts`); no choice-list or overlay-focus helper exists.
-   Proposed type: task; provisional effort: small.
-8. **Shared verbosity preference** — the Full/Concise toggle of
-   [§3.4.2](#342-verbosity-and-tooltips). `SettingsStore` exposes tooltips
-   (`tce-show-tooltips`) and reduced motion (`tce-ui-reduced-motion`) but has no
-   verbosity key, and `SettingsPanel.extraToggles` gives a game-local toggle
-   without shared persistence (`src/ui/SettingsStore.ts`,
-   `src/ui/SettingsPanel.ts`). Proposed type: task; provisional effort:
-   extra-small.
-9. **Deterministic replay adapter and replay assertion** — the replay guarantees
-   of [§3.5.4](#354-replay). The replay tool exists (`scripts/replay.ts` plus a
-   per-game `ReplayAdapter` in `scripts/adapters/ReplayAdapter.ts`), but this
-   game has no adapter and no fixture, so the scene-exit/score determinism
-   assertion cannot run. This one is a **build-epic deliverable, not engine
-   work**: the engine
-   seam is present; the adapter and fixture are the game's. Proposed type: task;
-   provisional effort: small.
+### 6.1 How to read an entry
 
----
+| Field | Rule |
+|---|---|
+| **Entry** | `G<n>`, stable across edits; every cross-reference in this document uses it. |
+| **Capability** | One sentence naming what the engine would gain. |
+| **Unlocks in this GDD** | The section(s) that cannot be implemented without it. A gap with no consumer is not listed. |
+| **Why the engine cannot do it at this commit** | The file/module that would have to change, and what it does not contain at this commit. A follow-through gap also says what *did* land, so the band is judged against real code. |
+| **Effort band** | `extra-small` (≤ half a day), `small` (0.5–2 days), `small–medium` (1–3 days), `medium` (2–5 days), `large` (1–3 weeks). Each band names its **nearest precedent** in the engine, so a reviewer can open that precedent and judge whether the band is credible. |
+| **Type** | The proposed Worklog issue type (`epic`, `feature`, `task`, `chore`). |
+| **Disposition** | **Filed** — a live Worklog item exists (id given). **Deferred to the build epic** — deliberately not filed; the reason is stated and the build epic's scope statement owns it. |
+
+**Scheduling hold.** Every entry filed **by this item** is created `blocked`,
+depends on the GDD epic `CG-0MWNFVLYT003M7XF`, and carries `startOn 2027-06-01`.
+It therefore cannot be dispatched by `wl next` before the GDD closes and the
+build epic is scoped. (G14 was filed before this backlog and keeps its own
+schedule.) Clearing `startOn` is the build-epic owner's first act (§6.6). This is
+how "deferred to the build epic" is made operational without leaving the work
+invisible.
+
+### 6.2 The backlog at a glance
+
+| Entry | Capability | Unlocks in this GDD | Why the engine cannot do it at this commit | Effort band (nearest precedent) | Type | Disposition |
+|---|---|---|---|---|---|---|
+| [G1](#g1) | Episode beat-sheet / objective layer: scene budgets, outcome classification, routing, loss ledger | [§1.3](#13-the-core-loop), [§2.2](#22-the-scene-beat-sheet-data-model)–[§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | `src/story-line/compile.ts` compiles one card's options; `src/story-line/resolve.ts` resolves one choice; neither knows a scene, objective, budget or route | large — `src/story-line/` itself | epic | Filed — `CG-0MWR0BAT30015DPQ` |
+| [G2](#g2) | Episode manifest schema + validator (`storylines:manifest`), including `resources.start` / `resources.bounds` | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) rule table, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 2, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | `schemas/` has only `story-line-manifest.schema.json`; `src/story-line/content/manifest.ts` builds a graph view model, `src/story-line/content/validate.ts` validates CSV only; no `storylines:manifest` script | medium — the `content/manifest.ts` + `content/validate.ts` pair | feature | Filed — `CG-0MWR0BFMW003856N` |
+| [G3](#g3) | Scene-space guard: enumerate scene exits and refusals, assert no `success` close on an exhausted clock and no refusal strands the run | [§2.4](#24-how-the-beat-sheet-composes-with-story-line) third check, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | `src/story-line/content/guard.ts` enumerates the card chain over declared resources only; the clock is not a resource and there is no manifest input | medium — `src/story-line/content/guard.ts` (extend) | feature | Filed — `CG-0MWR0BG9H007AFNU` |
+| [G4](#g4) | Resource bounds: per-key min/max, spill at the cap, clamped loss at the floor, reported remainder | [§2.8](#28-resource-model-and-economy) ranges and spill/clamp rules, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 1 | `createResourceProjection(...).applyResourceDelta` in `src/story-line/resources.ts` forwards every finite delta unbounded; no bounds type, no spill/clamp report | small–medium — `src/rule-engine/EconomyLedger.ts` (constraint-checked deltas) | feature | Filed — `CG-0MWR0BGVG004UE7X` |
+| [G5](#g5) | Irreversible-resource policy: never grant a declared irreversible key | [§2.8](#28-resource-model-and-economy) `hull`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 6, [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring) | `resources.irreversible` is read only by a *proposed* manifest rule; `selectDeclaredDelta` filters undeclared keys, so `#extra=hull:1` is legal content | small — the `unknown-resource-key` rule in `src/story-line/content/validate.ts` | task | Filed — `CG-0MWR0BHH9002OQUZ` |
+| [G6](#g6) | Compound / range conditions ("`hull ≥ 5` **and** `stores ≥ 3`", "at maximum") | [§2.2.5](#225-objective) `Objective.check`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 4 | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`) evaluated once (`evaluateCondition`, `src/story-line/resolve.ts`) | small — `Condition` + `evaluateCondition` | task | **Deferred to the build epic** (v1 uses one-clause objectives; two clauses are two scenes) |
+| [G7](#g7) | Surfaced affordability: compile an unaffordable option with its shortfall instead of deleting it | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat) option gating, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 3, [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), [§3.6](#36-named-presentation-gaps) B4 | `isOptionAffordable` returns a boolean and `compileStorylineFromEvent` omits the option at draw time; no requirement object reaches the presenter | small — `isOptionAffordable` + the compiled-option shape in `src/story-line/compile.ts` | feature | Filed — `CG-0MWR0BI3S008K9Y6` |
+| [G8](#g8) | Resource HUD: render a game-declared resource set, its bounds and its loss-bearing subset | [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 7, [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | `src/ui/index.ts` exports card/hand/pile components and `TokenPileView`, but no component renders a declared resource bag; the spike draws its two-key economy as bespoke text | medium — `src/ui/TokenPileView.ts` + `src/ui/HintBar.ts` | feature | Filed — `CG-0MWR0BIPV0074WLM` |
+| [G9](#g9) | Act/scene transition presentation: scene-exit banner and a sequenced act transition with a reduced-motion path | [§2.3 step D](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.6](#36-named-presentation-gaps) B5 | `src/ui/sceneTransition.ts` animates the camera only; no banner surface, no outcome→route sequence and no rendered scene boundary | small–medium — `src/ui/sceneTransition.ts` + `src/ui/narration-reveal.ts` | feature | Filed — `CG-0MWR0BJBU005TDTT` |
+| [G10](#g10) | Retire the legacy `act` / `clockCost` CSV columns and add the migration check | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) ("the two retired columns"), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | `src/story-line/content/adapters.ts` still declares both as Gym columns and as `editableColumns`; the spike reads `clockCost` from the CSV | small — the adapter column declaration + `missing-column` diagnostic | chore | Filed — `CG-0MWR0BJXI007UINE` |
+| [G11](#g11) | Keyboard choice navigation and overlay focus order (`1`–`6` / arrows + Enter, Escape topmost-only) | [§3.4.4](#344-keyboard-and-touch-input-paths), [§3.6](#36-named-presentation-gaps) B7, [§3.8](#38-what-this-section-does-not-prove) | only `HelpPanel` / `SettingsPanel` toggle keys and `getEndTurnKeybind()` are bound; no choice-list navigator or focus helper is exported from `src/ui/index.ts` | small — `HelpPanel`'s keydown lifecycle + `OverlayManager` | task | Filed — `CG-0MWR0BKIT0084ZID` |
+| [G12](#g12) | Shared verbosity preference (Full / Concise) in `SettingsStore` and `SettingsPanel` | [§3.4.2](#342-verbosity-and-tooltips), [§3.6](#36-named-presentation-gaps) B8 | `SettingsStore` persists tooltips and the end-turn keybind, `ReducedMotion` persists reduced motion; no verbosity key exists, and `extraToggles` is game-local | extra-small — the tooltips toggle in `SettingsStore` + `SettingsPanel` | task | Filed — `CG-0MWR0BL4Q000OYG6` |
+| [G13](#g13) | Deterministic replay adapter + fixture for this game | [§3.5.4](#354-replay), [§3.6](#36-named-presentation-gaps) B9, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | the engine seam is present (`scripts/replay.ts` + `scripts/adapters/ReplayAdapter.ts`); no adapter or fixture for this game exists | small — the Golf replay adapter as the reference implementation | task | **Deferred to the build epic** (game-owned deliverable, not engine work) |
+| [G14](#g14) | CSV authoring ergonomics for writers (the spike's five frictions) | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | already filed before this backlog: the authoring CLI replaces a whole `options` cell, refuses forward references and has no positional insert | small — `src/story-line/content/author.ts` + `src/story-line/content/mutate.ts` | chore | Filed — `CG-0MWQYDC7D003G4ON` (already live) |
+
+### 6.3 Entry detail
+
+#### <a id="g1"></a>G1 — Beat-sheet and objective layer
+
+**What it unlocks.** The core loop ([§1.3](#13-the-core-loop)) has no engine
+at this commit: acts select scenes, a scene charges a clock budget per entered beat,
+one objective is evaluated at the close, an ordered outcome table classifies
+`success` / `partial` / `failure`, an ordered route table picks the next
+beat/scene, and a loss ledger records what the close cost. It is also what the
+scene banner, clock, objective line and restart data read
+([§3.1](#31-presentation-surfaces-and-sll-zone-names)).
+
+**Why the engine cannot do it at this commit.** `src/story-line/compile.ts` compiles a
+single card's option list and `src/story-line/resolve.ts` resolves one chosen
+option; the module set (`compile`, `resolve`, `resources`, `journal`,
+`validate`, `ui-adapter`, `types`) has no episode type. The nearest artefact,
+`src/story-line/content/manifest.ts`, is a flat authoring graph, not a run-time
+beat sheet. The spike's act and clock bookkeeping live in its game rule module
+(`example-games/gym/GymLongErasureGame.ts`), which is exactly the code the
+backlog's epic must make generic.
+
+**Nearest precedent and effort band.** **Large**: `src/story-line/` itself —
+compile, resolve, resources, journal, ui-adapter, validate — is the closest
+comparable build. The band is large because the entry is a new runtime layer
+plus versioned save/load, transcript, replay and guard integration, not a
+helper. Secondary precedents: `src/ui/PhaseManager.ts` (game-agnostic phase
+state machine) and `src/core-engine/SaveLoad.ts` /
+`serializeWithVersion` (versioned run state).
+
+**Disposition.** **Filed** — `CG-0MWR0BAT30015DPQ` (`epic`, high, effort `L`).
+Blocked by the GDD epic and by G2 (the manifest shape is its input).
+
+#### <a id="g2"></a>G2 — Episode manifest schema and validator
+
+**What it unlocks.** [§2.2.1](#221-episode-manifest)'s data model becomes
+checkable: the [§2.4](#24-how-the-beat-sheet-composes-with-story-line) rule
+table (`duplicate-act`, `unknown-card`, `unassigned-card`, `dangling-chain`,
+`non-total-routes`, `non-total-outcome-rules`, `objective-invalid`,
+`loss-not-irreversible`, `numeric-invalid`, `resource-set-mismatch`,
+`clock-cost-mismatch`, `ending-successor`) runs as a pure validator behind
+`storylines:manifest`, and `resources.start` / `resources.bounds` become
+manifest data so gate reachability is provable from the declaration instead of
+a game constant ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)
+item 2).
+
+**Why the engine cannot do it at this commit.** `schemas/` contains only
+`story-line-manifest.schema.json`, which describes the flat story-line graph.
+`src/story-line/content/manifest.ts` builds that graph deterministically;
+`src/story-line/content/validate.ts` validates CSV content only — ids, options
+encoding, successors, prose budgets, declared keys. Neither knows an act, a
+scene, a beat, an objective, a budget or a route. `package.json` exposes
+`storylines:validate|guard|graph|author|editor`; `storylines:manifest` does not
+exist.
+
+**Nearest precedent and effort band.** **Medium**: the
+`src/story-line/content/manifest.ts` + `src/story-line/content/validate.ts`
+pair — a deterministic artefact builder and a pure validator with row/column
+diagnostics, both already unit-tested. The rule count is bounded (14 named
+rules), the validator is pure, and no runtime layer is required.
+
+**Disposition.** **Filed** — `CG-0MWR0BFMW003856N` (`feature`, high, effort
+`M`). Blocked by the GDD epic.
+
+#### <a id="g3"></a>G3 — Scene-space guard
+
+**What it unlocks.** The third static check of [§2.4](#24-how-the-beat-sheet-composes-with-story-line):
+enumerate scene exits and beat refusals and assert that no exhausted close is
+classified `success` and that no refusal leaves a state with no reachable
+ending. This is what makes [§2.8](#28-resource-model-and-economy)'s hull and
+clock failure states provable rather than asserted, and it is a named build-epic
+check in [§5.2](#52-verification-the-build-epic-must-add-named-gaps).
+
+**Why the engine cannot do it at this commit.** `src/story-line/content/guard.ts`
+enumerates the **card chain** over declared resources and asserts
+`gated-branch-survivable`, `ending-reachable` and `consequential-rejoin`. It
+takes a `ContentAdapter` and a CSV, has no manifest input, no scene boundary,
+no clock and no outcome/route semantics — the clock is not a declared resource,
+so an exhausted scene is invisible to it. (It also cannot yet model clamping;
+see G4.)
+
+**Nearest precedent and effort band.** **Medium**: `src/story-line/content/guard.ts`
+itself — 955 lines of bounded depth-first enumeration with fail-closed
+truncation reporting. The entry extends its state shape; the bound and reporting
+machinery is reused.
+
+**Disposition.** **Filed** — `CG-0MWR0BG9H007AFNU` (`feature`, medium, effort
+`M`). Blocked by the GDD epic and by G2 (the guard needs a manifest to read).
+
+#### <a id="g4"></a>G4 — Resource bounds, spill and clamped loss
+
+**What it unlocks.** The ranges in [§2.8](#28-resource-model-and-economy)
+(`hull` 0–5, `morale` 0–8, `stores` 0–6, `goodwill` 0–5, `charge` 1–2) become
+enforced: a gain at the cap spills rather than banks, a loss at the floor clamps
+and its unapplied remainder is recorded. Without it the GDD's "surplus spills /
+loss clamps" statements are authoring discipline plus a fixture test.
+
+**Why the engine cannot do it at this commit.**
+`createResourceProjection(...).applyResourceDelta` in
+`src/story-line/resources.ts` forwards every finite, non-zero delta to the
+game's own `apply` without bounds: nothing clamps, nothing spills and nothing is
+reported. `DEFAULT_RESOURCES` is a value bag, not a bounds declaration. The
+nearest constrained helper, `src/rule-engine/EconomyLedger.ts`, is hard-coded to
+`coins` / `reputation` and offers only `minCoins` / `minReputation` — no
+maximum, no spill, no clamped-loss record, and no other key.
+
+**Nearest precedent and effort band.** **Small–medium**:
+`src/rule-engine/EconomyLedger.ts` (constraint-checked deltas) plus the
+`StorylineResourceProjection` seam. The work is a bounds type, clamp/spill
+arithmetic, a reported remainder and the manifest plumbing shared with G2.
+
+**Disposition.** **Filed** — `CG-0MWR0BGVG004UE7X` (`feature`, medium, effort
+`M`). Blocked by the GDD epic.
+
+#### <a id="g5"></a>G5 — Irreversible-resource policy
+
+**What it unlocks.** `hull` becomes a guarantee rather than a convention: no
+authored `#extra` and no manifest loss rule can grant it, so the irreversible
+tension dial of [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring)
+cannot be undone by content drift.
+
+**Why the engine cannot do it at this commit.** `resources.irreversible` appears only in
+the proposed manifest rule `loss-not-irreversible`
+([§2.4](#24-how-the-beat-sheet-composes-with-story-line)), and the manifest
+validator does not exist yet (G2). In the runtime,
+`selectDeclaredDelta` (`src/story-line/resources.ts`) filters **undeclared**
+keys; a declared irreversible key is applied like any other, so `#extra=hull:1`
+is legal content. `src/story-line/content/validate.ts` refuses an undeclared key
+(`unknown-resource-key`) but has no direction rule. At this commit the GDD's
+guard is a fixture test plus authoring discipline
+([§2.8.3](#283-the-economy-by-act)).
+
+**Nearest precedent and effort band.** **Small**: the `unknown-resource-key`
+rule (a declarative diagnostic carrying row, column and reason) and the sign
+handling in `selectDeclaredDelta`. One declaration, one validation rule, one
+projection guard.
+
+**Disposition.** **Filed** — `CG-0MWR0BHH9002OQUZ` (`task`, medium, effort `S`).
+Blocked by the GDD epic.
+
+#### <a id="g6"></a>G6 — Compound and range conditions
+
+**What it unlocks.** [§2.2.5](#225-objective)'s `Objective.check` and the
+`#when` grammar could express "`hull ≥ 5` **and** `stores ≥ 3`", "at maximum"
+or a range, instead of forcing a one-clause objective.
+
+**Why the engine cannot do it at this commit.** `Condition` is a single
+`{field, op, value}` (`src/story-line/types.ts`) evaluated by
+`evaluateCondition` (`src/story-line/resolve.ts`); the manifest's `Objective.check`
+deliberately reuses that shape. The GDD works around it — a one-clause objective
+plus "a scene that needs more is two scenes" ([§2.2.5](#225-objective)) — which
+is why this entry is not on the v1 critical path.
+
+**Nearest precedent and effort band.** **Small**: `Condition` + `evaluateCondition`;
+the grammar and the validator already exist, so the work is a composite
+condition shape and its evaluation.
+
+**Disposition.** **Deferred to the build epic.** The v1 model is one clause by
+design; if the build epic needs a compound objective it opens this entry rather
+than widening the manifest informally.
+
+#### <a id="g7"></a>G7 — Surfaced affordability
+
+**What it unlocks.** An unaffordable option can be shown disabled with its
+shortfall ("2 charge needed") instead of being deleted at draw time, so the
+player learns the economy rather than seeing a shorter list
+([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 3:
+32 of 302 option instances hidden, 107 of 197 dead turns gate-collapsed).
+
+**Why the engine cannot do it at this commit.** `isOptionAffordable` in
+`src/story-line/compile.ts` returns a boolean and `compileStorylineFromEvent`
+filters unaffordable options out of `compiledOptions` before any presenter sees
+them. `StorylineOption` carries the authored `cost` but no computed
+affordability state and no shortfall shape.
+
+**Nearest precedent and effort band.** **Small**: `isOptionAffordable` plus the
+compiled-option shape. The arithmetic already exists; the change is an additive
+field and a policy switch (omit by default, surface on request), so every current
+caller keeps its behaviour.
+
+**Disposition.** **Filed** — `CG-0MWR0BI3S008K9Y6` (`feature`, medium, effort
+`S`). Blocked by the GDD epic.
+
+#### <a id="g8"></a>G8 — Resource HUD
+
+**What it unlocks.** A rendered, labelled view of the declared key set (value,
+maximum, loss-bearing marker) in the presentation contract's status zone
+([§3.1](#31-presentation-surfaces-and-sll-zone-names)), so a five-key economy is
+legible without bespoke scene text — the precondition for hypothesised
+comprehension ([§2.8.7](#287-how-the-economy-is-verified) H7).
+
+**Why the engine cannot do it at this commit.** `src/ui/index.ts` exports card, hand and
+pile views (`HandView`, `PileView`, `TokenPileView`), status helpers
+(`HintBar`) and the panel/overlay surface, but no component that renders a
+declared resource bag. SLL is not the gap: `src/ui/screen-layout.ts` resolves any
+zone a game's layout declares, so a `resources` zone is layout data. The feed
+seam exists (`StorylineResourceProjection.getResources`), the presenter does not.
+
+**Nearest precedent and effort band.** **Medium**: `src/ui/TokenPileView.ts`
+(token stack with live count labels and click handling) and `src/ui/HintBar.ts`
+(compact multi-item status strip), both SLL-positioned and unit-tested. The work
+is a reusable component with labels, bounds display, a colour-independent
+loss marker and a reduced-motion update path.
+
+**Disposition.** **Filed** — `CG-0MWR0BIPV0074WLM` (`feature`, medium, effort
+`M`). Blocked by the GDD epic.
+
+#### <a id="g9"></a>G9 — Act/scene transition presentation
+
+**What it unlocks.** The scene exit reads as a consequence: a banner (act, scene,
+objective result), then the route, then the next beat — with an act-transition
+motion and a reduced-motion fallback ([§3.1](#31-presentation-surfaces-and-sll-zone-names)
+`sceneBanner`, [§3.6](#36-named-presentation-gaps) B5).
+
+**Why the engine cannot do it at this commit.** Correcting B5's first phrasing: a shared
+camera transition **does** ship — `runSceneTransition` in
+`src/ui/sceneTransition.ts` fades or slides the camera and returns immediately
+under reduced motion. What does not exist is the **banner surface and the
+sequence**: no act/scene title component, no presentation of the objective
+result before routing, and no rendered precedent — the spike has no scene
+boundary (`example-games/gym/GymLongErasureGame.ts`) and its layout declares
+`statusBar`, `narrative`, `options`, `feedback`, `journal`, `controls`, with no
+`sceneBanner` zone (`example-games/gym/layouts/gym-long-erasure.layout.json`).
+
+**Nearest precedent and effort band.** **Small–medium**:
+`src/ui/sceneTransition.ts` (timed transition + reduced-motion skip),
+`src/ui/narration-reveal.ts` (sequenced animated text with SFX and a skip path)
+and `src/ui/Overlay.ts` (`createOverlayBackground` / `dismissOverlay` depth
+conventions). Every primitive exists; the work is composition, SLL wiring and
+SFX.
+
+**Disposition.** **Filed** — `CG-0MWR0BJBU005TDTT` (`feature`, medium, effort
+`M`). Blocked by the GDD epic. It depends on the runner (G1) for an outcome to
+present, but the presentation module can land independently.
+
+#### <a id="g10"></a>G10 — Retire the legacy `act` / `clockCost` columns
+
+**What it unlocks.** [§2.1](#21-composition-contract-who-owns-what)'s ownership
+rule: act membership is `scene.id` under `act.scenes`, pacing is
+`beat.clockCost` in the manifest, and neither is a CSV cell. Until the columns
+retire, a writer on the GDD game can still author beat-sheet data in the wrong
+place.
+
+**Why the engine cannot do it at this commit.** `src/story-line/content/adapters.ts`
+declares `act` and `clockCost` as Gym game columns **and** lists both in
+`editableColumns`, with defaults. `example-games/gym/GymLongErasureGame.ts` reads
+`clockCost` from the CSV for its pressure clock. The migration check
+(`clock-cost-mismatch`) is part of the manifest validator (G2), which does not
+exist yet.
+
+**Nearest precedent and effort band.** **Small**: the adapter's column
+declaration and the `missing-column` diagnostic in
+`src/story-line/content/validate.ts`. A content-format change with a migration,
+not new machinery.
+
+**Disposition.** **Filed** — `CG-0MWR0BJXI007UINE` (`chore`, low, effort `S`).
+Blocked by the GDD epic and by G2.
+
+#### <a id="g11"></a>G11 — Keyboard choice navigation and overlay focus order
+
+**What it unlocks.** The keyboard path of
+[§3.4.4](#344-keyboard-and-touch-input-paths): choose an option with `1`–`6` or
+arrows + Enter, traverse focus in an open overlay, activate with Enter/Space and
+close only the topmost modal with Escape
+([§3.2](#32-overlay-behaviour)). Without it the accessibility contract's keyboard
+claims are aspirational ([§3.8](#38-what-this-section-does-not-prove)).
+
+**Why the engine cannot do it at this commit.** Only the panels bind their own toggle
+key: `HelpPanel` (`toggleKey`, default `FORWARD_SLASH` = `?`) and `SettingsPanel`
+(`toggleKey`, default `Escape`) register `keydown` listeners in their own
+lifecycle. `getEndTurnKeybind()` / `setEndTurnKeybind()` in
+`src/ui/SettingsStore.ts` bind one game action. No choice-list navigator,
+focus-trap or focus-order helper is exported from `src/ui/index.ts`.
+
+**Nearest precedent and effort band.** **Small**: the keydown listener lifecycle
+in `src/ui/HelpPanel.ts` (register, and `off` on destroy) and
+`src/ui/OverlayManager.ts` (one live modal, ordered open/close). One navigator
+helper plus focus handling on the existing overlay primitives.
+
+**Disposition.** **Filed** — `CG-0MWR0BKIT0084ZID` (`task`, low, effort `S`).
+Blocked by the GDD epic.
+
+#### <a id="g12"></a>G12 — Shared verbosity preference
+
+**What it unlocks.** The Full/Concise reading preference of
+[§3.4.2](#342-verbosity-and-tooltips) persists across games and sessions, like
+tooltips and reduced motion already do.
+
+**Why the engine cannot do it at this commit.** `src/ui/SettingsStore.ts` persists the
+end-turn keybind (`tce-endturn-keybind`) and tooltips (`tce-show-tooltips`);
+`src/ui/ReducedMotion.ts` persists reduced motion (`tce-ui-reduced-motion`).
+There is no verbosity key or getter/setter, and `SettingsPanel.extraToggles` is
+game-local with no shared persistence.
+
+**Nearest precedent and effort band.** **Extra-small**: the tooltips toggle pair
+in `SettingsStore` plus the `extraToggles` wiring in `SettingsPanel`. One storage
+key, one getter/setter pair, one panel toggle.
+
+**Disposition.** **Filed** — `CG-0MWR0BL4Q000OYG6` (`task`, low, effort `XS`).
+Blocked by the GDD epic.
+
+#### <a id="g13"></a>G13 — Deterministic replay adapter and fixture
+
+**What it unlocks.** The [§3.5.4](#354-replay) guarantee can be asserted for
+this game: a transcript replay reproduces identical scene exits and score at the
+same seed.
+
+**Why the engine cannot do it at this commit.** The engine seam **is** present —
+`scripts/replay.ts` plus the per-game `ReplayAdapter` interface in
+`scripts/adapters/ReplayAdapter.ts` (Golf is the reference implementation).
+What does not exist is an adapter and fixture for this game, because the game
+does not exist yet.
+
+**Nearest precedent and effort band.** **Small**: the Golf replay adapter. The
+tool and interface are done; the per-game parsing, state injection and scene
+boot are the work.
+
+**Disposition.** **Deferred to the build epic.** This is a **game-owned
+deliverable, not engine work**; listing it as an engine gap would mis-size the
+build epic.
+
+#### <a id="g14"></a>G14 — CSV authoring ergonomics (already filed)
+
+**What it unlocks.** The writer path of
+[§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) without the
+five recorded frictions (whole-cell replacement, no forward reference, repeated
+resource list, no positional insert, generic `--field` writes).
+
+**Why the engine cannot do it at this commit.** `src/story-line/content/author.ts` and
+`src/story-line/content/mutate.ts` implement `add-card` / `update-card` against
+the whole `options` cell and refuse forward references; `add-linked-card` is the
+single-transaction workaround. Friction 5 (a typo'd column was a silent no-op)
+is already resolved by the `unknown content column` hard error.
+
+**Nearest precedent and effort band.** **Small**: the existing authoring verbs
+and the editor's guided forms; the CLI is the gap, not the model.
+
+**Disposition.** **Filed** — `CG-0MWQYDC7D003G4ON` (already live, `chore`,
+open). This backlog records it as CSV follow-through work rather than re-filing
+it.
+
+### 6.4 The five expected gaps, assessed explicitly
+
+The GDD's scope named five expected gaps. Each is assessed here, with the verdict
+this backlog reaches.
+
+| Expected gap | Verdict | Entries | Evidence at this commit |
+|---|---|---|---|
+| Beat-sheet / objective layer | **Confirmed — the build epic's core.** Not one gap but three that ship together: the runtime layer, the manifest contract that describes it and the guard that proves it. | [G1](#g1), [G2](#g2), [G3](#g3) | `src/story-line/compile.ts`, `src/story-line/resolve.ts`, `src/story-line/content/manifest.ts`, `src/story-line/content/guard.ts` |
+| Arbitrary-resource generalisation follow-through | **Partially landed; the follow-through is real but split.** The declared set, declared-key deltas and `unknown-resource-key` shipped (`src/story-line/resources.ts`, `src/story-line/content/validate.ts`). What did **not** ship: bounds/clamping, the irreversibility guarantee, structured affordability and compound conditions. | [G4](#g4), [G5](#g5), [G6](#g6) (and [G7](#g7) for affordability) | `applyResourceDelta` is unbounded; `selectDeclaredDelta` has no direction rule; `Condition` is single-clause |
+| CSV extension follow-through | **No single missing capability; the remaining work is split three ways.** The CSV vocabulary (`#cost` / `#extra` / `#when` / `#says`, `resources`, prose columns), the validator, the guard and the editor shipped. Remaining: retire the legacy columns, validate the manifest/CSV agreement, and the already-filed authoring ergonomics. | [G10](#g10), [G2](#g2), [G14](#g14) | `src/story-line/content/adapters.ts` still declares `act` / `clockCost`; `src/story-line/content/author.ts` + `authoring` frictions; `CG-0MWQYDC7D003G4ON` |
+| Resource HUD | **Confirmed.** No component renders a declared resource bag; the spike draws its two-key economy by hand. The zone itself is layout data and is not the gap. | [G8](#g8) (with [G7](#g7) for the affordability presentation) | `src/ui/index.ts` (no resource component), `src/ui/TokenPileView.ts` (nearest precedent) |
+| Act/scene transition presentation | **Confirmed, but narrower than first stated.** A camera transition ships (`runSceneTransition`); the banner surface, the outcome→route sequence and any rendered scene boundary do not. | [G9](#g9) | `src/ui/sceneTransition.ts`, `example-games/gym/layouts/gym-long-erasure.layout.json` (no `sceneBanner` zone) |
+
+### 6.5 What is deliberately not a gap
+
+These capabilities were named while writing other sections and are **not**
+backlog entries, because the engine already provides them. Listing them keeps the
+backlog honest: a reviewer can see the claim was checked, not avoided.
+
+| Capability | Why it is not a gap | Where it lives |
+|---|---|---|
+| Per-game SLL zone names (including the GDD's new zones) | SLL resolves any zone a layout declares; zones are per-game data | `src/ui/screen-layout.ts`, `src/ui/screen-layout-schema.ts` |
+| Overlay depth, dismissal and renderer-aware clipping | shipped primitives; the depth contract is documented | `src/ui/Overlay.ts` (`createOverlayBackground`, `dismissOverlay`, `createOverlayDialog`), `src/ui/ContainerClip.ts` (`createContainerClip`) |
+| Tooltips and hover-intent delays | shipped with pointer/touch delays | `src/ui/Tooltip.ts` |
+| Reduced motion | one effective-preference helper and helper-level fallbacks | `src/ui/ReducedMotion.ts` (`getEffectiveReducedMotion`), `src/ui/sceneTransition.ts` |
+| Versioned save/load | shipped, with a version-mismatch refusal | `src/core-engine/SaveLoad.ts` (`SaveLoadStore`, `serializeWithVersion`) |
+| Transcript recording and persistence | shipped | `src/core-engine/TranscriptRecorder.ts` (`TranscriptRecorderBase`), `src/core-engine/TranscriptStore.ts` |
+| SFX keys and event-driven audio | the shared key set and `SoundManager` mapping ship | `src/core-engine/SoundManager.ts` (`COMMON_SFX_KEYS`), `docs/SFX_CONVENTION.md` |
+| Prose pagination and progressive narration | shipped, including reduced-motion/skip paths | `src/ui/prose-pagination.ts`, `src/ui/narration-reveal.ts` |
+| Camera-level scene transitions | shipped | `src/ui/sceneTransition.ts` (`runSceneTransition`) |
+| Deterministic seeded RNG | shipped and already used by `@story-line` candidate draws | `src/core-engine/` seeded RNG, `src/story-line/resolve.ts` |
+
+### 6.6 Disposition record
+
+| Entry | Worklog item | Type | Priority | Effort | Blocked by | Status at filing |
+|---|---|---|---|---|---|---|
+| G1 | `CG-0MWR0BAT30015DPQ` | epic | high | L | GDD epic, G2 | blocked, scheduled past the GDD close |
+| G2 | `CG-0MWR0BFMW003856N` | feature | high | M | GDD epic | blocked, scheduled past the GDD close |
+| G3 | `CG-0MWR0BG9H007AFNU` | feature | medium | M | GDD epic, G2 | blocked, scheduled past the GDD close |
+| G4 | `CG-0MWR0BGVG004UE7X` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
+| G5 | `CG-0MWR0BHH9002OQUZ` | task | medium | S | GDD epic | blocked, scheduled past the GDD close |
+| G6 | — | task | — | — | — | **Deferred** — one-clause objectives are the v1 model |
+| G7 | `CG-0MWR0BI3S008K9Y6` | feature | medium | S | GDD epic | blocked, scheduled past the GDD close |
+| G8 | `CG-0MWR0BIPV0074WLM` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
+| G9 | `CG-0MWR0BJBU005TDTT` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
+| G10 | `CG-0MWR0BJXI007UINE` | chore | low | S | GDD epic, G2 | blocked, scheduled past the GDD close |
+| G11 | `CG-0MWR0BKIT0084ZID` | task | low | S | GDD epic | blocked, scheduled past the GDD close |
+| G12 | `CG-0MWR0BL4Q000OYG6` | task | low | XS | GDD epic | blocked, scheduled past the GDD close |
+| G13 | — | task | — | — | — | **Deferred** — game-owned replay adapter |
+| G14 | `CG-0MWQYDC7D003G4ON` | chore | — | — | — | Already live before this backlog |
+
+**The build-epic handover.** When the build epic is created, its first act is to
+clear `startOn` on the filed entries it adopts and set each one's parent to the
+build epic. Entries it declines stay blocked and scheduled, so a declined gap is
+visible rather than silently dropped. G6 and G13 are adopted only if the build
+epic's scope statement claims them.
+
+### 6.7 How a reviewer verifies this backlog
+
+1. **Open every cited module.** Each "why not at this commit" names a file in
+   `src/story-line/`, `src/story-line/content/`, `src/ui/` or
+   `example-games/gym/`. Confirm the named concept is absent (for a follow-through
+   gap, confirm what landed is exactly what the entry credits).
+2. **Check the effort band against its precedent.** Each band names a module or
+   module pair; the band is credible only if the precedent is comparable in
+   surface area.
+3. **Check the disposition.** Every row of §6.6 is a live item id or the
+   `Deferred` marker, and every filed item is blocked and scheduled.
+4. **Run the structural contract.**
+   `npx vitest run --project unit tests/story-line/content/gdd-engine-gap-backlog.test.ts`
+   fails if a cited path disappears, a required field or entry is missing, or a
+   disposition is neither a filed id nor the deferred marker.
+5. **Check that no gap is a duplicate.** No filed entry re-creates an already
+   completed item; G14 is explicitly reused rather than re-filed.
 
 ## 7. V1 Scope Statement and Deferred List (TODO)
 
@@ -2914,7 +3331,7 @@ is worse than a link.
 | `CG-0MWPY29730011FJ4` | Writer content pipeline (CSV authoring gate) — delivered: [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), T8; authored the frictions follow-up `CG-0MWQYDC7D003G4ON` |
 | `CG-0MWPY2AZX001UI2A` | Tension, pacing, failure and reset-ending scoring — delivered: [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), T9–T12; reconciled the open arc-credit item `CG-0MWNSR376002QBY9` |
 | `CG-0MWPY2CHF003AHE1` | Presentation contract: UI, audio, accessibility, determinism — delivered: [§3](#3-ux-visual-design-and-audio-direction), T13; named gaps B1, B4, B5, B7, B8, B9 for the backlog and build epic |
-| `CG-0MWPY2ECE002P2NH` | Engine-gap backlog |
+| `CG-0MWPY2ECE002P2NH` | Engine-gap backlog — delivered: [§6](#6-engine-gap-backlog); filed the engine-gap items listed in [§6.6](#66-disposition-record) |
 | `CG-0MWPY2FV30041M48` | IP-safe naming pass and prohibited-term gate |
 | `CG-0MWPY2HJU006LJMU` | V1 scope statement and deferred list |
 | `CG-0MWPY2JEU006DYUL` | Integration, review and verification close-out |
