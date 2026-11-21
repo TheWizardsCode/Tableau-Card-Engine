@@ -85,6 +85,14 @@ layer described here.
    - [2.9 Writer content pipeline](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)
    - [2.10 Tension, pacing, failure and reset-ending scoring](#210-tension-pacing-failure-and-reset-ending-scoring)
 3. [UX, Visual Design and Audio Direction](#3-ux-visual-design-and-audio-direction)
+   - [3.1 Presentation surfaces and SLL zone names](#31-presentation-surfaces-and-sll-zone-names)
+   - [3.2 Overlay behaviour](#32-overlay-behaviour)
+   - [3.3 Audio and SFX mapping](#33-audio-and-sfx-mapping)
+   - [3.4 Accessibility](#34-accessibility)
+   - [3.5 Determinism, save/load, transcript and replay](#35-determinism-saveload-transcript-and-replay)
+   - [3.6 Named presentation gaps](#36-named-presentation-gaps)
+   - [3.7 How this section is verified](#37-how-this-section-is-verified)
+   - [3.8 What this section does not prove](#38-what-this-section-does-not-prove)
 4. [Glossary](#4-glossary)
 5. [Test Plan](#5-test-plan)
 6. [Engine-Gap Backlog](#6-engine-gap-backlog-todo)
@@ -779,7 +787,8 @@ serialised through `serializeWithVersion` with its own version field, and a
 version mismatch is a refusal, not a best-effort load. Replaying the transcript
 must reproduce the same scene exits, outcomes, routes and score with no re-draw:
 the only RNG in the system is the seeded `@story-line` candidate draw. The full
-expectations table is owned by `CG-0MWPY2CHF003AHE1`.
+expectations table is written in
+[§3.5](#35-determinism-saveload-transcript-and-replay).
 
 ### 2.5 A worked manifest excerpt
 
@@ -858,9 +867,10 @@ claims would be strengthened by it.
 
 The following sections of this GDD were stubs by design. Each names the work item
 that owns it, so a reviewer can see the whole document's shape and no section is
-silently forgotten. The resource model ([§2.8](#28-resource-model-and-economy))
-and the writer content pipeline
-([§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)) are now
+silently forgotten. The resource model ([§2.8](#28-resource-model-and-economy)),
+the writer content pipeline
+([§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)) and the
+presentation contract ([§3](#3-ux-visual-design-and-audio-direction)) are now
 written; the rest remain stubs.
 
 | Section | Contents it must add | Owner |
@@ -868,7 +878,7 @@ written; the rest remain stubs.
 | Resource model and economy | **Written — [§2.8](#28-resource-model-and-economy)**: named key set, ranges, starting values, sources/sinks, each key's failure state and recovery, one worked trade per act, named engine gaps | `CG-0MWPY27EU008QPHN` |
 | Writer content pipeline | **Written — [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)**: column table, three verbatim worked rows (validated), option-cell grammar, the end-to-end review gate with sign-off roles, the real malformed-entry diagnostics and the five spike frictions with owners | `CG-0MWPY29730011FJ4` |
 | Tension, pacing, failure and reset-ending scoring | **Written — [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring)**: the clock as a per-scene budget with two recovery paths, hull as the irreversible dial, numeric pacing rules, the failure/recovery table per type, the scoring inputs/weights/bands with a worked score per band and the earned-not-punitive proof | `CG-0MWPY2AZX001UI2A` |
-| Presentation contract | SLL zone names, overlay behaviour, audio/SFX mapping, accessibility, determinism/save-load/transcript/replay expectations | `CG-0MWPY2CHF003AHE1` |
+| Presentation contract | **Written — [§3](#3-ux-visual-design-and-audio-direction)**: the SLL zone table (including three new game zones), overlay behaviour and depth ordering, the `COMMON_SFX_KEYS` map with a reduced-motion alternative per event, accessibility (reduced motion, verbosity/tooltips, colour independence, keyboard/touch), and determinism/save-load/transcript/replay expectations | `CG-0MWPY2CHF003AHE1` |
 | Glossary proper nouns and prohibited-term gate | final names with rationale, prohibited-term scan of this document, trademark sanity read | `CG-0MWPY2FV30041M48` |
 | Engine-gap backlog | every missing capability with unlock, module reference, effort band, issue type | `CG-0MWPY2ECE002P2NH` |
 | V1 scope and deferred list | act/scene/beat/branch counts, playtime, word budget, replayability, deferrals | `CG-0MWPY2HJU006LJMU` |
@@ -2009,27 +2019,433 @@ the score.
 
 ## 3. UX, Visual Design and Audio Direction
 
-> **TODO — owned by `CG-0MWPY2CHF003AHE1` (GDD presentation contract: UI, audio,
-> accessibility, determinism).** This section is a stub. It must not invent
-> surfaces that sections 1–2 do not need, and it must not change the data model.
+> **Written by `CG-0MWPY2CHF003AHE1`.** This section replaces the stub listed in
+> [§2.7](#27-sections-owned-by-downstream-work-items) and closes the presentation
+> and technical contract the rest of this document defers to. It invents no data:
+> every surface below renders a field sections 1–2 already define, every sound is
+> an existing `COMMON_SFX_KEYS` value, and every capability the engine cannot
+> supply is a pointer to the engine-gap backlog
+> ([§6](#6-engine-gap-backlog-todo)), not a promise.
+>
+> The baseline is the spike's rendered surface. `GymLongErasureScene` plus
+> `example-games/gym/layouts/gym-long-erasure.layout.json` prove, at this commit,
+> that one SLL document, a `SoundManager`, `revealNarration`, `paginateProse`,
+> `shakeIllegalMove` and `popTextOrIcon` compose into a playable narrative screen.
+> The full game **keeps that screen** and adds three zones — scene banner,
+> objective panel and epilogue — which are layout data, not engine work.
 
-The surfaces the beat-sheet model implies, as a checklist for that item:
+### 3.1 Presentation surfaces and SLL zone names
 
-| Surface | Data it renders (from this document) | Notes for the owner |
+One layout document — the game owns `gdd-long-erasure-layout` (version 1, base
+viewport 1280 × 720) — declares every zone and anchor the game resolves. Scenes
+call `parseScreenLayoutDocument()` once, then `anchorPoint()` per element,
+exactly as the spike does; **no scene passes a literal coordinate to a text,
+button or container**. `validateScreenLayoutDocument()` runs before the first
+render, so a malformed layout is a startup failure rather than a silently
+misplaced surface.
+
+A **zone** is a named normalised rectangle (a surface's reserved area); an
+**anchor** is a named normalised point inside it. The table is the contract:
+
+<!-- gdd-presentation-zones -->
+
+| Surface | Zone | Anchors (`zone.anchor`) | Data rendered | Engine status | Gym reference |
+|---|---|---|---|---|---|
+| Resource HUD | `statusBar` | `statusBar.act`, `statusBar.clock`, `statusBar.nextBeatCost`, `statusBar.resources`, `statusBar.losses` | act title; `clockRemaining / budget.clock`; the next beat's cost; `storyline.engine.getResources` over the declared keys; the summed irreversible deltas | **Shipped** in the spike layout; `nextBeatCost` and `losses` are new anchors — layout data, no engine change | `GymLongErasureScene` |
+| Act/scene banner | `sceneBanner` | `sceneBanner.actTitle`, `sceneBanner.sceneTitle`, `sceneBanner.outcome`, `sceneBanner.route` | `act.title`, `scene.title`; at a scene close, the `scene-exit` record's outcome word and the opened door ([§2.3](#23-how-a-scene-outcome-selects-the-next-beat)) | **New game zone**; `screen-layout-schema.ts` accepts any zone name. The *data* needs the beat-sheet layer (gap B1); the *transition motion* needs gap B5 | `GymHudComponentsScene` (panel chrome) |
+| Objective panel | `objectivePanel` | `objectivePanel.statement`, `objectivePanel.status` | `objective.statement`; pending / met / unmet, evaluated once at scene close | **New game zone**; the data needs gap B1. Keep the statement within 90 characters ([§2.2.5](#225-objective)) | `GymHudComponentsScene` (panel chrome) |
+| Beat narrative | `narrative` | `narrative.beat`, `narrative.title`, `narrative.effect`, `narrative.context`, `narrative.contextMore` | the compiled card: id, title, effect line, authored `context`; prose longer than the panel budget is **paged** by `paginateProse()`, never clipped | **Shipped** in the spike layout | `GymLongErasureScene` |
+| Choice list | `options` | `options.option1` … `options.option6` | `@story-line` compiled options, gated by `isOptionAffordable`; an unaffordable option is **shown** with its shortfall, not removed ([§1.5](#15-approach-decision-a-vs-c)) | **Shipped** (`option1`–`option4`); v1 declares six anchors at a 0.062 vertical step, which is 44.6 design px at 720 | `GymSllScene` (composed anchors), `GymLongErasureScene` |
+| Feedback line | `feedback` | `feedback.center` | one-line confirmation of the choice just made, and the refusal reason when a beat or option is refused | **Shipped**; the reason itself comes from `shakeIllegalMove`'s toast | `GymLongErasureScene` |
+| Journal (inline ticker) | `journal` | `journal.heading`, `journal.body` | `buildJournal` / `runJournal` over the activity log, including `scene-exit` lines; the ticker shows the newest row only | **Shipped**; the full journal is the modal overlay ([§3.2](#32-overlay-behaviour)) | `GymLongErasureScene`, `GymOverlayUiScene` (overlay) |
+| Epilogue | `epilogue` | `epilogue.endingTitle`, `epilogue.epilogueProse`, `epilogue.score`, `epilogue.band`, `epilogue.ledger`, `epilogue.journalSummary`, `epilogue.restart` | the ending card's `epilogue` prose, the score and band from [§2.10.5](#2105-the-reset-ending-scoring-model), the loss ledger, the surviving journal, and the post-ending action | **New game zone** rendered by game code; `buildEpilogue` and the scoring model exist (spike). The restart action needs the runner (gap B1) | `GymLongErasureScene` (ending screen), `GymAudioFeedbackScene` (score pop) |
+| Controls | `controls` | `controls.journal`, `controls.help`, `controls.settings` | `[ Journal ]`, the engine `HelpButton`/`SettingsButton`, and (on the epilogue) `[ Begin a new survey ]` | **Shipped** (`controls` in the spike; the buttons are engine components) | `GymHudComponentsScene` |
+
+**Zone rules.**
+
+1. **One reserved area per surface.** A zone may carry several related anchors —
+   the status bar carries the act, clock and resource HUD because they share one
+   glance-line — but two unrelated surfaces never share a zone, so a layout
+   change cannot move a surface the designer did not intend to move. `epilogue`
+   is a full-screen state in the *same* document, not a second document, so the
+   epilogue anchors move with the rest of the HUD.
+2. **No absolute coordinates, anywhere.** Positions come from `anchorPoint()`;
+   the only numbers a scene may pass are relative offsets *inside* an anchor's
+   box. The guard in [§3.7](#37-how-this-section-is-verified) fails the build if
+   the contract section regrows a coordinate pair.
+3. **Prose is paged, never clipped.** `narrative.context` uses `paginateProse()`
+   and `epilogue.epilogueProse` uses the same helper; a surface that cannot fit
+   its text is a layout defect, not a licence to truncate the writer's prose.
+4. **Tap targets have a floor.** The option anchors sit at a fixed 0.062
+   vertical step (44.6 design px at 720), so no option is a thinner target than
+   44 design px. Six anchors are headroom over the widest authored card (four
+   options in the spike content), so a future card with five or six choices does
+   not need the column re-laid out.
+5. **The inline journal is a ticker.** The full journal is the overlay, so the
+   deepest scene (six options) never competes with the journal for vertical
+   space; the ticker keeps the record visible without stealing the choice column.
+6. **The loss ledger is never a separate live zone.** Its permanent record is
+   `epilogue.ledger`; its live presence is `statusBar.losses` (for example
+   `hull −2`). A positive ledger line is what a refund would look like, and the
+   model forbids one ([§2.10.2](#2102-irreversible-loss-hull-as-the-dial)).
+7. **Colour is never the only channel.** Every state the palette distinguishes is
+   also printed ([§3.4.3](#343-colour-independent-signalling)).
+
+### 3.2 Overlay behaviour
+
+The game has five overlay-like states, one transient toast and one in-layout
+banner state (listed so the banner is not mistaken for an overlay). All of them
+use the shared component or SLL zone named in the table; none is hand-rolled.
+
+<!-- gdd-presentation-overlays -->
+
+| Overlay | Trigger | Engine component | Depth (backdrop / box / content) | Input blocking | Dismiss | State effect | Reduced motion | SFX |
+|---|---|---|---|---|---|---|---|---|
+| Help | `HelpButton` | `HelpPanel` | HUD container 1000; panel blocker 900 / background 901 / content 902 / close 903 | Full-viewport blocker | Close button; `?` toggles (engine default `toggleKey`) | none | Appears instantly (engine panel) | `COMMON_SFX_KEYS.UI_CLICK` |
+| Settings | `SettingsButton` | `SettingsPanel` (`hasTooltips` config) + `getReducedMotion` / `getTooltips` / `getEndTurnKeybind` | as Help | Full-viewport blocker | Close button; Escape (engine default `toggleKey`) | none; toggles apply immediately | Appears instantly | `COMMON_SFX_KEYS.UI_CLICK` |
+| Journal | `controls.journal` | `createOverlayDialog` (renderer-aware clip through `createContainerClip`) + `paginateProse` pages | engine defaults 200 / 201 / 202 inside `hudContainer` | Backdrop swallows pointer input | Close button; Escape; page buttons are the only vertical control (no wheel-only path) | none (read-only) | Appears instantly; no page-turn tween | `COMMON_SFX_KEYS.UI_CLICK` |
+| Confirmation | Epilogue restart; abandoning an ending | `createOverlayBackground` + `createOverlayButton` + `dismissOverlay` | 199 / 200 / 201 inside `hudContainer` | Backdrop swallows pointer input | Explicit confirm or cancel button; Escape = cancel | Mutates **only** on confirm; cancel leaves the run byte-identical | Appears instantly; no scale/fade | `COMMON_SFX_KEYS.UI_CLICK` |
+| Resume | Startup with a checkpoint | `CheckpointManager.checkAndResume` + `createDefaultResumeOverlay` (or the game's own) | 199 / 200 / 201 inside `hudContainer` | Backdrop swallows pointer input | Resume or fresh-run choice; Escape = keep the save | Loads the checkpoint **or** starts fresh; a fresh start never deletes the old save until confirmed | Appears instantly | `COMMON_SFX_KEYS.UI_CLICK` |
+| Illegal-move toast | A refused beat, unaffordable option or stale click | `shakeIllegalMove` (tint + shake + reason toast) | toast 1900 | none (non-blocking) | Auto-dismiss | none | No shake; the toast **still appears** | `COMMON_SFX_KEYS.ILLEGAL_MOVE` (automatic) |
+| Scene-exit banner | A scene close | the `sceneBanner` zone, not an overlay | in-layout (below HUD) | none | Advances with the route | none (the route read the outcome) | Instant text swap; no transition | `COMMON_SFX_KEYS.TURN_CHANGE` |
+
+**Overlay rules.**
+
+1. **Everything is parented into `hudContainer`.** Text, buttons and the modal box
+   itself — otherwise the content renders behind the backdrop (the project's
+   most common overlay defect). `createOverlayDialog` parents its own objects;
+   a hand-built modal must do the same.
+2. **One modal at a time.** Opening a second modal closes the first, so a
+   confirmation can never be buried under the journal and the run state can
+   never be edited through two paths.
+3. **Escape closes the topmost modal, never the game.** For the journal,
+   confirmation and resume modals the game binds Escape once and removes the
+   listener on teardown. The engine's own panels keep their default toggle keys
+   (`?` for Help, Escape for Settings), and the game never opens both at once,
+   so the bindings cannot collide.
+4. **Destructive confirmations require an explicit button.** A backdrop click or
+   Escape cancels; it never confirms a restart or an abandon.
+5. **A modal that scrolls must also page.** The journal paginates with
+   `paginateProse()` and page buttons instead of relying on the dialog's wheel
+   handler, because a wheel-only path is unreachable on touch. This is a design
+   decision, not a missing feature.
+6. **Depth ordering is one convention, two bases.** A hand-built modal uses
+   backdrop 199, box 200 and interactive content 201; `createOverlayDialog`
+   ships the same ordering on its own base (200 / 201 / 202). Either is correct
+   as long as the ordering holds, every object is parented into `hudContainer`,
+   and one modal never mixes the two bases. Modal content always sits above the
+   HUD's own panels and far below the illegal-move toast (1900).
+
+**Gym references.** `GymOverlayUiScene` (overlay background, depth ordering and
+renderer-aware clipping), `GymParameterizedOverlayScene` (a parameterised modal),
+`GymHudComponentsScene` (help and settings panels) and `GymSaveLoadScene` (the
+resume overlay).
+
+### 3.3 Audio and SFX mapping
+
+Every sound is a `COMMON_SFX_KEYS` value from `src/core-engine/SoundManager.ts`,
+played through the game's `SoundManager`; there are **no game-scoped SFX string
+literals** (`docs/SFX_CONVENTION.md`). Audio is best-effort: a missing or
+unplayable asset is swallowed by the manager and the textual channel always
+carries the message. `SoundManager` owns mute and volume, so the settings panel's
+controls apply uniformly.
+
+<!-- gdd-presentation-audio -->
+
+| Event | When it fires | SFX key | Animation | Reduced-motion alternative |
+|---|---|---|---|---|
+| Beat entered | the clock is charged and the narrative swaps to the new card | `COMMON_SFX_KEYS.CARD_SWAP` | card/narrative swap | text swaps instantly; no tween |
+| Choice resolved | the option resolves and its authored outcome prose is revealed | `COMMON_SFX_KEYS.SCORE_REVEAL` (via `revealNarration`) | progressive narration reveal at 28 ms per character, clamped to 400–9000 ms | full prose applied synchronously by `revealNarration`; `onComplete` fires synchronously |
+| Loss recorded | a `losses` rule applies (or a chain cost removes an irreversible key) | `COMMON_SFX_KEYS.SCORE_REVEAL` | `popTextOrIcon` pop above `statusBar.losses` | the pop is an instant text change |
+| Scene closed | the `scene-exit` record is classified and the banner rewrites | `COMMON_SFX_KEYS.TURN_CHANGE` | banner rewrite + (gap B5) scene transition | banner text swaps instantly |
+| Act closed | the last scene of an act closes | `COMMON_SFX_KEYS.ROUND_END` | act transition presentation (gap B5) | instant; the banner still names the act |
+| Ending reached | the ending card resolves and the epilogue opens | `COMMON_SFX_KEYS.ROUND_END` then `COMMON_SFX_KEYS.SCORE_REVEAL` | epilogue reveal, then the score pop | both texts are present instantly; no pop tween |
+| Refused beat | `clockCost > clockRemaining` at beat entry | `COMMON_SFX_KEYS.ILLEGAL_MOVE` (automatic) | `shakeIllegalMove` shake + reason toast | no shake; the reason toast still renders |
+| Refused option | an unaffordable or stale option is activated | `COMMON_SFX_KEYS.ILLEGAL_MOVE` (automatic) | `shakeIllegalMove` shake + reason toast naming the shortfall | no shake; the toast still renders |
+| Overlay opened or closed | any of the overlays in [§3.2](#32-overlay-behaviour) | `COMMON_SFX_KEYS.UI_CLICK` | none (instant appearance) | unchanged — already instant |
+| New run | the post-ending action starts a fresh survey | `COMMON_SFX_KEYS.UI_CLICK` | none | unchanged — already instant |
+
+**Audio rules.**
+
+1. **One key per event, played in sequence, never stacked.** An act close plays
+   `TURN_CHANGE` for the scene close and *then* `ROUND_END`; an ending plays
+   `ROUND_END` and *then* `SCORE_REVEAL`. No two keys are started on the same
+   frame, so the mix never clips and each sound keeps its meaning.
+2. **Reduced motion suppresses SFX.** That is the project-wide contract
+   (`docs/ui-animations.md` → Accessibility): reduced motion skips every tween
+   **and** every SFX, so the mapping's alternative column is always a *textual*
+   alternative, not a quieter animation. Nothing in this game's feedback exists
+   only in audio.
+3. **No AI action stream.** The game is single-player and authored; there is no
+   AI opponent, so the project's AI-animation rule has no subject here. The
+   authored consequence is animated by the rules above instead.
+4. **Restoring a save is silent.** Loading or resuming mutates no player action
+   and plays no SFX; this exemption is deliberate and is recorded here rather
+   than in code comments because the save path is engine code.
+5. **Assets resolve through `audioPathWithFallback('long-erasure', …)`** with the
+   six shared files as the fallback (`public/assets/audio/default/` already ships
+   `card-swap`, `turn-change`, `round-end`, `score-reveal`, `illegal-move` and
+   `ui-click`). No new asset is required by this section.
+
+**Gym references.** `GymAudioFeedbackScene` (event-driven audio, mute/volume,
+`popTextOrIcon`) and `GymLongErasureScene` (the full narrative map above, already
+wired to `COMMON_SFX_KEYS`).
+
+### 3.4 Accessibility
+
+#### 3.4.1 Reduced motion
+
+The preference chain is the engine's (`getEffectiveReducedMotion()` in
+`src/ui/ReducedMotion.ts`): an explicit `reducedMotion` argument wins, then the
+Settings panel toggle (`tce-ui-reduced-motion`), then
+`prefers-reduced-motion: reduce`. Every helper in this section receives the
+resolved flag; no scene re-derives it.
+
+With reduced motion enabled: tweens are skipped and sprites snap; SFX are
+suppressed; `revealNarration` applies the full prose synchronously and fires
+`onComplete` synchronously; `paginateProse` pages are unchanged (paging is not
+animation); the score pop is an instant text; `shakeIllegalMove` skips the shake
+but still renders its reason toast. The textual channel is never suppressed —
+this is the property that makes the mapping in [§3.3](#33-audio-and-sfx-mapping)
+accessible rather than merely quieter.
+
+#### 3.4.2 Verbosity and tooltips
+
+**Gym reference.** `GymTooltipScene` (DOM and Phaser tooltip modes, the
+settings toggle and the hover-intent delays).
+
+| Setting | Values | Default | Persistence | Status |
+|---|---|---|---|---|
+| Tooltips | on / off | on | `getTooltips()` / `setTooltips()` (`tce-show-tooltips`), rendered in `SettingsPanel` when `hasTooltips` | **Available** |
+| Reduced motion | on / off | system preference | `getReducedMotion()` / `setReducedMotion()` (`tce-ui-reduced-motion`) | **Available** |
+| Mute and volume | on/off, 0–1 | unmuted, engine default | `SoundManager` (`tce-sound-muted`, `tce-sound-volume`) | **Available** |
+| Verbosity | Full / Concise | Full | game-owned key via a SettingsPanel `extraToggles` entry | **Partly available** — the toggle seam exists; shared persistence is gap B8 |
+
+**Verbosity.** `Full` (default) shows the animated narration reveal, the
+one-line feedback after every choice, and one-line journal rows. `Concise` applies
+the outcome prose instantly and suppresses the *auxiliary* feedback line and the
+inline journal ticker (the journal overlay still holds every row). **Verbosity
+never hides authored prose** — context, outcome prose and the epilogue are shown
+at every level; it only controls the auxiliary chrome around them. The toggle is
+rendered through `SettingsPanel`'s `extraToggles`, so it sits with the engine's
+own toggles and needs no new panel code.
+
+**Tooltips.** `TooltipManager` renders in DOM or Phaser mode; the game enables
+hover intent (`delayMs: 350`) and press-and-hold (`touchDelayMs: 600`), so a
+pointer sweep no longer flashes text. Rules: a tooltip never carries information
+that is unavailable elsewhere (it repeats the on-screen label or the help
+panel); an option's label is never tooltip-only, because options are already
+visible text; tooltips follow the settings toggle and are cancelled by
+`hide()`/`destroy()`; on touch the press-and-hold path is the only trigger, so
+nothing requires hover.
+
+#### 3.4.3 Colour-independent signalling
+
+<!-- gdd-presentation-colour -->
+
+| State | Colour (secondary cue) | Primary non-colour channel |
 |---|---|---|
-| Resource HUD | `storyline.engine.getResources` over the declared keys; the irreversible subset marked as loss-bearing | must not hide affordability — surface "2 charge needed" instead of removing an option ([§1.5](#15-approach-decision-a-vs-c)) |
-| Scene banner | `scene.title`, `objective.statement` | objective is one line; no pixel positions (SLL zones only) |
-| Beat clock | `clockRemaining / budget.clock`, next beat's `clockCost` before it is entered | the beat cost must be visible *before* the player commits, so a refusal is never a surprise |
-| Scene-exit banner | the `scene-exit` record ([§2.3](#23-how-a-scene-outcome-selects-the-next-beat)): objective met/unmet, clock spent, outcome word, the door opened | the banner is the consequence, so it cannot be silent |
-| Choice list | `@story-line` compiled options, `isOptionAffordable` gating | the affordability decision must be presented, not merely applied |
-| Journal | `buildJournal` over the activity log, including `scene-exit` lines | the journal is the artefact that survives the reset |
-| Loss ledger | `{sceneId, field, delta, statement}` entries | the only place a refund would be visible, so it must never show one |
-| Epilogue | `buildEpilogue(...).epilogueProse`, the score/band from the scoring model | `le-end-reset` restarts the run at `start` as a post-ending action |
+| Resource affordability | dimmed/red | printed shortfall: `2 charge needed` |
+| Objective status | green / amber / red | word: `met` / `at risk` / `unmet` |
+| Scene outcome | green / amber / red | the outcome word: `success` / `partial` / `failure` on the banner |
+| Irreversible key | red marker | the word `irreversible` beside the key, and `losses only` in its tooltip |
+| Loss ledger line | red | a signed line: `−1 hull — <statement>` |
+| Selected option | tint/lift | a `[ selected ]` prefix and the raised card position |
+| Act progress | colour band | `Act 1 of 3` in `statusBar.act` |
 
-Audio, reduced motion, accessibility, save/load, transcript and replay are all
-owned by that item; the determinism constraint this document imposes is the one
-that cannot be traded: **a scene close consumes no RNG**, so a replay is
-reproducible from the seeded candidate draws alone.
+**Rule.** Colour is never the sole carrier of meaning. The review gate checks
+every row above against the rendered screen; the automated guard
+([§3.7](#37-how-this-section-is-verified)) pins that every row names a printed
+channel, not only a colour.
+
+Text contrast targets WCAG AA (4.5:1 for body text, 3:1 for
+large text and UI boundaries); the palette itself is art direction and is
+reviewed as art, not asserted by a unit test.
+
+#### 3.4.4 Keyboard and touch input paths
+
+| Action | Keyboard | Touch/pointer | Status |
+|---|---|---|---|
+| Open/close Help | `?` (engine default `toggleKey`) | tap the help button | **Available** (`HelpPanel`) |
+| Open/close Settings | Escape (engine default `toggleKey`) | tap the settings button | **Available** (`SettingsPanel`) |
+| Skip a narration reveal | any key | tap | **Available** (`revealNarration` `skipOnInput`, default on) |
+| Page the narrative or journal | Gap B7 (the page control is pointer-driven at this commit) | tap the page control | **Partly available** — `paginateProse()` is available; keyboard activation is B7 |
+| Select a choice | `1`–`6`, or arrows + Enter | tap the option row | **Gap B7** — no shared choice-navigation helper exists |
+| Traverse/activate overlay buttons | Tab / Enter / Space | tap | **Gap B7** — overlay focus order is not implemented |
+| Close a modal | Escape | close button | **Partly available** — the dialog exposes `close()`; the game binds Escape |
+| End-turn shortcut | `getEndTurnKeybind()` | n/a | **Not applicable** — the loop has no end-turn action; choices advance the beat |
+
+**Touch rules.** Every interactive element is a Phaser `Text`/container with
+`setInteractive` and a hit area padded to at least 44 design px; the option
+anchors' 0.062 step encodes that floor. Nothing depends on hover: tooltips use
+`touchDelayMs`, the journal pages rather than scrolls, and confirmations use
+explicit overlay buttons. Drag is not used (choices are taps), so there is no
+drag/tap conflict to arbitrate.
+
+### 3.5 Determinism, save/load, transcript and replay
+
+**Gym references.** `GymDeckRngScene` (seeded RNG and reproducible shuffles),
+`GymSaveLoadScene` (versioned save/load with a screenshot), `GymTranscriptScene`
+(transcript recording and auto-save) and `GymHeadlessDeterminism` tests (the same
+seed reproduces the same transcript).
+
+#### 3.5.1 Determinism
+
+The run has **one** RNG that affects play: the seeded `@story-line` candidate
+draw (`createSeededRng(seed)`; `shuffleArray()` where order is drawn). The seed
+is recorded at `run-start` and stored in the save, so the same seed plus the same
+choice sequence reproduces the same run. (Storage-layer identifiers inside
+`SaveLoadStore` are generated randomly, but they are not run state and never
+enter the transcript or the replay comparison.) The constraint carried from
+[§2.3](#23-how-a-scene-outcome-selects-the-next-beat) is absolute: **a scene
+close consumes no RNG**. Outcome classification, loss application, route
+selection and beat entry are pure functions of the run state; only the compiled
+option resolution may draw. Route, outcome-rule and loss tables are evaluated in
+declaration order, so a reordered table is the only thing that can change a
+decision at a fixed seed. `Math.random` does not appear in `src/story-line/`
+(pinned by the guard in [§3.7](#37-how-this-section-is-verified)).
+
+Timestamps are the one intended non-determinism: `startedAt` and `endedAt` are
+ISO wall-clock values. A replay comparison therefore compares the **content**
+(scene exits, outcomes, routes, ledger lines, score and band) and never the
+timestamps or screenshot pixels.
+
+#### 3.5.2 Save/load
+
+The run is persisted through `SaveLoadStore` with `SaveSerializer` and its own
+`schemaVersion`, under domain `run-checkpoint` and game type `long-erasure`.
+`serializeWithVersion()` writes the payload; `deserializeWithVersion()` refuses a
+version mismatch unless the serializer supplies a `migrate` hook — a mismatch is
+a refusal, never a best-effort load ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)).
+
+| Persisted field | Source | Why it must be in the save |
+|---|---|---|
+| `schemaVersion` | `SaveSerializer` | versioned refusal / migration |
+| `seed` | run start | the only RNG stream; without it the run is not reproducible |
+| `currentActId`, `currentSceneId`, `currentBeatId` | beat sheet | resume exactly where the player left |
+| `sceneClockRemaining` | beat sheet | clocks reset per scene; carrying it is the only way to resume mid-scene |
+| `pendingChain` | routing | a resolved choice whose scene close has not run yet |
+| `sceneHistory`, `routeHistory` | beat sheet | the banner, the epilogue and the audit |
+| `lossLedger` | [§2.10.2](#2102-irreversible-loss-hull-as-the-dial) | irreversible losses must survive a reload; a lost ledger is a refund |
+| `resources` | `engine.getResources` projection | declared keys only; no derived score is stored |
+| `journal`, `activityLog` | `@story-line` state | the prose is the record; ellipsised journal rows must not lose it |
+| `endingReached`, `scoreInputs` | epilogue | a resumed ending must score the same as a live one |
+
+**Cadence.** Checkpoint after every resolved choice (the unit of irreversible
+change) and again at every scene close; one slot per run. The post-ending
+`[ Begin a new survey ]` action clears the slot only after the new run's first
+checkpoint writes, so a crash between the epilogue and the restart still resumes
+the finished run rather than losing it.
+
+**Resume.** `CheckpointManager.checkAndResume()` offers resume or fresh; a fresh
+start never deletes the checkpoint until the player confirms. A failed load
+(version mismatch, unreadable payload) surfaces an actionable line in the resume
+overlay and falls back to a fresh run **only** on an explicit choice.
+
+#### 3.5.3 Transcript
+
+Recording uses `TranscriptRecorderBase<BaseTranscript<…>>`; persistence uses
+`TranscriptStore` (IndexedDB plus the dev-server disk mirror) and
+`autoSaveTranscript` at run end. The transcript is append-only: the recorder
+never rewrites an event. The event set is the contract:
+
+| Event | When | Required fields | Feeds |
+|---|---|---|---|
+| `run-start` | a new run, or a resume | `seed`, `manifestId`, `manifestVersion`, `contentChecksum`, `startingResources`, `resumedFrom` | replay reproducibility |
+| `beat-entry` | a beat is entered and its clock charged | `sceneId`, `cardId`, `clockCost`, `clockRemaining` | clock arithmetic, replay |
+| `beat-refused` | a beat cannot be entered | `sceneId`, `cardId`, `clockCost`, `clockRemaining`, `reason` | the refusal guarantee ([§2.10.4](#2104-failure-and-recovery-per-failure-type)) |
+| `choice-resolved` | an option resolves | `sceneId`, `cardId`, `optionId`, applied effects, `pushedCard` | journal, replay |
+| `scene-exit` | every scene close | exactly the record of [§2.3 step 11](#23-how-a-scene-outcome-selects-the-next-beat): `sceneId`, `objectiveMet`, `outcome`, `ruleId`, `routeId`, `clockSpent`, `clockRemaining`, `budgetExhausted`, `nextBeat` | banner, replay, audit |
+| `loss-applied` | each `losses` rule fires | `sceneId`, `field`, `delta`, `statement` | ledger, epilogue |
+| `ending-reached` | an ending card resolves | `cardId`, `score`, `band`, `hullLost`, `actsPlayed` | epilogue, replay |
+| `run-reset` | the post-ending restart | `endingCardId`, `journalEntryCount` | the reset ending's record |
+
+Every transcript carries the full authored prose for each resolved option; the
+journal may ellipsise a display row, the transcript never does
+(`StorylineJournalEntry` keeps the prose for exactly this reason).
+
+#### 3.5.4 Replay
+
+The replay tool (`scripts/replay.ts` plus a per-game `ReplayAdapter`) drives the
+scene from a fixture transcript. The build epic adds the adapter (a named gap in
+[§5.2](#52-verification-the-build-epic-must-add-named-gaps), backlog item 9);
+this contract states what it must prove:
+
+1. **Idempotence.** Replaying one fixture twice produces identical ordered
+   `scene-exit` records, identical `loss-applied` lines, and the same
+   `ending-reached` score and band.
+2. **No re-draw.** The adapter drives choices from the transcript's `optionId`;
+   it never re-runs the RNG to pick again. A choice that is no longer available
+   is a loud divergence failure, not a silent substitution.
+3. **Same-seed replay.** A headless run with the recorded seed and choice
+   sequence reproduces the transcript's content fields; only timestamps differ.
+4. **Headless exemption.** Replay and test modes render no scene and play no
+   audio, so the animation and SFX rules of [§3.3](#33-audio-and-sfx-mapping) do
+   not apply there (the project's documented exemption).
+
+### 3.6 Named presentation gaps
+
+Every capability this section names is either already in the engine or listed
+here and carried into the engine-gap backlog ([§6](#6-engine-gap-backlog-todo)).
+No gap is described as though it already works.
+
+| Gap | What it unlocks here | Why the engine cannot do it at this commit | Provisional effort | Type | Backlog entry |
+|---|---|---|---|---|---|
+| B1 Beat-sheet / objective layer | the banner, objective, clock, ledger and restart data all read from it | no scene, objective or budget concept exists (`src/story-line/compile.ts`; the spike's act/clock live in `example-games/gym/GymLongErasureGame.ts`) | large (the build epic's core) | epic | [§6](#6-engine-gap-backlog-todo) item 1 |
+| B4 Affordability presentation | showing an unaffordable option with its shortfall instead of removing it | content gating omits options rather than explaining them (`src/story-line/compile.ts`; `isOptionAffordable` is a predicate, not a presenter) | small | task | [§6](#6-engine-gap-backlog-todo) item 4 |
+| B5 Act/scene transition presentation | the `sceneBanner` and act transition motion | no shared transition surface or SLL zone ships; the spike has no scene boundary (`src/ui/screen-layout.ts`, `example-games/gym/layouts/gym-long-erasure.layout.json`) | small–medium | feature | [§6](#6-engine-gap-backlog-todo) item 5 |
+| B7 Keyboard choice navigation and overlay focus | the keyboard path in [§3.4.4](#344-keyboard-and-touch-input-paths) | only the panels' own toggle keys are bound (`?` for Help, Escape for Settings — `src/ui/HelpPanel.ts`, `src/ui/SettingsPanel.ts`, `src/ui/SettingsStore.ts`); no choice-list or overlay-focus helper exists | small | task | [§6](#6-engine-gap-backlog-todo) item 7 |
+| B8 Shared verbosity preference | the Full/Concise toggle in [§3.4.2](#342-verbosity-and-tooltips) | `SettingsStore` has tooltips and reduced motion but no verbosity key; `SettingsPanel.extraToggles` gives a game-local toggle without shared persistence | extra-small | task | [§6](#6-engine-gap-backlog-todo) item 8 |
+| B9 Deterministic replay adapter | the replay guarantees in [§3.5.4](#354-replay) | the replay tool is engine code but a game's adapter is a build-epic deliverable; no adapter exists for this game | small | task | [§6](#6-engine-gap-backlog-todo) item 9 |
+
+Deliberately **not** gaps: SLL zones (a per-game layout document admits any
+zone name), tooltips and their delays (`TooltipManager`), reduced motion
+(`getEffectiveReducedMotion()` and every helper), versioned save/load
+(`SaveLoadStore`, `serializeWithVersion`), transcript recording and persistence
+(`TranscriptRecorderBase`, `TranscriptStore`), overlay depth and clipping
+(`createOverlayBackground`, `createOverlayDialog`, `createContainerClip`) and
+every SFX key in [§3.3](#33-audio-and-sfx-mapping) (`COMMON_SFX_KEYS`).
+
+### 3.7 How this section is verified
+
+The contract is pinned by one unit suite and four review checks.
+
+| # | Claim being verified | Command | Expected |
+|---|---|---|---|
+| T13 | The zone table and the layout fixture agree; every anchor exists; option anchors meet the 44 design-px floor; every cited SFX key is a real `COMMON_SFX_KEYS` value; every audio row has a reduced-motion alternative; every colour-coded state names a printed channel; every cited Gym/source path exists; the section contains no coordinate pair; `Math.random` is absent from `src/story-line/` | `npx vitest run --project unit tests/story-line/content/gdd-presentation-contract.test.ts` | pass |
+
+**Review checks (manual).**
+
+1. **No absolute coordinates.** Open the game's only layout document and confirm
+   every `rect` and `anchor` is normalised; a raw pixel in a scene is a defect.
+2. **Overlay ordering.** Open the journal over the epilogue over the confirmation;
+   confirm exactly one modal is live, every text object is inside
+   `hudContainer`, and Escape closes the topmost only.
+3. **Audio read-back with the sound off.** Mute the game and play one act: every
+   event in [§3.3](#33-audio-and-sfx-mapping) must still be legible in text, and
+   a refused beat must still show its reason toast.
+4. **Colour independence.** Render one scene, one refusal and one epilogue in
+   greyscale; every row of [§3.4.3](#343-colour-independent-signalling) must
+   still be readable.
+
+### 3.8 What this section does not prove
+
+- **No human playtest of the presentation.** The zone set, the tap-target floor
+  and the audio map are structural; whether the banner *feels* like a
+  consequence is the human playtest [§2.6](#26-hypotheses-and-how-they-will-be-validated)
+  recommends before the act structure freezes.
+- **No audio mix.** Volumes, ducking and the SFX asset choice are art direction;
+  the contract fixes the key per event, not the master gain.
+- **No automated contrast audit.** The WCAG targets in
+  [§3.4.3](#343-colour-independent-signalling) are a review gate; no engine
+  checker measures the rendered palette.
+- **The keyboard path is untestable until B7 lands.** Only the engine's own
+  panel toggles and the narration skip can be exercised at this commit; choice
+  navigation
+  and overlay focus are explicitly a gap, not an assumed capability.
+- **No touch browser test for the journal paging.** `paginateProse()` is unit
+  tested and the spike renders it, but the full game's overlay does not exist yet;
+  the touch assertion is a review check until the build epic supplies the scene.
 
 ---
 
@@ -2093,6 +2509,7 @@ profiles; the commands below verify *this document* and the model it specifies.
 | T7 | The resource model's working fixture declares the GDD key set, carries one trade per act, never grants the irreversible key and keeps the state-gated branch survivable | `npm run storylines:validate -- --csv tests/fixtures/story-line/gdd-resource-trades.csv --game long-erasure`, then `npx vitest run --project unit tests/story-line/content/gdd-resource-model.test.ts` | `RESULT: VALID`; 12 tests pass ([§2.8.7](#287-how-the-economy-is-verified)) |
 | T8 | The rows quoted in [§2.9.4](#294-worked-example-rows-verbatim-validated) are byte-identical to the rows `storylines:validate` accepts, and the document still names every row's target | `npx vitest run --project unit tests/story-line/content/gdd-content-pipeline.test.ts` | pass — the document's rows are the fixture's rows, and the fixture validates |
 | T9–T12 | The scoring weights, bands and worked scores; the abandon band after the arc correction; the rejoin distance; the scene-budget sizing rule | see [§2.10.7](#2107-how-this-section-is-verified) | pass, or the named pending item (`CG-0MWNSR376002QBY9`) |
+| T13 | The presentation contract's zone table matches its layout fixture (every zone and anchor), option anchors meet the 44 design-px floor, every cited SFX key exists in `COMMON_SFX_KEYS` and every audio row has a reduced-motion alternative, every cited source path exists, the section contains no coordinate pair, and `src/story-line/` contains no `Math.random` | `npx vitest run --project unit tests/story-line/content/gdd-presentation-contract.test.ts` | pass ([§3.7](#37-how-this-section-is-verified)) |
 
 > T9–T12 live with the rules they verify ([§2.10.7](#2107-how-this-section-is-verified))
 > rather than here, so a re-tune cannot leave a stale command behind; the
@@ -2181,11 +2598,38 @@ documents:
    hide ([§2.3](#23-how-a-scene-outcome-selects-the-next-beat), option gating);
    options are currently omitted, not explained.
 5. **Act/scene transition presentation** — the scene-exit banner and act
-   transition surfaces ([§2.3 step D](#23-how-a-scene-outcome-selects-the-next-beat));
-   no SLL zone exists for them at this commit (`src/ui/screen-layout.ts`).
+   transition surfaces ([§2.3 step D](#23-how-a-scene-outcome-selects-the-next-beat)).
+   The zone set itself is layout data ([§3.1](#31-presentation-surfaces-and-sll-zone-names))
+   and needs no engine change; what does not exist is a shared transition
+   presentation (timing and a reduced-motion fallback) or any rendered precedent
+   (`src/ui/screen-layout.ts`,
+   `example-games/gym/layouts/gym-long-erasure.layout.json`).
 6. **Retirement of the legacy `act` / `clockCost` columns** — a content-format
    change with a migration check ([§2.1](#21-composition-contract-who-owns-what));
    the spike's game module currently reads them.
+7. **Keyboard choice navigation and overlay focus order** — the keyboard path of
+   [§3.4.4](#344-keyboard-and-touch-input-paths) (`1`–`6` or arrows + Enter to
+   choose, focus traversal and Enter/Space activation inside overlays). At this
+   commit only the panels' own toggle keys are bound (`?` for Help, Escape for
+   Settings — `src/ui/HelpPanel.ts`, `src/ui/SettingsPanel.ts`), and
+   `getEndTurnKeybind()` binds one game action
+   (`src/ui/SettingsStore.ts`); no choice-list or overlay-focus helper exists.
+   Proposed type: task; provisional effort: small.
+8. **Shared verbosity preference** — the Full/Concise toggle of
+   [§3.4.2](#342-verbosity-and-tooltips). `SettingsStore` exposes tooltips
+   (`tce-show-tooltips`) and reduced motion (`tce-ui-reduced-motion`) but has no
+   verbosity key, and `SettingsPanel.extraToggles` gives a game-local toggle
+   without shared persistence (`src/ui/SettingsStore.ts`,
+   `src/ui/SettingsPanel.ts`). Proposed type: task; provisional effort:
+   extra-small.
+9. **Deterministic replay adapter and replay assertion** — the replay guarantees
+   of [§3.5.4](#354-replay). The replay tool exists (`scripts/replay.ts` plus a
+   per-game `ReplayAdapter` in `scripts/adapters/ReplayAdapter.ts`), but this
+   game has no adapter and no fixture, so the scene-exit/score determinism
+   assertion cannot run. This one is a **build-epic deliverable, not engine
+   work**: the engine
+   seam is present; the adapter and fixture are the game's. Proposed type: task;
+   provisional effort: small.
 
 ---
 
@@ -2469,7 +2913,7 @@ is worse than a link.
 | `CG-0MWPY27EU008QPHN` | Resource model and economy (delivered: [§2.8](#28-resource-model-and-economy), one worked trade per act) |
 | `CG-0MWPY29730011FJ4` | Writer content pipeline (CSV authoring gate) — delivered: [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), T8; authored the frictions follow-up `CG-0MWQYDC7D003G4ON` |
 | `CG-0MWPY2AZX001UI2A` | Tension, pacing, failure and reset-ending scoring — delivered: [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), T9–T12; reconciled the open arc-credit item `CG-0MWNSR376002QBY9` |
-| `CG-0MWPY2CHF003AHE1` | Presentation contract: UI, audio, accessibility, determinism |
+| `CG-0MWPY2CHF003AHE1` | Presentation contract: UI, audio, accessibility, determinism — delivered: [§3](#3-ux-visual-design-and-audio-direction), T13; named gaps B1, B4, B5, B7, B8, B9 for the backlog and build epic |
 | `CG-0MWPY2ECE002P2NH` | Engine-gap backlog |
 | `CG-0MWPY2FV30041M48` | IP-safe naming pass and prohibited-term gate |
 | `CG-0MWPY2HJU006LJMU` | V1 scope statement and deferred list |
