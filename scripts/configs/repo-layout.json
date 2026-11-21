@@ -54,6 +54,7 @@
       "scripts/validate-transcript.ts",
       "scripts/verify-file-url-load.ts",
       "scripts/link-game-assets.ts",
+      "scripts/long-erasure-playtest.ts",
       "scripts/vite-game-assets-plugin.ts",
       "scripts/vite-game-discovery-plugin.ts",
       "scripts/vite-transcript-plugin.ts",

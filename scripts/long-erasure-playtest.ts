@@ -19,21 +19,29 @@
  * - **Named routes** (`--route name=A>B>C`), so a route no policy happens to
  *   take (a middle option, the gated branch, the abandon terminal) can be
  *   measured and quoted in the log.
+ * - **Act-boundary snapshots** (`actBoundaries`): the clock and resource bag
+ *   at the moment the run entered the first beat of each new act, plus the
+ *   beat number and card where the boundary fell (read-only reporting).
+ * - **Per-run pacing** (`pacing`): beats per act, decisions per act, decision
+ *   density, dead beats (a beat entered with at most one affordable option —
+ *   no decision to make) and prose volume. Summarised per policy too.
  *
  * Usage:
  *
  * ```bash
  * npx tsx scripts/long-erasure-playtest.ts [--seeds 40] [--json <path>] [--content <csv>] \
- *   [--route "reset-cheap=Log the erasure>Stay silent>..."]
+ *   [--route "reset-cheap=Log the erasure>Stay silent>..."] [--timings]
  * ```
  *
- * Deterministic: the same arguments always print the same numbers.
+ * Deterministic: the same arguments always print the same numbers. `--timings`
+ * is the one exception — it adds wall-clock `durationMs` to each run and is
+ * therefore deliberately opt-in.
  *
  * @module scripts/long-erasure-playtest
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 import type { StorylineOption } from '../src/story-line';
@@ -45,6 +53,7 @@ import {
   chooseOption,
   createLongErasureRun,
   isComplete,
+  type LongErasureAct,
   type LongErasureCard,
   type LongErasureContent,
   type LongErasureOutcome,
@@ -62,7 +71,7 @@ const ABANDON_OPTION = 'Abandon the voyage';
 /** The beat the state-gated branch feeds into. */
 const GATED_BEAT = 'le-ii-sabotage';
 
-type Policy = 'first' | 'last' | 'seeded' | 'greedy-goodwill';
+export type Policy = 'first' | 'last' | 'seeded' | 'greedy-goodwill';
 
 const POLICIES: readonly Policy[] = ['first', 'last', 'seeded', 'greedy-goodwill'];
 
@@ -92,7 +101,7 @@ function mean(values: readonly number[]): number {
 
 // ── Content shape ───────────────────────────────────────────────
 
-interface DecisionPoint {
+export interface DecisionPoint {
   cardId: string;
   cardName: string;
   act: string;
@@ -101,7 +110,7 @@ interface DecisionPoint {
   diverges: boolean;
 }
 
-interface ContentShape {
+export interface ContentShape {
   beats: number;
   acts: Record<string, number>;
   decisionPoints: DecisionPoint[];
@@ -126,7 +135,7 @@ interface ContentShape {
   };
 }
 
-function contentShape(content: LongErasureContent): ContentShape {
+export function contentShape(content: LongErasureContent): ContentShape {
   const acts: Record<string, number> = {};
   const decisionPoints: DecisionPoint[] = [];
   const singleOptionOrTerminal: string[] = [];
@@ -222,7 +231,7 @@ function contentShape(content: LongErasureContent): ContentShape {
 
 // ── Exhaustive playable route space ─────────────────────────────
 
-interface TerminalRoute {
+export interface TerminalRoute {
   labels: string[];
   path: string[];
   outcome: LongErasureOutcome | null;
@@ -237,7 +246,7 @@ interface TerminalRoute {
   sawAbandon: boolean;
 }
 
-interface PlayableRouteSpace {
+export interface PlayableRouteSpace {
   routes: number;
   byOutcome: Record<string, number>;
   byEnding: Record<string, number>;
@@ -266,7 +275,7 @@ interface PlayableRouteSpace {
 }
 
 /** Every route a player can actually take, respecting gates and the clock. */
-function enumeratePlayableRoutes(
+export function enumeratePlayableRoutes(
   content: LongErasureContent,
   maxRoutes = 5000,
 ): PlayableRouteSpace {
@@ -379,9 +388,174 @@ function enumeratePlayableRoutes(
   };
 }
 
+// ── Per-act boundaries and pacing ───────────────────────────────
+
+/** The acts in narrative order, so per-act output keys are stable. */
+const ACT_ORDER: readonly LongErasureAct[] = ['I', 'II', 'III', 'Ending'];
+
+/**
+ * One beat exactly as the run experienced it, captured after entry.
+ *
+ * This is the only new measurement surface the harness gained: recording what
+ * was on screen keeps the report honest about what a player actually saw, and
+ * it is read-only — no game or engine module learns about it.
+ */
+export interface BeatObservation {
+  /** Base card id (`le-ii-shelter-0` → `le-ii-shelter`). */
+  cardId: string;
+  act: LongErasureAct;
+  /** Options the affordability gate left on screen (`0` on a terminal beat). */
+  offeredOptions: number;
+  /** Clock remaining once this beat's cost was paid. */
+  clockOnEntry: number;
+  /** Resource bag once this beat's entry state settled. */
+  resourcesOnEntry: Record<string, number>;
+  /** True when the run was already over on entering this beat. */
+  terminal: boolean;
+}
+
+/** The run's state at the moment it entered the first beat of a new act. */
+export interface ActBoundary {
+  /** The act the run left. */
+  fromAct: LongErasureAct;
+  /** The act the run entered. */
+  toAct: LongErasureAct;
+  /** 1-based beat number at which the new act began. */
+  beat: number;
+  /** Base id of the first card of the new act. */
+  cardId: string;
+  /** Clock left after paying for that first beat. */
+  clockLeft: number;
+  /** Resource bag after that first beat's entry state settled. */
+  resources: Record<string, number>;
+}
+
+/** Per-run pacing: beats and decisions per act, density, dead beats, prose. */
+export interface RunPacing {
+  /** Beats entered per act, in narrative order. */
+  beatsPerAct: Record<string, number>;
+  /** Beats that offered more than one affordable option, per act. */
+  decisionsPerAct: Record<string, number>;
+  /** decisions ÷ beats per act (2 dp; `0` for an act the run never entered). */
+  decisionDensity: Record<string, number>;
+  /** decisions ÷ beats for the whole run (2 dp). */
+  density: number;
+  /** Non-terminal beats entered with at most one affordable option. */
+  deadBeats: number;
+  /** Base ids of those dead beats, in encounter order. */
+  deadBeatIds: string[];
+  /** Dead beats authored with a single option (a transit beat by design). */
+  authoredDeadBeats: number;
+  /** Dead beats where the affordability gate hid an authored choice. */
+  gateCollapsedBeats: number;
+  /** Prose words read: every entered beat's `effect` line. */
+  proseWords: number;
+}
+
+/** Captures one entered beat. Call only once the beat is actually played. */
+export function observeBeat(state: LongErasureState): BeatObservation {
+  return {
+    cardId: baseTypeId(state.currentCard.id),
+    act: state.act,
+    offeredOptions: availableOptions(state).length,
+    clockOnEntry: state.clock,
+    resourcesOnEntry: { ...state.resources },
+    terminal: isComplete(state),
+  };
+}
+
+/**
+ * Derives the act-boundary snapshots from a run's played beats.
+ *
+ * A boundary is recorded where the act a beat belongs to first differs from
+ * the previous beat's act. The snapshot is the post-entry state of that first
+ * beat of the new act — i.e. its clock cost has been paid and its entry effects
+ * applied, which is what the player sees as the act opens.
+ */
+export function actBoundariesFrom(
+  observations: readonly BeatObservation[],
+): ActBoundary[] {
+  const boundaries: ActBoundary[] = [];
+  for (let index = 1; index < observations.length; index += 1) {
+    const previous = observations[index - 1];
+    const current = observations[index];
+    if (current.act === previous.act) continue;
+    boundaries.push({
+      fromAct: previous.act,
+      toAct: current.act,
+      beat: index + 1,
+      cardId: current.cardId,
+      clockLeft: current.clockOnEntry,
+      resources: { ...current.resourcesOnEntry },
+    });
+  }
+  return boundaries;
+}
+
+/**
+ * Derives a run's pacing table from its played beats.
+ *
+ * A **dead beat** is a non-terminal beat entered with at most one affordable
+ * option: the run advances without asking the player anything. Terminal beats
+ * are excluded — reaching the ending is the run's conclusion, not a turn.
+ * Dead beats are split by cause: an **authored** dead beat was written with a
+ * single option, while a **gate-collapsed** dead beat was authored with a real
+ * choice that the affordability gate hid on this visit.
+ */
+export function pacingFrom(
+  observations: readonly BeatObservation[],
+  content: LongErasureContent,
+): RunPacing {
+  const beatsPerAct: Record<string, number> = {};
+  const decisionsPerAct: Record<string, number> = {};
+  const deadBeatIds: string[] = [];
+  let authoredDeadBeats = 0;
+  let gateCollapsedBeats = 0;
+  let decisions = 0;
+  let proseWords = 0;
+
+  for (const observation of observations) {
+    beatsPerAct[observation.act] = (beatsPerAct[observation.act] ?? 0) + 1;
+    const card = content.cards.find(
+      (candidate) => candidate.id === observation.cardId,
+    );
+    if (observation.offeredOptions > 1) {
+      decisionsPerAct[observation.act] =
+        (decisionsPerAct[observation.act] ?? 0) + 1;
+      decisions += 1;
+    } else if (!observation.terminal) {
+      deadBeatIds.push(observation.cardId);
+      if (card !== undefined && optionsOf(card).length > 1) gateCollapsedBeats += 1;
+      else authoredDeadBeats += 1;
+    }
+    const effect = card?.effect ?? '';
+    proseWords += effect.trim() === '' ? 0 : effect.trim().split(/\s+/).length;
+  }
+
+  const decisionDensity: Record<string, number> = {};
+  for (const act of ACT_ORDER) {
+    const beats = beatsPerAct[act] ?? 0;
+    decisionDensity[act] =
+      beats === 0 ? 0 : Math.round((((decisionsPerAct[act] ?? 0) / beats) * 100)) / 100;
+  }
+
+  const beats = observations.length;
+  return {
+    beatsPerAct,
+    decisionsPerAct,
+    decisionDensity,
+    density: beats === 0 ? 0 : Math.round(((decisions / beats) * 100)) / 100,
+    deadBeats: deadBeatIds.length,
+    deadBeatIds,
+    authoredDeadBeats,
+    gateCollapsedBeats,
+    proseWords,
+  };
+}
+
 // ── Playthroughs ────────────────────────────────────────────────
 
-interface RunRecord {
+export interface RunRecord {
   seed: number;
   policy: Policy;
   beats: number;
@@ -406,6 +580,14 @@ interface RunRecord {
   visibleConsequences: number;
   cosmeticChoices: { cardId: string; chosen: string; beaten: string[] }[];
   path: string[];
+  /** Every beat the run actually played, in order (internal; not serialised). */
+  observations: BeatObservation[];
+  /** Clock + resources at each act boundary the run crossed. */
+  actBoundaries: ActBoundary[];
+  /** Beats/decisions per act, density, dead beats, prose volume. */
+  pacing: RunPacing;
+  /** Wall clock for the headless replay; only present with `--timings`. */
+  durationMs?: number;
 }
 
 /** Deterministic choice RNG independent of the game's own successor draw. */
@@ -463,6 +645,19 @@ function emptyRecord(seed: number): RunRecord {
     visibleConsequences: 0,
     cosmeticChoices: [],
     path: [],
+    observations: [],
+    actBoundaries: [],
+    pacing: {
+      beatsPerAct: {},
+      decisionsPerAct: {},
+      decisionDensity: {},
+      density: 0,
+      deadBeats: 0,
+      deadBeatIds: [],
+      authoredDeadBeats: 0,
+      gateCollapsedBeats: 0,
+      proseWords: 0,
+    },
   };
 }
 
@@ -480,20 +675,19 @@ function finalise(state: LongErasureState, record: RunRecord): void {
   record.components = { ...epilogue.score.components };
   record.clockLeft = state.clock;
   record.resources = { ...state.resources };
-  const entered = [...state.history.map((entry) => entry.cardId), state.currentCard.id];
-  record.proseWords = entered.reduce((total, id) => {
-    const card = state.content.cards.find((candidate) => candidate.id === id);
-    const effect = card?.effect ?? '';
-    return total + (effect.trim() === '' ? 0 : effect.trim().split(/\s+/).length);
-  }, 0);
+  record.actBoundaries = actBoundariesFrom(record.observations);
+  record.pacing = pacingFrom(record.observations, state.content);
+  record.proseWords = record.pacing.proseWords;
 }
 
-function playRun(content: LongErasureContent, seed: number, policy: Policy): RunRecord {
+export function playRun(content: LongErasureContent, seed: number, policy: Policy): RunRecord {
+  const startedAt = performance.now();
   const random = choiceRandom(seed);
   let state = createLongErasureRun(seed, content);
   const record = emptyRecord(seed);
   record.policy = policy;
   record.path = [state.currentCard.id];
+  record.observations.push(observeBeat(state));
 
   for (let step = 0; step < 60 && !isComplete(state); step += 1) {
     const options = availableOptions(state);
@@ -524,8 +718,12 @@ function playRun(content: LongErasureContent, seed: number, policy: Policy): Run
     if (chosen.label === ABANDON_OPTION) record.abandonTaken = true;
 
     const cardId = state.currentCard.id;
+    const beatBefore = state.beat;
     state = chooseOption(state, chosen.label);
     record.path.push(`${cardId}:${chosen.label}→${state.currentCard.id}`);
+    // `beat` only advances for a beat that was actually played, so an expired
+    // run does not record a boundary or a dead beat for the beat it never saw.
+    if (state.beat > beatBefore) record.observations.push(observeBeat(state));
 
     // Did an authored `#when` rule decide this successor (rather than the draw)?
     const rules = chosen.conditionalSuccessors ?? [];
@@ -535,18 +733,21 @@ function playRun(content: LongErasureContent, seed: number, policy: Policy): Run
   }
 
   finalise(state, record);
+  record.durationMs = Math.round((performance.now() - startedAt) * 1000) / 1000;
   return record;
 }
 
 /** Plays one explicitly named route (labels separated by `>`). */
-function playRoute(
+export function playRoute(
   content: LongErasureContent,
   seed: number,
   labels: readonly string[],
 ): { record: RunRecord; journal: string[]; error: string | null } {
+  const startedAt = performance.now();
   let state = createLongErasureRun(seed, content);
   const record = emptyRecord(seed);
   record.path = [state.currentCard.id];
+  record.observations.push(observeBeat(state));
   let error: string | null = null;
 
   for (const label of labels) {
@@ -565,14 +766,17 @@ function playRoute(
 
     const rules = chosen.conditionalSuccessors ?? [];
     const cardId = state.currentCard.id;
+    const beatBefore = state.beat;
     state = chooseOption(state, label);
     record.path.push(`${cardId}:${label}→${state.currentCard.id}`);
+    if (state.beat > beatBefore) record.observations.push(observeBeat(state));
     if (rules.length > 0 && state.currentCard.id === baseTypeId(rules[0].successorId ?? '')) {
       record.whenRuleFired = true;
     }
   }
 
   finalise(state, record);
+  record.durationMs = Math.round((performance.now() - startedAt) * 1000) / 1000;
   return {
     record,
     journal: buildEpilogue(state).journal.map((entry) => entry.outcome),
@@ -582,7 +786,7 @@ function playRoute(
 
 // ── Reporting ───────────────────────────────────────────────────
 
-function summarise(records: readonly RunRecord[]): Record<string, unknown> {
+export function summarise(records: readonly RunRecord[]): Record<string, unknown> {
   const count = (pick: (record: RunRecord) => string): Record<string, number> => {
     const out: Record<string, number> = {};
     for (const record of records) {
@@ -603,6 +807,18 @@ function summarise(records: readonly RunRecord[]): Record<string, unknown> {
 
   const decisionsMet = records.reduce((total, record) => total + record.decisionsMet, 0);
   const visible = records.reduce((total, record) => total + record.visibleConsequences, 0);
+
+  // Pacing aggregates: mean beats/decisions per act, mean density, and the
+  // dead-beat count over the whole sample (a beat that asked nothing).
+  const perActMean = (
+    pick: (record: RunRecord) => Record<string, number> | undefined,
+  ): Record<string, number> =>
+    Object.fromEntries(
+      ACT_ORDER.map((act) => [
+        act,
+        Math.round(mean(records.map((record) => pick(record)?.[act] ?? 0)) * 100) / 100,
+      ]),
+    );
 
   return {
     runs: records.length,
@@ -629,6 +845,26 @@ function summarise(records: readonly RunRecord[]): Record<string, unknown> {
     abandonTaken: records.filter((record) => record.abandonTaken).length,
     whenRuleFired: records.filter((record) => record.whenRuleFired).length,
     distinctEndings: [...new Set(records.map((record) => record.endingId))],
+    pacing: {
+      beatsPerAct: perActMean((record) => record.pacing.beatsPerAct),
+      decisionsPerAct: perActMean((record) => record.pacing.decisionsPerAct),
+      decisionDensity: perActMean((record) => record.pacing.decisionDensity),
+      density: Math.round(mean(records.map((record) => record.pacing.density)) * 100) / 100,
+      deadBeatsPerRun:
+        Math.round(mean(records.map((record) => record.pacing.deadBeats)) * 100) / 100,
+      runsWithDeadBeats: records.filter((record) => record.pacing.deadBeats > 0).length,
+      deadBeatIds: [
+        ...new Set(records.flatMap((record) => record.pacing.deadBeatIds)),
+      ],
+      authoredDeadBeats: records.reduce(
+        (total, record) => total + record.pacing.authoredDeadBeats,
+        0,
+      ),
+      gateCollapsedBeats: records.reduce(
+        (total, record) => total + record.pacing.gateCollapsedBeats,
+        0,
+      ),
+    },
   };
 }
 
@@ -637,16 +873,19 @@ function parseArgs(argv: readonly string[]): {
   json: string | null;
   content: string;
   routes: { name: string; labels: string[] }[];
+  timings: boolean;
 } {
   let seeds = 40;
   let json: string | null = null;
   let content = CONTENT_PATH;
+  let timings = false;
   const routes: { name: string; labels: string[] }[] = [];
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--seeds') seeds = Number(argv[index + 1] ?? seeds);
     if (arg === '--json') json = argv[index + 1] ?? null;
     if (arg === '--content') content = path.resolve(argv[index + 1] ?? content);
+    if (arg === '--timings') timings = true;
     if (arg === '--route') {
       const spec = argv[index + 1] ?? '';
       const separator = spec.indexOf('=');
@@ -660,11 +899,11 @@ function parseArgs(argv: readonly string[]): {
       });
     }
   }
-  return { seeds, json, content, routes };
+  return { seeds, json, content, routes, timings };
 }
 
 function main(): void {
-  const { seeds, json, content: contentPath, routes: routeSpecs } = parseArgs(
+  const { seeds, json, content: contentPath, routes: routeSpecs, timings } = parseArgs(
     process.argv.slice(2),
   );
   const content = longErasureContentFromCsv(readFileSync(contentPath, 'utf8'));
@@ -678,7 +917,14 @@ function main(): void {
 
   const routes = routeSpecs.map((spec) => {
     const { record, journal, error } = playRoute(content, 1, spec.labels);
-    return { name: spec.name, error, journal, ...record };
+    const { observations: _observations, durationMs, ...measured } = record;
+    return {
+      name: spec.name,
+      error,
+      journal,
+      ...measured,
+      ...(timings ? { durationMs } : {}),
+    };
   });
 
   const report = {
@@ -698,7 +944,13 @@ function main(): void {
       ),
     },
     routes,
-    runs: records.map(({ path: runPath, ...rest }) => ({ ...rest, path: runPath.join(' | ') })),
+    runs: records.map(
+      ({ path: runPath, observations: _observations, durationMs, ...rest }) => ({
+        ...rest,
+        ...(timings ? { durationMs } : {}),
+        path: runPath.join(' | '),
+      }),
+    ),
   };
 
   if (json) {
@@ -708,7 +960,7 @@ function main(): void {
 
   process.stdout.write(
     [
-      'seed\tpolicy\tbeats\tchoices\tacts\toutcome\tending\tscore\tclock\tdecisions\tvisible\twords\tobserved',
+      'seed\tpolicy\tbeats\tchoices\tacts\toutcome\tending\tscore\tclock\tdecisions\tvisible\twords\tdead\tdensity\tobserved',
       ...records.map((record) =>
         [
           record.seed,
@@ -723,6 +975,8 @@ function main(): void {
           record.decisionsMet,
           record.visibleConsequences,
           record.proseWords,
+          record.pacing.deadBeats,
+          record.pacing.density,
           [
             record.gatedOffered ? 'gated-offered' : '',
             record.gatedTaken ? 'GATED-TAKEN' : '',
@@ -750,11 +1004,20 @@ function main(): void {
       `overall=${JSON.stringify(summarise(records))}`,
       ...routes.map(
         (route) =>
-          `route ${route.name}: ${route.error ?? 'ok'} outcome=${route.outcome} ending=${route.endingId} score=${route.score}(${JSON.stringify(route.components)}) band=${route.band} beats=${route.beats} choices=${route.choices} proseWords=${route.proseWords} clockLeft=${route.clockLeft} gatedOffered=${route.gatedOffered} gatedTaken=${route.gatedTaken} whenRuleFired=${route.whenRuleFired} journal=${JSON.stringify(route.journal)}`,
+          `route ${route.name}: ${route.error ?? 'ok'} outcome=${route.outcome} ending=${route.endingId} score=${route.score}(${JSON.stringify(route.components)}) band=${route.band} beats=${route.beats} choices=${route.choices} proseWords=${route.proseWords} clockLeft=${route.clockLeft} deadBeats=${JSON.stringify(route.pacing.deadBeatIds)} density=${route.pacing.density} gatedOffered=${route.gatedOffered} gatedTaken=${route.gatedTaken} whenRuleFired=${route.whenRuleFired} journal=${JSON.stringify(route.journal)}`,
+      ),
+      ...routes.map(
+        (route) =>
+          `route ${route.name} act boundaries=${JSON.stringify(route.actBoundaries)} pacing=${JSON.stringify(route.pacing)}`,
       ),
       '',
     ].join('\n'),
   );
 }
 
-main();
+// Entry-point guard: only run the CLI when executed as a script, so the
+// reporting helpers (and `playRoute` / `playRun`) can be imported by tests
+// without side effects.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

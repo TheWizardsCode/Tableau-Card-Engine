@@ -16,6 +16,12 @@ ergonomics**); does the chain-first model carry three acts and a clock without a
 scene/objective layer (the spike's central assumption); and is **approach A still the
 right full-game shape, or should the game be C** (an explicit recommendation).
 
+> **Follow-up:** [`docs/design/storyline-playtest-evaluation.md`](../design/storyline-playtest-evaluation.md)
+> (`CG-0MWPY24IX00719NH`) replays this evidence as four complete recorded runs with
+> per-act-boundary resources, per-run pacing and an explicit slideshow answer, on the
+> post-`CG-0MWPVYTSU0065BXC` content. Where the two differ, the evaluation note carries
+> the current number.
+
 Negative findings are recorded as findings, not failures. The spike was explicitly
 allowed to conclude that a chain-first structure cannot carry a full game.
 
@@ -427,6 +433,10 @@ fictional technology in the content.
 ---
 
 ## Appendix: reproducing this log
+
+> The evaluation note (`docs/design/storyline-playtest-evaluation.md`) reproduces these
+> measurements with the same harness; its §6 carries the exact command for the four
+> recorded runs, act-boundary resources and pacing tables.
 
 ```bash
 # Shape, route space, 160 policy runs, and four named routes
