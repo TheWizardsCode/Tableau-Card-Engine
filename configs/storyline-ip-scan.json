@@ -1,0 +1,18 @@
+{
+  "$comment": "Guarded path set for the prohibited-term (IP) gate (CG-0MWPY2FV30041M48). `npm run storylines:ip-scan` scans every path here with the term list in `terms`; the CI guard in tests/gym/LongErasureContent.test.ts scans the same set, so adding a content file or a design document to the gate is a config edit, not a code edit. Paths are repository-relative.",
+  "terms": "tests/fixtures/story-line/ip-prohibited-terms.json",
+  "targets": [
+    "docs/design/storyline-game-gdd.md",
+    "docs/design/storyline-playtest-evaluation.md",
+    "docs/gym/long-erasure-observation-log.md",
+    "tests/fixtures/story-line/gdd-worked-examples.csv",
+    "tests/fixtures/story-line/gdd-resource-trades.csv",
+    "tests/fixtures/story-line/gdd-presentation-layout.json",
+    "example-games/gym/content/long-erasure.csv",
+    "example-games/gym/content/long-erasure-manifest.json",
+    "example-games/gym/content/long-erasure-graph.mmd",
+    "example-games/gym/content/storylines.csv",
+    "example-games/gym/content/storyline-manifest.json",
+    "example-games/gym/content/storyline-graph.mmd"
+  ]
+}

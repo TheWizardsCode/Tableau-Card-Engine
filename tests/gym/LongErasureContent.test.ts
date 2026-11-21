@@ -13,12 +13,13 @@
  * (`parseCsv` → `cardsFromCsv` → `compileContentOptions` /
  * `buildStorylineManifestFromCsv`), so the test fails on real observable
  * output rather than on a text search. The one exception is the IP guard,
- * which is a text scan by definition — with a positive control so a guard that
+ * which is a text scan by definition — it runs over the guarded set in
+ * `configs/storyline-ip-scan.json` with a positive control, so a guard that
  * cannot fail is itself a failure.
  *
  * @module
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,6 +31,11 @@ import {
   LONG_ERASURE_CONTENT_PATH,
 } from '../../src/story-line/content/adapters';
 import { checkArtefacts } from '../../src/story-line/content/artefacts';
+import {
+  parseProhibitedTermList,
+  scanProhibitedTerms,
+  type ProhibitedTermList,
+} from '../../src/story-line/content/ip-terms';
 import {
   cardsFromCsv,
   compileContentOptions,
@@ -412,41 +418,61 @@ describe('The Long Erasure: reset/loop ending', () => {
 });
 
 describe('The Long Erasure: IP guard', () => {
-  /** The prohibited terms, lower-cased and longest-first (prefix-anchored match). */
-  const TERMS: readonly string[] = (
-    JSON.parse(readRepoFile('tests/fixtures/story-line/ip-prohibited-terms.json')) as {
-      terms: string[];
-    }
-  ).terms.map((term) => term.toLowerCase()).sort((a, b) => b.length - a.length);
+  /** The guarded-set config: the same data `npm run storylines:ip-scan` reads. */
+  const IP_CONFIG_PATH = 'configs/storyline-ip-scan.json';
 
-  /** Returns the prohibited terms found in `text` (case-insensitive, prefix-anchored). */
-  function findProhibitedTerms(text: string): string[] {
-    const haystack = text.toLowerCase();
-    return TERMS.filter((term) =>
-      // A prefix boundary keeps "warp" from matching innocent substrings while
-      // still catching inflections such as "warped" or "phasers".
-      new RegExp(`(^|[^a-z])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(haystack),
+  /** Reads the validated term list the config names. */
+  function shippedTermList(): ProhibitedTermList {
+    const config = JSON.parse(readRepoFile(IP_CONFIG_PATH)) as { terms?: string };
+    const parsed = parseProhibitedTermList(
+      JSON.parse(readRepoFile(config.terms ?? 'tests/fixtures/story-line/ip-prohibited-terms.json')),
     );
+    if (!parsed.ok) throw new Error(`term list is invalid: ${parsed.errors.join('; ')}`);
+    return parsed.list;
+  }
+
+  /** The repository-relative paths the gate covers. */
+  function guardedTargets(): string[] {
+    const config = JSON.parse(readRepoFile(IP_CONFIG_PATH)) as { targets: string[] };
+    return config.targets;
   }
 
   it('detects a prohibited term (the guard can actually fail)', () => {
-    expect(findProhibitedTerms('The warped hull answered with phasers.')).toEqual(
-      expect.arrayContaining(['warp', 'phaser']),
+    const list = shippedTermList();
+    expect(scanProhibitedTerms('The warped hull answered with phasers.', list)).toEqual(
+      expect.arrayContaining([
+        { term: 'warp', line: 1 },
+        { term: 'phaser', line: 1 },
+      ]),
     );
-    expect(findProhibitedTerms('The Archivist reweaves a drowned homeland.')).toEqual([]);
+    expect(
+      scanProhibitedTerms('The Archivist reweaves a drowned homeland.', list),
+    ).toEqual([]);
   });
 
-  it('keeps the authored content and its generated artefacts free of prohibited terms', () => {
-    const scanned = [
-      CONTENT_PATH,
-      MANIFEST_PATH,
-      MERMAID_PATH,
-      'example-games/gym/content/storylines.csv',
-      'example-games/gym/content/storyline-manifest.json',
-      'example-games/gym/content/storyline-graph.mmd',
-    ];
-    for (const path of scanned) {
-      expect(findProhibitedTerms(readRepoFile(path)), `${path} contains prohibited IP`).toEqual(
+  it('keeps the framework allowance narrow: a narrative use is still caught', () => {
+    const list = shippedTermList();
+    expect(scanProhibitedTerms('A `Phaser`-free logic module.', list)).toEqual([]);
+    expect(scanProhibitedTerms('The Phaser banks fired.', list)).toEqual([
+      { term: 'phaser', line: 1 },
+    ]);
+  });
+
+  it('guards the GDD, its examples and diagrams, and the authored content', () => {
+    const targets = guardedTargets();
+    expect(targets).toContain('docs/design/storyline-game-gdd.md');
+    expect(targets).toContain(CONTENT_PATH);
+    expect(targets).toContain(MANIFEST_PATH);
+    expect(targets).toContain(MERMAID_PATH);
+    for (const path of targets) {
+      expect(existsSync(join(REPO_ROOT, path)), `${path} is configured but missing`).toBe(true);
+    }
+  });
+
+  it('keeps the guarded set free of prohibited terms', () => {
+    const list = shippedTermList();
+    for (const path of guardedTargets()) {
+      expect(scanProhibitedTerms(readRepoFile(path), list), `${path} contains prohibited IP`).toEqual(
         [],
       );
     }

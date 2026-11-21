@@ -418,6 +418,28 @@ that game keeps its own playtest harness. See
 [Core: Generic Story-Line System → Route-space guard](../core-engine/story-line.md#route-space-guard)
 for the full contract.
 
+### 9.1 Prohibited-term (IP) scan (are the words the setting's own?)
+
+The validator proves a row is well formed; the route-space guard proves it is
+playable. Neither looks at whether a word belongs to someone else. The IP scan
+does, over the guarded set in `configs/storyline-ip-scan.json` with the term
+list in `tests/fixtures/story-line/ip-prohibited-terms.json`:
+
+```bash
+npm run storylines:ip-scan                            # every configured target
+npm run storylines:ip-scan -- path/to/candidate.csv   # one ad-hoc candidate
+npm run storylines:ip-scan -- --json                  # machine-readable report
+```
+
+It exits `0` only when every target is readable and clean; a match is reported
+with its file, line and term. The term list may carry a **narrow, case-sensitive
+allowance** for a technical homograph (the engine framework's own name), never a
+general exemption — a narrative use of the same word is still caught, and the
+unit tests pin that. Add a new content file to the guarded set in the same
+change. The Long Erasure GDD records the scan, the trademark read and the
+carried-forward review step ([scan record](../design/storyline-game-gdd.md#43-prohibited-term-scan-record),
+[gate](../design/storyline-game-gdd.md#45-the-prohibited-term-gate-and-how-a-writer-runs-it)).
+
 ## 10. Troubleshooting
 
 | Symptom | Cause / fix |

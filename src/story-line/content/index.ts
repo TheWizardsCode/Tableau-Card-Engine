@@ -12,6 +12,7 @@
  * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports |
  * | Transactional authoring | `author` | `addContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
  * | Generated artefacts | `artefacts` | `renderArtefacts`, `checkArtefacts`, `writeArtefacts`, `previewArtefacts`, `DEFAULT_ARTEFACT_PATHS` |
+ * | Prohibited-term (IP) scan | `ip-terms` | `parseProhibitedTermList`, `scanProhibitedTerms` |
  * | Shipped adapters | `adapters` | `GYM_CONTENT_ADAPTER`, `DEFAULT_CONTENT_ADAPTER`, `getContentAdapter` |
  *
  * Nothing here imports a game repository or Phaser,
@@ -139,6 +140,14 @@ export {
   renderArtefacts,
   writeArtefacts,
 } from './artefacts';
+
+export type {
+  ProhibitedTermAllowance,
+  ProhibitedTermList,
+  ProhibitedTermListParseResult,
+  ProhibitedTermMatch,
+} from './ip-terms';
+export { parseProhibitedTermList, scanProhibitedTerms } from './ip-terms';
 
 export type { ContentFileSpec } from './adapters';
 export {

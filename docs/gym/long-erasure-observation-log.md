@@ -456,13 +456,14 @@ built here):
 ## 8. IP statement
 
 This log accompanies an original setting and records no third-party franchise
-character, race, faction, ship class, technology name or episode title. The prose here
-was checked against the parent item's prohibited-term list by hand; the only match a
-mechanical scan of this file produces is the engine framework's own name
-("Phaser"), which is why the automated guard
-(`tests/gym/LongErasureContent.test.ts`) scans the authored content and its generated
-artefacts rather than prose documentation. The framework name is not a reference to any
-fictional technology in the content.
+character, race, faction, ship class, technology name or episode title. The prose here is
+checked by the prohibited-term gate (`npm run storylines:ip-scan`, guarded set in
+`configs/storyline-ip-scan.json`), which scans this log alongside the GDD, the content
+and the generated artefacts. The only match a mechanical scan of this file produces is
+the engine framework's own name ("Phaser"), which the term list allows through a narrow,
+case-sensitive technical allowance — a narrative use of the same word is still caught.
+The framework name is not a reference to any fictional technology in the content; the
+scan record is the GDD's §4.3 and the gate is §4.5.
 
 ---
 

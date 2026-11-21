@@ -85,7 +85,12 @@
       "src/ui/createCardGame.ts",
       "AGENTS.md",
       "docs/dev",
-      "scripts/refresh-thumbnails.sh"
+      "scripts/refresh-thumbnails.sh",
+      "src/story-line",
+      "tests/story-line",
+      "docs/core-engine",
+      "docs/design",
+      "scripts/ip-scan.ts"
     ],
     "assets": [
       "CREDITS.md",

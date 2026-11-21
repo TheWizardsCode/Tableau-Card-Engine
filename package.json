@@ -28,6 +28,7 @@
     "storylines:editor": "tsx scripts/storyline-editor-cli.ts",
     "storylines:graph": "tsx scripts/storyline-graph.ts",
     "storylines:guard": "tsx scripts/storyline-guard.ts",
+    "storylines:ip-scan": "tsx scripts/ip-scan.ts",
     "storylines:validate": "tsx scripts/validate-storylines.ts",
     "publish:repos": "tsx scripts/publish-repos.ts",
     "setup:distribution": "tsx scripts/setup-distribution.ts",

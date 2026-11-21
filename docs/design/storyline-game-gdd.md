@@ -8,7 +8,7 @@
 > |---|---|
 > | **Work item** | `CG-0MWPY25W4002UNKB` (GDD foundation: setting, loop and beat-sheet data model) |
 > | **Parent epic** | `CG-0MWNFVLYT003M7XF` (GDD: full story-line game, approach C — scene beat sheet) |
-> | **Document path** | `docs/design/storyline-game-gdd.md` (working default; finalised by `CG-0MWPY2FV30041M48`) |
+> | **Document path** | `docs/design/storyline-game-gdd.md` (final — see [§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)) |
 > | **Design direction** | Approach **C** (scene beat sheet) with approach A's card chain inside it and approach B's irreversible-loss dial |
 > | **Evidence base** | [`docs/gym/long-erasure-observation-log.md`](../gym/long-erasure-observation-log.md) (`CG-0MWNHZEGJ0099JFM`), re-measured by [`docs/design/storyline-playtest-evaluation.md`](./storyline-playtest-evaluation.md) (`CG-0MWPY24IX00719NH`) |
 > | **Engine contract composed with** | [`docs/core-engine/story-line.md`](../core-engine/story-line.md) (`@story-line`) |
@@ -16,7 +16,8 @@
 
 **How to read this document.** Sections 1–2 are written and complete: they are
 what an implementer needs to build the beat-sheet layer. Section 4 carries the
-fixed design vocabulary (its proper-noun table is pending the IP pass), and
+fixed design vocabulary and the final naming table, scan record and trademark
+read, and
 sections 3 and 6–7 are owned by later children of the epic and are present as
 marked stubs so the document is one continuous artefact from the start. Every
 stub names the work item that fills it, and nothing in sections 1–2 depends on
@@ -94,6 +95,11 @@ layer described here.
    - [3.7 How this section is verified](#37-how-this-section-is-verified)
    - [3.8 What this section does not prove](#38-what-this-section-does-not-prove)
 4. [Glossary](#4-glossary)
+   - [4.1 Design vocabulary](#41-design-vocabulary)
+   - [4.2 The setting's names (final)](#42-the-settings-names-final)
+   - [4.3 Prohibited-term scan record](#43-prohibited-term-scan-record)
+   - [4.4 Trademark sanity read](#44-trademark-sanity-read)
+   - [4.5 The prohibited-term gate, and how a writer runs it](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)
 5. [Test Plan](#5-test-plan)
 6. [Engine-Gap Backlog](#6-engine-gap-backlog)
 7. [V1 Scope Statement and Deferred List](#7-v1-scope-statement-and-deferred-list-todo)
@@ -107,7 +113,7 @@ layer described here.
 
 ### 1.1 Setting and tone
 
-**Working setting (names pending the IP pass).** The survey vessel *Ashlight*
+**Setting (final names — [§4.2](#42-the-settings-names-final)).** The survey vessel *Ashlight*
 holds station at the edge of a volume of space that has stopped having happened.
 The event has no monster and no fleet behind it: it is an *editing* event. Charts
 that cross the boundary come back blank, the log records a volume that no
@@ -121,8 +127,10 @@ record is *the episode they made*.
 
 The setting is original and is used at trope level only. No third-party
 character, race, faction, vessel, technology or episode title appears in this
-document or in the content it specifies; the prohibited-term checklist and the
-final naming table belong to `CG-0MWPY2FV30041M48`.
+document or in the content it specifies; the naming table is
+[§4.2](#42-the-settings-names-final), the scan record is
+[§4.3](#43-prohibited-term-scan-record) and the trademark read is
+[§4.4](#44-trademark-sanity-read).
 
 **Tone contract.** The register is a **survey service incident log**, not a
 military bridge. Four rules make that audible:
@@ -880,7 +888,7 @@ remain stubs.
 | Writer content pipeline | **Written — [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)**: column table, three verbatim worked rows (validated), option-cell grammar, the end-to-end review gate with sign-off roles, the real malformed-entry diagnostics and the five spike frictions with owners | `CG-0MWPY29730011FJ4` |
 | Tension, pacing, failure and reset-ending scoring | **Written — [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring)**: the clock as a per-scene budget with two recovery paths, hull as the irreversible dial, numeric pacing rules, the failure/recovery table per type, the scoring inputs/weights/bands with a worked score per band and the earned-not-punitive proof | `CG-0MWPY2AZX001UI2A` |
 | Presentation contract | **Written — [§3](#3-ux-visual-design-and-audio-direction)**: the SLL zone table (including three new game zones), overlay behaviour and depth ordering, the `COMMON_SFX_KEYS` map with a reduced-motion alternative per event, accessibility (reduced motion, verbosity/tooltips, colour independence, keyboard/touch), and determinism/save-load/transcript/replay expectations | `CG-0MWPY2CHF003AHE1` |
-| Glossary proper nouns and prohibited-term gate | final names with rationale, prohibited-term scan of this document, trademark sanity read | `CG-0MWPY2FV30041M48` |
+| Glossary proper nouns and prohibited-term gate | **Written — [§4.2](#42-the-settings-names-final)–[§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)**: the final naming table with a rationale per name, the recorded prohibited-term scan of this document and its guarded set, the trademark sanity read and the carried-forward review gate | `CG-0MWPY2FV30041M48` |
 | Engine-gap backlog | **Written — [§6](#6-engine-gap-backlog)**: every missing capability with unlock, module reference, effort band (with nearest precedent), issue type and disposition; filed items recorded in [§6.6](#66-disposition-record) | `CG-0MWPY2ECE002P2NH` |
 | V1 scope and deferred list | act/scene/beat/branch counts, playtime, word budget, replayability, deferrals | `CG-0MWPY2HJU006LJMU` |
 | Integration and review close-out | developer-guide link, reciprocal links, re-run verification at the final commit | `CG-0MWPY2JEU006DYUL` |
@@ -1358,8 +1366,8 @@ so a corrected row cannot leave a stale copy in this document. This is T8 in
 #### 2.9.5 The review gate
 
 The gate is a sequence, and every step is a command a writer can run. Steps 1–3
-are the writer's own pre-flight before anything is committed; steps 4–6 bring in
-the reviewer.
+and 6 are the writer's own pre-flight before anything is committed; steps 4–5
+and 7 bring in the reviewer.
 
 | # | Step | Command | Passes when | Owner |
 |---|---|---|---|---|
@@ -1368,7 +1376,8 @@ the reviewer.
 | 3 | **Guard the route space** | `npm run storylines:guard -- --csv <file> --game <adapter> --initial <bag>` (or `npm run storylines:guard` for every configured target) | `PASS` — all three invariants green, no bound hit | writer |
 | 4 | **Preview and apply** | editor preview → apply (or `--apply` headless) | the preview diff shows only the intended rows, the validator report inside it is clean, and apply returns `written: true` | writer + designer |
 | 5 | **Regenerate artefacts** | automatic on apply; verify with `npm run storylines:graph -- --format json --check` and `--format mermaid --check` | "no drift" — the committed manifest and Mermaid graph match the CSV | writer |
-| 6 | **Sign off** | a comment on the content work item carrying steps 2–5's output | designer approval + producer approval where required (below) | designer / producer |
+| 6 | **Scan for prohibited IP** | `npm run storylines:ip-scan` (or `-- <file>` for one candidate) | `RESULT: CLEAN`; the scan covers the change's file because that file is in the guarded set ([§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)) | writer |
+| 7 | **Sign off** | a comment on the content work item carrying steps 2–3 and 6's output, and steps 4–5's artefact result | designer approval + producer approval where required (below) | designer / producer |
 
 **Hard errors versus warnings.** A hard error refuses the write and must be
 fixed; a warning is reported and never invalidates the content.
@@ -1396,11 +1405,11 @@ required"** result naming the failing check.
 |---|---|---|
 | **Writer** | the row: prose, labels, targets, costs, the `consequential` and `ending` marks | the validator and guard output pasted into the work-item comment |
 | **Designer / balance reviewer** | the branch's *consequence*: it changes the scene, it fits the act's economy, and the cost/gain is affordable from the starting bag ([§2.8.3](#283-the-economy-by-act)) | approval comment quoting the preview diff's `options` cell |
-| **Producer** | a new act or scene, a change to a resource's source/sink set, a new proper noun (IP gate), or a change to the declared resource set | approval comment naming the section of this document that authorises it |
+| **Producer** | a new act or scene, a change to a resource's source/sink set, a new proper noun (IP gate, [§4.2](#42-the-settings-names-final)), or a change to the declared resource set | approval comment naming the section of this document that authorises it, plus the `RESULT: CLEAN` line from step 6 |
 
-The writer's own checks (steps 2–5) are necessary but not a sign-off: the
+The writer's own checks (steps 2–3 and 6) are necessary but not a sign-off: the
 designer's whole question is *would a player feel this choice?*, which no
-validator can answer.
+validator or scanner can answer.
 
 #### 2.9.6 What happens on a malformed entry
 
@@ -2452,10 +2461,13 @@ The contract is pinned by one unit suite and four review checks.
 
 ## 4. Glossary
 
-> **Proper nouns are working names.** The final naming table, the
-> prohibited-term scan and the trademark sanity read are owned by
-> `CG-0MWPY2FV30041M48`. The design vocabulary below is fixed by this document
-> and should not be renamed by that pass.
+> **Written by `CG-0MWPY2FV30041M48`.** The naming pass is complete:
+> [§4.2](#42-the-settings-names-final) is the final naming table,
+> [§4.3](#43-prohibited-term-scan-record) is the prohibited-term scan record,
+> [§4.4](#44-trademark-sanity-read) is the trademark sanity read and
+> [§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it) is the gate a
+> writer or reviewer runs. The design vocabulary in §4.1 is fixed by this
+> document and was not renamed by the pass.
 
 ### 4.1 Design vocabulary
 
@@ -2477,17 +2489,195 @@ The contract is pinned by one unit suite and four review checks.
 | **Reset ending** | The ending that restarts the run at `start`, leaving the journal and the ledger as the record. |
 | **Consequential choice** | A choice marked in the content's `consequential` column, held to the minimum rejoin distance by the route-space guard. |
 
-### 4.2 Working proper nouns (pending the IP pass)
+### 4.2 The setting's names (final)
 
-| Name | What it is | Rationale |
-|---|---|---|
-| **The Long Erasure** | Working title, and the name of the reset ending | names the phenomenon, not a franchise |
-| **Ashlight** | The survey vessel | a lamp-name for a ship that measures the dark |
-| **The Unwriting** | The phenomenon: space being edited out of having happened | describes the event, no proper-noun baggage |
-| **The Revision Loom** | The mechanism doing the editing | a working loom, not a weapon |
-| **Archivist Vane** | The antagonist's intermediary | an archivist, because the story is about records |
-| **The dead zone** | A listening shadow inside the erased volume | functional, plain-language place name |
-| **The muster station** | The nearest surviving port | functional, plain-language place name |
+These are the names the setting and its content use. Each row is either an
+invented proper noun or a deliberately common noun; the table is the whole
+inventory, so a name that is not here is not part of the setting's naming
+layer.
+
+| Name | Kind | What it is | Rationale (one line) | First use |
+|---|---|---|---|---|
+| **The Long Erasure** | Setting / title | The setting, the game's title and the name of the reset ending | Names the event in plain English — a long erasure of a volume of space — with no franchise vocabulary | Executive Summary; `le-end-reset` |
+| **The Unwriting** | Phenomenon | The erasure itself: space being edited out of having happened | A descriptive gerund: the event is an edit, not a weapon, and the word is coined from common English parts | [§1.1](#11-setting-and-tone); `le-i-open` |
+| **the weave** | Common noun (phenomenon) | The Revision Loom's ongoing revision, and the path a thread takes through it | A working metaphor for the mechanism; lower-case in prose and capitalised only inside the two card titles that name it | [§1.1](#11-setting-and-tone); `le-ii-keep`, `le-iii-ahead` |
+| **Ashlight** | Vessel | The player's survey vessel | A lamp-name for a ship that measures the dark: one transparent coinage from two common words, with no class prefix or registry number | [§1.1](#11-setting-and-tone); `le-iii-approach` |
+| **Archivist Vane** | Antagonist | The Revision Loom's unfailingly polite intermediary | An archivist, because the story is about records; `Vane` is an ordinary English surname with a weather-vane overtone — he shows which way the revision blows | [§1.1](#11-setting-and-tone); `le-ii-offer` |
+| **The Revision Loom** | Technology / mechanism | The structure that edits the volume and is still turning | A loom that revises: a working craft noun, deliberately not a weapon, drive or reactor | [§1.1](#11-setting-and-tone); `le-ii-offer` |
+| **the core** | Common noun (place) | The Loom's centre, where the player can stop it | Plain architectural noun; the scene title *The Core* capitalises it without coining anything | [§1.3](#13-the-core-loop); `le-iii-approach` |
+| **the dead zone** | Common noun (place) | A listening shadow inside the erased volume | A functional, plain-language place descriptor; no planet name is invented, so the place stays generic | [§1.3](#13-the-core-loop); `le-ii-shelter` |
+| **the muster station** | Common noun (place) | The nearest surviving port | A real maritime term for the place a crew assembles, used literally | [§1.1](#11-setting-and-tone); `le-ii-shelter` |
+| **the drowned homeland** | Common noun (place) | The lost home port a crew member remembers | A common-noun description; the homeworld is deliberately left unnamed, so the setting owns no planet name | [§2.8](#28-resource-model-and-economy); `le-end-reset` |
+| **the survey service** | Faction / institution | The civilian service the player's ship belongs to | **No proper noun is invented for the faction.** A plain institutional noun keeps the register civil-service rather than a polity, alliance or fleet | [§1.1](#11-setting-and-tone); content prose |
+| **the crew, the survey commander, the ally** | Roles | The people aboard, and the unnamed contact who guides the ship | Role nouns only; apart from the antagonist no character is named, so the player projects the crew rather than reading a cast list | [§1.2](#12-player-role-and-the-pitch); content prose |
+
+**Coverage by category.** Setting (1: The Long Erasure), phenomenon (2: The
+Unwriting, the weave), vessel (1: Ashlight), antagonist (1: Archivist Vane),
+technology (1: The Revision Loom), factions (1: the survey service — a
+common-noun institution, not an invented proper noun), places (4) and roles (1
+row covering the three role nouns) — twelve rows in all.
+
+**Two deliberate absences.** The pass found **no invented faction proper noun**
+and **no invented technology name beyond the Revision Loom**. That is a naming
+decision, not an omission: an invented polity or drive name is exactly the kind
+of term that invites a third-party comparison, and the design never needs one —
+the survey service is an employer, not a power, and the Loom is a mechanism,
+not a fleet.
+
+**Naming rules.**
+
+1. **The table is complete.** A capitalised word outside it is either a real
+   place or institution used literally (`the survey service`, `the muster
+   station`), a card title composed from the table's words and ordinary English
+   (for example *Dead Reckoning*, *The Missing Berth*, *Mutiny*, *Salvage
+   Rights*), or the design vocabulary in [§4.1](#41-design-vocabulary). Card and
+   scene titles are descriptive; they are not a second naming layer.
+2. **Every name is transparent.** Each is composed of common English words or
+   (for `Ashlight`) a single coinage from two of them. None copies a
+   third-party character, race, faction, vessel class, technology or episode
+   title.
+3. **A new proper noun is a reviewed change.** It needs a producer sign-off at
+   the review gate ([§2.9.5](#295-the-review-gate)), a row in this table and a
+   clean prohibited-term scan ([§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)).
+4. **Common nouns stay lower-case in prose.** `the weave`, `the core`, `the dead
+   zone`, `the muster station` and `the drowned homeland` are capitalised only
+   inside a title or at the start of a sentence.
+
+### 4.3 Prohibited-term scan record
+
+**Result: clean.** The scan was run over the guarded set at the commit this
+section was written against, using
+`tests/fixtures/story-line/ip-prohibited-terms.json` (40 terms, one narrow
+allowance). No prohibited third-party term appears in this document, its worked
+examples, its diagrams or the authored content it specifies.
+
+```text
+$ npm run storylines:ip-scan
+Prohibited-term scan — 12 file(s), 40 term(s), 1 allowance(s)
+  terms: tests/fixtures/story-line/ip-prohibited-terms.json
+  ✓ docs/design/storyline-game-gdd.md
+  ✓ docs/design/storyline-playtest-evaluation.md
+  ✓ docs/gym/long-erasure-observation-log.md
+  ✓ tests/fixtures/story-line/gdd-worked-examples.csv
+  ✓ tests/fixtures/story-line/gdd-resource-trades.csv
+  ✓ tests/fixtures/story-line/gdd-presentation-layout.json
+  ✓ example-games/gym/content/long-erasure.csv
+  ✓ example-games/gym/content/long-erasure-manifest.json
+  ✓ example-games/gym/content/long-erasure-graph.mmd
+  ✓ example-games/gym/content/storylines.csv
+  ✓ example-games/gym/content/storyline-manifest.json
+  ✓ example-games/gym/content/storyline-graph.mmd
+RESULT: CLEAN — no prohibited term in 12 file(s).
+```
+
+**What "the guarded set" means.** It is data, not a list inside a test:
+[`configs/storyline-ip-scan.json`](../../configs/storyline-ip-scan.json) names
+the files, [`tests/fixtures/story-line/ip-prohibited-terms.json`](../../tests/fixtures/story-line/ip-prohibited-terms.json)
+holds the terms and their allowances. Adding a content file or a document that
+quotes content is a config edit; the CI guard scans the same set, so a file
+cannot pass by being missing from it (a configured-but-absent path fails the
+scan and the test).
+
+**The one allowance.** One fictional-weapon term on the list is also the name
+of the game framework this engine builds on. The term list allows only the
+framework's **exact technical compounds** (its code-span/quoted name, `-free`,
+`tooltip`, `mode` and `` `Text` ``), and the allowance is case-sensitive. A
+narrative use of the word — for example, a ship's weapon banks — is still a
+match, and both the unit test and the CI guard assert that the allowance cannot
+hide it. This is the only allowance in the list; a second one would need the
+same rationale and the same positive control.
+
+**How the scan is enforced.** Three layers, none of which is a substitute for
+the human read in [§4.4](#44-trademark-sanity-read):
+
+| Layer | What it proves |
+|---|---|
+| `npm run storylines:ip-scan` | a writer or reviewer gets a per-file verdict, including an ad-hoc pre-commit check of a candidate file |
+| `tests/gym/LongErasureContent.test.ts` | CI scans the same configured set and fails on a match **or a missing target** |
+| `tests/story-line/content/ip-terms.test.ts`, `tests/scripts/ip-scan.test.ts` | the matching semantics, the allowance narrowness and the CLI's fail-closed behaviour are pinned |
+
+### 4.4 Trademark sanity read
+
+| | |
+|---|---|
+| **Read on** | 2026-11-21 |
+| **Mechanical search** | Every term in `ip-prohibited-terms.json` (40) across the 12 guarded files, by `npm run storylines:ip-scan`; the recorded output is [§4.3](#43-prohibited-term-scan-record). |
+| **Human read** | The whole of [§4.2](#42-the-settings-names-final) read name by name against the fixture's category list (franchise name, character, race, faction, ship class, technology, episode title), then the content CSV's titles and prose read as narrative rather than as data. Recorded as reviewed. |
+| **Register search** | **Not performed.** This environment has no access to the trademark registers, so no register or common-law clearance is claimed. |
+| **Decision** | Names retained as tabled; no rename is required by the scan or by the human read. |
+
+**Findings.**
+
+- **No list term appears anywhere in the guarded set.** The one mechanical
+  collision is the engine framework's own name, handled by the documented
+  allowance in [§4.3](#43-prohibited-term-scan-record); the narrative never
+  uses the word for anything in the setting.
+- **No name maps to a franchise element.** The setting noun, the vessel, the
+  antagonist, the mechanism and the phenomenon are each either a common-noun
+  description or a transparent coinage, and the faction is deliberately left
+  without a proper noun.
+- **Three card titles are ordinary phrases that are also the titles of
+  unrelated works:** *The Dead Zone*, *Dead Reckoning* and *The Core*. Each is
+  descriptive of its card, none is used as a source identifier, a series marker
+  or a claim of association, and short descriptive titles of this kind are not
+  distinctive in the relevant sense. The read records them rather than treating
+  a coincidental title match as a prohibited reference.
+
+**Residual risk, and what would reduce it.**
+
+1. **A mechanical scan cannot catch a paraphrased, translated or visual
+   reference.** The mitigation is the human read above plus the producer
+   sign-off at the review gate ([§2.9.5](#295-the-review-gate)); a paraphrase
+   that survives both is a content-review failure, not a scanner failure.
+2. **The two coined names carry the highest (still low) register risk:**
+   *The Long Erasure* and *Ashlight*. Both are transparent English formations
+   used in a distinct game context, which is why the assessed risk is **low** —
+   but low is not zero, and it is unverified because no register search was
+   performed.
+3. **Recommended before public promotion:** run register searches for both
+   coined names in the games/entertainment classes, record the result on the
+   close-out item (`CG-0MWPY2JEU006DYUL`), and re-run
+   `npm run storylines:ip-scan` if any name changes.
+
+### 4.5 The prohibited-term gate, and how a writer runs it
+
+The checklist is carried forward for content review as three committed
+artefacts, none of which is prose a reviewer has to reconstruct:
+
+| What | Where |
+|---|---|
+| The prohibited terms and their allowances | [`tests/fixtures/story-line/ip-prohibited-terms.json`](../../tests/fixtures/story-line/ip-prohibited-terms.json) |
+| The files the gate covers | [`configs/storyline-ip-scan.json`](../../configs/storyline-ip-scan.json) |
+| The command | `npm run storylines:ip-scan` |
+
+**Run it.**
+
+```bash
+npm run storylines:ip-scan                            # the guarded set (writer pre-commit and CI)
+npm run storylines:ip-scan -- path/to/candidate.csv   # one ad-hoc file before it is committed
+npm run storylines:ip-scan -- --json                  # machine-readable report
+```
+
+The command exits `0` only when every target was readable and no term matched;
+anything else exits `1` and names the file, the line and the term. A writer runs
+it before committing a content change; a reviewer runs it as part of the review
+gate, at **step 6** of [§2.9.5](#295-the-review-gate), and pastes the
+`RESULT: CLEAN` line into the sign-off comment. Adding a new content file to
+the gate is a config edit — do that in the same change as the file, so the next
+run covers it.
+
+**What the gate cannot do.** It is a text scan over the files it is given, so it
+cannot catch: a paraphrased reference, a translated term, a name that is not in
+the list, an image or an audio cue, or a homograph hidden behind an allowance.
+Those are the human read's job ([§4.4](#44-trademark-sanity-read)). It also does
+not replace the content validator or the route-space guard: those prove a row is
+well formed and playable, this proves its words are the setting's own.
+
+**Adding or changing a term.** A new term is a change to the fixture with a
+`source` note, and it applies to every guarded file at once. Never edit an
+allowance to hide a narrative match: an allowance needs a rationale and a
+positive control proving that a non-technical use of the same word is still
+caught.
 
 ---
 
@@ -2511,6 +2701,7 @@ profiles; the commands below verify *this document* and the model it specifies.
 | T8 | The rows quoted in [§2.9.4](#294-worked-example-rows-verbatim-validated) are byte-identical to the rows `storylines:validate` accepts, and the document still names every row's target | `npx vitest run --project unit tests/story-line/content/gdd-content-pipeline.test.ts` | pass — the document's rows are the fixture's rows, and the fixture validates |
 | T9–T12 | The scoring weights, bands and worked scores; the abandon band after the arc correction; the rejoin distance; the scene-budget sizing rule | see [§2.10.7](#2107-how-this-section-is-verified) | pass, or the named pending item (`CG-0MWNSR376002QBY9`) |
 | T13 | The presentation contract's zone table matches its layout fixture (every zone and anchor), option anchors meet the 44 design-px floor, every cited SFX key exists in `COMMON_SFX_KEYS` and every audio row has a reduced-motion alternative, every cited source path exists, the section contains no coordinate pair, and `src/story-line/` contains no `Math.random` | `npx vitest run --project unit tests/story-line/content/gdd-presentation-contract.test.ts` | pass ([§3.7](#37-how-this-section-is-verified)) |
+| T14 | The GDD, its worked examples, its diagrams and the authored content carry no prohibited third-party term; the gate cannot pass with a missing target and cannot be fooled by its framework allowance | `npm run storylines:ip-scan`, then `npx vitest run --project unit tests/gym/LongErasureContent.test.ts tests/story-line/content/ip-terms.test.ts tests/scripts/ip-scan.test.ts` | `RESULT: CLEAN`; tests pass ([§4.3](#43-prohibited-term-scan-record)) |
 
 > T9–T12 live with the rules they verify ([§2.10.7](#2107-how-this-section-is-verified))
 > rather than here, so a re-tune cannot leave a stale command behind; the
@@ -2571,6 +2762,11 @@ console.log("PASS: every manifest card id resolves and every content card is ass
    with a validation method — no unproven mechanism is presented as settled.
 6. **UK English and prose budgets.** Spelling convention held; objective
    statements within 90 characters.
+7. **IP names and gate.** Every invented proper noun is a row in
+   [§4.2](#42-the-settings-names-final); `npm run storylines:ip-scan` reads
+   `RESULT: CLEAN` at the commit under review; the trademark read's residual
+   risk ([§4.4](#44-trademark-sanity-read)) is accepted by the producer, with
+   the register-search recommendation carried to the close-out item.
 
 ---
 
@@ -3332,6 +3528,6 @@ is worse than a link.
 | `CG-0MWPY2AZX001UI2A` | Tension, pacing, failure and reset-ending scoring — delivered: [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), T9–T12; reconciled the open arc-credit item `CG-0MWNSR376002QBY9` |
 | `CG-0MWPY2CHF003AHE1` | Presentation contract: UI, audio, accessibility, determinism — delivered: [§3](#3-ux-visual-design-and-audio-direction), T13; named gaps B1, B4, B5, B7, B8, B9 for the backlog and build epic |
 | `CG-0MWPY2ECE002P2NH` | Engine-gap backlog — delivered: [§6](#6-engine-gap-backlog); filed the engine-gap items listed in [§6.6](#66-disposition-record) |
-| `CG-0MWPY2FV30041M48` | IP-safe naming pass and prohibited-term gate |
+| `CG-0MWPY2FV30041M48` | IP-safe naming pass and prohibited-term gate — delivered: [§4.2](#42-the-settings-names-final)–[§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it), T14; the GDD path is final (no rename needed) |
 | `CG-0MWPY2HJU006LJMU` | V1 scope statement and deferred list |
 | `CG-0MWPY2JEU006DYUL` | Integration, review and verification close-out |

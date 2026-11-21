@@ -65,6 +65,7 @@ GAMES_CONFIG=full npm run dev           # Run all games + Gym (after setup:distr
 npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV; needs the tce-main-street sibling)
 npm run storylines:validate  # Validate story-line content through the content adapter (default: Gym)
 npm run storylines:graph     # Regenerate the committed manifest/Mermaid artefacts (-- --check to guard drift)
+npm run storylines:ip-scan   # Scan the guarded set (GDD + content + artefacts) for prohibited third-party terms
 npm run storylines:author    # Transactional content edits (add-card / update-card; --dry-run supported)
 npm run storylines:editor    # Story-line editor: viewer + guided editing (local dev tool; -- --content/--adapter)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/

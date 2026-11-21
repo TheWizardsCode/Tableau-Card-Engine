@@ -1,6 +1,6 @@
 {
-  "note": "Prohibited third-party IP terms for the story-line content (CG-0MWNFV6VU003O3PC AC 10). The narrative is an original setting using the history-editing-weapon trope at trope level only, so no franchise name, character, race, faction, ship class or technology name may appear in the authored content or its generated artefacts. Matching is case-insensitive and anchored at the start of the term, so inflections (\"warped\", \"phasers\") are caught as well.",
-  "source": "CG-0MWNFV6VU003O3PC (Gym spike: IP-safe branching story-line game) — prohibited-term list; extended with the franchise's well-known character/race/ship-class names for the trademark sanity read.",
+  "note": "Prohibited third-party IP terms for the story-line content (CG-0MWNFV6VU003O3PC AC 10). The narrative is an original setting using the history-editing-weapon trope at trope level only, so no franchise name, character, race, faction, ship class or technology name may appear in the authored content, its generated artefacts, or the design documents that quote them. Matching is case-insensitive and anchored at the start of the term, so inflections (\"warped\", \"phasers\") are caught as well. `allowedOccurrences` lists exact, case-sensitive technical compounds that are blanked before matching (the engine framework's own name), each with a rationale; an allowance is never a general exemption, and a weapon reference using the same word is still caught (see the positive controls in tests/story-line/content/ip-terms.test.ts).",
+  "source": "CG-0MWNFV6VU003O3PC (Gym spike: IP-safe branching story-line game) \u2014 prohibited-term list; extended with the franchise's well-known character/race/ship-class names for the trademark sanity read.",
   "terms": [
     "star trek",
     "starfleet",
@@ -42,5 +42,11 @@
     "excelsior class",
     "defiant class",
     "runabout"
+  ],
+  "allowedOccurrences": [
+    {
+      "pattern": "(?:`Phaser`|\"Phaser\"|Phaser(?:-free| tooltip| mode| `Text`))",
+      "rationale": "Phaser is the HTML5 game framework this engine builds on, not a fictional technology. The allowance is case-sensitive and limited to the framework's code-span/quoted name and its technical compounds (-free, tooltip, mode, `Text`), so a lower-case or narrative use of the same word is still reported as a prohibited term."
+    }
   ]
 }

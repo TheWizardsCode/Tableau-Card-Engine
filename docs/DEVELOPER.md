@@ -1553,6 +1553,8 @@ npm run storylines:validate                     # validate every shipped content
 npm run storylines:validate -- --csv path.csv --json --fail-on-cycle
 npm run storylines:guard                        # guard every configured route-space target
 npm run storylines:guard -- --csv path.csv --game gym --initial coins=3 --json
+npm run storylines:ip-scan                      # scan the guarded set for prohibited third-party terms
+npm run storylines:ip-scan -- path.csv          # ad-hoc scan of one candidate file
 npm run storylines:graph                        # rewrite every shipped content artefact
 npm run storylines:graph -- --format json --check   # drift guard over every artefact
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
@@ -1576,7 +1578,13 @@ when a bound is hit; a game-specific mechanic that is not a declared resource
 (e.g. the Long Erasure pressure clock) is outside it. Passing `--csv` selects one file (an
 unregistered file falls back to the format's default artefact path); `--out`
 requires `--csv`. Every CLI exits `0` on success/valid content and `1` on invalid
-content, unreadable input or artefact drift. The author API validates before
+content, unreadable input or artefact drift. `storylines:ip-scan` walks the
+committed guarded set (`configs/storyline-ip-scan.json`: the story-line GDD and
+its fixtures, plus the shipped content and generated artefacts) with the term
+list in `tests/fixtures/story-line/ip-prohibited-terms.json`; it exits `1` on a
+prohibited term (named with its file, line and term), an unreadable target or a
+malformed term list. Naming paths on the command line scans exactly those files
+(an ad-hoc pre-commit check). The author API validates before
 writing and writes atomically; `--dry-run` prints the candidate and writes
 nothing. The committed Gym artefacts (`example-games/gym/content/storyline-manifest.json`
 + `storyline-graph.mmd` for `storylines.csv`, and
