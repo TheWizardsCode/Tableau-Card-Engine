@@ -37,6 +37,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   actBoundariesFrom,
+  enumeratePlayableRoutes,
   observeBeat,
   pacingFrom,
   playRoute,
@@ -45,6 +46,8 @@ import {
   type BeatObservation,
 } from '../../scripts/long-erasure-playtest';
 import {
+  JOURNEY_BANDS,
+  bandForScore,
   chooseOption,
   createLongErasureRun,
   isComplete,
@@ -314,5 +317,36 @@ describe('Long Erasure playtest harness — read-only contract', () => {
       summary.pacing.authoredDeadBeats + summary.pacing.gateCollapsedBeats,
     ).toBe(totalDeadBeats);
     expect(summary.pacing.deadBeatsPerRun).toBe(totalDeadBeats / records.length);
+  });
+});
+
+describe('Long Erasure playtest harness — abandon band guard', () => {
+  it('reports every playable abandon route below the top band', () => {
+    const space = enumeratePlayableRoutes(CONTENT);
+    const topBand = JOURNEY_BANDS[0];
+
+    expect(space.abandonRoutes).toBeGreaterThan(0);
+    // The reported range is the abandon routes' own distribution, not a guess.
+    const counted = Object.values(space.abandonBands).reduce(
+      (total, count) => total + count,
+      0,
+    );
+    expect(counted).toBe(space.abandonRoutes);
+    // CG-0MWNSR376002QBY9: entering the abandon ending no longer completes the
+    // arc, so no playable abandon route can reach the top band.
+    expect(space.abandonBands[topBand.label]).toBeUndefined();
+    expect(space.abandonScore.max).toBeLessThan(topBand.min);
+    expect(space.abandonScore.min).toBeLessThanOrEqual(space.abandonScore.max);
+  });
+
+  it('keeps a finishing route distinguishable above the abandon ceiling', () => {
+    const space = enumeratePlayableRoutes(CONTENT);
+    const topBand = JOURNEY_BANDS[0];
+
+    // The top band stays reachable by finishing — the fix lowers the abandon,
+    // it does not flatten every route — so the two outcomes remain separable.
+    expect(space.scoreBands[topBand.label]).toBeGreaterThan(0);
+    expect(space.score.max).toBeGreaterThan(space.abandonScore.max);
+    expect(bandForScore(space.score.max).label).toBe(topBand.label);
   });
 });

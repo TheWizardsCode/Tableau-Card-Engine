@@ -72,7 +72,7 @@ by this log.
 | Does the chain-first model carry three acts plus a clock? | **Partly.** Acts I and II carry the run; Act III does not. | 5 Act I beats, 8 Act II beats, **2 Act III beats**; Act I holds 5 decisions, Act II 7, Act III 2 (one of them the ending menu) |
 | Does the pressure clock bite? | **Not as pressure — as a silent branch filter.** | Clock 17; cheapest complete route spends 13; **`first` policy reaches the ending with 0 clock remaining in 40/40 runs**; only 5 of 160 policy runs expired, and 10 of the 14 expiring routes are on one branch |
 | Is the resource-gated branch a reward? | **No — it is reachable and unwinnable.** | 4 labelled routes enter `le-ii-sabotage`; **0 of them reach an ending**; every entry arrives with exactly 2 clock and every successor from that beat costs 3 |
-| Does the epilogue differentiate the journey? | **Only partly, and the abandon terminal is over-rewarded.** | Abandoning in Act II scores 79–81 (*top band*) vs 83 for finishing the arc; the arc award (60 points) is granted on entering any ending card |
+| Does the epilogue differentiate the journey? | **Only partly, and the abandon terminal is over-rewarded.** | Abandoning in Act II scores 79–81 (*top band*) vs 83 for finishing the arc; the arc award (60 points) is granted on entering any ending card. **Fixed** — see the §7.1 addendum (abandon now scores 54, two bands below finishing) |
 | Can a writer add a branch with no engineering help? | **Yes — under ~10 s of tool time, with five specific frictions.** | New branch authored, validated, graphed and played end to end (§5) |
 | Is approach A still the right full-game shape? | **No on its own — recommend C with A inside it (hybrid).** | §6 |
 
@@ -402,7 +402,41 @@ Filed as follow-ups from this log (not absorbed into the spike):
   `CG-0MWPVYXG6003ZIOV` (docs) — see the §4.4 resolution note.
 - `discovered-from` this item — **epilogue: stop awarding full arc credit for
   abandoning the voyage**. Abandoning in Act II scores 79–81 in the top band against 83
-  for finishing, so the closing screen cannot tell the two apart.
+  for finishing, so the closing screen cannot tell the two apart. **Resolved** by
+  `CG-0MWNSR376002QBY9` — see the §7.1 addendum below for the corrected measurements.
+
+### 7.1 Addendum (2026-11-21) — the arc rule is fixed (`CG-0MWNSR376002QBY9`)
+
+The measurements above are kept as the spike recorded them. The scoring rule they
+flagged as a defect is now fixed, following the GDD's adopted rule (§2.10.5): **an act
+is credited when the journal records at least one choice made in that act; the
+`Ending` act is never credited.** Entering an ending card therefore no longer completes
+the arc, and the score derives the act set from `state.history` rather than from
+`enterCard` bookkeeping.
+
+Re-measured on this checkout with the same harness (`npx tsx
+scripts/long-erasure-playtest.ts --seeds 40`):
+
+| Run | Before | After | Band after |
+|---|---|---|---|
+| `reset-cheap` (Acts I–III played) | 83 | **83** (unchanged) | *A chart worth keeping* |
+| `ram-chip` (Acts I–III played) | 75 | **75** (unchanged) | *A voyage that left a mark* |
+| `abandon` (Act II exit) | 79 (arc 60) | **54** (arc 35 + choices 10 + resources 13 − losses 4) | *A voyage the erasure nearly kept* |
+| Act II expiry at the Act III door (8 beats) | 31 (arc 15) | **51** (arc 35) | *A voyage the erasure nearly kept* |
+
+The expiry row is a deliberate correction to this item's original plan: the run played
+five Act II choices, so withholding Act II would punish the clock rather than the
+voyage (GDD §2.10.5). Route space over the default content: **16 abandon routes, scores
+50–60, none in the top band**; top-band routes fall from 52 to 40. One honest
+consequence, as the GDD predicted: the shipped content's lowest terminal route is now
+**50**, so the two lowest bands are reachable only through an explicit `clockMax` (the
+band table keeps the headroom; nothing is unreachable by hand-built probes).
+
+The scene help text now states the rule, and
+`tests/gym/LongErasureEpilogue.test.ts` pins the abandon score, the top-band
+unreachability of the abandon (even at its ceiling) and the same-prefix finishing
+margin; `tests/scripts/long-erasure-playtest.test.ts` guards the whole playable route
+space.
 
 Proposed for the GDD's own backlog (recorded on `CG-0MWNFVLYT003M7XF`, intentionally not
 built here):

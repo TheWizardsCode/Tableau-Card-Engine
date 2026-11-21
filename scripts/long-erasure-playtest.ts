@@ -265,6 +265,13 @@ export interface PlayableRouteSpace {
     clockOnEntry: { min: number; max: number };
   };
   abandonRoutes: number;
+  /** Score range over the routes that took the abandon terminal. */
+  abandonScore: { min: number; max: number; mean: number };
+  /**
+   * Band distribution over the routes that took the abandon terminal, so the
+   * abandon hatch's band ceiling is reported rather than left to inspection.
+   */
+  abandonBands: Record<string, number>;
   /** How often an authored option was hidden by the affordability gate. */
   affordability: { states: number; offeredOptions: number; hiddenOptions: number };
   /** Every beat's terminal outcomes, so a branch can be judged as a whole. */
@@ -359,6 +366,17 @@ export function enumeratePlayableRoutes(
     };
   };
 
+  const abandon = routes.filter((route) => route.sawAbandon);
+  const abandonBand = (pick: (route: TerminalRoute) => number): { min: number; max: number; mean: number } => {
+    if (abandon.length === 0) return { min: 0, max: 0, mean: 0 };
+    const values = abandon.map(pick);
+    return {
+      min: Math.min(...values),
+      max: Math.max(...values),
+      mean: Math.round(mean(values) * 100) / 100,
+    };
+  };
+
   return {
     routes: routes.length,
     byOutcome,
@@ -378,6 +396,12 @@ export function enumeratePlayableRoutes(
       },
     },
     abandonRoutes: routes.filter((route) => route.sawAbandon).length,
+    abandonScore: abandonBand((route) => route.score),
+    abandonBands: abandon.reduce<Record<string, number>>((bands, route) => {
+      const label = bandForScore(route.score).label;
+      bands[label] = (bands[label] ?? 0) + 1;
+      return bands;
+    }, {}),
     scoreBands: routes.reduce<Record<string, number>>((bands, route) => {
       const label = bandForScore(route.score).label;
       bands[label] = (bands[label] ?? 0) + 1;
@@ -998,7 +1022,7 @@ function main(): void {
       `playable beats=${JSON.stringify(space.beats)} choices=${JSON.stringify(space.choices)} score=${JSON.stringify(space.score)} scoreBands=${JSON.stringify(space.scoreBands)}`,
       `gated beat: routes=${space.gated.routesThroughGated} completed=${space.gated.completed} clockLeftOnEntry=${JSON.stringify(space.gated.clockOnEntry)}`,
       `expired routes (${space.expiring.length})=${space.expiring.map((r) => `${r.expiredOn}[${r.labels.join('>')}]`).join(' ;; ')}`,
-      `abandon routes=${space.abandonRoutes}`,
+      `abandon routes=${space.abandonRoutes} score=${JSON.stringify(space.abandonScore)} bands=${JSON.stringify(space.abandonBands)}`,
       `affordability: ${JSON.stringify(space.affordability)}`,
       `beat stats: ${JSON.stringify(space.beatStats)}`,
       `overall=${JSON.stringify(summarise(records))}`,

@@ -249,8 +249,10 @@ describe('GymLongErasureScene browser test', () => {
     expect(epilogue?.outcome).toBe('closed');
     expect(epilogue?.reset).toBe(false);
     expect(epilogue?.endingName).toBe('The Voyage Abandoned');
-    // Reaching any Ending card completes the whole arc, whatever its label.
-    expect(epilogue?.actsCompleted).toEqual(['I', 'II', 'III']);
+    // The arc is credited per act played: this Act II exit earns Acts I–II only
+    // (CG-0MWNSR376002QBY9), not the full arc for entering an Ending card.
+    expect(epilogue?.actsCompleted).toEqual(['I', 'II']);
+    expect(epilogue?.score.components.arc).toBe(35);
     expect(scene.getAvailableOptionLabels()).toEqual([]);
   });
 

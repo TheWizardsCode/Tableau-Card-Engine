@@ -48,12 +48,20 @@
  *
  * ## Acts
  *
- * Acts are gated, not merely implied by the graph: a run records each act it
- * advances beyond ({@link LongErasureState.completedActs}), and entering a
- * card from an earlier act than the current one is rejected. The cycle in the
- * content (`le-end-reset` → `le-i-open`) is the authored expression of the
- * **reset ending**, not a loop the module follows: entering an `Ending` card
- * closes the run, so the reset edge is never traversed.
+ * Acts are gated, not merely implied by the graph: a run records each act in
+ * which it has played at least one choice ({@link LongErasureState.completedActs}),
+ * and entering a card from an earlier act than the current one is rejected. The
+ * cycle in the content (`le-end-reset` → `le-i-open`) is the authored expression
+ * of the **reset ending**, not a loop the module follows: entering an `Ending`
+ * card closes the run, so the reset edge is never traversed.
+ *
+ * Arc credit follows the acts **played**, not the ending entered: an act is
+ * credited when the journey records a choice made in it, and the `Ending` act is
+ * never credited. Entering an ending card therefore cannot complete the arc, so
+ * the deliberately terminal `Abandon the voyage` — reachable from Act II — earns
+ * Acts I–II (35 points), not the full 60, while a run that finishes from Act III
+ * still earns Act III because the finishing choice is played there
+ * (CG-0MWNSR376002QBY9).
  *
  * ## The reset ending
  *
@@ -233,7 +241,7 @@ export interface LongErasureState {
   readonly currentCard: LongErasureCard;
   /** The act the current beat belongs to (`'Ending'` once it closes). */
   readonly act: LongErasureAct;
-  /** Acts the run has advanced beyond, in narrative order. */
+  /** Acts the run has played at least one choice in, in narrative order. */
   readonly completedActs: readonly LongErasureAct[];
   /** Append-only activity log the generic journal is built from. */
   readonly activityLog: readonly StorylineLogEntry[];
@@ -391,17 +399,19 @@ export function longErasureContentFromCsv(csvText: string): LongErasureContent {
  *
  * | Component | Rule | Bound |
  * |---|---|---|
- * | `arc` | act weights for every act the run advanced beyond (Act III only completes by reaching an ending) | 0–60 |
+ * | `arc` | act weights for every act in which the journey records at least one choice made (the `Ending` act is never credited) | 0–60 |
  * | `choices` | `perChoice` per recorded choice | 0–`choiceCap` |
  * | `resources` | `perResourceKey` per remaining point of each declared resource, capped per resource | 0–20 |
  * | `losses` | `-perCostPoint` per resource point paid as an option cost (irreversible loss) | −20–0 |
  *
- * The authored content tops out at 92 (60 + 12 + 20); the `[0, 100]` clamp is
- * a guard for hand-built snapshots and future content, never an unreachable
- * documented ceiling.
+ * The authored content tops out at 92 (60 + 12 + 20) for a finishing route; a
+ * route that ends from Act II can top out only at 67 (Acts I–II arc 35 + 12 +
+ * 20), below the top band, because the `Ending` act is never credited. The
+ * `[0, 100]` clamp is a guard for hand-built snapshots and future content,
+ * never an unreachable documented ceiling.
  */
 export const JOURNEY_SCORE_TABLE = {
-  /** Points per act the run advanced beyond. */
+  /** Points per act the run played at least one choice in (Ending is never credited). */
   act: { I: 15, II: 20, III: 25, Ending: 0 } as Readonly<
     Record<LongErasureAct, number>
   >,
@@ -462,7 +472,7 @@ export interface JourneyScore {
   readonly label: string;
   /** Bounded component breakdown. */
   readonly components: JourneyScoreComponents;
-  /** Acts the run advanced beyond. */
+  /** Acts the run played at least one choice in. */
   readonly actsCompleted: readonly LongErasureAct[];
   /** Number of recorded choices. */
   readonly choiceCount: number;
@@ -494,7 +504,7 @@ export interface LongErasureEpilogue {
    * (the outcome framing line), so content without an epilogue is unchanged.
    */
   readonly epilogueProse: string | null;
-  /** Acts the run advanced beyond. */
+  /** Acts the run played at least one choice in. */
   readonly actsCompleted: readonly LongErasureAct[];
   /** The journey score. */
   readonly score: JourneyScore;
@@ -577,6 +587,23 @@ function costPoints(history: readonly LongErasureHistoryEntry[]): {
 }
 
 /**
+ * The acts a journey actually played, derived from its recorded choices.
+ *
+ * An act is credited when the journal records at least one choice made in that
+ * act (the entry beat's choice counts as Act I); the `Ending` act is a gauge,
+ * not a played act, and is never credited. Deriving the set from
+ * {@link LongErasureHistoryEntry.act} makes the arc auditable: it cannot
+ * disagree with the journal, because the journal is the input.
+ */
+function playedActs(
+  history: readonly LongErasureHistoryEntry[],
+): LongErasureAct[] {
+  const played = new Set<LongErasureAct>();
+  for (const entry of history) played.add(entry.act);
+  return LONG_ERASURE_ACTS.filter((act) => played.has(act));
+}
+
+/**
  * Scores the journey actually taken.
  *
  * Pure: it reads only `state` (and the declared resource keys) and returns
@@ -587,7 +614,9 @@ function costPoints(history: readonly LongErasureHistoryEntry[]): {
  * @param state The run to score (never mutated).
  */
 export function scoreRun(state: LongErasureState): JourneyScore {
-  const arc = state.completedActs.reduce(
+  // The arc is the acts played, derived from the journal (CG-0MWNSR376002QBY9).
+  const actsCompleted = playedActs(state.history);
+  const arc = actsCompleted.reduce(
     (total, act) => total + JOURNEY_SCORE_TABLE.act[act],
     0,
   );
@@ -604,7 +633,7 @@ export function scoreRun(state: LongErasureState): JourneyScore {
     band,
     label: band.label,
     components: { arc, choices, resources, losses },
-    actsCompleted: [...state.completedActs],
+    actsCompleted,
     choiceCount: state.history.length,
     resourcesLeft: { ...state.resources },
     costPaid: paid,
@@ -820,12 +849,10 @@ function isResetEnding(
     .some((option) => successorIdsOf(option).includes(content.entryCardId));
 }
 
-/** Adds every act earlier than `rank` to the completed set, in order. */
-function recordActsBefore(working: WorkingState, rank: number): void {
-  for (const act of LONG_ERASURE_ACTS) {
-    if (ACT_RANK[act] >= rank) continue;
-    if (!working.completedActs.includes(act)) working.completedActs.push(act);
-  }
+/** Adds an act to the played-act mirror once a choice is recorded in it. */
+function recordActPlayed(working: WorkingState, act: LongErasureAct): void {
+  if (act === 'Ending') return;
+  if (!working.completedActs.includes(act)) working.completedActs.push(act);
 }
 
 /**
@@ -856,13 +883,13 @@ function enterCard(
 
   // The beat is payable: apply its bookkeeping.
   payClock(working, card.clockCost);
-  recordActsBefore(working, ACT_RANK[card.act]);
   working.act = card.act;
   working.beat += 1;
 
   if (card.act === 'Ending') {
-    // Reaching the ending completes the whole arc, whatever its label.
-    recordActsBefore(working, ACT_RANK.Ending);
+    // Entering the ending closes the run. It does NOT complete the arc: act
+    // credit is earned by playing choices in an act, so a terminal reached from
+    // Act II keeps only Acts I–II (CG-0MWNSR376002QBY9).
     working.status = 'complete';
     working.outcome = isResetEnding(card, content) ? 'reset' : 'closed';
     working.endingId = card.id;
@@ -953,6 +980,9 @@ export function chooseOption(
     cost,
     resourcesAfter: { ...working.resources },
   });
+  // Mirror the played-act set onto the state, keeping it consistent with the
+  // journal the score is derived from.
+  recordActPlayed(working, card.act);
 
   if (result.pushedCard == null) {
     // A terminal option: the chain ends without a successor beat.
@@ -1061,6 +1091,7 @@ export function buildEpilogue(
   const ending = state.endingId
     ? state.content.cards.find((card) => card.id === state.endingId) ?? null
     : null;
+  const score = scoreRun(state);
 
   return {
     status: state.status,
@@ -1069,8 +1100,8 @@ export function buildEpilogue(
     endingId: state.endingId,
     endingName: ending?.name ?? null,
     epilogueProse: ending?.epilogue ?? null,
-    actsCompleted: [...state.completedActs],
-    score: scoreRun(state),
+    actsCompleted: [...score.actsCompleted],
+    score,
     journal: runJournal(state),
   };
 }

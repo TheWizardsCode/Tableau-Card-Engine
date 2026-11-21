@@ -362,7 +362,7 @@ describe('The Long Erasure: determinism', () => {
 });
 
 describe('The Long Erasure: act gating', () => {
-  it('advances acts in order and records each act it leaves behind', () => {
+  it('advances acts in order and records each act a choice was played in', () => {
     let state = createLongErasureRun(0, CONTENT, { clockMax: 40 });
     expect(state.completedActs).toEqual([]);
 
@@ -453,7 +453,9 @@ describe('The Long Erasure: pressure clock', () => {
     // The beat that could not be paid is named, but was never entered…
     expect(state.currentCard.id).toBe('le-iii-approach');
     expect(state.act).toBe('II');
-    expect(state.completedActs).toEqual(['I']);
+    // Acts I–II were played (five choices in Act II); the unpayable Act III
+    // beat was never entered, so it earns nothing — but Act II is not withheld.
+    expect(state.completedActs).toEqual(['I', 'II']);
     expect(state.beat).toBe(8);
     // …no clock was deducted, no options are offered and no choice is possible.
     // (2 post-nudge: `le-ii-bargain` now costs 2, not 3 — CG-0MWPVYTSU0065BXC.)
@@ -463,7 +465,7 @@ describe('The Long Erasure: pressure clock', () => {
       code: 'complete',
     });
     // An expired run is still scored (and scored as an unfinished arc).
-    expect(scoreRun(state).components.arc).toBe(15);
+    expect(scoreRun(state).components.arc).toBe(35);
   });
 
   it('exposes the clock primitive with the same soft/hard contract', () => {
@@ -550,6 +552,9 @@ describe('The Long Erasure: terminals and journal', () => {
     expect(state.status).toBe('complete');
     expect(state.outcome).toBe('closed');
     expect(state.endingId).toBe('le-end-abandon');
+    // Act III was never played, so the ending card entry earns no Act III credit
+    // (CG-0MWNSR376002QBY9).
+    expect(state.completedActs).toEqual(['I', 'II']);
     expect(availableOptions(state)).toEqual([]);
     expect(labelsOf(state)).toEqual([]);
   });
