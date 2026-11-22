@@ -298,6 +298,13 @@ fires for a key outside a row's override or outside the file declaration.
 Files that keep per-row `resources` cells validate exactly as before — the
 declaration is opt-in and backward compatible.
 
+Authoring follows the same rule: `add-card` / `add-linked-card` into a file
+that declares `#resources:` leaves the new row's `resources` cell **blank**, so
+the row inherits the declaration instead of re-introducing the per-row copy
+(`CG-0MWRQVBGB003RB6X`). An explicit `--resources <keys>` fills the cell and
+overrides the declaration, and an adapter's `newCardDefaults.resources` is
+applied only when the file declares nothing.
+
 **Worked example.** One row from
 [`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)
 (record 2, quoted verbatim):

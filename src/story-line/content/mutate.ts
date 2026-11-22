@@ -28,6 +28,7 @@ import {
   compileContentOptions,
   findMissingColumns,
   parseCsv,
+  parseResourceDeclaration,
   serialiseCsv,
   type ParsedCsv,
 } from './csv';
@@ -345,11 +346,21 @@ export function applyAddContentCardSpec(
   }
 
   const row = emptyRow({ header, rows, declarations: parsed.declarations });
+  const fields = adapter.fields;
+  // A file-level `#resources:` line is the file's default set. Stamping the
+  // adapter's full key list into every new row would immediately re-introduce
+  // the per-row repetition the declaration exists to remove, so a declared
+  // file leaves the cell blank and the row inherits the declaration
+  // (`cardsFromCsv` applies it). A file with no declaration keeps the adapter
+  // default, and an explicit `--resources` still overrides either below.
+  const inheritsDeclaredResources =
+    fields.resources !== undefined &&
+    parseResourceDeclaration(parsed.declarations).length > 0;
   for (const [column, value] of Object.entries(adapter.newCardDefaults ?? {})) {
+    if (inheritsDeclaredResources && column === fields.resources) continue;
     if (header.includes(column)) setColumn(header, rows, row, column, value);
   }
 
-  const fields = adapter.fields;
   setColumn(header, rows, row, fields.id, spec.id);
   setColumn(header, rows, row, fields.name, spec.name);
   if (fields.effect !== undefined) {

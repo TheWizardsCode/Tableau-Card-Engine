@@ -28,7 +28,10 @@ import {
   parseResourceDeclaration,
   serialiseCsv,
 } from '../../../src/story-line/content/csv';
-import { updateContentCard } from '../../../src/story-line/content/mutate';
+import {
+  addContentCard,
+  updateContentCard,
+} from '../../../src/story-line/content/mutate';
 import { validateContentCsv } from '../../../src/story-line/content/validate';
 
 /** The declared set the Long Erasure content authors once, at file level. */
@@ -322,5 +325,68 @@ describe('authored edits preserve the declaration', () => {
     const cards = cardsFromCsv(parseCsv(result.csv), RESOURCE_ADAPTER);
     expect(cards[0].name).toBe('Card A Renamed');
     expect(cards[0].resourceKeys).toEqual([...VOYAGE_RESOURCES]);
+  });
+});
+
+describe('add-card inherits a file-level declaration', () => {
+  /**
+   * An adapter that seeds every new row with the full key list — the shape a
+   * game adapter uses when it predates the per-file declaration.
+   */
+  const DEFAULTING_ADAPTER: ContentAdapter = {
+    ...RESOURCE_ADAPTER,
+    newCardDefaults: { resources: VOYAGE_RESOURCES.join(',') },
+  };
+
+  /** The new row's raw `resources` cell in the candidate text. */
+  function resourcesCellOf(csvText: string, cardId: string): string {
+    const parsed = parseCsv(csvText);
+    const idIndex = parsed.header.indexOf('id');
+    const resourcesIndex = parsed.header.indexOf('resources');
+    const row = parsed.rows.find((candidate) => candidate[idIndex] === cardId);
+    return row?.[resourcesIndex] ?? '';
+  }
+
+  it('leaves the cell blank so the new row inherits the declaration', () => {
+    const text = contentCsv([['card-a', 'Card A', '', '', '']], [VOYAGE_DECLARATION]);
+
+    const result = addContentCard(text, DEFAULTING_ADAPTER, {
+      id: 'card-b',
+      name: 'Card B',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(resourcesCellOf(result.csv, 'card-b')).toBe('');
+    const cards = cardsFromCsv(parseCsv(result.csv), DEFAULTING_ADAPTER);
+    const added = cards.find((card) => card.id === 'card-b');
+    expect(added?.resourceKeys).toEqual([...VOYAGE_RESOURCES]);
+  });
+
+  it('still applies the adapter default when the file declares nothing', () => {
+    const text = contentCsv([['card-a', 'Card A', '', '', '']]);
+
+    const result = addContentCard(text, DEFAULTING_ADAPTER, {
+      id: 'card-b',
+      name: 'Card B',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(resourcesCellOf(result.csv, 'card-b')).toBe(VOYAGE_RESOURCES.join(','));
+  });
+
+  it('lets an explicit spec.resources override the declaration', () => {
+    const text = contentCsv([['card-a', 'Card A', '', '', '']], [VOYAGE_DECLARATION]);
+
+    const result = addContentCard(text, DEFAULTING_ADAPTER, {
+      id: 'card-b',
+      name: 'Card B',
+      resources: 'coins,reputation',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(resourcesCellOf(result.csv, 'card-b')).toBe('coins,reputation');
+    const cards = cardsFromCsv(parseCsv(result.csv), DEFAULTING_ADAPTER);
+    const added = cards.find((card) => card.id === 'card-b');
+    expect(added?.resourceKeys).toEqual(['coins', 'reputation']);
   });
 });
