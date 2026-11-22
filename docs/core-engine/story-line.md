@@ -264,8 +264,39 @@ Rules the parser and validator enforce:
 (`fields.resources`) points at a column carrying the card's declared keys —
 `"hull,morale,stores,goodwill,charge"` in the Long Erasure content. That set is
 the vocabulary for the card's `#cost` / `#extra` / `#when` keys and the set the
-validator checks; a blank cell (or an adapter without the mapping) falls back
-to the default `coins` / `reputation` projection.
+validator checks.
+
+The key set can instead be declared **once for the whole file** with a leading
+`#resources:` comment line before the header — the per-file declaration seam
+(`CG-0MWQZJEXQ002G3KE`):
+
+```csv
+#resources: hull,morale,stores,goodwill,charge
+id,name,effect,options,resources,storylineId
+le-i-open,The First Unwriting,The charts forget the volume with it.,,long-erasure
+```
+
+(The fixture is
+[`tests/fixtures/story-line/prose/per-file-resources.csv`](../../tests/fixtures/story-line/prose/per-file-resources.csv);
+the `resources` cell is blank, so the row inherits the declaration.)
+
+`parseCsv` lifts leading `#` comment lines out of the header/row matrix into
+`ParsedCsv.declarations` (so the schema and rows are unchanged and a
+round-trip is still byte-identical), and `parseResourceDeclaration` reads the
+first `#resources:` line. The effective set per card resolves in this order:
+
+1. **The row's `resources` cell**, when non-blank — it *overrides*, never
+extends, the file declaration, so a mixed-resource minority stays expressible
+   in one file.
+2. **The file-level `#resources:` declaration**, when the cell is blank (the
+   seam that removes the old per-row repetition).
+3. **The engine's default `coins` / `reputation` projection**, when neither
+   declares any (or the adapter has no `resources` mapping).
+
+Validation always uses the **effective** set, so `unknown-resource-key` still
+fires for a key outside a row's override or outside the file declaration.
+Files that keep per-row `resources` cells validate exactly as before — the
+declaration is opt-in and backward compatible.
 
 **Worked example.** One row from
 [`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)
@@ -641,7 +672,10 @@ export const TAVERN_ADAPTER: ContentAdapter = {
 
 An adapter may also map `resources` — the column declaring the card's resource
 keys, which is the vocabulary its `#cost` / `#extra` / `#when` attributes are
-validated against (blank or unmapped falls back to the default projection).
+validated against. A blank cell inherits the file's leading `#resources:`
+declaration; a cell and declaration that are both absent fall back to the
+default `coins` / `reputation` projection (see
+[Declaring the resource keys](#declaring-the-resource-keys)).
 
 Every column **not** in `fields` lands in `ContentCard.fields`, keyed by column
 name, so game columns (coin/reputation deltas, renown, payoff, …) are editable
@@ -663,7 +697,10 @@ shaped fixture adapter, proving the seam is not shaped around one game.
 
 `parseCsv` handles quoted fields, embedded commas/quotes/newlines and CRLF;
 `serialiseCsv` writes LF with a trailing newline, so a canonically quoted file
-round-trips **byte-identically** (column order preserved).
+round-trips **byte-identically** (column order and leading `#` declaration
+comments preserved). Leading `#` lines before the header are file-level
+declarations — lifted into `ParsedCsv.declarations` and never parsed as data
+rows (see [Declaring the resource keys](#declaring-the-resource-keys)).
 `computeContentChecksum(csvText)` is a deterministic DJB2 hex hash (8 chars) for
 change detection — any byte change produces a different checksum.
 
