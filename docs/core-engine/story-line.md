@@ -1123,6 +1123,13 @@ journal-derived epilogue score — live in the Phaser-free
 (unit-tested by `tests/gym/GymLongErasureGame.test.ts`), so the narrative is
 verified headlessly and the scene only renders state and forwards the choice.
 
+The full game design built on this content path — the three-act scene beat
+sheet, the economy, the presentation contract, the engine-gap backlog and the
+v1 scope — is the [*Long Erasure* GDD](../design/storyline-game-gdd.md); the
+spike's evidence is the
+[observation log](../gym/long-erasure-observation-log.md) and the
+[playtest evaluation](../design/storyline-playtest-evaluation.md).
+
 Its content is
 [`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)
 with the `long-erasure` adapter: a five-key declared set

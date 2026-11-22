@@ -337,7 +337,12 @@ as a `./core` submodule. The multi-game distribution composes those repos as
 **sibling checkouts** (`../tce-<game>`) alongside the merged core — the core
 carries no games at HEAD. Use `npm run setup:distribution -- --dir ..` to
 bootstrap them. The **Gym stays in the core repo** — it is the canonical
-core-engine feature demonstrator.
+core-engine feature demonstrator. Its full story-line spike, *The Long Erasure*,
+has a complete game design in
+[docs/design/storyline-game-gdd.md](docs/design/storyline-game-gdd.md) — the
+scene beat sheet, economy, presentation contract, engine-gap backlog and v1
+scope — with its evidence in the
+[observation log](docs/gym/long-erasure-observation-log.md).
 
 | Game | Repo | Description |
 |------|------|-------------|

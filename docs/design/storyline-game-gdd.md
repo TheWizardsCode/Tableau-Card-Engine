@@ -1,12 +1,15 @@
 # The Long Erasure — Game Design Document (GDD)
 
-> **Status.** Working draft. This is the single reviewable document for the full
-> story-line game; it ships no gameplay code. Settings names are working names
-> until the IP-safe naming pass assigns final ones.
+> **Status.** Complete design document, in review. This is the single reviewable
+> document for the full story-line game; it ships no gameplay code. Settings names
+> are final ([§4.2](#42-the-settings-names-final)): the IP-safe naming pass has run
+> and its gate reads clean at the review commit
+> ([§4.3](#43-prohibited-term-scan-record)–[§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)).
 >
 > | | |
 > |---|---|
 > | **Work item** | `CG-0MWPY25W4002UNKB` (GDD foundation: setting, loop and beat-sheet data model) |
+> | **Close-out review** | `CG-0MWPY2JEU006DYUL` (integration, review and verification close-out) — see [§5.4](#54-review-checklist-manual-for-the-producer-and-the-close-out) |
 > | **Parent epic** | `CG-0MWNFVLYT003M7XF` (GDD: full story-line game, approach C — scene beat sheet) |
 > | **Document path** | `docs/design/storyline-game-gdd.md` (final — see [§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)) |
 > | **Design direction** | Approach **C** (scene beat sheet) with approach A's card chain inside it and approach B's irreversible-loss dial |
@@ -876,14 +879,17 @@ claims would be strengthened by it.
 
 ### 2.7 Sections owned by downstream work items
 
-The following sections of this GDD were stubs by design. Each names the work item
-that owns it, so a reviewer can see the whole document's shape and no section is
-silently forgotten. The resource model ([§2.8](#28-resource-model-and-economy)),
-the writer content pipeline
+Every section below was a stub by design, and every one is now written at this
+commit. Each row names the work item that owns it, so a reviewer can see the
+whole document's shape and no section is silently forgotten. The resource model
+([§2.8](#28-resource-model-and-economy)), the writer content pipeline
 ([§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate)), the
-presentation contract ([§3](#3-ux-visual-design-and-audio-direction)) and the
-engine-gap backlog ([§6](#6-engine-gap-backlog)) are now written; the rest
-remain stubs.
+presentation contract ([§3](#3-ux-visual-design-and-audio-direction)), the
+naming and prohibited-term gate
+([§4.2](#42-the-settings-names-final)–[§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)),
+the engine-gap backlog ([§6](#6-engine-gap-backlog)) and the v1 scope
+([§7](#7-v1-scope-statement-and-deferred-list)) are all delivered; the final row
+records the integration and verification pass.
 
 | Section | Contents it must add | Owner |
 |---|---|---|
@@ -894,7 +900,7 @@ remain stubs.
 | Glossary proper nouns and prohibited-term gate | **Written — [§4.2](#42-the-settings-names-final)–[§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)**: the final naming table with a rationale per name, the recorded prohibited-term scan of this document and its guarded set, the trademark sanity read and the carried-forward review gate | `CG-0MWPY2FV30041M48` |
 | Engine-gap backlog | **Written — [§6](#6-engine-gap-backlog)**: every missing capability with unlock, module reference, effort band (with nearest precedent), issue type and disposition; filed items recorded in [§6.6](#66-disposition-record) | `CG-0MWPY2ECE002P2NH` |
 | V1 scope and deferred list | **Written — [§7](#7-v1-scope-statement-and-deferred-list)**: the counts table (3 acts / 7 scenes / 21 beats / 16 exits / 5 endings), the playtime arithmetic with its two stated assumptions, the 3,200-word authored budget, the replayability story and targets, the per-capability backlog check and the five-row deferred list | `CG-0MWPY2HJU006LJMU` |
-| Integration and review close-out | developer-guide link, reciprocal links, re-run verification at the final commit | `CG-0MWPY2JEU006DYUL` |
+| Integration and review close-out | **Written — this close-out**: the developer-guide link and the reciprocal links (developer guide, README, Gym index, `@story-line` reference), the verification re-run at the review commit ([§5.1](#51-verification-available-at-this-commit) T1–T4 and T7–T14) and the producer review request | `CG-0MWPY2JEU006DYUL` |
 
 ---
 
@@ -2012,7 +2018,7 @@ the score.
 | # | Claim | Command | Expected |
 |---|---|---|---|
 | T9 | The documented weights, caps, bands and the best/mid/worst worked scores are the ones the module exports and scores | `npx vitest run --project unit tests/gym/LongErasureEpilogue.test.ts` | pass — the table, the five band boundaries and the 87 / 42 / 0 pins (the abandon re-score is pinned by `CG-0MWNSR376002QBY9`) |
-| T10 | The measured abandon route lands below the finishing routes after the arc correction | `npx tsx scripts/long-erasure-playtest.ts --seeds 12 --route "abandon=Log the erasure>Stay silent>Shelter in the dead zone>Ration the stores>Abandon the voyage"` | **pending on `CG-0MWNSR376002QBY9`**: currently 79 (*A voyage that left a mark*), contract 54 (*A voyage the erasure nearly kept*) against R1 83 / R2 67 |
+| T10 | The measured abandon route lands below the finishing routes after the arc correction | `npx tsx scripts/long-erasure-playtest.ts --seeds 12 --route "abandon=Log the erasure>Stay silent>Shelter in the dead zone>Ration the stores>Abandon the voyage"` | pass — the route now scores 54 (*A voyage the erasure nearly kept*, arc 35) against R1 83 / R2 67, pinned by `tests/gym/LongErasureEpilogue.test.ts` (`CG-0MWNSR376002QBY9`, delivered) |
 | T11 | Every consequential choice meets the minimum rejoin distance, and the guard fails on the known-bad branch | `npm run storylines:guard -- --csv tests/fixtures/story-line/gdd-worked-examples.csv --game gym` and the positive control in [§2.9.5](#295-the-review-gate) | `PASS` on the worked content; `FAIL` on `guard-unwinnable-branch.csv` |
 | T12 | The scene budgets satisfy the sizing rule (no scene without a complete walk; one deliberate cliff per act, with a `budget: exhausted` rule, a loss rule and a failure route) | review check against [Appendix A](#appendix-a-the-episode-manifest-complete-worked-example), then the scene-space guard when it exists | every scene in the table passes; `s-iii-core` is the only cliff and carries all four preconditions |
 
@@ -2702,7 +2708,7 @@ profiles; the commands below verify *this document* and the model it specifies.
 | T6 | The document builds and the changed scope is green | `npm run build` then the test skill's unit profile | green |
 | T7 | The resource model's working fixture declares the GDD key set, carries one trade per act, never grants the irreversible key and keeps the state-gated branch survivable | `npm run storylines:validate -- --csv tests/fixtures/story-line/gdd-resource-trades.csv --game long-erasure`, then `npx vitest run --project unit tests/story-line/content/gdd-resource-model.test.ts` | `RESULT: VALID`; 12 tests pass ([§2.8.7](#287-how-the-economy-is-verified)) |
 | T8 | The rows quoted in [§2.9.4](#294-worked-example-rows-verbatim-validated) are byte-identical to the rows `storylines:validate` accepts, and the document still names every row's target | `npx vitest run --project unit tests/story-line/content/gdd-content-pipeline.test.ts` | pass — the document's rows are the fixture's rows, and the fixture validates |
-| T9–T12 | The scoring weights, bands and worked scores; the abandon band after the arc correction; the rejoin distance; the scene-budget sizing rule | see [§2.10.7](#2107-how-this-section-is-verified) | pass, or the named pending item (`CG-0MWNSR376002QBY9`) |
+| T9–T12 | The scoring weights, bands and worked scores; the abandon band after the arc correction; the rejoin distance; the scene-budget sizing rule | see [§2.10.7](#2107-how-this-section-is-verified) | pass — the abandon re-score is pinned by the delivered `CG-0MWNSR376002QBY9` |
 | T13 | The presentation contract's zone table matches its layout fixture (every zone and anchor), option anchors meet the 44 design-px floor, every cited SFX key exists in `COMMON_SFX_KEYS` and every audio row has a reduced-motion alternative, every cited source path exists, the section contains no coordinate pair, and `src/story-line/` contains no `Math.random` | `npx vitest run --project unit tests/story-line/content/gdd-presentation-contract.test.ts` | pass ([§3.7](#37-how-this-section-is-verified)) |
 | T14 | The GDD, its worked examples, its diagrams and the authored content carry no prohibited third-party term; the gate cannot pass with a missing target and cannot be fooled by its framework allowance | `npm run storylines:ip-scan`, then `npx vitest run --project unit tests/gym/LongErasureContent.test.ts tests/story-line/content/ip-terms.test.ts tests/scripts/ip-scan.test.ts` | `RESULT: CLEAN`; tests pass ([§4.3](#43-prohibited-term-scan-record)) |
 

@@ -1599,6 +1599,16 @@ three-act story-line spike, with `act` / `clockCost` game columns and the
 independent: `long-erasure.csv` uses its own storyline id, so the shipped demo
 rows and their committed options-parity goldens are untouched.
 
+The full game design built on this toolkit is the *Long Erasure* GDD
+([`docs/design/storyline-game-gdd.md`](design/storyline-game-gdd.md)): the
+three-act scene beat sheet, the resource and economy model, the presentation
+contract, the engine-gap backlog and the v1 scope — each section traced to the
+work item that owns it and to a verification command in its
+[test plan](design/storyline-game-gdd.md#5-test-plan). Its evidence base is
+the [observation log](gym/long-erasure-observation-log.md) and the
+[playtest evaluation](design/storyline-playtest-evaluation.md); the design
+itself ships no gameplay code, so nothing here changes at runtime.
+
 ### Authoring branches, costs and gates in CSV
 
 Writers author the whole option model in the `options` cell — no TypeScript
@@ -1670,7 +1680,7 @@ Every diagnostic names the **record**, the **column** and a stable **reason**:
 ```
 
 The first two lines are the shipped `storylines:validate` output for
-[`prose-says-unescaped.csv`](../../tests/fixtures/story-line/prose/prose-says-unescaped.csv);
+[`prose-says-unescaped.csv`](../tests/fixtures/story-line/prose/prose-says-unescaped.csv);
 the warning line is the shape pinned by `tests/story-line/content/validate.test.ts`.
 `✗` lines are hard errors (validation fails, the author API refuses to write);
 `!` lines are non-fatal warnings (the content is still valid).
