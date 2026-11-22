@@ -71,6 +71,13 @@ export interface AddContentCardSpec {
   readonly storylineTitle?: string | null;
   /** Declared resource keys for this card's option attributes. */
   readonly resources?: string | null;
+  /**
+   * Position the new row directly after this existing card's row instead of
+   * appending it, so CSV reading order can track narrative order. An id that
+   * names no card is refused with a clear error, naming the id; omitting the
+   * position appends (the historical behaviour, unchanged byte-for-byte).
+   */
+  readonly after?: string | null;
   /** Game-specific column values, keyed by CSV column name. */
   readonly fields?: Readonly<Record<string, string>>;
 }
@@ -239,10 +246,11 @@ function fieldKeyErrors(
 /**
  * Applies an `add-card` spec to CSV text **without validating** the candidate.
  *
- * Structural problems (missing required values, duplicate id, unknown column)
- * are still reported. Exposed for composing multi-step edits (a card added
- * *and* linked in) that must be validated once, as a whole candidate — the
- * public {@link addContentCard} wraps this with validation.
+ * Structural problems (missing required values, duplicate id, unknown column,
+ * an `after` naming no card) are still reported. Exposed for composing
+ * multi-step edits (a card added *and* linked in) that must be validated once,
+ * as a whole candidate — the public {@link addContentCard} wraps this with
+ * validation.
  *
  * @internal
  * @param csvText Current content CSV text.
@@ -271,6 +279,22 @@ export function applyAddContentCardSpec(
       ok: false,
       errors: [`add-card: card id "${spec.id}" already exists (duplicate id)`],
     };
+  }
+
+  // A positional insert must name an existing predecessor; an unknown id is a
+  // structural error reported before any row is built.
+  const after = spec.after?.trim() ?? '';
+  let insertAt: number | undefined;
+  if (after !== '') {
+    const predecessor = findRow(header, rows, adapter, after);
+    if (!predecessor) {
+      return {
+        csv: csvText,
+        ok: false,
+        errors: [`add-card: --after card "${after}" not found (no such card id)`],
+      };
+    }
+    insertAt = rows.indexOf(predecessor) + 1;
   }
 
   const row = emptyRow({ header, rows, declarations: parsed.declarations });
@@ -306,7 +330,8 @@ export function applyAddContentCardSpec(
     setColumn(header, rows, row, column, value);
   }
 
-  rows.push(row);
+  if (insertAt === undefined) rows.push(row);
+  else rows.splice(insertAt, 0, row);
   return { csv: serialiseCsv({ header, rows, declarations: parsed.declarations }), ok: true, errors: [] };
 }
 

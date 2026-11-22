@@ -837,7 +837,11 @@ const result = applyContentEditToFile({
 
 `addContentCard` refuses a duplicate id, a missing id/name, an unknown or mapped
 game column, and any edit whose result fails validation (for example a new card
-in a story-line that nothing links to — it would be `unreachable-card`).
+in a story-line that nothing links to — it would be `unreachable-card`). The
+optional `after` field names a base card id and inserts the new row directly
+after that card's row instead of appending, so CSV reading order can track
+narrative order; an `after` that names no card is refused with an error naming
+the id, and omitting it appends exactly as before.
 `updateContentCard` changes only the supplied fields; a nullable field set to
 `null` is cleared. A card is a choice exactly when its `options` encoding is
 non-empty — no separate flag or link column exists to set.

@@ -197,6 +197,95 @@ describe('addContentCard', () => {
   });
 });
 
+describe('add-card positional insert', () => {
+  /** Card ids of a content CSV, in file order. */
+  const rowIds = (csv: string): string[] => {
+    const parsed = parseCsv(csv);
+    const idIndex = parsed.header.indexOf(TAVERN_CONTENT_ADAPTER.fields.id);
+    return parsed.rows.map((row) => row[idIndex] ?? '');
+  };
+
+  it('inserts the new row directly after the named predecessor', () => {
+    const result = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-extra',
+      name: 'An Extra Card',
+      effect: 'The detour costs a day.',
+      fields: { payoff: '3' },
+      after: 'tav-inn',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(rowIds(result.csv)).toEqual(['tav-open', 'tav-inn', 'tav-extra', 'tav-tale']);
+
+    // Only the new line is added: dropping it reproduces the input
+    // byte-for-byte, so no existing row was rewritten.
+    const withoutInsert = result.csv
+      .split('\n')
+      .filter((line) => !line.startsWith('tav-extra,'));
+    expect(withoutInsert.join('\n')).toBe(tavernCsv);
+  });
+
+  it('appends when no position is given', () => {
+    const result = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-extra',
+      name: 'An Extra Card',
+      fields: { payoff: '3' },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.csv.startsWith(tavernCsv)).toBe(true);
+    expect(rowIds(result.csv)).toEqual(['tav-open', 'tav-inn', 'tav-tale', 'tav-extra']);
+  });
+
+  it('refuses an `after` that names no card, naming the id', () => {
+    const result = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-extra',
+      name: 'An Extra Card',
+      after: 'tav-ghost',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.csv).toBe(tavernCsv);
+    expect(result.errors).toContain(
+      'add-card: --after card "tav-ghost" not found (no such card id)',
+    );
+  });
+
+  it('inserts into a multi-member story-line without re-pointing the entry card', () => {
+    // Step 1: author the card just after its predecessor. It carries no
+    // story-line yet (a choice card without one is invalid), so it is not a
+    // member and reachability is unaffected.
+    const added = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-follow',
+      name: 'Following the Stranger',
+      effect: 'The road south is long.',
+      after: 'tav-inn',
+    });
+    expect(added.ok).toBe(true);
+    expect(rowIds(added.csv)).toEqual(['tav-open', 'tav-inn', 'tav-follow', 'tav-tale']);
+
+    // Step 2: link it in. `tav-open` stays the entry card (the first member
+    // with no incoming edge), so every member remains reachable — a re-pointed
+    // entry would surface as `unreachable-card` on the old entry.
+    const linked = updateContentCard(added.csv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-inn',
+      options: 'Listen|tav-tale;Follow|tav-follow;Retire|',
+    });
+    expect(linked.ok).toBe(true);
+    const member = updateContentCard(linked.csv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-follow',
+      storylineId: 'tav',
+      storylineTitle: 'Tavern Nights',
+    });
+    expect(member.ok).toBe(true);
+
+    expect(rowIds(member.csv)[0]).toBe('tav-open');
+    const validation = validateContentCsv(member.csv, TAVERN_CONTENT_ADAPTER);
+    expect(validation.valid).toBe(true);
+    expect(
+      validation.issues.filter((issue) => issue.code === 'unreachable-card'),
+    ).toEqual([]);
+  });
+});
+
 describe('updateContentCard', () => {
   it('changes only the supplied fields and leaves the content valid', () => {
     const result = updateContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
