@@ -14,14 +14,14 @@
 > | **Engine contract composed with** | [`docs/core-engine/story-line.md`](../core-engine/story-line.md) (`@story-line`) |
 > | **Section ownership** | [Appendix C](#appendix-c-work-item-map) |
 
-**How to read this document.** Sections 1–2 are written and complete: they are
-what an implementer needs to build the beat-sheet layer. Section 4 carries the
-fixed design vocabulary and the final naming table, scan record and trademark
-read, and
-sections 3 and 6–7 are owned by later children of the epic and are present as
-marked stubs so the document is one continuous artefact from the start. Every
-stub names the work item that fills it, and nothing in sections 1–2 depends on
-a stub being filled.
+**How to read this document.** Sections 1–2 are the implementer's core: the
+setting, the loop, the beat-sheet data model and the composition contract.
+Section 3 is the presentation contract, section 4 carries the fixed design
+vocabulary and the final naming table, scan record and trademark read, section 5
+is the test plan, section 6 is the engine-gap backlog and section 7 is the v1
+scope statement and deferred list. [§2.7](#27-sections-owned-by-downstream-work-items)
+records which child of the epic wrote each section, so a reviewer can always
+trace an assertion back to its source.
 
 ---
 
@@ -59,10 +59,13 @@ epilogue and a Phaser-free logic module — and adds only the layer the evidence
 says is missing: per-scene objectives, per-scene budgets, explicit outcomes and
 a finalised loss ledger.
 
-V1 content target, replayability and the deferred list are owned by
-`CG-0MWPY2HJU006LJMU`; the engine work this design needs is owned by
-`CG-0MWPY2ECE002P2NH`. Neither is a precondition for building the beat-sheet
-layer described here.
+V1 content target, replayability and the deferred list are fixed in
+[§7](#7-v1-scope-statement-and-deferred-list) — three acts, seven scenes,
+twenty-one authored scene beats, five endings, a 13-minute target run and a
+3,200-word authored budget, with an explicit cut line. The engine work this
+design needs is owned by `CG-0MWPY2ECE002P2NH` and listed against each v1
+capability in [§7.5](#75-every-v1-capability-against-the-backlog). Neither is a
+precondition for building the beat-sheet layer described here.
 
 ---
 
@@ -102,7 +105,7 @@ layer described here.
    - [4.5 The prohibited-term gate, and how a writer runs it](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)
 5. [Test Plan](#5-test-plan)
 6. [Engine-Gap Backlog](#6-engine-gap-backlog)
-7. [V1 Scope Statement and Deferred List](#7-v1-scope-statement-and-deferred-list-todo)
+7. [V1 Scope Statement and Deferred List](#7-v1-scope-statement-and-deferred-list)
 - [Appendix A: The episode manifest (complete worked example)](#appendix-a-the-episode-manifest-complete-worked-example)
 - [Appendix B: Evidence base](#appendix-b-evidence-base)
 - [Appendix C: Work-item map](#appendix-c-work-item-map)
@@ -861,7 +864,7 @@ because the beat-sheet layer has no implementation at this commit.
 | H2 | Per-scene budgets create a visible trade instead of a silent branch filter | **unproven**; the spike measured the *failure* of the containerless clock (12/138 routes expired, all on one boundary). The rules are now specified in [§2.10.1](#2101-the-clock-a-visible-per-scene-budget); the measurement is still outstanding. | extend the route-space enumeration over the manifest: no beat refusal may lead to a state with no ending; every refusal must route; measure refusals per run and happy-path clock slack | tension design (`CG-0MWPY2AZX001UI2A`, rules delivered; validation pending) |
 | H3 | Irreversible loss (hull) + the ledger make loss visible and unrefunded | **unproven**; the spike measured the opposite (loss refunded by the loop; depleted players saw *fewer* options). The mechanism is specified in [§2.10.2](#2102-irreversible-loss-hull-as-the-dial) and the score penalty in [§2.10.5](#2105-the-reset-ending-scoring-model); the diff test is still outstanding. | replay two runs with different hull outcomes and diff the epilogue; assert the ledger is never restored and the epilogue names each ledger line; scoring bands must separate abandon from finish | tension design (`CG-0MWPY2AZX001UI2A`, rules delivered; validation pending) |
 | H4 | The composition contract holds — no second choice model, condition language, prose store or RNG | **unproven** (no implementation) | import-boundary test: the beat-sheet module imports only `@story-line` public surface; a content-column test asserts the CSV gains no beat-sheet column; a manifest test asserts `resources.declared` equals the content set | build epic |
-| H5 | Five scenes / fifteen beats / five to seven exits is enough structure to fill a v1 act-shaped game without authoring a hub-and-spoke fan | **unproven** | scope the content volume from this shape and compare with the spike's 19-beat file; measure designer hours per scene against the writer's ≈ 8 s branch | scope (`CG-0MWPY2HJU006LJMU`) |
+| H5 | Five scenes / fifteen beats / five to seven exits is enough structure to fill a v1 act-shaped game without authoring a hub-and-spoke fan | **scoped, still unproven** — [§7.1](#71-the-v1-counts) fixes v1 at 7 scenes / 21 beats / 16 exits inside P4's bands; proving the shape reads as consequence needs the vertical slice | scope the content volume from this shape and compare with the spike's 19-beat file; measure designer hours per scene against the writer's ≈ 8 s branch | scope (`CG-0MWPY2HJU006LJMU`, scoped; vertical slice pending) |
 | H6 | The scene boundary is the right line between designer and writer work | **unproven** | author one new scene and one new in-scene branch end to end during the vertical slice; record which file each needed | content pipeline (`CG-0MWPY29730011FJ4`) |
 
 Two further evidence limits are carried forward rather than resolved here: the
@@ -890,7 +893,7 @@ remain stubs.
 | Presentation contract | **Written — [§3](#3-ux-visual-design-and-audio-direction)**: the SLL zone table (including three new game zones), overlay behaviour and depth ordering, the `COMMON_SFX_KEYS` map with a reduced-motion alternative per event, accessibility (reduced motion, verbosity/tooltips, colour independence, keyboard/touch), and determinism/save-load/transcript/replay expectations | `CG-0MWPY2CHF003AHE1` |
 | Glossary proper nouns and prohibited-term gate | **Written — [§4.2](#42-the-settings-names-final)–[§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it)**: the final naming table with a rationale per name, the recorded prohibited-term scan of this document and its guarded set, the trademark sanity read and the carried-forward review gate | `CG-0MWPY2FV30041M48` |
 | Engine-gap backlog | **Written — [§6](#6-engine-gap-backlog)**: every missing capability with unlock, module reference, effort band (with nearest precedent), issue type and disposition; filed items recorded in [§6.6](#66-disposition-record) | `CG-0MWPY2ECE002P2NH` |
-| V1 scope and deferred list | act/scene/beat/branch counts, playtime, word budget, replayability, deferrals | `CG-0MWPY2HJU006LJMU` |
+| V1 scope and deferred list | **Written — [§7](#7-v1-scope-statement-and-deferred-list)**: the counts table (3 acts / 7 scenes / 21 beats / 16 exits / 5 endings), the playtime arithmetic with its two stated assumptions, the 3,200-word authored budget, the replayability story and targets, the per-capability backlog check and the five-row deferred list | `CG-0MWPY2HJU006LJMU` |
 | Integration and review close-out | developer-guide link, reciprocal links, re-run verification at the final commit | `CG-0MWPY2JEU006DYUL` |
 
 ---
@@ -3246,22 +3249,319 @@ epic's scope statement claims them.
 5. **Check that no gap is a duplicate.** No filed entry re-creates an already
    completed item; G14 is explicitly reused rather than re-filed.
 
-## 7. V1 Scope Statement and Deferred List (TODO)
+## 7. V1 Scope Statement and Deferred List
 
-> **TODO — owned by `CG-0MWPY2HJU006LJMU`.** This section is a stub: it must be
-> internally consistent with the resource model, the scoring model and the gap
-> backlog, and no v1 feature may depend on an unfiled gap.
+> **Written by `CG-0MWPY2HJU006LJMU`.** This section replaces the stub that
+> [§2.7](#27-sections-owned-by-downstream-work-items) listed. It fixes the v1
+> content volume, the playtime target and its arithmetic, the authored word
+> budget, the replayability story and the cut line, and it checks every v1
+> capability against the engine-gap backlog ([§6](#6-engine-gap-backlog)). It
+> re-tunes no resource number ([§2.8](#28-resource-model-and-economy)), changes
+> no scoring weight or band ([§2.10.5](#2105-the-reset-ending-scoring-model)) and
+> files no new engine gap: it is the section where those three sections are
+> converted into a volume a producer can approve, and a cut line that says what
+> is deliberately absent.
 
-To be fixed by that item, using this document's numbers as the baseline:
+**The cut line in one paragraph.** V1 is the complete voyage: **three acts,
+seven scenes, twenty-one authored scene beats and five endings**, played against
+all five declared resources, the per-scene clock, the irreversible hull ledger
+and the journal-derived epilogue. Every **engine** capability that sentence
+needs is a **filed** gap ([§7.5](#75-every-v1-capability-against-the-backlog));
+the capabilities the engine already ships are listed, so they are checked rather
+than assumed, in [§6.5](#65-what-is-deliberately-not-a-gap). Everything else is
+either an engine gap the build epic builds first, or a deferral recorded in
+[§7.6](#76-the-deferred-list) with what it blocks and where it is tracked. Two
+things follow immediately, and they are the reason this section exists: nothing
+in v1 needs a gap that is unfiled, and nothing in v1 needs a gap bigger than
+`large`.
 
-| Input | Value used here |
-|---|---|
-| Acts | 3 |
-| Scenes | 5 in the worked manifest; v1 total is the owner's decision |
-| Beats | 15 assigned beats + 4 ending cards in the worked manifest |
-| Branches / exits | 5 scenes × 2–5 beats; the authored chain contributes the in-scene branches |
-| Target playtime basis | the spike's measured **6–10 beats** and **5–9 choices** per run (mean 8.48 beats), extended by scene exits — the owner converts this to minutes with a stated assumption |
-| Replayability basis | seeded content order, authored doors, and the scene outcomes that open or close them |
+**Two kinds of count.** Every number below is either an **authored** count (what
+the writer and designer produce) or a **run** count (what one player enters).
+The spike's 19-card file against its measured 6–10-beat run is the proof that
+the two must not be confused: a player never traverses every authored beat,
+because a scene's beats form a small ring and a run takes a subset of them.
+
+### 7.1 The v1 counts
+
+| Item | V1 value | Derived from | Verified by |
+|---|---|---|---|
+| Acts | **3** | the arc weighting in [§2.10.5](#2105-the-reset-ending-scoring-model) (15 / 20 / 25) is defined over three acts | [§7.7](#77-consistency-check) and the contract test |
+| Scenes | **7** — Act I 2, Act II 3, Act III 2 | [P4](#2103-pacing-rules-stated-numerically): 2 / 3 / 2 scenes | the manifest and the contract test |
+| Authored scene beats | **21** — Act I 6, Act II 9, Act III 6 (3 per scene) | [P1](#2103-pacing-rules-stated-numerically) (2–5 beats, target 3) inside P4's act bands | the manifest and the contract test |
+| Authored decision points | **21** — every scene beat offers a choice; **18** offer two or more options and **3** are labelled single-option transits (exactly one per act) | [P2](#2103-pacing-rules-stated-numerically) | the manifest, the route-space harness and the content guard |
+| Consequential decision points | **12 or more of the 18**, each meeting the minimum rejoin distance of 3 | [P3](#2103-pacing-rules-stated-numerically) | content guard `consequential-rejoin` and the route-space harness |
+| Authored scene exits | **16** — two scenes author three doors (success / partial / failure), five author two | [§2.2.7](#227-routes-and-route-targets) route tables and [§2.10.4](#2104-failure-and-recovery-per-failure-type) | the manifest's route tables |
+| Endings | **5** — the four carried from the spike plus the Act I hatch | [§2.10.5](#2105-the-reset-ending-scoring-model): v1 must author an early terminal so the bottom two bands are reachable in play | `endings[]` in the manifest and the route-space guard |
+| Scenes entered per run | **5–6 of 7** | [P5](#2103-pacing-rules-stated-numerically) | the route-space harness |
+| Beats entered per run | **12–16** | [P5](#2103-pacing-rules-stated-numerically) (the spike measured 6–10) | the route-space harness (`beats`) |
+| Decisions per run | **10–14** | [P5](#2103-pacing-rules-stated-numerically) (the spike measured 5–9) | the route-space harness (`choices`) |
+| Target playtime | **13 minutes a run, 10–16 minute range** | [§7.2](#72-playtime-the-assumption-and-the-arithmetic) | the contract test's arithmetic check |
+| Authored word budget | **3,200 words, tolerance 2,900–3,500** | [§7.3](#73-the-authored-word-budget) | the contract test's arithmetic check |
+| Declared resource keys | **5** — `hull`, `morale`, `stores`, `goodwill`, `charge` | [§2.8.1](#281-the-v1-declared-set-and-what-is-deliberately-not-in-it) | the contract test's cross-check against [§2.8](#28-resource-model-and-economy) |
+| Playable routes (target) | **150 or more** | [§7.4](#74-replayability-what-changes-between-runs) (the spike's route space was 138) | the route-space harness |
+| Distinct terminal states (target) | **100 or more** | [§7.4](#74-replayability-what-changes-between-runs) (the spike's was 132) | the route-space harness |
+
+**Per act, the counts inside P4's bands:**
+
+| Act | Scenes | Authored beats | Decision points | Scenes a run enters | Arc weight |
+|---|---|---|---|---|---|
+| Act I — the record | 2 | 6 | 6 (5 real + 1 transit) | 2 | 15 |
+| Act II — the price | 3 | 9 | 9 (8 real + 1 transit) | 2–3 | 20 |
+| Act III — the core | 2 | 6 | 6 (5 real + 1 transit) | 1–2 | 25 |
+| Endings | — | 5 terminal cards (1 beat each) | 0 (the post-ending restart aside) | 1 ending | 0 |
+
+Across the whole run the two run-level rules bind: **5–6 of the 7 scenes** are
+entered and **12–16 beats** are played. A run does not enter every authored beat
+of a scene it visits — each scene's three beats form a small ring and a run takes
+two or three of them — so the per-act columns above are authored volume, not a
+per-run traversal.
+
+**The five endings.** Four are carried unchanged from the spike; the fifth is the
+early terminal [§2.10.5](#2105-the-reset-ending-scoring-model) requires so the
+bottom two bands are reachable in play. The hatch's card title is composed from
+ordinary English words, so it adds no proper noun to the naming layer
+([§4.2](#42-the-settings-names-final) naming rule 1) and needs only the standing
+prohibited-term scan at authoring time.
+
+| Ending card | Title | Reachable from | Band ceiling |
+|---|---|---|---|
+| `le-end-reset` | *The Long Erasure* | the Act III scene's success door | 92 (authored maximum) |
+| `le-end-quiet` | *A Quiet Chart* | the Act III scene's charge-gated door | 92 |
+| `le-end-ram` | *Ashlight, Ends* | the Act III scene's hull-costing door | 92 |
+| `le-end-abandon` | *The Voyage Abandoned* | the Act II hatch | 67 (arc 35 + choices 12 + resources 20) |
+| `le-end-hatch` | *A Record Nobody Filed* | the Act I hatch | 47 (arc 15 + choices 12 + resources 20) |
+
+**Appendix A is the shape example, not the v1 volume.** The worked manifest
+stays a five-scene, fifteen-beat, four-ending manifest over the shipped spike
+content; this section is the v1 volume the build epic implements. Where the two
+disagree, this section is the contract and Appendix A is the illustration.
+
+### 7.2 Playtime: the assumption and the arithmetic
+
+Playtime is **estimated from the measured beats-per-run figure**, not from
+playtested human sessions. The estimate is only as good as its two stated
+assumptions, so both are printed here and neither is hidden inside a total.
+
+| Input | Value | Source |
+|---|---|---|
+| Spike beats per run (measured, 160 policy runs) | 6 / **7.95** / 10 (min / mean / max) | [evaluation §4.2](./storyline-playtest-evaluation.md#4-pacing-measured-numerically) |
+| Spike beats per run (measured, route space) | 6–10, mean **8.48** | [evaluation §4.2](./storyline-playtest-evaluation.md#4-pacing-measured-numerically) |
+| Spike choices per run (measured, route space) | 5–9, mean 7.57 | [evaluation §4.2](./storyline-playtest-evaluation.md#4-pacing-measured-numerically) |
+| V1 beats per run | **12–16, mean 14** | [P5](#2103-pacing-rules-stated-numerically) and [§7.1](#71-the-v1-counts) |
+| Per-beat allowance (**assumption A1**) | **35–50 s, target 42 s** — read the beat's context and its two-to-three options, compare costs, decide | this section; not measured |
+| Presentation overhead (**assumption A2**) | **~3 min** a run — opening, seven scene-exit banners, two act transitions, the epilogue and the score screen | this section; not measured |
+| Arithmetic | 12 × 35 s + 3:00 ≈ **10:00**; 14 × 42 s + 3:00 ≈ **12:48**; 16 × 50 s + 3:00 ≈ **16:20** | this section |
+| Published target | **13 minutes a run, 10–16 minute range** | this section |
+
+**The estimate's basis, stated plainly.** The measured figure is **6–10 beats
+and 5–9 choices per run** (mean 8.48 beats over the route space, 7.95 beats over
+the 160 policy runs). V1 nearly doubles both: P5 requires **12–16 beats and
+10–14 decisions**, because each scene now closes on an objective and routes on
+its outcome rather than falling through a chain. Multiplying the v1 run length by
+the per-beat allowance (A1) and adding the presentation overhead (A2) gives
+roughly **10–16 minutes**, with a **13-minute target** at the mean run of 14
+beats.
+
+**Cross-check against the word volume.** A run reads about **1,300–1,700
+words** (12–16 beats × about 100 words of context, outcome line and chosen
+option prose, plus one ~100-word epilogue). At 200 words per minute that is
+6.5–8.5 minutes of reading and at 150 words per minute 8.7–11.3 minutes, leaving
+**2–3 minutes of decision and presentation time** to reach the same 10–16 minute
+range. The two derivations agreeing is the reason the target is credible; they
+share one weakness — **neither was measured on a human**.
+
+**What the estimate does not claim.**
+
+1. **It is not a playtest.** A1 and A2 are assumptions; a human browser playtest
+   (ideally three people, at least one who has not read the content) is the
+   measurement that would replace them, and it is deferred in
+   [§7.6](#76-the-deferred-list) row D3.
+2. **It describes a first run.** A returning player who already knows the
+   doors reads faster and lands at the low end of the range.
+3. **It is a single run, not a completion time.** Seeing all seven scenes and
+   all five endings takes **two to three runs** — a run enters 5–6 of the 7
+   scenes and exactly 1 of the 5 endings — so the whole chart is roughly
+   **25–45 minutes** of play. That is the replayability time the design is
+   sized for.
+4. **It cannot be verified by the unit suite.** The contract test checks the
+   arithmetic in this section, not the human experience of the run.
+
+### 7.3 The authored word budget
+
+The budget is derived from the engine's own prose budgets
+([`PROSE_FIELD_SPECS`](../../src/story-line/content/prose.ts)) and the spike's
+measured authoring density, so a writer has a per-surface limit rather than a
+single opaque total.
+
+| Prose surface | Engine budget | Authored count | Character ceiling | Approx. words |
+|---|---|---|---|---|
+| `context` (the beat's situation) | 400 chars a beat | 21 beats | 8,400 | 1,370 |
+| `epilogue` (the ending's close) | 600 chars an ending | 5 endings | 3,000 | 490 |
+| `effect` (the beat's outcome line) | ~90 chars a card (the spike's measured density) | 26 cards | 2,340 | 380 |
+| option `#says` (the chosen option's prose) | ~130 chars an option (the spike's measured density) | ~45 options | 5,850 | 950 |
+| **Total authored** | — | **26 cards** | **~19,600 chars** | **~3,200 words** |
+
+**The rule.** The authored budget is **3,200 words**, with a **±10% approval
+tolerance (2,900–3,500)** a writer may land inside without re-approval. It is
+derived at **6.15 characters per word** — the conversion the spike's 1,820
+authored words over 19 cards implies. The hard floor is **2,500 words**: that is
+the spike's own measured density (96 words a card) carried to 26 cards, below
+which the cards cannot carry their context and option prose at the engine
+budgets. A change to a prose budget in `PROSE_FIELD_SPECS` changes this table,
+not the other way round.
+
+**Per run, the player reads roughly 40–50% of it** (1,300–1,700 of the 3,200
+words), which is the replayability budget made concrete: a second run reads a
+different subset because it enters different beats and chooses different options.
+
+### 7.4 Replayability: what changes between runs
+
+| What varies | What is fixed | Target |
+|---|---|---|
+| **Route** — 18 real decisions, 12 or more of them consequential (rejoin distance 3), every scene exit an authored door | the three-act frame, the 7 scenes, the one-clause objective a scene asks, the per-scene budget | **150 or more playable routes, 100 or more distinct terminal states**; every ending reachable, and each of the four carried endings reached on at least 2 routes |
+| **Seed** — the run's only RNG, drawn when one choice pushes to several possible head successors; the seed is recorded at `run-start` and stored in the save | the authored tables are evaluated in declaration order and a scene close consumes no RNG ([§3.5.1](#351-determinism)) | **160 measured runs (40 seeds × 4 policies — `first`, `last`, `seeded`, `greedy-goodwill`)**, covering all 7 scenes and all 5 endings, with zero runs that reach no ending and zero dead turns ([P6](#2103-pacing-rules-stated-numerically)) |
+| **Resources and the ledger** — a run's five-key bag, the hull it spends and every ledger line it records | the starting bag (5 / 5 / 4 / 0 / 2) and the bounds in [§2.8.2](#282-per-key-contract); `hull` is never granted | every one of the five keys has at least one source, one sink and one gate in v1; the ledger is never cleared, including at reset |
+| **Scene outcomes and doors** — `success` / `partial` / `failure` per scene and the door it opens, refusals included | the route vocabulary (`chain` / `beat` / `ending`) with no `retry` kind | every refusal routes to authored content; no route leads to a state without an ending |
+| **Score and band** — the journal-derived score and one of the five bands | the weights, caps and band boundaries of [§2.10.5](#2105-the-reset-ending-scoring-model) | all five bands reachable in play, including 0–19 and 20–39, which is why the Act I hatch exists |
+
+**What changes between runs, in one paragraph.** A second run is a **different
+voyage over the same chart**, not a reshuffle: the acts, scenes, objectives and
+budgets are identical, so the player's knowledge carries; the doors they opened
+last time are not the doors they open this time, because a consequential choice
+forks three or more beats before its scene closes; the bag and the hull ledger
+make the middle of the run a consequence of the beginning; and only one of five
+endings was seen. The seed never changes the *story* — it only moves a choice
+onto a different authored successor when the content offers more than one — so
+the variety a player feels is authored, and the seed's job is to make it
+replayable, not to generate it.
+
+**Why the route target is credible.** The spike's route space was **138 playable
+routes and 132 distinct terminal states** over 5 scenes, 15 beats and 14 decision
+points ([evaluation §4.2](./storyline-playtest-evaluation.md#4-pacing-measured-numerically)).
+V1 adds two scenes, six beats and four decision points across a wider per-scene
+ring, so **150 routes and 100 terminal states** is a floor rather than a stretch
+— and it is the floor the route-space harness measures, not a count the writer
+aims at.
+
+### 7.5 Every v1 capability against the backlog
+
+Every engine capability v1 needs is traced to a **filed** gap below, and no row
+is an unfiled gap or one of the deferred entries `G6` / `G13`.
+
+| V1 capability | GDD section | Backlog entry | Effort band | Filed item |
+|---|---|---|---|---|
+| Beat sheet / objective runtime layer (acts, scenes, budgets, outcomes, routing, ledger) | [§1.3](#13-the-core-loop), [§2.2](#22-the-scene-beat-sheet-data-model) | [G1](#g1) | large | `CG-0MWR0BAT30015DPQ` |
+| Episode manifest schema and validator (`storylines:manifest`) | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | [G2](#g2) | medium | `CG-0MWR0BFMW003856N` |
+| Scene-space guard (every exit, every refusal, every ending) | [§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10.4](#2104-failure-and-recovery-per-failure-type) | [G3](#g3) | medium | `CG-0MWR0BG9H007AFNU` |
+| Resource bounds and spill/clamp reporting | [§2.8](#28-resource-model-and-economy) | [G4](#g4) | small–medium | `CG-0MWR0BGVG004UE7X` |
+| Irreversible-resource policy (`hull` is never granted) | [§2.8.2](#282-per-key-contract), [§2.10.2](#2102-irreversible-loss-hull-as-the-dial) | [G5](#g5) | small | `CG-0MWR0BHH9002OQUZ` |
+| Surfaced affordability (an unaffordable door is shown, not deleted) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§2.10.1](#2101-the-clock-a-visible-per-scene-budget) T5 | [G7](#g7) | small | `CG-0MWR0BI3S008K9Y6` |
+| Resource HUD for the declared five-key bag | [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | [G8](#g8) | medium | `CG-0MWR0BIPV0074WLM` |
+| Scene-exit banner and sequenced act transition (with reduced motion) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | [G9](#g9) | small–medium | `CG-0MWR0BJBU005TDTT` |
+| Retire the legacy `act` / `clockCost` CSV columns | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) | [G10](#g10) | small | `CG-0MWR0BJXI007UINE` |
+| Keyboard choice navigation and overlay focus order | [§3.4.4](#344-keyboard-and-touch-input-paths) | [G11](#g11) | small | `CG-0MWR0BKIT0084ZID` |
+| Shared verbosity preference (Full / Concise) | [§3.4.2](#342-verbosity-and-tooltips) | [G12](#g12) | extra-small | `CG-0MWR0BL4Q000OYG6` |
+| Writer authoring ergonomics for the v1 volume | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | [G14](#g14) | small | `CG-0MWQYDC7D003G4ON` |
+
+**The disposition check.** Every row names a live Worklog item that already
+exists in [§6.6](#66-disposition-record), and every effort band is the one
+[§6.2](#62-the-backlog-at-a-glance) states for that entry. The largest band on
+the list is **`large`** (G1, the runtime layer), which is filed and scheduled;
+the backlog's band vocabulary tops out at `large`
+([§6.1](#61-how-to-read-an-entry)), so **no** v1 capability is `extra-large` —
+and none is unfiled. The two entries v1 does **not** depend on are `G6`
+(compound conditions) and `G13` (this game's replay adapter); both are deferred
+in [§7.6](#76-the-deferred-list).
+
+**The scheduling hold is unchanged.** Every filed entry is `blocked`, depends on
+the GDD epic `CG-0MWNFVLYT003M7XF` and carries `startOn 2027-06-01`, so nothing
+on this list can be dispatched before the GDD closes and the build epic is
+scoped. Clearing `startOn` and re-parenting the adopted entries is the build
+epic's first act ([§6.6](#66-disposition-record)).
+
+### 7.6 The deferred list
+
+Each row names **what the deferral blocks** (the capability that is unavailable
+until it is lifted), why v1 does not need it, and where it is tracked so it
+cannot be silently dropped.
+
+| # | Deferral | What it blocks | Why v1 does not need it | Tracked in |
+|---|---|---|---|---|
+| D1 | Compound and range conditions — [G6](#g6) | any objective or gate with two clauses ("`hull ≥ 5` **and** `stores ≥ 3`", "at maximum") | every v1 objective is one clause by design; a scene that needs more than one is authored as two scenes ([§2.2.5](#225-objective)) | [§6.6](#66-disposition-record) row `G6` (marked **Deferred**) and the build epic's handover |
+| D2 | Deterministic replay adapter and fixture for this game — [G13](#g13) | fixture-driven replay regression of recorded runs ([§3.5.4](#354-replay)) | v1 records append-only transcripts ([§3.5.3](#353-transcript)) and the pure module is unit-tested; the adapter is a game-owned deliverable, not engine work | [§6.6](#66-disposition-record) row `G13` and [§5.2](#52-verification-the-build-epic-must-add-named-gaps) |
+| D3 | A human browser playtest of the v1 content | measured wall-clock playtime, phone readability and felt tension — i.e. the measurement that would replace assumptions A1 and A2 in [§7.2](#72-playtime-the-assumption-and-the-arithmetic) | no v1 acceptance criterion depends on the playtest; the playtime target states its basis and its weakness | `CG-0MWR27FHI000HPT3` (filed by this item) |
+| D4 | Re-tuning the five resource numbers after the vertical slice | the final balance values — the starts, bounds and per-key costs in [§2.8.2](#282-per-key-contract) | v1 fixes the **container** (per-scene budgets, the irreversible dial, one-clause objectives); the numbers are the spike's measured baseline and any change must keep the rules of [§2.8.2](#282-per-key-contract) and [§2.8.3](#283-the-economy-by-act) | [§2.8](#28-resource-model-and-economy) preamble (the change-control rule) and the build epic's handover |
+| D5 | Steam achievements for the voyage | platform achievement unlocks and any player-visible progression outside the epilogue | v1's record is the epilogue and the transcript; the engine's achievement seam is game-agnostic and a game only declares a mapping | `electron/achievement-manifest.json` (the single source of truth) and [§6.5](#65-what-is-deliberately-not-a-gap) |
+
+**What "deferred" does not mean.** A deferred entry is not a rejected one: D1
+and D2 are live rows in the backlog with an explicit reason, D3 has its own work
+item, D4 is governed by the resource model's own change-control rule, and D5 is
+gated behind a manifest that a launcher build reads. None of them blocks a v1
+acceptance criterion, and none of them can be closed by saying "it was never
+written down".
+
+### 7.7 Consistency check
+
+| Axis | v1 commitment | Where it comes from |
+|---|---|---|
+| Act / scene shape | 3 acts, 7 scenes (2 / 3 / 2), 21 beats (6 / 9 / 6) — inside P4's bands | [§2.10.3](#2103-pacing-rules-stated-numerically) P1, P4 |
+| Run length | 12–16 beats and 10–14 decisions, 5–6 of 7 scenes, one ending | [P5](#2103-pacing-rules-stated-numerically) |
+| Resources | the five declared keys (`hull`, `morale`, `stores`, `goodwill`, `charge`), starts 5 / 5 / 4 / 0 / 2, the bounds of §2.8.2, `hull` irreversible | [§2.8.1](#281-the-v1-declared-set-and-what-is-deliberately-not-in-it), [§2.8.2](#282-per-key-contract) |
+| Objectives | one clause each; every declared key is read by at least one objective or `#when` gate | [§2.2.5](#225-objective), [§2.8.1](#281-the-v1-declared-set-and-what-is-deliberately-not-in-it) |
+| Clock | per-scene budgets of 2–7 ticks, at most one deliberate cliff per act, every scene entry resets its budget | [§2.10.1](#2101-the-clock-a-visible-per-scene-budget), [P7](#2103-pacing-rules-stated-numerically) |
+| Loss rules | only on `partial` or `failure`, only on an irreversible key, always with a printed statement; no scene close consumes RNG | [§2.10.2](#2102-irreversible-loss-hull-as-the-dial), [§3.5.1](#351-determinism) |
+| Scoring | arc 15 / 20 / 25 / 0, choices 12, resources 20, losses 20, five bands | [§2.10.5](#2105-the-reset-ending-scoring-model) |
+| Endings | 5, including the Act I hatch that makes the 0–19 and 20–39 bands reachable in play | [§2.10.5](#2105-the-reset-ending-scoring-model), [§2.10.6](#2106-what-this-section-does-not-prove) |
+| Engine | every capability a filed gap; the largest is `large` (G1); nothing `extra-large`; G6 and G13 not required | [§6.1](#61-how-to-read-an-entry), [§6.6](#66-disposition-record) |
+
+**The Act I hatch is arithmetic, not a wish.** The bottom two bands are reachable
+only if the hatch can be entered early with most of the bag already spent. With
+arc 15 for Act I, 2 points a choice, 1 point a remaining resource point (capped
+at 4 a key) and −2 a cost point, the hatch's reachable range is:
+
+| Hatch run | Arc | Choices | Resources | Losses | Total | Band |
+|---|---|---|---|---|---|---|
+| Entered after 1 choice, bag intact | 15 | 2 | 18 | 0 | 35 | 20–39 |
+| Entered after 1 choice, two keys spent | 15 | 2 | 9 | −4 | 22 | 20–39 |
+| Entered after 1 choice, heavy spend | 15 | 2 | 6 | −6 | 17 | **0–19** |
+| For comparison: R3 abandon in Act II | 35 | 10 | 13 | −4 | 54 | 40–59 |
+| For comparison: R1 finish in Act III | 60 | 12 | 15 | −4 | 83 | 80–100 |
+
+The hatch therefore has to be authored on a beat where the player can already
+have spent most of the bag — that is the content requirement this section adds,
+and it is checkable against the manifest and the route-space harness rather than
+argued from intent. The `le-end-abandon` ceiling of 67 in [§7.1](#71-the-v1-counts)
+is the same arithmetic: 35 + 12 + 20 − 0, which is 13 points below the top band
+and is why abandoning can never read as the best run.
+
+**No v1 number contradicts another.** The act weights (15 / 20 / 25) are the
+share of the 60 arc points, and they are defined over the same three acts that
+hold the seven scenes; the run length those scenes produce is what the playtime
+multiplies; the word budget is sized by the same 26 cards; and the route target
+is the harness's measure over the decision points. Where a later re-tune moves
+one of these numbers (§7.6 row D4), it must move the row's neighbours in the
+same commit.
+
+### 7.8 How a reviewer verifies this section
+
+1. **Run the structural contract.**
+   `npx vitest run --project unit tests/story-line/content/gdd-v1-scope.test.ts`
+   fails if a count leaves P4's or P5's bands, if the playtime or word-budget
+   arithmetic stops reconciling, if a must-have row cites an unfiled gap or a
+   deferred one, if a deferral loses its tracking reference, or if the resource
+   key list drifts from [§2.8.1](#281-the-v1-declared-set-and-what-is-deliberately-not-in-it).
+2. **Recompute the playtime arithmetic** from the three inputs in
+   [§7.2](#72-playtime-the-assumption-and-the-arithmetic); if 12 × 35 s + 3:00
+   is no longer about 10 minutes, the target moved and the section is stale.
+3. **Check the counts against the manifest** once the build epic authors it: 7
+   scenes, 21 scene beats, 5 endings, 16 exits, 18 real decisions. The numbers in
+   [§7.1](#71-the-v1-counts) are the acceptance contract, not a description.
+4. **Check every deferral's tracking reference** resolves to a live item, a
+   §6.6 row, or the named manifest — a deferral with nowhere to live is a
+   dropped feature.
+5. **Confirm the cut line is complete**: every capability in the one-paragraph
+   cut line appears in the [§7.5](#75-every-v1-capability-against-the-backlog)
+   table, and every row of that table is a **filed** item.
 
 ---
 
@@ -3529,5 +3829,5 @@ is worse than a link.
 | `CG-0MWPY2CHF003AHE1` | Presentation contract: UI, audio, accessibility, determinism — delivered: [§3](#3-ux-visual-design-and-audio-direction), T13; named gaps B1, B4, B5, B7, B8, B9 for the backlog and build epic |
 | `CG-0MWPY2ECE002P2NH` | Engine-gap backlog — delivered: [§6](#6-engine-gap-backlog); filed the engine-gap items listed in [§6.6](#66-disposition-record) |
 | `CG-0MWPY2FV30041M48` | IP-safe naming pass and prohibited-term gate — delivered: [§4.2](#42-the-settings-names-final)–[§4.5](#45-the-prohibited-term-gate-and-how-a-writer-runs-it), T14; the GDD path is final (no rename needed) |
-| `CG-0MWPY2HJU006LJMU` | V1 scope statement and deferred list |
+| `CG-0MWPY2HJU006LJMU` | V1 scope statement and deferred list — delivered: [§7](#7-v1-scope-statement-and-deferred-list); filed the human playtest deferral `CG-0MWR27FHI000HPT3` |
 | `CG-0MWPY2JEU006DYUL` | Integration, review and verification close-out |
