@@ -878,7 +878,10 @@ in a story-line that nothing links to — it would be `unreachable-card`). The
 optional `after` field names a base card id and inserts the new row directly
 after that card's row instead of appending, so CSV reading order can track
 narrative order; an `after` that names no card is refused with an error naming
-the id, and omitting it appends exactly as before.
+the id, and omitting it appends exactly as before. Neither form can silently
+re-point an existing story-line's entry card: an add that would move the entry
+(the first member with no incoming link) is refused, naming the old and
+would-be entry card.
 `updateContentCard` changes only the supplied fields; a nullable field set to
 `null` is cleared. A card is a choice exactly when its `options` encoding is
 non-empty — no separate flag or link column exists to set.
@@ -908,7 +911,7 @@ gate and the malformed-entry behaviour — is documented in the GDD's
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space: gated-branch survival, ending reachability, consequential rejoin distance (`--csv`, `--initial`, `--endings`, `--min-rejoin`, `--json`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
-| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`, prose via `--context` / `--epilogue` and `update-card --clear-context` / `--clear-epilogue`). |
+| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`, `add-card --after <card-id>` positional insert, prose via `--context` / `--epilogue` and `update-card --clear-context` / `--clear-epilogue`). |
 | `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |
 
 Every CLI supports `--help`, resolves `--game` (the author/validator/graph
@@ -919,6 +922,25 @@ candidate content without writing it.
 
 A forward reference is authored in one command with `add-linked-card`: the new
 card and the predecessor's incoming option land in a single validated write.
+
+A new card appends at the end of the file by default. `--after <card-id>`
+inserts its row directly after that card's row, so the CSV reads in narrative
+order instead of every new beat landing after the last one:
+
+```bash
+npm run storylines:author -- add-card --id gym-story-detour \
+  --name "A Detour" --effect "The scenic route." \
+  --storyline-id gym-story --storyline-title "Gym Storyline" \
+  --after gym-story-invest --options "Walk back|gym-story-start"
+```
+
+`--after` must name an existing base card id; an unknown id is refused with an
+error naming it, and nothing is written. Omitting `--after` appends exactly as
+before. A positional insert never silently re-points a story-line's entry card:
+the entry is the first member in file order with no incoming link, and an add
+that would move the entry (or leave a member unreachable from it) is refused,
+naming the old and would-be entry card. Link the new card in from a story-line
+member with `add-linked-card --link-from <card-id>` to keep the entry unchanged.
 
 ```bash
 npm run storylines:author -- add-linked-card --id gym-story-detour \
@@ -931,7 +953,8 @@ npm run storylines:author -- add-linked-card --id gym-story-detour \
 is refused and nothing is written) and `--link-label` sets the option text
 (default: the new card's name). Every `add-card` flag (`--effect`, `--options`,
 `--context`, `--epilogue`, `--storyline-id`, `--storyline-title`,
-`--resources`, `--field`) also applies to `add-linked-card`.
+`--resources`, `--after`, `--field`) also applies to `add-linked-card`, so an
+inserted card is linked in from its predecessor in the same transaction.
 
 One option is appended in place with `add-option`, so the existing cell is
 never retyped (and a dropped `;` can no longer remove a branch):

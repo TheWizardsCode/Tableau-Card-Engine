@@ -6,7 +6,9 @@
  * author API (`src/story-line/content/author.ts`):
  *
  * - `add-card`     appends a new card row (correct column count, no duplicate
- *                  id) and validates the resulting content.
+ *                  id) and validates the resulting content. `--after
+ *                  <card-id>` inserts the row directly after that card's row
+ *                  instead, so CSV reading order can track narrative order.
  * - `add-linked-card` appends a new card **and** links it in from an existing
  *                  card in one transaction: the predecessor gains an option
  *                  pointing at the new card, and only the combined candidate
@@ -37,6 +39,8 @@
  *   --storyline-title "X Arc"
  * npm run storylines:author -- update-card --id evt-x --storyline-id storyline-y
  * npm run storylines:author -- add-card --id evt-z --name "Z" --dry-run
+ * npm run storylines:author -- add-card --id evt-z --name "Z" \
+ *   --after evt-x --storyline-id storyline-x
  * npm run storylines:author -- add-linked-card --id evt-branch --name "Branch" \
  *   --link-from evt-x --link-label "Take the branch" --storyline-id storyline-x
  * npm run storylines:author -- add-option --id evt-x --label "Ask after the road" \
@@ -98,6 +102,8 @@ add-card options:
   --id <id> --name <name> [--effect <text>] [--options <encoding>]
   [--context <text>] [--epilogue <text>]
   [--storyline-id <id>] [--storyline-title <title>] [--resources <keys>]
+  [--after <card-id>]        Insert the new row after that card's row
+                             (default: append at the end of the file)
 
 add-linked-card options (add-card options, plus):
   --link-from <card-id>      Predecessor that gains the option (required)
@@ -122,6 +128,10 @@ update-card options:
 
 Choice nodes are authored through --options (label|target;label2|target2), which
 replaces the cell, or add-option, which appends one entry.
+A positional insert or append (--after) never silently re-points a story-line's
+entry card: the entry is the first member in file order with no incoming link,
+and an edit that would move the entry (or leave a member unreachable from it) is
+refused, naming both cards, instead of written.
 Declared resources (--resources "coins,hull") are the keys the option
 #cost/#extra/#when attributes may name. Prose is authored only through
 --context / --epilogue; the mapped columns are refused as --field keys.
@@ -212,6 +222,7 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
       storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
       storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),
       resources: optionalText('resources'),
+      after: optionalText('after'),
       fields,
     };
     if (command === 'add-card') return { command, csvPath, gameId, dryRun, spec };

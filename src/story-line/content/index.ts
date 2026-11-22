@@ -9,7 +9,7 @@
  * | Content model + adapter seam | `types` | `ContentCard`, `ContentAdapter`, `ContentFieldMapping`, `baseIdOf`, … |
  * | CSV + checksum | `csv` | `parseCsv`, `parseResourceDeclaration`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
  * | Manifest + Mermaid | `manifest` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers |
- * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports |
+ * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports, `storylineEntryCards` |
  * | Transactional authoring | `author` | `addContentCard`, `addLinkedContentCard`, `addOptionToContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
  * | Generated artefacts | `artefacts` | `renderArtefacts`, `checkArtefacts`, `writeArtefacts`, `previewArtefacts`, `DEFAULT_ARTEFACT_PATHS` |
  * | Prohibited-term (IP) scan | `ip-terms` | `parseProhibitedTermList`, `scanProhibitedTerms` |
@@ -103,6 +103,7 @@ export {
   contentValidationToJson,
   findCycles,
   formatContentValidationReport,
+  storylineEntryCards,
   validateContentCards,
   validateContentCsv,
 } from './validate';

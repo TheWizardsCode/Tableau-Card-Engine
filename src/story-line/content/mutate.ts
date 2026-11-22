@@ -32,7 +32,7 @@ import {
   type ParsedCsv,
 } from './csv';
 import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
-import { validateContentCsv, type ContentValidationResult } from './validate';
+import { validateContentCsv, storylineEntryCards, type ContentValidationResult } from './validate';
 
 // ── Result types ────────────────────────────────────────────
 
@@ -76,6 +76,10 @@ export interface AddContentCardSpec {
    * appending it, so CSV reading order can track narrative order. An id that
    * names no card is refused with a clear error, naming the id; omitting the
    * position appends (the historical behaviour, unchanged byte-for-byte).
+   *
+   * Neither `after` nor appending moves a story-line's entry card silently: an
+   * edit that would change the entry of an existing story-line (the first
+   * member with no incoming link) is refused, naming the old and new entry.
    */
   readonly after?: string | null;
   /** Game-specific column values, keyed by CSV column name. */
@@ -187,6 +191,49 @@ function findRow(
   return rows.find((row) => baseIdOf(adapter, row[idIndex] ?? '') === wanted) as
     | string[]
     | undefined;
+}
+
+/**
+ * Refuses an edit that would silently re-point an existing story-line's entry
+ * card.
+ *
+ * A story-line's entry card is the first member (in file order) with no
+ * incoming edge from another member (see {@link storylineEntryCards}). Adding a
+ * row can flip that choice without stranding any member — an appended card that
+ * points back at the old entry, for example, makes the old entry "linked to" so
+ * the new card becomes the entry. Validation passes, yet the story now starts
+ * at a different beat. Because that change is invisible in the diff, the add
+ * operations refuse it and name both the old and the would-be entry card.
+ *
+ * Story-lines that did not exist before the edit are never a re-point: their
+ * entry card is the new card, which is exactly what the author asked for.
+ *
+ * @param command     The author operation, used in the error prefix.
+ * @param originalCsv The content before the edit.
+ * @param candidateCsv The unvalidated content after the edit.
+ * @param adapter     The game content adapter.
+ * @returns The refusal message, or `undefined` when no entry card moved.
+ */
+function entryRepointError(
+  command: 'add-card' | 'add-linked-card',
+  originalCsv: string,
+  candidateCsv: string,
+  adapter: ContentAdapter,
+): string | undefined {
+  const before = storylineEntryCards(readContentCards(originalCsv, adapter), adapter);
+  if (before.size === 0) return undefined;
+  const after = storylineEntryCards(readContentCards(candidateCsv, adapter), adapter);
+  for (const [storylineId, entry] of after) {
+    const previous = before.get(storylineId);
+    if (previous === undefined || previous === entry) continue;
+    return (
+      `${command}: adding the new card would re-point story-line "${storylineId}"'s ` +
+      `entry card (currently "${previous}") to "${entry}" (the first member with ` +
+      'no incoming link); link the new card in from a story-line member ' +
+      '(add-linked-card --link-from <card-id>) so the entry card is unchanged'
+    );
+  }
+  return undefined;
 }
 
 /** Validates a candidate CSV and folds the outcome into an edit result. */
@@ -340,7 +387,9 @@ export function applyAddContentCardSpec(
  *
  * Structural problems (missing required values, duplicate id, unknown column)
  * are reported before the candidate is validated; the returned `csv` is the
- * unchanged input whenever `ok` is false.
+ * unchanged input whenever `ok` is false. An edit that would silently re-point
+ * an existing story-line's entry card is refused too (an author never moves a
+ * story-line's start beat by accident).
  *
  * @param csvText Current content CSV text.
  * @param adapter The game content adapter.
@@ -354,6 +403,10 @@ export function addContentCard(
 ): ContentEditResult {
   const applied = applyAddContentCardSpec(csvText, adapter, spec);
   if (!applied.ok) return applied;
+  const repointed = entryRepointError('add-card', csvText, applied.csv, adapter);
+  if (repointed !== undefined) {
+    return { csv: csvText, ok: false, errors: [repointed] };
+  }
   return finalise(csvText, applied.csv, adapter);
 }
 
@@ -744,6 +797,10 @@ export function addLinkedContentCard(
     // Never hand a partially-applied candidate to the writer: the card was
     // added in memory, but without its link the branch would be half-authored.
     return { ...linked, csv: csvText };
+  }
+  const repointed = entryRepointError('add-linked-card', csvText, linked.csv, adapter);
+  if (repointed !== undefined) {
+    return { csv: csvText, ok: false, errors: [repointed] };
   }
   return finalise(csvText, linked.csv, adapter);
 }

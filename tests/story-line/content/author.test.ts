@@ -284,6 +284,38 @@ describe('add-card positional insert', () => {
       validation.issues.filter((issue) => issue.code === 'unreachable-card'),
     ).toEqual([]);
   });
+
+  it('refuses an append that would silently re-point the entry card', () => {
+    // Linking back at the old entry would make it "linked to" within the
+    // story-line, so the appended card — the first member with no incoming
+    // link — would become the entry. Validation accepts that shape, so the
+    // author seam refuses it and names both cards.
+    const result = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-extra',
+      name: 'An Extra Card',
+      storylineId: 'tav',
+      storylineTitle: 'Tavern Nights',
+      options: 'Back|tav-open',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.csv).toBe(tavernCsv);
+    const message = result.errors.join(' ');
+    expect(message).toContain('re-point');
+    expect(message).toContain('tav-open');
+    expect(message).toContain('tav-extra');
+    expect(message).toContain('--link-from');
+  });
+
+  it('accepts a new story-line, whose new card is its entry', () => {
+    const result = addContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-other',
+      name: 'Another Night',
+      storylineId: 'tav-two',
+      storylineTitle: 'Other Nights',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
 });
 
 describe('updateContentCard', () => {

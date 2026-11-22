@@ -395,17 +395,7 @@ export function validateContentCards(
   });
 
   // ── Adjacency over the choice graph (base ids, known targets only) ──
-  const adjacency = new Map<string, string[]>();
-  for (const card of choiceCards) {
-    const from = base(card.id);
-    const next: string[] = [];
-    for (const option of optionsByCard.get(card) ?? []) {
-      for (const target of optionSuccessorIds(option, adapter)) {
-        if (knownIds.has(target)) next.push(target);
-      }
-    }
-    if (next.length > 0) adjacency.set(from, next);
-  }
+  const adjacency = buildChoiceAdjacency(choiceCards, optionsByCard, knownIds, adapter);
 
   // ── Cycle detection (informational unless failOnCycle) ──
   for (const cycle of findCycles(adjacency)) {
@@ -449,14 +439,140 @@ export function validateContentCards(
 }
 
 /**
+ * Groups story-line members by storyline id, in file order (base ids).
+ *
+ * Shared by the reachability check and the authoring seam's entry-card guard,
+ * so both resolve membership exactly the same way.
+ *
+ * @param cards   All content cards.
+ * @param adapter The game content adapter.
+ * @returns Members per storyline id, in file order.
+ */
+function storylineMembers(
+  cards: readonly ContentCard[],
+  adapter: ContentAdapter,
+): Map<string, string[]> {
+  const membersByStoryline = new Map<string, string[]>();
+  for (const card of cards) {
+    if (!card.storylineId) continue;
+    const members = membersByStoryline.get(card.storylineId) ?? [];
+    const id = baseIdOf(adapter, card.id);
+    if (!members.includes(id)) members.push(id);
+    membersByStoryline.set(card.storylineId, members);
+  }
+  return membersByStoryline;
+}
+
+/**
+ * The ids within one story-line that another member links to.
+ *
+ * @param members   The story-line's member ids, in file order.
+ * @param adjacency The choice-graph adjacency (base ids).
+ * @returns Ids with an incoming edge from a different member.
+ */
+function incomingMemberIds(
+  members: readonly string[],
+  adjacency: ReadonlyMap<string, readonly string[]>,
+): Set<string> {
+  const memberSet = new Set(members);
+  const incoming = new Set<string>();
+  for (const from of members) {
+    for (const to of adjacency.get(from) ?? []) {
+      if (memberSet.has(to) && to !== from) incoming.add(to);
+    }
+  }
+  return incoming;
+}
+
+/**
+ * Resolves the **entry card** of each story-line.
+ *
+ * A story-line's entry card is its first member (in file order) with no
+ * incoming edge from another member; a closed cycle has no such member, so its
+ * first card becomes the entry. This is the single definition of "entry card":
+ * the validator's reachability check and the authoring seam's re-point guard
+ * both use it, so an authored insert can never disagree with validation about
+ * which card starts a story-line.
+ *
+ * Cards whose `options` cell cannot be compiled contribute no edges —
+ * validation reports the malformation itself, and this resolver never throws.
+ *
+ * @param cards   All content cards.
+ * @param adapter The game content adapter.
+ * @returns Entry card id per story-line id (story-lines with no members omitted).
+ */
+export function storylineEntryCards(
+  cards: readonly ContentCard[],
+  adapter: ContentAdapter,
+): ReadonlyMap<string, string> {
+  const adjacency = contentAdjacency(cards, adapter);
+  const entries = new Map<string, string>();
+  for (const [storylineId, members] of storylineMembers(cards, adapter)) {
+    const incoming = incomingMemberIds(members, adjacency);
+    const entry = members.find((id) => !incoming.has(id)) ?? members[0];
+    if (entry !== undefined) entries.set(storylineId, entry);
+  }
+  return entries;
+}
+
+/** Choice adjacency over a card list (compiles every choice card's options). */
+function contentAdjacency(
+  cards: readonly ContentCard[],
+  adapter: ContentAdapter,
+): Map<string, string[]> {
+  const knownIds = new Set(cards.map((card) => baseIdOf(adapter, card.id)));
+  const choiceCards: ContentCard[] = [];
+  const optionsByCard = new Map<ContentCard, StorylineOption<unknown>[]>();
+  for (const card of cards) {
+    if (!contentCardHasChoice(card)) continue;
+    choiceCards.push(card);
+    try {
+      optionsByCard.set(card, compileContentOptions(card));
+    } catch {
+      // Malformed options are reported by validation; they contribute no
+      // edges here so entry-card resolution stays total.
+    }
+  }
+  return buildChoiceAdjacency(choiceCards, optionsByCard, knownIds, adapter);
+}
+
+/**
+ * Builds the choice-graph adjacency (base ids) from already-compiled options.
+ *
+ * @param choiceCards   Cards that present a choice.
+ * @param optionsByCard Compiled options per card.
+ * @param knownIds      Every known base card id (dangling targets are dropped).
+ * @param adapter       The game content adapter.
+ * @returns Adjacency map; cards with no known successor are omitted.
+ */
+function buildChoiceAdjacency(
+  choiceCards: readonly ContentCard[],
+  optionsByCard: ReadonlyMap<ContentCard, readonly StorylineOption<unknown>[]>,
+  knownIds: ReadonlySet<string>,
+  adapter: ContentAdapter,
+): Map<string, string[]> {
+  const adjacency = new Map<string, string[]>();
+  for (const card of choiceCards) {
+    const from = baseIdOf(adapter, card.id);
+    const next: string[] = [];
+    for (const option of optionsByCard.get(card) ?? []) {
+      for (const target of optionSuccessorIds(option, adapter)) {
+        if (knownIds.has(target)) next.push(target);
+      }
+    }
+    if (next.length > 0) adjacency.set(from, next);
+  }
+  return adjacency;
+}
+
+/**
  * Reports story-line members that cannot be reached from their story-line's
  * entry card.
  *
  * Each storyline group's entry card is the first member (in file order) with
- * no incoming edge from another member; a closed cycle has no such member, so
- * its first card becomes the entry. Members outside the entry's reachable set
- * are a disconnected fragment — an authoring error that no runtime path can
- * ever visit.
+ * no incoming edge from another member (see {@link storylineEntryCards});
+ * members outside the entry's reachable set are a disconnected fragment — an
+ * authoring error that no runtime path can ever visit.
  *
  * @param cards     All content cards.
  * @param adjacency The choice-graph adjacency (base ids).
@@ -468,27 +584,12 @@ function findUnreachableIssues(
   adjacency: ReadonlyMap<string, readonly string[]>,
   adapter: ContentAdapter,
 ): ContentIssue[] {
-  const base = (id: string): string => baseIdOf(adapter, id);
-  const membersByStoryline = new Map<string, string[]>();
-  for (const card of cards) {
-    if (!card.storylineId) continue;
-    const members = membersByStoryline.get(card.storylineId) ?? [];
-    const id = base(card.id);
-    if (!members.includes(id)) members.push(id);
-    membersByStoryline.set(card.storylineId, members);
-  }
-
   const issues: ContentIssue[] = [];
-  for (const [storylineId, members] of membersByStoryline) {
+  for (const [storylineId, members] of storylineMembers(cards, adapter)) {
     if (members.length <= 1) continue;
     const memberSet = new Set(members);
-    const hasIncoming = new Set<string>();
-    for (const from of members) {
-      for (const to of adjacency.get(from) ?? []) {
-        if (memberSet.has(to) && to !== from) hasIncoming.add(to);
-      }
-    }
-    const entry = members.find((id) => !hasIncoming.has(id)) ?? members[0];
+    const incoming = incomingMemberIds(members, adjacency);
+    const entry = members.find((id) => !incoming.has(id)) ?? members[0];
 
     const reached = new Set<string>([entry]);
     const queue = [entry];

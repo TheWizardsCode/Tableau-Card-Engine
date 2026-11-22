@@ -526,6 +526,274 @@ describe('parseAuthorCliArgs — add-option (CG-0MWQZJ6S50007XVE)', () => {
   });
 });
 
+describe('parseAuthorCliArgs — add-card --after (CG-0MWQZJIOR006L5PT)', () => {
+  /** Narrows a parsed invocation to an add-card one. */
+  function addCardOf(argv: readonly string[]) {
+    const parsed = parseAuthorCliArgs(argv);
+    if ('error' in parsed) throw new Error(parsed.error);
+    if (parsed.command !== 'add-card') {
+      throw new Error(`expected an add-card invocation, got ${parsed.command}`);
+    }
+    return parsed;
+  }
+
+  /** Card ids of a content file, in file order. */
+  function cardIds(csvPath: string): string[] {
+    const parsed = parseCsv(readText(csvPath));
+    const idIndex = parsed.header.indexOf(GYM_CONTENT_ADAPTER.fields.id);
+    return parsed.rows.map((row) => row[idIndex] ?? '');
+  }
+
+  it('parses --after onto the add-card spec', () => {
+    const parsed = addCardOf([
+      'add-card',
+      '--id',
+      'gym-story-detour',
+      '--name',
+      'A Detour',
+      '--after',
+      'gym-story-ignore',
+    ]);
+    expect(parsed.spec.after).toBe('gym-story-ignore');
+  });
+
+  it('leaves after undefined when omitted, so add-card still appends', () => {
+    const parsed = addCardOf(['add-card', '--id', 'gym-story-detour', '--name', 'A Detour']);
+    expect(parsed.spec.after).toBeUndefined();
+  });
+
+  it('applies --after to add-linked-card too (one shared card spec)', () => {
+    const parsed = parseAuthorCliArgs([
+      'add-linked-card',
+      '--id',
+      'gym-story-detour',
+      '--name',
+      'A Detour',
+      '--after',
+      'gym-story-ignore',
+      '--link-from',
+      'gym-story-ignore',
+    ]);
+    if ('error' in parsed || parsed.command !== 'add-linked-card') {
+      throw new Error('expected an add-linked-card invocation');
+    }
+    expect(parsed.spec.card.after).toBe('gym-story-ignore');
+  });
+
+  it('documents --after in the usage text', () => {
+    expect(AUTHOR_USAGE).toContain('--after');
+  });
+
+  it('inserts the new row directly after the named card through the CLI entry point', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      writeFileSync(csvPath, readText(GYM_CONTENT));
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-detour',
+          '--name',
+          'A Detour',
+          '--after',
+          'gym-story-invest',
+        ]),
+      );
+      expect(stderr).toBe('');
+      expect(code).toBe(0);
+      expect(cardIds(csvPath)).toEqual([
+        'gym-story-start',
+        'gym-story-invest',
+        'gym-story-detour',
+        'gym-story-ignore',
+        'gym-story-end',
+      ]);
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('still appends when --after is omitted', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      writeFileSync(csvPath, readText(GYM_CONTENT));
+
+      const { code } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-detour',
+          '--name',
+          'A Detour',
+        ]),
+      );
+      expect(code).toBe(0);
+      const ids = cardIds(csvPath);
+      expect(ids[0]).toBe('gym-story-start');
+      expect(ids[ids.length - 1]).toBe('gym-story-detour');
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('refuses an --after naming no card, naming the id, and writes nothing', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      const original = readText(GYM_CONTENT);
+      writeFileSync(csvPath, original);
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-detour',
+          '--name',
+          'A Detour',
+          '--after',
+          'gym-ghost',
+        ]),
+      );
+      expect(code).toBe(1);
+      expect(stderr).toContain('gym-ghost');
+      expect(readText(csvPath)).toBe(original);
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('keeps the entry card when a card is inserted then linked after its predecessor', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      writeFileSync(csvPath, readText(GYM_CONTENT));
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-linked-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-detour',
+          '--name',
+          'A Detour',
+          '--effect',
+          'The scenic route.',
+          '--storyline-id',
+          'gym-story',
+          '--storyline-title',
+          'Gym Storyline',
+          '--resources',
+          'coins,reputation',
+          '--after',
+          'gym-story-ignore',
+          '--link-from',
+          'gym-story-ignore',
+          '--link-label',
+          'Take the detour',
+        ]),
+      );
+      expect(stderr).toBe('');
+      expect(code).toBe(0);
+
+      const ids = cardIds(csvPath);
+      expect(ids).toEqual([
+        'gym-story-start',
+        'gym-story-invest',
+        'gym-story-ignore',
+        'gym-story-detour',
+        'gym-story-end',
+      ]);
+      // The entry card is still the first member — the insert never re-points it.
+      expect(ids[0]).toBe('gym-story-start');
+      expect(captureOutput(() => runValidateStorylinesCli(['--csv', csvPath])).code).toBe(0);
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('refuses an append that would silently re-point the entry card', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      const original = readText(GYM_CONTENT);
+      writeFileSync(csvPath, original);
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-detour',
+          '--name',
+          'A Detour',
+          '--storyline-id',
+          'gym-story',
+          '--storyline-title',
+          'Gym Storyline',
+          '--resources',
+          'coins,reputation',
+          '--options',
+          'Back|gym-story-start',
+        ]),
+      );
+      // Linking back at the old entry card would make it "linked to", so the
+      // new card would become the entry. Validation alone accepts that, so the
+      // author guard refuses it and names both cards — nothing is written.
+      expect(code).toBe(1);
+      expect(stderr).toContain('re-point');
+      expect(stderr).toContain('gym-story-start');
+      expect(stderr).toContain('gym-story-detour');
+      expect(readText(csvPath)).toBe(original);
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('refuses an unlinked member append that would strand the new card', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      const original = readText(GYM_CONTENT);
+      writeFileSync(csvPath, original);
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-detour',
+          '--name',
+          'A Detour',
+          '--storyline-id',
+          'gym-story',
+          '--storyline-title',
+          'Gym Storyline',
+          '--resources',
+          'coins,reputation',
+        ]),
+      );
+      expect(code).toBe(1);
+      expect(stderr).toContain('unreachable from the story-line');
+      expect(stderr).toContain('gym-story-detour');
+      expect(readText(csvPath)).toBe(original);
+    } finally {
+      temp.cleanup();
+    }
+  });
+});
+
 describe('validate-storylines CLI', () => {
   it('exits 0 and reports VALID for valid content', () => {
     const { code, stdout } = captureOutput(() =>
