@@ -377,13 +377,13 @@ second condition language — it reuses `@story-line`'s `Condition` shape
 player reads comes from the content CSV.
 
 **One deliberate duplication, named.** The declared resource set exists twice:
-per card in the CSV `resources` column (an engine friction the spike measured —
-every row repeats the full set) and once in `manifest.resources.declared`
-(the beat sheet needs it to validate conditions and loss rules statically). The
-manifest validator enforces equality (`resource-set-mismatch`), and the
-one-declaration-per-file fix is a tooling known limit, stated in
-[§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) and
-owned by `CG-0MWQYDC7D003G4ON`.
+once for the content file and once in `manifest.resources.declared` (the beat
+sheet needs it to validate conditions and loss rules statically). The manifest
+validator enforces equality (`resource-set-mismatch`). The spike's *per-row*
+repetition is gone: a leading `#resources: …` line declares the set once for
+the whole file and a blank `resources` cell inherits it
+([§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits)
+row 3, delivered by `CG-0MWQYDC7D003G4ON`).
 
 ### 2.2 The scene beat-sheet data model
 
@@ -1496,7 +1496,7 @@ and the page asks for a reload.
 | `links to unknown card "gx-ghost"` | `unknown-successor` (author API) | author the target card first, or add both in one `add-linked-card` edit |
 | `option … attribute "bogus"` | `unknown-attribute` | attributes are exactly `cost`, `extra`, `when`, `says` |
 | `Card "gx-open" … is unreachable` | `unreachable-card` | link the new card from an existing card ([§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) friction 1) |
-| `field "context" is a mapped story-line column` | — (author CLI) | author prose through the editor form or `--apply`, not `--field` |
+| `field "context" is a mapped story-line column` | — (author CLI) | author prose with `--context` / `--epilogue`, not `--field` ([§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) prose) |
 | `unknown content column "acts"` | — (author seam) | use the file's real column names; they are listed in the error |
 
 #### 2.9.7 The spike's five authoring frictions: resolved or known limits
@@ -1504,24 +1504,32 @@ and the page asks for a reload.
 The spike timed a complete branch end to end at **≈ 8 s of tool time with no
 TypeScript and no engineering help**, and recorded five frictions in the way
 ([observation log §5](../gym/long-erasure-observation-log.md#5-authoring-ergonomics-timed)).
-Re-verified at this commit, with the owning work item for each one that is still
-open:
+Re-verified at this commit: **all five are closed for the command line** (work
+item `CG-0MWQYDC7D003G4ON`), and each row names the command that closes it. The
+sixth friction the section itself found — prose was not authorable from the
+CLI — is closed by the same work item and listed after the table.
 
-| # | Friction (as recorded) | Status at this commit | What a writer does in its place | Owner |
+| # | Friction (as recorded) | Status at this commit | What a writer does now | Owner |
 |---|---|---|---|---|
-| 1 | **Forward references are refused**, so a branch must be authored backwards from its target | **Known limit** — the refusal is deliberate (a dangling target must not be writable), and `add-card` alone into an existing story-line can also re-point the entry card and fail every other member as `unreachable-card` | author the branch in a single linked edit — the editor's **Add card → Incoming link**, or `--apply` with `kind: "add-linked-card"` — so the card and its predecessor's option are written in one validated transaction | `CG-0MWQYDC7D003G4ON` |
-| 2 | **`update-card` replaces the whole `options` cell**, so one new option means retyping the rest | **Known limit** on the CLI; **mitigated** in the editor, whose guided forms emit a single edit for the changed card | use the editor's **Edit card** form (it hands you the current cell to extend and previews the diff), or paste the cell carefully and let validation catch a dropped `;` | `CG-0MWQYDC7D003G4ON` |
-| 3 | **Every row repeats the full declared resource set** in `resources` | **Known limit** — the declared set exists twice by design at this commit (per-row and once in the manifest; [§2.1](#21-composition-contract-who-owns-what)) | copy the key list exactly from the row above; a mismatch is caught by `unknown-resource-key`, not silently | `CG-0MWQYDC7D003G4ON` (with the manifest gap `CG-0MWPY2ECE002P2NH`) |
-| 4 | **No positional insert** — a new card is appended, so reading order drifts from narrative order | **Known limit** | append, and keep narrative order recoverable from the ids (`le-ii-…` sorts by act); a sorted view is the manifest's job, not the file's | `CG-0MWQYDC7D003G4ON` |
-| 5 | **Act and clock are generic `--field` writes**, and a typo'd field name was a silent no-op | **Resolved** — an unknown column is now a hard error naming the file's columns (`unknown content column "acts" (file columns: …)`); the legacy columns themselves retire into the manifest ([§2.1](#21-composition-contract-who-owns-what), engine gap [G10](#g10)) | nothing: authoring an `act`/`clockCost` column the adapter does not declare fails loudly | [G10](#g10) — filed (`CG-0MWR0BJXI007UINE`) |
+| 1 | **Forward references are refused**, so a branch must be authored backwards from its target | **Resolved** — `add-linked-card` writes the new card **and** its predecessor's option in one validated transaction, so a branch is never half-authored and the authoring order no longer matters. The target-must-exist refusal itself is unchanged (a dangling link must never be writable). | author the branch in one command: `npm run storylines:author -- add-linked-card --id gx-gale --name "The Gale" --link-from gx-reef --link-label "Run before the gale"` | `CG-0MWQYDC7D003G4ON` (delivered) |
+| 2 | **`update-card` replaces the whole `options` cell**, so one new option means retyping the rest | **Resolved** — `add-option` appends one encoded entry to the existing cell and leaves every existing option byte-for-byte alone. `update-card --options` still replaces the cell, deliberately, for a wholesale rewrite. | add one branch: `npm run storylines:author -- add-option --id gx-reef --label "Run before the gale" --target gx-gale --attr cost=coins:1` | `CG-0MWQYDC7D003G4ON` (delivered) |
+| 3 | **Every row repeats the full declared resource set** in `resources` | **Resolved** — a leading `#resources: hull,morale,stores,goodwill,charge` line before the header declares the set once per file. A blank `resources` cell inherits it; a non-blank cell overrides it (mixed-resource files stay expressible). The declaration is validated per card exactly as before, so `unknown-resource-key` still fires. | declare the set once at the top of the file (`#resources: …`) and leave the column blank on every row | `CG-0MWQYDC7D003G4ON` (delivered) |
+| 4 | **No positional insert** — a new card is appended, so reading order drifts from narrative order | **Resolved** — `add-card --after <card-id>` inserts the new row directly after that card's row; omitting `--after` appends exactly as before. Neither form can silently re-point a story-line's entry card: an edit that would move it is refused, naming both the old and the would-be entry and pointing at `add-linked-card --link-from`. | insert where the beat belongs: `npm run storylines:author -- add-card --id le-ii-toll --name "The Toll House" --after le-i-ford` | `CG-0MWQYDC7D003G4ON` (delivered) |
+| 5 | **Act and clock are generic `--field` writes**, and a typo'd field name was a silent no-op | **Resolved** — an unknown column is a hard error naming the file's columns (`unknown content column "acts" (file columns: …)`); the legacy columns themselves retire into the manifest ([§2.1](#21-composition-contract-who-owns-what), engine gap [G10](#g10)) | nothing: authoring an `act`/`clockCost` column the adapter does not declare fails loudly | [G10](#g10) — filed (`CG-0MWR0BJXI007UINE`) |
 
-**One friction found while writing this section.** `storylines:author` cannot
-author prose: `--field context=…` is refused ("field \"context\" is a mapped
-story-line column") and the CLI has no `--context` / `--epilogue` flag even
-though the author API and `--apply` both carry them. Until that lands, prose is
-authored through the editor form or a headless `--apply` payload
-(`{"edit":{"kind":"update-card","spec":{"id":"…","context":"…"}}}`). Owned by
-`CG-0MWQYDC7D003G4ON`.
+**Prose (found while writing this section): resolved.** `storylines:author` now
+authors prose directly: `--context <text>` and `--epilogue <text>` on `add-card`
+and `add-linked-card`, and `update-card --context` / `--epilogue` with
+`--clear-context` / `--clear-epilogue` to remove it. The mapped columns stay
+refused as `--field` keys (the dedicated flag is the path), and prose over the
+adopted budget is a warning on stderr — never a blocking error. No editor
+session and no `--apply` payload is needed:
+
+```bash
+npm run storylines:author -- update-card --id gx-open \
+  --context "The tide has turned and the barge is still on the reef line." \
+  --epilogue "By morning the reef is empty and the barge is gone."
+```
 
 **The diagnostics are the part to keep.** The spike's verdict — "row, column,
 reason and the declared set — a writer can fix that without asking anyone" —
@@ -1538,6 +1546,8 @@ one guard run and one artefact check. Worked on a scratch copy of the fixture:
 cp tests/fixtures/story-line/gdd-worked-examples.csv /tmp/walk.csv
 
 # 1. Add the beat AND its link, in one validated transaction.
+#    (The author CLI's `add-linked-card` is the same transaction; the editor
+#    CLI is used here because this walk also regenerates the artefacts.)
 npx tsx scripts/storyline-editor-cli.ts --content /tmp/walk.csv \
   --artefact-json /tmp/walk-manifest.json --artefact-mermaid /tmp/walk-graph.mmd \
   --apply '{"edit":{"kind":"add-linked-card","spec":{
@@ -2838,7 +2848,7 @@ invisible.
 | [G11](#g11) | Keyboard choice navigation and overlay focus order (`1`–`6` / arrows + Enter, Escape topmost-only) | [§3.4.4](#344-keyboard-and-touch-input-paths), [§3.6](#36-named-presentation-gaps) B7, [§3.8](#38-what-this-section-does-not-prove) | only `HelpPanel` / `SettingsPanel` toggle keys and `getEndTurnKeybind()` are bound; no choice-list navigator or focus helper is exported from `src/ui/index.ts` | small — `HelpPanel`'s keydown lifecycle + `OverlayManager` | task | Filed — `CG-0MWR0BKIT0084ZID` |
 | [G12](#g12) | Shared verbosity preference (Full / Concise) in `SettingsStore` and `SettingsPanel` | [§3.4.2](#342-verbosity-and-tooltips), [§3.6](#36-named-presentation-gaps) B8 | `SettingsStore` persists tooltips and the end-turn keybind, `ReducedMotion` persists reduced motion; no verbosity key exists, and `extraToggles` is game-local | extra-small — the tooltips toggle in `SettingsStore` + `SettingsPanel` | task | Filed — `CG-0MWR0BL4Q000OYG6` |
 | [G13](#g13) | Deterministic replay adapter + fixture for this game | [§3.5.4](#354-replay), [§3.6](#36-named-presentation-gaps) B9, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | the engine seam is present (`scripts/replay.ts` + `scripts/adapters/ReplayAdapter.ts`); no adapter or fixture for this game exists | small — the Golf replay adapter as the reference implementation | task | **Deferred to the build epic** (game-owned deliverable, not engine work) |
-| [G14](#g14) | CSV authoring ergonomics for writers (the spike's five frictions) | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | already filed before this backlog: the authoring CLI replaces a whole `options` cell, refuses forward references and has no positional insert | small — `src/story-line/content/author.ts` + `src/story-line/content/mutate.ts` | chore | Filed — `CG-0MWQYDC7D003G4ON` (already live) |
+| [G14](#g14) | CSV authoring ergonomics for writers (the spike's five frictions) | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | delivered: `add-option`, `add-linked-card`, `add-card --after`, `--context` / `--epilogue` and the per-file `#resources:` declaration close all five frictions on the CLI | small — `src/story-line/content/author.ts` + `src/story-line/content/mutate.ts` | chore | **Delivered** — `CG-0MWQYDC7D003G4ON` |
 
 ### 6.3 Entry detail
 
@@ -3160,18 +3170,30 @@ boot are the work.
 deliverable, not engine work**; listing it as an engine gap would mis-size the
 build epic.
 
-#### <a id="g14"></a>G14 — CSV authoring ergonomics (already filed)
+#### <a id="g14"></a>G14 — CSV authoring ergonomics (delivered)
 
 **What it unlocks.** The writer path of
 [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) without the
 five recorded frictions (whole-cell replacement, no forward reference, repeated
-resource list, no positional insert, generic `--field` writes).
+resource list, no positional insert, prose not authorable from the CLI).
 
-**Why the engine cannot do it at this commit.** `src/story-line/content/author.ts` and
-`src/story-line/content/mutate.ts` implement `add-card` / `update-card` against
-the whole `options` cell and refuse forward references; `add-linked-card` is the
-single-transaction workaround. Friction 5 (a typo'd column was a silent no-op)
-is already resolved by the `unknown content column` hard error.
+**Why the engine cannot do it at this commit.** It can, and does:
+`CG-0MWQYDC7D003G4ON` delivered every friction on the author CLI. `add-option`
+appends one option to the existing `options` cell; `add-linked-card` writes a
+card and its incoming link in one validated transaction; `add-card --after
+<card-id>` inserts a row at a documented position (and refuses an edit that
+would silently re-point a story-line's entry card); a leading `#resources:`
+line declares the resource set once per file; and `--context` / `--epilogue`
+author prose with no editor session. The target-must-exist refusal, the
+whole-cell `update-card --options` rewrite and the strict validator are
+unchanged, deliberately. Friction 5 (a typo'd column was a silent no-op) was
+already resolved by the `unknown content column` hard error.
+
+**Nearest precedent and effort band.** **Small**: the existing authoring verbs
+and the editor's guided forms; the CLI was the gap, not the model.
+
+**Disposition.** **Delivered** — `CG-0MWQYDC7D003G4ON` (`chore`). This backlog
+entry stays for the record; no follow-up work is needed.
 
 **Nearest precedent and effort band.** **Small**: the existing authoring verbs
 and the editor's guided forms; the CLI is the gap, not the model.
@@ -3189,7 +3211,7 @@ this backlog reaches.
 |---|---|---|---|
 | Beat-sheet / objective layer | **Confirmed — the build epic's core.** Not one gap but three that ship together: the runtime layer, the manifest contract that describes it and the guard that proves it. | [G1](#g1), [G2](#g2), [G3](#g3) | `src/story-line/compile.ts`, `src/story-line/resolve.ts`, `src/story-line/content/manifest.ts`, `src/story-line/content/guard.ts` |
 | Arbitrary-resource generalisation follow-through | **Partially landed; the follow-through is real but split.** The declared set, declared-key deltas and `unknown-resource-key` shipped (`src/story-line/resources.ts`, `src/story-line/content/validate.ts`). What did **not** ship: bounds/clamping, the irreversibility guarantee, structured affordability and compound conditions. | [G4](#g4), [G5](#g5), [G6](#g6) (and [G7](#g7) for affordability) | `applyResourceDelta` is unbounded; `selectDeclaredDelta` has no direction rule; `Condition` is single-clause |
-| CSV extension follow-through | **No single missing capability; the remaining work is split three ways.** The CSV vocabulary (`#cost` / `#extra` / `#when` / `#says`, `resources`, prose columns), the validator, the guard and the editor shipped. Remaining: retire the legacy columns, validate the manifest/CSV agreement, and the already-filed authoring ergonomics. | [G10](#g10), [G2](#g2), [G14](#g14) | `src/story-line/content/adapters.ts` still declares `act` / `clockCost`; `src/story-line/content/author.ts` + `authoring` frictions; `CG-0MWQYDC7D003G4ON` |
+| CSV extension follow-through | **No single missing capability; the remaining work is split two ways.** The CSV vocabulary (`#cost` / `#extra` / `#when` / `#says`, `resources`, prose columns), the validator, the guard and the editor shipped, and the authoring ergonomics landed ([G14](#g14), delivered). Remaining: retire the legacy columns and validate the manifest/CSV agreement. | [G10](#g10), [G2](#g2), [G14](#g14) | `src/story-line/content/adapters.ts` still declares `act` / `clockCost`; `CG-0MWQYDC7D003G4ON` delivered the authoring CLI ergonomics |
 | Resource HUD | **Confirmed.** No component renders a declared resource bag; the spike draws its two-key economy by hand. The zone itself is layout data and is not the gap. | [G8](#g8) (with [G7](#g7) for the affordability presentation) | `src/ui/index.ts` (no resource component), `src/ui/TokenPileView.ts` (nearest precedent) |
 | Act/scene transition presentation | **Confirmed, but narrower than first stated.** A camera transition ships (`runSceneTransition`); the banner surface, the outcome→route sequence and any rendered scene boundary do not. | [G9](#g9) | `src/ui/sceneTransition.ts`, `example-games/gym/layouts/gym-long-erasure.layout.json` (no `sceneBanner` zone) |
 
@@ -3229,7 +3251,7 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 | G11 | `CG-0MWR0BKIT0084ZID` | task | low | S | GDD epic | blocked, scheduled past the GDD close |
 | G12 | `CG-0MWR0BL4Q000OYG6` | task | low | XS | GDD epic | blocked, scheduled past the GDD close |
 | G13 | — | task | — | — | — | **Deferred** — game-owned replay adapter |
-| G14 | `CG-0MWQYDC7D003G4ON` | chore | — | — | — | Already live before this backlog |
+| G14 | `CG-0MWQYDC7D003G4ON` | chore | — | — | — | **Delivered** — authoring CLI ergonomics |
 
 **The build-epic handover.** When the build epic is created, its first act is to
 clear `startOn` on the filed entries it adopts and set each one's parent to the
@@ -3467,7 +3489,7 @@ is an unfiled gap or one of the deferred entries `G6` / `G13`.
 | Retire the legacy `act` / `clockCost` CSV columns | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) | [G10](#g10) | small | `CG-0MWR0BJXI007UINE` |
 | Keyboard choice navigation and overlay focus order | [§3.4.4](#344-keyboard-and-touch-input-paths) | [G11](#g11) | small | `CG-0MWR0BKIT0084ZID` |
 | Shared verbosity preference (Full / Concise) | [§3.4.2](#342-verbosity-and-tooltips) | [G12](#g12) | extra-small | `CG-0MWR0BL4Q000OYG6` |
-| Writer authoring ergonomics for the v1 volume | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | [G14](#g14) | small | `CG-0MWQYDC7D003G4ON` |
+| Writer authoring ergonomics for the v1 volume | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | [G14](#g14) | small | `CG-0MWQYDC7D003G4ON` (delivered) |
 
 **The disposition check.** Every row names a live Worklog item that already
 exists in [§6.6](#66-disposition-record), and every effort band is the one

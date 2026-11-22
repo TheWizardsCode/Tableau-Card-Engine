@@ -140,7 +140,10 @@ entry card: the entry is the first member in file order with no incoming link,
 and an edit that would move the entry (or leave a member unreachable from it) is
 refused, naming both cards, instead of written.
 Declared resources (--resources "coins,hull") are the keys the option
-#cost/#extra/#when attributes may name. Prose is authored only through
+#cost/#extra/#when attributes may name. A file may instead declare them once
+for every row in a leading "#resources: coins,hull" line before the header; a
+blank --resources inherits that declaration, a non-blank one overrides it.
+Prose is authored only through
 --context / --epilogue; the mapped columns are refused as --field keys.
 Prose is validated against its adopted budget (${PROSE_BUDGETS} characters):
 over-budget prose is reported as a warning on stderr and never blocks the edit.
