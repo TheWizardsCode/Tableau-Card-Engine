@@ -15,7 +15,10 @@
  * - a missing predecessor, a duplicate id, a link it cannot express (no
  *   `options` column) and a duplicate option label are all refused by name;
  * - an existing options cell keeps its authored attributes, because the link is
- *   appended through the shared option-append primitive.
+ *   appended through the shared option-append primitive;
+ * - a link can carry its own `#cost` / `#extra` / `#when` / `#says` metadata
+ *   (the extended surface of `add-linked-card`), and an attribute naming an
+ *   undeclared resource is refused before anything is written.
  *
  * @module
  */
@@ -222,5 +225,69 @@ describe('addLinkedContentCard — the forward-reference authoring path', () => 
     expect(codes).not.toContain('unreachable-card');
     expect(codes).not.toContain('unknown-successor');
     expect(validateContentCsv(result.csv, GYM_CONTENT_ADAPTER).valid).toBe(true);
+  });
+
+  it('encodes authored attributes on the generated link option', () => {
+    // The extended surface: a gated branch is authored in the same transaction
+    // as the card and its incoming option — no follow-up `add-option` pass.
+    const result = addLinkedContentCard(gymCsv, GYM_CONTENT_ADAPTER, {
+      card: {
+        id: 'gym-story-detour',
+        name: 'A Detour',
+        effect: 'The scenic route.',
+        storylineId: 'gym-story',
+        storylineTitle: 'Gym Storyline',
+        resources: 'coins,reputation',
+      },
+      linkFrom: {
+        id: 'gym-story-start',
+        label: 'Take the detour',
+        attributes: ['cost=coins:2', '#extra=reputation:+1'],
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+
+    const start = readContentCards(result.csv, GYM_CONTENT_ADAPTER).find(
+      (card) => card.id === 'gym-story-start',
+    );
+    expect(start?.options.endsWith(
+      ';Take the detour|gym-story-detour#cost=coins:2#extra=reputation:+1',
+    )).toBe(true);
+
+    const options = compileContentOptions(start!);
+    expect(options[options.length - 1]).toMatchObject({
+      label: 'Take the detour',
+      successorIds: ['gym-story-detour'],
+      cost: { coins: 2 },
+      extraEffect: { reputation: 1 },
+    });
+    expect(validateContentCsv(result.csv, GYM_CONTENT_ADAPTER).valid).toBe(true);
+  });
+
+  it('refuses a link attribute naming an undeclared resource, writing nothing', () => {
+    const result = addLinkedContentCard(gymCsv, GYM_CONTENT_ADAPTER, {
+      card: {
+        id: 'gym-story-detour',
+        name: 'A Detour',
+        effect: 'The scenic route.',
+        storylineId: 'gym-story',
+        storylineTitle: 'Gym Storyline',
+        resources: 'coins,reputation',
+      },
+      linkFrom: {
+        id: 'gym-story-start',
+        label: 'Take the detour',
+        attributes: ['cost=gold:2'],
+      },
+    });
+    expect(result.ok).toBe(false);
+    // The card was applied in memory, but the refused link means the unchanged
+    // input is returned: the file is never half-authored.
+    expect(result.csv).toBe(gymCsv);
+    expect(result.errors.join(' ')).toContain('gold');
+    expect(readContentCards(result.csv, GYM_CONTENT_ADAPTER).map((card) => card.id)).not.toContain(
+      'gym-story-detour',
+    );
   });
 });

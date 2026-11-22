@@ -383,8 +383,167 @@ describe('parseAuthorCliArgs — add-linked-card (CG-0MWQZIH6W003C8PG)', () => {
   });
 
   it('documents add-linked-card and its link flags in the usage text', () => {
-    for (const text of ['add-linked-card', '--link-from', '--link-label']) {
+    for (const text of ['add-linked-card', '--link-from', '--link-label', '--link-attr']) {
       expect(AUTHOR_USAGE).toContain(text);
+    }
+  });
+});
+
+describe('parseAuthorCliArgs — add-linked-card --link-attr (CG-0MWQZJMMF003YT8Y)', () => {
+  /** Narrows a parsed invocation to an add-linked-card one. */
+  function linkedOf(argv: readonly string[]) {
+    const parsed = parseAuthorCliArgs(argv);
+    if ('error' in parsed) throw new Error(parsed.error);
+    if (parsed.command !== 'add-linked-card') {
+      throw new Error(`expected an add-linked-card invocation, got ${parsed.command}`);
+    }
+    return parsed;
+  }
+
+  it('collects repeated --link-attr for the generated link in authored order', () => {
+    const parsed = linkedOf([
+      'add-linked-card',
+      '--id',
+      'gym-story-detour',
+      '--name',
+      'A Detour',
+      '--link-from',
+      'gym-story-start',
+      '--link-label',
+      'Take the detour',
+      '--link-attr',
+      'cost=coins:2',
+      '--link-attr',
+      '#extra=reputation:+1',
+    ]);
+    expect(parsed.spec.linkFrom).toEqual({
+      id: 'gym-story-start',
+      label: 'Take the detour',
+      attributes: ['cost=coins:2', '#extra=reputation:+1'],
+    });
+  });
+
+  it('leaves attributes undefined when no --link-attr is given', () => {
+    const parsed = linkedOf([
+      'add-linked-card',
+      '--id',
+      'gym-story-detour',
+      '--name',
+      'A Detour',
+      '--link-from',
+      'gym-story-start',
+    ]);
+    expect(parsed.spec.linkFrom).toEqual({ id: 'gym-story-start' });
+    expect(parsed.spec.linkFrom).not.toHaveProperty('attributes');
+  });
+
+  it('refuses a bare --link-attr', () => {
+    const parsed = parseAuthorCliArgs([
+      'add-linked-card',
+      '--id',
+      'gym-story-detour',
+      '--name',
+      'A Detour',
+      '--link-from',
+      'gym-story-start',
+      '--link-attr',
+    ]);
+    expect('error' in parsed && parsed.error).toContain('--link-attr');
+    expect('error' in parsed && parsed.error).toContain('name=value');
+  });
+
+  it('refuses --link-attr on a command that generates no link option', () => {
+    const parsed = parseAuthorCliArgs([
+      'add-card',
+      '--id',
+      'gym-story-detour',
+      '--name',
+      'A Detour',
+      '--link-attr',
+      'cost=coins:2',
+    ]);
+    expect('error' in parsed && parsed.error).toContain('--link-attr');
+  });
+
+  it('applies a gated link attribute end to end in one write', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      writeFileSync(csvPath, readText(GYM_CONTENT));
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-linked-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-detour',
+          '--name',
+          'A Detour',
+          '--effect',
+          'The scenic route.',
+          '--storyline-id',
+          'gym-story',
+          '--storyline-title',
+          'Gym Storyline',
+          '--resources',
+          'coins,reputation',
+          '--link-from',
+          'gym-story-invest',
+          '--link-label',
+          'Take the detour',
+          '--link-attr',
+          'cost=coins:2',
+        ]),
+      );
+      expect(stderr).toBe('');
+      expect(code).toBe(0);
+
+      const invest = cardsFromCsv(
+        parseCsv(readText(csvPath)),
+        GYM_CONTENT_ADAPTER,
+      ).find((candidate) => candidate.id === 'gym-story-invest');
+      expect(invest?.options).toBe(
+        'Celebrate|gym-story-end;Double down|;Take the detour|gym-story-detour#cost=coins:2',
+      );
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('refuses an undeclared link attribute and leaves the file byte-identical', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      const original = readText(GYM_CONTENT);
+      writeFileSync(csvPath, original);
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-linked-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-detour',
+          '--name',
+          'A Detour',
+          '--storyline-id',
+          'gym-story',
+          '--resources',
+          'coins,reputation',
+          '--link-from',
+          'gym-story-invest',
+          '--link-label',
+          'Take the detour',
+          '--link-attr',
+          'cost=gold:2',
+        ]),
+      );
+      expect(code).toBe(1);
+      expect(stderr).toContain('gold');
+      expect(readText(csvPath)).toBe(original);
+    } finally {
+      temp.cleanup();
     }
   });
 });

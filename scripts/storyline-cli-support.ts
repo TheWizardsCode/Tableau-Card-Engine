@@ -18,6 +18,11 @@ export interface ParsedArgv {
   readonly fieldPairs: readonly (readonly [string, string])[];
   /** Every `--attr <value>` occurrence, in order (repeatable option attributes). */
   readonly attributeValues: readonly string[];
+  /**
+   * Every `--link-attr <value>` occurrence, in order (repeatable attributes for
+   * the option `add-linked-card` generates on the predecessor).
+   */
+  readonly linkAttributeValues: readonly string[];
 }
 
 /**
@@ -25,9 +30,10 @@ export interface ParsedArgv {
  * `--attr` values.
  *
  * `--field` and `--attr` are the two repeatable flags, so they are collected
- * in authored order instead of the last value winning. A bare `--attr` has no
- * meaning (an attribute is always `name=value`, optionally `#`-prefixed), so
- * it is reported as an error rather than becoming a literal `true` attribute.
+ * in authored order instead of the last value winning. A bare `--attr` or
+ * `--link-attr` has no meaning (an attribute is always `name=value`, optionally
+ * `#`-prefixed), so it is reported as an error rather than becoming a literal
+ * `true` attribute.
  *
  * @param argv Raw arguments (without the node/script prefix).
  * @returns The parsed arguments.
@@ -37,6 +43,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
   const positionals: string[] = [];
   const fieldPairs: (readonly [string, string])[] = [];
   const attributeValues: string[] = [];
+  const linkAttributeValues: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
@@ -67,10 +74,18 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
       attributeValues.push(value);
       continue;
     }
+    if (key === 'link-attr') {
+      if (value === 'true') {
+        flags.set('link-attr-error', value);
+        continue;
+      }
+      linkAttributeValues.push(value);
+      continue;
+    }
     flags.set(key, value);
   }
 
-  return { flags, positionals, fieldPairs, attributeValues };
+  return { flags, positionals, fieldPairs, attributeValues, linkAttributeValues };
 }
 
 /** Reads a nullable id flag: `undefined` when absent, `null` when cleared. */

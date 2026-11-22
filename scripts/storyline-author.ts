@@ -13,7 +13,9 @@
  *                  card in one transaction: the predecessor gains an option
  *                  pointing at the new card, and only the combined candidate
  *                  is validated — so a forward reference is authored in one
- *                  step instead of backwards from its target.
+ *                  step instead of backwards from its target. `--link-attr`
+ *                  authors `#cost` / `#extra` / `#when` / `#says` metadata on
+ *                  the generated option.
  * - `add-option`   appends **one** option to an existing card's `options`
  *                  cell without retyping the options already there, and
  *                  validates the resulting content.
@@ -43,6 +45,8 @@
  *   --after evt-x --storyline-id storyline-x
  * npm run storylines:author -- add-linked-card --id evt-branch --name "Branch" \
  *   --link-from evt-x --link-label "Take the branch" --storyline-id storyline-x
+ * npm run storylines:author -- add-linked-card --id evt-branch --name "Branch" \
+ *   --link-from evt-x --link-attr cost=coins:2 --storyline-id storyline-x
  * npm run storylines:author -- add-option --id evt-x --label "Ask after the road" \
  *   --target evt-y --attr cost=coins:2
  * ```
@@ -108,6 +112,9 @@ add-card options:
 add-linked-card options (add-card options, plus):
   --link-from <card-id>      Predecessor that gains the option (required)
   --link-label <label>       Option label (default: the new card's name)
+  --link-attr <name=value>   Attribute for the generated link (repeatable),
+                             e.g. --link-attr cost=coins:2
+                             --link-attr extra=reputation:+1
 
 add-option options (append one option without retyping the cell):
   --id <card-id>             Existing card that gains the option (required)
@@ -178,13 +185,17 @@ const REMOVED_CHOICE_FLAGS = [
  * @returns The parsed invocation.
  */
 export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
-  const { flags, positionals, fieldPairs, attributeValues } = parseArgv(argv);
+  const { flags, positionals, fieldPairs, attributeValues, linkAttributeValues } =
+    parseArgv(argv);
   if (flags.has('help')) return { command: 'help' };
   if (flags.has('field-error')) {
     return { error: `--field expects <column=value>, got "${flags.get('field-error')}"` };
   }
   if (flags.has('attr-error')) {
     return { error: '--attr expects <name=value>, e.g. --attr cost=coins:2' };
+  }
+  if (flags.has('link-attr-error')) {
+    return { error: '--link-attr expects <name=value>, e.g. --link-attr cost=coins:2' };
   }
   const removedFlag = REMOVED_CHOICE_FLAGS.find((flag) => flags.has(flag));
   if (removedFlag !== undefined) {
@@ -209,6 +220,13 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
   const fields: Record<string, string> = {};
   for (const [column, value] of fieldPairs) fields[column] = value;
 
+  if (linkAttributeValues.length > 0 && command !== 'add-linked-card') {
+    return {
+      error:
+        '--link-attr describes the option add-linked-card generates on the predecessor; use --attr for an add-option attribute',
+    };
+  }
+
   const optionalText = (key: string): string | undefined => flags.get(key);
 
   if (command === 'add-card' || command === 'add-linked-card') {
@@ -231,6 +249,9 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
     const linkFrom: AddLinkedCardSpec['linkFrom'] = {
       id: flags.get('link-from') ?? '',
       ...(linkLabel !== undefined ? { label: linkLabel } : {}),
+      ...(linkAttributeValues.length > 0
+        ? { attributes: linkAttributeValues }
+        : {}),
     };
     return { command, csvPath, gameId, dryRun, spec: { card: spec, linkFrom } };
   }

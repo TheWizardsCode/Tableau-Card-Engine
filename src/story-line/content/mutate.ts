@@ -724,6 +724,13 @@ export interface AddLinkedCardSpec {
      * rejects.
      */
     readonly label?: string;
+    /**
+     * Extended attributes for the generated link (`#cost` / `#extra` / `#when`
+     * / `#says`), in authored order, exactly as {@link addOptionToContentCard}
+     * accepts them. Omitted authors a plain `label|newId` link; the validator
+     * still checks every key against the card's declared resources.
+     */
+    readonly attributes?: readonly string[];
   };
 }
 
@@ -734,7 +741,10 @@ export interface AddLinkedCardSpec {
  * The new card is applied through the pure add step; the predecessor then
  * gains `label|newId` appended to its `options` encoding through the same
  * option-append primitive `add-option` uses (so an existing cell is never
- * retyped and a dangling `;` never produces an empty option). The returned
+ * retyped and a dangling `;` never produces an empty option). Any authored
+ * `linkFrom.attributes` (`#cost` / `#extra` / `#when` / `#says`) are encoded on
+ * that generated option, so a gated branch is authored in the same single
+ * transaction. The returned
  * `csv` is the unchanged input whenever either step fails, so the write path
  * stays single, transactional and validator-gated.
  *
@@ -790,7 +800,7 @@ export function addLinkedContentCard(
     id: predecessor.id,
     options: appendOptionEncoding(
       predecessor.options,
-      encodeOptionEntry(label, newId),
+      encodeOptionEntry(label, newId, spec.linkFrom.attributes),
     ),
   });
   if (!linked.ok) {

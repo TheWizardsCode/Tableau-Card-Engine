@@ -1560,6 +1560,8 @@ npm run storylines:graph -- --format json --check   # drift guard over every art
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
 npm run storylines:author -- add-option --id evt-x --label "Ask after the road" --target evt-y
 npm run storylines:author -- add-linked-card --id evt-y --name "Y" --link-from evt-x
+npm run storylines:author -- add-linked-card --id evt-y --name "Y" --link-from evt-x \
+  --link-attr cost=coins:2
 npm run storylines:author -- update-card --id evt-x --storyline-id storyline-x
 npm run storylines:editor                       # open the local graph editor
 npm run storylines:editor -- --help             # editor flags

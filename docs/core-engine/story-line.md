@@ -896,8 +896,13 @@ then validates the **combined** candidate once — so the branch is never
 half-authored, and either half failing returns the unchanged input. The link is
 appended through the same option-append primitive as `add-option`, so an
 existing options cell (including its `#cost` / `#extra` / `#when` / `#says`
-attributes) is preserved verbatim. The editor's `add-linked-card` edit and the
-CLI's `add-linked-card` command are both thin wrappers over this one function.
+attributes) is preserved verbatim. `linkFrom.attributes` authors those same
+attributes on the **generated** option (in authored order, with or without the
+leading `#`), so a gated branch is authored in the same single transaction
+rather than in a follow-up `add-option` pass; an attribute naming an undeclared
+resource is refused before anything is written. The editor's `add-linked-card`
+edit and the CLI's `add-linked-card` command are both thin wrappers over this
+one function.
 
 ### CLIs
 
@@ -911,7 +916,7 @@ gate and the malformed-entry behaviour — is documented in the GDD's
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space: gated-branch survival, ending reachability, consequential rejoin distance (`--csv`, `--initial`, `--endings`, `--min-rejoin`, `--json`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
-| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`, `add-card --after <card-id>` positional insert, prose via `--context` / `--epilogue` and `update-card --clear-context` / `--clear-epilogue`). |
+| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`, `add-card --after <card-id>` positional insert, prose via `--context` / `--epilogue` and `update-card --clear-context` / `--clear-epilogue`, `add-linked-card --link-attr` for the generated link). |
 | `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |
 
 Every CLI supports `--help`, resolves `--game` (the author/validator/graph
@@ -946,12 +951,18 @@ member with `add-linked-card --link-from <card-id>` to keep the entry unchanged.
 npm run storylines:author -- add-linked-card --id gym-story-detour \
   --name "A Detour" --effect "The scenic route." \
   --storyline-id gym-story --storyline-title "Gym Storyline" \
-  --link-from gym-story-invest --link-label "Take the detour"
+  --link-from gym-story-invest --link-label "Take the detour" \
+  --link-attr cost=coins:2 --link-attr extra=reputation:+1
 ```
 
 `--link-from` names the predecessor (required; an absent or unknown predecessor
 is refused and nothing is written) and `--link-label` sets the option text
-(default: the new card's name). Every `add-card` flag (`--effect`, `--options`,
+(default: the new card's name). Each `--link-attr <name=value>` (repeatable)
+is appended, in authored order, to the option the command generates on that
+predecessor — the same `#cost` / `#extra` / `#when` / `#says` encoding
+`add-option --attr` accepts, validated against the card's declared resources,
+so a gated branch needs no follow-up `add-option` pass. Every `add-card` flag
+(`--effect`, `--options`,
 `--context`, `--epilogue`, `--storyline-id`, `--storyline-title`,
 `--resources`, `--after`, `--field`) also applies to `add-linked-card`, so an
 inserted card is linked in from its predecessor in the same transaction.
