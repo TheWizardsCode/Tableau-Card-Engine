@@ -68,7 +68,12 @@ import type {
   StorylineOption,
   StorylineResolution,
 } from '../../../src/story-line/types';
+import {
+  addContentCard,
+  updateContentCard,
+} from '../../../src/story-line/content/author';
 import { runValidateStorylinesCli } from '../../../scripts/validate-storylines';
+import { parseAuthorCliArgs } from '../../../scripts/storyline-author';
 import { addTemplate, makeAdapter, makeCard, makeState } from '../helpers';
 import { PROSE_CONTENT_ADAPTER, TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
 import {
@@ -500,5 +505,106 @@ describe('authored outcome prose (red: CG-0MWO7CTVP004DQC6)', () => {
 
     const unbroken = 'A'.repeat(80);
     expect(truncateOutcome!(unbroken, 20)).toBe(`${'A'.repeat(19)}…`);
+  });
+});
+
+// ── Author CLI prose flags ─────────────────────────────────────────
+
+/**
+ * Prose authored through `storylines:author` (`CG-0MWQZGVG0001T88B`).
+ *
+ * The CLI flags are the writer-facing path, so these tests go through the
+ * **real** parse → mutate → validate seam the command runs: the flags must land
+ * prose on the card (never in the game-specific `fields` bag, which would be
+ * refused as a mapped column), and the clear flags must empty the cell.
+ */
+describe('author CLI prose flags (CG-0MWQZGVG0001T88B)', () => {
+  /**
+   * A two-beat content file: `open` links to the terminal `end`.
+   *
+   * Adding `end` on its own keeps the file valid, so `add-card` runs through
+   * the same whole-content validation the CLI applies before writing.
+   */
+  const MINIMAL = [
+    'id,name,effect,options,storylineId,storylineTitle,resources,context,epilogue',
+    'open,The Quay,The tide is out.,Go|end,arc,The Arc,"coins",,"An old ending."',
+    '',
+  ].join('\n');
+
+  it('[green] add-card --context/--epilogue authors both prose columns', () => {
+    const parsed = parseAuthorCliArgs([
+      'add-card',
+      '--id',
+      'end',
+      '--name',
+      'The End',
+      '--context',
+      'A new scene opens.',
+      '--epilogue',
+      'The lamps go out.',
+    ]);
+    if ('error' in parsed || parsed.command !== 'add-card') {
+      throw new Error('expected an add-card invocation');
+    }
+
+    const result = addContentCard(MINIMAL, PROSE_CONTENT_ADAPTER, parsed.spec);
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+
+    const card = cardsFromCsv(parseCsv(result.csv), PROSE_CONTENT_ADAPTER).find(
+      (candidate) => candidate.id === 'end',
+    );
+    expect(asProse(card!).context).toBe('A new scene opens.');
+    expect(asProse(card!).epilogue).toBe('The lamps go out.');
+    expect(asProse(card!).fields.context).toBeUndefined();
+    expect(asProse(card!).fields.epilogue).toBeUndefined();
+  });
+
+  it('[green] update-card --context rewrites prose in place', () => {
+    const text = readProseFixture('prose-basic.csv');
+    const parsed = parseAuthorCliArgs([
+      'update-card',
+      '--id',
+      'prose-pier',
+      '--context',
+      'The pier runs out into a tide that has not turned.',
+    ]);
+    if ('error' in parsed || parsed.command !== 'update-card') {
+      throw new Error('expected an update-card invocation');
+    }
+
+    const result = updateContentCard(text, PROSE_CONTENT_ADAPTER, parsed.spec);
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+
+    const card = cardsFromCsv(parseCsv(result.csv), PROSE_CONTENT_ADAPTER).find(
+      (candidate) => candidate.id === 'prose-pier',
+    );
+    expect(asProse(card!).context).toBe(
+      'The pier runs out into a tide that has not turned.',
+    );
+  });
+
+  it('[green] --clear-context / --clear-epilogue empty the prose cells', () => {
+    const text = readProseFixture('prose-basic.csv');
+    const parsed = parseAuthorCliArgs([
+      'update-card',
+      '--id',
+      'prose-end',
+      '--clear-epilogue',
+    ]);
+    if ('error' in parsed || parsed.command !== 'update-card') {
+      throw new Error('expected an update-card invocation');
+    }
+
+    const result = updateContentCard(text, PROSE_CONTENT_ADAPTER, parsed.spec);
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+
+    const card = cardsFromCsv(parseCsv(result.csv), PROSE_CONTENT_ADAPTER).find(
+      (candidate) => candidate.id === 'prose-end',
+    );
+    // An emptied prose cell reads as "no prose authored", never as a blank string.
+    expect(asProse(card!).epilogue).toBeNull();
   });
 });

@@ -14,13 +14,20 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_CONTENT_PATH, DEFAULT_CONTENT_FILES } from '../../../src/story-line/content/adapters';
+import {
+  DEFAULT_CONTENT_PATH,
+  DEFAULT_CONTENT_FILES,
+  GYM_CONTENT_ADAPTER,
+} from '../../../src/story-line/content/adapters';
+import { updateContentCard } from '../../../src/story-line/content/author';
+import { cardsFromCsv, parseCsv } from '../../../src/story-line/content/csv';
+import { AUTHOR_USAGE, parseAuthorCliArgs } from '../../../scripts/storyline-author';
 import { DEFAULT_GRAPH_OUTPUTS, runStorylineGraphCli } from '../../../scripts/storyline-graph';
 import {
   parseValidateStorylinesArgs,
   runValidateStorylinesCli,
 } from '../../../scripts/validate-storylines';
-import { REPO_ROOT, captureOutput, fixturePath, makeTempDir } from './test-support';
+import { REPO_ROOT, captureOutput, fixturePath, makeTempDir, readText } from './test-support';
 
 const GYM_CONTENT = join(REPO_ROOT, DEFAULT_CONTENT_PATH);
 
@@ -63,6 +70,142 @@ describe('parseValidateStorylinesArgs', () => {
       json: true,
       failOnCycle: true,
     });
+  });
+});
+
+describe('parseAuthorCliArgs — prose flags (CG-0MWQZGVG0001T88B)', () => {
+  /**
+   * Narrows a parsed invocation to the prose fields two commands share.
+   *
+   * Prose is authored on both `add-card` and `update-card`, so the shared
+   * `context` / `epilogue` shape is what these parsing tests assert; the
+   * command-specific fields belong to that command's own suite.
+   */
+  function proseOf(argv: readonly string[]): {
+    readonly context?: string | null;
+    readonly epilogue?: string | null;
+  } {
+    const parsed = parseAuthorCliArgs(argv);
+    if ('error' in parsed) throw new Error(parsed.error);
+    if (parsed.command === 'help') throw new Error('unexpected help');
+    return parsed.spec;
+  }
+
+  it('parses --context and --epilogue on add-card', () => {
+    const spec = proseOf([
+      'add-card',
+      '--id',
+      'evt-x',
+      '--name',
+      'X',
+      '--context',
+      'Rain on the road.',
+      '--epilogue',
+      'The gate closes.',
+    ]);
+    expect(spec.context).toBe('Rain on the road.');
+    expect(spec.epilogue).toBe('The gate closes.');
+  });
+
+  it('parses --context and --epilogue on update-card', () => {
+    const spec = proseOf([
+      'update-card',
+      '--id',
+      'evt-x',
+      '--context',
+      'A rewritten situation.',
+      '--epilogue',
+      'A rewritten ending.',
+    ]);
+    expect(spec.context).toBe('A rewritten situation.');
+    expect(spec.epilogue).toBe('A rewritten ending.');
+  });
+
+  it('leaves prose untouched (undefined) when no prose flag is supplied', () => {
+    const added = proseOf(['add-card', '--id', 'evt-x', '--name', 'X']);
+    expect(added.context).toBeUndefined();
+    expect(added.epilogue).toBeUndefined();
+
+    const updated = proseOf(['update-card', '--id', 'evt-x']);
+    expect(updated.context).toBeUndefined();
+    expect(updated.epilogue).toBeUndefined();
+  });
+
+  it('null-clears prose with --clear-context / --clear-epilogue', () => {
+    const cleared = proseOf([
+      'update-card',
+      '--id',
+      'evt-x',
+      '--context',
+      'ignored when cleared',
+      '--clear-context',
+      '--epilogue',
+      'ignored when cleared',
+      '--clear-epilogue',
+    ]);
+    expect(cleared.context).toBeNull();
+    expect(cleared.epilogue).toBeNull();
+  });
+
+  it('accepts --context through validation without a mapped-column error', () => {
+    const parsed = parseAuthorCliArgs([
+      'update-card',
+      '--id',
+      'gym-story-start',
+      '--context',
+      'The road budget is on the table again.',
+    ]);
+    if ('error' in parsed || parsed.command !== 'update-card') {
+      throw new Error('expected an update-card invocation');
+    }
+
+    const result = updateContentCard(
+      readText(GYM_CONTENT),
+      GYM_CONTENT_ADAPTER,
+      parsed.spec,
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+
+    const card = cardsFromCsv(parseCsv(result.csv), GYM_CONTENT_ADAPTER).find(
+      (candidate) => candidate.id === 'gym-story-start',
+    );
+    expect(card?.context).toBe('The road budget is on the table again.');
+    expect(card?.fields.context).toBeUndefined();
+  });
+
+  it('still refuses --field context=… as a mapped story-line column', () => {
+    const parsed = parseAuthorCliArgs([
+      'update-card',
+      '--id',
+      'gym-story-start',
+      '--field',
+      'context=set the wrong way',
+    ]);
+    if ('error' in parsed || parsed.command !== 'update-card') {
+      throw new Error('expected an update-card invocation');
+    }
+
+    const result = updateContentCard(
+      readText(GYM_CONTENT),
+      GYM_CONTENT_ADAPTER,
+      parsed.spec,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain(
+      'field "context" is a mapped story-line column',
+    );
+  });
+
+  it('documents the prose flags in the usage text', () => {
+    for (const flag of [
+      '--context',
+      '--epilogue',
+      '--clear-context',
+      '--clear-epilogue',
+    ]) {
+      expect(AUTHOR_USAGE).toContain(flag);
+    }
   });
 });
 

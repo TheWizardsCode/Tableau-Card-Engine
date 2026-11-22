@@ -7,8 +7,9 @@
  *
  * - `add-card`     appends a new card row (correct column count, no duplicate
  *                  id) and validates the resulting content.
- * - `update-card`  edits an existing card (name, effect, options encoding,
- *                  story-line id/title and game columns).
+ * - `update-card`  edits an existing card (name, effect, context/epilogue
+ *                  prose, options encoding, story-line id/title and game
+ *                  columns).
  *
  * A card's choice-ness is authored **only** through `--options`; the removed
  * legacy choice/link flags (`--has-choices`, `--accept-next`,
@@ -68,18 +69,22 @@ Common options:
 
 add-card options:
   --id <id> --name <name> [--effect <text>] [--options <encoding>]
+  [--context <text>] [--epilogue <text>]
   [--storyline-id <id>] [--storyline-title <title>] [--resources <keys>]
 
 update-card options:
   --id <id> [--name <name>] [--effect <text>]
   [--options <encoding> | --clear-options]
+  [--context <text> | --clear-context]
+  [--epilogue <text> | --clear-epilogue]
   [--storyline-id <id> | --clear-storyline]
   [--storyline-title <title>]
   [--resources <keys> | --clear-resources]
 
 Choice nodes are authored only through --options (label|target;label2|target2).
 Declared resources (--resources "coins,hull") are the keys the option
-#cost/#extra/#when attributes may name.
+#cost/#extra/#when attributes may name. Prose is authored only through
+--context / --epilogue; the mapped columns are refused as --field keys.
 
 Exit codes: 0 = applied (or dry-run valid), 1 = refused (invalid usage/content).`;
 
@@ -141,6 +146,8 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
       id: flags.get('id') ?? '',
       name: flags.get('name') ?? '',
       effect: optionalText('effect'),
+      context: optionalText('context'),
+      epilogue: optionalText('epilogue'),
       options: optionalText('options'),
       storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
       storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),
@@ -154,6 +161,8 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
     id: flags.get('id') ?? '',
     name: optionalText('name'),
     effect: optionalText('effect'),
+    context: nullableFlag(flags, 'context', 'clear-context'),
+    epilogue: nullableFlag(flags, 'epilogue', 'clear-epilogue'),
     options: nullableFlag(flags, 'options', 'clear-options'),
     storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
     storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),
