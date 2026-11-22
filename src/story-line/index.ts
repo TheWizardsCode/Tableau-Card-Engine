@@ -99,6 +99,8 @@ export {
   defaultStoryUpdateLine,
   defaultJournalTitle,
   defaultStorylineSummary,
+  formatOptionCost,
+  formatOptionLabel,
 } from './ui-adapter';
 export {
   evaluateCondition,

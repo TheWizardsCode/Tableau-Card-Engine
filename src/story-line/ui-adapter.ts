@@ -13,8 +13,10 @@
  */
 
 import type {
+  OptionCost,
   StorylineCard,
   StorylineJournalEntry,
+  StorylineOption,
   StorylineUiAdapter,
 } from './types';
 
@@ -105,6 +107,43 @@ export function defaultJournalTitle(
 export function defaultStorylineSummary(card: StorylineCard): string {
   const name = defaultStorylineName(card) ?? card.name;
   return `Storyline: ${name}`;
+}
+
+/**
+ * Formats an option's authored cost as player-readable text.
+ *
+ * Resource keys are printed **as authored** (`coins`, `charge`, `stores`): the
+ * engine has no plural rules for an arbitrary declared key, so a key is quoted
+ * verbatim rather than guessed at. Entries keep the authored declaration order,
+ * so the same content always renders the same text.
+ *
+ * @param cost The option's cost map (`#cost=coins:5,stores:1`).
+ * @returns `''` when the option costs nothing, else `"5 coins"` /
+ *   `"1 charge, 2 stores"`.
+ */
+export function formatOptionCost(cost: OptionCost | undefined): string {
+  if (cost === undefined) return '';
+  return Object.entries(cost)
+    .filter(([, amount]) => typeof amount === 'number' && Number.isFinite(amount) && amount !== 0)
+    .map(([key, amount]) => `${amount} ${key}`)
+    .join(', ');
+}
+
+/**
+ * Formats the player-visible label for an option, including its cost.
+ *
+ * A cost-bearing option reads `Invest — 5 coins` so the price is visible at
+ * the point of choice; an option that costs nothing keeps its bare label, so
+ * existing cost-free content renders exactly as before.
+ *
+ * @param option The compiled option (label plus optional cost).
+ * @returns The label, suffixed with the formatted cost when one is authored.
+ */
+export function formatOptionLabel(
+  option: Pick<StorylineOption, 'label' | 'cost'>,
+): string {
+  const cost = formatOptionCost(option.cost);
+  return cost === '' ? option.label : `${option.label} — ${cost}`;
 }
 
 /**

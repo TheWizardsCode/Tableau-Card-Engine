@@ -35,7 +35,7 @@ import storylinesCsv from '../../example-games/gym/content/storylines.csv?raw';
 import { GYM_STORYLINE_KEY } from '../../example-games/gym/GymRegistry';
 import { COMMON_SFX_KEYS } from '../../src/core-engine';
 import { waitForScene } from '../helpers/waitForScene';
-import { parseStorylineOptionsEncoding } from '@story-line';
+import { formatOptionLabel, parseStorylineOptionsEncoding } from '@story-line';
 
 /** The catalogue the scene plays, projected from the authored CSV. */
 const AUTHORED_CARDS = demoCardsFromCsv(storylinesCsv);
@@ -49,10 +49,13 @@ function authoredCard(id: string): DemoCard {
 
 /** The prose the shipped demo authors on its first beat. */
 const AUTHORED_CONTEXT = authoredCard('gym-story-start').context ?? '';
+/** The first beat's compiled options, straight from the authored CSV. */
+const AUTHORED_START_OPTIONS = parseStorylineOptionsEncoding(
+  authoredCard('gym-story-start').options ?? '',
+);
+
 const AUTHORED_INVEST_OUTCOME =
-  parseStorylineOptionsEncoding(authoredCard('gym-story-start').options ?? '').find(
-    (option) => option.label === 'Invest',
-  )?.says ?? '';
+  AUTHORED_START_OPTIONS.find((option) => option.label === 'Invest')?.says ?? '';
 const SUCCESSOR_CONTEXT = authoredCard('gym-story-invest').context ?? '';
 const TERMINAL_CONTEXT = authoredCard('gym-story-end').context ?? '';
 
@@ -141,7 +144,14 @@ describe('GymStorylineScene browser test — optional context block', () => {
 
     expect(scene.isNarrativeVisible()).toBe(true);
     expect(scene.getNarrativeText()).toBe(AUTHORED_CONTEXT);
-    expect(scene.getOptionLabels()).toEqual(['[ Invest ]', '[ Ignore ]']);
+    // The authored `#cost=coins:5` on Invest is visible on its button; Ignore
+    // authors no cost, so it keeps its bare label. Both are derived from the
+    // CSV so a content edit drives the assertion.
+    expect(scene.getOptionLabels()).toEqual([
+      `[ ${formatOptionLabel(AUTHORED_START_OPTIONS[0])} ]`,
+      `[ ${formatOptionLabel(AUTHORED_START_OPTIONS[1])} ]`,
+    ]);
+    expect(scene.getOptionLabels()[0]).toContain('5 coins');
 
     // The options flow *below* the measured panel rather than sitting at the
     // no-prose anchor and colliding with it.

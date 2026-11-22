@@ -1178,6 +1178,35 @@ only on the card type — presentation no longer reads game state:
 The contract has **no clarity-label method**: the retired choice-clarity API is
 gone, and nothing replaces it.
 
+### Option labels with costs
+
+An option's authored `#cost` is part of what the player is choosing, so the
+shared formatters render it rather than leaving it to each game:
+
+```ts
+formatOptionCost({ coins: 5 })                       // '5 coins'
+formatOptionCost({ charge: 1, stores: 2 })           // '1 charge, 2 stores'
+formatOptionLabel({ label: 'Invest', cost: { coins: 5 } })
+                                                     // 'Invest — 5 coins'
+formatOptionLabel({ label: 'Ignore' })               // 'Ignore' (no cost)
+```
+
+Rules the implementation keeps, and the tests pin:
+
+- **Keys are printed as authored** (`coins`, `charge`, `stores`). The engine
+  knows nothing about a game's resource nouns, so it never invents
+  pluralisation — `{ stores: 1 }` renders `1 stores`, and a game that wants
+  `1 store` formats its own text.
+- **Declaration order is preserved**, so the same content always renders the
+  same string.
+- **Zero and non-finite amounts are omitted** (a cost that costs nothing is
+  invisible, not `0 coins`).
+- **A cost-free option keeps its bare label**, so content that authors no cost
+  renders exactly as it did before the formatter existed.
+
+`GymStorylineScene` renders `[ <formatOptionLabel(option)> ]`, which is why its
+first beat shows `[ Invest — 5 coins ]` next to `[ Ignore ]`.
+
 `defaultStoryUpdateLine`'s `accept` / `reject` wording is **label-driven** —
 it switches on the chosen option *label* (a legacy Main Street wording
 convention) and has nothing to do with the retired API. Any other label

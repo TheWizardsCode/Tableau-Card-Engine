@@ -19,6 +19,8 @@ import {
   createStorylineSystem,
   defaultStorylineName,
   defaultStoryUpdateLine,
+  formatOptionCost,
+  formatOptionLabel,
 } from '../../src/story-line';
 import { makeAdapter, makeCard, type TestCard } from './helpers';
 
@@ -181,11 +183,16 @@ describe('retired choice-clarity API', () => {
     ]);
   });
 
-  it('exports no clarity-label helper from the public barrel', () => {
+  it('exports no clarity helper from the public barrel', () => {
     // The retired API was removed from the barrel. A shape guard keeps a stale
     // re-export from creeping back without naming the removed symbols.
-    const labelish = Object.keys(storylineApi).filter((key) => /clarity|label/i.test(key));
-    expect(labelish).toEqual([]);
+    //
+    // The guard matches the retired *clarity* vocabulary specifically, not the
+    // word "label": `formatOptionLabel` is a current, supported export that
+    // renders an option's authored cost (CG-0MWRVR4TP001I97I), and banning
+    // every label-ish name would forbid legitimate presentation helpers.
+    const clarityish = Object.keys(storylineApi).filter((key) => /clarity/i.test(key));
+    expect(clarityish).toEqual([]);
   });
 });
 
@@ -232,5 +239,47 @@ describe('pluggable UI adapter', () => {
     expect(system.ui.choiceDialogTitle(card)).toBe('CUSTOM TITLE');
     // Unoverridden methods still use the default implementation.
     expect(system.ui.choiceDialogSubtitle(makeCard({ id: 'evt-y', name: 'Y', storylineId: 's1' }))).toBe('Y');
+  });
+});
+
+// ── option cost labels ──────────────────────────────────────
+
+describe('option cost labels', () => {
+  it('renders a cost-free option with its bare label', () => {
+    expect(formatOptionCost(undefined)).toBe('');
+    expect(formatOptionCost({})).toBe('');
+    expect(formatOptionLabel({ label: 'Ignore' })).toBe('Ignore');
+  });
+
+  it('appends a single-resource cost using the authored resource key', () => {
+    expect(formatOptionCost({ coins: 5 })).toBe('5 coins');
+    expect(formatOptionLabel({ label: 'Invest', cost: { coins: 5 } })).toBe(
+      'Invest — 5 coins',
+    );
+  });
+
+  it('lists several resources in the authored declaration order', () => {
+    expect(
+      formatOptionLabel({ label: 'Sail', cost: { charge: 1, stores: 2 } }),
+    ).toBe('Sail — 1 charge, 2 stores');
+    // Order is the map's own order, so the same content always reads the same.
+    expect(formatOptionCost({ stores: 2, charge: 1 })).toBe('2 stores, 1 charge');
+  });
+
+  it('does not invent pluralisation for an arbitrary declared key', () => {
+    // Resource keys are authored strings, not nouns with known plural rules.
+    expect(formatOptionCost({ charge: 1 })).toBe('1 charge');
+    expect(formatOptionCost({ stores: 1 })).toBe('1 stores');
+  });
+
+  it('omits zero and non-finite amounts instead of printing them', () => {
+    expect(formatOptionCost({ coins: 0, stores: 2 })).toBe('2 stores');
+    expect(formatOptionCost({ coins: Number.NaN })).toBe('');
+  });
+
+  it('keeps the authored label verbatim, adding only the separator', () => {
+    expect(
+      formatOptionLabel({ label: 'Pay up! (now)', cost: { coins: 3 } }),
+    ).toBe('Pay up! (now) — 3 coins');
   });
 });

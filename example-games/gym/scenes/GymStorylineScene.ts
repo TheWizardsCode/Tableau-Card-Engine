@@ -45,6 +45,7 @@ import {
   type DemoRuntime,
   type DemoState,
 } from '../GymStorylineDemo';
+import { formatOptionLabel } from '@story-line';
 import type {
   PendingStorylineChoice,
   StorylineCard,
@@ -159,7 +160,7 @@ export class GymStorylineScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: 'Each option button is generated from the current card\'s compiled options and labelled with the option\'s own label. [ Reset ] restarts the demo from the first card.',
+        body: 'Each option button is generated from the current card\'s compiled options and labelled with the option\'s own label, plus its authored cost when it has one (`Invest — 5 coins`), so a costly choice is visible before you pick it. [ Reset ] restarts the demo from the first card.',
       },
       {
         heading: 'Test plan',
@@ -356,7 +357,13 @@ export class GymStorylineScene extends GymSceneBase {
     this.revealHandle = null;
   }
 
-  /** Renders one button per compiled option, labelled from the option itself. */
+  /**
+   * Renders one button per compiled option, labelled from the option itself.
+   *
+   * The label comes from the shared `formatOptionLabel`, so an authored
+   * `#cost` is part of the button text (`[ Invest — 5 coins ]`) and a cost-free
+   * option keeps its bare label (`[ Ignore ]`).
+   */
   private renderOptions(
     options: StorylineOption<DemoState>[],
     startY: number,
@@ -368,7 +375,7 @@ export class GymStorylineScene extends GymSceneBase {
         this,
         cx,
         y,
-        `[ ${option.label} ]`,
+        `[ ${formatOptionLabel(option)} ]`,
         '#aaddff',
         { fontSize: '17px' },
       ).setOrigin(0.5);
