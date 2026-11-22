@@ -662,6 +662,87 @@ describe('storyline-author CLI', () => {
     expect(readText(contentPath)).toContain('A New Beginning');
   });
 
+  it('authors a forward reference in one transactional write (add-linked-card)', () => {
+    const { code, stderr } = captureOutput(() =>
+      runStorylineAuthorCli([
+        'add-linked-card',
+        '--csv',
+        contentPath,
+        '--id',
+        'gym-story-detour',
+        '--name',
+        'A Detour',
+        '--effect',
+        'The scenic route.',
+        '--storyline-id',
+        'gym-story',
+        '--storyline-title',
+        'Gym Storyline',
+        '--link-from',
+        'gym-story-invest',
+        '--link-label',
+        'Take the detour',
+      ]),
+    );
+    expect(stderr).toBe('');
+    expect(code).toBe(0);
+
+    const csv = readText(contentPath);
+    const cards = readContentCards(csv, GYM_CONTENT_ADAPTER);
+    expect(cards.map((card) => card.id)).toContain('gym-story-detour');
+    expect(cards.find((card) => card.id === 'gym-story-invest')?.options).toBe(
+      'Celebrate|gym-story-end;Double down|;Take the detour|gym-story-detour',
+    );
+
+    // The branch is never half-authored: one validation, and it is valid.
+    const validation = validateContentCsv(csv, GYM_CONTENT_ADAPTER);
+    expect(validation.valid).toBe(true);
+    expect(validation.issues.map((issue) => issue.code)).not.toContain(
+      'unreachable-card',
+    );
+    expect(validation.issues.map((issue) => issue.code)).not.toContain(
+      'unknown-successor',
+    );
+  });
+
+  it('refuses add-linked-card for an unknown predecessor without writing', () => {
+    const before = readText(contentPath);
+    const { code, stderr } = captureOutput(() =>
+      runStorylineAuthorCli([
+        'add-linked-card',
+        '--csv',
+        contentPath,
+        '--id',
+        'gym-story-detour',
+        '--name',
+        'A Detour',
+        '--link-from',
+        'gym-ghost',
+      ]),
+    );
+    expect(code).toBe(1);
+    expect(stderr).toContain('predecessor card "gym-ghost" not found');
+    expect(readText(contentPath)).toBe(before);
+  });
+
+  it('refuses add-linked-card without a --link-from predecessor', () => {
+    const before = readText(contentPath);
+    const { code, stderr } = captureOutput(() =>
+      runStorylineAuthorCli([
+        'add-linked-card',
+        '--csv',
+        contentPath,
+        '--id',
+        'gym-story-detour',
+        '--name',
+        'A Detour',
+      ]),
+    );
+    expect(code).toBe(1);
+    expect(stderr).toContain('add-linked-card: --link-from is required');
+    expect(readText(contentPath)).toBe(before);
+  });
+
   it('authors declared resources and extended option attributes from the CLI', () => {
     const { code } = captureOutput(() =>
       runStorylineAuthorCli([

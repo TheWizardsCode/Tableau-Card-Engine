@@ -10,7 +10,7 @@
  * | CSV + checksum | `csv` | `parseCsv`, `parseResourceDeclaration`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
  * | Manifest + Mermaid | `manifest` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers |
  * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports |
- * | Transactional authoring | `author` | `addContentCard`, `addOptionToContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
+ * | Transactional authoring | `author` | `addContentCard`, `addLinkedContentCard`, `addOptionToContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
  * | Generated artefacts | `artefacts` | `renderArtefacts`, `checkArtefacts`, `writeArtefacts`, `previewArtefacts`, `DEFAULT_ARTEFACT_PATHS` |
  * | Prohibited-term (IP) scan | `ip-terms` | `parseProhibitedTermList`, `scanProhibitedTerms` |
  * | Shipped adapters | `adapters` | `GYM_CONTENT_ADAPTER`, `DEFAULT_CONTENT_ADAPTER`, `getContentAdapter` |
@@ -112,6 +112,7 @@ export { PROSE_FIELD_SPECS, mappedProseColumns } from './prose';
 
 export type {
   AddContentCardSpec,
+  AddLinkedCardSpec,
   AddOptionContentCardSpec,
   ApplyContentEditOptions,
   ContentEditResult,
@@ -121,6 +122,7 @@ export type {
 } from './author';
 export {
   addContentCard,
+  addLinkedContentCard,
   addOptionToContentCard,
   appendOptionEncoding,
   applyContentEditToFile,

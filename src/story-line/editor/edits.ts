@@ -29,12 +29,11 @@
 
 import {
   addContentCard,
-  applyAddContentCardSpec,
-  applyUpdateContentCardSpec,
+  addLinkedContentCard,
   updateContentCard,
   updateContentCards,
-  readContentCards,
   type AddContentCardSpec,
+  type AddLinkedCardSpec,
   type ContentEditResult,
   type UpdateContentCardSpec,
 } from '../content/mutate';
@@ -71,28 +70,10 @@ export interface SetStorylineBatchSpec {
 
 /**
  * A spec for adding a card **and** linking it in from an existing card in one
- * transaction: the new card is appended with its own fields, then the chosen
- * predecessor gains an option pointing at it. This is what makes a guided add
- * into an existing multi-member story-line valid (`unreachable-card` never
- * fires because the new card is reachable).
- *
- * Linking is expressed **only** through the `options` encoding, so an adapter
- * that maps no `options` column cannot link a card in (the edit is refused
- * rather than silently written without the link).
+ * transaction — the shared `content/mutate.ts` spec, re-exported so existing
+ * editor callers keep one import surface. See {@link addLinkedContentCard}.
  */
-export interface AddLinkedCardSpec {
-  /** The new card (the same spec {@link addContentCard} accepts). */
-  readonly card: AddContentCardSpec;
-  /** The predecessor that gains a link to the new card. */
-  readonly linkFrom: {
-    /** The predecessor's card id. */
-    readonly id: string;
-    /**
-     * Option label shown to the player. Defaults to the new card's name.
-     */
-    readonly label?: string;
-  };
-}
+export type { AddLinkedCardSpec };
 
 /**
  * An editor edit: the curated operations the guided forms and the storyline
@@ -168,104 +149,6 @@ export function setStorylineBatch(
       }),
     ),
   );
-}
-
-/**
- * Appends an option to the predecessor card's `options` encoding, pointing at
- * the new card's id. Returns the update spec.
- */
-function linkUpdateFrom(
-  predecessor: { readonly id: string; readonly options: string },
-  newId: string,
-  link: AddLinkedCardSpec['linkFrom'],
-): UpdateContentCardSpec {
-  const label = (link.label ?? '').trim();
-  const existing = predecessor.options.trim();
-  return {
-    id: predecessor.id,
-    options: existing === '' ? `${label}|${newId}` : `${existing};${label}|${newId}`,
-  };
-}
-
-/** Folds a candidate CSV's validation outcome into an edit result. */
-function finaliseCandidate(
-  originalCsv: string,
-  candidateCsv: string,
-  adapter: ContentAdapter,
-): ContentEditResult {
-  const validation = validateContentCsv(candidateCsv, adapter);
-  if (!validation.valid) {
-    return {
-      csv: originalCsv,
-      ok: false,
-      errors: validation.issues.map((issue) => issue.message),
-      validation,
-    };
-  }
-  return { csv: candidateCsv, ok: true, errors: [], validation };
-}
-
-/**
- * Appends a new card and links it in from an existing card, validating the
- * combined candidate **once**.
- *
- * The new card is applied through the pure add step; then the chosen
- * predecessor gains an option (`label|newId` appended to its `options`
- * encoding) pointing at the new card, applied through the pure update step.
- * Validating only the combined candidate is deliberate: validating the
- * intermediate candidate (the new card alone) would reject it as unreachable
- * from its story-line before the link existed. The
- * returned `csv` is the unchanged input whenever either step fails — so the
- * write path stays single, transactional and validator-gated.
- *
- * @param csvText Current content CSV text.
- * @param adapter The game content adapter.
- * @param spec    The new card plus the predecessor link.
- * @returns The edit result.
- */
-export function addLinkedContentCard(
-  csvText: string,
-  adapter: ContentAdapter,
-  spec: AddLinkedCardSpec,
-): ContentEditResult {
-  const optionsColumn = adapter.fields.options;
-  if (optionsColumn === undefined) {
-    // Linking is expressed solely through the options encoding: refuse rather
-    // than write the card without the link the caller asked for.
-    return {
-      csv: csvText,
-      ok: false,
-      errors: [
-        `add-linked-card: adapter "${adapter.gameId}" maps no options column, so a card cannot be linked in`,
-      ],
-    };
-  }
-
-  const added = applyAddContentCardSpec(csvText, adapter, spec.card);
-  if (!added.ok) return added;
-
-  const newId = baseIdOf(adapter, spec.card.id);
-  const predecessorId = baseIdOf(adapter, spec.linkFrom.id);
-  const cards = readContentCards(added.csv, adapter);
-  const predecessor = cards.find((card) => baseIdOf(adapter, card.id) === predecessorId);
-  if (!predecessor) {
-    return {
-      csv: csvText,
-      ok: false,
-      errors: [`add-linked-card: predecessor card "${spec.linkFrom.id}" not found`],
-    };
-  }
-
-  const linked = applyUpdateContentCardSpec(
-    added.csv,
-    adapter,
-    linkUpdateFrom(predecessor, newId, spec.linkFrom),
-  );
-  if (!linked.ok) {
-    // Never hand a partially-applied candidate to the writer.
-    return { ...linked, csv: csvText };
-  }
-  return finaliseCandidate(csvText, linked.csv, adapter);
 }
 
 /**

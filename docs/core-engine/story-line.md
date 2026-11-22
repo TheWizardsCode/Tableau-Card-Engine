@@ -846,6 +846,19 @@ the id, and omitting it appends exactly as before.
 `null` is cleared. A card is a choice exactly when its `options` encoding is
 non-empty — no separate flag or link column exists to set.
 
+**Forward references: `addLinkedContentCard`.** A branch cannot be authored
+one cell at a time — an option may not name a card that does not exist yet
+(`unknown-successor`) and a new card added alone to an existing story-line is
+`unreachable-card`. `addLinkedContentCard(csv, adapter, { card, linkFrom })`
+adds the new card **and** appends an option on the `linkFrom` predecessor
+(`label|newId`, label defaulting to the new card's name) in one in-memory pass,
+then validates the **combined** candidate once — so the branch is never
+half-authored, and either half failing returns the unchanged input. The link is
+appended through the same option-append primitive as `add-option`, so an
+existing options cell (including its `#cost` / `#extra` / `#when` / `#says`
+attributes) is preserved verbatim. The editor's `add-linked-card` edit and the
+CLI's `add-linked-card` command are both thin wrappers over this one function.
+
 ### CLIs
 
 Thin `tsx` entry points over the seams (no Vite loader, no game import). The
@@ -858,7 +871,7 @@ gate and the malformed-entry behaviour — is documented in the GDD's
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space: gated-branch survival, ending reachability, consequential rejoin distance (`--csv`, `--initial`, `--endings`, `--min-rejoin`, `--json`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
-| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `update-card` (`--dry-run`, `--field column=value`). |
+| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `update-card` (`--dry-run`, `--field column=value`). |
 | `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |
 
 Every CLI supports `--help`, resolves `--game` (the author/validator/graph
@@ -866,6 +879,22 @@ CLIs) or `--adapter` (the editor) through the shipped adapter registry
 (default `gym`), and exits `0` on success and `1` on invalid/unreadable content
 or drift. `npm run storylines:author -- add-card --id … --dry-run` prints the
 candidate content without writing it.
+
+A forward reference is authored in one command with `add-linked-card`: the new
+card and the predecessor's incoming option land in a single validated write.
+
+```bash
+npm run storylines:author -- add-linked-card --id gym-story-detour \
+  --name "A Detour" --effect "The scenic route." \
+  --storyline-id gym-story --storyline-title "Gym Storyline" \
+  --link-from gym-story-invest --link-label "Take the detour"
+```
+
+`--link-from` names the predecessor (required; an absent or unknown predecessor
+is refused and nothing is written) and `--link-label` sets the option text
+(default: the new card's name). Every `add-card` flag (`--effect`, `--options`,
+`--context`, `--epilogue`, `--storyline-id`, `--storyline-title`,
+`--resources`, `--field`) also applies to `add-linked-card`.
 
 ## Editor (visual authoring tool)
 

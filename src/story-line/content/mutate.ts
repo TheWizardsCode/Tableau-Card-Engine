@@ -643,6 +643,111 @@ function declaresOptionLabel(card: ContentCard, label: string): boolean {
   }
 }
 
+// ── Add and link (forward-reference authoring) ──────────────
+
+/**
+ * A spec for adding a card **and** linking it in from an existing card in one
+ * transaction: the new card is applied first, then the chosen predecessor
+ * gains an option pointing at it.
+ *
+ * This is the forward-reference authoring path. Validating the two steps
+ * separately would refuse the intermediate candidate — a new card alone in an
+ * existing story-line is `unreachable-card` until the link exists — so both
+ * steps are applied in memory and the **combined** candidate is validated
+ * once. Linking is expressed only through the `options` encoding, so an
+ * adapter that maps no `options` column cannot link a card in (the edit is
+ * refused rather than silently written without the link).
+ */
+export interface AddLinkedCardSpec {
+  /** The new card (the same spec {@link addContentCard} accepts). */
+  readonly card: AddContentCardSpec;
+  /** The predecessor that gains a link to the new card. */
+  readonly linkFrom: {
+    /** The predecessor's card id (required). */
+    readonly id: string;
+    /**
+     * Option label shown to the player. Defaults to the new card's name, so an
+     * omitted label never authors the empty-label option the validator
+     * rejects.
+     */
+    readonly label?: string;
+  };
+}
+
+/**
+ * Adds a new card and links it in from an existing card, validating the
+ * combined candidate **once**.
+ *
+ * The new card is applied through the pure add step; the predecessor then
+ * gains `label|newId` appended to its `options` encoding through the same
+ * option-append primitive `add-option` uses (so an existing cell is never
+ * retyped and a dangling `;` never produces an empty option). The returned
+ * `csv` is the unchanged input whenever either step fails, so the write path
+ * stays single, transactional and validator-gated.
+ *
+ * @param csvText Current content CSV text.
+ * @param adapter The game content adapter.
+ * @param spec    The new card plus the predecessor link.
+ * @returns The edit result.
+ */
+export function addLinkedContentCard(
+  csvText: string,
+  adapter: ContentAdapter,
+  spec: AddLinkedCardSpec,
+): ContentEditResult {
+  const optionsColumn = adapter.fields.options;
+  if (optionsColumn === undefined) {
+    // Linking is expressed solely through the options encoding: refuse rather
+    // than write the card without the link the caller asked for.
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [
+        `add-linked-card: adapter "${adapter.gameId}" maps no options column, so a card cannot be linked in`,
+      ],
+    };
+  }
+
+  if (spec.linkFrom.id.trim() === '') {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: ['add-linked-card: --link-from is required'],
+    };
+  }
+
+  const added = applyAddContentCardSpec(csvText, adapter, spec.card);
+  if (!added.ok) return added;
+
+  const newId = baseIdOf(adapter, spec.card.id);
+  const predecessorId = baseIdOf(adapter, spec.linkFrom.id);
+  const predecessor = readContentCards(added.csv, adapter).find(
+    (card) => baseIdOf(adapter, card.id) === predecessorId,
+  );
+  if (!predecessor) {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [`add-linked-card: predecessor card "${spec.linkFrom.id}" not found`],
+    };
+  }
+
+  const label = (spec.linkFrom.label ?? '').trim() || spec.card.name.trim();
+  const linked = applyUpdateContentCardSpec(added.csv, adapter, {
+    id: predecessor.id,
+    options: appendOptionEncoding(
+      predecessor.options,
+      encodeOptionEntry(label, newId),
+    ),
+  });
+  if (!linked.ok) {
+    // Never hand a partially-applied candidate to the writer: the card was
+    // added in memory, but without its link the branch would be half-authored.
+    return { ...linked, csv: csvText };
+  }
+  return finalise(csvText, linked.csv, adapter);
+}
+
 // ── Read counterpart ─────────────────────────────────────────
 
 /**

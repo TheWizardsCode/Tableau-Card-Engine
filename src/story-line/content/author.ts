@@ -16,9 +16,10 @@
  * returned for preview but nothing is written.
  *
  * The pure in-memory mutations (`addContentCard`, `addOptionToContentCard`,
- * `updateContentCard`, `updateContentCards`, `readContentCards`,
- * `hasContentCard` and their result/spec types) live in {@link ../mutate} and
- * are re-exported here so
+ * `addLinkedContentCard`, `updateContentCard`, `updateContentCards`,
+ * `readContentCards`, `hasContentCard` and their result/spec types) live in
+ * {@link ../mutate} and are
+ * re-exported here so
  * existing callers keep one import surface — but a browser or form pipeline
  * that only needs preview/validation should import the pure module directly,
  * never this one (it binds `node:fs`).
@@ -38,6 +39,7 @@ import type { ContentEditResult, ContentMutation } from './mutate';
 
 export type {
   AddContentCardSpec,
+  AddLinkedCardSpec,
   AddOptionContentCardSpec,
   ContentEditResult,
   ContentMutation,
@@ -45,6 +47,7 @@ export type {
 } from './mutate';
 export {
   addContentCard,
+  addLinkedContentCard,
   addOptionToContentCard,
   appendOptionEncoding,
   encodeOptionEntry,

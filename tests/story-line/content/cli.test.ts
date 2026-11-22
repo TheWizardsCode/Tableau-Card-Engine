@@ -10,7 +10,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -87,7 +87,12 @@ describe('parseAuthorCliArgs — prose flags (CG-0MWQZGVG0001T88B)', () => {
   } {
     const parsed = parseAuthorCliArgs(argv);
     if ('error' in parsed) throw new Error(parsed.error);
-    if (parsed.command === 'help') throw new Error('unexpected help');
+    // Prose is authored on `add-card` / `update-card` only; `add-linked-card`
+    // carries the same prose fields inside its card spec and is covered by its
+    // own suite.
+    if (parsed.command !== 'add-card' && parsed.command !== 'update-card') {
+      throw new Error(`unexpected command ${String(parsed.command)}`);
+    }
     return parsed.spec;
   }
 
@@ -205,6 +210,75 @@ describe('parseAuthorCliArgs — prose flags (CG-0MWQZGVG0001T88B)', () => {
       '--clear-epilogue',
     ]) {
       expect(AUTHOR_USAGE).toContain(flag);
+    }
+  });
+});
+
+describe('parseAuthorCliArgs — add-linked-card (CG-0MWQZIH6W003C8PG)', () => {
+  /** Narrows a parsed invocation to an add-linked-card one. */
+  function linkedOf(argv: readonly string[]) {
+    const parsed = parseAuthorCliArgs(argv);
+    if ('error' in parsed) throw new Error(parsed.error);
+    if (parsed.command !== 'add-linked-card') {
+      throw new Error(`expected an add-linked-card invocation, got ${parsed.command}`);
+    }
+    return parsed;
+  }
+
+  it('parses the card spec plus a --link-from predecessor and its label', () => {
+    const parsed = linkedOf([
+      'add-linked-card',
+      '--id',
+      'gym-detour',
+      '--name',
+      'A Detour',
+      '--effect',
+      'The scenic route.',
+      '--link-from',
+      'gym-story-start',
+      '--link-label',
+      'Take the detour',
+      '--storyline-id',
+      'gym-story',
+      '--field',
+      'coinDelta=5',
+    ]);
+
+    expect(parsed.spec.card).toMatchObject({
+      id: 'gym-detour',
+      name: 'A Detour',
+      effect: 'The scenic route.',
+      storylineId: 'gym-story',
+      fields: { coinDelta: '5' },
+    });
+    expect(parsed.spec.linkFrom).toEqual({
+      id: 'gym-story-start',
+      label: 'Take the detour',
+    });
+  });
+
+  it('leaves the label undefined when --link-label is omitted and honours shared flags', () => {
+    const parsed = linkedOf([
+      'add-linked-card',
+      '--id',
+      'gym-detour',
+      '--name',
+      'A Detour',
+      '--link-from',
+      'gym-story-start',
+      '--dry-run',
+      '--game',
+      'gym',
+    ]);
+    expect(parsed.spec.linkFrom).toEqual({ id: 'gym-story-start' });
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.gameId).toBe('gym');
+    expect(parsed.csvPath).toBe(resolve(process.cwd(), DEFAULT_CONTENT_PATH));
+  });
+
+  it('documents add-linked-card and its link flags in the usage text', () => {
+    for (const text of ['add-linked-card', '--link-from', '--link-label']) {
+      expect(AUTHOR_USAGE).toContain(text);
     }
   });
 });

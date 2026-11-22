@@ -1558,6 +1558,7 @@ npm run storylines:ip-scan -- path.csv          # ad-hoc scan of one candidate f
 npm run storylines:graph                        # rewrite every shipped content artefact
 npm run storylines:graph -- --format json --check   # drift guard over every artefact
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
+npm run storylines:author -- add-linked-card --id evt-y --name "Y" --link-from evt-x
 npm run storylines:author -- update-card --id evt-x --storyline-id storyline-x
 npm run storylines:editor                       # open the local graph editor
 npm run storylines:editor -- --help             # editor flags

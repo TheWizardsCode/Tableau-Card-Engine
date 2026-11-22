@@ -7,6 +7,11 @@
  *
  * - `add-card`     appends a new card row (correct column count, no duplicate
  *                  id) and validates the resulting content.
+ * - `add-linked-card` appends a new card **and** links it in from an existing
+ *                  card in one transaction: the predecessor gains an option
+ *                  pointing at the new card, and only the combined candidate
+ *                  is validated — so a forward reference is authored in one
+ *                  step instead of backwards from its target.
  * - `update-card`  edits an existing card (name, effect, context/epilogue
  *                  prose, options encoding, story-line id/title and game
  *                  columns).
@@ -26,6 +31,8 @@
  *   --storyline-title "X Arc"
  * npm run storylines:author -- update-card --id evt-x --storyline-id storyline-y
  * npm run storylines:author -- add-card --id evt-z --name "Z" --dry-run
+ * npm run storylines:author -- add-linked-card --id evt-branch --name "Branch" \
+ *   --link-from evt-x --link-label "Take the branch" --storyline-id storyline-x
  * ```
  *
  * Runs under `tsx`; nothing here imports a game or Phaser.
@@ -42,9 +49,11 @@ import {
 } from '../src/story-line/content/adapters';
 import {
   addContentCard,
+  addLinkedContentCard,
   applyContentEditToFile,
   updateContentCard,
   type AddContentCardSpec,
+  type AddLinkedCardSpec,
   type ContentEditResult,
   type UpdateContentCardSpec,
 } from '../src/story-line/content/author';
@@ -58,6 +67,7 @@ export const AUTHOR_USAGE = `Transactional story-line content authoring.
 
 Usage:
   npx tsx scripts/storyline-author.ts add-card [options]
+  npx tsx scripts/storyline-author.ts add-linked-card [options]
   npx tsx scripts/storyline-author.ts update-card [options]
 
 Common options:
@@ -71,6 +81,10 @@ add-card options:
   --id <id> --name <name> [--effect <text>] [--options <encoding>]
   [--context <text>] [--epilogue <text>]
   [--storyline-id <id>] [--storyline-title <title>] [--resources <keys>]
+
+add-linked-card options (add-card options, plus):
+  --link-from <card-id>      Predecessor that gains the option (required)
+  --link-label <label>       Option label (default: the new card's name)
 
 update-card options:
   --id <id> [--name <name>] [--effect <text>]
@@ -91,9 +105,13 @@ Exit codes: 0 = applied (or dry-run valid), 1 = refused (invalid usage/content).
 /** Parsed author CLI invocation. */
 export type AuthorCliOptions =
   | { readonly command: 'add-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: AddContentCardSpec }
+  | { readonly command: 'add-linked-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: AddLinkedCardSpec }
   | { readonly command: 'update-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: UpdateContentCardSpec }
   | { readonly command: 'help' }
   | { readonly error: string };
+
+/** The commands the author CLI accepts. */
+const AUTHOR_COMMANDS = ['add-card', 'add-linked-card', 'update-card'] as const;
 
 /**
  * Legacy choice/link flags that no longer exist.
@@ -128,8 +146,12 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
     };
   }
   const command = positionals[0];
-  if (command !== 'add-card' && command !== 'update-card') {
-    return { error: 'expected a command: add-card | update-card' };
+  if (
+    command !== 'add-card' &&
+    command !== 'add-linked-card' &&
+    command !== 'update-card'
+  ) {
+    return { error: `expected a command: ${AUTHOR_COMMANDS.join(' | ')}` };
   }
 
   const csvPath = resolve(process.cwd(), flags.get('csv') ?? DEFAULT_CONTENT_PATH);
@@ -141,7 +163,7 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
 
   const optionalText = (key: string): string | undefined => flags.get(key);
 
-  if (command === 'add-card') {
+  if (command === 'add-card' || command === 'add-linked-card') {
     const spec: AddContentCardSpec = {
       id: flags.get('id') ?? '',
       name: flags.get('name') ?? '',
@@ -154,7 +176,14 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
       resources: optionalText('resources'),
       fields,
     };
-    return { command, csvPath, gameId, dryRun, spec };
+    if (command === 'add-card') return { command, csvPath, gameId, dryRun, spec };
+
+    const linkLabel = optionalText('link-label');
+    const linkFrom: AddLinkedCardSpec['linkFrom'] = {
+      id: flags.get('link-from') ?? '',
+      ...(linkLabel !== undefined ? { label: linkLabel } : {}),
+    };
+    return { command, csvPath, gameId, dryRun, spec: { card: spec, linkFrom } };
   }
 
   const spec: UpdateContentCardSpec = {
@@ -199,10 +228,16 @@ export function runStorylineAuthorCli(
     return 1;
   }
 
-  const mutate = (csv: string): ContentEditResult =>
-    parsed.command === 'add-card'
-      ? addContentCard(csv, adapter, parsed.spec)
-      : updateContentCard(csv, adapter, parsed.spec);
+  const mutate = (csv: string): ContentEditResult => {
+    switch (parsed.command) {
+      case 'add-card':
+        return addContentCard(csv, adapter, parsed.spec);
+      case 'add-linked-card':
+        return addLinkedContentCard(csv, adapter, parsed.spec);
+      case 'update-card':
+        return updateContentCard(csv, adapter, parsed.spec);
+    }
+  };
 
   const result = applyContentEditToFile({
     contentPath: parsed.csvPath,

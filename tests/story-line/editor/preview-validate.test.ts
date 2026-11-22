@@ -321,3 +321,83 @@ describe('applyEdit — validate before write', () => {
     expect(readFileSync(CONTENT_CSV_PATH, 'utf-8')).not.toContain('Municipal Investment');
   });
 });
+
+describe('add-linked-card — the single-transaction forward reference (CG-0MWQZIH6W003C8PG)', () => {
+  let fixture: EditorFixtureFiles;
+
+  beforeEach(() => {
+    fixture = copyEditorFixtureFiles();
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  /** The editor edit that authors a new branch and its incoming link at once. */
+  const LINKED_EDIT = {
+    kind: 'add-linked-card',
+    spec: {
+      card: {
+        id: 'gym-story-detour',
+        name: 'A Detour',
+        effect: 'The scenic route.',
+        storylineId: 'gym-story',
+        storylineTitle: 'Gym Storyline',
+      },
+      linkFrom: { id: 'gym-story-invest', label: 'Take the detour' },
+    },
+  } as const;
+
+  it('previews the new card and its predecessor option in one diff', () => {
+    const csv = readFileSync(fixture.csvPath, 'utf-8');
+    const preview = previewEdit(csv, GYM_CONTENT_ADAPTER, LINKED_EDIT);
+
+    expect(preview.ok).toBe(true);
+    expect(preview.errors).toEqual([]);
+    expect(preview.affectedIds).toEqual(
+      expect.arrayContaining(['gym-story-detour', 'gym-story-invest']),
+    );
+    expect(
+      preview.rows.find((row) => row.id === 'gym-story-detour')?.status,
+    ).toBe('added');
+    const predecessor = preview.rows.find((row) => row.id === 'gym-story-invest');
+    expect(predecessor?.status).toBe('changed');
+    expect(predecessor?.after?.options).toBe(
+      'Celebrate|gym-story-end;Double down|;Take the detour|gym-story-detour',
+    );
+
+    // One validation over the combined candidate: nothing is half-authored.
+    const codes = preview.validation.issues.map((issue) => issue.code);
+    expect(codes).not.toContain('unreachable-card');
+    expect(codes).not.toContain('unknown-successor');
+    expect(readFileSync(fixture.csvPath, 'utf-8')).toBe(csv);
+  });
+
+  it('refuses a link from a predecessor that does not exist, writing nothing', () => {
+    const before = readFileSync(fixture.csvPath, 'utf-8');
+    const loaded = computeContentChecksum(before);
+    const edit = {
+      kind: 'add-linked-card',
+      spec: {
+        card: { id: 'gym-story-detour', name: 'A Detour', storylineId: 'gym-story' },
+        linkFrom: { id: 'gym-ghost', label: 'Take the detour' },
+      },
+    } as const;
+
+    const preview = previewEdit(before, GYM_CONTENT_ADAPTER, edit);
+    expect(preview.ok).toBe(false);
+    expect(preview.errors.join(' ')).toContain('predecessor card "gym-ghost" not found');
+
+    const result = applyEdit({
+      contentPath: fixture.csvPath,
+      adapter: GYM_CONTENT_ADAPTER,
+      edit,
+      expectedChecksum: loaded,
+      artefactPaths: artefactPaths(fixture),
+      manualDocs: [],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.written).toBe(false);
+    expect(readFileSync(fixture.csvPath, 'utf-8')).toBe(before);
+  });
+});

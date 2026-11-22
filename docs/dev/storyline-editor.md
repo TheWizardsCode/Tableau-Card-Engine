@@ -285,7 +285,10 @@ The **Add card** form guides both decisions:
 - **Incoming link** — optionally choose the existing card that leads to the new
   card. This makes the form emit a single transactional `add-linked-card` edit:
   the card is appended **and** the predecessor gains an option pointing at it,
-  validated once and written once.
+  validated once and written once. The edit delegates to the shared
+  `addLinkedContentCard` in `src/story-line/content/mutate.ts` — the same
+  function the CLI's `add-linked-card` command uses — so the editor and the
+  command line author a forward reference identically.
 
 A new card that nothing links to in a story-line is refused by the validator
 (`unreachable-card`) — the guided form makes the missing-link case obvious
