@@ -423,7 +423,7 @@ A beat with its `context` and both of its options' `#says` values (record 2 of
 [`storylines.csv`](../../example-games/gym/content/storylines.csv)):
 
 ```csv
-gym-story-start,Town Meeting,Lose 50 coins,"Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.",gym-story,Gym Storyline,"coins,reputation",Incident,0,-50,0,"The town meets in the hall above the market, with the road budget on the table and rain coming in off the hills. Everyone is waiting to see who will pay for the roads this year."
+gym-story-start,Town Roads,Lose 50 coins in expenses for the meeting.,"Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.",gym-story,Gym Storyline,"coins,reputation",Incident,0,-50,0,"The people of the town are warning that the roads are in disrepair and the winter is coming to make them worse. The town meets in the hall above the market, with the road budget on the table and rain coming in off the hills. Everyone is waiting to see who will pay for the roads this year."
 ```
 
 A terminal card carrying its `epilogue` (record 17 of
@@ -1227,19 +1227,22 @@ const ui = {
 ```
 
 The Gym demo uses the default adapter, demonstrating that no game code is
-required to present the mechanic. Its in-code fixture (`DEMO_CARDS`)
-exercises the base experience and uses none of the new option fields; the
-shipped Gym content CSV does use them (a `#cost`, a `#extra` and a `#when` in
-one cell), so the authoring path is covered by real content as well as by the
-fixture tests.
+required to present the mechanic. It plays the shipped Gym content CSV
+directly (`demoCardsFromCsv` over
+[`storylines.csv`](../../example-games/gym/content/storylines.csv)), so the
+authoring path — a `#cost`, a `#extra` and a `#when` in one cell — is exercised
+by the demo itself: the demo starts at 60 coins so that `Invest`'s 5-coin cost
+is affordable while the `coins>=100` gate stays closed, keeping the branch
+reachable.
 
 ## Gym demo
 
 [`GymStorylineScene`](../../example-games/gym/scenes/GymStorylineScene.ts)
-(`GymStorylineScene` in the Gym catalogue) deals a small branching fixture
-(3–4 cards) with two-way and terminal options. It draws a card, renders the
-compiled options with the default UI adapter, resolves the choice, and deals
-the successor until the chain ends. It is covered by the Gym individual-scene
+(`GymStorylineScene` in the Gym catalogue) deals a small branching story-line
+(3–4 cards) with two-way and terminal options, read from the shipped content
+CSV at build time. It draws a card, renders the compiled options with the
+default UI adapter, resolves the choice, and deals the successor until the
+chain ends. It is covered by the Gym individual-scene
 smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 [Gym index](../gym/GYM_INDEX.md).
 

@@ -28,19 +28,33 @@ import {
 } from '../../example-games/gym/scenes/GymStorylineScene';
 import {
   createDemoRuntime,
+  demoCardsFromCsv,
   type DemoCard,
 } from '../../example-games/gym/GymStorylineDemo';
+import storylinesCsv from '../../example-games/gym/content/storylines.csv?raw';
 import { GYM_STORYLINE_KEY } from '../../example-games/gym/GymRegistry';
 import { COMMON_SFX_KEYS } from '../../src/core-engine';
 import { waitForScene } from '../helpers/waitForScene';
+import { parseStorylineOptionsEncoding } from '@story-line';
+
+/** The catalogue the scene plays, projected from the authored CSV. */
+const AUTHORED_CARDS = demoCardsFromCsv(storylinesCsv);
+
+/** The authored card with `id`; fails loudly when the content lost it. */
+function authoredCard(id: string): DemoCard {
+  const found = AUTHORED_CARDS.find((card) => card.id === id);
+  if (found === undefined) throw new Error(`authored content has no card "${id}"`);
+  return found;
+}
 
 /** The prose the shipped demo authors on its first beat. */
-const AUTHORED_CONTEXT =
-  'The town meets in the hall above the market, with the road budget on the table and rain coming in off the hills. Everyone is waiting to see who will pay for the roads this year.';
+const AUTHORED_CONTEXT = authoredCard('gym-story-start').context ?? '';
 const AUTHORED_INVEST_OUTCOME =
-  'The vote passes, and the road crews are working before the week is out.';
-const TERMINAL_CONTEXT =
-  'The new road opens, and the town begins to feel less like a place the world forgot. Whatever comes next will come by this road.';
+  parseStorylineOptionsEncoding(authoredCard('gym-story-start').options ?? '').find(
+    (option) => option.label === 'Invest',
+  )?.says ?? '';
+const SUCCESSOR_CONTEXT = authoredCard('gym-story-invest').context ?? '';
+const TERMINAL_CONTEXT = authoredCard('gym-story-end').context ?? '';
 
 /**
  * The same branch topology with **no** prose authored (the parity path).
@@ -157,9 +171,9 @@ describe('GymStorylineScene browser test — optional context block', () => {
     // The consequence precedes the successor beat's own context.
     const narrative = scene.getNarrativeText();
     expect(narrative).toContain(AUTHORED_INVEST_OUTCOME);
-    expect(narrative).toContain('The investment carries, and the road crews move out');
+    expect(narrative).toContain(SUCCESSOR_CONTEXT);
     expect(narrative.indexOf(AUTHORED_INVEST_OUTCOME)).toBeLessThan(
-      narrative.indexOf('The investment carries, and the road crews move out'),
+      narrative.indexOf(SUCCESSOR_CONTEXT),
     );
 
     // The choice played the shared UI click sound (the reveal owns its own

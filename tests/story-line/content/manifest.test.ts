@@ -63,13 +63,20 @@ describe('buildStorylineManifest', () => {
     ]);
 
     const start = gymManifest.nodes.find((node) => node.id === 'gym-story-start');
+    // The authored prose columns are read off the card under test (a content
+    // edit may change them); everything else here is structure or mechanics.
+    const startCard = cardsFromCsv(
+      parseCsv(readText(GYM_CONTENT_PATH)),
+      GYM_CONTENT_ADAPTER,
+    ).find((card) => card.id === 'gym-story-start');
+    expect(startCard, 'gym-story-start is in the content').toBeDefined();
     expect(start).toMatchObject({
-      name: 'Town Meeting',
+      name: startCard!.name,
+      effect: startCard!.effect,
       storylineId: 'gym-story',
       storylineTitle: 'Gym Storyline',
       isChoice: true,
       optionCount: 2,
-      effect: 'Lose 50 coins',
       impact: '−50 coins',
     });
     expect(start?.options).toEqual([
@@ -206,8 +213,11 @@ describe('authored prose in the manifest', () => {
 describe('rendering helpers', () => {
   it('renders choice cards as diamonds, plain cards as rounded boxes and terminal ends', () => {
     const mermaid = renderMermaid(gymManifest);
+    const start = gymManifest.nodes.find((node) => node.id === 'gym-story-start');
+    expect(start, 'gym-story-start is in the manifest').toBeDefined();
     expect(mermaid).toContain('flowchart TD');
-    expect(mermaid).toMatch(/gym_story_start\{"Town Meeting<br\/>gym-story-start/);
+    // The label carries the authored name; the shape is the structural claim.
+    expect(mermaid).toContain(`gym_story_start{"${start!.name}<br/>gym-story-start`);
     expect(mermaid).toMatch(/gym_story_end\("/);
     expect(mermaid).toContain('gym_story_start -->|Invest| gym_story_invest');
     expect(mermaid).toContain('_end(["end"])');
@@ -227,10 +237,17 @@ describe('rendering helpers', () => {
 
   it('builds a node label from the name, id, brief effect and impact', () => {
     const node = gymManifest.nodes.find((entry) => entry.id === 'gym-story-start');
-    expect(node && nodeLabel(node)).toBe(
-      'Town Meeting<br/>gym-story-start<br/>Lose 50 coins<br/>−50 coins',
-    );
-    expect(node && describeEventImpact(node)).toBe('−50 coins');
+    expect(node, 'gym-story-start is in the manifest').toBeDefined();
+    // The composition is the contract; the parts are read off the node, so an
+    // author's rename or rewritten effect prose cannot break this assertion.
+    expect(nodeLabel(node!).split('<br/>')).toEqual([
+      node!.name,
+      node!.id,
+      briefEventDescription(node!.effect),
+      describeEventImpact(node!),
+    ]);
+    // The impact is a mechanics figure, not prose: still pinned.
+    expect(describeEventImpact(node!)).toBe('−50 coins');
   });
 
   it('truncates a long effect at the first sentence or the length cap', () => {

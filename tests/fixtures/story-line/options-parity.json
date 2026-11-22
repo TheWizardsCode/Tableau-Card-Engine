@@ -1,7 +1,7 @@
 {
   "capturedFrom": "CG-0MVZFVYKD001Q18N",
   "capturedAt": "2026-11-02",
-  "captureNote": "Compiled option lists of every shipped story-line card, captured from real behaviour before the legacy two-way choice code was removed. Regenerate only when the shipped content is deliberately changed: run the capture in tests/story-line/options-parity.test.ts and review the diff.",
+  "captureNote": "Compiled option lists of every shipped story-line card, captured from real behaviour before the legacy two-way choice code was removed. Regenerate only when the shipped content is deliberately changed: run the capture in tests/story-line/options-parity.test.ts and review the diff. Card *names* are deliberately excluded (CG-0MWRSOU91003P36J): the name column is author-editable content prose, so pinning it here turned a plain rename in the story-line editor into a fixture regeneration. The programmatic Gym demo catalogue section was also removed: GymStorylineScene now projects its cards from this same CSV (demoCardsFromCsv), so it would have been a byte-identical duplicate of the `gym` source.",
   "baselineNote": "Story-line spike baseline (CG-0MWNHZ51N007STI3): the resource-generalisation and CSV-extension children must leave every captured option list unchanged. A diff is a finding, not a regeneration trigger.",
   "sources": [
     {
@@ -11,29 +11,33 @@
       "cards": [
         {
           "id": "gym-story-start",
-          "name": "Town Meeting",
           "storylineId": "gym-story",
           "options": [
             {
               "label": "Invest",
-              "successorIds": ["gym-story-invest"],
+              "successorIds": [
+                "gym-story-invest"
+              ],
               "effectPolicy": "apply"
             },
             {
               "label": "Ignore",
-              "successorIds": ["gym-story-ignore"],
+              "successorIds": [
+                "gym-story-ignore"
+              ],
               "effectPolicy": "apply"
             }
           ]
         },
         {
           "id": "gym-story-invest",
-          "name": "Public Investment",
           "storylineId": "gym-story",
           "options": [
             {
               "label": "Celebrate",
-              "successorIds": ["gym-story-end"],
+              "successorIds": [
+                "gym-story-end"
+              ],
               "effectPolicy": "apply"
             },
             {
@@ -45,12 +49,13 @@
         },
         {
           "id": "gym-story-ignore",
-          "name": "Neglected Roads",
           "storylineId": "gym-story",
           "options": [
             {
               "label": "Repair",
-              "successorIds": ["gym-story-end"],
+              "successorIds": [
+                "gym-story-end"
+              ],
               "effectPolicy": "apply"
             },
             {
@@ -62,7 +67,6 @@
         },
         {
           "id": "gym-story-end",
-          "name": "Transport Infrastructure",
           "storylineId": "gym-story",
           "options": []
         }
@@ -75,87 +79,17 @@
       "cards": [
         {
           "id": "biz-ms-foundations-teahouse",
-          "name": "Foundations Tea House",
           "storylineId": null,
           "options": []
         },
         {
           "id": "evt-ms-foundations-fair",
-          "name": "Founders' Day Fair",
           "storylineId": null,
           "options": []
         },
         {
           "id": "upg-ms-foundations-teahouse",
-          "name": "Upgrade to Tea House",
           "storylineId": null,
-          "options": []
-        }
-      ]
-    }
-  ],
-  "programmaticSources": [
-    {
-      "id": "gym-demo",
-      "module": "example-games/gym/GymStorylineDemo.ts",
-      "exportName": "DEMO_CARDS",
-      "adapter": "compileStorylineFromEvent with a fresh (empty) option registry",
-      "cards": [
-        {
-          "id": "gym-story-start",
-          "name": "Town Meeting",
-          "storylineId": "gym-story",
-          "options": [
-            {
-              "label": "Invest",
-              "successorIds": ["gym-story-invest"],
-              "effectPolicy": "apply"
-            },
-            {
-              "label": "Ignore",
-              "successorIds": ["gym-story-ignore"],
-              "effectPolicy": "apply"
-            }
-          ]
-        },
-        {
-          "id": "gym-story-invest",
-          "name": "Public Investment",
-          "storylineId": "gym-story",
-          "options": [
-            {
-              "label": "Celebrate",
-              "successorIds": ["gym-story-end"],
-              "effectPolicy": "apply"
-            },
-            {
-              "label": "Double down",
-              "successorIds": [],
-              "effectPolicy": "apply"
-            }
-          ]
-        },
-        {
-          "id": "gym-story-ignore",
-          "name": "Neglected Roads",
-          "storylineId": "gym-story",
-          "options": [
-            {
-              "label": "Repair",
-              "successorIds": ["gym-story-end"],
-              "effectPolicy": "apply"
-            },
-            {
-              "label": "Let it be",
-              "successorIds": [],
-              "effectPolicy": "apply"
-            }
-          ]
-        },
-        {
-          "id": "gym-story-end",
-          "name": "New Beginning",
-          "storylineId": "gym-story",
           "options": []
         }
       ]

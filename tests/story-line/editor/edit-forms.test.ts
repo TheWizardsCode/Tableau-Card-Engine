@@ -106,18 +106,18 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     expect(id.value).toBe('gym-story-start');
 
     const fields = new Map(descriptors.map((descriptor) => [descriptor.key, descriptor]));
-    expect(fields.get('name')?.value).toBe('Town Meeting');
-    expect(fields.get('effect')?.value).toBe('Lose 50 coins');
-    expect(fields.get('context')?.value).toContain('The town meets in the hall above the market');
-    expect(fields.get('options')?.value).toBe(
-      'Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.',
-    );
+    // Each descriptor surfaces the card's *own* value: the expectation is read
+    // off the loaded card, so authoring prose is not pinned here.
+    expect(fields.get('name')?.value).toBe(target.name);
+    expect(fields.get('effect')?.value).toBe(target.effect);
+    expect(fields.get('context')?.value).toBe(target.context);
+    expect(fields.get('options')?.value).toBe(target.options);
     // The extended grammar is discoverable from the field hint itself.
     expect(fields.get('options')?.hint).toContain('#cost=coins:5');
     expect(fields.get('options')?.hint).toContain('#extra=reputation:+2');
     expect(fields.get('options')?.hint).toContain('#when=coins>=3>cardX');
-    expect(fields.get('storylineId')?.value).toBe('gym-story');
-    expect(fields.get('storylineTitle')?.value).toBe('Gym Storyline');
+    expect(fields.get('storylineId')?.value).toBe(target.storylineId);
+    expect(fields.get('storylineTitle')?.value).toBe(target.storylineTitle);
     // The declared-resource column is a first-class descriptor with its own hint.
     expect(fields.get('resources')?.value).toBe('coins,reputation');
     expect(fields.get('resources')?.hint).toContain('resource keys');

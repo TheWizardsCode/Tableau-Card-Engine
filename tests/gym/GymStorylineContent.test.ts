@@ -10,11 +10,14 @@
  * - **Mechanics are frozen.** The compiled successor graph, option
  *   costs/extras/conditions and the card coin/reputation deltas are identical
  *   to `tests/fixtures/story-line/prose/gym-storyline-mechanics-baseline.json`,
- *   captured from `dev` before a word of demo prose was authored.
- * - **The scene catalogue mirrors the CSV.** `DEMO_CARDS` (what
- *   `GymStorylineScene` actually plays) carries the same authored prose as
- *   `example-games/gym/content/storylines.csv`, so the demo cannot drift from
- *   the content the toolchain validates and the manifest exposes.
+ *   captured from `dev` before a word of demo prose was authored. The
+ *   author-editable prose columns (`name`, `effect`, `context`, `#says`) are
+ *   deliberately **not** part of the baseline: an author edits them in the
+ *   story-line editor and must not have to regenerate a fixture to do it.
+ * - **The scene plays the CSV.** `GymStorylineScene` builds its catalogue with
+ *   `demoCardsFromCsv` over this same file, so the demo cannot drift from the
+ *   content the toolchain validates and the manifest exposes — the old
+ *   hand-maintained `DEMO_CARDS` copy is gone.
  *
  * The prose-authoring contract itself (budgets, escaping, round-trip) is
  * covered by `tests/story-line/content/*`; this suite is the Gym demo's own
@@ -41,8 +44,12 @@ import {
 import { buildStorylineManifestFromCsv } from '../../src/story-line/content/manifest';
 import { PROSE_FIELD_SPECS } from '../../src/story-line/content/prose';
 import type { ContentCard } from '../../src/story-line/content/types';
+import {
+  compileStorylineFromEvent,
+  createStorylineOptionRegistry,
+} from '../../src/story-line/compile';
 import type { StorylineOption } from '../../src/story-line/types';
-import { DEMO_CARDS } from '../../example-games/gym/GymStorylineDemo';
+import { demoCardsFromCsv } from '../../example-games/gym/GymStorylineDemo';
 
 /** Repository root, resolved from this file rather than `process.cwd()`. */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -75,12 +82,17 @@ function mechanicsOf(option: StorylineOption<unknown>): Record<string, unknown> 
   return mechanics;
 }
 
-/** A card's mechanics projection, matching the committed baseline shape. */
+/**
+ * A card's **mechanics** projection, matching the committed baseline shape.
+ *
+ * Deliberately excludes `name` and `effect`: both are author-editable prose
+ * columns (the editor exposes them), so pinning them here would force a
+ * fixture regeneration for every prose edit — the friction this suite exists
+ * to remove.
+ */
 function mechanicsOfCard(card: ContentCard): Record<string, unknown> {
   return {
     id: card.id,
-    name: card.name,
-    effect: card.effect,
     coinDelta: card.fields.coinDelta ?? null,
     reputationDelta: card.fields.reputationDelta ?? null,
     options: compileContentOptions(card).map(mechanicsOf),
@@ -129,30 +141,45 @@ describe('Gym storyline content — mechanics frozen against the baseline', () =
   });
 });
 
-describe('Gym storyline demo — scene catalogue mirrors the content', () => {
-  it('carries the same card ids, context and authored outcomes as the CSV', () => {
-    expect(DEMO_CARDS.map((card) => card.id)).toEqual(CARDS.map((card) => card.id));
+describe('Gym storyline demo — the scene plays the authored CSV', () => {
+  it('projects the authored content onto the demo catalogue, in row order', () => {
+    const demoCards = demoCardsFromCsv(CONTENT_TEXT);
 
-    for (const demoCard of DEMO_CARDS) {
-      const card = CARDS.find((candidate) => candidate.id === demoCard.id);
-      expect(card, demoCard.id).toBeDefined();
-      expect(demoCard.context ?? null, `${demoCard.id} context`).toBe(card?.context ?? null);
+    expect(demoCards.map((card) => card.id)).toEqual(CARDS.map((card) => card.id));
+    for (const [index, demoCard] of demoCards.entries()) {
+      const card = CARDS[index];
+      expect(demoCard, demoCard.id).toBeDefined();
+      // Every projections surface comes from the row, not from a code fixture.
+      expect(demoCard.name, demoCard.id).toBe(card.name);
+      expect(demoCard.effect, demoCard.id).toBe(card.effect);
+      expect(demoCard.context ?? null, `${demoCard.id} context`).toBe(
+        card.context ?? null,
+      );
+      expect(demoCard.options ?? '', `${demoCard.id} options`).toBe(card.options);
+      expect(demoCard.coinDelta, `${demoCard.id} coinDelta`).toBe(
+        Number(card.fields.coinDelta ?? 0),
+      );
+      expect(demoCard.reputationDelta, `${demoCard.id} reputationDelta`).toBe(
+        Number(card.fields.reputationDelta ?? 0),
+      );
+    }
+  });
 
-      const csvOptions = compileContentOptions(card!);
-      const demoOptions = demoCard.options
-        ? compileContentOptions({
-            ...card!,
-            options: demoCard.options,
-          })
-        : [];
-      expect(
-        demoOptions.map(saysOf),
-        `${demoCard.id} option outcomes`,
-      ).toEqual(csvOptions.map(saysOf));
-      expect(
-        demoOptions.map((option) => option.label),
-        `${demoCard.id} option labels`,
-      ).toEqual(csvOptions.map((option) => option.label));
+  it('compiles the same option topology the runtime resolves', () => {
+    const registry = createStorylineOptionRegistry<unknown>((id) =>
+      id.replace(/-\d+$/, ''),
+    );
+    const demoCards = demoCardsFromCsv(CONTENT_TEXT);
+
+    // The catalogue the scene draws compiles to exactly the options the
+    // content model compiles (successors, costs, conditions, prose), so a
+    // content edit reaches play rather than being re-encoded by hand.
+    for (const [index, demoCard] of demoCards.entries()) {
+      const compiled = compileStorylineFromEvent(demoCard, registry);
+      const fromContent = compileContentOptions(CARDS[index]);
+      expect(compiled.compiledOptions, demoCard.id).toEqual(
+        fromContent as typeof compiled.compiledOptions,
+      );
     }
   });
 });

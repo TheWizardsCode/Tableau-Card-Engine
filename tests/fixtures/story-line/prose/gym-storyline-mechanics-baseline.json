@@ -4,8 +4,6 @@
   "cards": [
     {
       "id": "gym-story-start",
-      "name": "Town Meeting",
-      "effect": "Lose 50 coins",
       "coinDelta": "-50",
       "reputationDelta": "0",
       "options": [
@@ -43,8 +41,6 @@
     },
     {
       "id": "gym-story-invest",
-      "name": "Public Investment",
-      "effect": "Gain 120 coins",
       "coinDelta": "120",
       "reputationDelta": "0",
       "options": [
@@ -64,8 +60,6 @@
     },
     {
       "id": "gym-story-ignore",
-      "name": "Neglected Roads",
-      "effect": "Lose 80 coins",
       "coinDelta": "-80",
       "reputationDelta": "0",
       "options": [
@@ -85,11 +79,10 @@
     },
     {
       "id": "gym-story-end",
-      "name": "Transport Infrastructure",
-      "effect": "Gain 60 reputation",
       "coinDelta": "0",
       "reputationDelta": "60",
       "options": []
     }
-  ]
+  ],
+  "note": "Mechanics only: card id, coin/reputation deltas and the compiled option topology (successors, cost, extra effect, conditional rules, effectPolicy) with authored prose (`#says`) stripped. Author-editable prose columns (name, effect, context) are deliberately excluded so a content edit does not require regenerating this fixture (CG-0MWRSOU91003P36J)."
 }

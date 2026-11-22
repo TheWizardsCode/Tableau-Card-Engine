@@ -170,7 +170,10 @@ describe('computeContentChecksum', () => {
     expect(checksum).toMatch(/^[0-9a-f]{8}$/);
     expect(computeContentChecksum(text)).toBe(checksum);
     expect(computeContentChecksum(`${text} `)).not.toBe(checksum);
-    expect(computeContentChecksum(text.replace('Town Meeting', 'Town Gathering'))).not.toBe(
+    // Mutate a *structural* token (a card id), never content prose: the shipped
+    // prose is author-editable, so pinning a word here would break the test on
+    // a legitimate editor rename.
+    expect(computeContentChecksum(text.replace('gym-story-invest', 'gym-story-x'))).not.toBe(
       checksum,
     );
   });
@@ -191,7 +194,8 @@ describe('findMissingColumns', () => {
 
 describe('cardsFromCsv', () => {
   it('projects the Gym content onto the generic model plus its game columns', () => {
-    const cards = cardsFromCsv(parseCsv(readText(GYM_CONTENT_PATH)), GYM_CONTENT_ADAPTER);
+    const parsed = parseCsv(readText(GYM_CONTENT_PATH));
+    const cards = cardsFromCsv(parsed, GYM_CONTENT_ADAPTER);
     expect(cards.map((entry) => entry.id)).toEqual([
       'gym-story-start',
       'gym-story-invest',
@@ -199,20 +203,27 @@ describe('cardsFromCsv', () => {
       'gym-story-end',
     ]);
 
+    // Expected values come from the row itself: the adapter's contract is that
+    // each mapped column lands on its field (and keeps its cell text), which is
+    // exactly what a content edit may change without touching this test.
+    const cell = (column: string): string =>
+      parsed.rows[0][parsed.header.indexOf(column)] ?? '';
     const start = cards[0];
-    expect(start.name).toBe('Town Meeting');
-    expect(start.effect).toBe('Lose 50 coins');
-    expect(start.options).toBe(
-      'Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.',
-    );
-    expect(start.storylineId).toBe('gym-story');
-    expect(start.storylineTitle).toBe('Gym Storyline');
+    expect(start.name).toBe(cell('name').trim());
+    expect(start.name.length).toBeGreaterThan(0);
+    expect(start.effect).toBe(cell('effect').trim());
+    expect(start.options).toBe(cell('options').trim());
+    expect(start.options).toContain('Invest|gym-story-invest');
+    expect(start.storylineId).toBe(cell('storylineId').trim());
+    expect(start.storylineTitle).toBe(cell('storylineTitle').trim());
     expect(start.resourceKeys).toEqual(['coins', 'reputation']);
+    // Game columns stay raw cells, available to the game without core knowing
+    // what they mean.
     expect(start.fields).toMatchObject({
-      trigger: 'Incident',
-      cost: '0',
-      coinDelta: '-50',
-      reputationDelta: '0',
+      trigger: cell('trigger'),
+      cost: cell('cost'),
+      coinDelta: cell('coinDelta'),
+      reputationDelta: cell('reputationDelta'),
     });
   });
 

@@ -37,6 +37,7 @@ import {
   applyDemoChoice,
   buildDemoCardView,
   createDemoRuntime,
+  demoCardsFromCsv,
   drawDemoCard,
   startDemo,
   type DemoCardView,
@@ -51,17 +52,28 @@ import type {
   StorylineSystem,
 } from '@story-line';
 import { SCENE_HEADER_Y } from './GymConstants';
+import storylinesCsv from '../content/storylines.csv?raw';
 
 const LOG_MAX_LINES = 6;
 
 /**
+ * The catalogue the scene plays: the authored content CSV, projected once.
+ *
+ * This is the whole point of importing the CSV here rather than carrying a
+ * TypeScript card list — an edit made in `npm run storylines:editor` (prose,
+ * option labels, costs, state gates) is the demo's content the next time the
+ * scene loads.
+ */
+const DEMO_CATALOGUE = demoCardsFromCsv(storylinesCsv);
+
+/**
  * Test / alternate-content seam for the demo's card catalogue.
  *
- * The scene boots the shipped `DEMO_CARDS` by default. A browser test (or a
+ * The scene boots the authored CSV catalogue by default. A browser test (or a
  * future alternate demo file) can install a factory that builds the runtime
  * from a different catalogue, which is how the "context absent" layout is
  * exercised with a real scene rather than asserted only on the view model.
- * Pass `null` to restore the shipped catalogue.
+ * Pass `null` to restore the authored catalogue.
  */
 let runtimeFactoryOverride: (() => DemoRuntime) | null = null;
 
@@ -72,9 +84,11 @@ export function setGymStorylineDemoRuntimeFactory(
   runtimeFactoryOverride = factory;
 }
 
-/** Builds the runtime the scene plays (override first, shipped catalogue else). */
+/** Builds the runtime the scene plays (override first, authored catalogue else). */
 function createSceneRuntime(): DemoRuntime {
-  return runtimeFactoryOverride !== null ? runtimeFactoryOverride() : createDemoRuntime();
+  return runtimeFactoryOverride !== null
+    ? runtimeFactoryOverride()
+    : createDemoRuntime(DEMO_CATALOGUE);
 }
 
 export class GymStorylineScene extends GymSceneBase {
@@ -149,7 +163,7 @@ export class GymStorylineScene extends GymSceneBase {
       },
       {
         heading: 'Test plan',
-        body: '1. The Town Meeting card offers Invest / Ignore above its context paragraph; either choice applies Town Meeting\'s effect (-50 coins), narrates the option’s authored outcome and deals the matching successor.\n2. Invest deals Public Investment, which offers Celebrate / Double down; Celebrate applies +120 coins and deals the terminal New Beginning card.\n3. New Beginning has no options: drawing it applies its +60 reputation effect, shows its context and ends the chain.\n4. Double down (a terminal option) ends the chain immediately with no successor.\n5. Reset returns to the first card.',
+        body: '1. The Town Roads card offers Invest / Ignore above its context paragraph; either choice applies Town Roads\' effect (-50 coins), narrates the option’s authored outcome and deals the matching successor. Invest also charges the authored 5-coin cost and grants its +2 reputation, and the card starts at 60 coins so that cost stays affordable and the authored 100-coin gate does not skip the branch.\n2. Invest deals Public Investment, which offers Celebrate / Double down; Celebrate applies +120 coins and deals the terminal Transport Infrastructure card.\n3. Transport Infrastructure has no options: drawing it applies its +60 reputation effect, shows its context and ends the chain.\n4. Double down (a terminal option) ends the chain immediately with no successor.\n5. Reset returns to the first card.\n\nThe cards themselves are read from `example-games/gym/content/storylines.csv`, so an edit made in the story-line editor changes this demo without a code change.',
       },
     ]);
 
