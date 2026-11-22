@@ -273,7 +273,7 @@ export function applyAddContentCardSpec(
     };
   }
 
-  const row = emptyRow({ header, rows });
+  const row = emptyRow({ header, rows, declarations: parsed.declarations });
   for (const [column, value] of Object.entries(adapter.newCardDefaults ?? {})) {
     if (header.includes(column)) setColumn(header, rows, row, column, value);
   }
@@ -307,7 +307,7 @@ export function applyAddContentCardSpec(
   }
 
   rows.push(row);
-  return { csv: serialiseCsv({ header, rows }), ok: true, errors: [] };
+  return { csv: serialiseCsv({ header, rows, declarations: parsed.declarations }), ok: true, errors: [] };
 }
 
 /**
@@ -407,7 +407,7 @@ export function applyUpdateContentCardSpec(
   }
 
   applyUpdateFields(header, rows, row, adapter, spec);
-  return { csv: serialiseCsv({ header, rows }), ok: true, errors: [] };
+  return { csv: serialiseCsv({ header, rows, declarations: parsed.declarations }), ok: true, errors: [] };
 }
 
 /**
@@ -473,7 +473,7 @@ export function updateContentCards(
     applyUpdateFields(header, rows, row, adapter, spec);
   }
 
-  return finalise(csvText, serialiseCsv({ header, rows }), adapter);
+  return finalise(csvText, serialiseCsv({ header, rows, declarations: parsed.declarations }), adapter);
 }
 
 // ── Option append ───────────────────────────────────────────
@@ -598,7 +598,7 @@ export function addOptionToContentCard(
     optionsColumn,
     appendOptionEncoding(existing, encodeOptionEntry(label, spec.target, spec.attributes)),
   );
-  return finalise(csvText, serialiseCsv({ header, rows }), adapter);
+  return finalise(csvText, serialiseCsv({ header, rows, declarations: parsed.declarations }), adapter);
 }
 
 /**

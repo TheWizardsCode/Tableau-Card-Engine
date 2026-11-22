@@ -77,14 +77,17 @@ export interface ContentCard {
    */
   readonly fields: Readonly<Record<string, string>>;
   /**
-   * The resource keys this card declares for its option attributes, parsed
-   * from the adapter's `resources` column (`"coins, hull, morale"` →
-   * `['coins', 'hull', 'morale']`). Empty when the adapter maps no resource
-   * column or the cell is blank.
+   * The resource keys this card declares for its option attributes: the row's
+   * `resources` cell (`"coins, hull, morale"` → `['coins', 'hull', 'morale']`)
+   * when it is non-blank, otherwise the file-level `#resources:` declaration
+   * (`parseCsv` → `parseResourceDeclaration`). Empty when neither declares
+   * any.
    *
-   * The declared set is the validation vocabulary for the card's `#cost`,
-   * `#extra` and `#when` option attributes; when it is empty the engine's
-   * default `coins` / `reputation` projection is checked instead.
+   * A per-row cell **overrides** the file declaration rather than extending it,
+   * so one file can carry a mixed-resource minority. The effective set is the
+   * validation vocabulary for the card's `#cost`, `#extra` and `#when` option
+   * attributes; when it is empty the engine's default `coins` / `reputation`
+   * projection is checked instead.
    */
   readonly resourceKeys: readonly string[];
 }

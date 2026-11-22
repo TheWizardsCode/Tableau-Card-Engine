@@ -7,7 +7,7 @@
  * | Concern | Module | Members |
  * |---|---|---|
  * | Content model + adapter seam | `types` | `ContentCard`, `ContentAdapter`, `ContentFieldMapping`, `baseIdOf`, … |
- * | CSV + checksum | `csv` | `parseCsv`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
+ * | CSV + checksum | `csv` | `parseCsv`, `parseResourceDeclaration`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
  * | Manifest + Mermaid | `manifest` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers |
  * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports |
  * | Transactional authoring | `author` | `addContentCard`, `addOptionToContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
@@ -43,6 +43,7 @@ export {
   findMissingColumns,
   optionSuccessorIds,
   parseCsv,
+  parseResourceDeclaration,
   serialiseCsv,
 } from './csv';
 

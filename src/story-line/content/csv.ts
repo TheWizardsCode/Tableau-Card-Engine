@@ -6,11 +6,15 @@
  * depends on:
  *
  * - **Round-trip stability** — for a canonically quoted file,
- *   `parseCsv` → `serialiseCsv` is byte-identical, including column order and
- *   the trailing newline.
+ *   `parseCsv` → `serialiseCsv` is byte-identical, including column order,
+ *   leading declaration comments and the trailing newline.
  * - **Change detection** — {@link computeContentChecksum} is a deterministic
  *   DJB2 hash of the raw text, so any byte change (even whitespace) yields a
  *   different checksum.
+ *
+ * Leading `#` lines before the header are **declaration comments**, lifted out
+ * of the header/row matrix so a file can declare something once for every row
+ * ({@link parseResourceDeclaration} reads the `#resources:` form).
  *
  * {@link cardsFromCsv} projects parsed rows onto the generic
  * {@link ContentCard} model through a game's {@link ContentAdapter};
@@ -38,6 +42,15 @@ export interface ParsedCsv {
   readonly header: readonly string[];
   /** Data rows; each row has one cell per header entry. */
   readonly rows: readonly (readonly string[])[];
+  /**
+   * Leading `#` comment lines, verbatim and in file order, before the header.
+   *
+   * A declaration line declares something once for the whole file instead of
+   * repeating it in every row; {@link parseResourceDeclaration} reads the
+   * `#resources:` form. The lines are re-emitted by {@link serialiseCsv}, so an
+   * authored edit never drops them.
+   */
+  readonly declarations: readonly string[];
 }
 
 /**
@@ -50,16 +63,32 @@ export interface ParsedCsv {
  * @returns The parsed header and rows.
  */
 export function parseCsv(text: string): ParsedCsv {
+  const declarations: string[] = [];
+  let body = text;
+  // A declaration line is any leading `#` line before the header. Only the
+  // leading block qualifies, so a `#`-leading cell in a data row stays data.
+  while (body.startsWith('#')) {
+    const lineEnd = body.search(/\r\n|\n|\r/);
+    if (lineEnd < 0) {
+      declarations.push(body);
+      body = '';
+      break;
+    }
+    declarations.push(body.slice(0, lineEnd));
+    const terminator = body.startsWith('\r\n', lineEnd) ? 2 : 1;
+    body = body.slice(lineEnd + terminator);
+  }
+
   const records: string[][] = [];
   let field = '';
   let row: string[] = [];
   let inQuotes = false;
 
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
     if (inQuotes) {
       if (ch === '"') {
-        if (text[i + 1] === '"') {
+        if (body[i + 1] === '"') {
           field += '"';
           i++;
         } else {
@@ -74,7 +103,7 @@ export function parseCsv(text: string): ParsedCsv {
       row.push(field);
       field = '';
     } else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && text[i + 1] === '\n') i++;
+      if (ch === '\r' && body[i + 1] === '\n') i++;
       row.push(field);
       field = '';
       records.push(row);
@@ -94,7 +123,28 @@ export function parseCsv(text: string): ParsedCsv {
   }
 
   const header = records.shift() ?? [];
-  return { header, rows: records };
+  return { header, rows: records, declarations };
+}
+
+/**
+ * Reads the file's declared resource keys from its leading declaration lines.
+ *
+ * Accepts a `#resources: hull,morale` line (an optional space after `#`, and a
+ * case-insensitive `resources` key). The first matching line wins; a file with
+ * no such line declares no keys (`[]`), which leaves per-row cells — or the
+ * engine's default projection — in charge.
+ *
+ * @param declarations Leading declaration lines from {@link ParsedCsv.declarations}.
+ * @returns The declared keys, in declaration order (trimmed and de-duplicated).
+ */
+export function parseResourceDeclaration(
+  declarations: readonly string[],
+): readonly string[] {
+  for (const line of declarations) {
+    const match = /^#\s*resources\s*:\s*(.*)$/i.exec(line);
+    if (match) return parseResourceKeys(match[1]);
+  }
+  return [];
 }
 
 /**
@@ -123,7 +173,10 @@ export function escapeCsvField(value: string): string {
  * @returns CSV text.
  */
 export function serialiseCsv(parsed: ParsedCsv): string {
-  const lines = [parsed.header.map(escapeCsvField).join(',')];
+  const lines = [
+    ...parsed.declarations,
+    parsed.header.map(escapeCsvField).join(','),
+  ];
   for (const row of parsed.rows) {
     lines.push(row.map(escapeCsvField).join(','));
   }
@@ -186,6 +239,12 @@ export function findMissingColumns(
  * any game-specific or not-yet-migrated column, lands in
  * {@link ContentCard.fields}.
  *
+ * The effective resource set per card is the row's `resources` cell when it is
+ * non-blank, otherwise the file-level `#resources:` declaration, otherwise
+ * nothing (the engine's default projection applies downstream). A per-row cell
+ * therefore **overrides**, rather than extends, the file declaration, so mixed
+ * resource sets inside one file stay expressible.
+ *
  * Authored prose is kept **verbatim** (commas, quotes, apostrophes, `;`, `|`
  * and `#` all survive) and a blank cell reads as `null` (absent), never `''`.
  * The prose keys exist only when the adapter maps their column, so content
@@ -222,6 +281,11 @@ export function cardsFromCsv(
   const mappedColumns = new Set(
     Object.values(adapter.fields).filter((column): column is string => column !== undefined),
   );
+  const declaredResources = parseResourceDeclaration(parsed.declarations);
+  const resourceKeysOf = (row: readonly string[]): readonly string[] => {
+    const raw = cell(row, adapter.fields.resources);
+    return raw.trim() === '' ? declaredResources : parseResourceKeys(raw);
+  };
 
   return parsed.rows.map((row) => {
     const fields: Record<string, string> = {};
@@ -244,7 +308,7 @@ export function cardsFromCsv(
       storylineId: optional(cell(row, adapter.fields.storylineId)),
       storylineTitle: optional(cell(row, adapter.fields.storylineTitle)),
       fields,
-      resourceKeys: parseResourceKeys(cell(row, adapter.fields.resources)),
+      resourceKeys: resourceKeysOf(row),
     };
   });
 }
