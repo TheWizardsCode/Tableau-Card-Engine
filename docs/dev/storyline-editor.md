@@ -353,6 +353,36 @@ After any write, run the game's artefact drift guards to confirm nothing is out
 of step (`npm run storylines:graph -- --format json --check`, Mermaid
 `--check`, and any game-side generated-doc `--check`).
 
+### Prose without an editor session
+
+Prose has **CLI parity**: the editor's `context` and `epilogue` fields are
+authored from the command line too, so no editor session is needed.
+
+```bash
+# add a beat with its situation paragraph
+npm run storylines:author -- add-card --id evt-x --name "X" \
+  --context "Rain on the road; the toll house is shuttered." \
+  --storyline-id storyline-x --storyline-title "X Arc"
+
+# rewrite a card's closing prose, or clear it entirely
+npm run storylines:author -- update-card --id evt-x \
+  --epilogue "The gate closes behind you."
+npm run storylines:author -- update-card --id evt-x --clear-epilogue
+```
+
+`add-card` and `update-card` both accept `--context <text>` and
+`--epilogue <text>`; `update-card` adds `--clear-context` / `--clear-epilogue`
+to null-clear a field. A prose column the adapter does not map is simply not
+written. Use the dedicated flags, not `--field`: `--field context=…` is refused
+as a **mapped story-line column**.
+
+Authored prose is checked against the adapter's adopted prose budget
+(`src/story-line/content/prose.ts`: `context` 400, `epilogue` 600 characters).
+An over-budget paragraph is a **warning, never a refusal** — the edit still
+applies, and the `prose-budget` warning is written to **stderr** (so the
+candidate CSV a `--dry-run` prints on stdout stays machine-readable), matching
+the warning `storylines:validate` and the editor's preview panel report.
+
 ## 8. Concurrency guard and manual documentation
 
 - **Stale content is never clobbered.** The session captures the content

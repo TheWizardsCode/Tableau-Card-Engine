@@ -871,7 +871,7 @@ gate and the malformed-entry behaviour — is documented in the GDD's
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space: gated-branch survival, ending reachability, consequential rejoin distance (`--csv`, `--initial`, `--endings`, `--min-rejoin`, `--json`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
-| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`). |
+| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`, prose via `--context` / `--epilogue` and `update-card --clear-context` / `--clear-epilogue`). |
 | `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |
 
 Every CLI supports `--help`, resolves `--game` (the author/validator/graph

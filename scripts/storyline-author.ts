@@ -26,7 +26,10 @@
  *
  * Every edit is built and validated **in memory** first; an invalid result
  * leaves the content file byte-identical and exits non-zero. `--dry-run`
- * prints the candidate content without writing it.
+ * prints the candidate content without writing it. Prose is authored through
+ * the dedicated `--context` / `--epilogue` flags and is checked against the
+ * adopted prose budget: an over-budget paragraph is reported as a
+ * `prose-budget` warning on stderr and never blocks the write.
  *
  * ```bash
  * npm run storylines:author -- add-card --id evt-x --name "X" --effect "…" \
@@ -68,6 +71,12 @@ import {
   nullableFlag,
   parseArgv,
 } from './storyline-cli-support';
+import { PROSE_FIELD_SPECS } from '../src/story-line/content/prose';
+
+/** The adopted prose budgets, rendered for the usage text (one source of truth). */
+const PROSE_BUDGETS = PROSE_FIELD_SPECS.map(
+  (spec) => `${spec.field} ${spec.budget}`,
+).join(', ');
 
 /** CLI usage text. */
 export const AUTHOR_USAGE = `Transactional story-line content authoring.
@@ -116,6 +125,8 @@ replaces the cell, or add-option, which appends one entry.
 Declared resources (--resources "coins,hull") are the keys the option
 #cost/#extra/#when attributes may name. Prose is authored only through
 --context / --epilogue; the mapped columns are refused as --field keys.
+Prose is validated against its adopted budget (${PROSE_BUDGETS} characters):
+over-budget prose is reported as a warning on stderr and never blocks the edit.
 
 Exit codes: 0 = applied (or dry-run valid), 1 = refused (invalid usage/content).`;
 
@@ -249,6 +260,30 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
 }
 
 /**
+ * Renders the candidate content's non-fatal warnings, one CLI line each.
+ *
+ * The prose budgets are warnings, never refusals: the edit is applied and the
+ * writer is told which field ran long (the same `prose-budget` warning the
+ * editor and `storylines:validate` report). The lines are written to
+ * **stderr** so the candidate CSV `--dry-run` prints on stdout stays
+ * machine-readable.
+ *
+ * @param result The applied (or dry-run) content edit.
+ * @returns One line per warning; empty when the content has none.
+ */
+export function formatAuthorWarnings(
+  result: ContentEditResult,
+): readonly string[] {
+  const warnings = result.validation?.warnings ?? [];
+  return warnings.map((warning) => {
+    const location = warning.row === undefined ? '' : ` row ${warning.row}`;
+    const column =
+      warning.column === undefined ? '' : `, column "${warning.column}"`;
+    return `storyline-author: warning [${warning.code}]${location}${column}: ${warning.message}`;
+  });
+}
+
+/**
  * Runs the authoring CLI.
  *
  * @param argv Raw arguments (defaults to `process.argv.slice(2)`).
@@ -299,6 +334,11 @@ export function runStorylineAuthorCli(
     process.stderr.write('storyline-author: refusing to write — validation failed:\n');
     for (const error of result.errors) process.stderr.write(`  - ${error}\n`);
     return 1;
+  }
+
+  // Non-fatal warnings (prose budgets) are reported, never fatal.
+  for (const line of formatAuthorWarnings(result)) {
+    process.stderr.write(`${line}\n`);
   }
 
   if (parsed.dryRun) {

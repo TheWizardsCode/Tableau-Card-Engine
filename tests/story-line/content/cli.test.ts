@@ -18,6 +18,7 @@ import {
   DEFAULT_CONTENT_PATH,
   DEFAULT_CONTENT_FILES,
   GYM_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_PATH,
 } from '../../../src/story-line/content/adapters';
 import {
   addOptionToContentCard,
@@ -217,6 +218,104 @@ describe('parseAuthorCliArgs — prose flags (CG-0MWQZGVG0001T88B)', () => {
       '--clear-epilogue',
     ]) {
       expect(AUTHOR_USAGE).toContain(flag);
+    }
+  });
+});
+
+describe('author CLI prose-budget warnings (CG-0MWQZJB32009KNGR)', () => {
+  /** Long Erasure content, whose adapter maps both prose columns. */
+  const LONG_ERASURE_CONTENT = join(REPO_ROOT, LONG_ERASURE_CONTENT_PATH);
+
+  /** Prose of exactly `length` characters (no newlines, so CSV stays simple). */
+  const prose = (length: number): string => 'R'.repeat(length);
+
+  it('warns on an over-budget context and still applies the edit', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      writeFileSync(csvPath, readText(GYM_CONTENT));
+
+      const { code, stdout, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'update-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-start',
+          // The adopted `context` budget is 400 characters.
+          '--context',
+          prose(401),
+        ]),
+      );
+
+      // A budget is a warning, never a refusal: the edit still lands.
+      expect(code).toBe(0);
+      expect(readText(csvPath)).toContain(prose(401));
+      expect(stderr).toContain('[prose-budget]');
+      expect(stderr).toContain('column "context"');
+      // The notice goes to stderr, so `--dry-run` stdout stays machine-readable.
+      expect(stdout).not.toContain('[prose-budget]');
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('stays silent when the authored prose is within its budget', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      writeFileSync(csvPath, readText(GYM_CONTENT));
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'update-card',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-start',
+          '--context',
+          prose(400),
+        ]),
+      );
+
+      expect(code).toBe(0);
+      expect(stderr).toBe('');
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('reports the epilogue budget on a dry run and writes nothing', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'long-erasure.csv');
+      writeFileSync(csvPath, readText(LONG_ERASURE_CONTENT));
+      const before = readText(csvPath);
+
+      const { code, stdout, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'update-card',
+          '--csv',
+          csvPath,
+          '--game',
+          'long-erasure',
+          '--id',
+          'le-i-open',
+          // The adopted `epilogue` budget is 600 characters.
+          '--epilogue',
+          prose(601),
+          '--dry-run',
+        ]),
+      );
+
+      expect(code).toBe(0);
+      expect(stderr).toContain('[prose-budget]');
+      expect(stderr).toContain('column "epilogue"');
+      expect(stdout).toContain(prose(601));
+      expect(stdout).not.toContain('[prose-budget]');
+      expect(readText(csvPath)).toBe(before);
+    } finally {
+      temp.cleanup();
     }
   });
 });
