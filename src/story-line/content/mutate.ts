@@ -25,6 +25,7 @@
 
 import {
   cardsFromCsv,
+  compileContentOptions,
   findMissingColumns,
   parseCsv,
   serialiseCsv,
@@ -104,6 +105,33 @@ export interface UpdateContentCardSpec {
 
 /** A pure in-memory content mutation (used by the file writer). */
 export type ContentMutation = (csvText: string) => ContentEditResult;
+
+/**
+ * A spec for appending one option to an existing card's `options` cell.
+ *
+ * This is the `add-option` counterpart of `update-card --options`: it appends
+ * a single `label|target` entry instead of replacing the whole cell, so a
+ * writer adding one branch never retypes the options that already exist.
+ */
+export interface AddOptionContentCardSpec {
+  /** The existing card whose `options` cell gains the option (required). */
+  readonly id: string;
+  /** The option label shown to the player (required, unique on the card). */
+  readonly label: string;
+  /**
+   * Successor card id(s), encoded verbatim after the `|`. Omitted or empty
+   * authors a terminal option. A target that does not exist is refused by
+   * validation (`unknown-successor`).
+   */
+  readonly target?: string | null;
+  /**
+   * Extended option attributes appended in authored order — `cost=coins:2`,
+   * `extra=reputation:+1`, `when=hull>=1>card` or `says=…`. A leading `#` is
+   * optional; each attribute is validated with the candidate content (an
+   * unknown resource key or malformed attribute refuses the edit).
+   */
+  readonly attributes?: readonly string[];
+}
 
 // ── Matrix helpers ──────────────────────────────────────────
 
@@ -446,6 +474,148 @@ export function updateContentCards(
   }
 
   return finalise(csvText, serialiseCsv({ header, rows }), adapter);
+}
+
+// ── Option append ───────────────────────────────────────────
+
+/**
+ * Encodes one option entry (`label|target#attr…`) for an `options` cell.
+ *
+ * A blank `target` authors a terminal option (`label|`). An attribute may be
+ * written with or without its leading `#`; the canonical encoding always
+ * carries one. Attributes are kept in authored order so an authored cell and
+ * an appended entry read the same way.
+ *
+ * @param label      The option label.
+ * @param target     Successor card id(s), comma-joined; empty for terminal.
+ * @param attributes Extended `#cost` / `#extra` / `#when` / `#says` attributes.
+ * @returns The option entry text.
+ */
+export function encodeOptionEntry(
+  label: string,
+  target?: string | null,
+  attributes?: readonly string[],
+): string {
+  const head = `${label.trim()}|${(target ?? '').trim()}`;
+  const suffix = (attributes ?? [])
+    .map((attribute) => attribute.trim())
+    .filter((attribute) => attribute !== '')
+    .map((attribute) => (attribute.startsWith('#') ? attribute : `#${attribute}`))
+    .join('');
+  return `${head}${suffix}`;
+}
+
+/**
+ * Appends one encoded option entry to an existing `options` cell.
+ *
+ * The existing text is preserved byte-for-byte apart from its trailing
+ * whitespace / separator: an already-terminated cell (`…;`) gains the entry
+ * directly, and a dangling trailing `;` never produces an empty option. This
+ * is what makes one-branch authoring safe without retyping the cell.
+ *
+ * @param existing The current cell text (may be empty).
+ * @param entry    The encoded option entry (see {@link encodeOptionEntry}).
+ * @returns The options cell with the entry appended last.
+ */
+export function appendOptionEncoding(existing: string, entry: string): string {
+  const head = existing.replace(/[\s;]+$/, '');
+  if (head === '') return entry;
+  return `${head};${entry}`;
+}
+
+/**
+ * Appends one option to an existing card and validates the resulting content.
+ *
+ * Structural problems (no options column on the adapter, missing id/label,
+ * unknown card, duplicate label) are reported before the candidate is
+ * validated; the returned `csv` is the unchanged input whenever `ok` is
+ * false. Everything else about an appended option — its successor exists, its
+ * `#cost` / `#extra` keys are declared, its encoding is well formed — is
+ * validated over the whole candidate by {@link validateContentCsv}, so the
+ * refusal reason names the offending option.
+ *
+ * @param csvText Current content CSV text.
+ * @param adapter The game content adapter.
+ * @param spec    The option to append to an existing card.
+ * @returns The edit result.
+ */
+export function addOptionToContentCard(
+  csvText: string,
+  adapter: ContentAdapter,
+  spec: AddOptionContentCardSpec,
+): ContentEditResult {
+  const optionsColumn = adapter.fields.options;
+  if (optionsColumn === undefined) {
+    // An option lives only in the options encoding: refuse rather than claim
+    // success while writing nothing.
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [
+        `add-option: adapter "${adapter.gameId}" maps no options column, so an option cannot be appended`,
+      ],
+    };
+  }
+
+  const parsed = parseCsv(csvText);
+  const header = [...parsed.header];
+  const rows = mutableRows(parsed);
+
+  const errors = headerErrors(header, adapter);
+  const label = spec.label.trim();
+  if (spec.id.trim() === '') errors.push('add-option: --id is required');
+  if (label === '') errors.push('add-option: --label is required');
+  if (errors.length > 0) return { csv: csvText, ok: false, errors };
+
+  const row = findRow(header, rows, adapter, spec.id);
+  if (!row) {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [`add-option: card id "${spec.id}" not found`],
+    };
+  }
+
+  const cardId = baseIdOf(adapter, spec.id);
+  const card = readContentCards(csvText, adapter).find(
+    (candidate) => baseIdOf(adapter, candidate.id) === cardId,
+  );
+  const optionsIndex = header.indexOf(optionsColumn);
+  const existing = optionsIndex < 0 ? '' : (row[optionsIndex] ?? '');
+  if (card && declaresOptionLabel(card, label)) {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [
+        `add-option: card "${cardId}" already declares the option label "${label}" (duplicate option label)`,
+      ],
+    };
+  }
+  setColumn(
+    header,
+    rows,
+    row,
+    optionsColumn,
+    appendOptionEncoding(existing, encodeOptionEntry(label, spec.target, spec.attributes)),
+  );
+  return finalise(csvText, serialiseCsv({ header, rows }), adapter);
+}
+
+/**
+ * True when a card already declares a label (case-insensitively, matching the
+ * validator's duplicate-label rule). A malformed existing encoding is not a
+ * duplicate error here — validation reports the malformation itself.
+ */
+function declaresOptionLabel(card: ContentCard, label: string): boolean {
+  if (card.options.trim() === '') return false;
+  const wanted = label.trim().toLowerCase();
+  try {
+    return compileContentOptions(card).some(
+      (option) => option.label.trim().toLowerCase() === wanted,
+    );
+  } catch {
+    return false;
+  }
 }
 
 // ── Read counterpart ─────────────────────────────────────────

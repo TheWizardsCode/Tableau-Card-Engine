@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GYM_CONTENT_ADAPTER } from '../../../src/story-line/content/adapters';
 import {
   addContentCard,
+  addOptionToContentCard,
   applyContentEditToFile,
   hasContentCard,
   readContentCards,
@@ -271,6 +272,176 @@ describe('updateContentCard', () => {
     );
     expect(end?.options).toBe('Revisit|gym-story-start');
     expect(end && contentCardHasChoice(end)).toBe(true);
+  });
+});
+
+describe('addOptionToContentCard', () => {
+  it('appends one option without retyping the existing cell', () => {
+    const result = addOptionToContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-open',
+      label: 'Ask after the road',
+      target: 'tav-tale',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+
+    const open = readContentCards(result.csv, TAVERN_CONTENT_ADAPTER).find(
+      (entry) => entry.id === 'tav-open',
+    );
+    // The authored options stay byte-identical and the new one is appended.
+    expect(open?.options).toBe('Admit|tav-inn;Turn away|;Ask after the road|tav-tale');
+
+    // No unknown-successor and no invalid-option: the appended option is valid.
+    const codes = (result.validation?.issues ?? []).map((issue) => issue.code);
+    expect(codes).not.toContain('unknown-successor');
+    expect(codes).not.toContain('invalid-option');
+    expect(validateContentCsv(result.csv, TAVERN_CONTENT_ADAPTER).valid).toBe(true);
+  });
+
+  it('leaves every other cell of the content untouched', () => {
+    const result = addOptionToContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-open',
+      label: 'Ask after the road',
+      target: 'tav-tale',
+    });
+    expect(result.ok).toBe(true);
+
+    const withoutOptions = (csv: string): unknown[] =>
+      readContentCards(csv, TAVERN_CONTENT_ADAPTER).map(({ options: _options, ...rest }) => rest);
+    expect(withoutOptions(result.csv)).toEqual(withoutOptions(tavernCsv));
+  });
+
+  it('turns a plain card into a choice card and keeps a dangling ; single', () => {
+    const added = addOptionToContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-tale',
+      label: 'Leave at dawn',
+    });
+    expect(added.ok).toBe(true);
+    const tale = readContentCards(added.csv, TAVERN_CONTENT_ADAPTER).find(
+      (entry) => entry.id === 'tav-tale',
+    );
+    expect(tale?.options).toBe('Leave at dawn|');
+    expect(validateContentCsv(added.csv, TAVERN_CONTENT_ADAPTER).valid).toBe(true);
+
+    // Appending to a cell that already ends in `;` does not create an empty
+    // option between the entries (the dropped-`;` friction, in reverse).
+    const trailingCsv = [
+      'card_key,card_name,flavour,arc,arc_name,choices,payoff',
+      'tav-a,First,Opening.,tav,Tavern,Go|tav-b;,1',
+      'tav-b,Second,Closing.,tav,Tavern,,2',
+      '',
+    ].join('\n');
+    const appended = addOptionToContentCard(trailingCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-a',
+      label: 'Stay',
+    });
+    expect(appended.ok).toBe(true);
+    expect(
+      readContentCards(appended.csv, TAVERN_CONTENT_ADAPTER).find(
+        (entry) => entry.id === 'tav-a',
+      )?.options,
+    ).toBe('Go|tav-b;Stay|');
+  });
+
+  it('appends declared option attributes verbatim and validates them', () => {
+    const gymCsv = readText(GYM_CONTENT_PATH);
+    const result = addOptionToContentCard(gymCsv, GYM_CONTENT_ADAPTER, {
+      id: 'gym-story-invest',
+      label: 'Wait for spring',
+      target: 'gym-story-end',
+      attributes: ['cost=coins:2', '#extra=reputation:+1', 'when=coins>=1>gym-story-end'],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+
+    const invest = readContentCards(result.csv, GYM_CONTENT_ADAPTER).find(
+      (entry) => entry.id === 'gym-story-invest',
+    );
+    expect(invest?.options.endsWith(
+      'Wait for spring|gym-story-end#cost=coins:2#extra=reputation:+1#when=coins>=1>gym-story-end',
+    )).toBe(true);
+    const appended = compileContentOptions(invest!);
+    expect(appended[appended.length - 1]).toMatchObject({
+      label: 'Wait for spring',
+      successorIds: ['gym-story-end'],
+      cost: { coins: 2 },
+      extraEffect: { reputation: 1 },
+      conditionalSuccessors: [
+        { when: { field: 'coins', op: '>=', value: 1 }, successorId: 'gym-story-end' },
+      ],
+    });
+  });
+
+  it('refuses a duplicate option label on the same card', () => {
+    const result = addOptionToContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-open',
+      label: 'admit',
+      target: 'tav-tale',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.csv).toBe(tavernCsv);
+    expect(result.errors.join(' ')).toContain('duplicate option label');
+    expect(result.errors.join(' ')).toContain('admit');
+  });
+
+  it('refuses an option that references a card that does not exist', () => {
+    const result = addOptionToContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-open',
+      label: 'Follow the stranger',
+      target: 'tav-ghost',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.csv).toBe(tavernCsv);
+    expect(result.errors.join(' ')).toContain('tav-ghost');
+    expect((result.validation?.issues ?? []).map((issue) => issue.code)).toContain(
+      'unknown-successor',
+    );
+  });
+
+  it('refuses an unknown resource key in an authored attribute', () => {
+    const gymCsv = readText(GYM_CONTENT_PATH);
+    const result = addOptionToContentCard(gymCsv, GYM_CONTENT_ADAPTER, {
+      id: 'gym-story-invest',
+      label: 'Buy the harbour',
+      target: 'gym-story-end',
+      attributes: ['cost=gold:1'],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.csv).toBe(gymCsv);
+    expect(result.errors.join(' ')).toContain('gold');
+  });
+
+  it('refuses a missing id, a missing label and an unknown card id', () => {
+    expect(
+      addOptionToContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, { id: '', label: 'X' }).errors,
+    ).toContain('add-option: --id is required');
+    expect(
+      addOptionToContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, { id: 'tav-open', label: ' ' })
+        .errors,
+    ).toContain('add-option: --label is required');
+
+    const missing = addOptionToContentCard(tavernCsv, TAVERN_CONTENT_ADAPTER, {
+      id: 'tav-nope',
+      label: 'X',
+    });
+    expect(missing.ok).toBe(false);
+    expect(missing.csv).toBe(tavernCsv);
+    expect(missing.errors.join(' ')).toContain('card id "tav-nope" not found');
+  });
+
+  it('refuses an adapter that maps no options column', () => {
+    const noOptionsAdapter = {
+      ...TAVERN_CONTENT_ADAPTER,
+      gameId: 'tavern-no-options',
+      fields: { ...TAVERN_CONTENT_ADAPTER.fields, options: undefined },
+    };
+    const result = addOptionToContentCard(tavernCsv, noOptionsAdapter, {
+      id: 'tav-open',
+      label: 'Ask after the road',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.csv).toBe(tavernCsv);
+    expect(result.errors.join(' ')).toContain('maps no options column');
   });
 });
 
