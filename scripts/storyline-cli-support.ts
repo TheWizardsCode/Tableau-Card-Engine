@@ -16,10 +16,18 @@ export interface ParsedArgv {
   readonly positionals: readonly string[];
   /** Every `--field key=value` occurrence, in order. */
   readonly fieldPairs: readonly (readonly [string, string])[];
+  /** Every `--attr <value>` occurrence, in order (repeatable option attributes). */
+  readonly attributeValues: readonly string[];
 }
 
 /**
- * Parses argv into flags, positionals and repeated `--field` pairs.
+ * Parses argv into flags, positionals, repeated `--field` pairs and repeated
+ * `--attr` values.
+ *
+ * `--field` and `--attr` are the two repeatable flags, so they are collected
+ * in authored order instead of the last value winning. A bare `--attr` has no
+ * meaning (an attribute is always `name=value`, optionally `#`-prefixed), so
+ * it is reported as an error rather than becoming a literal `true` attribute.
  *
  * @param argv Raw arguments (without the node/script prefix).
  * @returns The parsed arguments.
@@ -28,6 +36,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
   const flags = new Map<string, string>();
   const positionals: string[] = [];
   const fieldPairs: (readonly [string, string])[] = [];
+  const attributeValues: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
@@ -50,10 +59,18 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
       fieldPairs.push([value.slice(0, separator), value.slice(separator + 1)]);
       continue;
     }
+    if (key === 'attr') {
+      if (value === 'true') {
+        flags.set('attr-error', value);
+        continue;
+      }
+      attributeValues.push(value);
+      continue;
+    }
     flags.set(key, value);
   }
 
-  return { flags, positionals, fieldPairs };
+  return { flags, positionals, fieldPairs, attributeValues };
 }
 
 /** Reads a nullable id flag: `undefined` when absent, `null` when cleared. */

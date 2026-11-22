@@ -66,7 +66,7 @@ npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON +
 npm run storylines:validate  # Validate story-line content through the content adapter (default: Gym)
 npm run storylines:graph     # Regenerate the committed manifest/Mermaid artefacts (-- --check to guard drift)
 npm run storylines:ip-scan   # Scan the guarded set (GDD + content + artefacts) for prohibited third-party terms
-npm run storylines:author    # Transactional content edits (add-card / update-card; --dry-run supported)
+npm run storylines:author    # Transactional content edits (add-card / add-option / add-linked-card / update-card; --dry-run supported)
 npm run storylines:editor    # Story-line editor: viewer + guided editing (local dev tool; -- --content/--adapter)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher

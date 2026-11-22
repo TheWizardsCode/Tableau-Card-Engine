@@ -12,6 +12,9 @@
  *                  pointing at the new card, and only the combined candidate
  *                  is validated — so a forward reference is authored in one
  *                  step instead of backwards from its target.
+ * - `add-option`   appends **one** option to an existing card's `options`
+ *                  cell without retyping the options already there, and
+ *                  validates the resulting content.
  * - `update-card`  edits an existing card (name, effect, context/epilogue
  *                  prose, options encoding, story-line id/title and game
  *                  columns).
@@ -33,6 +36,8 @@
  * npm run storylines:author -- add-card --id evt-z --name "Z" --dry-run
  * npm run storylines:author -- add-linked-card --id evt-branch --name "Branch" \
  *   --link-from evt-x --link-label "Take the branch" --storyline-id storyline-x
+ * npm run storylines:author -- add-option --id evt-x --label "Ask after the road" \
+ *   --target evt-y --attr cost=coins:2
  * ```
  *
  * Runs under `tsx`; nothing here imports a game or Phaser.
@@ -50,10 +55,12 @@ import {
 import {
   addContentCard,
   addLinkedContentCard,
+  addOptionToContentCard,
   applyContentEditToFile,
   updateContentCard,
   type AddContentCardSpec,
   type AddLinkedCardSpec,
+  type AddOptionContentCardSpec,
   type ContentEditResult,
   type UpdateContentCardSpec,
 } from '../src/story-line/content/author';
@@ -68,6 +75,7 @@ export const AUTHOR_USAGE = `Transactional story-line content authoring.
 Usage:
   npx tsx scripts/storyline-author.ts add-card [options]
   npx tsx scripts/storyline-author.ts add-linked-card [options]
+  npx tsx scripts/storyline-author.ts add-option [options]
   npx tsx scripts/storyline-author.ts update-card [options]
 
 Common options:
@@ -86,6 +94,14 @@ add-linked-card options (add-card options, plus):
   --link-from <card-id>      Predecessor that gains the option (required)
   --link-label <label>       Option label (default: the new card's name)
 
+add-option options (append one option without retyping the cell):
+  --id <card-id>             Existing card that gains the option (required)
+  --label <label>            Option label, unique on that card (required)
+  --target <card-id>         Successor card id; omit for a terminal option
+  --attr <name=value>        Option attribute (repeatable); the leading # is
+                             optional, e.g. --attr cost=coins:2
+                             --attr extra=reputation:+1
+
 update-card options:
   --id <id> [--name <name>] [--effect <text>]
   [--options <encoding> | --clear-options]
@@ -95,7 +111,8 @@ update-card options:
   [--storyline-title <title>]
   [--resources <keys> | --clear-resources]
 
-Choice nodes are authored only through --options (label|target;label2|target2).
+Choice nodes are authored through --options (label|target;label2|target2), which
+replaces the cell, or add-option, which appends one entry.
 Declared resources (--resources "coins,hull") are the keys the option
 #cost/#extra/#when attributes may name. Prose is authored only through
 --context / --epilogue; the mapped columns are refused as --field keys.
@@ -106,12 +123,18 @@ Exit codes: 0 = applied (or dry-run valid), 1 = refused (invalid usage/content).
 export type AuthorCliOptions =
   | { readonly command: 'add-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: AddContentCardSpec }
   | { readonly command: 'add-linked-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: AddLinkedCardSpec }
+  | { readonly command: 'add-option'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: AddOptionContentCardSpec }
   | { readonly command: 'update-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: UpdateContentCardSpec }
   | { readonly command: 'help' }
   | { readonly error: string };
 
 /** The commands the author CLI accepts. */
-const AUTHOR_COMMANDS = ['add-card', 'add-linked-card', 'update-card'] as const;
+const AUTHOR_COMMANDS = [
+  'add-card',
+  'add-linked-card',
+  'add-option',
+  'update-card',
+] as const;
 
 /**
  * Legacy choice/link flags that no longer exist.
@@ -134,10 +157,13 @@ const REMOVED_CHOICE_FLAGS = [
  * @returns The parsed invocation.
  */
 export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
-  const { flags, positionals, fieldPairs } = parseArgv(argv);
+  const { flags, positionals, fieldPairs, attributeValues } = parseArgv(argv);
   if (flags.has('help')) return { command: 'help' };
   if (flags.has('field-error')) {
     return { error: `--field expects <column=value>, got "${flags.get('field-error')}"` };
+  }
+  if (flags.has('attr-error')) {
+    return { error: '--attr expects <name=value>, e.g. --attr cost=coins:2' };
   }
   const removedFlag = REMOVED_CHOICE_FLAGS.find((flag) => flags.has(flag));
   if (removedFlag !== undefined) {
@@ -149,6 +175,7 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
   if (
     command !== 'add-card' &&
     command !== 'add-linked-card' &&
+    command !== 'add-option' &&
     command !== 'update-card'
   ) {
     return { error: `expected a command: ${AUTHOR_COMMANDS.join(' | ')}` };
@@ -184,6 +211,26 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
       ...(linkLabel !== undefined ? { label: linkLabel } : {}),
     };
     return { command, csvPath, gameId, dryRun, spec: { card: spec, linkFrom } };
+  }
+
+  if (command === 'add-option') {
+    if (fieldPairs.length > 0) {
+      return {
+        error: 'add-option appends one option and takes no --field columns; use update-card for card columns',
+      };
+    }
+    return {
+      command,
+      csvPath,
+      gameId,
+      dryRun,
+      spec: {
+        id: flags.get('id') ?? '',
+        label: flags.get('label') ?? '',
+        target: optionalText('target'),
+        ...(attributeValues.length > 0 ? { attributes: attributeValues } : {}),
+      },
+    };
   }
 
   const spec: UpdateContentCardSpec = {
@@ -234,6 +281,8 @@ export function runStorylineAuthorCli(
         return addContentCard(csv, adapter, parsed.spec);
       case 'add-linked-card':
         return addLinkedContentCard(csv, adapter, parsed.spec);
+      case 'add-option':
+        return addOptionToContentCard(csv, adapter, parsed.spec);
       case 'update-card':
         return updateContentCard(csv, adapter, parsed.spec);
     }

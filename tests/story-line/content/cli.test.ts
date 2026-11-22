@@ -19,9 +19,16 @@ import {
   DEFAULT_CONTENT_FILES,
   GYM_CONTENT_ADAPTER,
 } from '../../../src/story-line/content/adapters';
-import { updateContentCard } from '../../../src/story-line/content/author';
+import {
+  addOptionToContentCard,
+  updateContentCard,
+} from '../../../src/story-line/content/author';
 import { cardsFromCsv, parseCsv } from '../../../src/story-line/content/csv';
-import { AUTHOR_USAGE, parseAuthorCliArgs } from '../../../scripts/storyline-author';
+import {
+  AUTHOR_USAGE,
+  parseAuthorCliArgs,
+  runStorylineAuthorCli,
+} from '../../../scripts/storyline-author';
 import { DEFAULT_GRAPH_OUTPUTS, runStorylineGraphCli } from '../../../scripts/storyline-graph';
 import {
   parseValidateStorylinesArgs,
@@ -280,6 +287,143 @@ describe('parseAuthorCliArgs — add-linked-card (CG-0MWQZIH6W003C8PG)', () => {
     for (const text of ['add-linked-card', '--link-from', '--link-label']) {
       expect(AUTHOR_USAGE).toContain(text);
     }
+  });
+});
+
+describe('parseAuthorCliArgs — add-option (CG-0MWQZJ6S50007XVE)', () => {
+  /** Narrows a parsed invocation to an add-option one. */
+  function optionOf(argv: readonly string[]) {
+    const parsed = parseAuthorCliArgs(argv);
+    if ('error' in parsed) throw new Error(parsed.error);
+    if (parsed.command !== 'add-option') {
+      throw new Error(`expected an add-option invocation, got ${parsed.command}`);
+    }
+    return parsed;
+  }
+
+  it('parses --id, --label, --target and repeated --attr in authored order', () => {
+    const parsed = optionOf([
+      'add-option',
+      '--id',
+      'gym-story-invest',
+      '--label',
+      'Wait for spring',
+      '--target',
+      'gym-story-end',
+      '--attr',
+      'cost=coins:2',
+      '--attr',
+      '#extra=reputation:+1',
+      '--dry-run',
+      '--game',
+      'gym',
+    ]);
+
+    expect(parsed.spec).toEqual({
+      id: 'gym-story-invest',
+      label: 'Wait for spring',
+      target: 'gym-story-end',
+      attributes: ['cost=coins:2', '#extra=reputation:+1'],
+    });
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.gameId).toBe('gym');
+    expect(parsed.csvPath).toBe(resolve(process.cwd(), DEFAULT_CONTENT_PATH));
+  });
+
+  it('omits target and attributes for a terminal option', () => {
+    const parsed = optionOf(['add-option', '--id', 'gym-story-end', '--label', 'Rest here']);
+    expect(parsed.spec).toEqual({ id: 'gym-story-end', label: 'Rest here' });
+  });
+
+  it('refuses a --field column, which add-option cannot write', () => {
+    const parsed = parseAuthorCliArgs([
+      'add-option',
+      '--id',
+      'gym-story-invest',
+      '--label',
+      'Wait for spring',
+      '--field',
+      'coinDelta=1',
+    ]);
+    expect('error' in parsed && parsed.error).toContain('--field');
+  });
+
+  it('documents add-option and its flags in the usage text', () => {
+    for (const text of ['add-option', '--label', '--target', '--attr']) {
+      expect(AUTHOR_USAGE).toContain(text);
+    }
+  });
+
+  it('appends an option to a content file through the CLI entry point', () => {
+    const temp = makeTempDir();
+    try {
+      const csvPath = join(temp.path, 'storylines.csv');
+      writeFileSync(csvPath, readText(GYM_CONTENT));
+
+      const { code, stderr } = captureOutput(() =>
+        runStorylineAuthorCli([
+          'add-option',
+          '--csv',
+          csvPath,
+          '--id',
+          'gym-story-invest',
+          '--label',
+          'Wait for spring',
+          '--target',
+          'gym-story-end',
+          '--attr',
+          'cost=coins:2',
+        ]),
+      );
+      expect(stderr).toBe('');
+      expect(code).toBe(0);
+
+      const invest = cardsFromCsv(
+        parseCsv(readText(csvPath)),
+        GYM_CONTENT_ADAPTER,
+      ).find((candidate) => candidate.id === 'gym-story-invest');
+      // The authored cell is preserved and the new option is appended last.
+      expect(invest?.options).toBe(
+        'Celebrate|gym-story-end;Double down|;Wait for spring|gym-story-end#cost=coins:2',
+      );
+    } finally {
+      temp.cleanup();
+    }
+  });
+
+  it('refuses an unknown successor, an unknown resource key and a duplicate label', () => {
+    const parsed = (label: string, target?: string, attributes?: readonly string[]) => {
+      const argv = ['add-option', '--id', 'gym-story-invest', '--label', label];
+      if (target !== undefined) argv.push('--target', target);
+      for (const attribute of attributes ?? []) argv.push('--attr', attribute);
+      return optionOf(argv).spec;
+    };
+
+    const unknownSuccessor = addOptionToContentCard(
+      readText(GYM_CONTENT),
+      GYM_CONTENT_ADAPTER,
+      parsed('Follow the rumour', 'gym-ghost'),
+    );
+    expect(unknownSuccessor.ok).toBe(false);
+    expect((unknownSuccessor.validation?.issues ?? []).map((issue) => issue.code)).toContain(
+      'unknown-successor',
+    );
+
+    const unknownResource = addOptionToContentCard(
+      readText(GYM_CONTENT),
+      GYM_CONTENT_ADAPTER,
+      parsed('Buy the harbour', 'gym-story-end', ['cost=gold:1']),
+    );
+    expect(unknownResource.ok).toBe(false);
+    expect(unknownResource.errors.join(' ')).toContain('gold');
+
+    const duplicate = addOptionToContentCard(
+      readText(GYM_CONTENT),
+      GYM_CONTENT_ADAPTER,
+      parsed('celebrate', 'gym-story-end'),
+    );
+    expect(duplicate.ok).toBe(false);
+    expect(duplicate.errors.join(' ')).toContain('duplicate option label');
   });
 });
 

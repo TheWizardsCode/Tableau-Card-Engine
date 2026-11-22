@@ -871,7 +871,7 @@ gate and the malformed-entry behaviour — is documented in the GDD's
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
 | `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space: gated-branch survival, ending reachability, consequential rejoin distance (`--csv`, `--initial`, `--endings`, `--min-rejoin`, `--json`). |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
-| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `update-card` (`--dry-run`, `--field column=value`). |
+| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`). |
 | `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |
 
 Every CLI supports `--help`, resolves `--game` (the author/validator/graph
@@ -895,6 +895,26 @@ is refused and nothing is written) and `--link-label` sets the option text
 (default: the new card's name). Every `add-card` flag (`--effect`, `--options`,
 `--context`, `--epilogue`, `--storyline-id`, `--storyline-title`,
 `--resources`, `--field`) also applies to `add-linked-card`.
+
+One option is appended in place with `add-option`, so the existing cell is
+never retyped (and a dropped `;` can no longer remove a branch):
+
+```bash
+npm run storylines:author -- add-option --id gym-story-invest \
+  --label "Wait for spring" --target gym-story-end \
+  --attr cost=coins:2 --attr extra=reputation:+1
+```
+
+`--id` is the card that gains the option, `--label` is its (card-unique) text
+and `--target` is the successor card id; omit `--target` to author a terminal
+option (`label|`). Each `--attr <name=value>` is appended in authored order
+with an optional leading `#` (`cost=coins:2` and `#cost=coins:2` are the same
+attribute). The append is refused, with nothing written, when the label is
+already declared on the card, the target names no card (`unknown-successor`),
+an attribute names an undeclared resource key, or the option encoding is
+malformed — the same validation `update-card --options` runs, applied to the
+whole appended candidate. `update-card --options` still replaces the entire
+cell.
 
 ## Editor (visual authoring tool)
 
