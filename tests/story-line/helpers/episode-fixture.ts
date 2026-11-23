@@ -75,6 +75,25 @@ export interface AppliedResourceDelta {
 }
 
 /**
+ * The stage label used when the harness is not driving a runner call.
+ *
+ * The runner itself has no notion of stages — it is one pipeline, not a state
+ * machine — so attribution is done by the **harness**: it sets this label
+ * around the call it is making, and the double stamps every draw it serves
+ * with it. A draw recorded under {@link RNG_STAGE_IDLE} would be a draw the
+ * caller cannot attribute, which the determinism suite treats as a failure.
+ */
+export const RNG_STAGE_IDLE = 'idle';
+
+/** One `engine.rng` call, tagged with the harness stage that caused it. */
+export interface RngDrawRecord {
+  /** The stage label active when the draw happened. */
+  readonly stage: string;
+  /** The value the draw returned. */
+  readonly value: number;
+}
+
+/**
  * The in-memory voyage state the double mutates.
  *
  * Resources start from the manifest's `resources.start` bag (read through the
@@ -98,6 +117,10 @@ export interface VoyageState {
   rngQueue: number[];
   /** Every value `engine.rng` returned, in call order. */
   rngDraws: number[];
+  /** Every `engine.rng` call, in order, tagged with the active stage. */
+  rngLedger: RngDrawRecord[];
+  /** The stage label the harness is currently driving. */
+  rngStage: string;
   /** Number of `engine.rng` calls (the one-draw-per-selection proof). */
   rngCalls: number;
   /** Every `applyResourceDelta` call, in order. */
@@ -155,6 +178,8 @@ export function createVoyageState(
     discards: [],
     rngQueue: Array.from({ length: SEEDED_RNG_DRAWS }, () => next()),
     rngDraws: [],
+    rngLedger: [],
+    rngStage: RNG_STAGE_IDLE,
     rngCalls: 0,
     appliedDeltas: [],
   };
@@ -166,8 +191,8 @@ export function createVoyageState(
  * Contract, mirroring the shipped adapters:
  * - `resources` is exactly the declared key set it was built with, so
  *   `createStorylineSystem` resolves the same set the manifest declares.
- * - `rng` consumes `state.rngQueue` first (recording each draw) and falls back
- *   to `0.5`; it never consults `Math.random`.
+ * - `rng` consumes `state.rngQueue` first (recording each draw, tagged with
+ *   `state.rngStage`) and falls back to `0.5`; it never consults `Math.random`.
  * - `applyResourceDelta` applies only declared keys, in declaration order, and
  *   records the call plus the resulting resources — every call, in order.
  * - `applyEffect` is a no-op: Long Erasure cards carry no intrinsic
@@ -186,6 +211,7 @@ export function createVoyageAdapter(
       state.rngCalls += 1;
       const value = state.rngQueue.length > 0 ? state.rngQueue.shift()! : 0.5;
       state.rngDraws.push(value);
+      state.rngLedger.push({ stage: state.rngStage, value });
       return value;
     },
     applyEffect() {
@@ -227,6 +253,29 @@ export function createVoyageAdapter(
       state.deck.push(card);
     },
   };
+}
+
+/**
+ * Runs `fn` with the double's RNG stage set to `stage`, restoring the previous
+ * label afterwards (even when `fn` throws).
+ *
+ * Every `engine.rng` draw inside `fn` is recorded against `stage`, which is
+ * what lets the determinism suite prove that a pipeline call did — or did not —
+ * consume the run's one RNG stream.
+ *
+ * @param state The voyage state whose engine double serves the draws.
+ * @param stage The pipeline stage label to attribute the draws to.
+ * @param fn    The call being driven.
+ * @returns Whatever `fn` returned.
+ */
+export function withRngStage<T>(state: VoyageState, stage: string, fn: () => T): T {
+  const previous = state.rngStage;
+  state.rngStage = stage;
+  try {
+    return fn();
+  } finally {
+    state.rngStage = previous;
+  }
 }
 
 // ── Fixture loader ──────────────────────────────────────────

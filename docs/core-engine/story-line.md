@@ -1672,6 +1672,46 @@ ending.
 The numbered §2.3 subsections (beat entry, choice resolution, scene close,
 routing, persistence) are documented here as they ship.
 
+### Determinism
+
+A run is a scripted pipeline, not an interactive one: the same seed and the
+same choice sequence must walk the same beats, take the same routes and close
+on the same ending. The rule that makes that true is **one RNG**:
+
+> The run consumes exactly one seeded RNG stream, and the only thing that may
+draw from it is the `@story-line` choice model resolving an option. Beat
+entry, scene close (including outcome classification and loss application),
+route selection, target resolution, serialisation and construction consume
+**no** draw.
+
+The choice model itself draws at most once per selection — a single
+`engine.rng()` call for the uniform candidate draw, and none for a callback
+resolver, a matching declarative `#when` rule or a terminal option. The runner
+does not draw independently; it delegates resolution and observes what
+happened.
+
+Two consequences the tests pin:
+
+- **Same seed, same choices ⇒ same run.** Two independently constructed
+  runners produce identical ordered `scene-exit` records, identical
+  `getLossLedger()` lines, an identical activity log and the same ending —
+  byte-identical after JSON serialisation.
+- **Route-table order is the only other lever.** Route selection is first
+  match wins in declaration order, so reordering two competing routes flips
+  the routed decision at a fixed seed without drawing any RNG. No wall clock
+  enters the run either: `Math.random` never appears in
+  [`src/story-line/episode-runner.ts`](../../src/story-line/episode-runner.ts),
+  no `Date.now()` / `new Date()` is read, and neither the scene-exit record
+  (exactly the nine §2.3 fields) nor a loss-ledger line carries a timestamp.
+
+The pinned tests are in
+[`tests/story-line/episode-runner-determinism.test.ts`](../../tests/story-line/episode-runner-determinism.test.ts),
+and they drive the committed acceptance fixture through the shared harness in
+[`tests/story-line/helpers/episode-fixture.ts`](../../tests/story-line/helpers/episode-fixture.ts).
+That harness tags every `engine.rng` draw with the pipeline stage that was
+running, so a draw outside option resolution is visible in the ledger rather
+than silently tolerated.
+
 ### Persistence
 
 GDD §3.5.2. A run checkpoints through the core write/read pair —
@@ -1847,6 +1887,13 @@ follows.
   classifies `failure` and applies `hull-sacrificed`, the reset restart returns
   to `manifest.start` without refunding hull, every exit names a declared route
   and outcome rule, and the suite imports no game module.
+- `tests/story-line/episode-runner-determinism.test.ts` — the one-RNG rule
+  and its proof: two independently constructed runs at the same seed and
+  choices are byte-identical (exits, loss ledger, activity log, ending), an
+  RNG-call ledger attributes every draw to option resolution and every other
+  pipeline step draws nothing, `Math.random` / wall-clock reads are absent and
+  no timestamp reaches a record, and reordering two competing routes flips the
+  decision at a fixed seed while an unmodified copy stays byte-identical.
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
   deterministic serial naming, pending-choice lifecycle, and carrying the
