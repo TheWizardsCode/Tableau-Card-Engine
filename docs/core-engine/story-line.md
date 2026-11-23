@@ -1264,6 +1264,105 @@ by the demo itself: the demo starts at 60 coins so that `Invest`'s 5-coin cost
 is affordable while the `coins>=100` gate stays closed, keeping the branch
 reachable.
 
+## Episode runner
+
+The beat-sheet layer of [GDD §2.3](../design/storyline-game-gdd.md#23-how-a-scene-outcome-selects-the-next-beat):
+an episode manifest authors acts → scenes → beats, a per-scene clock budget,
+one objective, an outcome-rule table and a route table, and the runner walks
+that data one beat at a time. It is constructed **around** a
+`StorylineSystem`, never beside it, so there is exactly one choice model,
+resource projection and RNG for the run.
+
+Module: [`src/story-line/episode-runner.ts`](../../src/story-line/episode-runner.ts),
+reachable through the `@story-line` barrel. No Phaser import reaches the module
+or its transitive imports (`tests/story-line/episode-runner-surface.test.ts`
+walks the graph and fails on any `phaser` specifier).
+
+| Exported name | Kind | Meaning |
+|---|---|---|
+| `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`. |
+| `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed }` — the validated manifest, the one choice model, the card map and the run's seed. |
+| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()`. |
+| `EpisodeRunState` | type | The read-only run state (see below). |
+| `SceneExitRecord` | type | The nine-field record appended once per scene close. |
+| `LossLedgerEntry` | type | One irreversible-loss line: the `chain` or `rule` variant. |
+| `LOSS_LEDGER_KINDS` | const | The two ledger kinds, `['chain', 'rule']`. |
+| `SCENE_EXIT_FIELDS` | const | The nine `SceneExitRecord` field names, in §2.3 step 11 order. |
+
+```ts
+import { createEpisodeRunner } from '@story-line';
+
+const runner = createEpisodeRunner({
+  manifest,          // EpisodeManifest (already validated — never re-validated)
+  storyline,         // createStorylineSystem({ engine, ui })
+  content: cardsById, // cardsFromCsv(parseCsv(csv), adapter)
+  seed: 1234,
+});
+
+runner.getState();       // EpisodeRunState — frozen snapshot
+runner.getSceneExits();  // readonly SceneExitRecord[] — frozen snapshot
+```
+
+Construction consumes no RNG and applies no resource delta. A requested run
+whose manifest starts at a scene no act declares throws an actionable error
+naming the manifest and the scene id; everything else is left to
+`validateEpisodeManifest` (GDD §2.4), because the runner must not re-check an
+already validated manifest.
+
+### Run state
+
+`EpisodeRunState` is exactly the beat-sheet state of GDD §3.5.2 — resources
+and the journal stay in the game's own state, read through the storyline engine
+adapter:
+
+| Field | At run start |
+|---|---|
+| `seed` | the seed the runner was constructed with |
+| `currentActId` / `currentSceneId` / `currentBeatId` | `manifest.start.act` / `.scene` / `.beat` |
+| `sceneClockRemaining` | the entry scene's `budget.clock` |
+| `pendingChain` | `null` |
+| `sceneHistory` / `routeHistory` | empty (the start scene counts as entered once it closes) |
+| `lossLedger` | empty |
+
+Every read returns a frozen defensively-copied snapshot, so mutating what
+`getState()` returns never changes the run, and two calls never share an
+array instance. The scene-exit records live on `getSceneExits()` and follow
+the same rule; they are append-only, in close order.
+
+### Scene-exit record
+
+One record per scene close, exactly the nine fields of §2.3 step 11 and in
+that order (`SCENE_EXIT_FIELDS`):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `sceneId` | `string` | the scene that closed |
+| `objectiveMet` | `boolean` | whether the scene objective was met at close |
+| `outcome` | `'success' \| 'partial' \| 'failure'` | the classified outcome |
+| `ruleId` | `string` | the `outcomeRules[].id` that classified it |
+| `routeId` | `string` | the `routes[].id` the close took |
+| `clockSpent` | `number` | ticks spent in the scene |
+| `clockRemaining` | `number` | ticks left when the scene closed |
+| `budgetExhausted` | `boolean` | whether a beat was refused for want of clock |
+| `nextBeat` | `string` | the beat (or ending card id) the route opens |
+
+A change to the record is a deliberate, compiler-checked change in both the
+interface and `SCENE_EXIT_FIELDS`; the surface test fails `npm run build` when
+the two disagree, and checks this section lists the same nine names.
+
+### Loss ledger entries
+
+`lossLedger` lines are never positive (a refund records nothing) and are
+ordered by observation:
+
+| `kind` | Fields | Recorded when |
+|---|---|---|
+| `chain` | `sceneId`, `beatId`, `field`, `delta` | an irreversible resource fell across a beat resolution — observed by diffing `engine.getResources`, never computed by the runner |
+| `rule` | `sceneId`, `ruleId`, `field`, `delta`, `statement` | a scene's `losses[]` rule fired at close, in declaration order |
+
+The numbered §2.3 subsections (beat entry, choice resolution, scene close,
+routing, persistence) are documented here as they ship.
+
 ## Gym demo
 
 [`GymStorylineScene`](../../example-games/gym/scenes/GymStorylineScene.ts)

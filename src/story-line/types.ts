@@ -23,6 +23,7 @@
  * @module
  */
 
+import type { EpisodeManifest, SceneOutcome } from './content/episode-manifest';
 import type {
   StorylineResourceKey,
   StorylineResources,
@@ -480,4 +481,197 @@ export interface StorylineSystem<TState, TCard extends StorylineCard> {
   journalIsEmpty(state: TState): boolean;
   /** Journal title, naming the story-lines seen. */
   journalTitle(state: TState): string;
+}
+
+// ── Episode runner (GDD §2.3) ────────────────────────────────
+
+/**
+ * Configuration for {@link createEpisodeRunner}.
+ *
+ * The manifest is consumed **read-only** and is assumed to have passed
+ * `validateEpisodeManifest` (GDD §2.4): the runner never re-validates it.
+ * The storyline system is the run's **one** choice model, resource
+ * projection and RNG — the runner adds no second resolution path.
+ *
+ * ```ts
+ * const runner = createEpisodeRunner({
+ *   manifest,               // already validated EpisodeManifest
+ *   storyline,              // createStorylineSystem({ engine, ui })
+ *   content: cardsById,     // cardsFromCsv(parseCsv(csv), adapter)
+ *   seed: 1234,             // the run's single seed
+ * });
+ * ```
+ */
+export interface EpisodeRunnerConfig<
+  TState = unknown,
+  TCard extends StorylineCard = StorylineCard,
+> {
+  /** The validated episode manifest the run walks (never mutated). */
+  readonly manifest: EpisodeManifest;
+  /** The one choice model, resource projection and RNG for the run. */
+  readonly storyline: StorylineSystem<TState, TCard>;
+  /**
+   * Content cards keyed by card id — the id space beats and endings resolve
+   * in. Built from the manifest's `content.file` (never re-derived here).
+   */
+  readonly content: ReadonlyMap<string, TCard>;
+  /** The run's single seed (recorded on `run-start` and in the save). */
+  readonly seed: number;
+}
+
+/**
+ * One loss-ledger line: an irreversible resource loss the run observed or
+ * applied. `delta` is always negative — the ledger never records a refund.
+ */
+export type LossLedgerEntry = ChainLossLedgerEntry | RuleLossLedgerEntry;
+
+/** The two loss-ledger entry kinds, in ledger-order vocabulary. */
+export const LOSS_LEDGER_KINDS = ['chain', 'rule'] as const;
+
+/** A loss-ledger entry kind ({@link LOSS_LEDGER_KINDS} member). */
+export type LossLedgerKind = (typeof LOSS_LEDGER_KINDS)[number];
+
+/**
+ * A loss observed by diffing an irreversible resource across a beat
+ * resolution (GDD §2.2.8): the engine applied it, the runner merely noticed.
+ */
+export interface ChainLossLedgerEntry {
+  /** Discriminator: a loss observed across a choice resolution. */
+  readonly kind: 'chain';
+  /** Scene the loss happened in. */
+  readonly sceneId: string;
+  /** Beat (card id) the loss was observed across. */
+  readonly beatId: string;
+  /** The irreversible declared resource that fell. */
+  readonly field: StorylineResourceKey;
+  /** The observed net change; always negative. */
+  readonly delta: number;
+}
+
+/**
+ * A loss applied by a scene's `losses` rule at scene close (GDD §2.3 step 8).
+ */
+export interface RuleLossLedgerEntry {
+  /** Discriminator: a loss applied by an authored loss rule. */
+  readonly kind: 'rule';
+  /** Scene the rule fired in. */
+  readonly sceneId: string;
+  /** The `losses[].id` that fired. */
+  readonly ruleId: string;
+  /** The irreversible declared resource the rule removed. */
+  readonly field: StorylineResourceKey;
+  /** The applied change; always negative. */
+  readonly delta: number;
+  /** The rule's player-facing `statement` line. */
+  readonly statement: string;
+}
+
+/**
+ * The run state, as read through {@link EpisodeRunner.getState}.
+ *
+ * Exactly the beat-sheet fields of GDD §3.5.2: the position in the manifest,
+ * the remaining scene clock, the pending chain card, the histories and the
+ * loss ledger. Resources and the journal live in the game's own state (read
+ * through the storyline engine adapter), never duplicated here.
+ */
+export interface EpisodeRunState {
+  /** The run's single seed. */
+  readonly seed: number;
+  /** The act the run is currently in (`manifest.start.act` at run start). */
+  readonly currentActId: string;
+  /** The scene the run is currently in (`manifest.start.scene` at run start). */
+  readonly currentSceneId: string;
+  /** The beat the run is currently on (`manifest.start.beat` at run start). */
+  readonly currentBeatId: string;
+  /** Clock ticks left in the current scene (resets per scene entry). */
+  readonly sceneClockRemaining: number;
+  /**
+   * A resolved choice's pushed card whose scene close has not run yet, or
+   * `null` when the scene is not waiting on a chain route.
+   */
+  readonly pendingChain: string | null;
+  /** Scene ids entered, in entry order (empty until the first scene close). */
+  readonly sceneHistory: readonly string[];
+  /** Route ids taken, in close order (empty until the first scene close). */
+  readonly routeHistory: readonly string[];
+  /** Observed and applied irreversible losses, in observation order. */
+  readonly lossLedger: readonly LossLedgerEntry[];
+}
+
+/**
+ * The nine fields of one `scene-exit` transcript record (GDD §2.3 step 11).
+ *
+ * This is the **single** source the scene-exit banner, the replay comparison
+ * and the audit read; {@link SCENE_EXIT_FIELDS} pins the field list so a
+ * widened record fails the build instead of silently drifting.
+ */
+export interface SceneExitRecord {
+  /** The scene that closed. */
+  readonly sceneId: string;
+  /** Whether the scene objective was met at close. */
+  readonly objectiveMet: boolean;
+  /** The classified scene outcome. */
+  readonly outcome: SceneOutcome;
+  /** The `outcomeRules[].id` that classified the outcome. */
+  readonly ruleId: string;
+  /** The `routes[].id` the close took. */
+  readonly routeId: string;
+  /** Clock ticks spent in the scene. */
+  readonly clockSpent: number;
+  /** Clock ticks left when the scene closed. */
+  readonly clockRemaining: number;
+  /** Whether the scene closed because a beat could not be afforded. */
+  readonly budgetExhausted: boolean;
+  /** The beat (or ending card id) the route opens, in contract order. */
+  readonly nextBeat: string;
+}
+
+/**
+ * The `scene-exit` record's fields, in GDD §2.3 step 11 order.
+ *
+ * Tests and the documentation assert {@link SceneExitRecord}'s keys against
+ * this tuple, so adding or removing a field is a deliberate, compiler-checked
+ * change in both places at once.
+ */
+export const SCENE_EXIT_FIELDS = [
+  'sceneId',
+  'objectiveMet',
+  'outcome',
+  'ruleId',
+  'routeId',
+  'clockSpent',
+  'clockRemaining',
+  'budgetExhausted',
+  'nextBeat',
+] as const;
+
+/**
+ * The episode runner: the beat-sheet layer constructed around a
+ * {@link StorylineSystem}.
+ *
+ * Later GDD §2.3 features (beat entry, choice resolution, scene close,
+ * routing, persistence) add behaviour to this surface; the constructed run
+ * state shape and the read-only accessors below stay stable.
+ */
+export interface EpisodeRunner<
+  TState = unknown,
+  TCard extends StorylineCard = StorylineCard,
+> {
+  /** The validated manifest the run walks. */
+  readonly manifest: EpisodeManifest;
+  /** The one choice model the runner delegates resolution to. */
+  readonly storyline: StorylineSystem<TState, TCard>;
+  /** The content card map beats and endings resolve in. */
+  readonly content: ReadonlyMap<string, TCard>;
+  /**
+   * A frozen snapshot of the run state.
+   *
+   * The snapshot is a defensive copy: mutating it (or its arrays) never
+   * changes the runner, and two calls never share an array instance.
+   */
+  getState(): EpisodeRunState;
+  /**
+   * The `scene-exit` records appended so far, in close order (frozen copy).
+   */
+  getSceneExits(): readonly SceneExitRecord[];
 }

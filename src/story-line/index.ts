@@ -8,6 +8,11 @@
  * and {@link StorylineUiAdapter} seams — core never imports game types and
  * has no Phaser dependency.
  *
+ * The beat-sheet layer sits on top of the same choice model:
+ * {@link createEpisodeRunner} walks a validated episode manifest (acts, scenes,
+ * beats, clock budget, outcome and route tables — GDD §2.3) around the one
+ * `StorylineSystem` a game supplies.
+ *
  * ```ts
  * import { createStorylineSystem } from '@story-line';
  *
@@ -136,6 +141,20 @@ export {
   isOptionAffordable,
 } from './compile';
 export type { StorylineOptionRegistry } from './compile';
+
+// ── Episode runner (GDD §2.3) ────────────────────────────────
+export { createEpisodeRunner } from './episode-runner';
+export { LOSS_LEDGER_KINDS, SCENE_EXIT_FIELDS } from './types';
+export type {
+  ChainLossLedgerEntry,
+  EpisodeRunState,
+  EpisodeRunner,
+  EpisodeRunnerConfig,
+  LossLedgerEntry,
+  LossLedgerKind,
+  RuleLossLedgerEntry,
+  SceneExitRecord,
+} from './types';
 
 /** Configuration for {@link createStorylineSystem}. */
 export interface StorylineSystemConfig<
