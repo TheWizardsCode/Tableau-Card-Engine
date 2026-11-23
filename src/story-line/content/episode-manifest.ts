@@ -52,7 +52,12 @@ import {
   readManifestStartBag,
 } from '../resources';
 import { compileContentOptions, optionSuccessorIds } from './csv';
-import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
+import {
+  baseIdOf,
+  LEGACY_CLOCK_COST_COLUMN,
+  type ContentAdapter,
+  type ContentCard,
+} from './types';
 
 /**
  * Canonical repository-relative path of the episode-manifest JSON schema.
@@ -822,6 +827,16 @@ const IMPLEMENTED_RULES: readonly EpisodeManifestRule[] = [
 const RESOURCE_RULES: readonly EpisodeManifestRule[] = ['resource-set-mismatch'];
 
 /**
+ * The migration-only rules, which need both the bound content and a legacy
+ * column the adapter still declares.
+ *
+ * They are reported as run only while that column exists: once G10
+ * (`CG-0MWR0BJXI007UINE`) retires it the list is empty, so the check disappears
+ * with the data instead of leaving a rule that silently passes.
+ */
+const MIGRATION_RULES: readonly EpisodeManifestRule[] = ['clock-cost-mismatch'];
+
+/**
  * The declared resource keys a manifest declares, in declaration order.
  *
  * Reads the raw document through total accessors (string members only, trimmed,
@@ -1305,6 +1320,31 @@ interface ContentResolutionIndex {
   readonly endingIds: ReadonlySet<string>;
   /** Storyline ids the episode's beats and endings belong to (unassigned-card scope). */
   readonly storylineIds: ReadonlySet<string>;
+  /**
+   * The legacy CSV `clockCost` column the adapter declares, or `undefined` when
+   * it declares none. Read from the adapter's **column declaration**, never a
+   * literal, so retiring the column (G10) is a data change.
+   */
+  readonly legacyClockCostColumn: string | undefined;
+}
+
+/**
+ * Resolves the legacy clock-cost column an adapter declares, or `undefined`.
+ *
+ * The column is a **game column**, not a story-line field mapping: it is read
+ * from {@link ContentCard.fields} (the raw row) and never through a mapped
+ * `ContentCard` member. The name comes from the adapter's declared columns
+ * rather than a literal here, so G10's removal (`CG-0MWR0BJXI007UINE`) is a
+ * data change: once no adapter declares the column, `clock-cost-mismatch` is a
+ * silent no-op.
+ */
+function legacyClockCostColumn(adapter: ContentAdapter): string | undefined {
+  const mapped: readonly string[] = Object.values(adapter.fields).filter(
+    (column): column is string => column !== undefined,
+  );
+  return adapter.columns.find(
+    (column) => column === LEGACY_CLOCK_COST_COLUMN && !mapped.includes(column),
+  );
 }
 
 /** Reads a card's id, or `undefined` when the value is not a card-shaped object. */
@@ -1371,7 +1411,7 @@ function buildContentResolutionIndex(
     if (typeof storylineId === 'string') storylineIds.add(storylineId);
   }
 
-  return { cardsById, successorsById, assignedBeatIds, endingIds, storylineIds };
+  return { cardsById, successorsById, assignedBeatIds, endingIds, storylineIds, legacyClockCostColumn: legacyClockCostColumn(adapter) };
 }
 
 /** The `endings[]` string entries, in declaration order. */
@@ -1556,6 +1596,53 @@ function endingSuccessorFindings(
 }
 
 /**
+ * `clock-cost-mismatch` *(migration only)*: the manifest and the legacy column agree.
+ *
+ * While the spike's per-card `clockCost` column still exists, a beat's
+ * authoritative `clockCost` in the manifest must equal the legacy CSV cell for
+ * the same `cardId`, so the interim period cannot silently desynchronise. The
+ * rule is deliberately narrow: it fires on **any** difference (a one-tick drift
+ * is the committed fixture), reports one finding per mismatched beat at the
+ * manifest field, and is silent when the adapter no longer declares the column
+ * (G10) or a cell carries no value to compare.
+ *
+ * The cell is read from the raw row ({@link ContentCard.fields}); it is never a
+ * beat's authoritative cost and never a story-line field mapping.
+ */
+function clockCostMismatchFindings(
+  traversal: EpisodeManifestTraversal,
+  index: ContentResolutionIndex,
+): FindingDraft[] {
+  const column = index.legacyClockCostColumn;
+  if (column === undefined) return [];
+  const findings: FindingDraft[] = [];
+  for (const beat of traversal.beats) {
+    const cardId = stringMember(beat.value, 'cardId');
+    const clockCost = numberMember(beat.value, 'clockCost');
+    // A missing/invalid cost is the schema's or `numeric-invalid`'s finding.
+    if (cardId === undefined || clockCost === undefined) continue;
+    const card = index.cardsById.get(cardId);
+    // A malformed card carries no raw row; the validator must stay total.
+    const cell = card === undefined ? undefined : recordOf(card.fields)?.[column];
+    // No column, or no value to compare: the migration check has nothing to say.
+    if (typeof cell !== 'string') continue;
+    const legacyText = cell.trim();
+    if (legacyText === '') continue;
+    const legacy = Number(legacyText);
+    if (!Number.isFinite(legacy) || legacy === clockCost) continue;
+    findings.push({
+      code: 'clock-cost-mismatch',
+      path: `${beat.path}.clockCost`,
+      message:
+        `Beat "${cardId}" declares clockCost ${JSON.stringify(clockCost)}, but the legacy ` +
+        `"${column}" cell for that card is ${JSON.stringify(legacyText)}; the two must agree ` +
+        'until the manifest is the only clock authority (G10 retires the column).',
+    });
+  }
+  return findings;
+}
+
+/**
  * Validates an episode manifest's identity, scope and card resolution (GDD §2.4).
  *
  * Pure and total: the document is inspected, never mutated, and any value —
@@ -1574,6 +1661,10 @@ function endingSuccessorFindings(
  * content file that declares no keys, and it is honoured as-is (every manifest
  * key is then extra) — the engine's `coins` / `reputation` projection is never
  * substituted for it here.
+ *
+ * The migration-only `clock-cost-mismatch` rule needs both: content bound and
+ * the adapter still declaring the legacy `clockCost` column. Retiring the
+ * column (G10) removes it from the rule list with no code change.
  *
  * @param manifest          The (possibly unvalidated) manifest document.
  * @param contentCards      Bound content cards — the input the card-resolution
@@ -1608,6 +1699,10 @@ export function validateEpisodeManifest(
           ...danglingChainFindings(traversal, contentIndex),
           ...endingSuccessorFindings(manifest, contentIndex),
         ];
+  const migrationRuleFindings =
+    contentIndex === undefined || contentIndex.legacyClockCostColumn === undefined
+      ? []
+      : clockCostMismatchFindings(traversal, contentIndex);
   const findings = collectFindings(manifestId, [
     ...duplicateActFindings(traversal),
     ...duplicateSceneFindings(traversal),
@@ -1621,6 +1716,7 @@ export function validateEpisodeManifest(
     ...numericInvalidFindings(traversal),
     ...contentRuleFindings,
     ...(declaredResources === undefined ? [] : resourceSetFindings(manifest, declaredResources)),
+    ...migrationRuleFindings,
   ]);
 
   return {
@@ -1630,6 +1726,9 @@ export function validateEpisodeManifest(
       ...IMPLEMENTED_RULES,
       ...(contentIndex === undefined ? [] : CONTENT_RULES),
       ...(declaredResources === undefined ? [] : RESOURCE_RULES),
+      ...(contentIndex === undefined || contentIndex.legacyClockCostColumn === undefined
+        ? []
+        : MIGRATION_RULES),
     ],
     counts: {
       acts: traversal.acts.length,

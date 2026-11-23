@@ -36,6 +36,22 @@
  */
 
 /**
+ * The legacy per-card `clockCost` column the Long Erasure spike still carries.
+ *
+ * **Migration-only.** A per-card clock cost is beat-sheet data written in the
+ * wrong place (GDD §2.1): pacing belongs to `beat.clockCost` in the episode
+ * manifest, and the column retires with that move (`CG-0MWR0BJXI007UINE`, G10).
+ * Until then exactly one reader consults it — the manifest validator's
+ * `clock-cost-mismatch` rule — and never as a beat's authoritative cost.
+ *
+ * It is a **game column**, not a {@link ContentFieldMapping} field: an adapter
+ * that declares it lists it in {@link ContentAdapter.columns}, and the rule
+ * reads the raw cell from {@link ContentCard.fields}. Removing it from that
+ * declaration (G10) therefore switches the check off with no code change.
+ */
+export const LEGACY_CLOCK_COST_COLUMN = 'clockCost' as const;
+
+/**
  * One story-line card as **content**: the generic story-line fields plus the
  * game's own columns, keyed by their CSV column name.
  *

@@ -15,7 +15,7 @@
  */
 
 import { DEFAULT_ARTEFACT_PATHS, type ArtefactPaths } from './artefact-paths';
-import type { ContentAdapter } from './types';
+import { LEGACY_CLOCK_COST_COLUMN, type ContentAdapter } from './types';
 
 /** Relative path of the default (Gym) story-line content file. */
 export const DEFAULT_CONTENT_PATH = 'example-games/gym/content/storylines.csv';
@@ -93,7 +93,10 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
  * Phaser-free run module reads:
  *
  * - `act` — the act the card belongs to (`I`, `II`, `III` or `Ending`);
- * - `clockCost` — pressure-clock beats consumed when the card is drawn;
+ * - {@link LEGACY_CLOCK_COST_COLUMN} (`clockCost`) — pressure-clock beats
+ *   consumed when the card is drawn, the migration-only column G10 retires in
+ *   favour of `beat.clockCost` (the manifest validator checks the two agree
+ *   while both exist);
  * - `context` / `epilogue` — the optional authored prose the narrative panel and
  *   the closing screen read. The columns are part of the file's schema and may
  *   be blank: a blank cell reads as "no prose authored" (`null`).
@@ -113,7 +116,7 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
     'storylineTitle',
     'resources',
     'act',
-    'clockCost',
+    LEGACY_CLOCK_COST_COLUMN,
     'context',
     'epilogue',
   ],
@@ -128,14 +131,14 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
     context: 'context',
     epilogue: 'epilogue',
   },
-  editableColumns: ['act', 'clockCost'],
+  editableColumns: ['act', LEGACY_CLOCK_COST_COLUMN],
   newCardDefaults: {
     options: '',
     storylineId: 'long-erasure',
     storylineTitle: 'The Long Erasure',
     resources: 'hull,morale,stores,goodwill,charge',
     act: 'I',
-    clockCost: '1',
+    [LEGACY_CLOCK_COST_COLUMN]: '1',
     context: '',
     epilogue: '',
   },
