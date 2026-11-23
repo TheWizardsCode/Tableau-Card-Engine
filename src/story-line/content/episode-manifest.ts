@@ -29,11 +29,28 @@
  * declared resource keys, which the schema cannot enumerate; the schema
  * constrains the key pattern and the value shape only. Cross-checking them
  * against `resources.declared` (a missing entry, `bounds.min > bounds.max`, a
- * start outside its bounds) is the validator's job.
+ * start outside its bounds) is the validator's job — and it is read through the
+ * pure {@link ../resources} read-throughs (`readManifestStartBag`,
+ * `readManifestBounds`), which fail closed instead of substituting a default.
+ * The declared set itself always arrives as the caller's `declaredResources`
+ * argument: this module never reads the engine's `coins` / `reputation`
+ * projection, a game module or a game constant, so a resource rule can never be
+ * satisfied by data the manifest did not declare.
+ *
+ * **Scope of the resource rules.** Only the *structural* agreement between
+ * `declared`, `start` and `bounds` is checked here. Gate reachability from the
+ * start bag belongs to the scene-space guard (`CG-0MWR0BG9H007AFNU`) and
+ * runtime clamping to the bounds belongs to the economy ledger
+ * (`CG-0MWR0BGVG004UE7X`); neither is arithmetic this validator does.
  *
  * @module
  */
 
+import {
+  normaliseResourceKeys,
+  readManifestBounds,
+  readManifestStartBag,
+} from '../resources';
 import { compileContentOptions, optionSuccessorIds } from './csv';
 import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
 
@@ -259,6 +276,15 @@ export interface EpisodeManifestFinding {
   readonly path: string;
   /** Reviewer-facing explanation, naming the conflicting declaration by path. */
   readonly message: string;
+  /**
+   * Stable reason code for a rule that reports several distinct defects under
+   * one §2.4 code (`missing-start-entry`, `bounds-inverted`,
+   * `start-outside-bounds`, …), so a tool can match the fault without parsing
+   * the message — the same `reason` field `content/validate.ts` carries.
+   *
+   * Absent when the code alone names the defect.
+   */
+  readonly reason?: string;
   /** The manifest the finding belongs to (`''` when the document declares no string id). */
   readonly manifestId: string;
 }
@@ -583,6 +609,8 @@ interface FindingDraft {
   readonly code: EpisodeManifestIssueCode;
   readonly path: string;
   readonly message: string;
+  /** Stable reason code, forwarded onto {@link EpisodeManifestFinding.reason}. */
+  readonly reason?: string;
 }
 
 /** A node's candidate key plus the path that addresses the key. */
@@ -767,6 +795,156 @@ const IMPLEMENTED_RULES: readonly EpisodeManifestRule[] = [
 ];
 
 /**
+ * The resource-block rules, which need the content file's declared set bound.
+ *
+ * They are reported as run only when `declaredResources` is bound: without it
+ * there is nothing to compare the manifest's declared set against, and a caller
+ * must be able to tell a pass apart from a rule that could not run. The
+ * structural half (start/bounds agreement) reads only manifest data, but it
+ * shares this one activation seam so a resource finding is never emitted by a
+ * validation that never claimed to check resources.
+ */
+const RESOURCE_RULES: readonly EpisodeManifestRule[] = ['resource-set-mismatch'];
+
+/**
+ * The declared resource keys a manifest declares, in declaration order.
+ *
+ * Reads the raw document through total accessors (string members only, trimmed,
+ * blank/de-duplicated via the shared key normalisation), so an unvalidated
+ * manifest yields fewer keys rather than an exception.
+ */
+function declaredResourceKeys(manifest: unknown): readonly string[] {
+  const declared = recordOf(recordOf(manifest)?.resources)?.declared;
+  return normaliseResourceKeys(
+    arrayOf(declared).filter((key): key is string => typeof key === 'string'),
+  );
+}
+
+/**
+ * `resource-set-mismatch`: the manifest's resource block is internally
+ * consistent and agrees with the content file's declared set.
+ *
+ * Six defects share the §2.4 code, each with its own `reason` so tooling (and
+ * a reviewer) can tell them apart without parsing the message:
+ *
+ * | reason | meaning |
+ * |---|---|
+ * | `declared-set-mismatch` | `resources.declared` ≠ the content file's declared set |
+ * | `irreversible-not-declared` | `resources.irreversible` names a key outside `declared` |
+ * | `missing-start-entry` | a declared key has no finite `resources.start` value |
+ * | `missing-bounds-entry` | a declared key has no finite `{ min, max }` bounds entry |
+ * | `bounds-inverted` | a declared key's `bounds.min > bounds.max` |
+ * | `start-outside-bounds` | a declared key's start value lies outside its own bounds |
+ *
+ * The set comparison is order-insensitive (both sides are normalised) and names
+ * the keys missing from the manifest and the keys the manifest adds. The
+ * structural checks read the manifest's own declarations through the shared
+ * `readManifestStartBag` / `readManifestBounds` read-throughs, which fail closed:
+ * a partly-readable block reports its issues rather than being defaulted.
+ *
+ * Reachability from the start bag is deliberately **not** checked here (the
+ * scene-space guard owns it), and neither is clamping (the economy ledger owns
+ * it); this rule only proves the declared resource block agrees with itself and
+ * with the content file.
+ *
+ * @param manifest          The (possibly unvalidated) manifest document.
+ * @param declaredResources The content file's declared key set.
+ */
+function resourceSetFindings(
+  manifest: unknown,
+  declaredResources: readonly string[],
+): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+  const resources = recordOf(recordOf(manifest)?.resources);
+  const declared = declaredResourceKeys(manifest);
+  const declaredSet = new Set(declared);
+
+  // (1) The manifest's declared set against the content file's declared set.
+  const expected = new Set(normaliseResourceKeys(declaredResources));
+  const missing = [...expected].filter((key) => !declaredSet.has(key));
+  const extra = declared.filter((key) => !expected.has(key));
+  if (missing.length > 0 || extra.length > 0) {
+    findings.push({
+      code: 'resource-set-mismatch',
+      path: 'resources.declared',
+      reason: 'declared-set-mismatch',
+      message:
+        `resources.declared [${listed(declared)}] does not match the content file's declared set ` +
+        `[${listed(expected)}]: missing ${listed(missing)}, extra ${listed(extra)}.`,
+    });
+  }
+
+  // (2) The irreversible subset must be part of the declared set.
+  arrayOf(resources?.irreversible).forEach((value, index) => {
+    if (typeof value !== 'string') return;
+    const key = value.trim();
+    if (declaredSet.has(key)) return;
+    findings.push({
+      code: 'resource-set-mismatch',
+      path: `resources.irreversible[${index}]`,
+      reason: 'irreversible-not-declared',
+      message:
+        `resources.irreversible[${index}] names "${key}", which is not in ` +
+        `resources.declared [${listed(declared)}], so the beat sheet would hold a loss-bearing key ` +
+        'it never declared.',
+    });
+  });
+
+  // (3) The run's starting bag: one finite value per declared key, no defaults.
+  const startBag = readManifestStartBag(declared, resources?.start);
+  if (!startBag.ok) {
+    for (const issue of startBag.issues) {
+      findings.push({
+        code: 'resource-set-mismatch',
+        path: `resources.start.${issue.key}`,
+        reason: issue.reason,
+        message:
+          `Declared resource "${issue.key}" has no finite resources.start value, so the run's ` +
+          'starting bag cannot be read from declared data (no default is substituted).',
+      });
+    }
+  }
+
+  // (4) The per-key design bounds: one well-ordered range per declared key.
+  const bounds = readManifestBounds(declared, resources?.bounds);
+  if (!bounds.ok) {
+    for (const issue of bounds.issues) {
+      findings.push({
+        code: 'resource-set-mismatch',
+        path: `resources.bounds.${issue.key}`,
+        reason: issue.reason,
+        message:
+          issue.reason === 'bounds-inverted'
+            ? `Declared resource "${issue.key}" has inverted design bounds (min > max), so no ` +
+              'value can satisfy the declared range.'
+            : `Declared resource "${issue.key}" has no finite { min, max } resources.bounds ` +
+              'entry (no default range is substituted).',
+      });
+    }
+  }
+
+  // (5) The start bag must sit inside the bounds it was declared against.
+  if (startBag.ok && bounds.ok) {
+    for (const key of declared) {
+      const value = startBag.bag[key];
+      const range = bounds.bounds[key];
+      if (value === undefined || range === undefined) continue;
+      if (value >= range.min && value <= range.max) continue;
+      findings.push({
+        code: 'resource-set-mismatch',
+        path: `resources.start.${key}`,
+        reason: 'start-outside-bounds',
+        message:
+          `Declared resource "${key}" starts at ${value}, outside its own bounds ` +
+          `[${range.min}, ${range.max}], so the run begins in a state the design forbids.`,
+      });
+    }
+  }
+
+  return findings;
+}
+
+/**
  * The card-resolution rules, which need the bound content as a second input.
  *
  * They are reported as run only when content is bound: without a card list
@@ -792,10 +970,21 @@ const IDENTITY_CONTENT_ADAPTER: ContentAdapter = {
   fields: { id: 'id', name: 'name' },
 };
 
-/** Orders findings by `path`, then `code` — the report's stable total order. */
+/**
+ * Orders findings by `path`, then `code`, then `reason` — the report's stable
+ * total order.
+ *
+ * `reason` breaks the tie between two findings of the same code at the same
+ * path (e.g. a missing start entry and an out-of-bounds start are distinct
+ * paths, but a structural rule may legitimately report twice at one path), so
+ * the order stays total and byte-stable.
+ */
 function compareFindings(left: EpisodeManifestFinding, right: EpisodeManifestFinding): number {
   if (left.path !== right.path) return left.path < right.path ? -1 : 1;
   if (left.code !== right.code) return left.code < right.code ? -1 : 1;
+  const leftReason = left.reason ?? '';
+  const rightReason = right.reason ?? '';
+  if (leftReason !== rightReason) return leftReason < rightReason ? -1 : 1;
   return 0;
 }
 
@@ -812,13 +1001,14 @@ function collectFindings(
   const seen = new Set<string>();
   const findings: EpisodeManifestFinding[] = [];
   for (const draft of drafts) {
-    const key = `${draft.code}\u0000${draft.path}`;
+    const key = `${draft.code}\u0000${draft.path}\u0000${draft.reason ?? ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
     findings.push({
       code: draft.code,
       path: draft.path,
       message: draft.message,
+      ...(draft.reason === undefined ? {} : { reason: draft.reason }),
       manifestId,
     });
   }
@@ -1108,22 +1298,28 @@ function endingSuccessorFindings(
  * those rules are neither run nor reported; an explicitly empty list is a bound
  * content file with no cards, and every reference is then `unknown-card`.
  *
- * @param manifest           The (possibly unvalidated) manifest document.
- * @param contentCards       Bound content cards — the input the card-resolution
- *                           rules read (CG-0MWSJYGEG007WOIU). Omit it to run the
- *                           manifest-only rules.
- * @param _declaredResources Declared resource keys — the input the resource
- *                           rules read (CG-0MWSJYLZ3005C2V1); unused by the
- *                           identity and card-resolution rules.
- * @param adapter            The game content adapter (its `baseId` rule); defaults
- *                           to the identity rule, which is right for template-only
- *                           content files.
+ * The resource rules follow the same seam: they run only when
+ * `declaredResources` is bound. An explicitly **empty** declared set is a bound
+ * content file that declares no keys, and it is honoured as-is (every manifest
+ * key is then extra) — the engine's `coins` / `reputation` projection is never
+ * substituted for it here.
+ *
+ * @param manifest          The (possibly unvalidated) manifest document.
+ * @param contentCards      Bound content cards — the input the card-resolution
+ *                          rules read (CG-0MWSJYGEG007WOIU). Omit it to run the
+ *                          manifest-only rules.
+ * @param declaredResources The content file's declared resource keys — the
+ *                          single source of the declared set for the resource
+ *                          rules (CG-0MWSJYLZ3005C2V1). Omit it to skip them.
+ * @param adapter           The game content adapter (its `baseId` rule); defaults
+ *                          to the identity rule, which is right for template-only
+ *                          content files.
  * @returns The findings, the rules that ran and the traversal counts.
  */
 export function validateEpisodeManifest(
   manifest: unknown,
   contentCards?: readonly ContentCard[],
-  _declaredResources: readonly string[] = [],
+  declaredResources?: readonly string[],
   adapter: ContentAdapter = IDENTITY_CONTENT_ADAPTER,
 ): EpisodeManifestValidationResult {
   const traversal = walkEpisodeManifest(manifest);
@@ -1149,12 +1345,17 @@ export function validateEpisodeManifest(
     ...nonTotalRouteFindings(traversal),
     ...nonTotalOutcomeRuleFindings(traversal),
     ...contentRuleFindings,
+    ...(declaredResources === undefined ? [] : resourceSetFindings(manifest, declaredResources)),
   ]);
 
   return {
     manifestId,
     findings,
-    rules: contentIndex === undefined ? IMPLEMENTED_RULES : [...IMPLEMENTED_RULES, ...CONTENT_RULES],
+    rules: [
+      ...IMPLEMENTED_RULES,
+      ...(contentIndex === undefined ? [] : CONTENT_RULES),
+      ...(declaredResources === undefined ? [] : RESOURCE_RULES),
+    ],
     counts: {
       acts: traversal.acts.length,
       scenes: traversal.scenes.length,
@@ -1187,7 +1388,8 @@ export function formatEpisodeManifestReport(result: EpisodeManifestValidationRes
   } else {
     lines.push(`ERRORS (${result.findings.length}):`);
     for (const finding of result.findings) {
-      lines.push(`  ✗ [${finding.code}] ${finding.path}: ${finding.message}`);
+      const reason = finding.reason === undefined ? '' : ` (${finding.reason})`;
+      lines.push(`  ✗ [${finding.code}]${reason} ${finding.path}: ${finding.message}`);
     }
   }
   lines.push('');

@@ -22,6 +22,13 @@
  *
  * Nothing here depends on Phaser or imports a game module.
  *
+ * The module is also the **read-through for the episode manifest's resource
+ * block**: {@link readManifestStartBag} and {@link readManifestBounds} read
+ * `resources.start` / `resources.bounds` for the declared keys and fail closed
+ * (reporting per-key issues) rather than substituting a default, so a validator
+ * or a guard can prove its claims from declared data instead of from a game-side
+ * start-bag constant.
+ *
  * @module
  */
 
@@ -75,10 +82,20 @@ export function readResource(
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-/** Trims, drops blank/duplicate keys, preserving declaration order. */
-function normaliseKeys(
+/**
+ * Trims, drops blank/duplicate keys, preserving declaration order.
+ *
+ * Where {@link parseResourceKeys} normalises a comma-separated declaration
+ * text, this normalises an already-split key collection (the manifest's
+ * `declared` array, an adapter's declared keys) with the same rule, so both
+ * forms of declaration compare equal after normalisation.
+ *
+ * @param keys Raw resource keys (any order, possibly blank or repeated).
+ * @returns The keys in declaration order, trimmed and de-duplicated.
+ */
+export function normaliseResourceKeys(
   keys: Iterable<StorylineResourceKey>,
-): StorylineResourceKey[] {
+): readonly StorylineResourceKey[] {
   const seen = new Set<StorylineResourceKey>();
   const normalised: StorylineResourceKey[] = [];
   for (const key of keys) {
@@ -103,7 +120,7 @@ function normaliseKeys(
 export function parseResourceKeys(
   text: string,
 ): readonly StorylineResourceKey[] {
-  return normaliseKeys(text.split(','));
+  return normaliseResourceKeys(text.split(','));
 }
 
 /**
@@ -120,8 +137,146 @@ export function resolveResourceKeys(
   declared?: Iterable<StorylineResourceKey> | undefined,
 ): readonly StorylineResourceKey[] {
   if (declared === undefined) return DEFAULT_RESOURCE_KEYS;
-  const keys = normaliseKeys(declared);
+  const keys = normaliseResourceKeys(declared);
   return keys.length > 0 ? keys : DEFAULT_RESOURCE_KEYS;
+}
+
+// ── Manifest start bag and bounds (read-through, no defaults) ─
+
+/**
+ * Inclusive per-key design bounds, the shape of one `resources.bounds` entry
+ * (`{ min, max }`).
+ */
+export interface ManifestResourceBounds {
+  /** Inclusive lower bound. */
+  readonly min: number;
+  /** Inclusive upper bound. */
+  readonly max: number;
+}
+
+/**
+ * Why a manifest resource block could not be read.
+ *
+ * The reason is stable and machine-readable (the validator forwards it onto its
+ * finding), so tooling can match the defect without parsing a message.
+ */
+export type ManifestResourceReadReason =
+  | 'missing-start-entry'
+  | 'missing-bounds-entry'
+  | 'bounds-inverted';
+
+/** One declared key the manifest resource block does not supply a value for. */
+export interface ManifestResourceReadIssue {
+  /** Stable reason code (see {@link ManifestResourceReadReason}). */
+  readonly reason: ManifestResourceReadReason;
+  /** The declared resource key the issue concerns. */
+  readonly key: StorylineResourceKey;
+}
+
+/**
+ * The outcome of reading the run's starting bag out of manifest data.
+ *
+ * A **failure is total**: when any declared key is missing the read yields no
+ * bag at all, so a caller cannot accidentally proceed with a partial bag —
+ * there is no default fill, and the engine's `coins` / `reputation` projection
+ * is never substituted for data the manifest was supposed to declare.
+ */
+export type ManifestStartBagRead =
+  | { readonly ok: true; readonly bag: StorylineResources }
+  | { readonly ok: false; readonly issues: readonly ManifestResourceReadIssue[] };
+
+/**
+ * The outcome of reading the per-key design bounds out of manifest data.
+ *
+ * Fails closed exactly like {@link ManifestStartBagRead}: no bounds are
+ * invented, and an inverted range (`min > max`) is reported rather than
+ * normalised.
+ */
+export type ManifestBoundsRead =
+  | {
+      readonly ok: true;
+      readonly bounds: Readonly<Record<StorylineResourceKey, ManifestResourceBounds>>;
+    }
+  | { readonly ok: false; readonly issues: readonly ManifestResourceReadIssue[] };
+
+/** Reads `value` as a finite number, or `undefined` for any other value. */
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** Reads `value` as a plain object, or `undefined` for any other shape. */
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * Reads the run's starting bag (`resources.start`) for the declared keys.
+ *
+ * This is the read-through the manifest validator and the scene-space guard
+ * share: the declared key set is the caller's (manifest `resources.declared`),
+ * and every declared key must carry a finite value. A missing or non-numeric
+ * entry is an issue (`missing-start-entry`) and the read as a whole fails — the
+ * values that *were* readable are never returned in a partial bag, so no code
+ * path can run a game from an under-declared start.
+ *
+ * @param declared The declared resource keys, in declaration order.
+ * @param start    The raw `resources.start` value (any shape).
+ * @returns The complete bag, or the per-key issues that made it unreadable.
+ */
+export function readManifestStartBag(
+  declared: readonly StorylineResourceKey[],
+  start: unknown,
+): ManifestStartBagRead {
+  const source = recordOf(start);
+  const bag: Record<StorylineResourceKey, number> = {};
+  const issues: ManifestResourceReadIssue[] = [];
+  for (const key of declared) {
+    const value = finiteNumber(source?.[key]);
+    if (value === undefined) {
+      issues.push({ reason: 'missing-start-entry', key });
+      continue;
+    }
+    bag[key] = value;
+  }
+  return issues.length > 0 ? { ok: false, issues } : { ok: true, bag };
+}
+
+/**
+ * Reads the per-key design bounds (`resources.bounds`) for the declared keys.
+ *
+ * Every declared key must carry a `{ min, max }` entry with finite members
+ * (`missing-bounds-entry` otherwise), and the range must not be inverted
+ * (`bounds-inverted`). A key that fails either check is reported and the read
+ * as a whole fails, so a caller never receives a partly-bounded model.
+ *
+ * @param declared The declared resource keys, in declaration order.
+ * @param bounds   The raw `resources.bounds` value (any shape).
+ * @returns The complete bounds map, or the per-key issues that made it unreadable.
+ */
+export function readManifestBounds(
+  declared: readonly StorylineResourceKey[],
+  bounds: unknown,
+): ManifestBoundsRead {
+  const source = recordOf(bounds);
+  const read: Record<StorylineResourceKey, ManifestResourceBounds> = {};
+  const issues: ManifestResourceReadIssue[] = [];
+  for (const key of declared) {
+    const entry = recordOf(source?.[key]);
+    const min = finiteNumber(entry?.min);
+    const max = finiteNumber(entry?.max);
+    if (min === undefined || max === undefined) {
+      issues.push({ reason: 'missing-bounds-entry', key });
+      continue;
+    }
+    if (min > max) {
+      issues.push({ reason: 'bounds-inverted', key });
+      continue;
+    }
+    read[key] = { min, max };
+  }
+  return issues.length > 0 ? { ok: false, issues } : { ok: true, bounds: read };
 }
 
 /**
@@ -206,7 +361,7 @@ export interface StorylineResourceProjection<TState> {
 export function createResourceProjection<TState>(
   fields: Readonly<Record<StorylineResourceKey, StorylineResourceField<TState>>>,
 ): StorylineResourceProjection<TState> {
-  const resources = normaliseKeys(Object.keys(fields));
+  const resources = normaliseResourceKeys(Object.keys(fields));
 
   return {
     resources,

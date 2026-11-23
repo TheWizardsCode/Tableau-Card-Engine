@@ -147,7 +147,7 @@ describe('clean control — the committed Appendix A manifest bound to long-eras
     expect(result.manifestId).toBe('long-erasure');
   });
 
-  it('reports the manifest-only rules followed by the four card-resolution rules', () => {
+  it('reports the manifest-only rules, the four card-resolution rules and the resource rule', () => {
     expect(validate(reference()).rules).toEqual([
       'duplicate-act',
       'duplicate-scene',
@@ -157,6 +157,8 @@ describe('clean control — the committed Appendix A manifest bound to long-eras
       'non-total-routes',
       'non-total-outcome-rules',
       ...CARD_RULES,
+      // The resource rules run because `validate()` binds a declared set.
+      'resource-set-mismatch',
     ]);
   });
 
