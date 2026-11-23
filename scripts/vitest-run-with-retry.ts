@@ -207,6 +207,109 @@ export const KILL_GRACE_MS = 5000;
  */
 export const LIST_TIMEOUT_MS = 120_000;
 
+// ── Host contention sampler ──────────────────────────────────────────────
+
+/** Readers that can be injected for testing. */
+export interface HostReaders {
+  /** Returns the 1-minute load average, or null/undefined if unavailable. */
+  readLoadAvg: () => number | null | undefined;
+  /** Returns the number of logical CPU cores. */
+  readCpuCount: () => number | undefined;
+}
+
+/** Result of a host contention sample. */
+export interface HostContention {
+  /** 1-minute load average, or null when unavailable (Windows or reader error). */
+  load1m: number | null;
+  /** Logical CPU core count (never zero — degrades to 1 on invalid input). */
+  cpuCount: number;
+}
+
+const DEFAULT_READ_LOAD_AVG: HostReaders['readLoadAvg'] = () => {
+  const avg = os.loadavg();
+  return avg[0];
+};
+
+const DEFAULT_READ_CPU_COUNT: HostReaders['readCpuCount'] = () => os.cpus().length;
+
+/**
+ * Sample the host's contention state: 1-minute load average and core count.
+ *
+ * Load is unavailable on Windows (load average is meaningless there), and the
+ * reader may throw (e.g. resource exhaustion); in both cases `load1m` is
+ * `null`. Invalid core counts (zero, NaN, undefined) degrade to `1` to avoid
+ * division-by-zero in scaling logic.
+ *
+ * Consumers should call this once before starting a stage to size the bound
+ * and once after abort for the diagnostic; both calls go through the same
+ * injected seam so the numbers are consistent.
+ *
+ * @param readers - Injected readers for testing; defaults to `node:os`.
+ * @returns `{ load1m, cpuCount }` — never throws, never returns invalid
+ *          values.
+ */
+export function sampleHostContention(
+  readers?: HostReaders,
+): HostContention {
+  const { readLoadAvg = DEFAULT_READ_LOAD_AVG, readCpuCount = DEFAULT_READ_CPU_COUNT } =
+    readers ?? {};
+
+  let load1m: number | null = null;
+  try {
+    const raw = readLoadAvg();
+    if (raw != null && Number.isFinite(raw) && raw >= 0) {
+      load1m = raw;
+    }
+  } catch {
+    // Reader error (e.g. resource exhaustion) — load is unavailable.
+  }
+
+  // Windows: os.loadavg() exists but returns [0,0,0] which is meaningless.
+  // We rely on the reader to return null there (the caller sets this up).
+
+  let cpuCount = readCpuCount();
+  if (
+    cpuCount == null ||
+    !Number.isFinite(cpuCount) ||
+    cpuCount <= 0
+  ) {
+    cpuCount = 1;
+  }
+
+  return { load1m, cpuCount };
+}
+
+/**
+ * Derive the unit-stage wall-clock bound using the hybrid strategy:
+ *   floor 600s (raised from 300s) × load-aware factor, capped at 1200s ceiling.
+ *
+ * The factor is `clamp((load1m / cpuCount) / 0.75, 1, 2)` — at ≤0.75 load per
+ * core the floor applies; at ≥1.5 load per core the ceiling applies (e.g. 24
+ * load on 16 cores = 1.5/core → 1200s).
+ *
+ * On Windows (load unavailable) or when the sampled load is null, the floor
+ * applies without scaling. An explicit `--timeout-ms` overrides this entirely
+ * and is handled by the caller (`parseRunnerArgs`).
+ *
+ * @param contention - Result from `sampleHostContention`.
+ * @returns The bound in milliseconds, clamped between floor and ceiling.
+ */
+export const UNIT_FLOOR_MS = 600_000;  // 600 s — 2.8× worst measured green stage
+export const UNIT_CEILING_MS = 1_200_000; // 1200 s — matches browser bound
+
+export function deriveUnitBound(contention: HostContention): number {
+  if (contention.load1m === null) {
+    return UNIT_FLOOR_MS;
+  }
+
+  const perCore = contention.load1m / contention.cpuCount;
+  // Scale factor: 1.0 at ≤0.75 load/core, linear to 2.0 at ≥1.5 load/core.
+  const factor = Math.min(2, Math.max(1, perCore / 0.75));
+  const bound = UNIT_FLOOR_MS * factor;
+
+  return Math.min(UNIT_CEILING_MS, Math.max(UNIT_FLOOR_MS, bound));
+}
+
 /**
  * Exit code reported when the opt-in pre-flight (expected-set derivation)
  * fails or times out. Distinct from a genuine test failure (1) and a hang

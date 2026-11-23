@@ -68,6 +68,11 @@ import {
   PreflightError,
   type VitestRunner,
   type VitestListRunner,
+  type HostReaders,
+  sampleHostContention,
+  deriveUnitBound,
+  UNIT_FLOOR_MS,
+  UNIT_CEILING_MS,
 } from '../../scripts/vitest-run-with-retry';
 
 // ── Output fixtures (match real vitest reporter output) ─────
@@ -1349,5 +1354,93 @@ describe('runWithRetry (coverage gate × module-fetch)', () => {
     const joined = warnings.join('\n');
     expect(joined).toContain('outcome=retry-clean');
     expect(joined).not.toContain('outcome=coverage-failed');
+  });
+});
+
+// ── Host contention sampler seam ──────────────────────────────────────────────
+
+describe('sampleHostContention', () => {
+  it('returns injected load and core count when readers are supplied', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => 4.2,
+      readCpuCount: () => 8,
+    });
+    expect(result).toEqual({ load1m: 4.2, cpuCount: 8 });
+  });
+
+  it('defaults to os.loadavg()[0] and os.cpus().length when no readers provided', () => {
+    const result = sampleHostContention();
+    expect(typeof result.load1m).toBe('number');
+    expect(typeof result.cpuCount).toBe('number');
+  });
+
+  it('returns load1m: null when the load reader throws (sampling failure does not abort)', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => {
+        throw new Error('disk full');
+      },
+      readCpuCount: () => 4,
+    });
+    expect(result.load1m).toBeNull();
+    expect(result.cpuCount).toBe(4);
+  });
+
+  it('returns load1m: null when the load reader returns null/undefined', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => null,
+      readCpuCount: () => 4,
+    });
+    expect(result.load1m).toBeNull();
+  });
+
+  it('degrades cpuCount to 1 when the reader returns zero', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => 2.0,
+      readCpuCount: () => 0,
+    });
+    expect(result.cpuCount).toBe(1);
+  });
+
+  it('degrades cpuCount to 1 when the reader returns undefined', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => 2.0,
+      readCpuCount: () => undefined as unknown as number,
+    });
+    expect(result.cpuCount).toBe(1);
+  });
+
+  it('degrades cpuCount to 1 when the reader returns NaN', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => 2.0,
+      readCpuCount: () => NaN,
+    });
+    expect(result.cpuCount).toBe(1);
+  });
+});
+
+describe('deriveUnitBound', () => {
+  it('returns the floor when load per core is ≤ 0.75 (idle host)', () => {
+    // load=3, cores=8 → 0.375/core → floor
+    expect(deriveUnitBound({ load1m: 3, cpuCount: 8 })).toBe(UNIT_FLOOR_MS);
+    // load=6, cores=8 → 0.75/core → floor (boundary)
+    expect(deriveUnitBound({ load1m: 6, cpuCount: 8 })).toBe(UNIT_FLOOR_MS);
+  });
+
+  it('applies linear scaling between floor and ceiling at moderate load', () => {
+    // load=8, cores=8 → 1.0/core → factor = 1/0.75 = 1.333 → 800,000ms
+    expect(deriveUnitBound({ load1m: 8, cpuCount: 8 })).toBe(800_000);
+    // load=9, cores=6 → 1.5/core → factor = 2.0 → ceiling
+    expect(deriveUnitBound({ load1m: 9, cpuCount: 6 })).toBe(UNIT_CEILING_MS);
+  });
+
+  it('returns the ceiling when load per core is ≥ 1.5 (extreme load)', () => {
+    // load=24, cores=16 → 1.5/core → ceiling
+    expect(deriveUnitBound({ load1m: 24, cpuCount: 16 })).toBe(UNIT_CEILING_MS);
+    // load=40, cores=16 → 2.5/core → still ceiling
+    expect(deriveUnitBound({ load1m: 40, cpuCount: 16 })).toBe(UNIT_CEILING_MS);
+  });
+
+  it('returns the floor when load1m is null (Windows / unavailable)', () => {
+    expect(deriveUnitBound({ load1m: null, cpuCount: 4 })).toBe(UNIT_FLOOR_MS);
   });
 });
