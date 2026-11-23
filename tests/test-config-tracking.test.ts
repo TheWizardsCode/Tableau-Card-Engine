@@ -42,11 +42,11 @@ function isGitIgnoredByRule(relativePath: string, cwd: string = repoRoot): boole
 }
 
 describe('.pi/test-config.json tracking', () => {
-  it('exists with timeoutPerCommand set to 1500', () => {
+  it('exists with timeoutPerCommand set to 3000', () => {
     const config = JSON.parse(
       readFileSync(join(repoRoot, configRelPath), 'utf8'),
     ) as { timeoutPerCommand?: number };
-    expect(config.timeoutPerCommand).toBe(1500);
+    expect(config.timeoutPerCommand).toBe(3000);
   });
 
   it('is not ignored by the git ignore rules', () => {
@@ -69,7 +69,7 @@ describe('.pi/test-config.json tracking', () => {
     // AC2: `implement.py finish` runs from a worktree and reads the timeout
     // from `<worktree>/.pi/test-config.json`. A fresh worktree only inherits
     // tracked files, so this asserts the exact mechanism the override relies
-    // on — the config must be present, not ignored, and hold the 1500 s value
+    // on — the config must be present, not ignored, and hold the 3000 s value
     // everywhere a worktree is created.
     const tmpRoot = mkdtempSync(join(tmpdir(), 'tce-test-config-worktree-'));
     const worktreePath = join(tmpRoot, 'wt');
@@ -79,7 +79,7 @@ describe('.pi/test-config.json tracking', () => {
       const config = JSON.parse(
         readFileSync(join(worktreePath, configRelPath), 'utf8'),
       ) as { timeoutPerCommand?: number };
-      expect(config.timeoutPerCommand).toBe(1500);
+      expect(config.timeoutPerCommand).toBe(3000);
       expect(isGitIgnoredByRule(configRelPath, worktreePath)).toBe(false);
     } finally {
       try {
