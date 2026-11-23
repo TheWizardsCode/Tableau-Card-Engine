@@ -162,6 +162,11 @@ describe('Gym storyline demo — the scene plays the authored CSV', () => {
       expect(demoCard.reputationDelta, `${demoCard.id} reputationDelta`).toBe(
         Number(card.fields.reputationDelta ?? 0),
       );
+      // The beat's authored cost is projected too: it is charged on resolution,
+      // so a content edit to the `cost` column reaches play.
+      expect(demoCard.cost ?? 0, `${demoCard.id} cost`).toBe(
+        Number(card.fields.cost ?? 0),
+      );
     }
   });
 

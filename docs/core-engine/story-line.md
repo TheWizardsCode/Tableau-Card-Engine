@@ -1262,7 +1262,11 @@ directly (`demoCardsFromCsv` over
 authoring path — a `#cost`, a `#extra` and a `#when` in one cell — is exercised
 by the demo itself: the demo starts at 60 coins so that `Invest`'s 5-coin cost
 is affordable while the `coins>=100` gate stays closed, keeping the branch
-reachable.
+reachable. A card's authored `cost` column is a real payment too:
+`Public Investment` costs 100 coins, charged when the beat resolves together
+with that beat's own +120 coin effect, so the branch reads as a +20 trade
+rather than a free reward (the scene shows the price on the card line before
+the player chooses).
 
 ## Episode runner
 

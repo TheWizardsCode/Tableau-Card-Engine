@@ -11,7 +11,9 @@
  *   options at their existing flow anchor — no reserved empty band, no shifted
  *   option positions;
  * - a chosen option's authored `#says` outcome is narrated into the panel
- *   through the shared reveal helper.
+ *   through the shared reveal helper;
+ * - a beat's authored `cost` is shown on the card line before the player
+ *   chooses (`Public Investment — Gain 120 coins (costs 100 coins)`).
  *
  * The "no context" fixture is injected through the scene's runtime factory
  * seam, so both paths are exercised with a real Phaser scene rather than
@@ -189,6 +191,22 @@ describe('GymStorylineScene browser test — optional context block', () => {
     // The choice played the shared UI click sound (the reveal owns its own
     // COMMON_SFX_KEYS sound through the same SoundManager).
     expect(scene.getPlayedSfxKeys()).toContain(COMMON_SFX_KEYS.UI_CLICK);
+  });
+
+  it('shows the paid beat’s authored cost on the card line', async () => {
+    const scene = await bootScene();
+
+    // The first beat is free, so its card line carries no cost label.
+    expect(scene.getCardLine()).not.toContain('costs');
+
+    scene.chooseByLabel('Invest');
+
+    // Public Investment authors `cost=100`, so the price is visible on the
+    // card line before the player picks Celebrate / Double down.
+    expect(scene.getCardLine()).toContain(authoredCard('gym-story-invest').name);
+    expect(scene.getCardLine()).toContain(
+      `costs ${authoredCard('gym-story-invest').cost ?? 0} coins`,
+    );
   });
 
   it('does not narrate invented prose for an option that authors none', async () => {

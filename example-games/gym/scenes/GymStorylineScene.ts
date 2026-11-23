@@ -45,7 +45,7 @@ import {
   type DemoRuntime,
   type DemoState,
 } from '../GymStorylineDemo';
-import { formatOptionLabel } from '@story-line';
+import { formatOptionCost, formatOptionLabel } from '@story-line';
 import type {
   PendingStorylineChoice,
   StorylineCard,
@@ -160,11 +160,11 @@ export class GymStorylineScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: 'Each option button is generated from the current card\'s compiled options and labelled with the option\'s own label, plus its authored cost when it has one (`Invest — 5 coins`), so a costly choice is visible before you pick it. [ Reset ] restarts the demo from the first card.',
+        body: 'Each option button is generated from the current card\'s compiled options and labelled with the option\'s own label, plus its authored cost when it has one (`Invest — 5 coins`), so a costly choice is visible before you pick it. A beat that authors a `cost` shows it on the card line and charges it when the beat resolves (`Public Investment — Gain 120 coins (costs 100 coins)`); the cost settles with the beat\'s own effect, so that beat nets +20 coins. [ Reset ] restarts the demo from the first card.',
       },
       {
         heading: 'Test plan',
-        body: '1. The Town Roads card offers Invest / Ignore above its context paragraph; either choice applies Town Roads\' effect (-50 coins), narrates the option’s authored outcome and deals the matching successor. Invest also charges the authored 5-coin cost and grants its +2 reputation, and the card starts at 60 coins so that cost stays affordable and the authored 100-coin gate does not skip the branch.\n2. Invest deals Public Investment, which offers Celebrate / Double down; Celebrate applies +120 coins and deals the terminal Transport Infrastructure card.\n3. Transport Infrastructure has no options: drawing it applies its +60 reputation effect, shows its context and ends the chain.\n4. Double down (a terminal option) ends the chain immediately with no successor.\n5. Reset returns to the first card.\n\nThe cards themselves are read from `example-games/gym/content/storylines.csv`, so an edit made in the story-line editor changes this demo without a code change.',
+        body: '1. The Town Roads card offers Invest / Ignore above its context paragraph; either choice applies Town Roads\' effect (-50 coins), narrates the option’s authored outcome and deals the matching successor. Invest also charges the authored 5-coin cost and grants its +2 reputation, and the card starts at 60 coins so that cost stays affordable and the authored 100-coin gate does not skip the branch.\n2. Invest deals Public Investment, which offers Celebrate / Double down. Its card line shows the beat\'s authored 100-coin cost, charged when the beat resolves: Celebrate applies +120 coins minus that 100 (a net +20) and deals the terminal Transport Infrastructure card.\n3. Transport Infrastructure has no options: drawing it applies its +60 reputation effect, shows its context and ends the chain.\n4. Double down (a terminal option) ends the chain immediately with no successor (the beat still pays its 100-coin cost against its +120, netting +20).\n5. Reset returns to the first card.\n\nThe cards themselves are read from `example-games/gym/content/storylines.csv`, so an edit made in the story-line editor changes this demo without a code change.',
       },
     ]);
 
@@ -279,9 +279,17 @@ export class GymStorylineScene extends GymSceneBase {
 
     this.titleText.setText(this.system.ui.choiceDialogTitle(card));
     this.subtitleText.setText(this.system.ui.choiceDialogSubtitle(card));
-    this.cardText.setText(`${card.name} — ${card.effect ?? 'no effect'}`);
 
     const view = buildDemoCardView(card, draw.options);
+    // An authored beat `cost` is shown on the card line, so the price is
+    // visible before the player chooses (Public Investment: 100 coins for a
+    // +120 gain). A cost-free beat keeps its bare name-and-effect line.
+    const costLabel =
+      view.cost > 0 ? ` (costs ${formatOptionCost({ coins: view.cost })})` : '';
+    this.cardText.setText(
+      `${card.name} — ${card.effect ?? 'no effect'}${costLabel}`,
+    );
+
     const optionsStartY = this.renderNarrative(view, outcomeProse, draw.options.length);
 
     if (!draw.finished) {
@@ -414,6 +422,11 @@ export class GymStorylineScene extends GymSceneBase {
   }
 
   // ── Observable surface (tests drive the scene through these) ──
+
+  /** The card line (name, effect and any authored beat cost). */
+  getCardLine(): string {
+    return this.cardText.text;
+  }
 
   /** The narrative panel's current text (context and/or narrated outcome). */
   getNarrativeText(): string {

@@ -11,6 +11,10 @@
  *   demo therefore plays the content an author edits: there is no second,
  *   hand-maintained catalogue to keep in step, and every authored option
  *   attribute (`#cost`, `#extra`, `#when`, `#says`) reaches play.
+ * - {@link demoCardCost} — the beat's authored `cost` column, charged as a
+ *   real payment when the card resolves (settled with the card's own effect,
+ *   so the demo's `Public Investment` branch nets +20 coins rather than
+ *   reading as a free reward).
  * - {@link createDemoState} — the initial demo state (coins, reputation,
  *   turn, seeded rng, activity log, chain deck).
  * - {@link createDemoEngine} — the {@link StorylineEngineAdapter} mapping the
@@ -75,6 +79,15 @@ export const DEMO_RNG_SEED = 0x5eed;
 export interface DemoCard extends StorylineCard {
   /** The beat's situation paragraph, or `null`/absent when none is authored. */
   readonly context?: string | null;
+  /**
+   * The beat's authored `cost` (the content file's `cost` column), in coins.
+   *
+   * A beat's cost is a **real payment**, not a display label: it settles
+   * together with the card's own effect when the card resolves (see
+   * {@link demoCardCost}), so `Public Investment` ("Gain 120 coins", `cost`
+   * 100) is a trade of 100 coins for 120 rather than a free reward.
+   */
+  readonly cost?: number;
 }
 
 /**
@@ -97,9 +110,9 @@ export function demoCardsFromCsv(csvText: string): DemoCard[] {
  * Projects one content row onto the demo's card shape.
  *
  * The game's own columns are ordinary CSV columns the generic adapter leaves
- * in {@link ContentCard.fields}; the demo reads its two resource deltas from
- * there. A non-numeric or blank cell reads as `0`, so a card always carries a
- * concrete delta.
+ * in {@link ContentCard.fields}; the demo reads its two resource deltas and
+ * the beat's `cost` from there. A non-numeric or blank cell reads as `0`, so a
+ * card always carries a concrete amount.
  */
 function demoCardFromContent(card: ContentCard): DemoCard {
   return {
@@ -111,11 +124,12 @@ function demoCardFromContent(card: ContentCard): DemoCard {
     storylineTitle: card.storylineTitle,
     coinDelta: demoDelta(card, 'coinDelta'),
     reputationDelta: demoDelta(card, 'reputationDelta'),
+    cost: demoDelta(card, 'cost'),
     context: card.context ?? null,
   };
 }
 
-/** Reads a numeric game column, treating blank/non-numeric as no delta. */
+/** Reads a numeric game column, treating blank/non-numeric as `0`. */
 function demoDelta(card: ContentCard, column: string): number {
   const value = Number(card.fields[column] ?? '');
   return Number.isFinite(value) ? value : 0;
@@ -133,12 +147,16 @@ export interface DemoOptionView {
  * The beat's presentation view model.
  *
  * The scene renders exactly this: a `context` paragraph above the options when
- * the card authors one (`null` otherwise, so the layout can close up) and the
- * authored outcome prose per option so a choice can narrate its consequence.
+ * the card authors one (`null` otherwise, so the layout can close up), the
+ * beat's authored `cost` so the price is visible on the card line before the
+ * player chooses, and the authored outcome prose per option so a choice can
+ * narrate its consequence.
  */
 export interface DemoCardView {
   /** The beat's authored situation paragraph, or `null` when absent. */
   readonly context: string | null;
+  /** The beat's authored cost in coins (`0` when the beat costs nothing). */
+  readonly cost: number;
   /** One entry per compiled option, in declaration order. */
   readonly options: readonly DemoOptionView[];
 }
@@ -155,11 +173,23 @@ export function buildDemoCardView(
 ): DemoCardView {
   return {
     context: authoredProse((card as DemoCard).context),
+    cost: demoCardCost(card),
     options: options.map((option) => ({
       label: option.label,
       outcome: authoredProse(option.says),
     })),
   };
+}
+
+/**
+ * A card's authored beat cost, in coins (`0` when the card authors none).
+ *
+ * The beat cost is charged when the card resolves — see the demo engine's
+ * `applyEffect`, which settles it together with the card's own coin delta.
+ */
+export function demoCardCost(card: StorylineCard): number {
+  const cost = (card as DemoCard).cost;
+  return typeof cost === 'number' && Number.isFinite(cost) ? cost : 0;
 }
 
 /**
@@ -186,6 +216,10 @@ function nextRandom(state: DemoState): number {
  * that same option. Starting above the gate would short-circuit the branch
  * straight to the ending and make `gym-story-invest` unreachable in the demo.
  * 60 keeps every authored card reachable and the cost affordable.
+ *
+ * Public Investment's own authored `cost` (100 coins) needs no extra float: it
+ * settles against that card's +120 coin effect in a single step, so the branch
+ * nets +20 and the balance never has to hold 100 coins at once.
  */
 export const DEMO_STARTING_COINS = 60;
 
@@ -234,7 +268,11 @@ export function createDemoEngine(
     ...demoResources,
     rng: (state) => nextRandom(state),
     applyEffect: (state, card) => {
-      state.coins += card.coinDelta ?? 0;
+      // A beat's authored `cost` is a real payment, settled together with the
+      // card's own effect in one step: the balance never dips through a
+      // transient negative, and the reported `coinChange` is the beat's real
+      // trade (Public Investment: +120 gained − 100 paid = +20).
+      state.coins += (card.coinDelta ?? 0) - demoCardCost(card);
       state.reputation += card.reputationDelta ?? 0;
     },
     appendLog: (state, text) => {

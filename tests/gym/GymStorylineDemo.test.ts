@@ -8,7 +8,8 @@
  * anywhere else — and what these tests pin — is the demo's *transitions*:
  * which options the first card offers, where each choice leads, which branch
  * ends the chain immediately, that an authored cost / extra effect / state
- * gate actually reaches play, and that the seeded replay is deterministic.
+ * gate actually reaches play, that a beat's authored `cost` is charged (settled
+ * with the beat's own effect), and that the seeded replay is deterministic.
  *
  * Everything here goes through the public `@story-line` API via the exported
  * runtime, so a change to the authored content (a renamed option, a re-pointed
@@ -32,6 +33,7 @@ import {
   buildDemoCardView,
   createDemoRuntime,
   createDemoState,
+  demoCardCost,
   demoCardsFromCsv,
   drawDemoCard,
   getBaseTypeId,
@@ -126,6 +128,17 @@ describe('GymStorylineDemo — authored catalogue', () => {
     expect(template('gym-story-end').reputationDelta).toBe(60);
   });
 
+  it('projects the authored beat cost onto the demo card', () => {
+    // The `cost` column is a real mechanic, not a label: Public Investment
+    // costs 100 coins, and the two cost-free beats stay at 0.
+    expect(template('gym-story-invest').cost).toBe(100);
+    expect(demoCardCost(template('gym-story-invest'))).toBe(100);
+    expect(demoCardCost(template('gym-story-start'))).toBe(0);
+    expect(demoCardCost(template('gym-story-end'))).toBe(0);
+    // A card that authors no `cost` column at all is free, never undefined.
+    expect(demoCardCost({ id: 'bare', name: 'Bare' })).toBe(0);
+  });
+
   it('starts below the authored state gate so every card stays reachable', () => {
     const a = createDemoState();
     expect(a.coins).toBe(DEMO_STARTING_COINS);
@@ -134,6 +147,12 @@ describe('GymStorylineDemo — authored catalogue', () => {
     expect(DEMO_STARTING_COINS - 50 - 5).toBeLessThan(100);
     // And above the cost, so the authored `Invest` option is affordable.
     expect(DEMO_STARTING_COINS - 50).toBeGreaterThanOrEqual(5);
+    // Public Investment's own 100-coin beat cost needs no extra float: it
+    // settles against that beat's +120 effect, so the branch nets +20 from a
+    // balance that never has to hold 100 coins at once.
+    const invest = template('gym-story-invest');
+    expect(demoCardCost(invest)).toBe(100);
+    expect((invest.coinDelta ?? 0) - demoCardCost(invest)).toBe(20);
   });
 
   it('starts with a deterministic seed and a clean journal', () => {
@@ -172,6 +191,62 @@ describe('GymStorylineDemo — draw', () => {
     expect(runtime.state.reputation).toBe(110);
     expect(runtime.state.activityLog).toHaveLength(1);
     expect(draw.storyUpdate).toContain('Gym Storyline');
+  });
+});
+
+describe('GymStorylineDemo — a beat charges its authored cost', () => {
+  it('charges nothing when the beat is drawn; the cost settles on resolution', () => {
+    const runtime = createDemoRuntime(DEMO_CATALOGUE);
+    const invest = template('gym-story-invest');
+
+    const draw = drawDemoCard(runtime.system, runtime.state, invest);
+
+    // Presenting a branching beat is not a purchase: the options are shown at
+    // the current balance and only the chosen resolution pays the cost.
+    expect(draw.finished).toBe(false);
+    expect(draw.coinChange).toBe(0);
+    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS);
+  });
+
+  it('nets the cost against a choice beat\'s effect in a single step', () => {
+    const runtime = createDemoRuntime(DEMO_CATALOGUE);
+    const invest = template('gym-story-invest');
+
+    const { result } = pick(runtime, invest, 'Celebrate');
+
+    // +120 gained, 100 paid, reported as one +20 delta so the balance is never
+    // transiently negative (public-investment trade, not a free reward).
+    expect(result.coinChange).toBe(20);
+    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS + 20);
+  });
+
+  it('charges a terminal card\'s cost with its own effect', () => {
+    // The authored Gym content has no terminal beat with a cost, so a fixture
+    // pins the terminal path: 30 paid against a -20 effect is a -50 delta.
+    const feeBeat: DemoCard = {
+      id: 'gym-story-fee',
+      name: 'Filing Fee',
+      effect: 'Settle the paperwork.',
+      coinDelta: -20,
+      cost: 30,
+    };
+    const runtime = createDemoRuntime([feeBeat]);
+
+    const draw = drawDemoCard(runtime.system, runtime.state, feeBeat);
+
+    expect(draw.finished).toBe(true);
+    expect(draw.coinChange).toBe(-50);
+    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS - 50);
+  });
+
+  it('charges nothing on a cost-free terminal beat', () => {
+    const runtime = createDemoRuntime(DEMO_CATALOGUE);
+    const terminal = template('gym-story-end');
+
+    const draw = drawDemoCard(runtime.system, runtime.state, terminal);
+
+    expect(draw.coinChange).toBe(0);
+    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS);
   });
 });
 
@@ -227,9 +302,10 @@ describe('GymStorylineDemo — choices determine the next card', () => {
     const invest = pick(runtime, start, 'Invest').result.pushedCard!;
     const { result } = pick(runtime, invest, 'Celebrate');
 
-    // Public Investment: +120 coins, then the terminal card is pushed.
-    expect(result.coinChange).toBe(120);
-    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS - 55 + 120);
+    // Public Investment: +120 coins granted less its authored 100-coin beat
+    // cost, settled in one step (a net +20), then the terminal card is pushed.
+    expect(result.coinChange).toBe(120 - 100);
+    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS - 55 + 20);
     expect(getBaseTypeId(result.pushedCard!.id)).toBe('gym-story-end');
   });
 
@@ -241,9 +317,9 @@ describe('GymStorylineDemo — choices determine the next card', () => {
 
     expect(result.pushedCard).toBeNull();
     expect(runtime.state.deck).toHaveLength(0);
-    // Resolution still applies Public Investment's own effect (+120).
-    expect(result.coinChange).toBe(120);
-    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS + 120);
+    // The beat still pays its 100-coin cost against its +120 effect.
+    expect(result.coinChange).toBe(20);
+    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS + 20);
   });
 
   it('the full happy path ends on the terminal Transport Infrastructure card', () => {
@@ -256,10 +332,11 @@ describe('GymStorylineDemo — choices determine the next card', () => {
 
     const finalDraw = drawDemoCard(runtime.system, runtime.state, end);
     expect(finalDraw.finished).toBe(true);
-    // 60 - 50 (Town Roads effect) - 5 (Invest cost) + 120 (Public Investment),
-    // then +60 reputation from the terminal card, on top of the +2 the
-    // authored `#extra=reputation:+2` granted on `Invest`.
-    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS - 55 + 120);
+    // 60 - 50 (Town Roads effect) - 5 (Invest cost) + 120 - 100 (Public
+    // Investment's effect less its beat cost), then +60 reputation from the
+    // terminal card, on top of the +2 the authored `#extra=reputation:+2`
+    // granted on `Invest`.
+    expect(runtime.state.coins).toBe(DEMO_STARTING_COINS - 55 + 20);
     expect(runtime.state.reputation).toBe(50 + 2 + 60);
 
     // The journal records the choice lines the scene renders.
@@ -301,13 +378,17 @@ describe('GymStorylineDemo — authored prose view model', () => {
   const IGNORE_OUTCOME =
     'The question is set aside, and the ruts deepen with every cart that passes.';
 
-  it('surfaces the beat context and the authored option outcomes', () => {
+  it('surfaces the beat context, beat cost and the authored option outcomes', () => {
     const runtime = createDemoRuntime(DEMO_CATALOGUE);
     const draw = startDemo(runtime);
 
     const view = buildDemoCardView(draw.card, draw.options);
 
     expect(view.context).toContain('The town meets in the hall above the market');
+    // The first beat is free; the paid beat's cost reaches the view model the
+    // scene renders on the card line.
+    expect(view.cost).toBe(0);
+    expect(buildDemoCardView(template('gym-story-invest'), []).cost).toBe(100);
     expect(view.options.map((option) => option.label)).toEqual(['Invest', 'Ignore']);
     expect(view.options.map((option) => option.outcome)).toEqual([
       INVEST_OUTCOME,

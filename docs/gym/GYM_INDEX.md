@@ -92,9 +92,14 @@ transitions live in the Phaser-free
 [`example-games/gym/GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts)
 and are unit-tested by `tests/gym/GymStorylineDemo.test.ts` — the scene only
 renders what those transitions return, so the demo can be verified without a
-browser. [`GymStorylineContent.test.ts`](../../tests/gym/GymStorylineContent.test.ts)
-proves the scene catalogue is the CSV projection and freezes the mechanics
-(the author-editable prose columns are deliberately not pinned).
+browser. A card's authored `cost` column is a **real payment**: it is shown on
+the scene's card line (`Public Investment — Gain 120 coins (costs 100 coins)`)
+and charged when the beat resolves, settled together with that beat's own coin
+delta, so the invest branch is a +20 trade rather than an unrewarded cost.
+[`GymStorylineContent.test.ts`](../../tests/gym/GymStorylineContent.test.ts)
+proves the scene catalogue is the CSV projection (deltas and the beat `cost`)
+and freezes the mechanics (the author-editable prose columns are deliberately
+not pinned).
 
 ## Scene Navigation
 
