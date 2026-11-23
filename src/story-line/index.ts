@@ -143,7 +143,13 @@ export {
 export type { StorylineOptionRegistry } from './compile';
 
 // ── Episode runner (GDD §2.3) ────────────────────────────────
-export { classifySceneOutcome, createEpisodeRunner, evaluateSceneCondition } from './episode-runner';
+export {
+  classifySceneOutcome,
+  createEpisodeRunner,
+  evaluateSceneCondition,
+  resolveRouteTarget,
+  selectRoute,
+} from './episode-runner';
 export { LOSS_LEDGER_KINDS, SCENE_EXIT_FIELDS } from './types';
 export type {
   BeatEntry,
@@ -159,11 +165,16 @@ export type {
   PresentedBeatEntry,
   PushedCardCase,
   RefusedBeatEntry,
+  RouteSelectionContext,
+  RouteSelectionRequest,
+  RouteTargetResolution,
+  RoutingCloseInput,
   RuleLossLedgerEntry,
   SceneCloseResult,
   SceneConditionContext,
   SceneExitRecord,
   SceneOutcomeClassification,
+  SceneRouteResult,
 } from './types';
 
 /** Configuration for {@link createStorylineSystem}. */

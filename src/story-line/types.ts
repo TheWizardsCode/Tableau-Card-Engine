@@ -23,7 +23,13 @@
  * @module
  */
 
-import type { EpisodeManifest, LossRule, SceneOutcome } from './content/episode-manifest';
+import type {
+  EpisodeManifest,
+  LossRule,
+  Scene,
+  SceneOutcome,
+  SceneRoute,
+} from './content/episode-manifest';
 import type {
   StorylineResourceKey,
   StorylineResources,
@@ -645,6 +651,71 @@ export const SCENE_EXIT_FIELDS = [
   'nextBeat',
 ] as const;
 
+// ── Routing (GDD §2.3 steps C.9–C.12) ───────────────────────
+
+/**
+ * The context a route's `when` gate is evaluated against (GDD §2.3 step 9).
+ *
+ * It is the scene-close context ({@link SceneConditionContext}) plus the run's
+ * pending chain, which is the second input route selection reads: a `chain`
+ * route is skipped while `pendingChain` is `null`, because it has no door to
+ * open.
+ */
+export interface RouteSelectionContext extends SceneConditionContext {
+  /** The card a resolved choice pushed, or `null` when there is no chain. */
+  readonly pendingChain: string | null;
+}
+
+/**
+ * A route target resolved into the run's next action (GDD §2.3 step 10).
+ *
+ * The manifest authors three target forms (`chain`, `beat`, `ending`); this is
+ * the one resolved shape the scene-exit record, the banner and scene entry
+ * read. `beatId` is always the next beat **card id** — the target scene's
+ * `entryBeat` for a `beat` target without an explicit beat, and the ending
+ * card id for an `ending` target — so the record's `nextBeat` never needs
+ * re-deriving.
+ */
+export interface RouteTargetResolution {
+  /** Whether the target opens a beat of a scene or an ending card. */
+  readonly kind: 'beat' | 'ending';
+  /** The act the target scene belongs to (`null` for an ending). */
+  readonly actId: string | null;
+  /** The scene the target beat belongs to (`null` for an ending). */
+  readonly sceneId: string | null;
+  /** The next beat's card id, or the ending card id for an ending. */
+  readonly beatId: string;
+  /** The ending card id for an `ending` target, `null` for a beat target. */
+  readonly endingCardId: string | null;
+}
+
+/**
+ * The result of routing one scene close (GDD §2.3 steps C.9–C.12).
+ *
+ * It carries the appended {@link SceneExitRecord} (the one shape the banner,
+ * the replay comparison and the audit read), the winning route and its
+ * resolved target, and — when the route opens an ending — the presented
+ * ending card. `runClosed` distinguishes the two terminal shapes: a beat
+ * target moved the run into a scene, an ending target closed it.
+ */
+export interface SceneRouteResult<TCard extends StorylineCard = StorylineCard> {
+  /** The `scene-exit` record this route appended, exactly as it was stored. */
+  readonly exit: SceneExitRecord;
+  /** The `routes[]` entry the close took (declaration order, first match). */
+  readonly route: SceneRoute;
+  /** The route's target, resolved into the run's next action. */
+  readonly target: RouteTargetResolution;
+  /** The route's next beat (or ending) card id — equal to `exit.nextBeat`. */
+  readonly nextBeat: string;
+  /** Whether the route closed the run (an ending target) rather than entering a scene. */
+  readonly runClosed: boolean;
+  /**
+   * The content card the ending target opened, exactly as the run's card map
+   * holds it, or `null` when the route entered a scene.
+   */
+  readonly endingCard: TCard | null;
+}
+
 // ── Beat entry (GDD §2.3 steps A.1–A.3) ─────────────────────
 
 /**
@@ -848,6 +919,35 @@ export interface SceneCloseResult {
 }
 
 /**
+ * The scene close a routing call consumes (GDD §2.3 steps C.9–C.12).
+ *
+ * Routing never re-classifies: it reads the close's `sceneId`, `outcome`, the
+ * winning `ruleId` and the `budgetExhausted` flag exactly as the close
+ * recorded them. The clock numbers the scene-exit record needs are read from
+ * the run state, which the close does not move.
+ */
+export type RoutingCloseInput = Pick<
+  SceneCloseResult,
+  'sceneId' | 'objectiveMet' | 'outcome' | 'ruleId' | 'budgetExhausted'
+>;
+
+/**
+ * The route-selection inputs (GDD §2.3 step 9), grouped for one pure helper.
+ *
+ * Exported so a caller can select a route without a runner (a preview tool, a
+ * validator cross-check) and so the declaration-order rule is testable in
+ * isolation from run state.
+ */
+export interface RouteSelectionRequest {
+  /** The scene whose `routes` are consulted (read-only). */
+  readonly scene: Scene;
+  /** The classified scene outcome the route's `on` is compared against. */
+  readonly outcome: SceneOutcome;
+  /** The `when` gate context and the run's pending chain. */
+  readonly context: RouteSelectionContext;
+}
+
+/**
  * The episode runner: the beat-sheet layer constructed around a
  * {@link StorylineSystem}.
  *
@@ -960,6 +1060,65 @@ export interface EpisodeRunner<
    *          record.
    */
   closeScene(state: TState): SceneCloseResult;
+  /**
+   * Routes the scene close the run just recorded (GDD §2.3 steps C.9–C.12).
+   *
+   * C.9: iterates the closed scene's `routes` in **declaration order** and
+   * takes the first entry whose `on` is `"*"` or equals the close's outcome,
+   * whose `when` is absent or matches the close context, and which is not a
+   * `chain` route while `pendingChain` is `null`.
+   *
+   * C.10: resolves the target — `chain` opens the pending chain card, `beat`
+   * opens `target.beat` (or the target scene's `entryBeat`), `ending` opens the
+   * ending card and closes the run.
+   *
+   * C.11: appends **one** frozen {@link SceneExitRecord} with exactly the nine
+   * §2.3 step 11 fields, onto the append-only `getSceneExits()` list.
+   *
+   * C.12: for a beat target, enters the target scene — resets
+   * `sceneClockRemaining` to its `budget.clock`, pushes the scene id onto
+   * `sceneHistory` (and the route id onto `routeHistory`), clears
+   * `pendingChain` and `budgetExhausted`, and leaves every irreversible
+   * resource key untouched. An ending target pushes the route id only and
+   * records the ending card (read through {@link EpisodeRunner.getEndingCardId}).
+   *
+   * The route's `when` gates read the resources **after** the close's loss
+   * rules applied (the step order of §2.3), while the objective and outcome
+   * read the pre-loss snapshot the close took. Routing consumes no RNG and
+   * applies no resource delta.
+   *
+   * @param close The close to route; its `sceneId` must be the run's current
+   *              scene (route the scene you just closed, in order).
+   * @param state The game state the gate reads and the log appends to.
+   * @returns A frozen {@link SceneRouteResult} carrying the appended record.
+   * @throws Error when the run already ended, when `close` names another
+   *         scene, when no route matches (a non-total route table, a content
+   *         defect) or when a target names an undeclared scene / beat.
+   */
+  routeScene(close: RoutingCloseInput, state: TState): SceneRouteResult<TCard>;
+  /**
+   * The ending card id the run closed on, or `null` while the run is active.
+   *
+   * Set by routing an `ending` target (GDD §2.3 step 10) and cleared by
+   * {@link EpisodeRunner.resetRun}. It is deliberately not part of the frozen
+   * {@link EpisodeRunState} snapshot: the ending is the run's terminal marker,
+   * not beat-sheet position.
+   */
+  getEndingCardId(): string | null;
+  /**
+   * Returns a closed run to the manifest's `start` (GDD §2.3 step 10).
+   *
+   * This is the post-ending restart action (`le-end-reset`'s *Begin the survey
+   * again*): position returns to `manifest.start`, the entry scene's clock is
+   * loaded, and `pendingChain`, `budgetExhausted`, the scene / route histories,
+   * the loss ledger and the scene-exit list are cleared so the new run records
+   * its own. The construction seed is kept — it is the run's one RNG stream,
+   * and restarting a deterministic run must not silently reseed it. Resources
+   * are the game's state and are never touched here.
+   *
+   * @throws Error when the run is still active (no ending has been reached).
+   */
+  resetRun(): void;
   /**
    * Applies one authored `LossRule` through the engine seam and records the
    * loss it observed (GDD §2.3 step C.8 / §2.2.8).

@@ -1286,7 +1286,7 @@ walks the graph and fails on any `phaser` specifier).
 |---|---|---|
 | `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`. |
 | `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed }` — the validated manifest, the one choice model, the card map and the run's seed. |
-| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `getLossLedger()` / `enterBeat()` / `resolveChoice()` / `closeScene()` / `applyLossRule()` / `getBudgetExhausted()`. |
+| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `getLossLedger()` / `enterBeat()` / `resolveChoice()` / `closeScene()` / `routeScene()` / `applyLossRule()` / `getBudgetExhausted()` / `getEndingCardId()` / `resetRun()`. |
 | `EpisodeRunState` | type | The read-only run state (see below). |
 | `ChoiceResolution` | type | One resolved choice's classification: `next`, `case`, `cardId`, `pendingChain`, `pushedCard` and the unchanged `@story-line` `resolution`. |
 | `ChoiceNext` | type | Where a resolved choice sends the run: `'continue'` or `'close'`. |
@@ -1296,6 +1296,13 @@ walks the graph and fails on any `phaser` specifier).
 | `SceneConditionContext` | type | `{ objectiveMet, budgetExhausted, resources }` — the one context the outcome and route gates read. |
 | `SceneOutcomeClassification` | type | The winning outcome rule's `{ ruleId, outcome }`. |
 | `SceneCloseResult` | type | One scene close's `{ sceneId, objectiveMet, outcome, ruleId, budgetExhausted, losses }` — what routing and the `scene-exit` record read. |
+| `RoutingCloseInput` | type | The close fields routing consumes; never re-classifies and never re-evaluates the outcome table. |
+| `selectRoute` | function | First matching route in declaration order, honouring `on` / `when` and skipping a chain door with no pending chain. |
+| `resolveRouteTarget` | function | Resolves a `chain` / `beat` / `ending` target into `{ kind, actId, sceneId, beatId, endingCardId }`. |
+| `RouteSelectionRequest` | type | `{ scene, outcome, context }` — the one input `selectRoute` reads. |
+| `RouteSelectionContext` | type | The scene-condition context plus `pendingChain`; the route `when` gate's input. |
+| `RouteTargetResolution` | type | A route target resolved into the run's next action (see "Routing and scene entry"). |
+| `SceneRouteResult` | type | One routed close: the appended `exit` record, the winning `route`, its `target`, `nextBeat`, `runClosed` and the presented `endingCard`. |
 | `BeatEntry` | type | One beat-entry outcome: the `presented` or `refused` variant (see "Beat entry"). |
 | `PresentedBeatEntry` | type | A beat the clock paid for: charged cost, prose and gated options. |
 | `RefusedBeatEntry` | type | A beat the clock could not pay for: no charge, no options, `budget-exhausted`. |
@@ -1321,6 +1328,9 @@ runner.getLossLedger();  // readonly LossLedgerEntry[] — frozen snapshot
 runner.enterBeat('le-i-open', gameState); // BeatEntry — presented or refused
 runner.resolveChoice(option, gameState);  // ChoiceResolution — next / case / pendingChain
 runner.closeScene(gameState);            // SceneCloseResult — objective / outcome / losses
+runner.routeScene(close, gameState);     // SceneRouteResult — exit / route / target / nextBeat
+runner.getEndingCardId();                // string | null — the ending the run closed on
+runner.resetRun();                       // post-ending restart, back to manifest.start
 ```
 
 Construction consumes no RNG and applies no resource delta. A requested run
@@ -1472,6 +1482,78 @@ position or clock: it only classifies and applies the authored losses. The
 returned result is the single shape routing reads, so the objective and the
 outcome table are never re-evaluated.
 
+### Routing and scene entry
+
+GDD §2.3 steps C.9–C.12. `routeScene(close, state)` takes the
+`SceneCloseResult` the close returned and finishes the scene boundary in the
+contract's order. It returns one frozen `SceneRouteResult`, and the run state is
+the only mutation target.
+
+1. **C.9 — select, first match wins.** `selectRoute({ scene, outcome, context })`
+   iterates the closed scene's `routes` in **declaration order** and takes the
+   first entry where all three clauses hold:
+   - `on === "*"` or `on === outcome`;
+   - `when` is absent or matches the close context (the same
+     `{ objective }` / `{ budget }` / raw `{ field, op, value }` vocabulary the
+     outcome table uses);
+   - the route is not `{ kind: "chain" }` while `pendingChain` is `null` — a
+     chain door with no chain has nothing to open.
+
+   The gate reads the resources **after** the close applied its loss rules
+   (steps 6–8 ran first), while the objective and the outcome keep the pre-loss
+   snapshot the close took. A table whose remaining candidates are all chain
+   routes is a content defect the validator cannot see; the selector throws an
+   actionable error instead of silently defaulting.
+2. **C.10 — resolve the target.** `resolveRouteTarget(manifest, route.to,
+   pendingChain)` returns a `RouteTargetResolution`:
+
+| `kind` | `beatId` | Meaning |
+|---|---|---|
+| `chain` | the pending chain card (a beat of another scene, or an ending) | the door the resolved choice pushed |
+| `beat` with `beat` | `target.beat` | that beat of the target scene |
+| `beat` without `beat` | the target scene's `entryBeat` | the scene's authored opening beat |
+| `ending` | the ending card id | the ending card is presented and the run closes |
+
+   `RouteTargetResolution` also carries `actId` / `sceneId` (`null` for an
+   ending) and `endingCardId` (`null` for a beat), so nothing downstream
+   re-derives the target. An `ending` target returns its content card as
+   `SceneRouteResult.endingCard`, records `getEndingCardId()`, and closes the
+   run: no beat can be entered, no choice resolved and no scene closed until
+   `resetRun()` — the post-ending restart action (`le-end-reset`'s *Begin the
+   survey again*) — returns position and clock to `manifest.start` and clears
+   the histories, ledger and scene-exit list. The construction seed is kept.
+3. **C.11 — emit one record.** Exactly one frozen `SceneExitRecord` is appended
+   per close, in close order (see "Scene-exit record"). Two activity-log lines
+   are derived from it and the winning route: a `scene-exit` line
+   (`Scene exit — s-i-open: success (survey-held), 1 of 2 ticks spent, 1 left,
+   budget intact.`) and a `route` line (`Route — quiet-answer →
+   s-i-answer:le-i-silent.`, or `Route — quiet-core → ending le-end-quiet.`).
+   They join the existing activity-log vocabulary; the journal continues to read
+   the `Story update — ` lines, which are `@story-line`'s own.
+4. **C.12 — enter the scene.** A beat target sets `currentActId` /
+   `currentSceneId` / `currentBeatId`, resets `sceneClockRemaining` to the target
+   scene's `budget.clock`, pushes the scene id onto `sceneHistory` (and the route
+   id onto `routeHistory`), and clears `pendingChain` and `budgetExhausted`.
+   Irreversible keys are **never** restored: nothing here touches the game's
+   resources, so entering a scene cannot refund a loss.
+
+```ts
+const close = runner.closeScene(gameState);
+const routed = runner.routeScene(close, gameState);
+
+routed.exit;       // the nine-field SceneExitRecord, also on getSceneExits()
+routed.route.id;   // the routes[] entry that won
+routed.nextBeat;   // === routed.exit.nextBeat
+routed.runClosed;  // true when the route opened an ending
+routed.endingCard; // the presented ending card, or null
+```
+
+Routing validates the close's scene, the selected route, the resolved target
+and the ending card's presence **before** any mutation, so a route that cannot
+be taken leaves the run, the record list and the activity log untouched. Route
+selection, record emission and scene entry consume no RNG and apply no resource
+delta — the adapter's RNG call count is unchanged across them.
+
 ### Run state
 
 `EpisodeRunState` is exactly the beat-sheet state of GDD §3.5.2 — resources
@@ -1484,7 +1566,7 @@ adapter:
 | `currentActId` / `currentSceneId` / `currentBeatId` | `manifest.start.act` / `.scene` / `.beat` |
 | `sceneClockRemaining` | the entry scene's `budget.clock` |
 | `pendingChain` | `null` |
-| `sceneHistory` / `routeHistory` | empty (the start scene counts as entered once it closes) |
+| `sceneHistory` / `routeHistory` | empty (the start scene counts as entered once it closes); each entry is a scene id / route id, in close order |
 | `lossLedger` | empty |
 
 Every read returns a frozen defensively-copied snapshot, so mutating what
@@ -1494,7 +1576,9 @@ the same rule; they are append-only, in close order.
 
 ### Scene-exit record
 
-One record per scene close, exactly the nine fields of §2.3 step 11 and in
+One record per scene close, appended by `routeScene` in close order and never
+rewritten (`getSceneExits()` returns a frozen defensive copy). It carries
+exactly the nine fields of §2.3 step 11 and in
 that order (`SCENE_EXIT_FIELDS`):
 
 | Field | Type | Meaning |

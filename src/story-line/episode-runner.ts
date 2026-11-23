@@ -42,7 +42,14 @@
  */
 
 import { isOptionAffordable } from './compile';
-import type { EpisodeManifest, LossRule, Scene, SceneCondition } from './content/episode-manifest';
+import type {
+  EpisodeManifest,
+  LossRule,
+  RouteTarget,
+  Scene,
+  SceneCondition,
+  SceneRoute,
+} from './content/episode-manifest';
 import { evaluateCondition } from './resolve';
 import { readResource, type StorylineResourceKey, type StorylineResources } from './resources';
 import type {
@@ -55,11 +62,16 @@ import type {
   EpisodeRunnerConfig,
   LossLedgerEntry,
   PushedCardCase,
+  RouteSelectionContext,
+  RouteSelectionRequest,
+  RouteTargetResolution,
+  RoutingCloseInput,
   RuleLossLedgerEntry,
   SceneCloseResult,
   SceneConditionContext,
   SceneExitRecord,
   SceneOutcomeClassification,
+  SceneRouteResult,
   StorylineCard,
   StorylineOption,
 } from './types';
@@ -84,6 +96,12 @@ interface MutableEpisodeRunState {
    */
   budgetExhausted: boolean;
   pendingChain: string | null;
+  /**
+   * The ending card id the run closed on (GDD §2.3 step 10), or `null` while
+   * the run is active. Read through `EpisodeRunner.getEndingCardId` and cleared
+   * by `resetRun`; deliberately not part of the frozen run-state snapshot.
+   */
+  endingCardId: string | null;
   readonly sceneHistory: string[];
   readonly routeHistory: string[];
   readonly lossLedger: LossLedgerEntry[];
@@ -192,6 +210,224 @@ function buildAssignedCardIndex(manifest: EpisodeManifest): AssignedCardIndex {
     }
   }
   return index;
+}
+
+/** One scene's owning act, as the scene index stores it. */
+interface SceneIndexEntry {
+  /** The id of the act declaring the scene. */
+  readonly actId: string;
+  /** The scene itself (read-only). */
+  readonly scene: Scene;
+}
+
+/** The manifest's scene index: scene id → its owning act and the scene. */
+type SceneIndex = ReadonlyMap<string, SceneIndexEntry>;
+
+/** Builds the scene index once, at construction, from the manifest. */
+function buildSceneIndex(manifest: EpisodeManifest): SceneIndex {
+  const index = new Map<string, SceneIndexEntry>();
+  for (const act of manifest.acts) {
+    for (const scene of act.scenes) {
+      index.set(scene.id, { actId: act.id, scene });
+    }
+  }
+  return index;
+}
+
+/** True when the route opens a `chain` door (GDD §2.3 step 9). */
+function isChainRoute(route: SceneRoute): boolean {
+  return route.to.kind === 'chain';
+}
+
+/**
+ * Selects the route a scene close takes (GDD §2.3 step 9).
+ *
+ * Iterates `scene.routes` in **declaration order** and returns the first entry
+ * where all three clauses hold:
+ *
+ * 1. `on === "*"` or `on === outcome`;
+ * 2. `when` is absent or matches the close context (the same
+ *    `objective` / `budget` / raw-resource vocabulary the outcome table uses);
+ * 3. the route is not `{ kind: "chain" }` while `pendingChain` is `null` — a
+ *    chain door with no chain has nothing to open.
+ *
+ * Pure: reads its arguments, mutates nothing and consumes no RNG.
+ *
+ * The validator guarantees a total table (every outcome named or an `on: "*"`
+ * catch-all) with an unconditional tail, but the chain-skip clause can still
+ * leave a close with no door when the only remaining candidates are chain
+ * routes — a content defect the validator cannot see from the table alone. It
+ * is reported loudly rather than silently defaulted.
+ *
+ * @param request The scene, its classified outcome and the gate context.
+ * @returns The winning route, in declaration order.
+ * @throws Error when no route matches (a route table that leaves a close with
+ *         no door).
+ */
+export function selectRoute(request: RouteSelectionRequest): SceneRoute {
+  const { scene, outcome, context } = request;
+
+  for (const route of scene.routes) {
+    if (route.on !== '*' && route.on !== outcome) continue;
+    if (route.when !== undefined && !evaluateSceneCondition(route.when, context)) continue;
+    if (isChainRoute(route) && context.pendingChain === null) continue;
+    return route;
+  }
+
+  throw new Error(
+    `Episode runner: scene "${scene.id}" has no route for outcome "${outcome}" ` +
+      `(pendingChain=${context.pendingChain === null ? 'null' : `"${context.pendingChain}"`}). ` +
+      'The route table must give every close a door; a chain route cannot open without a ' +
+      'pending chain. Fix the content (validateEpisodeManifest reports non-total-routes for a ' +
+      'table that names no outcome and has no on: "*" catch-all).',
+  );
+}
+
+/** The resolution an `ending` target produces (shared by chain and ending routes). */
+function endingResolution(endingCardId: string): RouteTargetResolution {
+  return Object.freeze({
+    kind: 'ending' as const,
+    actId: null,
+    sceneId: null,
+    beatId: endingCardId,
+    endingCardId,
+  });
+}
+
+/**
+ * Resolves a route target into the run's next action (GDD §2.3 step 10).
+ *
+ * - `chain` → the pending chain card: a beat of another scene (its scene and
+ *   act are read from the manifest's assigned-card index) or an ending card
+ *   (``manifest.endings``);
+ * - `beat` → `target.beat`, or the target scene's `entryBeat` when the target
+ *   names no beat;
+ * - `ending` → the named ending card, which closes the run.
+ *
+ * Pure: reads the manifest and its arguments, mutates nothing and consumes no
+ * RNG. The referenced scene / beat / ending is validated by
+ * `validateEpisodeManifest` (`unknown-scene`, `unknown-card`, `dangling-chain`),
+ * so an unresolvable target is reported loudly here rather than silently
+ * skipped.
+ *
+ * @param manifest     The validated manifest the target resolves in.
+ * @param target       The winning route's authored `to`.
+ * @param pendingChain The card a resolved choice pushed, or `null`.
+ * @returns The frozen {@link RouteTargetResolution}.
+ * @throws Error when a `chain` target has no pending chain, or when a beat /
+ *         ending / chain target names something the manifest does not declare.
+ */
+export function resolveRouteTarget(
+  manifest: EpisodeManifest,
+  target: RouteTarget,
+  pendingChain: string | null,
+): RouteTargetResolution {
+  if (target.kind === 'ending') {
+    if (!manifest.endings.includes(target.cardId)) {
+      throw new Error(
+        `Episode runner: route target names ending "${target.cardId}", which episode ` +
+          `"${manifest.id}" does not declare. Fix the route (validateEpisodeManifest reports ` +
+          'unknown-card).',
+      );
+    }
+    return endingResolution(target.cardId);
+  }
+
+  const sceneIndex = buildSceneIndex(manifest);
+
+  if (target.kind === 'chain') {
+    if (pendingChain === null) {
+      throw new Error(
+        `Episode runner: a chain route has no pending chain to open in episode ` +
+          `"${manifest.id}". Route selection skips a chain route while pendingChain is null.`,
+      );
+    }
+    if (manifest.endings.includes(pendingChain)) {
+      return endingResolution(pendingChain);
+    }
+
+    const entry = sceneIndex.get(findAssignedSceneId(manifest, pendingChain) ?? '');
+    if (entry === undefined) {
+      throw new Error(
+        `Episode runner: the pending chain "${pendingChain}" is neither a declared ending nor a ` +
+          `beat of any scene in episode "${manifest.id}". Fix the content ` +
+          '(validateEpisodeManifest reports dangling-chain).',
+      );
+    }
+    return Object.freeze({
+      kind: 'beat' as const,
+      actId: entry.actId,
+      sceneId: entry.scene.id,
+      beatId: pendingChain,
+      endingCardId: null,
+    });
+  }
+
+  const entry = sceneIndex.get(target.scene);
+  if (entry === undefined) {
+    throw new Error(
+      `Episode runner: route target names scene "${target.scene}", which no act of episode ` +
+        `"${manifest.id}" declares. Fix the route (validateEpisodeManifest reports unknown-scene).`,
+    );
+  }
+
+  const beatId = target.beat ?? entry.scene.entryBeat;
+  if (!entry.scene.beats.some((beat) => beat.cardId === beatId)) {
+    throw new Error(
+      `Episode runner: route target opens beat "${beatId}", which is not a beat of scene ` +
+        `"${entry.scene.id}" in episode "${manifest.id}". Fix the route ` +
+        '(validateEpisodeManifest reports unknown-card).',
+    );
+  }
+
+  return Object.freeze({
+    kind: 'beat' as const,
+    actId: entry.actId,
+    sceneId: entry.scene.id,
+    beatId,
+    endingCardId: null,
+  });
+}
+
+/** Finds the scene a beat card belongs to, or `undefined` when it is unassigned. */
+function findAssignedSceneId(manifest: EpisodeManifest, cardId: string): string | undefined {
+  for (const act of manifest.acts) {
+    for (const scene of act.scenes) {
+      if (scene.beats.some((beat) => beat.cardId === cardId)) return scene.id;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Formats a `scene-exit` activity-log line.
+ *
+ * The record is the single source, so the line is derived from it and never
+ * from the scene data it was built out of: the scene id, the outcome and its
+ * winning rule, the clock spent against the scene's budget, and the
+ * exhaustion flag.
+ *
+ * @param record The frozen record the route just appended.
+ */
+function formatSceneExitLine(record: SceneExitRecord): string {
+  const budget = record.clockSpent + record.clockRemaining;
+  return (
+    `Scene exit — ${record.sceneId}: ${record.outcome} (${record.ruleId}), ` +
+    `${record.clockSpent} of ${budget} ticks spent, ${record.clockRemaining} left, ` +
+    `budget ${record.budgetExhausted ? 'exhausted' : 'intact'}.`
+  );
+}
+
+/**
+ * Formats the route activity-log line for one resolved target.
+ *
+ * @param route  The winning route.
+ * @param target Its resolved target.
+ */
+function formatRouteLine(route: SceneRoute, target: RouteTargetResolution): string {
+  const door =
+    target.kind === 'beat' ? `${target.sceneId}:${target.beatId}` : `ending ${target.beatId}`;
+  return `Route — ${route.id} → ${door}.`;
 }
 
 /** The §2.3 step B.5 classification, before the run state is touched. */
@@ -340,6 +576,7 @@ export function createEpisodeRunner<
   }
 
   const assignedCards = buildAssignedCardIndex(manifest);
+  const sceneIndex = buildSceneIndex(manifest);
 
   const runState: MutableEpisodeRunState = {
     seed,
@@ -349,10 +586,29 @@ export function createEpisodeRunner<
     sceneClockRemaining: entryScene.budget.clock,
     budgetExhausted: false,
     pendingChain: null,
+    endingCardId: null,
     sceneHistory: [],
     routeHistory: [],
     lossLedger: [],
     sceneExits: [],
+  };
+
+  /**
+   * Refuses a run action once the run has closed on an ending.
+   *
+   * An ending closes the run (GDD §2.3 step 10): no beat can be entered, no
+   * choice resolved and no scene closed until {@link resetRun} begins again.
+   *
+   * @param action The run action being attempted, named in the error.
+   * @throws Error when the run has already reached an ending.
+   */
+  const assertRunActive = (action: string): void => {
+    if (runState.endingCardId === null) return;
+    throw new Error(
+      `Episode runner: cannot ${action} after the run reached ending ` +
+        `"${runState.endingCardId}". Call resetRun() to begin the survey again from ` +
+        `"${manifest.start.scene}".`,
+    );
   };
 
   /** The manifest's never-restored resource keys, in declaration order. */
@@ -455,6 +711,7 @@ export function createEpisodeRunner<
    * options resolve, so a content defect cannot leave a half-charged entry.
    */
   const enterBeat = (cardId: string, gameState: TState): BeatEntry<TState> => {
+    assertRunActive(`enter beat "${cardId}"`);
     const scene = findScene(manifest, runState.currentSceneId);
     if (scene === undefined) {
       throw new Error(
@@ -530,6 +787,7 @@ export function createEpisodeRunner<
     option: StorylineOption<TState>,
     state: TState,
   ): ChoiceResolution<TCard> => {
+    assertRunActive('resolve a choice');
     const card = content.get(runState.currentBeatId);
     if (card === undefined) {
       throw new Error(
@@ -595,6 +853,7 @@ export function createEpisodeRunner<
    * applied a fall — one activity-log line.
    */
   const closeScene = (state: TState): SceneCloseResult => {
+    assertRunActive('close a scene');
     const scene = findScene(manifest, runState.currentSceneId);
     if (scene === undefined) {
       throw new Error(
@@ -637,6 +896,178 @@ export function createEpisodeRunner<
     });
   };
 
+  /**
+   * Appends the scene-exit record and its two derived activity-log lines
+   * (GDD §2.3 step 11).
+   *
+   * The record is frozen and appended **once** per close, in close order; the
+   * log lines are derived from it and from the route, never from the scene data
+   * they were built out of.
+   */
+  const emitSceneExit = (
+    record: SceneExitRecord,
+    route: SceneRoute,
+    target: RouteTargetResolution,
+    state: TState,
+  ): SceneExitRecord => {
+    const frozen = Object.freeze(record);
+    runState.sceneExits.push(frozen);
+    storyline.engine.appendLog(state, formatSceneExitLine(frozen), 'scene-exit');
+    storyline.engine.appendLog(state, formatRouteLine(route, target), 'route');
+    return frozen;
+  };
+
+  /**
+   * Enters a scene at one of its beats (GDD §2.3 step 12).
+   *
+   * The clock is reset to the target scene's own `budget.clock`, the scene id
+   * is pushed onto `sceneHistory`, `pendingChain` and `budgetExhausted` are
+   * cleared and every resource — irreversible keys included — is left exactly
+   * as the game state holds it.
+   */
+  const enterScene = (sceneId: string, beatId: string): void => {
+    const entry = sceneIndex.get(sceneId);
+    if (entry === undefined) {
+      throw new Error(
+        `Episode runner: cannot enter scene "${sceneId}", which no act of episode ` +
+          `"${manifest.id}" declares. Fix the route (validateEpisodeManifest reports ` +
+          'unknown-scene).',
+      );
+    }
+
+    runState.currentActId = entry.actId;
+    runState.currentSceneId = entry.scene.id;
+    runState.currentBeatId = beatId;
+    runState.sceneClockRemaining = entry.scene.budget.clock;
+    runState.budgetExhausted = false;
+    runState.pendingChain = null;
+    runState.sceneHistory.push(entry.scene.id);
+  };
+
+  /**
+   * Routes the scene close into the next scene or ending (GDD §2.3 steps
+   * C.9–C.12): select, resolve, emit one nine-field record, then enter.
+   *
+   * Every validation (the close's scene, the selected route, the resolved
+   * target, the ending card's presence in the run's card map) runs before any
+   * mutation, so a route that cannot be taken leaves the run, the record list
+   * and the activity log untouched.
+   */
+  const routeScene = (close: RoutingCloseInput, state: TState): SceneRouteResult<TCard> => {
+    assertRunActive('route a scene close');
+
+    if (close.sceneId !== runState.currentSceneId) {
+      throw new Error(
+        `Episode runner: cannot route the close of scene "${close.sceneId}" while the run is in ` +
+          `"${runState.currentSceneId}". Route the scene you just closed, in close order.`,
+      );
+    }
+
+    const scene = sceneIndex.get(runState.currentSceneId)?.scene;
+    if (scene === undefined) {
+      throw new Error(
+        `Episode runner: current scene "${runState.currentSceneId}" is not declared by the ` +
+          `manifest "${manifest.id}". Fix the run state before routing the scene close.`,
+      );
+    }
+
+    // C.9 — first matching route in declaration order. The gate reads the
+    // post-loss resources (steps 6–8 ran before step 9), while the objective
+    // and the outcome read the pre-loss snapshot the close took.
+    const context: RouteSelectionContext = {
+      objectiveMet: close.objectiveMet,
+      budgetExhausted: close.budgetExhausted,
+      resources: storyline.engine.getResources(state),
+      pendingChain: runState.pendingChain,
+    };
+    const route = selectRoute({ scene, outcome: close.outcome, context });
+
+    // C.10 — resolve the target before anything is recorded or entered.
+    const target = resolveRouteTarget(manifest, route.to, runState.pendingChain);
+    const endingCard = target.kind === 'ending' ? content.get(target.beatId) : undefined;
+    if (target.kind === 'ending' && endingCard === undefined) {
+      throw new Error(
+        `Episode runner: route "${route.id}" opens ending "${target.beatId}", which has no card ` +
+          `in the run's card map. Load the manifest's content file before routing the close.`,
+      );
+    }
+
+    // C.11 — exactly one nine-field record, appended in close order.
+    const exit = emitSceneExit(
+      {
+        sceneId: scene.id,
+        objectiveMet: close.objectiveMet,
+        outcome: close.outcome,
+        ruleId: close.ruleId,
+        routeId: route.id,
+        clockSpent: scene.budget.clock - runState.sceneClockRemaining,
+        clockRemaining: runState.sceneClockRemaining,
+        budgetExhausted: close.budgetExhausted,
+        nextBeat: target.beatId,
+      },
+      route,
+      target,
+      state,
+    );
+    runState.routeHistory.push(route.id);
+
+    if (target.kind === 'ending') {
+      // The ending presents its card and closes the run; position stays where
+      // the closed scene left it until resetRun() begins again.
+      runState.pendingChain = null;
+      runState.endingCardId = target.beatId;
+      return Object.freeze({
+        exit,
+        route,
+        target,
+        nextBeat: target.beatId,
+        runClosed: true,
+        endingCard: endingCard as TCard,
+      });
+    }
+
+    // C.12 — enter the target scene with a fresh clock and no pending chain.
+    enterScene(target.sceneId as string, target.beatId);
+
+    return Object.freeze({
+      exit,
+      route,
+      target,
+      nextBeat: target.beatId,
+      runClosed: false,
+      endingCard: null,
+    });
+  };
+
+  /**
+   * Returns a closed run to the manifest's start (the post-ending restart).
+   *
+   * The construction seed is kept — it is the run's one RNG stream — while
+   * position, clock, pending chain, histories, ledger and the scene-exit list
+   * return to their constructed values. Resources are the game's state and stay
+   * untouched.
+   */
+  const resetRun = (): void => {
+    if (runState.endingCardId === null) {
+      throw new Error(
+        'Episode runner: cannot reset a run that has not reached an ending. ' +
+          'A restart is the post-ending action of GDD §2.3 step 10.',
+      );
+    }
+
+    runState.currentActId = start.act;
+    runState.currentSceneId = entryScene.id;
+    runState.currentBeatId = start.beat;
+    runState.sceneClockRemaining = entryScene.budget.clock;
+    runState.budgetExhausted = false;
+    runState.pendingChain = null;
+    runState.endingCardId = null;
+    runState.sceneHistory.length = 0;
+    runState.routeHistory.length = 0;
+    runState.lossLedger.length = 0;
+    runState.sceneExits.length = 0;
+  };
+
   return {
     manifest,
     storyline,
@@ -649,7 +1080,10 @@ export function createEpisodeRunner<
     enterBeat,
     resolveChoice,
     closeScene,
+    routeScene,
     applyLossRule,
     getBudgetExhausted: () => runState.budgetExhausted,
+    getEndingCardId: () => runState.endingCardId,
+    resetRun,
   };
 }
