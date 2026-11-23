@@ -23,6 +23,7 @@
  * @module
  */
 
+import type { VersionedPayload } from '../core-engine/SaveLoad';
 import type {
   EpisodeManifest,
   LossRule,
@@ -521,8 +522,24 @@ export interface EpisodeRunnerConfig<
    * in. Built from the manifest's `content.file` (never re-derived here).
    */
   readonly content: ReadonlyMap<string, TCard>;
-  /** The run's single seed (recorded on `run-start` and in the save). */
-  readonly seed: number;
+  /**
+   * The run's single seed (recorded on `run-start` and in the save).
+   *
+   * Required unless {@link EpisodeRunnerConfig.restored} supplies one: a
+   * restored run adopts the saved seed (the RNG stream is part of the saved
+   * state), so an explicit seed is ignored in that case.
+   */
+  readonly seed?: number;
+  /**
+   * A versioned run-state payload to resume from (GDD §3.5.2).
+   *
+   * When supplied, the runner is positioned at the saved act / scene / beat,
+   * adopts the saved scene clock, pending chain, histories, loss ledger and
+   * seed, instead of the manifest's `start`. The payload is read through
+   * `deserializeWithVersion`, so a schema-version mismatch is a refusal
+   * (never a best-effort load) and no partial state is restored.
+   */
+  readonly restored?: VersionedPayload<SerializedEpisodeRunState>;
 }
 
 /**
@@ -599,6 +616,37 @@ export interface EpisodeRunState {
   /** Scene ids entered, in entry order (empty until the first scene close). */
   readonly sceneHistory: readonly string[];
   /** Route ids taken, in close order (empty until the first scene close). */
+  readonly routeHistory: readonly string[];
+  /** Observed and applied irreversible losses, in observation order. */
+  readonly lossLedger: readonly LossLedgerEntry[];
+}
+
+/**
+ * The persisted run state: exactly the nine beat-sheet fields of GDD §3.5.2.
+ *
+ * This is the JSON-safe wire shape `serializeWithVersion` writes and
+ * `deserializeWithVersion` reads. It is deliberately narrower than
+ * {@link EpisodeRunState}'s neighbourhood: resources and the journal are the
+ * game's own state, the scene-exit records are transcript material, and the
+ * close-path `budgetExhausted` flag and the terminal ending marker are
+ * per-session bookkeeping — none of them is part of a level checkpoint.
+ */
+export interface SerializedEpisodeRunState {
+  /** The run's single seed (adopted on restore). */
+  readonly seed: number;
+  /** The act the run was in when the state was saved. */
+  readonly currentActId: string;
+  /** The scene the run was in when the state was saved. */
+  readonly currentSceneId: string;
+  /** The beat the run was on when the state was saved. */
+  readonly currentBeatId: string;
+  /** Clock ticks left in the current scene at the save point. */
+  readonly sceneClockRemaining: number;
+  /** The pending chain card whose close has not run yet, or `null`. */
+  readonly pendingChain: string | null;
+  /** Scene ids entered, in entry order. */
+  readonly sceneHistory: readonly string[];
+  /** Route ids taken, in close order. */
   readonly routeHistory: readonly string[];
   /** Observed and applied irreversible losses, in observation order. */
   readonly lossLedger: readonly LossLedgerEntry[];
@@ -972,6 +1020,28 @@ export interface EpisodeRunner<
    * changes the runner, and two calls never share an array instance.
    */
   getState(): EpisodeRunState;
+  /**
+   * Serialises the run through `serializeWithVersion` (GDD §3.5.2).
+   *
+   * The payload carries the schema version and exactly the nine persisted
+   * fields; resources, the journal and the scene-exit records are not part of
+   * a checkpoint. Serialising consumes no RNG and applies no resource delta.
+   */
+  serialize(): VersionedPayload<SerializedEpisodeRunState>;
+  /**
+   * Resumes the run from a versioned payload (GDD §3.5.2).
+   *
+   * The payload is read through `deserializeWithVersion` **before** anything is
+   * mutated, so a schema-version mismatch (or a payload naming a scene the
+   * manifest does not declare) throws and leaves the run exactly as it was.
+   * On success the run adopts the saved position, clock, pending chain,
+   * histories, ledger and seed; the scene-exit list is cleared (it is not
+   * persisted) and the run is active again, even if it had reached an ending.
+   *
+   * Restoring consumes no RNG and applies no resource delta: a reload is never
+   * a refund.
+   */
+  restore(payload: VersionedPayload<SerializedEpisodeRunState>): void;
   /**
    * The `scene-exit` records appended so far, in close order (frozen copy).
    */

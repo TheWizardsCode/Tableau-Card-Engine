@@ -31,7 +31,13 @@
  * - the loss ledger (GDD §2.2.8): one `chain` line per irreversible key that
  *   fell across a resolution (observed by diffing `engine.getResources`, never
  *   computed), and one `rule` line per authored `LossRule` the scene close
- *   applies through the engine seam. The ledger never holds a positive line.
+ *   applies through the engine seam. The ledger never holds a positive line;
+ * - versioned run state (GDD §3.5.2): {@link EpisodeRunStateSerializer} carries
+ *   the nine persisted fields at `schemaVersion: 1` through the core
+ *   `serializeWithVersion` / `deserializeWithVersion` helpers. A version
+ *   mismatch is a refusal (there is no v1 `migrate` hook), and restoring a
+ *   payload consumes no RNG and applies no resource delta — a reload is not a
+ *   refund.
  *
  * The single-choice model (compilation, resolution, resource projection and
  * RNG), the game's state and the activity log all stay with the supplied
@@ -41,6 +47,12 @@
  * @module
  */
 
+import {
+  deserializeWithVersion,
+  serializeWithVersion,
+  type SaveSerializer,
+  type VersionedPayload,
+} from '../core-engine/SaveLoad';
 import { isOptionAffordable } from './compile';
 import type {
   EpisodeManifest,
@@ -72,6 +84,7 @@ import type {
   SceneExitRecord,
   SceneOutcomeClassification,
   SceneRouteResult,
+  SerializedEpisodeRunState,
   StorylineCard,
   StorylineOption,
 } from './types';
@@ -84,7 +97,7 @@ import type {
  * what keeps every later §2.3 feature a change here plus a public method.
  */
 interface MutableEpisodeRunState {
-  readonly seed: number;
+  seed: number;
   currentActId: string;
   currentSceneId: string;
   currentBeatId: string;
@@ -169,6 +182,171 @@ export function classifySceneOutcome(
       'must be unconditional (validateEpisodeManifest reports non-total-outcome-rules); fix the content.',
   );
 }
+
+/**
+ * The persisted run state's schema version (GDD §3.5.2).
+ *
+ * Bumped when the wire shape changes. Version 1 has **no** `migrate` hook, so
+ * `deserializeWithVersion` refuses any other version instead of loading it
+ * best-effort — an older or newer payload is a refusal, not a guess.
+ */
+export const EPISODE_RUN_STATE_SCHEMA_VERSION = 1;
+
+/**
+ * Guards one persisted field's shape before it is trusted.
+ *
+ * @param condition  Whether the field is usable.
+ * @param field      The payload field being read, named in the error.
+ * @param expectation What the field must be, named in the error.
+ * @throws Error when the field is not the shape the schema version promises.
+ */
+function assertSerializedField(condition: boolean, field: string, expectation: string): void {
+  if (condition) return;
+  throw new Error(
+    `Episode runner: cannot deserialize run state \u2014 field "${field}" ${expectation}. ` +
+      'Write the payload with EpisodeRunStateSerializer at the current schema version.',
+  );
+}
+
+/**
+ * Serialises a run state into the nine persisted fields (GDD §3.5.2).
+ *
+ * Pure: reads its argument, copies every array and ledger line, and returns a
+ * JSON-safe payload. The shape is the wire format, not a second source of
+ * truth — it has exactly the fields {@link EpisodeRunState} persists, so a
+ * field added to the snapshot must be added here deliberately.
+ *
+ * @param state The frozen run state to serialise.
+ * @returns The nine-field persisted payload.
+ */
+export function serializeRunState(state: EpisodeRunState): SerializedEpisodeRunState {
+  return {
+    seed: state.seed,
+    currentActId: state.currentActId,
+    currentSceneId: state.currentSceneId,
+    currentBeatId: state.currentBeatId,
+    sceneClockRemaining: state.sceneClockRemaining,
+    pendingChain: state.pendingChain,
+    sceneHistory: [...state.sceneHistory],
+    routeHistory: [...state.routeHistory],
+    lossLedger: state.lossLedger.map((entry) => ({ ...entry })),
+  };
+}
+
+/**
+ * Reads one persisted payload into a frozen run state, without a manifest.
+ *
+ * This is `EpisodeRunStateSerializer.deserialize`: it checks the nine fields'
+ * shapes, copies the arrays and ledger lines, and freezes the result. It
+ * cannot check that the position exists in an episode — that is
+ * {@link hydrateRunState}'s job, which has the manifest.
+ *
+ * Pure: reads its argument, mutates nothing and consumes no RNG.
+ *
+ * @param payload The persisted payload (normally from `serializeWithVersion`).
+ * @returns The frozen run state the payload describes.
+ * @throws Error when a field is missing or the wrong shape.
+ */
+export function deserializeRunState(payload: SerializedEpisodeRunState): EpisodeRunState {
+  assertSerializedField(typeof payload === 'object' && payload !== null, 'payload', 'must be an object');
+  assertSerializedField(Number.isFinite(payload.seed), 'seed', 'must be a finite number');
+  assertSerializedField(typeof payload.currentActId === 'string', 'currentActId', 'must be a string');
+  assertSerializedField(
+    typeof payload.currentSceneId === 'string',
+    'currentSceneId',
+    'must be a string',
+  );
+  assertSerializedField(
+    typeof payload.currentBeatId === 'string',
+    'currentBeatId',
+    'must be a string',
+  );
+  assertSerializedField(
+    Number.isInteger(payload.sceneClockRemaining) && payload.sceneClockRemaining >= 0,
+    'sceneClockRemaining',
+    'must be an integer \u2265 0',
+  );
+  assertSerializedField(
+    payload.pendingChain === null || typeof payload.pendingChain === 'string',
+    'pendingChain',
+    'must be a string or null',
+  );
+  assertSerializedField(Array.isArray(payload.sceneHistory), 'sceneHistory', 'must be an array');
+  assertSerializedField(Array.isArray(payload.routeHistory), 'routeHistory', 'must be an array');
+  assertSerializedField(Array.isArray(payload.lossLedger), 'lossLedger', 'must be an array');
+
+  return Object.freeze({
+    seed: payload.seed,
+    currentActId: payload.currentActId,
+    currentSceneId: payload.currentSceneId,
+    currentBeatId: payload.currentBeatId,
+    sceneClockRemaining: payload.sceneClockRemaining,
+    pendingChain: payload.pendingChain,
+    sceneHistory: Object.freeze([...payload.sceneHistory]),
+    routeHistory: Object.freeze([...payload.routeHistory]),
+    lossLedger: Object.freeze(payload.lossLedger.map((entry) => Object.freeze({ ...entry }))),
+  });
+}
+
+/**
+ * Hydrates a persisted payload against the manifest it will resume in.
+ *
+ * The payload is read structurally first ({@link deserializeRunState}), then
+ * checked against the manifest: the saved scene must be declared by one of its
+ * acts and the saved act must be that scene's act. A checkpoint that names no
+ * declared scene is refused, so a runner never resumes into a position the
+ * episode cannot describe.
+ *
+ * Pure: reads its arguments, mutates nothing and consumes no RNG.
+ *
+ * @param payload  The persisted payload (normally from `serializeWithVersion`).
+ * @param manifest The validated manifest the run resumes in.
+ * @returns The frozen run state to resume from.
+ * @throws Error when the payload's position is not part of the manifest.
+ */
+export function hydrateRunState(
+  payload: SerializedEpisodeRunState,
+  manifest: EpisodeManifest,
+): EpisodeRunState {
+  const state = deserializeRunState(payload);
+  const act = manifest.acts.find((candidate) =>
+    candidate.scenes.some((scene) => scene.id === state.currentSceneId),
+  );
+  if (act === undefined) {
+    throw new Error(
+      `Episode runner: cannot restore run state at scene "${state.currentSceneId}", which no ` +
+        `act of episode "${manifest.id}" declares. Save the run against the manifest it belongs to.`,
+    );
+  }
+  if (act.id !== state.currentActId) {
+    throw new Error(
+      `Episode runner: cannot restore run state that says act "${state.currentActId}" for scene ` +
+        `"${state.currentSceneId}", which episode "${manifest.id}" declares under act ` +
+        `"${act.id}". The payload is inconsistent with the manifest.`,
+    );
+  }
+  return state;
+}
+
+/**
+ * The runner's {@link SaveSerializer} (GDD §3.5.2) for the core save/load
+ * helpers.
+ *
+ * `serializeWithVersion(EpisodeRunStateSerializer, runner.getState())` writes
+ * the versioned payload and `deserializeWithVersion` reads it; the runner's
+ * own `serialize()` / `restore()` wrap both. There is deliberately **no**
+ * `migrate` hook at version 1: a version mismatch throws the core
+ * `Incompatible save version: expected 1, got N` error rather than loading
+ * best-effort.
+ */
+export const EpisodeRunStateSerializer: SaveSerializer<
+  EpisodeRunState,
+  SerializedEpisodeRunState
+> = Object.freeze({
+  schemaVersion: EPISODE_RUN_STATE_SCHEMA_VERSION,
+  serialize: serializeRunState,
+  deserialize: deserializeRunState,
+});
 
 /**
  * Formats a rule loss for the activity log: the authored statement plus the
@@ -555,16 +733,23 @@ function snapshotIrreversible(
  * `sceneHistory` / `routeHistory` / `lossLedger`, `pendingChain: null`, and
  * the supplied `seed`. It consumes no RNG and applies no resource delta.
  *
+ * A `restored` payload replaces that constructed position with the saved one
+ * (GDD §3.5.2): the payload is hydrated **before** any state exists, so a
+ * version mismatch or an undeclared scene throws without constructing a
+ * partially-restored run.
+ *
  * @param config The validated manifest, the one storyline system, the content
- *               card map and the run's seed.
+ *               card map, the run's seed and an optional restored payload.
  * @returns A runner whose `getState()` reads the constructed run state.
- * @throws Error when the manifest's `start.scene` names no scene in any act.
+ * @throws Error when the manifest's `start.scene` names no scene in any act,
+ *         when a `restored` payload's version or scene is refused, or when
+ *         neither a seed nor a restored payload supplies the run's seed.
  */
 export function createEpisodeRunner<
   TState = unknown,
   TCard extends StorylineCard = StorylineCard,
 >(config: EpisodeRunnerConfig<TState, TCard>): EpisodeRunner<TState, TCard> {
-  const { manifest, storyline, content, seed } = config;
+  const { manifest, storyline, content } = config;
   const start = manifest.start;
   const entryScene = findScene(manifest, start.scene);
 
@@ -575,21 +760,40 @@ export function createEpisodeRunner<
     );
   }
 
+  // Hydrate first: a refused payload throws before any run state is built, so
+  // construction can never land a partially-restored run.
+  const restoredState =
+    config.restored === undefined
+      ? null
+      : hydrateRunState(
+          deserializeWithVersion(EpisodeRunStateSerializer, config.restored),
+          manifest,
+        );
+
+  const seed = restoredState === null ? config.seed : restoredState.seed;
+  if (seed === undefined) {
+    throw new Error(
+      `Episode runner: manifest "${manifest.id}" has no seed. Pass ` +
+        'createEpisodeRunner({ …, seed }) for a new run, or a `restored` payload to resume one.',
+    );
+  }
+
   const assignedCards = buildAssignedCardIndex(manifest);
   const sceneIndex = buildSceneIndex(manifest);
 
   const runState: MutableEpisodeRunState = {
     seed,
-    currentActId: start.act,
-    currentSceneId: entryScene.id,
-    currentBeatId: start.beat,
-    sceneClockRemaining: entryScene.budget.clock,
+    currentActId: restoredState?.currentActId ?? start.act,
+    currentSceneId: restoredState?.currentSceneId ?? entryScene.id,
+    currentBeatId: restoredState?.currentBeatId ?? start.beat,
+    sceneClockRemaining: restoredState?.sceneClockRemaining ?? entryScene.budget.clock,
     budgetExhausted: false,
-    pendingChain: null,
+    pendingChain: restoredState?.pendingChain ?? null,
     endingCardId: null,
-    sceneHistory: [],
-    routeHistory: [],
-    lossLedger: [],
+    sceneHistory: restoredState === null ? [] : [...restoredState.sceneHistory],
+    routeHistory: restoredState === null ? [] : [...restoredState.routeHistory],
+    lossLedger:
+      restoredState === null ? [] : restoredState.lossLedger.map((entry) => ({ ...entry })),
     sceneExits: [],
   };
 
@@ -701,6 +905,48 @@ export function createEpisodeRunner<
         runState.lossLedger.map((entry) => Object.freeze({ ...entry })),
       ),
     });
+
+  /**
+   * Writes the run through the core versioned-save helper (GDD §3.5.2).
+   *
+   * The payload carries the schema version and exactly the nine persisted
+   * fields. Serialising is a read: no RNG draw, no resource delta.
+   */
+  const serialize = (): VersionedPayload<SerializedEpisodeRunState> =>
+    serializeWithVersion(EpisodeRunStateSerializer, snapshot());
+
+  /**
+   * Replaces the run with the payload's state (GDD §3.5.2).
+   *
+   * Everything is hydrated **before** the first mutation, so a version
+   * mismatch or an undeclared scene refuses the restore and leaves the run
+   * exactly as it was. A successful restore adopts the saved position, clock,
+   * pending chain, histories, ledger and seed; the scene-exit list is cleared
+   * because it is not persisted, and the run becomes active again even if it
+   * had reached an ending (loading a checkpoint is not the reset action).
+   */
+  const restore = (payload: VersionedPayload<SerializedEpisodeRunState>): void => {
+    const hydrated = hydrateRunState(
+      deserializeWithVersion(EpisodeRunStateSerializer, payload),
+      manifest,
+    );
+
+    runState.seed = hydrated.seed;
+    runState.currentActId = hydrated.currentActId;
+    runState.currentSceneId = hydrated.currentSceneId;
+    runState.currentBeatId = hydrated.currentBeatId;
+    runState.sceneClockRemaining = hydrated.sceneClockRemaining;
+    runState.budgetExhausted = false;
+    runState.pendingChain = hydrated.pendingChain;
+    runState.endingCardId = null;
+    runState.sceneHistory.length = 0;
+    runState.sceneHistory.push(...hydrated.sceneHistory);
+    runState.routeHistory.length = 0;
+    runState.routeHistory.push(...hydrated.routeHistory);
+    runState.lossLedger.length = 0;
+    runState.lossLedger.push(...hydrated.lossLedger.map((entry) => ({ ...entry })));
+    runState.sceneExits.length = 0;
+  };
 
   /**
    * Enters a beat of the current scene (GDD §2.3 steps A.1–A.3).
@@ -1073,6 +1319,8 @@ export function createEpisodeRunner<
     storyline,
     content,
     getState: snapshot,
+    serialize,
+    restore,
     getSceneExits: () =>
       Object.freeze(runState.sceneExits.map((record) => Object.freeze({ ...record }))),
     getLossLedger: () =>

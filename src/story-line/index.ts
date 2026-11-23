@@ -146,9 +146,14 @@ export type { StorylineOptionRegistry } from './compile';
 export {
   classifySceneOutcome,
   createEpisodeRunner,
+  deserializeRunState,
+  EPISODE_RUN_STATE_SCHEMA_VERSION,
+  EpisodeRunStateSerializer,
   evaluateSceneCondition,
+  hydrateRunState,
   resolveRouteTarget,
   selectRoute,
+  serializeRunState,
 } from './episode-runner';
 export { LOSS_LEDGER_KINDS, SCENE_EXIT_FIELDS } from './types';
 export type {
@@ -175,6 +180,7 @@ export type {
   SceneExitRecord,
   SceneOutcomeClassification,
   SceneRouteResult,
+  SerializedEpisodeRunState,
 } from './types';
 
 /** Configuration for {@link createStorylineSystem}. */

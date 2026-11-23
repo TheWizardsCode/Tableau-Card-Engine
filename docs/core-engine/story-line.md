@@ -1284,10 +1284,16 @@ walks the graph and fails on any `phaser` specifier).
 
 | Exported name | Kind | Meaning |
 |---|---|---|
-| `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`. |
-| `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed }` — the validated manifest, the one choice model, the card map and the run's seed. |
-| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `getLossLedger()` / `enterBeat()` / `resolveChoice()` / `closeScene()` / `routeScene()` / `applyLossRule()` / `getBudgetExhausted()` / `getEndingCardId()` / `resetRun()`. |
+| `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`, or at a saved position when given `restored`. |
+| `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed?, restored? }` — the validated manifest, the one choice model, the card map, the run's seed and an optional versioned payload to resume. |
+| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `serialize()` / `restore()` / `getSceneExits()` / `getLossLedger()` / `enterBeat()` / `resolveChoice()` / `closeScene()` / `routeScene()` / `applyLossRule()` / `getBudgetExhausted()` / `getEndingCardId()` / `resetRun()`. |
 | `EpisodeRunState` | type | The read-only run state (see below). |
+| `SerializedEpisodeRunState` | type | The nine-field persisted payload (see "Persistence"). |
+| `EpisodeRunStateSerializer` | const | The `SaveSerializer` for the run state, at `schemaVersion: 1` with no `migrate` hook. |
+| `EPISODE_RUN_STATE_SCHEMA_VERSION` | const | The persisted run state's schema version (`1`). |
+| `serializeRunState` | function | Pure: run state → nine-field JSON-safe payload. |
+| `deserializeRunState` | function | Pure: payload → frozen run state; refuses a malformed field. |
+| `hydrateRunState` | function | Pure: payload + manifest → frozen run state; refuses a scene / act the manifest does not declare. |
 | `ChoiceResolution` | type | One resolved choice's classification: `next`, `case`, `cardId`, `pendingChain`, `pushedCard` and the unchanged `@story-line` `resolution`. |
 | `ChoiceNext` | type | Where a resolved choice sends the run: `'continue'` or `'close'`. |
 | `PushedCardCase` | type | The §2.3 step B.5 case: `'in-scene-beat'`, `'out-of-scene-beat'`, `'ending'` or `'none'`. |
@@ -1323,6 +1329,8 @@ const runner = createEpisodeRunner({
 });
 
 runner.getState();       // EpisodeRunState — frozen snapshot
+runner.serialize();      // { schemaVersion: 1, data: the nine persisted fields }
+runner.restore(payload); // resume from a save, refusing a version mismatch
 runner.getSceneExits();  // readonly SceneExitRecord[] — frozen snapshot
 runner.getLossLedger();  // readonly LossLedgerEntry[] — frozen snapshot
 runner.enterBeat('le-i-open', gameState); // BeatEntry — presented or refused
@@ -1572,7 +1580,8 @@ adapter:
 Every read returns a frozen defensively-copied snapshot, so mutating what
 `getState()` returns never changes the run, and two calls never share an
 array instance. The scene-exit records live on `getSceneExits()` and follow
-the same rule; they are append-only, in close order.
+the same rule; they are append-only, in close order. These nine fields are
+what [Persistence](#persistence) checkpoints.
 
 ### Scene-exit record
 
@@ -1663,6 +1672,76 @@ ending.
 The numbered §2.3 subsections (beat entry, choice resolution, scene close,
 routing, persistence) are documented here as they ship.
 
+### Persistence
+
+GDD §3.5.2. A run checkpoints through the core write/read pair —
+`serializeWithVersion` / `deserializeWithVersion` from
+[`src/core-engine/SaveLoad.ts`](../../src/core-engine/SaveLoad.ts) — with the
+runner's own `EpisodeRunStateSerializer` at `schemaVersion: 1`. Exactly **nine**
+fields are persisted:
+
+| Field | Meaning |
+|---|---|
+| `seed` | the run's single seed |
+| `currentActId` | the act the run was in |
+| `currentSceneId` | the scene the run was in |
+| `currentBeatId` | the beat the run was on |
+| `sceneClockRemaining` | clock ticks left in that scene |
+| `pendingChain` | a resolved choice's pushed card awaiting its close, or `null` |
+| `sceneHistory` | scene ids entered, in entry order |
+| `routeHistory` | route ids taken, in close order |
+| `lossLedger` | every `chain` / `rule` loss line, in observation order |
+
+Resources and the journal are **not** in a checkpoint: they are the game's own
+state, reached through the storyline engine adapter. Nor are the scene-exit
+records (transcript material), the close-path `budgetExhausted` flag or the
+terminal ending marker — a checkpoint is beat-sheet position, not a session
+recording.
+
+```ts
+import { serializeWithVersion, deserializeWithVersion } from '@core-engine';
+import { EpisodeRunStateSerializer } from '@story-line';
+
+const payload = runner.serialize(); // === serializeWithVersion(EpisodeRunStateSerializer, runner.getState())
+const restored = createEpisodeRunner({
+  manifest, storyline, content,
+  restored: payload,                // seed is adopted from the payload
+});
+
+payload.schemaVersion;              // 1
+EpisodeRunStateSerializer.migrate;  // undefined — v1 has no migration hook
+```
+
+**Round-trip.** `serializeRunState(state)` copies the nine fields into a
+JSON-safe payload, `deserializeRunState(payload)` validates each field's shape
+and freezes the result, and `hydrateRunState(payload, manifest)` additionally
+refuses a payload whose scene no act declares (or whose act and scene disagree).
+The payload survives `JSON.parse(JSON.stringify(…))` unchanged, so a save
+backend needs no special handling.
+
+**A version mismatch is a refusal.** `deserializeWithVersion` throws
+`Incompatible save version: expected 1, got N` whenever the payload's
+`schemaVersion` is not `1` — older and newer alike, because v1 ships no
+`migrate` hook. `runner.restore(payload)` hydrates the whole payload *before*
+its first mutation, so a refused restore (version mismatch, malformed field or
+undeclared scene) leaves the run exactly as it was: no partial state, no
+partial ledger, no moved clock. `createEpisodeRunner({ …, restored })` hydrates
+before it constructs any state, so a refused payload cannot construct a
+half-restored run either.
+
+**A restore resumes mid-scene.** The saved `sceneClockRemaining` is adopted as
+is — the entry scene's `budget.clock` is never reloaded — so the next
+`enterBeat` charges from the saved value. `pendingChain` is restored too, so a
+run saved between a choice and its close takes the same route the live run
+would. The scene-exit list is cleared (it is not persisted) and the run becomes
+active again even if it had reached an ending: loading a checkpoint is not the
+reset action.
+
+**A reload is not a refund.** Serialising and restoring consume no RNG and
+apply no resource delta, and a restored ledger deep-equals the saved one
+(`getLossLedger()` and `getState().lossLedger`), so restoring a checkpoint can
+never top a resource up or lose a recorded loss.
+
 ## Gym demo
 
 [`GymStorylineScene`](../../example-games/gym/scenes/GymStorylineScene.ts)
@@ -1715,6 +1794,11 @@ follows.
   delegation to `resolveStorylineOption` proved with a spy, and one test per
   `pushedCard` case (in-scene beat continues, out-of-scene beat and ending close
   with `pendingChain`, no push closes with `null`).
+- `tests/story-line/episode-runner-persistence.test.ts` — the nine persisted
+  fields, a JSON round-trip of a routed mid-scene run, a pending chain restored
+  and routed like the live run, a mid-scene clock that is not reloaded, ledger
+  fidelity for both line kinds, version-mismatch and undeclared-scene refusals
+  with no partial state, and the no-RNG / no-delta guarantees.
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
   deterministic serial naming, pending-choice lifecycle, and carrying the
